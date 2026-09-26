@@ -157,7 +157,7 @@ export async function boot() {
 
   // ---- camera
   const rig = engine.rig;
-  rig.focus.copy(player.pos); rig.snap();
+  rig.distTarget = 29; rig.focus.copy(player.pos); rig.snap();
 
   // ---- modes
   let dungeon = null;
@@ -182,7 +182,7 @@ export async function boot() {
       const s = dungeon.startPos;
       player.setPos(s.x, s.z); player.moveTarget = null; shadow.setPos(s.x + 0.8, s.z + 0.8);
       combat.add(shadow); shadow.recalc();
-      rig.focus.copy(player.pos); rig.snap();
+      rig.distTarget = 34; rig.focus.copy(player.pos); rig.snap();
       G.ui?.setMode?.('dungeon');
       G.ui?.setLocation?.(dungeon.theme.name, `B${floor}F`);
       G.ui?.minimap?.setProvider?.(new DungeonMinimap(G, dungeon));
@@ -209,7 +209,7 @@ export async function boot() {
       const home = dead ? { x: L.chewyHouse.x + 2.2, z: L.chewyHouse.z } : { x: L.dungeon.x, z: L.dungeon.z + 3.2 };
       player.setPos(home.x, home.z); shadow.setPos(home.x + 0.8, home.z + 0.6);
       player.anim.stop(); G.playerDead = false; G.actions.restoreAll(); shadow.fainted = 0; shadow.untargetable = false; shadow.anim.stop();
-      rig.focus.copy(player.pos); rig.snap();
+      rig.distTarget = 29; rig.focus.copy(player.pos); rig.snap();
       G.ui?.setMode?.('village'); G.ui?.setBoss?.(null);
       engine.post.grade.uniforms.get('uVigColor').value.set(0.55, 0.45, 0.65); engine.post.grade.uniforms.get('uVignette').value = 1.0; day.apply();
       G.ui?.minimap?.setProvider?.(vMap);
@@ -388,7 +388,7 @@ export async function boot() {
     const go = () => {
       G.titleActive = false; player.controlLocked = false;
       G.ui?.setMode?.('village');
-      rig.yawTarget = Math.PI / 4; rig.yaw = rig.yawTarget; rig.distTarget = 34;
+      rig.yawTarget = Math.PI / 4; rig.yaw = rig.yawTarget; rig.distTarget = 29;
       rig.focus.copy(player.pos); rig.snap();
       G.audio?.music?.(day.isNight() ? 'village_night' : 'village_day');
       if (isNew) setTimeout(() => intro(), 900);
