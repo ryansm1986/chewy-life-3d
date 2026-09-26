@@ -5,7 +5,7 @@ A cozy, hand-painted **3D isometric** village life-sim in the spirit of *Hello K
 his Boston terrier sidekick **Shadow**, and **Rosie**, a little girl with curly brown hair who runs the village treat shop.
 
 ## Play
-- Double-click **`Play Chewy Life.cmd`** (installs dependencies the first time, then opens the game in your browser), or
+- Double-click **`Play Chewy Life.cmd`** (installs dependencies the first time, builds the game in about a second, then opens it in your browser at http://localhost:4173), or
 - `npm install` then `npm run dev` and open http://localhost:5173
 
 Chrome / Edge recommended (WebGL2). Saves automatically to the browser's local storage.

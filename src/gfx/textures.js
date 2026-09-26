@@ -19,10 +19,18 @@ function memo(key, fn) { if (!cache.has(key)) cache.set(key, fn()); return cache
 export function brushTexture() {
   return memo('brush', () => {
     const S = 512, r = mulberry32(7);
+    // Blur once, seamlessly: tile the sharp layer 3x3 and blur the whole thing into the centre tile. (A canvas
+    // filter set while drawing thousands of dabs re-runs the blur per dab and cost ~3 s of boot.)
+    const blurWrap = (c, px) => {
+      const big = canvas(S * 3);
+      for (let ox = 0; ox < 3; ox++) for (let oy = 0; oy < 3; oy++) big.g.drawImage(c, ox * S, oy * S);
+      const out = canvas(S);
+      out.g.filter = `blur(${px}px)`; out.g.drawImage(big.c, -S, -S);
+      return out.g.getImageData(0, 0, S, S).data;
+    };
     const layer = (count, minR, maxR, elong, alpha, blur) => {
       const { c, g } = canvas(S);
       g.fillStyle = '#808080'; g.fillRect(0, 0, S, S);
-      g.filter = blur ? `blur(${blur}px)` : 'none';
       for (let i = 0; i < count; i++) {
         const x = r() * S, y = r() * S, rad = minR + r() * (maxR - minR), a = r() * TAU;
         const v = Math.floor(r() * 255);
@@ -33,13 +41,13 @@ export function brushTexture() {
           g.save(); g.translate(px, py); g.rotate(a); g.beginPath(); g.ellipse(0, 0, rad * elong, rad, 0, 0, TAU); g.fill(); g.restore();
         }
       }
-      return g.getImageData(0, 0, S, S).data;
+      return blur ? blurWrap(c, blur) : g.getImageData(0, 0, S, S).data;
     };
     const R = layer(4200, 3, 11, 2.2, 0.16, 0.6);
     const G = layer(260, 30, 90, 1.4, 0.13, 8);
     const B = (() => { // directional hatching
       const { c, g } = canvas(S);
-      g.fillStyle = '#808080'; g.fillRect(0, 0, S, S); g.filter = 'blur(0.8px)';
+      g.fillStyle = '#808080'; g.fillRect(0, 0, S, S);
       for (let i = 0; i < 2600; i++) {
         const x = r() * S, y = r() * S, len = 10 + r() * 26, v = Math.floor(r() * 255), a = -0.6 + r() * 0.25;
         g.strokeStyle = `rgba(${v},${v},${v},0.22)`; g.lineWidth = 2 + r() * 4; g.lineCap = 'round';
@@ -48,7 +56,7 @@ export function brushTexture() {
           g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(a) * len, py + Math.sin(a) * len); g.stroke();
         }
       }
-      return g.getImageData(0, 0, S, S).data;
+      return blurWrap(c, 0.8);
     })();
     const { c, g } = canvas(S);
     const out = g.createImageData(S, S);

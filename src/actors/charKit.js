@@ -146,7 +146,9 @@ class Rig {
       const sm = new THREE.SkinnedMesh(geo, mat); sm.name = name;
       root.add(sm); root.updateMatrixWorld(true);
       sm.bind(skeleton, sm.matrixWorld);
-      sm.computeBoundingSphere(); if (sm.boundingSphere) sm.boundingSphere.radius *= 1.4;
+      // bind-pose bounds with headroom for animation (SkinnedMesh.computeBoundingSphere skins every vertex on the CPU)
+      if (!geo.boundingSphere) geo.computeBoundingSphere();
+      sm.boundingSphere = geo.boundingSphere.clone(); sm.boundingSphere.radius *= 1.4;
       return sm;
     };
     const body = mk(bodyGeo, this.mat, 'body_skin'); body.castShadow = true; body.receiveShadow = true;
