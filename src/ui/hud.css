@@ -152,7 +152,7 @@
 .bb-fill { background: linear-gradient(#ff8a9a, #d8244e 55%, #a0123c); box-shadow: inset 0 3px 0 rgba(255, 255, 255, .4); }
 .bb-shine { position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .35) 45%, transparent 60%); background-size: 250% 100%; animation: sweep 2.8s ease-in-out infinite; }
 .bb-pct { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font: 700 13px/1 var(--font); color: #fff; -webkit-text-stroke: 3.5px #2a1418; paint-order: stroke fill; }
-.bb-sub { margin-top: 5px; font: 600 15px/1 var(--font); font-style: italic; color: #ffe6c8; -webkit-text-stroke: 4px #2a1418; paint-order: stroke fill; }
+.bb-sub { margin: 5px 0 10px; font: 600 15px/1 var(--font); font-style: italic; color: #ffe6c8; -webkit-text-stroke: 4px #2a1418; paint-order: stroke fill; }
 
 /* ---------------------------------------------------------------- bottom-center: orbs, dock, hotbar */
 .hud-bc { left: 50%; bottom: 8px; transform: translateX(-50%); display: flex; align-items: flex-end; }

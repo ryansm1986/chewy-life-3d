@@ -26,7 +26,7 @@ export class Tooltip {
   refresh(html) { if (this.on) this.show(html, this.box.className.replace(/^tt\s*/, ''), this.owner); }
   place() {
     const pad = 10, off = 20;
-    let x = this.x + off, y = this.y - this.h - 8;
+    let x = this.x + off, y = this.y - this.h - 22;
     if (x + this.w > innerWidth - pad) x = this.x - this.w - off;
     if (x < pad) x = pad;
     if (y < pad) y = Math.min(this.y + off + 6, innerHeight - this.h - pad);

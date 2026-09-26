@@ -102,7 +102,12 @@ export async function boot() {
   if (uiMod?.UI) { G.ui = uiMod.UI; try { G.ui.init(G); G.ui.setMode?.('village'); } catch (e) { console.error('[ui] init failed', e); G.ui = null; } }
 
   // ---- audio routing
-  Events.on('sfx', (name, o = {}) => G.audio?.play?.(name, o));
+  const SFX_ALIAS = { block: ['ball_bounce', { pitch: 0.7 }], ball_catch: ['pickup_item', { vol: 0.5 }], squeak: ['slime_bounce', { pitch: 1.9 }], pot_break: ['explosion_small', { pitch: 1.6, vol: 0.6 }], villager_greet: ['villager_chatter', {}] };
+  Events.on('sfx', (name, o = {}) => {
+    const a = SFX_ALIAS[name];
+    if (a) { const [n, extra] = a; if (n === 'villager_chatter') G.audio?.babble?.('hello!', { pitch: o.pitch || 1, pos: o.pos, vol: 0.5 }); else G.audio?.play?.(n, { ...o, ...extra }); return; }
+    G.audio?.play?.(name, o);
+  });
   Events.on('footstep', (p) => { G.audio?.play?.(G.mode === 'dungeon' ? 'footstep_stone' : 'footstep_grass', { vol: 0.35 }); if (Math.random() < 0.5) G.vfx.dust(p, { n: 1, size: 0.18 }); });
   Events.on('emote', ({ actor, kind }) => G.vfx.emote(actor, kind));
   Events.on('player:levelup', ({ lvl }) => { G.vfx.levelUp(player.pos.clone()); G.ui?.banner?.('Level Up!', `Chewy is now level ${lvl}`, { style: 'levelup' }); G.audio?.play?.('ui_levelup'); G.actions.restoreAll(); shadow.recalc(); });
@@ -290,12 +295,65 @@ export async function boot() {
   setInterval(save, 30000);
   addEventListener('beforeunload', save);
 
+  // ambience: water proximity + day/night music swaps (village only)
+  let ambT = 0, wasNight = day.isNight();
+  function villageAmbience(dt) {
+    ambT -= dt; if (ambT > 0) return; ambT = 0.5;
+    let near = 99; const p = player.pos;
+    for (let a = 0; a < 12; a++) for (const r of [2, 4, 7, 10]) { const x = p.x + Math.cos(a / 12 * Math.PI * 2) * r, z = p.z + Math.sin(a / 12 * Math.PI * 2) * r; if (village.terrain.heightAt(x, z) < 0) { near = Math.min(near, r); break; } }
+    G.audio?.setAmbienceMix?.({ water: near < 99 ? Math.max(0, 1 - near / 11) : 0 });
+    const n = day.isNight();
+    if (n !== wasNight && !G.ui?.isOpen?.('shop')) { wasNight = n; G.audio?.music?.(n ? 'village_night' : 'village_day', { fade: 4 }); G.audio?.ambience?.(n ? 'night' : 'village', { fade: 4 }); }
+  }
+
+  // ---- title screen & intro
+  const skip = sessionStorage.getItem('chewy3d.skipTitle');
+  sessionStorage.removeItem('chewy3d.skipTitle');
+  G.titleActive = false;
+  const showTitle = G.ui?.setMode && !skip && !P.has('fresh') && !P.has('floor') && !P.has('notitle');
+  if (showTitle) {
+    G.titleActive = true; player.controlLocked = true;
+    G.ui.setMode('title');
+    G.audio?.music?.('title');
+    rig.distTarget = 52; rig.focus.set(L.plaza.x, 1, L.plaza.z); rig.snap();
+    G.ui.onTitle({
+      hasSave: () => !!localStorage.getItem('chewy3d.save'),
+      newGame: () => { try { localStorage.removeItem('chewy3d.save'); } catch (e) { /* */ } sessionStorage.setItem('chewy3d.skipTitle', 'new'); location.reload(); },
+      continue: () => startGame(false),
+    });
+  } else if (skip === 'new' || (P.has('fresh') && !P.has('floor') && !P.has('nointro'))) setTimeout(() => intro(), 1200);
+  function startGame(isNew) {
+    const go = () => {
+      G.titleActive = false; player.controlLocked = false;
+      G.ui?.setMode?.('village');
+      rig.yawTarget = Math.PI / 4; rig.yaw = rig.yawTarget; rig.distTarget = 34;
+      rig.focus.copy(player.pos); rig.snap();
+      G.audio?.music?.(day.isNight() ? 'village_night' : 'village_day');
+      if (isNew) setTimeout(() => intro(), 900);
+    };
+    if (G.ui?.transition) G.ui.transition(go); else go();
+  }
+  async function intro() {
+    if (!G.ui?.dialogue) return;
+    const rosie = npcs[0];
+    player.controlLocked = true;
+    rosie.setPos(player.pos.x + 1.6, player.pos.z + 1.2); rosie.faceTo(player.pos.x, player.pos.z); player.faceTo(rosie.pos.x, rosie.pos.z);
+    rosie.anim.play('wave'); G.vfx.emote(rosie, 'heart', 2.2);
+    const pr = G.portrait('rosie');
+    await G.ui.dialogue({ speaker: 'Rosie', portrait: pr, lines: ["Good morning, Chewy! ♡ Did you sleep well? Shadow did. He snored like a tiny tractor.", "Welcome to *Blossom Hollow*! The sakura are blooming and everyone is so happy you're here."] });
+    await G.ui.dialogue({ speaker: 'Rosie', portrait: pr, lines: ['Walk with *WASD* or click the ground. Press *F* near friends to chat.', 'Press *B* to plan the village — paint zones for homes, shops and workshops, then watch it grow!', "And… there's something squeaky in *the Burrow* on the shrine hill. Take your Bone Sword — and your red tennis ball!"] });
+    player.controlLocked = false;
+    G.ui?.toast?.('Tip: I bag · K skills · C character · J quests · X swap weapon', { color: '#8fd0ff' });
+    G.story.progress('any');
+  }
+
   // ---- main loop
   let fpsAcc = 0, fpsN = 0; const fpsEl = P.has('fps') ? Object.assign(document.body.appendChild(document.createElement('div')), { style: 'position:fixed;left:8px;bottom:8px;color:#fff;font:12px monospace;z-index:99;text-shadow:0 1px 2px #000' }) : null;
   function frame() {
     const dt = engine.tick();
     if (G.mode === 'village') day.update(dt);
-    handleInput(dt);
+    if (G.titleActive) { rig.yawTarget += dt * 0.06; rig.yaw = rig.yawTarget; }
+    else handleInput(dt);
     G.actions.tickRegen(dt);
     player.update(dt);
     shadow.update(dt);
@@ -303,8 +361,10 @@ export async function boot() {
     G.combat.update(dt);
     if (G.mode === 'village') for (const n of npcs) n.update(dt);
     // camera follows with a little look-ahead
-    const lead = new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing)).multiplyScalar(Math.min(1, player.anim.speed / 4) * 1.2);
-    rig.focus.set(player.pos.x + lead.x, player.pos.y + 0.6, player.pos.z + lead.z);
+    if (!G.titleActive) {
+      const lead = new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing)).multiplyScalar(Math.min(1, player.anim.speed / 4) * 1.2);
+      rig.focus.set(player.pos.x + lead.x, player.pos.y + 0.6, player.pos.z + lead.z);
+    }
     rig.update(dt);
     updateOcclusion();
     if (G.mode === 'village') {
@@ -314,12 +374,14 @@ export async function boot() {
       sim.update(dt, engine.time);
       buildMode.update(dt);
       ambient.update(dt, engine.time);
+      villageAmbience(dt);
     } else {
       dungeon.update(dt, engine.time);
       G.world.updateSun(rig.target);
       G.world.lightPool.update(dt, rig.target, engine.time, 1);
     }
     G.vfx.update(dt);
+    G.audio?.update?.(dt, { pos: player.pos, camera: engine.camera });
     G.ui?.update?.(dt);
     engine.render();
     Input.endFrame();

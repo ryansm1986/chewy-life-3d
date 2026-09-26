@@ -94,7 +94,7 @@ export class Story {
     if (r.potions) for (const k in r.potions) A.addPotion(k, r.potions[k]);
     if (r.unique) A.pickup(makeUnique(pick(UNIQUE_IDS), Math.max(5, G.state.player.lvl)));
     if (r.hearts && d.giver) this.addHearts(d.giver, r.hearts);
-    G.ui?.banner?.('Quest Complete!', d.title, { style: 'levelup' });
+    G.ui?.banner?.('Quest Complete!', d.title, { style: 'quest' });
     Events.emit('sfx', 'ui_levelup');
     G.vfx?.levelUp?.(G.player.pos.clone());
     if (d.request) delete this.Q.requests[q.id];

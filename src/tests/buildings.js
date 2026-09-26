@@ -42,9 +42,14 @@ export default function () {
     x += w + gapX; rowD = Math.max(rowD, d);
   }
   const W = Math.max(...placed.map(p => p.cx + p.w / 2)), D = z + rowD;
-  const center = [W / 2, D / 2];
+  let center = [W / 2, D / 2];
   const span = Math.max(W, D);
-  const S = makeStage({ ground: Math.max(60, span + 30), center, dist: only ? Math.max(12, span * 1.6 + 6) : span * 1.25 + 10, hour: 10, groundColor: P.get('ground') || '#8ec46e' });
+  let dist0 = only ? Math.max(12, span * 1.6 + 6) : span * 1.25 + 10;
+  if (P.has('focus')) { // centre on one placed item: &focus=index
+    const f = placed[Math.min(placed.length - 1, +P.get('focus'))];
+    center = [f.cx, f.cz]; dist0 = Math.max(9, Math.max(f.w, f.d) * 2.6 + 5);
+  }
+  const S = makeStage({ ground: Math.max(60, span + 30), center, dist: dist0, hour: 10, groundColor: P.get('ground') || '#8ec46e' });
   const scene = S.scene;
   const padMat = makeToon({ color: '#93c864', brush: 0.25, rim: 0 });
   const lineMat = new THREE.LineBasicMaterial({ color: '#5a8a40', transparent: true, opacity: 0.35 });

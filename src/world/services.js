@@ -25,6 +25,9 @@ export function installServices(G) {
       onBuy: (item, price) => { const ok = G.actions.buyItem(item, price); if (ok && item.kind !== 'potion') { const s = G.state.shop.items; const i = s.indexOf(item); if (i >= 0) s.splice(i, 1); } return ok; },
     });
     Events.emit('sfx', 'ui_open');
+    G.audio?.music?.('shop', { fade: 1.2 });
+    const back = () => { if (G.ui?.isOpen?.('shop')) return setTimeout(back, 400); G.audio?.music?.(G.day?.isNight?.() ? 'village_night' : 'village_day', { fade: 2 }); };
+    setTimeout(back, 800);
   };
   // ---------------------------------------------------------------- Chewy's cottage
   G.openHome = () => lock(async () => {

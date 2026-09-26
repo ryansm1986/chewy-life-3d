@@ -3,6 +3,8 @@ import { homeL1, homeL2, homeL3 } from './homes.js';
 import { townHall, chewyHouse, rosieShop, boneSmith, dungeonGate, bulletinBoard } from './special.js';
 import { shopL1, shopL2, shopL3 } from './shops.js';
 import { farm, lumber, kiln, fishingHut } from './workshops.js';
+import { well, waterTower, stoneLantern, streetLamp, park, shrine, onsen, clinic, school } from './services.js';
+import { bench, flowerBed, fountain, sakuraPlanter, miniTorii, koiStatue, lanternString, fence, bridge, chewyStatue } from './decor.js';
 import { G, C } from './kit.js';
 import { BUILDINGS } from './catalog.js';
 
@@ -14,6 +16,8 @@ function placeholder(B) {
 
 export const MODELS = {
   townHall, chewyHouse, rosieShop, boneSmith, dungeonGate, bulletinBoard, farm, lumber, kiln, fishingHut,
+  well, waterTower, stoneLantern, streetLamp, park, shrine, onsen, clinic, school,
+  bench, flowerBed, fountain, sakuraPlanter, miniTorii, koiStatue, lanternString, fence, bridge, chewyStatue,
   home: (B, L) => (L === 1 ? homeL1(B) : L === 2 ? homeL2(B) : homeL3(B)),
   shop: (B, L) => (L === 1 ? shopL1(B) : L === 2 ? shopL2(B) : shopL3(B)),
 };

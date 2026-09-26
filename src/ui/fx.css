@@ -155,7 +155,7 @@
 @keyframes float { 0%, 100% { transform: rotate(var(--rot)) translateY(0); } 50% { transform: rotate(calc(var(--rot) * -.5)) translateY(-10px); } }
 .ti-spark { position: absolute; width: 38px; height: 38px; color: #fff3a0; animation: twinkle 1.8s ease-in-out infinite; filter: drop-shadow(0 0 6px rgba(255, 240, 150, .9)); z-index: 3; }
 .ti-spark .gl { width: 100%; height: 100%; }
-.ti-spark.s1 { left: 44%; top: -34px; } .ti-spark.s2 { right: 16%; top: 4px; width: 26px; height: 26px; animation-delay: .6s; } .ti-spark.s3 { left: 22%; bottom: -10px; width: 34px; height: 34px; animation: spinSlow 6s linear infinite; filter: none; }
+.ti-spark.s1 { left: 57%; top: 2px; } .ti-spark.s2 { right: 16%; top: 4px; width: 26px; height: 26px; animation-delay: .6s; } .ti-spark.s3 { left: 22%; bottom: -10px; width: 34px; height: 34px; animation: spinSlow 6s linear infinite; filter: none; }
 .ti-paws { position: relative; width: 520px; height: 34px; margin-top: 14px; }
 .ti-paws i { position: absolute; width: 24px; height: 24px; color: rgba(255, 246, 232, .95); filter: drop-shadow(0 2px 0 rgba(74, 44, 42, .6)); opacity: 0; animation: pawStep 5s linear infinite; animation-delay: calc(1.6s + var(--i) * .28s); }
 .ti-paws i .gl { width: 100%; height: 100%; }
