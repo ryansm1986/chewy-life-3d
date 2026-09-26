@@ -77,9 +77,6 @@ export async function boot() {
   rosie.speed = 1.8; npcs.push(rosie);
   for (const v of VILLAGERS) npcs.push(new Villager(village, G, v.spec, { id: v.id, anchor: v.anchor, wander: v.wander || 5 }));
   const skills = G.skills = new SkillRunner(G);
-  const portraits = new Portraits(engine);
-  for (const v of VILLAGERS) portraits.register(v.id, v.spec);
-  G.portrait = (id) => portraits.get(id);
   // townsfolk move in as homes fill up (capped for performance)
   const folk = [];
   function syncTownsfolk() {
@@ -101,6 +98,15 @@ export async function boot() {
 
   // fallback gate interaction if the Burrow landmark is missing
   if (!sim.S.buildings.some(b => b.type === 'dungeonGate')) village.interactables.push({ pos: new THREE.Vector3(L.dungeon.x, village.heightAt(L.dungeon.x, L.dungeon.z), L.dungeon.z + 1.6), radius: 1.8, label: 'Enter the Burrow', onInteract: () => G.openBurrowMenu() });
+
+  // ---- 3D portraits (also replace the UI's SVG busts so the HUD/title/paper doll show the real characters)
+  const portraits = new Portraits(engine);
+  for (const v of VILLAGERS) portraits.register(v.id, v.spec);
+  G.portrait = (id) => portraits.get(id);
+  try {
+    const pm = await import('./ui/portraits.js');
+    for (const id of ['chewy', 'shadow', 'rosie']) { const url = portraits.get(id); if (url) pm.PORTRAITS[id] = () => `<img class="p3d" src="${url}" alt="" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block">`; }
+  } catch (e) { console.warn('[portraits] ui override failed', e); }
 
   // ---- UI
   if (uiMod?.UI) { G.ui = uiMod.UI; try { G.ui.init(G); G.ui.setMode?.('village'); } catch (e) { console.error('[ui] init failed', e); G.ui = null; } }
@@ -158,7 +164,7 @@ export async function boot() {
 
   // ---- camera
   const rig = engine.rig;
-  rig.distTarget = 29; rig.focus.copy(player.pos); rig.snap();
+  rig.distTarget = 27; rig.focus.copy(player.pos); rig.snap();
 
   // ---- modes
   let dungeon = null;
@@ -228,7 +234,7 @@ export async function boot() {
       const home = dead ? { x: L.chewyHouse.x + 2.2, z: L.chewyHouse.z } : { x: L.dungeon.x, z: L.dungeon.z + 3.2 };
       player.setPos(home.x, home.z); shadow.setPos(home.x + 0.8, home.z + 0.6);
       player.anim.stop(); G.playerDead = false; G.actions.restoreAll(); shadow.fainted = 0; shadow.untargetable = false; shadow.anim.stop();
-      rig.distTarget = 29; rig.focus.copy(player.pos); rig.snap();
+      rig.distTarget = 27; rig.focus.copy(player.pos); rig.snap();
       G.ui?.setMode?.('village'); G.ui?.setBoss?.(null);
       engine.post.grade.uniforms.get('uVigColor').value.set(0.55, 0.45, 0.65); engine.post.grade.uniforms.get('uVignette').value = 1.0; day.apply();
       G.ui?.minimap?.setProvider?.(vMap);
@@ -407,7 +413,7 @@ export async function boot() {
     const go = () => {
       G.titleActive = false; player.controlLocked = false;
       G.ui?.setMode?.('village');
-      rig.yawTarget = Math.PI / 4; rig.yaw = rig.yawTarget; rig.distTarget = 29;
+      rig.yawTarget = Math.PI / 4; rig.yaw = rig.yawTarget; rig.distTarget = 27;
       rig.focus.copy(player.pos); rig.snap();
       G.audio?.music?.(day.isNight() ? 'village_night' : 'village_day');
       if (isNew) setTimeout(() => intro(), 900);

@@ -398,7 +398,8 @@ function buildHair(R, head, hair) {
 // ------------------------------------------------------------------ Shadow: quadruped Boston terrier
 export function buildBoston(spec = {}) {
   const R = new Rig({ name: 'Shadow', ...spec });
-  const black = spec.fur || '#26222c', white = '#fbf6f0', collar = spec.collar || '#4aa8f0';
+  const black = spec.fur || '#34303f', white = '#fbf6f0', collar = spec.collar || '#4aa8f0';
+  if (!spec.fur) R.mat.userData.u.uRimStr.value = 1.25; // slate rim keeps the little black dog readable at night
   const body = R.group(R.root, 'body', [0, 0.3, 0]);
   // barrel body, white chest
   const bg = new THREE.CapsuleGeometry(0.135, 0.22, 8, 18); bg.rotateX(Math.PI / 2);

@@ -90,7 +90,7 @@ export class Animator {
   }
   stop(name) { if (!name || this.action?.name === name) this.action = null; }
   busy() { return !!this.action && !this.action.def.hold && !['hurt', 'drink', 'wave', 'happy', 'pickup'].includes(this.action.name); }
-  hit(color = '#ffffff') { this.flash = 1; this.flashColor.set(color); }
+  hit(color = '#ffffff') { if (this.t - (this.lastHit ?? -9) < 0.35) return; this.lastHit = this.t; this.flash = 1; this.flashColor.set(color); }
   update(dt, worldPos) {
     this.t += dt;
     if (worldPos) {
@@ -129,7 +129,7 @@ export class Animator {
     // flash
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 6);
     const mat = this.rig.mat;
-    mat.emissive.copy(this.flashColor).multiplyScalar(this.flash * 0.9);
+    mat.emissive.copy(this.flashColor).multiplyScalar(this.flash * this.flash * 0.55);
   }
   _set(o, rx, ry, rz) { const r = this.rest.get(o); o.rotation.set(r.r.x + rx, r.r.y + ry, r.r.z + rz); }
   poseBiped(dt, A) {
