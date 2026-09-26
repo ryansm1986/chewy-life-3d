@@ -31,15 +31,17 @@ export class Player extends Actor {
   setWeapon(type, look = {}) {
     this.weaponType = type;
     const h = this.rig.parts.handR;
-    h.remove(this.sword); h.remove(this.ball);
-    if (type === 'sword') {
-      h.add(this.sword); this.sword.rotation.set(Math.PI * 0.78, 0, -0.25); this.sword.position.set(0, -0.02, 0.02);
-      this.swordBack.visible = false;
-    } else {
-      h.add(this.ball); this.ball.position.set(0, -0.06, 0.03);
-      this.swordBack.visible = true;
-    }
+    // both stay attached (the idle one shrunk to nothing) so each shader is compiled up front — no hitch on the first swap
+    if (this.sword.parent !== h) h.add(this.sword);
+    if (this.ball.parent !== h) h.add(this.ball);
+    this.sword.rotation.set(Math.PI * 0.78, 0, -0.25); this.sword.position.set(0, -0.02, 0.02);
+    this.ball.position.set(0, -0.06, 0.03);
+    const sword = type === 'sword';
+    this.sword.scale.setScalar(sword ? 1 : 0.0001); this.sword.castShadow = sword;
+    this.ball.scale.setScalar(sword ? 0.0001 : 1); this.ball.castShadow = !sword;
+    this.swordBack.visible = !sword;
   }
+
   // camera-relative WASD
   readMoveInput() {
     const d = this.inputDir.set(0, 0, 0);

@@ -221,6 +221,9 @@ export async function boot() {
       G.mode = 'dungeon';
       dungeon.start();
       vfx.prewarm(engine.renderer, engine.camera);
+      // compile every projectile / decal material now (behind the transition) so the first skill burst doesn't hitch
+      for (const kind of ['ball', 'blaze', 'fireball', 'foxfire', 'spark', 'acorn', 'firepot', 'bone', 'moonball']) combat.spawn({ team: 'ally', kind, pos: new THREE.Vector3(0, -60, 0), dir: new THREE.Vector3(1, 0, 0), speed: 1, range: 0.001 });
+      vfx.decal(new THREE.Vector3(0, -60, 0), { life: 0.05 }); vfx.decal(new THREE.Vector3(0, -60, 0), { life: 0.05, additive: true });
       try { engine.renderer.compile(world.scene, engine.camera); } catch (e) { /* ignore */ }
       const s = dungeon.startPos;
       player.setPos(s.x, s.z); player.moveTarget = null; shadow.setPos(s.x + 0.8, s.z + 0.8);

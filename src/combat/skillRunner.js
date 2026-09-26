@@ -175,7 +175,7 @@ export class SkillRunner {
     P.anim.play('throw', { speed: this.animSpeed(0.5), onEvent: ev => {
       if (ev !== 'release') return;
       const boom = (pos) => {
-        G.vfx.fire(pos, 44, { spread: p.radius * 0.55, size: 1.0 }); G.vfx.ring(pos, { color: '#ff9a3c', r0: 0.2, r1: p.radius * 1.4, life: 0.45, opacity: 1 }); G.vfx.ring(pos, { color: '#ffe070', r0: 0.1, r1: p.radius * 0.9, life: 0.3 }); G.vfx.flash(pos.clone().setY(0.6), '#ffae5a', 4.5, 0.3);
+        G.vfx.fire(pos, 30, { spread: p.radius * 0.6, size: 0.85 }); G.vfx.ring(pos, { color: '#ff9a3c', r0: 0.2, r1: p.radius * 1.4, life: 0.45, opacity: 1 }); G.vfx.ring(pos, { color: '#ffe070', r0: 0.1, r1: p.radius * 0.9, life: 0.3 }); G.vfx.flash(pos.clone().setY(0.6), '#ff9a4a', 3.2, 0.24);
         G.vfx.decal(pos, { r: p.radius * 1.0, color: '#2a140c', opacity: 0.6, life: p.burnDuration + 1.5 });
         G.vfx.decal(pos, { r: p.radius * 0.9, color: '#ff7a2a', additive: true, opacity: 0.45, life: p.burnDuration });
         G.vfx.poof(pos.clone().setY(0.3), { color: '#6a4a44', n: 10, size: 0.8 });
@@ -350,7 +350,7 @@ export class SkillRunner {
           const last = b.hit.get(e) || -9;
           if (o.t - last >= o.p.hitInterval) { b.hit.set(e, o.t); this.combat.hitMonster(e, { dmgPct: o.p.dmgPct, knock: 0.2, from: P.pos }); }
         });
-        G.vfx.glow.spawn({ x: b.m.position.x, y: b.m.position.y, z: b.m.position.z, life: 0.3, size: 0.75, size1: 0.1, color: '#ffe8b0', alpha: 0.7, alpha1: 0 });
+        if (Math.random() < 0.5) G.vfx.glow.spawn({ x: b.m.position.x, y: b.m.position.y, z: b.m.position.z, life: 0.28, size: 0.55, size1: 0.1, color: '#ffd890', alpha: 0.45, alpha1: 0 });
       }
       if (o.t >= o.p.duration) { for (const b of o.bones) { G.vfx.poof(b.m.position, { n: 4, size: 0.3 }); b.m.parent?.remove(b.m); } this.orbits.splice(i, 1); }
     }
