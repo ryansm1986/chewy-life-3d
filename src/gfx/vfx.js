@@ -196,6 +196,7 @@ export class VFX {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(r * 2, r * 2), mat); m.rotation.x = -Math.PI / 2; m.position.set(p.x, p.y + 0.07, p.z); m.renderOrder = 9;
     return this.add(m, (dt, t) => { mat.uniforms.uK.value = clamp(t / time); }, time + 0.05);
   }
+  emoteTexture(kind) { if (!this.emoteTex.has(kind)) this.emoteTex.set(kind, emoteTexture(kind)); return this.emoteTex.get(kind); }
   // speech-bubble emote that follows an actor
   emote(actor, kind = 'heart', life = 1.8) {
     if (!this.emoteTex.has(kind)) this.emoteTex.set(kind, emoteTexture(kind));

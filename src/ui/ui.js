@@ -51,7 +51,7 @@ export const UI = {
     this.floats = new Floats(this.layers.world);
     this.labels = new LootLabels(this.layers.world);
     this.toasts = new Toasts(this.layers.msg);
-    this.banners = new Banners(this.layers.msg, this.layers.fx);
+    this.banners = new Banners(this.layers.msg, this.layers.fx); this.banners.hold = () => !!this.dlg?.active;
     this.iris = new Iris(this.layers.iris);
     this.drag = new ItemDrag(this);
     this.dlg = new Dialogue(this);

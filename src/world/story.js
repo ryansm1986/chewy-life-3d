@@ -101,6 +101,21 @@ export class Story {
     if (d.next) setTimeout(() => this.start(d.next), 2500);
     Events.emit('quest:update');
   }
+  // complete any active 'talk to <npc>' step
+  markTalk(id) {
+    let hit = false;
+    for (const q of this.Q.active) { const d = this.def(q.id); const s = d?.steps[q.step]; if (s?.type === 'talk' && s.npc === id) { q.prog = 1; hit = true; } }
+    if (hit) this.progress('talk');
+    return hit;
+  }
+  // what marker (if any) should float above this NPC: '!' = has something for you, '?' = waiting on your progress
+  markerFor(id) {
+    for (const q of this.Q.active) { const d = this.def(q.id); const s = d?.steps[q.step]; if (s?.type === 'talk' && s.npc === id) return '!'; }
+    const f = this.G.state.friends[id];
+    if (f?.pendingReward) return 'gift';
+    if (this.Q.active.some(q => { const d = this.def(q.id); return d && d.giver === id && !d.request; })) return '?';
+    return null;
+  }
   // quest objects for the UI tracker / journal
   uiList() {
     const G = this.G, st = G.state;
@@ -142,7 +157,7 @@ export class Story {
     const say = (lines, choices) => ui?.dialogue ? ui.dialogue({ speaker: npc.name, portrait, lines, choices, voice: npc.spec.voice }) : Promise.resolve(null);
     if (f.talkedDay !== day) { f.talkedDay = day; this.addHearts(id, 2); }
     // story talk steps
-    for (const q of this.Q.active) { const d = this.def(q.id); const s = d?.steps[q.step]; if (s?.type === 'talk' && s.npc === id) { q.prog = 1; this.progress('talk'); } }
+    this.markTalk(id);
     // pending heart reward
     if (f.pendingReward) {
       const R = HEART_REWARDS[f.pendingReward]; f.pendingReward = null;

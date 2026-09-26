@@ -186,6 +186,8 @@ export class Banners {
     if (!this.busy) this.next();
   }
   async next() {
+    // hold queued banners while a dialogue is on screen (they would cover the conversation)
+    if (this.q.length && this.hold?.()) { this.busy = true; clearTimeout(this._ht); this._ht = setTimeout(() => this.next(), 300); return; }
     const b = this.q.shift();
     if (!b) { this.busy = false; this.cur = null; return; }
     this.busy = true; this.cur = b.key;

@@ -255,7 +255,7 @@ export async function boot() {
     if (G.playerDead) return;
     G.playerDead = true; skills.clearAll();
     player.anim.play('die'); engine.timeScale = 0.4; engine.post.pulse('#3a2040', 0.3);
-    G.ui?.banner?.('Oof!', 'Chewy needs a nap…', { style: 'boss' });
+    G.ui?.banner?.('Oof!', 'Chewy needs a nap… Shadow will drag him home.', { style: 'area' });
     G.audio?.play?.('player_die');
     const lost = Math.floor(G.state.coins * 0.1); if (lost > 0) { G.state.coins -= lost; Events.emit('coins:changed', { coins: G.state.coins }); }
     setTimeout(() => { engine.timeScale = 1; G.returnToVillage(true); }, 2600);
@@ -418,14 +418,39 @@ export async function boot() {
     if (!G.ui?.dialogue) return;
     const rosie = npcs[0];
     player.controlLocked = true;
-    rosie.setPos(player.pos.x + 1.6, player.pos.z + 1.2); rosie.faceTo(player.pos.x, player.pos.z); player.faceTo(rosie.pos.x, rosie.pos.z);
+    rosie.talking = true; rosie.state = 'idle';
+    rosie.setPos(player.pos.x + 1.5, player.pos.z + 1.1); rosie.faceTo(player.pos.x, player.pos.z); player.faceTo(rosie.pos.x, rosie.pos.z);
     rosie.anim.play('wave'); G.vfx.emote(rosie, 'heart', 2.2);
+    // frame both of them
+    const prevDist = rig.distTarget; G.introFocus = player.pos.clone().lerp(rosie.pos, 0.5); rig.distTarget = 20;
     const pr = G.portrait('rosie');
     await G.ui.dialogue({ speaker: 'Rosie', portrait: pr, lines: ["Good morning, Chewy! ♡ Did you sleep well? Shadow did. He snored like a tiny tractor.", "Welcome to *Blossom Hollow*! The sakura are blooming and everyone is so happy you're here."] });
     await G.ui.dialogue({ speaker: 'Rosie', portrait: pr, lines: ['Walk with *WASD* or click the ground. Press *F* near friends to chat.', 'Press *B* to plan the village — paint zones for homes, shops and workshops, then watch it grow!', "And… there's something squeaky in *the Burrow* on the shrine hill. Take your Bone Sword — and your red tennis ball!"] });
+    G.introFocus = null; rig.distTarget = prevDist;
+    rosie.talking = false; rosie.greeted = 30; rosie.state = 'idle'; rosie.t = 4;
     player.controlLocked = false;
+    G.story.markTalk('rosie');
     G.ui?.toast?.('Tip: I bag · K skills · C character · J quests · X swap weapon', { color: '#8fd0ff' });
-    G.story.progress('any');
+  }
+
+  // ---- floating quest markers over NPCs ('!' something for you, '?' quest giver, gift = friendship reward)
+  const markers = new Map();
+  let markerT = 0;
+  function updateMarkers(dt) {
+    markerT -= dt;
+    if (markerT <= 0) {
+      markerT = 0.5;
+      for (const n of npcs) {
+        const kind = G.mode === 'village' && n.visible ? G.story.markerFor(n.id) : null;
+        let m = markers.get(n);
+        if (!kind) { if (m) m.visible = false; continue; }
+        if (!m) { m = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false, depthTest: false, toneMapped: false })); m.renderOrder = 25; village.scene.add(m); markers.set(n, m); }
+        if (m.userData.kind !== kind) { m.material.map = vVfx.emoteTexture(kind === 'gift' ? 'gift' : kind); m.material.needsUpdate = true; m.userData.kind = kind; }
+        m.visible = !n.talking;
+      }
+    }
+    const t = engine.time;
+    for (const [n, m] of markers) if (m.visible) { m.position.set(n.pos.x, n.pos.y + (n.rig.height || 1.2) + 0.75 + Math.sin(t * 3 + n.pos.x) * 0.08, n.pos.z); m.scale.setScalar(0.62 + Math.sin(t * 6) * 0.02); }
   }
 
   // ---- main loop
@@ -445,7 +470,8 @@ export async function boot() {
     G.combat.update(dt);
     if (G.mode === 'village') for (const n of npcs) n.update(dt);
     // camera follows with a little look-ahead
-    if (buildMode.active && G.buildFocus) rig.focus.set(G.buildFocus.x, player.pos.y + 0.6, G.buildFocus.z);
+    if (G.introFocus) rig.focus.set(G.introFocus.x, player.pos.y + 0.6, G.introFocus.z);
+    else if (buildMode.active && G.buildFocus) rig.focus.set(G.buildFocus.x, player.pos.y + 0.6, G.buildFocus.z);
     else if (!G.titleActive) {
       const lead = new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing)).multiplyScalar(Math.min(1, player.anim.speed / 4) * 1.2);
       rig.focus.set(player.pos.x + lead.x, player.pos.y + 0.6, player.pos.z + lead.z);
@@ -461,6 +487,7 @@ export async function boot() {
       ambient.update(dt, engine.time);
       if (player.pos.z < 40) waterfall.update(dt, engine.time, day);
       villageAmbience(dt);
+      updateMarkers(rdt);
     } else {
       dungeon.update(dt, engine.time);
       G.world.updateSun(rig.target);
