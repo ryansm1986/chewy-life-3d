@@ -195,7 +195,7 @@ export class Story {
       Events.emit('sfx', 'ui_quest');
     }
     const dv = !npc.folk && this.tryDeliver(id);
-    if (dv?.done) { await say([`${dv.done.n} ${dv.done.mat}! Oh, thank you so much, Chewy!`]); return; }
+    if (dv?.done) { npc.anim.play('happy'); G.vfx?.emote?.(npc, 'heart', 2); await say([`${dv.done.n} ${dv.done.mat}! Oh, thank you so much, Chewy!`]); } // then carry on to the usual menu
     if (npc.folk) { await say([pick(['Blossom Hollow is the coziest village ever!', 'I just moved in! My new home smells like fresh cedar.', 'Have you seen the koi pond? So peaceful.', 'The Burrow gives me the shivers… you are so brave, Chewy!', 'I love the lanterns at night.', 'Shadow let me pet him! Best day ever.'])]); return; }
     const lines = [];
     const quest = this.Q.active.find(q => this.def(q.id)?.giver === id);
