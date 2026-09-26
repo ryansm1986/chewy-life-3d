@@ -3,10 +3,10 @@ import { RNG, Noise } from '../core/util.js';
 
 export const CELL = 2; // world units per cell
 export const THEMES = {
-  burrow: { name: 'Mossy Burrow', floor: ['#b58e68', '#a57e5a', '#c49c74'], wall: ['#8a6a58', '#7a5c4c', '#9a7a64'], top: ['#6aa04e', '#5a9044', '#80b45a'], fog: '#2a2038', ambient: ['#6a6aa0', '#3a2a30'], accent: '#8ad0ff', light: '#ffc47a', monsters: ['mochi', 'dustbunny', 'kinoko', 'mochi', 'dustbunny'], music: 'dungeon' },
-  crystal: { name: 'Crystal Grotto', floor: ['#9aa6c8', '#8894b8', '#b0bcd8'], wall: ['#5a4a8a', '#4a3c78', '#6a5a9c'], top: ['#a8e8ff', '#c8b8ff', '#ffc8f0'], fog: '#161430', ambient: ['#8a98e0', '#2a2040'], accent: '#ff8ae0', light: '#7ae8ff', monsters: ['kinoko', 'lantern', 'mochi', 'dustbunny', 'wisp'], music: 'dungeon' },
-  shrine: { name: 'Fox Shrine Tunnels', floor: ['#c08858', '#b07a4c', '#d09a68'], wall: ['#8a5a50', '#7a4c44', '#9a6a5c'], top: ['#7aa060', '#6a9050', '#e86a5a'], fog: '#241418', ambient: ['#c8a0a0', '#3a2424'], accent: '#ff6a4a', light: '#ffae6a', monsters: ['kasa', 'lantern', 'wisp', 'tanuki', 'kasa'], music: 'dungeon' },
-  kitchen: { name: "Oni's Kitchen", floor: ['#9a8078', '#8a7068', '#a89088'], wall: ['#6a5048', '#5a4038', '#7a5c50'], top: ['#8a6a5a', '#6a4a40', '#ff9a5a'], fog: '#20100c', ambient: ['#d8a080', '#402018'], accent: '#ff8a3a', light: '#ff9a4a', monsters: ['oni', 'tanuki', 'lantern', 'mochi', 'oni'], music: 'dungeon' },
+  burrow: { name: 'Mossy Burrow', floor: ['#b58e68', '#a57e5a', '#c49c74'], wall: ['#8a6a58', '#7a5c4c', '#9a7a64'], top: ['#6aa04e', '#5a9044', '#80b45a'], fog: '#2a2038', ambient: ['#6a6aa0', '#3a2a30'], accent: '#8ad0ff', light: '#ffc47a', monsters: ['mochi', 'dustbunny', 'kinoko', 'mochi', 'dustbunny'], music: 'dungeon', wobble: 0.9 },
+  crystal: { name: 'Crystal Grotto', floor: ['#9aa6c8', '#8894b8', '#b0bcd8'], wall: ['#5a4a8a', '#4a3c78', '#6a5a9c'], top: ['#a8e8ff', '#c8b8ff', '#ffc8f0'], fog: '#161430', ambient: ['#8a98e0', '#2a2040'], accent: '#ff8ae0', light: '#7ae8ff', monsters: ['kinoko', 'lantern', 'mochi', 'dustbunny', 'wisp'], music: 'dungeon', wobble: 0.8 },
+  shrine: { name: 'Fox Shrine Tunnels', floor: ['#c08858', '#b07a4c', '#d09a68'], wall: ['#8a5a50', '#7a4c44', '#9a6a5c'], top: ['#7aa060', '#6a9050', '#e86a5a'], fog: '#241418', ambient: ['#c8a0a0', '#3a2424'], accent: '#ff6a4a', light: '#ffae6a', monsters: ['kasa', 'lantern', 'wisp', 'tanuki', 'kasa'], music: 'dungeon', wobble: 0.25, built: true },
+  kitchen: { name: "Oni's Kitchen", floor: ['#9a8078', '#8a7068', '#a89088'], wall: ['#6a5048', '#5a4038', '#7a5c50'], top: ['#8a6a5a', '#6a4a40', '#ff9a5a'], fog: '#20100c', ambient: ['#d8a080', '#402018'], accent: '#ff8a3a', light: '#ff9a4a', monsters: ['oni', 'tanuki', 'lantern', 'mochi', 'oni'], music: 'dungeon', wobble: 0.3, built: true },
 };
 export function themeFor(floor) {
   const f = ((floor - 1) % 20);
@@ -19,6 +19,9 @@ export function generate({ floor = 1, seed = 1 } = {}) {
   const rng = new RNG(seed * 7919 + floor * 104729);
   const noise = new Noise(seed + floor * 13);
   const boss = bossFor(floor);
+  const theme = themeFor(floor), TH = THEMES[theme];
+  // built biomes (shrine / kitchen) get cleaner rooms and straight corridors so fences & brick walls read as architecture
+  const wob = TH.wobble ?? 0.9, built = !!TH.built, cr = built ? 1.4 : 2.2;
   const W = boss ? 56 : 64 + Math.min(16, floor * 2), H = W;
   const grid = new Uint8Array(W * H); // 0 wall, 1 floor
   const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? 0 : grid[y * W + x];
@@ -36,9 +39,9 @@ export function generate({ floor = 1, seed = 1 } = {}) {
   // carve organic rooms (rounded rect with noisy edge)
   for (const r of rooms) {
     for (let y = r.y - 1; y <= r.y + r.h; y++) for (let x = r.x - 1; x <= r.x + r.w; x++) {
-      const dx = Math.max(0, Math.abs(x + 0.5 - (r.x + r.w / 2)) - (r.w / 2 - 2.2)), dy = Math.max(0, Math.abs(y + 0.5 - (r.y + r.h / 2)) - (r.h / 2 - 2.2));
-      const d = Math.hypot(dx, dy) + noise.n2(x * 0.35, y * 0.35) * 0.9;
-      if (d < 2.2) set(x, y);
+      const dx = Math.max(0, Math.abs(x + 0.5 - (r.x + r.w / 2)) - (r.w / 2 - cr)), dy = Math.max(0, Math.abs(y + 0.5 - (r.y + r.h / 2)) - (r.h / 2 - cr));
+      const d = Math.hypot(dx, dy) + noise.n2(x * 0.35, y * 0.35) * wob;
+      if (d < cr) set(x, y);
     }
   }
   // connect rooms: MST (Prim) + a few extra loops
@@ -60,10 +63,11 @@ export function generate({ floor = 1, seed = 1 } = {}) {
   const corridor = (a, b) => {
     let x = a.cx, y = a.cy;
     const horizFirst = rng.chance(0.5);
-    const wob = rng.range(0, 100);
-    const carve = (cx, cy) => { for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) if (Math.abs(ox) + Math.abs(oy) < 2 || noise.n2(cx * 0.3 + wob, cy * 0.3) > 0.1) set(cx + ox, cy + oy); };
-    const stepX = () => { while (x !== b.cx) { x += Math.sign(b.cx - x); carve(x, y + Math.round(noise.n2(x * 0.15, wob) * 1.2)); } };
-    const stepY = () => { while (y !== b.cy) { y += Math.sign(b.cy - y); carve(x + Math.round(noise.n2(wob, y * 0.15) * 1.2), y); } };
+    const wofs = rng.range(0, 100);
+    const bend = built ? 0 : 1.2;
+    const carve = (cx, cy) => { for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) if (built || Math.abs(ox) + Math.abs(oy) < 2 || noise.n2(cx * 0.3 + wofs, cy * 0.3) > 0.1) set(cx + ox, cy + oy); };
+    const stepX = () => { while (x !== b.cx) { x += Math.sign(b.cx - x); carve(x, y + Math.round(noise.n2(x * 0.15, wofs) * bend)); } };
+    const stepY = () => { while (y !== b.cy) { y += Math.sign(b.cy - y); carve(x + Math.round(noise.n2(wofs, y * 0.15) * bend), y); } };
     if (horizFirst) { stepX(); stepY(); } else { stepY(); stepX(); }
   };
   for (const [i, j] of edges) corridor(rooms[i], rooms[j]);
@@ -122,15 +126,8 @@ export function generate({ floor = 1, seed = 1 } = {}) {
     const np = rng.int(1, 4);
     for (let k = 0; k < np; k++) { const c = freeCell(r, 1); if (c) pots.push(c); }
   }
-  // decorative props along walls (cells next to walls)
-  for (let y = 2; y < H - 2; y++) for (let x = 2; x < W - 2; x++) {
-    if (!at(x, y)) continue;
-    const nearWall = !at(x + 1, y) || !at(x - 1, y) || !at(x, y + 1) || !at(x, y - 1);
-    const k = y * W + x;
-    if (occupied.has(k)) continue;
-    if (nearWall && rng.chance(0.16)) props.push({ x, y, kind: 'edge', r: rng.next() });
-    else if (!nearWall && rng.chance(0.025)) props.push({ x, y, kind: 'floor', r: rng.next() });
-  }
+  const stairsCell = far.kind === 'stairs' ? freeCell(far, 2) || { x: far.cx, y: far.cy } : null;
+  const waypoint = floor % 5 === 1 && floor > 1 ? { x: start.cx + 2, y: start.cy } : null;
   // light sources: a few per room along the walls
   const lights = [];
   for (const r of rooms) {
@@ -143,6 +140,33 @@ export function generate({ floor = 1, seed = 1 } = {}) {
       }
     }
   }
-  const stairsCell = far.kind === 'stairs' ? freeCell(far, 2) || { x: far.cx, y: far.cy } : null;
-  return { W, H, grid, rooms, centers, start: { x: start.cx, y: start.cy }, stairs: stairsCell, bossRoom: boss ? far : null, boss, spawns, chests, pots, shrines, props, lights, floor, mlvl, theme: themeFor(floor), at, waypoint: floor % 5 === 1 && floor > 1 ? { x: start.cx + 2, y: start.cy } : null };
+  // room ownership per cell (0 = corridor, i + 1 = rooms[i]); used for floor patterns & clutter
+  const roomId = new Uint8Array(W * H);
+  rooms.forEach((r, i) => {
+    r.id = i + 1;
+    for (let y = r.y - 1; y <= r.y + r.h; y++) for (let x = r.x - 1; x <= r.x + r.w; x++) { const k = y * W + x; if (at(x, y) && !roomId[k]) roomId[k] = i + 1; }
+  });
+  // keep-clear zones: arrival (player + exit portal + waypoint), stairs, boss fighting ring
+  const clear = [[start.cx, start.cy, 3.2]];
+  if (stairsCell) clear.push([stairsCell.x, stairsCell.y, 1.6]);
+  if (waypoint) clear.push([waypoint.x, waypoint.y, 1.8]);
+  if (boss) clear.push([far.cx, far.cy, 4.6]);
+  const cleared = (x, y) => clear.some(([cx, cy, r]) => (x - cx) ** 2 + (y - cy) ** 2 < r * r);
+  // decorative clutter: 'corner' clusters, 'edge' props hugging walls, sparse 'floor' props in open room space.
+  // wx/wy point toward the adjacent wall(s); big = may carry a collider (never next to a corridor mouth)
+  for (let y = 2; y < H - 2; y++) for (let x = 2; x < W - 2; x++) {
+    if (!at(x, y)) continue;
+    const k = y * W + x;
+    if (occupied.has(k) || cleared(x, y)) continue;
+    const wx = (at(x + 1, y) ? 0 : 1) - (at(x - 1, y) ? 0 : 1), wy = (at(x, y + 1) ? 0 : 1) - (at(x, y - 1) ? 0 : 1);
+    const nw = (at(x + 1, y) ? 0 : 1) + (at(x - 1, y) ? 0 : 1) + (at(x, y + 1) ? 0 : 1) + (at(x, y - 1) ? 0 : 1);
+    const diag = !at(x + 1, y + 1) || !at(x - 1, y - 1) || !at(x + 1, y - 1) || !at(x - 1, y + 1);
+    const rid = roomId[k];
+    let mouth = false;
+    for (let oy = -2; oy <= 2 && !mouth; oy++) for (let ox = -2; ox <= 2; ox++) { const j = (y + oy) * W + x + ox; if (at(x + ox, y + oy) && roomId[j] !== rid) { mouth = true; break; } }
+    if (rid && nw >= 2 && (wx || wy) && rng.chance(0.6)) props.push({ x, y, kind: 'corner', r: rng.next(), room: rid, wx, wy, big: !mouth });
+    else if (nw >= 1 && (wx || wy) && rng.chance(rid ? 0.26 : 0.12)) props.push({ x, y, kind: 'edge', r: rng.next(), room: rid, wx, wy, big: !!rid && !mouth && rng.chance(0.55) });
+    else if (rid && !nw && !diag && rng.chance(0.028)) props.push({ x, y, kind: 'floor', r: rng.next(), room: rid, wx: 0, wy: 0, big: false });
+  }
+  return { W, H, grid, roomId, rooms, centers, start: { x: start.cx, y: start.cy }, stairs: stairsCell, bossRoom: boss ? far : null, boss, spawns, chests, pots, shrines, props, lights, floor, mlvl, theme, at, waypoint };
 }
