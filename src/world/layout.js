@@ -63,6 +63,29 @@ export function applyLayout(terrain) {
   terrain.syncTiles();
 }
 
+// Big-tree keep-out. The default camera looks from +x/+z (yaw 45°, ~43° pitch), so a 5-unit tree up to ~7 tiles
+// on that side of a landmark hides its door and whoever stands there. Keep the village core open too.
+export const CAMERA_SIDE = 7;
+const SIGHTLINES = [
+  // [landmark key, extra side clearance, camera-side reach]
+  ['townHall', 2.5, CAMERA_SIDE], ['rosieShop', 2.5, CAMERA_SIDE + 1], ['chewyHouse', 2.5, CAMERA_SIDE], ['dungeon', 2, CAMERA_SIDE],
+];
+export function treeKeepOut(x, z, canopy = 2) {
+  const P = LANDMARKS.plaza;
+  if (Math.hypot(x - P.x, z - P.z) < 12.5) return true; // village core: plaza, starter homes, spawn
+  for (const [k, side, reach] of SIGHTLINES) {
+    const L = LANDMARKS[k];
+    const rotated = L.rot && L.rot % Math.PI !== 0;
+    const hw = ((rotated ? L.d : L.w) || 4) / 2, hd = ((rotated ? L.w : L.d) || 4) / 2;
+    const dx = x - L.x, dz = z - L.z;
+    if (Math.abs(dx) < hw + side + canopy && Math.abs(dz) < hd + side + canopy) return true;
+    // sweep the footprint towards the camera along the (+1,+1) diagonal
+    const u = (dx + dz) / Math.SQRT2, v = (dx - dz) / Math.SQRT2, ext = (hw + hd) / Math.SQRT2;
+    if (u > -ext && u < ext + reach + canopy && Math.abs(v) < ext + canopy + 0.5) return true;
+  }
+  return false;
+}
+
 // Tiles reserved (no vegetation) for landmark buildings and the shrine area
 export function reservedAt(x, z) {
   for (const k of ['townHall', 'chewyHouse', 'rosieShop']) {

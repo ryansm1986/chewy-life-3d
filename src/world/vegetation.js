@@ -5,7 +5,8 @@ import { makeToon, applyDepth } from '../gfx/materials.js';
 import { leafCardTexture } from '../gfx/textures.js';
 import { branch, puff, cards, paint, merge, xf, tube } from '../gfx/geom.js';
 import { mulberry32, TAU, clamp, Noise } from '../core/util.js';
-import { T, WORLD } from './terrain.js';
+import { T, WORLD, OVERLAY_GLSL } from './terrain.js';
+import { treeKeepOut } from './layout.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const col = h => new THREE.Color(h);
@@ -84,7 +85,7 @@ function buildTree(kind, seed) {
   }
   const pal = S.palette.map(h => col(h));
   const foliageParts = small.map((q, i) => {
-    const g = puff(q.c, q.r, { detail: 2, noise: 0.12, squash: q.sq, crown: crownCenter, crownMix: 0.42, seed: seed * 3 + i });
+    const g = cullBuried(puff(q.c, q.r, { detail: 2, noise: 0.12, squash: q.sq, crown: crownCenter, crownMix: 0.42, seed: seed * 3 + i }), q, small);
     const t = clamp((q.c.y - (crownCenter.y - 1.4)) / 2.6);
     const base = pal[2].clone().lerp(pal[1], clamp(t * 1.3)).lerp(pal[0], clamp(t * 1.6 - 0.4));
     base.offsetHSL((r() - 0.5) * 0.03, (r() - 0.5) * 0.08, (r() - 0.5) * 0.06);
@@ -97,6 +98,33 @@ function buildTree(kind, seed) {
   const minY = Math.min(...puffs.map(q => q.c.y - q.r));
   paintFoliage(cardGeo, S.palette, r, crownCenter.y, minY);
   return { trunkGeo, foliage, cardGeo, height: crownCenter.y + 1.5 };
+}
+
+// Drop canopy triangles buried inside neighbouring clumps (never visible, ~40% of a cauliflower crown).
+// Conservative: a vertex counts as buried only well inside another clump (noise margin) and above its flattened belly.
+function cullBuried(g, self, all) {
+  const pos = g.attributes.position, n = pos.count;
+  const buried = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    for (const q of all) {
+      if (q === self || y < q.c.y - q.r * q.sq * 0.25) continue;
+      const dx = x - q.c.x, dy = (y - q.c.y) / q.sq, dz = z - q.c.z, rr = q.r * 0.84;
+      if (dx * dx + dy * dy + dz * dz < rr * rr) { buried[i] = 1; break; }
+    }
+  }
+  const keep = [];
+  for (let t = 0; t < n; t += 3) if (!(buried[t] && buried[t + 1] && buried[t + 2])) keep.push(t);
+  if (keep.length * 3 === n) return g;
+  const out = new THREE.BufferGeometry();
+  for (const [name, attr] of Object.entries(g.attributes)) {
+    const w = attr.itemSize, src = attr.array, dst = new src.constructor(keep.length * 3 * w);
+    let o = 0;
+    for (const t of keep) for (let k = 0; k < 3 * w; k++) dst[o++] = src[t * w + k];
+    out.setAttribute(name, new THREE.BufferAttribute(dst, w));
+  }
+  g.dispose();
+  return out;
 }
 
 // ------------------------------------------------------------------ bamboo
@@ -201,60 +229,119 @@ function rockGeo(seed) {
   return paint(g, (p, n, o) => { o.set('#a8a0b4').lerp(col('#d4ccd4'), clamp(n.y * 0.5 + 0.3)); if (n.y > 0.72) o.lerp(col('#7cb05a'), 0.75); });
 }
 
+// ------------------------------------------------------------------ batched rendering
+// Every vegetation material is ONE BatchedMesh holding all variant geometries of all species that share it.
+// BatchedMesh frustum-culls per instance — for the main camera AND the sun's shadow camera — so off-screen trees
+// cost nothing, and the whole island is ~13 draw calls instead of one call per species × variant × part.
+// makeToon's vertex injection only knows InstancedMesh, so vegToon() re-derives the world position and the wind
+// origin from batchingMatrix inside the vertexWorld hook (shared by the colour and the shadow-depth programs).
+const WIND_ID = { grass: 1, tree: 2, leaf: 3, cloth: 4, reed: 5 };
+function vegToon(o) {
+  const mode = WIND_ID[o.wind] || 0;
+  const vw = /* glsl */`
+    #ifdef USE_BATCHING
+      cOrigin = (modelMatrix * batchingMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+      cWorld = modelMatrix * batchingMatrix * vec4(transformed, 1.0);
+      ${mode ? `cWorld.xyz += windOffset(cWorld.xyz, transformed, cOrigin, ${mode}, uv);` : ''}
+      #ifdef TOON
+        vCWN = normalize(mat3(modelMatrix) * mat3(batchingMatrix) * objectNormal);
+      #endif
+    #endif
+  `;
+  return makeToon({ ...o, wind: undefined, vertexWorld: vw });
+}
+const WHITE = new THREE.Color(1, 1, 1);
+class Batch {
+  constructor(name, mat, { castShadow = true, receiveShadow = true, sort = true } = {}) {
+    this.name = name; this.mat = mat; this.castShadow = castShadow; this.receiveShadow = receiveShadow; this.sort = sort;
+    this.geos = []; this.items = [];
+  }
+  add(geo, m4, color, rec) {
+    let gi = this.geos.indexOf(geo);
+    if (gi < 0) { gi = this.geos.length; this.geos.push(geo); }
+    this.items.push({ gi, m: m4.clone(), c: color ? color.clone() : WHITE, rec });
+  }
+  build(group) {
+    if (!this.items?.length) return null;
+    const verts = this.geos.reduce((a, g) => a + g.attributes.position.count, 0);
+    const idx = this.geos.reduce((a, g) => a + (g.index ? g.index.count : 0), 0);
+    const bm = new THREE.BatchedMesh(this.items.length, verts, Math.max(1, idx), this.mat);
+    bm.name = 'veg:' + this.name;
+    const ids = this.geos.map(g => bm.addGeometry(g));
+    for (const it of this.items) {
+      const id = bm.addInstance(ids[it.gi]);
+      bm.setMatrixAt(id, it.m); bm.setColorAt(id, it.c);
+      it.rec.parts.push({ bm, id });
+    }
+    bm.castShadow = this.castShadow && !this.mat.userData.noCast; bm.receiveShadow = this.receiveShadow;
+    bm.sortObjects = this.sort; bm.perObjectFrustumCulled = true;
+    applyDepth(bm);
+    bm.computeBoundingBox(); bm.computeBoundingSphere();
+    group.add(bm);
+    this.items = null; // free the staging copies
+    this.mesh = bm;
+    return bm;
+  }
+}
+
 // ------------------------------------------------------------------ Vegetation manager
 export class Vegetation {
   constructor(world) {
     this.world = world;
     this.terrain = world.terrain;
     this.group = new THREE.Group(); this.group.name = 'vegetation';
-    this.instances = []; // {kind, x, z, r, meshes:[{mesh, index}], matrix}
+    this.instances = []; // {kind, x, z, y, s, big, parts:[{bm, id}], alive, col?}
     this.colliders = [];
+    this.batches = [];
     this.noise = new Noise(77);
   }
-  // Generic: build InstancedMeshes for a set of variant geometries, place transforms
-  _instanced(variants, mats, placements, { castShadow = true, receiveShadow = true, kind = 'x', collide = 0 } = {}) {
-    // variants: [[geoPart0, geoPart1...], ...]; mats: [matPart0, matPart1...]
-    const byVar = variants.map(() => []);
-    for (const pl of placements) byVar[pl.v % variants.length].push(pl);
-    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), c = new THREE.Color();
-    variants.forEach((parts, vi) => {
-      const list = byVar[vi]; if (!list.length) return;
-      const meshes = parts.map((g, pi) => {
-        const im = new THREE.InstancedMesh(g, mats[pi], list.length);
-        im.castShadow = castShadow && !mats[pi].userData.noCast; im.receiveShadow = receiveShadow;
-        applyDepth(im);
-        this.group.add(im);
-        return im;
-      });
-      list.forEach((pl, i) => {
-        p.set(pl.x, pl.y, pl.z); q.setFromAxisAngle(V(0, 1, 0), pl.rot); s.setScalar(pl.s); if (pl.sy) s.y *= pl.sy;
-        m4.compose(p, q, s);
-        const rec = { kind, x: pl.x, z: pl.z, y: pl.y, s: pl.s, meshes: [], matrix: m4.clone(), alive: true };
-        meshes.forEach(im => {
-          im.setMatrixAt(i, m4);
-          if (pl.tint) { c.set(pl.tint); im.setColorAt(i, c); } else if (im.instanceColor || pl.tint === undefined) { c.setRGB(1, 1, 1); if (pl.hue) c.setRGB(...pl.hue); im.setColorAt(i, c); }
-          rec.meshes.push({ im, i });
-        });
-        if (collide) { rec.col = { x: pl.x, z: pl.z, r: collide * pl.s }; this.colliders.push(rec.col); }
-        this.instances.push(rec);
-      });
-      meshes.forEach(im => { im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; im.computeBoundingSphere(); });
-    });
+  batch(name, mat, opts) { const b = new Batch(name, mat, opts); this.batches.push(b); return b; }
+  // Queue instances: variants = [[geoPart0, geoPart1...], ...]; batches = [Batch per part]
+  _place(variants, batches, placements, { kind = 'x', collide = 0 } = {}) {
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), c = new THREE.Color(), up = V(0, 1, 0);
+    const big = !!TREE_SPECIES[kind] || kind === 'bamboo';
+    for (const pl of placements) {
+      p.set(pl.x, pl.y, pl.z); q.setFromAxisAngle(up, pl.rot); s.setScalar(pl.s); if (pl.sy) s.y *= pl.sy;
+      m4.compose(p, q, s);
+      if (pl.tint) c.set(pl.tint); else if (pl.hue) c.setRGB(...pl.hue); else c.setRGB(1, 1, 1);
+      const rec = { kind, x: pl.x, z: pl.z, y: pl.y, s: pl.s, big, parts: [], alive: true };
+      variants[pl.v % variants.length].forEach((g, pi) => batches[pi].add(g, m4, c, rec));
+      if (collide) { rec.col = { x: pl.x, z: pl.z, r: collide * pl.s }; this.colliders.push(rec.col); }
+      this.instances.push(rec);
+    }
+  }
+  _kill(rec) {
+    rec.alive = false;
+    for (const { bm, id } of rec.parts) bm.setVisibleAt(id, false);
+    if (rec.col) { const k = this.colliders.indexOf(rec.col); if (k >= 0) this.colliders.splice(k, 1); }
+    this.world.onVegRemoved?.(rec);
   }
   // Remove vegetation (not grass) inside a rectangle; returns count
   clearRect(x0, z0, x1, z1, pad = 0.3) {
-    let n = 0; const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+    let n = 0;
     for (const rec of this.instances) {
       if (!rec.alive) continue;
-      if (rec.x > x0 - pad && rec.x < x1 + pad && rec.z > z0 - pad && rec.z < z1 + pad) {
-        rec.alive = false; n++;
-        for (const { im, i } of rec.meshes) { im.setMatrixAt(i, zero); im.instanceMatrix.needsUpdate = true; }
-        if (rec.col) { const k = this.colliders.indexOf(rec.col); if (k >= 0) this.colliders.splice(k, 1); }
-        this.world.onVegRemoved?.(rec);
+      if (rec.x > x0 - pad && rec.x < x1 + pad && rec.z > z0 - pad && rec.z < z1 + pad) { this._kill(rec); n++; }
+    }
+    return n;
+  }
+  // Clear around a building: small plants within `pad`, big trees whose canopy would overlap the roof (`canopy`),
+  // and — on the camera side (+x/+z) — far enough that no crown hides the facade (`front`).
+  clearAround(x0, z0, x1, z1, { pad = 0.6, canopy = 2.3, front = 3.6 } = {}) {
+    let n = 0;
+    for (const rec of this.instances) {
+      if (!rec.alive) continue;
+      const r = rec.big ? canopy * Math.min(1.2, rec.s) : pad, f = rec.big ? front : pad;
+      if (rec.x > x0 - r && rec.x < x1 + f && rec.z > z0 - r && rec.z < z1 + f) {
+        // trim the far corner of the camera-side band so it is a diagonal wedge, not a square
+        if (rec.big && rec.x > x1 + r && rec.z > z1 + r && (rec.x - x1) + (rec.z - z1) > f + r) continue;
+        this._kill(rec); n++;
       }
     }
     return n;
   }
+  // Build-mode view: 0 = normal lawn, 1 = short, overlay-tinted grass so painted zones read clearly
+  setBuildView(k) { const u = this.grassMat?.userData?.u; if (u) u.uBuild.value = k; }
   build(canPlace, quality = 2) {
     const tr = this.terrain, rnd = mulberry32(2024), N = this.noise;
     const H = (x, z) => tr.heightAt(x, z);
@@ -270,7 +357,7 @@ export class Vegetation {
     const taken = [];
     const farFromTrees = (x, z, d) => taken.every(([tx, tz, td]) => (tx - x) ** 2 + (tz - z) ** 2 > (d + td) ** 2);
     const tryTree = (kind, x, z, spacing = 2.4) => {
-      if (!okGround(x, z, 1.2) || !farFromTrees(x, z, spacing)) return false;
+      if (treeKeepOut(x, z) || !okGround(x, z, 1.2) || !farFromTrees(x, z, spacing)) return false;
       treeSpots[kind].push({ x, z }); taken.push([x, z, spacing]); return true;
     };
     for (let i = 0; i < 2600; i++) {
@@ -286,25 +373,28 @@ export class Vegetation {
       if (kind) tryTree(kind, x, z, kind === 'sakura' ? 2.8 : 2.3);
     }
     this.extraTrees?.(tryTree);
-    const barkMat = makeToon({ vertexColors: true, wind: 'tree', brush: 0.3, brushScale: 1.2, rim: 0.2, occluder: true });
+    const barkB = this.batch('bark', vegToon({ vertexColors: true, wind: 'tree', brush: 0.3, brushScale: 1.2, rim: 0.2, occluder: true }));
+    const folB = this.batch('foliage', vegToon({ occluder: true, vertexColors: true, wind: 'leaf', brush: 0.22, brushScale: 0.8, rim: 0.55, shadowSat: 0.5, term: [-0.15, 0.4] }));
     for (const kind of Object.keys(treeSpots)) {
       const spots = treeSpots[kind]; if (!spots.length) continue;
       const S = TREE_SPECIES[kind];
       const variants = [0, 1, 2].map(v => { const t = buildTree(kind, v + 1); return [t.trunkGeo, t.foliage, t.cardGeo]; });
-      const folMat = makeToon({ occluder: true, vertexColors: true, wind: 'leaf', brush: 0.22, brushScale: 0.8, rim: 0.55, shadowSat: 0.5, term: [-0.15, 0.4] });
-      const cardMat = makeToon({ occluder: true, noShadowCast: true, vertexColors: true, wind: 'leaf', map: leafCardTexture(S.leaf), alphaTest: 0.42, side: THREE.DoubleSide, noFlip: true, brush: 0.12, rim: 0.55, shadowSat: 0.5, term: [-0.15, 0.4] });
+      const cardB = this.batch('cards:' + kind, vegToon({ occluder: true, noShadowCast: true, vertexColors: true, wind: 'leaf', map: leafCardTexture(S.leaf), alphaTest: 0.42, side: THREE.DoubleSide, noFlip: true, brush: 0.12, rim: 0.55, shadowSat: 0.5, term: [-0.15, 0.4] }), { castShadow: false });
       const pl = spots.map(sp => ({ x: sp.x, z: sp.z, y: H(sp.x, sp.z), rot: rnd() * TAU, s: 0.85 + rnd() * 0.4, v: Math.floor(rnd() * 3), hue: [0.92 + rnd() * 0.16, 0.92 + rnd() * 0.12, 0.92 + rnd() * 0.12] }));
-      this._instanced(variants, [barkMat, folMat, cardMat], pl, { kind, collide: S.radius });
-      this.treeSpots = treeSpots;
+      this._place(variants, [barkB, folB, cardB], pl, { kind, collide: S.radius });
     }
+    this.treeSpots = treeSpots;
     // ---- bamboo groves (west)
     const bambooPl = [];
     for (let i = 0; i < 400; i++) {
       const a = rnd() * TAU, d = Math.sqrt(rnd()) * 14; const x = 17 + Math.cos(a) * d, z = 52 + Math.sin(a) * d * 1.3;
-      if (okGround(x, z, 0.8) && farFromTrees(x, z, 1.1)) { bambooPl.push({ x, z, y: H(x, z), rot: rnd() * TAU, s: 0.9 + rnd() * 0.3, v: Math.floor(rnd() * 3) }); taken.push([x, z, 1.1]); }
+      if (okGround(x, z, 0.8) && farFromTrees(x, z, 1.1) && !treeKeepOut(x, z, 1)) { bambooPl.push({ x, z, y: H(x, z), rot: rnd() * TAU, s: 0.9 + rnd() * 0.3, v: Math.floor(rnd() * 3) }); taken.push([x, z, 1.1]); }
     }
     const bv = [0, 1, 2].map(v => { const b = buildBamboo(v); return [b.stalks, b.leaves]; });
-    this._instanced(bv, [makeToon({ occluder: true, vertexColors: true, wind: 'reed', windAmt: 0.6, brush: 0.15, rim: 0.4 }), makeToon({ occluder: true, vertexColors: true, wind: 'reed', windAmt: 0.6, map: leafCardTexture('bamboo'), alphaTest: 0.4, side: THREE.DoubleSide, noFlip: true, rim: 0.5 })], bambooPl, { kind: 'bamboo', collide: 0.6 });
+    this._place(bv, [
+      this.batch('bamboo', vegToon({ occluder: true, vertexColors: true, wind: 'reed', windAmt: 0.6, brush: 0.15, rim: 0.4 })),
+      this.batch('bambooLeaf', vegToon({ occluder: true, vertexColors: true, wind: 'reed', windAmt: 0.6, map: leafCardTexture('bamboo'), alphaTest: 0.4, side: THREE.DoubleSide, noFlip: true, rim: 0.5 })),
+    ], bambooPl, { kind: 'bamboo', collide: 0.6 });
     // ---- bushes
     const bushPl = { hydrangea: [], azalea: [], box: [] };
     for (let i = 0; i < 1400; i++) {
@@ -315,10 +405,11 @@ export class Vegetation {
       if (!k) continue;
       bushPl[k].push({ x, z, y: H(x, z), rot: rnd() * TAU, s: 0.8 + rnd() * 0.5, v: Math.floor(rnd() * 3) }); taken.push([x, z, 0.7]);
     }
+    const bushB = this.batch('bush', vegToon({ vertexColors: true, wind: 'leaf', windAmt: 0.5, brush: 0.2, rim: 0.45, term: [-0.1, 0.4] }), { sort: false });
     for (const k of Object.keys(bushPl)) {
       if (!bushPl[k].length) continue;
       const vars = [0, 1, 2].map(v => [buildBush(k, v * 3 + k.length)]);
-      this._instanced(vars, [makeToon({ vertexColors: true, wind: 'leaf', windAmt: 0.5, brush: 0.2, rim: 0.45, term: [-0.1, 0.4] })], bushPl[k], { kind: 'bush', collide: 0.35 });
+      this._place(vars, [bushB], bushPl[k], { kind: 'bush', collide: 0.35 });
     }
     // ---- susuki fields (south / coast)
     const suPl = [];
@@ -329,7 +420,7 @@ export class Vegetation {
       if (!farFromTrees(x, z, 0.5)) continue;
       suPl.push({ x, z, y: h, rot: rnd() * TAU, s: 0.8 + rnd() * 0.5, v: Math.floor(rnd() * 3) });
     }
-    this._instanced([0, 1, 2].map(v => [susukiGeo(v)]), [makeToon({ vertexColors: true, wind: 'reed', windAmt: 1.6, brush: 0.1, rim: 0.6 })], suPl, { kind: 'susuki' });
+    this._place([0, 1, 2].map(v => [susukiGeo(v)]), [this.batch('susuki', vegToon({ vertexColors: true, wind: 'reed', windAmt: 1.6, brush: 0.1, rim: 0.6 }), { sort: false })], suPl, { kind: 'susuki' });
     // ---- rocks
     const rockPl = [];
     for (let i = 0; i < 500; i++) {
@@ -339,8 +430,9 @@ export class Vegetation {
       if (!(t === T.ROCK || (shore && rnd() < 0.2) || (t === T.GRASS && rnd() < 0.04))) continue;
       rockPl.push({ x, z, y: H(x, z) - 0.1, rot: rnd() * TAU, s: 0.5 + rnd() * (t === T.ROCK ? 1.4 : 0.7), sy: 0.8 + rnd() * 0.5, v: Math.floor(rnd() * 4) });
     }
-    this._instanced([0, 1, 2, 3].map(v => [rockGeo(v * 11 + 3)]), [makeToon({ vertexColors: true, brush: 0.3, brushScale: 0.8, rim: 0.3, term: [0.0, 0.35] })], rockPl, { kind: 'rock', collide: 0.45 });
+    this._place([0, 1, 2, 3].map(v => [rockGeo(v * 11 + 3)]), [this.batch('rock', vegToon({ vertexColors: true, brush: 0.3, brushScale: 0.8, rim: 0.3, term: [0.0, 0.35] }), { sort: false })], rockPl, { kind: 'rock', collide: 0.45 });
     this.buildFlowers(canPlace, rnd, quality);
+    for (const b of this.batches) b.build(this.group);
     this.buildGrass(quality);
     this.taken = taken;
   }
@@ -359,27 +451,27 @@ export class Vegetation {
       const c = pal[Math.floor((N.n2(x * 0.11 + 5, z * 0.11) * 0.5 + 0.5) * 7.99)];
       pls[k].push({ x, z, y: tr.heightAt(x, z) - 0.02, rot: rnd() * TAU, s: 0.32 + rnd() * 0.18, v: 0, tint: c });
     }
-    for (const k of kinds) {
-      if (!pls[k].length) continue;
-      const mat = makeToon({ vertexColors: true, wind: 'grass', brush: 0.05, rim: 0.5, term: [-0.3, 0.3] });
-      this._instanced([[flowerGeo(k)]], [mat], pls[k], { kind: 'flower', castShadow: false });
-    }
+    const fb = this.batch('flower', vegToon({ vertexColors: true, wind: 'grass', brush: 0.05, rim: 0.5, term: [-0.3, 0.3] }), { castShadow: false, sort: false });
+    for (const k of kinds) if (pls[k].length) this._place([[flowerGeo(k)]], [fb], pls[k], { kind: 'flower' });
   }
   buildGrass(quality) {
     const tr = this.terrain;
     const density = quality >= 2 ? 44 : quality === 1 ? 24 : 12;
     const blade = bladeGeo();
     const rnd = mulberry32(99);
-    const mat = makeToon({
+    const ov = tr.overlayUniforms?.() || { uOverlay: { value: null }, uOverlayAmt: { value: 0 }, uOverlayMode: { value: 1 }, uGrid: { value: 0 }, uCursor: { value: new THREE.Vector4(-99, -99, 0, 0) }, uCursorCol: { value: new THREE.Vector4(1, 1, 1, 0) } };
+    const mat = this.grassMat = makeToon({
       wind: 'grass', fixedNormal: [0, 1, 0], noFlip: true, brush: 0.12, rim: 0.0, shadowSat: 0.45, side: THREE.DoubleSide,
-      uniforms: { uTiles: { value: tr.tileTex }, uWorld: { value: WORLD } },
-      vertexPars: 'uniform sampler2D uTiles; uniform float uWorld; varying float vGH;',
+      uniforms: { uTiles: { value: tr.tileTex }, uWorld: { value: WORLD }, uBuild: { value: 0 }, ...ov },
+      vertexPars: 'uniform sampler2D uTiles; uniform float uWorld; uniform float uBuild; varying float vGH;',
       vertexWorld: `
         vGH = position.y;
         float allow = texture2D(uTiles, cOrigin.xz / uWorld).a;
         if (allow < 0.55) cWorld.xyz = cOrigin;
+        // build view: blades crouch so painted zones, coverage and the drag rectangle read clearly
+        cWorld.xyz = cOrigin + (cWorld.xyz - cOrigin) * vec3(1.0 - uBuild * 0.3, 1.0 - uBuild * 0.68, 1.0 - uBuild * 0.3);
       `,
-      fragPars: 'varying float vGH;',
+      fragPars: 'varying float vGH; uniform float uWorld;\n' + OVERLAY_GLSL,
       fragColor: /* glsl */`
         {
           vec3 wp = vCWorld;
@@ -393,6 +485,7 @@ export class Vegetation {
           diffuseColor.rgb = mix(grass * 0.8, tip, smoothstep(0.0, 1.0, vGH));
         }
       `,
+      fragOut: 'outgoingLight = applyBuildOverlay(outgoingLight, vCWorld, 1.0);',
     });
     const CH = 16, chunks = Math.ceil(WORLD / CH);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();

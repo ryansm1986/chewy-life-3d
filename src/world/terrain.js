@@ -150,8 +150,9 @@ export class Terrain {
     const mat = makeToon({
       brush: 0.16, brushScale: 0.22, rim: 0.0, shadowSat: 0.45,
       uniforms: {
-        uTiles: { value: this.tileTex }, uOverlay: { value: this.overlayTex }, uOverlayAmt: { value: 0 },
+        uTiles: { value: this.tileTex }, uOverlay: { value: this.overlayTex }, uOverlayAmt: { value: 0 }, uOverlayMode: { value: 1 },
         uWorld: { value: WORLD }, uGrid: { value: 0 }, uCursor: { value: new THREE.Vector4(-99, -99, 0, 0) },
+        uCursorCol: { value: new THREE.Vector4(1, 1, 0.85, 0.12) },
       },
       fragPars: TERRAIN_FRAG_PARS,
       fragColor: TERRAIN_FRAG_COLOR,
@@ -163,6 +164,11 @@ export class Terrain {
     m.name = 'terrain';
     return m;
   }
+  // uniform objects the grass shares so it renders the same build overlay as the ground
+  overlayUniforms() {
+    const u = this.material?.userData?.u; if (!u) return null;
+    return { uOverlay: u.uOverlay, uOverlayAmt: u.uOverlayAmt, uOverlayMode: u.uOverlayMode, uGrid: u.uGrid, uCursor: u.uCursor, uCursorCol: u.uCursorCol };
+  }
   // big seabed skirt around the island so the sea has something under it
   skirt() {
     const g = new THREE.RingGeometry(WORLD * 0.72, 420, 64, 1);
@@ -172,13 +178,69 @@ export class Terrain {
   }
 }
 
-const TERRAIN_FRAG_PARS = /* glsl */`
-uniform sampler2D uTiles;
+// Build-mode overlay shared by the terrain and the grass blades (the grass material binds the very same uniform
+// objects, see Terrain.overlayUniforms()), so zones, coverage, grid and the drag rectangle read on top of the lawn.
+//  uOverlay: RGBA per tile (NearestFilter). uOverlayMode 1 = zones (flat fill, stripes, bold borders where the zone
+//  changes), 0 = coverage gradient (outline where coverage ends). uCursor = (cx, cz, w, d), uCursorCol = (rgb, fill).
+export const OVERLAY_GLSL = /* glsl */`
 uniform sampler2D uOverlay;
 uniform float uOverlayAmt;
-uniform float uWorld;
+uniform float uOverlayMode;
 uniform float uGrid;
 uniform vec4 uCursor;
+uniform vec4 uCursorCol;
+float ovDiff(vec4 a, vec4 b) { return step(0.04, abs(a.r - b.r) + abs(a.g - b.g) + abs(a.b - b.b) + abs(a.a - b.a)); }
+vec3 applyBuildOverlay(vec3 col, vec3 wp, float blade) {
+  vec2 tuv = wp.xz / uWorld;
+  float lum = dot(col, vec3(0.333));
+  if (uOverlayAmt > 0.0) {
+    vec4 ov = texture2D(uOverlay, tuv);
+    if (ov.a > 0.004) {
+      float px = 1.0 / uWorld;
+      vec2 f = fract(wp.xz);
+      vec4 oL = texture2D(uOverlay, tuv - vec2(px, 0.0)), oR = texture2D(uOverlay, tuv + vec2(px, 0.0));
+      vec4 oD = texture2D(uOverlay, tuv - vec2(0.0, px)), oU = texture2D(uOverlay, tuv + vec2(0.0, px));
+      float zones = step(0.5, uOverlayMode);
+      vec4 dif = zones > 0.5 ? vec4(ovDiff(ov, oL), ovDiff(ov, oR), ovDiff(ov, oD), ovDiff(ov, oU))
+                             : vec4(step(oL.a, 0.004), step(oR.a, 0.004), step(oD.a, 0.004), step(oU.a, 0.004));
+      float e = min(min(mix(1.0, f.x, dif.x), mix(1.0, 1.0 - f.x, dif.y)), min(mix(1.0, f.y, dif.z), mix(1.0, 1.0 - f.y, dif.w)));
+      vec3 tint = ov.rgb * (0.62 + 0.5 * lum);
+      float a = ov.a;
+      if (zones > 0.5) a *= mix(0.78, 1.0, step(0.5, fract((wp.x + wp.z) * 0.7071))); // soft diagonal stripes
+      col = mix(col, tint, clamp(a * (1.0 + blade * 0.25), 0.0, 1.0) * uOverlayAmt);
+      float w = zones > 0.5 ? 0.15 : 0.1;
+      float line = 1.0 - smoothstep(w - 0.05, w, e);
+      col = mix(col, ov.rgb * 0.42, line * 0.95 * uOverlayAmt);
+      float hi = smoothstep(w - 0.01, w + 0.02, e) * (1.0 - smoothstep(w + 0.05, w + 0.1, e));
+      col = mix(col, mix(ov.rgb, vec3(1.0), 0.65), hi * 0.7 * zones * uOverlayAmt);
+    }
+  }
+  if (uGrid > 0.0) {
+    vec2 g = abs(fract(wp.xz) - 0.5);
+    float line = smoothstep(0.465, 0.5, max(g.x, g.y));
+    col = mix(col, vec3(1.0, 0.98, 0.9), line * (0.32 - blade * 0.12) * uGrid);
+  }
+  if (uCursor.z > 0.0) {
+    vec2 q = abs(wp.xz - uCursor.xy) - uCursor.zw * 0.5;
+    float sd = max(q.x, q.y);
+    float inside = step(sd, 0.0);
+    float border = inside * smoothstep(-0.2, -0.04, sd);
+    float pulse = 0.8 + 0.2 * sin(uTime * 7.0);
+    col = mix(col, uCursorCol.rgb * (0.55 + 0.6 * lum), inside * uCursorCol.a);
+    col = mix(col, mix(uCursorCol.rgb, vec3(1.0), 0.45), border * 0.92 * pulse);
+    // corner ticks make big rectangles readable at a glance
+    vec2 cq = abs(wp.xz - uCursor.xy) - (uCursor.zw * 0.5 - 0.55);
+    float corner = inside * step(0.0, cq.x) * step(0.0, cq.y);
+    col = mix(col, vec3(1.0), corner * 0.55);
+  }
+  return col;
+}
+`;
+
+const TERRAIN_FRAG_PARS = /* glsl */`
+uniform sampler2D uTiles;
+uniform float uWorld;
+${OVERLAY_GLSL}
 vec2 vHash2(vec2 p) { p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return fract(sin(p) * 43758.5453); }
 // returns (edge distance, cell id hash)
 vec2 voronoi(vec2 x) {
@@ -247,23 +309,5 @@ const TERRAIN_FRAG_COLOR = /* glsl */`
 `;
 
 const TERRAIN_FRAG_OUT = /* glsl */`
-{
-  vec2 tuv = vCWorld.xz / uWorld;
-  if (uOverlayAmt > 0.0) {
-    vec4 ov = texture2D(uOverlay, tuv);
-    outgoingLight = mix(outgoingLight, ov.rgb * (0.6 + 0.4 * dot(outgoingLight, vec3(0.33))), ov.a * uOverlayAmt);
-  }
-  if (uGrid > 0.0) {
-    vec2 f = abs(fract(vCWorld.xz) - 0.5);
-    float line = smoothstep(0.47, 0.5, max(f.x, f.y));
-    outgoingLight = mix(outgoingLight, vec3(1.0, 0.98, 0.9), line * 0.35 * uGrid);
-  }
-  if (uCursor.z > 0.0) {
-    vec2 d = vCWorld.xz - uCursor.xy;
-    vec2 q = abs(d) - vec2(uCursor.z, uCursor.w) * 0.5;
-    float inside = step(max(q.x, q.y), 0.0);
-    float border = inside * smoothstep(-0.12, 0.0, max(q.x, q.y));
-    outgoingLight = mix(outgoingLight, vec3(1.0, 1.0, 0.85), border * 0.8 + inside * 0.12);
-  }
-}
+  outgoingLight = applyBuildOverlay(outgoingLight, vCWorld, 0.0);
 `;
