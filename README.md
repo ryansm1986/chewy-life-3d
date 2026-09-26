@@ -46,3 +46,10 @@ Chrome / Edge recommended (WebGL2). Saves automatically to the browser's local s
 Three.js r186 + Vite, plain ES modules, all art procedural (no image assets): characters, buildings, vegetation, monsters,
 icons and portraits are generated in code; all music and sound effects are synthesized with the Web Audio API.
 Dev pages live under `/?test=…` (`sandbox`, `chars`, `monsters`, `dungeon`, `buildings`, `ui`, `rpg`, `audio`, `portraits`).
+
+## Testing
+- `node tools/test-rpg.mjs` — ~4.8M checks on items, affixes, stats, levelling and drop tables.
+- `node tools/qa/run-all.mjs` — browser scenario suite (needs `npm run dev`): village↔Burrow round trips and leak checks,
+  combat stress with every skill, all four bosses, death, village sim + save/load, inventory edge cases, dialogue/story,
+  input edge cases. Each scenario (`tools/qa/s*.mjs`) can also run on its own.
+- `node tools/shot.mjs --url "/?..." --out name` — headless screenshot harness used for visual iteration.
