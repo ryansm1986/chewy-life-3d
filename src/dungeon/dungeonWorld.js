@@ -2,8 +2,8 @@
 import * as THREE from 'three';
 import { CELL, THEMES } from './gen.js';
 import { makeToon, makeGlow, U } from '../gfx/materials.js';
-import { paint, merge, puff, xf, RoundedBox, tube } from '../gfx/geom.js';
-import { glowTexture } from '../gfx/textures.js';
+import { paint, merge, puff, xf, RoundedBox, tube, mergeVertices } from '../gfx/geom.js';
+import { glowTexture, shaftTexture } from '../gfx/textures.js';
 import { LightPool } from '../core/engine.js';
 import { Collision } from '../world/collision.js';
 import { Noise, mulberry32, clamp, rand, TAU } from '../core/util.js';
@@ -18,8 +18,8 @@ export class DungeonWorld {
     const scene = this.scene = new THREE.Scene();
     scene.background = C(T.fog);
     scene.fog = new THREE.Fog(T.fog, 38, 70);
-    this.hemi = new THREE.HemisphereLight(T.ambient[0], T.ambient[1], 1.0); scene.add(this.hemi);
-    const sun = this.sun = new THREE.DirectionalLight('#b8b0ff', 0.9);
+    this.hemi = new THREE.HemisphereLight(T.ambient[0], T.ambient[1], 1.35); scene.add(this.hemi);
+    const sun = this.sun = new THREE.DirectionalLight('#d8d0ff', 1.25);
     sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
     const sc = sun.shadow.camera; sc.left = -26; sc.right = 26; sc.top = 26; sc.bottom = -26; sc.near = 1; sc.far = 120;
     sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.04; sun.shadow.radius = 3;
@@ -31,7 +31,7 @@ export class DungeonWorld {
     this.interactables = [];
     this.rng = mulberry32(layout.floor * 31 + 7);
     this.noise = new Noise(layout.floor + 5);
-    this.buildFloor(); this.buildWalls(); this.buildProps(); this.buildLights();
+    this.buildFloor(); this.buildWalls(); this.buildProps(); this.buildLights(); this.buildShafts();
   }
   cellToWorld(x, y) { return V((x + 0.5) * CELL, 0, (y + 0.5) * CELL); }
   worldToCell(x, z) { return [Math.floor(x / CELL), Math.floor(z / CELL)]; }
@@ -109,30 +109,40 @@ export class DungeonWorld {
     const wc = T.wall.map(C), tc = T.top.map(C);
     const isEdge = (x, y) => !at(x, y) && (at(x + 1, y) || at(x - 1, y) || at(x, y + 1) || at(x, y - 1) || at(x + 1, y + 1) || at(x - 1, y - 1) || at(x + 1, y - 1) || at(x - 1, y + 1));
     const chunk = (cx, cz, s, h, k) => {
-      const g = new RoundedBox(s, h, s, 2, Math.min(0.55, s * 0.3));
-      const pos = g.attributes.position;
-      for (let i = 0; i < pos.count; i++) {
-        const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
-        const n = N.n2((x + cx) * 0.7, (z + cz) * 0.7 + y * 0.5);
-        pos.setXYZ(i, x * (1 + n * 0.18), y + (y > 0 ? n * 0.25 : 0), z * (1 + N.n2(z * 0.9 + cz, x + cx) * 0.18));
+      // an organic rock pillar: 2-3 stacked noisy lumps, mossy/crystal cap on top
+      const lumps = [];
+      const n = h > 3 ? 3 : 2;
+      for (let i = 0; i < n; i++) {
+        const t = i / n, rr = s * (0.62 - t * 0.12) * (0.9 + r() * 0.2);
+        let g = new THREE.IcosahedronGeometry(1, 2);
+        g.deleteAttribute('normal'); g.deleteAttribute('uv'); g = mergeVertices(g);
+        const pos = g.attributes.position;
+        for (let j = 0; j < pos.count; j++) {
+          const x = pos.getX(j), y = pos.getY(j), z = pos.getZ(j);
+          const nn = N.n2((x + cx) * 1.3 + i * 5, (z + cz) * 1.3 + y * 1.7) * 0.22 + N.n2((x - cz) * 3.1, (y + cx) * 3.1) * 0.08;
+          pos.setXYZ(j, x * rr * (1 + nn), y * (h / n) * 0.62 * (1 + nn * 0.6), z * rr * (1 + nn));
+        }
+        g.computeVertexNormals();
+        g.translate(cx + (r() - 0.5) * 0.25, (t + 0.5 / n) * h * 0.92, cz + (r() - 0.5) * 0.25);
+        lumps.push(g);
       }
-      g.computeVertexNormals();
-      g.translate(cx, h / 2 - 0.1, cz);
-      const base = wc[k % 3], top = tc[(k + 1) % 3];
-      return paint(g, (p, n, o) => {
-        o.copy(base).lerp(wc[(k + 1) % 3], clamp((p.y / h) * 0.6));
-        if (n.y > 0.55) o.copy(top).lerp(tc[(k + 2) % 3], clamp(N.n2(p.x * 0.8, p.z * 0.8) * 0.5 + 0.5));
-        o.multiplyScalar(0.85 + 0.15 * clamp(p.y / h));
+      const base = wc[k % 3];
+      const top = tc[(k + 1) % 3];
+      return paint(merge(lumps), (p, nrm, o) => {
+        o.copy(base).lerp(wc[(k + 1) % 3], clamp(N.n2(p.x * 0.6, p.y * 0.9) * 0.5 + 0.5));
+        const up = clamp((nrm.y - 0.35) * 2.2) * clamp((p.y - h * 0.45) / (h * 0.4));
+        o.lerp(top, up);
+        o.multiplyScalar(0.72 + 0.28 * clamp(p.y / h));
       });
     };
     let k = 0;
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       if (!isEdge(x, y)) continue;
       const wp = this.cellToWorld(x, y);
-      const h = 2.2 + r() * 1.4 + (N.n2(x * 0.2, y * 0.2) * 0.5 + 0.5) * 1.2;
-      parts.push(chunk(wp.x + (r() - 0.5) * 0.3, wp.z + (r() - 0.5) * 0.3, CELL * (1.05 + r() * 0.2), h, k++));
+      const h = 2.0 + r() * 1.2 + (N.n2(x * 0.2, y * 0.2) * 0.5 + 0.5) * 1.4;
+      parts.push(chunk(wp.x + (r() - 0.5) * 0.3, wp.z + (r() - 0.5) * 0.3, CELL * (0.95 + r() * 0.2), h, k++));
       this.collision.addRect(wp.x - CELL / 2, wp.z - CELL / 2, wp.x + CELL / 2, wp.z + CELL / 2, 'wall');
-      if (r() < 0.25) parts.push(chunk(wp.x + (r() - 0.5) * 0.8, wp.z + (r() - 0.5) * 0.8, CELL * 0.6, h + 0.6 + r() * 0.8, k++));
+      if (r() < 0.3) parts.push(chunk(wp.x + (r() - 0.5) * 0.9, wp.z + (r() - 0.5) * 0.9, CELL * 0.55, h * 0.55 + r() * 0.8, k++));
     }
     // batch into a few meshes (keeps per-mesh vertex counts reasonable)
     const mat = makeToon({ vertexColors: true, brush: 0.28, brushScale: 0.6, rim: 0.3, occluder: true, term: [-0.05, 0.35] });
@@ -198,7 +208,7 @@ export class DungeonWorld {
     const T = this.theme;
     for (const l of this.L.lights) {
       const wp = this.cellToWorld(l.x, l.y);
-      this.lightPool.addSource({ pos: V(wp.x, 1.4, wp.z), color: C(T.light), intensity: 9, radius: 9, flicker: 1 });
+      this.lightPool.addSource({ pos: V(wp.x, 1.5, wp.z), color: C(T.light), intensity: 12, radius: 11, flicker: 1 });
       // brazier / lantern visual
       const g = new THREE.CylinderGeometry(0.16, 0.22, 0.9, 8); g.translate(0, 0.45, 0);
       const bowl = new THREE.SphereGeometry(0.28, 12, 8, 0, TAU, Math.PI / 2, Math.PI / 2); bowl.translate(0, 1.0, 0);
@@ -210,13 +220,39 @@ export class DungeonWorld {
       (this.flames ||= []).push({ s: flame, p: flame.position.clone(), ph: Math.random() * 10 });
     }
   }
+  buildShafts() {
+    const { rooms } = this.L;
+    const tex = shaftTexture();
+    this.shafts = [];
+    for (const r of rooms) {
+      if (this.rng() < 0.45) continue;
+      const wp = this.cellToWorld(r.cx + Math.floor((this.rng() - 0.5) * r.w * 0.5), r.cy + Math.floor((this.rng() - 0.5) * r.h * 0.5));
+      const col = C(this.theme.accent).lerp(C('#ffffff'), 0.55);
+      for (let i = 0; i < 3; i++) {
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(1.6 + this.rng() * 1.4, 11), new THREE.MeshBasicMaterial({ map: tex, color: col, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, fog: false }));
+        m.geometry.translate(0, 5.5, 0);
+        m.position.set(wp.x + (this.rng() - 0.5) * 1.5, 0, wp.z + (this.rng() - 0.5) * 1.5);
+        m.rotation.set(0.28, this.rng() * TAU, 0.18);
+        m.renderOrder = 11; this.scene.add(m);
+        this.shafts.push({ m, ph: this.rng() * 10, base: 0.08 + this.rng() * 0.06 });
+      }
+      const pool = new THREE.Mesh(new THREE.CircleGeometry(1.6, 24), new THREE.MeshBasicMaterial({ map: glowTexture(), color: col, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+      pool.rotation.x = -Math.PI / 2; pool.position.set(wp.x, 0.04, wp.z); this.scene.add(pool);
+      this.shaftSpots = (this.shaftSpots || []); this.shaftSpots.push(wp);
+    }
+  }
   onSky() {}
   updateSun(focus) {
     const s = this.sun;
     s.target.position.copy(focus); s.position.copy(focus).addScaledVector(this.sunDir, 50); s.target.updateMatrixWorld();
     U.uSunDir.value.copy(this.sunDir);
   }
-  update(dt, t) {
-    for (const f of this.flames || []) { f.s.scale.setScalar(1.3 + Math.sin(t * 11 + f.ph) * 0.12 + Math.sin(t * 23 + f.ph) * 0.08); }
+  update(dt, t, vfx, focus) {
+    for (const f of this.flames || []) { f.s.scale.setScalar(1.3 + Math.sin(t * 11 + f.ph) * 0.12 + Math.sin(t * 23 + f.ph) * 0.08); if (vfx && Math.random() < dt * 6) vfx.glow.spawn({ x: f.p.x + rand(-0.1, 0.1), y: f.p.y, z: f.p.z + rand(-0.1, 0.1), vy: rand(0.6, 1.2), life: 0.6, size: 0.25, size1: 0.02, color: this.theme.light, alpha: 0.9, alpha1: 0 }); }
+    for (const s of this.shafts || []) s.m.material.opacity = s.base * (0.75 + 0.25 * Math.sin(t * 0.7 + s.ph));
+    if (vfx && focus) { // floating dust motes / spores around the player
+      this.moteAcc = (this.moteAcc || 0) + dt * 10;
+      while (this.moteAcc > 1) { this.moteAcc--; const x = focus.x + rand(-12, 12), z = focus.z + rand(-10, 10); if (!this.walkable(x, z)) continue; vfx.glow.spawn({ x, y: rand(0.3, 3), z, vx: rand(-0.1, 0.1), vy: rand(0.02, 0.12), vz: rand(-0.1, 0.1), life: rand(3, 5), size: rand(0.06, 0.12), color: this.theme.accent, alpha: 0.7, alpha1: 0, fadeIn: 1, flicker: rand(2, 5) }); }
+    }
   }
 }

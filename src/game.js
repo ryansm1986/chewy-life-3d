@@ -18,6 +18,9 @@ import { SkillRunner } from './combat/skillRunner.js';
 import { DungeonMode } from './dungeon/dungeonMode.js';
 import { newGameState, createActions } from './rpg/actions.js';
 import { skillRuntime } from './rpg/skills.js';
+import { VillageSim } from './world/village.js';
+import { BuildMode } from './world/buildMode.js';
+import { Story } from './world/story.js';
 
 async function tryImport(path) { try { return await import(/* @vite-ignore */ path); } catch (e) { console.warn('[boot] optional module missing', path, e.message); return null; } }
 
@@ -47,6 +50,10 @@ export async function boot() {
   G.vfx = vVfx;
   const ambient = new Ambient(G, village, vVfx);
   const vCombat = new Combat(G, village);
+  const sim = G.sim = new VillageSim(G, village);
+  sim.init();
+  village.onNewDay = d => sim.onNewDay(d);
+  const buildMode = G.build = new BuildMode(G, sim);
   G.village = { world: village, vfx: vVfx, ambient, combat: vCombat };
   G.world = village; G.combat = vCombat;
   engine.setWorld(village);
@@ -64,8 +71,8 @@ export async function boot() {
   for (const v of VILLAGERS) npcs.push(new Villager(village, G, v.spec, { id: v.id, anchor: v.anchor, wander: v.wander || 5 }));
   const skills = G.skills = new SkillRunner(G);
 
-  // dungeon gate interactable (the building model sits here once the village sim places it)
-  village.interactables.push({ pos: new THREE.Vector3(L.dungeon.x, village.heightAt(L.dungeon.x, L.dungeon.z), L.dungeon.z + 1.6), radius: 1.8, label: 'Enter the Burrow', onInteract: () => G.openBurrowMenu() });
+  // fallback gate interaction if the Burrow landmark is missing
+  if (!sim.S.buildings.some(b => b.type === 'dungeonGate')) village.interactables.push({ pos: new THREE.Vector3(L.dungeon.x, village.heightAt(L.dungeon.x, L.dungeon.z), L.dungeon.z + 1.6), radius: 1.8, label: 'Enter the Burrow', onInteract: () => G.openBurrowMenu() });
 
   // ---- UI
   if (uiMod?.UI) { G.ui = uiMod.UI; try { G.ui.init(G); G.ui.setMode?.('village'); } catch (e) { console.error('[ui] init failed', e); G.ui = null; } }
@@ -154,14 +161,12 @@ export async function boot() {
   }
 
   // ---- interaction helpers
+  G.story = new Story(G);
   G.talkTo = (npc) => {
+    if (npc.talking) return;
     npc.talking = true; player.controlLocked = true;
-    const lines = npc.id === 'rosie'
-      ? ["Chewy! You're up! Shadow's been chasing butterflies all morning.", 'The village could use more homes — and something grumbly is stirring in the Burrow again.']
-      : [`Hi Chewy! Lovely day in Blossom Hollow, isn't it?`];
     const done = () => { npc.talking = false; player.controlLocked = false; };
-    if (G.ui?.dialogue) G.ui.dialogue({ speaker: npc.name, portrait: G.ui?.portraits?.get?.(npc.id), lines }).then(done, done);
-    else setTimeout(done, 1200);
+    G.story.talk(npc).then(done, (e) => { console.error(e); done(); });
   };
   function nearestInteract() {
     let best = null, bd = 1e9;
@@ -203,6 +208,8 @@ export async function boot() {
   // ---- per-frame input
   let hoverEnemy = null;
   function handleInput(dt) {
+    if (G.mode === 'village' && Input.hit('b') && !player.controlLocked) { buildMode.active ? buildMode.exit() : buildMode.enter(); }
+    if (buildMode.active) { if (Input.mouse.wheel) rig.zoom(Input.mouse.wheel); const d = player.readMoveInput(); if (d.lengthSq()) rig.focus.addScaledVector(d, 0); return; }
     const modal = G.ui?.anyModal?.();
     if (modal || player.controlLocked || G.playerDead) { G.ui?.setInteract?.(null); return; }
     const hb = G.state.player.hotbar;
@@ -273,6 +280,8 @@ export async function boot() {
       village.updateSun(rig.target, day.sunDir);
       village.lightPool.update(dt, rig.target, engine.time, day.night);
       village.update(dt, engine.time);
+      sim.update(dt, engine.time);
+      buildMode.update(dt);
       ambient.update(dt, engine.time);
     } else {
       dungeon.update(dt, engine.time);

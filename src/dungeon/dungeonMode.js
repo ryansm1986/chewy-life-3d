@@ -326,7 +326,7 @@ export class DungeonMode {
     if (this.playerLight) this.playerLight.pos.copy(G.player.pos).setY(G.player.pos.y + 1.8);
     // boss bar
     if (this.boss?.alive && this.boss.aggro) G.ui?.setBoss?.({ name: this.boss.name, hp: this.boss.life, max: this.boss.lifeMax });
-    this.world.update(dt, t);
+    this.world.update(dt, t, G.vfx, G.player.pos);
   }
   dispose() { this.loot.clear(); this.monsters.length = 0; }
 }

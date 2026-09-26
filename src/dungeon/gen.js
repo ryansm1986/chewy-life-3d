@@ -4,7 +4,7 @@ import { RNG, Noise } from '../core/util.js';
 export const CELL = 2; // world units per cell
 export const THEMES = {
   burrow: { name: 'Mossy Burrow', floor: ['#b58e68', '#a57e5a', '#c49c74'], wall: ['#8a6a58', '#7a5c4c', '#9a7a64'], top: ['#6aa04e', '#5a9044', '#80b45a'], fog: '#2a2038', ambient: ['#6a6aa0', '#3a2a30'], accent: '#8ad0ff', light: '#ffc47a', monsters: ['mochi', 'dustbunny', 'kinoko', 'mochi', 'dustbunny'], music: 'dungeon' },
-  crystal: { name: 'Crystal Grotto', floor: ['#9a92b8', '#8a82a8', '#aaa2c8'], wall: ['#6a6090', '#5a5080', '#7a70a0'], top: ['#b8a8e0', '#a898d0', '#c8b8f0'], fog: '#1c1830', ambient: ['#7a70c0', '#2a2040'], accent: '#ff8ae0', light: '#b8a0ff', monsters: ['kinoko', 'lantern', 'mochi', 'dustbunny', 'wisp'], music: 'dungeon' },
+  crystal: { name: 'Crystal Grotto', floor: ['#9aa6c8', '#8894b8', '#b0bcd8'], wall: ['#5a4a8a', '#4a3c78', '#6a5a9c'], top: ['#a8e8ff', '#c8b8ff', '#ffc8f0'], fog: '#161430', ambient: ['#8a98e0', '#2a2040'], accent: '#ff8ae0', light: '#7ae8ff', monsters: ['kinoko', 'lantern', 'mochi', 'dustbunny', 'wisp'], music: 'dungeon' },
   shrine: { name: 'Fox Shrine Tunnels', floor: ['#b07a50', '#a06a44', '#c08a5c'], wall: ['#6a4448', '#5a383c', '#7a5054'], top: ['#3a3a44', '#34343c', '#44444e'], fog: '#281820', ambient: ['#a06a80', '#301820'], accent: '#ff6a4a', light: '#ffae6a', monsters: ['kasa', 'lantern', 'wisp', 'tanuki', 'kasa'], music: 'dungeon' },
   kitchen: { name: "Oni's Kitchen", floor: ['#8a7068', '#7a6058', '#9a8078'], wall: ['#5a4040', '#4a3434', '#6a4c4c'], top: ['#3a2a2a', '#342424', '#443030'], fog: '#2a1414', ambient: ['#c07050', '#301410'], accent: '#ff8a3a', light: '#ff9a4a', monsters: ['oni', 'tanuki', 'lantern', 'mochi', 'oni'], music: 'dungeon' },
 };

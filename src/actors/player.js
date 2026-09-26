@@ -67,7 +67,7 @@ export class Player extends Actor {
     let moved = 0;
     // external speed modifiers (buffs, chill auras)
     this.slowT = Math.max(0, (this.slowT || 0) - dt);
-    this.speedMul = (G.combat?.moveMul?.() || 1) * (1 + (G.derived?.moveSpeed || 0) / 100) * (this.slowT > 0 ? 1 - (this.slowAmt || 0.3) : 1) * (G.combat?.buffs?.shrineZoom ? 1.35 : 1);
+    this.speedMul = (G.combat?.moveMul?.() || 1) * (G.derived?.moveMul || 1) * (this.slowT > 0 ? 1 - (this.slowAmt || 0.3) : 1) * (G.combat?.buffs?.shrineZoom ? 1.35 : 1);
     if (G.playerDead) { super.update(dt); return; }
     if (this.knock && this.knock.lengthSq() > 0.01) { const b = this.pos.clone(); this.pos.addScaledVector(this.knock, dt); this.knock.multiplyScalar(Math.exp(-10 * dt)); this.world.collision?.resolve(this.pos, this.radius, b); }
     if (this.leap || this.dash) { this.pos.y = this.world.heightAt(this.pos.x, this.pos.z); super.update(dt); return; }

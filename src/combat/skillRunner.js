@@ -17,7 +17,7 @@ export class SkillRunner {
   rt(id) { return skillRuntime(id, this.G.state, this.G.derived); }
   cooldown(id) { return this.cds[id] || 0; }
   cooldownFrac(id) { const r = this.rt(id); if (!r || !r.cd) return 0; return clamp((this.cds[id] || 0) / r.cd); }
-  attacksPerSec() { const D = this.G.derived; return (D.aspd || 1.4) * (1 + (D.atkSpeed || 0) / 100) * this.combat.atkMul(); }
+  attacksPerSec() { const D = this.G.derived; return (D.aspd || 1.4) * this.combat.atkMul() * (this.combat.buffs.shrineZoom ? 1.35 : 1); }
   // aim: world point; returns true if cast started
   tryCast(id, aim, target = null) {
     const G = this.G, P = G.player;
