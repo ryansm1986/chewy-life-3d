@@ -261,6 +261,7 @@ export class DungeonMode {
   onMonsterDeath(m) {
     const G = this.G, D = G.derived;
     const i = this.monsters.indexOf(m); if (i >= 0) this.monsters.splice(i, 1);
+    (this.dying ||= []).push(m);
     this.combat.remove(m);
     // xp
     let xp = xpForKill(m.stats.xp, m.level, G.state.player.lvl);
@@ -360,6 +361,8 @@ export class DungeonMode {
     const G = this.G;
     this.flowT -= dt; if (this.flowT <= 0) { this.flowT = 0.4; this.updateFlow(); }
     for (const m of [...this.monsters]) m.update(dt);
+    this.dying = (this.dying || []).filter(m => !m.disposed);
+    for (const m of this.dying) m.update(dt); // death squash / poof animation
     this.loot.update(dt);
     for (const s of this.spinners || []) s(dt, t);
     if (this.playerLight) this.playerLight.pos.copy(G.player.pos).setY(G.player.pos.y + 1.8);

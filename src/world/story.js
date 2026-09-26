@@ -38,6 +38,7 @@ export class Story {
     const Q = G.state.quests;
     Q.active ||= []; Q.done ||= []; Q.requests ||= {};
     if (!Q.active.length && !Q.done.length) this.start('welcome', true);
+    for (const id of Q.done) { const nx = QUESTS[id]?.next; if (nx && !Q.done.includes(nx) && !Q.active.some(q => q.id === nx)) this.start(nx, true); }
     Events.on('monster:killed', e => this.progress('kill', e));
     Events.on('boss:dead', e => this.progress('boss', e));
     Events.on('mode:changed', e => { if (e.mode === 'dungeon') this.progress('floor', e); });
@@ -59,6 +60,7 @@ export class Story {
     const G = this.G, st = G.state;
     switch (s.type) {
       case 'collect': return (st.materials[s.mat] || 0) >= s.n;
+      case 'deliver': return !!q.delivered;
       case 'build': return st.village.buildings.filter(b => b.type === s.btype).length >= s.n + (q.base || 0);
       case 'buildAny': return st.village.buildings.filter(b => s.btypes.includes(b.type)).length >= s.n + (q.base || 0);
       case 'pop': return (G.sim?.stats.population || 0) >= s.n;
@@ -92,12 +94,12 @@ export class Story {
     if (r.skillPts) A.addSkillPts(r.skillPts);
     if (r.mats) for (const k in r.mats) A.addMaterial(k, r.mats[k]);
     if (r.potions) for (const k in r.potions) A.addPotion(k, r.potions[k]);
-    if (r.unique) A.pickup(makeUnique(pick(UNIQUE_IDS), Math.max(5, G.state.player.lvl)));
+    if (r.unique) this.giveItem(makeUnique(pick(UNIQUE_IDS), Math.max(5, G.state.player.lvl)));
     if (r.hearts && d.giver) this.addHearts(d.giver, r.hearts);
     G.ui?.banner?.('Quest Complete!', d.title, { style: 'quest' });
     Events.emit('sfx', 'ui_levelup');
     G.vfx?.levelUp?.(G.player.pos.clone());
-    if (d.request) delete this.Q.requests[q.id];
+    if (d.request) { delete this.Q.requests[q.id]; const k = this.Q.done.lastIndexOf(q.id); if (k >= 0) this.Q.done.splice(k, 1); }
     if (d.next) setTimeout(() => this.start(d.next), 2500);
     Events.emit('quest:update');
   }
@@ -116,6 +118,30 @@ export class Story {
     if (this.Q.active.some(q => { const d = this.def(q.id); return d && d.giver === id && !d.request; })) return '?';
     return null;
   }
+  // put a reward item in the bag; if it's full, into the stash; if that's full too, at Chewy's feet
+  giveItem(item) {
+    const G = this.G;
+    if (G.actions.pickup(item)) return true;
+    const st = G.state.stash, i = st.indexOf(null);
+    if (i >= 0) { st[i] = item; Events.emit('inv:changed', { c: 'stash' }); G.ui?.toast?.(`Bag full — ${item.name} was sent to your stash at home`, { color: '#ffd84a' }); return true; }
+    const loot = G.mode === 'dungeon' ? G.dungeon?.loot : G.villageLoot;
+    loot?.drop(G.player.pos.clone(), [{ type: 'item', item }]);
+    G.ui?.toast?.(`Bag and stash full — ${item.name} is on the ground`, { color: '#ffd84a' });
+    return true;
+  }
+  // hand over requested materials when talking to the giver
+  tryDeliver(id) {
+    const G = this.G;
+    for (const q of this.Q.active) {
+      const d = this.def(q.id), s = d?.steps[q.step];
+      if (s?.type !== 'deliver' || s.npc !== id) continue;
+      if ((G.state.materials[s.mat] || 0) < s.n) return { need: s };
+      G.actions.spendMaterials({ [s.mat]: s.n }); q.delivered = true;
+      this.progress('deliver');
+      return { done: s };
+    }
+    return null;
+  }
   // quest objects for the UI tracker / journal
   uiList() {
     const G = this.G, st = G.state;
@@ -123,7 +149,7 @@ export class Story {
       const done = i < q.step;
       let have = 0, need = s.n || 1;
       if (i === q.step) {
-        if (s.type === 'collect') have = st.materials[s.mat] || 0;
+        if (s.type === 'collect' || s.type === 'deliver') have = st.materials[s.mat] || 0;
         else if (s.type === 'build') have = st.village.buildings.filter(b => b.type === s.btype).length;
         else if (s.type === 'buildAny') have = st.village.buildings.filter(b => s.btypes.includes(b.type)).length - (q.base || 0);
         else if (s.type === 'pop') have = G.sim?.stats.population || 0;
@@ -159,13 +185,17 @@ export class Story {
     // story talk steps
     this.markTalk(id);
     // pending heart reward
-    if (f.pendingReward) {
+    if (f.pendingReward && HEART_REWARDS[f.pendingReward]?.item && G.actions.firstFree('inv') < 0) {
+      await say(["I have a present for you… but your bag looks stuffed! I'll keep it safe until you have room."]);
+    } else if (f.pendingReward) {
       const R = HEART_REWARDS[f.pendingReward]; f.pendingReward = null;
       await say([R.text]);
       if (R.coins) G.actions.addCoins(R.coins);
-      if (R.item) G.actions.pickup(generateItem({ ilvl: G.state.player.lvl + 2, rarity: R.item }));
+      if (R.item) this.giveItem(generateItem({ ilvl: G.state.player.lvl + 2, rarity: R.item }));
       Events.emit('sfx', 'ui_quest');
     }
+    const dv = !npc.folk && this.tryDeliver(id);
+    if (dv?.done) { await say([`${dv.done.n} ${dv.done.mat}! Oh, thank you so much, Chewy!`]); return; }
     if (npc.folk) { await say([pick(['Blossom Hollow is the coziest village ever!', 'I just moved in! My new home smells like fresh cedar.', 'Have you seen the koi pond? So peaceful.', 'The Burrow gives me the shivers… you are so brave, Chewy!', 'I love the lanterns at night.', 'Shadow let me pet him! Best day ever.'])]); return; }
     const lines = [];
     const quest = this.Q.active.find(q => this.def(q.id)?.giver === id);
@@ -206,7 +236,7 @@ export class Story {
     const lvl = G.state.player.lvl;
     const mat = pick(['wood', 'stone', 'petal', 'mochi', 'silk', 'lantern', 'crystal', 'bone']);
     const templates = [
-      { steps: [{ type: 'collect', mat, n: randInt(2, 5), text: `Bring ${mat}` }], text: `Could you bring me some ${mat}? I'm making something special!` },
+      { steps: [{ type: 'deliver', mat, n: randInt(2, 5), npc: id, text: `Bring ${mat} to ${npc.name}` }], text: `Could you bring me some ${mat}? I'm making something special!` },
       { steps: [{ type: 'kill', n: randInt(10, 20), text: 'Defeat yokai in the Burrow' }], text: 'The yokai keep knocking over my flower pots… could you shoo some away?' },
       { steps: [{ type: 'buildAny', btypes: ['bench', 'flowerBed', 'sakuraPlanter'], n: 1, text: 'Build a bench, flower bed or planter' }], text: 'The village could use somewhere cute to sit. Would you build something?' },
     ];

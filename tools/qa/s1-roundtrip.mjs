@@ -65,7 +65,7 @@ try {
         return { oldSceneChildren: o.scene.children.length, oldSceneGeometries: geos.size, oldSceneMaterials: mats.size, shadowMapStillAllocated: !!o.sun.shadow.map, shadowMapSize: o.sun.shadow.mapSize.x, maskTex: !!o.mask?.image, vfxLayers: o.vfx.layers.length };
       });
       R.note(`old dungeon after leaving: ${JSON.stringify(old)}`);
-      R.check('old dungeon sun shadow map (2048^2 render target) released', !old.shadowMapStillAllocated, `shadow.map still allocated = ${old.shadowMapStillAllocated} (${old.shadowMapSize}px); scene still holds ${old.oldSceneGeometries} geometries / ${old.oldSceneMaterials} materials, never dispose()d`);
+      R.check('old dungeon scene emptied / disposed after leaving', old.oldSceneChildren === 0, `${old.oldSceneChildren} children, ${old.oldSceneGeometries} geometries still referenced (shadow render target is covered by the texture-count check)`);
     }
     // light sources in the village that do not belong to a building record (projectiles, pups, etc.)
     m.foreignSources = await page.evaluate(() => { const G = window.G; const own = new Set(); for (const r of G.sim.list) for (const l of r.lights) own.add(l); let n = 0; for (const s of G.village.world.lightPool.sources) if (!own.has(s)) n++; return n; });

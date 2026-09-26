@@ -32,7 +32,7 @@ fs.mkdirSync(outDir, { recursive: true });
 const base = process.env.BASE || 'http://localhost:5173';
 const browser = await chromium.launch({
   executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true,
-  args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
+  args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required', '--js-flags=--expose-gc'],
 });
 const page = await browser.newPage({ viewport: { width: opt.w, height: opt.h } });
 await page.routeWebSocket(/.*/, ws => { ws.onMessage(() => {}); });

@@ -73,7 +73,8 @@ export function installServices(G) {
     const c = await say('Bonesmith', ['*Clang clang!* Need your gear tuned up, pup?'], [{ text: 'Reforge an item (reroll magic properties)' }, { text: 'Punch a socket into a plain item' }, { text: 'Upgrade to a sturdier tier' }, { text: 'Just looking' }]);
     if (c == null || c > 2) return;
     const inv = G.state.inventory.map((it, i) => ({ it, i })).filter(x => x.it && x.it.kind === 'gear');
-    const eligible = inv.filter(({ it }) => c === 0 ? (it.rarity === 'magic' || it.rarity === 'rare') : c === 1 ? it.rarity === 'normal' && (it.sockets || 0) < 2 : true);
+    const nextTier = it => Object.entries(ITEM_BASES).find(([id, b]) => b.slot === it.slot && (b.wtype || null) === (it.wtype || null) && (b.tier || 0) > (ITEM_BASES[it.base]?.tier || 0));
+    const eligible = inv.filter(({ it }) => c === 0 ? (it.rarity === 'magic' || it.rarity === 'rare') : c === 1 ? it.rarity === 'normal' && (it.sockets || 0) < 2 : !!nextTier(it));
     if (!eligible.length) return say('Bonesmith', ["Hmm, you don't have anything in your bag I can work on for that."]);
     const cost = (it) => c === 0 ? { coins: Math.round(itemValue(it) * 2 + 40), bone: 2 } : c === 1 ? { coins: 80 + it.ilvl * 6, stone: 4 } : { coins: 200 + it.ilvl * 12, bone: 5, crystal: 1 };
     const pickI = await say('Bonesmith', ['Which one?'], [...eligible.slice(0, 6).map(({ it }) => ({ text: `${it.name} — ${Object.entries(cost(it)).map(([k, v]) => `${v} ${k}`).join(', ')}` })), { text: 'Never mind' }]);

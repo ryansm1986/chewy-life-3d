@@ -40,6 +40,7 @@ export async function boot() {
   // ---- persistent state + actions
   const saved = !P.has('fresh') && loadSave();
   G.state = saved || newGameState();
+  if (G.state.player.life === 0) G.state.player.life = null;
   G.actions = createActions(G);
   G.actions.recompute();
   G.skillParams = (id) => skillRuntime(id, G.state, G.derived)?.params;
@@ -231,17 +232,21 @@ export async function boot() {
         G.state.flags.burrowTut = true;
         const tutFor = dungeon;
         setTimeout(async () => {
-          if (G.mode !== 'dungeon' || G.dungeon !== tutFor || G.playerDead) { G.state.flags.burrowTut = false; return; } // left already: show it next visit
-          player.controlLocked = true;
+          if (G.mode !== 'dungeon' || G.dungeon !== tutFor || G.playerDead || G.leavingDungeon) { G.state.flags.burrowTut = false; return; } // left already: show it next visit
+          player.controlLocked = true; G.tutorialOpen = true;
           await G.ui.dialogue({ speaker: 'Shadow', portrait: G.portrait('shadow'), lines: ["*Sniff sniff!* Yip! (Monsters ahead! Here's how we fight, Chewy!)", '*Click a monster* to bonk it with your Bone Sword. *Right-click* uses Chomp Slash!', "Press *X* to swap to your Red Tennis Ball, *Space* to roll away, and *Q* for a Heart Treat when you're hurt.", 'Spend skill points with *K* and stat points with *C*. Find the *stairs* to go deeper — or step in the purple portal to go home!'] });
-          player.controlLocked = false;
+          player.controlLocked = false; G.tutorialOpen = false;
         }, 2600);
       }
     };
     if (G.ui?.transition) G.ui.transition(go); else go();
   };
   G.returnToVillage = (dead = false) => {
+    G.leavingDungeon = true;
     const go = () => {
+      G.leavingDungeon = false;
+      // a Burrow-only conversation (Shadow's combat tutorial) must not follow Chewy home
+      if (G.ui?.dlg?.active && G.tutorialOpen) { G.ui.dlg.finish(-1); G.state.flags.burrowTut = false; }
       skills.clearAll();
       const old = dungeon;
       swapWorld(village, vVfx, vCombat);
@@ -249,7 +254,8 @@ export async function boot() {
       G.mode = 'village';
       const home = dead ? { x: L.chewyHouse.x + 2.2, z: L.chewyHouse.z } : { x: L.dungeon.x, z: L.dungeon.z + 3.2 };
       player.setPos(home.x, home.z); shadow.setPos(home.x + 0.8, home.z + 0.6);
-      player.anim.stop(); G.playerDead = false; G.actions.restoreAll(); shadow.fainted = 0; shadow.untargetable = false; shadow.anim.stop();
+      player.anim.stop(); G.playerDead = false; G.actions.restoreAll(); shadow.fainted = 0; shadow.untargetable = false; shadow.anim.stop(); shadow.recalc(); shadow.life = shadow.lifeMax;
+      G.ui?.lootLabel?.clear?.();
       rig.distTarget = 27; rig.focus.copy(player.pos); rig.snap();
       G.ui?.setMode?.('village'); G.ui?.setBoss?.(null);
       engine.post.grade.uniforms.get('uVigColor').value.set(0.55, 0.45, 0.65); engine.post.grade.uniforms.get('uVignette').value = 1.0; day.apply();
@@ -293,7 +299,7 @@ export async function boot() {
   G.talkTo = (npc) => {
     if (npc.talking) return;
     npc.talking = true; player.controlLocked = true;
-    const done = () => { npc.talking = false; player.controlLocked = false; };
+    const done = () => { npc.talking = false; player.controlLocked = false; G.interactCooldown = engine.time + 0.4; Input.consume('f'); };
     G.story.talk(npc).then(done, (e) => { console.error(e); done(); });
   };
   function nearestInteract() {
@@ -336,7 +342,7 @@ export async function boot() {
   // ---- per-frame input
   let hoverEnemy = null;
   function handleInput(dt) {
-    if (G.mode === 'village' && Input.hit('b') && !player.controlLocked) { buildMode.active ? buildMode.exit() : buildMode.enter(); }
+    if (G.mode === 'village' && Input.hit('b') && !player.controlLocked && !G.ui?.isPaused?.() && !G.ui?.anyModal?.()) { buildMode.active ? buildMode.exit() : buildMode.enter(); }
     if (buildMode.active) {
       if (Input.mouse.wheel) rig.zoom(Input.mouse.wheel);
       if (!G.buildFocus) G.buildFocus = player.pos.clone();
@@ -378,7 +384,7 @@ export async function boot() {
     if (Input.hit('t') && G.mode === 'dungeon') G.returnToVillage();
     const it = nearestInteract();
     G.ui?.setInteract?.(it ? it.label : null);
-    if (it && Input.hit('f')) it.onInteract();
+    if (it && Input.hit('f') && engine.time > (G.interactCooldown || 0)) it.onInteract();
     if (Input.mouse.wheel) rig.zoom(Input.mouse.wheel);
     // target frame
     if (hoverEnemy && !hoverEnemy.breakable) G.ui?.setTarget?.({ name: hoverEnemy.name, hp: hoverEnemy.life, max: hoverEnemy.lifeMax, rarity: hoverEnemy.rank, mods: (hoverEnemy.stats.mods || []).map(m => m) });
@@ -393,7 +399,7 @@ export async function boot() {
   }
 
   // ---- save / load
-  function save() { try { G.state.hour = day.hour; G.state.day = day.day; localStorage.setItem('chewy3d.save', JSON.stringify(G.state)); } catch (e) { /* storage unavailable */ } }
+  function save() { try { if (G.playerDead || G.state.player.life === 0) G.state.player.life = null; /* never persist a knocked-out Chewy */ G.state.hour = day.hour; G.state.day = day.day; localStorage.setItem('chewy3d.save', JSON.stringify(G.state)); } catch (e) { /* storage unavailable */ } }
   G.save = save;
   setInterval(save, 30000);
   addEventListener('beforeunload', save);

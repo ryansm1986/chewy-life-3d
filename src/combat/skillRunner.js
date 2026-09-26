@@ -26,7 +26,7 @@ export class SkillRunner {
     const def = getSkill(id); if (!def) return false;
     // auto-swap to the right weapon for weapon skills
     if (def.wep && G.derived.weaponType !== def.wep) {
-      const alt = G.state.equipment.weaponAlt;
+      const E = G.state.equipment, alt = G.state.player.activeWeapon === 1 ? E.weapon : E.weaponAlt; // the weapon NOT in hand
       if (alt && alt.wtype === def.wep) { G.actions.swapWeapons(); this.syncWeapon(); Events.emit('sfx', 'ui_equip'); }
       else {
         if (!this._noWepT || G.engine.time - this._noWepT > 1.5) { this._noWepT = G.engine.time; G.ui?.float?.(P.pos.clone().setY(1.6), def.wep === 'ball' ? 'No ball equipped!' : 'No bone sword equipped!', { kind: 'status', color: '#9fd0ff' }); Events.emit('sfx', 'ui_error'); }
@@ -250,7 +250,7 @@ export class SkillRunner {
         const a = i / p.pups * TAU;
         this.pups.push(new SpiritPup(G, P.pos.clone().add(new THREE.Vector3(Math.cos(a), 0, Math.sin(a))), p));
       }
-      G.combat.buffs.shadowPower = { dmg: p.shadowDmg, life: p.shadowLife };
+      G.combat.buffs.shadowPower = { dmg: p.shadowDmg, life: p.shadowLife, t: p.duration };
       G.companion?.empower?.(p);
     } });
   }
@@ -308,6 +308,7 @@ export class SkillRunner {
     for (const k in this.cds) if (this.cds[k] > 0) this.cds[k] = Math.max(0, this.cds[k] - dt);
     if (this.queued) { this.queued.t -= dt; if (this.queued.t <= 0) this.queued = null; else if (!P.anim.busy()) { const q = this.queued; this.queued = null; this.tryCast(q.id, q.aim, q.target); } }
     // channel (Tail Spin)
+    if (this.channel && G.derived.weaponType !== 'sword') this.endChannel(); // Tail Spin needs the bone sword
     if (this.channel) {
       const c = this.channel, p = c.R.params;
       c.t += dt; c.acc += dt;
@@ -358,6 +359,8 @@ export class SkillRunner {
   }
   endChannel() { const P = this.G.player; this.channel = null; P.anim.stop('spin'); P.canMoveWhileActing = false; }
   clearAll() {
+    if (this.channel) this.endChannel();
+    const P = this.G.player; if (P) { P.leap = null; P.dash = null; P.invuln = false; P.canMoveWhileActing = false; if (P.anim.action?.name === 'spin') P.anim.stop('spin'); }
     for (const o of this.orbits) for (const b of o.bones) b.m.parent?.remove(b.m);
     this.orbits.length = 0; this.channel = null;
     for (const x of this.pups || []) x.expire(true); this.pups = [];

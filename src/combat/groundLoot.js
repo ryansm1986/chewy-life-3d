@@ -7,6 +7,7 @@ import { tennisBallTexture } from '../gfx/textures.js';
 import { boneSwordGeo } from '../actors/charKit.js';
 import { RARITY } from '../rpg/items.js';
 import { Events } from '../core/events.js';
+import { POTION_CAP } from '../rpg/actions.js';
 import { rand, TAU, dist, uid } from '../core/util.js';
 
 const RCOL = { normal: '#f4efe6', magic: '#6ea8ff', rare: '#ffd84a', unique: '#ff9a3c', set: '#5ee07a' };
@@ -64,6 +65,7 @@ export class GroundLoot {
     });
   }
   spawn(d, from, to) {
+    if (this.disposed) return; // the floor was left while this drop was still in the air
     let mesh, color = '#ffffff', beam = null, label = null;
     if (d.type === 'coins') { mesh = new THREE.Mesh(coinGeo(), makeToon({ vertexColors: true, rim: 0.7, emissive: '#ffb030', emissiveIntensity: 0.25 })); }
     else if (d.type === 'potion') { mesh = new THREE.Mesh(potionGeo(d.key), makeToon({ vertexColors: true, rim: 0.6, emissive: POT_COL[d.key], emissiveIntensity: 0.3 })); }
@@ -72,7 +74,7 @@ export class GroundLoot {
     else if (d.type === 'item') {
       const it = d.item; color = RCOL[it.rarity] || '#ffffff';
       if (it.slot === 'weapon' && it.wtype === 'sword') { mesh = new THREE.Mesh(boneSwordGeo(), makeToon({ vertexColors: true, rim: 0.6, emissive: color, emissiveIntensity: it.rarity === 'normal' ? 0 : 0.25 })); mesh.scale.setScalar(0.7); mesh.rotation.z = Math.PI / 2; }
-      else if (it.slot === 'weapon') { mesh = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 10), makeToon({ map: tennisBallTexture(), rim: 0.6, emissive: color, emissiveIntensity: 0.15 })); mesh.geometry.translate(0, 0.13, 0); }
+      else if (it.slot === 'weapon') { mesh = new THREE.Mesh(geo('lootBall', () => { const g = new THREE.SphereGeometry(0.13, 14, 10); g.translate(0, 0.13, 0); return g; }), makeToon({ map: tennisBallTexture(), rim: 0.6, emissive: color, emissiveIntensity: 0.15 })); }
       else { mesh = new THREE.Mesh(bundleGeo(), makeToon({ color, rim: 0.7, emissive: color, emissiveIntensity: 0.2 })); }
       label = it.name;
       if (['rare', 'unique', 'set'].includes(it.rarity)) beam = this.G.vfx.pillar(to, { color, persistent: true, r: 0.28, h: 5, opacity: it.rarity === 'rare' ? 0.35 : 0.6 });
@@ -102,6 +104,10 @@ export class GroundLoot {
     else { G.vfx.sparkle(p, { n: 10, color: e.color }); Events.emit('sfx', ['unique', 'set', 'rare'].includes(e.d.item?.rarity) ? 'pickup_rare' : 'pickup_item'); G.ui?.pickupFly?.(e.d.item, p); }
     return true;
   }
+  canTake(d) {
+    if (d.type === 'potion') return (this.G.state.potions[d.key] || 0) < (POTION_CAP[d.key] ?? 15);
+    return true;
+  }
   remove(e) {
     const i = this.list.indexOf(e); if (i >= 0) this.list.splice(i, 1);
     e.mesh.parent?.remove(e.mesh);
@@ -125,7 +131,7 @@ export class GroundLoot {
         if (!P || G.playerDead) continue;
         const d = dist(P.pos.x, P.pos.z, e.to.x, e.to.z);
         const auto = e.d.type !== 'item' && e.d.type !== 'gem';
-        if (auto && d < 2.2 && !(e.refusedUntil > e.t)) { // magnet (pauses after a refused pickup, e.g. full belt)
+        if (auto && d < 2.2 && !(e.refusedUntil > e.t) && this.canTake(e.d)) { // magnet (only for loot Chewy can actually take) (pauses after a refused pickup, e.g. full belt)
           e.to.lerp(P.pos, Math.min(1, dt * 8));
           if (d < 0.5 && !this.tryPickup(e)) { e.refusedUntil = e.t + 4; e.refusedPos = P.pos.clone(); }
         } else if (e.refusedUntil > e.t && e.refusedPos && P.pos.distanceTo(e.refusedPos) > 2.5) e.refusedUntil = 0; else if (!auto && d < 0.6 && !e.triedAuto) { e.triedAuto = true; if (!this.tryPickup(e)) e.triedAuto = true; }
@@ -134,5 +140,5 @@ export class GroundLoot {
       }
     }
   }
-  clear() { for (const e of [...this.list]) this.remove(e); }
+  clear() { this.disposed = true; for (const e of [...this.list]) this.remove(e); }
 }

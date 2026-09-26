@@ -101,7 +101,12 @@ export class Monster {
     this.mode.onMonsterDeath(this);
     setTimeout(() => this.dispose(), 480);
   }
-  dispose() { this.world.scene.remove(this.model.root, this.shadow); }
+  dispose() {
+    this.world.scene.remove(this.model.root, this.shadow);
+    this.model.root.traverse(o => { if (o.isMesh) { o.geometry?.dispose(); } });
+    this.shadow.geometry?.dispose();
+    this.disposed = true;
+  }
   // ------------------------------------------------------------------ AI
   update(dt) {
     if (!this.alive) { this.anim.update(dt, false, 0); return; }

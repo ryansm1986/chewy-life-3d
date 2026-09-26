@@ -5,7 +5,7 @@ import { tennisBallTexture, glowTexture } from '../gfx/textures.js';
 import { Events } from '../core/events.js';
 import { rand, TAU } from '../core/util.js';
 
-let ballGeo, ballMat, acornGeo, acornMat, potGeo, potMat;
+let ballGeo, ballMat, acornGeo, acornMat, potGeo, potMat, acornCap;
 function ballMesh(r = 0.12) {
   ballGeo ||= new THREE.SphereGeometry(1, 16, 12);
   ballMat ||= makeToon({ map: tennisBallTexture(), rim: 0.6, brush: 0.04, emissive: '#ffffff', emissiveIntensity: 0 });
@@ -14,7 +14,8 @@ function ballMesh(r = 0.12) {
 function acornMesh() {
   if (!acornGeo) { acornGeo = new THREE.SphereGeometry(0.1, 10, 8); acornGeo.scale(1, 1.25, 1); acornMat = makeToon({ color: '#b07a4a', rim: 0.4 }); }
   const m = new THREE.Mesh(acornGeo, acornMat); m.castShadow = true;
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.105, 10, 6, 0, TAU, 0, Math.PI / 2), makeToon({ color: '#6a4a30', rim: 0.3 })); cap.position.y = 0.04; m.add(cap);
+  acornCap ||= [new THREE.SphereGeometry(0.105, 10, 6, 0, TAU, 0, Math.PI / 2), makeToon({ color: '#6a4a30', rim: 0.3 })];
+  const cap = new THREE.Mesh(acornCap[0], acornCap[1]); cap.position.y = 0.04; m.add(cap);
   return m;
 }
 function potMesh() {

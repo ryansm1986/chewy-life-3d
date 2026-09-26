@@ -43,34 +43,36 @@ try {
         const L = G.dungeon.layout; if (P.pos.x < 0 || P.pos.z < 0 || P.pos.x > L.W * 2 || P.pos.z > L.H * 2) S.anomalies.push('off map');
         for (const m of G.dungeon.monsters) if (!QA.finite(m.pos)) { S.anomalies.push(`monster NaN ${m.id}`); break; }
         // find a target, bring the fight to it
+        if (G.dungeon.monsters.filter(m => m.alive).length < 6) { const kinds = ['mochi', 'lantern', 'kasa', 'tanuki', 'wisp', 'oni', 'kinoko']; G.dungeon.summonAround({ pos: P.pos }, kinds[(Math.random() * kinds.length) | 0], 4); S.summons = (S.summons || 0) + 1; }
         let tgt = G.combat.nearest(P.pos, 'ally', 14, e => !e.breakable);
         if (!tgt) {
           const alive = G.dungeon.monsters.filter(m => m.alive);
           if (alive.length) { const m = alive[(Math.random() * alive.length) | 0]; P.setPos(m.pos.x, m.pos.z); S.teleports++; tgt = m; }
         }
+        if (P.leap) { P._leapSeen = (P._leapSeen || 0) + 1; if (P._leapSeen > 20) { S.anomalies.push(`P.leap stuck >2 s (anim=${P.anim.action?.name}) @${(now - t0) | 0}ms`); P.leap = null; P._leapSeen = 0; } } else P._leapSeen = 0;
         if (now < whirlUntil) { S.whirlTicks++; return; }
+        if (!S.wrapped) { S.wrapped = true; const raw = G.skills.tryCast.bind(G.skills); G.skills.tryCast = (id, a, t) => { const r = raw(id, a, t); if (r) (S.started ||= {})[id] = (S.started[id] || 0) + 1; return r; }; }
+        if (P.anim.busy() || P.leap || P.dash || G.skills.queued) { S.waitBusy = (S.waitBusy || 0) + 1; return; }
         G.input.keys.delete('1');
         if (k % 9 === 8) { whirlUntil = now + 1500; G.input.keys.add('1'); k++; S.byId.whirl = (S.byId.whirl || 0) + 1; return; }
         const id = ids[k++ % ids.length];
-        if (Math.random() < 0.3) G.skills.cds = {};
+        G.skills.cds = {};
         const aim = tgt ? tgt.pos.clone() : P.pos.clone().add(new V(Math.random() * 6 - 3, 0, Math.random() * 6 - 3));
         S.casts++;
         const busy = P.anim.busy(), cd = G.skills.cooldown(id);
         const ok = G.skills.tryCast(id, aim, tgt);
         if (ok) { S.ok++; S.byId[id] = (S.byId[id] || 0) + 1; }
         else { const why = busy ? 'busy:' + P.anim.action?.name : cd > 0 ? 'cooldown' : 'other'; (S.fail ||= {})[why] = (S.fail[why] || 0) + 1; }
-        // the leap soft-lock (P.leap never cleared) would ruin the rest of the run: record it and unstick
-        if (P.leap) { P._leapSeen = (P._leapSeen || 0) + 1; if (P._leapSeen > 20) { S.anomalies.push(`P.leap stuck >2 s (anim=${P.anim.action?.name}) @${(now - t0) | 0}ms`); P.leap = null; P._leapSeen = 0; } } else P._leapSeen = 0;
       } catch (e) { S.castErr.push(String(e && e.stack || e).slice(0, 300)); }
       if (now - t0 > DUR * 1000) { clearInterval(iv); G.input.keys.delete('1'); res(); }
     }, 110);
   }), DUR);
   const S = await page.evaluate(() => window.QA.stress);
-  R.note(`casts=${S.casts} started=${S.ok} whirlTicks=${S.whirlTicks} teleports=${S.teleports} byId=${JSON.stringify(S.byId)} notStarted=${JSON.stringify(S.fail)}`);
+  R.note(`casts=${S.casts} startedDirect=${S.ok} startedInclQueued=${JSON.stringify(S.started)} waitBusy=${S.waitBusy} whirlTicks=${S.whirlTicks} teleports=${S.teleports} byId=${JSON.stringify(S.byId)} notStarted=${JSON.stringify(S.fail)}`);
   R.check('no exceptions thrown by tryCast/update during stress', !S.castErr.length, S.castErr.slice(0, 3).join(' | '));
   const anomalies = [...new Set(S.anomalies)];
   R.check('player never NaN / inside rock / off-map', !anomalies.length, anomalies.slice(0, 6).join(' | '));
-  const allFired = ['attack', 'chomp', 'dig', 'bonestorm', 'throw', 'ricochet', 'multi', 'decoy', 'blaze', 'fetchstorm', 'woof', 'zoom', 'packcall', 'treat', 'howl', 'moonhowl', 'whirl'].filter(id => !S.byId[id]);
+  const allFired = ['attack', 'chomp', 'dig', 'bonestorm', 'throw', 'ricochet', 'multi', 'decoy', 'blaze', 'fetchstorm', 'woof', 'zoom', 'packcall', 'treat', 'howl', 'moonhowl', 'whirl'].filter(id => !(S.started || {})[id] && !S.byId[id]);
   R.check('every skill was actually cast at least once', !allFired.length, allFired.length ? 'never started: ' + allFired.join(',') : '');
   await sleep(page, 2500);
   const after = await page.evaluate(() => ({ kills: window.QA.counts['monster:killed'] || 0, xp: window.G.state.player.xp + window.G.state.player.lvl * 1e7, xp0: window.QA.xp0, loot: window.G.dungeon.loot.list.length, drops: window.QA.sfx.filter(s => s === 'drop_item').length, alive: window.G.dungeon.monsters.filter(m => m.alive).length, orbits: window.G.skills.orbits.length, pups: (window.G.skills.pups || []).filter(p => p.alive).length, decoys: (window.G.skills.decoys || []).filter(d => d.alive).length, zones: window.G.combat.zones.length, proj: window.G.combat.projectiles.length }));
@@ -82,7 +84,7 @@ try {
   R.check('no stuck skill state after casting stops (leap/dash/channel/invuln)', !st.leap && !st.dash && !st.channel && !st.invuln, JSON.stringify(st));
   // can the player still walk?
   const p0 = await page.evaluate(() => window.G.player.pos.clone());
-  for (const k of ['w', 'a', 's', 'd']) await tap(page, k, 350);
+  await tap(page, 'w', 500); await tap(page, 'd', 500);
   const moved = await page.evaluate(p0 => { const P = window.G.player.pos; return Math.hypot(P.x - p0.x, P.z - p0.z); }, p0);
   R.check('player can still move with WASD after the stress run', moved > 0.3, `moved ${moved.toFixed(2)}`);
 
@@ -121,19 +123,20 @@ try {
     const cands = [];
     for (let y = 2; y < L.H - 2; y++) for (let x = 2; x < L.W - 2; x++) {
       if (!L.at(x, y)) continue;
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        if (!L.at(x + dx, y + dy) && L.at(x + 2 * dx, y + 2 * dy) && L.at(x + 3 * dx, y + 3 * dy)) cands.push({ x, y, dx, dy });
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (const th of [1, 2]) {
+        let wall = true; for (let t = 1; t <= th; t++) if (L.at(x + t * dx, y + t * dy)) wall = false;
+        if (wall && L.at(x + (th + 1) * dx, y + (th + 1) * dy)) cands.push({ x, y, dx, dy, th });
       }
     }
-    if (!cands.length) return { skipped: 'no 1-cell walls on this floor' };
+    if (!cands.length) return { skipped: 'no thin walls on this floor' };
     let best = null;
-    for (const c of cands.slice(0, 400)) { const D = bfs(c.x, c.y); const far = D[(c.y + 2 * c.dy) * L.W + c.x + 2 * c.dx]; if (far > 6 && (!best || far > best.far)) best = { ...c, far }; }
+    for (const c of cands.slice(0, 600)) { const D = bfs(c.x, c.y); const far = D[(c.y + (c.th + 1) * c.dy) * L.W + c.x + (c.th + 1) * c.dx]; if (far > 8 && (!best || far > best.far)) best = { ...c, far }; }
     if (!best) return { skipped: 'walls here are short-cuts only' };
     G.skills.clearAll(); G.skills.cds = {}; P.anim.stop(); P.leap = null; G.actions.restoreAll();
     const sx = (best.x + 0.5) * 2, sz = (best.y + 0.5) * 2;
     P.setPos(sx, sz);
     await new Promise(r => setTimeout(r, 200));
-    const aim = new V(sx + best.dx * 5, 0, sz + best.dy * 5);
+    const aim = new V(sx + best.dx * 6, 0, sz + best.dy * 6);
     const ok = G.skills.tryCast('dig', aim);
     await new Promise(r => setTimeout(r, 1500));
     const cx = Math.floor(P.pos.x / 2), cy = Math.floor(P.pos.z / 2);
@@ -141,7 +144,30 @@ try {
     return { ok, from: [best.x, best.y], dir: [best.dx, best.dy], walkDistToOtherSide: best.far, endCell: [cx, cy], endWalkDist: D[cy * L.W + cx], leapDist: Math.hypot(P.pos.x - sx, P.pos.z - sz).toFixed(2) };
   });
   if (tunnel.skipped) R.note('dig-through-wall: ' + tunnel.skipped);
-  else R.check('Dig Slam cannot leap through a 1-cell rock wall', !(tunnel.endWalkDist > 4), JSON.stringify(tunnel));
+  else R.check('Dig Slam cannot leap through a thin rock wall', !(tunnel.endWalkDist > 4), JSON.stringify(tunnel));
+
+  // ---------------------------------------------------------------- targeted: Tail Spin held on its hotbar key deals damage
+  const whirl = await page.evaluate(async () => {
+    const G = window.G, P = G.player;
+    G.skills.clearAll(); G.skills.cds = {}; P.leap = null; P.anim.stop(); G.actions.restoreAll();
+    const s = G.dungeon.startPos; P.setPos(s.x, s.z);
+    for (const m of G.dungeon.monsters) m.status.stun = 99;
+    const before = G.dungeon.monsters.length;
+    G.dungeon.summonAround({ pos: P.pos }, 'mochi', 4);
+    const ring = G.dungeon.monsters.slice(before);
+    ring.forEach((m, i) => { const a = i / ring.length * Math.PI * 2; m.pos.set(P.pos.x + Math.cos(a) * 1.1, 0, P.pos.z + Math.sin(a) * 1.1); m.lifeMax = m.life = 1e7; m.status.stun = 99; });
+    G.state.player.hotbar[2] = 'whirl';
+    let hits = 0, casts = 0; const rawHit = G.combat.hitMonster.bind(G.combat), rawCast = G.skills.tryCast;
+    G.combat.hitMonster = (m, o) => { hits++; return rawHit(m, o); };
+    G.skills.tryCast = function (id, a, t) { const r = rawCast.call(this, id, a, t); if (r && id === 'whirl') casts++; return r; };
+    const z0 = G.actions.zoom();
+    G.input.keys.add('1');
+    await new Promise(r => setTimeout(r, 2000));
+    G.input.keys.delete('1');
+    G.combat.hitMonster = rawHit; G.skills.tryCast = rawCast;
+    return { monstersInRange: ring.length, hits, whirlCastsStarted: casts, zoomSpent: +(z0 - G.actions.zoom()).toFixed(1), channel: !!G.skills.channel, dbg: { modal: G.ui?.anyModal?.(), locked: P.controlLocked, dead: G.playerDead, wt: G.derived.weaponType, alt: G.state.equipment.weaponAlt?.wtype, busy: P.anim.busy(), act: P.anim.action?.name, leap: !!P.leap, dash: !!P.dash, hb: G.state.player.hotbar } };
+  });
+  R.check('Tail Spin held on its hotbar key actually hits (≈4 hits/s per monster)', whirl.hits >= 8, JSON.stringify(whirl));
 } catch (e) { errors.push('[harness] ' + e.stack); }
 const failed = R.finish(errors, warns);
 await browser.close();
