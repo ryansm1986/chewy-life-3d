@@ -177,8 +177,8 @@ export function xpProgress(p) {
   const S = rpg.stats;
   const f = pick(S, 'xpProgress');
   if (f) { try { const r = f(p); if (r) return r; } catch (e) { /* ignore */ } }
-  const need = xpForLevel(p.lvl);
-  return { cur: p.xp, need, frac: Math.max(0, Math.min(1, p.xp / need)) };
+  const need = xpForLevel(p.lvl || 1), cur = +p.xp || 0;
+  return { cur, need, frac: need > 0 && isFinite(need) ? Math.max(0, Math.min(1, cur / need)) : 0 };
 }
 
 // ------------------------------------------------------------------ items

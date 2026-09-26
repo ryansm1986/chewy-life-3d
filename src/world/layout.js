@@ -71,7 +71,7 @@ export function reservedAt(x, z) {
     if (Math.abs(x - L.x) < w && Math.abs(z - L.z) < d) return true;
   }
   if (Math.hypot(x - LANDMARKS.dungeon.x, z - LANDMARKS.dungeon.z) < 8) return true;
-  if (Math.hypot(x - LANDMARKS.plaza.x, z - LANDMARKS.plaza.z) < 7.5) return true;
+  if (Math.hypot(x - LANDMARKS.plaza.x, z - LANDMARKS.plaza.z) < 11.5) return true;
   if (Math.hypot(x - LANDMARKS.bridgeW.x, z - LANDMARKS.bridgeW.z) < 5.5) return true;
   return false;
 }

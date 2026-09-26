@@ -15,12 +15,12 @@ const PALETTE = ['#ff8fb0', '#ffcf4a', '#8fe0c0', '#8fd0ff', '#c3b3ff', '#fff6e8
 
 // ------------------------------------------------------------------ floating text
 const KIND = {
-  dmg: { life: 0.95, rise: 1.3, size: 1 },
-  crit: { life: 1.35, rise: 1.7, size: 1.6 },
-  hurt: { life: 1.0, rise: 1.1, size: 1.05 },
-  heal: { life: 1.15, rise: 1.5, size: 1 },
-  xp: { life: 1.5, rise: 1.9, size: 0.85 },
-  coins: { life: 1.3, rise: 1.7, size: 0.95 },
+  dmg: { life: 0.95, rise: 0.9, size: 1 },
+  crit: { life: 1.35, rise: 1.2, size: 1.6 },
+  hurt: { life: 1.0, rise: 0.8, size: 1.05 },
+  heal: { life: 1.15, rise: 1.1, size: 1 },
+  xp: { life: 1.5, rise: 1.4, size: 0.85 },
+  coins: { life: 1.3, rise: 1.2, size: 0.95 },
   miss: { life: 0.9, rise: 1.0, size: 0.85 },
   block: { life: 0.9, rise: 1.0, size: 0.85 },
   status: { life: 1.4, rise: 1.4, size: 0.85 },
@@ -44,7 +44,7 @@ export class Floats {
     else if (kind === 'coins') html = `${glyph('coin')}<span>${esc(text)}</span>`;
     else if (kind === 'xp') html = `<span>${esc(text)}</span>`;
     n.innerHTML = html;
-    const f = { n, x: pos.x, y: pos.y + (opts.yOff ?? 1.4), z: pos.z, t: 0, life: K.life, rise: K.rise, size: K.size * (opts.scale || 1), kind, drift: (Math.random() - 0.5) * (kind === 'crit' ? 30 : 40), stack: 0, sx: 0, sy: 0, rot: kind === 'crit' ? (Math.random() - 0.5) * 16 : (Math.random() - 0.5) * 6 };
+    const f = { n, x: pos.x, y: (pos.y || 0) + (opts.yOff ?? 0), z: pos.z, t: 0, life: K.life, rise: K.rise, size: K.size * (opts.scale || 1), kind, drift: (Math.random() - 0.5) * (kind === 'crit' ? 30 : 40), stack: 0, sx: 0, sy: 0, rot: kind === 'crit' ? (Math.random() - 0.5) * 16 : (Math.random() - 0.5) * 6 };
     // stacking: find recent floats that started near the same screen spot
     const cam = this.camera;
     if (cam) {

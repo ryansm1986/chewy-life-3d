@@ -252,7 +252,7 @@ export async function boot() {
     const depth = -_o.clone().applyMatrix4(cam.matrixWorldInverse).z;
     _o.project(cam);
     const pr = engine.renderer.getPixelRatio();
-    U.uOccl.value.set((_o.x * 0.5 + 0.5) * innerWidth * pr, (_o.y * 0.5 + 0.5) * innerHeight * pr, innerHeight * pr * 0.13, depth);
+    U.uOccl.value.set((_o.x * 0.5 + 0.5) * innerWidth * pr, (_o.y * 0.5 + 0.5) * innerHeight * pr, innerHeight * pr * 0.2, depth);
   }
 
   // ---- per-frame input

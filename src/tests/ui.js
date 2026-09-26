@@ -104,7 +104,7 @@ export default async function () {
   const clock = { hour: S.day.hour };
   S.onUpdate((dt, t) => {
     mobs.forEach((m, i) => { m.position.y = .45 + Math.abs(Math.sin(t * 3 + i)) * .35; m.scale.set(1 + Math.sin(t * 6 + i) * .05, .75 - Math.sin(t * 6 + i) * .05, 1); });
-    if (demo._stress) for (let k = 0; k < 3; k++) { const m = mobs[(Math.random() * mobs.length) | 0]; UI.float(m.position, String((Math.random() * 60) | 0), { kind: Math.random() < .12 ? 'crit' : 'dmg' }); }
+    if (demo._stress) for (let k = 0; k < 3; k++) { const m = mobs[(Math.random() * mobs.length) | 0]; UI.float(m.position, String((Math.random() * 60) | 0), { kind: Math.random() < .12 ? 'crit' : 'dmg', yOff: 1 }); }
     if (demo._timeFlow) { S.day.hour = (S.day.hour + dt * 0.5) % 24; state.hour = S.day.hour; }
     UI.update(dt);
   });
@@ -145,18 +145,18 @@ export default async function () {
     },
     floats() {
       const m = mobs;
-      UI.float(m[0].position, '42', { kind: 'dmg' });
-      setTimeout(() => UI.float(m[0].position, '37', { kind: 'dmg' }), 90);
-      setTimeout(() => UI.float(m[1].position, '128!', { kind: 'crit' }), 120);
-      UI.float(chewy.position, '+24', { kind: 'heal' });
-      UI.float(m[2].position, '+35 XP', { kind: 'xp' });
-      UI.float(m[3].position, '+12', { kind: 'coins' });
+      UI.float(m[0].position, '42', { kind: 'dmg', yOff: 1.1 });
+      setTimeout(() => UI.float(m[0].position, '37', { kind: 'dmg', yOff: 1.1 }), 90);
+      setTimeout(() => UI.float(m[1].position, '128!', { kind: 'crit', yOff: 1.1 }), 120);
+      UI.float(chewy.position, '+24', { kind: 'heal', yOff: 1 });
+      UI.float(m[2].position, '+35 XP', { kind: 'xp', yOff: 1.1 });
+      UI.float(m[3].position, '+12', { kind: 'coins', yOff: 1.1 });
       UI.float(m[2].position, 'miss', { kind: 'miss', yOff: 2.2 });
       UI.float(chewy.position, '-18', { kind: 'hurt', yOff: 1.9 });
       UI.float(m[3].position, 'Burning!', { kind: 'status', color: '#ff9a3c', yOff: 2.4 });
     },
     stress: on => { demo._stress = on !== false; },
-    levelup: () => { state.player.lvl++; Events.emit('player:levelup', { lvl: state.player.lvl }); },
+    levelup: () => { state.player.lvl++; Events.emit('player:levelup', { lvl: state.player.lvl }); UI.banner('Level Up!', `Chewy is now level ${state.player.lvl}`, { style: 'levelup' }); },
     area: () => UI.banner('Mossy Burrow', 'Floor 3 · The mushrooms whisper…', { style: 'area', jp: '苔の巣穴' }),
     bossBanner: () => UI.banner('King Mochimaru', 'The Squishy Tyrant', { style: 'boss' }),
     questBanner: () => UI.banner('Quest Complete!', 'Blossom Delivery · +80 coins', { style: 'quest' }),

@@ -63,7 +63,7 @@ export class DayNight {
     // sun path: daytime arc; at night a moon arc with the same light
     const h = this.hour;
     let el, az;
-    if (h >= 5.5 && h <= 19.5) { const t = (h - 5.5) / 14; el = 0.3 + Math.sin(t * Math.PI) * 0.62; az = -1.9 + t * 2.4; }
+    if (h >= 5.5 && h <= 19.5) { const t = (h - 5.5) / 14; el = 0.3 + Math.sin(t * Math.PI) * 0.62; az = -1.1 + t * 2.4; }
     else { const t = ((h + 24 - 19.5) % 24) / 10; el = 0.45 + Math.sin(clamp(t) * Math.PI) * 0.45; az = 1.2 - t * 2.0; }
     this.sunDir.set(Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el)).normalize();
     if (w.sun) { w.sun.color.copy(o.sun); w.sun.intensity = o.si * this.exposure; }

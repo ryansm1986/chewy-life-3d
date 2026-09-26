@@ -74,6 +74,7 @@ export class ShopPanel extends Panel {
     return itemTipHTML(e.item, { state: st, derived: this.d, compare: x => this.ui.drag.equippedFor(x), price: { label: 'Price', value: fmt(p), afford }, hints: [afford ? '<b>Click</b> buy' : "Can't afford yet"] });
   }
   click(s) {
+    this.ui.tip.hide(); this._hov = null;
     if (s.dataset.inv != null) { this.ui.drag.sell({ c: 'inv', i: +s.dataset.inv }); this.say(['Ooh, thank you!', 'I can use this!', 'Pleasure doing business~'][Math.floor(Math.random() * 3)]); return; }
     const i = +s.dataset.i, e = this.entries?.[i]; if (!e) return;
     const st = this.st, p = this.price(e), A = this.G.actions || {};
