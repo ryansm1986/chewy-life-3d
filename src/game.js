@@ -113,6 +113,32 @@ export async function boot() {
     };
   }
 
+  // ---- UI hooks: cooldowns, settings, pause-menu save/quit, buffs
+  let fpsOn = P.has('fps');
+  if (G.ui) {
+    G.ui.setSkillProvider?.({ cooldown: id => skills.cooldownFrac(id), remaining: id => skills.cooldown(id) });
+    const applySetting = (k, v, all) => {
+      if (k === 'music') G.audio?.setVolume?.('music', v);
+      if (k === 'sfx') { G.audio?.setVolume?.('sfx', v); G.audio?.setVolume?.('ambience', v * 0.8); }
+      if (k === 'shake') engine.rig.shakeMul = v ? 1 : 0;
+      if (k === 'quality') {
+        engine.renderer.setPixelRatio(Math.min(devicePixelRatio, v >= 2 ? 1.5 : 1));
+        engine.post.ao.enabled = v >= 1; engine.post.ao.configuration.halfRes = v < 2; engine.post.tiltPass.enabled = v >= 1;
+        engine.resize();
+      }
+      if (k === 'showFps') fpsOn = !!v;
+    };
+    G.ui.onSetting?.(applySetting);
+    for (const [k, v] of Object.entries(G.ui.settings || {})) applySetting(k, v, G.ui.settings);
+    G.ui.onMenu?.({ save: () => { save(); G.ui.toast?.('Game saved ♡', { color: '#8fe0c0' }); }, quit: () => { save(); location.reload(); } });
+  }
+  const BUFF_INFO = { howl: ['Howl', 'music', '#ff9a6a'], frenzy: ['Zoomies Frenzy', 'bolt', '#ffd84a'], shrineZoom: ['Zoomies Shrine', 'bolt', '#8fe0c0'], shrineLuck: ['Lucky Cat', 'clover', '#ffd84a'], shrineXp: ['Sparkle Shrine', 'sparkle', '#b8a8ff'], cursed: ['Cursed', 'skull', '#b88aff'], shadowPower: ['Pack Call', 'shadowDog', '#8ab8ff'] };
+  function syncBuffs() {
+    const B = G.combat?.buffs || {}; const list = [];
+    for (const [k, b] of Object.entries(B)) { const inf = BUFF_INFO[k]; if (!inf || (k === 'frenzy' && !b.stacks)) continue; list.push({ id: k, name: k === 'frenzy' ? `${inf[0]} ×${b.stacks}` : inf[0], glyph: inf[1], color: inf[2], time: b.t > 0 ? b.t : 0 }); }
+    G.ui?.setBuffs?.(list);
+  }
+
   // ---- audio routing
   const SFX_ALIAS = { block: ['ball_bounce', { pitch: 0.7 }], ball_catch: ['pickup_item', { vol: 0.5 }], squeak: ['slime_bounce', { pitch: 1.9 }], pot_break: ['explosion_small', { pitch: 1.6, vol: 0.6 }], villager_greet: ['villager_chatter', {}] };
   Events.on('sfx', (name, o = {}) => {
@@ -373,7 +399,7 @@ export async function boot() {
   }
 
   // ---- main loop
-  let fpsAcc = 0, fpsN = 0; const fpsEl = P.has('fps') ? Object.assign(document.body.appendChild(document.createElement('div')), { style: 'position:fixed;left:8px;bottom:8px;color:#fff;font:12px monospace;z-index:99;text-shadow:0 1px 2px #000' }) : null;
+  let fpsAcc = 0, fpsN = 0; const fpsEl = Object.assign(document.body.appendChild(document.createElement('div')), { style: 'position:fixed;left:8px;bottom:8px;color:#fff;font:12px monospace;z-index:99;text-shadow:0 1px 2px #000' });
   function frame() {
     const dt = engine.tick();
     if (G.mode === 'village') day.update(dt);
@@ -408,11 +434,12 @@ export async function boot() {
       G.world.lightPool.update(dt, rig.target, engine.time, 1);
     }
     G.vfx.update(dt);
+    syncBuffs();
     G.audio?.update?.(dt, { pos: player.pos, camera: engine.camera });
     G.ui?.update?.(dt);
     engine.render();
     Input.endFrame();
-    if (fpsEl) { fpsAcc += dt; fpsN++; if (fpsAcc > 0.5) { fpsEl.textContent = `${Math.round(fpsN / fpsAcc)} fps`; fpsAcc = 0; fpsN = 0; } }
+    if (fpsEl) { fpsEl.style.display = fpsOn ? '' : 'none'; fpsAcc += dt; fpsN++; if (fpsAcc > 0.5) { fpsEl.textContent = `${Math.round(fpsN / fpsAcc)} fps`; fpsAcc = 0; fpsN = 0; } }
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);

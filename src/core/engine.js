@@ -16,12 +16,12 @@ export class CameraRig {
     this.pitch = 0.74;
     this.dist = 34; this.distTarget = 34;
     this.minDist = 18; this.maxDist = 66;
-    this.shakeAmt = 0; this.shakeT = 0;
+    this.shakeAmt = 0; this.shakeT = 0; this.shakeMul = 1;
     this.lead = new THREE.Vector3();
     this._off = new THREE.Vector3();
   }
   snap() { this.target.copy(this.focus); this.dist = this.distTarget; this.yaw = this.yawTarget; this.update(0); }
-  shake(a) { this.shakeAmt = Math.max(this.shakeAmt, a); }
+  shake(a) { this.shakeAmt = Math.max(this.shakeAmt, a * this.shakeMul); }
   zoom(d) { this.distTarget = clamp(this.distTarget * (1 + d * 0.1), this.minDist, this.maxDist); }
   update(dt) {
     const k = dt > 0 ? 1 - Math.exp(-6 * dt) : 1;
