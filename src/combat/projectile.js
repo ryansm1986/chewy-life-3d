@@ -27,15 +27,15 @@ function glowSprite(color, s = 1) {
 }
 
 const VIS = {
-  ball: { mesh: () => ballMesh(0.12), trail: '#ffe0d0', light: null },
-  blaze: { mesh: () => { const g = new THREE.Group(); g.add(ballMesh(0.14), glowSprite('#ff9a3c', 1.4)); return g; }, trail: '#ff9a3c', fire: true, light: '#ff8a3a' },
+  ball: { mesh: () => { const g = new THREE.Group(); g.add(ballMesh(0.16), glowSprite('#ff7a6a', 0.7)); return g; }, trail: '#ff8a70', trailSize: 0.55, light: null },
+  blaze: { mesh: () => { const g = new THREE.Group(); g.add(ballMesh(0.18), glowSprite('#ff9a3c', 2.4)); return g; }, trail: '#ff9a3c', fire: true, fireSize: 0.7, light: '#ff8a3a' },
   fireball: { mesh: () => glowSprite('#ffa050', 1.1), trail: '#ff7a3a', fire: true, light: '#ff8a3a' },
   foxfire: { mesh: () => glowSprite('#8ab8ff', 1.0), trail: '#aac8ff', light: '#7aa8ff' },
   spark: { mesh: () => glowSprite('#fff27a', 0.6), trail: '#fff27a' },
   acorn: { mesh: acornMesh, trail: null },
   firepot: { mesh: potMesh, trail: '#ffb070', fire: true },
   bone: { mesh: () => glowSprite('#fff6e0', 0.8), trail: '#fff6e0' },
-  moonball: { mesh: () => { const g = new THREE.Group(); g.add(ballMesh(0.16), glowSprite('#ffe8a0', 1.2)); return g; }, trail: '#fff0b0' },
+  moonball: { mesh: () => { const g = new THREE.Group(); g.add(ballMesh(0.2), glowSprite('#ffe8a0', 1.8)); return g; }, trail: '#fff0b0', trailSize: 0.7 },
 };
 
 export class Projectile {
@@ -114,9 +114,9 @@ export class Projectile {
     }
     this.mesh.position.copy(this.pos);
     if (this.mesh.isMesh || this.mesh.isGroup) { this.mesh.rotation.x += dt * 18; this.mesh.rotation.z += dt * 7; }
-    if (this.vis.trail && Math.random() < 0.9) {
-      if (this.vis.fire) vfx.fire(this.pos, 1, { spread: 0.08, size: 0.35 });
-      else vfx.glow.spawn({ x: this.pos.x, y: this.pos.y, z: this.pos.z, life: 0.25, size: this.kind === 'ball' ? 0.25 : 0.4, size1: 0.02, color: this.vis.trail, alpha: 0.6, alpha1: 0 });
+    if (this.vis.trail) {
+      if (this.vis.fire) vfx.fire(this.pos, 2, { spread: 0.1, size: this.vis.fireSize || 0.4 });
+      else vfx.glow.spawn({ x: this.pos.x, y: this.pos.y, z: this.pos.z, life: 0.32, size: this.vis.trailSize || 0.45, size1: 0.04, color: this.vis.trail, alpha: 0.75, alpha1: 0 });
     }
     return true;
   }

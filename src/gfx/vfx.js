@@ -134,12 +134,25 @@ export class VFX {
     m.position.set(p.x, p.y + y, p.z); m.renderOrder = 12;
     return this.add(m, (dt, t) => { const k = clamp(t / life); const r = r0 + (r1 - r0) * ease.outCubic(k); m.scale.setScalar(r); m.material.opacity = opacity * (1 - k); if (!flat) m.lookAt(this.engine.camera.position); }, life);
   }
+  // flat ground decal (scorch marks, magic circles, impact glows). additive=false → darkening multiply-ish decal
+  decal(p, { r = 1.5, color = '#2a1a14', life = 3, opacity = 0.55, additive = false, tex = null, spin = 0, grow = 0 } = {}) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: tex || glowTexture(), color: C(color), transparent: true, opacity, depthWrite: false, toneMapped: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, polygonOffset: true, polygonOffsetFactor: -2 }));
+    m.rotation.x = -Math.PI / 2; m.position.set(p.x, (p.y || 0) + 0.04, p.z); m.renderOrder = 8; m.scale.setScalar(r);
+    return this.add(m, (dt, t) => { const k = clamp(t / life); m.material.opacity = opacity * (1 - ease.inQuad(k)); m.rotation.z += spin * dt; if (grow) m.scale.setScalar(r * (1 + grow * ease.outCubic(k))); }, life);
+  }
+  // big stylised impact: flash star + ring + sparks + optional decal
+  impact(p, { color = '#fff4c0', r = 1.6, decal = null } = {}) {
+    this.flash(p.clone().setY(p.y + 0.4), color, r * 1.4, 0.2);
+    this.ring(p, { color, r0: 0.2, r1: r * 1.2, life: 0.35, opacity: 1 });
+    this.sparks(p.clone().setY(p.y + 0.3), { n: 14, color, speed: 6, size: 0.45 });
+    if (decal) this.decal(p, { r: r * 0.9, color: decal, life: 2.5, opacity: 0.45 });
+  }
   shockwave(p, r = 3, color = '#fff0c0') { this.ring(p, { color, r0: 0.3, r1: r, life: 0.45, opacity: 1 }); this.ring(p, { color: '#ffffff', r0: 0.1, r1: r * 0.7, life: 0.3 }); this.dustRing(p, r * 0.8); }
   dustRing(p, r = 2, n = 18) {
     for (let i = 0; i < n; i++) { const a = i / n * TAU; this.smoke.spawn({ x: p.x + Math.cos(a) * 0.4, y: p.y + 0.1, z: p.z + Math.sin(a) * 0.4, vx: Math.cos(a) * r * 2.2, vy: rand(0.3, 1), vz: Math.sin(a) * r * 2.2, life: rand(0.5, 0.8), size: 0.45, size1: 1.1, color: '#e8dcc8', alpha: 0.7, alpha1: 0, drag: 5 }); }
   }
   // horizontal crescent slash around an actor. dir = facing angle (radians, atan2(x,z)), arc in radians
-  slash(p, dir, { color = '#fffaf0', arc = 2.6, r = 1.3, life = 0.22, y = 0.55, reverse = false, width = 0.55, tilt = 0 } = {}) {
+  slash(p, dir, { color = '#fffaf0', arc = 2.6, r = 1.4, life = 0.26, y = 0.55, reverse = false, width = 0.8, tilt = 0, glow = true } = {}) {
     const g = new THREE.RingGeometry(r - width, r, 32, 1, 0, arc);
     // remap uv: u along arc, v across
     const uv = g.attributes.uv, pos = g.attributes.position;
@@ -153,7 +166,12 @@ export class VFX {
     grp.position.set(p.x, p.y + y, p.z);
     grp.rotation.set(tilt, dir + Math.PI / 2 + arc / 2, 0, 'YXZ');
     grp.renderOrder = 13; m.renderOrder = 13;
-    return this.add(grp, (dt, t) => { const k = clamp(t / life); m.material.opacity = 1 - ease.inQuad(k); grp.scale.setScalar(0.85 + 0.3 * ease.outCubic(k)); }, life);
+    let m2 = null;
+    if (glow) { // wider soft coloured underlay makes the arc read as a chunky swoosh
+      m2 = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: slashTexture(), color: C(color).lerp(C('#ffb070'), 0.35), transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+      m2.rotation.x = -Math.PI / 2; m2.scale.set(1.15, 1.15, 1); m2.position.y = -0.05; grp.add(m2);
+    }
+    return this.add(grp, (dt, t) => { const k = clamp(t / life); m.material.opacity = 1 - ease.inQuad(k); if (m2) m2.material.opacity = 0.5 * (1 - k); grp.scale.setScalar(0.85 + 0.3 * ease.outCubic(k)); }, life);
   }
   // vertical light beam
   pillar(p, { color = '#ffe070', r = 0.5, h = 6, life = 1, persistent = false, opacity = 0.8 } = {}) {

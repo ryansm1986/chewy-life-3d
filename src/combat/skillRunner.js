@@ -88,8 +88,9 @@ export class SkillRunner {
     P.anim.play('swing', { speed: this.animSpeed(0.5), onEvent: ev => {
       if (ev !== 'hit') return;
       const f = P.facing, arc = p.arc * Math.PI / 180;
-      G.vfx.slash(P.pos, f, { arc, r: p.radius, width: 0.8, color: '#fff4d8', life: 0.26 });
-      G.vfx.slash(P.pos, f, { arc: arc * 0.9, r: p.radius * 0.7, width: 0.5, color: '#ffd0a0', life: 0.2, reverse: true });
+      G.vfx.slash(P.pos, f, { arc, r: p.radius * 1.1, width: 1.1, color: '#fff4d8', life: 0.3 });
+      G.vfx.slash(P.pos, f, { arc: arc * 0.9, r: p.radius * 0.75, width: 0.7, color: '#ffd070', life: 0.24, reverse: true });
+      G.vfx.decal(P.pos.clone().add(this.forward().multiplyScalar(p.radius * 0.5)), { r: p.radius * 0.8, color: '#ffe0a0', additive: true, opacity: 0.35, life: 0.5, grow: 0.4 });
       Events.emit('sfx', 'swing_heavy'); Events.emit('sfx', 'bark', { pitch: 0.8 });
       this.arcHit(P.pos, f, p.radius, p.arc, e => this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: p.knockback, from: P.pos }));
       G.engine.rig.shake(0.25);
@@ -110,7 +111,9 @@ export class SkillRunner {
     P.anim.play('slam', { speed: 0.8, onEvent: ev => {
       if (ev !== 'impact') return;
       P.leap = null;
-      G.vfx.shockwave(P.pos, p.radius, '#ffe0b0'); G.vfx.dustRing(P.pos, p.radius);
+      G.vfx.shockwave(P.pos, p.radius * 1.2, '#ffe0b0'); G.vfx.dustRing(P.pos, p.radius);
+      G.vfx.decal(P.pos, { r: p.radius * 0.9, color: '#3a2418', opacity: 0.55, life: 3.5 });
+      G.vfx.flash(P.pos.clone().setY(0.6), '#ffe0a0', p.radius * 1.5, 0.22);
       for (let i = 0; i < 10; i++) G.vfx.smoke.spawn({ x: P.pos.x, y: 0.2, z: P.pos.z, vx: rand(-3, 3), vy: rand(3, 6), vz: rand(-3, 3), life: 0.8, size: 0.25, size1: 0.1, color: '#8a6a4a', alpha: 1, alpha1: 0, grav: 12 });
       Events.emit('sfx', 'dig'); Events.emit('sfx', 'explosion_small');
       G.engine.rig.shake(0.7); G.engine.hitStop = 0.06;
@@ -121,10 +124,11 @@ export class SkillRunner {
     const G = this.G, P = G.player, p = R.params;
     const bones = [];
     for (let i = 0; i < p.count; i++) {
-      const m = new THREE.Mesh(this.G.player.sword.geometry, this.G.player.rig.mat); m.scale.setScalar(0.55); m.castShadow = true;
+      const m = new THREE.Mesh(this.G.player.sword.geometry, this.G.player.rig.mat); m.scale.setScalar(0.9); m.castShadow = true;
       G.world.scene.add(m); bones.push({ m, a: i / p.count * TAU, hit: new Map() });
     }
-    this.orbits.push({ bones, t: 0, p });
+    const rune = G.vfx.decal(P.pos, { r: p.radius * 1.15, color: '#fff0c0', additive: true, opacity: 0.4, life: p.duration, spin: 1.5, tex: null });
+    this.orbits.push({ bones, t: 0, p, rune });
     P.anim.play('cast'); Events.emit('sfx', 'buff');
     G.vfx.ring(P.pos, { color: '#fff4d8', r0: 0.3, r1: p.radius, life: 0.5 });
   }
@@ -157,7 +161,10 @@ export class SkillRunner {
     P.anim.play('throw', { speed: this.animSpeed(0.5), onEvent: ev => {
       if (ev !== 'release') return;
       const boom = (pos) => {
-        G.vfx.fire(pos, 30, { spread: p.radius * 0.5, size: 0.7 }); G.vfx.ring(pos, { color: '#ff9a3c', r0: 0.2, r1: p.radius * 1.2, life: 0.4 }); G.vfx.flash(pos.clone().setY(0.6), '#ffae5a', 3, 0.25);
+        G.vfx.fire(pos, 44, { spread: p.radius * 0.55, size: 1.0 }); G.vfx.ring(pos, { color: '#ff9a3c', r0: 0.2, r1: p.radius * 1.4, life: 0.45, opacity: 1 }); G.vfx.ring(pos, { color: '#ffe070', r0: 0.1, r1: p.radius * 0.9, life: 0.3 }); G.vfx.flash(pos.clone().setY(0.6), '#ffae5a', 4.5, 0.3);
+        G.vfx.decal(pos, { r: p.radius * 1.0, color: '#2a140c', opacity: 0.6, life: p.burnDuration + 1.5 });
+        G.vfx.decal(pos, { r: p.radius * 0.9, color: '#ff7a2a', additive: true, opacity: 0.45, life: p.burnDuration });
+        G.vfx.poof(pos.clone().setY(0.3), { color: '#6a4a44', n: 10, size: 0.8 });
         G.vfx.light(pos, '#ff8a3a', 16, 8, 0.4); G.engine.rig.shake(0.35); Events.emit('sfx', 'explosion_small'); Events.emit('sfx', 'fire_whoosh');
         this.nova(pos, p.radius, e => { const dmg = this.combat.hitMonster(e, { dmgPct: p.dmgPct, element: 'fire', from: pos, knock: 0.4 }); e.applyStatus?.('burn', p.burnDuration, dmg * p.burnPct / 100); });
         // lingering burning ground
@@ -171,14 +178,15 @@ export class SkillRunner {
     const d = Math.min(p.range, dist(aim.x, aim.z, P.pos.x, P.pos.z));
     const center = P.pos.clone().add(aim.clone().sub(P.pos).setY(0).normalize().multiplyScalar(d));
     P.anim.play('cast'); Events.emit('sfx', 'bark');
-    G.vfx.telegraph(center, p.radius, p.duration, '#ffd84a');
+    G.vfx.ring(center, { color: '#ffe08a', r0: p.radius * 0.3, r1: p.radius, life: 0.5 });
+    G.vfx.decal(center, { r: p.radius, color: '#ffe08a', additive: true, opacity: 0.22, life: p.duration + 0.4, spin: 0.6 });
     let spawned = 0;
     this.combat.addZone({ pos: center, life: p.duration + 0.8, tick: p.duration / p.count, onTick: () => {
       if (spawned++ >= p.count) return;
       const a = rand(0, TAU), r = Math.sqrt(Math.random()) * p.radius;
       const to = center.clone().add(new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r));
       this.combat.spawn({ team: 'ally', kind: 'moonball', pos: to.clone().add(new THREE.Vector3(-2, 9, -2)), lob: { to, h: 0.5, time: 0.45 }, onEnd: () => {
-        G.vfx.sparks(to.clone().setY(0.2), { n: 6, color: '#ffe0a0', speed: 4 }); G.vfx.dust(to, { n: 2 });
+        G.vfx.impact(to, { color: '#ffe08a', r: p.impactRadius * 1.1 }); G.vfx.dust(to, { n: 3 });
         Events.emit('sfx', 'ball_bounce', { vol: 0.4 });
         this.nova(to, p.impactRadius, e => this.combat.hitMonster(e, { dmgPct: p.dmgPct, from: to, knock: 0.2, silent: false }));
       } });
@@ -204,7 +212,8 @@ export class SkillRunner {
     P.anim.play('bark', { onEvent: ev => {
       if (ev !== 'bark') return;
       Events.emit('sfx', 'bark');
-      G.vfx.ring(P.pos, { color: '#ffffff', r0: 0.3, r1: p.radius, life: 0.4, y: 0.6 }); G.vfx.ring(P.pos, { color: '#cfe8ff', r0: 0.2, r1: p.radius * 0.7, life: 0.3 });
+      G.vfx.ring(P.pos, { color: '#ffffff', r0: 0.3, r1: p.radius * 1.1, life: 0.45, y: 0.6, opacity: 1 }); G.vfx.ring(P.pos, { color: '#9fd8ff', r0: 0.2, r1: p.radius * 0.8, life: 0.35 }); G.vfx.ring(P.pos, { color: '#cfe8ff', r0: 0.2, r1: p.radius, life: 0.5, flat: false });
+      G.vfx.decal(P.pos, { r: p.radius * 0.8, color: '#bfe6ff', additive: true, opacity: 0.35, life: 0.6, grow: 0.3 });
       G.engine.rig.shake(0.3);
       this.nova(P.pos, p.radius, e => this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: p.knockback, stun: p.stun, from: P.pos }));
     } });
@@ -315,6 +324,7 @@ export class SkillRunner {
     // Bone Storm orbits
     for (let i = this.orbits.length - 1; i >= 0; i--) {
       const o = this.orbits[i]; o.t += dt;
+      if (o.rune?.obj) o.rune.obj.position.set(P.pos.x, P.pos.y + 0.05, P.pos.z);
       for (const b of o.bones) {
         b.a += o.p.orbitSpeed * dt;
         const r = o.p.radius * (0.85 + Math.sin(o.t * 3 + b.a) * 0.1);
@@ -324,7 +334,7 @@ export class SkillRunner {
           const last = b.hit.get(e) || -9;
           if (o.t - last >= o.p.hitInterval) { b.hit.set(e, o.t); this.combat.hitMonster(e, { dmgPct: o.p.dmgPct, knock: 0.2, from: P.pos }); }
         });
-        if (Math.random() < 0.3) G.vfx.glow.spawn({ x: b.m.position.x, y: b.m.position.y, z: b.m.position.z, life: 0.25, size: 0.4, size1: 0.05, color: '#fff4d8', alpha: 0.5, alpha1: 0 });
+        G.vfx.glow.spawn({ x: b.m.position.x, y: b.m.position.y, z: b.m.position.z, life: 0.3, size: 0.75, size1: 0.1, color: '#ffe8b0', alpha: 0.7, alpha1: 0 });
       }
       if (o.t >= o.p.duration) { for (const b of o.bones) { G.vfx.poof(b.m.position, { n: 4, size: 0.3 }); b.m.parent?.remove(b.m); } this.orbits.splice(i, 1); }
     }

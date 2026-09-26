@@ -266,7 +266,9 @@ export class DungeonMode {
     if (this.combat.buffs.shrineXp) xp = Math.round(xp * 1.5);
     xp = Math.round(xp * (1 + (D.xpBonus || 0) / 100));
     G.actions.addXp(xp);
-    G.ui?.float?.(m.pos.clone().setY(1.9 * m.scale + 0.3), `+${xp} xp`, { kind: 'xp' });
+    // batch xp into one floating number above Chewy instead of one per kill
+    this.xpAcc = (this.xpAcc || 0) + xp;
+    if (!this.xpTimer) this.xpTimer = setTimeout(() => { this.xpTimer = null; if (this.xpAcc > 0 && this.G.player) this.G.ui?.float?.(this.G.player.pos.clone().setY(this.G.player.pos.y + 2.0), `+${this.xpAcc} xp`, { kind: 'xp' }); this.xpAcc = 0; }, 550);
     if (D.lifeOnKill) G.actions.heal(D.lifeOnKill);
     // drops
     const mf = (D.mf || 0) + (this.combat.buffs.shrineLuck ? 60 : 0);
