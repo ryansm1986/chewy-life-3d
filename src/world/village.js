@@ -8,7 +8,7 @@ import { Events } from '../core/events.js';
 import { uid, rand, randInt, clamp, ease, mulberry32, pick } from '../core/util.js';
 
 export const ZONES = { R: 1, C: 2, W: 3 };
-export const ZONE_COLORS = { 1: [120, 220, 120], 2: [110, 170, 255], 3: [255, 196, 90] };
+export const ZONE_COLORS = { 1: [70, 205, 90], 2: [70, 140, 255], 3: [255, 165, 40] };
 export const COVER_KINDS = ['water', 'light', 'joy', 'health', 'learn'];
 const COVER_COLORS = { water: [90, 170, 255], light: [255, 220, 110], joy: [255, 130, 190], health: [120, 230, 160], learn: [180, 140, 255] };
 
@@ -424,7 +424,7 @@ export class VillageSim {
     D.fill(0);
     for (let i = 0; i < WORLD * WORLD; i++) {
       if (mode && COVER_KINDS.includes(mode)) { const v = this.cover[mode][i]; if (v > 0) { const c = COVER_COLORS[mode]; D[i * 4] = c[0]; D[i * 4 + 1] = c[1]; D[i * 4 + 2] = c[2]; D[i * 4 + 3] = Math.min(200, v * 170); } }
-      else if (mode === 'zones' || mode === 'build') { const z = this.zone[i]; if (z) { const c = ZONE_COLORS[z]; D[i * 4] = c[0]; D[i * 4 + 1] = c[1]; D[i * 4 + 2] = c[2]; D[i * 4 + 3] = 140; } }
+      else if (mode === 'zones' || mode === 'build') { const z = this.zone[i]; if (z) { const c = ZONE_COLORS[z]; D[i * 4] = c[0]; D[i * 4 + 1] = c[1]; D[i * 4 + 2] = c[2]; D[i * 4 + 3] = 185; } }
     }
     this.terrain.overlayTex.needsUpdate = true;
   }
