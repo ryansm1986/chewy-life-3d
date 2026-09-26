@@ -127,7 +127,17 @@ export function generate({ floor = 1, seed = 1 } = {}) {
     for (let k = 0; k < np; k++) { const c = freeCell(r, 1); if (c) pots.push(c); }
   }
   const stairsCell = far.kind === 'stairs' ? freeCell(far, 2) || { x: far.cx, y: far.cy } : null;
-  const waypoint = floor % 5 === 1 && floor > 1 ? { x: start.cx + 2, y: start.cy } : null;
+  // waypoint: nearest cell to the start whose whole 3x3 neighbourhood is open floor (never inside rock)
+  let waypoint = null;
+  if (floor % 5 === 1 && floor > 1) {
+    const open3 = (x, y) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!at(x + dx, y + dy)) return false; return true; };
+    let best = null, bd = 1e9;
+    for (let y = start.y - 1; y <= start.y + start.h; y++) for (let x = start.x - 1; x <= start.x + start.w; x++) {
+      const d = Math.abs(x - start.cx - 2) + Math.abs(y - start.cy);
+      if ((x !== start.cx || y !== start.cy) && open3(x, y) && d < bd) { bd = d; best = { x, y }; }
+    }
+    waypoint = best;
+  }
   // light sources: a few per room along the walls
   const lights = [];
   for (const r of rooms) {

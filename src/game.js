@@ -217,7 +217,9 @@ export async function boot() {
       save();
       if (!G.state.flags.burrowTut && G.ui?.dialogue) {
         G.state.flags.burrowTut = true;
+        const tutFor = dungeon;
         setTimeout(async () => {
+          if (G.mode !== 'dungeon' || G.dungeon !== tutFor || G.playerDead) { G.state.flags.burrowTut = false; return; } // left already: show it next visit
           player.controlLocked = true;
           await G.ui.dialogue({ speaker: 'Shadow', portrait: G.portrait('shadow'), lines: ["*Sniff sniff!* Yip! (Monsters ahead! Here's how we fight, Chewy!)", '*Click a monster* to bonk it with your Bone Sword. *Right-click* uses Chomp Slash!', "Press *X* to swap to your Red Tennis Ball, *Space* to roll away, and *Q* for a Heart Treat when you're hurt.", 'Spend skill points with *K* and stat points with *C*. Find the *stairs* to go deeper — or step in the purple portal to go home!'] });
           player.controlLocked = false;
@@ -373,7 +375,7 @@ export async function boot() {
   function usePotion(key) {
     const eff = G.actions.usePotion(key);
     if (!eff) return;
-    player.anim.play('drink');
+    if (!player.anim.busy() && !player.leap && !player.dash && !skills.channel) player.anim.play('drink'); // never interrupt an attack or leap
     G.audio?.play?.('potion_drink');
     if (key === 'zoom') G.vfx.sparkle(player.pos.clone().setY(0.8), { n: 12, color: '#8fc8ff' }); else G.vfx.heal(player.pos.clone());
   }

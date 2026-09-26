@@ -29,6 +29,7 @@ export class SkillRunner {
     const u = usable(id, G.state, G.derived);
     if (!u.ok) { if (!this._warnT || G.engine.time - this._warnT > 1) { this._warnT = G.engine.time; G.ui?.float?.(P.pos.clone().setY(1.6), u.why, { kind: 'status', color: '#9fd0ff' }); Events.emit('sfx', 'ui_error'); } return false; }
     if ((this.cds[id] || 0) > 0) return false;
+    if (id === 'whirl' && this.channel?.id === 'whirl') return true;
     const R = this.rt(id); if (!R) return false;
     if (def.kind !== 'channel' && R.cost > 0 && !G.actions.spendZoom(R.cost)) return false;
     this.cds[id] = R.cd;
@@ -98,7 +99,8 @@ export class SkillRunner {
   }
   cast_whirl(R, aim) {
     const P = this.G.player;
-    this.channel = { id: 'whirl', R, acc: 0, t: 0 };
+    if (this.channel?.id === 'whirl') return;
+    this.channel = { id: 'whirl', R, acc: 1 / Math.max(1, R.params.hitsPerSec), t: 0 }; // first hit lands immediately
     P.anim.play('spin'); P.canMoveWhileActing = true;
     Events.emit('sfx', 'swing_heavy');
   }
@@ -106,7 +108,12 @@ export class SkillRunner {
     const G = this.G, P = G.player, p = R.params;
     const d = Math.min(p.leap, dist(aim.x, aim.z, P.pos.x, P.pos.z));
     const dir = aim.clone().sub(P.pos).setY(0).normalize();
-    const start = P.pos.clone(), end = P.pos.clone().addScaledVector(dir, d);
+    const start = P.pos.clone(), end = P.pos.clone();
+    for (let t = 0.25; t <= d + 1e-6; t += 0.25) {
+      const x = start.x + dir.x * t, z = start.z + dir.z * t;
+      if (G.world.collision?.solidAt?.(x, z, P.radius * 0.8)) break;
+      end.set(x, start.y, z);
+    }
     P.leap = { start, end, t: 0, dur: 0.5 / 0.8 * 0.62 };
     P.anim.play('slam', { speed: 0.8, onEvent: ev => {
       if (ev !== 'impact') return;
@@ -309,6 +316,7 @@ export class SkillRunner {
       }
     }
     // Dig Slam leap arc
+    if (P.leap && P.anim.action?.name !== 'slam') P.leap = null;
     if (P.leap) { P.leap.t += dt; const k = clamp(P.leap.t / P.leap.dur); P.pos.lerpVectors(P.leap.start, P.leap.end, k); G.world.collision?.resolve(P.pos, P.radius, P.leap.start); }
     // Zoomies dash
     if (P.dash) {
