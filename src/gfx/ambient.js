@@ -32,6 +32,41 @@ function koiMesh(seed) {
   return new THREE.Mesh(g, makeToon({ vertexColors: true, rim: 0.4, brush: 0.05 }));
 }
 
+// Anime-style wind streak: a camera-facing ribbon swept along an analytic curly path in the vertex shader.
+const WIND_VS = /* glsl */`
+attribute float aU; attribute float aS;
+uniform float uT; uniform vec3 uStart; uniform vec3 uDir; uniform vec3 uSide; uniform float uLen; uniform float uAmp; uniform float uPhase; uniform float uCurl;
+varying float vA;
+vec3 path(float u) {
+  vec3 p = uStart + uDir * u * uLen + uSide * sin(u * 5.0 + uPhase) * uAmp + vec3(0.0, sin(u * 3.0 + uPhase * 1.3) * uAmp * 0.4 + u * 0.4, 0.0);
+  float c = smoothstep(0.45, 0.55, u) * (1.0 - smoothstep(0.62, 0.75, u)) * uCurl;
+  float a = (u - 0.45) * 30.0;
+  p += (uSide * sin(a) + vec3(0.0, 1.0 - cos(a), 0.0)) * 0.45 * c;
+  return p;
+}
+void main() {
+  vec3 p = path(aU);
+  vec3 t = normalize(path(aU + 0.01) - p + 1e-5);
+  vec3 v = normalize(cameraPosition - p);
+  vec3 w = normalize(cross(t, v));
+  float head = uT * 1.5; float tail = head - 0.5;
+  float a = smoothstep(tail, tail + 0.25, aU) * (1.0 - smoothstep(head - 0.06, head, aU));
+  vA = a;
+  p += w * aS * 0.05 * (0.4 + 0.6 * a);
+  gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
+}`;
+const WIND_FS = /* glsl */`
+uniform float uOpacity; varying float vA;
+void main() { if (vA < 0.01) discard; gl_FragColor = vec4(1.0, 1.0, 1.0, vA * uOpacity); }`;
+function windStreakGeo() {
+  const N = 64, pos = [], u = [], sd = [], idx = [];
+  for (let i = 0; i <= N; i++) for (const s of [-1, 1]) { pos.push(0, 0, 0); u.push(i / N); sd.push(s); }
+  for (let i = 0; i < N; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('aU', new THREE.Float32BufferAttribute(u, 1)); g.setAttribute('aS', new THREE.Float32BufferAttribute(sd, 1));
+  g.setIndex(idx); return g;
+}
+
 export class Ambient {
   constructor(G, world, vfx) {
     this.G = G; this.world = world; this.vfx = vfx;
@@ -58,6 +93,15 @@ export class Ambient {
       this.shafts.push({ m, off: new THREE.Vector3(rand(-16, 16), 0, rand(-12, 12)), w: rand(0.8, 2.2), ph: rand(0, TAU) });
     }
     this.smokeEmitters = []; // {pos, rate, acc, color}
+    // wind streaks
+    const wg = windStreakGeo();
+    this.streaks = [];
+    for (let i = 0; i < 6; i++) {
+      const uni = { uT: { value: 2 }, uStart: { value: new THREE.Vector3() }, uDir: { value: new THREE.Vector3(1, 0, 0) }, uSide: { value: new THREE.Vector3(0, 0, 1) }, uLen: { value: 8 }, uAmp: { value: 0.4 }, uPhase: { value: 0 }, uCurl: { value: 0 }, uOpacity: { value: 0.5 } };
+      const m = new THREE.Mesh(wg, new THREE.ShaderMaterial({ vertexShader: WIND_VS, fragmentShader: WIND_FS, uniforms: uni, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+      m.frustumCulled = false; m.renderOrder = 14; world.scene.add(m);
+      this.streaks.push({ m, u: uni, t: 2, dur: 1, delay: rand(0, 3) });
+    }
   }
   addSmoke(pos, { rate = 2.5, color = '#f4f0ec', size = 0.5, steam = false } = {}) { const e = { pos: pos.clone(), rate, acc: rand(0, 1), color, size, steam }; this.smokeEmitters.push(e); return e; }
   update(dt, t) {
@@ -139,6 +183,19 @@ export class Ambient {
       s.m.material.opacity = golden * (0.1 + 0.06 * Math.sin(t * 0.5 + s.ph));
       s.m.material.color.copy(day?.out?.sun || new THREE.Color('#ffe0a0'));
       s.m.visible = golden > 0.01;
+    }
+    // ---- wind streaks swooping with the gusts
+    for (const st of this.streaks) {
+      if (st.t <= 1.05) { st.t += dt / st.dur; st.u.uT.value = st.t; continue; }
+      st.delay -= dt; st.m.visible = false;
+      if (st.delay > 0 || night > 0.6) continue;
+      st.delay = rand(1.5, 5); st.t = 0; st.dur = rand(1.6, 2.6); st.m.visible = true;
+      const dir = new THREE.Vector3(wind.x, 0, wind.y).normalize(), side = new THREE.Vector3(-dir.z, 0, dir.x);
+      const len = rand(7, 12);
+      const cx = focus.x + rand(-10, 10), cz = focus.z + rand(-8, 8);
+      st.u.uStart.value.set(cx - dir.x * len * 0.5, this.world.heightAt(cx, cz) + rand(0.6, 2.2), cz - dir.z * len * 0.5);
+      st.u.uDir.value.copy(dir); st.u.uSide.value.copy(side); st.u.uLen.value = len; st.u.uAmp.value = rand(0.2, 0.6);
+      st.u.uPhase.value = rand(0, 6.28); st.u.uCurl.value = Math.random() < 0.5 ? 1 : 0; st.u.uOpacity.value = 0.55 * (1 - night);
     }
     // ---- chimney smoke / steam
     for (const e of this.smokeEmitters) {
