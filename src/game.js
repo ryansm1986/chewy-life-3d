@@ -412,7 +412,10 @@ export async function boot() {
   // ---- main loop
   let fpsAcc = 0, fpsN = 0; const fpsEl = Object.assign(document.body.appendChild(document.createElement('div')), { style: 'position:fixed;left:8px;bottom:8px;color:#fff;font:12px monospace;z-index:99;text-shadow:0 1px 2px #000' });
   function frame() {
-    const dt = engine.tick();
+    const rdt = engine.tick();
+    // pause gameplay for the pause menu, and in the Burrow while reading dialogue (nothing should hit Chewy mid-sentence)
+    const paused = G.ui?.isPaused?.() || (G.mode === 'dungeon' && G.ui?.dlg?.active);
+    const dt = paused ? 0 : rdt;
     if (G.mode === 'village') day.update(dt);
     if (G.titleActive) { rig.yawTarget += dt * 0.06; rig.yaw = rig.yawTarget; }
     else handleInput(dt);
@@ -447,7 +450,7 @@ export async function boot() {
     G.vfx.update(dt);
     syncBuffs();
     G.audio?.update?.(dt, { pos: player.pos, camera: engine.camera });
-    G.ui?.update?.(dt);
+    G.ui?.update?.(rdt);
     engine.render();
     Input.endFrame();
     if (fpsEl) { fpsEl.style.display = fpsOn ? '' : 'none'; fpsAcc += dt; fpsN++; if (fpsAcc > 0.5) { fpsEl.textContent = `${Math.round(fpsN / fpsAcc)} fps`; fpsAcc = 0; fpsN = 0; } }

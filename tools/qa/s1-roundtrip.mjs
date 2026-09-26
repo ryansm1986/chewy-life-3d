@@ -63,7 +63,7 @@ try {
     m.foreignSources = await page.evaluate(() => { const G = window.G; const own = new Set(); for (const r of G.sim.list) for (const l of r.lights) own.add(l); let n = 0; for (const s of G.village.world.lightPool.sources) if (!own.has(s)) n++; return n; });
     const dup = await dupCheck();
     const st = await page.evaluate(() => window.QA.state());
-    hist.push({ i, ...m, dungeon: inDungeon, dup, locked: st.locked });
+    hist.push({ i, ...m, dungeon: inDungeon, dup, locked: st.locked, st: JSON.stringify({ anim: st.anim, dlg: st.dlg, modal: st.modal, dead: st.dead }) });
     R.note(`cycle ${i + 1} (floor ${floor}): geo=${m.geo} tex=${m.tex} progs=${m.progs} vChildren=${m.villageChildren} vSources=${m.villageSources} labels=${m.lootLabels} | in-dungeon loot=${inDungeon.loot} labels=${inDungeon.labels} | dup=${JSON.stringify(dup)}`);
   }
   const wl1 = await windowListeners();
@@ -78,7 +78,7 @@ try {
   R.check('no loot labels left over in the village', hist.every(h => h.lootLabels === 0), hist.map(h => h.lootLabels).join(','));
   R.check('bus events not duplicated (1 sfx emit -> 1 audio.play, 1 toast -> 1 toast)', hist.every(h => h.dup.sfx === 1 && h.dup.toast === 1), hist.map(h => JSON.stringify(h.dup)).join(' '));
   R.check('window event listeners do not multiply', wl1.n === wl0.n, `${wl0.n} -> ${wl1.n} ${JSON.stringify(wl1.by)}`);
-  R.check('controls unlocked after every return', hist.every(h => !h.locked));
+  R.check('controls unlocked after every return', hist.every(h => !h.locked), hist.map(h => h.locked + ':' + h.st).join(' '));
 
   // stairs chain: floor 1 -> 2 -> 3 via G.enterDungeon while already in the dungeon (the "burrow deeper" path)
   await page.evaluate(() => window.G.enterDungeon(1));
