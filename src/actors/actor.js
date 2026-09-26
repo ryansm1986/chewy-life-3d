@@ -65,5 +65,6 @@ export class Actor {
   }
   dispose() {
     this.world.scene.remove(this.rig.root); this.world.scene.remove(this.shadow);
+    this.rig.dispose?.();
   }
 }

@@ -30,11 +30,12 @@ export class BuildPanel extends Panel {
     this.body.innerHTML = `<div class="bd-main"><div class="bd-cards"></div>
       <div class="bd-side">
         <div class="bd-stats"></div>
+        <div class="bd-rank"></div>
         <div class="bd-ov">${OVERLAYS.map(([m, n]) => `<button class="ovl" data-m="${m}" style="--oc:${COVERS[m]?.[0] || '#ff8fb0'}">${n}</button>`).join('')}</div>
         <div class="bh-t">Pick a building or a tool</div>
         <div class="bh-k"><span class="kc sm">${glyph('mouseL')}</span>place <span class="kc sm">R</span>rotate <span class="kc sm">Esc</span>cancel</div>
       </div></div>`;
-    this.$ = { tabs: this.extra.querySelector('.bd-tabs'), cards: this.body.querySelector('.bd-cards'), hint: this.body.querySelector('.bh-t'), tools: this.extra.querySelector('.bd-tools'), stats: this.body.querySelector('.bd-stats'), ov: this.body.querySelector('.bd-ov') };
+    this.$ = { tabs: this.extra.querySelector('.bd-tabs'), cards: this.body.querySelector('.bd-cards'), hint: this.body.querySelector('.bh-t'), tools: this.extra.querySelector('.bd-tools'), stats: this.body.querySelector('.bd-stats'), rank: this.body.querySelector('.bd-rank'), ov: this.body.querySelector('.bd-ov') };
     this.$.ov.addEventListener('click', e => { const b = e.target.closest('.ovl'); if (!b) return; this.overlay = this.overlay === b.dataset.m ? '' : b.dataset.m; this.opts.onOverlay?.(this.overlay || null); this.markOverlay(); this.ui.sfx?.('tab'); });
     this.$.tabs.addEventListener('click', e => { const t = e.target.closest('.tab'); if (t) { this.cat = t.dataset.c; this.render(true); this.ui.sfx?.('tab'); } });
     this.$.cards.addEventListener('click', e => { const c = e.target.closest('.card'); if (c) this.pick(c); });
@@ -64,9 +65,26 @@ export class BuildPanel extends Panel {
     const S = this.opts.stats?.() || this.st.village?.stats || null;
     if (!S) { this.$.stats.innerHTML = ''; return; }
     const hp = Math.round((S.happiness ?? 0.5) * 100);
-    const h = `<span title="Villagers">${glyph('home')}<b>${S.population ?? 0}</b></span><span title="Happiness">${glyph('heart')}<b>${hp}%</b></span>${S.rank ? `<span title="Village rank">${glyph('star')}<b>${S.rank}</b></span>` : ''}`;
+    const h = `<span title="Villagers">${glyph('home')}<b>${S.population ?? 0}</b><small>villager${S.population === 1 ? '' : 's'}</small></span><span title="Happiness">${glyph('heart')}<b>${hp}%</b><small>happy</small></span>`;
     if (h !== this._stH) { this._stH = h; this.$.stats.innerHTML = h; }
+    this.renderRank(S.rankInfo || (S.rank ? { rank: S.rank, pop: S.population ?? 0 } : null));
     if (S.demand) this.ui.hud.setRCI(S.demand);
+  }
+  // "Village rank" progress: ★ Rank 2 ▓▓▓░░ 18/28 → Rank 3 unlocks …
+  renderRank(R) {
+    const box = this.$.rank;
+    if (!R) { if (this._rkH) { this._rkH = ''; box.innerHTML = ''; } return; }
+    const top = R.next == null;
+    const frac = top ? 1 : Math.max(0, Math.min(1, (R.pop - (R.cur || 0)) / Math.max(1, R.next - (R.cur || 0))));
+    const un = R.unlocks || [];
+    const unl = un.length ? `unlocks <b>${un.slice(0, 2).map(esc).join(', ')}</b>${un.length > 2 ? ` +${un.length - 2} more` : ''}` : 'a prouder village';
+    const h = `<div class="rk-top" title="Village rank grows with villagers"><span class="rk-badge">${glyph('star')}<b>${R.rank}</b></span><span class="rk-l">Rank ${R.rank}</span>
+        <span class="rk-bar"><i style="width:${(frac * 100).toFixed(1)}%"></i></span><span class="rk-n">${top ? 'max' : `${R.pop}/${R.next}`}</span></div>
+      <div class="rk-next">${top ? 'Top rank — Blossom Hollow is famous!' : `${R.next - R.pop} more villager${R.next - R.pop === 1 ? '' : 's'} → Rank ${R.rank + 1} ${unl}`}</div>`;
+    if (h === this._rkH) return;
+    const up = this._rkRank != null && R.rank > this._rkRank;
+    this._rkH = h; this._rkRank = R.rank; box.innerHTML = h;
+    if (up) replay(box, 'rankup', 900);
   }
   onClose() { this.ui.root.classList.remove('building'); clearInterval(this._st); this.sel = null; this.tool = null; this.opts.onClose?.(); }
   find(id) { for (const c of this.opts.categories || []) for (const it of c.items || []) if (it.id === id) return it; return null; }
@@ -139,16 +157,79 @@ export class BuildPanel extends Panel {
       this.$.cards.innerHTML = items.length ? items.map((it, i) => {
         const poor = Object.keys(this.afford(it.cost)).length > 0;
         const icon = it.icon ? `<img src="${it.icon}" alt="" draggable="false">` : `<img src="${glyphURL(it.glyph || C.g)}" alt="" class="gi" draggable="false">`;
-        return `<div class="card ${it.locked ? 'locked' : ''} ${poor ? 'poor' : ''}" data-id="${esc(it.id)}" style="--i:${i};--cc:${C.c}">
+        const built = it.locked === 'Already built';
+        return `<div class="card ${it.locked ? 'locked' : ''} ${built ? 'built' : ''} ${poor && !built ? 'poor' : ''}" data-id="${esc(it.id)}" style="--i:${i};--cc:${C.c}">
           <div class="cd-art">${icon}${it.size ? `<span class="cd-size">${it.size[0]}×${it.size[1]}</span>` : ''}${it.zone ? `<span class="cd-zone z-${it.zone}">${it.zone}</span>` : ''}</div>
           <div class="cd-n">${esc(it.name)}</div>
           <div class="cd-cost">${this.costHTML(it.cost)}</div>
           ${it.cover?.kind && COVERS[it.cover.kind] ? `<span class="cd-cover" style="--cv:${COVERS[it.cover.kind][0]}" title="${COVERS[it.cover.kind][1]}"></span>` : ''}
-          ${it.locked ? `<div class="cd-lock">${glyph('lock')}<span>${esc(typeof it.locked === 'string' ? it.locked : it.req || 'Locked')}</span></div>` : ''}
+          ${built ? `<div class="cd-built">${glyph('check')}<span>Built</span></div>` : it.locked ? `<div class="cd-lock">${glyph('lock')}<span>${esc(typeof it.locked === 'string' ? it.locked : it.req || 'Locked')}</span></div>` : ''}
         </div>`;
       }).join('') : `<div class="bd-empty">${glyph('sakura')}Nothing here yet — keep growing the village!</div>`;
       if (tabChanged) { this.$.cards.scrollLeft = 0; replay(this.$.cards, 'swap', 400); }
       this.markSel();
     }
+  }
+}
+
+// ------------------------------------------------------------------ build-mode hover card
+// Follows the cursor over the village: a building's residents/jobs and needs (✓/✗ with coverage bars), or an empty
+// zoned lot's demand / room / path, plus what blocks growth or the next level. Data comes from VillageSim.inspect().
+const NEED_COL = { road: '#c9a878', water: '#5aaaff', light: '#ffd24a', joy: '#ff82be', health: '#5ed69a', learn: '#a88cff', care: '#5ed69a', demand: '#8fe0c0', lot: '#ffcf4a' };
+const CAT_G = { home: 'home', shop: 'shop', craft: 'craft', service: 'service', decor: 'decor', special: 'special' };
+const ZONE_COL = { R: '#5ec79a', C: '#5aa8ff', W: '#e8a92a' };
+export class InspectCard {
+  constructor(ui, layer) {
+    this.ui = ui;
+    this.wrap = el('div', 'bi-wrap');
+    this.box = el('div', 'bi');
+    this.wrap.appendChild(this.box);
+    layer.appendChild(this.wrap);
+    this.on = false; this.sig = ''; this.w = 0; this.h = 0;
+  }
+  show(info, x, y) {
+    if (!info) return this.hide();
+    const sig = info === this._info ? this.sig : JSON.stringify(info);
+    this._info = info;
+    if (sig !== this.sig) {
+      const swap = this.on && info.id !== this._id;
+      this.sig = sig; this._id = info.id ?? info.title;
+      this.box.innerHTML = this.html(info);
+      this.box.style.setProperty('--hc', info.kind === 'zone' ? ZONE_COL[info.zone] || '#ffcf4a' : info.zone ? ZONE_COL[info.zone] : '#ff8fb0');
+      this.box.classList.toggle('bad', !info.ok);
+      const r = this.box.getBoundingClientRect(); this.w = r.width; this.h = r.height;
+      if (swap) replay(this.box, 'swap', 260);
+    }
+    if (!this.on) { this.on = true; this.wrap.classList.remove('show'); void this.wrap.offsetWidth; this.wrap.classList.add('show'); }
+    this.place(x, y);
+  }
+  place(x, y) {
+    const pad = 12, s = this.ui.scale || 1, bp = this.ui.panels.build;
+    const floor = bp?.isOpen && bp.panel ? bp.panel.getBoundingClientRect().top : innerHeight;
+    let px = x + 26 * s, py = y + 22 * s;
+    if (px + this.w > innerWidth - pad) px = x - this.w - 22 * s;
+    if (py + this.h > floor - pad) py = Math.max(pad, Math.min(y - this.h - 18 * s, floor - this.h - pad));
+    px = Math.max(pad, px); py = Math.max(pad, py);
+    this.wrap.style.transform = `translate3d(${px | 0}px,${py | 0}px,0)`;
+  }
+  hide() { if (!this.on) return; this.on = false; this.wrap.classList.remove('show'); }
+  html(I) {
+    const icon = I.kind === 'zone' ? `<span class="bi-z" style="--zc:${ZONE_COL[I.zone]}">${I.zone}</span>` : glyph(CAT_G[I.cat] || 'home');
+    const stats = (I.stats || []).map(s => `<span>${glyph(s.g)}${esc(s.text)}</span>`).join('');
+    const row = l => {
+      const c = NEED_COL[l.kind] || '#c3b3ff';
+      const bar = l.have != null ? `<span class="bi-bar ${l.ok ? 'ok' : 'no'}"><i style="width:${Math.round(Math.min(1, l.have) * 100)}%"></i>${l.need != null ? `<u style="left:${Math.round(l.need * 100)}%"></u>` : ''}</span>` : '';
+      const mark = l.info && l.ok == null ? '' : `<b class="bi-m ${l.ok ? 'ok' : 'no'}">${l.ok ? '✓' : '✗'}</b>`;
+      return `<div class="bi-row ${l.ok ? 'ok' : 'no'} ${l.info ? 'soft' : ''} ${bar ? 'hasbar' : ''}" style="--nc:${c}">${mark}<span class="bi-t">${esc(l.text)}</span>${bar}${l.val ? `<span class="bi-v">${esc(l.val)}</span>` : ''}</div>`;
+    };
+    const need = (I.lines || []).filter(l => !l.info), soft = (I.lines || []).filter(l => l.info);
+    const covers = I.kind === 'building' && !I.zone; // services / decor: "gives …" lines
+    let rows = need.map(row).join('');
+    if (soft.length) rows += (need.length ? `<div class="bi-sh">${I.kind === 'zone' ? 'Comfort here · for level 2' : 'Comfort'}</div>` : covers ? '' : '<div class="bi-sh">Comfort</div>') + soft.map(row).join('');
+    const head = I.needFor ? `<div class="bi-sh">To reach level ${I.needFor}</div>` : I.kind === 'zone' ? '<div class="bi-sh">To grow here</div>' : '';
+    const bl = (I.blockers || []).map(b => `<div class="bi-bl">${glyph('x')}<span>${esc(b)}</span></div>`).join('');
+    const hint = (I.hint ? `<div class="bi-ok ${I.ok ? '' : 'dim'}">${I.ok ? glyph('sparkle') : ''}<span>${esc(I.hint)}</span></div>` : '') + (I.note ? `<div class="bi-note">${esc(I.note)}</div>` : '');
+    return `<div class="bi-h"><span class="bi-ic">${icon}</span><div class="bi-ti"><b>${esc(I.title)}</b>${I.sub ? `<small>${esc(I.sub)}</small>` : ''}</div></div>
+      ${stats ? `<div class="bi-stats">${stats}</div>` : ''}${head}${rows ? `<div class="bi-rows">${rows}</div>` : ''}${bl}${hint}`;
   }
 }

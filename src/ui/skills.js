@@ -2,7 +2,7 @@
 import { el, esc, replay, setText } from './dom.js';
 import { glyph } from './glyphs.js';
 import { Panel } from './panel.js';
-import { TREES, skillList, skillDef, skillIconURL, skillInfoLines, canLearnSkill, effLevel, treeInfo } from './rpg.js';
+import { TREES, skillList, skillDef, skillIconURL, hotbarIconURL, skillInfoLines, canLearnSkill, effLevel, treeInfo } from './rpg.js';
 
 const COLW = 118, ROWH = 80, NODE = 64, PADX = 64, PADY = 26;
 const SLOT_NAMES = ['LMB', 'RMB', '1', '2', '3', '4'];
@@ -15,7 +15,7 @@ export class SkillsPanel extends Panel {
     b.innerHTML = `<div class="tabs sk-tabs">${TREES.map(t => `<button class="tab" data-t="${t.id}" style="--tc:${t.color}">${glyph(t.glyph)}<span>${t.name}</span><b class="tab-n">0</b></button>`).join('')}</div>
       <div class="tree-wrap"><div class="tree"><div class="tree-title"><span class="tt-jp"></span></div><svg class="links"></svg><div class="rows"></div><div class="nodes"></div></div></div>
       <div class="sk-foot">${glyph('mouseL')}Learn <span class="sep">·</span>${glyph('mouseR')}Assign <span class="sep">·</span><span class="kc sm">1</span>–<span class="kc sm">4</span> while hovering <span class="sep">·</span> Drag to hotbar</div>`;
-    this.$ = { pts: this.extra.querySelector('.sk-pts b'), ptsBox: this.extra.querySelector('.sk-pts'), tree: b.querySelector('.tree'), links: b.querySelector('.links'), nodes: b.querySelector('.nodes'), rows: b.querySelector('.rows'), title: b.querySelector('.tree-title') };
+    this.$ = { pts: this.extra.querySelector('.sk-pts b'), ptsW: this.extra.querySelector('.sk-pts span'), ptsBox: this.extra.querySelector('.sk-pts'), tree: b.querySelector('.tree'), links: b.querySelector('.links'), nodes: b.querySelector('.nodes'), rows: b.querySelector('.rows'), title: b.querySelector('.tree-title') };
     b.querySelector('.sk-tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (t) this.setTree(t.dataset.t); });
     const N = this.$.nodes;
     N.addEventListener('mouseover', e => { const n = e.target.closest('.node'); if (!n || n === this._hov) return; this._hov = n; this.hoverId = n.dataset.id; this.ui.tip.show(this.tipHTML(n.dataset.id), 'skill', n); });
@@ -62,6 +62,7 @@ export class SkillsPanel extends Panel {
     const p = this.st.player || {};
     const pts = p.skillPts || 0;
     setText(this.$.pts, String(pts));
+    setText(this.$.ptsW, pts === 1 ? 'point' : 'points');
     this.$.ptsBox.classList.toggle('on', pts > 0);
     const all = skillList();
     for (const t of TREES) {
@@ -166,7 +167,7 @@ export class SkillsPanel extends Panel {
     const need = s.reqLvl + lvl;
     if (need > 1 && lvl < s.maxLvl) reqs.push(`<span class="${(p.lvl || 1) >= need ? 'ok' : 'bad'}">Level ${need}</span>`);
     for (const q of s.prereq) { const d = skillDef(q); reqs.push(`<span class="${this.lvl(q) > 0 ? 'ok' : 'bad'}">${esc(d?.name || q)}</span>`); }
-    const syn = (s.synergies || []).map(x => { const d = skillDef(x.id); return `<div class="tt-syn">${glyph('sparkle')}<b>${esc(d?.name || x.id)}</b> <span>${esc(x.text || '')}</span> <i>(${this.lvl(x.id)} pts)</i></div>`; }).join('');
+    const syn = (s.synergies || []).map(x => { const d = skillDef(x.id); return `<div class="tt-syn">${glyph('sparkle')}<b>${esc(d?.name || x.id)}</b> <span>${esc(x.text || '')}</span> <i>(${this.lvl(x.id)} pt${this.lvl(x.id) === 1 ? '' : 's'})</i></div>`; }).join('');
     const hot = (p.hotbar || []).indexOf(id);
     const KIND = { active: 'Active', passive: 'Passive', aura: 'Aura', channel: 'Channel' };
     const wep = s.wep === 'sword' ? ' · Bone Sword' : s.wep === 'ball' ? ' · Ball' : '';
@@ -188,7 +189,7 @@ export class SkillsPanel extends Panel {
     if (s.passive) { this.ui.toast(`${s.name} is passive — always active!`, { icon: 'sparkle' }); return; }
     if (this.lvl(id) <= 0) { replay(anchor, 'deny', 400); this.ui.toast('Learn it first!', { icon: 'lock', color: '#ff8fb0' }); return; }
     const hot = this.st.player?.hotbar || [];
-    this.ui.popover(anchor, `<div class="pop-h">Assign <b>${esc(s.name)}</b></div><div class="pop-slots">${SLOT_NAMES.map((n, i) => `<button class="pop-slot ${hot[i] === id ? 'on' : ''}" data-i="${i}">${hot[i] ? `<img src="${skillIconURL(hot[i])}" alt="">` : ''}<span class="kc sm">${i === 0 ? glyph('mouseL') : i === 1 ? glyph('mouseR') : n}</span></button>`).join('')}</div>`, e => {
+    this.ui.popover(anchor, `<div class="pop-h">Assign <b>${esc(s.name)}</b></div><div class="pop-slots">${SLOT_NAMES.map((n, i) => `<button class="pop-slot ${hot[i] === id ? 'on' : ''}" data-i="${i}">${hot[i] ? `<img src="${hotbarIconURL(hot[i], this.d)}" alt="">` : ''}<span class="kc sm">${i === 0 ? glyph('mouseL') : i === 1 ? glyph('mouseR') : n}</span></button>`).join('')}</div>`, e => {
       const b = e.target.closest('.pop-slot'); if (!b) return false;
       this.assign(+b.dataset.i, id); return true;
     });
@@ -209,7 +210,7 @@ export class SkillsPanel extends Panel {
     const hot = this.st.player?.hotbar || [];
     const items = [{ id: 'attack', name: 'Attack' }, ...known];
     this.ui.popover(anchor, `<div class="pop-h">Slot <span class="kc sm">${slot === 0 ? glyph('mouseL') : slot === 1 ? glyph('mouseR') : SLOT_NAMES[slot]}</span></div>
-      <div class="pop-skills">${items.map(s => `<button class="pop-sk ${hot[slot] === s.id ? 'on' : ''}" data-id="${s.id}" title="${esc(s.name)}"><img src="${skillIconURL(s.id)}" alt=""><span>${esc(s.name)}</span></button>`).join('')}
+      <div class="pop-skills">${items.map(s => `<button class="pop-sk ${hot[slot] === s.id ? 'on' : ''}" data-id="${s.id}" title="${esc(s.name)}"><img src="${hotbarIconURL(s.id, this.d)}" alt=""><span>${esc(s.name)}</span></button>`).join('')}
       <button class="pop-sk clear" data-id="">${glyph('x')}<span>Clear</span></button></div>
       ${known.length ? '' : '<div class="pop-note">Learn skills in the skill tree (K)!</div>'}`, e => {
       const b = e.target.closest('.pop-sk'); if (!b) return false;

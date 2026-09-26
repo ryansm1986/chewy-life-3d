@@ -91,7 +91,7 @@ export const BUILDINGS = {
   lanternString: { name: 'Lantern String', cat: 'decor', size: [2, 1], levels: 1, cost: { coins: 45, wood: 2, lantern: 2, silk: 1 }, ...cov(['light', 4], ['joy', 3]), desc: 'A row of paper lanterns swaying between two poles.' },
   fence: { name: 'Picket Fence', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 6, wood: 1 }, desc: 'Keeps the chickens honest. Runs along x; rotate to turn.' },
   bridge: { name: 'Arched Bridge', cat: 'decor', size: [3, 9], levels: 1, cost: { coins: 200, wood: 24, stone: 8 }, desc: 'A vermilion taiko bridge. Deck height: bridgeDeckHeight(localZ).' },
-  chewyStatue: { name: 'Chewy Statue', cat: 'decor', size: [2, 2], levels: 1, cost: { coins: 250, stone: 20, bone: 8 }, ...cov(['joy', 8]), desc: 'A stone Chewy proudly guarding his golden bone. Rub the paw plaque for luck!' },
+  chewyStatue: { name: 'Chewy Statue', cat: 'special', size: [2, 2], levels: 1, unique: true, cost: { coins: 250, stone: 20, bone: 8 }, ...cov(['joy', 8]), desc: 'A stone Chewy proudly guarding his golden bone. Rub the paw plaque for luck!' },
 };
 
 export const CATEGORIES = { special: 'Landmarks', home: 'Homes', shop: 'Shops', craft: 'Workshops', service: 'Services', decor: 'Decor' };

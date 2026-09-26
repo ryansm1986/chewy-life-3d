@@ -3,9 +3,10 @@
 // animation; each part is one merged vertex-coloured mesh + an inverted-hull outline.
 import * as THREE from 'three';
 import { makeToon, makeOutline } from '../gfx/materials.js';
-import { merge, paint, tube, xf } from '../gfx/geom.js';
+import { merge, paint, tube, xf, mergeGeometries } from '../gfx/geom.js';
 import { tennisBallTexture } from '../gfx/textures.js';
 import { mulberry32, TAU, clamp } from '../core/util.js';
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const C = h => new THREE.Color(h);
@@ -103,6 +104,82 @@ class Rig {
     return m;
   }
   group(parent, name, p = [0, 0, 0]) { const g = new THREE.Group(); g.name = name; g.position.set(...p); parent.add(g); this.parts[name] = g; return g; }
+  // Bake every part mesh into ONE rigidly-skinned mesh (+ one outline) whose bones are the animated groups.
+  // ~20 part meshes x (main + outline + shadow) draw calls per character become ~3. Animation is unchanged:
+  // the animator keeps driving the same groups, which are now the skeleton's bones.
+  bake() {
+    const root = this.root;
+    root.updateMatrixWorld(true);
+    const rootInv = root.matrixWorld.clone().invert();
+    // the mouth animates its own transform: swap the mesh for a plain bone object in the same place
+    const mouth = this.parts.mouth;
+    if (mouth?.isMesh) {
+      const mb = new THREE.Object3D(); mb.name = 'mouthBone';
+      mb.position.copy(mouth.position); mb.rotation.copy(mouth.rotation); mb.scale.copy(mouth.scale);
+      mouth.parent.add(mb); mb.updateMatrixWorld(true); this.parts.mouth = mb;
+    }
+    const bones = [], index = new Map();
+    const boneOf = o => { if (!index.has(o)) { index.set(o, bones.length); bones.push(o); } return index.get(o); };
+    boneOf(root);
+    const toon = [];
+    root.traverse(o => { if (o.isMesh && o.material === this.mat && (o.visible || o === mouth)) toon.push(o); });
+    const bakeList = list => {
+      const geos = list.map(m => {
+        const bone = m === mouth ? this.parts.mouth : m.parent;
+        const g = merge([m.geometry.clone().applyMatrix4(rootInv.clone().multiply(m.matrixWorld))]);
+        const n = g.attributes.position.count, bi = boneOf(bone);
+        const si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
+        for (let i = 0; i < n; i++) { si[i * 4] = bi; sw[i * 4] = 1; }
+        g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+        g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+        return g;
+      });
+      return mergeGeometries(geos, false);
+    };
+    const bodyGeo = bakeList(toon);
+    const olGeo = bakeList(toon.filter(m => m.userData.outline));
+    // remove the original part meshes (and their outline shells)
+    for (const m of toon) { m.userData.outline?.parent?.remove(m.userData.outline); m.parent?.remove(m); }
+    // bones must be real Bone-like objects for the skeleton: groups work since only matrixWorld is used
+    const skeleton = new THREE.Skeleton(bones);
+    const mk = (geo, mat, name) => {
+      const sm = new THREE.SkinnedMesh(geo, mat); sm.name = name;
+      root.add(sm); root.updateMatrixWorld(true);
+      sm.bind(skeleton, sm.matrixWorld);
+      sm.computeBoundingSphere(); if (sm.boundingSphere) sm.boundingSphere.radius *= 1.4;
+      return sm;
+    };
+    const body = mk(bodyGeo, this.mat, 'body_skin'); body.castShadow = true; body.receiveShadow = true;
+    const ol = mk(olGeo, this.outMat, 'outline_skin'); ol.castShadow = false;
+    this.meshes = [body]; this.skeleton = skeleton; this.skin = body; this.outline = ol;
+    return this;
+  }
+  // free the GPU side of a throwaway rig (spirit pups, monsters, portrait renders). Attached props such as the
+  // player's weapons use shared cached geometry and are left alone.
+  dispose() {
+    if (!this.sharedGeo) { this.skin?.geometry.dispose(); this.outline?.geometry.dispose(); }
+    this.skeleton?.dispose(); this.mat.dispose(); this.outMat.dispose();
+  }
+}
+
+// A new rig that shares a baked rig's geometry (cheap: no procedural build, no GPU upload) but has its own
+// bones, skeleton and materials, so it animates and flashes independently. Used for summons such as spirit pups.
+export function cloneRig(src) {
+  const R = new Rig(src.spec);
+  const root = cloneSkinned(src.root);
+  const a = [], b = [];
+  src.root.traverse(o => a.push(o)); root.traverse(o => b.push(o));
+  const map = new Map(a.map((o, i) => [o, b[i]]));
+  for (const k of ['height', 'quadruped', 'offsetY']) if (k in src) R[k] = src[k];
+  R.root = root;
+  for (const [k, o] of Object.entries(src.parts)) R.parts[k] = Array.isArray(o) ? o.map(x => map.get(x)) : map.get(o);
+  R.skin = map.get(src.skin); R.outline = map.get(src.outline); R.meshes = [R.skin]; R.skeleton = R.skin.skeleton;
+  R.outline.bind(R.skeleton, R.outline.bindMatrix); // one skeleton (one bone texture) for body + outline
+  R.mat.emissive.copy(src.mat.emissive); R.mat.emissiveIntensity = src.mat.emissiveIntensity;
+  R.mat.transparent = src.mat.transparent; R.mat.opacity = src.mat.opacity;
+  R.skin.material = R.mat; R.outline.material = R.outMat;
+  R.sharedGeo = true;
+  return R;
 }
 
 /**
@@ -200,7 +277,7 @@ export function buildHumanoid(spec) {
 
   R.root.scale.setScalar(spec.scale || 1);
   R.height = 1.15 * (spec.scale || 1);
-  return R;
+  return R.bake();
 }
 
 function buildHead(R, head, sp, spec, { fur, fur2, fur3, skin }) {
@@ -435,7 +512,7 @@ export function buildBoston(spec = {}) {
   R.add(tail, ell(0.035, 0.035, 0.06, black, [0, 0.01, -0.03], [-0.5, 0, 0]), 'tailMesh');
   R.quadruped = true;
   R.height = 0.62;
-  return R;
+  return R.bake();
 }
 
 // X-ray silhouette: when a character is hidden behind scenery, draw a soft coloured silhouette through it.
@@ -450,8 +527,10 @@ export function enableXray(rig, color = '#ffd9a0', opacity = 0.55) {
   xm.stencilWrite = true; xm.stencilRef = 1; xm.stencilFunc = THREE.NotEqualStencilFunc;
   xm.stencilFail = THREE.KeepStencilOp; xm.stencilZFail = THREE.KeepStencilOp; xm.stencilZPass = THREE.KeepStencilOp;
   for (const mesh of rig.meshes) {
-    const x = new THREE.Mesh(mesh.geometry, xm); x.renderOrder = 30; x.castShadow = false; x.receiveShadow = false;
-    x.name = mesh.name + '_xray'; mesh.add(x);
+    const x = mesh.isSkinnedMesh ? new THREE.SkinnedMesh(mesh.geometry, xm) : new THREE.Mesh(mesh.geometry, xm);
+    x.renderOrder = 30; x.castShadow = false; x.receiveShadow = false; x.name = mesh.name + '_xray';
+    if (mesh.isSkinnedMesh) { mesh.parent.add(x); x.bind(mesh.skeleton, mesh.bindMatrix); x.boundingSphere = mesh.boundingSphere; }
+    else mesh.add(x);
   }
   rig.xrayMat = xm;
   return xm;

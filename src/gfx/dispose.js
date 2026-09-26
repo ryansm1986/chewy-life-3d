@@ -8,6 +8,7 @@ export function disposeScene(scene, extra = []) {
     if (o.customDepthMaterial) mats.add(o.customDepthMaterial);
     if (o.isLight && o.shadow?.map) o.shadow.dispose();
     if (o.isInstancedMesh) o.dispose?.();
+    if (o.isSkinnedMesh) o.skeleton?.dispose();
   });
   for (const m of mats) {
     for (const k of ['map', 'alphaMap', 'emissiveMap', 'normalMap', 'gradientMap']) if (m[k]?.isTexture) texs.add(m[k]);

@@ -25,13 +25,35 @@ const KIND = {
   block: { life: 0.9, rise: 1.0, size: 0.85 },
   status: { life: 1.4, rise: 1.4, size: 0.85 },
 };
+// Numeric dmg/crit floats that land near the same world spot within MERGE_MS become one number (summed, crit style if
+// any hit was a crit, with a little scale bump). At most MAX_FLOATS live at once — the oldest non-crit fades out fast.
+const MERGE_MS = 150, MERGE_R2 = 0.65 * 0.65, MAX_FLOATS = 14, FADE = 0.12;
+const NUM_RE = /^([+\-−]?)(\d+)(!?)$/;
 export class Floats {
   constructor(layer) {
     this.root = el('div', 'floats'); layer.appendChild(this.root);
     this.pool = []; this.active = [];
   }
   spawn(pos, text, opts = {}) {
-    const kind = KIND[opts.kind] ? opts.kind : 'dmg';
+    let kind = KIND[opts.kind] ? opts.kind : 'dmg';
+    const now = performance.now();
+    const y0 = (pos.y || 0) + (opts.yOff ?? 0);
+    const num = (kind === 'dmg' || kind === 'crit') ? NUM_RE.exec(text) : null;
+    if (num) {
+      const sign = num[1] === '−' ? '-' : num[1], col = opts.color || '';
+      for (let i = this.active.length - 1; i >= 0; i--) {
+        const o = this.active[i];
+        if (!o.num || o.dying || now - o.born > MERGE_MS || o.sign !== sign || o.col !== col) continue;
+        const dx = o.x - pos.x, dy = o.y - y0, dz = o.z - pos.z;
+        if (dx * dx + dy * dy + dz * dz > MERGE_R2) continue;
+        o.val += +num[2]; o.hits++;
+        if (kind === 'crit' && o.kind !== 'crit') { o.kind = 'crit'; o.life = Math.max(o.life, KIND.crit.life); o.rise = KIND.crit.rise; o.base = KIND.crit.size * (opts.scale || 1); o.n.className = 'fl k-crit'; }
+        o.size = o.base * Math.min(1.45, 1 + 0.07 * (o.hits - 1));
+        o.bump = 1;
+        this.paint(o);
+        return o;
+      }
+    }
     const K = KIND[kind];
     if (this.active.length > 260) this.release(0);
     let n = this.pool.pop();
@@ -39,24 +61,43 @@ export class Floats {
     n.className = 'fl k-' + kind;
     n.style.color = opts.color || '';
     n.style.opacity = '0';
-    let html = esc(text);
-    if (kind === 'crit') html = `${glyph('star', 'fl-star')}<span>${esc(text)}</span>`;
-    else if (kind === 'coins') html = `${glyph('coin')}<span>${esc(text)}</span>`;
-    else if (kind === 'xp') html = `<span>${esc(text)}</span>`;
-    n.innerHTML = html;
-    const f = { n, x: pos.x, y: (pos.y || 0) + (opts.yOff ?? 0), z: pos.z, t: 0, life: K.life, rise: K.rise, size: K.size * (opts.scale || 1), kind, drift: (Math.random() - 0.5) * (kind === 'crit' ? 30 : 40), stack: 0, sx: 0, sy: 0, rot: kind === 'crit' ? (Math.random() - 0.5) * 16 : (Math.random() - 0.5) * 6 };
-    // stacking: find recent floats that started near the same screen spot
+    const base = K.size * (opts.scale || 1);
+    const f = { n, x: pos.x, y: y0, z: pos.z, t: 0, born: now, life: K.life, rise: K.rise, base, size: base, kind, text, bump: 0,
+      num: !!num, sign: num ? (num[1] === '−' ? '-' : num[1]) : '', val: num ? +num[2] : 0, hits: 1, col: opts.color || '',
+      drift: (Math.random() - 0.5) * (kind === 'crit' ? 24 : 30), stack: 0, stackX: 0, push: 0, pushT: 0, sx: 0, sy: 0, rot: kind === 'crit' ? (Math.random() - 0.5) * 16 : (Math.random() - 0.5) * 6 };
+    this.paint(f);
+    // stacking: a new number near young ones pushes them up into a tidy zig-zag column instead of overlapping
     const cam = this.camera;
     if (cam) {
       const p = project(cam, f.x, f.y, f.z); f.sx = p.x; f.sy = p.y;
       let k = 0;
-      for (const o of this.active) if (o.t < 0.45 && Math.abs(o.sx - p.x) < 60 && Math.abs(o.sy - p.y) < 40) k++;
-      k = Math.min(k, 8);
-      f.stackX = k ? ((k % 3) - 1 || (k % 2 ? 1 : -1)) * 30 : 0;
-      f.stack = Math.ceil(k / 3) * 20;
+      const h = 26 * base;
+      for (const o of this.active) if (!o.dying && o.t < 0.7 && Math.abs(o.sx - p.x) < 70 && Math.abs(o.sy - p.y) < 48) { o.pushT += h; k++; }
+      if (k) { f.stackX = (k % 2 ? 1 : -1) * Math.min(26, 10 + k * 4); f.drift *= 0.35; }
     }
     this.active.push(f);
+    this.cap();
     return f;
+  }
+  paint(f) {
+    const text = f.num ? `${f.sign}${f.val}${f.kind === 'crit' ? '!' : ''}` : f.text;
+    let html = esc(text);
+    if (f.kind === 'crit') html = `${glyph('star', 'fl-star')}<span>${esc(text)}</span>`;
+    else if (f.kind === 'coins') html = `${glyph('coin')}<span>${esc(text)}</span>`;
+    else if (f.kind === 'xp') html = `<span>${esc(text)}</span>`;
+    f.n.innerHTML = html;
+  }
+  // keep at most MAX_FLOATS live: the oldest non-crit (else the oldest) fades out quickly
+  cap() {
+    let live = 0;
+    for (const o of this.active) if (!o.dying) live++;
+    while (live > MAX_FLOATS) {
+      let victim = null;
+      for (const o of this.active) if (!o.dying && o.kind !== 'crit' && (!victim || o.born < victim.born)) victim = o;
+      if (!victim) for (const o of this.active) if (!o.dying && (!victim || o.born < victim.born)) victim = o;
+      if (!victim) break;
+      victim.dying = FADE; live--;
+    }
   }
   release(i) { const f = this.active[i]; f.n.style.opacity = '0'; f.n.style.transform = 'translate3d(-999px,-999px,0)'; this.pool.push(f.n); this.active.splice(i, 1); }
   update(dt, camera, scale) {
@@ -65,6 +106,8 @@ export class Floats {
     for (let i = this.active.length - 1; i >= 0; i--) {
       const f = this.active[i];
       f.t += dt;
+      if (f.dying) { f.dying -= dt; if (f.dying <= 0) { this.release(i); continue; } }
+      if (f.pushT > f.push) f.push += (f.pushT - f.push) * (1 - Math.exp(-18 * dt));
       const u = f.t / f.life;
       if (u >= 1) { this.release(i); continue; }
       const rise = f.rise * (1 - (1 - u) * (1 - u));
@@ -74,9 +117,11 @@ export class Floats {
       const a = f.t;
       let s = a < 0.09 ? 0.35 + (a / 0.09) * 1.05 : a < 0.24 ? 1.4 - ((a - 0.09) / 0.15) * 0.4 : 1 - Math.max(0, u - 0.7) * 0.6;
       if (f.kind === 'crit' && a < 0.35) s *= 1 + Math.sin(a * 40) * 0.06 * (1 - a / 0.35);
+      if (f.bump > 0) { s *= 1 + 0.3 * f.bump; f.bump = Math.max(0, f.bump - dt * 6); }
       s *= f.size * scale;
-      const op = u < 0.65 ? 1 : 1 - (u - 0.65) / 0.35;
-      const x = p.x + (f.drift * u + (f.stackX || 0)) * scale, y = p.y - f.stack * scale;
+      let op = u < 0.65 ? 1 : 1 - (u - 0.65) / 0.35;
+      if (f.dying) op *= Math.max(0, f.dying / FADE);
+      const x = p.x + (f.drift * u + (f.stackX || 0)) * scale, y = p.y - (f.stack + f.push) * scale;
       f.n.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) translate(-50%,-50%) rotate(${(f.rot * (1 - u)).toFixed(1)}deg) scale(${s.toFixed(3)})`;
       f.n.style.opacity = op.toFixed(3);
     }

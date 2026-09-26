@@ -318,3 +318,25 @@
 
 /* quest tracker: solid paper so it reads over bright roofs */
 .hud .qtrack { background: rgba(255, 246, 232, .94) !important; box-shadow: 0 4px 0 rgba(74, 44, 42, .18), 0 6px 18px rgba(74, 44, 42, .2); }
+
+/* ---------------------------------------------------------------- quest target pointer (questArrow.js) */
+.qa { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity .25s, visibility 0s .25s; z-index: 3; }
+.qa.show { opacity: 1; visibility: visible; transition: opacity .25s, visibility 0s; }
+.qa-pt { position: absolute; left: 0; top: 0; }
+.qa-b { position: absolute; left: -21px; top: -21px; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 40% 35%, #fff, #ffe3ec 70%);
+  border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink), 0 0 0 4px rgba(255, 143, 176, .35), 0 6px 14px rgba(40, 18, 30, .3); z-index: 1; }
+.qa-ic .gl { width: 24px; height: 24px; display: block; }
+.qa[data-kind="place"] .qa-b { background: radial-gradient(circle at 40% 35%, #fff, #fff1c4 70%); box-shadow: 0 3px 0 var(--ink), 0 0 0 4px rgba(255, 207, 74, .4), 0 6px 14px rgba(40, 18, 30, .3); }
+.qa-rot { position: absolute; left: -42px; top: -42px; width: 84px; height: 84px; display: none; }
+.qa-tri { position: absolute; left: 50%; top: -8px; width: 34px; height: 34px; margin-left: -17px; filter: drop-shadow(0 2px 0 rgba(74, 44, 42, .35)); }
+.qa.edge .qa-rot { display: block; }
+.qa-tail { position: absolute; left: -8px; top: 12px; width: 16px; height: 16px; background: #ffe3ec; border-right: 3px solid var(--ink); border-bottom: 3px solid var(--ink); border-radius: 0 0 4px 0; transform: rotate(45deg); display: none; }
+.qa[data-kind="place"] .qa-tail { background: #fff1c4; }
+.qa.mark .qa-tail { display: block; }
+.qa-l { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 5px; padding: 3px 10px 4px; white-space: nowrap; background: rgba(255, 246, 232, .96); border: 2.5px solid var(--ink); border-radius: 999px;
+  font: 700 13px/1 var(--font); color: var(--ink); box-shadow: 0 2px 0 var(--ink); transform: translate(-50%, -50%); }
+.qa-d { font: 600 11.5px/1 var(--font); color: var(--ink2); }
+.qa.mark .qa-l { top: -40px; }
+.qa.pop .qa-b { animation: lvPop .5s var(--pop); }
+.qa.edge .qa-b { animation: qaPulse 1.6s ease-in-out infinite; }
+@keyframes qaPulse { 50% { box-shadow: 0 3px 0 var(--ink), 0 0 0 9px rgba(255, 143, 176, .16), 0 6px 14px rgba(40, 18, 30, .3); } }

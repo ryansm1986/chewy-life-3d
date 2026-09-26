@@ -107,7 +107,7 @@ export class Engine {
     this.post = null;
     this.time = 0; this.dt = 0;
     this.timeScale = 1; this.hitStop = 0;
-    this.clock = new THREE.Clock();
+    this.clock = new THREE.Timer(); this.clock.connect(document);
     this.raycaster = new THREE.Raycaster();
     addEventListener('resize', () => this.resize());
   }
@@ -135,7 +135,7 @@ export class Engine {
     return p;
   }
   tick() {
-    let dt = Math.min(this.clock.getDelta(), 1 / 20);
+    this.clock.update(); let dt = Math.min(this.clock.getDelta(), 1 / 20);
     if (this.hitStop > 0) { this.hitStop -= dt; dt *= 0.08; }
     dt *= this.timeScale;
     this.dt = dt; this.time += dt;

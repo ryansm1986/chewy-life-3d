@@ -2,7 +2,7 @@
 // flowers and a GPU grass field. Everything sways with the shared wind and bends around actors.
 import * as THREE from 'three';
 import { makeToon, applyDepth } from '../gfx/materials.js';
-import { leafCardTexture } from '../gfx/textures.js';
+import { leafCardTexture, floretTexture } from '../gfx/textures.js';
 import { branch, puff, cards, paint, merge, xf, tube } from '../gfx/geom.js';
 import { mulberry32, TAU, clamp, Noise } from '../core/util.js';
 import { T, WORLD, OVERLAY_GLSL } from './terrain.js';
@@ -250,6 +250,52 @@ function vegToon(o) {
   `;
   return makeToon({ ...o, wind: undefined, vertexWorld: vw });
 }
+// Leafy silhouettes for canopy clumps: where a clump turns away from the camera, bite noise-shaped leaf lobes
+// out of it so crowns read as masses of foliage instead of smooth balls. Interior (camera-facing) pixels skip it.
+const LEAF_EDGE = {
+  uniforms: { uFloret: { value: null } },
+  fragPars: /* glsl */`
+    uniform sampler2D uFloret;
+    float gFloretH = 0.0;
+    vec3 floretSample(vec3 p, vec3 n) {
+      vec3 w = abs(n); w = pow(w, vec3(6.0)); w /= (w.x + w.y + w.z + 1e-4);
+      return texture2D(uFloret, p.zy).rgb * w.x + texture2D(uFloret, p.xz).rgb * w.y + texture2D(uFloret, p.xy).rgb * w.z;
+    }
+    float lfHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+    float lfNoise(vec3 x) {
+      vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(mix(lfHash(i), lfHash(i + vec3(1, 0, 0)), f.x), mix(lfHash(i + vec3(0, 1, 0)), lfHash(i + vec3(1, 1, 0)), f.x), f.y),
+                 mix(mix(lfHash(i + vec3(0, 0, 1)), lfHash(i + vec3(1, 0, 1)), f.x), mix(lfHash(i + vec3(0, 1, 1)), lfHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+    }`,
+  fragColor: /* glsl */`
+    {
+      float ndv = dot(normalize(vCWN), normalize(cameraPosition - vCWorld));
+      if (ndv < 0.55) {
+        float lf = lfNoise(vCWorld * 5.5) * 0.65 + lfNoise(vCWorld * 13.0 + 7.1) * 0.35;
+        if (ndv < 0.08 + lf * 0.42) discard;
+        // leaf lobes near the edge catch a little more light, like painted highlights on leaf tips
+        diffuseColor.rgb *= 1.0 + smoothstep(0.55, 0.2, ndv) * (lf - 0.4) * 0.35;
+      }
+      // painted florets / leaf clusters: darker, more saturated gaps; domed, slightly varied clusters
+      vec3 fl = floretSample(vCWorld * 0.2, normalize(vCWN));
+      float f1 = clamp(fl.b * 1.1, 0.0, 1.0);
+      gFloretH = sqrt(max(0.0, 1.0 - f1 * f1));            // hemispherical dome per cluster
+      float gap = 1.0 - smoothstep(0.0, 0.4, fl.r);
+      diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * diffuseColor.rgb * 1.15, gap * gap * 0.14);
+      diffuseColor.rgb *= 0.93 + 0.14 * fl.g;
+    }`,
+  // bump the lighting normal with the cluster domes (screen-space derivative bump, as three's perturbNormalArb)
+  fragNormal: /* glsl */`
+    {
+      vec3 sp = -vViewPosition;
+      vec3 dpx = dFdx(sp), dpy = dFdy(sp);
+      float dhx = dFdx(gFloretH), dhy = dFdy(gFloretH);
+      vec3 r1 = cross(dpy, normal), r2 = cross(normal, dpx);
+      float det = dot(dpx, r1);
+      vec3 grad = sign(det) * (dhx * r1 + dhy * r2);
+      normal = normalize(abs(det) * normal - grad * 0.035);
+    }`,
+};
 const WHITE = new THREE.Color(1, 1, 1);
 class Batch {
   constructor(name, mat, { castShadow = true, receiveShadow = true, sort = true } = {}) {
@@ -374,7 +420,8 @@ export class Vegetation {
     }
     this.extraTrees?.(tryTree);
     const barkB = this.batch('bark', vegToon({ vertexColors: true, wind: 'tree', brush: 0.3, brushScale: 1.2, rim: 0.2, occluder: true }));
-    const folB = this.batch('foliage', vegToon({ occluder: true, vertexColors: true, wind: 'leaf', brush: 0.22, brushScale: 0.8, rim: 0.55, shadowSat: 0.5, term: [-0.15, 0.4] }));
+    LEAF_EDGE.uniforms.uFloret.value = floretTexture();
+    const folB = this.batch('foliage', vegToon({ ...LEAF_EDGE, occluder: true, vertexColors: true, wind: 'leaf', brush: 0.22, brushScale: 0.8, rim: 0.55, shadowSat: 0.5, term: [-0.15, 0.4] }));
     for (const kind of Object.keys(treeSpots)) {
       const spots = treeSpots[kind]; if (!spots.length) continue;
       const S = TREE_SPECIES[kind];

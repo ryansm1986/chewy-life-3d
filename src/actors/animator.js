@@ -76,7 +76,7 @@ export class Animator {
     this.blinkT = 1 + Math.random() * 3; this.blinkK = 0;
     this.ear = [{ a: 0, v: 0 }, { a: 0, v: 0 }];
     this.scarf = { a: 0, v: 0 };
-    this.flash = 0; this.flashColor = new THREE.Color('#ffffff');
+    this.flash = 0; this.flashColor = new THREE.Color('#ffffff'); this.baseEmissive = rig.mat.emissive.clone();
     this.talk = 0; this.mood = 0; // mood: 0 normal, 1 happy
     this.wag = 1;
     this.prevPos = new THREE.Vector3(); this.vel = new THREE.Vector3(); this.first = true;
@@ -124,12 +124,12 @@ export class Animator {
     if (m) {
       const talkOpen = this.talk > 0 ? (Math.sin(this.t * 18) * 0.5 + 0.5) * this.talk : 0;
       const o = Math.max(A.mouth, talkOpen);
-      m.visible = o > 0.05; m.scale.y = Math.max(0.01, o);
+      m.visible = o > 0.05; const k = o > 0.05 ? 1 : 0.0001; m.scale.set(k, Math.max(0.01, o) * k, k);
     }
     // flash
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 6);
     const mat = this.rig.mat;
-    mat.emissive.copy(this.flashColor).multiplyScalar(this.flash * this.flash * 0.55);
+    mat.emissive.copy(this.flashColor).multiplyScalar(this.flash * this.flash * 0.55 / (mat.emissiveIntensity || 1)).add(this.baseEmissive);
   }
   _set(o, rx, ry, rz) { const r = this.rest.get(o); o.rotation.set(r.r.x + rx, r.r.y + ry, r.r.z + rz); }
   poseBiped(dt, A) {

@@ -45,7 +45,10 @@ export function materialIconURL(k) {
 }
 export function potionInfo(k) { const P = rpg.items.POTIONS?.[k]; return P ? { name: P.name, desc: P.desc, price: P.price, color: P.color } : null; }
 
-const SKILL_FALLBACK_G = { attack: 'swords', chomp: 'bone', fetch: 'ball' };
+const SKILL_FALLBACK_G = { attack: 'swords', attack_ball: 'ball', chomp: 'bone', fetch: 'ball' };
+// hotbar / popover icon: the basic 'attack' follows the equipped weapon (bone sword vs tennis ball)
+export function hotbarIconURL(id, derived) { return skillIconURL(id === 'attack' && derived?.weaponType === 'ball' ? 'attack_ball' : id); }
+export const plural = (n, word, pl = word + 's') => `${n} ${n === 1 ? word : pl}`;
 export function skillIconURL(id) {
   if (!id) return '';
   const f = pick(rpg.icons, 'skillIcon', 'skillIconURL');

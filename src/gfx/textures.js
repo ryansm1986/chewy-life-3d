@@ -58,6 +58,35 @@ export function brushTexture() {
   });
 }
 
+// Tileable cellular 'floret' pattern for canopy clumps (Worley noise, 10x10 jittered cells, wraps seamlessly).
+// R: F2-F1 (0 in the gaps between florets), G: per-floret random value, B: F1 (0 at a floret's centre).
+export function floretTexture() {
+  return memo('floret', () => {
+    const S = 256, N = 10, cell = S / N, r = mulberry32(31);
+    const pts = [];
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) pts.push({ x: (i + 0.15 + r() * 0.7) * cell, y: (j + 0.15 + r() * 0.7) * cell, v: r() });
+    const { c, g } = canvas(S);
+    const img = g.createImageData(S, S);
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const ci = Math.floor(x / cell), cj = Math.floor(y / cell);
+      let f1 = 1e9, f2 = 1e9, v = 0;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const ii = (ci + di + N) % N, jj = (cj + dj + N) % N, q = pts[jj * N + ii];
+        const px = q.x + Math.floor((ci + di) / N) * S, py = q.y + Math.floor((cj + dj) / N) * S;
+        const d = Math.hypot(x - px, y - py);
+        if (d < f1) { f2 = f1; f1 = d; v = q.v; } else if (d < f2) f2 = d;
+      }
+      const k = (y * S + x) * 4;
+      img.data[k] = Math.min(255, (f2 - f1) / cell * 255 * 1.4);
+      img.data[k + 1] = v * 255;
+      img.data[k + 2] = Math.min(255, f1 / cell * 255 * 1.3);
+      img.data[k + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    return tex(c, { repeat: true });
+  });
+}
+
 // Foliage card: clustered leaves (alpha) with painted value variation in RGB.
 export function leafCardTexture(kind = 'leaf') {
   return memo('leaf:' + kind, () => {

@@ -197,7 +197,7 @@ function injectDepthVertex(shader, o) {
 // shader code share one compiled program (uniform values stay per-material).
 function hashStr(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
 function shaderKey(prefix, o) {
-  return prefix + hashStr(JSON.stringify([o.wind || '', o.fixedNormal || '', !!o.noFlip, !!o.objectBrush, o.vertexPars || '', o.vertexWorld || '', o.fragPars || '', o.fragColor || '', o.fragOut || '', Object.keys(o.uniforms || {}).sort().join(',')]));
+  return prefix + hashStr(JSON.stringify([o.wind || '', o.fixedNormal || '', !!o.noFlip, !!o.objectBrush, o.vertexPars || '', o.vertexWorld || '', o.fragPars || '', o.fragColor || '', o.fragNormal || '', o.fragOut || '', Object.keys(o.uniforms || {}).sort().join(',')]));
 }
 /**
  * makeToon(opts)
@@ -207,6 +207,7 @@ function shaderKey(prefix, o) {
  *  wind: 'grass'|'tree'|'leaf'|'cloth'|'reed', windAmt
  *  fixedNormal [x,y,z]
  *  uniforms {}, vertexPars, vertexWorld (glsl operating on cWorld), fragPars, fragColor (after color_fragment),
+ *  fragNormal (after normal_fragment_maps; may perturb the view-space `normal`),
  *  fragOut (after outgoingLight computed; may modify outgoingLight)
  *  castShadow depth material is attached as mat.userData.depthMat when wind/alpha is used
  */
@@ -247,6 +248,7 @@ export function makeToon(o = {}) {
       .replace('#include <lights_toon_pars_fragment>', TOON_LIGHT)
       .replace('#include <normal_fragment_begin>', o.noFlip ? '#include <normal_fragment_begin>\n normal = normalize(vNormal); nonPerturbedNormal = normal;' : '#include <normal_fragment_begin>')
       .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n occlusionFade(vViewPosition.z);')
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${o.fragNormal || ''}`)
       .replace('#include <color_fragment>', /* glsl */`
         #include <color_fragment>
         ${o.fragColor || ''}

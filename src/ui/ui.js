@@ -13,7 +13,8 @@ import { ItemDrag, InventoryPanel, StashPanel } from './inventory.js';
 import { CharacterPanel } from './character.js';
 import { SkillsPanel } from './skills.js';
 import { Dialogue } from './dialogue.js';
-import { BuildPanel } from './build.js';
+import { BuildPanel, InspectCard } from './build.js';
+import { QuestArrow } from './questArrow.js';
 import { ShopPanel } from './shop.js';
 import { MapPanel, QuestPanel, normQuest } from './map.js';
 import { MenuPanel } from './menu.js';
@@ -53,6 +54,8 @@ export const UI = {
     this.toasts = new Toasts(this.layers.msg);
     this.banners = new Banners(this.layers.msg, this.layers.fx); this.banners.hold = () => !!this.dlg?.active;
     this.iris = new Iris(this.layers.iris);
+    this.inspectCard = new InspectCard(this, this.layers.over);
+    this.qarrow = new QuestArrow(this, this.layers.world);
     this.drag = new ItemDrag(this);
     this.dlg = new Dialogue(this);
     this.titleScreen = new Title(this);
@@ -116,6 +119,7 @@ export const UI = {
     this.floats.update(dt, cam, this.scale);
     this.labels.update(dt, cam, this.scale);
     if (this.mode !== 'title') this.hud.update(dt);
+    this.qarrow.update(dt, cam);
     this.panels.map.update?.(dt);
     if (this.settings.showFps) {
       this._fpsAcc += dt; this._fpsN++;
@@ -134,6 +138,7 @@ export const UI = {
     if (mode === 'title') { this.closeAll(); this.titleScreen.show(); this.labels.clear(); this.setTarget(null); this.setBoss(null); }
     else if (prev === 'title') this.titleScreen.hide();
     if (mode !== 'village' && this.isOpen('build')) this.close('build');
+    if (mode !== 'village') this.inspectCard?.hide();
     if (mode === 'dungeon' && !this.hud.cache.loc) this.hud.setLocation('The Burrow', 'B1F');
     if (mode === 'village') this.hud.setLocation(null);
   },
@@ -188,6 +193,8 @@ export const UI = {
     this.toggle('build', opts);
   },
   setBuildProvider(fn) { this._buildProvider = fn; },
+  // build-mode hover card (data from VillageSim.inspect) at screen position x,y; null hides it
+  buildInspect(info, x, y) { if (!this.ready) return; if (!info || this.mode !== 'village' || this.dlg.active || this.isOpen('menu')) this.inspectCard.hide(); else this.inspectCard.show(info, x, y); },
   refreshItems() { for (const n of ['inventory', 'stash', 'character', 'shop']) this.panels[n].refresh(); },
 
   // ------------------------------------------------------------------ keyboard

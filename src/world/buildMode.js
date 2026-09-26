@@ -1,7 +1,7 @@
 // Build mode: palette (via UI), ghost preview on the grid, zone/path painting, bulldozer, coverage overlays.
 import * as THREE from 'three';
 import { BUILDINGS, CATEGORIES, buildModel, sizeOf } from './buildings/index.js';
-import { ZONES } from './village.js';
+import { ZONES, RANK_POP } from './village.js';
 import { Input } from '../core/input.js';
 import { Events } from '../core/events.js';
 import { WORLD } from './terrain.js';
@@ -32,11 +32,12 @@ export class BuildMode {
     const rank = this.sim.stats.rank;
     const cats = [];
     for (const [cid, cname] of Object.entries(CATEGORIES)) {
-      const items = Object.entries(BUILDINGS).filter(([id, b]) => b.cat === cid && !b.prebuilt && !b.zone).map(([id, b]) => {
+      // prebuilt landmarks are listed too (always 'Already built') so the Landmarks tab shows the whole village set
+      const items = Object.entries(BUILDINGS).filter(([id, b]) => b.cat === cid && !b.zone).map(([id, b]) => {
         const need = RANK_REQ[id] || 1;
         const unique = b.unique && this.sim.S.buildings.some(x => x.type === id);
-        return { id, name: b.name, cost: b.cost, desc: b.desc, cover: b.cover || null, covers: b.covers || null, size: sizeOf(id, 1), icon: this.G.thumbs?.get(id) || null, locked: rank < need ? `Village rank ${need}` : unique ? 'Already built' : null };
-      });
+        return { id, name: b.name, cost: b.cost || {}, desc: b.desc, cover: b.cover || null, covers: b.covers || null, size: sizeOf(id, 1), icon: this.G.thumbs?.get(id) || null, locked: unique || b.prebuilt ? 'Already built' : rank < need ? `Village rank ${need}` : null };
+      }).sort((a, b) => !!a.locked - !!b.locked);
       if (items.length) cats.push({ id: cid, name: cname, items });
     }
     return cats;
@@ -55,13 +56,15 @@ export class BuildMode {
       onBulldoze: () => this.setTool({ kind: 'bulldoze' }),
       onOverlay: m => this.overlay(m || 'build'),
       onClose: () => this.exit(),
-      stats: () => ({ ...this.sim.stats, demand: this.sim.demand }),
+      stats: () => ({ ...this.sim.stats, demand: this.sim.demand, rankInfo: this.rankInfo() }),
     });
+    this.sim.showNeedIcons?.(true);
     Events.emit('sfx', 'ui_open');
   }
   exit() {
     if (!this.active) return;
     this.active = false; this.G.buildMode = false; this.setTool(null);
+    this.sim.showNeedIcons?.(false); this.inspectAt(null);
     this.G.engine.rig.distTarget = this.prevDist;
     this.G.engine.rig.yawTarget = Math.round((this.G.engine.rig.yawTarget - Math.PI / 4) / (Math.PI / 2)) * (Math.PI / 2) + Math.PI / 4;
     this.overlay(null);
@@ -81,6 +84,22 @@ export class BuildMode {
     if (t?.kind === 'zone') this.overlay('zones');
     else if (this.active && !['water', 'light', 'joy', 'health', 'learn'].includes(this.sim.overlayMode)) this.overlay('build');
   }
+  // village rank progress for the palette: current rank, villagers, next threshold and what it unlocks
+  rankInfo() {
+    const rank = this.sim.stats.rank || 1, pop = this.sim.stats.population || 0;
+    const unlocks = Object.entries(RANK_REQ).filter(([, r]) => r === rank + 1).map(([id]) => BUILDINGS[id]?.name).filter(Boolean);
+    return { rank, pop, cur: RANK_POP[rank - 1] ?? 0, next: RANK_POP[rank] ?? null, unlocks };
+  }
+  // hover card: inspect the tile under the cursor (throttled; re-evaluated when the tile changes or every 0.4 s)
+  inspectAt(cur, dt = 0) {
+    const ui = this.G.ui;
+    if (!cur) { this.insKey = ''; this.insInfo = null; ui?.buildInspect?.(null); return null; }
+    const key = cur.x + ',' + cur.z;
+    this.insT = (this.insT || 0) - dt;
+    if (key !== this.insKey || this.insT <= 0) { this.insKey = key; this.insT = 0.4; this.insInfo = this.sim.inspect?.(cur.x, cur.z) || null; }
+    ui?.buildInspect?.(this.insInfo, Input.mouse.x, Input.mouse.y);
+    return this.insInfo;
+  }
   cursorTile() {
     const G = this.G;
     const p = G.engine.mouseGround(Input.mouse.nx, Input.mouse.ny, (x, z) => this.sim.world.heightAt(x, z));
@@ -98,7 +117,15 @@ export class BuildMode {
     if (!overUI) this.lastCur = cur;
     if (Input.hit('escape')) { if (this.tool) { this.setTool(null); Input.consume('escape'); } }
     if (Input.mouseHit(2) && this.tool) this.setTool(null);
-    if (!this.tool) { U.uCursor.value.set(cur.x + 0.5, cur.z + 0.5, 1, 1); this.cursorCol('#fff8d8', 0.1); return; }
+    // info card for the hovered lot / building (only while browsing or painting zones, never over the palette)
+    const inspecting = !overUI && (!this.tool || (this.tool.kind === 'zone' && !this.drag));
+    const ins = this.inspectAt(inspecting ? cur : null, dt);
+    if (!this.tool) {
+      const hb = ins?.kind === 'building' ? sim.buildingAt(cur.x, cur.z) : null;
+      if (hb) { const [w, d] = sim.dims(hb.type, hb.rot, hb.level); U.uCursor.value.set(hb.x + w / 2, hb.z + d / 2, w, d); this.cursorCol(ins.ok ? '#bff5da' : '#ffb0bc', 0.16); }
+      else { U.uCursor.value.set(cur.x + 0.5, cur.z + 0.5, 1, 1); this.cursorCol('#fff8d8', 0.1); }
+      return;
+    }
     if (this.tool.kind === 'zone' || this.tool.kind === 'path') {
       if (Input.mouseHit(0) && !overUI) this.drag = { x: cur.x, z: cur.z };
       const a = this.drag || cur;

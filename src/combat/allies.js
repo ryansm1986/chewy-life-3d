@@ -1,7 +1,17 @@
 // Allied summons: spirit pups (Pack Call) and the squeaky decoy (Fetch Mastery).
 import * as THREE from 'three';
 import { Actor } from '../actors/actor.js';
-import { buildBoston } from '../actors/charKit.js';
+import { buildBoston, cloneRig } from '../actors/charKit.js';
+
+// one baked spirit-pup rig; every summon clones it (shared geometry) instead of building a Boston from scratch
+let pupTemplate = null;
+function pupRig() {
+  if (!pupTemplate) {
+    pupTemplate = buildBoston({ fur: '#6a8ad8', collar: '#ffffff', outline: '#bfe0ff' });
+    pupTemplate.mat.emissive.set('#4a7aff'); pupTemplate.mat.emissiveIntensity = 0.6; pupTemplate.mat.transparent = true; pupTemplate.mat.opacity = 0.85;
+  }
+  return cloneRig(pupTemplate);
+}
 import { makeToon, makeOutline } from '../gfx/materials.js';
 import { paint, merge } from '../gfx/geom.js';
 import { Events } from '../core/events.js';
@@ -9,8 +19,7 @@ import { rand, dist, TAU, clamp } from '../core/util.js';
 
 export class SpiritPup extends Actor {
   constructor(G, pos, p) {
-    const rig = buildBoston({ fur: '#6a8ad8', collar: '#ffffff', outline: '#bfe0ff' });
-    rig.mat.emissive.set('#4a7aff'); rig.mat.emissiveIntensity = 0.6; rig.mat.transparent = true; rig.mat.opacity = 0.85;
+    const rig = pupRig();
     rig.root.scale.setScalar(0.85);
     super(G.world, rig, { radius: 0.22, speed: p.pupSpeed || 6, name: 'Spirit Pup' });
     this.G = G; this.p = p; this.team = 'ally'; this.alive = true; this.height = 0.6;

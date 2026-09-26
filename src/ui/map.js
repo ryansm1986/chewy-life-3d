@@ -4,15 +4,14 @@ import { glyph } from './glyphs.js';
 import { Panel } from './panel.js';
 import { drawPlaceholderMap } from './hud.js';
 
+const LEGEND_VILLAGE = [['you', 'Chewy'], ['shop', 'Shops'], ['home', 'Homes'], ['craft', 'Workshops'], ['quest', 'Quest'], ['gate', 'Burrow gate']];
+const LEGEND_DUNGEON = [['you', 'Chewy'], ['mon', 'Monsters'], ['elite', 'Elites'], ['boss', 'Boss'], ['stairs', 'Stairs down'], ['portal', 'Portal home'], ['wp', 'Waypoint'], ['quest', 'Quest']];
 export class MapPanel extends Panel {
   constructor(ui) { super(ui, { name: 'map', title: 'Map', jp: '地図', side: 'center', cls: 'p-map', icon: 'map' }); }
   init() {
     this.body.innerHTML = `<div class="mp-wrap"><div class="mp-frame"><canvas class="mp-cv"></canvas><div class="mp-compass">${glyph('sakura')}<b>N</b></div><div class="mp-vig"></div></div>
       <div class="mp-side"><div class="mp-loc"><b class="mp-name">Blossom Hollow</b><span class="jp mp-jp">さくら村</span></div>
-        <div class="mp-legend">
-          <div><i class="lg you"></i>Chewy</div><div><i class="lg shop"></i>Shops</div><div><i class="lg home"></i>Homes</div>
-          <div><i class="lg quest"></i>Quest</div><div><i class="lg gate"></i>Burrow gate</div>
-        </div>
+        <div class="mp-legend"></div>
         <div class="mp-tip">${glyph('paw')}Scroll the mouse wheel to zoom the map</div>
       </div></div>`;
     this.cv = this.body.querySelector('.mp-cv');
@@ -21,6 +20,11 @@ export class MapPanel extends Panel {
   }
   onOpen() { this.acc = 0; this.draw(); }
   render() {
+    const dun = this.ui.mode === 'dungeon';
+    if (this._lgMode !== this.ui.mode) {
+      this._lgMode = this.ui.mode;
+      this.body.querySelector('.mp-legend').innerHTML = (dun ? LEGEND_DUNGEON : LEGEND_VILLAGE).map(([c, t]) => `<div><i class="lg ${c}"></i>${t}</div>`).join('');
+    }
     const loc = this.ui.hud?.cache.loc;
     const name = this.ui.mode === 'dungeon' ? (loc?.name || 'The Burrow') : 'Blossom Hollow';
     this.body.querySelector('.mp-name').textContent = name;

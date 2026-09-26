@@ -6,11 +6,26 @@ import { T, WORLD } from './terrain.js';
 import { LANDMARKS } from './layout.js';
 import { Events } from '../core/events.js';
 import { uid, rand, randInt, clamp, ease, mulberry32, pick } from '../core/util.js';
+import { NeedIcons } from './needIcons.js';
 
 export const ZONES = { R: 1, C: 2, W: 3 };
 export const ZONE_COLORS = { 1: [70, 205, 90], 2: [70, 140, 255], 3: [255, 165, 40] };
 export const COVER_KINDS = ['water', 'light', 'joy', 'health', 'learn'];
 const COVER_COLORS = { water: [90, 170, 255], light: [255, 220, 110], joy: [255, 130, 190], health: [120, 230, 160], learn: [180, 140, 255] };
+// ---- planning feedback tables (read-only mirrors of the rules in simulate()/grow() — keep in sync if those change)
+export const RANK_POP = [0, 12, 28, 50, 80]; // villagers needed for rank 1..5
+const LEVEL_NEEDS = { 1: [['water', 0.2], ['joy', 0.25]], 2: [['water', 0.3], ['joy', 0.5], ['light', 0.2], ['care', 0.2]] }; // care = health OR learn
+const MOVE_IN_DEMAND = -0.2, LEVEL_DEMAND = -0.1, GROW_DEMAND = 0.05;
+const ZONE_KEY = { 1: 'R', 2: 'C', 3: 'W' };
+const ZONE_INFO = {
+  R: { name: 'Homes zone', word: 'homes', types: ['home'] },
+  C: { name: 'Shops zone', word: 'shops', types: ['shop'] },
+  W: { name: 'Workshop zone', word: 'workshops', types: ['farm', 'lumber', 'kiln', 'fishingHut'] },
+};
+const NEED_NAME = { road: 'Path', water: 'Water', joy: 'Joy', light: 'Light', health: 'Health', learn: 'Learning', care: 'Health / Learning' };
+const NEED_FIX = { water: 'a Well or Water Tower', joy: 'a Park, Benches or Flower Beds', light: 'Stone Lanterns or Lantern Posts', care: 'a Paw Clinic or Village School' };
+const pct = v => `${Math.round(v * 100)}%`;
+const sgn = v => `${v >= 0 ? '+' : '−'}${Math.round(Math.abs(v) * 100)}%`;
 
 export class VillageSim {
   constructor(G, world) {
@@ -383,14 +398,30 @@ export class VillageSim {
     this.G.vfx?.pillar?.(p, { color, life: 2.2, r: 0.9, h: 6, opacity: 0.6 });
     this.G.vfx?.sparkle?.(p.clone().setY(p.y + 1.5), { n: 18, color, r: 1.5 });
   }
-  levelUp(b) {
+  // Where the next-level footprint fits: any anchor that still covers the current lot and keeps path access,
+  // preferring the one that grows over the most zoned tiles. → { x, z } or { why } (reason for the same-corner try)
+  growSpot(b) {
     const nl = b.level + 1;
     const [w1, d1] = this.dims(b.type, b.rot, b.level), [w2, d2] = this.dims(b.type, b.rot, nl);
-    if (w2 !== w1 || d2 !== d1) { // needs to expand: try keeping the same corner
-      const rec = this.list.find(r => r.data === b);
-      if (!this.canPlace(b.type, b.x, b.z, b.rot, nl, b.idx).ok) return false;
-      this.despawn(rec);
-    } else { const rec = this.list.find(r => r.data === b); this.despawn(rec); }
+    if (w1 === w2 && d1 === d2) return { x: b.x, z: b.z };
+    let best = null, bestScore = -1, why = null;
+    for (let dz = 0; dz <= Math.max(0, d2 - d1); dz++) for (let dx = 0; dx <= Math.max(0, w2 - w1); dx++) {
+      const x = b.x - dx, z = b.z - dz, first = !dx && !dz;
+      const c = this.canPlace(b.type, x, z, b.rot, nl, b.idx);
+      if (!c.ok) { if (first) why = c.why; continue; }
+      if (!this.roadAccess({ type: b.type, rot: b.rot, level: nl, x, z })) { if (first) why = 'No path next to it'; continue; }
+      let score = 0;
+      for (let zz = z; zz < z + d2; zz++) for (let xx = x; xx < x + w2; xx++) if (this.zone[zz * WORLD + xx]) score++;
+      if (score > bestScore) { bestScore = score; best = { x, z }; }
+    }
+    return best || { why: why || 'Something is already here' };
+  }
+  levelUp(b) {
+    const nl = b.level + 1;
+    const spot = this.growSpot(b);
+    if (spot.why) return false;
+    this.despawn(this.list.find(r => r.data === b));
+    b.x = spot.x; b.z = spot.z;
     b.level = nl; b.seed = randInt(0, 9999);
     const rec = this.spawnModel(b, true);
     this.refreshTiles();
@@ -448,5 +479,112 @@ export class VillageSim {
       if (this.tickT > 6) { this.tickT = 0; this.simulate(); this.grow(); this.simulate(); }
       if (this.digestT != null) { this.digestT -= dt; if (this.digestT <= 0) this.flushDigest(); }
     }
+    this.needIcons?.update(dt, t);
+  }
+  // ------------------------------------------------------------------ planning feedback (build-mode inspector + need bubbles)
+  // Coverage the next level asks for: [{kind, need, have, ok}] ([] at max level / for non-zoned buildings).
+  levelNeeds(b) {
+    const def = BUILDINGS[b.type]; if (!def?.zone || b.level >= def.levels) return [];
+    const q = b.q || this.quality(b);
+    return LEVEL_NEEDS[Math.min(2, b.level)].map(([kind, need]) => { const have = kind === 'care' ? Math.max(q.health, q.learn) : q[kind]; return { kind, need, have, ok: have > need }; });
+  }
+  // can the building expand to its next-level footprint where it stands?
+  roomToGrow(b) { return !this.growBlock(b); }
+  // why the next-level footprint doesn't fit (null when it does) — same check as levelUp()
+  growBlock(b) {
+    const def = BUILDINGS[b.type]; if (b.level >= def.levels) return null;
+    const c = this.growSpot(b);
+    return !c.why ? null : ({ 'No path next to it': 'it would lose its path', 'Keep the paths clear': 'a path is in the way', 'Something is already here': 'a neighbour is in the way', 'Too wet!': 'water is in the way', 'Ground is too bumpy': 'the ground is too bumpy', 'The plaza is for decorations': 'the plaza is in the way', 'Too rocky': 'rocks are in the way' }[c.why] || String(c.why || 'blocked').toLowerCase());
+  }
+  // what a zoned building is missing, most urgent first (for the floating need bubbles): 'road'|'water'|'joy'|'light'|'care'|'room'
+  needsFor(b) {
+    const def = BUILDINGS[b.type]; if (!def?.zone) return [];
+    const q = b.q || this.quality(b);
+    if (!q.road) return ['road'];
+    const out = this.levelNeeds(b).filter(n => !n.ok).map(n => n.kind);
+    if (!out.length && def.cat === 'home' && (b.happy ?? 1) < 0.35) out.push('joy');
+    if (!out.length && !this.roomToGrow(b)) out.push('room');
+    return out.slice(0, 2);
+  }
+  showNeedIcons(on) {
+    if (on && !this.needIcons) this.needIcons = new NeedIcons(this);
+    this.needIcons?.setVisible(on);
+  }
+  // Build-mode hover card for a tile: { kind, title, sub, cat, stats:[{g,text}], lines:[{text, ok, kind, have, need, val}], blockers:[text], hint, ok } or null
+  inspect(x, z) {
+    x = Math.floor(x); z = Math.floor(z);
+    if (!(x >= 0 && z >= 0 && x < WORLD && z < WORLD)) return null;
+    const b = this.buildingAt(x, z);
+    if (b) return this.inspectBuilding(b);
+    const zt = this.zone[z * WORLD + x];
+    return zt ? this.inspectZone(x, z, zt) : null;
+  }
+  inspectBuilding(b) {
+    const def = BUILDINGS[b.type], q = b.q || this.quality(b);
+    const info = { kind: 'building', id: b.id, type: b.type, cat: def.cat, zone: def.zone || null, title: def.name, sub: '', stats: [], lines: [], blockers: [], hint: '', ok: true };
+    const catName = { home: 'Home', shop: 'Shop', craft: 'Workshop', service: 'Service', decor: 'Decoration', special: 'Landmark' }[def.cat] || '';
+    info.sub = def.levels > 1 ? `Level ${b.level} of ${def.levels} · ${catName}` : catName;
+    if (def.cat === 'home') {
+      const cap = def.capacity?.[b.level - 1] ?? 0;
+      info.stats.push({ g: 'home', text: `${b.residents || 0}/${cap} residents` }, { g: 'heart', text: `${pct(clamp(b.happy ?? 0))} happy` });
+    }
+    const jobs = def.jobs ? def.jobs[Math.min(def.jobs.length - 1, b.level - 1)] || 0 : 0;
+    if (jobs) info.stats.push({ g: 'craft', text: `${jobs} job${jobs === 1 ? '' : 's'}` });
+    if (!def.zone) {
+      // services, decor and landmarks: say what they give the neighbourhood
+      for (const c of def.covers || []) info.lines.push({ kind: c.kind, text: `Gives ${NEED_NAME[c.kind].toLowerCase()} within ${c.r} tiles`, ok: true, info: true });
+      if (!info.lines.length && def.desc) info.note = def.desc;
+      return info;
+    }
+    // zoned building: its needs for the next level (or its current comfort when fully grown)
+    info.lines.push({ kind: 'road', text: NEED_NAME.road, ok: !!q.road, val: q.road ? 'yes' : 'none' });
+    const needs = this.levelNeeds(b);
+    if (needs.length) for (const n of needs) info.lines.push({ kind: n.kind, text: NEED_NAME[n.kind], ok: n.ok, have: clamp(n.have), need: n.need, val: pct(clamp(n.have)) });
+    else for (const k of ['water', 'joy', 'light']) info.lines.push({ kind: k, text: NEED_NAME[k], ok: q[k] > 0.2, have: clamp(q[k]), val: pct(clamp(q[k])), info: true });
+    const zi = ZONE_INFO[def.zone], dem = this.demand[def.zone];
+    if (!q.road) info.blockers.push("No path beside it — villagers can't reach it, move in or upgrade. Lay a path next to it.");
+    if (def.cat === 'home' && q.road && (b.residents || 0) < (def.capacity?.[b.level - 1] ?? 0) && dem <= MOVE_IN_DEMAND) info.blockers.push(`Nobody wants to move in (homes demand ${sgn(dem)}) — villagers need jobs: zone shops & workshops.`);
+    if (needs.length) {
+      info.needFor = b.level + 1;
+      for (const n of needs) if (!n.ok) info.blockers.push(`Needs more ${NEED_NAME[n.kind].toLowerCase()} (${pct(clamp(n.have))} of ${pct(n.need)}) — build ${NEED_FIX[n.kind]} nearby.`);
+      if (dem <= LEVEL_DEMAND) info.blockers.push(`Low demand for ${zi.word} (${sgn(dem)}) — it waits until villagers want more.`);
+      const gb = this.growBlock(b);
+      if (gb) { const [w2, d2] = this.dims(b.type, b.rot, b.level + 1); info.blockers.push(`No room to expand to ${w2}×${d2} — ${gb}.`); }
+      info.hint = info.blockers.length ? '' : `Ready to grow — it will reach level ${b.level + 1} soon!`;
+    } else info.hint = 'Fully grown!';
+    info.ok = !info.blockers.length;
+    return info;
+  }
+  inspectZone(x, z, zt) {
+    const key = ZONE_KEY[zt], zi = ZONE_INFO[key], dem = this.demand[key];
+    // is there a buildable lot through this tile? (same test as findLot: inside the zone, placeable, path access)
+    let fit = null, noRoad = null, why = null;
+    search: for (const type of zi.types) for (const rot of [0, 1]) {
+      const [w, d] = this.dims(type, rot);
+      for (let z0 = z - d + 1; z0 <= z; z0++) for (let x0 = x - w + 1; x0 <= x; x0++) {
+        let inside = true;
+        for (let zz = z0; zz < z0 + d && inside; zz++) for (let xx = x0; xx < x0 + w && inside; xx++) if (this.zone[zz * WORLD + xx] !== zt) inside = false;
+        if (!inside) continue;
+        const c = this.canPlace(type, x0, z0, rot);
+        if (!c.ok) { why ||= c.why; continue; }
+        if (this.roadAccess({ type, x: x0, z: z0, rot, level: 1 })) { fit = { type, w, d }; break search; }
+        noRoad ||= { type, w, d };
+      }
+    }
+    const lot = fit || noRoad;
+    const minSize = key === 'W' ? '2×3' : '2×2';
+    const info = { kind: 'zone', zone: key, title: zi.name, sub: 'Empty lot', stats: [], lines: [], blockers: [], hint: '', ok: false };
+    info.lines.push({ kind: 'demand', text: `Demand for ${zi.word}`, ok: dem > GROW_DEMAND, val: sgn(dem) });
+    info.lines.push({ kind: 'lot', text: lot ? `Room for a ${lot.w}×${lot.d} lot` : `Needs a ${minSize} block`, ok: !!lot });
+    info.lines.push({ kind: 'road', text: NEED_NAME.road, ok: !!fit, val: fit ? 'yes' : 'none' });
+    // coverage here decides how far a future building can grow
+    for (const [k, need] of LEVEL_NEEDS[1]) { const have = clamp(this.coverAt(k, x + 0.5, z + 0.5)); info.lines.push({ kind: k, text: NEED_NAME[k], ok: have > need, have, need, val: pct(have), info: true }); }
+    if (!lot) info.blockers.push(why && why !== 'Something is already here' ? `Can't build here: ${why.toLowerCase()}.` : `Zone is too small — paint at least a ${minSize} block.`);
+    else if (!fit) info.blockers.push('No path beside this lot — lay a path next to it.');
+    if (dem <= GROW_DEMAND) info.blockers.push(key === 'R' ? `No demand for homes (${sgn(dem)}) — villagers want jobs & joy first: zone shops and workshops.` : `No demand for ${zi.word} (${sgn(dem)}) — grow more homes first.`);
+    info.ok = !info.blockers.length;
+    info.hint = info.ok ? 'Villagers will build here soon!' : '';
+    return info;
   }
 }
+

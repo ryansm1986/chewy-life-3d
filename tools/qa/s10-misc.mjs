@@ -18,6 +18,8 @@ try {
     const G = window.G, D = G.dungeon, P = G.player, mem = () => G.engine.renderer.info.memory.geometries;
     for (const m of D.monsters) m.status.stun = 999;
     G.player.invuln = true;
+    // drops would fill the per-item-type loot geometry caches at random and look like leaks: suppress them here
+    const realDrop = D.loot.drop; D.loot.drop = () => {};
     const rounds = [];
     // warm-up round (not counted): first kills upload shared, cached loot/VFX geometry once
     { const n0 = D.monsters.length; for (const kind of ['mochi', 'kasa', 'lantern', 'oni', 'kinoko', 'wisp']) D.summonAround({ pos: P.pos }, kind, 5);
@@ -33,6 +35,7 @@ try {
       await new Promise(r => setTimeout(r, 1500)); // die() -> dispose() after 480 ms
       rounds.push({ killed: fresh.length, geoBeforeSummon: gPre, geoWhileAlive: g0, geoAfterKill: mem() });
     }
+    D.loot.drop = realDrop;
     return rounds;
   });
   

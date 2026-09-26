@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { el, esc, fmt, setText, setVar, setCls, setStyle, replay, clamp, damp, rarityColor } from './dom.js';
 import { glyph, glyphURL, MATERIALS } from './glyphs.js';
 import { portrait } from './portraits.js';
-import { skillIconURL, skillDef, skillCost, xpProgress, potionIconURL, potionInfo, materialIconURL, skillUsable } from './rpg.js';
+import { skillIconURL, hotbarIconURL, skillDef, skillCost, xpProgress, potionIconURL, potionInfo, materialIconURL, skillUsable } from './rpg.js';
 import { simpleTip } from './tooltip.js';
 
 const TAU = Math.PI * 2;
@@ -331,11 +331,13 @@ export class Hud {
     const hot = p.hotbar || [];
     for (let i = 0; i < 6; i++) {
       const s = this.slots[i], id = hot[i] || null;
-      if (s.id !== id) {
-        s.id = id;
-        s.ic.src = id ? skillIconURL(id) : '';
+      const icKey = id === 'attack' ? 'attack:' + (d.weaponType || 'sword') : id;
+      if (s.id !== id || s.icKey !== icKey) {
+        const was = s.id;
+        s.id = id; s.icKey = icKey;
+        s.ic.src = id ? hotbarIconURL(id, d) : '';
         setCls(s.el, 'empty', !id);
-        if (s.id !== undefined) replay(s.el, 'swap', 450);
+        if (was !== undefined) replay(s.el, 'swap', 450);
       }
       if (!id) continue;
       const cdv = this.cd.provider ? clamp(+this.cd.provider.cooldown?.(id) || 0) : 0;
@@ -629,7 +631,8 @@ export class Hud {
     const def = skillDef(id);
     const lvl = this.pl.skills?.[id] || (id === 'attack' ? 1 : 0);
     const cost = skillCost(id, this.st);
-    return simpleTip(`${esc(def?.name || id)} <span class="kc sm">${key}</span>`, `${def?.desc ? esc(def.desc) + '<br>' : ''}<span class="tt-dim">${id === 'attack' ? 'Basic attack' : 'Level ' + lvl}${cost ? ` · ${Math.round(cost * 10) / 10} Zoom` : ''}</span>`);
+    const wep = id === 'attack' ? (this.d.weaponType === 'ball' ? 'Basic attack · Red Tennis Ball' : 'Basic attack · Bone Sword') : '';
+    return simpleTip(`${esc(def?.name || id)} <span class="kc sm">${key}</span>`, `${def?.desc ? esc(def.desc) + '<br>' : ''}<span class="tt-dim">${id === 'attack' ? wep : 'Level ' + lvl}${cost ? ` · ${Math.round(cost * 10) / 10} Zoom` : ''}</span>`);
   }
   // screen-space rect of the bag button (fly-to-bag target)
   bagRect() {

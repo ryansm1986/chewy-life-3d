@@ -46,7 +46,7 @@ export class Portraits {
     const px = new Uint8Array(this.size * this.size * 4);
     r.readRenderTargetPixels(this.rt, 0, 0, this.size, this.size, px);
     r.setRenderTarget(prevRT); U.uTime.value = prevTime; U.uOccl.value.copy(prevOcc);
-    this.scene.remove(rig.root);
+    this.scene.remove(rig.root); rig.dispose();
     const g = this.canvas.getContext('2d');
     const img = g.createImageData(this.size, this.size);
     for (let y = 0; y < this.size; y++) img.data.set(px.subarray((this.size - 1 - y) * this.size * 4, (this.size - y) * this.size * 4), y * this.size * 4);

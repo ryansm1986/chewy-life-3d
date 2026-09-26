@@ -70,10 +70,11 @@ export class CharacterPanel extends Panel {
         <div class="ch-id">
           <div class="ch-name">Chewy <span class="jp">チューイ</span></div>
           <div class="ch-cls">Level <b class="ch-lv">1</b> · Pup of the Blossom Dojo</div>
-          <div class="ch-xp"><i></i><span></span></div>
+          <div class="ch-xp"><i></i></div>
+          <div class="ch-xpl"><span>Experience</span><b class="ch-xpt"></b></div>
         </div>
       </div>
-      <div class="ch-pts"><span class="ch-pts-b">${glyph('sparkle')}<b>0</b> points to spend!</span><span class="tt-dim">Shift+click spends 5</span></div>
+      <div class="ch-pts"><span class="ch-pts-b">${glyph('sparkle')}<b>0</b> <span class="ch-pts-w">points</span> to spend!</span><span class="tt-dim">Shift+click spends 5</span></div>
       <div class="attrs">${ATTR.map(a => `
         <div class="attr" data-k="${a.k}" style="--ac:${a.c}">
           <div class="at-ic">${glyph(a.g)}</div>
@@ -83,7 +84,7 @@ export class CharacterPanel extends Panel {
         </div>`).join('')}
       </div>
       <div class="dgroups">${GROUPS.map(g => `<div class="dg dg-${g.id}"><div class="dg-h">${glyph(g.g)}${g.name}<span class="jp">${g.jp}</span></div><div class="dg-rows"></div></div>`).join('')}</div>`;
-    this.$ = { lv: b.querySelector('.ch-lv'), xp: b.querySelector('.ch-xp i'), xpT: b.querySelector('.ch-xp span'), pts: b.querySelector('.ch-pts'), ptsN: b.querySelector('.ch-pts b') };
+    this.$ = { lv: b.querySelector('.ch-lv'), xp: b.querySelector('.ch-xp i'), xpT: b.querySelector('.ch-xpt'), pts: b.querySelector('.ch-pts'), ptsN: b.querySelector('.ch-pts b'), ptsW: b.querySelector('.ch-pts-w') };
     for (const a of ATTR) {
       const row = b.querySelector(`.attr[data-k="${a.k}"]`);
       this.ui.tip.bind(row.querySelector('.at-ic'), () => simpleTip(`${a.n} <span class="jp">${a.jp}</span>`, a.tip));
@@ -113,9 +114,10 @@ export class CharacterPanel extends Panel {
     setText(this.$.lv, String(p.lvl || 1));
     const x = xpProgress(p);
     this.$.xp.style.width = (x.frac * 100).toFixed(1) + '%';
-    setText(this.$.xpT, `${fmt(x.cur)} / ${fmt(x.need)} XP`);
+    setText(this.$.xpT, `${fmt(x.cur)} / ${fmt(x.need)} XP · ${Math.floor(x.frac * 100)}%`);
     const pts = p.statPts || 0;
     setText(this.$.ptsN, String(pts));
+    setText(this.$.ptsW, pts === 1 ? 'point' : 'points');
     this.$.pts.classList.toggle('on', pts > 0);
     for (const a of ATTR) {
       const row = this.body.querySelector(`.attr[data-k="${a.k}"]`);

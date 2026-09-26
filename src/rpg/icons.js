@@ -1005,6 +1005,13 @@ function drawSkill(g, id) {
       tennis(g, 12, 11, 8);
       break;
     }
+    case 'attack_ball': { // basic attack with the Red Tennis Ball equipped: a big ball on a bouncy throw arc
+      g.save(); g.setLineDash([3.2, 3.6]); g.beginPath(); g.moveTo(-24, 20); g.quadraticCurveTo(-18, -18, 2, -8); stroke(g, INK, 2.2); g.restore();
+      for (const [x, y, r] of [[-21, 12, 2.6], [-14, -4, 2]]) { circ(g, x, y, r); paint(g, CREAM, 1.2); }
+      for (let i = 0; i < 3; i++) ribbonStroke(g, () => { g.beginPath(); g.moveTo(-10 + i * 2, 6 + i * 7); g.lineTo(-1 + i * 2, 4 + i * 7); }, 2.2);
+      tennis(g, 8, 4, 15);
+      break;
+    }
     case 'chomp': {
       g.beginPath(); g.arc(4, 8, 22, Math.PI * 1.05, Math.PI * 1.85); stroke(g, INK, 9); g.beginPath(); g.arc(4, 8, 22, Math.PI * 1.05, Math.PI * 1.85); stroke(g, CREAM, 6);
       g.fillStyle = CREAM; g.strokeStyle = INK; g.lineWidth = 1.3;
