@@ -110,6 +110,7 @@ export class VillageSim {
   }
   nextIdx() { let m = -1; for (const b of this.S.buildings) m = Math.max(m, b.idx ?? -1); return m + 1; }
   remove(b, refund = true) {
+    if (!b || this.S.buildings.indexOf(b) < 0) return false; // already gone: no-op (splice(-1) would delete the last building)
     const rec = this.list.find(r => r.data === b);
     if (rec) this.despawn(rec);
     this.S.buildings.splice(this.S.buildings.indexOf(b), 1);

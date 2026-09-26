@@ -59,6 +59,7 @@ export async function boot() {
   const waterfall = new Waterfall(village, vVfx, { x: village.landmarks.waterfall.x });
   const vCombat = new Combat(G, village);
   const sim = G.sim = new VillageSim(G, village);
+  G.village = { world: village, vfx: vVfx, ambient, combat: vCombat }; // before init: buildings register chimney smoke with the ambient
   sim.init();
   village.onNewDay = d => { sim.flushDigest(); sim.onNewDay(d); };
   const buildMode = G.build = new BuildMode(G, sim);
