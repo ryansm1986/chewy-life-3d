@@ -18,6 +18,7 @@ import { SkillRunner } from './combat/skillRunner.js';
 import { DungeonMode } from './dungeon/dungeonMode.js';
 import { newGameState, createActions } from './rpg/actions.js';
 import { skillRuntime } from './rpg/skills.js';
+import { disposeScene } from './gfx/dispose.js';
 import { VillageSim } from './world/village.js';
 import { BuildMode } from './world/buildMode.js';
 import { Story } from './world/story.js';
@@ -166,14 +167,31 @@ export async function boot() {
     engine.setWorld(world);
     player.changeWorld(world); shadow.changeWorld(world);
   };
+  // tear down a finished floor completely (entities, loot, lights, GPU resources) so nothing leaks between visits
+  function disposeDungeon(d = dungeon) {
+    if (!d) return;
+    const dc = G.combat === vCombat ? null : G.combat;
+    dc?.clear();
+    d.dispose();
+    d.world.lightPool.clear();
+    if (G.vfx !== vVfx) G.vfx.clear();
+    disposeScene(d.world.scene, [d.world.mask]);
+    for (const k of [...vCombat.entities]) if (k.breakable || k.mode === d) vCombat.remove(k);
+    player.interactTarget = null; player.pendingLoot = null; player.moveTarget = null;
+    skills.queued = null;
+    if (d === dungeon) dungeon = G.dungeon = null;
+  }
   G.enterDungeon = (floor = 1) => {
     const go = () => {
       skills.clearAll();
-      if (dungeon) { G.combat.clear(); dungeon.dispose(); dungeon.world.lightPool.clear(); }
+      disposeDungeon();
       dungeon = G.dungeon = new DungeonMode(G);
+      // the floor's combat must exist BEFORE build(): breakable pots register themselves with G.combat
+      const combat = new Combat(G, null);
+      G.combat = combat;
       const world = dungeon.build(floor);
+      combat.world = world;
       const vfx = new VFX(engine, world.scene); vfx.setLightPool(world.lightPool);
-      const combat = new Combat(G, world);
       swapWorld(world, vfx, combat);
       G.mode = 'dungeon';
       dungeon.start();
@@ -203,8 +221,9 @@ export async function boot() {
   G.returnToVillage = (dead = false) => {
     const go = () => {
       skills.clearAll();
-      if (dungeon) { G.combat.clear(); dungeon.dispose(); dungeon = G.dungeon = null; }
+      const old = dungeon;
       swapWorld(village, vVfx, vCombat);
+      disposeDungeon(old);
       G.mode = 'village';
       const home = dead ? { x: L.chewyHouse.x + 2.2, z: L.chewyHouse.z } : { x: L.dungeon.x, z: L.dungeon.z + 3.2 };
       player.setPos(home.x, home.z); shadow.setPos(home.x + 0.8, home.z + 0.6);
