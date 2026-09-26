@@ -52,6 +52,7 @@ export class BuildMode {
     if (!this.active) return;
     this.active = false; this.G.buildMode = false; this.setTool(null);
     this.G.engine.rig.distTarget = this.prevDist;
+    this.G.engine.rig.yawTarget = Math.round((this.G.engine.rig.yawTarget - Math.PI / 4) / (Math.PI / 2)) * (Math.PI / 2) + Math.PI / 4;
     this.sim.setOverlay(null);
     this.sim.terrain.material.userData.u.uGrid.value = 0;
     this.sim.terrain.material.userData.u.uCursor.value.set(-99, -99, 0, 0);

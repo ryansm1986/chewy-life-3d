@@ -155,6 +155,7 @@ export async function boot() {
       combat.add(shadow); shadow.recalc();
       rig.focus.copy(player.pos); rig.snap();
       G.ui?.setMode?.('dungeon');
+      G.ui?.setLocation?.(dungeon.theme.name, `B${floor}F`);
       G.ui?.minimap?.setProvider?.(new DungeonMinimap(G, dungeon));
       G.audio?.music?.(dungeon.layout.boss ? 'boss' : 'dungeon'); G.audio?.ambience?.('dungeon');
       Events.emit('mode:changed', { mode: 'dungeon', floor });
@@ -258,7 +259,18 @@ export async function boot() {
   let hoverEnemy = null;
   function handleInput(dt) {
     if (G.mode === 'village' && Input.hit('b') && !player.controlLocked) { buildMode.active ? buildMode.exit() : buildMode.enter(); }
-    if (buildMode.active) { if (Input.mouse.wheel) rig.zoom(Input.mouse.wheel); const d = player.readMoveInput(); if (d.lengthSq()) rig.focus.addScaledVector(d, 0); return; }
+    if (buildMode.active) {
+      if (Input.mouse.wheel) rig.zoom(Input.mouse.wheel);
+      if (!G.buildFocus) G.buildFocus = player.pos.clone();
+      const { f, r } = rig.groundAxes(); const d = new THREE.Vector3();
+      if (Input.down('w')) d.add(f); if (Input.down('s')) d.sub(f); if (Input.down('d')) d.add(r); if (Input.down('a')) d.sub(r);
+      G.buildFocus.addScaledVector(d, dt * 16);
+      G.buildFocus.x = Math.max(10, Math.min(102, G.buildFocus.x)); G.buildFocus.z = Math.max(10, Math.min(102, G.buildFocus.z));
+      if (Input.hit('q')) { rig.yawTarget += Math.PI / 2; Events.emit('sfx', 'ui_tab'); }
+      if (Input.hit('e')) { rig.yawTarget -= Math.PI / 2; Events.emit('sfx', 'ui_tab'); }
+      return;
+    }
+    if (G.buildFocus) { G.buildFocus = null; }
     const modal = G.ui?.anyModal?.();
     if (modal || player.controlLocked || G.playerDead) { G.ui?.setInteract?.(null); return; }
     const hb = G.state.player.hotbar;
@@ -374,7 +386,8 @@ export async function boot() {
     G.combat.update(dt);
     if (G.mode === 'village') for (const n of npcs) n.update(dt);
     // camera follows with a little look-ahead
-    if (!G.titleActive) {
+    if (buildMode.active && G.buildFocus) rig.focus.set(G.buildFocus.x, player.pos.y + 0.6, G.buildFocus.z);
+    else if (!G.titleActive) {
       const lead = new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing)).multiplyScalar(Math.min(1, player.anim.speed / 4) * 1.2);
       rig.focus.set(player.pos.x + lead.x, player.pos.y + 0.6, player.pos.z + lead.z);
     }

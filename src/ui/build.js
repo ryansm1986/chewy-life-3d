@@ -13,12 +13,12 @@ const CATS = {
 };
 const ZONES = [['R', 'Homes zone', 'home', '#5ec79a'], ['C', 'Shops zone', 'shop', '#5aa8ff'], ['W', 'Workshop zone', 'craft', '#e8a92a']];
 const COVERS = { water: ['#5aaaff', 'Water'], light: ['#ffd24a', 'Light'], joy: ['#ff82be', 'Joy'], health: ['#5ed69a', 'Health'], learn: ['#a88cff', 'Learning'] };
-const OVERLAYS = [['build', 'Zones'], ['water', 'Water'], ['light', 'Light'], ['joy', 'Joy'], ['health', 'Health'], ['learn', 'Learn']];
+const OVERLAYS = [['', 'Zones'], ['water', 'Water'], ['light', 'Light'], ['joy', 'Joy'], ['health', 'Health'], ['learn', 'Learn']];
 
 export class BuildPanel extends Panel {
   constructor(ui) { super(ui, { name: 'build', title: 'Build', jp: '建てる', side: 'bottom', cls: 'p-build', icon: 'hammer' }); this.cat = null; this.sel = null; this.tool = null; }
   init() {
-    this.body.innerHTML = `<div class="bd-top"><div class="tabs bd-tabs"></div><div class="bd-tools">
+    this.extra.innerHTML = `<div class="tabs bd-tabs"></div><div class="bd-tools">
         <span class="bd-tl">Zones</span>${ZONES.map(([z, n, g, c]) => `<button class="zone" data-z="${z}" style="--zc:${c}" title="${n}"><b>${z}</b>${glyph(g)}</button>`).join('')}
         <button class="zone erase" data-z="zone0" title="Erase zones">${glyph('x')}</button>
         <span class="bd-sep"></span>
@@ -26,14 +26,16 @@ export class BuildPanel extends Panel {
         <button class="zone path erase" data-z="path0" title="Remove paths"><i class="pth"></i>${glyph('x', 'mini')}</button>
         <span class="bd-sep"></span>
         <button class="zone bull" data-z="bulldoze" title="Bulldoze">${glyph('shovel')}</button>
-      </div></div>
-      <div class="bd-cards"></div>
-      <div class="bd-hint"><span class="bh-t">Pick a building to place</span>
-        <span class="bd-ov"><span class="bd-tl">View</span>${OVERLAYS.map(([m, n]) => `<button class="ovl" data-m="${m}" style="--oc:${COVERS[m]?.[0] || '#ff8fb0'}">${n}</button>`).join('')}</span>
-        <span class="bd-stats"></span>
-        <span class="bh-k"><span class="kc sm">${glyph('mouseL')}</span> place <span class="kc sm">R</span> rotate <span class="kc sm">Esc</span> cancel</span></div>`;
-    this.$ = { tabs: this.body.querySelector('.bd-tabs'), cards: this.body.querySelector('.bd-cards'), hint: this.body.querySelector('.bh-t'), tools: this.body.querySelector('.bd-tools'), stats: this.body.querySelector('.bd-stats'), ov: this.body.querySelector('.bd-ov') };
-    this.$.ov.addEventListener('click', e => { const b = e.target.closest('.ovl'); if (!b) return; this.overlay = this.overlay === b.dataset.m ? 'build' : b.dataset.m; this.opts.onOverlay?.(this.overlay); this.markOverlay(); this.ui.sfx?.('tab'); });
+      </div>`;
+    this.body.innerHTML = `<div class="bd-main"><div class="bd-cards"></div>
+      <div class="bd-side">
+        <div class="bd-stats"></div>
+        <div class="bd-ov">${OVERLAYS.map(([m, n]) => `<button class="ovl" data-m="${m}" style="--oc:${COVERS[m]?.[0] || '#ff8fb0'}">${n}</button>`).join('')}</div>
+        <div class="bh-t">Pick a building or a tool</div>
+        <div class="bh-k"><span class="kc sm">${glyph('mouseL')}</span>place <span class="kc sm">R</span>rotate <span class="kc sm">Esc</span>cancel</div>
+      </div></div>`;
+    this.$ = { tabs: this.extra.querySelector('.bd-tabs'), cards: this.body.querySelector('.bd-cards'), hint: this.body.querySelector('.bh-t'), tools: this.extra.querySelector('.bd-tools'), stats: this.body.querySelector('.bd-stats'), ov: this.body.querySelector('.bd-ov') };
+    this.$.ov.addEventListener('click', e => { const b = e.target.closest('.ovl'); if (!b) return; this.overlay = this.overlay === b.dataset.m ? '' : b.dataset.m; this.opts.onOverlay?.(this.overlay || null); this.markOverlay(); this.ui.sfx?.('tab'); });
     this.$.tabs.addEventListener('click', e => { const t = e.target.closest('.tab'); if (t) { this.cat = t.dataset.c; this.render(true); this.ui.sfx?.('tab'); } });
     this.$.cards.addEventListener('click', e => { const c = e.target.closest('.card'); if (c) this.pick(c); });
     this.$.cards.addEventListener('wheel', e => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { this.$.cards.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
@@ -55,7 +57,7 @@ export class BuildPanel extends Panel {
       this.ui.sfx?.('select');
     });
   }
-  onOpen() { this.ui.root.classList.add('building'); this.overlay = 'build'; this.markOverlay(); this.updateStats(); clearInterval(this._st); this._st = setInterval(() => this.updateStats(), 700); }
+  onOpen() { this.ui.root.classList.add('building'); this.overlay = ''; this.markOverlay(); this.updateStats(); clearInterval(this._st); this._st = setInterval(() => this.updateStats(), 700); }
   markOverlay() { for (const b of this.$.ov.querySelectorAll('.ovl')) b.classList.toggle('on', b.dataset.m === this.overlay); this.$.ov.style.display = this.opts.onOverlay ? '' : 'none'; }
   updateStats() {
     if (!this.isOpen) return;
@@ -125,7 +127,7 @@ export class BuildPanel extends Panel {
     const tabsSig = cats.map(c => c.id + (c.items || []).length).join();
     if (tabsSig !== this._tabsSig) {
       this._tabsSig = tabsSig;
-      this.$.tabs.innerHTML = cats.map(c => { const C = CATS[c.id] || { g: 'sparkle', c: '#ffcf4a' }; return `<button class="tab" data-c="${c.id}" style="--tc:${C.c}">${glyph(C.g)}<span>${esc(c.name || C.name)}</span><span class="jp">${C.jp || ''}</span></button>`; }).join('');
+      this.$.tabs.innerHTML = cats.map(c => { const C = CATS[c.id] || { g: 'sparkle', c: '#ffcf4a' }; return `<button class="tab" data-c="${c.id}" style="--tc:${C.c}" title="${esc(C.jp || '')}">${glyph(C.g)}<span>${esc(c.name || C.name)}</span></button>`; }).join('');
     }
     for (const t of this.$.tabs.children) t.classList.toggle('on', t.dataset.c === this.cat);
     const cat = cats.find(c => c.id === this.cat);

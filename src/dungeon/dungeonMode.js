@@ -252,7 +252,7 @@ export class DungeonMode {
     if (this.combat.buffs.shrineXp) xp = Math.round(xp * 1.5);
     xp = Math.round(xp * (1 + (D.xpBonus || 0) / 100));
     G.actions.addXp(xp);
-    G.ui?.float?.(m.pos.clone().setY(1.4 * m.scale), `+${xp} xp`, { kind: 'xp' });
+    G.ui?.float?.(m.pos.clone().setY(1.9 * m.scale + 0.3), `+${xp} xp`, { kind: 'xp' });
     if (D.lifeOnKill) G.actions.heal(D.lifeOnKill);
     // drops
     const mf = (D.mf || 0) + (this.combat.buffs.shrineLuck ? 60 : 0);

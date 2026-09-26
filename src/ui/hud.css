@@ -9,7 +9,7 @@
 .ui-root.dlg-open .hud-br { transform: translateY(70%); opacity: 0; }
 .ui-root.building .hud-bc { transform: translate(-50%, 110%); opacity: 0; }
 .ui-root.building .hud-br .menubtns { transform: translateY(180%); opacity: 0; }
-.ui-root.building .hud-br { transform: translateY(-190px); }
+.ui-root.building .hud-br { transform: translateY(-178px); }
 .ui-root.dlg-open .hud-tl .qtrack { opacity: .35; }
 
 /* ---------------------------------------------------------------- top-left: player card */
@@ -303,7 +303,7 @@
 .hb.wrongwep .hb-in::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(45deg, rgba(74, 44, 42, .12) 0 5px, transparent 5px 10px); }
 
 .hud .prompt { z-index: 3; transition: opacity .15s, transform .2s, visibility 0s .2s, bottom .45s var(--soft); }
-.ui-root.building .hud .prompt { bottom: 374px; }
+.ui-root.building .hud .prompt { bottom: 212px; }
 .ui-root.dlg-open .hud .prompt { opacity: 0; }
 .ui-root.has-panel:not(.building) .hud .prompt { opacity: 0; }
 .hud .prompt.hint { padding: 8px 18px 9px; background: var(--paper-noise), linear-gradient(#fff9e0, #ffefc0); }
