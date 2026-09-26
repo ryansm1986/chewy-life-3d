@@ -11,6 +11,7 @@ import { Villager } from './actors/npc.js';
 import { CAST } from './actors/charKit.js';
 import { VILLAGERS, randomVillagerSpec } from './actors/roster.js';
 import { U } from './gfx/materials.js';
+import { glowTexture } from './gfx/textures.js';
 import { VFX } from './gfx/vfx.js';
 import { Ambient } from './gfx/ambient.js';
 import { Combat } from './combat/combat.js';
@@ -79,7 +80,10 @@ export async function boot() {
   const shadow = G.companion = new Companion(village, G);
   shadow.setPos(L.spawn.x + 1, L.spawn.z - 0.8); shadow.recalc();
   const npcs = G.npcs = [];
-  const rosie = new Villager(village, G, CAST.rosie, { id: 'rosie', anchor: { x: L.rosieShop.x - 2.4, z: L.rosieShop.z + 0.5 }, wander: 2.2, role: 'shop' });
+  // Rosie minds her shop from the front (camera side of the door) so she's always visible
+  const shopRec = sim.list.find(r => r.data.type === 'rosieShop');
+  const rosieAnchor = shopRec ? { x: shopRec.door.x + 0.9, z: shopRec.door.z + 0.9 } : { x: L.rosieShop.x - 2.4, z: L.rosieShop.z + 0.5 };
+  const rosie = new Villager(village, G, CAST.rosie, { id: 'rosie', anchor: rosieAnchor, wander: 1.4, role: 'shop' });
   rosie.speed = 1.8; npcs.push(rosie);
   for (const v of VILLAGERS) npcs.push(new Villager(village, G, v.spec, { id: v.id, anchor: v.anchor, wander: v.wander || 5 }));
   const skills = G.skills = new SkillRunner(G);
@@ -179,7 +183,7 @@ export async function boot() {
 
   // ---- camera
   const rig = engine.rig;
-  rig.distTarget = 27; rig.focus.copy(player.pos); rig.snap();
+  rig.distTarget = 22; rig.focus.copy(player.pos); rig.snap();
 
   // ---- modes
   let dungeon = null;
@@ -221,7 +225,7 @@ export async function boot() {
       const s = dungeon.startPos;
       player.setPos(s.x, s.z); player.moveTarget = null; shadow.setPos(s.x + 0.8, s.z + 0.8);
       combat.add(shadow); shadow.recalc();
-      rig.distTarget = 34; rig.focus.copy(player.pos); rig.snap();
+      rig.distTarget = 27; rig.focus.copy(player.pos); rig.snap();
       G.ui?.setMode?.('dungeon');
       G.ui?.setLocation?.(dungeon.theme.name, `B${floor}F`);
       G.ui?.minimap?.setProvider?.(new DungeonMinimap(G, dungeon));
@@ -256,7 +260,7 @@ export async function boot() {
       player.setPos(home.x, home.z); shadow.setPos(home.x + 0.8, home.z + 0.6);
       player.anim.stop(); G.playerDead = false; G.actions.restoreAll(); shadow.fainted = 0; shadow.untargetable = false; shadow.anim.stop(); shadow.recalc(); shadow.life = shadow.lifeMax;
       G.ui?.lootLabel?.clear?.();
-      rig.distTarget = 27; rig.focus.copy(player.pos); rig.snap();
+      rig.distTarget = 22; rig.focus.copy(player.pos); rig.snap();
       G.ui?.setMode?.('village'); G.ui?.setBoss?.(null);
       engine.post.grade.uniforms.get('uVigColor').value.set(0.55, 0.45, 0.65); engine.post.grade.uniforms.get('uVignette').value = 1.0; day.apply();
       G.ui?.minimap?.setProvider?.(vMap);
@@ -330,6 +334,29 @@ export async function boot() {
 
   // occlusion fade: tell shaders where Chewy is on screen
   const _o = new THREE.Vector3();
+  // hero readability: a soft warm light + glow ring that follow Chewy (and a small one for Shadow) at night and
+  // in the Burrow, and a stronger rim so the pair never sink into dark scenes
+  const heroRing = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.6), new THREE.MeshBasicMaterial({ map: glowTexture(), color: '#ffd9a0', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+  heroRing.rotation.x = -Math.PI / 2; heroRing.renderOrder = 7;
+  const pupRing = heroRing.clone(); pupRing.material = heroRing.material.clone(); pupRing.material.color.set('#a8c8ff'); pupRing.scale.setScalar(0.6);
+  let heroLight = null, heroWorld = null;
+  function updateHero(dt) {
+    const w = G.world;
+    if (heroWorld !== w) {
+      heroWorld = w; w.scene.add(heroRing, pupRing);
+      heroLight = w._heroLight ||= w.lightPool.addSource({ pos: new THREE.Vector3(), color: new THREE.Color('#ffe2b8'), intensity: 0, radius: 7, priority: 8 });
+    }
+    const dark = G.mode === 'dungeon' ? 1 : day.out.night;
+    heroLight.pos.set(player.pos.x, player.pos.y + 2.2, player.pos.z);
+    heroLight.intensity = G.mode === 'dungeon' ? 0 : 5 * dark; // the Burrow already has its own lantern light on Chewy
+    heroRing.position.set(player.pos.x, player.pos.y + 0.05, player.pos.z);
+    heroRing.material.opacity = 0.2 * dark * (0.9 + 0.1 * Math.sin(engine.time * 2));
+    pupRing.position.set(shadow.pos.x, shadow.pos.y + 0.05, shadow.pos.z);
+    pupRing.material.opacity = 0.18 * dark;
+    const rim = 0.55 + 0.75 * dark;
+    for (const r of [player.rig, shadow.rig]) { const u = r.mat.userData.u; if (u) u.uRimStr.value = r === shadow.rig ? Math.max(1.25, rim + 0.4) : rim; }
+  }
+
   function updateOcclusion() {
     const cam = engine.camera; cam.updateMatrixWorld();
     _o.copy(player.pos).setY(player.pos.y + 0.55);
@@ -435,7 +462,7 @@ export async function boot() {
     const go = () => {
       G.titleActive = false; player.controlLocked = false;
       G.ui?.setMode?.('village');
-      rig.yawTarget = Math.PI / 4; rig.yaw = rig.yawTarget; rig.distTarget = 27;
+      rig.yawTarget = Math.PI / 4; rig.yaw = rig.yawTarget; rig.distTarget = 22;
       rig.focus.copy(player.pos); rig.snap();
       G.audio?.music?.(day.isNight() ? 'village_night' : 'village_day');
       if (isNew) setTimeout(() => intro(), 900);
@@ -447,7 +474,10 @@ export async function boot() {
     const rosie = npcs[0];
     player.controlLocked = true;
     rosie.talking = true; rosie.state = 'idle';
-    rosie.setPos(player.pos.x + 1.5, player.pos.z + 1.1); rosie.faceTo(player.pos.x, player.pos.z); player.faceTo(rosie.pos.x, rosie.pos.z);
+    // side by side across the screen, both turned a little toward the camera so faces read
+    { const { f, r } = rig.groundAxes(); rosie.setPos(player.pos.x + r.x * 1.6 + f.x * 0.35, player.pos.z + r.z * 1.6 + f.z * 0.35); }
+    rosie.faceTo(player.pos.x, player.pos.z); player.faceTo(rosie.pos.x, rosie.pos.z);
+    rosie.faceBias = 0.5; player.faceTarget -= 0.5; player.facing = player.faceTarget;
     rosie.anim.play('wave'); G.vfx.emote(rosie, 'heart', 2.2);
     // frame both of them
     const prevDist = rig.distTarget; G.introFocus = player.pos.clone().lerp(rosie.pos, 0.5); rig.distTarget = 20;
@@ -455,7 +485,7 @@ export async function boot() {
     await G.ui.dialogue({ speaker: 'Rosie', portrait: pr, lines: ["Good morning, Chewy! ♡ Did you sleep well? Shadow did. He snored like a tiny tractor.", "Welcome to *Blossom Hollow*! The sakura are blooming and everyone is so happy you're here."] });
     await G.ui.dialogue({ speaker: 'Rosie', portrait: pr, lines: ['Walk with *WASD* or click the ground. Press *F* near friends to chat.', 'Press *B* to plan the village — paint zones for homes, shops and workshops, then watch it grow!', "And… there's something squeaky in *the Burrow* on the shrine hill. Take your Bone Sword — and your red tennis ball!"] });
     G.introFocus = null; rig.distTarget = prevDist;
-    rosie.talking = false; rosie.greeted = 30; rosie.state = 'idle'; rosie.t = 4;
+    rosie.talking = false; rosie.faceBias = 0; rosie.greeted = 30; rosie.state = 'idle'; rosie.t = 4;
     player.controlLocked = false;
     G.story.markTalk('rosie');
     G.ui?.toast?.('Tip: I bag · K skills · C character · J quests · X swap weapon', { color: '#8fd0ff' });
@@ -506,6 +536,7 @@ export async function boot() {
     }
     rig.update(dt);
     updateOcclusion();
+    updateHero(rdt);
     if (G.mode === 'village') {
       village.updateSun(rig.target, day.sunDir);
       village.lightPool.update(dt, rig.target, engine.time, day.night);

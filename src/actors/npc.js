@@ -22,7 +22,7 @@ export class Villager extends Actor {
     const night = G.day?.isNight?.() && this.home;
     const pd = p ? dist(p.pos.x, p.pos.z, this.pos.x, this.pos.z) : 99;
     if (this.talking) {
-      if (p) this.faceTo(p.pos.x, p.pos.z);
+      if (p) { this.faceTo(p.pos.x, p.pos.z); this.faceTarget += this.faceBias || 0; }
     } else if (night) {
       // walk home then hide inside
       if (this.visible) {
