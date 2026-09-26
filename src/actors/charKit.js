@@ -196,7 +196,7 @@ export function buildHumanoid(spec) {
   // bow / hats
   const hatAnchor = R.group(head, 'hatAnchor', [0, 0.25, 0]);
   if (of.hat) buildHat(R, hatAnchor, of.hat, of.hatColor || '#f4c04a', sp);
-  if (of.bow) R.add(head, merge([ell(0.08, 0.055, 0.035, of.bow, [0.085, 0.24, 0.06], [0, 0, 0.5]), ell(0.08, 0.055, 0.035, of.bow, [0.22, 0.2, 0.05], [0, 0, -0.3]), ell(0.035, 0.035, 0.035, of.bow, [0.15, 0.225, 0.07])]), 'bow');
+  if (of.bow) R.add(head, merge([ell(0.09, 0.06, 0.04, of.bow, [0.07, 0.36, 0.1], [0.5, 0, 0.45]), ell(0.09, 0.06, 0.04, of.bow, [0.22, 0.32, 0.08], [0.5, 0, -0.35]), ell(0.04, 0.04, 0.04, of.bow, [0.145, 0.34, 0.11])]), 'bow');
 
   R.root.scale.setScalar(spec.scale || 1);
   R.height = 1.15 * (spec.scale || 1);

@@ -55,14 +55,18 @@ try {
         if (Math.random() < 0.3) G.skills.cds = {};
         const aim = tgt ? tgt.pos.clone() : P.pos.clone().add(new V(Math.random() * 6 - 3, 0, Math.random() * 6 - 3));
         S.casts++;
+        const busy = P.anim.busy(), cd = G.skills.cooldown(id);
         const ok = G.skills.tryCast(id, aim, tgt);
         if (ok) { S.ok++; S.byId[id] = (S.byId[id] || 0) + 1; }
+        else { const why = busy ? 'busy:' + P.anim.action?.name : cd > 0 ? 'cooldown' : 'other'; (S.fail ||= {})[why] = (S.fail[why] || 0) + 1; }
+        // the leap soft-lock (P.leap never cleared) would ruin the rest of the run: record it and unstick
+        if (P.leap) { P._leapSeen = (P._leapSeen || 0) + 1; if (P._leapSeen > 20) { S.anomalies.push(`P.leap stuck >2 s (anim=${P.anim.action?.name}) @${(now - t0) | 0}ms`); P.leap = null; P._leapSeen = 0; } } else P._leapSeen = 0;
       } catch (e) { S.castErr.push(String(e && e.stack || e).slice(0, 300)); }
       if (now - t0 > DUR * 1000) { clearInterval(iv); G.input.keys.delete('1'); res(); }
     }, 110);
   }), DUR);
   const S = await page.evaluate(() => window.QA.stress);
-  R.note(`casts=${S.casts} started=${S.ok} whirlTicks=${S.whirlTicks} teleports=${S.teleports} byId=${JSON.stringify(S.byId)}`);
+  R.note(`casts=${S.casts} started=${S.ok} whirlTicks=${S.whirlTicks} teleports=${S.teleports} byId=${JSON.stringify(S.byId)} notStarted=${JSON.stringify(S.fail)}`);
   R.check('no exceptions thrown by tryCast/update during stress', !S.castErr.length, S.castErr.slice(0, 3).join(' | '));
   const anomalies = [...new Set(S.anomalies)];
   R.check('player never NaN / inside rock / off-map', !anomalies.length, anomalies.slice(0, 6).join(' | '));
