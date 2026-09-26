@@ -76,7 +76,7 @@ export const BUILDINGS = {
   waterTower: { name: 'Water Tower', cat: 'service', size: [2, 2], levels: 1, cost: { coins: 120, wood: 14, stone: 6 }, ...cov(['water', 12]), desc: 'A big wooden tank on tall legs keeps the whole neighbourhood splashy.' },
   stoneLantern: { name: 'Stone Lantern', cat: 'service', size: [1, 1], levels: 1, cost: { coins: 30, stone: 5 }, ...cov(['light', 5]), desc: 'A mossy tōrō that glows softly after sunset.' },
   streetLamp: { name: 'Lantern Post', cat: 'service', size: [1, 1], levels: 1, cost: { coins: 35, wood: 2, lantern: 1 }, ...cov(['light', 6]), desc: 'A cheerful paper lantern on a wooden post. Moths love it.' },
-  park: { name: 'Pocket Park', cat: 'service', size: [3, 3], levels: 1, cost: { coins: 150, wood: 6, petal: 6 }, ...cov(['joy', 8]), jobs: [0], desc: 'Benches, a little sakura, flower beds and a pond full of lily pads.' },
+  park: { name: 'Pocket Park', cat: 'service', size: [3, 3], levels: 1, cost: { coins: 150, wood: 6, petal: 6 }, ...cov(['joy', 8]), desc: 'Benches, a little sakura, flower beds and a pond full of lily pads.' },
   shrine: { name: 'Blossom Shrine', cat: 'service', size: [3, 3], levels: 1, cost: { coins: 300, wood: 20, stone: 10, lantern: 2, petal: 4 }, ...cov(['joy', 12]), jobs: [1], desc: 'Ring the bell, clap twice and make a wish for good snacks.' },
   onsen: { name: 'Hot Spring', cat: 'service', size: [4, 4], levels: 1, cost: { coins: 400, wood: 16, stone: 24, crystal: 2 }, ...cov(['joy', 10], ['health', 10]), jobs: [2], desc: 'Steamy, cozy and good for sore paws. Bamboo walls for privacy!' },
   clinic: { name: 'Paw Clinic', cat: 'service', size: [3, 3], levels: 1, cost: { coins: 320, wood: 18, stone: 10, mochi: 3 }, ...cov(['health', 10]), jobs: [2], desc: 'Bandages, warm tea and gentle hugs for every villager.' },
@@ -91,7 +91,7 @@ export const BUILDINGS = {
   lanternString: { name: 'Lantern String', cat: 'decor', size: [2, 1], levels: 1, cost: { coins: 45, wood: 2, lantern: 2, silk: 1 }, ...cov(['light', 4], ['joy', 3]), desc: 'A row of paper lanterns swaying between two poles.' },
   fence: { name: 'Picket Fence', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 6, wood: 1 }, desc: 'Keeps the chickens honest. Runs along x; rotate to turn.' },
   bridge: { name: 'Arched Bridge', cat: 'decor', size: [3, 9], levels: 1, cost: { coins: 200, wood: 24, stone: 8 }, desc: 'A vermilion taiko bridge. Deck height: bridgeDeckHeight(localZ).' },
-  chewyStatue: { name: 'Golden Bone Statue', cat: 'decor', size: [2, 2], levels: 1, cost: { coins: 250, stone: 20, bone: 8 }, ...cov(['joy', 8]), desc: 'A monument to the goodest boy and his greatest treasure.' },
+  chewyStatue: { name: 'Chewy Statue', cat: 'decor', size: [2, 2], levels: 1, cost: { coins: 250, stone: 20, bone: 8 }, ...cov(['joy', 8]), desc: 'A stone Chewy proudly guarding his golden bone. Rub the paw plaque for luck!' },
 };
 
 export const CATEGORIES = { special: 'Landmarks', home: 'Homes', shop: 'Shops', craft: 'Workshops', service: 'Services', decor: 'Decor' };

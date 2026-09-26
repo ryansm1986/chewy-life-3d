@@ -23,6 +23,7 @@ import { BuildMode } from './world/buildMode.js';
 import { Story } from './world/story.js';
 import { Portraits } from './gfx/portraits.js';
 import { installServices } from './world/services.js';
+import { Waterfall } from './world/waterfall.js';
 import { VillageMinimap, DungeonMinimap } from './world/minimap.js';
 
 async function tryImport(path) { try { return await import(/* @vite-ignore */ path); } catch (e) { console.warn('[boot] optional module missing', path, e.message); return null; } }
@@ -52,6 +53,7 @@ export async function boot() {
   const vVfx = new VFX(engine, village.scene); vVfx.setLightPool(village.lightPool);
   G.vfx = vVfx;
   const ambient = new Ambient(G, village, vVfx);
+  const waterfall = new Waterfall(village, vVfx, { x: village.landmarks.waterfall.x });
   const vCombat = new Combat(G, village);
   const sim = G.sim = new VillageSim(G, village);
   sim.init();
@@ -385,6 +387,7 @@ export async function boot() {
       sim.update(dt, engine.time);
       buildMode.update(dt);
       ambient.update(dt, engine.time);
+      if (player.pos.z < 40) waterfall.update(dt, engine.time, day);
       villageAmbience(dt);
     } else {
       dungeon.update(dt, engine.time);

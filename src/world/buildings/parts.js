@@ -2,7 +2,7 @@
 // doors, noren curtains, engawa porches, chimneys, steps and fences. All take a Builder `B` and build
 // in its current local frame (front = +z).
 import * as THREE from 'three';
-import { puff } from '../../gfx/geom.js';
+import { puff, tube } from '../../gfx/geom.js';
 import { G, V, C, PI, bar, shade, mixc } from './kit.js';
 import { shapeGeo } from './symbols.js';
 
@@ -301,7 +301,6 @@ export function fence(B, a, b, { style = 'picket', h = 0.6, color } = {}) {
   });
 }
 
-import { tube } from '../../gfx/geom.js';
 export function tubeOf(pts, radial = 5) { return tube(pts, radial, false); }
 
 // Flower box / planter trough (local centre at its top)

@@ -157,7 +157,7 @@ export function fishingHut(B, L) {
   B.push([0, 0, zc]);
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const s = G.cyl(0.06, 0.07, y0, 6); s.translate(sx * (w / 2 - 0.08), y0 / 2, sz * (d / 2 - 0.08)); B.add(s, C.woodDark); }
   const floor = G.box(w + 0.1, 0.08, d + 0.1, 0.02); floor.translate(0, y0 - 0.02, 0); B.add(floor, C.woodMid);
-  walls(B, { w, d, h, y0, planks: '#8aa0b0', frame: '#5a6a7a' });
+  walls(B, { w, d, h, y0, planks: '#b4c6d2', frame: '#6a7a8a' });
   onFace(B, { w, d }, 'f', -0.25, y0, () => { door(B, { w: 0.62, h: 1.1, style: 'wood', wood: '#b0c0c8', frame: '#5a6a7a' }); noren(B, { w: 0.6, h: 0.36, y: 1.14, z: 0.14, color: '#3a6a9a', strips: 2, symbol: () => flatSymbol('fish'), symScale: 0.16 }); });
   onFace(B, { w, d }, 'r', 0, y0 + 0.75, () => shoji(B, { w: 0.5, h: 0.4, frame: '#5a6a7a' }));
   onFace(B, { w, d }, 'f', 0.45, y0 + 0.8, () => shoji(B, { w: 0.34, h: 0.34, frame: '#5a6a7a' }));

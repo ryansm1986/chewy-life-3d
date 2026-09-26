@@ -62,7 +62,7 @@ export const UI = {
     };
     this.skills = this.panels.skills;
     // popover + skill drag ghost
-    this.pop = el('div', 'pop-wrap'); this.pop.innerHTML = '<div class="pop"></div>'; this.layers.over.appendChild(this.pop);
+    this.pop = el('div', 'pop-wrap'); this.pop.innerHTML = '<div class="pop-box"></div>'; this.layers.over.appendChild(this.pop);
     this.skGhost = el('div', 'cursor-item skill'); this.skGhost.innerHTML = '<div class="ci-in"><img alt=""></div>'; this.layers.over.appendChild(this.skGhost);
     this.fpsEl = el('div', 'fps'); this.layers.over.appendChild(this.fpsEl);
     this._fpsAcc = 0; this._fpsN = 0;

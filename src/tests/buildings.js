@@ -1,6 +1,8 @@
-// Building catalog showcase: every building / level laid out on grass with labels.
-// Params: &only=id[,id2] &level=N &seed=N &variants=N (seeds per level) &cat=home|shop|craft|service|decor|special
-//         &hour=21 (night) &dist= &yaw= &pitch= &labels=0 &smoke=0 &rot=radians &pads=0
+// Building catalog showcase (/?test=buildings): every building / level laid out in labelled rows on grass.
+// Params: &only=id[,id2]  &cat=special|home|shop|craft|service|decor  &level=N  &seed=N  &variants=N (seeds per level)
+//         &focus=i (centre + zoom on the i-th placed item)  &hour=21 (night; the stage reads `hour`)  &dist= &yaw= &pitch=
+//         &labels=0  &smoke=0 (emitter preview puffs)  &doors=1 (door markers)  &pads=0 (footprint tiles)  &rot=radians  &row=width
+// Labels show id, level, seed and triangle count. window.__info = { count, totalTris, per:{id:level:seed → tris} }.
 import * as THREE from 'three';
 import { makeStage } from './_stage.js';
 import { BUILDINGS, buildModel, setNight, CATEGORIES } from '../world/buildings/index.js';

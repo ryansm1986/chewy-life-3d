@@ -251,13 +251,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1c1424; }
 
 /* ---------------------------------------------------------------- popover */
 .pop-wrap { position: fixed; left: 0; top: 0; z-index: 55; pointer-events: none; }
-.pop { zoom: var(--ui-scale); position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); visibility: hidden; pointer-events: none;
+.pop-box { zoom: var(--ui-scale); position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); visibility: hidden; pointer-events: none;
   padding: 10px 12px 12px; background: var(--paper-noise), linear-gradient(#fffcf6, #ffefdc); border: 3px solid var(--ink); border-radius: 18px; box-shadow: 0 5px 0 rgba(74, 44, 42, .35), 0 16px 30px rgba(40, 20, 40, .3); }
-.pop-wrap[data-dir="down"] .pop { transform: translate(-50%, 0); }
-.pop::after { content: ''; position: absolute; left: 50%; bottom: -11px; width: 16px; height: 16px; margin-left: -8px; background: #ffefdc; border-right: 3px solid var(--ink); border-bottom: 3px solid var(--ink); transform: rotate(45deg); border-radius: 0 0 4px 0; }
-.pop-wrap[data-dir="down"] .pop::after { top: -11px; bottom: auto; transform: rotate(-135deg); }
-.pop-wrap.show .pop { visibility: visible; pointer-events: auto; animation: popIn .35s var(--pop); }
-.pop-wrap[data-dir="up"].show .pop { transform-origin: 50% 100%; }
+.pop-wrap[data-dir="down"] .pop-box { transform: translate(-50%, 0); }
+.pop-box::after { content: ''; position: absolute; left: 50%; bottom: -11px; width: 16px; height: 16px; margin-left: -8px; background: #ffefdc; border-right: 3px solid var(--ink); border-bottom: 3px solid var(--ink); transform: rotate(45deg); border-radius: 0 0 4px 0; }
+.pop-wrap[data-dir="down"] .pop-box::after { top: -11px; bottom: auto; transform: rotate(-135deg); }
+.pop-wrap.show .pop-box { visibility: visible; pointer-events: auto; animation: popIn .35s var(--pop); }
+.pop-wrap[data-dir="up"].show .pop-box { transform-origin: 50% 100%; }
 @keyframes popIn { from { opacity: 0; scale: .6; } }
 .pop-h { font: 700 14px var(--font); text-align: center; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; }
 .pop-slots { display: flex; gap: 6px; }

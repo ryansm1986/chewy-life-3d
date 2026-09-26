@@ -196,7 +196,7 @@ export class Builder {
       const list = this.buckets[k];
       if (!list.length) continue;
       const g = merge(list);
-      if (k !== 'water' && k !== 'jet') warp(g, this.seed, this.warpAmt);
+      if (k !== 'jet') warp(g, this.seed, this.warpAmt);
       if (k === 'body') groundShade(g);
       g.computeBoundingSphere();
       geos[k] = g;
