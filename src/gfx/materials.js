@@ -18,6 +18,7 @@ export const U = {
   uNight: { value: 0 },
   uSunDir: { value: new THREE.Vector3(0.5, 0.8, 0.3).normalize() },
   uSkyHor: { value: new THREE.Color('#d8f0ff') },
+  uOccl: { value: new THREE.Vector4(-9999, -9999, 1, 0) }, // player screen px (x,y), radius px, view depth
 };
 export function initSharedUniforms() { U.uBrush.value = brushTexture(); }
 
@@ -89,10 +90,27 @@ uniform float uShadowSat;
 uniform float uCloudShadow;
 uniform vec2 uCloudOffset;
 uniform float uNight;
+uniform vec4 uOccl;
+uniform float uOcclOn;
 varying vec3 vCWorld;
 varying vec3 vCObj;
 varying vec3 vCWN;
 
+float bayer4(vec2 p) {
+  vec2 q = mod(floor(p), 4.0);
+  int i = int(q.x) + int(q.y) * 4;
+  float m[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+  return (m[i] + 0.5) / 16.0;
+}
+void occlusionFade(float fragDepth) {
+  if (uOcclOn < 0.5) return;
+  vec2 d = gl_FragCoord.xy - uOccl.xy;
+  float r = length(d * vec2(1.0, 1.15)) / uOccl.z;
+  if (r > 1.0) return;
+  float front = smoothstep(0.6, 2.2, uOccl.w - fragDepth);
+  float k = smoothstep(1.0, 0.45, r) * front * 0.88;
+  if (bayer4(gl_FragCoord.xy) < k) discard;
+}
 float cloudShadowAt(vec3 p) {
   vec2 q = p.xz * 0.012 + uCloudOffset;
   float n = texture2D(uBrush, q).g * 0.6 + texture2D(uBrush, q * 2.3 + 0.37).g * 0.4;
@@ -208,6 +226,7 @@ export function makeToon(o = {}) {
     uTerm: { value: new THREE.Vector2(...(o.term || [-0.08, 0.32])) },
     uShadowSat: { value: o.shadowSat ?? 0.35 },
     uWindAmt: { value: o.windAmt ?? 1 },
+    uOcclOn: { value: o.occluder ? 1 : 0 },
     ...(o.uniforms || {}),
   };
   mat.userData.u = local;
@@ -221,6 +240,7 @@ export function makeToon(o = {}) {
       .replace('#include <common>', `#include <common>\n${PAINT_GLSL}\n${o.fragPars || ''}`)
       .replace('#include <lights_toon_pars_fragment>', TOON_LIGHT)
       .replace('#include <normal_fragment_begin>', o.noFlip ? '#include <normal_fragment_begin>\n normal = normalize(vNormal); nonPerturbedNormal = normal;' : '#include <normal_fragment_begin>')
+      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n occlusionFade(vViewPosition.z);')
       .replace('#include <color_fragment>', /* glsl */`
         #include <color_fragment>
         ${o.fragColor || ''}

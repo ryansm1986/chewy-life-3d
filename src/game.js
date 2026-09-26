@@ -1,5 +1,296 @@
-// Full game bootstrap (filled in as systems come online). For now it forwards to the sandbox.
+// Game orchestrator: boot, village <-> dungeon modes, input routing, combat input, death, main loop.
+import * as THREE from 'three';
+import { Engine } from './core/engine.js';
+import { Input } from './core/input.js';
+import { Events } from './core/events.js';
+import { VillageWorld } from './world/villageWorld.js';
+import { DayNight } from './gfx/sky.js';
+import { Player } from './actors/player.js';
+import { Companion } from './actors/companion.js';
+import { Villager } from './actors/npc.js';
+import { CAST } from './actors/charKit.js';
+import { VILLAGERS } from './actors/roster.js';
+import { U } from './gfx/materials.js';
+import { VFX } from './gfx/vfx.js';
+import { Ambient } from './gfx/ambient.js';
+import { Combat } from './combat/combat.js';
+import { SkillRunner } from './combat/skillRunner.js';
+import { DungeonMode } from './dungeon/dungeonMode.js';
+import { newGameState, createActions } from './rpg/actions.js';
+import { skillRuntime } from './rpg/skills.js';
+
+async function tryImport(path) { try { return await import(/* @vite-ignore */ path); } catch (e) { console.warn('[boot] optional module missing', path, e.message); return null; } }
+
 export async function boot() {
-  const m = await import('./tests/sandbox.js');
-  m.default();
+  const engine = new Engine();
+  Input.init(engine.renderer.domElement);
+  const P = engine.params;
+  const G = window.G = { engine, input: Input, events: Events, THREE, mode: 'village', ui: null, audio: null, playerDead: false };
+
+  // ---- persistent state + actions
+  const saved = !P.has('fresh') && loadSave();
+  G.state = saved || newGameState();
+  G.actions = createActions(G);
+  G.actions.recompute();
+  G.skillParams = (id) => skillRuntime(id, G.state, G.derived)?.params;
+
+  const [uiMod, audioMod] = await Promise.all([P.has('noui') ? null : tryImport('./ui/ui.js'), P.has('noaudio') ? null : tryImport('./audio/audio.js')]);
+  G.audio = audioMod?.Audio || null;
+  try { G.audio?.init?.(); } catch (e) { console.warn('[audio] init failed', e); }
+
+  // ---- village
+  const village = new VillageWorld(engine);
+  const day = G.day = new DayNight(village, engine.post);
+  day.hour = P.has('hour') ? +P.get('hour') : (G.state.hour ?? 8.5);
+  day.day = G.state.day || 1;
+  const vVfx = new VFX(engine, village.scene); vVfx.setLightPool(village.lightPool);
+  G.vfx = vVfx;
+  const ambient = new Ambient(G, village, vVfx);
+  const vCombat = new Combat(G, village);
+  G.village = { world: village, vfx: vVfx, ambient, combat: vCombat };
+  G.world = village; G.combat = vCombat;
+  engine.setWorld(village);
+
+  // ---- actors
+  const L = village.landmarks;
+  const player = G.player = new Player(village, G);
+  player.setPos(L.spawn.x, L.spawn.z); player.faceTarget = player.facing = Math.PI * 0.25;
+  player.setWeapon(G.derived.weaponType || 'sword');
+  const shadow = G.companion = new Companion(village, G);
+  shadow.setPos(L.spawn.x + 1, L.spawn.z - 0.8); shadow.recalc();
+  const npcs = G.npcs = [];
+  const rosie = new Villager(village, G, CAST.rosie, { id: 'rosie', anchor: { x: L.rosieShop.x - 2.4, z: L.rosieShop.z + 0.5 }, wander: 2.2, role: 'shop' });
+  rosie.speed = 1.8; npcs.push(rosie);
+  for (const v of VILLAGERS) npcs.push(new Villager(village, G, v.spec, { id: v.id, anchor: v.anchor, wander: v.wander || 5 }));
+  const skills = G.skills = new SkillRunner(G);
+
+  // dungeon gate interactable (the building model sits here once the village sim places it)
+  village.interactables.push({ pos: new THREE.Vector3(L.dungeon.x, village.heightAt(L.dungeon.x, L.dungeon.z), L.dungeon.z + 1.6), radius: 1.8, label: 'Enter the Burrow', onInteract: () => G.openBurrowMenu() });
+
+  // ---- UI
+  if (uiMod?.UI) { G.ui = uiMod.UI; try { G.ui.init(G); G.ui.setMode?.('village'); } catch (e) { console.error('[ui] init failed', e); G.ui = null; } }
+
+  // ---- audio routing
+  Events.on('sfx', (name, o = {}) => G.audio?.play?.(name, o));
+  Events.on('footstep', (p) => { G.audio?.play?.(G.mode === 'dungeon' ? 'footstep_stone' : 'footstep_grass', { vol: 0.35 }); if (Math.random() < 0.5) G.vfx.dust(p, { n: 1, size: 0.18 }); });
+  Events.on('emote', ({ actor, kind }) => G.vfx.emote(actor, kind));
+  Events.on('player:levelup', ({ lvl }) => { G.vfx.levelUp(player.pos.clone()); G.ui?.banner?.('Level Up!', `Chewy is now level ${lvl}`, { style: 'levelup' }); G.audio?.play?.('ui_levelup'); G.actions.restoreAll(); shadow.recalc(); });
+  Events.on('player:dead', () => onPlayerDeath());
+  Events.on('equip:changed', () => player.setWeapon(G.derived.weaponType || 'sword'));
+  Events.on('stats:changed', () => shadow.recalc());
+  G.audio?.music?.('village_day'); G.audio?.ambience?.('village');
+
+  // ---- camera
+  const rig = engine.rig;
+  rig.focus.copy(player.pos); rig.snap();
+
+  // ---- modes
+  let dungeon = null;
+  const swapWorld = (world, vfx, combat) => {
+    G.world = world; G.vfx = vfx; G.combat = combat;
+    engine.setWorld(world);
+    player.changeWorld(world); shadow.changeWorld(world);
+  };
+  G.enterDungeon = (floor = 1) => {
+    const go = () => {
+      skills.clearAll();
+      if (dungeon) { G.combat.clear(); dungeon.dispose(); dungeon.world.lightPool.clear(); }
+      dungeon = G.dungeon = new DungeonMode(G);
+      const world = dungeon.build(floor);
+      const vfx = new VFX(engine, world.scene); vfx.setLightPool(world.lightPool);
+      const combat = new Combat(G, world);
+      swapWorld(world, vfx, combat);
+      G.mode = 'dungeon';
+      dungeon.start();
+      const s = dungeon.startPos;
+      player.setPos(s.x, s.z); player.moveTarget = null; shadow.setPos(s.x + 0.8, s.z + 0.8);
+      combat.add(shadow); shadow.recalc();
+      rig.focus.copy(player.pos); rig.snap();
+      G.ui?.setMode?.('dungeon');
+      G.audio?.music?.(dungeon.layout.boss ? 'boss' : 'dungeon'); G.audio?.ambience?.('dungeon');
+      Events.emit('mode:changed', { mode: 'dungeon', floor });
+      save();
+    };
+    if (G.ui?.transition) G.ui.transition(go); else go();
+  };
+  G.returnToVillage = (dead = false) => {
+    const go = () => {
+      skills.clearAll();
+      if (dungeon) { G.combat.clear(); dungeon.dispose(); dungeon = G.dungeon = null; }
+      swapWorld(village, vVfx, vCombat);
+      G.mode = 'village';
+      const home = dead ? { x: L.chewyHouse.x + 2.2, z: L.chewyHouse.z } : { x: L.dungeon.x, z: L.dungeon.z + 3.2 };
+      player.setPos(home.x, home.z); shadow.setPos(home.x + 0.8, home.z + 0.6);
+      player.anim.stop(); G.playerDead = false; G.actions.restoreAll(); shadow.fainted = 0; shadow.untargetable = false; shadow.anim.stop();
+      rig.focus.copy(player.pos); rig.snap();
+      G.ui?.setMode?.('village'); G.ui?.setBoss?.(null);
+      G.audio?.music?.(day.isNight() ? 'village_night' : 'village_day'); G.audio?.ambience?.(day.isNight() ? 'night' : 'village');
+      Events.emit('mode:changed', { mode: 'village' });
+      if (dead) setTimeout(() => G.ui?.dialogue?.({ speaker: 'Rosie', portrait: G.ui?.portraits?.get?.('rosie'), lines: ['Chewy! Shadow dragged you all the way home by your scarf!', "Let's patch you up. Maybe bring more Heart Treats next time, okay?"] }), 900);
+      save();
+    };
+    if (G.ui?.transition) G.ui.transition(go); else go();
+  };
+  G.openBurrowMenu = () => {
+    const wps = [...(G.state.dungeon.waypoints || [1])].sort((a, b) => a - b);
+    if (!G.ui?.dialogue || wps.length <= 1) return G.enterDungeon(wps[wps.length - 1] || 1);
+    G.ui.dialogue({ speaker: 'The Burrow', lines: ['A warm breeze drifts up from the burrow… Shadow wiggles with excitement!'], choices: wps.map(f => ({ text: `Floor ${f}` })).concat([{ text: 'Not yet' }]) })
+      .then(i => { if (i != null && i < wps.length) G.enterDungeon(wps[i]); });
+  };
+  G.openWaypoints = () => {
+    const wps = [...(G.state.dungeon.waypoints || [1])].sort((a, b) => a - b);
+    if (!G.ui?.dialogue) return;
+    G.ui.dialogue({ speaker: 'Waypoint', lines: ['The paw rune hums softly. Where to?'], choices: wps.map(f => ({ text: `Floor ${f}` })).concat([{ text: 'Blossom Hollow' }, { text: 'Stay' }]) })
+      .then(i => { if (i == null) return; if (i < wps.length) G.enterDungeon(wps[i]); else if (i === wps.length) G.returnToVillage(); });
+  };
+  function onPlayerDeath() {
+    if (G.playerDead) return;
+    G.playerDead = true; skills.clearAll();
+    player.anim.play('die'); engine.timeScale = 0.4; engine.post.pulse('#3a2040', 0.3);
+    G.ui?.banner?.('Oof!', 'Chewy needs a nap…', { style: 'boss' });
+    G.audio?.play?.('player_die');
+    const lost = Math.floor(G.state.coins * 0.1); if (lost > 0) { G.state.coins -= lost; Events.emit('coins:changed', { coins: G.state.coins }); }
+    setTimeout(() => { engine.timeScale = 1; G.returnToVillage(true); }, 2600);
+  }
+
+  // ---- interaction helpers
+  G.talkTo = (npc) => {
+    npc.talking = true; player.controlLocked = true;
+    const lines = npc.id === 'rosie'
+      ? ["Chewy! You're up! Shadow's been chasing butterflies all morning.", 'The village could use more homes — and something grumbly is stirring in the Burrow again.']
+      : [`Hi Chewy! Lovely day in Blossom Hollow, isn't it?`];
+    const done = () => { npc.talking = false; player.controlLocked = false; };
+    if (G.ui?.dialogue) G.ui.dialogue({ speaker: npc.name, portrait: G.ui?.portraits?.get?.(npc.id), lines }).then(done, done);
+    else setTimeout(done, 1200);
+  };
+  function nearestInteract() {
+    let best = null, bd = 1e9;
+    const list = G.mode === 'village' ? [...npcs.filter(n => n.visible).map(n => n.interact), ...G.world.interactables] : G.world.interactables;
+    for (const it of list) {
+      const d = Math.hypot(it.pos.x - player.pos.x, it.pos.z - player.pos.z);
+      if (d < (it.radius || 1.4) + 0.4 && d < bd) { bd = d; best = it; }
+    }
+    return best;
+  }
+  const _v = new THREE.Vector3();
+  function pickInteractAtMouse() {
+    const cam = engine.camera;
+    let best = null, bd = 56;
+    const list = G.mode === 'village' ? npcs.filter(n => n.visible).map(n => n.interact).concat(G.world.interactables) : G.world.interactables;
+    for (const it of list) {
+      _v.copy(it.pos).setY(it.pos.y + 0.6).project(cam);
+      const sx = (_v.x * 0.5 + 0.5) * innerWidth, sy = (-_v.y * 0.5 + 0.5) * innerHeight;
+      const d = Math.hypot(sx - Input.mouse.x, sy - Input.mouse.y);
+      if (d < bd) { bd = d; best = it; }
+    }
+    return best;
+  }
+  // which key/button holds a skill (for channeling)
+  const SLOT_KEYS = [() => Input.mouseDown(0), () => Input.mouseDown(2), () => Input.down('1'), () => Input.down('2'), () => Input.down('3'), () => Input.down('4')];
+  const skillInput = { holding(id) { const hb = G.state.player.hotbar; return hb.some((s, i) => s === id && SLOT_KEYS[i]()); } };
+
+  // occlusion fade: tell shaders where Chewy is on screen
+  const _o = new THREE.Vector3();
+  function updateOcclusion() {
+    const cam = engine.camera; cam.updateMatrixWorld();
+    _o.copy(player.pos).setY(player.pos.y + 0.55);
+    const depth = -_o.clone().applyMatrix4(cam.matrixWorldInverse).z;
+    _o.project(cam);
+    const pr = engine.renderer.getPixelRatio();
+    U.uOccl.value.set((_o.x * 0.5 + 0.5) * innerWidth * pr, (_o.y * 0.5 + 0.5) * innerHeight * pr, innerHeight * pr * 0.13, depth);
+  }
+
+  // ---- per-frame input
+  let hoverEnemy = null;
+  function handleInput(dt) {
+    const modal = G.ui?.anyModal?.();
+    if (modal || player.controlLocked || G.playerDead) { G.ui?.setInteract?.(null); return; }
+    const hb = G.state.player.hotbar;
+    const aim = engine.mouseGround(Input.mouse.nx, Input.mouse.ny, (x, z) => G.world.heightAt(x, z));
+    hoverEnemy = G.mode === 'dungeon' && !Input.mouse.overUI ? G.combat.pickAtScreen(Input.mouse.x, Input.mouse.y, engine.camera) : null;
+    // LMB: attack enemies under the cursor (or Shift+click), otherwise walk / interact
+    if (Input.mouseDown(0) && !Input.mouse.overUI) {
+      if (hoverEnemy || (Input.down('shift') && G.mode === 'dungeon')) {
+        const tgt = hoverEnemy ? hoverEnemy.pos : aim;
+        const R = skillRuntime(hb[0] || 'attack', G.state, G.derived);
+        const melee = R && !R.params?.projectile && !(R.params?.speed) && (R.params?.radius || 0) < 3;
+        const reach = (R?.params?.radius || 1.8) + (hoverEnemy?.radius || 0.3) - 0.2;
+        if (hoverEnemy && melee && Math.hypot(tgt.x - player.pos.x, tgt.z - player.pos.z) > reach) { player.moveTarget = tgt.clone(); player.interactTarget = null; }
+        else { player.moveTarget = null; skills.tryCast(hb[0] || 'attack', tgt, hoverEnemy); }
+      } else {
+        const it = Input.mouseHit(0) ? pickInteractAtMouse() : null;
+        if (it) { player.interactTarget = it; player.moveTarget = it.pos.clone(); }
+        else if (!player.interactTarget) player.moveTarget = aim;
+      }
+    }
+    if (Input.mouseDown(2) && !Input.mouse.overUI && hb[1]) skills.tryCast(hb[1], hoverEnemy ? hoverEnemy.pos : aim, hoverEnemy);
+    for (let k = 1; k <= 4; k++) if (Input.down(String(k)) && hb[k + 1]) skills.tryCast(hb[k + 1], hoverEnemy ? hoverEnemy.pos : aim, hoverEnemy);
+    if (Input.hit('q')) usePotion('heart');
+    if (Input.hit('e')) usePotion('zoom');
+    if (Input.hit('r')) usePotion('rejuv');
+    if (Input.hit('x')) { G.actions.swapWeapons(); player.setWeapon(G.derived.weaponType || 'sword'); G.audio?.play?.('ui_equip'); G.vfx.sparkle(player.pos.clone().setY(0.8), { n: 6 }); }
+    if (Input.hit('t') && G.mode === 'dungeon') G.returnToVillage();
+    const it = nearestInteract();
+    G.ui?.setInteract?.(it ? it.label : null);
+    if (it && Input.hit('f')) it.onInteract();
+    if (Input.mouse.wheel) rig.zoom(Input.mouse.wheel);
+    // target frame
+    if (hoverEnemy && !hoverEnemy.breakable) G.ui?.setTarget?.({ name: hoverEnemy.name, hp: hoverEnemy.life, max: hoverEnemy.lifeMax, rarity: hoverEnemy.rank, mods: (hoverEnemy.stats.mods || []).map(m => m) });
+    else G.ui?.setTarget?.(null);
+  }
+  function usePotion(key) {
+    const eff = G.actions.usePotion(key);
+    if (!eff) return;
+    player.anim.play('drink');
+    G.audio?.play?.('potion_drink');
+    if (key === 'zoom') G.vfx.sparkle(player.pos.clone().setY(0.8), { n: 12, color: '#8fc8ff' }); else G.vfx.heal(player.pos.clone());
+  }
+
+  // ---- save / load
+  function save() { try { G.state.hour = day.hour; G.state.day = day.day; localStorage.setItem('chewy3d.save', JSON.stringify(G.state)); } catch (e) { /* storage unavailable */ } }
+  G.save = save;
+  setInterval(save, 30000);
+  addEventListener('beforeunload', save);
+
+  // ---- main loop
+  let fpsAcc = 0, fpsN = 0; const fpsEl = P.has('fps') ? Object.assign(document.body.appendChild(document.createElement('div')), { style: 'position:fixed;left:8px;bottom:8px;color:#fff;font:12px monospace;z-index:99;text-shadow:0 1px 2px #000' }) : null;
+  function frame() {
+    const dt = engine.tick();
+    if (G.mode === 'village') day.update(dt);
+    handleInput(dt);
+    G.actions.tickRegen(dt);
+    player.update(dt);
+    shadow.update(dt);
+    skills.update(dt, skillInput);
+    G.combat.update(dt);
+    if (G.mode === 'village') for (const n of npcs) n.update(dt);
+    // camera follows with a little look-ahead
+    const lead = new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing)).multiplyScalar(Math.min(1, player.anim.speed / 4) * 1.2);
+    rig.focus.set(player.pos.x + lead.x, player.pos.y + 0.6, player.pos.z + lead.z);
+    rig.update(dt);
+    updateOcclusion();
+    if (G.mode === 'village') {
+      village.updateSun(rig.target, day.sunDir);
+      village.lightPool.update(dt, rig.target, engine.time, day.night);
+      village.update(dt, engine.time);
+      ambient.update(dt, engine.time);
+    } else {
+      dungeon.update(dt, engine.time);
+      G.world.updateSun(rig.target);
+      G.world.lightPool.update(dt, rig.target, engine.time, 1);
+    }
+    G.vfx.update(dt);
+    G.ui?.update?.(dt);
+    engine.render();
+    Input.endFrame();
+    if (fpsEl) { fpsAcc += dt; fpsN++; if (fpsAcc > 0.5) { fpsEl.textContent = `${Math.round(fpsN / fpsAcc)} fps`; fpsAcc = 0; fpsN = 0; } }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  if (P.has('floor')) setTimeout(() => G.enterDungeon(+P.get('floor')), 100);
+  setTimeout(() => { window.__ready = true; }, P.has('floor') ? 2500 : 400);
+}
+
+function loadSave() {
+  try { const s = localStorage.getItem('chewy3d.save'); if (!s) return null; const st = JSON.parse(s); return st?.version ? st : null; } catch { return null; }
 }

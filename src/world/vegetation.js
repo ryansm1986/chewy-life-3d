@@ -286,13 +286,13 @@ export class Vegetation {
       if (kind) tryTree(kind, x, z, kind === 'sakura' ? 2.8 : 2.3);
     }
     this.extraTrees?.(tryTree);
-    const barkMat = makeToon({ vertexColors: true, wind: 'tree', brush: 0.3, brushScale: 1.2, rim: 0.2 });
+    const barkMat = makeToon({ vertexColors: true, wind: 'tree', brush: 0.3, brushScale: 1.2, rim: 0.2, occluder: true });
     for (const kind of Object.keys(treeSpots)) {
       const spots = treeSpots[kind]; if (!spots.length) continue;
       const S = TREE_SPECIES[kind];
       const variants = [0, 1, 2].map(v => { const t = buildTree(kind, v + 1); return [t.trunkGeo, t.foliage, t.cardGeo]; });
-      const folMat = makeToon({ vertexColors: true, wind: 'leaf', brush: 0.22, brushScale: 0.8, rim: 0.55, shadowSat: 0.5, term: [-0.15, 0.4] });
-      const cardMat = makeToon({ noShadowCast: true, vertexColors: true, wind: 'leaf', map: leafCardTexture(S.leaf), alphaTest: 0.42, side: THREE.DoubleSide, noFlip: true, brush: 0.12, rim: 0.55, shadowSat: 0.5, term: [-0.15, 0.4] });
+      const folMat = makeToon({ occluder: true, vertexColors: true, wind: 'leaf', brush: 0.22, brushScale: 0.8, rim: 0.55, shadowSat: 0.5, term: [-0.15, 0.4] });
+      const cardMat = makeToon({ occluder: true, noShadowCast: true, vertexColors: true, wind: 'leaf', map: leafCardTexture(S.leaf), alphaTest: 0.42, side: THREE.DoubleSide, noFlip: true, brush: 0.12, rim: 0.55, shadowSat: 0.5, term: [-0.15, 0.4] });
       const pl = spots.map(sp => ({ x: sp.x, z: sp.z, y: H(sp.x, sp.z), rot: rnd() * TAU, s: 0.85 + rnd() * 0.4, v: Math.floor(rnd() * 3), hue: [0.92 + rnd() * 0.16, 0.92 + rnd() * 0.12, 0.92 + rnd() * 0.12] }));
       this._instanced(variants, [barkMat, folMat, cardMat], pl, { kind, collide: S.radius });
       this.treeSpots = treeSpots;
@@ -304,7 +304,7 @@ export class Vegetation {
       if (okGround(x, z, 0.8) && farFromTrees(x, z, 1.1)) { bambooPl.push({ x, z, y: H(x, z), rot: rnd() * TAU, s: 0.9 + rnd() * 0.3, v: Math.floor(rnd() * 3) }); taken.push([x, z, 1.1]); }
     }
     const bv = [0, 1, 2].map(v => { const b = buildBamboo(v); return [b.stalks, b.leaves]; });
-    this._instanced(bv, [makeToon({ vertexColors: true, wind: 'reed', windAmt: 0.6, brush: 0.15, rim: 0.4 }), makeToon({ vertexColors: true, wind: 'reed', windAmt: 0.6, map: leafCardTexture('bamboo'), alphaTest: 0.4, side: THREE.DoubleSide, noFlip: true, rim: 0.5 })], bambooPl, { kind: 'bamboo', collide: 0.6 });
+    this._instanced(bv, [makeToon({ occluder: true, vertexColors: true, wind: 'reed', windAmt: 0.6, brush: 0.15, rim: 0.4 }), makeToon({ occluder: true, vertexColors: true, wind: 'reed', windAmt: 0.6, map: leafCardTexture('bamboo'), alphaTest: 0.4, side: THREE.DoubleSide, noFlip: true, rim: 0.5 })], bambooPl, { kind: 'bamboo', collide: 0.6 });
     // ---- bushes
     const bushPl = { hydrangea: [], azalea: [], box: [] };
     for (let i = 0; i < 1400; i++) {

@@ -6,6 +6,7 @@ import { LightPool } from '../core/engine.js';
 import { U } from '../gfx/materials.js';
 import { Vegetation } from './vegetation.js';
 import { applyLayout, reservedAt, distToPaths, LANDMARKS } from './layout.js';
+import { Collision } from './collision.js';
 
 export class VillageWorld {
   constructor(engine) {
@@ -36,8 +37,23 @@ export class VillageWorld {
     this.veg.build((x, z) => !reservedAt(x, z) && distToPaths(x, z) > 0.5, engine.quality);
     scene.add(this.veg.group);
     this._snap = new THREE.Vector3();
+    // collision: vegetation trunks/rocks + terrain (deep water, cliffs, map edge)
+    this.collision = new Collision(4);
+    for (const c of this.veg.colliders) c.ref = this.collision.addCircle(c.x, c.z, c.r);
+    this.decks = []; // walkable platforms over water (bridges): {x0,z0,x1,z1,h:(x,z)=>y}
+    this.collision.blockFn = (x, z) => !this.walkable(x, z);
+    this.interactables = [];
+    this.landmarks = LANDMARKS;
   }
-  heightAt(x, z) { return this.terrain.heightAt(x, z); }
+  deckAt(x, z) { for (const d of this.decks) if (x > d.x0 && x < d.x1 && z > d.z0 && z < d.z1) return d; return null; }
+  heightAt(x, z) { const d = this.deckAt(x, z); if (d) return d.h(x, z); return Math.max(this.terrain.heightAt(x, z), -0.35); }
+  walkable(x, z) {
+    if (x < 2 || z < 2 || x > WORLD - 2 || z > WORLD - 2) return false;
+    if (this.deckAt(x, z)) return true;
+    const h = this.terrain.heightAt(x, z);
+    return h > -0.22 && this.terrain.slopeAt(x, z) < 0.5;
+  }
+  onVegRemoved(rec) { if (rec.col?.ref) this.collision.remove(rec.col.ref); }
   nearPath(x, z, d) { return distToPaths(x, z) < d; }
   onSky(o, day) {
     U.uSunDir.value.copy(day.sunDir);
