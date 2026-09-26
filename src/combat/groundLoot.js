@@ -125,10 +125,10 @@ export class GroundLoot {
         if (!P || G.playerDead) continue;
         const d = dist(P.pos.x, P.pos.z, e.to.x, e.to.z);
         const auto = e.d.type !== 'item' && e.d.type !== 'gem';
-        if (auto && d < 2.2) { // magnet
+        if (auto && d < 2.2 && !(e.refusedUntil > e.t)) { // magnet (pauses after a refused pickup, e.g. full belt)
           e.to.lerp(P.pos, Math.min(1, dt * 8));
-          if (d < 0.5) this.tryPickup(e);
-        } else if (!auto && d < 0.6 && !e.triedAuto) { e.triedAuto = true; if (!this.tryPickup(e)) e.triedAuto = true; }
+          if (d < 0.5 && !this.tryPickup(e)) { e.refusedUntil = e.t + 4; e.refusedPos = P.pos.clone(); }
+        } else if (e.refusedUntil > e.t && e.refusedPos && P.pos.distanceTo(e.refusedPos) > 2.5) e.refusedUntil = 0; else if (!auto && d < 0.6 && !e.triedAuto) { e.triedAuto = true; if (!this.tryPickup(e)) e.triedAuto = true; }
         else if (d > 1.2) e.triedAuto = false;
         if (P.pendingLoot === e && d < 1.3) { P.pendingLoot = null; this.tryPickup(e, true); }
       }

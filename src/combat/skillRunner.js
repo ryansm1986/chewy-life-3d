@@ -25,7 +25,14 @@ export class SkillRunner {
     if (P.anim.busy() && id !== 'whirl') { this.queued = { id, aim: aim.clone(), target, t: 0.25 }; return false; }
     const def = getSkill(id); if (!def) return false;
     // auto-swap to the right weapon for weapon skills
-    if (def.wep && G.derived.weaponType !== def.wep) { G.actions.swapWeapons(); this.syncWeapon(); Events.emit('sfx', 'ui_equip'); }
+    if (def.wep && G.derived.weaponType !== def.wep) {
+      const alt = G.state.equipment.weaponAlt;
+      if (alt && alt.wtype === def.wep) { G.actions.swapWeapons(); this.syncWeapon(); Events.emit('sfx', 'ui_equip'); }
+      else {
+        if (!this._noWepT || G.engine.time - this._noWepT > 1.5) { this._noWepT = G.engine.time; G.ui?.float?.(P.pos.clone().setY(1.6), def.wep === 'ball' ? 'No ball equipped!' : 'No bone sword equipped!', { kind: 'status', color: '#9fd0ff' }); Events.emit('sfx', 'ui_error'); }
+        return false;
+      }
+    }
     const u = usable(id, G.state, G.derived);
     if (!u.ok) { if (!this._warnT || G.engine.time - this._warnT > 1) { this._warnT = G.engine.time; G.ui?.float?.(P.pos.clone().setY(1.6), u.why, { kind: 'status', color: '#9fd0ff' }); Events.emit('sfx', 'ui_error'); } return false; }
     if ((this.cds[id] || 0) > 0) return false;

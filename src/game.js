@@ -16,6 +16,7 @@ import { Ambient } from './gfx/ambient.js';
 import { Combat } from './combat/combat.js';
 import { SkillRunner } from './combat/skillRunner.js';
 import { DungeonMode } from './dungeon/dungeonMode.js';
+import { GroundLoot } from './combat/groundLoot.js';
 import { newGameState, createActions } from './rpg/actions.js';
 import { skillRuntime } from './rpg/skills.js';
 import { disposeScene } from './gfx/dispose.js';
@@ -58,6 +59,8 @@ export async function boot() {
   setTimeout(() => vVfx.prewarm(engine.renderer, engine.camera), 200);
   const waterfall = new Waterfall(village, vVfx, { x: village.landmarks.waterfall.x });
   const vCombat = new Combat(G, village);
+  const vLoot = new GroundLoot(G, village);
+  G.villageLoot = vLoot;
   const sim = G.sim = new VillageSim(G, village);
   G.village = { world: village, vfx: vVfx, ambient, combat: vCombat }; // before init: buildings register chimney smoke with the ambient
   sim.init();
@@ -161,6 +164,14 @@ export async function boot() {
   Events.on('emote', ({ actor, kind }) => G.vfx.emote(actor, kind));
   Events.on('player:levelup', ({ lvl }) => { G.vfx.levelUp(player.pos.clone()); G.ui?.banner?.('Level Up!', `Chewy is now level ${lvl}`, { style: 'levelup' }); G.audio?.play?.('ui_levelup'); G.actions.restoreAll(); shadow.recalc(); });
   Events.on('player:dead', () => onPlayerDeath());
+  Events.on('item:drop', ({ item }) => {
+    if (!item) return;
+    const loot = G.mode === 'dungeon' ? G.dungeon?.loot : vLoot;
+    const p = player.pos.clone();
+    loot?.drop(p, [item.kind === 'gem' ? { type: 'gem', item } : { type: 'item', item }]);
+    // don't instantly re-grab what we just dropped
+    setTimeout(() => { for (const e of loot?.list || []) if (e.d.item === item) e.triedAuto = true; }, 700);
+  });
   Events.on('equip:changed', () => player.setWeapon(G.derived.weaponType || 'sword'));
   Events.on('stats:changed', () => shadow.recalc());
   G.audio?.music?.('village_day'); G.audio?.ambience?.('village');
@@ -498,6 +509,7 @@ export async function boot() {
       ambient.update(dt, engine.time);
       if (player.pos.z < 40) waterfall.update(dt, engine.time, day);
       villageAmbience(dt);
+      vLoot.update(dt);
       updateMarkers(rdt);
     } else {
       dungeon.update(dt, engine.time);
