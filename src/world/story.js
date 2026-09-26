@@ -142,6 +142,30 @@ export class Story {
     }
     return null;
   }
+  // where the current objective is, for the on-screen quest pointer → { pos, label, kind } | null
+  target() {
+    const G = this.G, st = G.state;
+    const act = this.Q.active.filter(q => this.def(q.id));
+    const order = [...act.filter(q => !this.def(q.id).request), ...act.filter(q => this.def(q.id).request)];
+    const npcPos = id => { const n = G.npcs?.find(x => x.id === id && x.visible); return n ? { pos: n.pos, label: n.name, kind: 'npc' } : null; };
+    for (const q of order) {
+      const d = this.def(q.id), s = d.steps[q.step]; if (!s) continue;
+      if (s.type === 'talk') { const t = npcPos(s.npc); if (t) return t; continue; }
+      if (s.type === 'deliver') { if ((st.materials[s.mat] || 0) >= s.n) { const t = npcPos(s.npc); if (t) return t; } continue; }
+      const burrowStep = ['kill', 'floor', 'boss'].includes(s.type) || (s.type === 'collect' && s.mat === 'mochi');
+      if (burrowStep) {
+        if (G.mode === 'village') {
+          const gate = G.sim?.list.find(r => r.data.type === 'dungeonGate');
+          if (gate) return { pos: gate.door, label: 'The Burrow', kind: 'place' };
+        } else if (G.mode === 'dungeon' && (s.type === 'floor' || s.type === 'boss') && G.dungeon) {
+          if (s.type === 'boss' && G.dungeon.boss?.alive) return { pos: G.dungeon.boss.pos, label: G.dungeon.boss.name, kind: 'place' };
+          if (G.dungeon.stairsPos) return { pos: G.dungeon.stairsPos, label: 'Stairs down', kind: 'place' };
+        }
+        continue;
+      }
+    }
+    return null;
+  }
   // quest objects for the UI tracker / journal
   uiList() {
     const G = this.G, st = G.state;

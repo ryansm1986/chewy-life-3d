@@ -232,16 +232,8 @@ export async function boot() {
       G.audio?.music?.(dungeon.layout.boss ? 'boss' : 'dungeon'); G.audio?.ambience?.('dungeon');
       Events.emit('mode:changed', { mode: 'dungeon', floor });
       save();
-      if (!G.state.flags.burrowTut && G.ui?.dialogue) {
-        G.state.flags.burrowTut = true;
-        const tutFor = dungeon;
-        setTimeout(async () => {
-          if (G.mode !== 'dungeon' || G.dungeon !== tutFor || G.playerDead || G.leavingDungeon) { G.state.flags.burrowTut = false; return; } // left already: show it next visit
-          player.controlLocked = true; G.tutorialOpen = true;
-          await G.ui.dialogue({ speaker: 'Shadow', portrait: G.portrait('shadow'), lines: ["*Sniff sniff!* Yip! (Monsters ahead! Here's how we fight, Chewy!)", '*Click a monster* to bonk it with your Bone Sword. *Right-click* uses Chomp Slash!', "Press *X* to swap to your Red Tennis Ball, *Space* to roll away, and *Q* for a Heart Treat when you're hurt.", 'Spend skill points with *K* and stat points with *C*. Find the *stairs* to go deeper — or step in the purple portal to go home!'] });
-          player.controlLocked = false; G.tutorialOpen = false;
-        }, 2600);
-      }
+      // first visit: one short, non-blocking tip from Shadow; the rest arrive when they become useful (see hints())
+      if (!G.state.flags.burrowTut) { G.state.flags.burrowTut = true; setTimeout(() => G.mode === 'dungeon' && hint('fight', '*Yip!* Click a monster to bonk it — right-click for Chomp Slash!'), 1800); }
     };
     if (G.ui?.transition) G.ui.transition(go); else go();
   };
@@ -296,6 +288,7 @@ export async function boot() {
   // ---- interaction helpers
   G.story = new Story(G);
   G.ui?.setQuestProvider?.(() => G.story.uiList());
+  G.questTarget = () => (G.titleActive || G.playerDead ? null : G.story.target());
   installServices(G);
   const vMap = new VillageMinimap(G);
   Events.on('village:changed', () => { vMap.dirty = true; });
@@ -423,6 +416,32 @@ export async function boot() {
     if (!player.anim.busy() && !player.leap && !player.dash && !skills.channel) player.anim.play('drink'); // never interrupt an attack or leap
     G.audio?.play?.('potion_drink');
     if (key === 'zoom') G.vfx.sparkle(player.pos.clone().setY(0.8), { n: 12, color: '#8fc8ff' }); else G.vfx.heal(player.pos.clone());
+  }
+
+  // ---- contextual hints: one-line tips from Shadow, each shown once, never blocking play
+  const H = () => (G.state.flags.hints ||= {});
+  function hint(id, text) {
+    if (H()[id] || !G.ui?.toast) return;
+    H()[id] = true;
+    G.ui.toast(text.replace(/\*/g, ''), { color: '#9fd0ff', iconURL: G.portrait('shadow'), duration: 7, sub: 'Shadow' });
+    G.audio?.play?.('bark_small', { vol: 0.5 });
+  }
+  G.hint = hint;
+  let hintT = 0;
+  function hints(dt) {
+    hintT -= dt; if (hintT > 0 || G.playerDead) return; hintT = 0.5;
+    if (G.ui?.dlg?.active) return;
+    const D = G.derived, st = G.state;
+    if (G.mode === 'dungeon' && G.dungeon) {
+      if (G.actions.life() < D.lifeMax * 0.5 && st.potions.heart > 0) hint('potion', 'Ouch! Press Q to munch a Heart Treat.');
+      if (st.player.skillPts > 0 && st.player.lvl >= 2) hint('skills', 'You have a skill point! Press K to learn something new.');
+      if (st.player.statPts > 0 && st.player.lvl >= 2 && H().skills) hint('stats', 'Stat points too! Press C to get stronger.');
+      const sp = G.dungeon.stairsPos; if (sp && sp.distanceTo(player.pos) < 7) hint('stairs', 'Stairs! Press F to burrow deeper.');
+      if (G.dungeon.monsters.some(m => m.alive && m.aggro && m.def.attack?.type === 'ranged' && m.pos.distanceTo(player.pos) < 9)) hint('ball', 'They throw things! Press X to swap to your tennis ball — Space to roll away.');
+      if ((G.dungeon.loot?.list || []).some(e => e.d.type === 'item' && e.to.distanceTo(player.pos) < 5)) hint('loot', 'Shiny! Walk over loot to grab it. Press I to see your bag.');
+    } else if (G.mode === 'village' && !G.titleActive) {
+      if (st.quests.done.includes('burrow1') && !G.buildMode) hint('build', 'Press B to plan the village — paint zones and friends will build there!');
+    }
   }
 
   // ---- save / load
@@ -555,6 +574,7 @@ export async function boot() {
     }
     G.vfx.update(dt);
     syncBuffs();
+    hints(rdt);
     G.audio?.update?.(dt, { pos: player.pos, camera: engine.camera });
     G.ui?.update?.(rdt);
     engine.render();
