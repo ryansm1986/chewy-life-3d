@@ -356,14 +356,20 @@ export const MONSTERS = {
   // bosses
   mochiKing: { name: 'King Mochi the Squishy', build: 'mochi', boss: true, scale: 3.0, radius: 1.3, vr: 1.3, speed: 1.8, life: 1, dmg: 1.2, move: 'bounce', attack: { type: 'slam', range: 3.5, radius: 4.2, cd: 3.4, windup: 1.0 }, variants: [{ color: '#ffe8f0', king: true }], summon: 'mochi' },
   kasaLord: { name: 'Lord Karakasa', build: 'kasa', boss: true, scale: 2.6, radius: 1.1, vr: 1.7, speed: 2.2, life: 1, dmg: 1.3, move: 'hop', attack: { type: 'spin', range: 3, radius: 3.4, cd: 3.0, windup: 0.7 }, variants: [{ color: '#c8364a', lord: true }], summon: 'kasa' },
-  oniChef: { name: 'Oni Chef Gorobei', build: 'oniChef', boss: true, scale: 2.4, radius: 1.1, vr: 1.25, speed: 2.0, life: 1, dmg: 1.4, move: 'waddle', element: 'fire', attack: { type: 'barrage', range: 9, cd: 3.0, windup: 0.8, proj: 'firepot', speed: 8 }, variants: [{ color: '#ff5a4a' }], summon: 'lantern' },
-  nineTails: { name: 'Tamamo, the Nine-Tailed', build: 'tamamo', boss: true, scale: 2.5, radius: 0.9, vr: 1.15, light: '#9ac4ff', speed: 3.2, life: 1, dmg: 1.5, move: 'walk', element: 'zap', attack: { type: 'barrage', range: 10, cd: 2.4, windup: 0.6, proj: 'foxfire', speed: 10 }, variants: [{ color: '#fff4ea' }], summon: 'wisp' },
+  oniChef: { name: 'Oni Chef Gorobei', build: 'oniChef', boss: true, scale: 2.4, radius: 1.1, vr: 1.25, speed: 2.0, life: 0.75, dmg: 1.4, move: 'waddle', element: 'fire', noKite: true, attack: { type: 'barrage', range: 9, cd: 3.0, windup: 0.8, proj: 'firepot', speed: 8, n: 5, nEnraged: 7, spread: 2.8, blast: 1.6, dmgMul: 0.6, rest: 1.3 }, variants: [{ color: '#ff5a4a' }], summon: 'lantern', summonN: [3, 3] },
+  nineTails: { name: 'Tamamo, the Nine-Tailed', build: 'tamamo', boss: true, scale: 2.5, radius: 0.9, vr: 1.15, light: '#9ac4ff', speed: 1.9, life: 1, dmg: 1.5, move: 'walk', element: 'zap', pattern: 'kitsune', attack: { type: 'barrage', range: 10, cd: 2.4, windup: 0.8, proj: 'foxfire', speed: 9, homing: 0.8, n: 5, nEnraged: 7, dmgMul: 0.5 }, variants: [{ color: '#fff4ea' }], summon: 'wisp', summonN: [2, 3] },
 };
 
 // Procedural motion for monster models
 export class MonsterAnim {
-  constructor(model, def) { this.m = model; this.def = def; this.t = rand(0, 10); this.flash = 0; this.flashC = new THREE.Color('#ffffff'); this.lunge = 0; this.wind = 0; this.spin = 0; this.deathT = -1; this.rig = model.rig; }
-  hit(c = '#ffffff') { this.flash = 1; this.flashC.set(c); }
+  constructor(model, def) { this.m = model; this.def = def; this.t = rand(0, 10); this.flash = 0; this.flashC = new THREE.Color('#ffffff'); this.flashAmp = 0.9; this.flashRate = 6; this.lastFlash = -9; this.lunge = 0; this.wind = 0; this.spin = 0; this.deathT = -1; this.rig = model.rig; }
+  // hit flash. Small monsters pop white (0.9, ~170 ms); bosses / elites pass {amp, dur, gap}: a gentle tint that stays under
+  // the bloom threshold, short, and rate-limited so a stream of hits flickers instead of holding the body lit.
+  hit(c = '#ffffff', { amp = 0.9, dur = 1 / 6, gap = 0 } = {}) {
+    if (gap && this.t - this.lastFlash < gap) return false;
+    this.lastFlash = this.t; this.flash = 1; this.flashC.set(c); this.flashAmp = amp; this.flashRate = 1 / dur;
+    return true;
+  }
   update(dt, moving, speed) {
     this.t += dt; const t = this.t, p = this.m.pivot, s = this.def.scale || 1;
     let y = 0, sx = 1, sy = 1, rz = 0, rx = 0;
@@ -387,8 +393,8 @@ export class MonsterAnim {
     } else {
       p.position.y = y; p.scale.set(sx * s, sy * s, sx * s); p.rotation.z = rz; p.rotation.x = rx;
     }
-    if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 6);
-    this.m.mat.emissive.copy(this.flashC).multiplyScalar(this.flash * 0.9);
+    if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * this.flashRate);
+    this.m.mat.emissive.copy(this.flashC).multiplyScalar(this.flash * this.flashAmp);
   }
 }
 

@@ -4,9 +4,14 @@ import { skillRuntime, usable, getSkill } from '../rpg/skills.js';
 import { Events } from '../core/events.js';
 import { rand, TAU, clamp, dist, angleDiff } from '../core/util.js';
 import { SpiritPup, Decoy } from './allies.js';
+import { ringTexture } from '../gfx/textures.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const ELEM_COL = { phys: '#fffaf0', fire: '#ffae5a', frost: '#9fe0ff', zap: '#fff27a', stink: '#b8e880', holy: '#fff0b0' };
+// Melee reach assist: a swing aimed at a monster that is just out of reach (≤ LUNGE) commits with a quick, collision-safe
+// lunge that tracks the target through the wind-up; one that is further away walks up first and swings on arrival.
+const LUNGE = 1.2, LUNGE_SPEED = 10;
+const _d = new THREE.Vector3();
 
 export class SkillRunner {
   constructor(G) {
@@ -38,30 +43,145 @@ export class SkillRunner {
     if ((this.cds[id] || 0) > 0) return false;
     if (id === 'whirl' && this.channel?.id === 'whirl') return true;
     const R = this.rt(id); if (!R) return false;
+    // melee: never swing at thin air when a monster was clicked — walk up (too far) or lunge (just out of reach)
+    let melee = null;
+    if (this.isMelee(id, R)) {
+      if (!target || !target.alive || target.team !== 'enemy') target = this.softTarget(R, aim);
+      if (target) {
+        const reach = this.reach(R, target), d = dist(target.pos.x, target.pos.z, P.pos.x, P.pos.z);
+        if (d > reach + LUNGE && !target.breakable) { this.approachTo(id, target); return false; }
+        melee = { target, reach, budget: LUNGE, cost: def.kind !== 'channel' ? R.cost : 0 };
+        aim = target.pos;
+      }
+    }
     if (def.kind !== 'channel' && R.cost > 0 && !G.actions.spendZoom(R.cost)) return false;
     this.cds[id] = R.cd;
-    P.moveTarget = null;
+    P.moveTarget = null; this.approach = null;
     P.faceTarget = Math.atan2(aim.x - P.pos.x, aim.z - P.pos.z); P.facing = P.faceTarget;
+    this.melee = melee;
     const fn = this[`cast_${id}`] || this.castGeneric;
     fn.call(this, R, aim.clone(), target);
     G.state.player.lastCast = id;
     return true;
   }
+  // ---------------------------------------------------------------- melee reach assist
+  isMelee(id, R) { return id === 'chomp' || (id === 'attack' && !R.params?.projectile); }
+  // centre-to-centre distance at which the swing's arc (radius + body) still lands with a little margin
+  reach(R, target) { return (R.params?.radius || 1.8) + (target?.radius || 0.3) - 0.15; }
+  // no monster under the cursor: a monster within lunge reach roughly where Chewy is aiming
+  softTarget(R, aim) {
+    const P = this.G.player, fa = Math.atan2(aim.x - P.pos.x, aim.z - P.pos.z);
+    let best = null, bs = 1e9;
+    // the cursor's ground point is right on a monster (the screen pick just missed it): that's the one
+    for (const e of this.combat.entities) {
+      if (!e.alive || e.team !== 'enemy' || e.breakable) continue;
+      const d = dist(e.pos.x, e.pos.z, aim.x, aim.z);
+      if (d < (e.bodyR || e.radius || 0.3) + 0.5 && d < bs) { bs = d; best = e; }
+    }
+    if (best) return best;
+    bs = 1e9;
+    for (const e of this.combat.entities) {
+      if (!e.alive || e.team !== 'enemy' || e.breakable) continue;
+      const d = dist(e.pos.x, e.pos.z, P.pos.x, P.pos.z);
+      if (d > this.reach(R, e) + LUNGE) continue;
+      const off = Math.abs(angleDiff(fa, Math.atan2(e.pos.x - P.pos.x, e.pos.z - P.pos.z)));
+      if (off > 0.9 && d > (e.radius || 0.3) + 0.8) continue;
+      const s = d + off * 2;
+      if (s < bs) { bs = s; best = e; }
+    }
+    return best;
+  }
+  // D2-style: clicked a monster out of reach → walk up to it and swing once in range (cancelled by any other move order)
+  approachTo(id, target) {
+    const P = this.G.player;
+    const a = this.approach && this.approach.target === target && this.approach.id === id ? this.approach : (this.approach = { id, target, mt: new THREE.Vector3() });
+    a.t = 3;
+    a.mt.copy(target.pos); P.moveTarget = a.mt; P.interactTarget = null;
+  }
+  updateApproach(dt) {
+    const a = this.approach, G = this.G, P = G.player;
+    if (!a) return;
+    a.t -= dt;
+    if (!a.target.alive || a.t <= 0 || G.playerDead || P.moveTarget !== a.mt) { if (P.moveTarget === a.mt) P.moveTarget = null; this.approach = null; return; }
+    const R = this.rt(a.id);
+    if (!R) { this.approach = null; return; }
+    const d = dist(a.target.pos.x, a.target.pos.z, P.pos.x, P.pos.z);
+    if (d <= this.reach(R, a.target) + LUNGE * 0.5) {
+      if (P.anim.busy()) return;
+      this.approach = null; P.moveTarget = null;
+      this.tryCast(a.id, a.target.pos.clone(), a.target);
+    } else a.mt.copy(a.target.pos); // follow a moving target
+  }
+  // during the wind-up: turn to the target and lunge (≤ LUNGE total, quick, collision-safe) if it drifted out of reach
+  updateMelee(dt) {
+    const m = this.melee, G = this.G, P = G.player;
+    if (!m) return;
+    const act = P.anim.action?.name;
+    if (!m.target.alive || G.playerDead || P.leap || P.dash || !(act === 'swing' || act === 'swing2')) { this.melee = null; return; }
+    const t = m.target, dx = t.pos.x - P.pos.x, dz = t.pos.z - P.pos.z, d = Math.hypot(dx, dz);
+    if (d < 1e-3) return;
+    P.faceTarget = Math.atan2(dx, dz); P.facing = P.faceTarget;
+    // the target blinked / was flung out of reach mid-wind-up: pull the swing instead of slashing thin air (zoom refunded)
+    if (d > m.reach + m.budget + 0.35) { P.anim.stop(act); this.melee = null; if (m.cost) G.actions.restoreZoom?.(m.cost); return; }
+    const want = d - (m.reach - 0.3);
+    if (want <= 0 || m.budget <= 0) return;
+    const step = Math.min(want, m.budget, LUNGE_SPEED * dt);
+    const before = P.pos.clone();
+    P.pos.x += dx / d * step; P.pos.z += dz / d * step;
+    G.world.collision?.resolve(P.pos, P.radius, before);
+    P.pos.y = G.world.heightAt(P.pos.x, P.pos.z);
+    const moved = Math.hypot(P.pos.x - before.x, P.pos.z - before.z);
+    m.budget = moved < step * 0.3 ? 0 : m.budget - moved; // blocked by a wall: stop lunging
+    if (moved > 0.02 && Math.random() < 0.5) G.vfx.dust(P.pos, { n: 1 });
+  }
+  // at the hit frame: if the aimed-at monster slipped just out of reach (a hop, a knockback), close the gap with what's
+  // left of the lunge budget so the blow still connects
+  snapIn(target, radius) {
+    const m = this.melee, G = this.G, P = G.player;
+    if (!m || !target || m.target !== target || !target.alive) return;
+    const dx = target.pos.x - P.pos.x, dz = target.pos.z - P.pos.z, d = Math.hypot(dx, dz);
+    if (d < 1e-3) return;
+    P.faceTarget = P.facing = Math.atan2(dx, dz);
+    const step = Math.min(d - (radius + (target.radius || 0.3) - 0.25), m.budget);
+    if (step <= 0.02) return;
+    const before = P.pos.clone();
+    P.pos.x += dx / d * step; P.pos.z += dz / d * step;
+    G.world.collision?.resolve(P.pos, P.radius, before);
+    P.pos.y = G.world.heightAt(P.pos.x, P.pos.z);
+    m.budget = 0;
+  }
+  // big bodies (bosses) aren't pushed by Chewy and don't push him: keep him from ending up inside one
+  keepOutOfBigBodies() {
+    const G = this.G, P = G.player;
+    if (P.leap || G.mode !== 'dungeon') return;
+    for (const e of this.combat.entities) {
+      if (!e.alive || e.team !== 'enemy' || !e.def?.boss) continue;
+      const mn = (e.bodyR || e.radius) + 0.36, dx = P.pos.x - e.pos.x, dz = P.pos.z - e.pos.z, d2 = dx * dx + dz * dz;
+      if (d2 >= mn * mn) continue;
+      const d = Math.sqrt(d2) || 1e-3, before = P.pos.clone(), k = Math.min(mn - d, 0.25);
+      P.pos.x += (d2 > 1e-6 ? dx / d : 1) * k; P.pos.z += (d2 > 1e-6 ? dz / d : 0) * k;
+      G.world.collision?.resolve(P.pos, P.radius, before);
+    }
+  }
   syncWeapon() { this.G.player.setWeapon(this.G.derived.weaponType || 'sword'); }
   animSpeed(base = 0.46) { return this.attacksPerSec() * base; }
   // ---------------------------------------------------------------- hit helpers
-  arcHit(origin, facing, radius, arcDeg, fn) {
+  // primary: the monster the swing was aimed at — it's hit if it's anywhere within reach (+ a little forgiveness),
+  // even if it slid out of the arc during the wind-up
+  arcHit(origin, facing, radius, arcDeg, fn, primary = null) {
     const half = (arcDeg * Math.PI / 180) / 2;
+    let got = false;
     this.combat.inRadius(origin.x, origin.z, radius, 'ally', (e, d) => {
       const a = Math.atan2(e.pos.x - origin.x, e.pos.z - origin.z);
-      if (d < 0.8 || Math.abs(angleDiff(facing, a)) <= half + 0.15) fn(e, d);
+      if (d < 0.8 || Math.abs(angleDiff(facing, a)) <= half + 0.15) { if (e === primary) got = true; fn(e, d); }
     });
+    if (primary && !got && primary.alive && dist(primary.pos.x, primary.pos.z, origin.x, origin.z) < radius + (primary.radius || 0.3) + 0.35) fn(primary, 0);
   }
   nova(center, radius, fn) { this.combat.inRadius(center.x, center.z, radius, 'ally', fn); }
   forward() { const P = this.G.player; return new THREE.Vector3(Math.sin(P.facing), 0, Math.cos(P.facing)); }
   handPos() { const P = this.G.player; return P.pos.clone().add(this.forward().multiplyScalar(0.4)).setY(P.pos.y + 0.75); }
   // ---------------------------------------------------------------- basic attack
-  cast_attack(R, aim) {
+  cast_attack(R, aim, target) {
     const G = this.G, P = G.player, p = R.params;
     if (p.projectile) {
       P.anim.play('throw', { speed: this.animSpeed(0.5), onEvent: ev => { if (ev === 'release') this.throwBall({ dmgPct: p.dmgPct, speed: p.speed, range: p.range, pierce: p.pierce, returns: true }, aim); } });
@@ -70,12 +190,14 @@ export class SkillRunner {
     const alt = (this.combo++ % 2) === 1;
     P.anim.play(alt ? 'swing2' : 'swing', { speed: this.animSpeed(0.46), onEvent: ev => {
       if (ev !== 'hit') return;
+      this.snapIn(target, p.radius);
       const f = P.facing;
       G.vfx.slash(P.pos, f, { arc: 2.1, r: p.radius * 0.95, reverse: alt, color: '#fffaf0', life: 0.2 });
       Events.emit('sfx', 'swing');
       let hit = 0;
-      this.arcHit(P.pos, f, p.radius, p.arc, (e) => { this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: p.knockback, from: P.pos }); hit++; });
+      this.arcHit(P.pos, f, p.radius, p.arc, (e) => { this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: p.knockback, from: P.pos }); hit++; }, target);
       if (hit) G.engine.rig.shake(0.12);
+      this.melee = null;
     } });
   }
   throwBall(o, aim, kind = 'ball') {
@@ -91,17 +213,19 @@ export class SkillRunner {
     });
   }
   // ---------------------------------------------------------------- Bone Arts
-  cast_chomp(R, aim) {
+  cast_chomp(R, aim, target) {
     const G = this.G, P = G.player, p = R.params;
     P.anim.play('swing', { speed: this.animSpeed(0.5), onEvent: ev => {
       if (ev !== 'hit') return;
+      this.snapIn(target, p.radius);
       const f = P.facing, arc = p.arc * Math.PI / 180;
       G.vfx.slash(P.pos, f, { arc, r: p.radius * 1.1, width: 1.1, color: '#fff4d8', life: 0.3 });
       G.vfx.slash(P.pos, f, { arc: arc * 0.9, r: p.radius * 0.75, width: 0.7, color: '#ffd070', life: 0.24, reverse: true });
       G.vfx.decal(P.pos.clone().add(this.forward().multiplyScalar(p.radius * 0.5)), { r: p.radius * 0.8, color: '#ffe0a0', additive: true, opacity: 0.35, life: 0.5, grow: 0.4 });
       Events.emit('sfx', 'swing_heavy'); Events.emit('sfx', 'bark', { pitch: 0.8 });
-      this.arcHit(P.pos, f, p.radius, p.arc, e => this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: p.knockback, from: P.pos }));
+      this.arcHit(P.pos, f, p.radius, p.arc, e => this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: p.knockback, from: P.pos }), target);
       G.engine.rig.shake(0.25);
+      this.melee = null;
     } });
   }
   cast_whirl(R, aim) {
@@ -141,7 +265,7 @@ export class SkillRunner {
       const m = new THREE.Mesh(this.G.player.sword.geometry, this.G.player.rig.mat); m.scale.setScalar(0.9); m.castShadow = true;
       G.world.scene.add(m); bones.push({ m, a: i / p.count * TAU, hit: new Map() });
     }
-    const rune = G.vfx.decal(P.pos, { r: p.radius * 1.15, color: '#fff0c0', additive: true, opacity: 0.4, life: p.duration, spin: 1.5, tex: null });
+    const rune = G.vfx.decal(P.pos, { r: p.radius * 1.15, color: '#ffe6a8', additive: true, opacity: 0.5, life: p.duration, spin: 1.5, tex: ringTexture() });
     this.orbits.push({ bones, t: 0, p, rune });
     P.anim.play('cast'); Events.emit('sfx', 'buff');
     G.vfx.ring(P.pos, { color: '#fff4d8', r0: 0.3, r1: p.radius, life: 0.5 });
@@ -177,7 +301,7 @@ export class SkillRunner {
       const boom = (pos) => {
         G.vfx.fire(pos, 30, { spread: p.radius * 0.6, size: 0.85 }); G.vfx.ring(pos, { color: '#ff9a3c', r0: 0.2, r1: p.radius * 1.4, life: 0.45, opacity: 1 }); G.vfx.ring(pos, { color: '#ffe070', r0: 0.1, r1: p.radius * 0.9, life: 0.3 }); G.vfx.flash(pos.clone().setY(0.6), '#ff9a4a', 3.2, 0.24);
         G.vfx.decal(pos, { r: p.radius * 1.0, color: '#2a140c', opacity: 0.6, life: p.burnDuration + 1.5 });
-        G.vfx.decal(pos, { r: p.radius * 0.9, color: '#ff7a2a', additive: true, opacity: 0.45, life: p.burnDuration });
+        G.vfx.decal(pos, { r: p.radius * 0.9, color: '#ff7a2a', additive: true, opacity: 0.3, life: p.burnDuration });
         G.vfx.poof(pos.clone().setY(0.3), { color: '#6a4a44', n: 10, size: 0.8 });
         G.vfx.light(pos, '#ff8a3a', 16, 8, 0.4); G.engine.rig.shake(0.35); Events.emit('sfx', 'explosion_small'); Events.emit('sfx', 'fire_whoosh');
         this.nova(pos, p.radius, e => { const dmg = this.combat.hitMonster(e, { dmgPct: p.dmgPct, element: 'fire', from: pos, knock: 0.4 }); e.applyStatus?.('burn', p.burnDuration, dmg * p.burnPct / 100); });
@@ -306,7 +430,9 @@ export class SkillRunner {
   update(dt, input) {
     const G = this.G, P = G.player;
     for (const k in this.cds) if (this.cds[k] > 0) this.cds[k] = Math.max(0, this.cds[k] - dt);
-    if (this.queued) { this.queued.t -= dt; if (this.queued.t <= 0) this.queued = null; else if (!P.anim.busy()) { const q = this.queued; this.queued = null; this.tryCast(q.id, q.aim, q.target); } }
+    if (this.queued) { this.queued.t -= dt; if (this.queued.t <= 0) this.queued = null; else if (!P.anim.busy()) { const q = this.queued; this.queued = null; this.tryCast(q.id, q.target?.alive ? q.target.pos.clone() : q.aim, q.target); } }
+    this.updateApproach(dt);
+    this.updateMelee(dt);
     // channel (Tail Spin)
     if (this.channel && G.derived.weaponType !== 'sword') this.endChannel(); // Tail Spin needs the bone sword
     if (this.channel) {
@@ -356,9 +482,11 @@ export class SkillRunner {
     }
     for (const x of this.pups || []) x.update(dt);
     for (const x of this.decoys || []) x.update(dt);
+    this.keepOutOfBigBodies();
   }
   endChannel() { const P = this.G.player; this.channel = null; P.anim.stop('spin'); P.canMoveWhileActing = false; }
   clearAll() {
+    this.melee = null; this.approach = null;
     if (this.channel) this.endChannel();
     const P = this.G.player; if (P) { P.leap = null; P.dash = null; P.invuln = false; P.canMoveWhileActing = false; if (P.anim.action?.name === 'spin') P.anim.stop('spin'); }
     for (const o of this.orbits) for (const b of o.bones) b.m.parent?.remove(b.m);

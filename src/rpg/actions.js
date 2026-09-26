@@ -37,6 +37,7 @@ export function newGameState() {
       name: 'Chewy', lvl: 1, xp: 0, stats: { str: 10, dex: 10, vit: 12, ene: 8 }, statPts: 0, skillPts: 1,
       skills: { chomp: 1 }, hotbar: ['attack', 'chomp', null, null, null, null],
       life: null, zoom: null, activeWeapon: 0,
+      mouseSets: [['attack', 'chomp'], ['attack', null]], // per weapon set [LMB, RMB] (see swapWeapons)
     },
     coins: 350,
     materials: { wood: 45, stone: 30, petal: 10, crystal: 1, bone: 2, mochi: 0, silk: 1, lantern: 2 },
@@ -112,6 +113,7 @@ export function createActions(G) {
     emit('inv:changed', { c: 'inv' });
     emit('equip:changed', { slot, item: it, old: old || null });
     recompute();
+    if (slot === 'weapon' || slot === 'weaponAlt') refitSets();
     return true;
   }
   function unequip(slot) {
@@ -126,11 +128,58 @@ export function createActions(G) {
     recompute();
     return true;
   }
+  // ------------------------------------------------------------ weapon sets (D2 style)
+  // Each weapon set (0 = equipment.weapon, 1 = equipment.weaponAlt) remembers its own [LMB, RMB] skills in
+  // player.mouseSets. The active set's pair is always live in hotbar[0..1] (so input / HUD keep reading the hotbar);
+  // swapWeapons() files the live pair under the set being put away and brings the other set's pair in.
+  // Keys 1–4 (hotbar[2..5]) are shared by both sets.
+  const setWeaponType = i => (S().equipment[i ? 'weaponAlt' : 'weapon']?.wtype) || (i ? 'ball' : 'sword');
+  const fitsSet = (id, i) => !id || id === 'attack' || !SKILLS[id]?.wep || SKILLS[id].wep === setWeaponType(i);
+  const knows = id => S().player.skills[id] > 0 && SKILLS[id] && SKILLS[id].kind !== 'passive' && SKILLS[id].kind !== 'aura';
+  /** Best right-click skill for a weapon set: the weapon's most-trained spammable skill, else its other actives. */
+  function defaultRmb(i) {
+    const P = S().player, wt = setWeaponType(i);
+    const pref = wt === 'ball' ? ['throw', 'ricochet', 'multi', 'blaze', 'fetchstorm', 'decoy'] : ['chomp', 'dig', 'whirl', 'bonestorm'];
+    let best = null;
+    pref.forEach((id, k) => { if (!knows(id)) return; const sc = (P.skills[id] || 0) * 10 - k * (k < 4 ? 1 : 25); if (!best || sc > best.sc) best = { id, sc }; });
+    return best ? best.id : null;
+  }
+  function ensureMouseSets() {
+    const P = S().player;
+    const ok = s => Array.isArray(s) && s.length === 2;
+    if (Array.isArray(P.mouseSets) && P.mouseSets.length === 2 && P.mouseSets.every(ok)) return P.mouseSets;
+    // migrate an older save: the current pair stays on every set it suits; a set it doesn't suit gets sensible defaults
+    const cur = [P.hotbar[0] ?? 'attack', P.hotbar[1] ?? null];
+    P.mouseSets = [0, 1].map(i => (fitsSet(cur[0], i) && fitsSet(cur[1], i) ? [...cur] : ['attack', defaultRmb(i)]));
+    const live = P.mouseSets[P.activeWeapon === 1 ? 1 : 0];
+    P.hotbar[0] = live[0]; P.hotbar[1] = live[1];
+    return P.mouseSets;
+  }
+  /** A set whose weapon changed type (e.g. a ball equipped where the sword was) trades skills that no longer fit for defaults. */
+  function refitSets() {
+    const P = S().player, sets = ensureMouseSets(), act = P.activeWeapon === 1 ? 1 : 0;
+    let changed = false;
+    for (const i of [0, 1]) {
+      if (!S().equipment[i ? 'weaponAlt' : 'weapon']) continue; // bare paws: keep what was bound
+      const pair = i === act ? [P.hotbar[0] ?? null, P.hotbar[1] ?? null] : sets[i];
+      const next = [fitsSet(pair[0], i) ? pair[0] : 'attack', fitsSet(pair[1], i) ? pair[1] : defaultRmb(i)];
+      if (next[0] === pair[0] && next[1] === pair[1]) continue;
+      changed = true; sets[i] = next;
+      if (i === act) { P.hotbar[0] = next[0]; P.hotbar[1] = next[1]; }
+    }
+    if (changed) emit('hotbar:changed', { hotbar: P.hotbar });
+  }
+  const syncLiveSet = () => { const P = S().player, sets = ensureMouseSets(); sets[P.activeWeapon === 1 ? 1 : 0] = [P.hotbar[0] ?? null, P.hotbar[1] ?? null]; };
   function swapWeapons() {
     const p = S().player;
-    p.activeWeapon = p.activeWeapon === 1 ? 0 : 1;
+    const sets = ensureMouseSets();
+    const from = p.activeWeapon === 1 ? 1 : 0, to = 1 - from;
+    sets[from] = [p.hotbar[0] ?? null, p.hotbar[1] ?? null];
+    p.activeWeapon = to;
+    p.hotbar[0] = sets[to][0] ?? null; p.hotbar[1] = sets[to][1] ?? null;
     emit('equip:changed', { slot: p.activeWeapon ? 'weaponAlt' : 'weapon', swap: true });
     recompute();
+    emit('hotbar:changed', { hotbar: p.hotbar, swap: true, set: to });
     return G.derived.weaponType;
   }
 
@@ -150,7 +199,7 @@ export function createActions(G) {
     }
     const touchesEquip = from.c === 'equip' || to.c === 'equip';
     emit('inv:changed', { c: to.c });
-    if (touchesEquip) { emit('equip:changed', { slot: to.c === 'equip' ? to.i : from.i }); recompute(); }
+    if (touchesEquip) { emit('equip:changed', { slot: to.c === 'equip' ? to.i : from.i }); recompute(); if ([from.i, to.i].some(k => k === 'weapon' || k === 'weaponAlt')) refitSets(); }
     return true;
   }
   function dropItem(from) {
@@ -335,9 +384,17 @@ export function createActions(G) {
     P.skills[id] = (P.skills[id] || 0) + 1;
     P.skillPts--;
     const def = SKILLS[id];
-    if (P.skills[id] === 1 && def.kind !== 'passive' && def.kind !== 'aura' && !P.hotbar.includes(id)) {
-      const free = P.hotbar.findIndex((h, i) => i >= 1 && !h);
-      if (free >= 0) { P.hotbar[free] = id; emit('hotbar:changed', { hotbar: P.hotbar }); }
+    if (P.skills[id] === 1 && def.kind !== 'passive' && def.kind !== 'aura') {
+      const sets = ensureMouseSets(), act = P.activeWeapon === 1 ? 1 : 0;
+      let changed = false;
+      // a weapon skill fills the empty right-click of the set that holds that weapon (e.g. the ball set's RMB)
+      const home = def.wep ? [act, 1 - act].find(i => setWeaponType(i) === def.wep) : undefined;
+      if (home !== undefined && home !== act && !sets[home][1]) { sets[home][1] = id; changed = true; }
+      if (!P.hotbar.includes(id)) {
+        const free = P.hotbar.findIndex((h, i) => i >= 1 && !h && (i > 1 || fitsSet(id, act)));
+        if (free >= 0) { P.hotbar[free] = id; changed = true; }
+      }
+      if (changed) { syncLiveSet(); emit('hotbar:changed', { hotbar: P.hotbar }); }
     }
     emit('skill:learned', { id, lvl: P.skills[id] });
     recompute();
@@ -358,12 +415,19 @@ export function createActions(G) {
       const def = SKILLS[skillId];
       if (!def || !(P.skills[skillId] > 0) || def.kind === 'passive' || def.kind === 'aura') return false;
     }
+    ensureMouseSets();
     const prev = P.hotbar[slot];
     const at = skillId == null ? -1 : P.hotbar.indexOf(skillId);
     if (at >= 0 && at !== slot) P.hotbar[at] = prev ?? null; // swap
     P.hotbar[slot] = skillId ?? null;
+    syncLiveSet(); // LMB / RMB belong to the active weapon set
     emit('hotbar:changed', { hotbar: P.hotbar });
     return true;
+  }
+  /** The [LMB, RMB] skills of weapon set `i` (0 = main, 1 = alt); the active set reads live from the hotbar. */
+  function mouseSet(i) {
+    const P = S().player, sets = ensureMouseSets();
+    return i === (P.activeWeapon === 1 ? 1 : 0) ? [P.hotbar[0] ?? null, P.hotbar[1] ?? null] : [...sets[i]];
   }
   function addXp(n) {
     const P = S().player;
@@ -398,6 +462,7 @@ export function createActions(G) {
     P.statPts += sp;
     P.skillPts += kp;
     P.hotbar = ['attack', null, null, null, null, null];
+    P.mouseSets = [['attack', null], ['attack', null]];
     emit('hotbar:changed', { hotbar: P.hotbar });
     recompute();
     return { statPts: sp, skillPts: kp };
@@ -424,7 +489,8 @@ export function createActions(G) {
     // extras
     tickRegen, activeHots, addPotion, heal, restoreZoom, spendZoom, damage, restoreAll, life, zoom,
     addSkillPts, addStatPts, respec, socket, getItem, firstFree, canEquip, equipProblem, setPieces,
+    mouseSet, ensureMouseSets, setWeaponType,
   };
-  if (G.state) recompute(true);
+  if (G.state) { ensureMouseSets(); recompute(true); }
   return api;
 }

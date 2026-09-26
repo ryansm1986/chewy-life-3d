@@ -237,8 +237,9 @@ export class Banners {
     if (!b) { this.busy = false; this.cur = null; return; }
     this.busy = true; this.cur = b.key;
     if (this.root.children.length > 2) for (const c of [...this.root.children].slice(0, -1)) c.remove();
-    let dur = b.dur || { levelup: 2.8, area: 3.2, boss: 2.9, quest: 2.8, default: 2.4 }[b.style] || 2.4;
+    let dur = b.dur || { levelup: 2.8, area: 3.2, boss: 2.0, quest: 2.8, default: 2.4 }[b.style] || 2.4;
     if (this.q.length) dur *= 0.7;
+    this.root.dataset.style = b.style; // boss banners sit in the top band, clear of the arena
     const n = el('div', `bn bn-${b.style}`);
     const L = letters(b.title, 'lt');
     if (b.style === 'levelup') {
@@ -256,11 +257,23 @@ export class Banners {
       n.innerHTML = `<div class="bn-title">${L}</div>${b.sub ? `<div class="bn-sub">${esc(b.sub)}</div>` : ''}`;
     }
     this.root.appendChild(n);
-    await wait(dur * 1000);
+    // shown for `dur`, or until dismiss(style) cuts it short (e.g. the boss banner leaves as soon as the fight starts)
+    const shownAt = performance.now();
+    await new Promise(res => { const cur = this.live = { style: b.style, shownAt, done: res }; cur.timer = setTimeout(res, dur * 1000); });
+    clearTimeout(this.live?.timer); this.live = null;
     n.classList.add('out');
-    await wait(650);
+    await wait(b.style === 'boss' ? 420 : 650);
     n.remove();
     this.next();
+  }
+  /** Retire banners of `style`: queued ones are dropped, the live one leaves once it has been up `minShown` seconds. */
+  dismiss(style, minShown = 0.9) {
+    for (const b of this.q) if (b.style === style) b.dur = Math.min(b.dur || 99, minShown);
+    const L = this.live;
+    if (!L || L.style !== style || L.dismissing) return;
+    L.dismissing = true;
+    clearTimeout(L.timer);
+    L.timer = setTimeout(L.done, Math.max(0, minShown * 1000 - (performance.now() - L.shownAt)));
   }
 }
 

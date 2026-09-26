@@ -40,7 +40,8 @@ export class DungeonMode {
     // player light (warm lantern glow that follows Chewy)
     this.playerLight = this.world.lightPool.addSource({ pos: new THREE.Vector3(), color: new THREE.Color('#ffd8a8'), intensity: 7, radius: 11, priority: 10 });
     G.ui?.banner?.(`Floor ${this.floor}`, `The Burrow — ${this.theme.name}`, { style: 'area' });
-    if (L.boss) setTimeout(() => G.ui?.banner?.(MONSTERS[L.boss].name, 'awaits in the deepest chamber…', { style: 'boss' }), 2600);
+    // boss floors: a small heads-up toast (the big boss banner is saved for the actual encounter)
+    if (L.boss) setTimeout(() => { if (G.dungeon === this && this.boss?.alive && !this.boss.introDone) G.ui?.toast?.(`${MONSTERS[L.boss].name} lurks in the deepest chamber…`, { icon: 'oni', color: '#ff8a9a' }); }, 2600);
     G.state.dungeon.deepest = Math.max(G.state.dungeon.deepest || 0, this.floor);
     // dungeon colour grade (the village day/night grade doesn't run down here)
     const post = G.engine.post, gr = post.grade.uniforms;
@@ -84,9 +85,16 @@ export class DungeonMode {
     G.vfx.dustRing(b.pos, 5, 26);
     rig.shake(0.9); E.post.pulse('#ff9ab0', 0.25); E.post.hitAberration(1);
     Events.emit('sfx', 'boss_roar'); G.audio?.music?.('boss', { fade: 0.5 });
-    G.ui?.banner?.(b.name, ['The squishiest royal in the Burrow!', 'Rain or shine, he hops to fight!', 'Something smells delicious… and dangerous!', 'Nine tails, one very bad mood.'][[5, 10, 15, 20].indexOf(this.floor % 20 || 20)] || 'appears!', { style: 'boss' });
+    // compact banner in the top band; it leaves early once blows are exchanged (bossEngaged)
+    G.ui?.banner?.(b.name, ['The squishiest royal in the Burrow!', 'Rain or shine, he hops to fight!', 'Something smells delicious… and dangerous!', 'Nine tails, one very bad mood.'][[5, 10, 15, 20].indexOf(this.floor % 20 || 20)] || 'appears!', { style: 'boss', duration: 2.0 });
+    if (b.engaged) setTimeout(() => this.bossEngaged(b), 0);
     setTimeout(() => { E.timeScale = 1; b.anim.wind = 0; }, 900);
     setTimeout(() => { rig.distTarget = prevDist; }, 2200);
+  }
+  // first blow either way (Chewy hits the boss / the boss starts an attack): the intro banner steps aside
+  bossEngaged(b) {
+    if (!b.engaged) b.engaged = true;
+    if (b.introDone && !b.bannerGone) { b.bannerGone = true; this.G.ui?.banners?.dismiss?.('boss', 1.4); }
   }
   summonAround(boss, id, n) {
     for (let i = 0; i < n; i++) {
@@ -369,6 +377,8 @@ export class DungeonMode {
     if (this.playerLight) this.playerLight.pos.copy(G.player.pos).setY(G.player.pos.y + 1.8);
     // boss bar
     if (this.boss?.alive && this.boss.aggro) G.ui?.setBoss?.({ name: this.boss.name, hp: this.boss.life, max: this.boss.lifeMax });
+    // skill VFX that land on the boss are toned down (vfx.dampAt) so it stays readable under fire
+    if (G.vfx) { const dm = this._dampers ||= []; dm.length = 0; if (this.boss?.alive) dm.push(this.boss); G.vfx.dampers = dm; }
     this.world.update(dt, t, G.vfx, G.player.pos);
   }
   dispose() { this.loot.clear(); this.monsters.length = 0; }

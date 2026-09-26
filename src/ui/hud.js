@@ -278,10 +278,16 @@ export class Hud {
       hb.appendChild(s);
       const o = { el: s, ic: s.querySelector('.hb-ic'), cd: s.querySelector('.hb-cd'), cdt: s.querySelector('.hb-cdt'), id: undefined, cdv: -1 };
       tip.bind(s, () => this.slotTip(i));
-      s.addEventListener('contextmenu', e => { e.preventDefault(); this.ui.skills?.openAssign?.(i, s); });
-      s.addEventListener('click', () => this.ui.skills?.openAssign?.(i, s));
+      s.addEventListener('contextmenu', e => { e.preventDefault(); this.openAssign(i, s); });
+      s.addEventListener('click', () => this.openAssign(i, s));
       return o;
     });
+    // weapon-set badge between LMB / RMB: which set's mouse skills are live (click or X swaps; each set keeps its own)
+    const ws = this.wsBadge = el('div', 'hb-ws');
+    ws.innerHTML = `<div class="ws-in"><span class="ws-ic"></span><b class="ws-n"></b></div>`;
+    hb.appendChild(ws);
+    ws.addEventListener('click', e => { e.stopPropagation(); const G = this.ui.G; if (!G?.actions?.swapWeapons || G.mode === 'title') return; G.actions.swapWeapons(); G.audio?.play?.('ui_equip'); });
+    tip.bind(ws, () => { const set = this.pl.activeWeapon === 1 ? 1 : 0, wt = this.d.weaponType || 'sword'; return simpleTip(`Weapon set ${set ? 'II' : 'I'} · ${wt === 'ball' ? 'Tennis Ball' : 'Bone Sword'}`, `Each weapon set remembers its own ${glyph('mouseL')} / ${glyph('mouseR')} skills.<br><span class="tt-dim">Press <span class="kc sm">X</span> or click to swap.</span>`); });
     hb.appendChild(el('div', 'hb-sep'));
     this.belt = [['heart', 'Q', 'Heart Potion', 'Restores Life'], ['zoom', 'E', 'Zoom Potion', 'Restores Zoom'], ['rejuv', 'R', 'Rejuv Potion', 'Restores Life and Zoom']].map(([k, key, name, desc]) => {
       const s = el('div', 'belt b-' + k);
@@ -327,8 +333,18 @@ export class Hud {
     this.zoom.set(p.zoom == null ? zoomMax : p.zoom, zoomMax);
     this.life.draw(dt); this.zoom.draw(dt);
     const zoomNow = p.zoom == null ? zoomMax : p.zoom;
-    // hotbar
+    // hotbar (LMB / RMB show the active weapon set's pair; the badge flips on a swap)
     const hot = p.hotbar || [];
+    const wsKey = (p.activeWeapon === 1 ? 1 : 0) + ':' + (d.weaponType || 'sword');
+    if (wsKey !== this.wsKey) {
+      const first = this.wsKey === undefined;
+      this.wsKey = wsKey;
+      const [set, wt] = wsKey.split(':');
+      this.wsBadge.querySelector('.ws-ic').innerHTML = glyph(wt === 'ball' ? 'ball' : 'sword');
+      this.wsBadge.querySelector('.ws-n').textContent = set === '1' ? 'II' : 'I';
+      this.$.hotbar.dataset.ws = wt;
+      if (!first) { replay(this.wsBadge, 'flip', 520); for (const k of [0, 1]) replay(this.slots[k].el, 'swap', 450); }
+    }
     for (let i = 0; i < 6; i++) {
       const s = this.slots[i], id = hot[i] || null;
       const icKey = id === 'attack' ? 'attack:' + (d.weaponType || 'sword') : id;
@@ -623,6 +639,15 @@ export class Hud {
 
   // ---------------------------------------------------------------- flashes
   flashSlot(i) { const s = this.slots[i]; if (s) replay(s.el, 'press', 320); }
+  // slot → skill chooser; for the mouse slots the popover names the weapon set it edits
+  openAssign(i, anchor) {
+    this.ui.skills?.openAssign?.(i, anchor);
+    if (i > 1) return;
+    const h = this.ui.pop?.querySelector?.('.pop-h');
+    if (!h || h.querySelector('.pop-ws')) return;
+    const wt = this.d.weaponType || 'sword', set = this.pl.activeWeapon === 1 ? 'II' : 'I';
+    h.insertAdjacentHTML('beforeend', `<span class="pop-ws" data-ws="${wt}">${glyph(wt === 'ball' ? 'ball' : 'sword')}Set ${set}</span>`);
+  }
   flashBelt(k) { const b = this.belt.find(x => x.k === k); if (b) replay(b.el, b.v > 0 ? 'press' : 'deny', 360); }
   slotTip(i) {
     const id = this.pl.hotbar?.[i];
@@ -632,7 +657,8 @@ export class Hud {
     const lvl = this.pl.skills?.[id] || (id === 'attack' ? 1 : 0);
     const cost = skillCost(id, this.st);
     const wep = id === 'attack' ? (this.d.weaponType === 'ball' ? 'Basic attack · Red Tennis Ball' : 'Basic attack · Bone Sword') : '';
-    return simpleTip(`${esc(def?.name || id)} <span class="kc sm">${key}</span>`, `${def?.desc ? esc(def.desc) + '<br>' : ''}<span class="tt-dim">${id === 'attack' ? wep : 'Level ' + lvl}${cost ? ` · ${Math.round(cost * 10) / 10} Zoom` : ''}</span>`);
+    const setNote = i < 2 ? `<br><span class="tt-dim">Weapon set ${this.pl.activeWeapon === 1 ? 'II' : 'I'} — <span class="kc sm">X</span> swaps to the other set's mouse skills</span>` : '';
+    return simpleTip(`${esc(def?.name || id)} <span class="kc sm">${key}</span>`, `${def?.desc ? esc(def.desc) + '<br>' : ''}<span class="tt-dim">${id === 'attack' ? wep : 'Level ' + lvl}${cost ? ` · ${Math.round(cost * 10) / 10} Zoom` : ''}</span>${setNote}`);
   }
   // screen-space rect of the bag button (fly-to-bag target)
   bagRect() {

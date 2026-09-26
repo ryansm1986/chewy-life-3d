@@ -393,7 +393,7 @@ export async function boot() {
         const R = skillRuntime(hb[0] || 'attack', G.state, G.derived);
         const melee = R && !R.params?.projectile && !(R.params?.speed) && (R.params?.radius || 0) < 3;
         const reach = (R?.params?.radius || 1.8) + (hoverEnemy?.radius || 0.3) - 0.2;
-        if (hoverEnemy && melee && Math.hypot(tgt.x - player.pos.x, tgt.z - player.pos.z) > reach) { player.moveTarget = tgt.clone(); player.interactTarget = null; }
+        if (hoverEnemy && melee && Math.hypot(tgt.x - player.pos.x, tgt.z - player.pos.z) > reach) { skills.approachTo(hb[0] || 'attack', hoverEnemy); } // D2-style: one click walks up and swings
         else { player.moveTarget = null; skills.tryCast(hb[0] || 'attack', tgt, hoverEnemy); }
       } else {
         const it = Input.mouseHit(0) ? pickInteractAtMouse() : null;

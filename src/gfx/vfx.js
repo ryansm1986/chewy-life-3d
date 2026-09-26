@@ -6,6 +6,7 @@ import { rand, TAU, clamp, ease } from '../core/util.js';
 
 const _v = new THREE.Vector3();
 const C = h => new THREE.Color(h);
+const DAMP_MIN = 0.25; // additive effects sitting right on a boss keep 25% of their brightness
 
 function emoteTexture(kind) {
   const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
@@ -44,9 +45,39 @@ export class VFX {
     this.fx = []; // mesh effects {update(dt)->bool, obj}
     this.emoteTex = new Map();
     this.lightPool = null;
+    // Readability near big bodies: live bosses registered here ({pos, bodyR|radius, height, alive}) tone down every
+    // additive glow / spark / flash / flash-light that lands on them, so a storm of skill effects can't turn the boss
+    // into a white blob — its silhouette and face stay readable (the dungeon keeps this list in sync each frame).
+    this.dampers = [];
+    for (const L of [this.glow, this.spark]) {
+      const raw = L.spawn.bind(L);
+      L.spawn = o => {
+        if (this.dampers.length && !this._undamped) {
+          const k = this.dampAt(o.x, o.y, o.z);
+          if (k < 1) { o.alpha = (o.alpha ?? 1) * k; if (o.alpha1) o.alpha1 *= k; const s = 0.55 + 0.45 * k; if (o.size != null) o.size *= s; if (o.size1 != null) o.size1 *= s; }
+        }
+        return raw(o);
+      };
+    }
   }
   setLightPool(lp) { this.lightPool = lp; }
-  light(pos, color, intensity = 6, radius = 6, life = 0.3) { this.lightPool?.flash(pos, color, intensity, radius, life); }
+  // the boss's own telegraphs (wind-up swirls etc.) must stay loud: spawn them inside undamped(() => …)
+  undamped(fn) { this._undamped = true; try { return fn(); } finally { this._undamped = false; } }
+  // 1 = untouched … DAMP_MIN right on a registered boss (horizontal falloff from its body radius; effects well above its head are left alone)
+  dampAt(x, y, z) {
+    let k = 1;
+    for (const d of this.dampers) {
+      if (!d || d.alive === false) continue;
+      const R = d.bodyR || d.radius || 1, H = (d.height || 2) + 0.8;
+      if (y != null && y > (d.pos.y || 0) + H) continue;
+      const dist = Math.hypot(x - d.pos.x, z - d.pos.z);
+      const a = R * 0.9, b = R * 1.7 + 0.6;
+      const t = clamp((dist - a) / (b - a));
+      k = Math.min(k, DAMP_MIN + (1 - DAMP_MIN) * t * t * (3 - 2 * t));
+    }
+    return k;
+  }
+  light(pos, color, intensity = 6, radius = 6, life = 0.3) { if (this.dampers.length) intensity *= this.dampAt(pos.x, pos.y, pos.z) ** 1.5; this.lightPool?.flash(pos, color, intensity, radius, life); }
   update(dt) {
     const cam = this.engine.camera;
     for (const l of this.layers) l.update(dt, cam);
@@ -77,16 +108,22 @@ export class VFX {
     }
   }
   flash(p, color = '#ffffff', size = 1.4, life = 0.18) { this.glow.spawn({ x: p.x, y: p.y, z: p.z, life, size, size1: size * 1.6, color, alpha: 0.9, alpha1: 0 }); }
-  hit(p, { color = '#fff4c0', crit = false, element = 'phys' } = {}) {
+  // soft: hits on a big body (boss) — sparks still read, but the flash sprite / crit light stay small so they don't wash it out
+  hit(p, { color = '#fff4c0', crit = false, element = 'phys', soft = false } = {}) {
     const ec = { fire: '#ffa040', frost: '#9fe0ff', zap: '#fff27a', stink: '#a8e070', holy: '#fff6c0', phys: color }[element] || color;
-    this.flash(p, ec, crit ? 2.2 : 1.1, crit ? 0.26 : 0.16);
-    this.sparks(p, { n: crit ? 18 : 8, color: ec, speed: crit ? 7 : 4.5, size: crit ? 0.5 : 0.32 });
-    if (crit) { this.ring(p, { color: '#ffd84a', r0: 0.2, r1: 1.6, life: 0.3, flat: false }); this.light(p, '#ffd070', 10, 6, 0.2); }
-    if (element === 'fire') this.fire(p, 6);
-    if (element === 'frost') this.frost(p, 6);
-    if (element === 'zap') this.sparks(p, { n: 8, color: '#fff7a0', speed: 8, size: 0.25 });
-    if (element === 'stink') this.stink(p, 4);
+    const s = soft ? 0.55 : 1;
+    if (soft) { // big bodies: a tiny flash + opaque confetti chips (normal blend, so they read without adding light)
+      this.flash(p, ec, crit ? 0.8 : 0.45, 0.1);
+      for (let i = 0, n = crit ? 9 : 5; i < n; i++) { const a = rand(0, TAU), v = rand(2, 4.5); this.dot.spawn({ x: p.x, y: p.y, z: p.z, vx: Math.cos(a) * v, vy: rand(1.5, 4), vz: Math.sin(a) * v, life: rand(0.35, 0.55), size: rand(0.1, 0.17), size1: 0.04, color: i % 2 ? ec : crit ? '#ffcf4a' : '#ffa870', alpha: 1, alpha1: 0.6, grav: 12, drag: 1.5 }); }
+    } else this.flash(p, ec, crit ? 2.2 : 1.1, crit ? 0.26 : 0.16);
+    this.sparks(p, { n: Math.round((crit ? 18 : 8) * s), color: ec, speed: crit ? 7 : 4.5, size: crit ? 0.5 : 0.32 });
+    if (crit) { this.ring(p, { color: '#ffd84a', r0: 0.2, r1: 1.6 * s, life: 0.3, flat: false, opacity: soft ? 0.5 : 0.9 }); this.light(p, '#ffd070', soft ? 3 : 10, soft ? 4 : 6, 0.2); }
+    if (element === 'fire') this.fire(p, soft ? 3 : 6);
+    if (element === 'frost') this.frost(p, soft ? 3 : 6);
+    if (element === 'zap') this.sparks(p, { n: soft ? 4 : 8, color: '#fff7a0', speed: 8, size: 0.25 });
+    if (element === 'stink') this.stink(p, soft ? 2 : 4);
   }
+  dk(p) { return this.dampers.length ? this.dampAt(p.x, p.y, p.z) : 1; }
   poof(p, { color = '#fff0f6', n = 14, size = 0.7, hearts = false } = {}) {
     for (let i = 0; i < n; i++) {
       const a = rand(0, TAU), s = rand(0.8, 2.4);
@@ -129,6 +166,7 @@ export class VFX {
 
   // ------------------------------------------------------------------ mesh effects
   ring(p, { color = '#ffffff', r0 = 0.2, r1 = 2, life = 0.4, flat = true, opacity = 0.9, y = 0.06 } = {}) {
+    opacity *= flat ? 1 : this.dk(p); // camera-facing rings sit over whatever they're centred on
     const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: ringTexture(), color: C(color), transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
     if (flat) m.rotation.x = -Math.PI / 2; else m.lookAt(this.engine.camera.position);
     m.position.set(p.x, p.y + y, p.z); m.renderOrder = 12;
@@ -136,6 +174,7 @@ export class VFX {
   }
   // flat ground decal (scorch marks, magic circles, impact glows). additive=false → darkening multiply-ish decal
   decal(p, { r = 1.5, color = '#2a1a14', life = 3, opacity = 0.55, additive = false, tex = null, spin = 0, grow = 0 } = {}) {
+    if (additive) opacity *= 0.5 + 0.5 * this.dk(p);
     const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: tex || glowTexture(), color: C(color), transparent: true, opacity, depthWrite: false, toneMapped: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, polygonOffset: true, polygonOffsetFactor: -2 }));
     m.rotation.x = -Math.PI / 2; m.position.set(p.x, (p.y || 0) + 0.04, p.z); m.renderOrder = 8; m.scale.setScalar(r);
     return this.add(m, (dt, t) => { const k = clamp(t / life); m.material.opacity = opacity * (1 - ease.inQuad(k)); m.rotation.z += spin * dt; if (grow) m.scale.setScalar(r * (1 + grow * ease.outCubic(k))); }, life);
@@ -175,6 +214,7 @@ export class VFX {
   }
   // vertical light beam
   pillar(p, { color = '#ffe070', r = 0.5, h = 6, life = 1, persistent = false, opacity = 0.8 } = {}) {
+    if (!persistent) opacity *= this.dk(p);
     const g = new THREE.CylinderGeometry(r, r * 1.05, h, 20, 1, true); g.translate(0, h / 2, 0);
     const tex = shaftTexture();
     const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tex, color: C(color), transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
@@ -201,7 +241,8 @@ export class VFX {
     const grp = new THREE.Group(); grp.add(m, m2);
     this.light(b, color, 12, 7, life);
     this.sparks(b, { n: 10, color, speed: 6, size: 0.3 });
-    return this.add(grp, (dt, t) => { const k = clamp(t / life); m.material.opacity = (1 - k) * (0.6 + 0.4 * Math.random()); m2.material.opacity = 0.25 * (1 - k); }, life);
+    const dk = this.dk(b);
+    return this.add(grp, (dt, t) => { const k = clamp(t / life); m.material.opacity = dk * (1 - k) * (0.6 + 0.4 * Math.random()); m2.material.opacity = dk * 0.25 * (1 - k); }, life);
   }
   // ground AoE telegraph (enemy windups): fills from center to edge over `time`
   telegraph(p, r, time, color = '#ff5a5a') {

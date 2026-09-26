@@ -70,7 +70,16 @@ export class Combat {
     m.takeDamage(dmg, { element, crit, knock, stun, from });
     if (!silent) {
       G.ui?.float?.(m.pos.clone().setY(m.pos.y + (m.height || 1) + 0.2), crit ? `${dmg}!` : `${dmg}`, { kind: crit ? 'crit' : 'dmg', color: element !== 'phys' ? ELEMENT_COLORS[element] : undefined });
-      G.vfx.hit(m.pos.clone().setY(m.pos.y + (m.height || 1) * 0.5), { crit, element });
+      if (m.big) {
+        // big bodies: burst on the side facing the attacker at chest height (not over the face), small flash, rate-limited
+        const t = G.engine.time || 0;
+        if (crit || t - (m._hitFxT || -9) > 0.09) {
+          m._hitFxT = t;
+          const src = from || G.player?.pos || m.pos;
+          _v.set(src.x - m.pos.x, 0, src.z - m.pos.z); if (_v.lengthSq() < 1e-4) _v.set(0, 0, 1); _v.normalize().multiplyScalar((m.bodyR || m.radius || 1) * 0.85);
+          G.vfx.hit(new THREE.Vector3(m.pos.x + _v.x, m.pos.y + Math.min((m.height || 1) * 0.4, 1.1), m.pos.z + _v.z), { crit, element, soft: true });
+        }
+      } else G.vfx.hit(m.pos.clone().setY(m.pos.y + (m.height || 1) * 0.5), { crit, element });
       Events.emit('sfx', crit ? 'hit_crit' : 'hit_flesh', { pos: m.pos });
       if (crit) { G.engine.rig.shake(0.35); G.engine.hitStop = Math.max(G.engine.hitStop, 0.05); }
       else G.engine.hitStop = Math.max(G.engine.hitStop, 0.018);

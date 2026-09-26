@@ -82,6 +82,18 @@
 .bn-warn { display: flex; align-items: center; justify-content: center; gap: 12px; font: 700 20px/1 var(--font); color: #ff7a7a; letter-spacing: 8px; -webkit-text-stroke: 5px #2a1418; paint-order: stroke fill; margin-bottom: 4px; animation: fadeUp .4s both; }
 .bn-warn .gl { width: 36px; height: 36px; animation: wiggle .6s ease-in-out infinite; }
 .bn-boss .bn-sub { color: #ffe0c8; -webkit-text-stroke: 5px #2a1418; font-style: italic; }
+/* boss banners: compact, in the top band just under the boss bar, so the arena (and the boss) stay in view */
+.banners[data-style="boss"] { top: 10.5%; }
+.bn-boss .bn-title { font-size: 54px; -webkit-text-stroke: 9px #2a1418; text-shadow: 0 6px 0 #2a1418, 0 0 30px rgba(255, 60, 60, .7); }
+.bn-boss .bn-title .lt { animation-delay: calc(.12s + var(--i) * .022s); }
+.bn-boss .bn-sub { animation-delay: .35s; }
+.bn-boss .bn-streak { top: 57%; width: 940px; height: 92px; margin: -46px 0 0 -470px; }
+.bn-boss .bn-warn { font-size: 15px; letter-spacing: 6px; -webkit-text-stroke: 4px #2a1418; }
+.bn-boss .bn-warn .gl { width: 26px; height: 26px; }
+.bn-boss .bn-sub { font-size: 17px; margin-top: 4px; -webkit-text-stroke: 4px #2a1418; }
+.bn-boss .bn-vig { background: radial-gradient(ellipse 45% 40% at 50% 52%, transparent 35%, rgba(90, 0, 20, .38) 100%); animation-duration: 2.2s; }
+.bn-boss.out { animation: bnOutUp .42s ease-in forwards; }
+@keyframes bnOutUp { to { opacity: 0; transform: translateY(-24px) scale(.92); filter: blur(3px); } }
 .bn-quest .bn-title { font-size: 64px; color: #ffe066; text-shadow: 0 8px 0 var(--ink), 0 0 36px rgba(255, 200, 80, .8); }
 .bn-scroll .gl { width: 62px; height: 62px; animation: slotPop .7s var(--pop) both, bob 1.4s ease-in-out .7s infinite; filter: drop-shadow(0 4px 0 rgba(74, 44, 42, .35)); }
 
