@@ -170,7 +170,7 @@ export const UI = {
     this.panels.inventory.refresh();
     this.G?.events?.emit?.('ui:close', { name });
   },
-  toggle(name, opts) { if (this.isOpen(name)) this.close(name); else this.open(name, opts); },
+  toggle(name, opts) { this._user = true; try { if (this.isOpen(name)) this.close(name); else this.open(name, opts); } finally { this._user = false; } },
   isOpen(name) { return !!this.panels[name]?.isOpen; },
   closeAll() { for (const n of Object.keys(this.panels)) this.close(n, true); this.hidePopover(); this.drag?.cancel(); },
   anyModal() {
@@ -204,7 +204,7 @@ export const UI = {
       if (this.drag.held) { this.drag.cancel(); return; }
       if (this.isOpen('build') && (this.panels.build.sel || this.panels.build.tool)) { this.panels.build.clearSelection(); this.panels.build.opts.onCancel?.(); return; }
       const top = [...this._order].reverse().find(n => this.panels[n]?.isOpen);
-      if (top) this.close(top); else this.open('menu');
+      this._user = true; try { if (top) this.close(top); else this.open('menu'); } finally { this._user = false; }
       return;
     }
     if (this.isOpen('menu')) return;

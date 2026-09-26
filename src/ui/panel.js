@@ -23,7 +23,7 @@ export class Panel {
     this.body = this.panel.querySelector('.pb');
     this.extra = this.panel.querySelector('.ph-extra');
     this.setTitle(this.title, this.jp);
-    this.panel.querySelector('.ph-x').addEventListener('click', () => this.ui.close(this.name));
+    this.panel.querySelector('.ph-x').addEventListener('click', () => { this.ui._user = true; try { this.ui.close(this.name); } finally { this.ui._user = false; } });
     this.panel.addEventListener('mousedown', () => this.ui._raise(this));
     this.initDrag();
     this.ui.layers.panels.appendChild(w);
@@ -64,7 +64,7 @@ export class Panel {
     if (!was) {
       this.wrap.classList.remove('opening'); void this.wrap.offsetWidth; this.wrap.classList.add('opening');
       clearTimeout(this._openT); this._openT = setTimeout(() => this.wrap.classList.remove('opening'), 900);
-      this.ui.sfx?.('open');
+      if (this.ui._user) this.ui.sfx?.('open');
     }
     this.onOpen?.();
   }
@@ -76,7 +76,7 @@ export class Panel {
     this.wrap.classList.add('closing');
     this.ui.tip.hide();
     this._closeT = setTimeout(() => { this.wrap.style.display = 'none'; this.wrap.classList.remove('closing'); }, 260);
-    this.ui.sfx?.('close');
+    if (this.ui._user || this.ui._closingByKey) this.ui.sfx?.('close');
   }
   // re-render only if visible
   refresh() { if (this.isOpen) this.render(); }

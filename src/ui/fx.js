@@ -51,7 +51,9 @@ export class Floats {
       const p = project(cam, f.x, f.y, f.z); f.sx = p.x; f.sy = p.y;
       let k = 0;
       for (const o of this.active) if (o.t < 0.45 && Math.abs(o.sx - p.x) < 60 && Math.abs(o.sy - p.y) < 40) k++;
-      f.stack = Math.min(k, 6) * 24;
+      k = Math.min(k, 8);
+      f.stackX = k ? ((k % 3) - 1 || (k % 2 ? 1 : -1)) * 30 : 0;
+      f.stack = Math.ceil(k / 3) * 20;
     }
     this.active.push(f);
     return f;
@@ -74,7 +76,7 @@ export class Floats {
       if (f.kind === 'crit' && a < 0.35) s *= 1 + Math.sin(a * 40) * 0.06 * (1 - a / 0.35);
       s *= f.size * scale;
       const op = u < 0.65 ? 1 : 1 - (u - 0.65) / 0.35;
-      const x = p.x + f.drift * u, y = p.y - f.stack * scale;
+      const x = p.x + (f.drift * u + (f.stackX || 0)) * scale, y = p.y - f.stack * scale;
       f.n.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) translate(-50%,-50%) rotate(${(f.rot * (1 - u)).toFixed(1)}deg) scale(${s.toFixed(3)})`;
       f.n.style.opacity = op.toFixed(3);
     }

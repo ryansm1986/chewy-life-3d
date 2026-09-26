@@ -3,7 +3,7 @@ import { T, WORLD } from './terrain.js';
 
 export const LANDMARKS = {
   plaza: { x: 56, z: 60.5 },
-  spawn: { x: 56, z: 66 },
+  spawn: { x: 57.5, z: 63.6 },
   townHall: { x: 56, z: 51, w: 6, d: 4, rot: 0 },
   chewyHouse: { x: 45.5, z: 63.5, w: 3, d: 3, rot: Math.PI / 2 },
   rosieShop: { x: 66.5, z: 57.5, w: 4, d: 3, rot: -Math.PI / 2 },
