@@ -77,7 +77,7 @@ export class Post {
     this.ao = new N8AOPostPass(scene, camera, w, h);
     Object.assign(this.ao.configuration, { aoRadius: 1.6, distanceFalloff: 0.6, intensity: 2.2, color: new THREE.Color('#40285a'), halfRes: quality < 2, aoSamples: 12, denoiseSamples: 8, denoiseRadius: 10, gammaCorrection: false });
     this.composer.addPass(this.ao);
-    this.tilt = new TiltShiftEffect({ offset: 0.0, rotation: 0, focusArea: 0.62, feather: 0.3, kernelSize: KernelSize.SMALL });
+    this.tilt = new TiltShiftEffect({ offset: 0.0, rotation: 0, focusArea: 0.78, feather: 0.22, kernelSize: KernelSize.VERY_SMALL });
     this.tiltPass = new EffectPass(camera, this.tilt);
     this.composer.addPass(this.tiltPass);
     this.bloom = new BloomEffect({ intensity: 0.85, luminanceThreshold: 0.78, luminanceSmoothing: 0.25, mipmapBlur: true, radius: 0.72, levels: 7 });
