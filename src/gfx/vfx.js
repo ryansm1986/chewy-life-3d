@@ -59,6 +59,16 @@ export class VFX {
   clear() { for (const l of this.layers) l.clear(); for (const f of this.fx) f.obj?.parent?.remove(f.obj); this.fx.length = 0; }
   add(obj, update, life = 0) { if (obj) this.scene.add(obj); const f = { obj, update, t: 0, life }; this.fx.push(f); return f; }
 
+  // compile every effect's shader up front (call behind a loading transition) so first use doesn't hitch
+  prewarm(renderer, camera) {
+    const p = new THREE.Vector3(0, -50, 0);
+    this.ring(p); this.slash(p, 0); this.pillar(p); this.telegraph(p, 1, 1);
+    this.lightning(p, p.clone().setY(-49)); this.emote({ pos: p, rig: { height: 1 } }, 'heart', 0.1); this.emote({ pos: p, rig: { height: 1 } }, '!', 0.1);
+    this.sparks(p); this.poof(p); this.fire(p); this.petals(p); this.stink(p);
+    for (const l of this.layers) l.update(0.016, camera);
+    try { renderer.compile(this.scene, camera); } catch (e) { /* ignore */ }
+    this.clear();
+  }
   // ------------------------------------------------------------------ particle presets
   sparks(p, { n = 10, color = '#fff2a0', speed = 5, size = 0.35, life = 0.35, up = 1.5, grav = 6 } = {}) {
     for (let i = 0; i < n; i++) {

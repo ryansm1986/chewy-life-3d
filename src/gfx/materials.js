@@ -192,7 +192,12 @@ function injectDepthVertex(shader, o) {
     .replace('#include <worldpos_vertex>', 'vec4 worldPosition = cWorld;');
 }
 
-let keySeq = 0;
+// Program cache keys derive from everything that changes generated GLSL, so materials with identical
+// shader code share one compiled program (uniform values stay per-material).
+function hashStr(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
+function shaderKey(prefix, o) {
+  return prefix + hashStr(JSON.stringify([o.wind || '', o.fixedNormal || '', !!o.noFlip, !!o.objectBrush, o.vertexPars || '', o.vertexWorld || '', o.fragPars || '', o.fragColor || '', o.fragOut || '', Object.keys(o.uniforms || {}).sort().join(',')]));
+}
 /**
  * makeToon(opts)
  *  color, map, alphaMap, vertexColors, emissive, emissiveIntensity, transparent, opacity, alphaTest, side
@@ -231,7 +236,7 @@ export function makeToon(o = {}) {
   };
   mat.userData.u = local;
   if (o.noShadowCast) mat.userData.noCast = true;
-  const key = 'toon' + (keySeq++);
+  const key = shaderKey('toon', o);
   mat.customProgramCacheKey = () => key;
   mat.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, U, local);
@@ -286,7 +291,7 @@ export function makeToon(o = {}) {
 export function makeDepth(o) {
   const dm = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: o.map || null, alphaMap: o.alphaMap || null, alphaTest: o.alphaTest || 0, side: o.side ?? THREE.FrontSide });
   const local = { uWindAmt: { value: o.windAmt ?? 1 }, ...(o.uniforms || {}) };
-  const key = 'depth' + (keySeq++);
+  const key = shaderKey('depth', o);
   dm.customProgramCacheKey = () => key;
   dm.onBeforeCompile = shader => { Object.assign(shader.uniforms, U, local); injectDepthVertex(shader, o); };
   return dm;
@@ -312,8 +317,7 @@ export function makeOutline(color = '#3a2230', width = 0.02) {
   const m = new THREE.MeshBasicMaterial({ color, side: THREE.BackSide, fog: true });
   const w = { value: width };
   m.userData.width = w;
-  const key = 'outline' + (keySeq++);
-  m.customProgramCacheKey = () => key;
+  m.customProgramCacheKey = () => 'outline';
   m.onBeforeCompile = s => {
     s.uniforms.uOutW = w;
     s.vertexShader = s.vertexShader

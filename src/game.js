@@ -53,6 +53,7 @@ export async function boot() {
   const vVfx = new VFX(engine, village.scene); vVfx.setLightPool(village.lightPool);
   G.vfx = vVfx;
   const ambient = new Ambient(G, village, vVfx);
+  setTimeout(() => vVfx.prewarm(engine.renderer, engine.camera), 200);
   const waterfall = new Waterfall(village, vVfx, { x: village.landmarks.waterfall.x });
   const vCombat = new Combat(G, village);
   const sim = G.sim = new VillageSim(G, village);
@@ -176,6 +177,8 @@ export async function boot() {
       swapWorld(world, vfx, combat);
       G.mode = 'dungeon';
       dungeon.start();
+      vfx.prewarm(engine.renderer, engine.camera);
+      try { engine.renderer.compile(world.scene, engine.camera); } catch (e) { /* ignore */ }
       const s = dungeon.startPos;
       player.setPos(s.x, s.z); player.moveTarget = null; shadow.setPos(s.x + 0.8, s.z + 0.8);
       combat.add(shadow); shadow.recalc();

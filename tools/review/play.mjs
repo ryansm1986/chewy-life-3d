@@ -38,6 +38,7 @@ const page = await browser.newPage({ viewport: { width: opt.w, height: opt.h } }
 await page.routeWebSocket(/.*/, ws => { ws.onMessage(() => {}); });
 const logs = [];
 page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') logs.push(`[${m.type()}] ${m.text()}`); });
+page.on('response', r => { if (r.status() >= 400) logs.push('[http ' + r.status() + '] ' + r.url()); });
 page.on('pageerror', e => logs.push(`[pageerror] ${e.message}\n${(e.stack || '').split('\n').slice(0, 4).join('\n')}`));
 const t0 = Date.now();
 await page.goto(base + opt.url, { waitUntil: 'load' });
