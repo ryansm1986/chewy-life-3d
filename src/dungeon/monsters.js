@@ -83,26 +83,54 @@ const BUILD = {
     m.glow = col; return m;
   },
   kasa(v) {
-    const col = C(v.color || '#8a5ad0');
-    // folded wagasa paper umbrella: pleated cone with bamboo ribs, a wooden tip and a tied band
-    const u = new THREE.ConeGeometry(0.52, 1.0, 32, 6, true); u.translate(0, 0.98, 0);
+    const col = C(v.color || '#8a5ad0'), paper = C('#fff4ec');
+    const RIBS = 10, top = 1.5, hem = 0.5;
+    // domed wagasa canopy (lathe profile), pleated between ribs, with a scalloped hem that dips between ribs
+    const prof = [];
+    for (let i = 0; i <= 10; i++) { const t = i / 10; prof.push(new THREE.Vector2(0.02 + 0.56 * Math.pow(t, 0.85) * (1 + 0.08 * Math.sin(t * Math.PI)), top - (top - hem) * t)); }
+    prof.reverse(); // bottom → top so lathe normals face outward
+    const u = new THREE.LatheGeometry(prof, RIBS * 4);
     const pos = u.attributes.position;
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i); const a = Math.atan2(x, z);
-      const k = 1 + Math.cos(a * 8) * 0.13 * (1.5 - y);
-      pos.setX(i, x * k); pos.setZ(i, z * k);
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), a = Math.atan2(x, z);
+      const t = (top - y) / (top - hem);
+      const pleat = 1 - 0.07 * t * (0.5 - 0.5 * Math.cos(a * RIBS));
+      pos.setX(i, x * pleat); pos.setZ(i, z * pleat);
+      if (t > 0.97) pos.setY(i, y + 0.07 * (0.5 - 0.5 * Math.cos(a * RIBS))); // scallops lift between ribs
     }
     u.computeVertexNormals();
-    paint(u, (p, n, o) => { const a = Math.atan2(p.x, p.z); const fold = Math.cos(a * 8); o.copy(col).lerp(C('#fff4ec'), 0.18 + fold * 0.12); if (Math.abs(p.y - 0.62) < 0.05) o.set('#ffd84a'); if (fold > 0.96) o.multiplyScalar(0.75); });
-    const cap = new THREE.CylinderGeometry(0.06, 0.52 * 1.05, 0.08, 32); cap.translate(0, 0.47, 0); paint(cap, (p, n, o) => o.copy(col).multiplyScalar(0.7));
-    const parts = [u, cap, cone(0.05, 0.22, '#8a5a3a', [0, 1.55, 0]), paint(xf(new THREE.TorusGeometry(0.1, 0.022, 6, 20), { p: [0, 1.3, 0], r: [Math.PI / 2, 0, 0] }), (p, n, o) => o.set('#e8503a'))];
-    parts.push(ell(0.12, 0.13, 0.05, '#fffaf0', [0, 0.92, 0.36], [-0.35, 0, 0]), ell(0.065, 0.075, 0.04, '#2a1418', [0, 0.92, 0.4], [-0.35, 0, 0]), ell(0.022, 0.022, 0.02, '#ffffff', [-0.022, 0.95, 0.43]));
-    parts.push(tube([{ p: V(-0.05, 1.03, 0.33), r: 0.012 }, { p: V(0.05, 1.07, 0.33), r: 0.012 }], 4, true));
-    paint(parts[parts.length - 1], (p, n, o) => o.set(INK));
-    const tongue = tube([{ p: V(0, 0.72, 0.38), r: 0.07 }, { p: V(0, 0.6, 0.46), r: 0.055 }, { p: V(0.02, 0.48, 0.44), r: 0.03 }], 6, true); paint(tongue, (p, n, o) => o.set('#ff6a8a')); parts.push(tongue);
-    const leg = new THREE.CylinderGeometry(0.035, 0.035, 0.46, 6); leg.translate(0, 0.25, 0); paint(leg, (p, n, o) => o.set('#c98f5e')); parts.push(leg);
+    paint(u, (p, n, o) => {
+      const a = Math.atan2(p.x, p.z), t = (top - p.y) / (top - hem), fold = 0.5 + 0.5 * Math.cos(a * RIBS);
+      o.copy(col).lerp(paper, 0.08 + (1 - fold) * 0.14);
+      if (t > 0.86) o.copy(col).multiplyScalar(0.72); // darker hem band
+      if (t < 0.2) o.lerp(paper, 0.35);                // pale crown
+      if (Math.abs(t - 0.55) < 0.025) o.set('#ffe29a');  // thin painted stripe
+    });
+    const inner = new THREE.LatheGeometry(prof.slice().reverse().map(q => new THREE.Vector2(q.x * 0.95, q.y - 0.02)), RIBS * 2); // underside
+    paint(inner, (p, n, o) => o.copy(col).multiplyScalar(0.55));
+    const parts = [u, inner];
+    // bamboo ribs along every fold, poking out at the hem
+    for (let i = 0; i < RIBS; i++) {
+      const a = (i / RIBS) * TAU, s = Math.sin(a), c = Math.cos(a), R = 0.58;
+      const rib = tube([{ p: V(0, top + 0.02, 0), r: 0.012 }, { p: V(s * R * 0.55, top - 0.5, c * R * 0.55), r: 0.016 }, { p: V(s * (R + 0.01), hem + 0.01, c * (R + 0.01)), r: 0.014 }], 4, true);
+      parts.push(paint(rib, (p, n, o) => o.set('#8a5a3a')));
+    }
+    parts.push(cone(0.05, 0.24, '#8a5a3a', [0, top + 0.12, 0]));
+    parts.push(paint(xf(new THREE.TorusGeometry(0.075, 0.02, 6, 20), { p: [0, top - 0.12, 0], r: [Math.PI / 2, 0, 0] }), (p, n, o) => o.set('#e8503a')));
+    // face on the paper
+    parts.push(ell(0.13, 0.14, 0.05, '#fffaf0', [0, 1.0, 0.43], [-0.3, 0, 0]), ell(0.07, 0.08, 0.04, '#2a1418', [0, 1.0, 0.47], [-0.3, 0, 0]), ell(0.024, 0.024, 0.02, '#ffffff', [-0.024, 1.03, 0.5]));
+    const brow = tube([{ p: V(-0.07, 1.14, 0.42), r: 0.013 }, { p: V(0.06, 1.18, 0.41), r: 0.013 }], 4, true); paint(brow, (p, n, o) => o.set(INK)); parts.push(brow);
+    const tongue = tube([{ p: V(0, 0.78, 0.47), r: 0.075 }, { p: V(0, 0.64, 0.55), r: 0.06 }, { p: V(0.03, 0.5, 0.53), r: 0.03 }], 6, true); paint(tongue, (p, n, o) => o.set('#ff6a8a')); parts.push(tongue);
+    // single wooden leg + geta
+    const leg = new THREE.CylinderGeometry(0.035, 0.04, 0.5, 6); leg.translate(0, 0.25, 0); paint(leg, (p, n, o) => o.set('#c98f5e')); parts.push(leg);
     const geta = new RoundedBox(0.22, 0.06, 0.32, 1, 0.02); geta.translate(0, 0.03, 0.03); paint(geta, (p, n, o) => o.set('#b07a4a')); parts.push(geta);
     for (const z of [-0.08, 0.12]) { const t = new THREE.BoxGeometry(0.2, 0.05, 0.04); t.translate(0, -0.01, z); paint(t, (p, n, o) => o.set('#6a4a3a')); parts.push(t); }
+    if (v.crown) { // lordly paper talisman and a red tassel
+      const o1 = new THREE.BoxGeometry(0.12, 0.3, 0.012); o1.rotateX(-0.25); o1.translate(0.0, top - 0.05, 0.12);
+      parts.push(paint(o1, (p, n, o) => { o.set('#fff6dc'); if (Math.abs(p.x) < 0.02) o.set('#d8302a'); }));
+      const tas = tube([{ p: V(0.08, top + 0.1, 0), r: 0.012 }, { p: V(0.2, top - 0.1, 0.05), r: 0.012 }, { p: V(0.24, top - 0.3, 0.08), r: 0.03 }], 5, true);
+      parts.push(paint(tas, (p, n, o) => o.set('#e8364a')));
+    }
     return finish(parts);
   },
   wisp(v) {
@@ -150,7 +178,7 @@ export const MONSTERS = {
   tanuki: { name: 'Tanuki Bandit', build: 'tanuki', radius: 0.32, speed: 3.0, life: 1.0, dmg: 0.9, move: 'walk', attack: { type: 'ranged', range: 6.5, cd: 1.5, windup: 0.35, proj: 'acorn', speed: 10 }, variants: [{ color: '#4a4a6a' }, { color: '#6a3a3a' }] },
   // bosses
   mochiKing: { name: 'King Mochi the Squishy', build: 'mochi', boss: true, scale: 3.0, radius: 1.3, speed: 1.8, life: 1, dmg: 1.2, move: 'bounce', attack: { type: 'slam', range: 3.5, radius: 4.2, cd: 3.4, windup: 1.0 }, variants: [{ color: '#ffe0ec', crown: true, topping: 'berry' }], summon: 'mochi' },
-  kasaLord: { name: 'Lord Karakasa', build: 'kasa', boss: true, scale: 2.6, radius: 1.1, speed: 2.2, life: 1, dmg: 1.3, move: 'hop', attack: { type: 'spin', range: 3, radius: 3.4, cd: 3.0, windup: 0.7 }, variants: [{ color: '#c8364a' }], summon: 'kasa' },
+  kasaLord: { name: 'Lord Karakasa', build: 'kasa', boss: true, scale: 2.6, radius: 1.1, speed: 2.2, life: 1, dmg: 1.3, move: 'hop', attack: { type: 'spin', range: 3, radius: 3.4, cd: 3.0, windup: 0.7 }, variants: [{ color: '#c8364a', crown: true }], summon: 'kasa' },
   oniChef: { name: 'Oni Chef Gorobei', build: 'oni', boss: true, scale: 2.4, radius: 1.1, speed: 2.0, life: 1, dmg: 1.4, move: 'waddle', element: 'fire', attack: { type: 'barrage', range: 9, cd: 3.0, windup: 0.8, proj: 'firepot', speed: 8 }, variants: [{ color: '#ff5a4a' }], summon: 'lantern' },
   nineTails: { name: 'Tamamo, the Nine-Tailed', build: 'fox', boss: true, scale: 2.2, radius: 0.9, speed: 3.2, life: 1, dmg: 1.5, move: 'walk', element: 'zap', attack: { type: 'barrage', range: 10, cd: 2.4, windup: 0.6, proj: 'foxfire', speed: 10 }, variants: [{ color: '#fff4ea' }], summon: 'wisp' },
 };

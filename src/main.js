@@ -3,6 +3,7 @@
 const params = new URLSearchParams(location.search);
 const test = params.get('test');
 if (test) {
+  document.getElementById('boot')?.remove();
   import(`./tests/${test}.js`).then(m => m.default?.()).catch(e => { console.error('[test] failed', e); });
 } else {
   import('./game.js').then(m => m.boot()).catch(e => { console.error('[boot] failed', e); });
