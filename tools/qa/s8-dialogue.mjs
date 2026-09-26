@@ -45,7 +45,11 @@ try {
   await page.keyboard.press('Escape'); await sleep(page, 400);
 
   // F on the last line of a no-choice dialogue must not re-open the conversation
-  const folkOrNpc = await page.evaluate(() => { const G = window.G; const n = G.npcs.find(x => x.id === 'kuma') || G.npcs[1]; G.player.setPos(n.pos.x + 0.8, n.pos.z); n.state = 'idle'; n.t = 99; return n.id; });
+  const folkOrNpc = await page.evaluate(() => {
+    const G = window.G; const n = G.npcs.find(x => x.id === 'kuma') || G.npcs[1];
+    // a random request of this villager that happens to be complete would open a thank-you menu first: not what this check is about
+    const St = G.story; St.Q.active = St.Q.active.filter(q => { const d = St.def(q.id); return !(d?.request && d.steps?.some(s => s.npc === n.id)); });
+    G.player.setPos(n.pos.x + 0.8, n.pos.z); n.state = 'idle'; n.t = 99; return n.id; });
   await sleep(page, 200);
   const preF = await page.evaluate(() => { const G = window.G, k = G.npcs.find(x => x.id === 'kuma'); return { modal: G.ui.anyModal(), open: Object.keys(G.ui.panels).filter(n => G.ui.isOpen(n)), locked: G.player.controlLocked, kvis: k?.visible, kTalking: k?.talking, dist: k ? Math.hypot(k.pos.x - G.player.pos.x, k.pos.z - G.player.pos.z).toFixed(2) : null, paused: G.ui.isPaused?.(), build: G.build?.active, title: G.titleActive, dead: G.playerDead, focus: document.activeElement?.tagName + '.' + document.activeElement?.className }; });
   await tap(page, 'f'); await sleep(page, 400);
