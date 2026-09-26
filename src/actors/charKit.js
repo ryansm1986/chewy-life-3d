@@ -258,12 +258,13 @@ function buildHead(R, head, sp, spec, { fur, fur2, fur3, skin }) {
     const ez = sp.frogEyes ? 0.2 : (sp.human ? 0.262 : 0.255);
     eg.position.set(ex, ey, ez);
     eg.rotation.y = s * (sp.frogEyes ? 0.3 : 0.42);
+    eg.rotation.x = -0.22; // look up a little toward the isometric camera
     const big = spec.eyeSize || (sp.human ? 1.3 : 1.22);
     const ep = [];
     if (sp.human || spec.eyeWhite) ep.push(ell(0.058 * big, 0.07 * big, 0.02, '#ffffff', [0, 0, -0.004]));
     ep.push(ell(0.05 * big, 0.064 * big, 0.024, spec.iris ? spec.iris : eyeC, [0, -0.004, 0]));
-    if (spec.iris) ep.push(ell(0.03 * big, 0.04 * big, 0.022, '#1a0e0a', [0, -0.002, 0.008]));
-    ep.push(ell(0.019 * big, 0.019 * big, 0.012, '#ffffff', [-s * 0.012 - 0.008, 0.024 * big, 0.022]));
+    if (spec.iris) ep.push(ell(0.036 * big, 0.047 * big, 0.022, '#1a0e0a', [0, 0.004, 0.008]));
+    ep.push(ell(0.021 * big, 0.021 * big, 0.012, '#ffffff', [-s * 0.012 - 0.008, 0.026 * big, 0.024]));
     ep.push(ell(0.009 * big, 0.009 * big, 0.008, '#ffffff', [s * 0.016, -0.026 * big, 0.022]));
     if (sp.human) ep.push(curve([[-0.055, 0.055, 0.012], [0, 0.078, 0.02], [0.06, 0.06, 0.012], [0.075, 0.075, 0.005]].map(([x, y, z]) => [x * -s * -1 * (s < 0 ? -1 : 1), y, z]), 0.008, '#2a1418'));
     const m = new THREE.Mesh(merge(ep), R.mat); m.castShadow = false;

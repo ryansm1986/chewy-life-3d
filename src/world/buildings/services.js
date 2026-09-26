@@ -284,8 +284,9 @@ export function school(B) {
   B.at([1.45, 0, 0.9], 0, () => {
     const p = G.cyl(0.03, 0.035, 2.3, 6); p.translate(0, 1.15, 0); B.add(p, '#e8e0d8');
     const ball = G.sph(0.05, 6, 4); ball.translate(0, 2.32, 0); B.add(ball, C.gold);
-    const fl = G.plane(0.56, 0.36, 4, 3); fl.translate(0.3, 2.05, 0); B.cloth(fl, '#fff6ea', { x0: 0.02, x1: 0.58, yTop: 2.23, yBot: 1.87 });
-    const dot = G.disc(0.1, 12); dot.translate(0.3, 2.05, 0.005); B.cloth(dot, '#ff6f7f', { x0: 0.02, x1: 0.58, yTop: 2.23, yBot: 1.87 });
+    const fl = G.plane(0.56, 0.36, 4, 3); fl.translate(0.3, 2.05, 0); B.cloth(fl, '#7cc4f4', { x0: 0.02, x1: 0.58, yTop: 2.23, yBot: 1.87 });
+    const st = flatSymbol('book'); st.scale(0.26, 0.26, 1); st.translate(0.3, 2.05, 0.005); B.cloth(st, '#fff6ea', { x0: 0.02, x1: 0.58, yTop: 2.23, yBot: 1.87 });
+    const hem = G.plane(0.56, 0.05, 4, 1); hem.translate(0.3, 1.895, 0.004); B.cloth(hem, '#ffd24a', { x0: 0.02, x1: 0.58, yTop: 2.23, yBot: 1.87 });
   });
   B.at([-1.35, 0, 0.95], 0, () => { const sb = G.box(0.9, 0.12, 0.7, 0.03); sb.translate(0, 0.06, 0); B.add(sb, C.woodLight); const sand = G.box(0.8, 0.04, 0.6, 0); sand.translate(0, 0.12, 0); B.add(sand, '#f4e0b0'); const bk = G.cyl(0.07, 0.06, 0.1, 8); bk.translate(0.2, 0.19, 0.1); B.add(bk, '#6ab0ff'); });
   B.at([0.35, 0, 0.95], -0.3, () => signboard(B, { sym: 'star', w: 0.4, h: 0.4, style: 'aframe', color: '#3a4a44', frame: C.woodLight, symSize: 0.28 }));

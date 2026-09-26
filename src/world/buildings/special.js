@@ -24,13 +24,14 @@ export function townHall(B) {
   onFace(B, blk, 'f', 0, y0, () => {
     door(B, { w: 1.3, h: 1.45, style: 'lattice' });
     noren(B, { w: 1.3, h: 0.55, y: 1.5, z: 0.18, color: C.indigo, strips: 3, symbol: () => flatSymbol('sakura'), symScale: 0.3 });
-    B.at([0, 1.72, 0.12], 0, () => signboard(B, { sym: 'sakura', w: 0.9, h: 0.28, color: '#3a2a30', frame: C.gold, symSize: 0.24 }));
   });
   for (const u of [-1.75, -0.95, 0.95, 1.75]) onFace(B, blk, 'f', u, y0 + 0.95, () => shoji(B, { w: 0.58, h: 0.62, box: Math.abs(u) > 1.5, flowers: ['#ff9ec0', '#ffffff'] }));
   for (const u of [-0.5, 0.5]) { onFace(B, blk, 'r', u, y0 + 0.95, () => shoji(B, { w: 0.7, h: 0.6 })); onFace(B, blk, 'l', u, y0 + 0.95, () => shoji(B, { w: 0.7, h: 0.6 })); }
   for (const u of [-1.2, 0, 1.2]) onFace(B, blk, 'b', u, y0 + 0.95, () => shoji(B, { w: 0.7, h: 0.6 }));
   // lower tier: pent roof on veranda posts
-  const low = roof(B, { type: 'skirt', w, d, y0: y0 + h, over: 0.62, H: 0.95, curve: 0.38, lift: 0.34, liftW: 0.9, thick: 0.16, ribW: 0.3, color: roofCol, tTop: 0.5 });
+  const low = roof(B, { type: 'skirt', w, d, y0: y0 + h, over: 0.62, H: 0.95, curve: 0.38, lift: 0.34, liftW: 0.9, thick: 0.16, ribW: 0.3, color: roofCol, tTop: 0.5, pastel: 0.2, moss: 0.15 });
+  // chidori-hafu entrance gable jutting from the lower roof over the stairs
+  B.at([0, 0, d / 2 + 0.2], 0, () => roof(B, { type: 'gable', ridge: 'z', w: 1.5, d: 1.3, y0: y0 + h + 0.02, over: 0.3, gOver: 0.24, H: 0.62, curve: 0.45, lift: 0.22, liftW: 0.45, thick: 0.13, ribW: 0.26, color: roofCol, gable: 'ornate', pastel: 0.2 }));
   posts(B, [-2.4, -1.25, 1.25, 2.4], d / 2 + 0.5, y0 + h - 0.1, C.vermilion, 0.075);
   const beam = G.box(4.9, 0.12, 0.1, 0.02); beam.translate(0, y0 + h - 0.12, d / 2 + 0.5); B.add(beam, C.vermilion);
   for (const x of [-1.85, -0.62, 0.62, 1.85]) B.at([x, y0 + h - 0.2, d / 2 + 0.5], 0, () => chochin(B, { r: 0.13, h: 0.26, cord: 0.02 }));
@@ -38,12 +39,13 @@ export function townHall(B) {
   const y2 = low.topY, w2 = Math.max(3.0, low.openW + 0.12), d2 = Math.max(1.3, low.openD + 0.1), h2 = 1.25;
   walls(B, { w: w2, d: d2, h: h2, y0: y2, plaster: '#fff6ea', rail: false });
   const blk2 = { w: w2, d: d2 };
-  for (const u of [-0.95, 0, 0.95]) onFace(B, blk2, 'f', u, y2 + 0.66, () => (u === 0 ? roundWindow(B, { r: 0.3, lattice: 'fine' }) : shoji(B, { w: 0.62, h: 0.5 })));
+  for (const u of [-1.0, 1.0]) onFace(B, blk2, 'f', u, y2 + 0.66, () => shoji(B, { w: 0.56, h: 0.5 }));
+  onFace(B, blk2, 'f', 0, y2 + 0.68, () => signboard(B, { sym: 'sakura', w: 1.0, h: 0.46, color: '#3a2a30', frame: C.gold, symSize: 0.38 }));
   onFace(B, blk2, 'r', 0, y2 + 0.66, () => roundWindow(B, { r: 0.26 }));
   onFace(B, blk2, 'l', 0, y2 + 0.66, () => roundWindow(B, { r: 0.26 }));
   onFace(B, blk2, 'b', 0, y2 + 0.66, () => shoji(B, { w: 1.0, h: 0.5 }));
   // railing balcony ring on the pent roof top
-  const top = roof(B, { type: 'irimoya', w: w2, d: d2, y0: y2 + h2, over: 0.55, H: 1.05, curve: 0.46, lift: 0.4, liftW: 0.9, thick: 0.17, ribW: 0.3, color: roofCol, gable: 'ornate', tg: 0.46, shachi: true });
+  const top = roof(B, { type: 'irimoya', w: w2, d: d2, y0: y2 + h2, over: 0.55, H: 1.05, curve: 0.46, lift: 0.4, liftW: 0.9, thick: 0.17, ribW: 0.3, color: roofCol, gable: 'ornate', tg: 0.46, shachi: true, pastel: 0.2 });
   // bell cupola on the ridge
   const ry = top.ridgeY;
   B.push([0, ry + 0.12, 0]);

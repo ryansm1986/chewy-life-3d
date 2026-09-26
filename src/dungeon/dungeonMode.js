@@ -42,6 +42,11 @@ export class DungeonMode {
     G.ui?.banner?.(`Floor ${this.floor}`, `The Burrow — ${this.theme.name}`, { style: 'area' });
     if (L.boss) setTimeout(() => G.ui?.banner?.(MONSTERS[L.boss].name, 'awaits in the deepest chamber…', { style: 'boss' }), 2600);
     G.state.dungeon.deepest = Math.max(G.state.dungeon.deepest || 0, this.floor);
+    // dungeon colour grade (the village day/night grade doesn't run down here)
+    const post = G.engine.post, gr = post.grade.uniforms;
+    gr.get('uLift').value.set(0.012, 0.004, 0.02); gr.get('uGain').value.set(1.05, 1.0, 0.95); gr.get('uSat').value = 1.1;
+    gr.get('uVigColor').value.set(0.16, 0.1, 0.16); gr.get('uVignette').value = 1.25;
+    post.bloom.intensity = 1.15; post.bloom.luminanceMaterial.threshold = 0.6;
   }
   spawnPack(sp) {
     const L = this.layout, G = this.G;
@@ -140,9 +145,11 @@ export class DungeonMode {
   }
   makeWaypoint(p) {
     const W = this.world, G = this.G;
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.2, 0.2, 24), makeToon({ color: '#c8c0d0', rim: 0.3 })); base.position.copy(p).setY(0.1); base.receiveShadow = true;
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.25, 0.2, 24), makeToon({ color: '#7a7890', rim: 0.3, brush: 0.3 })); base.position.copy(p).setY(0.1); base.receiveShadow = true;
+    for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; const st = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 0.5 + (i % 2) * 0.3, 6), makeToon({ color: '#9a98b0', rim: 0.3 })); st.position.set(p.x + Math.cos(a) * 1.4, 0.25, p.z + Math.sin(a) * 1.4); st.castShadow = true; W.scene.add(st); }
     const rune = new THREE.Mesh(new THREE.CircleGeometry(0.8, 24), new THREE.MeshBasicMaterial({ map: glowTexture(), color: new THREE.Color('#8fd0ff'), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); rune.rotation.x = -Math.PI / 2; rune.position.copy(p).setY(0.22);
     W.scene.add(base, rune);
+    W.lightPool.addSource({ pos: p.clone().setY(0.8), color: new THREE.Color('#8fd0ff'), intensity: 5, radius: 6, flicker: 0.2 });
     W.interactables.push({ pos: p, radius: 1.4, label: 'Use Waypoint', onInteract: () => G.openWaypoints?.() });
     (this.spinners ||= []).push((dt, t) => { rune.material.opacity = 0.6 + Math.sin(t * 2) * 0.3; });
   }
@@ -228,8 +235,9 @@ export class DungeonMode {
   }
   sporeCloud(pos, r, dmg, src) {
     const G = this.G, P = G.player;
-    G.vfx.stink(pos, 20); Events.emit('sfx', 'stink', { pos });
-    this.combat.addZone({ pos: pos.clone(), radius: r, life: 3, tick: 0.6, update: (dt) => { if (Math.random() < 0.5) G.vfx.stink(pos.clone().add(V(rand(-r, r) * 0.6, 0, rand(-r, r) * 0.6)), 1); },
+    G.vfx.stink(pos, 8); Events.emit('sfx', 'stink', { pos });
+    for (let i = 0; i < 10; i++) G.vfx.spark.spawn({ x: pos.x + rand(-r, r) * 0.7, y: rand(0.2, 1), z: pos.z + rand(-r, r) * 0.7, vy: rand(0.2, 0.6), life: rand(1, 2), size: rand(0.12, 0.22), color: '#f0ff9a', alpha: 0.9, alpha1: 0, spin: rand(-2, 2) });
+    this.combat.addZone({ pos: pos.clone(), radius: r, life: 2.6, tick: 0.6, update: (dt) => { if (Math.random() < 0.12) G.vfx.stink(pos.clone().add(V(rand(-r, r) * 0.6, 0, rand(-r, r) * 0.6)), 1); },
       onTick: () => { if (!G.playerDead && dist(P.pos.x, P.pos.z, pos.x, pos.z) < r) this.combat.hitPlayer(Math.round(dmg * 0.35), { element: 'stink', level: src.level, src }); } });
   }
   fireNova(m) {

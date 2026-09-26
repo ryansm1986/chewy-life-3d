@@ -108,19 +108,19 @@ export function lumber(B, L) {
 
 // ------------------------------------------------------------------ pottery kiln (noborigama)
 export function kiln(B, L) {
-  const clay = '#c88a6a', clayD = '#a86a50';
-  // stepped climbing chambers rising toward -z on a little slope
-  const slope = G.box(1.4, 0.5, 2.4, 0.2); slope.translate(-0.45, 0.0, -0.3); B.add(slope, '#9a8a7a');
+  const clay = '#d8a282', clayD = '#b07a60';
+  // stepped climbing chambers (rounded humps) rising toward -z up a grassy slope
+  const slope = puff(V(-0.45, -0.25, -0.45), 1.25, { detail: 2, noise: 0.08, squash: 0.45, seed: 9 }); slope.scale(0.75, 1, 1.25); slope.translate(-0.11, 0, 0.1);
+  B.add(slope, (p, n, o) => o.set('#8cc070').lerp(col('#a8a0b0'), clamp(0.8 - n.y)));
   for (let i = 0; i < 3; i++) {
-    const z = 0.55 - i * 0.72, y = 0.12 + i * 0.22, r = 0.55;
-    const ch = new THREE.CylinderGeometry(r, r, 0.66, 14, 1, false, -PI / 2, PI); ch.rotateX(PI / 2); ch.rotateZ(0); ch.scale(1, 0.95, 1); ch.translate(-0.45, y, z);
-    B.add(ch, (p, n, o) => o.set(clay).lerp(col(clayD), clamp(Math.sin(p.x * 30) * 0.3 + 0.3)));
-    // peep hole glow on the side
-    const hole = G.disc(0.07, 8); hole.rotateY(PI / 2); hole.translate(0.11, y + 0.22, z); B.glow(hole, '#ff9a3a', { hot: true, tint: 1, flicker: 1 });
-    const hr = G.torus(0.08, 0.025, 4, 10); hr.rotateY(PI / 2); hr.translate(0.105, y + 0.22, z); B.add(hr, clayD);
+    const z = 0.5 - i * 0.62, y = 0.02 + i * 0.26, r = 0.5;
+    const hump = G.sph(r, 14, 9, 0, TAU, 0, PI / 2); hump.scale(1, 0.95, 0.78); hump.translate(-0.45, y, z);
+    B.add(hump, (p, n, o) => { o.set(clay).lerp(col('#e8b894'), clamp(n.y * 0.6)); const row = Math.floor((p.y - y) / 0.09); if (((p.y - y) % 0.09) < 0.012) o.multiplyScalar(0.82); void row; });
+    const hole = G.disc(0.065, 8); hole.rotateY(PI / 2); hole.translate(0.06, y + 0.18, z); B.glow(hole, '#ff9a3a', { hot: true, tint: 1, flicker: 1 });
+    const hr = G.torus(0.07, 0.022, 4, 10); hr.rotateY(PI / 2); hr.translate(0.055, y + 0.18, z); B.add(hr, clayD);
   }
   // firebox mouth at the front with glowing arch
-  B.push([-0.45, 0.05, 0.92]);
+  B.push([-0.45, 0.02, 0.98]);
   const fb = G.box(0.8, 0.55, 0.4, 0.08); fb.translate(0, 0.27, 0); B.add(fb, clayD);
   const arch = new THREE.Shape(); arch.moveTo(-0.18, 0); arch.lineTo(0.18, 0); arch.lineTo(0.18, 0.12); arch.absarc(0, 0.12, 0.18, 0, PI, false); arch.lineTo(-0.18, 0);
   const ag = new THREE.ShapeGeometry(arch, 8); ag.translate(0, 0.04, 0.205); B.glow(ag, '#ff8a2a', { hot: true, tint: 1, flicker: 1 });

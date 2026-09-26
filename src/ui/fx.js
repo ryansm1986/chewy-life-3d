@@ -289,12 +289,14 @@ export class Iris {
     this.rimg.setAttribute('transform', tr + ' ');
     this.rimg.firstElementChild.setAttribute('stroke-width', (3 / Math.max(0.05, s)).toFixed(2));
   }
+  // log-space zoom so the paw shape stays readable for most of the animation
   _anim(from, to, ms, easeFn, cx, cy) {
+    const la = Math.log(Math.max(from, 0.05)), lb = Math.log(Math.max(to, 0.05));
     return new Promise(res => {
       const t0 = performance.now();
       const step = now => {
         const u = clamp((now - t0) / ms);
-        this._set(from + (to - from) * easeFn(u), cx, cy);
+        this._set(Math.exp(la + (lb - la) * easeFn(u)), cx, cy);
         if (u < 1) requestAnimationFrame(step); else res();
       };
       requestAnimationFrame(step);
@@ -311,14 +313,18 @@ export class Iris {
     const big = Math.hypot(innerWidth, innerHeight) / (shape === 'circle' ? 70 : 22);
     this.root.classList.add('on');
     this._set(big, cx, cy);
-    const inBack = t => t * t * (2.2 * t - 1.2);
-    await this._anim(big, 0, opts.inMs || 620, inBack, cx, cy);
+    const inOut = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+    const antic = t => (t < 0.12 ? -0.04 * Math.sin((t / 0.12) * Math.PI) : inOut((t - 0.12) / 0.88)); // tiny grow before closing
+    await this._anim(big, 0.12, opts.inMs || 760, antic, cx, cy);
+    this._set(0.0001, cx, cy);
     this.root.classList.add('covered');
+    const t0 = performance.now();
     try { await mid?.(); } catch (e) { console.error('[ui] transition mid failed', e); }
-    await wait(opts.hold ?? 280);
+    await wait(Math.max(0, (opts.hold ?? 520) - (performance.now() - t0)));
     this.root.classList.remove('covered');
-    const outBack = t => 1 + 2.4 * Math.pow(t - 1, 3) + 1.4 * Math.pow(t - 1, 2);
-    await this._anim(0, big, opts.outMs || 700, outBack, innerWidth / 2, innerHeight / 2);
+    await wait(120);
+    const ox = innerWidth / 2, oy = innerHeight / 2;
+    await this._anim(0.12, big, opts.outMs || 900, inOut, ox, oy);
     this.root.classList.remove('on');
     this.active = false;
   }

@@ -40,7 +40,7 @@ export class Monster {
     this.facing = rand(0, TAU);
     this.speed = def.speed * this.stats.speedMul;
     this.status = {};
-    this.state = 'idle'; this.stateT = 0; this.cd = rand(0.5, 1.5); this.aggro = false;
+    this.state = 'idle'; this.stateT = 0; this.cd = rand(0.6, 2.4); this.aggro = false;
     this.leader = leader; this.wander = null; this.knock = new THREE.Vector3();
     this.shadow = contactShadow(this.radius * 1.2);
     this.world.scene.add(this.model.root, this.shadow);
@@ -202,7 +202,7 @@ export class Monster {
     this.anim.wind = 1;
     this.kit?.play(A.type === 'ranged' ? 'throw' : 'swing', { speed: 0.9 / A.windup * 0.4 });
     const vfx = this.G.vfx;
-    if (A.type === 'aoe') this.telegraph = vfx.telegraph(this.pos, A.radius, A.windup, '#9ee05a');
+    if (A.type === 'aoe') this.telegraph = vfx.telegraph(this.pos, A.radius, A.windup, '#c8e070');
     else if (A.type === 'slam') { this.telegraph = vfx.telegraph(this.atkPoint, A.radius, A.windup, '#ff5a6a'); }
     else if (A.type === 'spin') this.telegraph = vfx.telegraph(this.pos, A.radius, A.windup, '#ff5a6a');
     else if (A.type === 'charge') { this.chargeDir = target.pos.clone().sub(this.pos).setY(0).normalize(); }

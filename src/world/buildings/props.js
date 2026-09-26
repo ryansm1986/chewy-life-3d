@@ -36,24 +36,29 @@ export function chochin(B, { r = 0.17, h = 0.36, color = C.red, band = true, cor
   return y0 - 0.05 - h / 2;
 }
 
-// Stone lantern (toro) — ground at 0; returns light height
+// Stone lantern (toro): hexagonal kasuga-style, chunky and mossy. Ground at 0; returns the light height.
 export function toro(B, { s = 1, moss = true } = {}) {
-  let y = 0;
-  B.push([0, 0, 0], B.wob(0.1), s);
-  const stone = () => B.pick(STONES);
-  const mossy = base => (p, n, o) => { o.set(base); if (moss && n.y > 0.55) o.lerp(col(C.moss), 0.55); };
-  const g1 = G.cyl(0.26, 0.3, 0.14, 6); g1.translate(0, 0.07, 0); B.add(g1, mossy(stone()));
-  const g2 = G.cyl(0.1, 0.13, 0.62, 8); g2.translate(0, 0.14 + 0.31, 0); B.add(g2, stone());
-  const g3 = G.cyl(0.26, 0.2, 0.11, 6); g3.translate(0, 0.8, 0); B.add(g3, mossy(stone()));
-  // fire box
-  const fb = G.box(0.28, 0.26, 0.28, 0.03); fb.translate(0, 0.98, 0);
-  const inner = G.box(0.2, 0.2, 0.3, 0); inner.translate(0, 0.98, 0); B.glow(inner, '#fff0c0', { flicker: 0.6 });
-  const inner2 = G.box(0.3, 0.2, 0.2, 0); inner2.translate(0, 0.98, 0); B.glow(inner2, '#fff0c0', { flicker: 0.6 });
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const p = G.box(0.07, 0.26, 0.07, 0.015); p.translate(sx * 0.12, 0.98, sz * 0.12); B.add(p, stone()); }
-  roof(B, { type: 'hip', w: 0.26, d: 0.26, y0: 1.1, over: 0.14, H: 0.22, curve: 0.5, lift: 0.1, liftW: 0.12, thick: 0.07, ribW: 0, course: 0, color: STONES[2], edge: STONES[0], under: STONES[4], cap: STONES[1], finial: 'stone', moss: moss ? 0.7 : 0 });
+  B.push([0, 0, 0], B.wob(0.12), s);
+  const st = () => B.pick(STONES);
+  const mossy = base => (p, n, o) => { o.set(base); if (moss && n.y > 0.6) o.lerp(col(C.moss), 0.5); };
+  const hex = (rt, rb, h, y, c) => { const g = G.cyl(rt, rb, h, 6); g.translate(0, y + h / 2, 0); B.add(g, c); };
+  hex(0.25, 0.29, 0.12, 0, mossy(st()));
+  hex(0.19, 0.23, 0.08, 0.12, mossy(st()));
+  const pil = G.cyl(0.095, 0.115, 0.5, 8); pil.translate(0, 0.45, 0); B.add(pil, st());
+  const ring = G.torus(0.105, 0.02, 4, 10); ring.rotateX(PI / 2); ring.translate(0, 0.46, 0); B.add(ring, st());
+  hex(0.25, 0.15, 0.1, 0.7, mossy(st()));
+  // fire box: glowing hex lantern with stone corner posts
+  const glow = G.cyl(0.15, 0.15, 0.22, 6); glow.translate(0, 0.92, 0); B.glow(glow, '#fff0c8', { flicker: 0.7 });
+  for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; const p = G.box(0.06, 0.24, 0.06, 0); p.rotateY(a); p.translate(Math.sin(a) * 0.165, 0.92, Math.cos(a) * 0.165); B.add(p, st()); }
+  hex(0.2, 0.2, 0.03, 0.795, st());
+  // kasa: thick hexagonal cap with upturned warabite corners + hoju finial
+  const kasa = G.cyl(0.05, 0.36, 0.2, 6); kasa.translate(0, 1.16, 0); B.add(kasa, mossy(st()));
+  const brim = G.cyl(0.36, 0.34, 0.06, 6); brim.translate(0, 1.04, 0); B.add(brim, st());
+  for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; const c = G.sph(0.045, 6, 4); c.scale(1, 1.3, 1); c.translate(Math.sin(a) * 0.36, 1.1, Math.cos(a) * 0.36); B.add(c, st()); }
+  const nk = G.cyl(0.05, 0.06, 0.06, 6); nk.translate(0, 1.28, 0); B.add(nk, st());
+  const hj = G.lathe([[0.001, 0], [0.06, 0.02], [0.075, 0.08], [0.04, 0.15], [0.001, 0.2]], 8); hj.translate(0, 1.3, 0); B.add(hj, st());
   B.pop();
-  y = 0.98 * s;
-  return y;
+  return 0.92 * s;
 }
 
 export function barrel(B, { r = 0.2, h = 0.42, wood = C.woodLight, lid = true } = {}) {

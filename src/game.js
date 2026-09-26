@@ -161,6 +161,7 @@ export async function boot() {
       player.anim.stop(); G.playerDead = false; G.actions.restoreAll(); shadow.fainted = 0; shadow.untargetable = false; shadow.anim.stop();
       rig.focus.copy(player.pos); rig.snap();
       G.ui?.setMode?.('village'); G.ui?.setBoss?.(null);
+      engine.post.grade.uniforms.get('uVigColor').value.set(0.55, 0.45, 0.65); engine.post.grade.uniforms.get('uVignette').value = 1.0; day.apply();
       G.ui?.minimap?.setProvider?.(vMap);
       G.audio?.music?.(day.isNight() ? 'village_night' : 'village_day'); G.audio?.ambience?.(day.isNight() ? 'night' : 'village');
       Events.emit('mode:changed', { mode: 'village' });

@@ -10,8 +10,8 @@ const K = [
   { h: 8.5, sun: '#fff0d8', si: 2.9, sky: '#bcdcff', gnd: '#b4c28c', hi: 1.25, fog: '#cfe6ff', zen: '#7cc0ff', hor: '#d8f0ff', rim: '#fff0c8', lift: [0.02, 0.0, 0.05], gain: [1.03, 1.0, 0.96], sat: 1.12, night: 0 },
   { h: 13, sun: '#fff8ee', si: 3.1, sky: '#c4e2ff', gnd: '#b8c890', hi: 1.3, fog: '#d4ecff', zen: '#6cbcff', hor: '#e0f4ff', rim: '#fff4dc', lift: [0.02, 0.0, 0.045], gain: [1.02, 1.0, 0.97], sat: 1.12, night: 0 },
   { h: 16.5, sun: '#ffdcaa', si: 2.9, sky: '#c0d4ff', gnd: '#c8b888', hi: 1.2, fog: '#ffe4c8', zen: '#88b8f0', hor: '#ffe8d0', rim: '#ffd8a0', lift: [0.03, 0.0, 0.05], gain: [1.06, 1.0, 0.92], sat: 1.14, night: 0 },
-  { h: 18.4, sun: '#ff9870', si: 2.1, sky: '#c8a8e0', gnd: '#b07878', hi: 1.1, fog: '#ffb4a0', zen: '#8878d0', hor: '#ffa890', rim: '#ffa070', lift: [0.05, 0.0, 0.06], gain: [1.1, 0.97, 0.9], sat: 1.18, night: 0.15 },
-  { h: 19.6, sun: '#c088e0', si: 1.0, sky: '#7a70c0', gnd: '#503850', hi: 1.1, fog: '#7a68b0', zen: '#3a3480', hor: '#b078b8', rim: '#d0a0ff', lift: [0.03, 0.0, 0.09], gain: [0.98, 0.95, 1.08], sat: 1.1, night: 0.7 },
+  { h: 18.4, sun: '#ffb070', si: 2.2, sky: '#b8b4e0', gnd: '#b89080', hi: 1.1, fog: '#ffc8a8', zen: '#8878d0', hor: '#ffb890', rim: '#ffb070', lift: [0.04, 0.01, 0.05], gain: [1.08, 0.99, 0.9], sat: 1.08, night: 0.12 },
+  { h: 19.6, sun: '#d898c8', si: 1.1, sky: '#7a78c0', gnd: '#584050', hi: 1.1, fog: '#7a70b0', zen: '#3a3480', hor: '#c888b8', rim: '#e0a8ff', lift: [0.03, 0.01, 0.08], gain: [0.98, 0.96, 1.06], sat: 1.05, night: 0.7 },
   { h: 21, sun: '#8ea8ff', si: 1.0, sky: '#4a5a9a', gnd: '#2c2848', hi: 1.15, fog: '#2a3060', zen: '#10183a', hor: '#2c3a70', rim: '#9fb8ff', lift: [0.0, 0.02, 0.08], gain: [0.92, 0.97, 1.1], sat: 1.0, night: 1 },
   { h: 24, sun: '#8ea8ff', si: 1.0, sky: '#4a5a9a', gnd: '#2c2848', hi: 1.15, fog: '#2a3060', zen: '#10183a', hor: '#2c3a70', rim: '#9fb8ff', lift: [0.0, 0.02, 0.08], gain: [0.92, 0.97, 1.1], sat: 1.0, night: 1 },
 ];

@@ -110,6 +110,7 @@ export default async function () {
   });
 
   // ---- demo helpers
+  window.UI = UI;
   const demo = window.demo = {
     G, UI, gen,
     title: () => UI.setMode('title'),

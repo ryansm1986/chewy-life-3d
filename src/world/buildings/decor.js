@@ -92,21 +92,29 @@ export function miniTorii(B) {
 }
 
 export function koiStatue(B) {
-  const ped = G.lathe([[0.001, 0], [0.38, 0], [0.4, 0.08], [0.3, 0.14], [0.26, 0.5], [0.34, 0.56], [0.001, 0.56]], 10); B.add(ped, (p, n, o) => { o.set(STONES[1]); if (n.y > 0.8) o.set('#e0d8d4'); });
-  // stylised wave
-  const wave = G.torus(0.2, 0.08, 6, 14, PI * 1.3); wave.rotateY(PI / 2); wave.translate(0, 0.66, 0); B.add(wave, '#6aa8d8');
-  const foam = G.sph(0.08, 8, 6); foam.translate(0, 0.84, -0.18); B.add(foam, '#e8f4ff');
-  // leaping koi: curved body tube with fins & tail
-  const pts = [];
-  for (let i = 0; i <= 8; i++) { const t = i / 8; const a = -0.6 + t * 1.9; pts.push({ p: V(0, 0.9 + Math.sin(a) * 0.36, Math.cos(a) * 0.3 - 0.05), r: 0.03 + Math.sin(Math.min(1, t * 1.3) * PI) * 0.1 }); }
-  B.add(tube(pts, 8, true), (p, n, o) => { o.set('#fff6ea'); if (Math.sin(p.y * 22 + p.z * 9) > 0.2 && n.x > -0.3) o.set('#ff7a3a'); });
-  const tailP = pts[1].p;
-  const tail = G.cone(0.12, 0.2, 4); tail.scale(0.25, 1, 1); tail.rotateX(0.7); tail.translate(0, tailP.y - 0.1, tailP.z + 0.08); B.add(tail, '#ff7a3a');
-  const head = pts[7].p;
-  for (const s of [-1, 1]) { const e = G.sph(0.022, 5, 4); e.translate(s * 0.06, head.y + 0.02, head.z + 0.02); B.add(e, C.ink); }
-  const fin = G.cone(0.06, 0.12, 4); fin.scale(0.2, 1, 1); fin.translate(0, 1.2, 0.2); B.add(fin, '#ff9a5a');
-  const mouthJet = tube([{ p: V(0, head.y + 0.05, head.z - 0.08), r: 0.02 }, { p: V(0, head.y + 0.2, head.z - 0.25), r: 0.02 }, { p: V(0, head.y + 0.1, head.z - 0.4), r: 0.018 }], 5, false);
-  void mouthJet;
+  const ped = G.lathe([[0.001, 0], [0.38, 0], [0.4, 0.08], [0.3, 0.14], [0.27, 0.46], [0.34, 0.52], [0.001, 0.52]], 12);
+  B.add(ped, (p, n, o) => { o.set(STONES[1]); if (n.y > 0.8) o.set('#e0d8d4'); });
+  // splash of stylised water around the koi
+  for (let i = 0; i < 7; i++) { const a = i / 7 * TAU; const w = puff(V(Math.cos(a) * 0.18, 0.6 + (i % 2) * 0.05, Math.sin(a) * 0.18), 0.11, { detail: 1, noise: 0.2, squash: 0.8, seed: i + 30 }); B.add(w, i % 2 ? '#8fd0f0' : '#b8e4fa'); }
+  for (let i = 0; i < 5; i++) { const f = G.sph(0.045, 6, 5); f.translate(B.rand(-0.24, 0.24), 0.72 + B.rand(0, 0.06), B.rand(-0.24, 0.24)); B.add(f, '#f4fbff'); }
+  // leaping koi: plump arched body, calico patches, fins and a fan tail
+  const R = [0.035, 0.06, 0.085, 0.105, 0.115, 0.118, 0.112, 0.1, 0.08, 0.05];
+  const pts = R.map((r, i) => { const t = i / (R.length - 1); return { p: V(0, 0.62 + t * 0.72, -0.14 + Math.sin(t * PI * 0.9) * 0.2 - t * 0.02), r }; });
+  B.add(tube(pts, 10, true), (p, n, o) => {
+    o.set('#fff8ee');
+    const patch = Math.sin(p.y * 13 + 1.2) * Math.cos(p.z * 9 - 0.5) + (n.x > 0 ? 0.25 : -0.1);
+    if (patch > 0.2) o.set('#ff7a3a');
+    if (p.y > 1.22 && n.z < 0.3) o.set('#ff5a2a');
+  });
+  const head = pts[R.length - 2].p, tailP = pts[0].p;
+  for (const sx of [-1, 1]) {
+    const e = G.sph(0.028, 6, 5); e.translate(sx * 0.075, head.y + 0.03, head.z + 0.06); B.add(e, '#2a2230');
+    const hl = G.sph(0.01, 4, 3); hl.translate(sx * 0.082, head.y + 0.045, head.z + 0.08); B.add(hl, '#ffffff');
+    const fin = G.sph(0.08, 8, 5); fin.scale(0.2, 0.55, 1); fin.rotateX(0.6); fin.rotateZ(sx * 0.5); fin.translate(sx * 0.12, pts[6].p.y - 0.05, pts[6].p.z + 0.02); B.add(fin, '#ffb080');
+  }
+  const mouth = G.torus(0.028, 0.012, 4, 8); mouth.rotateX(-0.4); mouth.translate(0, head.y + 0.1, head.z + 0.05); B.add(mouth, '#ff9a80');
+  const dorsal = G.sph(0.12, 8, 5); dorsal.scale(0.12, 0.6, 1); dorsal.rotateX(-0.9); dorsal.translate(0, pts[5].p.y, pts[5].p.z - 0.11); B.add(dorsal, '#ff8a5a');
+  for (const sx of [-1, 1]) { const lobe = G.sph(0.12, 8, 5); lobe.scale(0.12, 1, 0.55); lobe.rotateX(sx * 0.5 + 0.2); lobe.translate(0, tailP.y - 0.08, tailP.z + sx * 0.07); B.add(lobe, '#ff7a3a'); }
   for (let i = 0; i < 4; i++) { const a = i * 1.6 + 0.3; B.at([Math.cos(a) * 0.4, 0, Math.sin(a) * 0.4], 0, () => bush(B, { r: 0.1, n: 1, color: '#5aa84a', flowers: i % 2 ? ['#ff8fb0'] : null })); }
   B.door.set(0, 0, 0.55);
   B.height = 1.6;

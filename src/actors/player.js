@@ -32,7 +32,7 @@ export class Player extends Actor {
     const h = this.rig.parts.handR;
     h.remove(this.sword); h.remove(this.ball);
     if (type === 'sword') {
-      h.add(this.sword); this.sword.rotation.set(Math.PI * 0.62, 0, 0); this.sword.position.set(0, -0.02, 0.02);
+      h.add(this.sword); this.sword.rotation.set(Math.PI * 0.78, 0, -0.25); this.sword.position.set(0, -0.02, 0.02);
       this.swordBack.visible = false;
     } else {
       h.add(this.ball); this.ball.position.set(0, -0.06, 0.03);

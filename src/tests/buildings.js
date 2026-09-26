@@ -51,6 +51,10 @@ export default function () {
   }
   const S = makeStage({ ground: Math.max(60, span + 30), center, dist: dist0, hour: 10, groundColor: P.get('ground') || '#8ec46e' });
   const scene = S.scene;
+  if (only || P.has('focus')) { // lift the look-at point to a third of the tallest building
+    const hMax = P.has('focus') ? placed[Math.min(placed.length - 1, +P.get('focus'))].m.height : Math.max(...placed.map(p => p.m.height));
+    S.engine.rig.focus.y = hMax * 0.32; S.engine.rig.snap();
+  }
   const padMat = makeToon({ color: '#93c864', brush: 0.25, rim: 0 });
   const lineMat = new THREE.LineBasicMaterial({ color: '#5a8a40', transparent: true, opacity: 0.35 });
   for (const p of placed) {

@@ -34,7 +34,7 @@ export class VillageSim {
       V.buildings = []; V.zones = []; V.paths = []; V.day = 1; V.income = [];
       this.seedStarterVillage();
     } else {
-      for (const p of V.paths || []) this.terrain.tiles[p[1] * WORLD + p[0]] = T.PATH;
+      for (const p of V.paths || []) { this.terrain.tiles[p[1] * WORLD + p[0]] = T.PATH; this.world.veg.clearRect(p[0], p[1], p[0] + 1, p[1] + 1, 0.1); }
       for (const [x, z, t] of V.zones || []) this.zone[z * WORLD + x] = t;
       for (const b of V.buildings) this.spawnModel(b, false);
     }
