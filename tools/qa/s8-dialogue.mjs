@@ -47,6 +47,7 @@ try {
   // F on the last line of a no-choice dialogue must not re-open the conversation
   const folkOrNpc = await page.evaluate(() => { const G = window.G; const n = G.npcs.find(x => x.id === 'kuma') || G.npcs[1]; G.player.setPos(n.pos.x + 0.8, n.pos.z); n.state = 'idle'; n.t = 99; return n.id; });
   await sleep(page, 200);
+  const preF = await page.evaluate(() => { const G = window.G, k = G.npcs.find(x => x.id === 'kuma'); return { modal: G.ui.anyModal(), open: Object.keys(G.ui.panels).filter(n => G.ui.isOpen(n)), locked: G.player.controlLocked, kvis: k?.visible, kTalking: k?.talking, dist: k ? Math.hypot(k.pos.x - G.player.pos.x, k.pos.z - G.player.pos.z).toFixed(2) : null, paused: G.ui.isPaused?.(), build: G.build?.active, title: G.titleActive, dead: G.playerDead, focus: document.activeElement?.tagName + '.' + document.activeElement?.className }; });
   await tap(page, 'f'); await sleep(page, 400);
   const opened = await page.evaluate(() => window.G.ui.dlg.active);
   await page.keyboard.press('1'); await sleep(page, 500); // "Chat"
@@ -59,7 +60,7 @@ try {
   }
   await sleep(page, 300);
   const after = await page.evaluate(() => ({ active: window.G.ui.dlg.active, choices: window.G.ui.dlg.choices?.map(c => c.text) || null, first: window.G.ui.dlg.lines?.[0]?.text?.slice(0, 50) }));
-  R.check(`pressing F to finish the last line does not immediately re-open the chat (${folkOrNpc})`, opened && !reopen && !after.active, JSON.stringify({ opened, reopen, after }));
+  R.check(`pressing F to finish the last line does not immediately re-open the chat (${folkOrNpc})`, opened && !reopen && !after.active, JSON.stringify({ opened, reopen, after, preF }));
   await settle();
 
   // gift twice the same day, heart reward

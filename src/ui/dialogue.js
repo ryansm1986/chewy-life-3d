@@ -138,7 +138,11 @@ export class Dialogue {
   key(k, e) {
     if (!this.active) return false;
     if (k === ' ' || k === 'Enter' || k === 'f' || k === 'F') { this.advance(); return true; }
-    if (/^[1-9]$/.test(k) && this.choices && !this.typing && this.i >= this.lines.length - 1) { this.choose(+k - 1); return true; }
+    if (/^[1-9]$/.test(k) && this.choices && this.i >= this.lines.length - 1) {
+      // choosing while the last line is still typing: finish the line and take the choice right away
+      if (this.typing) this.advance();
+      this.choose(+k - 1); return true;
+    }
     if (k === 'Escape') { if (!this.choices?.length) { if (this.typing) this.advance(); else this.finish(-1); } return true; }
     return true; // swallow gameplay keys while talking
   }

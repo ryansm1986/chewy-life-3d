@@ -299,7 +299,7 @@ export async function boot() {
   G.talkTo = (npc) => {
     if (npc.talking) return;
     npc.talking = true; player.controlLocked = true;
-    const done = () => { npc.talking = false; player.controlLocked = false; G.interactCooldown = engine.time + 0.4; Input.consume('f'); };
+    const done = () => { npc.talking = false; player.controlLocked = false; G.interactCooldown = performance.now() + 350; Input.consume('f'); };
     G.story.talk(npc).then(done, (e) => { console.error(e); done(); });
   };
   function nearestInteract() {
@@ -384,7 +384,7 @@ export async function boot() {
     if (Input.hit('t') && G.mode === 'dungeon') G.returnToVillage();
     const it = nearestInteract();
     G.ui?.setInteract?.(it ? it.label : null);
-    if (it && Input.hit('f') && engine.time > (G.interactCooldown || 0)) it.onInteract();
+    if (it && Input.hit('f') && performance.now() > (G.interactCooldown || 0)) it.onInteract();
     if (Input.mouse.wheel) rig.zoom(Input.mouse.wheel);
     // target frame
     if (hoverEnemy && !hoverEnemy.breakable) G.ui?.setTarget?.({ name: hoverEnemy.name, hp: hoverEnemy.life, max: hoverEnemy.lifeMax, rarity: hoverEnemy.rank, mods: (hoverEnemy.stats.mods || []).map(m => m) });
