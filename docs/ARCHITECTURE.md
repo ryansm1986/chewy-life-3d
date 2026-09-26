@@ -65,6 +65,26 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
 - `rig.dispose()` frees a throwaway rig (skips shared geometry). Don't store Object3Ds in `userData` (clone deep-copies it via JSON).
 - `enableXray(rig)` adds skinned silhouette twins bound to the same skeleton.
 
+- Shape language (Pokémon/Pokopia-like): `SPECIES` rows describe a sculpted head (`head` scale, `cheek`, `snout`
+  [length, width, height, centre], `tufts`, `eye` [spacing, height]). `sculptor(sp)` deforms a welded unit sphere and
+  `at(u, v, lift)` returns a point (+normal) on that surface, so eyes, nose, mouth, blush, brows and ears sit exactly on
+  the face. Face details are merged without an ink hull (`faceDetails`); only volumes get outlines.
+- Occluders: scenery that can hide Chewy/Shadow stamps stencil 2 (`markOccluder`, applied by `makeToon({occluder})` and
+  village buildings); the x-ray pass draws only over stencil 2.
+
+## Village life (src/actors/villageLife.js, npc.js, lifePoses.js)
+- `G.villageLife` (created by the first villager update) owns activity slots derived from `G.sim.list` (benches,
+  fountain rim, shop counters, farm, flower beds, fishing spots, statues, notice board, well, lanterns, hot spring),
+  claims (one villager per slot), a path grid that prefers paths, props (broom, watering can, rod) and chat pairing.
+- Villagers pick activities by `G.day.hour` and personality; talking to one (`talking = true`) drops everything.
+  `G.villageLife.force(villager, kind)` is a debug hook. Poses in lifePoses.js only move `rig.parts` groups.
+
+## Combat notes
+- `player.mouseSets` = [[LMB, RMB] sword set, [LMB, RMB] ball set]; the active pair is mirrored in `hotbar[0..1]`.
+  `swapWeapons()` swaps pairs and emits `hotbar:changed {swap, set}`; actions `mouseSet`, `ensureMouseSets`, `setWeaponType`.
+- Melee assist in skillRunner (`approachTo`, lunge, hit-frame re-check). `G.vfx.dampers` / `vfx.undamped()` tone down
+  effects on a live boss (its own telegraphs are exempt).
+
 ## Game context `G` (src/game.js)
 ```js
 G = { engine, input, events, state /* persistent save */, derived /* computed stats */, actions, ui, audio, vfx,
