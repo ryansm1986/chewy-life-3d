@@ -30,7 +30,7 @@ export function tube(points, radial = 7, capEnd = true) {
   const row = radial + 1;
   for (let i = 0; i < points.length - 1; i++) for (let k = 0; k < radial; k++) {
     const a = i * row + k, b = a + row, c = b + 1, d = a + 1;
-    idx.push(a, b, d, b, c, d);
+    idx.push(a, d, b, b, d, c); // counter-clockwise seen from outside (face normals agree with the vertex normals)
   }
   if (capEnd) { // pointed cap
     const last = points[points.length - 1];
@@ -38,7 +38,7 @@ export function tube(points, radial = 7, capEnd = true) {
     const t = new THREE.Vector3().subVectors(last.p, points[points.length - 2].p).normalize();
     pos.push(last.p.x + t.x * last.r, last.p.y + t.y * last.r, last.p.z + t.z * last.r); nor.push(t.x, t.y, t.z); uv.push(0.5, 1);
     const base = (points.length - 1) * row;
-    for (let k = 0; k < radial; k++) idx.push(base + k, tip, base + k + 1);
+    for (let k = 0; k < radial; k++) idx.push(base + k, base + k + 1, tip);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));

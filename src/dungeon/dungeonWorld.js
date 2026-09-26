@@ -7,10 +7,7 @@
 import * as THREE from 'three';
 import { CELL, THEMES } from './gen.js';
 import { makeToon, U } from '../gfx/materials.js';
-import { tube as tubeRaw, RoundedBox } from '../gfx/geom.js';
-// geom.tube() winds its triangles inward (face normals oppose the vertex normals), so with FrontSide toon materials a
-// tube shows its dark inner far wall and the ink hull covers the near side (why tongues rendered black). Flip it here.
-const tube = (...a) => { const g = tubeRaw(...a), I = g.index.array; for (let i = 0; i < I.length; i += 3) { const t = I[i + 1]; I[i + 1] = I[i + 2]; I[i + 2] = t; } return g; };
+import { tube, RoundedBox } from '../gfx/geom.js';
 import { LightPool } from '../core/engine.js';
 import { Collision } from '../world/collision.js';
 import { Noise, mulberry32, clamp, rand, TAU } from '../core/util.js';

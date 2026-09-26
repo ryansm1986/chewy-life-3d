@@ -1,10 +1,7 @@
 // Cute yokai monsters: definitions + procedural models + lightweight procedural animation.
 import * as THREE from 'three';
 import { makeToon, makeOutline } from '../gfx/materials.js';
-import { paint, merge, tube as tubeRaw, xf, RoundedBox } from '../gfx/geom.js';
-// geom.tube() winds its triangles inward (face normals oppose the vertex normals), so with FrontSide toon materials a
-// tube shows its dark inner far wall and the ink hull covers the near side (why tongues rendered black). Flip it here.
-const tube = (...a) => { const g = tubeRaw(...a), I = g.index.array; for (let i = 0; i < I.length; i += 3) { const t = I[i + 1]; I[i + 1] = I[i + 2]; I[i + 2] = t; } return g; };
+import { paint, merge, tube, xf, RoundedBox } from '../gfx/geom.js';
 import { buildHumanoid } from '../actors/charKit.js';
 import { clamp, TAU, rand, ease } from '../core/util.js';
 
