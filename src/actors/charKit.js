@@ -437,6 +437,25 @@ export function buildBoston(spec = {}) {
   return R;
 }
 
+// X-ray silhouette: when a character is hidden behind scenery, draw a soft coloured silhouette through it.
+// The character writes stencil=1 where it is visible; the x-ray pass draws only where depth is GREATER and stencil != 1,
+// so it never tints the character's own body.
+export function enableXray(rig, color = '#ffd9a0', opacity = 0.55) {
+  for (const m of [rig.mat, rig.outMat]) {
+    m.stencilWrite = true; m.stencilRef = 1; m.stencilFunc = THREE.AlwaysStencilFunc;
+    m.stencilZPass = THREE.ReplaceStencilOp; m.stencilFail = THREE.KeepStencilOp; m.stencilZFail = THREE.KeepStencilOp;
+  }
+  const xm = new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, depthFunc: THREE.GreaterDepth, fog: false, toneMapped: false });
+  xm.stencilWrite = true; xm.stencilRef = 1; xm.stencilFunc = THREE.NotEqualStencilFunc;
+  xm.stencilFail = THREE.KeepStencilOp; xm.stencilZFail = THREE.KeepStencilOp; xm.stencilZPass = THREE.KeepStencilOp;
+  for (const mesh of rig.meshes) {
+    const x = new THREE.Mesh(mesh.geometry, xm); x.renderOrder = 30; x.castShadow = false; x.receiveShadow = false;
+    x.name = mesh.name + '_xray'; mesh.add(x);
+  }
+  rig.xrayMat = xm;
+  return xm;
+}
+
 // Blob contact shadow that sits under characters (sells grounding, especially in shade)
 export function contactShadow(r = 0.34) {
   const c = document.createElement('canvas'); c.width = c.height = 64;

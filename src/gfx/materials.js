@@ -107,9 +107,10 @@ void occlusionFade(float fragDepth) {
   vec2 d = gl_FragCoord.xy - uOccl.xy;
   float r = length(d * vec2(1.0, 1.15)) / uOccl.z;
   if (r > 1.0) return;
-  float front = smoothstep(0.6, 2.2, uOccl.w - fragDepth);
-  float k = smoothstep(1.0, 0.45, r) * front * 0.88;
-  if (bayer4(gl_FragCoord.xy) < k) discard;
+  // clean circular cutaway (fully open inside) with a thin dithered rim, only for surfaces in front of Chewy
+  float front = smoothstep(0.8, 2.0, uOccl.w - fragDepth);
+  float k = smoothstep(1.0, 0.82, r) * front;
+  if (k > 0.97 || bayer4(gl_FragCoord.xy) < k) discard;
 }
 float cloudShadowAt(vec3 p) {
   vec2 q = p.xz * 0.012 + uCloudOffset;

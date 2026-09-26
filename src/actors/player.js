@@ -1,7 +1,7 @@
 // Chewy — the player. WASD / click-to-move, dodge roll, interaction, weapon visuals and grass bending.
 import * as THREE from 'three';
 import { Actor } from './actor.js';
-import { buildHumanoid, CAST, boneSwordGeo, tennisBall } from './charKit.js';
+import { buildHumanoid, CAST, boneSwordGeo, tennisBall, enableXray } from './charKit.js';
 import { Input } from '../core/input.js';
 import { Events } from '../core/events.js';
 import { U } from '../gfx/materials.js';
@@ -12,6 +12,7 @@ export class Player extends Actor {
     const rig = buildHumanoid(CAST.chewy);
     super(world, rig, { radius: 0.3, speed: 4.4, name: 'Chewy' });
     this.G = G;
+    enableXray(rig, '#ffc890', 0.6);
     this.moveTarget = null; this.interactTarget = null;
     this.rollT = 0; this.rollDir = new THREE.Vector3(); this.rollCd = 0;
     this.stepAcc = 0;

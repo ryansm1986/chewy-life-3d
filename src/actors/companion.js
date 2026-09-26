@@ -1,7 +1,7 @@
 // Shadow the Boston terrier — follows Chewy, sniffs around, sits, barks, and fights in the Burrow.
 import * as THREE from 'three';
 import { Actor } from './actor.js';
-import { buildBoston } from './charKit.js';
+import { buildBoston, enableXray } from './charKit.js';
 import { Events } from '../core/events.js';
 import { U } from '../gfx/materials.js';
 import { rand, chance } from '../core/util.js';
@@ -10,6 +10,7 @@ export class Companion extends Actor {
   constructor(world, G) {
     super(world, buildBoston(), { radius: 0.22, speed: 4.2, name: 'Shadow' });
     this.G = G;
+    enableXray(this.rig, '#9fc8ff', 0.55);
     this.state = 'follow'; this.stateT = 0;
     this.wanderTarget = null;
     this.idleT = 0;

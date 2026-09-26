@@ -70,7 +70,7 @@ export class GradeEffect extends Effect {
 export class Post {
   constructor(renderer, scene, camera, quality) {
     this.renderer = renderer;
-    this.composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType });
+    this.composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, stencilBuffer: true });
     this.renderPass = new RenderPass(scene, camera);
     this.composer.addPass(this.renderPass);
     const w = innerWidth, h = innerHeight;
