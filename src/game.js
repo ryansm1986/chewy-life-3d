@@ -189,6 +189,14 @@ export async function boot() {
       G.audio?.music?.(dungeon.layout.boss ? 'boss' : 'dungeon'); G.audio?.ambience?.('dungeon');
       Events.emit('mode:changed', { mode: 'dungeon', floor });
       save();
+      if (!G.state.flags.burrowTut && G.ui?.dialogue) {
+        G.state.flags.burrowTut = true;
+        setTimeout(async () => {
+          player.controlLocked = true;
+          await G.ui.dialogue({ speaker: 'Shadow', portrait: G.portrait('shadow'), lines: ["*Sniff sniff!* Yip! (Monsters ahead! Here's how we fight, Chewy!)", '*Click a monster* to bonk it with your Bone Sword. *Right-click* uses Chomp Slash!', "Press *X* to swap to your Red Tennis Ball, *Space* to roll away, and *Q* for a Heart Treat when you're hurt.", 'Spend skill points with *K* and stat points with *C*. Find the *stairs* to go deeper — or step in the purple portal to go home!'] });
+          player.controlLocked = false;
+        }, 2600);
+      }
     };
     if (G.ui?.transition) G.ui.transition(go); else go();
   };
