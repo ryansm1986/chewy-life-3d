@@ -40,7 +40,12 @@ export class Title {
       const a = b.dataset.a, h = ui._titleH || {};
       b.classList.remove('pressed'); void b.offsetWidth; b.classList.add('pressed');
       ui.sfx?.('select');
-      if (a === 'settings') ui.open('menu', { view: 'settings', from: 'title' });
+      if (a === 'settings') {
+        // tuck the title away while settings are open (the menu lives in a lower layer)
+        ui.layers.title.classList.add('behind');
+        ui.open('menu', { view: 'settings', from: 'title' });
+        const off = ui.G?.events?.on?.('ui:close', e => { if (e?.name === 'menu') { ui.layers.title.classList.remove('behind'); off?.(); } });
+      }
       else if (a === 'newGame') h.newGame?.();
       else if (a === 'continue') h.continue?.();
     });

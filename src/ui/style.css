@@ -291,3 +291,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1c1424; }
 @keyframes bob { 50% { transform: translateY(-4px); } }
 @keyframes breathe { 50% { transform: scale(1.025) translateY(-2px); } }
 @keyframes twinkle { 0%, 100% { transform: scale(.6) rotate(0); opacity: .5; } 50% { transform: scale(1.1) rotate(45deg); opacity: 1; } }
+
+/* title hides while its Settings menu is open */
+.l-title { transition: opacity .3s ease, transform .3s ease; }
+.l-title.behind { opacity: 0; pointer-events: none; transform: scale(1.03); }

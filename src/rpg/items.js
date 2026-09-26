@@ -765,7 +765,7 @@ export function itemTooltip(it, state, derived) {
       for (const s of t.stats) L(`(${t.n === 'full' ? 'Full Set' : need + ' Items'}) ${statText(s.stat, s.value, null, it)}`, n >= need ? C.green : C.grey);
     }
   }
-  if (it.flavor && it.rarity === 'unique') L(`"${it.flavor}"`, C.flavor, { italic: true, gap: true });
+  if (it.flavor && it.rarity === 'unique') L(/^["“]/.test(it.flavor) ? it.flavor : `“${it.flavor}”`, C.flavor, { italic: true, gap: true });
   L(`Sell value: ${it.value} coins`, C.grey, { gap: true });
   return {
     title: it.name, titleColor: col, subtitle, lines,

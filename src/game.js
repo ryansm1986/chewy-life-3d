@@ -512,7 +512,7 @@ export async function boot() {
   }
   requestAnimationFrame(frame);
   if (P.has('floor')) setTimeout(() => G.enterDungeon(+P.get('floor')), 100);
-  setTimeout(() => { window.__ready = true; }, P.has('floor') ? 2500 : 400);
+  setTimeout(() => { window.__ready = true; const b = document.getElementById('boot'); if (b) { b.classList.add('gone'); setTimeout(() => b.remove(), 700); } }, P.has('floor') ? 2500 : 400);
 }
 
 function loadSave() {

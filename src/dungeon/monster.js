@@ -10,7 +10,7 @@ import { rand, randInt, clamp, TAU, dist, dampAngle, pick, chance } from '../cor
 
 export const KIND_MAP = { mochi: 'mochi', dustbunny: 'dust', kinoko: 'kinoko', lantern: 'lantern', kasa: 'kasa', wisp: 'kitsune', oni: 'oni', tanuki: 'tanuki', mochiKing: 'mochi', kasaLord: 'kasa', oniChef: 'oni', nineTails: 'kitsune' };
 const UNIQUE_A = ['Squishy', 'Grumpy', 'Sneaky', 'Wobbly', 'Fluffmaw', 'Bitter', 'Sticky', 'Gloomy', 'Crunchy', 'Soggy', 'Rascal', 'Snoot'];
-const UNIQUE_B = ['the Sticky', 'Nibblebane', 'the Unwashed', 'Toebiter', 'the Loud', 'Crumbclaw', 'the Rude', 'Sockthief', 'the Unpettable', 'Bedwetter', 'the Menace'];
+const UNIQUE_B = ['the Sticky', 'Nibblebane', 'the Crumb-Snatcher', 'Toebiter', 'the Loud', 'Crumbclaw', 'the Sleepy', 'Sockthief', 'the Unpettable', 'Pillowhog', 'the Snack Bandit', 'Grumblepaw'];
 const _p = new THREE.Vector3();
 
 export class Monster {
@@ -105,6 +105,7 @@ export class Monster {
   // ------------------------------------------------------------------ AI
   update(dt) {
     if (!this.alive) { this.anim.update(dt, false, 0); return; }
+    this.separate(dt);
     const G = this.G, P = G.player, st = this.status;
     this.stateT += dt; this.cd -= dt * (this.stats.atkMul || 1) * (this.enraged ? 1.4 : 1);
     let moving = false;
@@ -139,7 +140,7 @@ export class Monster {
         // boss phases: summon minions at 66% / 33%
         if (this.def.boss && this.def.summon) {
           const frac = this.life / this.lifeMax;
-          if ((frac < 0.66 && this.summoned === 0) || (frac < 0.33 && this.summoned === 1)) { this.summoned++; this.mode.summonAround(this, this.def.summon, 3 + this.summoned); G.ui?.banner?.(this.name, this.summoned === 1 ? 'calls for backup!' : 'is getting really mad!', { style: 'boss' }); if (this.summoned === 2) this.enraged = true; }
+          if ((frac < 0.66 && this.summoned === 0) || (frac < 0.33 && this.summoned === 1)) { this.summoned++; this.mode.summonAround(this, this.def.summon, 3 + this.summoned); G.ui?.toast?.(`${this.name} ${this.summoned === 1 ? 'calls for backup!' : 'is getting really mad!'}`, { color: '#ff8a9a', icon: 'oni' }); G.vfx.emote(this, this.summoned === 1 ? '!' : 'anger', 1.6); G.engine.rig.shake(0.4); if (this.summoned === 2) this.enraged = true; }
         }
       } else if (!this.leader) { // idle wander
         if (!this.wander || this.stateT > 4) { this.wander = this.pos.clone().add(new THREE.Vector3(rand(-3, 3), 0, rand(-3, 3))); this.stateT = 0; }
@@ -159,6 +160,14 @@ export class Monster {
     this.anim.update(dt, moving, this.speed);
     if (this.kit) this.kit.update(dt, this.pos);
     this.sync();
+  }
+  // keep packs from merging into one blob: push apart using the visual radius, every frame
+  separate(dt) {
+    for (const m of this.mode.monsters) {
+      if (m === this || !m.alive) continue;
+      const dx = this.pos.x - m.pos.x, dz = this.pos.z - m.pos.z, d2 = dx * dx + dz * dz, mn = (this.radius + m.radius) * 1.15;
+      if (d2 < mn * mn && d2 > 1e-6) { const d = Math.sqrt(d2), k = (mn - d) * Math.min(1, dt * 8) * 0.5; this.pos.x += dx / d * k; this.pos.z += dz / d * k; }
+    }
   }
   pickTarget() {
     const G = this.G; let best = G.playerDead ? null : G.player, bd = best ? dist(best.pos.x, best.pos.z, this.pos.x, this.pos.z) : 1e9;

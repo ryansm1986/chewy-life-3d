@@ -324,7 +324,7 @@ hr('ACTIONS');
   A.pickup(makeGem('ruby', 1));
   ok(S.inventory[2] && S.inventory[2].gemTier === 1, 'different tier does not stack');
   const c0 = S.coins; A.pickup({ type: 'coins', n: 33 }); ok(S.coins === c0 + 33, 'pickup coins');
-  A.pickup({ type: 'material', key: 'silk', n: 3 }); ok(S.materials.silk === 3, 'pickup material');
+  { const s0 = S.materials.silk || 0; A.pickup({ type: 'material', key: 'silk', n: 3 }); ok(S.materials.silk === s0 + 3, 'pickup material'); }
   A.pickup({ type: 'potion', key: 'rejuv' }); ok(S.potions.rejuv === 1, 'pickup potion');
   // equip
   const lifeBefore = G.derived.lifeMax;
@@ -397,9 +397,10 @@ hr('ACTIONS');
   ok(!A.setHotbar(2, 'whirl'), 'cannot hotbar unlearned');
   ok(A.addStat('str') && S.player.stats.str === 11 && S.player.statPts === 14, 'addStat');
   // materials
-  ok(A.hasMaterials({ wood: 5, coins: 10 }) && !A.hasMaterials({ crystal: 1 }), 'hasMaterials');
-  ok(A.spendMaterials({ wood: 5, stone: 2 }) && S.materials.wood === 15 && S.materials.stone === 8, 'spendMaterials');
-  ok(!A.spendMaterials({ lantern: 1 }), 'spendMaterials fails when short');
+  ok(A.hasMaterials({ wood: 5, coins: 10 }) && !A.hasMaterials({ crystal: (S.materials.crystal || 0) + 1 }), 'hasMaterials');
+  { const w0 = S.materials.wood, s0 = S.materials.stone;
+    ok(A.spendMaterials({ wood: 5, stone: 2 }) && S.materials.wood === w0 - 5 && S.materials.stone === s0 - 2, 'spendMaterials'); }
+  ok(!A.spendMaterials({ lantern: (S.materials.lantern || 0) + 1 }), 'spendMaterials fails when short');
   // socket via action
   S.inventory.fill(null);
   const sw = generateItem({ ilvl: 10, base: 'boneSword', rarity: 'normal', rng }); sw.sockets = 1;

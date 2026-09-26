@@ -315,3 +315,6 @@
 .hud .rci-foot:empty { display: none; }
 .hud .rci-foot .gl { width: 13px; height: 13px; }
 .hud .rci-foot .rci-sep { width: 4px; }
+
+/* quest tracker: solid paper so it reads over bright roofs */
+.hud .qtrack { background: rgba(255, 246, 232, .94) !important; box-shadow: 0 4px 0 rgba(74, 44, 42, .18), 0 6px 18px rgba(74, 44, 42, .2); }
