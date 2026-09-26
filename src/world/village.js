@@ -160,7 +160,8 @@ export class VillageSim {
     if (!['flowerBed', 'bridge', 'fence'].includes(b.type) && b.type !== 'park') col = this.world.collision.addRect(b.x + inset, b.z + inset, b.x + w - inset, b.z + d - inset, 'building');
     let deck = null;
     if (b.type === 'bridge') { this.addBridgeDeck(b, model); deck = this._deck; }
-    this.world.veg.clearRect(b.x, b.z, b.x + w, b.z + d, 0.6);
+    if (def.cat === 'decor' || !this.world.veg.clearAround) this.world.veg.clearRect(b.x, b.z, b.x + w, b.z + d, 0.6);
+    else this.world.veg.clearAround(b.x, b.z, b.x + w, b.z + d);
     // lights & smoke
     const lights = [], rot = new THREE.Matrix4().makeRotationY(-b.rot * Math.PI / 2);
     for (const l of model.lights || []) {
@@ -265,14 +266,14 @@ export class VillageSim {
     for (const b of V.buildings) {
       const def = BUILDINGS[b.type]; if (def.cat !== 'home' || !b.q?.road) continue;
       const cap = def.capacity[b.level - 1];
-      if (b.residents < cap && this.demand.R > -0.2 && R() < 0.5) { b.residents++; if (R() < 0.3) this.G.ui?.toast?.('A new villager moved in!', { color: '#8fe0c0' }); }
+      if (b.residents < cap && this.demand.R > -0.2 && R() < 0.5) { b.residents++; this.news('villagers'); }
     }
     // new building on a zoned lot
     for (const [key, t] of [['R', ZONES.R], ['C', ZONES.C], ['W', ZONES.W]]) {
       if (this.demand[key] <= 0.05 || R() > 0.6) continue;
       const type = key === 'R' ? 'home' : key === 'C' ? 'shop' : pick(['farm', 'lumber', 'kiln', 'fishingHut']);
       const lot = this.findLot(t, type);
-      if (lot) { const b = this.place(type, lot.x, lot.z, lot.rot, { free: true, silent: false }); if (b) { this.G.ui?.toast?.(`${BUILDINGS[type].variants?.[0] || BUILDINGS[type].name} sprouted in the ${key === 'R' ? 'homes' : key === 'C' ? 'shops' : 'workshop'} zone!`, { color: '#ffd84a' }); return; } }
+      if (lot) { const b = this.place(type, lot.x, lot.z, lot.rot, { free: true, silent: false }); if (b) { this.news(key === 'R' ? 'homes' : key === 'C' ? 'shops' : 'workshops'); this.ping(b); return; } }
     }
     // level ups
     for (const b of V.buildings) {
@@ -359,6 +360,28 @@ export class VillageSim {
     const cx = b.x + w / 2 + dirs[0] * (w / 2 + 0.5), cz = b.z + d / 2 + dirs[1] * (d / 2 + 0.5);
     const t = this.terrain.tile(cx, cz); return t === T.PATH || t === T.PLAZA;
   }
+  // collect growth events and report them as one friendly digest (at most about once a minute)
+  news(kind) {
+    this.digest ||= {}; this.digest[kind] = (this.digest[kind] || 0) + 1;
+    this.digestT ??= 20;
+  }
+  flushDigest(force = false) {
+    const d = this.digest; if (!d) return;
+    const parts = [];
+    if (d.homes) parts.push(`+${d.homes} home${d.homes > 1 ? 's' : ''}`);
+    if (d.shops) parts.push(`+${d.shops} shop${d.shops > 1 ? 's' : ''}`);
+    if (d.workshops) parts.push(`+${d.workshops} workshop${d.workshops > 1 ? 's' : ''}`);
+    if (d.upgrades) parts.push(`${d.upgrades} upgrade${d.upgrades > 1 ? 's' : ''}`);
+    if (d.villagers) parts.push(`+${d.villagers} villager${d.villagers > 1 ? 's' : ''}`);
+    if (parts.length) this.G.ui?.toast?.(`Blossom Hollow grew: ${parts.join(', ')}`, { color: '#8fe0c0', icon: 'home' });
+    this.digest = null; this.digestT = null;
+  }
+  // visible world ping where something new appeared (sparkle pillar + heart)
+  ping(b, color = '#ffb0d0') {
+    const p = this.worldPos(b);
+    this.G.vfx?.pillar?.(p, { color, life: 2.2, r: 0.9, h: 6, opacity: 0.6 });
+    this.G.vfx?.sparkle?.(p.clone().setY(p.y + 1.5), { n: 18, color, r: 1.5 });
+  }
   levelUp(b) {
     const nl = b.level + 1;
     const [w1, d1] = this.dims(b.type, b.rot, b.level), [w2, d2] = this.dims(b.type, b.rot, nl);
@@ -371,7 +394,7 @@ export class VillageSim {
     const rec = this.spawnModel(b, true);
     this.refreshTiles();
     this.G.vfx?.levelUp?.(this.worldPos(b));
-    this.G.ui?.toast?.(`${BUILDINGS[b.type].name} grew to level ${nl}!`, { color: '#ffd84a' });
+    this.news('upgrades'); this.ping(b, '#ffd84a');
     Events.emit('sfx', 'build_complete');
     return true;
   }
@@ -417,7 +440,12 @@ export class VillageSim {
     for (const r of this.list) r.model.update?.(dt, t);
     const n = this.G.day?.out?.night ?? 0;
     if (Math.abs(n - this.nightVal) > 0.02) { this.nightVal = n; for (const r of this.list) setNight(r.model, n); }
-    this.tickT += dt;
-    if (this.tickT > 6) { this.tickT = 0; this.simulate(); this.grow(); this.simulate(); }
+    // growth pauses on the title screen, during conversations and while in the Burrow
+    const G = this.G, busy = G.titleActive || G.mode !== 'village' || G.ui?.dlg?.active || G.player?.controlLocked;
+    if (!busy) {
+      this.tickT += dt;
+      if (this.tickT > 6) { this.tickT = 0; this.simulate(); this.grow(); this.simulate(); }
+      if (this.digestT != null) { this.digestT -= dt; if (this.digestT <= 0) this.flushDigest(); }
+    }
   }
 }

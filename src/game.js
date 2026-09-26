@@ -23,6 +23,7 @@ import { VillageSim } from './world/village.js';
 import { BuildMode } from './world/buildMode.js';
 import { Story } from './world/story.js';
 import { Portraits } from './gfx/portraits.js';
+import { BuildingThumbs } from './gfx/thumbs.js';
 import { installServices } from './world/services.js';
 import { Waterfall } from './world/waterfall.js';
 import { VillageMinimap, DungeonMinimap } from './world/minimap.js';
@@ -59,7 +60,7 @@ export async function boot() {
   const vCombat = new Combat(G, village);
   const sim = G.sim = new VillageSim(G, village);
   sim.init();
-  village.onNewDay = d => sim.onNewDay(d);
+  village.onNewDay = d => { sim.flushDigest(); sim.onNewDay(d); };
   const buildMode = G.build = new BuildMode(G, sim);
   G.village = { world: village, vfx: vVfx, ambient, combat: vCombat };
   G.world = village; G.combat = vCombat;
@@ -103,6 +104,7 @@ export async function boot() {
   const portraits = new Portraits(engine);
   for (const v of VILLAGERS) portraits.register(v.id, v.spec);
   G.portrait = (id) => portraits.get(id);
+  G.thumbs = new BuildingThumbs(engine);
   try {
     const pm = await import('./ui/portraits.js');
     for (const id of ['chewy', 'shadow', 'rosie']) { const url = portraits.get(id); if (url) pm.PORTRAITS[id] = () => `<img class="p3d" src="${url}" alt="" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block">`; }

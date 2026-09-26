@@ -421,3 +421,9 @@
 .card { flex-basis: 108px; }
 .cd-n { min-height: 26px; }
 .bd-cards { padding: 11px 8px 8px; }
+
+/* 3D building thumbnails in the build palette */
+.cd-art { height: 64px; overflow: hidden; }
+.cd-art img:not(.gi) { width: 66px; height: 66px; max-width: none; max-height: none; object-fit: contain; filter: saturate(1.2) contrast(1.05) drop-shadow(0 2px 2px rgba(74, 44, 42, .25)); }
+/* the card row scrolls sideways (mouse wheel) — fade the edge so it's clear there is more */
+.bd-cards { -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 46px), transparent 100%); mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 46px), transparent 100%); padding-right: 40px; scrollbar-width: thin; }

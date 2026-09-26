@@ -16,6 +16,17 @@ export class BuildMode {
     this.okMat = new THREE.MeshBasicMaterial({ color: '#8affb0', transparent: true, opacity: 0.55, depthWrite: false });
     this.badMat = new THREE.MeshBasicMaterial({ color: '#ff7a8a', transparent: true, opacity: 0.55, depthWrite: false });
     this.prevDist = 34;
+    this.view = 0; // 0..1 build-view blend (grass shrink)
+    this.lastCur = null;
+  }
+  overlay(mode) {
+    this.sim.setOverlay(mode);
+    const u = this.sim.terrain.material.userData.u;
+    if (u.uOverlayMode) u.uOverlayMode.value = (mode === 'build' || mode === 'zones' || !mode) ? 1 : 0;
+  }
+  cursorCol(hex, fill = 0.14) {
+    const u = this.sim.terrain.material.userData.u; if (!u.uCursorCol) return;
+    const c = new THREE.Color(hex); u.uCursorCol.value.set(c.r, c.g, c.b, fill);
   }
   catalog() {
     const rank = this.sim.stats.rank;
@@ -24,7 +35,7 @@ export class BuildMode {
       const items = Object.entries(BUILDINGS).filter(([id, b]) => b.cat === cid && !b.prebuilt && !b.zone).map(([id, b]) => {
         const need = RANK_REQ[id] || 1;
         const unique = b.unique && this.sim.S.buildings.some(x => x.type === id);
-        return { id, name: b.name, cost: b.cost, desc: b.desc, cover: b.covers || null, locked: rank < need ? `Village rank ${need}` : unique ? 'Already built' : null };
+        return { id, name: b.name, cost: b.cost, desc: b.desc, cover: b.cover || null, covers: b.covers || null, size: sizeOf(id, 1), icon: this.G.thumbs?.get(id) || null, locked: rank < need ? `Village rank ${need}` : unique ? 'Already built' : null };
       });
       if (items.length) cats.push({ id: cid, name: cname, items });
     }
@@ -34,7 +45,7 @@ export class BuildMode {
     if (this.active || this.G.mode !== 'village') return;
     this.active = true; this.G.buildMode = true;
     const rig = this.G.engine.rig; this.prevDist = rig.distTarget; rig.distTarget = Math.max(rig.distTarget, 44);
-    this.sim.setOverlay('build');
+    this.overlay('build');
     this.sim.terrain.material.userData.u.uGrid.value = 1;
     this.G.ui?.open?.('build', {
       categories: this.catalog(),
@@ -42,7 +53,7 @@ export class BuildMode {
       onZone: z => this.setTool(z ? { kind: 'zone', zone: typeof z === 'string' ? ZONES[z] ?? 0 : z } : { kind: 'zone', zone: 0 }),
       onPath: (erase) => this.setTool({ kind: 'path', erase: !!erase }),
       onBulldoze: () => this.setTool({ kind: 'bulldoze' }),
-      onOverlay: m => this.sim.setOverlay(m || 'build'),
+      onOverlay: m => this.overlay(m || 'build'),
       onClose: () => this.exit(),
       stats: () => ({ ...this.sim.stats, demand: this.sim.demand }),
     });
@@ -53,7 +64,7 @@ export class BuildMode {
     this.active = false; this.G.buildMode = false; this.setTool(null);
     this.G.engine.rig.distTarget = this.prevDist;
     this.G.engine.rig.yawTarget = Math.round((this.G.engine.rig.yawTarget - Math.PI / 4) / (Math.PI / 2)) * (Math.PI / 2) + Math.PI / 4;
-    this.sim.setOverlay(null);
+    this.overlay(null);
     this.sim.terrain.material.userData.u.uGrid.value = 0;
     this.sim.terrain.material.userData.u.uCursor.value.set(-99, -99, 0, 0);
     if (this.G.ui?.isOpen?.('build')) this.G.ui.close('build');
@@ -67,8 +78,8 @@ export class BuildMode {
       g.traverse(o => { if (o.isMesh) { o.userData.origMat = o.material; o.castShadow = false; } });
       this.ghost = g; this.sim.world.scene.add(g); this.ghostOk = null; this.ghostY = 0;
     }
-    if (t?.kind === 'zone') this.sim.setOverlay('zones');
-    else if (this.active) this.sim.setOverlay('build');
+    if (t?.kind === 'zone') this.overlay('zones');
+    else if (this.active && !['water', 'light', 'joy', 'health', 'learn'].includes(this.sim.overlayMode)) this.overlay('build');
   }
   cursorTile() {
     const G = this.G;
@@ -76,12 +87,50 @@ export class BuildMode {
     return { x: Math.floor(p.x), z: Math.floor(p.z), p };
   }
   update(dt) {
+    // grass shrinks in build view so zones and overlays read clearly (eases in and out)
+    const vt = this.active ? 1 : 0;
+    if (Math.abs(this.view - vt) > 0.001) { this.view = damp(this.view, vt, 6, dt); if (Math.abs(this.view - vt) < 0.01) this.view = vt; this.sim.world.veg.setBuildView?.(this.view); }
     if (!this.active) return;
-    const G = this.G, sim = this.sim, cur = this.cursorTile(), U = sim.terrain.material.userData.u;
+    const G = this.G, sim = this.sim, U = sim.terrain.material.userData.u;
+    // over the palette: keep using the last world cursor (so drags can finish), but never start actions there
+    const overUI = Input.mouse.overUI;
+    const cur = overUI && this.lastCur ? this.lastCur : this.cursorTile();
+    if (!overUI) this.lastCur = cur;
     if (Input.hit('escape')) { if (this.tool) { this.setTool(null); Input.consume('escape'); } }
     if (Input.mouseHit(2) && this.tool) this.setTool(null);
-    if (!this.tool) { U.uCursor.value.set(cur.x + 0.5, cur.z + 0.5, 1, 1); return; }
-    if (Input.mouse.overUI) return;
+    if (!this.tool) { U.uCursor.value.set(cur.x + 0.5, cur.z + 0.5, 1, 1); this.cursorCol('#fff8d8', 0.1); return; }
+    if (this.tool.kind === 'zone' || this.tool.kind === 'path') {
+      if (Input.mouseHit(0) && !overUI) this.drag = { x: cur.x, z: cur.z };
+      const a = this.drag || cur;
+      const x0 = Math.min(a.x, cur.x), x1 = Math.max(a.x, cur.x), z0 = Math.min(a.z, cur.z), z1 = Math.max(a.z, cur.z);
+      const zc = { 1: '#7adc7a', 2: '#6eaaff', 3: '#ffc45a', 0: '#ff8a8a' }[this.tool.zone ?? 0];
+      if (this.tool.kind === 'path' && this.drag) { // paths paint as you drag
+        if (!overUI && sim.paintPath(cur.x, cur.z, !this.tool.erase)) Events.emit('sfx', 'build_place', { vol: 0.3 });
+        U.uCursor.value.set(cur.x + 0.5, cur.z + 0.5, 1, 1); this.cursorCol(this.tool.erase ? '#ff8a8a' : '#f4e2c4', 0.35);
+      } else {
+        U.uCursor.value.set((x0 + x1 + 1) / 2, (z0 + z1 + 1) / 2, x1 - x0 + 1, z1 - z0 + 1);
+        this.cursorCol(this.tool.kind === 'path' ? '#f4e2c4' : zc, this.drag ? 0.35 : 0.2);
+      }
+      const n = (x1 - x0 + 1) * (z1 - z0 + 1);
+      const zname = { 1: 'homes', 2: 'shops', 3: 'workshops', 0: 'unzoned' }[this.tool.zone ?? 0];
+      let hint;
+      if (this.tool.kind === 'path') hint = this.tool.erase ? 'Drag to remove paths' : 'Drag to lay stone paths';
+      else if (this.drag) hint = `${x1 - x0 + 1}×${z1 - z0 + 1} · ${n} tiles → ${zname}`;
+      else hint = `Drag to paint a ${zname} zone · villagers build there when there is demand`;
+      G.ui?.setInteract?.(hint);
+      if (!Input.mouseDown(0) && this.drag) { // finish on mouse-up even if released over the palette
+        if (this.tool.kind === 'zone') {
+          const k = sim.paintZone(x0, z0, x1, z1, this.tool.zone);
+          if (k) {
+            Events.emit('sfx', 'build_place', { vol: 0.5 });
+            G.vfx.sparkle(new THREE.Vector3((x0 + x1 + 1) / 2, sim.terrain.heightAt(x0, z0) + 0.3, (z0 + z1 + 1) / 2), { n: 10 + Math.min(20, k), r: Math.min(4, (x1 - x0) / 2 + 0.5), color: zc });
+          }
+        } else sim.refreshTiles();
+        this.drag = null;
+      }
+      return;
+    }
+    if (overUI) return;
     if (this.tool.kind === 'building') {
       if (Input.hit('r')) { this.rot = (this.rot + 1) % 4; Events.emit('sfx', 'ui_click'); }
       const [w, d] = sim.dims(this.tool.type, this.rot);
@@ -89,35 +138,21 @@ export class BuildMode {
       const chk = sim.canPlace(this.tool.type, x0, z0, this.rot);
       const afford = G.actions.hasMaterials(BUILDINGS[this.tool.type].cost);
       const ok = chk.ok && afford;
-      U.uCursor.value.set(x0 + w / 2, z0 + d / 2, w, d);
+      U.uCursor.value.set(x0 + w / 2, z0 + d / 2, w, d); this.cursorCol(ok ? '#8affb0' : '#ff7a8a', 0.3);
       // ghost follows smoothly with a little hop
       const target = new THREE.Vector3(x0 + w / 2, sim.terrain.heightAt(x0 + w / 2, z0 + d / 2) + 0.05, z0 + d / 2);
       this.ghost.position.x = damp(this.ghost.position.x, target.x, 22, dt); this.ghost.position.z = damp(this.ghost.position.z, target.z, 22, dt);
       this.ghost.position.y = target.y + Math.abs(Math.sin(G.engine.time * 4)) * 0.08;
       this.ghost.rotation.y = damp(this.ghost.rotation.y, -this.rot * Math.PI / 2, 16, dt);
       if (ok !== this.ghostOk) { this.ghostOk = ok; this.ghost.traverse(o => { if (o.isMesh) o.material = ok ? this.okMat : this.badMat; }); }
-      G.ui?.setInteract?.(ok ? `Click to build · R to rotate` : (!chk.ok ? chk.why : 'Not enough materials'));
+      G.ui?.setInteract?.(ok ? 'Click to build · R to rotate' : (!chk.ok ? chk.why : 'Not enough materials'));
       if (Input.mouseHit(0)) {
         const b = sim.place(this.tool.type, x0, z0, this.rot);
         if (b) { G.vfx.sparkle(target.clone().setY(target.y + 1), { n: 20, r: 1.2 }); if (BUILDINGS[this.tool.type].unique) this.setTool(null); }
       }
-    } else if (this.tool.kind === 'zone' || this.tool.kind === 'path') {
-      if (Input.mouseHit(0)) this.drag = { x: cur.x, z: cur.z };
-      const a = this.drag || cur;
-      const x0 = Math.min(a.x, cur.x), x1 = Math.max(a.x, cur.x), z0 = Math.min(a.z, cur.z), z1 = Math.max(a.z, cur.z);
-      if (this.tool.kind === 'path' && this.drag) { // paths paint as you drag
-        if (sim.paintPath(cur.x, cur.z, !this.tool.erase)) Events.emit('sfx', 'build_place', { vol: 0.3 });
-        U.uCursor.value.set(cur.x + 0.5, cur.z + 0.5, 1, 1);
-      } else U.uCursor.value.set((x0 + x1 + 1) / 2, (z0 + z1 + 1) / 2, x1 - x0 + 1, z1 - z0 + 1);
-      G.ui?.setInteract?.(this.tool.kind === 'path' ? (this.tool.erase ? 'Drag to remove paths' : 'Drag to lay stone paths') : 'Drag to paint a zone · villagers build there when there is demand');
-      if (Input.mouse && !Input.mouseDown(0) && this.drag) {
-        if (this.tool.kind === 'zone') { const n = sim.paintZone(x0, z0, x1, z1, this.tool.zone); if (n) Events.emit('sfx', 'build_place', { vol: 0.5 }); }
-        else sim.refreshTiles();
-        this.drag = null;
-      }
     } else if (this.tool.kind === 'bulldoze') {
       const b = sim.buildingAt(cur.x, cur.z);
-      U.uCursor.value.set(cur.x + 0.5, cur.z + 0.5, 1, 1);
+      U.uCursor.value.set(cur.x + 0.5, cur.z + 0.5, 1, 1); this.cursorCol('#ff7a8a', 0.25);
       G.ui?.setInteract?.(b ? (BUILDINGS[b.type].prebuilt ? `${BUILDINGS[b.type].name} can't be removed` : `Click to remove ${BUILDINGS[b.type].name} (50% refund)`) : 'Click a building to remove it');
       if (b) { const [w, d] = sim.dims(b.type, b.rot, b.level); U.uCursor.value.set(b.x + w / 2, b.z + d / 2, w, d); }
       if (Input.mouseHit(0) && b && !BUILDINGS[b.type].prebuilt) sim.remove(b);
