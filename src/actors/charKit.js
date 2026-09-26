@@ -187,6 +187,7 @@ export function buildHumanoid(spec) {
     const parts = [cap(0.056, 0.13, sleeve, [0, -0.09, 0])];
     if (top === 'gi' || top === 'kimono') parts.push(ell(0.085, 0.07, 0.085, sleeve, [0, -0.13, 0]));
     if (top === 'dress') parts.push(ell(0.075, 0.06, 0.075, topC, [0, -0.03, 0]));
+    if (of.wraps) { for (const [y, r] of [[-0.17, 0.05], [-0.145, 0.052]]) parts.push(paint(xf(new THREE.CylinderGeometry(r, r, 0.03, 12), { p: [0, y, 0.005], r: [0.1, 0, 0.12] }), (p, n, o) => o.set(of.wraps))); }
     parts.push(ell(0.066, 0.064, 0.066, sp.human ? skin : fur, [0, -0.215, 0.01], [0, 0, 0], 16, shade(0.1)));
     R.add(g, merge(parts), 'arm');
   }
@@ -222,7 +223,10 @@ function buildHead(R, head, sp, spec, { fur, fur2, fur3, skin }) {
   if (sp.muzzle) {
     let [mx, my, mz, oy, oz] = sp.muzzle;
     const ms = spec.muzzleScale || 1; mx *= ms; my *= ms; mz *= ms; oz += (ms - 1) * 0.08;
-    parts.push(ell(mx, my, mz, spec.muzzleColor || fur2, [0, oy, oz], [0, 0, 0], 18));
+    const chin = spec.patterns?.chin;
+    const mg = ell(mx, my, mz, spec.muzzleColor || fur2, [0, oy, oz], [0, 0, 0], 18);
+    if (chin) paint(mg, (pp, n, o) => { o.set(spec.muzzleColor || fur2); if (pp.y < oy - my * 0.25) o.set(chin); });
+    parts.push(mg);
     if (sp.nose) { const [nx, ny, nz] = sp.nose; parts.push(ell(nx, ny, nz, spec.nose || '#3a1e1a', [0, oy + my * 0.55, oz + mz * 0.92], [0.2, 0, 0], 14)); parts.push(ell(nx * 0.35, ny * 0.25, nz * 0.3, '#ffffff', [-nx * 0.3, oy + my * 0.55 + ny * 0.55, oz + mz * 0.92 + nz * 0.6])); }
     // smile  ω
     const y0 = oy - my * 0.25, z0 = oz + mz * 0.88;
@@ -327,7 +331,10 @@ function buildEars(R, head, kind, spec, fur, fur2, fur3) {
 
 function buildTail(R, body, kind, fur, fur2, spec) {
   const g = new THREE.Group(); g.name = 'tail'; g.position.set(0, 0.08, -0.17); body.add(g); R.parts.tail = g;
-  if (kind === 'dog') {
+  if (kind === 'dog' && spec.patterns?.tailFluff) {
+    g.rotation.x = -0.8;
+    R.add(g, merge([ell(0.05, 0.09, 0.05, fur, [0, 0.06, 0]), ell(0.065, 0.1, 0.06, fur, [0, 0.16, 0.03], [0.35, 0, 0]), ell(0.055, 0.075, 0.05, fur2, [0, 0.25, 0.07], [0.5, 0, 0])]), 'tailMesh');
+  } else if (kind === 'dog') {
     g.rotation.x = -0.9;
     R.add(g, merge([cap(0.042, 0.1, fur, [0, 0.06, 0]), cap(0.036, 0.08, fur, [0, 0.16, 0.025], [0.35, 0, 0]), ell(0.04, 0.05, 0.04, spec.patterns?.tailTip ? '#fffaf2' : fur, [0, 0.22, 0.05])]), 'tailMesh');
   } else if (kind === 'cat') {
@@ -444,10 +451,10 @@ export function contactShadow(r = 0.34) {
 // ------------------------------------------------------------------ the cast
 export const CAST = {
   chewy: {
-    name: 'Chewy', species: 'dog', fur: '#7c4a34', fur2: '#b07e5e', fur3: '#6a3c28', earColor: '#633422', earInner: '#4a2418',
-    nose: '#2a1610', iris: '#d8962e', eye: '#d8962e', muzzleColor: '#b48462', blush: '#ff9a9a', muzzleScale: 1.12,
-    patterns: { chestBlaze: true }, brows: false,
-    outfit: { top: 'gi', topColor: '#2c3a6a', bottomColor: '#3a3448', scarf: '#e0443a', sash: '#e0443a' },
+    name: 'Chewy', species: 'dog', fur: '#83482c', fur2: '#a8683f', fur3: '#6e3a22', earColor: '#6a361f', earInner: '#4a2418',
+    nose: '#7a3a2c', iris: '#d8962e', eye: '#d8962e', muzzleColor: '#9a5a38', blush: '#ff9a9a', muzzleScale: 1.12,
+    patterns: { chestBlaze: true, chin: '#fbf1e4', tailFluff: true }, brows: false,
+    outfit: { top: 'gi', topColor: '#2c3a6a', bottomColor: '#35303f', scarf: '#e0443a', sash: '#e0443a', wraps: '#f4ece0' },
   },
   rosie: {
     name: 'Rosie', species: 'human', skin: '#ffe4d2', iris: '#7a4424', eye: '#7a4424', blush: '#ff9ab0', eyeWhite: true,
