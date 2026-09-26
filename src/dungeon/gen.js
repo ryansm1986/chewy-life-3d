@@ -2,15 +2,19 @@
 import { RNG, Noise } from '../core/util.js';
 
 export const CELL = 2; // world units per cell
+// kit: which geometry/shader kit renders the biome (defaults to the theme key); sun/sunI: key light colour & strength
 export const THEMES = {
-  burrow: { name: 'Mossy Burrow', floor: ['#b58e68', '#a57e5a', '#c49c74'], wall: ['#8a6a58', '#7a5c4c', '#9a7a64'], top: ['#6aa04e', '#5a9044', '#80b45a'], fog: '#2a2038', ambient: ['#6a6aa0', '#3a2a30'], accent: '#8ad0ff', light: '#ffc47a', monsters: ['mochi', 'dustbunny', 'kinoko', 'mochi', 'dustbunny'], music: 'dungeon', wobble: 0.9 },
-  crystal: { name: 'Crystal Grotto', floor: ['#9aa6c8', '#8894b8', '#b0bcd8'], wall: ['#5a4a8a', '#4a3c78', '#6a5a9c'], top: ['#a8e8ff', '#c8b8ff', '#ffc8f0'], fog: '#161430', ambient: ['#8a98e0', '#2a2040'], accent: '#ff8ae0', light: '#7ae8ff', monsters: ['kinoko', 'lantern', 'mochi', 'dustbunny', 'wisp'], music: 'dungeon', wobble: 0.8 },
+  burrow: { name: 'Mossy Burrow', floor: ['#d2bc9e', '#c4ac8c', '#dcc8aa'], wall: ['#9a7658', '#8a684c', '#a88464'], top: ['#8aac6a', '#7a9c5e', '#a0bc7c'], fog: '#2c2230', ambient: ['#b4acd0', '#6a5648'], ambientI: 1.55, sun: '#fff4e4', sunI: 1.2, accent: '#ffe6a8', light: '#ffc88a', lightI: 9, grade: { gain: [1.0, 1.0, 0.98], sat: 1.0, lift: [0.022, 0.014, 0.026] }, monsters: ['mochi', 'dustbunny', 'kinoko', 'mochi', 'dustbunny'], music: 'dungeon', wobble: 0.9 },
   shrine: { name: 'Fox Shrine Tunnels', floor: ['#c08858', '#b07a4c', '#d09a68'], wall: ['#8a5a50', '#7a4c44', '#9a6a5c'], top: ['#7aa060', '#6a9050', '#e86a5a'], fog: '#241418', ambient: ['#c8a0a0', '#3a2424'], accent: '#ff6a4a', light: '#ffae6a', monsters: ['kasa', 'lantern', 'wisp', 'tanuki', 'kasa'], music: 'dungeon', wobble: 0.25, built: true },
   kitchen: { name: "Oni's Kitchen", floor: ['#9a8078', '#8a7068', '#a89088'], wall: ['#6a5048', '#5a4038', '#7a5c50'], top: ['#8a6a5a', '#6a4a40', '#ff9a5a'], fog: '#20100c', ambient: ['#d8a080', '#402018'], accent: '#ff8a3a', light: '#ff9a4a', monsters: ['oni', 'tanuki', 'lantern', 'mochi', 'oni'], music: 'dungeon', wobble: 0.3, built: true },
+  crystal: { name: 'Crystal Grotto', floor: ['#9aa6c8', '#8894b8', '#b0bcd8'], wall: ['#5a4a8a', '#4a3c78', '#6a5a9c'], top: ['#a8e8ff', '#c8b8ff', '#ffc8f0'], fog: '#161430', ambient: ['#8a98e0', '#2a2040'], accent: '#ff8ae0', light: '#7ae8ff', monsters: ['wisp', 'kinoko', 'lantern', 'mochi', 'wisp', 'dustbunny'], music: 'dungeon', wobble: 0.8 },
+  // Tamamo's lair: the fox-shrine kit re-lit by moonlight (cool silver key light, warm lanterns, blue foxfire)
+  moon: { name: 'Moonlit Fox Sanctum', kit: 'shrine', floor: ['#b89878', '#a88a6c', '#c8a888'], wall: ['#5a5a8a', '#4a4a78', '#6a6a9a'], top: ['#6a8a9a', '#5a7a8a', '#bcd8ff'], fog: '#10122a', ambient: ['#98a8f0', '#262440'], ambientI: 1.4, sun: '#c4d4ff', sunI: 1.6, accent: '#bcd8ff', light: '#ffc890', lightI: 9, grade: { gain: [0.97, 1.0, 1.05], sat: 1.05, lift: [0.01, 0.01, 0.03] }, monsters: ['wisp', 'kasa', 'lantern', 'tanuki', 'wisp'], music: 'dungeon', wobble: 0.25, built: true },
 };
+// 1-5 burrow (King Mochi) · 6-10 fox shrine (Lord Karakasa) · 11-15 kitchen (Oni Chef) · 16-19 crystal grotto · 20 moonlit sanctum (Tamamo)
 export function themeFor(floor) {
   const f = ((floor - 1) % 20);
-  return f < 5 ? 'burrow' : f < 10 ? 'crystal' : f < 15 ? 'shrine' : 'kitchen';
+  return f < 5 ? 'burrow' : f < 10 ? 'shrine' : f < 15 ? 'kitchen' : f < 19 ? 'crystal' : 'moon';
 }
 export const BOSSES = { 5: 'mochiKing', 10: 'kasaLord', 15: 'oniChef', 20: 'nineTails' };
 export function bossFor(floor) { return floor % 5 === 0 ? BOSSES[((floor - 1) % 20) + 1] || 'mochiKing' : null; }

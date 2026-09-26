@@ -3,7 +3,6 @@ import * as THREE from 'three';
 import { MONSTERS, buildMonster, MonsterAnim } from './monsters.js';
 import { monsterStats, applyRandomMods, MONSTER_MODS } from '../rpg/stats.js';
 import { Animator } from '../actors/animator.js';
-import { contactShadow } from '../actors/charKit.js';
 import { makeOutline } from '../gfx/materials.js';
 import { Events } from '../core/events.js';
 import { rand, randInt, clamp, TAU, dist, dampAngle, pick, chance } from '../core/util.js';
@@ -12,6 +11,35 @@ export const KIND_MAP = { mochi: 'mochi', dustbunny: 'dust', kinoko: 'kinoko', l
 const UNIQUE_A = ['Squishy', 'Grumpy', 'Sneaky', 'Wobbly', 'Fluffmaw', 'Bitter', 'Sticky', 'Gloomy', 'Crunchy', 'Soggy', 'Rascal', 'Snoot'];
 const UNIQUE_B = ['the Sticky', 'Nibblebane', 'the Crumb-Snatcher', 'Toebiter', 'the Loud', 'Crumbclaw', 'the Sleepy', 'Sockthief', 'the Unpettable', 'Pillowhog', 'the Snack Bandit', 'Grumblepaw'];
 const _p = new THREE.Vector3();
+const PLAYER_VR = 0.36; // Chewy's visual body radius (his collision radius is 0.3)
+
+// Contact disc under every monster: soft painted shadow + a thin footprint ring (ink for normal monsters, the elite
+// colour for champions / uniques / bosses) so a pack reads as separate bodies instead of one blob.
+const RING_MATS = new Map();
+function ringMat(color, ringA) {
+  const key = color + ringA; let m = RING_MATS.get(key);
+  if (m) return m;
+  m = new THREE.ShaderMaterial({
+    uniforms: { uCol: { value: new THREE.Color(color) }, uRingA: { value: ringA } },
+    vertexShader: 'varying vec2 vQ; void main() { vQ = uv * 2.0 - 1.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: /* glsl */`uniform vec3 uCol; uniform float uRingA; varying vec2 vQ;
+      void main() {
+        float r = length(vQ);
+        float sh = (1.0 - smoothstep(0.05, 0.95, r)) * 0.42;
+        float ring = smoothstep(0.075, 0.02, abs(r - 0.84)) * uRingA;
+        vec3 c = mix(vec3(0.16, 0.08, 0.24), uCol, ring / max(ring + sh, 1e-3));
+        gl_FragColor = vec4(c, clamp(sh + ring, 0.0, 0.85));
+      }`,
+    transparent: true, depthWrite: false,
+  });
+  RING_MATS.set(key, m);
+  return m;
+}
+function contactRing(r, color = '#2a1830', ringA = 0.32) {
+  const g = new THREE.PlaneGeometry(r * 2, r * 2); g.rotateX(-Math.PI / 2);
+  const m = new THREE.Mesh(g, ringMat(color, ringA)); m.position.y = 0.025; m.renderOrder = 1;
+  return m;
+}
 
 export class Monster {
   constructor(mode, id, { level = 1, rank = 'normal', variant = 0, x, z, leader = null, rng = Math.random } = {}) {
@@ -33,8 +61,10 @@ export class Monster {
     this.anim = new MonsterAnim(this.model, { ...def, scale });
     this.kit = this.model.rig ? new Animator(this.model.rig) : null;
     if (this.model.rig) { this.model.rig.spec.scale = scale; }
-    this.radius = def.radius * (scale / (def.scale || 1)) * (def.boss ? 1 : 1);
+    this.radius = def.radius * (scale / (def.scale || 1));
     if (def.boss) this.radius = def.radius;
+    // visual body radius (incl. champion/unique scale) used to keep bodies apart; collision with rock keeps using radius
+    this.bodyR = def.boss ? (def.vr || def.radius) : (def.vr || def.radius) * (scale / (def.scale || 1));
     this.height = (this.model.rig ? 1.15 : 1.0) * scale;
     this.pos = new THREE.Vector3(x, 0, z);
     this.facing = rand(0, TAU);
@@ -42,14 +72,18 @@ export class Monster {
     this.status = {};
     this.state = 'idle'; this.stateT = 0; this.cd = rand(0.6, 2.4); this.aggro = false;
     this.leader = leader; this.wander = null; this.knock = new THREE.Vector3();
-    this.shadow = contactShadow(this.radius * 1.2);
-    this.world.scene.add(this.model.root, this.shadow);
     // elite visuals
-    if (rank === 'champion' || rank === 'unique' || def.boss) {
-      const col = def.boss ? '#ff4a6a' : rank === 'unique' ? '#ffb030' : '#6aa8ff';
-      if (this.model.outline) { this.model.outline.material = makeOutline(col, 0.02); }
-      this.eliteColor = col;
+    const elite = rank === 'champion' || rank === 'unique' || def.boss;
+    const eCol = def.boss ? (def.light || '#ff4a6a') : rank === 'unique' ? '#ffb030' : '#6aa8ff';
+    this.shadow = contactRing(this.bodyR * 1.3, elite ? eCol : '#2a1830', elite ? 0.7 : 0.32);
+    this.world.scene.add(this.model.root, this.shadow);
+    if (elite) {
+      // champions / uniques get the D2-style coloured contour; bosses keep a crisp ink one (at 2-3x scale a coloured hull turns their brows & eyes pink)
+      if (this.model.outline) { this.model.outline.material = def.boss ? makeOutline('#2a1622', 0.014) : makeOutline(eCol, 0.02); }
+      this.eliteColor = def.boss ? '#ff4a6a' : eCol;
     }
+    // bosses with a signature glow carry their own light (Tamamo's foxfire)
+    if (def.light) this.light = this.world.lightPool.addSource({ pos: new THREE.Vector3(x, 3.6, z), color: new THREE.Color(def.light), intensity: 3.5, radius: 9, flicker: 0.35, priority: 6 });
     this.summoned = 0;
     this.telegraph = null;
     this.sync();
@@ -59,7 +93,8 @@ export class Monster {
     const r = this.model.root;
     r.position.set(this.pos.x, this.world.heightAt(this.pos.x, this.pos.z) + (this.kit ? (this.model.rig.offsetY || 0) : 0), this.pos.z);
     r.rotation.y = this.facing;
-    this.shadow.position.set(this.pos.x, 0.03, this.pos.z);
+    this.shadow.position.set(this.pos.x, 0.025, this.pos.z);
+    if (this.light) this.light.pos.set(this.pos.x + Math.sin(this.facing) * 1.5, 3.6, this.pos.z + Math.cos(this.facing) * 1.5);
   }
   heal(n) { this.life = Math.min(this.lifeMax, this.life + n); }
   takeDamage(dmg, { element = 'phys', crit = false, knock = 0, stun = 0, from = null } = {}) {
@@ -92,6 +127,7 @@ export class Monster {
     if (!this.alive) return;
     this.alive = false; this.life = 0;
     this.cancelAttack();
+    if (this.light) { this.world.lightPool.removeSource(this.light); this.light = null; }
     const G = this.G;
     this.anim.deathT = 0;
     G.vfx.poof(this.pos.clone().setY(0.4 * this.scale), { color: this.def.boss ? '#ffe0f0' : '#fff4fa', size: 0.6 * this.scale, n: this.def.boss ? 40 : 14 });
@@ -104,12 +140,14 @@ export class Monster {
   dispose() {
     this.world.scene.remove(this.model.root, this.shadow);
     this.model.root.traverse(o => { if (o.isMesh) { o.geometry?.dispose(); } });
+    this.model.rig?.skeleton?.dispose();
     this.shadow.geometry?.dispose();
+    if (this.light) { this.world.lightPool.removeSource(this.light); this.light = null; }
     this.disposed = true;
   }
   // ------------------------------------------------------------------ AI
   update(dt) {
-    if (!this.alive) { this.anim.update(dt, false, 0); return; }
+    if (!this.alive) { this.anim.update(dt, false, 0); this.shadow.scale.setScalar(Math.max(0.01, 1 - clamp(this.anim.deathT / 0.45))); return; }
     this.separate(dt);
     const G = this.G, P = G.player, st = this.status;
     this.stateT += dt; this.cd -= dt * (this.stats.atkMul || 1) * (this.enraged ? 1.4 : 1);
@@ -166,13 +204,38 @@ export class Monster {
     if (this.kit) this.kit.update(dt, this.pos);
     this.sync();
   }
-  // keep packs from merging into one blob: push apart using the visual radius, every frame
+  // Keep packs readable: bodies never interpenetrate (visual radius incl. scale), nor stand inside Chewy / allies.
+  // Each monster resolves its share of every overlap (half vs another monster, all of it vs a boss or an ally);
+  // bosses are never shoved by their minions. The per-frame correction is rate-limited so crowds settle smoothly.
   separate(dt) {
+    const G = this.G, P = G.player;
+    if (this.def.boss) return; // bosses are never shoved (move() stops them walking into Chewy instead)
+    if (!this.aggro && P && (this.pos.x - P.pos.x) ** 2 + (this.pos.z - P.pos.z) ** 2 > 900) return; // idle & off-screen: nothing to untangle
+    let px = 0, pz = 0;
+    const R = this.bodyR;
     for (const m of this.mode.monsters) {
       if (m === this || !m.alive) continue;
-      const dx = this.pos.x - m.pos.x, dz = this.pos.z - m.pos.z, d2 = dx * dx + dz * dz, mn = (this.radius + m.radius) * 1.15;
-      if (d2 < mn * mn && d2 > 1e-6) { const d = Math.sqrt(d2), k = (mn - d) * Math.min(1, dt * 8) * 0.5; this.pos.x += dx / d * k; this.pos.z += dz / d * k; }
+      const dx = this.pos.x - m.pos.x, dz = this.pos.z - m.pos.z, mn = (R + m.bodyR) * 1.02;
+      if (dx > mn || dx < -mn || dz > mn || dz < -mn) continue;
+      const d2 = dx * dx + dz * dz; if (d2 >= mn * mn) continue;
+      let d = Math.sqrt(d2), nx, nz;
+      if (d < 1e-4) { const a = (this.mode.monsters.indexOf(this) * 2.39996) % TAU; nx = Math.cos(a); nz = Math.sin(a); d = 0; } else { nx = dx / d; nz = dz / d; }
+      const share = m.def.boss ? 1 : 0.5;
+      px += nx * (mn - d) * share; pz += nz * (mn - d) * share;
     }
+    const keepOff = (e, er) => {
+      const dx = this.pos.x - e.pos.x, dz = this.pos.z - e.pos.z, mn = R + er, d2 = dx * dx + dz * dz;
+      if (d2 >= mn * mn) return;
+      const d = Math.sqrt(d2); if (d < 1e-4) { px += 1e-3; return; }
+      px += dx / d * (mn - d); pz += dz / d * (mn - d);
+    };
+    if (P && !G.playerDead) keepOff(P, PLAYER_VR);
+    for (const e of this.mode.combat?.entities || []) if (e.team === 'ally' && e.alive && e !== P && e.pos && !e.untargetable) keepOff(e, Math.max(0.3, e.radius || 0.3));
+    const L = Math.hypot(px, pz);
+    if (L < 1e-5) return;
+    const k = Math.min(1, Math.max(0.05, dt * 10) / L);
+    _p.copy(this.pos); this.pos.x += px * k; this.pos.z += pz * k;
+    this.world.collision.resolve(this.pos, this.radius * 0.8, _p);
   }
   pickTarget() {
     const G = this.G; let best = G.playerDead ? null : G.player, bd = best ? dist(best.pos.x, best.pos.z, this.pos.x, this.pos.z) : 1e9;
@@ -187,19 +250,35 @@ export class Monster {
   move(dir, dt, mul = 1) {
     _p.copy(this.pos);
     this.pos.x += dir.x * this.speed * mul * dt; this.pos.z += dir.z * this.speed * mul * dt;
-    // separation
-    for (const m of this.mode.monsters) {
-      if (m === this || !m.alive) continue;
-      const dx = this.pos.x - m.pos.x, dz = this.pos.z - m.pos.z, d = Math.hypot(dx, dz), mn = this.radius + m.radius;
-      if (d < mn && d > 1e-4) { this.pos.x += dx / d * (mn - d) * 0.5; this.pos.z += dz / d * (mn - d) * 0.5; }
+    this.world.collision.resolve(this.pos, this.radius * 0.8, _p); // bodies are kept apart in separate()
+    const P = this.G.player;
+    if (this.def.boss && P && !this.G.playerDead) { // a boss never steps into Chewy (it isn't pushed either)
+      const mn = this.bodyR + PLAYER_VR, d1 = (this.pos.x - P.pos.x) ** 2 + (this.pos.z - P.pos.z) ** 2;
+      if (d1 < mn * mn && d1 < (_p.x - P.pos.x) ** 2 + (_p.z - P.pos.z) ** 2) { this.pos.x = _p.x; this.pos.z = _p.z; }
     }
-    this.world.collision.resolve(this.pos, this.radius * 0.8, _p);
     this.facing = dampAngle(this.facing, Math.atan2(dir.x, dir.z), 10, dt);
   }
   chase(target, dt, mul) {
     let dir;
     if (this.mode.los(this.pos, target.pos)) dir = target.pos.clone().sub(this.pos).setY(0).normalize();
     else dir = this.mode.flowDir(this.pos) || target.pos.clone().sub(this.pos).setY(0).normalize();
+    // surround instead of stacking: when a pack-mate already blocks the way in, slide around it (each monster keeps
+    // its own side) so the pack fans out into a ring of readable bodies rather than a pile behind the front row
+    if (!this.def.boss) {
+      const dT = dist(target.pos.x, target.pos.z, this.pos.x, this.pos.z);
+      if (dT < 4) {
+        for (const m of this.mode.monsters) {
+          if (m === this || !m.alive) continue;
+          const dx = m.pos.x - this.pos.x, dz = m.pos.z - this.pos.z, mn = (this.bodyR + m.bodyR) * 1.2;
+          if (dx * dx + dz * dz > mn * mn || dx * dir.x + dz * dir.z <= 0) continue;
+          const side = this.side ??= (Math.random() < 0.5 ? -1 : 1), a = side * 1.1;
+          const c = Math.cos(a), s = Math.sin(a);
+          dir = new THREE.Vector3(dir.x * c - dir.z * s, 0, dir.x * s + dir.z * c);
+          mul *= 0.7;
+          break;
+        }
+      }
+    }
     this.move(dir, dt, mul);
   }
   blink(target) {

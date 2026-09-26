@@ -7,8 +7,10 @@
 import * as THREE from 'three';
 import { CELL, THEMES } from './gen.js';
 import { makeToon, U } from '../gfx/materials.js';
-import { tube, RoundedBox } from '../gfx/geom.js';
-import { glowTexture, shaftTexture } from '../gfx/textures.js';
+import { tube as tubeRaw, RoundedBox } from '../gfx/geom.js';
+// geom.tube() winds its triangles inward (face normals oppose the vertex normals), so with FrontSide toon materials a
+// tube shows its dark inner far wall and the ink hull covers the near side (why tongues rendered black). Flip it here.
+const tube = (...a) => { const g = tubeRaw(...a), I = g.index.array; for (let i = 0; i < I.length; i += 3) { const t = I[i + 1]; I[i + 1] = I[i + 2]; I[i + 2] = t; } return g; };
 import { LightPool } from '../core/engine.js';
 import { Collision } from '../world/collision.js';
 import { Noise, mulberry32, clamp, rand, TAU } from '../core/util.js';
@@ -102,6 +104,18 @@ const M = (x, y, z, sx, sy = sx, sz = sx, rx = 0, ry = 0, rz = 0) => { _E.set(rx
 // local +Y along unit direction d (spin around it first)
 const MD = (x, y, z, d, sx, sy, sz, spin = 0) => { _Q.setFromUnitVectors(UPV, d); if (spin) { _Q2.setFromAxisAngle(UPV, spin); _Q.multiply(_Q2); } return _M.compose(_P.set(x, y, z), _Q, _S.set(sx, sy, sz)); };
 
+// Additive glow that leaves the destination ALPHA untouched. The post chain blends every effect with
+// mix(dst, src, src.a): any quad that bumps the scene buffer's alpha above 1 gets its whole footprint
+// re-graded (that was the rectangular "box" around every halo, which wrote alpha = 1 over its full quad).
+export function keepAlphaAdd(m) {
+  m.blending = THREE.CustomBlending; m.blendEquation = THREE.AddEquation;
+  m.blendSrc = THREE.OneFactor; m.blendDst = THREE.OneFactor; m.blendSrcAlpha = THREE.ZeroFactor; m.blendDstAlpha = THREE.OneFactor;
+  m.transparent = true; m.depthWrite = false; m.toneMapped = false;
+  return m;
+}
+// analytic soft falloff (no texture -> no mip bleed to the quad edge); r = 0 centre .. 1 rim, exactly 0 at and beyond the rim
+const FALLOFF_GLSL = /* glsl */`float glowFall(float r) { float k = clamp(1.0 - r, 0.0, 1.0); return k * k * (0.55 + 0.45 * k) + 0.35 * exp(-r * r * 30.0) * k; }`;
+
 // camera-facing glow halos / flames in one draw call (billboarded in view space, per-quad flicker)
 class Halos {
   constructor() { this.list = []; }
@@ -119,22 +133,86 @@ class Halos {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aInfo', new THREE.BufferAttribute(info, 4)); g.setAttribute('color', new THREE.BufferAttribute(cl, 3));
     g.setIndex(new THREE.BufferAttribute(idx, 1));
-    const mat = new THREE.ShaderMaterial({
-      uniforms: { uTime: U.uTime, uMap: { value: glowTexture() } },
+    const mat = keepAlphaAdd(new THREE.ShaderMaterial({
+      uniforms: { uTime: U.uTime },
       vertexShader: /* glsl */`
-        attribute vec4 aInfo; attribute vec3 color; uniform float uTime; varying vec2 vUv; varying vec3 vCol;
+        attribute vec4 aInfo; attribute vec3 color; uniform float uTime; varying vec2 vQ; varying vec3 vCol;
         void main() {
-          vUv = aInfo.xy * 0.5 + 0.5; vCol = color;
+          vQ = aInfo.xy; vCol = color;
           float fl = 1.0 + aInfo.w * (sin(uTime * 11.0 + position.x * 3.1) * 0.08 + sin(uTime * 23.0 + position.z * 1.7) * 0.05);
           vec4 mv = modelViewMatrix * vec4(position, 1.0); mv.xy += aInfo.xy * aInfo.z * fl;
+          mv.z += aInfo.z * 0.85; // pull the card toward the camera so it floats in front of the wall/prop it lights instead of slicing through it
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: /* glsl */`
-        uniform sampler2D uMap; varying vec2 vUv; varying vec3 vCol;
-        void main() { float a = texture2D(uMap, vUv).a; gl_FragColor = vec4(vCol * a, 1.0); }`,
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
-    });
+        varying vec2 vQ; varying vec3 vCol; ${FALLOFF_GLSL}
+        void main() { gl_FragColor = vec4(vCol * glowFall(length(vQ)), 0.0); }`,
+    }));
     const m = new THREE.Mesh(g, mat); m.frustumCulled = false; m.renderOrder = 8; scene.add(m);
+    return m;
+  }
+}
+// flat glow pools on the floor (shaft spots, spring ponds) in one draw call; pulse = slow breathing
+class FloorGlows {
+  constructor() { this.list = []; }
+  add(x, y, z, r, color, alpha = 0.35, pulse = 0) { this.list.push([x, y, z, r, col(color), alpha, pulse]); }
+  build(scene) {
+    const n = this.list.length; if (!n) return null;
+    const pos = new Float32Array(n * 12), info = new Float32Array(n * 12), cl = new Float32Array(n * 12), idx = new Uint32Array(n * 6);
+    const cr = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+    this.list.forEach(([x, y, z, r, c, a, p], i) => {
+      for (let k = 0; k < 4; k++) { const v = i * 4 + k; pos.set([x + cr[k][0] * r, y, z + cr[k][1] * r], v * 3); info.set([cr[k][0], cr[k][1], p], v * 3); cl.set([c.r * a, c.g * a, c.b * a], v * 3); }
+      idx.set([i * 4, i * 4 + 2, i * 4 + 1, i * 4, i * 4 + 3, i * 4 + 2], i * 6);
+    });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aInfo', new THREE.BufferAttribute(info, 3)); g.setAttribute('color', new THREE.BufferAttribute(cl, 3));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    const mat = keepAlphaAdd(new THREE.ShaderMaterial({
+      uniforms: { uTime: U.uTime },
+      vertexShader: /* glsl */`
+        attribute vec3 aInfo; attribute vec3 color; uniform float uTime; varying vec2 vQ; varying vec3 vCol;
+        void main() { vQ = aInfo.xy; vCol = color * (1.0 - aInfo.z * (0.25 - 0.25 * sin(uTime * 1.6 + position.x))); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: /* glsl */`varying vec2 vQ; varying vec3 vCol; ${FALLOFF_GLSL}
+        void main() { gl_FragColor = vec4(vCol * glowFall(length(vQ)), 0.0); }`,
+      side: THREE.DoubleSide,
+    }));
+    const m = new THREE.Mesh(g, mat); m.frustumCulled = false; m.renderOrder = 2; scene.add(m);
+    return m;
+  }
+}
+// god-ray planes (slanted, double sided) in one draw call; analytic side/top falloff, per-plane shimmer phase
+class Shafts {
+  constructor() { this.list = []; }
+  add(x, z, w, h, rx, ry, rz, base, ph) { this.list.push([x, z, w, h, rx, ry, rz, base, ph]); }
+  build(scene, color) {
+    const n = this.list.length; if (!n) return null;
+    const pos = new Float32Array(n * 12), info = new Float32Array(n * 16), idx = new Uint32Array(n * 6);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3();
+    this.list.forEach(([x, z, w, h, rx, ry, rz, base, ph], i) => {
+      m4.compose(v.set(x, 0, z), q.setFromEuler(e.set(rx, ry, rz)), _S.set(1, 1, 1));
+      [[-0.5, 0, 0, 0], [0.5, 0, 1, 0], [0.5, 1, 1, 1], [-0.5, 1, 0, 1]].forEach(([cx, cy, u, t], k) => {
+        v.set(cx * w, cy * h, 0).applyMatrix4(m4); pos.set([v.x, v.y, v.z], (i * 4 + k) * 3); info.set([u, t, base, ph], (i * 4 + k) * 4);
+      });
+      idx.set([i * 4, i * 4 + 1, i * 4 + 2, i * 4, i * 4 + 2, i * 4 + 3], i * 6);
+    });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aInfo', new THREE.BufferAttribute(info, 4));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    const mat = keepAlphaAdd(new THREE.ShaderMaterial({
+      uniforms: { uTime: U.uTime, uCol: { value: color } },
+      vertexShader: /* glsl */`
+        attribute vec4 aInfo; uniform float uTime; varying vec2 vUv; varying float vA;
+        void main() { vUv = aInfo.xy; vA = aInfo.z * (0.75 + 0.25 * sin(uTime * 0.7 + aInfo.w)); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: /* glsl */`
+        uniform vec3 uCol; varying vec2 vUv; varying float vA;
+        void main() {
+          float side = pow(sin(clamp(vUv.x, 0.0, 1.0) * 3.14159), 2.2);
+          float fade = pow(1.0 - vUv.y, 1.3) * smoothstep(0.0, 0.16, vUv.y);
+          gl_FragColor = vec4(uCol * side * fade * vA, 0.0);
+        }`,
+      side: THREE.DoubleSide,
+    }));
+    const m = new THREE.Mesh(g, mat); m.frustumCulled = false; m.renderOrder = 11; scene.add(m);
     return m;
   }
 }
@@ -184,10 +262,10 @@ const FLOOR_THEME = {
     c = mix(c, c * vec3(1.14, 1.08, 1.0), trail * smoothstep(0.35, 0.65, vn(p * 0.35)));
     // moss patches (thicker towards walls) with tiny clover flowers
     float mn = fbm(p * 0.13 + 3.0) + smoothstep(1.7, 0.6, wd) * 0.2 + (nB - 0.5) * 0.12;
-    float moss = smoothstep(0.575, 0.6, mn), mossHi = smoothstep(0.63, 0.72, mn);
-    vec3 mcol = mix(${glc('#5f8a44')}, ${glc('#86b458')}, smoothstep(0.3, 0.75, vn(p * 1.1)));
-    mcol = mix(mcol, ${glc('#a8cc6a')}, mossHi * 0.45);
-    c = mix(c, c * 0.78, smoothstep(0.53, 0.575, mn) * (1.0 - moss) * 0.7);
+    float moss = smoothstep(0.615, 0.64, mn), mossHi = smoothstep(0.67, 0.76, mn);
+    vec3 mcol = mix(${glc('#7e9a5e')}, ${glc('#98b070')}, smoothstep(0.3, 0.75, vn(p * 1.1)));
+    mcol = mix(mcol, ${glc('#b4c88c')}, mossHi * 0.45);
+    c = mix(c, c * 0.84, smoothstep(0.57, 0.615, mn) * (1.0 - moss) * 0.7);
     c = mix(c, mcol, moss);
     vec2 fcc = floor(p * 2.6); vec2 fo = fract(p * 2.6) - 0.5 - (h2(fcc) - 0.5) * 0.5; float fh = h1(fcc + 7.0);
     float flw = step(0.88, fh) * smoothstep(0.13, 0.07, length(fo)) * mossHi;
@@ -218,6 +296,20 @@ const FLOOR_THEME = {
     c = mix(c, wat, pud);
     c = mix(c, ${glc('#e8f8ff')}, smoothstep(0.765, 0.772, pn) * (1.0 - smoothstep(0.776, 0.785, pn)) * away * 0.7);
     fG += ${glc('#c8f0ff')} * (twinkle(p, 3.2, 0.7) * pud * 2.2 + pud * 0.06);
+    // leaf litter & fallen petals drifting toward the walls (small painted leaves with a soft drop shadow and a vein)
+    {
+      vec2 lc; vec3 lv = vor(p * 1.6 + 31.0, lc);
+      float lp = step(0.9 - smoothstep(2.6, 0.9, wd) * 0.1, lv.z) * (1.0 - pud) * step(0.9, wd);
+      if (lp > 0.0) {
+        float la = lv.z * 71.0, cs = cos(la), sn = sin(la); vec2 q = vec2(cs * lc.x - sn * lc.y, sn * lc.x + cs * lc.y);
+        float hh = h1(vec2(lv.z * 37.0, 5.0));
+        vec3 lcol = hh < 0.4 ? ${glc('#c8a458')} : hh < 0.68 ? ${glc('#9cb06a')} : hh < 0.88 ? ${glc('#d68e5c')} : ${glc('#ffc4d8')};
+        c = mix(c, c * 0.8, smoothstep(1.25, 0.85, length((q - vec2(0.025, -0.03)) / vec2(0.19, 0.085))) * lp * 0.45);
+        float leaf = smoothstep(1.0, 0.8, length(q / vec2(0.17, 0.075)));
+        c = mix(c, lcol * (0.88 + 0.22 * smoothstep(-0.12, 0.12, q.x)), leaf * lp);
+        c = mix(c, lcol * 0.72, leaf * lp * smoothstep(0.01, 0.0, abs(q.y)) * 0.55);
+      }
+    }
   `,
   crystal: /* glsl */`
     vec2 tc; vec3 v = vor(p * 0.6, tc);
@@ -279,11 +371,19 @@ const FLOOR_THEME = {
         float dc = ax ? abs(p.y - ctr.y) : abs(p.x - ctr.x), lc = ax ? p.x : p.y;
         float l0 = (ax ? lo.x : lo.y) - 0.4, l1 = (ax ? hi.x : hi.y) + 0.4;
         float inR = smoothstep(0.86, 0.82, dc) * step(l0, lc) * step(lc, l1);
+        #ifdef MOON
+        vec3 rc = K.x > 3.5 ? ${glc('#c8a040')} : ${glc('#2e3470')};
+        #else
         vec3 rc = K.x > 3.5 ? ${glc('#e0a832')} : ${glc('#c42e34')};
+        #endif
         float trim = smoothstep(0.6, 0.63, dc) * smoothstep(0.74, 0.71, dc);
         vec2 mm = vec2(fract(lc * 0.7) - 0.5, dc);
         float dia = smoothstep(0.02, 0.0, abs(mm.x) * 0.8 + mm.y * 0.9 - 0.28) * (1.0 - smoothstep(0.02, 0.0, abs(mm.x) * 0.8 + mm.y * 0.9 - 0.2));
+        #ifdef MOON
+        rc = mix(rc, ${glc('#d8e4ff')}, clamp(trim + dia, 0.0, 1.0));
+        #else
         rc = mix(rc, ${glc('#ffd36a')}, clamp(trim + dia, 0.0, 1.0));
+        #endif
         rc *= 0.95 + 0.05 * vn(p * 7.0);
         float fringe = step(abs(lc - clamp(lc, l0, l1)), 0.16) * (1.0 - step(l0, lc) * step(lc, l1)) * smoothstep(0.8, 0.76, dc) * step(0.5, fract(dc * 9.0));
         c = mix(c, c * 0.7, smoothstep(0.98, 0.86, dc) * step(l0 - 0.08, lc) * step(lc, l1 + 0.08) * (1.0 - inR) * 0.6);
@@ -293,6 +393,9 @@ const FLOOR_THEME = {
     } else {
       c = ori > 120.0 ? planks(p.yx, plankBase) : planks(p, plankBase);
     }
+    #ifdef MOON
+    c = mix(c, c * vec3(0.8, 0.9, 1.16), 0.55); // moon-washed timber & tatami
+    #endif
   `,
   kitchen: /* glsl */`
     if (rid > 0) {
@@ -378,10 +481,11 @@ const PROFILES = {
     [-0.02, h - 0.24, 'ledge', 0], [-0.18, h - 0.2, 'ledge', 0], [-0.18, h - 0.02, 'ledge', 0], [0.05, h + 0.08, 'cap', 2], [0.95, h + 0.08, 'cap', 2], [0.95, h + 0.08, 'fill', 0], [D, h - 0.2, 'fill', 0], [D * 1.2 + 0.3, -0.02, 'void', 0]],
 };
 const WALL_ROLES = {
-  burrow: { dirt: ['#8a624a', '#9a7258'], lip: ['#4c7a38', '#5a8a40'], moss: ['#629a44', '#72a84c'], grass: ['#74aa50', '#8cc05c'], grassBack: ['#4e7a3a', '#5a8442'], back: ['#3a2c30', '#40303a'] },
+  burrow: { dirt: ['#9c7a5e', '#ac8a6c'], lip: ['#62804e', '#6c8a56'], moss: ['#72925c', '#7e9c66'], grass: ['#809e70', '#8eaa7c'], grassBack: ['#5a7250', '#627a56'], back: ['#3a2c2c', '#403232'] },
   crystal: { rockBase: ['#3c3068', '#463a74'], rock: ['#5a4a8e', '#6c5ca4'], rockTop: ['#8a7cc4', '#9a8ed0'], frost: ['#d2dcfa', '#eef2ff'], rockBack: ['#2c2450', '#342a5c'] },
   shrine: { stone: ['#8e8894', '#a09aa4'], stoneTop: ['#b6aeb4', '#c4bcc2'], face: ['#ffffff', '#f4f0ee'], rail: ['#c8362c', '#d4402e'], roof: ['#56688a', '#5e7294'], ridge: ['#343c52', '#3a4258'], roofBack: ['#48587a', '#506284'], fill: ['#2e2226', '#34262a'] },
   kitchen: { base: ['#4a3028', '#523630'], brick: ['#ffffff', '#f4ece8'], ledge: ['#6a5048', '#76584e'], cap: ['#8a7c74', '#9a8a80'], fill: ['#2a1c18', '#302018'] },
+  moon: { stone: ['#7c7e9c', '#8c8caa'], stoneTop: ['#a6a8c6', '#b2b4d2'], face: ['#ffffff', '#f2f2fa'], rail: ['#c8362c', '#d4402e'], roof: ['#3c4474', '#444c7e'], ridge: ['#22264a', '#282c52'], roofBack: ['#343c68', '#3c4470'], fill: ['#14162e', '#181a34'] },
 };
 const WALL_H = { burrow: [2.5, 1.3, 0.55], crystal: [2.9, 1.2, 0.55], shrine: [2.45, 0.1, 0.62], kitchen: [2.7, 0.12, 0.6] }; // base, variation, near-side factor
 const WALL_GLSL = {
@@ -445,12 +549,13 @@ export class DungeonWorld {
   constructor(engine, layout) {
     this.engine = engine; this.L = layout;
     const T = this.theme = THEMES[layout.theme];
-    this.th = layout.theme;
+    this.variant = layout.theme; // palette (e.g. 'moon')
+    this.th = T.kit || layout.theme; // geometry / shader kit
     const scene = this.scene = new THREE.Scene();
     scene.background = C(T.fog);
     scene.fog = new THREE.Fog(T.fog, 38, 70);
-    this.hemi = new THREE.HemisphereLight(T.ambient[0], T.ambient[1], 1.35); scene.add(this.hemi);
-    const sun = this.sun = new THREE.DirectionalLight('#d8d0ff', 1.25);
+    this.hemi = new THREE.HemisphereLight(T.ambient[0], T.ambient[1], T.ambientI ?? 1.35); scene.add(this.hemi);
+    const sun = this.sun = new THREE.DirectionalLight(T.sun || '#d8d0ff', T.sunI ?? 1.25);
     sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
     const sc = sun.shadow.camera; sc.left = -26; sc.right = 26; sc.top = 26; sc.bottom = -26; sc.near = 1; sc.far = 120;
     sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.04; sun.shadow.radius = 3;
@@ -462,10 +567,12 @@ export class DungeonWorld {
     this.interactables = [];
     this.rng = mulberry32(layout.floor * 31 + 7);
     this.noise = new Noise(layout.floor + 5);
-    this.flames = []; this.steam = []; this.pulses = [];
+    this.flames = []; this.steam = [];
     // static batches: props, wall dressing (fades with the player cut-away), and emissive bits
     this.solid = new Chunks(); this.wallDeco = new Chunks(); this.glow = new Chunks(); this.wallGlow = new Chunks(); this.halos = new Halos();
+    this.floorGlows = new FloorGlows(); this.shaftBatch = new Shafts();
     this.buildInfo(); this.buildFloor(); this.buildWalls(); this.buildProps(); this.buildLights(); this.buildShafts(); this.buildCenterpieces(); this.buildArena();
+    this.shaftBatch.build(scene, C(T.accent).lerp(C('#ffffff'), 0.55)); this.floorGlows.build(scene);
     const matSolid = makeToon({ vertexColors: true, brush: 0.18, rim: 0.35 });
     const matSolidOcc = makeToon({ vertexColors: true, brush: 0.18, rim: 0.35, occluder: true });
     const glowOut = 'outgoingLight += diffuseColor.rgb * 1.35;';
@@ -530,11 +637,11 @@ export class DungeonWorld {
     const b = this.L.bossRoom;
     const uBoss = new THREE.Vector4(0, 0, 0, 0);
     if (b) { const c = this.cellToWorld(b.cx, b.cy); uBoss.set(c.x, c.z, Math.min(b.w, b.h) * CELL * 0.5 - 2.4, 1); this.arena = { x: c.x, z: c.z, R: uBoss.z }; }
-    const SIG = { burrow: '#ffc2dc', crystal: '#8af0ff', shrine: '#ffd24a', kitchen: '#ff8a3a' };
+    const SIG = { burrow: '#ffc2dc', crystal: '#8af0ff', shrine: '#ffd24a', kitchen: '#ff8a3a', moon: '#7c9cff' };
     const mat = makeToon({
       brush: 0.2, brushScale: 0.25, rim: 0, shadowSat: 0.5,
-      uniforms: { uInfo: { value: this.info }, uSize: { value: size }, uF0: { value: C(T.floor[0]) }, uF1: { value: C(T.floor[1]) }, uF2: { value: C(T.floor[2]) }, uVoid: { value: C(T.fog) }, uSig: { value: C(SIG[this.th]) }, uRoom: { value: uRoom }, uRoomK: { value: uRoomK }, uBoss: { value: uBoss } },
-      fragPars: FLOOR_PARS,
+      uniforms: { uInfo: { value: this.info }, uSize: { value: size }, uF0: { value: C(T.floor[0]) }, uF1: { value: C(T.floor[1]) }, uF2: { value: C(T.floor[2]) }, uVoid: { value: C(T.fog) }, uSig: { value: C(SIG[this.variant] || SIG[this.th]) }, uRoom: { value: uRoom }, uRoomK: { value: uRoomK }, uBoss: { value: uBoss } },
+      fragPars: (this.variant === 'moon' ? '#define MOON\n' : '') + FLOOR_PARS,
       fragColor: /* glsl */`
         {
           vec2 p = vCWorld.xz;
@@ -612,7 +719,7 @@ export class DungeonWorld {
   buildWalls() {
     const th = this.th, T = this.theme, N = this.noise, r = this.rng;
     const built = !!T.built, ds = built ? 0.55 : th === 'crystal' ? 0.7 : 0.5;
-    const prof = PROFILES[th], roles = WALL_ROLES[th], [H0, HV, NEAR] = WALL_H[th];
+    const prof = PROFILES[th], roles = WALL_ROLES[this.variant] || WALL_ROLES[th], [H0, HV, NEAR] = WALL_H[th];
     const voidC = C(T.fog).multiplyScalar(0.55);
     const roleCols = {}; for (const k in roles) roleCols[k] = roles[k].map(C);
     const loops = this.traceLoops();
@@ -662,8 +769,8 @@ export class DungeonWorld {
           else {
             const rc = roleCols[role], t = clamp(N.n2(s.x * 0.45 + k, s.z * 0.45) * 0.5 + 0.5);
             _c.copy(rc[0]).lerp(rc[1], t);
-            if (role === 'dirt' || role === 'rock' || role === 'rockBase') _c.multiplyScalar(0.72 + 0.28 * clamp(y / s.h + 0.1));
-            if (role === 'grass' && N.n2(s.x * 0.22, s.z * 0.22) > 0.45) _c.lerp(C('#a8c860'), 0.35);
+            if (role === 'dirt' || role === 'rock' || role === 'rockBase') _c.multiplyScalar((th === 'burrow' ? 0.82 : 0.72) + (th === 'burrow' ? 0.18 : 0.28) * clamp(y / s.h + 0.1));
+            if (role === 'grass' && N.n2(s.x * 0.22, s.z * 0.22) > 0.45) _c.lerp(C(th === 'burrow' ? '#b4c490' : '#a8c860'), 0.35);
             if ((role === 'face' || role === 'brick') && y < 0.5) _c.multiplyScalar(0.8);
             colA.push(_c.r, _c.g, _c.b);
           }
@@ -727,6 +834,20 @@ export class DungeonWorld {
         }
         continue;
       }
+      if (th === 'burrow') { // cosy burrow architecture: timber props every few metres and the odd critter door
+        let lastSeg = -1;
+        const k = Math.max(1, Math.round(0.62 / (len / n)));
+        for (let i = 0; i < n; i++) {
+          const s = S[i], seg = Math.floor(s.u / 6.5);
+          if (seg === lastSeg || s.f < 0.35 || s.u > len - 3) continue;
+          const A = S[(i - k + n) % n], B = S[(i + k) % n];
+          if (A.f < 0.25 || B.f < 0.25 || Math.abs(A.h - B.h) > 0.5) continue; // straight-ish, camera-facing run only
+          lastSeg = seg;
+          const hsh = mulberry32(seg * 7919 + seed * 104729)();
+          if (hsh < 0.2) this.critterDoor(s, addLight);
+          else if (hsh < 0.7) this.timberFrame(A, B);
+        }
+      }
       for (let i = 0; i < n; i++) {
         const s = S[i];
         if (r() > (th === 'burrow' ? 0.3 : 0.26)) continue;
@@ -745,7 +866,7 @@ export class DungeonWorld {
             const m = 3 + Math.floor(r() * 3);
             for (let q = 0; q < m; q++) {
               const o = (q / (m - 1) - 0.5) * 1.1, len2 = 0.25 + r() * 0.45;
-              WD.add(SH.sphLo(), M(fx + s.tx * o - s.nx * 0.08, s.h * 0.84 - len2 * 0.5, fz + s.tz * o - s.nz * 0.08, 0.14 + r() * 0.06, len2 * 0.6, 0.09, 0, face, 0), null, (x, y, z, nx, ny, nz, o2) => o2.copy(col('#4e8a3a')).lerp(col('#86b858'), clamp(ny * 0.5 + 0.5)));
+              WD.add(SH.sphLo(), M(fx + s.tx * o - s.nx * 0.08, s.h * 0.84 - len2 * 0.5, fz + s.tz * o - s.nz * 0.08, 0.14 + r() * 0.06, len2 * 0.6, 0.09, 0, face, 0), null, (x, y, z, nx, ny, nz, o2) => o2.copy(col('#5e8444')).lerp(col('#94b068'), clamp(ny * 0.5 + 0.5)));
             }
           } else if (far && k < 0.66) { // shelf fungus
             const y0 = s.h * (0.3 + r() * 0.35), cc = r() < 0.5 ? '#f4d8a8' : '#e89a5a';
@@ -757,7 +878,7 @@ export class DungeonWorld {
           } else if (far && k < 0.9) { // glowing mushrooms near the base
             this.mushrooms(WG, fx - s.nx * 0.1, 0, fz - s.nz * 0.1, r() < 0.6 ? '#8ad8ff' : '#ff9ad0', 0.8 + r() * 0.4, HA);
           } else if (far) { // mossy boulder at the base
-            WD.add(SH.ico(), M(fx - s.nx * 0.25, 0.12, fz - s.nz * 0.25, 0.32 + r() * 0.2, 0.26 + r() * 0.1, 0.3 + r() * 0.2, r(), r() * TAU, 0), null, (x, y, z, nx, ny, nz, o2) => o2.copy(col('#8a7a70')).lerp(col('#6aa04e'), clamp(ny * 1.6 - 0.3)));
+            WD.add(SH.ico(), M(fx - s.nx * 0.25, 0.12, fz - s.nz * 0.25, 0.32 + r() * 0.2, 0.26 + r() * 0.1, 0.3 + r() * 0.2, r(), r() * TAU, 0), null, (x, y, z, nx, ny, nz, o2) => o2.copy(col('#9a8a7e')).lerp(col('#7c9a5a'), clamp(ny * 1.6 - 0.3)));
           }
         } else { // crystal grotto
           const k = r();
@@ -788,6 +909,43 @@ export class DungeonWorld {
         }
       }
     }
+  }
+  timberFrame(A, B) { // two rough posts and a lintel propping up the mossy lip
+    const WD = this.wallDeco, r = this.rng;
+    const wood = (y0, y1) => (x, y, z, nx, ny, nz, o) => o.copy(col('#7a5034')).lerp(col('#a8744a'), clamp(0.5 + 0.5 * Math.sin(y * 9 + x * 3 + z * 2)) * 0.45 + clamp((y - y0) / Math.max(0.01, y1 - y0)) * 0.2);
+    const hh = Math.min(A.h, B.h) * 0.78;
+    const pts = [A, B].map(s => ({ x: s.x - s.nx * 0.42, z: s.z - s.nz * 0.42 }));
+    for (const p of pts) {
+      WD.add(SH.cyl6(), M(p.x, 0, p.z, 0.11, hh, 0.11, (r() - 0.5) * 0.05, r() * TAU, (r() - 0.5) * 0.05), null, wood(0, hh));
+      WD.add(SH.cyl6(), M(p.x, 0, p.z, 0.15, 0.1, 0.15, 0, r() * TAU, 0), col('#5a3c28'));
+    }
+    const dx = pts[1].x - pts[0].x, dz = pts[1].z - pts[0].z, L = Math.hypot(dx, dz) || 1, d = V(dx / L, 0, dz / L);
+    WD.add(SH.box(), MD(pts[0].x - d.x * 0.3, hh - 0.02, pts[0].z - d.z * 0.3, d, 0.24, L + 0.6, 0.2, Math.atan2(A.nx, A.nz)), null, wood(hh - 0.1, hh + 0.2));
+    for (const p of pts) WD.add(SH.sphLo(), M(p.x - A.nx * 0.12, hh + 0.1, p.z - A.nz * 0.12, 0.05), col('#4a3a3a')); // iron pegs
+    if (r() < 0.5) { // a lantern hooked on the lintel
+      const mx = (pts[0].x + pts[1].x) / 2 - A.nx * 0.14, mz = (pts[0].z + pts[1].z) / 2 - A.nz * 0.14;
+      WD.add(SH.cyl(), M(mx, hh - 0.3, mz, 0.01, 0.3, 0.01), col('#3a2a2a'));
+      this.wallGlow.add(SH.sph(), M(mx, hh - 0.4, mz, 0.1, 0.12, 0.1), col('#ffd890'));
+      WD.add(SH.cone(), M(mx, hh - 0.3, mz, 0.12, 0.08, 0.12), col('#4a3a3a'));
+      this.halos.add(mx, hh - 0.4, mz, 1.2, '#ffc47a', 0.5, 1);
+    }
+  }
+  critterDoor(s, addLight) { // round hobbit-style door of some burrow critter, with a lamp and a doormat
+    const WD = this.wallDeco, WG = this.wallGlow, HA = this.halos, r = this.rng;
+    const d = V(-s.nx, 0.12, -s.nz).normalize(), bx = s.x - s.nx * 0.3, bz = s.z - s.nz * 0.3, cy = 0.44;
+    const dc = ['#5a8a6a', '#c8644a', '#4a6a9a', '#d8a040', '#8a5aa0'][Math.floor(r() * 5)];
+    WD.add(SH.disc(), MD(bx - d.x * 0.02, cy, bz - d.z * 0.02, d, 0.42, 0.08, 0.42), null, (x, y, z, nx, ny, nz, o, lx, ly, lz) => { o.set(dc); if (Math.abs(Math.sin(lx * 10)) < 0.14) o.multiplyScalar(0.72); if (ly > 0.9 && Math.hypot(lx, lz) < 0.25) o.lerp(col('#ffffff'), 0.08); });
+    WD.add(SH.torus(), MD(bx + d.x * 0.03, cy, bz + d.z * 0.03, d, 0.46, 0.46, 0.46), null, (x, y, z, nx, ny, nz, o) => o.copy(col('#7a5034')).lerp(col('#b07a4e'), clamp(ny * 0.5 + 0.5)));
+    const tx = -d.z, tz = d.x;
+    WD.add(SH.sphLo(), M(bx + d.x * 0.1 + tx * 0.22, cy - 0.02, bz + d.z * 0.1 + tz * 0.22, 0.045), col('#f4c04a'));
+    WD.add(SH.box(), M(bx + d.x * 0.5, 0.005, bz + d.z * 0.5, 0.62, 0.025, 0.36, 0, Math.atan2(d.x, d.z), 0), null, (x, y, z, nx, ny, nz, o, lx) => o.set(Math.abs(Math.sin(lx * 18)) > 0.6 ? '#c8a060' : '#a8744a'));
+    // tiny lamp on a bracket beside the door
+    const lx = bx + d.x * 0.22 - tx * 0.55, lz = bz + d.z * 0.22 - tz * 0.55;
+    WD.add(SH.cyl(), M(lx, 0.95, lz, 0.015, 0.14, 0.015), col('#3a2a2a'));
+    WG.add(SH.sph(), M(lx, 0.88, lz, 0.08, 0.1, 0.08), col('#ffd890'));
+    HA.add(lx, 0.88, lz, 1.1, '#ffc47a', 0.55, 1);
+    if (r() < 0.6) addLight(lx + d.x * 0.5, 1.0, lz + d.z * 0.5, '#ffc47a', 4, 5, 0.6);
+    this.flower(WD, bx + d.x * 0.35 + tx * 0.6, 0, bz + d.z * 0.35 + tz * 0.6, '#ffb8d0', 0.9);
   }
   shrinePost(s, face, hash, mid, addLight) {
     const WD = this.wallDeco, WG = this.wallGlow, HA = this.halos, r = this.rng;
@@ -868,7 +1026,7 @@ export class DungeonWorld {
     }
   }
   // ------------------------------------------------------------------ small prop kit (all append into batches)
-  tuft(b, x, y, z, s = 1, c0 = '#5a9a40', c1 = '#a8d468') {
+  tuft(b, x, y, z, s = 1, c0 = '#6a9448', c1 = '#aac47c') {
     const r = this.rng, m = 5 + Math.floor(r() * 3);
     for (let i = 0; i < m; i++) {
       const a = (i / m) * TAU + r() * 0.5, lean = 0.25 + r() * 0.35, hh = (0.22 + r() * 0.18) * s;
@@ -894,12 +1052,12 @@ export class DungeonWorld {
     b.add(SH.cyl(), M(x, y + h, z, 0.095, 0.05, 0.095), col('#8a5a3a'));
     b.add(SH.sphLo(), M(x, y + h + 0.05, z, 0.05, 0.03, 0.05), col('#e8d0a0'));
   }
-  toro(b, g, x, z, face, s = 1, lightUp = false) { // stone lantern
+  toro(b, g, x, z, face, s = 1, lightUp = false, fire = '#ffb85a') { // stone lantern
     const st = '#a8a2a6', dk = '#8a8488';
     b.add(SH.cyl6(), M(x, 0, z, 0.22 * s, 0.1 * s, 0.22 * s, 0, face, 0), col(dk));
     b.add(SH.cyl6(), M(x, 0.1 * s, z, 0.07 * s, 0.5 * s, 0.07 * s, 0, face, 0), col(st));
     b.add(SH.cyl6(), M(x, 0.6 * s, z, 0.2 * s, 0.07 * s, 0.2 * s, 0, face, 0), col(dk));
-    g.add(SH.box(), M(x, 0.67 * s, z, 0.24 * s, 0.22 * s, 0.24 * s, 0, face, 0), null, (px, py, pz, nx, ny, nz, o) => o.set(Math.abs(ny) > 0.5 ? '#6a5a50' : '#ffb85a'));
+    g.add(SH.box(), M(x, 0.67 * s, z, 0.24 * s, 0.22 * s, 0.24 * s, 0, face, 0), null, (px, py, pz, nx, ny, nz, o) => o.set(Math.abs(ny) > 0.5 ? '#6a5a50' : fire));
     b.add(SH.cone4(), M(x, 0.89 * s, z, 0.3 * s, 0.22 * s, 0.3 * s, 0, face + Math.PI / 4, 0), col(dk));
     b.add(SH.sphLo(), M(x, 1.12 * s, z, 0.05 * s), col(st));
     if (lightUp) this.halos.add(x, 0.78 * s, z, 1.2 * s, '#ffb060', 0.5, 1);
@@ -984,7 +1142,7 @@ export class DungeonWorld {
       }
     }
   }
-  mossRock(b, x, z, s) { const r = this.rng; b.add(SH.ico(), M(x, s * 0.25, z, s, s * (0.6 + r() * 0.3), s * (0.8 + r() * 0.3), r(), r() * TAU, r() * 0.3), null, (px, py, pz, nx, ny, nz, o) => o.copy(col('#8e7e74')).lerp(col('#6aa04e'), clamp(ny * 1.8 - 0.5)).lerp(col('#9ac866'), clamp(ny * 2 - 1.4))); }
+  mossRock(b, x, z, s) { const r = this.rng; b.add(SH.ico(), M(x, s * 0.25, z, s, s * (0.6 + r() * 0.3), s * (0.8 + r() * 0.3), r(), r() * TAU, r() * 0.3), null, (px, py, pz, nx, ny, nz, o) => o.copy(col('#a09084')).lerp(col('#7c9a5a'), clamp(ny * 1.8 - 0.5)).lerp(col('#a8bc80'), clamp(ny * 2 - 1.4))); }
   pebbles(b, x, z, c) { const r = this.rng; for (let i = 0; i < 4 + r() * 3; i++) { const s = 0.06 + r() * 0.08; b.add(SH.sphLo(), M(x + (r() - 0.5) * 0.7, s * 0.3, z + (r() - 0.5) * 0.7, s, s * 0.6, s * 0.85, 0, r() * 3, 0), null, (px, py, pz, nx, ny, nz, o) => o.copy(col(c)).multiplyScalar(0.8 + ny * 0.3)); } }
   bone(b, x, z, face) {
     const ca = Math.cos(face), sa = Math.sin(face), L2 = 0.26;
@@ -1107,7 +1265,7 @@ export class DungeonWorld {
         GL.add(SH.sph(), M(lx, 1.15, lz, 0.13, 0.16, 0.13), col('#ffd890'));
         B.add(SH.cone(), M(lx, 1.27, lz, 0.16, 0.12, 0.16), col('#4a3a3a'));
         fy = 1.15; flame = false; HA.add(lx, fy, lz, 1.8, T.light, 0.65, 1);
-        this.lightPool.addSource({ pos: V(lx, 1.5, lz), color: C(T.light), intensity: 12, radius: 11, flicker: 1 });
+        this.lightPool.addSource({ pos: V(lx, 1.5, lz), color: C(T.light), intensity: T.lightI ?? 12, radius: 11, flicker: 1 });
         this.collision.addCircle(x, z, 0.25);
         this.tuft(B, x + 0.15, 0, z + 0.1, 0.9);
         continue;
@@ -1124,43 +1282,35 @@ export class DungeonWorld {
         GL.add(SH.sphLo(), M(x, 0.92, z, 0.24, 0.08, 0.24), col('#ff7a2a'));
         fy = 1.12;
       }
-      this.lightPool.addSource({ pos: V(x, 1.5, z), color: C(T.light), intensity: 12, radius: 11, flicker: 1 });
+      this.lightPool.addSource({ pos: V(x, 1.5, z), color: C(T.light), intensity: T.lightI ?? 12, radius: 11, flicker: 1 });
       this.collision.addCircle(x, z, 0.3);
       if (flame) { HA.add(x, fy, z, 1.4, T.light, 1, 1.5); this.flames.push({ p: V(x, fy, z) }); }
     }
   }
   buildShafts() {
-    const { rooms } = this.L;
-    const tex = shaftTexture();
-    this.shafts = [];
-    const col2 = C(this.theme.accent).lerp(C('#ffffff'), 0.55);
-    const mat = new THREE.MeshBasicMaterial({ map: tex, color: col2, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, fog: false });
-    for (const r of rooms) {
-      if (this.rng() < 0.45 || r.kind === 'boss') continue;
-      const wp = this.cellToWorld(r.cx + Math.floor((this.rng() - 0.5) * r.w * 0.5), r.cy + Math.floor((this.rng() - 0.5) * r.h * 0.5));
-      for (let i = 0; i < 3; i++) {
-        const m = new THREE.Mesh(new THREE.PlaneGeometry(1.6 + this.rng() * 1.4, 11), mat.clone());
-        m.geometry.translate(0, 5.5, 0);
-        m.position.set(wp.x + (this.rng() - 0.5) * 1.5, 0, wp.z + (this.rng() - 0.5) * 1.5);
-        m.rotation.set(0.28, this.rng() * TAU, 0.18);
-        m.renderOrder = 11; this.scene.add(m);
-        this.shafts.push({ m, ph: this.rng() * 10, base: 0.08 + this.rng() * 0.06 });
-      }
-      const pool = new THREE.Mesh(new THREE.CircleGeometry(1.6, 24), new THREE.MeshBasicMaterial({ map: glowTexture(), color: col2, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
-      pool.rotation.x = -Math.PI / 2; pool.position.set(wp.x, 0.04, wp.z); this.scene.add(pool);
+    const { rooms } = this.L, r = this.rng, SB = this.shaftBatch;
+    const col2 = C(this.theme.accent).lerp(C('#ffffff'), 0.55).getHexString();
+    const beam = (x, z, n, w0, w1, base0, base1, poolR, poolA) => {
+      for (let i = 0; i < n; i++) SB.add(x + (r() - 0.5) * 1.5, z + (r() - 0.5) * 1.5, w0 + r() * w1, 11, 0.28, r() * TAU, 0.18, base0 + r() * base1, r() * 10);
+      this.floorGlows.add(x, 0.04, z, poolR, '#' + col2, poolA);
+    };
+    for (const rm of rooms) {
+      if (r() < 0.45 || rm.kind === 'boss') continue;
+      const wp = this.cellToWorld(rm.cx + Math.floor((r() - 0.5) * rm.w * 0.5), rm.cy + Math.floor((r() - 0.5) * rm.h * 0.5));
+      beam(wp.x, wp.z, 3, 1.6, 1.4, 0.08, 0.06, 1.6, 0.35);
       (this.shaftSpots ||= []).push(wp);
     }
+    // Tamamo's sanctum: a broad moonbeam falls on the middle of the arena
+    if (this.variant === 'moon' && this.arena) beam(this.arena.x, this.arena.z, 5, 2.2, 1.6, 0.1, 0.06, 3.2, 0.16);
   }
   buildCenterpieces() {
     const th = this.th, r = this.rng, T = this.theme, solid = this.solid, glow = this.glow;
     for (const c of this.L.centers || []) {
       const p = this.cellToWorld(c.x, c.y);
       if (th === 'burrow') { // glowing spring pond with lily pads and mossy rocks
-        const pond = new THREE.Mesh(new THREE.CircleGeometry(1.9, 40), new THREE.MeshBasicMaterial({ color: new THREE.Color('#5ad0e8').multiplyScalar(1.2), toneMapped: false, transparent: true, opacity: 0.9 }));
+        const pond = new THREE.Mesh(new THREE.CircleGeometry(1.9, 40), new THREE.MeshBasicMaterial({ color: new THREE.Color('#5ad0e8').multiplyScalar(1.2), toneMapped: false }));
         pond.rotation.x = -Math.PI / 2; pond.position.set(p.x, 0.05, p.z); this.scene.add(pond);
-        const inner = new THREE.Mesh(new THREE.CircleGeometry(1.2, 32), new THREE.MeshBasicMaterial({ map: glowTexture(), color: '#bff8ff', transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
-        inner.rotation.x = -Math.PI / 2; inner.position.set(p.x, 0.07, p.z); this.scene.add(inner);
-        this.pulses.push({ m: inner, base: 0.7 });
+        this.floorGlows.add(p.x, 0.07, p.z, 1.3, '#bff8ff', 0.75, 1);
         for (let i = 0; i < 12; i++) { const a = i / 12 * TAU + r() * 0.3; this.mossRock(solid, p.x + Math.cos(a) * 2.1, p.z + Math.sin(a) * 2.1, 0.3 + r() * 0.25); }
         for (let i = 0; i < 5; i++) { const a = r() * TAU, d = r() * 1.3; solid.add(SH.disc(), M(p.x + Math.cos(a) * d, 0.07, p.z + Math.sin(a) * d, 0.22 + r() * 0.1, 0.03, 0.22), col('#6ac05a')); }
         for (let i = 0; i < 4; i++) { const a = r() * TAU; this.flower(solid, p.x + Math.cos(a) * 2.4, 0, p.z + Math.sin(a) * 2.4, '#ffb8d0'); this.tuft(solid, p.x + Math.cos(a + 0.4) * 2.5, 0, p.z + Math.sin(a + 0.4) * 2.5, 1.1); }
@@ -1213,8 +1363,39 @@ export class DungeonWorld {
         if (ok) { spots.push({ x, z, a, i }); break; }
       }
     }
+    const boss = this.L.boss, moon = this.variant === 'moon';
     for (const s of spots) {
       const face = Math.atan2(A.x - s.x, A.z - s.z), alt = s.i % 2 === 0;
+      if (moon) { // Tamamo: vermilion torii with blue foxfire lanterns, and stone lanterns burning foxfire between
+        if (alt) {
+          const tx = Math.cos(face), tz = -Math.sin(face);
+          for (const e of [-1, 1]) { B.add(SH.cyl(), M(s.x + tx * e * 0.75, 0, s.z + tz * e * 0.75, 0.12, 2.5, 0.12), col('#d8382c')); B.add(SH.cyl(), M(s.x + tx * e * 0.75, 0, s.z + tz * e * 0.75, 0.16, 0.22, 0.16), col('#22222e')); }
+          B.add(SH.box(), M(s.x, 2.46, s.z, 2.3, 0.16, 0.26, 0, face, 0), col('#22222e'));
+          B.add(SH.box(), M(s.x, 2.34, s.z, 2.0, 0.08, 0.2, 0, face, 0), col('#d8382c'));
+          B.add(SH.box(), M(s.x, 2.02, s.z, 1.8, 0.1, 0.14, 0, face, 0), col('#d8382c'));
+          B.add(SH.cyl(), M(s.x, 1.72, s.z, 0.01, 0.3, 0.01), col('#2a2020'));
+          GL.add(SH.sph(), M(s.x, 1.55, s.z, 0.22, 0.26, 0.22), null, (x, y, z, nx, ny, nz, o) => o.copy(col('#9ac4ff')).lerp(col('#ffffff'), clamp(ny * 0.5 + 0.3)));
+          HA.add(s.x, 1.55, s.z, 2.4, '#7aa8ff', 0.6, 1);
+          for (const e of [-1, 1]) this.collision.addCircle(s.x + tx * e * 0.75, s.z + tz * e * 0.75, 0.2);
+        } else {
+          this.toro(B, GL, s.x, s.z, face, 1.2, false, '#9ac4ff');
+          HA.add(s.x, 0.8 * 1.2, s.z, 1.8, '#8ab8ff', 0.7, 1);
+          this.collision.addCircle(s.x, s.z, 0.3);
+        }
+        continue;
+      }
+      if (boss === 'kasaLord' && th === 'shrine') { // Lord Karakasa's court: vermilion gates and his planted parasols
+        if (alt) {
+          const tx = Math.cos(face), tz = -Math.sin(face);
+          for (const e of [-1, 1]) B.add(SH.cyl(), M(s.x + tx * e * 0.7, 0, s.z + tz * e * 0.7, 0.13, 2.4, 0.13), col('#d8382c'));
+          B.add(SH.box(), M(s.x, 2.35, s.z, 2.0, 0.14, 0.24, 0, face, 0), col('#2a2020'));
+          B.add(SH.box(), M(s.x, 2.05, s.z, 1.6, 0.1, 0.16, 0, face, 0), col('#d8382c'));
+          GL.add(SH.sph(), M(s.x, 1.55, s.z, 0.26, 0.34, 0.26), null, (x, y, z, nx, ny, nz, o) => { o.set('#ff6a48'); if (Math.abs(y - 1.55) > 0.26) o.set('#2a1a1a'); });
+          HA.add(s.x, 1.55, s.z, 2, '#ff9a5a', 0.6, 1);
+          for (const e of [-1, 1]) this.collision.addCircle(s.x + tx * e * 0.7, s.z + tz * e * 0.7, 0.2);
+        } else this.parasol(s.x, s.z, face);
+        continue;
+      }
       if (th === 'burrow') {
         if (alt) { // giant glowing mushroom
           B.add(SH.taper(), M(s.x, 0, s.z, 0.26, 2.0, 0.26), col('#fff4e0'));
@@ -1233,8 +1414,8 @@ export class DungeonWorld {
         if (alt) { // pair of red pillars with a hanging lantern (mini gate)
           const tx = Math.cos(face), tz = -Math.sin(face);
           for (const e of [-1, 1]) B.add(SH.cyl(), M(s.x + tx * e * 0.7, 0, s.z + tz * e * 0.7, 0.13, 2.4, 0.13), col('#d8382c'));
-          B.add(SH.box(), M(s.x, 2.35, s.z, 2.0, 0.14, 0.24, 0, face + Math.PI / 2, 0), col('#2a2020'));
-          B.add(SH.box(), M(s.x, 2.05, s.z, 1.6, 0.1, 0.16, 0, face + Math.PI / 2, 0), col('#d8382c'));
+          B.add(SH.box(), M(s.x, 2.35, s.z, 2.0, 0.14, 0.24, 0, face, 0), col('#2a2020'));
+          B.add(SH.box(), M(s.x, 2.05, s.z, 1.6, 0.1, 0.16, 0, face, 0), col('#d8382c'));
           GL.add(SH.sph(), M(s.x, 1.55, s.z, 0.26, 0.34, 0.26), null, (x, y, z, nx, ny, nz, o) => { o.set('#ff6a48'); if (Math.abs(y - 1.55) > 0.26) o.set('#2a1a1a'); });
           HA.add(s.x, 1.55, s.z, 2, '#ff9a5a', 0.6, 1);
           for (const e of [-1, 1]) this.collision.addCircle(s.x + tx * e * 0.7, s.z + tz * e * 0.7, 0.2);
@@ -1250,7 +1431,8 @@ export class DungeonWorld {
       }
     }
     // a few braziers/lights on the ring so the arena reads at a glance
-    for (let i = 0; i < spots.length; i += 3) { const s = spots[i]; this.lightPool.addSource({ pos: V(s.x, 1.8, s.z), color: C(this.theme.light), intensity: 9, radius: 9, flicker: 0.8 }); }
+    for (let i = 0; i < spots.length; i += 3) { const s = spots[i]; this.lightPool.addSource({ pos: V(s.x, 1.8, s.z), color: C(moon ? '#8ab0ff' : this.theme.light), intensity: 9, radius: 9, flicker: 0.8 }); }
+    if (moon) this.lightPool.addSource({ pos: V(A.x, 7, A.z), color: C('#b8c8ff'), intensity: 5, radius: 16, flicker: 0.05 });
   }
   banner(x, z, face, c1, c2, motif) { // nobori flag on a pole, emblem painted in vertex colours
     const B = this.solid;
@@ -1258,7 +1440,7 @@ export class DungeonWorld {
     B.add(SH.sphLo(), M(x, 3.12, z, 0.07), col('#e8b848'));
     const ca = Math.cos(face), sa = -Math.sin(face); // tangent (flag hangs beside the pole)
     const cx = x + ca * 0.36, cz = z + sa * 0.36;
-    B.add(SH.box(), M(cx, 2.95, cz, 0.78, 0.05, 0.05, 0, face + Math.PI / 2, 0), col('#4a3430'));
+    B.add(SH.box(), M(cx, 2.95, cz, 0.78, 0.05, 0.05, 0, face, 0), col('#4a3430'));
     B.add(SH.box(), M(cx, 1.05, cz, 0.7, 1.9, 0.03, 0, face, 0), null, (px, py, pz, nx, ny, nz, o, lx, ly) => {
       o.set(c1);
       const u = lx, v = ly - 0.5; // -0.5..0.5 across, -0.5..0.5 up
@@ -1295,8 +1477,6 @@ export class DungeonWorld {
       if (focus && (f.p.x - focus.x) ** 2 + (f.p.z - focus.z) ** 2 > 26 * 26) continue;
       if (Math.random() < dt * 6) vfx.glow.spawn({ x: f.p.x + rand(-0.1, 0.1), y: f.p.y, z: f.p.z + rand(-0.1, 0.1), vy: rand(0.6, 1.2), life: 0.6, size: 0.25, size1: 0.02, color: this.theme.light, alpha: 0.9, alpha1: 0 });
     }
-    for (const s of this.shafts || []) s.m.material.opacity = s.base * (0.75 + 0.25 * Math.sin(t * 0.7 + s.ph));
-    for (const pu of this.pulses) pu.m.material.opacity = pu.base * (0.75 + 0.25 * Math.sin(t * 1.6));
     if (vfx) for (const sp of this.steam) {
       if (focus && sp.distanceTo(focus) > 30) continue;
       if (Math.random() < dt * 6) vfx.smoke.spawn({ x: sp.x + rand(-0.3, 0.3), y: sp.y, z: sp.z + rand(-0.3, 0.3), vy: rand(0.6, 1.1), life: rand(1.5, 2.5), size: 0.4, size1: 1.3, color: '#fff0e8', alpha: 0.5, alpha1: 0, fadeIn: 0.3 });

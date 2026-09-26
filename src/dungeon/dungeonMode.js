@@ -44,8 +44,9 @@ export class DungeonMode {
     G.state.dungeon.deepest = Math.max(G.state.dungeon.deepest || 0, this.floor);
     // dungeon colour grade (the village day/night grade doesn't run down here)
     const post = G.engine.post, gr = post.grade.uniforms;
-    gr.get('uLift').value.set(0.012, 0.004, 0.02); gr.get('uGain').value.set(1.05, 1.0, 0.95); gr.get('uSat').value = 1.1;
-    gr.get('uVigColor').value.set(0.16, 0.1, 0.16); gr.get('uVignette').value = 1.25;
+    const gd = this.theme.grade || {}; // per-biome grade (the Burrow is lifted & neutral so floor 1 isn't murky)
+    gr.get('uLift').value.set(...(gd.lift || [0.012, 0.004, 0.02])); gr.get('uGain').value.set(...(gd.gain || [1.05, 1.0, 0.95])); gr.get('uSat').value = gd.sat ?? 1.1;
+    gr.get('uVigColor').value.set(0.16, 0.1, 0.16); gr.get('uVignette').value = 1.05;
     post.bloom.intensity = 1.15; post.bloom.luminanceMaterial.threshold = 0.6;
   }
   spawnPack(sp) {
