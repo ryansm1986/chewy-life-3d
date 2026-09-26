@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { rand, TAU, clamp, smoothstep, chance } from '../core/util.js';
 import { U, makeToon } from './materials.js';
-import { shaftTexture } from './textures.js';
+import { shaftTexture, glowTexture } from './textures.js';
 import { paint, merge, xf } from './geom.js';
 
 function butterflyMesh(color) {
@@ -93,6 +93,18 @@ export class Ambient {
       this.shafts.push({ m, off: new THREE.Vector3(rand(-16, 16), 0, rand(-12, 12)), w: rand(0.8, 2.2), ph: rand(0, TAU) });
     }
     this.smokeEmitters = []; // {pos, rate, acc, color}
+    // floating sky lanterns (night)
+    this.lanterns = [];
+    const lg = new THREE.CylinderGeometry(0.16, 0.12, 0.34, 10, 1, true);
+    const lm = new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffb060').multiplyScalar(2.2), side: THREE.DoubleSide, toneMapped: false, transparent: true });
+    const gt = glowTexture();
+    for (let i = 0; i < 14; i++) {
+      const m = new THREE.Mesh(lg, lm.clone());
+      const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: gt, color: '#ffb870', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, opacity: 0.6 }));
+      halo.scale.setScalar(1.3); m.add(halo); m.visible = false; m.renderOrder = 15;
+      world.scene.add(m);
+      this.lanterns.push({ m, halo, t: rand(0, 40), life: rand(26, 40), p: new THREE.Vector3(), ph: rand(0, TAU), active: false });
+    }
     // wind streaks
     const wg = windStreakGeo();
     this.streaks = [];
@@ -206,6 +218,30 @@ export class Ambient {
       st.u.uStart.value.set(cx - dir.x * len * 0.5, this.world.heightAt(cx, cz) + rand(0.6, 2.2), cz - dir.z * len * 0.5);
       st.u.uDir.value.copy(dir); st.u.uSide.value.copy(side); st.u.uLen.value = len; st.u.uAmp.value = rand(0.2, 0.6);
       st.u.uPhase.value = rand(0, 6.28); st.u.uCurl.value = Math.random() < 0.5 ? 1 : 0; st.u.uOpacity.value = 0.55 * (1 - night);
+    }
+    // ---- sky lanterns rising over the village at night
+    const lanternNight = smoothstep(19.5, 20.5, h) + (1 - smoothstep(3.5, 5, h)) * (h < 12 ? 1 : 0);
+    for (const L of this.lanterns) {
+      if (!L.active) {
+        L.m.visible = false;
+        if (lanternNight > 0.5 && Math.random() < dt * 0.25) {
+          L.active = true; L.t = 0; L.life = rand(28, 42);
+          const c = this.world.landmarks?.plaza || focus;
+          L.p.set(c.x + rand(-14, 14), this.world.heightAt(c.x, c.z) + 0.6, c.z + rand(-14, 14));
+        }
+        continue;
+      }
+      L.t += dt;
+      const k = L.t / L.life;
+      L.p.y += dt * (0.32 + k * 0.1);
+      L.p.x += (wind.x * 0.25 + Math.sin(L.t * 0.4 + L.ph) * 0.12) * dt;
+      L.p.z += (wind.y * 0.25 + Math.cos(L.t * 0.33 + L.ph) * 0.12) * dt;
+      L.m.position.copy(L.p);
+      L.m.rotation.set(Math.sin(L.t * 0.9 + L.ph) * 0.08, L.t * 0.2, Math.cos(L.t * 0.7) * 0.08);
+      const a = Math.min(1, L.t / 3) * (1 - smoothstep(0.8, 1, k)) * Math.max(0.2, lanternNight);
+      L.m.material.opacity = a; L.halo.material.opacity = 0.55 * a * (0.85 + 0.15 * Math.sin(t * 3 + L.ph));
+      L.m.visible = a > 0.01;
+      if (k >= 1) L.active = false;
     }
     // ---- chimney smoke / steam
     for (const e of this.smokeEmitters) {
