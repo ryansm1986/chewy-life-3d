@@ -74,6 +74,7 @@ export class DungeonMode {
   }
   bossIntro(b) {
     const G = this.G, E = G.engine, rig = E.rig;
+    Events.emit('boss:spawn', { id: b.id, name: b.name, floor: this.floor });
     const prevDist = rig.distTarget;
     rig.distTarget = Math.max(rig.minDist, prevDist * 0.72);
     E.timeScale = 0.35;
@@ -289,12 +290,26 @@ export class DungeonMode {
     // stairs appear where the boss fell + a return portal
     const p = b.pos.clone();
     setTimeout(() => {
-      this.makeStairs(p.clone().add(V(2, 0, 0)));
-      this.world.interactables.push({ pos: p.clone().add(V(2, 0, 0)), radius: 1.3, label: `Burrow deeper (Floor ${this.floor + 1})`, onInteract: () => G.enterDungeon(this.floor + 1) });
-      this.makePortal(p.clone().add(V(-2, 0, 0)), '#ffe070');
-      this.world.interactables.push({ pos: p.clone().add(V(-2, 0, 0)), radius: 1.2, label: 'Return to Blossom Hollow', onInteract: () => G.returnToVillage() });
+      if (G.dungeon !== this) return;
+      // stairs and portal go to open floor near where the boss fell (never inside rock, even against a wall)
+      const sp = this.openSpotNear(p, 2, 1.3), pp = this.openSpotNear(p, 2, 1.2, sp);
+      this.makeStairs(sp);
+      this.world.interactables.push({ pos: sp, radius: 1.3, label: `Burrow deeper (Floor ${this.floor + 1})`, onInteract: () => G.enterDungeon(this.floor + 1) });
+      this.makePortal(pp, '#ffe070');
+      this.world.interactables.push({ pos: pp, radius: 1.2, label: 'Return to Blossom Hollow', onInteract: () => G.returnToVillage() });
     }, 1500);
     this.boss = null;
+  }
+  // nearest point about `d` away from `c` whose surroundings (radius r) are open floor; avoids `avoid`
+  openSpotNear(c, d = 2, r = 1.2, avoid = null) {
+    const W = this.world;
+    const clear = (x, z) => { for (let a = 0; a < 8; a++) if (!W.walkable(x + Math.cos(a / 8 * TAU) * r, z + Math.sin(a / 8 * TAU) * r)) return false; return W.walkable(x, z); };
+    for (let ring = d; ring <= d + 8; ring += 0.75) for (let k = 0; k < 16; k++) {
+      const a = k / 16 * TAU, x = c.x + Math.cos(a) * ring, z = c.z + Math.sin(a) * ring;
+      if (avoid && Math.hypot(x - avoid.x, z - avoid.z) < 2.6) continue;
+      if (clear(x, z)) return V(x, 0, z);
+    }
+    return this.startPos ? this.startPos.clone().add(V(avoid ? -1.6 : 1.6, 0, 1.6)) : c.clone();
   }
   // ------------------------------------------------------------------ pathing
   cellOf(p) { return [Math.floor(p.x / CELL), Math.floor(p.z / CELL)]; }

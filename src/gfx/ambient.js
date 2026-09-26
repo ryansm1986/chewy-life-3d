@@ -36,7 +36,7 @@ function koiMesh(seed) {
 const WIND_VS = /* glsl */`
 attribute float aU; attribute float aS;
 uniform float uT; uniform vec3 uStart; uniform vec3 uDir; uniform vec3 uSide; uniform float uLen; uniform float uAmp; uniform float uPhase; uniform float uCurl;
-varying float vA;
+varying float vA; varying float vS;
 vec3 path(float u) {
   vec3 p = uStart + uDir * u * uLen + uSide * sin(u * 5.0 + uPhase) * uAmp + vec3(0.0, sin(u * 3.0 + uPhase * 1.3) * uAmp * 0.4 + u * 0.4, 0.0);
   float c = smoothstep(0.45, 0.55, u) * (1.0 - smoothstep(0.62, 0.75, u)) * uCurl;
@@ -51,13 +51,13 @@ void main() {
   vec3 w = normalize(cross(t, v));
   float head = uT * 1.5; float tail = head - 0.5;
   float a = smoothstep(tail, tail + 0.25, aU) * (1.0 - smoothstep(head - 0.06, head, aU));
-  vA = a;
-  p += w * aS * 0.05 * (0.4 + 0.6 * a);
+  vA = a; vS = aS;
+  p += w * aS * 0.09 * (0.4 + 0.6 * a);
   gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
 }`;
 const WIND_FS = /* glsl */`
-uniform float uOpacity; varying float vA;
-void main() { if (vA < 0.01) discard; gl_FragColor = vec4(1.0, 1.0, 1.0, vA * uOpacity); }`;
+uniform float uOpacity; varying float vA; varying float vS;
+void main() { if (vA < 0.01) discard; float soft = 1.0 - vS * vS; gl_FragColor = vec4(1.0, 1.0, 1.0, vA * uOpacity * soft * soft); }`;
 function windStreakGeo() {
   const N = 64, pos = [], u = [], sd = [], idx = [];
   for (let i = 0; i <= N; i++) for (const s of [-1, 1]) { pos.push(0, 0, 0); u.push(i / N); sd.push(s); }
@@ -202,7 +202,7 @@ export class Ambient {
       s.m.rotation.z += -Math.atan2(sd.x, sd.y) * 0.5;
       s.m.rotation.x += Math.atan2(sd.z, sd.y) * 0.3;
       s.m.scale.set(s.w, 1, 1);
-      s.m.material.opacity = golden * (0.1 + 0.06 * Math.sin(t * 0.5 + s.ph));
+      s.m.material.opacity = golden * (0.17 + 0.07 * Math.sin(t * 0.5 + s.ph));
       s.m.material.color.copy(day?.out?.sun || new THREE.Color('#ffe0a0'));
       s.m.visible = golden > 0.01;
     }
@@ -217,7 +217,7 @@ export class Ambient {
       const cx = focus.x + rand(-10, 10), cz = focus.z + rand(-8, 8);
       st.u.uStart.value.set(cx - dir.x * len * 0.5, this.world.heightAt(cx, cz) + rand(0.6, 2.2), cz - dir.z * len * 0.5);
       st.u.uDir.value.copy(dir); st.u.uSide.value.copy(side); st.u.uLen.value = len; st.u.uAmp.value = rand(0.2, 0.6);
-      st.u.uPhase.value = rand(0, 6.28); st.u.uCurl.value = Math.random() < 0.5 ? 1 : 0; st.u.uOpacity.value = 0.55 * (1 - night);
+      st.u.uPhase.value = rand(0, 6.28); st.u.uCurl.value = Math.random() < 0.5 ? 1 : 0; st.u.uOpacity.value = 0.42 * (1 - night);
     }
     // ---- sky lanterns rising over the village at night
     const lanternNight = smoothstep(19.5, 20.5, h) + (1 - smoothstep(3.5, 5, h)) * (h < 12 ? 1 : 0);
