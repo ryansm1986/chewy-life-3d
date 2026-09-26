@@ -72,6 +72,20 @@ export class DungeonMode {
       this.monsters.push(m); this.combat.add(m);
     }
   }
+  bossIntro(b) {
+    const G = this.G, E = G.engine, rig = E.rig;
+    const prevDist = rig.distTarget;
+    rig.distTarget = Math.max(rig.minDist, prevDist * 0.72);
+    E.timeScale = 0.35;
+    b.anim.wind = 1; b.anim.lunge = 1;
+    G.vfx.ring(b.pos, { color: '#ff6a8a', r0: 0.5, r1: 7, life: 0.9 });
+    G.vfx.dustRing(b.pos, 5, 26);
+    rig.shake(0.9); E.post.pulse('#ff9ab0', 0.25); E.post.hitAberration(1);
+    Events.emit('sfx', 'boss_roar'); G.audio?.music?.('boss', { fade: 0.5 });
+    G.ui?.banner?.(b.name, ['The squishiest royal in the Burrow!', 'Rain or shine, he hops to fight!', 'Something smells delicious… and dangerous!', 'Nine tails, one very bad mood.'][[5, 10, 15, 20].indexOf(this.floor % 20 || 20)] || 'appears!', { style: 'boss' });
+    setTimeout(() => { E.timeScale = 1; b.anim.wind = 0; }, 900);
+    setTimeout(() => { rig.distTarget = prevDist; }, 2200);
+  }
   summonAround(boss, id, n) {
     for (let i = 0; i < n; i++) {
       const a = i / n * TAU; const x = boss.pos.x + Math.cos(a) * 2.5, z = boss.pos.z + Math.sin(a) * 2.5;

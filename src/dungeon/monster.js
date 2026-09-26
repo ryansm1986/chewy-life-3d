@@ -82,6 +82,7 @@ export class Monster {
     else this.status[kind] = Math.max(this.status[kind] || 0, dur * (this.def.boss ? 0.35 : 1));
   }
   alert() {
+    if (this.def.boss && !this.introDone) { this.introDone = true; this.mode.bossIntro?.(this); }
     this.aggro = true;
     if (this.state === 'idle') { this.G.vfx.emote(this, '!', 0.9); }
     for (const m of this.mode.monsters) if (m !== this && m.alive && !m.aggro && dist(m.pos.x, m.pos.z, this.pos.x, this.pos.z) < 7) { m.aggro = true; }
