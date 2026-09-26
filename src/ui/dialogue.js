@@ -94,7 +94,8 @@ export class Dialogue {
     this.$.count.textContent = this.lines.length > 1 ? `${this.i + 1}/${this.lines.length}` : '';
     clearTimeout(this._tt);
     this._tt = setTimeout(() => this.doneTyping(), dur * 1000);
-    this.ui.sfx?.('talk');
+    // cute gibberish voice (src/audio babble) when available
+    try { this._bab?.stop?.(); this._bab = this.ui.G?.audio?.babble?.(String(line.text).replace(/\*/g, ''), { voice: line.voice || this.opts.voice || undefined, pitch: line.pitch || this.opts.pitch }); } catch (e) { this._bab = null; }
   }
   doneTyping() {
     clearTimeout(this._tt);
@@ -108,7 +109,7 @@ export class Dialogue {
   }
   advance() {
     if (!this.active) return;
-    if (this.typing) { this.$.tx.classList.add('instant'); this.doneTyping(); return; }
+    if (this.typing) { this.$.tx.classList.add('instant'); this.doneTyping(); try { this._bab?.stop?.(0.08); } catch (e) { /* ignore */ } return; }
     if (this.i < this.lines.length - 1) { this.i++; this.showLine(); return; }
     if (this.choices?.length) return; // must pick
     this.finish(-1);
@@ -124,6 +125,7 @@ export class Dialogue {
     if (!this.active) return;
     this.active = false;
     clearTimeout(this._tt);
+    try { this._bab?.stop?.(0.08); } catch (e) { /* ignore */ }
     this._spk = null;
     this.root.classList.add('out');
     this.ui.root.classList.remove('dlg-open');

@@ -58,6 +58,8 @@ export class VillageSim {
     for (const [t, dx, dz] of [['sakuraPlanter', -3, -2], ['sakuraPlanter', 3, -2], ['bench', -2, 3], ['bench', 2, 3], ['flowerBed', -1, -3], ['flowerBed', 1, -3], ['bulletinBoard', 0, -4]]) this.place(t, Math.floor(P.x + dx), Math.floor(P.z + dz), 0, { free: true, silent: true });
     for (let i = 0; i < 5; i++) this.autoPlace('streetLamp', P.x, P.z, 6, 20, true);
     for (let i = 0; i < 4; i++) this.autoPlace('flowerBed', P.x, P.z, 6, 16, true);
+    // zones waiting to grow (beside paths)
+    this.autoZone(ZONES.R, 4, 9, 24, 4); this.autoZone(ZONES.C, 2, 8, 20, 4); this.autoZone(ZONES.W, 2, 14, 28, 4);
     // homes start inhabited
     for (const b of this.S.buildings) if (BUILDINGS[b.type].cat === 'home') b.residents = BUILDINGS[b.type].capacity[b.level - 1];
   }
@@ -301,6 +303,37 @@ export class VillageSim {
     cands.sort((a, b) => b.score - a.score);
     const c = cands[0]; if (!c) return null;
     return this.place(type, c.x, c.z, c.rot, { free: true, silent: true });
+  }
+  // paint n square zone blocks (size x size) on free, flat grass beside paths, r0..r1 from the plaza
+  autoZone(t, n, r0, r1, size) {
+    const P = LANDMARKS.plaza, cands = [];
+    for (let z = Math.floor(P.z - r1); z <= P.z + r1; z++) for (let x = Math.floor(P.x - r1); x <= P.x + r1; x++) {
+      const d = Math.hypot(x + size / 2 - P.x, z + size / 2 - P.z); if (d < r0 || d > r1) continue;
+      let ok = true, hMin = 1e9, hMax = -1e9;
+      for (let zz = z; zz < z + size && ok; zz++) for (let xx = x; xx < x + size && ok; xx++) {
+        const i = zz * WORLD + xx;
+        if (this.terrain.tiles[i] !== T.GRASS || this.occ[i] >= 0 || this.zone[i]) ok = false;
+        const h = this.terrain.heightAt(xx + 0.5, zz + 0.5); hMin = Math.min(hMin, h); hMax = Math.max(hMax, h);
+      }
+      if (!ok || hMax - hMin > 0.5 || hMin < 0.6) continue;
+      if (!this.roadAccess({ type: 'well', x, z, rot: 0, level: 1, _w: size })) { // check a ring around the block
+        let road = false;
+        for (let k = -1; k <= size && !road; k++) for (const [xx, zz] of [[x + k, z - 1], [x + k, z + size], [x - 1, z + k], [x + size, z + k]]) { const tt = this.terrain.tile(xx, zz); if (tt === T.PATH || tt === T.PLAZA) { road = true; break; } }
+        if (!road) continue;
+      }
+      cands.push({ x, z, score: -d * 0.1 + Math.random() });
+    }
+    cands.sort((a, b) => b.score - a.score);
+    let made = 0;
+    for (const c of cands) {
+      if (made >= n) break;
+      let free = true;
+      for (let zz = c.z - 1; zz <= c.z + size && free; zz++) for (let xx = c.x - 1; xx <= c.x + size && free; xx++) if (this.zone[zz * WORLD + xx] || this.occ[zz * WORLD + xx] >= 0) free = false;
+      if (!free) continue;
+      this.paintZone(c.x, c.z, c.x + size - 1, c.z + size - 1, t); made++;
+      this.world.veg.clearRect(c.x, c.z, c.x + size, c.z + size, 0.2);
+    }
+    return made;
   }
   findLot(zoneType, type) {
     const cands = [];

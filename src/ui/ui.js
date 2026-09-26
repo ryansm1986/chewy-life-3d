@@ -24,6 +24,9 @@ import { Vector3 } from 'three';
 const SETTINGS_KEY = 'chewy3d.settings';
 const DEFAULT_SETTINGS = { quality: 2, music: 0.7, sfx: 0.8, uiScale: 1, shake: true, showFps: false };
 const NON_BLOCKING = new Set(['build']); // panels that don't pause gameplay input
+// UI sound names → src/audio sfx ids (learn / equip / level-up / toast sounds are already bound to game events by the audio module)
+const SFX_MAP = { open: 'ui_open', close: 'ui_close', tab: 'ui_tab', deny: 'ui_error', coin: 'ui_coin', buy: 'ui_buy', hover: 'ui_hover',
+  select: 'ui_click', assign: 'ui_click', stat: 'ui_click', pick: 'ui_click', drop: 'ui_click', sort: 'ui_click', tick: 'ui_click', bag: 'ui_click', click: 'ui_click' };
 
 export const UI = {
   G: null, mode: 'title', scale: 1, ready: false,
@@ -76,6 +79,7 @@ export const UI = {
     if (this._mmPending) this.hud.mm.provider = this._mmPending;
     if (this._lootCb) this.labels.onClick(this._lootCb);
     if (this._skillProv) this.hud.cd.provider = this._skillProv;
+    root.addEventListener('mouseover', e => { const t = e.target.closest?.('button, .slot, .node, .card, .hb, .belt, .sh-item, .q-item, .ll'); if (t && t !== this._hovEl) { this._hovEl = t; this.sfx('hover'); } });
     this.bindEvents();
     this.applySettings(true);
     this.setMode(G?.mode && G.mode !== 'title' ? G.mode : this.mode);
@@ -95,14 +99,14 @@ export const UI = {
     on('materials:changed', () => this.panels.build.refresh());
     on('skill:learned', () => this.panels.skills.refresh());
     on('player:levelup', p => this.levelUp(p?.lvl ?? this.G?.state?.player?.lvl));
-    on('item:pickup', p => this.pickup(p?.item || p, p?.pos || p?.worldPos));
-    on('quest:update', p => { this.hud.cache.qAcc = 0; this.panels.quests.refresh(); if (p?.text) this.toast(p.text, { icon: 'scroll', color: '#ffcf4a' }); if (p?.complete || p?.done) this.banner('Quest Complete!', p.name || '', { style: 'quest' }); });
-    on('toast', p => (typeof p === 'string' ? this.toast(p) : p && this.toast(p.text, p)));
+    on('item:pickup', p => { const it = p?.item || p; if (!it || it.kind === 'material' || it.kind === 'potion') return; requestAnimationFrame(() => this.pickup(it, p?.pos || p?.worldPos, true)); });
+    on('quest:update', () => { this.hud.cache.qAcc = 0; this.panels.quests.refresh(); });
+    on('toast', p => (typeof p === 'string' ? this.toast(p) : p?.text && this.toast(p.text, p)));
     on('mode:changed', p => this.setMode(p?.mode || p));
     on('village:changed', () => this.panels.build.refresh());
-    on('boss:spawn', p => { if (p?.name) this.banner(p.name, p.title || 'A mighty foe appears!', { style: 'boss' }); });
-    on('boss:dead', p => { this.setBoss(null); this.banner('Victory!', p?.name ? `${p.name} was defeated` : 'The boss was defeated', { style: 'quest' }); });
-    on('player:dead', () => this.banner('Chewy needs a nap…', 'Waking up back home', { style: 'boss' }));
+    on('potions:changed', () => this.panels.shop.refresh());
+    on('hotbar:changed', () => this.panels.skills.refresh());
+    on('boss:dead', () => this.setBoss(null));
   },
 
   // ------------------------------------------------------------------ frame
@@ -177,7 +181,12 @@ export const UI = {
   },
   isPaused() { return this.ready && (this.mode === 'title' || this.isOpen('menu')); },
   _raise(p) { this._z = (this._z || 10) + 1; if (p.wrap) p.wrap.style.zIndex = this._z; },
-  openBuild(opts) { if (this.mode !== 'village') { this.toast('You can only build in the village!', { icon: 'hammer' }); return; } this.toggle('build', opts); },
+  openBuild(opts) {
+    if (this.mode !== 'village') { this.toast('You can only build in the village!', { icon: 'hammer' }); return; }
+    const B = this.G?.build;
+    if (B?.enter) { B.active ? B.exit() : B.enter(); return; }
+    this.toggle('build', opts);
+  },
   setBuildProvider(fn) { this._buildProvider = fn; },
   refreshItems() { for (const n of ['inventory', 'stash', 'character', 'shop']) this.panels[n].refresh(); },
 
@@ -201,7 +210,7 @@ export const UI = {
     if (this.isOpen('menu')) return;
     const map = { KeyI: 'inventory', KeyC: 'character', KeyK: 'skills', KeyJ: 'quests', KeyM: 'map', Tab: 'map' };
     if (map[code]) { e.preventDefault(); this.toggle(map[code]); return; }
-    if (code === 'KeyB') { if (this.mode === 'village') this.openBuild(); return; }
+    if (code === 'KeyB') { if (this.mode === 'village' && !this.G?.build && this._buildProvider) this.openBuild(); return; } // the game toggles G.build itself
     const dig = /^Digit([1-4])$/.exec(code);
     if (dig) {
       const slot = +dig[1] + 1;
@@ -233,7 +242,11 @@ export const UI = {
   },
   onTitle(h) { this._titleH = h || {}; this.titleScreen?.sync(); },
   onMenu(h) { this._menuH = h || {}; },
-  sfx(name) { try { this.G?.audio?.ui?.(name); } catch (e) { /* ignore */ } },
+  sfx(name) {
+    const m = SFX_MAP[name]; if (!m) return;
+    if (name === 'hover') { const t = performance.now(); if (t - (this._hovT || 0) < 70) return; this._hovT = t; }
+    try { this.G?.audio?.play?.(m); } catch (e) { /* ignore */ }
+  },
 
   // ------------------------------------------------------------------ messages
   toast(text, opts = {}) { if (!this.ready) return null; return this.toasts.show(text, opts); },
@@ -262,24 +275,32 @@ export const UI = {
     list = list.filter(Boolean);
     return all ? list : list.filter(q => !q.done || q.objectives.length);
   },
+  // HUD celebration for a level-up (the big banner is shown by whoever calls UI.banner(..., {style:'levelup'}))
   levelUp(lvl) {
-    this.banner('Level Up!', `Chewy is now level ${lvl} · +5 stat points · +1 skill point`, { style: 'levelup' });
-    const r = this.hud.life.el.getBoundingClientRect();
+    const r = this.hud.life.el.getBoundingClientRect(), r2 = this.hud.$.xp.getBoundingClientRect();
     this.burst(r.left + r.width / 2, r.top + r.height / 2, { n: 20, spread: 110 });
+    this.burst(r2.left + 20, r2.top + r2.height / 2, { n: 14, spread: 70, kind: 'star', colors: ['#ffcf4a', '#fff3b8', '#c3a6ff'] });
+    this.ring(r2.left + 20, r2.top + r2.height / 2, '#ffcf4a');
   },
 
-  // item picked up in the world → toast + icon flies into the bag
-  pickup(item, worldPos) {
+  // item picked up in the world → toast + icon flies into the bag. Deduped per item uid (event + explicit call).
+  pickup(item, worldPos, fromEvent) {
     if (!this.ready || !item) return;
+    const key = item.uid || item.name;
+    const now = performance.now();
+    this._flown = this._flown || new Map();
+    if (key && now - (this._flown.get(key) || -1e9) < 1500) return;
+    if (key) this._flown.set(key, now);
     let from = { x: innerWidth / 2, y: innerHeight / 2 };
     const cam = this.G?.engine?.camera;
     const wp = worldPos || this.hud.playerPos();
-    if (cam && wp) { const v = new Vector3(wp.x, (wp.y || 0) + 0.8, wp.z).project(cam); from = { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight }; }
+    if (cam && wp) { const v = new Vector3(wp.x, (wp.y || 0) + (worldPos ? 0 : 0.8), wp.z).project(cam); from = { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight }; }
     this.flyToBag(itemIconURL(item), from, item);
-    if (item.rarity && item.rarity !== 'normal' || item.kind !== 'gear') {
-      this.toast(itemName(item), { iconURL: itemIconURL(item), color: rarityColor(item.rarity), rarity: item.rarity, sub: item.rarity === 'unique' ? 'Unique find!' : item.rarity === 'set' ? 'Set item!' : item.rarity === 'rare' ? 'Rare find!' : 'Picked up' });
+    if (item.rarity && item.rarity !== 'normal' || item.kind === 'gem' || item.kind === 'gift' || item.kind === 'key') {
+      this.toast(itemName(item), { iconURL: itemIconURL(item), color: rarityColor(item.rarity), rarity: item.rarity, sub: item.rarity === 'unique' ? 'Unique find!' : item.rarity === 'set' ? 'Set item!' : item.rarity === 'rare' ? 'Rare find!' : 'Picked up', silent: true });
     }
   },
+  pickupFly(item, worldPos) { this.pickup(item, worldPos); },
   flyToBag(icon, from, item) {
     const bagVisible = this.mode !== 'title';
     const to = this.isOpen('inventory') ? this.panels.inventory.panel.getBoundingClientRect() : this.hud.bagRect();

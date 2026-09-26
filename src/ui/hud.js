@@ -221,8 +221,8 @@ export class Hud {
         <div class="tg-mods"></div>
       </div>
     </div>
+    <div class="prompt"><span class="kc">F</span><span class="pr-t"></span></div>
     <div class="hud-bc">
-      <div class="prompt"><span class="kc">F</span><span class="pr-t"></span></div>
       <div class="lvl-badges">
         <button class="lvb stat" data-open="character"><span class="lvb-p">${glyph('plus')}</span><span class="lvb-t">Stats</span><b>0</b></button>
         <button class="lvb skill" data-open="skills"><span class="lvb-p">${glyph('plus')}</span><span class="lvb-t">Skill</span><b>0</b></button>
@@ -241,6 +241,7 @@ export class Hud {
           <div class="rci-cols">
             ${['R', 'C', 'W'].map(k => `<div class="rci-c" data-k="${k}"><div class="rci-track"><i></i></div><div class="rci-l">${glyph(k === 'R' ? 'home' : k === 'C' ? 'shop' : 'craft')}</div></div>`).join('')}
           </div>
+          <div class="rci-foot"></div>
         </div>
         <button class="build-btn" data-open="build">${glyph('hammer')}<span class="bb-l">Build</span><span class="kc">B</span></button>
       </div>
@@ -261,7 +262,7 @@ export class Hud {
       prompt: q('.prompt'), prT: q('.pr-t'), prK: q('.prompt .kc'),
       lvbStat: q('.lvb.stat'), lvbSkill: q('.lvb.skill'),
       xp: q('.xp'), xpLv: q('.xp-lv span'), xpFill: q('.xp-fill'), xpGain: q('.xp-gain'), xpT: q('.xp-t'),
-      hotbar: q('.hotbar'), dock: q('.dock'), vtools: q('.vtools'), rci: q('.rci'), menubtns: q('.menubtns'),
+      hotbar: q('.hotbar'), dock: q('.dock'), vtools: q('.vtools'), rci: q('.rci'), rciFoot: q('.rci-foot'), menubtns: q('.menubtns'),
     };
     // orbs
     this.life = new Orb('life'); this.zoom = new Orb('zoom');
@@ -282,8 +283,8 @@ export class Hud {
       return o;
     });
     hb.appendChild(el('div', 'hb-sep'));
-    this.belt = [['heart', 'Q', 'Heart Potion', 'Restores Life'], ['zoom', 'E', 'Zoom Potion', 'Restores Zoom']].map(([k, key, name, desc]) => {
-      const s = el('div', 'belt');
+    this.belt = [['heart', 'Q', 'Heart Potion', 'Restores Life'], ['zoom', 'E', 'Zoom Potion', 'Restores Zoom'], ['rejuv', 'R', 'Rejuv Potion', 'Restores Life and Zoom']].map(([k, key, name, desc]) => {
+      const s = el('div', 'belt b-' + k);
       s.innerHTML = `<div class="hb-in"><img class="bt-ic" src="${potionIconURL(k)}" alt="" draggable="false"><b class="bt-n">0</b><div class="hb-fl"></div></div><span class="kc hb-k">${key}</span>`;
       hb.appendChild(s);
       s.addEventListener('click', () => { this.ui.G?.actions?.usePotion?.(k); this.flashBelt(k); });
@@ -354,7 +355,7 @@ export class Hud {
     }
     for (const b of this.belt) {
       const n = st.potions?.[b.k] || 0;
-      if (n !== b.v) { if (b.v >= 0 && n > b.v) replay(b.el, 'gain', 500); b.v = n; setText(b.n, String(n)); setCls(b.el, 'none', n <= 0); }
+      if (n !== b.v) { if (b.v >= 0 && n > b.v) replay(b.el, 'gain', 500); b.v = n; setText(b.n, String(n)); setCls(b.el, 'none', n <= 0); if (b.k === 'rejuv') setCls(b.el, 'has', n > 0); }
     }
     // xp + level
     const lvl = p.lvl || 1;
@@ -402,7 +403,15 @@ export class Hud {
     this.updateClock();
     // quest tracker (throttled)
     this.cache.qAcc = (this.cache.qAcc || 0) - dt;
-    if (this.cache.qAcc <= 0) { this.cache.qAcc = 0.5; this.updateQuests(); }
+    if (this.cache.qAcc <= 0) {
+      this.cache.qAcc = 0.5; this.updateQuests();
+      const vs = st.village?.stats;
+      if (vs && this.mode === 'village') {
+        if (vs.demand && !this._rciManual) this.setRCI(vs.demand, true);
+        const pop = `${glyph('home')}<b>${vs.population ?? 0}</b><span class="rci-sep"></span>${glyph('heart')}<b>${Math.round((vs.happiness ?? 0.5) * 100)}%</b>`;
+        if (pop !== this.cache.pop) { this.cache.pop = pop; this.$.rciFoot.innerHTML = pop; }
+      }
+    }
     // minimap (≈15 fps)
     this.mm.acc += dt;
     if (this.mm.acc > 1 / 15) { this.mm.acc = 0; this.drawMinimap(); }
@@ -534,7 +543,7 @@ export class Hud {
   setTarget(info) {
     const tg = this.$.tg;
     if (!info) { if (this.target) { this.target = null; setCls(tg, 'show', false); } return; }
-    const frac = clamp(info.frac ?? (info.hp ?? info.life ?? 0) / Math.max(1, info.hpMax ?? info.lifeMax ?? info.maxHp ?? 1));
+    const frac = clamp(info.frac ?? (info.hp ?? info.life ?? 0) / Math.max(1, info.hpMax ?? info.max ?? info.lifeMax ?? info.maxHp ?? 1));
     const key = info.id ?? info.name;
     const t = this.target;
     if (!t || t.key !== key) {
@@ -552,7 +561,7 @@ export class Hud {
   setBoss(info) {
     const b = this.$.boss;
     if (!info) { if (this.boss) { this.boss = null; setCls(b, 'show', false); setCls(this.$.tc, 'has-boss', false); } return; }
-    const frac = clamp(info.frac ?? (info.hp ?? info.life ?? 0) / Math.max(1, info.hpMax ?? info.lifeMax ?? info.maxHp ?? 1));
+    const frac = clamp(info.frac ?? (info.hp ?? info.life ?? 0) / Math.max(1, info.hpMax ?? info.max ?? info.lifeMax ?? info.maxHp ?? 1));
     const key = info.id ?? info.name;
     if (!this.boss || this.boss.key !== key) {
       this.boss = { key, frac, ghost: frac, hold: 0 };
@@ -577,17 +586,22 @@ export class Hud {
   // ---------------------------------------------------------------- prompt
   setInteract(text, opts = {}) {
     const p = this.$.prompt;
-    const key = opts.key || 'F';
-    const sig = text ? key + '|' + text : '';
+    let key = opts.key;
+    if (key === undefined) key = !text ? '' : /^(click|drag)/i.test(text) ? 'mouse' : this.ui.root.classList.contains('building') ? null : 'F';
+    const sig = text ? (key || '-') + '|' + text : '';
     if (sig === this.cache.prompt) return;
     this.cache.prompt = sig;
     if (!text) { setCls(p, 'show', false); return; }
-    setText(this.$.prT, text); setText(this.$.prK, key);
+    setText(this.$.prT, text);
+    this.$.prK.style.display = key ? '' : 'none';
+    if (key === 'mouse') this.$.prK.innerHTML = glyph('mouseL'); else if (key) { this.$.prK._t = null; setText(this.$.prK, key); }
+    setCls(p, 'hint', !key);
     setCls(p, 'show', false); void p.offsetWidth; setCls(p, 'show', true);
   }
 
-  setRCI(v) {
+  setRCI(v, auto) {
     if (!v) return;
+    if (!auto) this._rciManual = true;
     const r = { R: v.R ?? v.r ?? 0, C: v.C ?? v.c ?? 0, W: v.W ?? v.w ?? 0 };
     this.cache.rci = r;
     for (const k of ['R', 'C', 'W']) {

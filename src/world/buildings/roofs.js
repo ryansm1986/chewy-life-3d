@@ -71,7 +71,7 @@ function roofCore(B, o) {
   if (type === 'shed') R.H = o.H ?? Bz * 0.5;
   const tw = over / (type === 'shed' ? 2 * Bz : Bz);
   R.yb = o.y0 - R.H * prof(tw, R.curve) + R.thick;
-  const capCol = o.cap || shade(o.color || '#5d6f9e', 0.72);
+  const capCol = o.cap || mixc(shade(o.color || '#5d6f9e', 0.78), '#f6eef4', 0.1);
   const out = { yb: R.yb, H: R.H, A, Bz, ridgeY: R.yb + R.H };
 
   if (type === 'hip') {
@@ -225,12 +225,12 @@ function face(B, R, f) {
     const T = [], U = [];
     for (const t of rows) { T.push(P(s, t, 0).p); U.push(P(s, t, 1).p); }
     B.add(band(T, U, R.edge, V(dir[0] * sgn, 0, dir[1] * sgn)), null);
-    if (f.barge) { // descending ridge along the barge edge
+    if (f.barge && R.k >= 0.4) { // descending ridge along the barge edge
       const pts = []; for (let k = 0; k <= 8; k++) { const t = lerp(f.t1, f.t0, k / 8); const q = P(s, t, 2).p; q.x -= dir[0] * sgn * 0.05 * R.k; q.z -= dir[1] * sgn * 0.05 * R.k; q.y += 0.02; pts.push({ p: q, r: 0.068 * R.k }); }
       capTube(B, pts, R);
     }
   }
-  if (f.hip1) {
+  if (f.hip1 && R.k >= 0.4) {
     const tTop = f.hipT ?? f.t1, pts = [];
     for (let k = 0; k <= 10; k++) { const t = lerp(tTop, f.t0, k / 10); const q = P(1, t, 2).p; q.y += 0.02; pts.push({ p: q, r: 0.075 * R.k }); }
     capTube(B, pts, R);

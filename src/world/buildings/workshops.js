@@ -128,7 +128,7 @@ export function kiln(B, L) {
   B.pop();
   // chimney at the top/back
   chimney(B, -0.45, -1.3, 0.5, 2.3, 1.0);
-  B.light([-0.45, 0.6, 1.4], { color: '#ff8a3a', intensity: 3.8, radius: 5, flicker: 1, nightOnly: false });
+  B.light([-0.45, 0.6, 1.4], { color: '#ff8a3a', intensity: 3.8, radius: 5, flicker: 1, nightOnly: true });
   // pottery shed at the side with shelves
   B.at([0.85, 0, -0.35], 0, () => {
     openShed(B, { w: 1.1, d: 1.1, h: 1.45, color: ROOFS.terracotta });

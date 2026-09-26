@@ -131,7 +131,7 @@ export class Builder {
     this.m = new THREE.Matrix4(); this.stack = [];
     this.lights = []; this.smoke = []; this.anims = [];
     this.door = V(0, 0, 1); this.height = 1; this.footprint = [1, 1];
-    this.jitter = 0.05; this.warpAmt = 0.035;
+    this.jitter = 0.05; this.warpAmt = 0.05;
     this.cur = null;
   }
   rand(a = 0, b = 1) { return a + (b - a) * this.r(); }

@@ -1,7 +1,7 @@
 // Cute yokai monsters: definitions + procedural models + lightweight procedural animation.
 import * as THREE from 'three';
 import { makeToon, makeOutline } from '../gfx/materials.js';
-import { paint, merge, tube, xf } from '../gfx/geom.js';
+import { paint, merge, tube, xf, RoundedBox } from '../gfx/geom.js';
 import { buildHumanoid } from '../actors/charKit.js';
 import { clamp, TAU, rand, ease } from '../core/util.js';
 
@@ -83,14 +83,26 @@ const BUILD = {
     m.glow = col; return m;
   },
   kasa(v) {
-    const col = v.color || '#8a5ad0';
-    const u = new THREE.ConeGeometry(0.5, 0.9, 16, 3); u.translate(0, 0.95, 0);
-    paint(u, (p, n, o) => { const a = Math.atan2(p.x, p.z); o.set(Math.sin(a * 8) > 0 ? col : '#fff4e8'); });
-    const parts = [u, cone(0.04, 0.2, '#3a2a2a', [0, 1.48, 0])];
-    parts.push(ell(0.11, 0.12, 0.05, '#fffaf0', [0, 0.95, 0.3], [-0.3, 0, 0]), ell(0.06, 0.07, 0.04, '#2a1418', [0, 0.95, 0.34], [-0.3, 0, 0]), ell(0.02, 0.02, 0.02, '#ffffff', [-0.02, 0.98, 0.37]));
-    const tongue = tube([{ p: V(0, 0.72, 0.33), r: 0.06 }, { p: V(0, 0.6, 0.4), r: 0.05 }, { p: V(0, 0.5, 0.38), r: 0.03 }], 6, true); paint(tongue, (p, n, o) => o.set('#ff6a8a')); parts.push(tongue);
-    const leg = new THREE.CylinderGeometry(0.035, 0.035, 0.52, 6); leg.translate(0, 0.28, 0); paint(leg, (p, n, o) => o.set('#6a4a3a')); parts.push(leg);
-    const geta = new THREE.BoxGeometry(0.2, 0.05, 0.3); geta.translate(0, 0.03, 0.03); paint(geta, (p, n, o) => o.set('#c98f5e')); parts.push(geta);
+    const col = C(v.color || '#8a5ad0');
+    // folded wagasa paper umbrella: pleated cone with bamboo ribs, a wooden tip and a tied band
+    const u = new THREE.ConeGeometry(0.52, 1.0, 32, 6, true); u.translate(0, 0.98, 0);
+    const pos = u.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i); const a = Math.atan2(x, z);
+      const k = 1 + Math.cos(a * 8) * 0.13 * (1.5 - y);
+      pos.setX(i, x * k); pos.setZ(i, z * k);
+    }
+    u.computeVertexNormals();
+    paint(u, (p, n, o) => { const a = Math.atan2(p.x, p.z); const fold = Math.cos(a * 8); o.copy(col).lerp(C('#fff4ec'), 0.18 + fold * 0.12); if (Math.abs(p.y - 0.62) < 0.05) o.set('#ffd84a'); if (fold > 0.96) o.multiplyScalar(0.75); });
+    const cap = new THREE.CylinderGeometry(0.06, 0.52 * 1.05, 0.08, 32); cap.translate(0, 0.47, 0); paint(cap, (p, n, o) => o.copy(col).multiplyScalar(0.7));
+    const parts = [u, cap, cone(0.05, 0.22, '#8a5a3a', [0, 1.55, 0]), paint(xf(new THREE.TorusGeometry(0.1, 0.022, 6, 20), { p: [0, 1.3, 0], r: [Math.PI / 2, 0, 0] }), (p, n, o) => o.set('#e8503a'))];
+    parts.push(ell(0.12, 0.13, 0.05, '#fffaf0', [0, 0.92, 0.36], [-0.35, 0, 0]), ell(0.065, 0.075, 0.04, '#2a1418', [0, 0.92, 0.4], [-0.35, 0, 0]), ell(0.022, 0.022, 0.02, '#ffffff', [-0.022, 0.95, 0.43]));
+    parts.push(tube([{ p: V(-0.05, 1.03, 0.33), r: 0.012 }, { p: V(0.05, 1.07, 0.33), r: 0.012 }], 4, true));
+    paint(parts[parts.length - 1], (p, n, o) => o.set(INK));
+    const tongue = tube([{ p: V(0, 0.72, 0.38), r: 0.07 }, { p: V(0, 0.6, 0.46), r: 0.055 }, { p: V(0.02, 0.48, 0.44), r: 0.03 }], 6, true); paint(tongue, (p, n, o) => o.set('#ff6a8a')); parts.push(tongue);
+    const leg = new THREE.CylinderGeometry(0.035, 0.035, 0.46, 6); leg.translate(0, 0.25, 0); paint(leg, (p, n, o) => o.set('#c98f5e')); parts.push(leg);
+    const geta = new RoundedBox(0.22, 0.06, 0.32, 1, 0.02); geta.translate(0, 0.03, 0.03); paint(geta, (p, n, o) => o.set('#b07a4a')); parts.push(geta);
+    for (const z of [-0.08, 0.12]) { const t = new THREE.BoxGeometry(0.2, 0.05, 0.04); t.translate(0, -0.01, z); paint(t, (p, n, o) => o.set('#6a4a3a')); parts.push(t); }
     return finish(parts);
   },
   wisp(v) {

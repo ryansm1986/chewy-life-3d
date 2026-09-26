@@ -10,6 +10,7 @@ function project(camera, x, y, z) {
   V.set(x, y, z).project(camera);
   return { x: (V.x * 0.5 + 0.5) * innerWidth, y: (-V.y * 0.5 + 0.5) * innerHeight, ok: V.z < 1 && V.z > -1 };
 }
+const RARITY_COL = { magic: '#6ea8ff', rare: '#ffd84a', unique: '#ff9a3c', set: '#5ee07a' };
 const PALETTE = ['#ff8fb0', '#ffcf4a', '#8fe0c0', '#8fd0ff', '#c3b3ff', '#fff6e8', '#ffbcd6'];
 
 // ------------------------------------------------------------------ floating text
@@ -81,30 +82,65 @@ export class Floats {
 }
 
 // ------------------------------------------------------------------ toasts
+// Max 4 live toasts; identical texts merge into one (×N badge, timer restarts); bursts are rate-limited
+// through a small queue so a chatty village sim can never flood the DOM.
 export class Toasts {
-  constructor(layer) { this.root = el('div', 'toasts'); layer.appendChild(this.root); }
+  constructor(layer) { this.root = el('div', 'toasts'); layer.appendChild(this.root); this.live = []; this.q = []; this.last = 0; this.timer = null; }
   show(text, opts = {}) {
     if (typeof opts === 'string') opts = { icon: opts };
+    text = String(text ?? '');
+    if (!text) return null;
+    const key = text + '|' + (opts.sub || '');
+    const dup = this.live.find(t => t._key === key && !t._dying);
+    if (dup) { this.bumpDup(dup, opts); return dup; }
+    const qd = this.q.find(x => x.key === key);
+    if (qd) { qd.n++; return null; }
+    this.q.push({ key, text, opts, n: 1 });
+    if (this.q.length > 8) this.q.splice(0, this.q.length - 8);
+    this.pump();
+    return null;
+  }
+  pump() {
+    if (this.timer || !this.q.length) return;
+    const wait = Math.max(0, this.last + 140 - performance.now());
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      const x = this.q.shift();
+      if (x) { this.last = performance.now(); const t = this.make(x.text, x.opts); if (x.n > 1) this.bumpDup(t, x.opts, x.n - 1); }
+      this.pump();
+    }, wait);
+  }
+  make(text, opts) {
     const icon = opts.icon || 'sparkle';
     const col = opts.color || (opts.rarity ? rarityColor(opts.rarity) : '#ff8fb0');
-    const ic = opts.iconURL ? `<img src="${opts.iconURL}" alt="">` : (/^[a-zA-Z]+$/.test(icon) ? glyph(icon) : `<span class="emo">${icon}</span>`);
+    const ic = opts.iconURL ? `<img src="${opts.iconURL}" alt="">` : (/^[a-zA-Z]+$/.test(icon) ? glyph(icon) : `<span class="emo">${esc(icon)}</span>`);
     const dur = opts.duration || 3.6;
     const t = el('div', 'toast' + (opts.rarity ? ' r-' + opts.rarity : ''));
+    t._key = text + '|' + (opts.sub || ''); t._dur = dur; t._n = 1;
     t.style.setProperty('--tc', col);
     t.style.setProperty('--dur', dur + 's');
-    t.innerHTML = `<div class="t-ic">${ic}</div><div class="t-tx">${opts.html ? text : esc(text)}${opts.sub ? `<small>${esc(opts.sub)}</small>` : ''}</div><div class="t-bar"></div>`;
+    t.innerHTML = `<div class="t-ic">${ic}</div><div class="t-tx">${opts.html ? text : esc(text)}${opts.sub ? `<small>${esc(opts.sub)}</small>` : ''}</div><b class="t-n"></b><div class="t-bar"></div>`;
     this.root.appendChild(t);
-    while (this.root.children.length > 5) this.kill(this.root.firstElementChild, true);
+    this.live.push(t);
+    // hard cap: retire the oldest live toasts (they finish their exit animation, then leave the DOM)
+    const alive = this.live.filter(x => !x._dying);
+    for (let i = 0; i < alive.length - 4; i++) this.kill(alive[i], true);
     t._to = setTimeout(() => this.kill(t), dur * 1000);
     t.addEventListener('click', () => this.kill(t));
     return t;
   }
+  bumpDup(t, opts, add = 1) {
+    t._n += add;
+    const n = t.querySelector('.t-n'); n.textContent = '×' + t._n; n.classList.remove('pop'); void n.offsetWidth; n.classList.add('pop');
+    clearTimeout(t._to); t._to = setTimeout(() => this.kill(t), (t._dur || 3.6) * 1000);
+    const bar = t.querySelector('.t-bar'); bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = '';
+  }
   kill(t, fast) {
     if (!t || t._dying) return;
     t._dying = true; clearTimeout(t._to);
-    t.style.height = t.offsetHeight + 'px';
+    t.style.setProperty('--h', t.offsetHeight + 'px');
     t.classList.add('out');
-    setTimeout(() => t.remove(), fast ? 250 : 520);
+    setTimeout(() => { t.remove(); const i = this.live.indexOf(t); if (i >= 0) this.live.splice(i, 1); }, fast ? 260 : 520);
   }
 }
 
@@ -141,15 +177,19 @@ export class Banners {
     const style = opts.style || 'default';
     // area banners replace each other; others queue
     if (style === 'area') this.q = this.q.filter(b => b.style !== 'area');
-    this.q.push({ title, sub, style, dur: opts.duration, jp: opts.jp });
-    if (this.q.length > 4) this.q.shift();
+    const key = style + '|' + title + '|' + sub;
+    if (this.q.some(b => b.key === key) || (this.busy && this.cur === key)) return;
+    this.q.push({ key, title, sub, style, dur: opts.duration, jp: opts.jp });
+    if (this.q.length > 3) this.q.splice(0, this.q.length - 3);
     if (!this.busy) this.next();
   }
   async next() {
     const b = this.q.shift();
-    if (!b) { this.busy = false; return; }
-    this.busy = true;
-    const dur = b.dur || { levelup: 2.8, area: 3.2, boss: 2.9, quest: 2.8, default: 2.4 }[b.style] || 2.4;
+    if (!b) { this.busy = false; this.cur = null; return; }
+    this.busy = true; this.cur = b.key;
+    if (this.root.children.length > 2) for (const c of [...this.root.children].slice(0, -1)) c.remove();
+    let dur = b.dur || { levelup: 2.8, area: 3.2, boss: 2.9, quest: 2.8, default: 2.4 }[b.style] || 2.4;
+    if (this.q.length) dur *= 0.7;
     const n = el('div', `bn bn-${b.style}`);
     const L = letters(b.title, 'lt');
     if (b.style === 'levelup') {
@@ -204,18 +244,19 @@ export class LootLabels {
       const l = e.target.closest('.ll'); if (!l) return;
       e.stopPropagation(); e.preventDefault();
       const o = this.map.get(l.dataset.id);
-      if (o) { l.classList.add('click'); this.cb?.(o.id, o); }
+      if (o) { l.classList.add('click'); if (o.onClick) o.onClick(o.id, o); else this.cb?.(o.id, o); }
     });
   }
-  add({ id, name, color, worldPos, rarity, always, qty }) {
+  add({ id, name, color, worldPos, rarity, always, qty, onClick }) {
     id = String(id);
     if (this.map.has(id)) this.remove(id, true);
+    if (!rarity && color) rarity = Object.keys(RARITY_COL).find(k => RARITY_COL[k] === String(color).toLowerCase());
     const n = el('div', 'll' + (rarity ? ' r-' + rarity : ''));
     n.dataset.id = id;
     n.style.setProperty('--rc', color || rarityColor(rarity));
     n.innerHTML = `<span>${esc(name)}${qty > 1 ? ` <small>×${qty}</small>` : ''}</span>`;
     this.root.appendChild(n);
-    const o = { id, n, pos: new THREE.Vector3(worldPos.x, worldPos.y ?? 0, worldPos.z), always: always ?? ['rare', 'unique', 'set'].includes(rarity), t: 0, w: n.offsetWidth || 100, h: n.offsetHeight || 26, vis: null, x: 0, y: 0 };
+    const o = { id, n, pos: new THREE.Vector3(worldPos.x, worldPos.y ?? 0, worldPos.z), always: always ?? ['rare', 'unique', 'set'].includes(rarity), t: 0, w: n.offsetWidth || 100, h: n.offsetHeight || 26, vis: null, x: 0, y: 0, onClick };
     this.map.set(id, o);
     return o;
   }

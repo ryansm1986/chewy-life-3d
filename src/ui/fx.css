@@ -171,3 +171,9 @@
 .title.out .ti-center { animation: tiOut .8s ease-in forwards; }
 .title.out .ti-vig, .title.out .ti-foot, .title.out .ti-petals { animation: fadeOut .8s forwards; }
 @keyframes tiOut { 30% { transform: translate(-50%, -48%) scale(1.03); } 100% { opacity: 0; transform: translate(-50%, -80%) scale(.85); } }
+.toasts { transition: bottom .45s var(--soft); }
+.ui-root.building .toasts { bottom: 392px; }
+.ui-root.dlg-open .toasts { bottom: 214px; }
+.t-n { align-self: flex-start; margin: -2px -8px 0 2px; font: 700 12px/1 var(--font); color: #fff; background: var(--tc); border: 2px solid var(--ink); border-radius: 8px; padding: 2px 5px; display: none; }
+.t-n:not(:empty) { display: block; }
+.t-n.pop { animation: slotPop .4s var(--pop); }

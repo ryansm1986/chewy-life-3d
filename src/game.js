@@ -100,6 +100,16 @@ export async function boot() {
 
   // ---- UI
   if (uiMod?.UI) { G.ui = uiMod.UI; try { G.ui.init(G); G.ui.setMode?.('village'); } catch (e) { console.error('[ui] init failed', e); G.ui = null; } }
+  // defensive rate limit: collapse duplicate toasts and cap bursts
+  if (G.ui?.toast) {
+    const raw = G.ui.toast.bind(G.ui); const recent = new Map(); let bucket = 3, lastT = performance.now();
+    G.ui.toast = (text, o) => {
+      const now = performance.now(); bucket = Math.min(3, bucket + (now - lastT) / 700); lastT = now;
+      if ((recent.get(text) || 0) > now - 2500 || bucket < 1) return;
+      recent.set(text, now); bucket -= 1; if (recent.size > 40) recent.clear();
+      return raw(text, o);
+    };
+  }
 
   // ---- audio routing
   const SFX_ALIAS = { block: ['ball_bounce', { pitch: 0.7 }], ball_catch: ['pickup_item', { vol: 0.5 }], squeak: ['slime_bounce', { pitch: 1.9 }], pot_break: ['explosion_small', { pitch: 1.6, vol: 0.6 }], villager_greet: ['villager_chatter', {}] };

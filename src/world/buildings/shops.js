@@ -17,7 +17,8 @@ const STALLS = [
   { name: 'taiyaki', sym: 'taiyaki', noren: C.indigo, roof: ROOFS.terracotta },
 ];
 export function shopL1(B) {
-  const v = B.variant, S = STALLS[v % 3];
+  const v = B.variant, S = { ...STALLS[v % 3] };
+  if (v >= 3) S.roof = [ROOFS.plum, ROOFS.teal, ROOFS.slate, ROOFS.moss, ROOFS.terracotta][v % 5];
   const cz = -0.25, cw = 1.3, cd = 0.6, ch = 0.8;
   B.push([0, 0, cz], B.wob(0.04));
   // counter cart
@@ -86,7 +87,8 @@ const SHOPS2 = [
   { name: 'toy', sym: 'toy', noren: '#c84a6a', roof: ROOFS.plum, wall: '#fff7e6' },
 ];
 export function shopL2(B) {
-  const v = B.variant, S = SHOPS2[v % 4];
+  const v = B.variant, S = { ...SHOPS2[v % 4] };
+  if (v >= 4) { S.roof = [ROOFS.slate, ROOFS.plum, ROOFS.terracotta, ROOFS.teal][v % 4]; S.wall = WALL_TINTS[(v * 3) % WALL_TINTS.length]; }
   const w = 2.4, d = 1.55, h = 1.55, y0 = 0.26, zc = -0.62;
   B.push([0, 0, zc]);
   foundation(B, { w, d, h: y0 });
@@ -153,7 +155,8 @@ export function shopL2(B) {
 // ------------------------------------------------------------------ L3: teahouse / department store (two storeys)
 export function shopL3(B) {
   const v = B.variant, tea = v % 2 === 0;
-  const roofCol = tea ? ROOFS.slate : ROOFS.teal, wall = tea ? '#fff3e0' : '#f6f1ff';
+  const roofCol = tea ? [ROOFS.slate, ROOFS.plum, ROOFS.moss, ROOFS.terracotta][(v >> 1) % 4] : [ROOFS.teal, ROOFS.terracotta, ROOFS.slate, ROOFS.plum][(v >> 1) % 4];
+  const wall = tea ? ['#fff3e0', '#fff0e8', '#fdf2ea', '#fff7e6'][(v >> 1) % 4] : ['#f6f1ff', '#f1f7ea', '#fff7e6', '#ffece6'][(v >> 1) % 4];
   const w = 2.5, d = 1.9, h = 1.5, y0 = 0.3, zc = -0.45;
   B.push([0, 0, zc]);
   foundation(B, { w, d, h: y0 });

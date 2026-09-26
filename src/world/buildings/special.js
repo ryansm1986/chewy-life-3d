@@ -219,7 +219,7 @@ export function boneSmith(B) {
   // bellows beside the hearth
   B.at([0.62, 0.36, 0.1], 0, () => { const bl = G.sph(0.2, 8, 6); bl.scale(0.8, 0.5, 1.1); B.add(bl, '#8a5a3a'); const nz = G.cyl(0.03, 0.05, 0.3, 6); nz.rotateZ(PI / 2); nz.translate(-0.24, 0.02, 0); B.add(nz, C.iron); const hd = G.box(0.05, 0.05, 0.3, 0); hd.translate(0.12, 0.1, 0); B.add(hd, C.woodLight); });
   B.pop();
-  B.light([fx, 1.0, fz + 0.6], { color: '#ff8a3a', intensity: 4.5, radius: 5.5, flicker: 1, nightOnly: false });
+  B.light([fx, 1.0, fz + 0.6], { color: '#ff8a3a', intensity: 4.5, radius: 5.5, flicker: 1, nightOnly: true });
   // yard: anvil, quench tub, weapon rack with bone swords, charcoal & logs
   B.at([-0.25, 0, 0.45], 0.35, () => anvil(B));
   B.at([-1.05, 0, 0.5], 0, () => bucket(B, { r: 0.2, h: 0.3, water: true }));
@@ -285,7 +285,7 @@ export function dungeonGate(B) {
   B.at([-1.65, 0, 0.55], 0, () => bush(B, { r: 0.24, color: '#5a9a4a', flowers: ['#c8a8ff'] }));
   B.at([1.7, 0, 0.55], 0, () => bamboo(B, { n: 3, h: 1.7, spread: 0.18 }));
   B.at([1.3, 0, -1.85], 0, () => rock(B, { r: 0.28 }));
-  B.light([0, 0.9, 0.75], { color: '#b070ff', intensity: 4.5, radius: 6.5, flicker: 0.4, nightOnly: false });
+  B.light([0, 0.9, 0.75], { color: '#b070ff', intensity: 3.2, radius: 6.5, flicker: 0.4, nightOnly: false });
   B.light([0, 1.1, 1.5], { ...LAMP, intensity: 2.6, radius: 5 });
   B.door.set(0, 0, 0.85);
   B.height = 2.6;

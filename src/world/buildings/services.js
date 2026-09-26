@@ -88,10 +88,9 @@ export function streetLamp(B) {
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const q = G.box(0.035, 0.36, 0.035, 0); q.translate(sx * 0.14, 0.2, sz * 0.14); B.add(q, C.woodDark); }
   for (const y of [0.03, 0.37]) for (const [w, d] of [[0.3, 0.035], [0.035, 0.3]]) for (const s of [-1, 1]) { const q = G.box(w, 0.03, d, 0); q.translate(w > 0.1 ? 0 : s * 0.14, y, w > 0.1 ? s * 0.14 : 0); B.add(q, C.woodDark); }
   for (const sd of [0, PI / 2, PI, -PI / 2]) B.at([0, 0.2, 0], sd, () => { const b = G.box(0.02, 0.3, 0.005, 0); b.translate(0, 0, 0.142); B.add(b, C.woodDark); const b2 = G.box(0.24, 0.02, 0.005, 0); b2.translate(0, 0, 0.142); B.add(b2, C.woodDark); });
-  roof(B, { type: 'hip', w: 0.3, d: 0.3, y0: 0.4, over: 0.12, H: 0.2, curve: 0.45, lift: 0.08, liftW: 0.12, thick: 0.05, ribW: 0, course: 0, color: '#3a3a44', edge: '#5a5a64', under: C.woodDark, finial: 'stone' });
+  roof(B, { type: 'hip', w: 0.3, d: 0.3, y0: 0.4, over: 0.13, H: 0.24, curve: 0.45, lift: 0.1, liftW: 0.14, thick: 0.07, ribW: 0, course: 0, color: '#4a4a5a', edge: '#8a8a9a', under: C.woodDark, finial: 'stone' });
   B.pop();
-  const arm = G.box(0.04, 0.04, 0.3, 0); arm.translate(0, 1.2, 0.15); B.add(arm, C.woodDark);
-  const hook = G.torus(0.03, 0.008, 3, 8); hook.translate(0, 1.17, 0.3); B.add(hook, C.iron);
+  for (const sy of [0.45, 1.05]) { const band = G.box(0.13, 0.05, 0.13, 0); band.translate(0, sy, 0); B.add(band, C.iron); }
   const plant = G.sph(0.14, 7, 5); plant.scale(1, 0.7, 1); plant.translate(0.2, 0.12, 0.15); B.add(plant, '#5aa84a', 'leaf');
   B.light([0, h + 0.2, 0], { color: '#ffc27a', intensity: 3.2, radius: 6, flicker: 0.5, nightOnly: true });
   B.door.set(0, 0, 0.55);

@@ -30,7 +30,8 @@ export class ShopPanel extends Panel {
     this.setTitle(o.name || "Rosie's Treats", o.jp || 'おやつ屋');
     this.$.por.innerHTML = portraitHTML(o.portrait || o.keeper || 'rosie');
     this.say(o.greeting || 'Welcome, Chewy! Fresh treats today~');
-    this.entries = (o.items || []).map(x => (x && (x.item || x.potion) ? { ...x } : x?.kind === 'potion' ? { potion: x.key, price: x.price } : { item: x }));
+    const pots = (o.potions || []).map(k => (typeof k === 'string' ? { potion: k } : k));
+    this.entries = [...pots, ...(o.items || o.stock || [])].map(x => (x && (x.item || x.potion) ? { ...x } : x?.kind === 'potion' ? { potion: x.key, price: x.price } : { item: x }));
     this.tab = o.tab || 'buy';
     this._sig = null;
     this.render();
@@ -78,7 +79,7 @@ export class ShopPanel extends Panel {
     const st = this.st, p = this.price(e), A = this.G.actions || {};
     if ((st.coins || 0) < p) { replay(s, 'deny', 450); this.say("Hmm, you're a few coins short~"); this.ui.sfx?.('deny'); return; }
     let ok;
-    if (this.opts.onBuy) ok = this.opts.onBuy(e.item || e, p, e);
+    if (this.opts.onBuy) ok = this.opts.onBuy(e.potion ? { kind: 'potion', key: e.potion } : e.item, p, e);
     else if (e.potion) {
       if (A.buyItem) ok = A.buyItem({ kind: 'potion', key: e.potion }, p);
       else if (A.spendCoins?.(p)) { st.potions[e.potion] = (st.potions[e.potion] || 0) + 1; this.G.events?.emit?.('potions:changed'); ok = true; }
@@ -89,7 +90,7 @@ export class ShopPanel extends Panel {
     const icon = s.querySelector('img')?.src;
     this.ui.flyToBag(icon, { x: r.left + r.width / 2, y: r.top + r.height / 2 }, e.item);
     this.ui.burst(r.left + r.width / 2, r.top + r.height / 2, { n: 10, spread: 50, colors: ['#ffcf4a', '#fff3b8', '#ff8fb0'] });
-    this.ui.sfx?.('coin');
+    this.ui.sfx?.('buy');
     this.say(THANKS[Math.floor(Math.random() * THANKS.length)]);
     if (e.stock != null) { e.stock--; if (e.stock <= 0) this.entries.splice(i, 1); }
     else if (e.item && e.item.kind === 'gear' && !e.infinite) this.entries.splice(i, 1);

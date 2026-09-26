@@ -25,31 +25,41 @@ export default function () {
     const levels = lvl ? [Math.min(lvl, def.levels)] : Array.from({ length: def.levels }, (_, i) => i + 1);
     for (const L of levels) for (let k = 0; k < variants; k++) items.push({ id, level: L, seed: seed0 + k, cat: def.cat });
   }
-  // build + layout (rows per category, wrapped)
-  const maxRow = +(P.get('row') ?? (items.length > 6 ? 30 : 60));
-  const gapX = 1.6, gapZ = 2.6;
-  let x = 0, z = 0, rowD = 0, lastCat = null;
+  // build + layout: rows run along the screen-horizontal diagonal of the default iso camera (yaw 45°),
+  // one row (or more, wrapped) per category; buildings stay axis-aligned facing +z.
+  const maxRow = +(P.get('row') ?? (items.length > 6 ? 46 : 60));
+  const band = { special: 0, home: 1, shop: 1, craft: 2, service: 3, decor: 4 };
+  const gapU = 1.3, gapV = 2.4, SQ = Math.SQRT1_2;
+  const U = [SQ, -SQ], Vv = [SQ, SQ]; // screen-right, screen-down (toward camera)
+  let u = 0, vr = 0, rowV = 0, lastCat = null;
   const placed = [];
   for (const it of items) {
     const m = buildModel(it.id, { level: it.level, seed: it.seed });
     const [w, d] = m.footprint;
-    if ((x > 0 && x + w > maxRow) || (lastCat && it.cat !== lastCat && !only)) { x = 0; z += rowD + gapZ; rowD = 0; }
+    const ext = (w + d) * SQ; // footprint extent along either diagonal
+    if ((u > 0 && u + ext > maxRow) || (lastCat && band[it.cat] !== band[lastCat] && !only)) { u = 0; vr += rowV + gapV; rowV = 0; }
     lastCat = it.cat;
-    const cx = x + w / 2, cz = z + d / 2;
+    const cu = u + ext / 2, cv = vr + ext / 2;
+    const cx = cu * U[0] + cv * Vv[0], cz = cu * U[1] + cv * Vv[1];
     m.group.position.set(cx, 0, cz);
     m.group.rotation.y = rot;
     placed.push({ ...it, m, cx, cz, w, d });
-    x += w + gapX; rowD = Math.max(rowD, d);
+    u += ext + gapU; rowV = Math.max(rowV, ext);
   }
-  const W = Math.max(...placed.map(p => p.cx + p.w / 2)), D = z + rowD;
-  let center = [W / 2, D / 2];
-  const span = Math.max(W, D);
-  let dist0 = only ? Math.max(12, span * 1.6 + 6) : span * 1.25 + 10;
+  const xs = placed.flatMap(p => [p.cx - p.w / 2, p.cx + p.w / 2]), zs = placed.flatMap(p => [p.cz - p.d / 2, p.cz + p.d / 2]);
+  let center = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...zs) + Math.max(...zs)) / 2];
+  const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs));
+  // fit the layout on screen (FOV 20, pitch ~49deg, 16:9)
+  const us = placed.map(p => (p.cx * U[0] + p.cz * U[1])), vs = placed.map(p => (p.cx * Vv[0] + p.cz * Vv[1]));
+  const WU = Math.max(...us) - Math.min(...us) + 4, HV = Math.max(...vs) - Math.min(...vs) + 4;
+  const hTop = Math.max(...placed.map(p => p.m.height));
+  let dist0 = Math.max(12, Math.max(WU / 0.62, (HV * 0.75 + hTop * 0.66) / 0.35) * 1.02);
+  if (only && placed.length === 1) dist0 = Math.max(12, span * 1.6 + 6);
   if (P.has('focus')) { // centre on one placed item: &focus=index
     const f = placed[Math.min(placed.length - 1, +P.get('focus'))];
     center = [f.cx, f.cz]; dist0 = Math.max(9, Math.max(f.w, f.d) * 2.6 + 5);
   }
-  const S = makeStage({ ground: Math.max(60, span + 30), center, dist: dist0, hour: 10, groundColor: P.get('ground') || '#8ec46e' });
+  const S = makeStage({ ground: Math.max(60, span * 1.5 + 30), center, dist: dist0, hour: 10, groundColor: P.get('ground') || '#8ec46e' });
   const scene = S.scene;
   if (only || P.has('focus')) { // lift the look-at point to a third of the tallest building
     const hMax = P.has('focus') ? placed[Math.min(placed.length - 1, +P.get('focus'))].m.height : Math.max(...placed.map(p => p.m.height));

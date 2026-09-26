@@ -202,22 +202,42 @@ export function bridge(B) {
 }
 
 export function chewyStatue(B) {
-  // stepped plinth
-  const s1 = G.box(1.6, 0.22, 1.6, 0.05); s1.translate(0, 0.11, 0); B.add(s1, STONES[2]);
-  const s2 = G.box(1.2, 0.3, 1.2, 0.05); s2.translate(0, 0.37, 0); B.add(s2, STONES[0]);
-  const s3 = G.box(0.8, 0.5, 0.8, 0.05); s3.translate(0, 0.77, 0); B.add(s3, STONES[1]);
-  B.at([0, 0.72, 0.405], 0, () => { const pl = G.box(0.46, 0.22, 0.03, 0.01); B.add(pl, C.gold); B.at([0, 0, 0.02], 0, () => symbol(B, 'paw', 0.18, { colors: ['#8a5a2c'] })); });
-  // giant golden bone, standing tilted
-  B.at([0, 1.02, 0], 0.4, () => {
-    B.push([0, 0.75, 0], 0, 1, 0, 0.35);
-    const shaft = G.cyl(0.13, 0.13, 1.2, 12); B.add(shaft, (p, n, o) => o.set('#f4c04a').lerp(col('#fff0b0'), clamp(n.x * 0.5 + 0.3)));
-    for (const sy of [-1, 1]) for (const sx of [-1, 1]) { const k = G.sph(0.2, 12, 9); k.translate(sx * 0.14, sy * 0.66, 0); B.add(k, (p, n, o) => o.set('#f4c04a').lerp(col('#fff4c0'), clamp(n.y * sy * 0.5 + n.x * 0.3))); }
-    B.pop();
+  // stepped plinth with a paw plaque
+  const s1 = G.box(1.6, 0.2, 1.6, 0.05); s1.translate(0, 0.1, 0); B.add(s1, STONES[2]);
+  const s2 = G.box(1.2, 0.28, 1.2, 0.05); s2.translate(0, 0.34, 0); B.add(s2, STONES[0]);
+  const s3 = G.box(0.86, 0.36, 0.86, 0.05); s3.translate(0, 0.66, 0); B.add(s3, STONES[1]);
+  B.at([0, 0.64, 0.435], 0, () => { const pl = G.box(0.5, 0.22, 0.03, 0.01); B.add(pl, C.gold); B.at([0, 0, 0.02], 0, () => symbol(B, 'paw', 0.17, { colors: ['#8a5a2c'] })); });
+  // sitting dog sculpture (Chewy) in pale stone with a red scarf and a golden bone in its mouth
+  const stone = '#e4dcd6', stoneS = '#cfc4c8';
+  B.push([0, 0.84, 0.02]);
+  const body = G.sph(0.3, 14, 10); body.scale(1, 1.15, 0.95); body.translate(0, 0.32, -0.04); B.add(body, stone);
+  const chest = G.sph(0.2, 12, 8); chest.scale(1, 1.2, 0.8); chest.translate(0, 0.36, 0.14); B.add(chest, '#f4eee8');
+  for (const sx of [-1, 1]) {
+    const leg = G.sph(0.11, 10, 7); leg.scale(0.9, 1.5, 1); leg.translate(sx * 0.12, 0.12, 0.2); B.add(leg, stone);
+    const paw = G.sph(0.09, 10, 7); paw.scale(1.1, 0.7, 1.3); paw.translate(sx * 0.13, 0.05, 0.28); B.add(paw, '#f4eee8');
+    const hip = G.sph(0.15, 10, 7); hip.scale(1, 0.8, 1.2); hip.translate(sx * 0.2, 0.1, -0.1); B.add(hip, stone);
+  }
+  const head = G.sph(0.27, 16, 12); head.scale(1.05, 0.95, 1); head.translate(0, 0.78, 0.08); B.add(head, stone);
+  const muzzle = G.sph(0.14, 12, 9); muzzle.scale(1.1, 0.8, 1); muzzle.translate(0, 0.7, 0.3); B.add(muzzle, '#f4eee8');
+  const nose = G.sph(0.045, 8, 6); nose.scale(1.3, 0.9, 1); nose.translate(0, 0.76, 0.43); B.add(nose, '#5a4a4e');
+  for (const sx of [-1, 1]) {
+    const eye = G.sph(0.035, 8, 6); eye.scale(1, 1.2, 0.6); eye.translate(sx * 0.1, 0.85, 0.3); B.add(eye, '#5a4a4e');
+    const ear = G.sph(0.13, 10, 7); ear.scale(0.55, 1.1, 0.35); ear.rotateZ(sx * 0.5); ear.translate(sx * 0.25, 0.82, 0.02); B.add(ear, stoneS);
+    const cheek = G.sph(0.03, 6, 4); cheek.translate(sx * 0.16, 0.74, 0.3); B.add(cheek, '#ffb0b8');
+  }
+  const tail = tube([{ p: V(0, 0.12, -0.3), r: 0.06 }, { p: V(0.12, 0.2, -0.42), r: 0.055 }, { p: V(0.16, 0.36, -0.4), r: 0.045 }, { p: V(0.1, 0.46, -0.32), r: 0.03 }], 7, true); B.add(tail, stone);
+  const scarf = G.torus(0.2, 0.05, 6, 16); scarf.rotateX(PI / 2 - 0.2); scarf.translate(0, 0.58, 0.07); B.add(scarf, C.red);
+  const knot = G.box(0.1, 0.16, 0.05, 0.02); knot.rotateZ(0.3); knot.translate(0.12, 0.5, 0.24); B.add(knot, C.red);
+  // golden bone held across the mouth
+  B.at([0, 0.66, 0.36], 0, () => {
+    const shaft = G.cyl(0.05, 0.05, 0.52, 10); shaft.rotateZ(PI / 2); B.add(shaft, (p, n, o) => o.set('#f4c04a').lerp(col('#fff0b0'), clamp(n.y * 0.6)));
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) { const k = G.sph(0.075, 10, 8); k.translate(sx * 0.28, sy * 0.055, 0); B.add(k, (p, n, o) => o.set('#f4c04a').lerp(col('#fff4c0'), clamp(n.y * 0.5 + 0.2))); }
   });
-  // flower ring + little lanterns
-  for (let i = 0; i < 10; i++) { const a = i / 10 * TAU; const f = G.sph(0.06, 6, 4); f.translate(Math.cos(a) * 0.5, 0.54, Math.sin(a) * 0.5); B.add(f, B.pick(['#ff8fb0', '#ffffff', '#ffd24a'])); }
-  for (const [x, z] of [[-0.72, 0.72], [0.72, 0.72], [-0.72, -0.72], [0.72, -0.72]]) B.at([x, 0.22, z], 0, () => bush(B, { r: 0.13, n: 1, color: '#5aa84a', flowers: ['#ff8fb0'] }));
-  B.light([0, 1.8, 0.6], { color: '#ffd080', intensity: 2.2, radius: 5, flicker: 0.2 });
+  B.pop();
+  // flower ring + corner shrubs
+  for (let i = 0; i < 12; i++) { const a = i / 12 * TAU; const f = G.sph(0.055, 6, 4); f.translate(Math.cos(a) * 0.55, 0.51, Math.sin(a) * 0.55); B.add(f, B.pick(['#ff8fb0', '#ffffff', '#ffd24a'])); }
+  for (const [x, z] of [[-0.7, 0.7], [0.7, 0.7], [-0.7, -0.7], [0.7, -0.7]]) B.at([x, 0.2, z], 0, () => bush(B, { r: 0.13, n: 1, color: '#5aa84a', flowers: ['#ff8fb0'] }));
+  B.light([0, 1.9, 0.7], { color: '#ffd080', intensity: 2.2, radius: 5, flicker: 0.2 });
   B.door.set(0, 0, 1.1);
-  B.height = 3.0;
+  B.height = 2.3;
 }

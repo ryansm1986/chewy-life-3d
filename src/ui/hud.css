@@ -243,11 +243,11 @@
 .hud .lvb b { min-width: 20px; height: 20px; border-radius: 10px; display: grid; place-items: center; background: var(--ink); color: #fff; -webkit-text-stroke: 0; font-size: 12px; padding: 0 5px; }
 @keyframes badgePulse { 0%, 100% { transform: scale(1) rotate(0); } 50% { transform: scale(1.1) rotate(-3deg); } }
 
-.hud .prompt { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%) scale(.4); opacity: 0; visibility: hidden; display: flex; align-items: center; gap: 10px; white-space: nowrap;
+.hud .prompt { position: absolute; left: 50%; bottom: 158px; transform: translateX(-50%) scale(.4); opacity: 0; visibility: hidden; display: flex; align-items: center; gap: 10px; white-space: nowrap;
   padding: 7px 18px 8px 8px; font: 700 18px/1 var(--font); background: var(--paper-noise), linear-gradient(#fffdf8, #fff0de); border: 3px solid var(--ink); border-radius: 18px;
   box-shadow: 0 4px 0 rgba(74, 44, 42, .4), 0 10px 20px rgba(60, 26, 40, .2); pointer-events: none; transition: opacity .15s, transform .2s, visibility 0s .2s; }
 .hud .prompt::after { content: ''; position: absolute; left: 50%; bottom: -10px; width: 14px; height: 14px; margin-left: -7px; background: #fff0de; border-right: 3px solid var(--ink); border-bottom: 3px solid var(--ink); transform: rotate(45deg); border-radius: 0 0 4px 0; }
-.hud .prompt.show { visibility: visible; opacity: 1; transform: translateX(-50%); pointer-events: auto; cursor: pointer; animation: promptIn .5s var(--pop); transition: opacity .15s, transform .2s, visibility 0s; }
+.hud .prompt.show { visibility: visible; opacity: 1; transform: translateX(-50%); pointer-events: auto; cursor: pointer; animation: promptIn .5s var(--pop); transition: opacity .15s, transform .2s, visibility 0s, bottom .45s var(--soft); }
 @keyframes promptIn { 0% { transform: translateX(-50%) translateY(14px) scale(.4); } 60% { transform: translateX(-50%) translateY(-3px) scale(1.08); } 100% { transform: translateX(-50%); } }
 .hud .prompt .kc { min-width: 32px; height: 32px; font-size: 16px; background: linear-gradient(#fff4c0, #ffcf4a); animation: bob 1s ease-in-out infinite; }
 
@@ -301,3 +301,17 @@
 .tt-mats img { width: 22px; height: 22px; object-fit: contain; }
 .hb.wrongwep .hb-ic { filter: grayscale(1) opacity(.55); }
 .hb.wrongwep .hb-in::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(45deg, rgba(74, 44, 42, .12) 0 5px, transparent 5px 10px); }
+
+.hud .prompt { z-index: 3; transition: opacity .15s, transform .2s, visibility 0s .2s, bottom .45s var(--soft); }
+.ui-root.building .hud .prompt { bottom: 374px; }
+.ui-root.dlg-open .hud .prompt { opacity: 0; }
+.ui-root.has-panel:not(.building) .hud .prompt { opacity: 0; }
+.hud .prompt.hint { padding: 8px 18px 9px; background: var(--paper-noise), linear-gradient(#fff9e0, #ffefc0); }
+.hud .prompt .kc .gl { width: 20px; height: 20px; }
+.hud .belt.b-rejuv { width: 0; margin-left: -8px; opacity: 0; transform: scale(.3); transition: width .4s var(--spring), margin .4s, opacity .3s, transform .4s var(--pop); overflow: visible; }
+.hud .belt.b-rejuv.has { width: 50px; margin-left: 0; opacity: 1; transform: none; }
+
+.hud .rci-foot { display: flex; align-items: center; justify-content: center; gap: 3px; margin-top: 5px; font: 700 11px/1 var(--font); }
+.hud .rci-foot:empty { display: none; }
+.hud .rci-foot .gl { width: 13px; height: 13px; }
+.hud .rci-foot .rci-sep { width: 4px; }
