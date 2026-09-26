@@ -32,7 +32,7 @@ function finish(parts, opts = {}) {
   const mat = makeToon({ vertexColors: true, objectBrush: true, brush: 0.1, rim: 0.6, term: [-0.02, 0.3], ...(opts.mat || {}) });
   const geo = merge(parts);
   const body = new THREE.Mesh(geo, mat); body.castShadow = true; body.receiveShadow = true;
-  const ol = new THREE.Mesh(geo, makeOutline(INK, opts.outline ?? 0.012));
+  const ol = new THREE.Mesh(geo, makeOutline(INK, opts.outline ?? 0.018));
   const pivot = new THREE.Group(); pivot.add(body, ol);
   const root = new THREE.Group(); root.add(pivot);
   return { root, pivot, body, mat, outline: ol };
@@ -139,7 +139,7 @@ const BUILD = {
     paint(b, (p, n, o) => o.set(col).lerp(C('#ffffff'), clamp(n.y * 0.5 + 0.2)));
     const flame = cone(0.22, 0.5, col, [0, 1.2, -0.05], [-0.3, 0, 0]);
     const parts = [b, flame, ...eyes(0.94, 0.25, 0.09, 0.9, false, '#1a2a5a')];
-    const m = finish(parts, { mat: { fragOut: 'outgoingLight += diffuseColor.rgb * 0.9;' }, outline: 0.006 });
+    const m = finish(parts, { mat: { fragOut: 'outgoingLight += diffuseColor.rgb * 0.9;' }, outline: 0.012 });
     m.glow = col; return m;
   },
   oni(v) {
