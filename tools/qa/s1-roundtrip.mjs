@@ -22,6 +22,8 @@ async function dupCheck() {
 }
 try {
   await boot(page, 'fresh&nointro');
+  // freeze village growth so new buildings don't pollute the leak numbers (sim.update grows every 6 s)
+  await page.evaluate(() => { window.__freeze = setInterval(() => { window.G.sim.tickT = -1e9; }, 200); window.G.sim.tickT = -1e9; });
   const base = await page.evaluate(() => window.QA.mem());
   const wl0 = await windowListeners();
   R.note(`baseline ${JSON.stringify(base)} windowListeners=${wl0.n}`);
@@ -39,11 +41,26 @@ try {
       G.player.setPos(D.startPos.x, D.startPos.z);
     });
     await sleep(page, 1200);
-    const inDungeon = await page.evaluate(() => ({ sources: window.G.world.lightPool.sources.size, loot: window.G.dungeon.loot.list.length, labels: document.querySelectorAll('.ll').length, ents: window.G.combat.entities.size }));
+    const inDungeon = await page.evaluate(() => {
+      const G = window.G; window.__old = { scene: G.world.scene, vfx: G.vfx, sun: G.world.sun, mask: G.world.mask };
+      return { sources: G.world.lightPool.sources.size, loot: G.dungeon.loot.list.length, labels: document.querySelectorAll('.ll').length, ents: G.combat.entities.size };
+    });
     await page.evaluate(() => window.G.returnToVillage());
     await waitMode(page, 'village');
     await sleep(page, 700);
     const m = await page.evaluate(() => window.QA.mem());
+    if (i === 0) {
+      const old = await page.evaluate(() => {
+        const o = window.__old, geos = new Set(), mats = new Set();
+        o.scene.traverse(x => { if (x.geometry) geos.add(x.geometry); if (x.material) mats.add(x.material); });
+        let disposedFlag = 0; // three sets no public flag; check the particle layers still hold their buffers
+        return { oldSceneChildren: o.scene.children.length, oldSceneGeometries: geos.size, oldSceneMaterials: mats.size, shadowMapStillAllocated: !!o.sun.shadow.map, shadowMapSize: o.sun.shadow.mapSize.x, maskTex: !!o.mask?.image, vfxLayers: o.vfx.layers.length };
+      });
+      R.note(`old dungeon after leaving: ${JSON.stringify(old)}`);
+      R.check('old dungeon sun shadow map (2048^2 render target) released', !old.shadowMapStillAllocated, `shadow.map still allocated = ${old.shadowMapStillAllocated} (${old.shadowMapSize}px); scene still holds ${old.oldSceneGeometries} geometries / ${old.oldSceneMaterials} materials, never dispose()d`);
+    }
+    // light sources in the village that do not belong to a building record (projectiles, pups, etc.)
+    m.foreignSources = await page.evaluate(() => { const G = window.G; const own = new Set(); for (const r of G.sim.list) for (const l of r.lights) own.add(l); let n = 0; for (const s of G.village.world.lightPool.sources) if (!own.has(s)) n++; return n; });
     const dup = await dupCheck();
     const st = await page.evaluate(() => window.QA.state());
     hist.push({ i, ...m, dungeon: inDungeon, dup, locked: st.locked });
@@ -55,8 +72,8 @@ try {
   R.check('GPU geometries do not grow per round trip', geoPerCycle < 5, `+${geoPerCycle.toFixed(1)} geometries per cycle (cycle1 ${first.geo} -> cycle5 ${last.geo}; baseline ${base.geo})`);
   R.check('GPU textures do not grow per round trip', texPerCycle < 1, `+${texPerCycle.toFixed(1)} textures per cycle (cycle1 ${first.tex} -> cycle5 ${last.tex}; baseline ${base.tex})`);
   R.check('shader programs stable', last.progs - first.progs <= 2, `${first.progs} -> ${last.progs}`);
-  R.check('village scene child count stable', last.villageChildren === base.villageChildren, `${base.villageChildren} -> ${hist.map(h => h.villageChildren).join(',')}`);
-  R.check('village light-pool sources do not accumulate', last.villageSources === base.villageSources, `${base.villageSources} -> ${hist.map(h => h.villageSources).join(',')}`);
+  R.check('village scene child count stable', last.villageChildren === first.villageChildren, `${base.villageChildren} -> ${hist.map(h => h.villageChildren).join(',')}`);
+  R.check('village light-pool sources do not accumulate', last.villageSources === first.villageSources && last.foreignSources === first.foreignSources, `${base.villageSources} -> ${hist.map(h => h.villageSources).join(',')} (non-building sources ${hist.map(h => h.foreignSources).join(',')})`);
   R.check('village interactables stable', last.villageInteract === base.villageInteract, `${base.villageInteract} -> ${last.villageInteract}`);
   R.check('no loot labels left over in the village', hist.every(h => h.lootLabels === 0), hist.map(h => h.lootLabels).join(','));
   R.check('bus events not duplicated (1 sfx emit -> 1 audio.play, 1 toast -> 1 toast)', hist.every(h => h.dup.sfx === 1 && h.dup.toast === 1), hist.map(h => JSON.stringify(h.dup)).join(' '));

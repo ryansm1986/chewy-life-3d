@@ -108,9 +108,19 @@ export class Ambient {
     const G = this.G, day = G.day, vfx = this.vfx;
     const focus = G.engine.rig.target;
     const night = day ? day.out.night : 0;
+    // ---- wind: slow wandering direction, gusts that swell and fade; clouds drift with it
+    this.gustT = (this.gustT ?? 4) - dt;
+    if (this.gustT <= 0) { this.gustT = rand(5, 12); this.gustTarget = rand(1.1, 1.9); this.gustLife = rand(2.5, 4.5); }
+    if (this.gustLife > 0) this.gustLife -= dt; else this.gustTarget = 0.75;
+    this.windStr = (this.windStr ?? 0.9) + ((this.gustTarget ?? 0.75) - (this.windStr ?? 0.9)) * Math.min(1, dt * 0.8);
+    U.uWindStr.value = this.windStr;
+    const wa = 0.64 + Math.sin(t * 0.021) * 0.35 + Math.sin(t * 0.0073) * 0.2;
+    U.uWindDir.value.set(Math.cos(wa), Math.sin(wa));
+    U.uCloudOffset.value.x += U.uWindDir.value.x * dt * 0.0035 * (0.6 + this.windStr * 0.4);
+    U.uCloudOffset.value.y += U.uWindDir.value.y * dt * 0.0035 * (0.6 + this.windStr * 0.4);
     const wind = U.uWindDir.value;
     // ---- sakura petals drifting across the whole view
-    this.petalAcc += dt * 22;
+    this.petalAcc += dt * 22 * (0.5 + this.windStr * 0.6);
     while (this.petalAcc > 1) {
       this.petalAcc--;
       const x = focus.x + rand(-22, 22) - wind.x * 6, z = focus.z + rand(-18, 18) - wind.y * 6;
@@ -189,7 +199,7 @@ export class Ambient {
       if (st.t <= 1.05) { st.t += dt / st.dur; st.u.uT.value = st.t; continue; }
       st.delay -= dt; st.m.visible = false;
       if (st.delay > 0 || night > 0.6) continue;
-      st.delay = rand(1.5, 5); st.t = 0; st.dur = rand(1.6, 2.6); st.m.visible = true;
+      st.delay = rand(1.5, 5) / Math.max(0.6, this.windStr); st.t = 0; st.dur = rand(1.6, 2.6); st.m.visible = true;
       const dir = new THREE.Vector3(wind.x, 0, wind.y).normalize(), side = new THREE.Vector3(-dir.z, 0, dir.x);
       const len = rand(7, 12);
       const cx = focus.x + rand(-10, 10), cz = focus.z + rand(-8, 8);
