@@ -95,6 +95,15 @@ export function generate({ floor = 1, seed = 1 } = {}) {
     }
     return null;
   };
+  // decorative centerpieces in larger rooms (reserved before spawns)
+  const centers = [];
+  for (const r of rooms) {
+    if (r.kind !== 'normal' || r.w < 8 || r.h < 8 || !rng.chance(0.6)) continue;
+    let ok = true; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!at(r.cx + dx, r.cy + dy)) ok = false;
+    if (!ok) continue;
+    centers.push({ x: r.cx, y: r.cy, r: rng.next() });
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) occupied.add((r.cy + dy) * W + r.cx + dx);
+  }
   const spawns = [], chests = [], pots = [], shrines = [], props = [];
   const mlvl = floor + 1;
   for (const r of rooms) {
@@ -135,5 +144,5 @@ export function generate({ floor = 1, seed = 1 } = {}) {
     }
   }
   const stairsCell = far.kind === 'stairs' ? freeCell(far, 2) || { x: far.cx, y: far.cy } : null;
-  return { W, H, grid, rooms, start: { x: start.cx, y: start.cy }, stairs: stairsCell, bossRoom: boss ? far : null, boss, spawns, chests, pots, shrines, props, lights, floor, mlvl, theme: themeFor(floor), at, waypoint: floor % 5 === 1 && floor > 1 ? { x: start.cx + 2, y: start.cy } : null };
+  return { W, H, grid, rooms, centers, start: { x: start.cx, y: start.cy }, stairs: stairsCell, bossRoom: boss ? far : null, boss, spawns, chests, pots, shrines, props, lights, floor, mlvl, theme: themeFor(floor), at, waypoint: floor % 5 === 1 && floor > 1 ? { x: start.cx + 2, y: start.cy } : null };
 }

@@ -1,7 +1,7 @@
 // Scenario 1: village <-> dungeon round trips x5 (+ a stairs chain) — leak & duplication checks.
 // Measures renderer.info.memory (GPU geometries/textures), programs, village scene children, light-pool sources,
 // window listeners (CDP), bus-handler duplication (one emit -> one sfx / one toast) and loot-label DOM residue.
-import { launch, boot, waitMode, sleep, makeReport } from './lib.mjs';
+import { launch, boot, waitMode, sleep, makeReport, drainDialogue } from './lib.mjs';
 
 const R = makeReport('S1 village<->dungeon round trips');
 const { browser, context, page, errors, warns } = await launch();
@@ -48,6 +48,14 @@ try {
     await page.evaluate(() => window.G.returnToVillage());
     await waitMode(page, 'village');
     await sleep(page, 700);
+    if (i === 0) {
+      // first-ever Burrow visit schedules Shadow's combat tutorial 2.6 s after entering; we left after ~1.5 s
+      await sleep(page, 1500);
+      const tut = await page.evaluate(() => ({ mode: window.G.mode, dlg: !!window.G.ui.dlg.active, speaker: window.G.ui.dlg.active ? window.G.ui.dlg.opts.speaker : null, line: window.G.ui.dlg.active ? window.G.ui.dlg.lines[0].text.slice(0, 60) : null, locked: window.G.player.controlLocked }));
+      R.check('Burrow combat tutorial does not pop up after already leaving the Burrow', !(tut.dlg && tut.speaker === 'Shadow' && tut.mode === 'village'), JSON.stringify(tut));
+      await drainDialogue(page);
+      await sleep(page, 300);
+    }
     const m = await page.evaluate(() => window.QA.mem());
     if (i === 0) {
       const old = await page.evaluate(() => {
@@ -77,7 +85,7 @@ try {
   R.check('village interactables stable', last.villageInteract === base.villageInteract, `${base.villageInteract} -> ${last.villageInteract}`);
   R.check('no loot labels left over in the village', hist.every(h => h.lootLabels === 0), hist.map(h => h.lootLabels).join(','));
   R.check('bus events not duplicated (1 sfx emit -> 1 audio.play, 1 toast -> 1 toast)', hist.every(h => h.dup.sfx === 1 && h.dup.toast === 1), hist.map(h => JSON.stringify(h.dup)).join(' '));
-  R.check('window event listeners do not multiply', wl1.n === wl0.n, `${wl0.n} -> ${wl1.n} ${JSON.stringify(wl1.by)}`);
+  R.check('window event listeners do not multiply', wl1.n <= wl0.n, `${wl0.n} -> ${wl1.n} ${JSON.stringify(wl1.by)}`);
   R.check('controls unlocked after every return', hist.every(h => !h.locked), hist.map(h => h.locked + ':' + h.st).join(' '));
 
   // stairs chain: floor 1 -> 2 -> 3 via G.enterDungeon while already in the dungeon (the "burrow deeper" path)

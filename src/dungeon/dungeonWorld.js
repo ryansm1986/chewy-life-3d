@@ -31,7 +31,7 @@ export class DungeonWorld {
     this.interactables = [];
     this.rng = mulberry32(layout.floor * 31 + 7);
     this.noise = new Noise(layout.floor + 5);
-    this.buildFloor(); this.buildWalls(); this.buildProps(); this.buildLights(); this.buildShafts();
+    this.buildFloor(); this.buildWalls(); this.buildProps(); this.buildLights(); this.buildShafts(); this.buildCenterpieces();
   }
   cellToWorld(x, y) { return V((x + 0.5) * CELL, 0, (y + 0.5) * CELL); }
   worldToCell(x, z) { return [Math.floor(x / CELL), Math.floor(z / CELL)]; }
@@ -241,6 +241,58 @@ export class DungeonWorld {
       this.shaftSpots = (this.shaftSpots || []); this.shaftSpots.push(wp);
     }
   }
+  buildCenterpieces() {
+    const th = this.L.theme, r = this.rng, T = this.theme;
+    const solid = [], glow = [];
+    this.steam = [];
+    for (const c of this.L.centers || []) {
+      const p = this.cellToWorld(c.x, c.y);
+      if (th === 'burrow') { // glowing spring pond with lily pads and mossy rocks
+        const pond = new THREE.Mesh(new THREE.CircleGeometry(1.9, 40), new THREE.MeshBasicMaterial({ color: new THREE.Color('#5ad0e8').multiplyScalar(1.2), toneMapped: false, transparent: true, opacity: 0.9 }));
+        pond.rotation.x = -Math.PI / 2; pond.position.set(p.x, 0.05, p.z); this.scene.add(pond);
+        const inner = new THREE.Mesh(new THREE.CircleGeometry(1.2, 32), new THREE.MeshBasicMaterial({ map: glowTexture(), color: '#bff8ff', transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+        inner.rotation.x = -Math.PI / 2; inner.position.set(p.x, 0.07, p.z); this.scene.add(inner);
+        (this.pulses ||= []).push({ m: inner, base: 0.7 });
+        for (let i = 0; i < 12; i++) { const a = i / 12 * TAU + r() * 0.3; solid.push(paint(puff(V(p.x + Math.cos(a) * 2.1, 0.1, p.z + Math.sin(a) * 2.1), 0.3 + r() * 0.25, { detail: 1, noise: 0.3, squash: 0.6, seed: i }), (q, n, o) => o.set(T.wall[1]).lerp(C(T.top[0]), clamp(n.y)))); }
+        for (let i = 0; i < 5; i++) { const a = r() * TAU, d = r() * 1.3; const pad = new THREE.CylinderGeometry(0.22 + r() * 0.1, 0.22, 0.03, 12, 1, false, 0.4, TAU - 0.4); pad.translate(p.x + Math.cos(a) * d, 0.08, p.z + Math.sin(a) * d); solid.push(paint(pad, (q, n, o) => o.set('#6ac05a'))); }
+        this.lightPool.addSource({ pos: V(p.x, 1.2, p.z), color: C('#7ae0ff'), intensity: 8, radius: 8, flicker: 0.2 });
+        this.collision.addCircle(p.x, p.z, 2.0);
+      } else if (th === 'crystal') { // crystal heart
+        for (let i = 0; i < 9; i++) {
+          const a = i / 9 * TAU + r() * 0.4, d = i === 0 ? 0 : 0.5 + r() * 0.5, hgt = i === 0 ? 3.2 : 1.2 + r() * 1.4;
+          const g = new THREE.OctahedronGeometry(0.4, 0); g.scale(0.7, hgt, 0.7); g.rotateZ(i === 0 ? 0 : (r() - 0.5) * 0.7); g.rotateX(i === 0 ? 0 : (r() - 0.5) * 0.7);
+          g.translate(p.x + Math.cos(a) * d, hgt * 0.35, p.z + Math.sin(a) * d);
+          const col = i % 2 ? '#ff8ae0' : '#7af0ff';
+          glow.push(paint(g, (q, n, o) => o.set(col).lerp(C('#ffffff'), clamp(n.y * 0.6))));
+        }
+        this.lightPool.addSource({ pos: V(p.x, 2, p.z), color: C('#c8a8ff'), intensity: 10, radius: 9, flicker: 0.3 });
+        this.collision.addCircle(p.x, p.z, 1.1);
+      } else if (th === 'shrine') { // little fox shrine: torii, fox statues, lanterns
+        const post = (x, z) => { const g = new THREE.CylinderGeometry(0.09, 0.1, 1.9, 8); g.translate(x, 0.95, z); return paint(g, (q, n, o) => o.set('#e0442e')); };
+        solid.push(post(p.x - 0.9, p.z), post(p.x + 0.9, p.z));
+        const beam = new THREE.BoxGeometry(2.5, 0.14, 0.2); beam.translate(p.x, 1.95, p.z); solid.push(paint(beam, (q, n, o) => o.set('#2a2020')));
+        const beam2 = new THREE.BoxGeometry(2.1, 0.1, 0.14); beam2.translate(p.x, 1.62, p.z); solid.push(paint(beam2, (q, n, o) => o.set('#e0442e')));
+        for (const s of [-1, 1]) {
+          const base = new THREE.BoxGeometry(0.4, 0.3, 0.4); base.translate(p.x + s * 1.4, 0.15, p.z + 0.8); solid.push(paint(base, (q, n, o) => o.set('#a8a0a8')));
+          const fox = puff(V(p.x + s * 1.4, 0.55, p.z + 0.8), 0.22, { detail: 1, noise: 0.1, squash: 1.2, seed: s + 5 }); solid.push(paint(fox, (q, n, o) => o.set('#fff8f0')));
+          for (const e of [-1, 1]) { const ear = new THREE.ConeGeometry(0.06, 0.16, 5); ear.translate(p.x + s * 1.4 + e * 0.09, 0.85, p.z + 0.8); solid.push(paint(ear, (q, n, o) => o.set('#fff8f0'))); }
+          const scarf = new THREE.TorusGeometry(0.16, 0.04, 6, 12); scarf.rotateX(Math.PI / 2); scarf.translate(p.x + s * 1.4, 0.48, p.z + 0.8); solid.push(paint(scarf, (q, n, o) => o.set('#e0442e')));
+        }
+        this.lightPool.addSource({ pos: V(p.x, 1.4, p.z + 0.8), color: C('#ffae6a'), intensity: 9, radius: 8, flicker: 0.8 });
+        for (const [x, z, rr] of [[-0.9, 0, 0.2], [0.9, 0, 0.2], [-1.4, 0.8, 0.3], [1.4, 0.8, 0.3]]) this.collision.addCircle(p.x + x, p.z + z, rr);
+      } else { // kitchen: bubbling cauldron over a fire
+        const pot = new THREE.SphereGeometry(0.85, 20, 14, 0, TAU, Math.PI * 0.25, Math.PI * 0.75); pot.translate(p.x, 0.9, p.z); solid.push(paint(pot, (q, n, o) => o.set('#3a3438')));
+        const rim = new THREE.TorusGeometry(0.62, 0.08, 8, 24); rim.rotateX(Math.PI / 2); rim.translate(p.x, 1.5, p.z); solid.push(paint(rim, (q, n, o) => o.set('#5a5058')));
+        const soup = new THREE.CircleGeometry(0.6, 24); soup.rotateX(-Math.PI / 2); soup.translate(p.x, 1.42, p.z); glow.push(paint(soup, (q, n, o) => o.set('#ffa040')));
+        for (let i = 0; i < 5; i++) { const a = i / 5 * TAU; const log = new THREE.CylinderGeometry(0.08, 0.08, 1.1, 6); log.rotateZ(Math.PI / 2); log.rotateY(a); log.translate(p.x, 0.1, p.z); solid.push(paint(log, (q, n, o) => o.set('#6a4a30'))); }
+        this.lightPool.addSource({ pos: V(p.x, 0.8, p.z), color: C('#ff8a3a'), intensity: 12, radius: 9, flicker: 1.5 });
+        this.collision.addCircle(p.x, p.z, 1.0);
+        this.steam.push(V(p.x, 1.5, p.z));
+      }
+    }
+    if (solid.length) { const m = new THREE.Mesh(merge(solid), makeToon({ vertexColors: true, rim: 0.4, brush: 0.2 })); m.castShadow = true; m.receiveShadow = true; this.scene.add(m); }
+    if (glow.length) { const m = new THREE.Mesh(merge(glow), makeToon({ vertexColors: true, rim: 0.7, fragOut: 'outgoingLight += diffuseColor.rgb * 1.2;' })); m.castShadow = true; this.scene.add(m); }
+  }
   onSky() {}
   updateSun(focus) {
     const s = this.sun;
@@ -250,6 +302,12 @@ export class DungeonWorld {
   update(dt, t, vfx, focus) {
     for (const f of this.flames || []) { f.s.scale.setScalar(1.3 + Math.sin(t * 11 + f.ph) * 0.12 + Math.sin(t * 23 + f.ph) * 0.08); if (vfx && Math.random() < dt * 6) vfx.glow.spawn({ x: f.p.x + rand(-0.1, 0.1), y: f.p.y, z: f.p.z + rand(-0.1, 0.1), vy: rand(0.6, 1.2), life: 0.6, size: 0.25, size1: 0.02, color: this.theme.light, alpha: 0.9, alpha1: 0 }); }
     for (const s of this.shafts || []) s.m.material.opacity = s.base * (0.75 + 0.25 * Math.sin(t * 0.7 + s.ph));
+    for (const pu of this.pulses || []) pu.m.material.opacity = pu.base * (0.75 + 0.25 * Math.sin(t * 1.6));
+    if (vfx) for (const sp of this.steam || []) {
+      if (focus && sp.distanceTo(focus) > 30) continue;
+      if (Math.random() < dt * 6) vfx.smoke.spawn({ x: sp.x + rand(-0.3, 0.3), y: sp.y, z: sp.z + rand(-0.3, 0.3), vy: rand(0.6, 1.1), life: rand(1.5, 2.5), size: 0.4, size1: 1.3, color: '#fff0e8', alpha: 0.5, alpha1: 0, fadeIn: 0.3 });
+      if (Math.random() < dt * 4) vfx.glow.spawn({ x: sp.x + rand(-0.4, 0.4), y: sp.y - 0.05, z: sp.z + rand(-0.4, 0.4), vy: 0.3, life: 0.5, size: 0.25, size1: 0.05, color: '#ffc060', alpha: 0.9, alpha1: 0 });
+    }
     if (vfx && focus) { // floating dust motes / spores around the player
       this.moteAcc = (this.moteAcc || 0) + dt * 10;
       while (this.moteAcc > 1) { this.moteAcc--; const x = focus.x + rand(-12, 12), z = focus.z + rand(-10, 10); if (!this.walkable(x, z)) continue; vfx.glow.spawn({ x, y: rand(0.3, 3), z, vx: rand(-0.1, 0.1), vy: rand(0.02, 0.12), vz: rand(-0.1, 0.1), life: rand(3, 5), size: rand(0.06, 0.12), color: this.theme.accent, alpha: 0.7, alpha1: 0, fadeIn: 1, flicker: rand(2, 5) }); }
