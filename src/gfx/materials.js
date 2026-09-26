@@ -19,8 +19,29 @@ export const U = {
   uSunDir: { value: new THREE.Vector3(0.5, 0.8, 0.3).normalize() },
   uSkyHor: { value: new THREE.Color('#d8f0ff') },
   uOccl: { value: new THREE.Vector4(-9999, -9999, 1, 0) }, // player screen px (x,y), radius px, view depth
+  // painted light pools: the nearest lamps as (x, y, z, radius) + premultiplied colour; radius 0 ends the list
+  uPoolPos: { value: Array.from({ length: 32 }, () => new THREE.Vector4()) },
+  uPoolCol: { value: Array.from({ length: 32 }, () => new THREE.Vector3()) },
 };
 export function initSharedUniforms() { U.uBrush.value = brushTexture(); }
+
+// Warm pools of lamp light on the ground and grass for every lamp in range, not just the 8 real point lights
+// (see LightPool.update). Add to outgoingLight, multiplied by the surface colour.
+export const POOL_GLSL = /* glsl */`
+uniform vec4 uPoolPos[32];
+uniform vec3 uPoolCol[32];
+vec3 lightPools(vec3 wp) {
+  vec3 acc = vec3(0.0);
+  for (int i = 0; i < 32; i++) {
+    vec4 L = uPoolPos[i];
+    if (L.w <= 0.0) break;
+    vec2 d = wp.xz - L.xz;
+    float f = clamp(1.0 - dot(d, d) / (L.w * L.w), 0.0, 1.0);
+    acc += uPoolCol[i] * f * f;
+  }
+  return acc;
+}
+`;
 
 // gradient kept linear filtered for a soft painted terminator
 const WIND_GLSL = /* glsl */`

@@ -1,7 +1,7 @@
 // Island terrain: heightfield, painted tile layer (paths / plaza / fields), GPU texture mirrors for shaders.
 import * as THREE from 'three';
 import { Noise, clamp, smoothstep, lerp } from '../core/util.js';
-import { makeToon } from '../gfx/materials.js';
+import { makeToon, POOL_GLSL } from '../gfx/materials.js';
 
 export const WORLD = 112;
 export const T = { GRASS: 0, PATH: 1, PLAZA: 2, FIELD: 3, SAND: 4, ROCK: 5, WATER: 6 };
@@ -154,7 +154,7 @@ export class Terrain {
         uWorld: { value: WORLD }, uGrid: { value: 0 }, uCursor: { value: new THREE.Vector4(-99, -99, 0, 0) },
         uCursorCol: { value: new THREE.Vector4(1, 1, 0.85, 0.12) },
       },
-      fragPars: TERRAIN_FRAG_PARS,
+      fragPars: TERRAIN_FRAG_PARS + POOL_GLSL,
       fragColor: TERRAIN_FRAG_COLOR,
       fragOut: TERRAIN_FRAG_OUT,
     });
@@ -309,5 +309,6 @@ const TERRAIN_FRAG_COLOR = /* glsl */`
 `;
 
 const TERRAIN_FRAG_OUT = /* glsl */`
+  outgoingLight += lightPools(vCWorld) * diffuseColor.rgb;
   outgoingLight = applyBuildOverlay(outgoingLight, vCWorld, 0.0);
 `;

@@ -74,9 +74,19 @@ export class LightPool {
     for (let i = this.transient.length - 1; i >= 0; i--) {
       const t = this.transient[i]; t.life -= dt;
       if (t.life <= 0) { this.transient.splice(i, 1); continue; }
-      cand.push({ d: t.pos.distanceToSquared(center) - 5000, pos: t.pos, color: t.color, intensity: t.intensity * (t.life / t.max), radius: t.radius });
+      cand.push({ d: t.pos.distanceToSquared(center) - 5000, pos: t.pos, color: t.color, intensity: t.intensity * (t.life / t.max), radius: t.radius, transient: true });
     }
     cand.sort((a, b) => a.d - b.d);
+    // painted ground pools for the nearest lamps (materials.js POOL_GLSL); skill flashes only use the real lights
+    const PP = U.uPoolPos.value, PC = U.uPoolCol.value;
+    let n = 0;
+    for (const c of cand) {
+      if (c.transient || n >= PP.length) continue;
+      PP[n].set(c.pos.x, c.pos.y, c.pos.z, c.radius * 0.55);
+      PC[n].set(c.color.r, c.color.g, c.color.b).multiplyScalar(c.intensity * 0.1);
+      n++;
+    }
+    if (n < PP.length) PP[n].w = 0;
     for (let i = 0; i < this.lights.length; i++) {
       const l = this.lights[i], c = cand[i];
       if (c) { l.position.copy(c.pos); l.color.copy(c.color); l.intensity = c.intensity; l.distance = c.radius; }

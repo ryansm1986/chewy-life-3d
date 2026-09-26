@@ -1,7 +1,7 @@
 // Japanese-garden vegetation: sakura, momiji, niwaki pines, round trees, bamboo, hydrangea, susuki,
 // flowers and a GPU grass field. Everything sways with the shared wind and bends around actors.
 import * as THREE from 'three';
-import { makeToon, applyDepth } from '../gfx/materials.js';
+import { makeToon, applyDepth, POOL_GLSL } from '../gfx/materials.js';
 import { leafCardTexture, floretTexture } from '../gfx/textures.js';
 import { branch, puff, cards, paint, merge, xf, tube } from '../gfx/geom.js';
 import { mulberry32, TAU, clamp, Noise } from '../core/util.js';
@@ -518,7 +518,7 @@ export class Vegetation {
         // build view: blades crouch so painted zones, coverage and the drag rectangle read clearly
         cWorld.xyz = cOrigin + (cWorld.xyz - cOrigin) * vec3(1.0 - uBuild * 0.3, 1.0 - uBuild * 0.68, 1.0 - uBuild * 0.3);
       `,
-      fragPars: 'varying float vGH; uniform float uWorld;\n' + OVERLAY_GLSL,
+      fragPars: 'varying float vGH; uniform float uWorld;\n' + OVERLAY_GLSL + POOL_GLSL,
       fragColor: /* glsl */`
         {
           vec3 wp = vCWorld;
@@ -532,7 +532,7 @@ export class Vegetation {
           diffuseColor.rgb = mix(grass * 0.8, tip, smoothstep(0.0, 1.0, vGH));
         }
       `,
-      fragOut: 'outgoingLight = applyBuildOverlay(outgoingLight, vCWorld, 1.0);',
+      fragOut: 'outgoingLight += lightPools(vCWorld) * diffuseColor.rgb * (0.7 + 0.5 * vGH); outgoingLight = applyBuildOverlay(outgoingLight, vCWorld, 1.0);',
     });
     const CH = 16, chunks = Math.ceil(WORLD / CH);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
