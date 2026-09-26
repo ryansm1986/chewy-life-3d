@@ -35,8 +35,9 @@ export class Portraits {
     rig.root.rotation.y = -0.25;
     this.scene.add(rig.root);
     const quad = !!rig.quadruped;
-    this.cam.position.set(hp.x + 0.3, hp.y + (quad ? 0.12 : 0.1), hp.z + (quad ? 1.6 : 2.15));
-    this.cam.lookAt(hp.x, hp.y - (quad ? 0.0 : 0.04), hp.z);
+    // head-and-shoulders framing (the Pokémon-style heads are smaller than the old ball heads)
+    this.cam.position.set(hp.x + 0.25, hp.y + (quad ? 0.1 : 0.06), hp.z + (quad ? 1.45 : 1.72));
+    this.cam.lookAt(hp.x, hp.y - (quad ? 0.02 : 0.07), hp.z);
     const r = this.engine.renderer;
     const prevRT = r.getRenderTarget(), prevBg = this.scene.background;
     const prevTime = U.uTime.value; U.uTime.value = 0;

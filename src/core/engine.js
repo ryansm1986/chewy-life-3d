@@ -69,7 +69,7 @@ export class LightPool {
       const d = s.pos.distanceToSquared(center);
       if (d > 40 * 40) continue;
       const fl = s.flicker ? 1 + Math.sin(time * 9 + s.pos.x * 3) * 0.06 * s.flicker + Math.sin(time * 23 + s.pos.z) * 0.04 * s.flicker : 1;
-      cand.push({ d: d - (s.priority || 0) * 400, pos: s.pos, color: s.color, intensity: s.intensity * fl * nightOnly, radius: s.radius });
+      cand.push({ d: d - (s.priority || 0) * 400, pos: s.pos, color: s.color, intensity: s.intensity * fl * nightOnly, radius: s.radius, noPool: s.noPool });
     }
     for (let i = this.transient.length - 1; i >= 0; i--) {
       const t = this.transient[i]; t.life -= dt;
@@ -81,9 +81,9 @@ export class LightPool {
     const PP = U.uPoolPos.value, PC = U.uPoolCol.value;
     let n = 0;
     for (const c of cand) {
-      if (c.transient || n >= PP.length) continue;
-      PP[n].set(c.pos.x, c.pos.y, c.pos.z, c.radius * 0.55);
-      PC[n].set(c.color.r, c.color.g, c.color.b).multiplyScalar(c.intensity * 0.1);
+      if (c.transient || c.noPool || n >= PP.length) continue;
+      PP[n].set(c.pos.x, c.pos.y, c.pos.z, c.radius * 0.7);
+      PC[n].set(c.color.r, c.color.g, c.color.b).multiplyScalar(c.intensity * 0.16);
       n++;
     }
     if (n < PP.length) PP[n].w = 0;
@@ -120,6 +120,15 @@ export class Engine {
     this.clock = new THREE.Timer(); this.clock.connect(document);
     this.raycaster = new THREE.Raycaster();
     addEventListener('resize', () => this.resize());
+    // Every frame renders into the composer's (linear) input buffer, so programs are keyed with a linear output colour
+    // space; a bare renderer.compile() would build the sRGB-output variant and the "prewarm" would compile the wrong
+    // shaders. Compile against the same target the scene is really drawn into.
+    const compile = r.compile.bind(r);
+    r.compile = (scene, camera, target) => {
+      const prev = r.getRenderTarget(), rt = this.post?.composer?.inputBuffer;
+      if (rt) r.setRenderTarget(rt);
+      try { return compile(scene, camera, target); } finally { if (rt) r.setRenderTarget(prev); }
+    };
   }
   // A world provides {scene, sun, hemi, lightPool}
   setWorld(world) {

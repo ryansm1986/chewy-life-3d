@@ -7,6 +7,7 @@ import { LANDMARKS } from './layout.js';
 import { Events } from '../core/events.js';
 import { uid, rand, randInt, clamp, ease, mulberry32, pick } from '../core/util.js';
 import { NeedIcons } from './needIcons.js';
+import { markOccluder } from '../gfx/materials.js';
 
 export const ZONES = { R: 1, C: 2, W: 3 };
 export const ZONE_COLORS = { 1: [70, 205, 90], 2: [70, 140, 255], 3: [255, 165, 40] };
@@ -165,7 +166,7 @@ export class VillageSim {
     const g = new THREE.Group(); g.add(model.group);
     const p = this.worldPos(b);
     g.position.copy(p); g.rotation.y = -b.rot * Math.PI / 2;
-    g.traverse(o => { if (o.isMesh) { o.castShadow = o.castShadow !== false; o.receiveShadow = true; const m = o.material; if (m?.userData?.u?.uOcclOn) m.userData.u.uOcclOn.value = 1; } });
+    g.traverse(o => { if (o.isMesh) { o.castShadow = o.castShadow !== false; o.receiveShadow = true; const m = o.material; if (m?.userData?.u?.uOcclOn) { m.userData.u.uOcclOn.value = 1; markOccluder(m); } } });
     this.group.add(g);
     const [w, d] = this.dims(b.type, b.rot, b.level);
     for (let z = b.z; z < b.z + d; z++) for (let x = b.x; x < b.x + w; x++) { this.occ[z * WORLD + x] = b.idx; this.zone[z * WORLD + x] = 0; }

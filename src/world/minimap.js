@@ -97,6 +97,7 @@ export class DungeonMinimap {
     this.c = document.createElement('canvas'); this.c.width = L.W * 4; this.c.height = L.H * 4;
     this.g = this.c.getContext('2d');
     this.lastCell = -1;
+    this.box = [1e9, 1e9, -1e9, -1e9]; // explored cells' bounds (x0, y0, x1, y1) so the big map can fit what has been seen
   }
   reveal() {
     const L = this.mode.layout, p = this.G.player.pos, cx = Math.floor(p.x / CELL), cy = Math.floor(p.z / CELL), R = 7;
@@ -105,17 +106,21 @@ export class DungeonMinimap {
     for (let y = cy - R; y <= cy + R; y++) for (let x = cx - R; x <= cx + R; x++) {
       if (x < 0 || y < 0 || x >= L.W || y >= L.H || (x - cx) ** 2 + (y - cy) ** 2 > R * R) continue;
       const i = y * L.W + x; if (this.seen[i]) continue; this.seen[i] = 1;
+      const b = this.box; if (x < b[0]) b[0] = x; if (y < b[1]) b[1] = y; if (x > b[2]) b[2] = x; if (y > b[3]) b[3] = y;
       if (L.at(x, y)) { g.fillStyle = '#f4e4d0'; g.fillRect(x * 4, y * 4, 4, 4); }
       else if (L.at(x + 1, y) || L.at(x - 1, y) || L.at(x, y + 1) || L.at(x, y - 1)) { g.fillStyle = '#8a6a8a'; g.fillRect(x * 4, y * 4, 4, 4); }
     }
   }
   draw(ctx, size, pp, o = {}) {
     this.reveal();
-    const G = this.G, L = this.mode.layout, p = G.player.pos, span = o.big ? L.W * CELL : 44, k = size / span;
+    const G = this.G, L = this.mode.layout, p = G.player.pos, b = this.box;
+    // big map: fit the explored area (plus a margin, at least ~40 m) instead of the whole, mostly unknown floor; wheel zooms
+    const fit = o.big && b[2] >= b[0];
+    const span = fit ? Math.max(40, (Math.max(b[2] - b[0], b[3] - b[1]) + 6) * CELL) / (o.zoom || 1) : o.big ? L.W * CELL : 44, k = size / span;
     ctx.save(); ctx.clearRect(0, 0, size, size);
     ctx.fillStyle = '#2a2038'; ctx.fillRect(0, 0, size, size);
     ctx.translate(size / 2, size / 2); ctx.rotate(mapRot(G.engine.rig.yaw));
-    const cx = o.big ? L.W * CELL / 2 : p.x, cz = o.big ? L.H * CELL / 2 : p.z;
+    const cx = fit ? (b[0] + b[2] + 1) / 2 * CELL : o.big ? L.W * CELL / 2 : p.x, cz = fit ? (b[1] + b[3] + 1) / 2 * CELL : o.big ? L.H * CELL / 2 : p.z;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(this.c, -cx * k, -cz * k, L.W * CELL * k, L.H * CELL * k);
     const dot = (x, z, r, fill) => { ctx.beginPath(); ctx.arc((x - cx) * k, (z - cz) * k, r, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = '#2a1a24'; ctx.lineWidth = 1.2; ctx.stroke(); };

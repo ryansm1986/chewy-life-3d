@@ -75,6 +75,10 @@ export class Companion extends Actor {
       const back = new THREE.Vector3(-Math.sin(p.facing), 0, -Math.cos(p.facing));
       this.setPos(p.pos.x + back.x * 1.2, p.pos.z + back.z * 1.2);
     }
+    if (this.hold) { // scripted staging (intro): stay on the mark, face the given way, sit once there
+      if (this.moveTo(this.hold.x, this.hold.z, dt, 0.8, 0.15)) { this.faceTarget = this.hold.face; if (!this.anim.action) this.anim.play('sit'); }
+      super.update(dt); return;
+    }
     if (this.combatUpdate?.(dt)) { super.update(dt); return; }
     if (d > 2.6) {
       // run to a spot beside/behind Chewy

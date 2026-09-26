@@ -4,8 +4,8 @@ import { U } from './materials.js';
 import { clamp, lerp, smoothstep } from '../core/util.js';
 
 const K = [
-  { h: 0, sun: '#8ea8ff', si: 1.0, sky: '#4a5a9a', gnd: '#2c2848', hi: 1.15, fog: '#2a3060', zen: '#10183a', hor: '#2c3a70', rim: '#9fb8ff', lift: [0.0, 0.02, 0.08], gain: [0.92, 0.97, 1.1], sat: 1.0, night: 1 },
-  { h: 4.8, sun: '#a0a8ff', si: 0.9, sky: '#5a5a9a', gnd: '#3a3050', hi: 1.1, fog: '#4a4a80', zen: '#1c2450', hor: '#4a4a88', rim: '#b0b8ff', lift: [0.02, 0.01, 0.08], gain: [0.95, 0.97, 1.08], sat: 1.0, night: 0.85 },
+  { h: 0, sun: '#8ea8ff', si: 0.85, sky: '#46558f', gnd: '#282442', hi: 0.88, fog: '#2a3060', zen: '#10183a', hor: '#2c3a70', rim: '#9fb8ff', lift: [0.0, 0.02, 0.08], gain: [0.92, 0.97, 1.1], sat: 1.0, night: 1 },
+  { h: 4.8, sun: '#a0a8ff', si: 0.8, sky: '#555594', gnd: '#36304c', hi: 0.9, fog: '#4a4a80', zen: '#1c2450', hor: '#4a4a88', rim: '#b0b8ff', lift: [0.02, 0.01, 0.08], gain: [0.95, 0.97, 1.08], sat: 1.0, night: 0.85 },
   // dawn: cool blue fill, warm peach sun only in the direct light
   { h: 6.2, sun: '#ffc8a0', si: 2.3, sky: '#a8c0f0', gnd: '#a8b098', hi: 1.2, fog: '#e0d8f0', zen: '#8aa8e8', hor: '#ffd8c0', rim: '#ffd0a8', lift: [0.015, 0.01, 0.05], gain: [1.03, 1.0, 0.97], sat: 1.1, night: 0.1 },
   { h: 8.5, sun: '#fff0d8', si: 2.9, sky: '#bcdcff', gnd: '#b4c28c', hi: 1.25, fog: '#cfe6ff', zen: '#7cc0ff', hor: '#d8f0ff', rim: '#fff0c8', lift: [0.02, 0.0, 0.05], gain: [1.03, 1.0, 0.96], sat: 1.12, night: 0 },
@@ -14,8 +14,8 @@ const K = [
   // golden hour: gold key light + cool lavender sky fill (not a global orange filter)
   { h: 18.2, sun: '#ffc070', si: 2.7, sky: '#a8b4e8', gnd: '#a8a488', hi: 1.15, fog: '#f0d8d0', zen: '#8a90d8', hor: '#ffc8a0', rim: '#ffc078', lift: [0.01, 0.005, 0.06], gain: [1.05, 1.0, 0.95], sat: 1.12, night: 0.05 },
   { h: 19.6, sun: '#e0a0c8', si: 1.3, sky: '#7a80c8', gnd: '#584860', hi: 1.12, fog: '#7a78b8', zen: '#3a3a88', hor: '#d098b8', rim: '#e8b0ff', lift: [0.02, 0.01, 0.08], gain: [0.98, 0.97, 1.05], sat: 1.05, night: 0.65 },
-  { h: 21, sun: '#8ea8ff', si: 1.0, sky: '#4a5a9a', gnd: '#2c2848', hi: 1.15, fog: '#2a3060', zen: '#10183a', hor: '#2c3a70', rim: '#9fb8ff', lift: [0.0, 0.02, 0.08], gain: [0.92, 0.97, 1.1], sat: 1.0, night: 1 },
-  { h: 24, sun: '#8ea8ff', si: 1.0, sky: '#4a5a9a', gnd: '#2c2848', hi: 1.15, fog: '#2a3060', zen: '#10183a', hor: '#2c3a70', rim: '#9fb8ff', lift: [0.0, 0.02, 0.08], gain: [0.92, 0.97, 1.1], sat: 1.0, night: 1 },
+  { h: 21, sun: '#8ea8ff', si: 0.85, sky: '#46558f', gnd: '#282442', hi: 0.88, fog: '#2a3060', zen: '#10183a', hor: '#2c3a70', rim: '#9fb8ff', lift: [0.0, 0.02, 0.08], gain: [0.92, 0.97, 1.1], sat: 1.0, night: 1 },
+  { h: 24, sun: '#8ea8ff', si: 0.85, sky: '#46558f', gnd: '#282442', hi: 0.88, fog: '#2a3060', zen: '#10183a', hor: '#2c3a70', rim: '#9fb8ff', lift: [0.0, 0.02, 0.08], gain: [0.92, 0.97, 1.1], sat: 1.0, night: 1 },
 ];
 const col = {};
 function C(hex) { return col[hex] || (col[hex] = new THREE.Color(hex)); }

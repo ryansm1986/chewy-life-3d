@@ -12,6 +12,10 @@ function pupRig() {
   }
   return cloneRig(pupTemplate);
 }
+// a throwaway pup for the dungeon prewarm: its translucent, glowing material is its own shader variant (~100 ms to compile)
+// kept for the whole session: disposing its material would release the compiled program again
+let prewarmPup = null;
+export function pupPrewarmRig() { return (prewarmPup ||= pupRig()); }
 import { makeToon, makeOutline } from '../gfx/materials.js';
 import { paint, merge } from '../gfx/geom.js';
 import { Events } from '../core/events.js';

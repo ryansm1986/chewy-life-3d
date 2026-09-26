@@ -2,6 +2,7 @@
 // timed actions with hit events, squash & stretch and hit flashes.
 import * as THREE from 'three';
 import { clamp, lerp, ease, TAU, damp } from '../core/util.js';
+import { LIFE_ACTIONS } from './lifePoses.js';
 
 // action library: dur (s), events {name: t01}, pose(t01, P, A) applies additive offsets
 const ACTIONS = {
@@ -56,9 +57,11 @@ const ACTIONS = {
   pickup: { dur: 0.45, ev: { grab: 0.4 }, pose: (t, P, A) => { const k = Math.sin(clamp(t) * Math.PI); A.body.x += 0.6 * k; A.armR.x += -1.2 * k; A.armL.x += -1.2 * k; A.sq += 0.1 * k; A.y += -0.06 * k; } },
   drink: { dur: 0.7, pose: (t, P, A) => { const k = Math.sin(clamp(t) * Math.PI); A.armR.x += -2.2 * k; A.armR.z += 0.6 * k; A.head.x += -0.35 * k; A.eyesHappy = k > 0.5 ? 1 : 0; } },
   dig: { dur: 0.9, pose: (t, P, A) => { const s = Math.sin(t * 26); A.body.x += 0.55; A.armR.x += -1.2 + s * 0.7; A.armL.x += -1.2 - s * 0.7; A.sq += 0.06; A.tailWag = 2.5; } },
-  sit: { dur: 99, hold: true, pose: (t, P, A) => { const k = ease.outQuad(clamp(t / 0.3)); A.y += -0.12 * k; A.legL.x += -1.4 * k; A.legR.x += -1.4 * k; A.sq += 0.04 * k; } },
+  sit: { dur: 99, hold: true, pose: (t, P, A) => { if (P.legs) return; /* quadrupeds sit in poseQuad */ const k = ease.outQuad(clamp(t / 0.3)); A.y += -0.12 * k; A.legL.x += -1.4 * k; A.legR.x += -1.4 * k; A.sq += 0.04 * k; } },
   spin: { dur: 99, hold: true, pose: (t, P, A) => { A.spin = t * 16; A.armR.z += 1.4; A.armL.z += -1.4; A.armR.x += -0.2; } },
 };
+// villager daily-life poses (bench sitting, chores, chat gestures, idle fidgets) live in lifePoses.js
+for (const k in LIFE_ACTIONS) if (!ACTIONS[k]) ACTIONS[k] = LIFE_ACTIONS[k];
 export { ACTIONS };
 
 const zero = () => ({ x: 0, y: 0, z: 0 });
@@ -173,10 +176,15 @@ export class Animator {
     const sitting = this.action?.name === 'sit';
     this._set(FL, s * amp, 0, 0); this._set(BR, s * amp, 0, 0);
     this._set(FR, -s * amp, 0, 0); this._set(BL, -s * amp, 0, 0);
-    if (this.action?.name === 'sit') { const k = Math.min(1, this.action.t / 0.3); this._set(BL, -1.4 * k, 0, 0); this._set(BR, -1.4 * k, 0, 0); A.y -= 0.08 * k; A.body.x -= 0.5 * k; }
+    // sit: the body pitches up at the front so the rump settles onto the ground (only the body drops, the front paws stay
+    // planted), the haunches come down and the hind legs fold forward along the ground; the head counter-tilts to look ahead
+    const sk = sitting ? ease.outQuad(Math.min(1, this.action.t / 0.3)) : 0;
+    for (const L of [BL, BR]) L.position.y = this.rest.get(L).p.y - 0.17 * sk;
+    if (sk) { this._set(BL, -1.45 * sk, 0, 0); this._set(BR, -1.45 * sk, 0, 0); A.body.x -= 0.5 * sk; A.head.x += 0.38 * sk; }
     const rb = this.rest.get(P.body);
     const bob = Math.abs(Math.sin(ph));
-    P.body.position.y = rb.p.y + bob * 0.03 * mv + Math.sin(t * 2.4) * 0.006 + A.y;
+    // A.y already lifts/lowers the whole rig through rig.offsetY (as for bipeds), so it is not added to the body again
+    P.body.position.y = rb.p.y + bob * 0.03 * mv + Math.sin(t * 2.4) * 0.006 - 0.045 * sk;
     P.body.rotation.set(rb.r.x + A.body.x + Math.sin(ph * 2) * 0.03 * mv, A.body.y, Math.sin(ph) * 0.04 * mv);
     this._set(P.head, Math.sin(ph * 2) * 0.05 * mv + A.head.x + Math.sin(t * 0.8) * 0.03, Math.sin(t * 0.43) * 0.25 * (1 - mv) + A.head.y, Math.sin(t * 0.61) * 0.08 * (1 - mv) + A.head.z);
     const sc = this.rig.spec.scale || 1, sq = A.sq;

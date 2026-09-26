@@ -1,0 +1,22 @@
+import { open } from './lib.mjs';
+const s = await open('/?fresh&nointro&hour=10', { wait: 2500 });
+await s.ev(() => {
+  G.state.flags.burrowTut = true;
+  const P = G.state.player; P.lvl = 30; P.stats = { str: 90, dex: 90, vit: 400, ene: 300 };
+  for (const id of ['chomp', 'whirl', 'bonestorm', 'blaze', 'fetchstorm', 'woof', 'packcall', 'multi', 'ricochet', 'throw', 'fetchMastery', 'boneMastery', 'dig']) P.skills[id] = 10;
+  G.actions.recompute(); P.life = null; P.zoom = null;
+  G.enterDungeon(12);
+});
+await s.sleep(5000);
+await s.ev(() => { const p = G.player.pos; let k = 0; for (const m of G.dungeon.monsters) { if (!m.alive || m.isBoss) continue; if (k++ > 45) break; const a = Math.random() * 6.28, r = 3 + Math.random() * 5; const x = p.x + Math.cos(a) * r, z = p.z + Math.sin(a) * r; if (G.world.walkable(x, z)) { m.pos.set(x, m.pos.y, z); m.aggro = true; } } });
+await s.sleep(800);
+const casts = ['fetchstorm', 'bonestorm', 'blaze', 'packcall', 'woof', 'multi'];
+const t0 = Date.now();
+const loop = (async () => { let i = 0; while (Date.now() - t0 < 6000) { const id = casts[i++ % casts.length]; await s.ev(id => { const ms = G.dungeon.monsters.filter(m => m.alive); const m = ms[0]; G.state.player.zoom = null; G.state.player.life = null; if (G.skills.cds) G.skills.cds[id] = 0; const ball = ['fetchstorm', 'blaze', 'multi'].includes(id); if ((G.derived.weaponType === 'ball') !== ball) { G.actions.swapWeapons(); G.player.setWeapon(G.derived.weaponType); } if (m) G.skills.tryCast(id, m.pos.clone(), m); }, id); await s.sleep(120); } })();
+await s.sleep(1500);
+console.log('stress fps', JSON.stringify(await s.fps(3000)), JSON.stringify(await s.stats()));
+await s.snap('38_stress_fight');
+console.log('stress fps 2nd window', JSON.stringify(await s.fps(2500)), JSON.stringify(await s.stats()));
+await loop;
+await s.log('alive', () => G.dungeon.monsters.filter(m => m.alive).length);
+await s.close();

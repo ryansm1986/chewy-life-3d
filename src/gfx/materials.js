@@ -25,6 +25,17 @@ export const U = {
 };
 export function initSharedUniforms() { U.uBrush.value = brushTexture(); }
 
+// Scenery that can hide Chewy/Shadow (buildings, trees, dungeon walls) stamps stencil 2 where it is the visible surface;
+// the characters stamp 1. The x-ray silhouette (charKit enableXray) draws only over stencil 2, so grass blades, terrain
+// and props never trigger it. Stencil state is not part of the program key, so this costs no shader variants.
+export const STENCIL_OCCLUDER = 2;
+export function markOccluder(m) {
+  if (!m || m.stencilWrite) return m;
+  m.stencilWrite = true; m.stencilRef = STENCIL_OCCLUDER; m.stencilFunc = THREE.AlwaysStencilFunc;
+  m.stencilZPass = THREE.ReplaceStencilOp; m.stencilFail = THREE.KeepStencilOp; m.stencilZFail = THREE.KeepStencilOp;
+  return m;
+}
+
 // Warm pools of lamp light on the ground and grass for every lamp in range, not just the 8 real point lights
 // (see LightPool.update). Add to outgoingLight, multiplied by the surface colour.
 export const POOL_GLSL = /* glsl */`
@@ -35,9 +46,8 @@ vec3 lightPools(vec3 wp) {
   for (int i = 0; i < 32; i++) {
     vec4 L = uPoolPos[i];
     if (L.w <= 0.0) break;
-    vec2 d = wp.xz - L.xz;
-    float f = clamp(1.0 - dot(d, d) / (L.w * L.w), 0.0, 1.0);
-    acc += uPoolCol[i] * f * f;
+    float f = clamp(1.0 - length(wp.xz - L.xz) / L.w, 0.0, 1.0);
+    acc += uPoolCol[i] * (f * f * (0.35 + 0.65 * f));  // bright heart, quick falloff: reads as a pool, not a wash
   }
   return acc;
 }
@@ -129,8 +139,9 @@ void occlusionFade(float fragDepth) {
   float r = length(d * vec2(1.0, 1.15)) / uOccl.z;
   if (r > 1.0) return;
   // clean circular cutaway (fully open inside) with a thin dithered rim, only for surfaces in front of Chewy
-  float front = smoothstep(0.8, 2.0, uOccl.w - fragDepth);
-  float k = smoothstep(1.0, 0.93, r) * front;
+  // in front of Chewy or not: a near-binary test, so sloped walls/roofs get a clean cut instead of a dithered half-disc
+  float front = smoothstep(1.0, 1.12, uOccl.w - fragDepth);
+  float k = smoothstep(1.0, 0.96, r) * front;
   if (k > 0.97 || bayer4(gl_FragCoord.xy) < k) discard;
 }
 float cloudShadowAt(vec3 p) {
@@ -309,6 +320,7 @@ export function makeToon(o = {}) {
     mat.userData.shader = shader;
   };
   if (o.wind || o.alphaTest || o.vertexWorld) mat.userData.depthMat = makeDepth(o);
+  if (o.occluder) markOccluder(mat);
   return mat;
 }
 

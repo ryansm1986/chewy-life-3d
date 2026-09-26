@@ -16,6 +16,7 @@ import { VFX } from './gfx/vfx.js';
 import { Ambient } from './gfx/ambient.js';
 import { Combat } from './combat/combat.js';
 import { SkillRunner } from './combat/skillRunner.js';
+import { pupPrewarmRig } from './combat/allies.js';
 import { DungeonMode } from './dungeon/dungeonMode.js';
 import { GroundLoot } from './combat/groundLoot.js';
 import { newGameState, createActions } from './rpg/actions.js';
@@ -224,7 +225,9 @@ export async function boot() {
       // compile every projectile / decal material now (behind the transition) so the first skill burst doesn't hitch
       for (const kind of ['ball', 'blaze', 'fireball', 'foxfire', 'spark', 'acorn', 'firepot', 'bone', 'moonball']) combat.spawn({ team: 'ally', kind, pos: new THREE.Vector3(0, -60, 0), dir: new THREE.Vector3(1, 0, 0), speed: 1, range: 0.001 });
       vfx.decal(new THREE.Vector3(0, -60, 0), { life: 0.05 }); vfx.decal(new THREE.Vector3(0, -60, 0), { life: 0.05, additive: true });
+      const pup = pupPrewarmRig(); pup.root.position.set(0, -60, 0); world.scene.add(pup.root);
       try { engine.renderer.compile(world.scene, engine.camera); } catch (e) { /* ignore */ }
+      world.scene.remove(pup.root);
       const s = dungeon.startPos;
       player.setPos(s.x, s.z); player.moveTarget = null; shadow.setPos(s.x + 0.8, s.z + 0.8);
       combat.add(shadow); shadow.recalc();
@@ -340,11 +343,11 @@ export async function boot() {
     const w = G.world;
     if (heroWorld !== w) {
       heroWorld = w; w.scene.add(heroRing, pupRing);
-      heroLight = w._heroLight ||= w.lightPool.addSource({ pos: new THREE.Vector3(), color: new THREE.Color('#ffe2b8'), intensity: 0, radius: 7, priority: 8 });
+      heroLight = w._heroLight ||= w.lightPool.addSource({ pos: new THREE.Vector3(), color: new THREE.Color('#ffe2b8'), intensity: 0, radius: 7, priority: 8, noPool: true });
     }
     const dark = G.mode === 'dungeon' ? 1 : day.out.night;
     heroLight.pos.set(player.pos.x, player.pos.y + 2.2, player.pos.z);
-    heroLight.intensity = G.mode === 'dungeon' ? 0 : 5 * dark; // the Burrow already has its own lantern light on Chewy
+    heroLight.intensity = G.mode === 'dungeon' ? 0 : 3.6 * dark; // the Burrow already has its own lantern light on Chewy
     heroRing.position.set(player.pos.x, player.pos.y + 0.05, player.pos.z);
     heroRing.material.opacity = 0.2 * dark * (0.9 + 0.1 * Math.sin(engine.time * 2));
     pupRing.position.set(shadow.pos.x, shadow.pos.y + 0.05, shadow.pos.z);
@@ -423,9 +426,15 @@ export async function boot() {
 
   // ---- contextual hints: one-line tips from Shadow, each shown once, never blocking play
   const H = () => (G.state.flags.hints ||= {});
+  // one tip on screen at a time, none mid boss fight except the life-saving potion tip; a tip that has to wait is
+  // simply offered again on a later check (its flag is only set once it is shown)
+  let hintBusyUntil = 0;
   function hint(id, text) {
     if (H()[id] || !G.ui?.toast) return;
-    H()[id] = true;
+    const now = performance.now();
+    if (now < hintBusyUntil) return;
+    if (id !== 'potion' && G.mode === 'dungeon' && G.dungeon?.boss?.alive && G.dungeon.boss.aggro) return;
+    H()[id] = true; hintBusyUntil = now + 7500;
     G.ui.toast(text.replace(/\*/g, ''), { color: '#9fd0ff', iconURL: G.portrait('shadow'), duration: 7, sub: 'Shadow' });
     G.audio?.play?.('bark_small', { vol: 0.5 });
   }
@@ -496,8 +505,26 @@ export async function boot() {
     const rosie = npcs[0];
     player.controlLocked = true;
     rosie.talking = true; rosie.state = 'idle';
-    // side by side across the screen, both turned a little toward the camera so faces read
-    { const { f, r } = rig.groundAxes(); rosie.setPos(player.pos.x + r.x * 1.6 + f.x * 0.35, player.pos.z + r.z * 1.6 + f.z * 0.35); }
+    // side by side across the screen, both turned a little toward the camera so faces read, with Shadow in front of the
+    // pair. Pick the nearest spot where all three stand on open ground: no benches, lamps, walls or trees in the shot.
+    { const { f, r } = rig.groundAxes();
+      const clear = (x, z, rad) => {
+        for (let a = 0; a < 8; a++) for (const d of [0, rad * 0.5, rad]) {
+          const px = x + Math.cos(a * 0.785) * d, pz = z + Math.sin(a * 0.785) * d;
+          if (!G.world.walkable(px, pz) || G.world.collision.solidAt(px, pz, 0.1) || G.sim.buildingAt(px, pz)) return false;
+        }
+        return true;
+      };
+      const spots = (c) => ({ chewy: c.clone().addScaledVector(r, -0.8), rosie: c.clone().addScaledVector(r, 0.8).addScaledVector(f, 0.35), shadow: c.clone().addScaledVector(f, -1.0) });
+      let best = null;
+      for (let ring = 0; ring <= 8 && !best; ring++) for (let k = 0; k < Math.max(1, ring * 6) && !best; k++) {
+        const a = k / Math.max(1, ring * 6) * Math.PI * 2, c = player.pos.clone().add(new THREE.Vector3(Math.cos(a) * ring * 0.9, 0, Math.sin(a) * ring * 0.9));
+        const s = spots(c);
+        if (clear(s.chewy.x, s.chewy.z, 1.1) && clear(s.rosie.x, s.rosie.z, 1.1) && clear(s.shadow.x, s.shadow.z, 0.8)) best = s;
+      }
+      best ||= spots(player.pos.clone().addScaledVector(r, 0.8));
+      player.setPos(best.chewy.x, best.chewy.z); rosie.setPos(best.rosie.x, best.rosie.z);
+      shadow.setPos(best.shadow.x, best.shadow.z); shadow.hold = { x: best.shadow.x, z: best.shadow.z, face: Math.atan2(-f.x, -f.z) }; }
     rosie.faceTo(player.pos.x, player.pos.z); player.faceTo(rosie.pos.x, rosie.pos.z);
     rosie.faceBias = 0.5; player.faceTarget -= 0.5; player.facing = player.faceTarget;
     rosie.anim.play('wave'); G.vfx.emote(rosie, 'heart', 2.2);
@@ -506,7 +533,7 @@ export async function boot() {
     const pr = G.portrait('rosie');
     await G.ui.dialogue({ speaker: 'Rosie', portrait: pr, lines: ["Good morning, Chewy! ♡ Did you sleep well? Shadow did. He snored like a tiny tractor.", "Welcome to *Blossom Hollow*! The sakura are blooming and everyone is so happy you're here."] });
     await G.ui.dialogue({ speaker: 'Rosie', portrait: pr, lines: ['Walk with *WASD* or click the ground. Press *F* near friends to chat.', 'Press *B* to plan the village — paint zones for homes, shops and workshops, then watch it grow!', "And… there's something squeaky in *the Burrow* on the shrine hill. Take your Bone Sword — and your red tennis ball!"] });
-    G.introFocus = null; rig.distTarget = prevDist;
+    G.introFocus = null; rig.distTarget = prevDist; shadow.hold = null;
     rosie.talking = false; rosie.faceBias = 0; rosie.greeted = 30; rosie.state = 'idle'; rosie.t = 4;
     player.controlLocked = false;
     G.story.markTalk('rosie');

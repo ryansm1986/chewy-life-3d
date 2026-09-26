@@ -271,10 +271,10 @@ const LEAF_EDGE = {
     {
       float ndv = dot(normalize(vCWN), normalize(cameraPosition - vCWorld));
       if (ndv < 0.55) {
-        float lf = lfNoise(vCWorld * 5.5) * 0.65 + lfNoise(vCWorld * 13.0 + 7.1) * 0.35;
-        if (ndv < 0.08 + lf * 0.42) discard;
+        float lf = lfNoise(vCWorld * 3.2) * 0.75 + lfNoise(vCWorld * 7.5 + 7.1) * 0.25;
+        if (ndv < 0.04 + lf * 0.3) discard;
         // leaf lobes near the edge catch a little more light, like painted highlights on leaf tips
-        diffuseColor.rgb *= 1.0 + smoothstep(0.55, 0.2, ndv) * (lf - 0.4) * 0.35;
+        diffuseColor.rgb *= 1.0 + smoothstep(0.45, 0.15, ndv) * lf * 0.22;
       }
       // painted florets / leaf clusters: darker, more saturated gaps; domed, slightly varied clusters
       vec3 fl = floretSample(vCWorld * 0.2, normalize(vCWN));
@@ -426,7 +426,7 @@ export class Vegetation {
       const spots = treeSpots[kind]; if (!spots.length) continue;
       const S = TREE_SPECIES[kind];
       const variants = [0, 1, 2].map(v => { const t = buildTree(kind, v + 1); return [t.trunkGeo, t.foliage, t.cardGeo]; });
-      const cardB = this.batch('cards:' + kind, vegToon({ occluder: true, noShadowCast: true, vertexColors: true, wind: 'leaf', map: leafCardTexture(S.leaf), alphaTest: 0.42, side: THREE.DoubleSide, noFlip: true, brush: 0.12, rim: 0.55, shadowSat: 0.5, term: [-0.15, 0.4] }), { castShadow: false });
+      const cardB = this.batch('cards:' + kind, vegToon({ occluder: true, noShadowCast: true, vertexColors: true, wind: 'leaf', map: leafCardTexture(S.leaf), alphaTest: 0.42, side: THREE.DoubleSide, noFlip: true, brush: 0.12, rim: 0.55, shadowSat: 0.3, term: [-0.45, 0.35] }), { castShadow: false });
       const pl = spots.map(sp => ({ x: sp.x, z: sp.z, y: H(sp.x, sp.z), rot: rnd() * TAU, s: 0.85 + rnd() * 0.4, v: Math.floor(rnd() * 3), hue: [0.92 + rnd() * 0.16, 0.92 + rnd() * 0.12, 0.92 + rnd() * 0.12] }));
       this._place(variants, [barkB, folB, cardB], pl, { kind, collide: S.radius });
     }
