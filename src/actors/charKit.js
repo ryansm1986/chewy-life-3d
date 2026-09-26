@@ -211,8 +211,6 @@ function buildHead(R, head, sp, spec, { fur, fur2, fur3, skin }) {
   const headG = new THREE.SphereGeometry(0.3, 28, 20); headG.scale(hx, hy, hz);
   paint(headG, (p, n, o) => {
     let c = C(sp.human ? skin : fur);
-    if (sp.mask && p.z > 0.1 && p.y > -0.1 && p.y < 0.08 && Math.abs(p.x) > 0.05) c = C(fur3);
-    if (sp.patches && p.z > 0.12 && p.y > -0.06 && p.y < 0.11 && Math.abs(p.x) > 0.05 && Math.abs(p.x) < 0.2) c = C('#2a2630');
     if (pat.blaze && p.z > 0.05 && Math.abs(p.x) < 0.035 + Math.max(0, -p.y) * 0.25 && p.y < 0.28) c = C('#fffaf2');
     if (pat.faceWhite && p.z > 0.12 && p.y < -0.02) c = C(fur2);
     if (spec.species === 'fox' && p.z > 0.1 && p.y < -0.04 && Math.abs(p.x) > 0.06) c = C(fur2);
@@ -239,6 +237,9 @@ function buildHead(R, head, sp, spec, { fur, fur2, fur3, skin }) {
   } else if (sp.frogEyes) {
     parts.push(curve([[-0.12, -0.08, 0.26], [0, -0.11, 0.3], [0.12, -0.08, 0.26]], 0.008, INK));
   }
+  // crisp face markings (panda eye patches, tanuki mask)
+  if (sp.patches) for (const s of [-1, 1]) parts.push(ell(0.075, 0.09, 0.03, '#2a2630', [s * 0.118, 0.035, 0.26], [0, s * 0.42, s * -0.5]));
+  if (sp.mask) for (const s of [-1, 1]) parts.push(ell(0.1, 0.065, 0.03, spec.fur3 || '#3a2c28', [s * 0.13, 0.02, 0.255], [0, s * 0.45, s * 0.25]));
   // blush
   const blush = spec.blush || '#ff9ab0';
   if (blush !== 'none') for (const s of [-1, 1]) parts.push(ell(0.048, 0.028, 0.02, blush, [s * 0.185, -0.06, 0.225], [0, s * 0.62, 0]));

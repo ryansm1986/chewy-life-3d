@@ -15,3 +15,26 @@ export const VILLAGERS = [
   { id: 'kero', anchor: { x: 67, z: 69 }, wander: 3, spec: { name: 'Kero', species: 'frog', voice: 1.1, fur: '#8ad86a', fur2: '#e8f8c8', outfit: { top: 'shirt', topColor: '#ffd24a', bottomColor: '#4a6ab0', scarf: '#e8503a' } },
     likes: ['stone', 'fish'], bio: 'Guardian of the koi pond. Very serious about lily pads.' },
 ];
+
+// Randomised townsfolk who move into homes as the village grows.
+const NAMES = ['Momo', 'Hana', 'Sora', 'Yuki', 'Kiki', 'Riku', 'Nori', 'Mugi', 'Kuri', 'Tofu', 'Azuki', 'Ume', 'Haru', 'Natsu', 'Koko', 'Pipi', 'Fuku', 'Chibi', 'Maru', 'Suzu', 'Taro', 'Mimi', 'Beni', 'Shiro'];
+const SPECIES = [
+  ['cat', ['#fff4ea', '#f4a860', '#8a8a9a', '#3a3440', '#ffd8a8']], ['bunny', ['#ffffff', '#e8d0c0', '#b8a898']], ['bear', ['#a86a44', '#d8a878', '#6a4a3a']],
+  ['fox', ['#ff9a4a', '#f4d0a0']], ['panda', ['#fbf8f4']], ['tanuki', ['#a08070']], ['frog', ['#8ad86a', '#6ac8a0', '#b8e070']], ['duck', ['#fff8ec', '#ffe8a0']], ['dog', ['#e8c89a', '#fff4ea', '#9a6a4a', '#3a3036']],
+];
+const TOPS = ['shirt', 'kimono', 'overalls', 'gi', 'dress'];
+const COLORS = ['#ff8fb0', '#8fd0ff', '#ffd24a', '#8fe0c0', '#c8a8ff', '#ff9a6a', '#6a8aff', '#ff6a7a', '#a0d060', '#f4f0e8'];
+const HATS = [null, null, null, 'straw', 'beret', 'flower', 'bandana', 'leaf'];
+export function randomVillagerSpec(rng = Math.random) {
+  const pick = a => a[Math.floor(rng() * a.length)];
+  const [species, furs] = pick(SPECIES);
+  const fur = pick(furs);
+  const top = pick(TOPS);
+  const spec = {
+    name: pick(NAMES), species, fur, fur2: '#fff8f0', voice: 0.8 + rng() * 0.8, seed: Math.floor(rng() * 1e6),
+    outfit: { top, topColor: pick(COLORS), topColor2: '#ffffff', bottomColor: pick(['#4a4a6a', '#6a4a3a', '#3a5a8a', '#5a3a5a']), bottom: rng() < 0.3 ? 'shorts' : undefined, hat: pick(HATS), hatColor: pick(COLORS), sash: top === 'kimono' ? pick(COLORS) : undefined, apron: rng() < 0.12 ? '#fff6e8' : undefined },
+  };
+  if (species === 'tanuki') { spec.fur3 = '#4a3a34'; spec.earColor = '#4a3a34'; }
+  if (species === 'cat' && rng() < 0.5) spec.fur3 = pick(furs);
+  return spec;
+}

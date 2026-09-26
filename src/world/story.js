@@ -101,6 +101,26 @@ export class Story {
     if (d.next) setTimeout(() => this.start(d.next), 2500);
     Events.emit('quest:update');
   }
+  // quest objects for the UI tracker / journal
+  uiList() {
+    const G = this.G, st = G.state;
+    const stepView = (q, s, i) => {
+      const done = i < q.step;
+      let have = 0, need = s.n || 1;
+      if (i === q.step) {
+        if (s.type === 'collect') have = st.materials[s.mat] || 0;
+        else if (s.type === 'build') have = st.village.buildings.filter(b => b.type === s.btype).length;
+        else if (s.type === 'buildAny') have = st.village.buildings.filter(b => s.btypes.includes(b.type)).length - (q.base || 0);
+        else if (s.type === 'pop') have = G.sim?.stats.population || 0;
+        else if (s.type === 'floor') have = Math.min(s.n, st.dungeon.deepest || 0);
+        else have = q.prog || 0;
+      }
+      return { text: s.text, have: done ? need : Math.min(need, have), need, done };
+    };
+    const act = this.Q.active.map(q => { const d = this.def(q.id); if (!d) return null; return { id: q.id, title: d.title, desc: d.desc, giver: this.nameOf(d.giver), main: !d.request, steps: d.steps.map((s, i) => stepView(q, s, i)).slice(0, q.step + 1), reward: d.reward }; }).filter(Boolean);
+    const done = this.Q.done.filter(id => QUESTS[id]).map(id => ({ id, title: QUESTS[id].title, desc: QUESTS[id].desc, giver: this.nameOf(QUESTS[id].giver), main: true, steps: QUESTS[id].steps.map(s => ({ text: s.text, have: 1, need: 1, done: true })), reward: QUESTS[id].reward, done: true }));
+    return act; // (completed quests live in state.quests.done)
+  }
   // ------------------------------------------------------------------ friendship
   friend(id) { return (this.G.state.friends[id] ||= { hearts: 0, pts: 0, talkedDay: 0, giftDay: 0, rewards: [] }); }
   addHearts(id, pts) {
@@ -118,7 +138,7 @@ export class Story {
   // full conversation flow for a villager
   async talk(npc) {
     const G = this.G, ui = G.ui, id = npc.id, f = this.friend(id), day = G.day?.day || 1;
-    const portrait = ui?.portraits?.get?.(id);
+    const portrait = G.portrait?.(id);
     const say = (lines, choices) => ui?.dialogue ? ui.dialogue({ speaker: npc.name, portrait, lines, choices, voice: npc.spec.voice }) : Promise.resolve(null);
     if (f.talkedDay !== day) { f.talkedDay = day; this.addHearts(id, 2); }
     // story talk steps
@@ -131,6 +151,7 @@ export class Story {
       if (R.item) G.actions.pickup(generateItem({ ilvl: G.state.player.lvl + 2, rarity: R.item }));
       Events.emit('sfx', 'ui_quest');
     }
+    if (npc.folk) { await say([pick(['Blossom Hollow is the coziest village ever!', 'I just moved in! My new home smells like fresh cedar.', 'Have you seen the koi pond? So peaceful.', 'The Burrow gives me the shivers… you are so brave, Chewy!', 'I love the lanterns at night.', 'Shadow let me pet him! Best day ever.'])]); return; }
     const lines = [];
     const quest = this.Q.active.find(q => this.def(q.id)?.giver === id);
     if (id === 'rosie' && quest) lines.push(this.def(quest.id).desc);

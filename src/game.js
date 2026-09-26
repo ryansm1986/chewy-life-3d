@@ -9,7 +9,7 @@ import { Player } from './actors/player.js';
 import { Companion } from './actors/companion.js';
 import { Villager } from './actors/npc.js';
 import { CAST } from './actors/charKit.js';
-import { VILLAGERS } from './actors/roster.js';
+import { VILLAGERS, randomVillagerSpec } from './actors/roster.js';
 import { U } from './gfx/materials.js';
 import { VFX } from './gfx/vfx.js';
 import { Ambient } from './gfx/ambient.js';
@@ -21,6 +21,9 @@ import { skillRuntime } from './rpg/skills.js';
 import { VillageSim } from './world/village.js';
 import { BuildMode } from './world/buildMode.js';
 import { Story } from './world/story.js';
+import { Portraits } from './gfx/portraits.js';
+import { installServices } from './world/services.js';
+import { VillageMinimap, DungeonMinimap } from './world/minimap.js';
 
 async function tryImport(path) { try { return await import(/* @vite-ignore */ path); } catch (e) { console.warn('[boot] optional module missing', path, e.message); return null; } }
 
@@ -70,6 +73,27 @@ export async function boot() {
   rosie.speed = 1.8; npcs.push(rosie);
   for (const v of VILLAGERS) npcs.push(new Villager(village, G, v.spec, { id: v.id, anchor: v.anchor, wander: v.wander || 5 }));
   const skills = G.skills = new SkillRunner(G);
+  const portraits = new Portraits(engine);
+  for (const v of VILLAGERS) portraits.register(v.id, v.spec);
+  G.portrait = (id) => portraits.get(id);
+  // townsfolk move in as homes fill up (capped for performance)
+  const folk = [];
+  function syncTownsfolk() {
+    const homes = sim.list.filter(r => r.data.type === 'home' && (r.data.residents || 0) > 0);
+    const want = Math.min(16, Math.max(0, Math.round(sim.stats.population * 0.6) - 4));
+    while (folk.length < want && homes.length) {
+      const h = homes[folk.length % homes.length];
+      const spec = randomVillagerSpec();
+      const anchors = [L.plaza, ...sim.list.filter(r => r.data.type === 'shop').map(r => ({ x: r.door.x, z: r.door.z }))];
+      const a = anchors[Math.floor(Math.random() * anchors.length)];
+      const v = new Villager(village, G, spec, { id: 'folk' + folk.length, anchor: { x: a.x, z: a.z }, home: h.door.clone(), wander: 6 });
+      v.setPos(h.door.x, h.door.z); v.folk = true; portraits.register(v.id, spec);
+      v.interact.label = `Chat with ${spec.name}`;
+      folk.push(v); npcs.push(v);
+      if (G.mode === 'village') G.vfx.emote(v, 'heart', 2);
+    }
+  }
+  setInterval(syncTownsfolk, 8000); setTimeout(syncTownsfolk, 1500);
 
   // fallback gate interaction if the Burrow landmark is missing
   if (!sim.S.buildings.some(b => b.type === 'dungeonGate')) village.interactables.push({ pos: new THREE.Vector3(L.dungeon.x, village.heightAt(L.dungeon.x, L.dungeon.z), L.dungeon.z + 1.6), radius: 1.8, label: 'Enter the Burrow', onInteract: () => G.openBurrowMenu() });
@@ -114,6 +138,7 @@ export async function boot() {
       combat.add(shadow); shadow.recalc();
       rig.focus.copy(player.pos); rig.snap();
       G.ui?.setMode?.('dungeon');
+      G.ui?.minimap?.setProvider?.(new DungeonMinimap(G, dungeon));
       G.audio?.music?.(dungeon.layout.boss ? 'boss' : 'dungeon'); G.audio?.ambience?.('dungeon');
       Events.emit('mode:changed', { mode: 'dungeon', floor });
       save();
@@ -131,9 +156,10 @@ export async function boot() {
       player.anim.stop(); G.playerDead = false; G.actions.restoreAll(); shadow.fainted = 0; shadow.untargetable = false; shadow.anim.stop();
       rig.focus.copy(player.pos); rig.snap();
       G.ui?.setMode?.('village'); G.ui?.setBoss?.(null);
+      G.ui?.minimap?.setProvider?.(vMap);
       G.audio?.music?.(day.isNight() ? 'village_night' : 'village_day'); G.audio?.ambience?.(day.isNight() ? 'night' : 'village');
       Events.emit('mode:changed', { mode: 'village' });
-      if (dead) setTimeout(() => G.ui?.dialogue?.({ speaker: 'Rosie', portrait: G.ui?.portraits?.get?.('rosie'), lines: ['Chewy! Shadow dragged you all the way home by your scarf!', "Let's patch you up. Maybe bring more Heart Treats next time, okay?"] }), 900);
+      if (dead) setTimeout(() => G.ui?.dialogue?.({ speaker: 'Rosie', portrait: G.portrait('rosie'), lines: ['Chewy! Shadow dragged you all the way home by your scarf!', "Let's patch you up. Maybe bring more Heart Treats next time, okay?"] }), 900);
       save();
     };
     if (G.ui?.transition) G.ui.transition(go); else go();
@@ -162,6 +188,11 @@ export async function boot() {
 
   // ---- interaction helpers
   G.story = new Story(G);
+  G.ui?.setQuestProvider?.(() => G.story.uiList());
+  installServices(G);
+  const vMap = new VillageMinimap(G);
+  Events.on('village:changed', () => { vMap.dirty = true; });
+  G.ui?.minimap?.setProvider?.(vMap);
   G.talkTo = (npc) => {
     if (npc.talking) return;
     npc.talking = true; player.controlLocked = true;
