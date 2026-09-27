@@ -107,6 +107,45 @@ export function ksBuffer(sr, midi, kind = 'koto') {
   });
 }
 
+// Kitchenware one-shots (Oni's Kitchen): rendered once in JS (sum of decaying inharmonic partials + a filtered
+// noise transient) and cached per sample rate, so dense pot-and-pan percussion costs 2 nodes per hit.
+//   parts [[ratio, amp, decay s], ...]   click [level, decay s, one-pole coefficient]   hiss [level, decay s] (bright noise tail)
+const HITS = {
+  pot: { base: 196, dur: 0.8, parts: [[1, 1, 0.38], [1.51, 0.5, 0.22], [2.13, 0.32, 0.14], [2.94, 0.18, 0.08], [4.07, 0.07, 0.05]], click: [0.35, 0.006, 0.35], bend: -0.04 },
+  pan: { base: 523, dur: 0.7, parts: [[1, 1, 0.26], [1.93, 0.45, 0.17], [3.01, 0.26, 0.09], [4.52, 0.12, 0.05]], click: [0.4, 0.004, 0.6] },
+  lid: { base: 740, dur: 1.1, parts: [[1, 0.35, 0.5], [1.37, 0.3, 0.42], [2.21, 0.26, 0.3], [3.17, 0.2, 0.22], [4.4, 0.14, 0.16]], click: [0.25, 0.01, 0.8], hiss: [0.35, 0.28] },
+  spoon: { base: 1150, dur: 0.09, parts: [[1, 1, 0.016], [1.62, 0.45, 0.01]], click: [0.5, 0.003, 0.7] },
+  bowl: { base: 330, dur: 5, parts: [[1, 1, 2.6], [1.004, 0.8, 2.6], [2.71, 0.35, 1.2], [2.716, 0.25, 1.2], [5.1, 0.1, 0.5]], click: [0.05, 0.004, 0.3] },
+};
+export const HIT_BASE = Object.fromEntries(Object.entries(HITS).map(([k, v]) => [k, v.base]));
+export function hitBuffer(sr, kind) {
+  return cached(`hit|${sr}|${kind}`, () => {
+    const H = HITS[kind], len = Math.floor(sr * H.dur), d = new Float32Array(len), rng = mulberry32(kind.length * 977 + 13);
+    const atk = Math.floor(sr * 0.0015);
+    for (const [r, a, dec] of H.parts) {
+      const w = (2 * Math.PI * H.base * r) / sr, k = Math.exp(-1 / (dec * sr)), ph0 = rng() * 6.283;
+      let e = a, ph = ph0;
+      for (let i = 0; i < len; i++) {
+        const bend = H.bend ? 1 + H.bend * Math.exp(-i / (sr * 0.03)) : 1;
+        ph += w * bend; d[i] += Math.sin(ph) * e * (i < atk ? i / atk : 1); e *= k;
+        if (e < 1e-5) break;
+      }
+    }
+    if (H.click) {
+      const [lvl, dec, c] = H.click, k = Math.exp(-1 / (dec * sr)); let e = lvl, lp = 0;
+      for (let i = 0; i < len && e > 1e-5; i++) { lp += c * ((rng() * 2 - 1) - lp); d[i] += lp * e; e *= k; }
+    }
+    if (H.hiss) {
+      const [lvl, dec] = H.hiss, k = Math.exp(-1 / (dec * sr)); let e = lvl, prev = 0;
+      for (let i = 0; i < len && e > 1e-5; i++) { const w = rng() * 2 - 1; d[i] += (w - prev) * 0.5 * e * (i < atk * 4 ? i / (atk * 4) : 1); prev = w; e *= k; }
+    }
+    let pk = 0; for (let i = 0; i < len; i++) pk = Math.max(pk, Math.abs(d[i]));
+    const g = 0.9 / (pk || 1), fade = Math.floor(sr * 0.02);
+    for (let i = 0; i < len; i++) d[i] *= g * (i > len - fade ? (len - i) / fade : 1);
+    const b = makeBuffer(sr, len); b.copyToChannel(d, 0); return b;
+  });
+}
+
 // ------------------------------------------------------------------------------------------ mix graph
 // master:  buses → masterIn → hp 28Hz → master vol → mute → compressor → soft clip → destination
 // music:   musicIn → duck → lowpass 7.5k → music vol → masterIn     (hall reverb returns into musicIn)

@@ -64,7 +64,7 @@ export class QuestPanel extends Panel {
     this.body.innerHTML = `<div class="tabs q-tabs"><button class="tab on" data-t="active">${glyph('scroll')}Active <b class="tab-n">0</b></button><button class="tab" data-t="done">${glyph('check')}Done <b class="tab-n">0</b></button></div>
       <div class="q-wrap"><div class="q-list"></div><div class="q-detail"></div></div>`;
     this.$ = { list: this.body.querySelector('.q-list'), det: this.body.querySelector('.q-detail') };
-    this.body.querySelector('.q-tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (t) { this.tab = t.dataset.t; this.sel = null; this._sig = null; this.render(); } });
+    this.body.querySelector('.q-tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (t) { if (t.dataset.t !== this.tab) this.ui.sfx?.('tab'); this.tab = t.dataset.t; this.sel = null; this._sig = null; this.render(); } });
     this.$.list.addEventListener('click', e => { const q = e.target.closest('.q-item'); if (q) { this.sel = q.dataset.id; this._sig = null; this.render(); this.ui.sfx?.('tab'); } });
   }
   render() {

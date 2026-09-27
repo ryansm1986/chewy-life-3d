@@ -2,9 +2,9 @@
 // Buttons for every SFX / music track / ambience, volume sliders, babble tester, stress + positional demos.
 // window.renderCheck() renders everything with an OfflineAudioContext and reports peak / RMS / duration /
 // spectral centroid / high-frequency energy, flagging silent, clipping, overly long or harsh sounds.
-import { Audio, renderOffline, SFX_GROUPS, SFX_NAMES, TRACK_NAMES, AMBIENCE_NAMES, BABBLE_VOICES, DEFAULT_VOLUMES, gibberish } from '../audio/audio.js';
+import { Audio, renderOffline, SFX_GROUPS, SFX_NAMES, TRACK_NAMES, STING_NAMES, AMBIENCE_NAMES, BABBLE_VOICES, DEFAULT_VOLUMES, gibberish } from '../audio/audio.js';
 
-const LONG_OK = { player_die: 3.2, ghost_wail: 2.6, howl: 2.6, portal: 2.8, build_complete: 2.8, ui_levelup: 2.8, waypoint: 2.8, villager_chatter: 3.5, pickup_rare: 2.6, chest_open: 2.6, ui_quest: 2.6 };
+const LONG_OK = { player_die: 3.2, ghost_wail: 2.6, howl: 2.6, portal: 2.8, build_complete: 2.8, ui_levelup: 2.8, waypoint: 2.8, villager_chatter: 3.5, pickup_rare: 2.6, chest_open: 2.6, ui_quest: 2.6, ui_quest_done: 2.6, pickup_unique: 2.8, victory_sfx: 2.8 };
 
 export default function () {
   document.title = 'Chewy Life 3D — Audio';
@@ -55,8 +55,14 @@ export default function () {
   const mus = el('div', { className: 'card row' }), musBtns = {};
   for (const t of TRACK_NAMES) mus.append(musBtns[t] = btn(t, () => { Audio.music(t, { fade: 2 }); hl(); }));
   mus.append(btn('stop', () => { Audio.music(null, { fade: 1.5 }); hl(); }), btn('duck 1.5s', () => Audio.duck(0.3, 1.5)));
-  const hl = () => { for (const [k, b] of Object.entries(musBtns)) b.classList.toggle('on', Audio.currentTrack === k); for (const [k, b] of Object.entries(ambBtns)) b.classList.toggle('on', Audio.currentAmbience === k); };
-  main.append(el('h2', { textContent: 'Music (generative, crossfading)' }), mus);
+  const hl = () => { for (const [k, b] of Object.entries(musBtns)) b.classList.toggle('on', Audio.currentTrack === k); for (const [k, b] of Object.entries(ambBtns)) b.classList.toggle('on', Audio.currentAmbience === k); for (const [k, b] of Object.entries(intBtns)) b.classList.toggle('on', String(Audio.forcedIntensity) === k); };
+  // intensity (combat layer on the Burrow themes; phase 2 / enrage on boss themes) + stings
+  const intRow = el('div', { className: 'card row' }), intBtns = {};
+  intRow.append(el('b', { textContent: 'intensity' }));
+  for (const [k, n] of [['null', 'follow game'], ['0', 'calm'], ['1', 'combat / phase 2'], ['2', 'enraged']]) intRow.append(intBtns[k] = btn(n, () => { Audio.setIntensity(k === 'null' ? null : +k); hl(); }));
+  intRow.append(el('b', { textContent: ' stings' }));
+  for (const s of STING_NAMES) intRow.append(btn(s, () => Audio.sting(s), 'big'));
+  main.append(el('h2', { textContent: 'Music (generative, crossfading)' }), mus, intRow);
 
   // ---- ambience
   const amb = el('div', { className: 'card row' }), ambBtns = {};
@@ -194,11 +200,18 @@ async function renderCheck(opts = {}) {
     add('babble', 'line', buffer, a, flags);
   }
   if (opts.music !== false && !opts.only) {
-    for (const t of TRACK_NAMES) for (const skip of [0, 6]) {
-      const { buffer } = await renderOffline('music', t, { seconds: opts.musicSeconds || 8, chain: opts.chain || 'raw', opts: { skip } });
+    const { TRACKS } = await import('../audio/music.js');
+    for (const t of TRACK_NAMES) for (const skip of [0, 6]) for (let intensity = 0; intensity <= (skip ? TRACKS[t].maxIntensity || 0 : 0); intensity++) {
+      const { buffer } = await renderOffline('music', t, { seconds: opts.musicSeconds || 8, chain: opts.chain || 'raw', opts: { skip, intensity } });
       const a = analyze(buffer), flags = [];
       if (a.rms < 0.02) flags.push('QUIET'); if (a.peak > 0.99) flags.push('CLIP'); if (a.hf > 0.3) flags.push('HARSH');
-      add('music', skip ? `${t}@${skip}` : t, buffer, a, flags);
+      add('music', `${t}${skip ? '@' + skip : ''}${intensity ? '!' + intensity : ''}`, buffer, a, flags);
+    }
+    for (const s of STING_NAMES) {
+      const { buffer } = await renderOffline('sting', s, { chain: opts.chain || 'raw' });
+      const a = analyze(buffer), flags = [];
+      if (a.peak < 0.05) flags.push('QUIET'); if (a.peak > 0.99) flags.push('CLIP'); if (a.hf > 0.3) flags.push('HARSH');
+      add('music', `sting:${s}`, buffer, a, flags);
     }
   }
   if (opts.ambience !== false && !opts.only) {

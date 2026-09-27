@@ -1,7 +1,7 @@
 // Ambience beds: continuous filtered-noise layers (wind, stream, rumble) + randomly scheduled events
 // (birds, furin wind chimes, crickets, frogs, owl, bubbles, drips...). Deterministic for a given seed so the
 // offline render check can drive it synchronously.
-import { Voice, noiseBuffer, mulberry32 } from './core.js';
+import { Voice, noiseBuffer, mulberry32, hitBuffer, HIT_BASE } from './core.js';
 
 export class AmbiencePlayer {
   constructor(graph, name, { seed, start } = {}) {
@@ -117,8 +117,22 @@ function wind(A, { gain, lp, gust = [1.5, 4], rustle = 0.05, chimes = true }) {
   }, 0.01);
 }
 
+// Distant kitchenware (cached one-shot buffer, re-pitched), panned and sent to the reverb.
+function clank(A, t, kind, v, pan) {
+  const c = A.ctx, src = c.createBufferSource(), g = c.createGain(), p = c.createStereoPanner(), s = c.createGain();
+  src.buffer = hitBuffer(c.sampleRate, kind); src.playbackRate.value = A.r(0.8, 1.25);
+  g.gain.value = v; p.pan.value = pan; s.gain.value = 0.9;
+  src.connect(g); g.connect(p); p.connect(A.out); p.connect(s); s.connect(A.rev);
+  src.start(t);
+}
+// A breathy swell of air through a narrow band (shrine torii, fox whispers, glass resonance).
+function swell(A, t, { f0, f1, q = 7, len = 4, v = 0.2, color = 'pink', rev = 0.6 }) {
+  const s = A.voice(t);
+  s.noise({ pts: [[0, f0], [len * 0.5, f1], [len, f0 * 0.9]], q, a: len * 0.4, h: len * 0.2, d: len * 0.4, lin: true, v, color, rev, pan: A.r(-0.6, 0.6) });
+}
+
 // Output trims so the beds sit at similar perceived loudness (calibrated with the render check).
-const AMB_GAIN = { village: 1.2, night: 1.8, water: 1, dungeon: 1.4 };
+const AMB_GAIN = { village: 1.2, night: 1.8, water: 1, dungeon: 1.4, dungeon_shrine: 1.4, dungeon_kitchen: 1.3, dungeon_crystal: 1.5, dungeon_moon: 1.7 };
 
 export const AMBIENCES = {
   village(A) {
@@ -179,6 +193,61 @@ export const AMBIENCES = {
       s.noise({ pts: [[0, 260], [2, 420], [4, 230]], q: 7, a: 1.5, h: 1, d: 1.5, lin: true, v: 0.26, color: 'pink', rev: 0.6, pan: A.r(-0.5, 0.5) });
     }, 6);
   },
+  // Fox Shrine Tunnels: a breeze through the torii, far-off furin, a deep temple bell now and then, creaking wood.
+  dungeon_shrine(A) {
+    A.bed({ color: 'brown', filters: [['lowpass', 140, 0]], gain: 0.22 });
+    wind(A, { gain: 0.07, lp: 650, gust: [3, 7], rustle: 0.015, chimes: false });
+    A.every(7, 16, t => furin(A, t), 3);
+    A.every(2.5, 6, t => drip(A, t, 0.06), 1.5);
+    A.every(22, 40, t => { const s = A.voice(t); s.bell({ f: A.r(146, 165), d: 5, v: 0.05, partials: [[1, 1, 1], [2.71, 0.4, 0.5], [5.2, 0.12, 0.25]], rev: 0.7, pan: A.r(-0.5, 0.5) }); }, 8);
+    A.every(12, 26, t => { const s = A.voice(t), f = A.r(260, 380); s.tone({ pts: [[0, f], [0.35, f * 0.8]], type: 'sawtooth', a: 0.05, h: 0.25, d: 0.1, v: 0.018, bp: 700, bq: 5, am: [22, 0.6], rev: 0.4, pan: A.r(-0.7, 0.7) }); }, 5);
+    A.every(15, 30, t => swell(A, t, { f0: 500, f1: 760, q: 8, len: 3.5, v: 0.16 }), 9);
+  },
+  // Oni's Kitchen: warm hearth rumble, crackling fire, a bubbling stew pot, sizzle, far-off pot clanks.
+  dungeon_kitchen(A) {
+    const rum = A.bed({ color: 'brown', filters: [['lowpass', 170, 0]], gain: 0.26 });
+    const siz = A.bed({ color: 'white', filters: [['highpass', 3800, 0], ['lowpass', 8000, 0]], gain: 0.006, pan: -0.3 });
+    A.every(2, 5, t => { rum.g.gain.setTargetAtTime(A.r(0.2, 0.32), t, 1.2); siz.g.gain.setTargetAtTime(A.r(0.002, 0.009), t, 0.8); }, 0.01);
+    A.every(0.06, 0.5, t => { const s = A.voice(t); s.noise({ f: A.r(1800, 4200), q: 3, a: 0.001, d: A.r(0.006, 0.02), v: A.r(0.03, 0.09), pan: A.r(-0.4, 0.1) }); }, 0.2);
+    A.every(1.5, 4, t => { // the stew: a cluster of round bubbles
+      const s = A.voice(t), n = 3 + ((A.rng() * 5) | 0), pan = A.r(0.1, 0.6); let at = 0;
+      for (let i = 0; i < n; i++) { const f = A.r(200, 480); s.tone({ at, pts: [[0, f], [0.05, f * A.r(1.5, 2.1)]], a: 0.004, d: 0.07, v: A.r(0.05, 0.1), pan, rev: 0.2, lp: 2000 }); at += A.r(0.05, 0.22); }
+    }, 0.6);
+    A.every(8, 18, t => clank(A, t, A.rng() < 0.6 ? 'pot' : 'pan', A.r(0.035, 0.06), A.r(-0.8, 0.8)), 4);
+    A.every(18, 35, t => swell(A, t, { f0: 180, f1: 320, q: 5, len: 3, v: 0.14, color: 'brown' }), 10);
+  },
+  // Crystal Grotto: thin cold air, glassy drips in a huge space, shimmering chime clusters, resonant glass swells.
+  dungeon_crystal(A) {
+    A.bed({ color: 'brown', filters: [['lowpass', 100, 0]], gain: 0.2 });
+    const air = A.bed({ color: 'pink', filters: [['bandpass', 1100, 1.5]], gain: 0.018, rev: 0.6 });
+    A.every(3, 7, t => air.f[0].frequency.setTargetAtTime(A.r(800, 1600), t, 2), 0.01);
+    A.every(0.8, 3, t => drip(A, t, 0.07), 0.3);
+    const E = [1319, 1480, 1661, 1865, 1976, 2489, 2637, 2960];
+    A.every(5, 12, t => {
+      const s = A.voice(t), n = 2 + ((A.rng() * 4) | 0), pan = A.r(-0.7, 0.7); let at = 0;
+      for (let i = 0; i < n; i++) { s.bell({ at, f: E[(A.rng() * E.length) | 0], d: A.r(1.5, 2.8), v: 0.022, pan, rev: 0.8, partials: [[1, 1, 1], [2.32, 0.3, 0.5], [4.25, 0.1, 0.3]] }); at += A.r(0.08, 0.35); }
+    }, 2);
+    A.every(12, 24, t => swell(A, t, { f0: A.r(1200, 1700), f1: A.r(1800, 2400), q: 18, len: 5, v: 0.12, color: 'white', rev: 0.8 }), 6);
+  },
+  // Moonlit Fox Sanctum: night breeze, bell crickets, an owl, whispering foxfire, a lone furin.
+  dungeon_moon(A) {
+    A.bed({ color: 'brown', filters: [['lowpass', 110, 0]], gain: 0.16 });
+    wind(A, { gain: 0.08, lp: 520, gust: [3, 8], rustle: 0.015, chimes: false });
+    for (let k = 0; k < 2; k++) {
+      const c = { f: A.r(4200, 5200), pan: A.r(-0.8, 0.8), pulses: 2 + k, rate: A.r(26, 36), v: A.r(0.012, 0.02) };
+      const gap = A.r(0.5, 0.9);
+      A.every(gap * 0.9, gap * 1.1, t => cricketChirp(A, t, c), A.r(0, 0.5));
+    }
+    A.every(10, 22, t => furin(A, t), 5);
+    A.every(9, 18, t => swell(A, t, { f0: A.r(700, 1000), f1: A.r(1100, 1600), q: 9, len: 3, v: 0.1, rev: 0.7 }), 4);
+    A.every(30, 55, t => { // owl
+      const s = A.voice(t), pan = A.r(-0.6, 0.6);
+      for (const [at, f, h] of [[0, 390, 0.18], [0.5, 375, 0.1], [0.72, 360, 0.25]]) s.tone({ at, pts: [[0, f * 0.96], [0.06, f]], a: 0.05, h, d: 0.18, lin: true, v: 0.03, lp: 900, pan, rev: 0.6 });
+    }, 12);
+  },
 };
+
+// Biome ambience per Burrow theme (gen.js THEMES keys).
+export const BIOME_AMBIENCES = { burrow: 'dungeon', shrine: 'dungeon_shrine', kitchen: 'dungeon_kitchen', crystal: 'dungeon_crystal', moon: 'dungeon_moon' };
 
 export const AMBIENCE_NAMES = Object.keys(AMBIENCES);

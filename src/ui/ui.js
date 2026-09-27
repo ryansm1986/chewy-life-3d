@@ -26,7 +26,7 @@ const SETTINGS_KEY = 'chewy3d.settings';
 const DEFAULT_SETTINGS = { quality: 2, music: 0.7, sfx: 0.8, uiScale: 1, shake: true, showFps: false };
 const NON_BLOCKING = new Set(['build']); // panels that don't pause gameplay input
 // UI sound names → src/audio sfx ids (learn / equip / level-up / toast sounds are already bound to game events by the audio module)
-const SFX_MAP = { open: 'ui_open', close: 'ui_close', tab: 'ui_tab', deny: 'ui_error', coin: 'ui_coin', buy: 'ui_buy', hover: 'ui_hover',
+const SFX_MAP = { open: 'ui_open', close: 'ui_close', tab: 'ui_tab', deny: 'ui_error', coin: 'ui_coin', buy: 'ui_buy', hover: 'ui_hover', equip: 'ui_equip', learn: 'ui_learn',
   select: 'ui_click', assign: 'ui_click', stat: 'ui_click', pick: 'ui_click', drop: 'ui_click', sort: 'ui_click', tick: 'ui_click', bag: 'ui_click', click: 'ui_click' };
 
 export const UI = {
@@ -257,7 +257,7 @@ export const UI = {
 
   // ------------------------------------------------------------------ messages
   toast(text, opts = {}) { if (!this.ready) return null; return this.toasts.show(text, opts); },
-  banner(title, sub = '', opts = {}) { if (!this.ready) return; this.banners.show(title, sub, opts); },
+  banner(title, sub = '', opts = {}) { if (!this.ready) return; this.banners.show(title, sub, opts); this.events.emit('ui:banner', { title, style: opts.style }); },
   float(worldPos, text, opts = {}) { if (!this.ready || !worldPos) return; this.floats.spawn(worldPos, String(text), opts); },
   dialogue(opts) { if (!this.ready) return Promise.resolve(-1); this.hidePopover(); this.tip.hide(); return this.dlg.open(opts); },
   setTarget(info) { if (this.ready) this.hud.setTarget(info); },

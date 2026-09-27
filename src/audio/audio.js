@@ -8,20 +8,36 @@
 //   Audio.ambience('village'); Audio.setAmbienceMix({ water: 0.6 });   // water = stream-proximity overlay (0..1)
 //   Audio.update(dt, { pos: player.position, camera });              // or { x, z, yaw } — positional panning / attenuation
 //   Audio.setVolume('master'|'music'|'sfx'|'ambience', 0..1); Audio.toggleMute(); Audio.duck(0.4, 1.5);
+//   Audio.sting('victory');                          // one-shot musical cue on the music bus
 //
 // Volumes are perceptual (gain = v²) and persisted in localStorage.
+//
+// Music direction (init() binds this to the core event bus — no game-side wiring needed):
+//  - music('dungeon') plays the current Burrow biome's theme (G.dungeon.layout.theme → BIOME_TRACKS); floors of the same
+//    biome keep the theme running, a new biome crossfades. ambience('dungeon') resolves the same way.
+//  - music('boss') plays the biome's boss theme once the encounter has started (boss.introDone); before that (entering a
+//    boss floor) it resolves to the biome theme, so the boss music arrives with the boss intro (boss:spawn).
+//  - boss intensity follows the fight: 1 below 66% life / first summon, 2 when enraged (polled, bar-quantised).
+//    Biome themes get a combat drive layer while a pack is hunting Chewy.
+//  - boss:dead → boss music out, victory sting, the level-up/quest fanfares that the kill triggers fold into it,
+//    then the biome theme returns.
+//  - Big SFX (level up, quest, rare loot, roars) and dialogue babble duck the music; ducks stack (deepest wins).
 import { Graph, Voice, clamp } from './core.js';
 import { SFX, SFX_NAMES, SFX_GROUPS } from './sfx.js';
-import { MusicPlayer, TRACKS, TRACK_NAMES } from './music.js';
-import { AmbiencePlayer, AMBIENCES, AMBIENCE_NAMES } from './ambience.js';
+import { MusicPlayer, TRACKS, TRACK_NAMES, STINGS, STING_NAMES, BIOME_TRACKS, BOSS_TRACKS } from './music.js';
+import { AmbiencePlayer, AMBIENCES, AMBIENCE_NAMES, BIOME_AMBIENCES } from './ambience.js';
 import { babble as synthBabble, babbleDuration, gibberish, VOICES } from './babble.js';
+import { Events as CoreEvents } from '../core/events.js';
+import { cacheStats, cacheOpts } from './instruments.js';
 
-export { SFX_NAMES, SFX_GROUPS, TRACK_NAMES, AMBIENCE_NAMES, gibberish };
+export { SFX_NAMES, SFX_GROUPS, TRACK_NAMES, STING_NAMES, AMBIENCE_NAMES, BIOME_TRACKS, BOSS_TRACKS, gibberish, cacheStats, cacheOpts };
 export const BABBLE_VOICES = Object.keys(VOICES);
 export const DEFAULT_VOLUMES = { master: 0.85, music: 0.7, sfx: 0.85, ambience: 0.65 };
 const LS_KEY = 'chewy3d.audio.v1';
 const MAX_VOICES = 28;
 const curve = v => v * v;
+const CELEBRATE = new Set(['ui_levelup', 'ui_quest_done']); // folded into the victory sting
+const gameG = () => (typeof window !== 'undefined' ? window.G : null);
 
 class AudioSystem {
   constructor() {
@@ -30,9 +46,12 @@ class AudioSystem {
     try { const s = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); if (s) { Object.assign(this.vol, s.vol || {}); this.muted = !!s.muted; } } catch { /* private mode */ }
     this.voices = []; this.lastPlay = new Map(); this.warned = new Set();
     this.listener = { x: 0, y: 0, z: 0, rx: 1, rz: 0 };
-    this.track = null; this.wantTrack = null; this.fading = [];
+    this.track = null; this.wantTrack = null; this.fading = []; this.stings = [];
     this.amb = null; this.wantAmb = null; this.water = null; this.mix = { water: 0 }; this.waterZeroAt = 0; this.waterEff = 0;
     this.babbleHandle = null; this.inited = false; this.timer = 0;
+    // director state
+    this.ducks = []; this.duckLvl = 1; this.remaps = new Map(); this.victoryUntil = 0; this.victoryShimmer = false;
+    this.returnT = 0; this.fightUntil = 0; this.forcedIntensity = null; this.biomeOverride = null; this.dirT = 0; this.unbind = null;
     this.onGesture = this.onGesture.bind(this); this.tick = this.tick.bind(this);
   }
 
@@ -40,6 +59,7 @@ class AudioSystem {
   init() {
     if (this.inited || typeof window === 'undefined') return this;
     this.inited = true; this.addGestures();
+    this.unbind = this.bindEvents(CoreEvents);
     return this;
   }
   get ready() { return !!this.ctx && this.ctx.state === 'running'; }
@@ -75,16 +95,44 @@ class AudioSystem {
     const hidden = typeof document !== 'undefined' && document.hidden;
     if (c.state === 'running') {
       const now = c.currentTime, ahead = hidden ? 2.5 : 0.5;
+      if ((this.dirT -= 1) <= 0) { this.dirT = 4; try { this.direct(now); } catch (e) { /* game state mid-teardown */ } }
       for (const p of [this.track, this.amb, this.water, ...this.fading]) {
         if (!p) continue;
         if (p.nextBar != null && p.nextBar < now - 0.05) p.resync(now);
         p.scheduleUntil(now + ahead, now);
       }
-      this.fading = this.fading.filter(p => { if (now > p.stopAt) { p.dispose(); return false; } return true; });
+      const retire = p => { if (now > p.stopAt) { p.dispose(); return false; } return true; };
+      this.fading = this.fading.filter(retire);
+      if (this.stings.length) this.stings = this.stings.filter(retire);
+      if (this.ducks.length && this.ducks.some(d => d.until <= now)) this.applyDuck(now);
       this.prune(now);
       if (this.water && this.waterEff <= 0.001 && now - this.waterZeroAt > 3) { this.water.fadeOut(now, 0.5); this.fading.push(this.water); this.water = null; }
     }
     this.timer = setTimeout(this.tick, hidden ? 250 : 60);
+  }
+  // Reads the live game (window.G) a few times a second: boss phase → boss-track intensity, a pack hunting Chewy →
+  // combat layer on the biome theme (held 5 s after the fight calms). Everything lands on the next bar line.
+  direct(now) {
+    const tr = this.track, G = gameG();
+    if (!tr || !tr.def.maxIntensity) return;
+    let lvl = 0;
+    if (G?.mode === 'dungeon' && G.dungeon) {
+      const D = G.dungeon;
+      if (tr.def.boss) {
+        const b = D.boss;
+        if (b?.alive) { const f = b.life / (b.lifeMax || 1); lvl = b.enraged || f < 0.33 ? 2 : b.summoned > 0 || f < 0.66 ? 1 : 0; }
+        else lvl = tr.wantIntensity;
+      } else {
+        const P = G.player?.pos; let n = 0;
+        if (P) for (const m of D.monsters) {
+          if (!m.alive || !m.aggro || m.def?.boss || Math.abs(m.pos.x - P.x) + Math.abs(m.pos.z - P.z) > 16) continue;
+          n += m.rank && m.rank !== 'normal' ? 2 : 1; if (n >= 2) break;
+        }
+        if (n >= 2) this.fightUntil = now + 5;
+        lvl = now < this.fightUntil ? 1 : 0;
+      }
+    }
+    tr.setIntensity(this.forcedIntensity ?? lvl);
   }
 
   // ------------------------------------------------------------------------------------------ volume
@@ -102,11 +150,32 @@ class AudioSystem {
     for (const k of Object.keys(this.vol)) { const g = this.graph.gainFor(k); if (g) g.gain.setTargetAtTime(curve(this.vol[k]), t, tc); }
     this.graph.muteG.gain.setTargetAtTime(this.muted ? 0 : 1, t, tc);
   }
-  // Temporarily lower the music (boss roars, dialogue, stingers).
+  // Temporarily lower the music (boss roars, dialogue, big stingers). Ducks stack: the deepest active one wins and
+  // the music eases back up when the last one expires (checked by the scheduler tick).
   duck(level = 0.4, dur = 1.5, attack = 0.08) {
     if (!this.ready) return;
-    const p = this.graph.duckG.gain, t = this.ctx.currentTime;
-    p.cancelScheduledValues(t); p.setTargetAtTime(level, t, attack / 3); p.setTargetAtTime(1, t + dur, 0.5);
+    const now = this.ctx.currentTime;
+    this.ducks.push({ level: clamp(level, 0, 1), until: now + dur });
+    this.applyDuck(now, attack);
+  }
+  applyDuck(now, attack = 0.08) {
+    this.ducks = this.ducks.filter(d => d.until > now);
+    const lvl = this.ducks.reduce((m, d) => Math.min(m, d.level), 1);
+    if (Math.abs(lvl - this.duckLvl) < 1e-3) return;
+    const p = this.graph.duckG.gain;
+    p.cancelScheduledValues(now); p.setValueAtTime(p.value, now);
+    p.setTargetAtTime(lvl, now, lvl < this.duckLvl ? attack / 3 : 0.45);
+    this.duckLvl = lvl;
+  }
+  // The next `from` sfx within `secs` plays as `to` instead (to = null → skipped). Used to pick a sound from game
+  // context that the emitter doesn't know about (item rarity, quest vs level-up) without double-playing.
+  remap(from, to, secs = 0.25) { this.remaps.set(from, { to, until: performance.now() + secs * 1000 }); }
+  resolveSfx(name) {
+    const now = performance.now();
+    if (now < this.victoryUntil && CELEBRATE.has(name)) { if (this.victoryShimmer) { this.victoryShimmer = false; return 'victory_sfx'; } return null; }
+    const rm = this.remaps.get(name);
+    if (rm) { this.remaps.delete(name); if (now <= rm.until) return rm.to; }
+    return name;
   }
 
   // ------------------------------------------------------------------------------------------ sfx
@@ -115,6 +184,7 @@ class AudioSystem {
   play(name, o = {}) {
     const c = this.ctx;
     if (!c || c.state !== 'running' || this.muted || this.vol.sfx <= 0 || this.vol.master <= 0) return null;
+    if (this.remaps.size || this.victoryUntil) { name = this.resolveSfx(name); if (!name) return null; }
     const def = SFX[name];
     if (!def) { if (!this.warned.has(name)) { this.warned.add(name); console.warn('[audio] unknown sfx', name); } return null; }
     const now = c.currentTime;
@@ -140,6 +210,7 @@ class AudioSystem {
     try { def.fn(s, o); } catch (e) { console.error('[audio] sfx failed', name, e); }
     const v = { name, start: t, end: s.end, ...out };
     this.voices.push(v);
+    if (def.duck && !o.pos && performance.now() >= this.victoryUntil) this.duck(def.duck[0], def.duck[1], 0.06);
     return { duration: s.end - t, stop: (fade = 0.05) => this.steal(v, c.currentTime, fade) };
   }
   voiceOut(vol, pan, lp, rev) {
@@ -199,26 +270,67 @@ class AudioSystem {
     this.voices.push(v);
     const h = { duration, stop: (fade = 0.05) => this.steal(v, c.currentTime, fade) };
     this.babbleHandle = h;
+    if (!o.pos) this.duck(0.62, duration + 0.15, 0.12); // dialogue: the music steps back while someone talks
     return h;
   }
 
   // ------------------------------------------------------------------------------------------ music
-  music(name, { fade = 2, restart = false } = {}) {
+  // 'dungeon' / 'boss' are resolved against the live Burrow floor (see the header comment).
+  resolveTrack(name) {
+    if (name !== 'dungeon' && name !== 'boss') return name;
+    const D = gameG()?.dungeon, th = this.biomeOverride || D?.layout?.theme;
+    if (name === 'boss') {
+      const b = D?.boss;
+      if (D && !(b && b.alive && b.introDone)) return BIOME_TRACKS[th] || 'dungeon';
+      return BOSS_TRACKS[th] || 'boss';
+    }
+    return BIOME_TRACKS[th] || 'dungeon';
+  }
+  music(name, { fade = 2, restart = false, internal = false } = {}) {
+    name = name ? this.resolveTrack(name) : null;
     if (name && !TRACKS[name]) { console.warn('[audio] unknown track', name); return; }
+    if (!internal && this.returnT) { clearTimeout(this.returnT); this.returnT = 0; }
     this.wantTrack = name || null;
     const c = this.ctx; if (!c || c.state !== 'running') return;
     if (!restart && (this.track ? this.track.name : null) === this.wantTrack) return;
     const now = c.currentTime;
     if (this.track) { this.track.fadeOut(now, fade); this.fading.push(this.track); this.track = null; }
+    if (!internal) for (const s of this.stings) if (s.stopAt > now + fade) s.fadeOut(now, Math.max(0.3, fade * 0.6));
     if (name) {
-      const p = new MusicPlayer(this.graph, name, { start: now + 0.08 });
+      const p = new MusicPlayer(this.graph, name, { start: now + 0.08, intensity: this.forcedIntensity ?? 0 });
       p.fadeIn(now, Math.max(0.05, fade * 0.8)); p.scheduleUntil(now + 0.5); this.track = p;
     }
   }
   stopMusic(fade = 2) { this.music(null, { fade }); }
+  // One-shot cue (STINGS) on the music bus; rings out on its own.
+  sting(name, { delay = 0 } = {}) {
+    const def = STINGS[name]; if (!def) { console.warn('[audio] unknown sting', name); return null; }
+    if (!this.ready) return null;
+    const now = this.ctx.currentTime, p = new MusicPlayer(this.graph, name);
+    p.fadeIn(now, 0.01); def.play(p, now + 0.05 + delay);
+    p.stopAt = now + delay + def.len + 3.5;
+    this.stings.push(p);
+    return p;
+  }
+  // Debug / test override of the music intensity (null = follow the game).
+  setIntensity(n) { this.forcedIntensity = n == null ? null : n; if (this.track) this.track.setIntensity(n ?? 0); }
+  get intensity() { return this.track ? this.track.intensity : 0; }
+  // Boss down: the boss theme gives way to the victory sting, then the floor's theme returns.
+  victory() {
+    this.victoryUntil = performance.now() + 3000; this.victoryShimmer = true;
+    if (this.returnT) clearTimeout(this.returnT);
+    const back = () => { this.returnT = 0; if (gameG()?.mode === 'dungeon') this.music('dungeon', { fade: 3, internal: true }); };
+    if (!this.ready) { this.wantTrack = this.resolveTrack('dungeon'); return; }
+    const now = this.ctx.currentTime;
+    if (this.track) { this.track.fadeOut(now, 0.7); this.fading.push(this.track); this.track = null; this.wantTrack = null; }
+    this.ducks.length = 0; this.applyDuck(now);
+    this.sting('victory', { delay: 0.1 });
+    this.returnT = setTimeout(back, (STINGS.victory.len - 0.4) * 1000);
+  }
 
   // ------------------------------------------------------------------------------------------ ambience
   ambience(name, { fade = 2.5 } = {}) {
+    if (name === 'dungeon') { const th = this.biomeOverride || gameG()?.dungeon?.layout?.theme; name = BIOME_AMBIENCES[th] || 'dungeon'; }
     if (name && !AMBIENCES[name]) { console.warn('[audio] unknown ambience', name); return; }
     this.wantAmb = name || null;
     const c = this.ctx; if (!c || c.state !== 'running') return;
@@ -244,23 +356,25 @@ class AudioSystem {
   }
 }
 
-// Optional one-line wiring to the game event bus (docs/ARCHITECTURE.md events). Returns an unsubscribe function.
-// Only maps unambiguous events; call Audio.play(...) directly for everything else (combat, footsteps, UI clicks).
+// Music director wiring to the game event bus (docs/ARCHITECTURE.md events); init() binds it to core/events.js.
+// It never plays a sound the game already plays for the same event (the game routes 'sfx' events and calls
+// music()/ambience() itself) — it only adds musical direction and picks context-specific variants via remap().
+// Returns an unsubscribe function.
 AudioSystem.prototype.bindEvents = function (Events) {
-  const RARE = new Set(['rare', 'unique', 'set']);
-  const MODE = { title: ['title', null], village: ['village_day', 'village'], dungeon: ['dungeon', 'dungeon'] };
-  let beforeBoss = null;
   const offs = [
-    Events.on('player:levelup', () => this.play('ui_levelup')),
-    Events.on('skill:learned', () => this.play('ui_learn')),
-    Events.on('item:pickup', e => this.play(RARE.has(e?.item?.rarity) ? 'pickup_rare' : 'pickup_item')),
-    Events.on('item:drop', () => this.play('drop_item')),
-    Events.on('equip:changed', () => this.play('ui_equip')),
-    Events.on('toast', () => this.play('ui_toast')),
-    Events.on('player:dead', () => { this.play('player_die'); this.duck(0.35, 3); }),
-    Events.on('boss:spawn', () => { beforeBoss = this.wantTrack; this.play('boss_roar'); this.duck(0.3, 1.4); this.music('boss', { fade: 1.2 }); }),
-    Events.on('boss:dead', () => { this.play('ui_levelup'); this.music(beforeBoss || 'dungeon', { fade: 3 }); }),
-    Events.on('mode:changed', e => { const m = MODE[e?.mode]; if (m) { this.music(m[0], { fade: 2.5 }); this.ambience(m[1]); } }),
+    // boss encounter: a hard duck for the intro roar (the boss track itself is started by the game's music('boss'))
+    Events.on('boss:spawn', () => { if (this.returnT) { clearTimeout(this.returnT); this.returnT = 0; } this.victoryUntil = 0; this.duck(0.35, 1.5, 0.05); }),
+    Events.on('boss:dead', () => this.victory()),
+    Events.on('mode:changed', () => { this.fightUntil = 0; }),
+    // loot rarity → pickup sound tier (the loot code emits pickup_item / pickup_rare right after this event)
+    Events.on('item:pickup', e => {
+      const it = e?.item; if (!it) return;
+      if (it.kind === 'gem') this.remap('pickup_item', 'pickup_gem');
+      else if (it.rarity === 'magic') this.remap('pickup_item', 'pickup_magic');
+      else if (it.rarity === 'unique' || it.rarity === 'set') this.remap('pickup_rare', 'pickup_unique');
+    }),
+    // quest completion shows its banner, then plays the level-up sfx: give it its own jingle
+    Events.on('ui:banner', e => { if (e?.style === 'quest' && /complete/i.test(e.title || '')) this.remap('ui_levelup', 'ui_quest_done', 0.4); }),
   ];
   return () => offs.forEach(off => off && off());
 };
@@ -270,12 +384,13 @@ export default Audio;
 
 // ------------------------------------------------------------------------------------------ offline rendering
 // Renders one sound / track / ambience into an AudioBuffer with an OfflineAudioContext (used by ?test=audio).
-//   kind: 'sfx' | 'music' | 'ambience' | 'babble'.  chain 'raw' = buses at unity, no limiter; 'full' = default volumes + limiter.
+//   kind: 'sfx' | 'music' | 'sting' | 'ambience' | 'babble'.  chain 'raw' = buses at unity, no limiter; 'full' = default volumes + limiter.
+//   music opts: skip (bars), solo ([channels]), intensity (0..2)
 export async function renderOffline(kind, name, { seconds, sampleRate = 44100, seed = 1234, opts = {}, chain = 'raw' } = {}) {
-  const secs = seconds ?? (kind === 'sfx' || kind === 'babble' ? 5 : 8);
+  const secs = seconds ?? (kind === 'sfx' || kind === 'babble' ? 5 : kind === 'sting' ? 7 : 8);
   const ctx = new OfflineAudioContext(2, Math.ceil(secs * sampleRate), sampleRate);
   const vols = chain === 'full' ? Object.fromEntries(Object.entries(DEFAULT_VOLUMES).map(([k, v]) => [k, curve(v)])) : {};
-  const part = kind === 'sfx' || kind === 'babble' ? 'sfx' : kind;
+  const part = kind === 'sfx' || kind === 'babble' ? 'sfx' : kind === 'sting' ? 'music' : kind;
   const g = new Graph(ctx, ctx.destination, { limiter: chain === 'full', vols, parts: [part] });
   let dur = 0;
   if (kind === 'sfx' || kind === 'babble') {
@@ -285,9 +400,13 @@ export async function renderOffline(kind, name, { seconds, sampleRate = 44100, s
     if (kind === 'sfx') { const s = new Voice(ctx, { dry, wet }, 0.01, opts.pitch ?? 1); def.fn(s, opts); dur = s.end - 0.01; }
     else dur = synthBabble(ctx, { dry, wet }, name, { t: 0.01, ...opts });
   } else if (kind === 'music') {
-    const p = new MusicPlayer(g, name, { seed, start: 0.02 }); p.fadeIn(0, 0.01);
+    const p = new MusicPlayer(g, name, { seed, start: 0.02, intensity: opts.intensity || 0 }); p.fadeIn(0, 0.01);
     if (opts.skip) p.skip(opts.skip); if (opts.solo) p.solo(opts.solo);
-    p.scheduleUntil(secs); dur = secs;
+    for (let i = 0; i < 40 && p.nextBar < secs; i++) p.scheduleUntil(secs);
+    dur = secs;
+  } else if (kind === 'sting') {
+    const p = new MusicPlayer(g, name, { seed }); p.fadeIn(0, 0.01);
+    STINGS[name].play(p, 0.05); dur = secs;
   } else if (kind === 'ambience') {
     const p = new AmbiencePlayer(g, name, { seed, start: 0.02 }); p.fadeIn(0, 0.01); p.scheduleUntil(secs); dur = secs;
   }

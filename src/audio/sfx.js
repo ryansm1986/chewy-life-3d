@@ -1,34 +1,40 @@
-// Procedural SFX library. Each entry: { fn(voice, opts), vary, max, gap, trim }
+// Procedural SFX library. Each entry: { fn(voice, opts), vary, max, gap, trim, duck }
 //   fn    builds the sound on a Voice (core.js) — times are relative, frequencies are scaled by the voice pitch P
 //   vary  random pitch variation per call (±fraction)      max  max simultaneous voices of this sound
 //   gap   min seconds between retriggers                   trim level trim (calibrated with the ?test=audio render check)
+//   duck  [level, seconds] — big moments dip the music bus under themselves
 // Aesthetic: soft, round and cute — sine/triangle bodies, low-passed noise, pentatonic sparkles, bonks & boings.
 import { babble, gibberish } from './babble.js';
 
 const R = (a, b) => a + Math.random() * (b - a);
+const mf = m => 440 * Math.pow(2, (m - 69) / 12);
 const PON = { pts: [[0, 300], [0.1, 430]], a: 0.003, d: 0.38 }; // kotsuzumi "pon~"
+const GLASS = [[1, 1, 1], [2.32, 0.35, 0.5], [4.25, 0.12, 0.3]];
+// soft brassy "bwah" (fanfares)
+const brass = (s, at, f, h, v) => s.tone({ at, f, stack: [['sawtooth', -5, 0.5], ['sawtooth', 5, 0.5], ['triangle', 0, 0.6]], a: 0.02, h, d: 0.2, v, lp: 900, lp2: 2600, lt: 0.06, lq: 1.5, rev: 0.25 });
 
 export const SFX = {
   // ------------------------------------------------------------------------------------------ UI
-  ui_hover: { vary: 0.03, max: 2, gap: 0.035, fn(s) {
-    s.tone({ f: 2200, a: 0.002, d: 0.035, v: 0.12 });
-    s.tone({ f: 3300, a: 0.001, d: 0.015, v: 0.03 });
+  // hover: a tiny bubble "tik" — the quietest thing in the game (UI also rate-limits it)
+  ui_hover: { vary: 0.06, max: 1, gap: 0.06, fn(s) {
+    s.tone({ pts: [[0, 1650], [0.018, 2250]], a: 0.002, d: 0.028, v: 0.1 });
+    s.noise({ f: 4200, q: 3, a: 0.001, d: 0.007, v: 0.025 });
   } },
   ui_click: { vary: 0.04, max: 3, gap: 0.03, fn(s) {
     s.tone({ f: 1250, f2: 820, glide: 0.03, a: 0.001, d: 0.06, v: 0.34 });
     s.tone({ f: 2600, type: 'triangle', a: 0.001, d: 0.012, v: 0.06 });
     s.noise({ f: 3200, q: 2, a: 0.001, d: 0.012, v: 0.2 });
   } },
-  ui_open: { vary: 0.02, fn(s) {
-    s.tone({ f: 420, f2: 900, glide: 0.09, a: 0.004, d: 0.14, v: 0.3 });
-    s.noise({ f: 1500, f2: 4200, q: 1.2, a: 0.03, d: 0.12, v: 0.2 });
-    s.bell({ at: 0.06, f: 1318, d: 0.55, v: 0.12, rev: 0.3 });
-    s.bell({ at: 0.11, f: 1976, d: 0.45, v: 0.07, rev: 0.3 });
+  // panel open: a soft paper whoosh up + a round pop + one glint
+  ui_open: { vary: 0.03, gap: 0.06, fn(s) {
+    s.noise({ f: 650, f2: 2600, glide: 0.14, q: 1.1, a: 0.05, d: 0.11, v: 0.2, color: 'pink' });
+    s.tone({ at: 0.045, pts: [[0, 480], [0.035, 960]], a: 0.002, d: 0.08, v: 0.26 });
+    s.bell({ at: 0.09, f: 1568, d: 0.45, v: 0.06, rev: 0.3 });
   } },
-  ui_close: { vary: 0.02, fn(s) {
-    s.tone({ f: 900, f2: 420, glide: 0.1, a: 0.004, d: 0.13, v: 0.28 });
-    s.noise({ f: 3800, f2: 1300, q: 1.2, a: 0.02, d: 0.1, v: 0.16 });
-    s.bell({ at: 0.05, f: 988, d: 0.35, v: 0.08, rev: 0.25 });
+  // panel close: whoosh down + a lower pop
+  ui_close: { vary: 0.03, gap: 0.06, fn(s) {
+    s.noise({ f: 2400, f2: 650, glide: 0.12, q: 1.1, a: 0.03, d: 0.1, v: 0.18, color: 'pink' });
+    s.tone({ at: 0.045, pts: [[0, 800], [0.045, 420]], a: 0.002, d: 0.07, v: 0.22 });
   } },
   ui_tab: { vary: 0.05, max: 2, fn(s) {
     s.noise({ f: 2600, q: 0.9, a: 0.004, d: 0.05, v: 0.22 });
@@ -51,14 +57,35 @@ export const SFX = {
     s.fm({ at: 0.12, f: 3136, ratio: 2, index: 0.7, id: 0.08, a: 0.001, d: 0.45, v: 0.09, rev: 0.25 });
     s.sparkle({ at: 0.15, n: 3, base: 2637, v: 0.035 });
   } },
-  ui_levelup: { vary: 0, max: 1, fn(s) {
-    [523, 659, 784, 1046, 1318].forEach((f, i) => s.pluck({ at: i * 0.07, f, kind: 'koto', v: 0.3, rev: 0.3, lp: 5000 }));
-    [1046, 1318, 1568, 2093].forEach((f, i) => s.bell({ at: 0.36 + i * 0.012, f, d: 1.4, v: 0.08, rev: 0.45 }));
-    s.tone({ at: 0.34, f: 262, stack: [['sine', 0, 1], ['triangle', 5, 0.3]], a: 0.1, h: 0.3, d: 0.9, v: 0.12, rev: 0.4 });
-    s.tone({ at: 0.34, f: 392, a: 0.1, h: 0.3, d: 0.9, v: 0.08, rev: 0.4 });
-    s.tone({ at: 0.35, ...PON, v: 0.28 });
-    s.noise({ at: 0.3, ft: 'highpass', f: 6000, a: 0.25, d: 0.9, v: 0.12, rev: 0.4 });
-    s.sparkle({ at: 0.4, n: 7, base: 2093, spread: 0.8, v: 0.045 });
+  // level-up fanfare: "ta-ta-ta-TAAA!" — brassy stabs up the C arpeggio with koto doubling, a taiko + pon hit
+  // under the held chord, then a bell chord and sparkles
+  ui_levelup: { vary: 0, max: 1, duck: [0.4, 2.2], fn(s) {
+    brass(s, 0, 392, 0.05, 0.065); brass(s, 0.11, 523, 0.05, 0.065); brass(s, 0.22, 659, 0.05, 0.07);
+    brass(s, 0.33, 784, 0.6, 0.08); brass(s, 0.33, 659, 0.6, 0.05); brass(s, 0.33, 523, 0.6, 0.05);
+    [392, 523, 659, 1046].forEach((f, i) => s.pluck({ at: i * 0.11, f, kind: 'koto', v: 0.22, rev: 0.3, lp: 5000 }));
+    s.tone({ at: 0.33, pts: [[0, 96], [0.12, 60]], a: 0.002, d: 0.6, v: 0.32 });
+    s.tone({ at: 0.34, ...PON, v: 0.22 });
+    [1046, 1318, 1568, 2093].forEach((f, i) => s.bell({ at: 0.38 + i * 0.012, f, d: 1.3, v: 0.055, rev: 0.45 }));
+    s.noise({ at: 0.3, ft: 'highpass', f: 6000, a: 0.25, d: 0.9, v: 0.09, rev: 0.4 });
+    s.sparkle({ at: 0.5, n: 7, base: 2093, spread: 0.8, v: 0.04 });
+  } },
+  // quest complete: a little koto + marimba turn "mi-re-mi-sol-DO!" landing on a warm bell chord
+  ui_quest_done: { vary: 0, max: 1, duck: [0.45, 1.8], fn(s) {
+    [[0, 76], [0.09, 74], [0.18, 76], [0.3, 79], [0.46, 84]].forEach(([at, m], i) => {
+      s.pluck({ at, m, kind: 'koto', v: i === 4 ? 0.34 : 0.26, rev: 0.3, lp: 4500 });
+      s.tone({ at, f: mf(m - 12), a: 0.002, d: 0.28, v: 0.12 });
+    });
+    s.tone({ at: 0.46, ...PON, v: 0.24 });
+    s.noise({ at: 0.46, f: 2900, q: 3, a: 0.001, d: 0.025, v: 0.18 });
+    s.tone({ at: 0.46, f: 262, stack: [['sine', 0, 1], ['triangle', 4, 0.3], ['sine', 0, 0.4, 1.5]], a: 0.06, h: 0.3, d: 0.8, v: 0.1, rev: 0.4 });
+    [1046, 1318, 1568, 2093].forEach((f, i) => s.bell({ at: 0.48 + i * 0.02, f, d: 1.2, v: 0.055, rev: 0.45 }));
+    s.sparkle({ at: 0.55, n: 5, base: 2349, spread: 0.6, v: 0.035 });
+  } },
+  // boss down: a bright shimmer that sits over the victory sting (and still celebrates with the music muted)
+  victory_sfx: { vary: 0, max: 1, fn(s) {
+    s.noise({ ft: 'highpass', f: 5000, a: 0.3, d: 1.3, v: 0.09, am: [12, 0.5], rev: 0.5 });
+    s.tone({ f: 220, f2: 660, glide: 0.45, stack: [['sine', 0, 1], ['sine', 5, 0.4, 1.5]], a: 0.2, h: 0.1, d: 0.6, v: 0.08, rev: 0.4 });
+    s.sparkle({ at: 0.1, n: 12, base: 2093, spread: 1.6, v: 0.045 });
   } },
   ui_learn: { vary: 0.01, max: 1, fn(s) {
     s.tone({ f: 500, f2: 1600, glide: 0.35, type: 'triangle', a: 0.02, h: 0.1, d: 0.35, v: 0.12, vib: [9, 25], lp: 3000, rev: 0.4 });
@@ -72,7 +99,7 @@ export const SFX = {
     s.tone({ at: 0.05, f: 1700, a: 0.001, d: 0.03, v: 0.1 });
     s.tone({ at: 0.07, f: 2550, a: 0.001, d: 0.05, v: 0.06 });
   } },
-  ui_quest: { vary: 0, max: 1, fn(s) {
+  ui_quest: { vary: 0, max: 1, duck: [0.65, 1.4], fn(s) {
     [[0, 67], [0.11, 72], [0.22, 76], [0.33, 79]].forEach(([at, m]) => s.pluck({ at, m, kind: 'koto', v: 0.32, rev: 0.3, lp: 4500 }));
     s.bell({ at: 0.33, f: 1568, d: 1.2, v: 0.08, rev: 0.4 });
     s.bell({ at: 0.35, f: 2093, d: 1.1, v: 0.06, rev: 0.4 });
@@ -95,7 +122,29 @@ export const SFX = {
     for (let i = 0; i < n; i++) s.fm({ at: i * 0.05 + Math.random() * 0.015, f: R(2300, 3000), ratio: 2.41, index: 1.3, id: 0.03, a: 0.001, d: R(0.12, 0.2), v: 0.13, pan: R(-0.3, 0.3) });
     s.fm({ at: n * 0.05, f: 3136, ratio: 2, index: 0.7, id: 0.05, a: 0.001, d: 0.3, v: 0.1, rev: 0.25 });
   } },
-  pickup_rare: { vary: 0.01, max: 1, fn(s) {
+  // magic (blue): a two-note glassy chime
+  pickup_magic: { vary: 0.03, max: 2, fn(s) {
+    s.tone({ f: 520, f2: 1040, glide: 0.05, a: 0.002, d: 0.07, v: 0.2 });
+    s.fm({ at: 0.03, f: 1568, ratio: 1, index: 0.7, id: 0.05, a: 0.001, d: 0.3, v: 0.13, rev: 0.25 });
+    s.fm({ at: 0.1, f: 2349, ratio: 1, index: 0.6, id: 0.05, a: 0.001, d: 0.45, v: 0.12, rev: 0.3 });
+    s.sparkle({ at: 0.14, n: 2, base: 2349, v: 0.028, spread: 0.2 });
+  } },
+  // gem: crystalline double "ting"
+  pickup_gem: { vary: 0.04, max: 2, fn(s) {
+    s.tone({ f: 600, f2: 1200, glide: 0.05, a: 0.002, d: 0.06, v: 0.15 });
+    s.bell({ f: 2637, d: 0.6, v: 0.1, rev: 0.4, partials: GLASS });
+    s.bell({ at: 0.07, f: 3520, d: 0.7, v: 0.08, rev: 0.45, partials: GLASS });
+  } },
+  // unique / set: harp glissando, bell chord, a warm swell and a shower of sparkles
+  pickup_unique: { vary: 0, max: 1, duck: [0.55, 2], fn(s) {
+    [72, 74, 76, 79, 81, 84, 86, 88, 91].forEach((m, i) => s.pluck({ at: i * 0.04, m, kind: 'harp', v: 0.3, rev: 0.4, lp: 5200 }));
+    [1046, 1318, 1568, 2093].forEach((f, i) => s.bell({ at: 0.4 + i * 0.015, f, d: 1.6, v: 0.075, rev: 0.5 }));
+    s.tone({ at: 0.35, f: 262, stack: [['sine', 0, 1], ['triangle', 5, 0.3], ['sine', -4, 0.5, 1.5]], a: 0.2, h: 0.4, d: 1.1, v: 0.11, rev: 0.5 });
+    s.noise({ at: 0.3, ft: 'highpass', f: 6500, a: 0.3, d: 1.1, v: 0.1, am: [12, 0.5], rev: 0.5 });
+    s.sparkle({ at: 0.45, n: 10, base: 2093, spread: 1.2, v: 0.045 });
+  } },
+  // rare (yellow): a sparkly bell run
+  pickup_rare: { vary: 0.01, max: 1, duck: [0.7, 1.2], fn(s) {
     [1046, 1175, 1318, 1568, 1760, 2093].forEach((f, i) => s.bell({ at: i * 0.045, f, d: 0.6, v: 0.1, rev: 0.45 }));
     s.tone({ at: 0.25, f: 523, stack: [['sine', 0, 1], ['triangle', 6, 0.3]], a: 0.15, h: 0.2, d: 0.9, v: 0.12, rev: 0.4 });
     s.tone({ at: 0.25, f: 784, a: 0.15, h: 0.2, d: 0.9, v: 0.08, rev: 0.4 });
@@ -175,7 +224,7 @@ export const SFX = {
     s.tone({ pts: [[0, 630], [0.35, 960], [0.9, 780], [1.3, 570]], vib: [5.1, 25, 0.2], a: 0.35, h: 0.45, d: 0.55, lin: true, v: 0.06, rev: 0.6 });
     s.noise({ f: 700, q: 4, a: 0.4, h: 0.3, d: 0.6, lin: true, v: 0.15, rev: 0.5 });
   } },
-  boss_roar: { vary: 0.04, max: 1, fn(s) {
+  boss_roar: { vary: 0.04, max: 1, duck: [0.8, 0.6], fn(s) { // roars on every boss wind-up: only a light dip (the intro ducks hard via boss:spawn)
     s.voice({ f: [[0, 150], [0.15, 215], [0.7, 170], [1.1, 115]],
       form: [[0, [500, 1000, 2200]], [0.2, [760, 1180, 2400]], [0.8, [620, 1000, 2200]], [1.1, [450, 800, 2000]]],
       amp: [[0, 0], [0.06, 0.9], [0.2, 1], [0.8, 0.8], [1.15, 0]], q: [5, 7, 8], breath: 0.4, rough: 0.35, roughF: 32, body: 0.4, v: 0.6, rev: 0.35 });
@@ -189,7 +238,7 @@ export const SFX = {
       amp: [[0, 0], [0.01, 1], [0.08, 0.6], [0.15, 0]], q: [6, 8, 9], breath: 0.2, body: 0.3, v: 0.45 });
     s.noise({ ft: 'lowpass', f: 800, a: 0.002, d: 0.06, v: 0.3, color: 'pink' });
   } },
-  player_die: { vary: 0, max: 1, fn(s) {
+  player_die: { vary: 0, max: 1, duck: [0.3, 2.8], fn(s) {
     s.voice({ f: [[0, 900], [0.2, 1020], [0.75, 520]], type: 'triangle', vib: [6, 30, 0.1], form: [[0, [900, 2200, 3100]], [0.75, [600, 1500, 2600]]],
       amp: [[0, 0], [0.06, 0.8], [0.5, 0.7], [0.8, 0]], breath: 0.1, body: 0.6, bodyF: 1300, v: 0.3, rev: 0.3 });
     // muted sad trombone: wah wah wah waaah
@@ -289,21 +338,22 @@ export const SFX = {
     s.tone({ at: 0.36, f: 420, f2: 330, a: 0.001, d: 0.08, v: 0.25 });
     s.noise({ at: 0.36, f: 1100, q: 3, a: 0.001, d: 0.04, v: 0.3 });
   } },
-  portal: { vary: 0.03, max: 1, fn(s) {
+  portal: { vary: 0.03, max: 1, duck: [0.7, 1.5], fn(s) {
     s.noise({ pts: [[0, 400], [0.6, 2800], [1.4, 700]], q: 4, a: 0.3, h: 0.5, d: 0.7, lin: true, v: 0.5, am: [7, 0.4], rev: 0.5 });
     s.tone({ pts: [[0, 300], [1.0, 900]], stack: [['sine', -8, 0.6], ['sine', 8, 0.6]], a: 0.3, h: 0.5, d: 0.7, lin: true, v: 0.12, rev: 0.5 });
     s.tone({ f: 110, a: 0.3, h: 0.5, d: 0.8, lin: true, v: 0.15 });
     [1175, 1568, 1760, 2349, 2637, 3136].forEach((f, i) => s.bell({ at: 0.2 + i * 0.12, f, d: 0.7, v: 0.05, rev: 0.6, pan: Math.sin(i * 2) * 0.6 }));
   } },
+  // placement: a satisfying wooden "thunk" (heavy body + knock), a puff of dust, one tiny glint
   build_place: { vary: 0.06, max: 3, fn(s) {
-    s.tone({ f: 150, f2: 95, glide: 0.06, a: 0.001, d: 0.16, v: 0.5 });
-    s.tone({ f: 300, type: 'triangle', a: 0.001, d: 0.06, v: 0.15 });
-    s.noise({ ft: 'lowpass', f: 1200, a: 0.001, d: 0.05, v: 0.45, color: 'pink' });
-    s.noise({ f: 720, q: 4, a: 0.001, d: 0.09, v: 0.3 });
-    s.bell({ at: 0.09, f: 2093, d: 0.4, v: 0.07, rev: 0.4 });
-    s.bell({ at: 0.14, f: 3136, d: 0.35, v: 0.05, rev: 0.4 });
+    s.tone({ pts: [[0, 175], [0.07, 90]], a: 0.001, d: 0.2, v: 0.5 });
+    s.tone({ f: 330, type: 'triangle', a: 0.001, d: 0.05, v: 0.14, lp: 1200 });
+    s.noise({ ft: 'lowpass', f: 1000, a: 0.001, d: 0.06, v: 0.45, color: 'pink' });
+    s.noise({ f: 720, q: 4, a: 0.001, d: 0.08, v: 0.22 });
+    s.noise({ at: 0.03, f: 650, f2: 280, q: 0.8, a: 0.04, d: 0.28, v: 0.1, color: 'pink' });
+    s.bell({ at: 0.1, f: 2093, d: 0.35, v: 0.05, rev: 0.4 });
   } },
-  build_complete: { vary: 0, max: 1, fn(s) {
+  build_complete: { vary: 0, max: 1, duck: [0.6, 1.6], fn(s) {
     [67, 69, 72, 74, 76, 79].forEach((m, i) => s.pluck({ at: i * 0.065, m, kind: 'koto', v: 0.28, rev: 0.3, lp: 5000 }));
     [1046, 1318, 1568].forEach((f, i) => s.bell({ at: 0.42 + i * 0.015, f, d: 1.6, v: 0.08, rev: 0.45 }));
     s.tone({ at: 0.4, ...PON, v: 0.3 });
@@ -316,13 +366,13 @@ export const SFX = {
     for (let i = 0; i < 3; i++) s.tone({ at: R(0.02, 0.4), f: R(250, 400), f2: 150, a: 0.001, d: 0.05, v: 0.12 });
     s.noise({ at: 0.3, f: 800, f2: 300, q: 0.8, a: 0.1, d: 0.5, v: 0.3, color: 'pink' });
   } },
-  chest_open: { vary: 0.02, max: 1, fn(s) {
+  chest_open: { vary: 0.02, max: 1, duck: [0.75, 1], fn(s) {
     s.tone({ pts: [[0, 90], [0.25, 135]], type: 'sawtooth', fmod: [23, 6], bp: 900, bq: 6, a: 0.02, h: 0.18, d: 0.08, v: 0.35 });
     s.tone({ at: 0.28, f: 260, f2: 180, a: 0.001, d: 0.08, v: 0.25 });
     [1046, 1318, 1568, 2093].forEach((f, i) => s.bell({ at: 0.33 + i * 0.07, f, d: 0.9, v: 0.09, rev: 0.45 }));
     s.noise({ at: 0.35, ft: 'highpass', f: 6500, a: 0.2, d: 0.7, v: 0.1, am: [13, 0.5], rev: 0.45 });
   } },
-  waypoint: { vary: 0, max: 1, fn(s) {
+  waypoint: { vary: 0, max: 1, duck: [0.65, 1.8], fn(s) {
     for (const [f, dt] of [[587, 0], [880, 4], [1319, -4]]) s.tone({ f, detune: dt, a: 0.35, h: 0.35, d: 1.0, lin: true, v: 0.08, vib: [4.5, 8], rev: 0.5 });
     s.noise({ f: 300, f2: 2400, q: 2, a: 0.4, d: 0.6, v: 0.25, rev: 0.4 });
     s.bell({ at: 0.35, f: 1760, d: 1.4, v: 0.08, rev: 0.5 });
@@ -355,6 +405,7 @@ export const SFX = {
 const TRIM = {
   ui_hover: 0.75, ui_click: 0.6, ui_tab: 1.4, ui_coin: 1.8, ui_buy: 1.5, ui_learn: 1.7, ui_equip: 1.3, ui_toast: 1.2,
   pickup_item: 1.3, pickup_gold: 2.5, pickup_rare: 1.6, drop_item: 0.95,
+  pickup_magic: 1.65, pickup_gem: 1.2, pickup_unique: 1.3, ui_quest_done: 1.15, victory_sfx: 1.5,
   footstep_grass: 2.2, footstep_stone: 1.1, footstep_wood: 0.7,
   swing: 2.6, swing_heavy: 1.45, throw: 3.3, dash: 3.3, hit_crit: 1.15, player_hurt: 0.6, monster_die: 1.5, ghost_wail: 0.7, boss_roar: 0.55, player_die: 0.5,
   bark: 0.9, bark_small: 0.4, howl: 0.37, whine: 0.3, dig: 2,
@@ -366,8 +417,8 @@ for (const [k, v] of Object.entries(TRIM)) SFX[k].trim = v;
 export const SFX_NAMES = Object.keys(SFX);
 
 export const SFX_GROUPS = {
-  UI: ['ui_click', 'ui_hover', 'ui_open', 'ui_close', 'ui_tab', 'ui_error', 'ui_coin', 'ui_levelup', 'ui_learn', 'ui_equip', 'ui_buy', 'ui_quest', 'ui_toast'],
-  Pickups: ['pickup_item', 'pickup_gold', 'pickup_rare', 'drop_item'],
+  UI: ['ui_click', 'ui_hover', 'ui_open', 'ui_close', 'ui_tab', 'ui_error', 'ui_coin', 'ui_levelup', 'ui_learn', 'ui_equip', 'ui_buy', 'ui_quest', 'ui_quest_done', 'ui_toast', 'victory_sfx'],
+  Pickups: ['pickup_item', 'pickup_magic', 'pickup_gem', 'pickup_rare', 'pickup_unique', 'pickup_gold', 'drop_item'],
   Footsteps: ['footstep_grass', 'footstep_stone', 'footstep_wood'],
   Combat: ['swing', 'swing_heavy', 'throw', 'ball_bounce', 'hit_flesh', 'hit_crit', 'monster_hit', 'monster_die', 'slime_bounce', 'ghost_wail', 'boss_roar', 'player_hurt', 'player_die'],
   Dogs: ['bark', 'bark_small', 'howl', 'whine', 'dig'],
