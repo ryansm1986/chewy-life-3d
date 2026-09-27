@@ -79,6 +79,12 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
 - Villagers pick activities by `G.day.hour` and personality; talking to one (`talking = true`) drops everything.
   `G.villageLife.force(villager, kind)` is a debug hook. Poses in lifePoses.js only move `rig.parts` groups.
 
+## Navigation (src/core/nav.js)
+- Shared `GridAStar` + per-world 0.5 m clearance grid (`navFor(world)`, exposed as `player.nav` for tests) and
+  `PathFollow`. Click-to-move, melee approach, interact targets, loot pickup and Shadow's catch-up route through it;
+  WASD stays direct. Collider changes are detected lazily (collision objects carry a `_nid`).
+- Input: a press released before the next frame stays down for exactly one frame, so every poller sees taps.
+
 ## Combat notes
 - `player.mouseSets` = [[LMB, RMB] sword set, [LMB, RMB] ball set]; the active pair is mirrored in `hotbar[0..1]`.
   `swapWeapons()` swaps pairs and emits `hotbar:changed {swap, set}`; actions `mouseSet`, `ensureMouseSets`, `setWeaponType`.
