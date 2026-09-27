@@ -78,6 +78,9 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
   claims (one villager per slot), a path grid that prefers paths, props (broom, watering can, rod) and chat pairing.
 - Villagers pick activities by `G.day.hour` and personality; talking to one (`talking = true`) drops everything.
   `G.villageLife.force(villager, kind)` is a debug hook. Poses in lifePoses.js only move `rig.parts` groups.
+- Villagers have homes (`VillageLife.homeFor` / `doorInfo`, doorstep outside the collider) and bedtimes (`BED` in
+  npc.js); at night they step in through the door, Chewy can knock, and quest-targeted villagers wait on the doorstep.
+- Small props (not occluders) use material clones with the cutaway off; only buildings/trees write the x-ray stencil.
 
 ## Navigation (src/core/nav.js)
 - Shared `GridAStar` + per-world 0.5 m clearance grid (`navFor(world)`, exposed as `player.nav` for tests) and
