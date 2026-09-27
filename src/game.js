@@ -8,7 +8,7 @@ import { DayNight } from './gfx/sky.js';
 import { Player } from './actors/player.js';
 import { Companion } from './actors/companion.js';
 import { Villager } from './actors/npc.js';
-import { CAST } from './actors/charKit.js';
+import { CAST, prebuildHumanoid } from './actors/charKit.js';
 import { VILLAGERS, randomVillagerSpec } from './actors/roster.js';
 import { U } from './gfx/materials.js';
 import { glowTexture } from './gfx/textures.js';
@@ -91,15 +91,22 @@ export async function boot() {
   for (const v of VILLAGERS) npcs.push(new Villager(village, G, v.spec, { id: v.id, anchor: v.anchor, wander: v.wander || 5 }));
   const skills = G.skills = new SkillRunner(G);
   // townsfolk move in as homes fill up (capped for performance)
-  const folk = [];
+  const folk = [], FOLK_MAX = 16;
+  // Building a villager costs ~20 ms: a visible hitch if it happens mid-play. Newcomers' rigs are pre-built while
+  // nobody can see a hitch (boot, title, dialogue, menus, the Burrow) and move in from this pool; newcomers arrive
+  // one per check, and only wait when the pool is empty and the village is on screen.
+  const folkPool = [];
+  const hitchHidden = () => G.titleActive || G.mode !== 'village' || G.ui?.dlg?.active || G.ui?.anyModal?.();
+  const stockFolk = () => { if (folk.length + folkPool.length < FOLK_MAX) folkPool.push(prebuildHumanoid(randomVillagerSpec())); };
+  for (let i = 0; i < 6; i++) stockFolk(); // behind the boot splash
+  setInterval(() => { if (hitchHidden()) stockFolk(); }, 350);
   function syncTownsfolk() {
     const homes = sim.list.filter(r => r.data.type === 'home' && (r.data.residents || 0) > 0);
-    const want = Math.min(16, Math.max(0, Math.round(sim.stats.population * 0.6) - 4));
-    // one newcomer per check: building a villager costs ~20 ms, so several at once was a visible hitch (and arriving
-    // one by one reads better anyway)
+    const want = Math.min(FOLK_MAX, Math.max(0, Math.round(sim.stats.population * 0.6) - 4));
     if (folk.length < want && homes.length) {
+      if (!folkPool.length && !hitchHidden()) return; // wait for a pre-built rig rather than hitch on screen
       const h = homes[folk.length % homes.length];
-      const spec = randomVillagerSpec();
+      const spec = folkPool.shift() || randomVillagerSpec();
       const anchors = [L.plaza, ...sim.list.filter(r => r.data.type === 'shop').map(r => ({ x: r.door.x, z: r.door.z }))];
       const a = anchors[Math.floor(Math.random() * anchors.length)];
       const v = new Villager(village, G, spec, { id: 'folk' + folk.length, anchor: { x: a.x, z: a.z }, home: h.door.clone(), wander: 6 });

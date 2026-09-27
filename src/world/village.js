@@ -1,7 +1,7 @@
 // SimCity-style village simulation: placement, zoning (R/C/W), road access, service coverage, RCI demand,
 // organic growth & level-ups, residents, daily income. Renders buildings via the buildings kit.
 import * as THREE from 'three';
-import { BUILDINGS, buildModel, setNight, sizeOf, bridgeDeckHeight, getTemplate, VARIANTS } from './buildings/index.js';
+import { BUILDINGS, buildModel, setNight, sizeOf, bridgeDeckHeight, getTemplate, hasTemplate, VARIANTS } from './buildings/index.js';
 import { T, WORLD } from './terrain.js';
 import { LANDMARKS } from './layout.js';
 import { Events } from '../core/events.js';
@@ -72,24 +72,31 @@ export class VillageSim {
   }
   get S() { return this.G.state.village; }
   // ------------------------------------------------------------------ setup / persistence
-  // Zoned buildings grow with a random variant/level; building a template the first time costs 5-20 ms, which showed
-  // as a hitch right when a home popped up. Pre-build them one at a time in idle moments instead.
+  // Zoned buildings grow with a random variant/level; building a template the first time costs 5-20 ms, a hitch right
+  // when a home pops up. Templates are pre-built only while nobody can see a hitch: the level-1 variants that grow
+  // first behind the boot splash, the rest during the title screen, dialogue, menus and Burrow trips. (Idle callbacks
+  // mid-play were tried: on a busy machine their timeouts fire constantly and each build became a visible hitch.)
+  // a random seed, preferring a variant whose model template is already built (no build hitch mid-play); the prewarm
+  // fills in the other variants over time, so variety returns
+  seedFor(type, level) {
+    const seeds = []; for (let i = 0; i < 6; i++) seeds.push(randInt(0, 9999));
+    return seeds.find(sd => hasTemplate(type, level, sd)) ?? seeds[0];
+  }
   prewarmTemplates() {
     if (this._prewarm) return;
     const q = this._prewarm = [];
     for (const [id, d] of Object.entries(BUILDINGS)) if (d.zone) for (let lv = 1; lv <= (d.levels || 1); lv++) for (let v = 0; v < VARIANTS; v++) q.push([id, lv, v]);
+    q.sort((a, b) => a[1] - b[1]); // level 1 first
     const one = () => { const [id, lv, v] = q.shift(); try { getTemplate(id, lv, v); } catch (e) { /* unknown combo */ } };
-    const ric = globalThis.requestIdleCallback || (f => setTimeout(() => f({ timeRemaining: () => 8, didTimeout: true }), 120));
-    const step = dl => {
-      const G = this.G, screenBusy = G.titleActive || G.ui?.dlg?.active || G.mode !== 'village';
-      if (screenBusy) { const t = performance.now(); while (q.length && performance.now() - t < 12) one(); } // nobody sees a hitch here
-      else if (q.length && (dl.timeRemaining() > 3 || dl.didTimeout)) one();
-      if (q.length) screenBusy ? setTimeout(() => step({ timeRemaining: () => 0 }), 30) : ric(step, { timeout: 400 });
-    };
-    ric(step, { timeout: 400 });
+    for (let t = performance.now(); q.length && q[0][1] === 1 && performance.now() - t < 400;) one(); // boot, behind the splash
+    const hidden = () => { const G = this.G; return G.titleActive || G.ui?.dlg?.active || G.ui?.anyModal?.() || G.mode !== 'village'; };
+    const iv = setInterval(() => {
+      if (!q.length) return clearInterval(iv);
+      if (hidden()) for (let t = performance.now(); q.length && performance.now() - t < 14;) one();
+    }, 60);
   }
   init() {
-    setTimeout(() => this.prewarmTemplates(), 3000); // after boot settles
+    this.prewarmTemplates();
     const V = this.G.state.village;
     if (!V.buildings) {
       V.buildings = []; V.zones = []; V.paths = []; V.day = 1; V.income = [];
@@ -162,7 +169,7 @@ export class VillageSim {
       if (!this.G.actions.hasMaterials(def.cost)) { if (!silent) this.G.ui?.toast?.('Not enough materials!', { color: '#ff8a8a' }); Events.emit('sfx', 'ui_error'); return null; }
       this.G.actions.spendMaterials(def.cost);
     }
-    const b = { id: uid(), idx: this.nextIdx(), type, x: x0, z: z0, rot, level, seed: randInt(0, 9999), residents: 0, built: this.G.day?.day || 1 };
+    const b = { id: uid(), idx: this.nextIdx(), type, x: x0, z: z0, rot, level, seed: this.seedFor(type, level), residents: 0, built: this.G.day?.day || 1 };
     this.S.buildings.push(b);
     this.spawnModel(b, !silent);
     this.refreshTiles();
@@ -479,7 +486,7 @@ export class VillageSim {
     if (spot.why) return false;
     this.despawn(this.list.find(r => r.data === b));
     b.x = spot.x; b.z = spot.z;
-    b.level = nl; b.seed = randInt(0, 9999);
+    b.level = nl; b.seed = this.seedFor(b.type, nl);
     const rec = this.spawnModel(b, true);
     this.refreshTiles();
     this.G.vfx?.levelUp?.(this.worldPos(b));

@@ -18,6 +18,8 @@ const cache = new Map();
 function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
 export function variantOf(seed = 0) { return (((seed | 0) % VARIANTS) + VARIANTS) % VARIANTS; }
 
+// is this variant's template already built (building it costs 5-20 ms)?
+export function hasTemplate(id, level = 1, seed = 0) { const def = BUILDINGS[id]; if (!def) return false; return cache.has(`${id}:${clamp(level | 0, 1, def.levels || 1)}:${variantOf(seed)}`); }
 export function getTemplate(id, level = 1, seed = 0) {
   const def = BUILDINGS[id];
   if (!def) throw new Error(`[buildings] unknown id ${id}`);

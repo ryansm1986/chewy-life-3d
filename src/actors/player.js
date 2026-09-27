@@ -45,6 +45,7 @@ export class Player extends Actor {
     this.sword.scale.setScalar(sword ? 1 : 0.0001); this.sword.castShadow = sword;
     this.ball.scale.setScalar(sword ? 0.0001 : 1); this.ball.castShadow = !sword;
     this.swordBack.visible = !sword;
+    this._sheathed = undefined; // re-evaluated by carrySword next frame
   }
 
   // camera-relative WASD
@@ -119,6 +120,17 @@ export class Player extends Actor {
   // tip it level like a lance. Attacks and skills (any animator action) pose it freely.
   carrySword(dt) {
     if (this.weaponType !== 'sword') return;
+    // In the village the sword rides on his back (he was leaning on it like a cane); it comes out for any attack or
+    // skill and goes back a few seconds later. In the Burrow it stays in hand.
+    if (this.anim.action) this._drawnT = 3;
+    this._drawnT = Math.max(0, (this._drawnT || 0) - dt);
+    const sheathed = this.G.mode === 'village' && this._drawnT <= 0;
+    if (sheathed !== this._sheathed) {
+      this._sheathed = sheathed;
+      this.sword.scale.setScalar(sheathed ? 0.0001 : 1); this.sword.castShadow = !sheathed;
+      this.swordBack.visible = sheathed;
+    }
+    if (sheathed) return;
     const arm = this.rig.parts.armR, body = this.rig.parts.body, R = this.anim.rest;
     const ra = R.get(arm), rb = R.get(body); if (!ra || !rb) return;
     const want = this.anim.action ? 0 : 1;

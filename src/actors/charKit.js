@@ -60,9 +60,9 @@ export const SPECIES = {
   fox: { foot: 'fox', hand: 'fox', hs: 0.74, body: [0.9, 1.1], taper: -0.12, head: [1.06, 0.9, 0.98], cheek: 0.18, snout: [0.6, 0.28, 0.24, -0.3], nose: [0.036, 0.028, 0.028], ears: 'fox', tail: 'fox', tufts: 0.08, eye: [0.4, 0.1] },
   panda: { foot: 'bear', hand: 'bear', hs: 0.74, body: [1.28, 1.02], square: 0.22, taper: 0.14, belly: true, limb: 1.12, head: [1.12, 0.96, 0.98], cheek: 0.1, snout: [0.24, 0.34, 0.26, -0.34], nose: [0.044, 0.032, 0.03], ears: 'bear', tail: 'stub', patches: true, eye: [0.4, 0.06] },
   tanuki: { hs: 0.75, body: [1.2, 1.0], square: 0.15, belly: true, head: [1.1, 0.94, 0.98], cheek: 0.16, snout: [0.4, 0.3, 0.26, -0.3], nose: [0.042, 0.03, 0.03], ears: 'tanuki', tail: 'tanuki', mask: true, tufts: 0.07, eye: [0.4, 0.08] },
-  frog: { foot: 'web', hand: 'web', hs: 0.84, body: [1.18, 0.92], square: 0.3, neckless: 0.07, belly: true, head: [1.42, 0.74, 1.02], cheek: 0.06, snout: null, nose: null, ears: 'none', tail: 'none', frogEyes: true, eye: [0.45, 0.62] },
+  frog: { foot: 'web', hand: 'web', legs: 0.02, hs: 0.84, body: [1.18, 0.92], square: 0.3, neckless: 0.07, belly: true, head: [1.42, 0.74, 1.02], cheek: 0.06, snout: null, nose: null, ears: 'none', tail: 'none', frogEyes: true, eye: [0.45, 0.62] },
   duck: { foot: 'web', hs: 0.76, body: [1.12, 1.0], taper: 0.08, belly: true, head: [1.0, 1.0, 0.98], cheek: 0.05, snout: null, beak: true, nose: null, ears: 'none', tail: 'duck', eye: [0.4, 0.12] },
-  human: { hs: 0.84, body: [1.0, 1.0], head: [0.97, 1.04, 0.95], cheek: 0.02, chin: 0.2, snout: null, nose: [0.028, 0.022, 0.022], ears: 'human', tail: 'none', human: true, eye: [0.38, 0.04] },
+  human: { hs: 0.84, body: [1.0, 1.0], head: [1.0, 0.98, 0.95], cheek: 0.07, chin: 0.07, snout: null, nose: [0.028, 0.022, 0.022], ears: 'human', tail: 'none', human: true, eye: [0.38, 0.04] },
 };
 const RH = 0.27; // head radius before the species scale
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
@@ -209,7 +209,16 @@ export function cloneRig(src) {
  *   patterns:{chestBlaze, blaze, socks, tailTip}, outfit:{ top, topColor, topColor2, bottom, bottomColor, scarf, sash, apron, hat, hatColor, bow, glasses, bag },
  *   hair:{ style:'curly', color, color2 }, skin }
  */
+// Rigs built ahead of time (prebuildHumanoid) are handed out by buildHumanoid for the same spec object, so a villager
+// can be constructed mid-play without the ~20 ms build.
+const PREBUILT = new WeakMap();
+export function prebuildHumanoid(spec) { if (!PREBUILT.has(spec)) PREBUILT.set(spec, makeHumanoid(spec)); return spec; }
 export function buildHumanoid(spec) {
+  const r = PREBUILT.get(spec);
+  if (r) { PREBUILT.delete(spec); return r; }
+  return makeHumanoid(spec);
+}
+function makeHumanoid(spec) {
   const R = new Rig(spec);
   const sp = SPECIES[spec.species] || SPECIES.dog;
   const fur = spec.fur || '#c98f5e', fur2 = spec.fur2 || '#fff2e0', fur3 = spec.fur3 || (sp.patches ? '#2a2630' : fur);
@@ -219,16 +228,18 @@ export function buildHumanoid(spec) {
   const topC = of.topColor || '#6ea8ff', topC2 = of.topColor2 || '#ffffff', botC = of.bottomColor || '#4a4a6a';
 
   // --- hierarchy (hip height 0.27 and part names are a contract with the animator and the NPC poses)
-  const [bw, bh] = sp.body || [1, 1], lk = sp.limb || 1;   // species body plan: torso width/height, limb thickness
-  const body = R.group(R.root, 'body', [0, 0.27, 0]);
-  const legL = R.group(R.root, 'legL', [0.08 * Math.min(bw, 1.15), 0.27, 0]);
-  const legR = R.group(R.root, 'legR', [-0.08 * Math.min(bw, 1.15), 0.27, 0]);
+  const [bw, bh0] = sp.body || [1, 1], lk = sp.limb || 1;   // species body plan: torso width/height, limb thickness
+  // Pokopia proportions: longer legs (dL) and arms (dA), a taller torso (TS) and a smaller head than the old chibi
+  const dL = sp.legs ?? 0.05, dA = 0.035, TS = 1.12, bh = bh0 * TS, HIP = 0.27 + dL;
+  const body = R.group(R.root, 'body', [0, HIP, 0]);
+  const legL = R.group(R.root, 'legL', [0.08 * Math.min(bw, 1.15), HIP, 0]);
+  const legR = R.group(R.root, 'legR', [-0.08 * Math.min(bw, 1.15), HIP, 0]);
   const head = R.group(body, 'head', [0, 0.415 * bh - (sp.neckless || 0), 0.012]);
-  head.scale.setScalar(sp.hs || 0.8);
+  head.scale.setScalar((sp.hs || 0.8) * 0.9);
   const armL = R.group(body, 'armL', [0.146 * bw, 0.282 * bh, 0]);
   const armR = R.group(body, 'armR', [-0.146 * bw, 0.282 * bh, 0]);
-  const handL = R.group(armL, 'handL', [0, -0.235, 0.02]);
-  const handR = R.group(armR, 'handR', [0, -0.235, 0.02]);
+  const handL = R.group(armL, 'handL', [0, -0.235 - dA, 0.02]);
+  const handR = R.group(armR, 'handR', [0, -0.235 - dA, 0.02]);
   const back = R.group(body, 'back', [0, 0.17 * bh, -0.17 * bw]);
 
   // --- torso: a bean, narrow at the shoulders and fuller at the belly, a little flatter front-to-back (no more ball)
@@ -269,23 +280,24 @@ export function buildHumanoid(spec) {
     torsoParts.push(torus(0.078, 0.026, topC2, [0, 0.3, 0]));
   }
   if (of.bag) { torsoParts.push(ell(0.08, 0.09, 0.045, of.bag, [0, 0.15, -0.17])); torsoParts.push(xf(torus(0.165, 0.011, of.bag, [0, 0.2, 0], [Math.PI / 2 - 0.5, 0, 0]), { s: [1, 1, 0.87] })); }
-  R.add(body, merge(torsoParts), 'torso');
+  R.add(body, merge(torsoParts).scale(1, TS, 1), 'torso');
 
   // tail
   if (sp.tail !== 'none') buildTail(R, body, sp.tail, fur, fur2, spec);
 
   // scarf (with trailing tails as a separate swinging group)
   if (of.scarf) {
-    R.add(body, merge([xf(torus(0.098, 0.04, of.scarf, [0, 0.305 * bh, 0.005], [Math.PI / 2 + 0.12, 0, 0]), { s: [bw, 1, 0.9] }), ell(0.045, 0.036, 0.028, of.scarf, [-0.05, 0.28, 0.11])]), 'scarf');
-    const tails = R.group(body, 'scarfTail', [0.02, 0.3, -0.085]);
+    R.add(body, merge([xf(torus(0.098, 0.04, of.scarf, [0, 0.305 * bh, 0.005], [Math.PI / 2 + 0.12, 0, 0]), { s: [bw, 1, 0.9] }), ell(0.045, 0.036, 0.028, of.scarf, [-0.05 * bw, 0.28 * bh, 0.11])]), 'scarf');
+    const tails = R.group(body, 'scarfTail', [0.02, 0.3 * TS, -0.085]);
     R.add(tails, merge([cap(0.032, 0.1, of.scarf, [0.02, -0.07, -0.03], [0.5, 0, 0.15], null), cap(0.027, 0.08, of.scarf, [-0.04, -0.06, -0.02], [0.4, 0, -0.2])]), 'scarfTails');
   }
 
   // --- legs & feet: a tapered leg and a proper foot (longer, flatter, soft pads) — reads as a creature, not a peg
   for (const [g, s] of [[legL, 1], [legR, -1]]) {
     const pants = top === 'dress' ? (of.socks || '#ffffff') : (of.bottom === 'shorts' || bare ? (limbC || skin) : botC);
-    const parts = [xf(cap(0.058 * lk, 0.1, pants, [0, -0.095, 0]), { s: [1, 1, 0.92] })];
+    const parts = [xf(cap(0.058 * lk, 0.1 + dL, pants, [0, -0.095 - dL / 2, 0]), { s: [1, 1, 0.92] })];
     if (of.bottom === 'shorts' && top !== 'dress') parts.push(cap(0.068, 0.03, botC, [0, -0.045, 0]));
+    const legN = parts.length;
     const footC = sp.human ? (of.shoes || '#d8443a') : (spec.patterns?.socks ? '#fffaf2' : fur3);
     const foot = sp.foot || 'paw';
     if (foot === 'long') { // bunny: long flat hind feet
@@ -309,13 +321,14 @@ export function buildHumanoid(spec) {
         parts.push(ell(0.04, 0.008, 0.05, spec.pads || '#f2b8b0', [0, -0.272, 0.04])); // paw pad peeking under the foot
       }
     }
+    for (let i = legN; i < parts.length; i++) parts[i].translate(0, -dL, 0); // feet at the new hip height
     R.add(g, merge(parts), 'leg');
   }
   // --- arms: slimmer, longer, with a mitten paw and a little thumb
   for (const [g, s] of [[armL, 1], [armR, -1]]) {
     const sleeve = top === 'none' ? (limbC || fur) : (top === 'overalls' ? of.shirt || '#ffffff' : topC);
     const r = (sp.human ? 0.042 : 0.047) * lk;
-    const parts = [cap(r, 0.14, sleeve, [0, -0.095, 0])];
+    const parts = [cap(r, 0.14 + dA, sleeve, [0, -0.095 - dA / 2, 0])];
     if (top === 'gi' || top === 'kimono') parts.push(paint(new THREE.CylinderGeometry(r + 0.014, r + 0.024, 0.07, 14).translate(0, -0.12, 0), (p, n, o) => o.set(sleeve)));
     if (top === 'dress') parts.push(ell(0.064, 0.052, 0.064, topC, [0, -0.03, 0]));
     if (of.wraps) { for (const [y, rr] of [[-0.18, r - 0.002], [-0.155, r]]) parts.push(paint(xf(new THREE.CylinderGeometry(rr, rr, 0.028, 12), { p: [0, y, 0.004], r: [0.1, 0, 0.12] }), (p, n, o) => o.set(of.wraps))); }
@@ -330,6 +343,7 @@ export function buildHumanoid(spec) {
       parts.push(ell(0.048, 0.056, 0.042, handC, [0, -0.228, 0.01], [0, 0, 0], 16, shade(0.1)));
       parts.push(ell(0.018, 0.026, 0.018, handC, [-s * 0.038, -0.212, 0.026], [0, 0, s * 0.5]));
     }
+    for (let i = 1; i < parts.length; i++) { parts[i].computeBoundingBox(); if (parts[i].boundingBox.max.y < -0.12) parts[i].translate(0, -dA, 0); } // hands, wraps
     R.add(g, merge(parts), 'arm');
   }
   // --- head
@@ -340,7 +354,7 @@ export function buildHumanoid(spec) {
   if (of.bow) { const b = face.at(0.42, 0.72, 0.01); R.add(head, merge([ell(0.08, 0.055, 0.036, of.bow, [b.x - 0.065, b.y + 0.02, b.z], [0.5, 0, 0.45]), ell(0.08, 0.055, 0.036, of.bow, [b.x + 0.065, b.y - 0.01, b.z - 0.01], [0.5, 0, -0.35]), ell(0.036, 0.036, 0.036, of.bow, [b.x, b.y + 0.005, b.z + 0.01])]), 'bow'); }
 
   R.root.scale.setScalar(spec.scale || 1);
-  R.height = 1.15 * (spec.scale || 1);
+  R.height = 1.22 * (spec.scale || 1); // longer legs + torso
   return R.bake();
 }
 
@@ -509,10 +523,10 @@ function buildEars(R, head, kind, spec, fur, fur2, fur3, S) {
     if (kind === 'none' || kind === 'human') continue;
     const g = mk(s);
     if (kind === 'rose') { // Chewy: semi-erect ear whose top third folds forward (his photo + the concept art)
-      seat(g, s, 0.6, 0.66); g.rotation.set(-0.05, 0, -s * 0.42);
-      R.add(g, merge([cone(0.13, 0.19, earC, [0, 0.085, 0], [0, 0, 0], 16, 1, 0.3), cone(0.085, 0.14, spec.earInner || '#5a2a1a', [0, 0.075, 0.018], [0, 0, 0], 12, 1, 0.18)]), 'earBase');
-      const tip = new THREE.Group(); tip.name = 'earTip'; tip.position.set(0, 0.125, 0.012); tip.rotation.set(1.75, 0, -s * 0.2); g.add(tip);
-      R.add(tip, merge([cone(0.075, 0.1, C(earC).multiplyScalar(0.85).getStyle(), [0, 0.045, 0], [0, 0, 0], 14, 1, 0.3)]), 'earTip');
+      seat(g, s, 0.62, 0.64); g.rotation.set(-0.08, 0, -s * 0.5);
+      R.add(g, merge([cone(0.16, 0.2, earC, [0, 0.09, 0], [0, 0, 0], 16, 1, 0.28), cone(0.1, 0.15, spec.earInner || '#5a2a1a', [0, 0.08, 0.02], [0, 0, 0], 12, 1, 0.16)]), 'earBase');
+      const tip = new THREE.Group(); tip.name = 'earTip'; tip.position.set(0, 0.15, 0.015); tip.rotation.set(2.2, 0, -s * 0.25); g.add(tip);
+      R.add(tip, merge([cone(0.12, 0.15, C(earC).multiplyScalar(0.88).getStyle(), [0, 0.07, 0], [0, 0, 0], 16, 1, 0.28)]), 'earTip');
       g.userData.tip = tip;
     } else if (kind === 'floppy') {
       seat(g, s, 0.8, 0.45); g.rotation.z = s * 0.35;
@@ -714,12 +728,15 @@ export function enableXray(rig, color = '#ffd9a0', opacity = 0.55) {
 }
 
 // Blob contact shadow that sits under characters (sells grounding, especially in shade)
+let shadowTex = null; // one soft blob texture shared by every actor (was a new canvas + upload per actor)
 export function contactShadow(r = 0.34) {
-  const c = document.createElement('canvas'); c.width = c.height = 64;
-  const g = c.getContext('2d'); const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-  grd.addColorStop(0, 'rgba(40,20,60,0.45)'); grd.addColorStop(1, 'rgba(40,20,60,0)'); g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
-  const t = new THREE.CanvasTexture(c);
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(r * 2, r * 2), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
+  if (!shadowTex) {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'); const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grd.addColorStop(0, 'rgba(40,20,60,0.45)'); grd.addColorStop(1, 'rgba(40,20,60,0)'); g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
+    shadowTex = new THREE.CanvasTexture(c);
+  }
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(r * 2, r * 2), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
   m.rotation.x = -Math.PI / 2; m.position.y = 0.02; m.renderOrder = 1;
   return m;
 }
