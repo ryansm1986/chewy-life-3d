@@ -296,6 +296,23 @@ const LEAF_EDGE = {
       normal = normalize(abs(det) * normal - grad * 0.035);
     }`,
 };
+// Night readability for canopies / leaf cards: the moon-side of a crown is lit, but the side facing the camera mostly
+// gets the dark ground-hemisphere fill, so crowns near the camera went almost black (spiky alpha cards on top). Keep a
+// cool moonlit floor under the lighting, stronger for foliage well in front of Chewy (uOccl.w = his view depth), plus a
+// soft silver rim on those foreground crowns so they read as leaves, not black cut-outs.
+const MOONLIT = /* glsl */`
+  if (uNight > 0.01) {
+    // foreground = nearer the camera than Chewy on the ground plane (height-independent, unlike view depth);
+    // uOccl.w is Chewy's view depth, ~ the camera distance, and the rig pitch is 0.62 rad (cos = 0.81)
+    float fgK = smoothstep(1.5, 6.0, uOccl.w * 0.81 - length(cameraPosition.xz - vCWorld.xz));
+    float mLum = dot(outgoingLight, vec3(0.3, 0.59, 0.11));
+    vec3 mHue = mix(vec3(1.0), diffuseColor.rgb / max(0.03, dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))), 0.55) * vec3(0.72, 0.82, 1.2);
+    float mFloor = uNight * (0.032 + 0.045 * fgK);
+    outgoingLight += mHue * max(0.0, mFloor - mLum);
+    float mRim = smoothstep(0.5, 1.0, 1.0 - abs(dot(normal, normalize(vViewPosition))));
+    outgoingLight += mHue * uNight * fgK * mRim * 0.05;
+  }
+`;
 const WHITE = new THREE.Color(1, 1, 1);
 class Batch {
   constructor(name, mat, { castShadow = true, receiveShadow = true, sort = true } = {}) {
@@ -421,12 +438,12 @@ export class Vegetation {
     this.extraTrees?.(tryTree);
     const barkB = this.batch('bark', vegToon({ vertexColors: true, wind: 'tree', brush: 0.3, brushScale: 1.2, rim: 0.2, occluder: true }));
     LEAF_EDGE.uniforms.uFloret.value = floretTexture();
-    const folB = this.batch('foliage', vegToon({ ...LEAF_EDGE, occluder: true, vertexColors: true, wind: 'leaf', brush: 0.22, brushScale: 0.8, rim: 0.55, shadowSat: 0.5, term: [-0.15, 0.4] }));
+    const folB = this.batch('foliage', vegToon({ ...LEAF_EDGE, fragOut: MOONLIT, occluder: true, vertexColors: true, wind: 'leaf', brush: 0.22, brushScale: 0.8, rim: 0.55, shadowSat: 0.5, term: [-0.15, 0.4] }));
     for (const kind of Object.keys(treeSpots)) {
       const spots = treeSpots[kind]; if (!spots.length) continue;
       const S = TREE_SPECIES[kind];
       const variants = [0, 1, 2].map(v => { const t = buildTree(kind, v + 1); return [t.trunkGeo, t.foliage, t.cardGeo]; });
-      const cardB = this.batch('cards:' + kind, vegToon({ occluder: true, noShadowCast: true, vertexColors: true, wind: 'leaf', map: leafCardTexture(S.leaf), alphaTest: 0.42, side: THREE.DoubleSide, noFlip: true, brush: 0.12, rim: 0.55, shadowSat: 0.3, term: [-0.45, 0.35] }), { castShadow: false });
+      const cardB = this.batch('cards:' + kind, vegToon({ fragOut: MOONLIT, occluder: true, noShadowCast: true, vertexColors: true, wind: 'leaf', map: leafCardTexture(S.leaf), alphaTest: 0.42, side: THREE.DoubleSide, noFlip: true, brush: 0.12, rim: 0.55, shadowSat: 0.3, term: [-0.45, 0.35] }), { castShadow: false });
       const pl = spots.map(sp => ({ x: sp.x, z: sp.z, y: H(sp.x, sp.z), rot: rnd() * TAU, s: 0.85 + rnd() * 0.4, v: Math.floor(rnd() * 3), hue: [0.92 + rnd() * 0.16, 0.92 + rnd() * 0.12, 0.92 + rnd() * 0.12] }));
       this._place(variants, [barkB, folB, cardB], pl, { kind, collide: S.radius });
     }
@@ -440,7 +457,7 @@ export class Vegetation {
     const bv = [0, 1, 2].map(v => { const b = buildBamboo(v); return [b.stalks, b.leaves]; });
     this._place(bv, [
       this.batch('bamboo', vegToon({ occluder: true, vertexColors: true, wind: 'reed', windAmt: 0.6, brush: 0.15, rim: 0.4 })),
-      this.batch('bambooLeaf', vegToon({ occluder: true, vertexColors: true, wind: 'reed', windAmt: 0.6, map: leafCardTexture('bamboo'), alphaTest: 0.4, side: THREE.DoubleSide, noFlip: true, rim: 0.5 })),
+      this.batch('bambooLeaf', vegToon({ fragOut: MOONLIT, occluder: true, vertexColors: true, wind: 'reed', windAmt: 0.6, map: leafCardTexture('bamboo'), alphaTest: 0.4, side: THREE.DoubleSide, noFlip: true, rim: 0.5 })),
     ], bambooPl, { kind: 'bamboo', collide: 0.6 });
     // ---- bushes
     const bushPl = { hydrangea: [], azalea: [], box: [] };

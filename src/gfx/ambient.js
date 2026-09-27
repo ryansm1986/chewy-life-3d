@@ -231,6 +231,8 @@ export class Ambient {
         }
         continue;
       }
+      // daylight (or a clock jump to morning): fade the stragglers out quickly and retire them
+      if (lanternNight < 0.5) L.fade = Math.max(0, (L.fade ?? 1) - dt / 3); else L.fade = 1;
       L.t += dt;
       const k = L.t / L.life;
       L.p.y += dt * (0.32 + k * 0.1);
@@ -238,10 +240,10 @@ export class Ambient {
       L.p.z += (wind.y * 0.25 + Math.cos(L.t * 0.33 + L.ph) * 0.12) * dt;
       L.m.position.copy(L.p);
       L.m.rotation.set(Math.sin(L.t * 0.9 + L.ph) * 0.08, L.t * 0.2, Math.cos(L.t * 0.7) * 0.08);
-      const a = Math.min(1, L.t / 3) * (1 - smoothstep(0.8, 1, k)) * Math.max(0.2, lanternNight);
+      const a = Math.min(1, L.t / 3) * (1 - smoothstep(0.8, 1, k)) * Math.min(1, lanternNight) * L.fade;
       L.m.material.opacity = a; L.halo.material.opacity = 0.55 * a * (0.85 + 0.15 * Math.sin(t * 3 + L.ph));
       L.m.visible = a > 0.01;
-      if (k >= 1) L.active = false;
+      if (k >= 1 || L.fade <= 0 || (lanternNight < 0.02 && L.t > 0.5)) { L.active = false; L.m.visible = false; }
     }
     // ---- chimney smoke / steam
     for (const e of this.smokeEmitters) {

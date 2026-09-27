@@ -28,8 +28,34 @@ const NEED_FIX = { water: 'a Well or Water Tower', joy: 'a Park, Benches or Flow
 const pct = v => `${Math.round(v * 100)}%`;
 const sgn = v => `${v >= 0 ? '+' : '−'}${Math.round(Math.abs(v) * 100)}%`;
 
-const noStencil = (r, sc, cam, geo, mat) => { mat.stencilWrite = false; };
-const restoreStencil = (r, sc, cam, geo, mat) => { mat.stencilWrite = true; };
+// Small models (decor, lanterns, wells, stalls) draw with a twin of the shared building material that has the
+// occlusion cutaway switched off (uOcclOn = 0) and writes no x-ray stencil: a stone lantern next to Chewy must never
+// dissolve, and only real buildings trigger the x-ray silhouette -- except bushy props big enough to swallow Chewy
+// whole (a sakura planter's crown), which keep the stencil so he shows as a silhouette instead of vanishing.
+// A uniform can't be toggled per draw (the renderer only re-uploads material uniforms when the material changes, and
+// opaque draws are sorted by material), so the twin is a separate material object. It keeps the same
+// customProgramCacheKey, so it shares the compiled program (no new shader), shares every other uniform object with the
+// original, and reads the original's emissive live (setNight).
+const PROP_TWINS = [new Map(), new Map()];
+function propTwin(m, xray = false) {
+  let t = PROP_TWINS[+xray].get(m);
+  if (t) return t;
+  const ud = m.userData;
+  m.userData = {}; t = m.clone(); m.userData = ud; // (Material.clone JSON-copies userData: keep it out of that)
+  const u = { ...ud.u, uOcclOn: { value: 0 } };
+  t.userData = { ...ud, u, shader: null };
+  t.stencilWrite = false; if (xray) markOccluder(t);
+  t.customProgramCacheKey = m.customProgramCacheKey;
+  const base = m.onBeforeCompile;
+  t.onBeforeCompile = (sh, r) => {
+    const keep = ud.shader; base.call(m, sh, r); ud.shader = keep; // base() binds the original's uniforms + records its shader
+    sh.uniforms.uOcclOn = u.uOcclOn; t.userData.shader = sh;
+  };
+  t.emissive = m.emissive;
+  Object.defineProperty(t, 'emissiveIntensity', { get: () => m.emissiveIntensity, set() {}, configurable: true });
+  PROP_TWINS[+xray].set(m, t);
+  return t;
+}
 export class VillageSim {
   constructor(G, world) {
     this.G = G; this.world = world; this.terrain = world.terrain;
@@ -185,17 +211,17 @@ export class VillageSim {
     const g = new THREE.Group(); g.add(model.group);
     const p = this.worldPos(b);
     g.position.copy(p); g.rotation.y = -b.rot * Math.PI / 2;
-    // Only real buildings may trigger the x-ray silhouette: small models (decor, lanterns, wells, stalls) share the same
-    // materials, so their draws switch stencil writing off just for themselves (stencil is not part of the program key).
+    // Only real buildings get the occlusion cutaway and may trigger the x-ray silhouette; small models (decor,
+    // lanterns, wells, stalls) swap to propTwin() materials (see above).
     const [fw, fd] = this.dims(b.type, b.rot, b.level);
     const box = new THREE.Box3().setFromObject(model.group), tall = box.max.y - box.min.y > 1.7;
     const occluder = BUILDINGS[b.type].cat !== 'decor' && tall && fw * fd >= 4;
+    const bushy = !occluder && box.max.y - box.min.y > 1.75 && Math.min(box.max.x - box.min.x, box.max.z - box.min.z) > 1.1;
     g.traverse(o => {
       if (!o.isMesh) return;
       o.castShadow = o.castShadow !== false; o.receiveShadow = true;
       const m = o.material; if (!m?.userData?.u?.uOcclOn) return;
-      m.userData.u.uOcclOn.value = 1; markOccluder(m);
-      if (!occluder) { o.onBeforeRender = noStencil; o.onAfterRender = restoreStencil; }
+      if (occluder) { m.userData.u.uOcclOn.value = 1; markOccluder(m); } else o.material = propTwin(m, bushy);
     });
     this.group.add(g);
     const [w, d] = this.dims(b.type, b.rot, b.level);

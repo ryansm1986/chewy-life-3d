@@ -138,10 +138,12 @@ void occlusionFade(float fragDepth) {
   vec2 d = gl_FragCoord.xy - uOccl.xy;
   float r = length(d * vec2(1.0, 1.15)) / uOccl.z;
   if (r > 1.0) return;
-  // clean circular cutaway (fully open inside) with a thin dithered rim, only for surfaces in front of Chewy
-  // in front of Chewy or not: a near-binary test, so sloped walls/roofs get a clean cut instead of a dithered half-disc
-  float front = smoothstep(1.0, 1.12, uOccl.w - fragDepth);
-  float k = smoothstep(1.0, 0.96, r) * front;
+  // clean circular cutaway (fully open inside) with a thin dithered rim, only for surfaces well in front of Chewy.
+  // The in-front test is strictly binary (no depth band): a surface near Chewy's depth (a wall he leans on, a lantern or
+  // bench beside him) is never dithered, and sloped walls/roofs crossing the threshold get a clean cut, not a Bayer ramp.
+  // (Small props opt out entirely via uOcclOn = 0: see propTwin() in world/village.js.)
+  if (uOccl.w - fragDepth < 1.15) return;
+  float k = smoothstep(1.0, 0.96, r);
   if (k > 0.97 || bayer4(gl_FragCoord.xy) < k) discard;
 }
 float cloudShadowAt(vec3 p) {

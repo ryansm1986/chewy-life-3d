@@ -3,7 +3,10 @@
 // water flower beds, tend the veggie patch, fish at the water's edge, admire statues, read the notice board, crank the
 // well, sweep yards, soak in the hot spring. They stroll along the paths (grid A*), stop to chat with each other
 // (facing, gestures, emotes, babble), greet and watch Chewy, and never walk through Chewy, Shadow or each other
-// (look-ahead sidestep + soft separation). Folk go home and hide at night; talking to Chewy pauses everything.
+// (look-ahead sidestep + soft separation). Everybody has a bedtime: at night they walk to their doorstep, turn to the
+// door, step in (warm light spill, door sound) and are tucked in; in the morning they step back out the same way.
+// Chewy can knock on a door at night; a villager an active quest step needs waits up on the doorstep instead.
+// Talking to Chewy pauses everything.
 import * as THREE from 'three';
 import { Actor } from './actor.js';
 import { buildHumanoid } from './charKit.js';
@@ -37,7 +40,7 @@ const PROP_FOR = { sweep: 'broom', water: 'can', fish: 'rod' };
 const SEATED = new Set(['sitBench', 'sitDoze', 'sitWave', 'standUp']);
 // schedule: base weights per part of day (named villagers without a home stay out at night)
 function schedule(h, night) {
-  if (night) return { bench: 3, rim: 1.2, lantern: 3, chat: 1, stroll: 0.5, idle: 1.5 };
+  if (night) return { bench: 3, rim: 1.2, lantern: 3, onsen: 1.2, chat: 1, stroll: 0.5, idle: 1.5 };
   if (h < 9.5) return { sweep: 3, garden: 3, farm: 2.2, well: 1.6, board: 1.6, stroll: 1.5, bench: 1, rim: 0.6, admire: 1, chat: 2.4, counter: 1.2, fish: 0.8, idle: 0.8 };
   if (h < 17) return { counter: 2.5, browse: 2.2, farm: 1.4, fish: 2, admire: 1.8, bench: 2, rim: 1.4, stroll: 2.2, chat: 3.4, board: 1, garden: 0.8, well: 0.6, idle: 0.8 };
   return { bench: 3, rim: 1.6, onsen: 3, admire: 1.6, lantern: 1.8, chat: 3.6, stroll: 1.5, fish: 1.2, idle: 0.8 };
@@ -52,6 +55,10 @@ const LIKES = {
   kero: { fish: 5, admire: 1.5 },
 };
 const FOLK_LIKES = ['bench', 'garden', 'farm', 'fish', 'counter', 'browse', 'admire', 'sweep', 'chat', 'onsen', 'board'];
+// bedtimes [in, out] in game hours. Rosie keeps her shop lit a little later; Kitsune (lantern gazing) and Kero (night
+// fishing, the hot spring) are the night owls, but the whole cast is tucked in by 23:30. Townsfolk head home at dusk
+// (19:15-20:00) and wake 5:30-6:30, staggered so doors open one by one.
+const BED = { rosie: [22.9, 6.6], mochi: [21.6, 7.0], usagi: [20.8, 6.0], kuma: [21.0, 5.8], kitsune: [23.3, 7.6], pan: [22.2, 8.0], tanu: [22.6, 7.2], kero: [23.0, 6.4] };
 
 export class Villager extends Actor {
   constructor(world, G, spec, { id, anchor, home = null, wander = 5, role = 'villager' } = {}) {
@@ -72,6 +79,9 @@ export class Villager extends Actor {
     this.seated = false; this.fidgetT = rand(4, 10); this.look = 0; this.wasTalking = false;
     this.prop = null; this.propKind = null; this.props = null; this.line = null; this.bobber = null;
     this.likes = LIKES[this.id] || null;
+    // home & bedtime (see villageLife.homeFor / doorInfo)
+    this.homeRec = null; this.homeInfo = null; this._hv = -1; this.bedNow = false; this.homeTries = 0;
+    this.door = null; this.doorScale = 1; this.doorLift = 0; this.knocked = false; this.knockT = 0; this.needT = 0; this.needOut = false;
   }
   get hour() { return this.G.day?.hour ?? 12; }
   update(dt) {
@@ -79,20 +89,31 @@ export class Villager extends Actor {
     const life = this.life || (this.life = VillageLife.get(G));
     if (!life) return this.legacyUpdate(dt);
     life.frame();
+    if (this._hv !== life.ver) this.resolveHome(life);
     const p = G.player;
-    const night = G.day?.isNight?.() && this.home;
     const pd = p ? dist(p.pos.x, p.pos.z, this.pos.x, this.pos.z) : 99;
-    if (!this.warm) { this.warm = true; if (life.warmup() && !night && chance(0.75)) this.decide(true); }
+    const inBed = this.inBed(), need = inBed && this.questNeed(dt);
+    if (this.knocked && !this.door && !this.talking) { // answered the door: back to bed once the chat is over
+      this.knockT += dt;
+      if (this.wasTalking || this.knockT > 4) this.knocked = false;
+    }
+    const bed = this.bedNow = inBed && !need && !this.knocked;
+    if (!this.warm) { this.warm = true; if (life.warmup()) { if (bed) this.tuckIn(true); else if (chance(0.75)) this.decide(true); } }
     // someone else (intro, tests, story) reset us to idle: drop whatever we were doing
     if (this.state === 'idle' && (this.act || this.goal || this.chat)) this.clearTask();
     this.chatCD -= dt;
     if (this.talking) {
       if (!this.wasTalking) this.onTalk();
       if (p) { this.faceTo(p.pos.x, p.pos.z); this.faceTarget += this.faceBias || 0; }
-    } else if (night) {
-      this.nightTick(dt);
+    } else if (this.door) {
+      this.doorTick(dt, pd);
+    } else if (bed) {
+      this.nightTick(dt, pd);
+    } else if (!this.visible && this.state !== 'inside') {
+      this.stepOut(); // morning (staggered), a knock at the door, or a quest step needs us: out through the front door
+    } else if (need && this.role !== 'shop' && this.homeInfo) {
+      this.porchTick(dt, p, pd); // past bedtime but Chewy still has business with us: wait up on the doorstep
     } else {
-      if (!this.visible && this.state !== 'inside') { this.visible = true; if (this.home) this.setPos(this.home.x, this.home.z); this.state = 'idle'; this.t = rand(0.5, 2); this.anim.first = true; }
       this.greetTick(dt, p, pd);
       switch (this.state) {
         case 'idle': this.idleTick(dt, p, pd); break;
@@ -104,11 +125,12 @@ export class Villager extends Actor {
       }
     }
     this.wasTalking = this.talking;
-    if (this.visible && !this.seated) this.separate(dt);
+    if (this.visible && !this.seated && !this.door) this.separate(dt);
     this.interact.pos = this.pos;
     this.chatTalk = damp(this.chatTalk, this.talkWant(), 10, dt);
     this.anim.talk = this.talking ? 0.8 : this.chatTalk;
     super.update(dt);
+    if (this.doorScale !== 1) { this.rig.root.scale.multiplyScalar(this.doorScale); this.shadow.scale.multiplyScalar(this.doorScale); }
     if (this.visible) this.post(dt, p, pd);
   }
   // ------------------------------------------------------------------ decisions
@@ -130,7 +152,7 @@ export class Villager extends Actor {
     }
     let r = Math.random() * sum, kind = 'idle';
     for (let i = 0; i < opts.length; i += 2) { r -= opts[i + 1]; if (r <= 0) { kind = opts[i]; break; } }
-    const near = this.home && chance(0.35) ? this.home : this.anchor;
+    const near = this.home && (chance(0.35) || (this.homeInfo && this.hoursToBed() < 1.2)) ? this.home : this.anchor;
     if (kind === 'chat') {
       const pn = life.partner(this);
       if (pn) return this.startChat(pn);
@@ -145,7 +167,8 @@ export class Villager extends Actor {
       const sl = life.claim(this, kind, near, this.folk ? 24 : 19, teleport) || (near !== this.anchor ? life.claim(this, kind, this.anchor, 19, teleport) : null);
       if (sl) {
         if (teleport) return this.beginAct(sl, true);
-        return this.go(sl.ax ?? sl.x, sl.az ?? sl.z, { kind: 'slot', slot: sl, speed: kind === 'onsen' || kind === 'counter' ? 1 : 0.9 });
+        const sp = sl.spot || sl;
+        return this.go(sp.ax ?? sp.x, sp.az ?? sp.z, { kind: 'slot', slot: sl, speed: kind === 'onsen' || kind === 'counter' ? 1 : 0.9 });
       }
     }
     // idle a while near the anchor (the old wander keeps them from freezing in one spot)
@@ -211,7 +234,8 @@ export class Villager extends Actor {
     let tx = P[i], tz = P[i + 1], last = i >= P.length - 2;
     let dx = tx - pos.x, dz = tz - pos.z, d = Math.hypot(dx, dz);
     if (!last && d < 0.45) { this.pi = i += 2; tx = P[i]; tz = P[i + 1]; last = i >= P.length - 2; dx = tx - pos.x; dz = tz - pos.z; d = Math.hypot(dx, dz); }
-    if (last && d < 0.13) return 1;
+    const near = this.goal?.near || 0.13;
+    if (last && (d < near || (near > 0.2 && d < near * 3 && this.stuckT > 0.8))) return 1; // (doorsteps: close, or wedged against the porch, counts)
     _dir.set(dx / d, 0, dz / d);
     const slow = this.steer(_dir, dt);
     const k = last ? Math.min(1, d / (this.speed * mul * dt + 1e-6)) : 1;
@@ -254,7 +278,8 @@ export class Villager extends Actor {
     switch (g.kind) {
       case 'slot': return this.beginAct(g.slot, false);
       case 'chat': return this.chatArrive();
-      case 'home': this.visible = false; this.state = 'hidden'; return;
+      case 'home': return this.enterDoor(this.G.player ? dist(this.G.player.pos.x, this.G.player.pos.z, this.pos.x, this.pos.z) : 99);
+      case 'porch': this.state = 'porch'; this.t = rand(2, 4); return;
       default: {
         this.state = 'idle'; this.t = rand(2, 5);
         const pn = this.chatCD <= 0 && chance(0.4) ? this.life.partner(this, 6) : null;
@@ -276,14 +301,15 @@ export class Villager extends Actor {
     const h = this.hour, late = h >= 21 || h < 5.5;
     if (def.seat && ((late && chance(0.7)) || (this.id === 'pan' && chance(0.5)) || chance(0.08))) pose = 'sitDoze'; // sleepyheads
     const dur = sl.dur || def.dur;
-    this.act = { slot: sl, def, kind: sl.kind, pose, t: rand(dur[0], dur[1]), phase: 'do', k: 0, fidgetT: rand(4, 9), emoteT: rand(5, 11), biteT: rand(7, 16), seq: 0, fx: 0 };
+    this.act = { slot: sl, spot: sl.spot || sl, def, kind: sl.kind, pose, t: rand(dur[0], dur[1]), phase: 'do', k: 0, fidgetT: rand(4, 9), emoteT: rand(5, 11), biteT: rand(7, 16), seq: 0, fx: 0 };
     this.state = 'act';
     if (def.hide) { // hot spring: slip inside for a soak
       this.visible = false; this.state = 'inside'; this.t = this.act.t; return;
     }
     if (def.seat) {
       if (instant) {
-        this.pos.set(sl.x, sl.seatY - this.seatDrop(), sl.z); this.facing = this.faceTarget = sl.face; this.sync();
+        const sp = this.act.spot;
+        this.pos.set(sp.x, sl.seatY - this.seatDrop(), sp.z); this.facing = this.faceTarget = sl.face; this.sync();
         this.seated = true; this.anim.play(pose); this.anim.action.t = 1; this.anim.first = true;
       } else { this.act.phase = 'turn'; this.act.k = 0; this.faceTarget = sl.face; }
       return;
@@ -296,7 +322,7 @@ export class Villager extends Actor {
   actTick(dt, p, pd) {
     const a = this.act;
     if (!a) { this.state = 'idle'; this.t = 1; return; }
-    const sl = a.slot;
+    const sl = a.slot, sp = a.spot || sl;
     if (sl.dead) { this.endAct(); this.state = 'idle'; this.t = 1; return; }
     if (a.phase === 'turn') { // at the bench: turn around, then hop onto the seat
       a.k += dt;
@@ -306,12 +332,12 @@ export class Villager extends Actor {
     if (a.phase === 'sit' || a.phase === 'rise') {
       a.k = Math.min(1, a.k + dt / 0.38);
       const u = a.phase === 'sit' ? a.k : 1 - a.k, e = u * u * (3 - 2 * u);
-      this.pos.x = sl.ax + (sl.x - sl.ax) * e; this.pos.z = sl.az + (sl.z - sl.az) * e;
-      const gy = this.world.heightAt(sl.ax, sl.az);
+      this.pos.x = sp.ax + (sp.x - sp.ax) * e; this.pos.z = sp.az + (sp.z - sp.az) * e;
+      const gy = this.world.heightAt(sp.ax, sp.az);
       this.pos.y = gy + (sl.seatY - this.seatDrop() - gy) * e;
       if (a.k >= 1) {
         if (a.phase === 'sit') a.phase = 'do';
-        else { this.seated = false; this.setPos(sl.ax, sl.az); this.endAct(); this.state = 'idle'; this.t = rand(1.5, 3.5); }
+        else { this.seated = false; this.setPos(sp.ax, sp.az); this.endAct(); this.state = 'idle'; this.t = rand(1.5, 3.5); }
       }
       return;
     }
@@ -330,12 +356,12 @@ export class Villager extends Actor {
     if (a.emoteT <= 0) { a.emoteT = rand(8, 16); if (pd < 26) this.emote(a.pose === 'sitDoze' ? 'zzz' : a.def.emote ? pick(a.def.emote) : null); }
     if (a.pose === 'sitDoze' && a.emoteT > 4 && a.emoteT < 4 + dt) this.emote('zzz');
     if (a.kind === 'fish') this.fishTick(dt, a, pd);
-    if (a.kind === 'bench' && this.seated && !this.benchChat && sl.pair?.by?.seated && sl.pair.by.act?.phase === 'do' && this.chatCD <= 0 && a.pose !== 'sitDoze' && sl.pair.by.act.pose !== 'sitDoze' && chance(dt * 0.25)) this.startBenchChat(sl.pair.by);
+    if (a.kind === 'bench' && this.seated && !this.benchChat && sl.pair?.by && sl.pair.by !== this && sl.pair.by.seated && sl.pair.by.act?.phase === 'do' && this.chatCD <= 0 && a.pose !== 'sitDoze' && sl.pair.by.act.pose !== 'sitDoze' && chance(dt * 0.25)) this.startBenchChat(sl.pair.by);
     if (this.benchChat) this.benchChatTick(dt);
     if (a.t <= 0 && !busy && !this.benchChat) {
       if (this.seated) {
         // don't stand up into Chewy
-        if (p && dist(p.pos.x, p.pos.z, sl.ax, sl.az) < 0.8) { a.t = 1; return; }
+        if (p && dist(p.pos.x, p.pos.z, sp.ax, sp.az) < 0.8) { a.t = 1; return; }
         this.anim.play('standUp'); a.phase = 'rise'; a.k = 0;
       } else {
         const after = a.kind === 'farm' || a.kind === 'sweep' ? 'stretch' : a.kind === 'well' ? 'drink' : null;
@@ -358,6 +384,21 @@ export class Villager extends Actor {
       }
     } catch (e) { /* keep the default */ }
     return (this._seatDrop = SEAT_LIFT + low * (this.rig.spec.scale || 1) - 0.035);
+  }
+  // half the body's width (widest of the body and head, from the baked rig) for bench seating; follows redesigns
+  halfWidth() {
+    if (this._hw != null) return this._hw;
+    let w = 0.24;
+    try {
+      const skin = this.rig.skin, B = this.rig.skeleton?.bones, P = this.rig.parts;
+      const b0 = B ? B.indexOf(P.body) : -1, b1 = B ? B.indexOf(P.head) : -1;
+      if (skin && (b0 >= 0 || b1 >= 0)) {
+        const pos = skin.geometry.attributes.position, SI = skin.geometry.attributes.skinIndex; let m = 0;
+        for (let i = 0; i < pos.count; i++) { const b = SI.getX(i); if (b === b0 || b === b1) m = Math.max(m, Math.abs(pos.getX(i))); }
+        if (m > 0) w = m;
+      }
+    } catch (e) { /* keep the default */ }
+    return (this._hw = w * (this.rig.spec.scale || 1));
   }
   ensurePose() {
     const a = this.act; if (!a || this.anim.action) return;
@@ -383,7 +424,8 @@ export class Villager extends Actor {
     if (this.benchChat) this.endBenchChat();
     this.setProp(null);
     if (this.anim.action && (this.anim.action.def.hold || SEATED.has(this.anim.action.name))) this.anim.stop();
-    if (this.seated) { this.seated = false; if (a.slot.ax != null) this.setPos(a.slot.ax, a.slot.az); this.anim.first = true; }
+    const sp = a.spot || a.slot;
+    if (this.seated) { this.seated = false; if (sp.ax != null) this.setPos(sp.ax, sp.az); this.anim.first = true; }
   }
   insideTick(dt) {
     this.t -= dt;
@@ -407,20 +449,156 @@ export class Villager extends Actor {
     }
     if (this.t <= 0) this.decide(false);
   }
-  nightTick(dt) {
-    // walk home, then hide inside (folk)
-    if (this.state === 'inside') { this.endAct(); this.state = 'hidden'; return; } // leave the hot spring straight home
-    if (!this.visible) return;
-    if (!(this.state === 'walk' && this.goal?.kind === 'home')) { this.clearTask(); this.go(this.home.x, this.home.z, { kind: 'home', speed: 1.2 }); }
-    this.walkTick(dt);
-    if (this.state !== 'walk' && this.state !== 'hidden' && this.visible) { // path failed: fall back to the old straight walk
-      this.state = 'walk'; this.goal = { x: this.home.x, z: this.home.z, kind: 'home', speed: 1.2 }; this.path = [this.home.x, this.home.z]; this.pi = 0; this.needPath = false; this.walkMax = 1e9;
+  // ------------------------------------------------------------------ home, bedtime, doors
+  resolveHome(life) {
+    this._hv = life.ver;
+    const rec = life.homeFor(this);
+    if (rec !== this.homeRec) { if (this.homeRec) life.wakeUp(this, this.homeRec); this.homeRec = rec; }
+    this.homeInfo = rec ? life.doorInfo(rec) : null;
+    if (rec) this.home = rec.door; // townsfolk: the sim's door point (follows upgrades); named cast: their assigned house
+    if (rec && !this.visible && this.state === 'hidden') life.tuckIn(this, rec); // re-register the knock prompt
+  }
+  bedHours() {
+    if (this._bed) return this._bed;
+    if (BED[this.id]) return (this._bed = BED[this.id]);
+    const f = ((parseInt(this.id.replace(/\D/g, ''), 10) || 0) * 0.618034 + 0.13) % 1;
+    return (this._bed = this.folk ? [19.25 + f * 0.75, 5.55 + f * 0.9] : [21.2 + f, 6.4 + f]);
+  }
+  inBed() {
+    if (!this.homeInfo && !this.home) return false; // homeless (no house built for us yet): the old stay-out routine
+    const h = this.hour, [b, w] = this.bedHours();
+    return h >= b || h < w;
+  }
+  hoursToBed() { return (this.bedHours()[0] - this.hour + 24) % 24; }
+  // an active quest step needs Chewy to talk to us (or hand something over): stay reachable
+  questNeed(dt) {
+    if (this.folk) return false;
+    if ((this.needT -= dt) > 0) return this.needOut;
+    this.needT = 0.8;
+    const G = this.G, S = G.story, Q = G.state?.quests;
+    let need = false;
+    if (S?.def && Q?.active) for (const q of Q.active) {
+      const s = S.def(q.id)?.steps?.[q.step];
+      if (!s || s.npc !== this.id) continue;
+      if (s.type === 'talk' || (s.type === 'deliver' && (G.state.materials?.[s.mat] || 0) >= s.n)) { need = true; break; }
     }
+    return (this.needOut = need);
+  }
+  nightTick(dt, pd) {
+    if (this.state === 'inside') { this.endAct(); this.tuckIn(true); return; } // out of the hot spring and straight home, unseen
+    if (!this.visible) return;
+    const H = this.homeInfo, tx = H ? H.step.x : this.home.x, tz = H ? H.step.z : this.home.z;
+    const d = dist(tx, tz, this.pos.x, this.pos.z);
+    if (d < 0.6) return this.enterDoor(pd);
+    // long past bedtime (a clock jump, a nap at home) and nobody watching: already home
+    if (pd > 12 && (this.hour - this.bedHours()[0] + 24) % 24 > 1 && !this.onScreen()) return this.tuckIn(true);
+    if (!(this.state === 'walk' && this.goal?.kind === 'home')) {
+      this.clearTask();
+      if (++this.homeTries > 3) return d < 2.5 ? this.enterDoor(pd) : this.tuckIn(false); // lost: don't jitter at a wall all night
+      this.go(tx, tz, { kind: 'home', speed: this.hoursToBed() > 22.5 ? 1.2 : 1.35, near: 0.55 });
+    }
+    this.walkTick(dt);
+  }
+  onScreen() {
+    const cam = this.G.engine?.camera; if (!cam) return true;
+    _w.set(this.pos.x, this.pos.y + 0.6, this.pos.z).project(cam);
+    return _w.z < 1 && Math.abs(_w.x) < 1.1 && Math.abs(_w.y) < 1.15;
+  }
+  // hidden inside for the night (silent = nobody saw it happen)
+  tuckIn(silent) {
+    this.clearTask();
+    if (this.seated) this.seated = false;
+    if (!silent && this.visible) this.G.vfx?.dust?.(this.pos, { n: 5, color: '#ffffff', size: 0.45 });
+    this.door = null; this.doorScale = 1; this.doorLift = 0; this.homeTries = 0;
+    this.visible = false; this.state = 'hidden';
+    this.life?.tuckIn(this, this.homeRec);
+  }
+  // the goodnight beat: (wave at Chewy if he's close) -> turn to the door -> it opens (light spill + sound) -> step in
+  enterDoor(pd = 99) {
+    const H = this.homeInfo;
+    this.clearTask();
+    if (!H) return this.tuckIn(false);
+    const p = this.G.player, bye = p && !this.G.playerDead && pd < 6 && chance(0.75);
+    const sh = clamp(dist(H.step.x, H.step.z, this.pos.x, this.pos.z) / 1.6, 0.4, 1.5); // shuffle onto the step
+    this.door = { dir: 'in', t: 0, H, sx: this.pos.x, sz: this.pos.z, sh, bye: bye ? 1.15 : 0, open: false };
+    this.state = 'door'; this.homeTries = 0;
+    if (bye) { this.faceTo(p.pos.x, p.pos.z); this.anim.play('wave'); this.emote(chance(0.5) ? 'zzz' : 'heart'); }
+  }
+  // morning (or a knock): the door opens and we step out onto the doorstep
+  stepOut() {
+    const H = this.homeInfo;
+    this.life?.wakeUp(this, this.homeRec);
+    this.visible = true; this.anim.first = true; this.homeTries = 0;
+    if (!H) { if (this.home) this.setPos(this.home.x, this.home.z); this.state = 'idle'; this.t = rand(0.5, 2); return; }
+    this.setPos(H.inner.x, H.inner.z); this.facing = this.faceTarget = H.face + Math.PI;
+    this.door = { dir: 'out', t: 0, H, open: false };
+    this.state = 'door'; this.doorScale = 0.62; this.doorLift = 1;
+  }
+  answerDoor() { if (this.visible || this.door) return; this.knocked = true; this.knockT = 0; }
+  doorTick(dt, pd) {
+    const D = this.door, H = D.H, pos = this.pos;
+    D.t += dt;
+    const lerpTo = (ax, az, bx, bz, e) => { pos.x = ax + (bx - ax) * e; pos.z = az + (bz - az) * e; pos.y = this.world.heightAt(pos.x, pos.z) + 0.16 * this.doorLift; };
+    if (D.dir === 'in') {
+      const t = D.t - D.bye;
+      if (t < 0) return; // waving goodnight
+      if (t < D.sh) { // shuffle onto the doorstep, turn to the door
+        this.faceTarget = H.face; this.doorLift = 0;
+        const u = t / D.sh; lerpTo(D.sx, D.sz, H.step.x, H.step.z, u * (2 - u));
+        return;
+      }
+      if (!D.open) { D.open = true; this.doorFx(H, pd); if (this.anim.action?.name === 'wave') this.anim.stop(); }
+      const u = clamp((t - D.sh) / 0.7), e = u * u * (3 - 2 * u);
+      this.faceTarget = H.face; this.doorLift = e;
+      lerpTo(H.step.x, H.step.z, H.inner.x, H.inner.z, e);
+      this.doorScale = 1 - 0.4 * e * e;
+      if (u >= 1) this.tuckIn(true);
+      return;
+    }
+    // stepping out
+    if (!D.open) { D.open = true; this.doorFx(H, pd); }
+    const u = clamp(D.t / 0.75), e = u * u * (3 - 2 * u);
+    this.faceTarget = H.face + Math.PI; this.doorLift = 1 - e;
+    lerpTo(H.inner.x, H.inner.z, H.step.x, H.step.z, e);
+    this.doorScale = 0.62 + 0.38 * Math.sqrt(e);
+    if (u < 1) return;
+    this.door = null; this.doorScale = 1; this.doorLift = 0; this.state = 'idle'; this.t = rand(1.5, 3);
+    if (this.knocked) { // Chewy knocked: blink at him, then chat
+      this.emote('?');
+      this.G.talkTo?.(this);
+    } else {
+      this.anim.play(this.hour < 9 ? pick(['stretch', 'yawn']) : 'stretch');
+      if (pd < 26) this.emote(pick(['sparkle', 'note', 'heart']));
+    }
+  }
+  // the door opening: warm light spilling out (a short LightPool flash) + a soft glow + the door sound
+  doorFx(H, pd) {
+    if (pd > 28) return;
+    const y = this.world.heightAt(H.door.x, H.door.z);
+    _w.set(H.door.x + H.fx * 0.2, y + 0.8, H.door.z + H.fz * 0.2);
+    const night = this.G.day?.isNight?.() ? 1 : 0.25;
+    this.G.vfx?.light?.(_w, '#ffbf73', 2.2 + 2.6 * night, 3.2, 1.1);
+    if (night > 0.5) this.G.vfx?.flash?.(_w, '#ffcf8a', 0.9, 0.55);
+    if (pd < 18) Events.emit('sfx', 'door_open', { pos: this.pos, vol: 0.32 });
+  }
+  // waiting up on the doorstep (quest target after bedtime): look out for Chewy, yawn now and then
+  porchTick(dt, p, pd) {
+    const H = this.homeInfo;
+    this.greetTick(dt, p, pd);
+    if (this.state === 'walk' && this.goal?.kind === 'porch') { this.walkTick(dt); return; }
+    if (this.state !== 'porch') {
+      if (this.state === 'walk' || this.act || this.chat) this.clearTask();
+      if (dist(H.step.x, H.step.z, this.pos.x, this.pos.z) > 0.7) { this.go(H.step.x, H.step.z, { kind: 'porch', speed: 1, near: 0.5 }); return; }
+      this.state = 'porch';
+    }
+    if (p && pd < 3.2) this.faceTo(p.pos.x, p.pos.z); else this.faceTarget = H.face + Math.PI;
+    this.fidgetT -= dt;
+    if (this.fidgetT <= 0 && !this.anim.action) { this.fidgetT = rand(5, 9); this.anim.play(pick(['yawn', 'lookAround', 'stretch'])); if (chance(0.3)) this.emote('zzz'); }
   }
   // ------------------------------------------------------------------ greeting Chewy
   greetTick(dt, p, pd) {
     this.greeted -= dt;
-    if (!p || pd >= 3.2 || this.greeted > 0 || p.anim.speed <= 0.2 || this.state === 'inside') return;
+    if (!p || pd >= 3.2 || this.greeted > 0 || p.anim.speed <= 0.2 || this.state === 'inside' || this.door) return;
     if (this.act?.pose === 'sitDoze') return; // fast asleep
     this.greeted = 25;
     Events.emit('emote', { actor: this, kind: chance(0.5) ? 'heart' : 'note' });
@@ -437,6 +615,10 @@ export class Villager extends Actor {
   }
   // ------------------------------------------------------------------ Chewy talks to us: stop everything and turn to him
   onTalk() {
+    if (this.door) { // mid door beat: finish it on the doorstep
+      const H = this.door.H; this.door = null; this.doorScale = 1; this.doorLift = 0;
+      this.setPos(H.step.x, H.step.z);
+    }
     this.clearTask();
     this.state = 'idle'; this.t = rand(2.5, 4);
   }
@@ -450,7 +632,7 @@ export class Villager extends Actor {
   // ------------------------------------------------------------------ chatting with another villager
   chatReady() {
     if (!this.visible || this.talking || this.chat || this.benchChat || this.chatCD > 0 || this.seated || !this.warm) return false;
-    if (this.G.day?.isNight?.() && this.home) return false;
+    if (this.bedNow) return false;
     if (this.state === 'idle') return true;
     if (this.state === 'walk') return this.goal?.kind === 'stroll' || this.goal?.kind === 'wander';
     if (this.state === 'act') return !!this.act.def.chatty && this.act.phase === 'do';

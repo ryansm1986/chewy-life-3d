@@ -7,6 +7,9 @@
 //    shared GridAStar in core/nav.js) + string-pulling, so villagers stroll along the paths and around buildings
 //    instead of sliding along walls. Throttled per frame.
 //  - PROPS: tiny shared-geometry broom / watering can / fishing rod that villagers hold in rig.parts.handR.
+//  - HOMES: homeFor(v) (townsfolk: the sim's house; named cast: HOME_PREF near their anchor), doorInfo(rec) (doorstep
+//    outside the collider, doorway point, door-facing yaw) and the night "Knock on X's door" prompts (tuckIn/wakeUp).
+//  - BENCH SEATS: seatSpot() places each sitter by body width (wide bodies scoot in or take the whole bench).
 import * as THREE from 'three';
 import { Events } from '../core/events.js';
 import { BUILDINGS } from '../world/buildings/index.js';
@@ -18,7 +21,12 @@ import { GridAStar } from '../core/nav.js';
 const NOCOL = new Set(['flowerBed', 'bridge', 'fence', 'park']); // walk-through (see VillageSim.spawnModel)
 const BLOCK = 255;
 const SEAT_TOP = 0.445; // bench seat height above its base
+const SEAT_OFF = 0.29;  // default seat offset from the bench centre
 const RIM_TOP = 0.37;   // fountain rim
+// Named villagers' homes: building types to look for near their anchor, in order (their shop, a landmark, else the
+// nearest cosy home). Townsfolk get their home from the sim (game.js).
+const HOME_PREF = { rosie: ['rosieShop'], kuma: ['shop', 'home'], kitsune: ['shrine', 'home'], kero: ['fishingHut', 'home'] };
+const _rc = new THREE.Raycaster(), _ro = new THREE.Vector3(), _rd = new THREE.Vector3();
 
 // ------------------------------------------------------------------ navigation grid
 class NavGrid {
@@ -175,6 +183,9 @@ export class VillageLife {
     this.frameT = -1; this.budget = 0;
     this.born = performance.now();
     this.fishSpots = null;
+    this.ver = 0;               // bumped by every slot rebuild (villagers re-resolve their homes)
+    this.doorCache = new Map(); // building record -> doorstep info
+    this.knocks = new Map();    // building record -> { inter, who: Set<Villager> } for residents tucked in at night
     this.stats = { paths: 0, pathMs: 0, rebuilds: 0, navMs: 0 };
     this.onChanged = () => { this.dirty = true; this.nav.dirty = true; };
     Events.on('village:changed', this.onChanged);
@@ -201,6 +212,8 @@ export class VillageLife {
   // ---- slots
   rebuild() {
     this.dirty = false; this.lastLen = this.sim.list.length;
+    this.ver++; this.doorCache.clear();
+    for (const [rec, k] of this.knocks) if (!this.sim.list.includes(rec)) { this.dropKnock(k); this.knocks.delete(rec); }
     const old = new Map(this.slots.map(s => [s.id, s]));
     const out = [];
     const W = this.world, col = W.collision;
@@ -218,20 +231,27 @@ export class VillageLife {
         if (!free(q.x, q.z)) return;
         out.push({ id: `${b.id}:${kind}:${n++}`, kind, x: q.x, z: q.z, face, rec, ...extra });
       };
-      const bench = (bx, bz, brot, y0, key) => { // a bench (local position + rotation inside this building)
+      // a bench (local position + rotation inside this building; w = seat length). Two seat slots at ±SEAT_OFF; the
+      // exact spot along the seat is worked out per villager at claim time (seatSpot: wide bodies scoot inward, very
+      // wide ones take the middle of the whole bench), so nobody hangs off the end or sits in a neighbour's lap.
+      const bench = (bx, bz, brot, y0, key, w = 0.95) => {
         const bc = Math.cos(brot), bs = Math.sin(brot), pair = [];
-        for (const sx of [-0.29, 0.29]) {
+        const mid = L(bx + -0.05 * bs, bz + -0.05 * bc);
+        for (const sx of [-SEAT_OFF, SEAT_OFF]) {
           const seat = L(bx + sx * bc + -0.05 * bs, bz - sx * bs + -0.05 * bc), app = L(bx + sx * bc + 0.62 * bs, bz - sx * bs + 0.62 * bc);
           if (!free(app.x, app.z, 0.26)) continue;
-          const sl = { id: `${b.id}:seat:${key}:${sx}`, kind: 'bench', x: seat.x, z: seat.z, ax: app.x, az: app.z, face: th + brot, seatY: p.y + y0 + SEAT_TOP, rec, pair: null };
+          const sl = {
+            id: `${b.id}:seat:${key}:${sx}`, kind: 'bench', x: seat.x, z: seat.z, ax: app.x, az: app.z, face: th + brot, seatY: p.y + y0 + SEAT_TOP, rec, pair: null,
+            bx: mid.x, bz: mid.z, ux: (seat.x - mid.x) / SEAT_OFF, uz: (seat.z - mid.z) / SEAT_OFF, aox: app.x - seat.x, aoz: app.z - seat.z, half: w / 2,
+          };
           pair.push(sl); out.push(sl);
         }
         if (pair.length === 2) { pair[0].pair = pair[1]; pair[1].pair = pair[0]; }
       };
       const [w, d] = this.sim.dims(type, b.rot, b.level), hw = (b.rot % 2 ? d : w) / 2, hd = (b.rot % 2 ? w : d) / 2; // local half extents
       switch (type) {
-        case 'bench': bench(0, 0, 0, 0, 'b'); break;
-        case 'park': bench(0.55, -0.85, 0, 0.05, 'p1'); bench(-1.0, 0.55, Math.PI / 2, 0.05, 'p2'); stand(0.55, 0.1, th + Math.PI, 'admire'); break;
+        case 'bench': bench(0, 0, 0, 0, 'b', 0.95); break;
+        case 'park': bench(0.55, -0.85, 0, 0.05, 'p1', 1.0); bench(-1.0, 0.55, Math.PI / 2, 0.05, 'p2', 0.9); stand(0.55, 0.1, th + Math.PI, 'admire'); break;
         case 'fountain': {
           // rim seats on the camera side (faces read from the default +x+z view), admirers on the far side
           const cam = Math.PI / 4;
@@ -292,7 +312,7 @@ export class VillageLife {
     // carry claims over; flag vanished slots
     for (const sl of out) {
       const o = old.get(sl.id), v = o?.by; if (!v) continue;
-      sl.by = v;
+      sl.by = v; sl.spot = o.spot || null;
       if (v.act?.slot === o) v.act.slot = sl;
       if (v.goal?.slot === o) v.goal.slot = sl;
     }
@@ -333,20 +353,147 @@ export class VillageLife {
   // best free slot of a kind for villager v (distance-weighted random; owners of a home prefer their own yard)
   claim(v, kind, near, maxD = 22, teleport = false) {
     const list = this.byKind.get(kind); if (!list) return null;
-    let best = null, bs = -1;
+    let best = null, bs = -1, bspot = null;
     for (const sl of list) {
       if (sl.by || sl.dead) continue;
       const d = Math.hypot(sl.x - near.x, sl.z - near.z); if (d > maxD) continue;
+      const spot = sl.half ? this.seatSpot(v, sl) : null;
+      if (sl.half && !spot) continue; // no room for this body on that bench
       let sc = Math.random() / (1 + d / 7);
       if (sl.home && v.home && Math.hypot(sl.home.x - v.home.x, sl.home.z - v.home.z) < 0.5) sc *= 6;
       else if (sl.home && v.home) sc *= 0.3; // somebody else's yard
       if (sl.kind === 'bench' && sl.pair?.by) sc *= teleport ? 1.5 : 2.5; // sit next to someone: a chance to chat
-      if (sc > bs) { bs = sc; best = sl; }
+      if (sc > bs) { bs = sc; best = sl; bspot = spot; }
     }
-    if (best) best.by = v;
+    if (best) this.take(best, v, bspot);
     return best;
   }
-  release(sl, v) { if (sl && sl.by === v) sl.by = null; }
+  take(sl, v, spot) {
+    sl.by = v; sl.spot = spot || null;
+    if (spot?.whole && sl.pair) { sl.pair.by = v; sl.pair.spot = null; } // centred: the whole bench is ours
+  }
+  release(sl, v) {
+    if (!sl) return;
+    if (sl.by === v) { sl.by = null; sl.spot = null; }
+    if (sl.pair?.by === v) { sl.pair.by = null; sl.pair.spot = null; }
+  }
+  // ---- bench seating that respects body width (SPECIES body/head size varies a lot: a frog's head is ~1.4x a cat's)
+  // Returns { x, z, ax, az, off, whole } for villager v on bench slot sl, or null when it doesn't fit next to the
+  // current neighbour. off = distance from the bench centre toward this slot's end.
+  seatSpot(v, sl) {
+    if (!sl.half) return null;
+    const hw = v.halfWidth?.() ?? 0.24, reach = sl.half + 0.02; // heads may just reach the bench end, not past it
+    const nb = sl.pair?.by && sl.pair.by !== v ? sl.pair.by : null;
+    const at = (off, whole = false) => {
+      const x = sl.bx + sl.ux * off, z = sl.bz + sl.uz * off;
+      return { x, z, ax: x + sl.aox, az: z + sl.aoz, off, whole };
+    };
+    if (!nb) {
+      if (hw >= 0.28) return sl.pair && sl.pair.by ? null : at(0, !!sl.pair); // very wide: one per bench, centred
+      return at(Math.min(SEAT_OFF, reach - hw));
+    }
+    const ns = sl.pair.spot, noff = ns ? ns.off : SEAT_OFF;
+    if (ns?.whole || hw >= 0.28) return null;
+    const off = Math.min(SEAT_OFF, reach - hw), nhw = nb.halfWidth?.() ?? 0.24;
+    if (off + noff < hw + nhw - 0.1) return null; // shoulders would overlap
+    return at(off);
+  }
+  // ---- homes & doors
+  // building record a villager lives in: townsfolk by their door point (the sim gives it), named villagers by HOME_PREF
+  homeFor(v) {
+    const list = this.sim.list;
+    if (v.homeRec && list.includes(v.homeRec)) return v.homeRec;
+    if (v.folk || (v.home && v.homeFixed)) {
+      if (!v.home) return null;
+      let best = null, bd = 2.5;
+      for (const r of list) { const d = Math.hypot(r.door.x - v.home.x, r.door.z - v.home.z); if (d < bd && (r.data.type === 'home' || d < 0.3)) { bd = d; best = r; } }
+      return best;
+    }
+    const prefs = HOME_PREF[v.id] || ['home'];
+    const a = v.anchor;
+    for (const t of prefs) {
+      let best = null, bs = Infinity;
+      for (const r of list) {
+        if (r.data.type !== t || !this.doorInfo(r)) continue;
+        let s = Math.hypot(r.door.x - a.x, r.door.z - a.z);
+        for (const n of this.G.npcs) if (n !== v && !n.folk && n.homeRec === r) s += 7; // spread the cast over the houses
+        if (s < bs) { bs = s; best = r; }
+      }
+      if (best && (t === 'home' || bs < 26)) return best;
+    }
+    return null;
+  }
+  // doorstep (outside the building's collider, where villagers walk to), the doorway point they step into, and the
+  // yaw that faces the door. Cached per building until the next slot rebuild.
+  doorInfo(rec) {
+    let D = this.doorCache.get(rec);
+    if (D !== undefined) return D;
+    const W = this.world, col = W.collision, th = -rec.data.rot * Math.PI / 2, fx = Math.sin(th), fz = Math.cos(th);
+    const dp = rec.door;
+    // nearest free spot in front of the door (straight out first; a little to the side if a fence / neighbour is in the way)
+    let sx = 0, sz = 0, best = Infinity;
+    for (const lat of [0, 0.3, -0.3, 0.6, -0.6]) {
+      for (let k = 0; k < 2.2; k += 0.08) {
+        const x = dp.x + fx * k - fz * lat, z = dp.z + fz * k + fx * lat;
+        if (col.solidAt(x, z, 0.3)) continue;
+        const x2 = x + fx * 0.06, z2 = z + fz * 0.06, cost = k + Math.abs(lat) * 1.5;
+        if (cost < best && W.walkable(x2, z2) && !col.solidAt(x2, z2, 0.28)) { best = cost; sx = x2; sz = z2; }
+        break;
+      }
+      if (best < 0.9) break;
+    }
+    if (best === Infinity) { this.doorCache.set(rec, null); return null; }
+    // how far behind the door point the actual door / wall is: a couple of short rays at hip and chest height
+    // (probed once per building record: the model never changes, only what stands around it)
+    let wall = rec._doorWall ?? -1;
+    const g = rec.group;
+    if (wall < 0 && g && Math.abs(g.scale.y - 1) < 1e-3) {
+      g.updateMatrixWorld(true);
+      const y0 = W.heightAt(dp.x, dp.z);
+      for (const h of [0.55, 0.95]) {
+        _ro.set(dp.x + fx * 0.25, y0 + h, dp.z + fz * 0.25); _rd.set(-fx, 0, -fz);
+        _rc.set(_ro, _rd); _rc.far = 2.6;
+        const hit = _rc.intersectObject(g, true).find(i => i.object.isMesh && !i.object.material?.transparent);
+        if (hit) wall = Math.max(wall, hit.distance - 0.25);
+      }
+      rec._doorWall = wall = wall < 0 ? 0.5 : wall;
+    }
+    if (wall < 0) wall = 0.5; // (still rising after placement: keep a sane default, re-probed next rebuild)
+    wall = Math.min(1.6, Math.max(0.1, wall));
+    D = {
+      rec, fx, fz, face: Math.atan2(-fx, -fz),
+      step: { x: sx, z: sz },
+      // the doorway: just past the door plane, so the far half of the body is already behind the wall
+      inner: { x: dp.x - fx * (wall + 0.12), z: dp.z - fz * (wall + 0.12) },
+      door: { x: dp.x - fx * wall, z: dp.z - fz * wall },
+    };
+    this.doorCache.set(rec, D);
+    return D;
+  }
+  // residents tucked in for the night: Chewy can knock on their door (one prompt per door, named villagers answer first)
+  tuckIn(v, rec) {
+    if (!rec || rec.inter || rec.data.type === 'rosieShop') return; // shops / services keep their own door prompt
+    const D = this.doorInfo(rec); if (!D) return;
+    let k = this.knocks.get(rec);
+    if (!k) {
+      const pos = new THREE.Vector3(D.step.x, this.world.heightAt(D.step.x, D.step.z), D.step.z);
+      k = { who: new Set(), inter: { pos, radius: 1.05, label: 'Knock', onInteract: () => this.knock(rec) } };
+      this.knocks.set(rec, k); this.world.interactables.push(k.inter);
+    }
+    k.who.add(v); this.knockLabel(k);
+  }
+  wakeUp(v, rec) {
+    const k = rec && this.knocks.get(rec); if (!k) return;
+    k.who.delete(v);
+    if (!k.who.size) { this.dropKnock(k); this.knocks.delete(rec); } else this.knockLabel(k);
+  }
+  knockFirst(k) { let f = null; for (const v of k.who) if (!f || (f.folk && !v.folk)) f = v; return f; }
+  knockLabel(k) { const f = this.knockFirst(k); k.inter.label = f ? `Knock on ${f.name}'s door` : 'Knock'; }
+  dropKnock(k) { const a = this.world.interactables, i = a.indexOf(k.inter); if (i >= 0) a.splice(i, 1); }
+  knock(rec) {
+    const k = this.knocks.get(rec); const v = k && this.knockFirst(k);
+    if (v) v.answerDoor?.();
+  }
   // conversation partner for v: a nearby villager who is free to stop and talk
   partner(v, maxD = 9) {
     let best = null, bd = maxD;
@@ -361,10 +508,15 @@ export class VillageLife {
   force(v, kind, near = v.pos, instant = true) {
     v.clearTask(); v.warm = true;
     let best = null, bd = 1e9;
-    for (const sl of this.byKind.get(kind) || []) { if (sl.by || sl.dead) continue; const d = Math.hypot(sl.x - near.x, sl.z - near.z); if (d < bd) { bd = d; best = sl; } }
+    let spot = null;
+    for (const sl of this.byKind.get(kind) || []) {
+      if (sl.by || sl.dead) continue;
+      const sp = sl.half ? this.seatSpot(v, sl) : null; if (sl.half && !sp) continue;
+      const d = Math.hypot(sl.x - near.x, sl.z - near.z); if (d < bd) { bd = d; best = sl; spot = sp; }
+    }
     if (!best) return null;
-    best.by = v;
-    if (instant) v.beginAct(best, true); else v.go(best.ax ?? best.x, best.az ?? best.z, { kind: 'slot', slot: best, speed: 1 });
+    this.take(best, v, spot);
+    if (instant) v.beginAct(best, true); else v.go(spot?.ax ?? best.ax ?? best.x, spot?.az ?? best.az ?? best.z, { kind: 'slot', slot: best, speed: 1 });
     return best;
   }
   dispose() { Events.off?.('village:changed', this.onChanged); }
