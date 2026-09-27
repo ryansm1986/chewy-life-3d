@@ -28,7 +28,7 @@ try {
   const wl0 = await windowListeners();
   R.note(`baseline ${JSON.stringify(base)} windowListeners=${wl0.n}`);
   const hist = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 7; i++) {
     const floor = 1 + (i % 3);
     await page.evaluate(f => window.G.enterDungeon(f), floor);
     await waitMode(page, 'dungeon');
@@ -75,10 +75,12 @@ try {
     R.note(`cycle ${i + 1} (floor ${floor}): geo=${m.geo} tex=${m.tex} progs=${m.progs} vChildren=${m.villageChildren} vSources=${m.villageSources} labels=${m.lootLabels} | in-dungeon loot=${inDungeon.loot} labels=${inDungeon.labels} | dup=${JSON.stringify(dup)}`);
   }
   const wl1 = await windowListeners();
-  const first = hist[0], last = hist[hist.length - 1];
-  const geoPerCycle = (last.geo - first.geo) / (hist.length - 1), texPerCycle = (last.tex - first.tex) / (hist.length - 1);
-  R.check('GPU geometries do not grow per round trip', geoPerCycle < 5, `+${geoPerCycle.toFixed(1)} geometries per cycle (cycle1 ${first.geo} -> cycle5 ${last.geo}; baseline ${base.geo})`);
-  R.check('GPU textures do not grow per round trip', texPerCycle < 1, `+${texPerCycle.toFixed(1)} textures per cycle (cycle1 ${first.tex} -> cycle5 ${last.tex}; baseline ${base.tex})`);
+  // growth after warm-up: the first cycles fill one-time caches (emote bubbles, loot geometry, villager props, first
+  // visits to a biome), so compare cycle 3 with the last one
+  const first = hist[2], last = hist[hist.length - 1], span = hist.length - 3;
+  const geoPerCycle = (last.geo - first.geo) / span, texPerCycle = (last.tex - first.tex) / span;
+  R.check('GPU geometries do not grow per round trip', geoPerCycle < 5, `+${geoPerCycle.toFixed(1)} geometries per cycle (cycle3 ${first.geo} -> cycle${hist.length} ${last.geo}; baseline ${base.geo})`);
+  R.check('GPU textures do not grow per round trip', texPerCycle < 1, `+${texPerCycle.toFixed(1)} textures per cycle (cycle3 ${first.tex} -> cycle${hist.length} ${last.tex}; baseline ${base.tex})`);
   R.check('shader programs stable', last.progs - first.progs <= 2, `${first.progs} -> ${last.progs}`);
   R.check('village scene child count stable (no growth beyond transient effects)', (() => { const v = hist.map(h => h.villageChildren); return Math.max(...v) - Math.min(...v) <= 2 && last.villageChildren <= first.villageChildren + 2; })(), `${base.villageChildren} -> ${hist.map(h => h.villageChildren).join(',')}`);
   R.check('village light-pool sources do not accumulate', last.villageSources === first.villageSources && last.foreignSources === first.foreignSources, `${base.villageSources} -> ${hist.map(h => h.villageSources).join(',')} (non-building sources ${hist.map(h => h.foreignSources).join(',')})`);
