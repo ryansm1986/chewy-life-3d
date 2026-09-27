@@ -247,7 +247,7 @@ export class Banners {
     if (style === 'area') this.q = this.q.filter(b => b.style !== 'area');
     const key = style + '|' + title + '|' + sub;
     if (this.q.some(b => b.key === key) || (this.busy && this.cur === key)) return;
-    const item = { key, title, sub, style, dur: opts.duration, jp: opts.jp, xp: opts.xp, lvl: opts.lvl };
+    const item = { key, title, sub, style, dur: opts.duration, jp: opts.jp, xp: opts.xp, lvl: opts.lvl, top: opts.top };
     if (style === 'victory') {
       // Victory owns the moment: it jumps the queue; a level-up banner that popped up a beat earlier, or a boss intro
       // banner still up after a very quick kill, yields to it
@@ -287,6 +287,7 @@ export class Banners {
     let dur = b.dur || { levelup: 2.8, area: 3.2, boss: 2.0, quest: 2.8, victory: 3.6, default: 2.4 }[b.style] || 2.4;
     if (this.q.length && b.style !== 'victory') dur *= 0.7;
     this.root.dataset.style = b.style; // boss / victory banners sit in the top band, clear of the arena
+    this.root.style.top = b.top || ''; // …unless the caller places it (the boss card picks the band the boss isn't in)
     const n = el('div', `bn bn-${b.style}`);
     const L = letters(b.title, 'lt');
     if (b.style === 'victory') {

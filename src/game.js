@@ -170,7 +170,8 @@ export async function boot() {
     if (a) { const [n, extra] = a; if (n === 'villager_chatter') G.audio?.babble?.('hello!', { pitch: o.pitch || 1, pos: o.pos, vol: 0.5 }); else G.audio?.play?.(n, { ...o, ...extra }); return; }
     G.audio?.play?.(name, o);
   });
-  Events.on('footstep', (p) => { G.audio?.play?.(G.mode === 'dungeon' ? 'footstep_stone' : 'footstep_grass', { vol: 0.35 }); if (Math.random() < 0.5) G.vfx.dust(p, { n: 1, size: 0.18 }); });
+  const stepSound = () => { if (G.mode !== 'dungeon') return 'footstep_grass'; const th = G.dungeon?.layout?.theme; return th === 'shrine' || th === 'moon' || th === 'kitchen' ? 'footstep_wood' : 'footstep_stone'; };
+  Events.on('footstep', (p) => { G.audio?.play?.(stepSound(), { vol: 0.35 }); if (Math.random() < 0.5) G.vfx.dust(p, { n: 1, size: 0.18 }); });
   Events.on('emote', ({ actor, kind }) => G.vfx.emote(actor, kind));
   Events.on('player:levelup', ({ lvl }) => { G.vfx.levelUp(player.pos.clone()); G.ui?.banner?.('Level Up!', `Chewy is now level ${lvl}`, { style: 'levelup' }); G.audio?.play?.('ui_levelup'); G.actions.restoreAll(); shadow.recalc(); });
   Events.on('player:dead', () => onPlayerDeath());
@@ -205,6 +206,7 @@ export async function boot() {
     d.dispose();
     d.world.lightPool.clear();
     if (G.vfx !== vVfx) G.vfx.clear();
+    pupPrewarmRig().root.removeFromParent(); // the session-long prewarm pup must never be disposed with a floor
     disposeScene(d.world.scene, [d.world.mask, d.world.decoTex]); // data textures held in uniforms
     for (const k of [...vCombat.entities]) if (k.breakable || k.mode === d) vCombat.remove(k);
     player.interactTarget = null; player.pendingLoot = null; player.moveTarget = null;
@@ -229,9 +231,14 @@ export async function boot() {
       // compile every projectile / decal material now (behind the transition) so the first skill burst doesn't hitch
       for (const kind of ['ball', 'blaze', 'fireball', 'foxfire', 'spark', 'acorn', 'firepot', 'bone', 'moonball']) combat.spawn({ team: 'ally', kind, pos: new THREE.Vector3(0, -60, 0), dir: new THREE.Vector3(1, 0, 0), speed: 1, range: 0.001 });
       vfx.decal(new THREE.Vector3(0, -60, 0), { life: 0.05 }); vfx.decal(new THREE.Vector3(0, -60, 0), { life: 0.05, additive: true });
+      // the prewarm pup is also DRAWN for a few real frames (culling off, far below the floor, behind the transition):
+      // compile() only links programs — the GPU driver builds the final shader and uploads the skinned geometry / bone
+      // texture at the first real draw, which otherwise lands on the first Pack Call as a 35-50 ms frame
       const pup = pupPrewarmRig(); pup.root.position.set(0, -60, 0); world.scene.add(pup.root);
+      pup.root.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
       try { engine.renderer.compile(world.scene, engine.camera); } catch (e) { /* ignore */ }
-      world.scene.remove(pup.root);
+      let pupFrames = 0; const pupOut = () => { if (++pupFrames < 3 && pup.root.parent === world.scene) requestAnimationFrame(pupOut); else world.scene.remove(pup.root); };
+      requestAnimationFrame(pupOut);
       const s = dungeon.startPos;
       player.setPos(s.x, s.z); player.moveTarget = null; shadow.setPos(s.x + 0.8, s.z + 0.8);
       combat.add(shadow); shadow.recalc();

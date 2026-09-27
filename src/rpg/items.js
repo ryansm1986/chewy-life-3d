@@ -368,14 +368,18 @@ export function pickBase(ilvl, slot, wtype, rng) {
   return rng.weighted(cands).b;
 }
 
-/** D2-style rarity roll with diminishing magic find. rank: normal | champion | unique | boss */
+/** D2-style rarity roll with diminishing magic find. rank: normal | champion | unique | boss | hoard (a boss's extra picks) | chest */
 export const RARITY_CHANCE = {
   normal: { unique: 0.010, set: 0.012, rare: 0.06, magic: 0.30 },
   champion: { unique: 0.020, set: 0.024, rare: 0.12, magic: 0.45 },
   unique: { unique: 0.035, set: 0.040, rare: 0.20, magic: 0.55 },
   boss: { unique: 0.080, set: 0.080, rare: 1.0, magic: 1.0 },
+  hoard: { unique: 0.035, set: 0.040, rare: 0.20, magic: 0.55 },
   chest: { unique: 0.015, set: 0.018, rare: 0.10, magic: 0.40 },
 };
+/** Shallow floors (monster level <= 9, floors 1-8): champion packs and unique monsters roll rares at half weight, ramping
+ *  back to full by level 15, so a rare still feels like a find early on. Bosses (and their hoard) are never scaled. */
+export const earlyRareK = (ilvl, rank) => (rank === 'champion' || rank === 'unique') ? 0.5 + 0.5 * clamp((ilvl - 9) / 6, 0, 1) : 1;
 export const effectiveMF = mf => ({
   unique: (mf * 250) / (mf + 250), set: (mf * 500) / (mf + 500), rare: (mf * 600) / (mf + 600), magic: mf,
 });
@@ -386,7 +390,7 @@ export function rollRarity(ilvl, mf = 0, rank = 'normal', rng) {
   const lvlK = 1 + Math.min(0.5, ilvl / 120); // deeper = slightly luckier
   if (rng.next() < C.unique * (1 + e.unique / 100) * lvlK) return 'unique';
   if (rng.next() < C.set * (1 + e.set / 100) * lvlK) return 'set';
-  if (rng.next() < C.rare * (1 + e.rare / 100) * lvlK) return 'rare';
+  if (rng.next() < C.rare * (1 + e.rare / 100) * lvlK * earlyRareK(ilvl, rank)) return 'rare';
   if (rng.next() < C.magic * (1 + e.magic / 100)) return 'magic';
   return 'normal';
 }
@@ -465,12 +469,15 @@ function rollSockets(it, base, rng) {
 
 /**
  * Generate a random item. o = { ilvl, rarity?, slot?, wtype?, base?, mf?, rank?, rng? }
- * Unique/set rarities fall back to rare when nothing fits (D2 style). Collars/charms are never normal.
+ * Unique/set rarities fall back to rare when nothing fits (D2 style) — except a *rolled* unique/set from an ordinary
+ * monster (normal / champion / unique rank) on a floor too shallow for any to exist, which becomes magic: otherwise the
+ * set/unique weight would quietly double the early rare rate. Collars/charms are never normal.
  */
 export function generateItem(o = {}) {
   const rng = toRng(o.rng);
   const ilvl = clamp(Math.round(o.ilvl || 1), 1, 99);
-  let rarity = o.rarity || rollRarity(ilvl, o.mf || 0, o.rank || 'normal', rng);
+  const rank = o.rank || 'normal';
+  let rarity = o.rarity || rollRarity(ilvl, o.mf || 0, rank, rng);
   if (rarity === 'unique' || rarity === 'set') {
     const pool = rarity === 'unique'
       ? UNIQUE_IDS.map(id => UNIQUES[id]).filter(u => u.lvl <= ilvl + 2)
@@ -480,7 +487,7 @@ export function generateItem(o = {}) {
       const pickU = rng.weighted(fit.map(u => ({ u, w: u.w || 1 }))).u;
       return rarity === 'unique' ? makeUnique(pickU.id, ilvl, rng) : makeSetItem(pickU.id, rng, ilvl);
     }
-    rarity = 'rare';
+    rarity = !o.rarity && !pool.length && (rank === 'normal' || rank === 'champion' || rank === 'unique') ? 'magic' : 'rare';
   }
   const base = o.base ? ITEM_BASES[o.base] : pickBase(ilvl, o.slot, o.wtype, rng);
   if (!base || base.kind !== 'gear') throw new Error('generateItem: bad base ' + o.base);

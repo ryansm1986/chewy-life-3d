@@ -54,6 +54,8 @@ const SH = {
   stem: () => tpl('stem', () => new THREE.CylinderGeometry(0.6, 1, 1, 3, 1, true).translate(0, 0.5, 0), true),
   hemiLo: () => tpl('hemiLo', () => new THREE.SphereGeometry(1, 8, 3, 0, TAU, 0, Math.PI / 2)),
   cylLo: () => tpl('cylLo', () => new THREE.CylinderGeometry(1, 1, 1, 6, 1, true).translate(0, 0.5, 0)),
+  puff: () => tpl('puff', () => new THREE.SphereGeometry(1, 7, 4)), // foliage puffs on the wall tops (~40 tris)
+  cyl8: () => tpl('cyl8', () => new THREE.CylinderGeometry(1, 1, 1, 8).translate(0, 0.5, 0)),
 };
 // bent, fanned grass blades (local y 0..~1 = root..tip)
 function tuftGeo(seed, n) {
@@ -608,29 +610,75 @@ const FLOOR_BOSS = /* glsl */`
 
 // ------------------------------------------------------------------ wall kits
 // profile point: [offset into the wall (negative = over the floor), y, colour role, pattern kind]
-// pattern kinds: 0 plain (vertex colour), 1 face pattern, 2 roof / cap pattern.  h = height, D = cap depth
+// pattern kinds: 0 plain (vertex colour), 1 face pattern, 2 roof / cap pattern, 3 wall-top surface (garden / meadow /
+// pantry / frost, painted in world space and darkened toward the void), 4 eave tile-end row. h = height, D = cap depth.
+// A kind change always sits on a duplicated point (zero-length segment) so patterns switch on a clean edge.
+// Shrine roof: the back slope ends at RB, then a moss garden runs to GE (the middle of the rock) before dropping to the void.
+const shrineRB = D => Math.max(1.25, Math.min(1.75, D * 0.6));
+// wall tops fade toward the void with depth behind the face (TOP_GLSL.topFade is the same curve per pixel)
+const topFade = (o, D) => { const b = Math.max(1.5, D + 0.2), t = clamp((o - 0.9) / (b - 0.9)); return 1 - 0.6 * t * t * (3 - 2 * t); };
 const PROFILES = {
   burrow: (h, D, j) => [[-0.3, -0.02, 'dirt', 1], [-0.16 + j[0], 0.3 * h, 'dirt', 1], [-0.1 + j[1], 0.6 * h, 'dirt', 1], [-0.24 + j[2], 0.83 * h, 'lip', 0], [-0.1, 0.96 * h, 'moss', 0],
-    [0.3, 1.04 * h, 'grass', 0], [D * 0.6 + 0.3, 1.02 * h + j[3], 'grass', 0], [D + 0.15, 0.8 * h, 'grassBack', 0], [D * 1.15 + 0.2, 0.3 * h, 'back', 0], [D * 1.25 + 0.3, -0.02, 'void', 0]],
+    [0.3, 1.04 * h, 'grass', 0], [0.3, 1.04 * h, 'grass', 3], [D * 0.6 + 0.3, 1.02 * h + j[3], 'grass', 3], [D + 0.15, 0.8 * h, 'grassBack', 3], [D + 0.15, 0.8 * h, 'grassBack', 0], [D * 1.15 + 0.2, 0.3 * h, 'back', 0], [D * 1.25 + 0.3, -0.02, 'void', 0]],
   crystal: (h, D, j) => [[-0.3, -0.02, 'rockBase', 1], [-0.22 + j[0], 0.34 * h, 'rock', 1], [-0.06 + j[1], 0.7 * h + j[3] * 0.5, 'rock', 1], [0.1 + j[2], 0.95 * h, 'rockTop', 0],
-    [0.5, 1.03 * h + j[3], 'frost', 0], [D * 0.65, 1.06 * h - j[3], 'frost', 0], [D + 0.1, 0.7 * h, 'rockBack', 0], [D * 1.25 + 0.3, -0.02, 'void', 0]],
-  shrine: (h, D) => [[-0.16, -0.02, 'stone', 0], [-0.16, 0.34, 'stone', 0], [-0.04, 0.38, 'stoneTop', 0], [-0.04, 0.38, 'face', 1], [-0.04, h - 0.3, 'face', 1],
-    [-0.04, h - 0.3, 'rail', 0], [-0.12, h - 0.28, 'rail', 0], [-0.12, h - 0.1, 'rail', 0], [-0.12, h - 0.1, 'roof', 2], [-0.5, h + 0.02, 'roof', 2], [0.45, h + 0.46, 'roof', 2],
-    [0.45, h + 0.46, 'ridge', 0], [0.6, h + 0.56, 'ridge', 0], [0.75, h + 0.44, 'ridge', 0], [0.75, h + 0.44, 'roofBack', 2], [Math.max(1.2, D * 0.6), h + 0.02, 'roofBack', 2], [Math.max(1.25, D * 0.6), h - 0.05, 'fill', 0], [D, h - 0.3, 'fill', 0], [D * 1.2 + 0.3, -0.02, 'void', 0]],
-  kitchen: (h, D) => [[-0.12, -0.02, 'base', 0], [-0.12, 0.22, 'base', 0], [-0.02, 0.25, 'base', 0], [-0.02, 0.25, 'brick', 1], [-0.02, h - 0.24, 'brick', 1],
-    [-0.02, h - 0.24, 'ledge', 0], [-0.18, h - 0.2, 'ledge', 0], [-0.18, h - 0.02, 'ledge', 0], [0.05, h + 0.08, 'cap', 2], [0.95, h + 0.08, 'cap', 2], [0.95, h + 0.08, 'fill', 0], [D, h - 0.2, 'fill', 0], [D * 1.2 + 0.3, -0.02, 'void', 0]],
+    [0.5, 1.03 * h + j[3], 'frost', 0], [0.5, 1.03 * h + j[3], 'frost', 3], [D * 0.65, 1.06 * h - j[3], 'frost', 3], [D + 0.1, 0.7 * h, 'rockBack', 3], [D + 0.1, 0.7 * h, 'rockBack', 0], [D * 1.25 + 0.3, -0.02, 'void', 0]],
+  shrine: (h, D) => {
+    const RB = shrineRB(D), GE = Math.max(RB + 0.1, D);
+    return [[-0.16, -0.02, 'stone', 0], [-0.16, 0.34, 'stone', 0], [-0.04, 0.38, 'stoneTop', 0], [-0.04, 0.38, 'face', 1], [-0.04, h - 0.3, 'face', 1],
+      [-0.04, h - 0.3, 'rail', 0], [-0.12, h - 0.28, 'rail', 0], [-0.12, h - 0.1, 'rail', 0],
+      [-0.12, h - 0.1, 'soffit', 0], [-0.54, h - 0.02, 'soffit', 0], [-0.54, h - 0.02, 'eave', 4], [-0.58, h + 0.11, 'eave', 4], // eave: soffit, then the row of round tile ends
+      [-0.58, h + 0.11, 'roof', 2], [0.42, h + 0.5, 'roof', 2],
+      [0.42, h + 0.5, 'ridge', 0], [0.5, h + 0.63, 'ridge', 0], [0.5, h + 0.63, 'ridgeTop', 0], [0.66, h + 0.63, 'ridgeTop', 0], [0.66, h + 0.63, 'ridge', 0], [0.74, h + 0.5, 'ridge', 0],
+      [0.74, h + 0.5, 'roofBack', 2], [RB, h + 0.08, 'roofBack', 2],
+      [RB, h + 0.08, 'gutter', 0], [RB + 0.1, h - 0.06, 'gutter', 0], [RB + 0.1, h - 0.06, 'garden', 3], [GE, h - 0.08, 'garden', 3],
+      [GE, h - 0.08, 'rim', 0], [GE * 1.1 + 0.35, -0.02, 'void', 0]];
+  },
+  kitchen: (h, D) => {
+    const TE = Math.max(1.05, D);
+    return [[-0.12, -0.02, 'base', 0], [-0.12, 0.22, 'base', 0], [-0.02, 0.25, 'base', 0], [-0.02, 0.25, 'brick', 1], [-0.02, h - 0.24, 'brick', 1],
+      [-0.02, h - 0.24, 'ledge', 0], [-0.18, h - 0.2, 'ledge', 0], [-0.18, h - 0.02, 'ledge', 0], [-0.18, h - 0.02, 'cap', 2], [0.05, h + 0.08, 'cap', 2], [0.95, h + 0.08, 'cap', 2],
+      [0.95, h + 0.08, 'capBack', 0], [1.05, h - 0.02, 'capBack', 0], [1.05, h - 0.02, 'top', 3], [TE, h - 0.04, 'top', 3],
+      [TE, h - 0.04, 'fill', 0], [TE * 1.1 + 0.3, -0.02, 'void', 0]];
+  },
 };
+// shrine / sanctum roofs change colour from building to building (per traced wall loop): slate, verdigris, plum
+const ROOF_VARIANTS = {
+  shrine: [null, [['#3f7a78', '#46857f'], ['#37696a', '#3e7372']], [['#645a74', '#6c627e'], ['#5a5068', '#625872']]],
+  moon: [null, [['#3c6474', '#436e7e'], ['#34586a', '#3a6272']], [['#5a5286', '#625a90'], ['#4e4878', '#565082']]],
+};
+// roles on top of the rock mass: their vertex colour fades toward the void the deeper they sit behind the face
+const TOP_ROLES = new Set(['grass', 'grassBack', 'back', 'frost', 'rockBack', 'roofBack', 'gutter', 'garden', 'rim', 'capBack', 'top', 'fill']);
 const WALL_ROLES = {
   burrow: { dirt: ['#9c7a5e', '#ac8a6c'], lip: ['#62804e', '#6c8a56'], moss: ['#72925c', '#7e9c66'], grass: ['#809e70', '#8eaa7c'], grassBack: ['#5a7250', '#627a56'], back: ['#3a2c2c', '#403232'] },
   crystal: { rockBase: ['#3c3068', '#463a74'], rock: ['#5a4a8e', '#6c5ca4'], rockTop: ['#8a7cc4', '#9a8ed0'], frost: ['#d2dcfa', '#eef2ff'], rockBack: ['#2c2450', '#342a5c'] },
-  shrine: { stone: ['#8e8894', '#a09aa4'], stoneTop: ['#b6aeb4', '#c4bcc2'], face: ['#ffffff', '#f4f0ee'], rail: ['#c8362c', '#d4402e'], roof: ['#56688a', '#5e7294'], ridge: ['#343c52', '#3a4258'], roofBack: ['#48587a', '#506284'], fill: ['#2e2226', '#34262a'] },
-  kitchen: { base: ['#4a3028', '#523630'], brick: ['#ffffff', '#f4ece8'], ledge: ['#6a5048', '#76584e'], cap: ['#8a7c74', '#9a8a80'], fill: ['#2a1c18', '#302018'] },
-  moon: { stone: ['#7c7e9c', '#8c8caa'], stoneTop: ['#a6a8c6', '#b2b4d2'], face: ['#ffffff', '#f2f2fa'], rail: ['#c8362c', '#d4402e'], roof: ['#3c4474', '#444c7e'], ridge: ['#22264a', '#282c52'], roofBack: ['#343c68', '#3c4470'], fill: ['#14162e', '#181a34'] },
+  shrine: { stone: ['#8e8894', '#a09aa4'], stoneTop: ['#b6aeb4', '#c4bcc2'], face: ['#ffffff', '#f4f0ee'], rail: ['#c8362c', '#d4402e'], soffit: ['#5a3a2c', '#643f30'], eave: ['#5c6e92', '#64789a'],
+    roof: ['#56688a', '#5e7294'], ridge: ['#ece4d8', '#f4eee4'], ridgeTop: ['#343c52', '#3a4258'], roofBack: ['#4c5c7e', '#546688'], gutter: ['#4a3a34', '#523f38'], garden: ['#ffffff', '#f2f4ee'], rim: ['#5a5048', '#62574e'] },
+  kitchen: { base: ['#4a3028', '#523630'], brick: ['#ffffff', '#f4ece8'], ledge: ['#6a5048', '#76584e'], cap: ['#8a7c74', '#9a8a80'], capBack: ['#6a5a52', '#74625a'], top: ['#ffffff', '#f4eee8'], fill: ['#3a2820', '#402c24'] },
+  moon: { stone: ['#7c7e9c', '#8c8caa'], stoneTop: ['#a6a8c6', '#b2b4d2'], face: ['#ffffff', '#f2f2fa'], rail: ['#c8362c', '#d4402e'], soffit: ['#3a2c3c', '#423244'], eave: ['#5a6494', '#626c9c'],
+    roof: ['#4a5486', '#525c90'], ridge: ['#dce2f2', '#e6eaf8'], ridgeTop: ['#22264a', '#282c52'], roofBack: ['#3e4776', '#46507e'], gutter: ['#2e2a44', '#34304c'], garden: ['#ffffff', '#f0f2fa'], rim: ['#3a3e56', '#40445e'] },
 };
 const WALL_H = { burrow: [2.5, 1.3, 0.55], crystal: [2.9, 1.2, 0.55], shrine: [2.45, 0.1, 0.62], kitchen: [2.7, 0.12, 0.6] }; // base, variation, near-side factor
+// wall-top helpers (kind 3 carries vWall = (u, depth behind the face, 3, cap depth D)); topFade matches the vertex fade
+const TOP_GLSL = /* glsl */`
+float topFade() { return 1.0 - 0.6 * smoothstep(0.9, max(1.5, vWall.w + 0.2), vWall.y); }
+`;
 const WALL_GLSL = {
   burrow: /* glsl */`
-    if (vWall.z > 0.5) {
+    if (vWall.z > 2.5) { // meadow on top of the burrow walls: clover drifts, blade strokes, flower dots (world space)
+      vec2 p = vCWorld.xz; float fd = topFade();
+      diffuseColor.rgb *= 0.84 + 0.32 * fbm(p * 1.1 + uSeed);
+      float cl = smoothstep(0.58, 0.68, vn(p * 0.75 + 5.0));
+      diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.72, 0.9, 0.72), cl * 0.7);
+      diffuseColor.rgb *= 0.9 + 0.1 * sin(p.x * 21.0 + sin(p.y * 6.0 + p.x) * 2.5) * sin(p.y * 17.0 + p.x * 3.0);
+      vec2 fq = p * 2.6; vec2 fi = floor(fq); vec2 ff = fract(fq) - 0.5 - (h2(fi) - 0.5) * 0.6; float fh = h1(fi + 11.0 + uSeed);
+      float fl = step(0.87, fh) * smoothstep(0.1, 0.055, length(ff));
+      vec3 fc = fh > 0.965 ? ${glc('#fff0a0')} : fh > 0.93 ? ${glc('#ffb8d0')} : fh > 0.9 ? ${glc('#c8b0ff')} : ${glc('#ffffff')};
+      diffuseColor.rgb = mix(diffuseColor.rgb, fc * fd, fl * 0.9);
+      // fallen leaves near the lip
+      vec2 lq = p * 1.7 + 3.1; vec2 li = floor(lq); vec2 lf = fract(lq) - 0.5 - (h2(li) - 0.5) * 0.5; float lh = h1(li + 23.0);
+      float lv = step(0.93, lh) * smoothstep(0.09, 0.05, length(lf * vec2(1.0, 1.9))) * (1.0 - smoothstep(0.8, 1.6, vWall.y));
+      diffuseColor.rgb = mix(diffuseColor.rgb, (lh > 0.965 ? ${glc('#e0a050')} : ${glc('#c86a3e')}) * fd, lv);
+    } else if (vWall.z > 0.5 && vWall.z < 1.5) {
       float u = vWall.x, v = vWall.y, lip = vWall.w * 0.715; // the face pattern hands over to the mossy lip colour here
       // painted strata: wavy bands of red clay, dark loam and pale sand with a thin seam between them
       float wv = v * 1.35 + (vn(vec2(u * 0.16, 3.0)) - 0.5) * 0.9 + sin(u * 0.4 + uSeed) * 0.12;
@@ -666,7 +714,18 @@ const WALL_GLSL = {
       diffuseColor.rgb *= mix(0.72, 1.0, smoothstep(0.0, 0.35, v)); // damp, darker foot
     }`,
   crystal: /* glsl */`
-    if (vWall.z > 0.5) {
+    if (vWall.z > 2.5) { // rime crust on top: faceted plates with blue cracks, snow drifts and glints (world space)
+      vec2 p = vCWorld.xz; float fd = topFade();
+      vec2 q = p * 1.5, qi = floor(q), qf = fract(q); float md = 8.0, md2 = 8.0; vec2 mc = vec2(0.0);
+      for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) { vec2 g = vec2(float(i), float(j)); vec2 r = g + h2(qi + g) - qf; float d = dot(r, r); if (d < md) { md2 = md; md = d; mc = qi + g; } else if (d < md2) md2 = d; }
+      float edge = sqrt(md2) - sqrt(md);
+      diffuseColor.rgb *= 0.88 + 0.18 * h1(mc + uSeed);
+      diffuseColor.rgb = mix(diffuseColor.rgb, ${glc('#8a9ee6')} * fd, smoothstep(0.08, 0.02, edge) * 0.5);
+      diffuseColor.rgb = mix(diffuseColor.rgb, ${glc('#f8faff')} * fd, smoothstep(0.45, 0.72, fbm(p * 0.55 + 2.0)) * 0.45);
+      float tint = vn(p * 0.3 + 9.0);
+      diffuseColor.rgb *= mix(vec3(1.0), tint > 0.5 ? vec3(1.04, 0.94, 1.08) : vec3(0.94, 1.02, 1.08), abs(tint - 0.5) * 0.8);
+      wG += ${glc('#dff0ff')} * twinkle(p * 1.3, 2.0, 0.86) * 1.3 * fd;
+    } else if (vWall.z > 0.5 && vWall.z < 1.5) {
       float u = vWall.x, v = vWall.y;
       // layered rock: tilted bands of violet, slate and pale amethyst + colour drift along the face
       float wv = v * 1.1 + u * 0.12 + (vn(vec2(u * 0.2, 5.0)) - 0.5) * 0.8;
@@ -682,7 +741,7 @@ const WALL_GLSL = {
       diffuseColor.rgb = mix(diffuseColor.rgb, vc, ve);
       wG += vc * ve * 1.1;
     }
-    wG += ${glc('#e8f4ff')} * twinkle(vec2(vWall.x, vWall.y * 1.3), 2.5, 0.9) * 1.4;`,
+    if (vWall.z < 2.5) wG += ${glc('#e8f4ff')} * twinkle(vec2(vWall.x, vWall.y * 1.3), 2.5, 0.9) * 1.4;`,
   shrine: /* glsl */`
     if (vWall.z > 0.5 && vWall.z < 1.5) {
       float u = vWall.x, v = vWall.y, pw = 2.4, pf = fract(u / pw) * pw;
@@ -699,9 +758,48 @@ const WALL_GLSL = {
         wc *= mix(0.6, 1.0, smoothstep(0.0, 0.08, min(bf, 1.0 - bf)));
         diffuseColor.rgb *= wc;
       }
-    } else if (vWall.z > 1.5) { // kawara roof tiles
-      float tf = fract(vWall.x / 0.28), row = fract(vWall.y / 0.2);
-      diffuseColor.rgb *= (0.72 + 0.28 * sin(tf * 3.14159)) * mix(0.7, 1.0, smoothstep(0.0, 0.18, row));
+    } else if (vWall.z > 1.5 && vWall.z < 2.5) { // kawara roof: rounded tile columns in overlapping rows, moss in the grooves
+      float cu = vWall.x / 0.28, ci = floor(cu), tf = fract(cu), rv = vWall.y / 0.2, ri = floor(rv), row = fract(rv);
+      float crest = sin(tf * 3.14159);
+      float sh = (0.64 + 0.36 * crest) * mix(0.6, 1.0, smoothstep(0.0, 0.2, row)) * (0.9 + 0.14 * h1(vec2(ci, ri) + uSeed));
+      vec3 rc = diffuseColor.rgb * sh;
+      rc += diffuseColor.rgb * 0.24 * smoothstep(0.82, 1.0, crest) * smoothstep(0.15, 0.6, row); // sheen along each crest
+      rc *= 1.0 - 0.1 * smoothstep(0.55, 0.9, vn(vec2(vWall.x * 0.9, 1.0))) * (0.5 + 0.5 * sin(vWall.x * 7.0)); // rain streaks
+      float mo = smoothstep(0.6, 0.8, fbm(vCWorld.xz * 0.7 + uSeed)) * (0.35 + 0.65 * (1.0 - crest));
+#ifdef MOON
+      rc = mix(rc, ${glc('#5a8a92')} * (0.8 + 0.3 * h1(vec2(ci, ri) * 1.7)), mo * 0.55);
+      wG += ${glc('#cfe0ff')} * twinkle(vec2(vWall.x, vWall.y * 1.5), 2.2, 0.93) * 0.7; // moonlit dew glints
+#else
+      rc = mix(rc, ${glc('#6a8a4a')} * (0.8 + 0.3 * h1(vec2(ci, ri) * 1.7)), mo * 0.6);
+      vec2 pq = vCWorld.xz * 2.4; vec2 pc = floor(pq); vec2 pf = fract(pq) - 0.5 - (h2(pc) - 0.5) * 0.6; // fallen sakura petals
+      rc = mix(rc, ${glc('#ffc2d8')}, step(0.94, h1(pc + 7.0)) * smoothstep(0.075, 0.045, length(pf * vec2(1.0, 1.6))) * 0.9);
+#endif
+      diffuseColor.rgb = rc;
+    } else if (vWall.z > 2.5 && vWall.z < 3.5) { // moss garden on the roof tops: raked gravel beds and stepping stones
+      vec2 p = vCWorld.xz;
+      float m = fbm(p * 0.9 + uSeed), clump = smoothstep(0.45, 0.75, vn(p * 2.3 + 4.0));
+#ifdef MOON
+      vec3 c = mix(${glc('#2e4e5c')}, ${glc('#6a9aa4')}, smoothstep(0.3, 0.75, m)), gr = ${glc('#d4dcf0')};
+#else
+      vec3 c = mix(${glc('#3e6a32')}, ${glc('#94ba5e')}, smoothstep(0.3, 0.75, m)), gr = ${glc('#e2dcc0')};
+#endif
+      c *= (0.84 + 0.22 * clump) * (0.92 + 0.08 * sin(p.x * 19.0 + sin(p.y * 5.0) * 2.0) * sin(p.y * 15.0)); // moss cushions
+#ifdef MOON
+      float bed = smoothstep(0.7, 0.75, vn(p * 0.6 + 3.0 + uSeed));
+#else
+      float bed = smoothstep(0.69, 0.73, vn(p * 0.55 + 3.0 + uSeed));
+#endif
+      c = mix(c, gr * (0.84 + 0.16 * sin(vWall.y * 42.0 + sin(vWall.x * 0.7) * 1.5)), bed); // raked gravel: lines follow the wall
+      vec2 q = p * 1.5; vec2 qi = floor(q); vec2 qf = fract(q) - 0.5 - (h2(qi) - 0.5) * 0.4;
+      float isSt = step(0.86, h1(qi + 3.0)) * (1.0 - bed), sd = length(qf * vec2(1.0, 1.3));
+      c *= 1.0 - 0.3 * isSt * smoothstep(0.26, 0.18, sd); // contact shade around each stepping stone
+      c = mix(c, ${glc('#b4aea4')} * (0.78 + 0.25 * h1(qi)), isSt * smoothstep(0.18, 0.14, sd));
+      diffuseColor.rgb *= c; // the vertex colour carries the fade toward the void
+    } else if (vWall.z > 3.5) { // eave: a row of round tile ends, each with an embossed crest
+      float tf = fract(vWall.x / 0.28) - 0.5, ey = vWall.y / 0.136 - 0.5;
+      float d = length(vec2(tf * 0.28, ey * 0.136)) / 0.066, cap = smoothstep(1.0, 0.84, d);
+      vec3 c = diffuseColor.rgb * mix(0.48, 1.1, cap);
+      diffuseColor.rgb = mix(c, diffuseColor.rgb * 1.55, smoothstep(0.14, 0.04, abs(d - 0.52)) * cap * 0.6);
     }`,
   kitchen: /* glsl */`
     if (vWall.z > 0.5 && vWall.z < 1.5) {
@@ -714,9 +812,18 @@ const WALL_GLSL = {
       bc = mix(${glc('#d8c6ac')}, bc * (0.9 + 0.1 * vn(vec2(u, v) * 8.0)), mort);
       bc *= mix(1.0, 0.68, smoothstep(1.3, 2.7, v));
       diffuseColor.rgb *= bc;
-    } else if (vWall.z > 1.5) {
+    } else if (vWall.z > 1.5 && vWall.z < 2.5) { // stone cap slabs with a worn, lighter front edge
       float sf = fract(vWall.x / 0.62);
       diffuseColor.rgb *= mix(0.72, 1.0, smoothstep(0.0, 0.05, min(sf, 1.0 - sf))) * (0.92 + 0.16 * h1(vec2(floor(vWall.x / 0.62), 1.0)));
+      diffuseColor.rgb *= (1.0 + 0.14 * smoothstep(0.34, 0.2, vWall.y)) * (0.94 + 0.08 * vn(vCWorld.xz * 4.0));
+    } else if (vWall.z > 2.5) { // pantry loft behind the cap: dark boards along the wall, soot and a dusting of flour
+      float a = vWall.x, b = vWall.y, row = floor(b / 0.3), fy = fract(b / 0.3);
+      float len = 1.6 + h1(vec2(row, 3.0 + uSeed)) * 1.4, sx = (a + h1(vec2(row, 9.0)) * len) / len, fx = fract(sx);
+      vec3 c = mix(${glc('#5a3a28')}, ${glc('#8e5e3c')}, h1(vec2(row, floor(sx)))) * (0.93 + 0.07 * sin(a * 30.0 + vn(vec2(a * 1.3, row)) * 6.0));
+      c *= mix(0.5, 1.0, smoothstep(0.0, 0.08, min(fy, 1.0 - fy))) * mix(0.68, 1.0, smoothstep(0.0, 0.03, min(fx, 1.0 - fx) * len));
+      c *= 1.0 - 0.3 * smoothstep(0.5, 0.8, fbm(vCWorld.xz * 0.4 + 3.0)); // soot
+      c = mix(c, ${glc('#f4ece0')}, smoothstep(0.66, 0.78, vn(vCWorld.xz * 0.9 + 7.0)) * 0.3); // flour dust
+      diffuseColor.rgb *= c * 1.2;
     }`,
 };
 
@@ -918,7 +1025,9 @@ export class DungeonWorld {
           ${FLOOR_BOSS}
           c *= mix(0.58, 1.0, smoothstep(0.45, 1.3, wd));   // painted contact shade along the wall base
           c *= mix(0.88, 1.0, smoothstep(1.0, 3.6, wd));    // and a broad room vignette: rooms read as volumes, not flat plates
-          c = mix(uVoid * 0.6, c, smoothstep(0.2, 0.62, m));
+          // the void between wall tops: never a flat fill — a slow painterly mottle, deepest in the middle of big gaps
+          vec3 vd = uVoid * 0.6 * (0.72 + 0.5 * fbm(p * 0.07 + 17.0)) * (0.85 + 0.15 * vn(p * 0.6 + 3.0));
+          c = mix(vd, c, smoothstep(0.2, 0.62, m));
           fG *= smoothstep(0.4, 0.7, m);
           diffuseColor.rgb = c;
         }
@@ -988,21 +1097,26 @@ export class DungeonWorld {
     this.wallSamples = [];
     const pos = [], nor = [], colA = [], wallA = [], idx = [];
     let vbase = 0, loopSeed = 0;
+    const rv0 = (ROOF_VARIANTS[this.variant] || (th === 'shrine' ? ROOF_VARIANTS.shrine : [])).map(v => v && v.map(p => p.map(C)));
+    const roofVars = rv0.length ? [rv0[0], rv0[0], rv0[1], rv0[1], rv0[2]] : []; // slate 40%, verdigris 40%, plum 20%
     for (const raw of loops) {
       loopSeed++;
+      const rvar = roofVars.length ? roofVars[Math.floor(mulberry32(loopSeed * 7919 + this.L.floor * 31)() * roofVars.length)] : null;
       const { pts, len } = DungeonWorld.smoothLoop(raw, 2, ds);
       const n = pts.length;
       const S = pts.map((p, i) => {
         const a = pts[(i - 1 + n) % n], b = pts[(i + 1) % n];
         let tx = b[0] - a[0], tz = b[1] - a[1]; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
         const nx = tz, nz = -tx; // into the wall
-        let thick = 7;
-        for (let s = 0.3; s < 7; s += 0.35) if (!this.solidAtCell(p[0] + nx * s, p[1] + nz * s)) { thick = s; break; }
+        let thick = 10.5;
+        for (let s = 0.3; s < 10.5; s += 0.35) if (!this.solidAtCell(p[0] + nx * s, p[1] + nz * s)) { thick = s; break; }
         const f = -(nx * CAMX + nz * CAMZ); // >0: face looks at the camera (far wall)
         return { x: p[0], z: p[1], tx, tz, nx, nz, thick, f, u: (i / n) * len };
       });
-      // smoothed cap depth (min-filter then blur) and height (camera-facing walls full height, near side cut down)
-      const dRaw = S.map(s => clamp(s.thick * 0.5, 0.45, 3.0));
+      // smoothed cap depth (min-filter then blur) and height (camera-facing walls full height, near side cut down).
+      // The top reaches up to 4.4 m behind the face, so most rock between rooms reads as a dressed wall top (garden,
+      // meadow, pantry roof, rime) that darkens toward a narrow strip of void instead of a wide flat hole.
+      const dRaw = S.map(s => clamp(s.thick * 0.5, 0.45, 4.4));
       const dMin = dRaw.map((_, i) => { let m = 9; for (let k = -3; k <= 3; k++) m = Math.min(m, dRaw[(i + k + n) % n]); return m; });
       const hRaw = S.map(s => {
         const nn = N.n2(s.x * 0.09 + loopSeed, s.z * 0.09) * 0.5 + 0.5, n2 = N.n2(s.x * 0.31, s.z * 0.31 + 7) * 0.5 + 0.5;
@@ -1021,22 +1135,24 @@ export class DungeonWorld {
         const j = built ? [0, 0, 0, 0] : [N.n2(s.x * 0.7, s.z * 0.7) * 0.1, N.n2(s.z * 0.8 + 3, s.x * 0.8) * 0.12, N.n2(s.x * 0.5 + 9, s.z * 0.5) * 0.14, N.n2(s.x * 0.4, s.z * 0.4 + 5) * 0.25];
         if (th === 'crystal') { const q = mulberry32(Math.floor(s.x * 13.1) * 7919 + Math.floor(s.z * 17.3)); j[0] += (q() - 0.5) * 0.3; j[1] += (q() - 0.5) * 0.34; j[2] += (q() - 0.5) * 0.3; j[3] += (q() - 0.5) * 0.4; }
         const P = prof(s.h, s.D, j);
-        let v = 0;
+        if (i < n) s.P = P; // kept for the wall-top dressing (surface heights)
+        let vRun = 0; // arc length since the current pattern kind began (roof rows start at the eave, eave caps at 0)
         for (let k = 0; k < K; k++) {
           const [o, y, role, kind] = P[k];
-          if (k) v += Math.hypot(o - P[k - 1][0], y - P[k - 1][1]);
+          if (k) { const dv = Math.hypot(o - P[k - 1][0], y - P[k - 1][1]); vRun = kind === P[k - 1][3] ? vRun + dv : 0; }
           pos.push(s.x + s.nx * o, y, s.z + s.nz * o);
           nor.push(0, 1, 0);
           if (role === 'void') colA.push(voidC.r, voidC.g, voidC.b);
           else {
-            const rc = roleCols[role], t = clamp(N.n2(s.x * 0.45 + k, s.z * 0.45) * 0.5 + 0.5);
+            const rc = rvar && (role === 'roof' || role === 'eave') ? rvar[0] : rvar && role === 'roofBack' ? rvar[1] : roleCols[role], t = clamp(N.n2(s.x * 0.45 + k, s.z * 0.45) * 0.5 + 0.5);
             _c.copy(rc[0]).lerp(rc[1], t);
             if (role === 'dirt' || role === 'rock' || role === 'rockBase') _c.multiplyScalar((th === 'burrow' ? 0.82 : 0.72) + (th === 'burrow' ? 0.18 : 0.28) * clamp(y / s.h + 0.1));
             if (role === 'grass' && N.n2(s.x * 0.22, s.z * 0.22) > 0.45) _c.lerp(C(th === 'burrow' ? '#b4c490' : '#a8c860'), 0.35);
             if ((role === 'face' || role === 'brick') && y < 0.5) _c.multiplyScalar(0.8);
+            if (TOP_ROLES.has(role)) _c.multiplyScalar(topFade(o, s.D)); // darken toward the void
             colA.push(_c.r, _c.g, _c.b);
           }
-          wallA.push(u, kind === 2 ? v : y, kind, s.h);
+          wallA.push(u, kind === 2 || kind === 4 ? vRun : kind === 3 ? o : y, kind, kind === 3 ? s.D : s.h);
         }
       }
       for (let i = 0; i < n; i++) for (let k = 0; k < K - 1; k++) {
@@ -1057,7 +1173,7 @@ export class DungeonWorld {
       vertexColors: true, brush: th === 'crystal' ? 0.18 : 0.26, brushScale: 0.5, rim: 0.28, occluder: true, term: [-0.05, 0.35],
       uniforms: { uSeed: { value: (this.L.floor * 3.7) % 11 } },
       vertexPars: 'attribute vec4 aWall; varying vec4 vWall;', vertexWorld: 'vWall = aWall;',
-      fragPars: `varying vec4 vWall; uniform float uSeed; vec3 wG; ${NOISE_GLSL}`,
+      fragPars: `${this.variant === 'moon' ? '#define MOON\n' : ''}varying vec4 vWall; uniform float uSeed; vec3 wG; ${NOISE_GLSL}${TOP_GLSL}`,
       fragColor: `wG = vec3(0.0); ${WALL_GLSL[th]}`,
       fragOut: 'outgoingLight += wG;',
     });
@@ -1171,6 +1287,127 @@ export class DungeonWorld {
         }
       }
     }
+    this.dressTops(addLight);
+  }
+  // ------------------------------------------------------------------ wall-top dressing
+  // Set dressing on the tops of the rock masses (the band each wall profile paints as kind 3): cloud-pruned pines,
+  // bamboo, stone lanterns and moss mounds in the shrine / sanctum roof gardens; jars, crates, barrels and smoking
+  // chimneys on the kitchen's pantry roofs; bushes, flowers and toadstools on the burrow meadows; crystal clusters and
+  // rime mounds in the grotto. It all goes into the wall-dressing batches (same cut-away, no extra draw calls). On walls
+  // between Chewy and the camera an item may rise only ~0.7 m per metre it sits behind the face, so it never hides more
+  // of the room than the wall itself does. Its own random stream keeps every older placement unchanged.
+  dressTops(addLight) {
+    const th = this.th, moon = this.variant === 'moon', WD = this.wallDeco, WG = this.wallGlow, HA = this.halos;
+    const r = mulberry32(this.L.floor * 9173 + 5), pick = a => a[Math.floor(r() * a.length)];
+    const gap = { shrine: [1.9, 3.0], kitchen: [1.7, 2.7], burrow: [1.3, 2.3], crystal: [1.6, 2.8] }[th];
+    const span = s => { // the kind-3 run of this sample's profile: [o0, o1] and the surface height along it
+      const P = s.P; if (!P) return null; let a = -1, b = -1;
+      for (let k = 0; k < P.length; k++) if (P[k][3] === 3) { if (a < 0) a = k; b = k; }
+      if (a < 0 || P[b][0] - P[a][0] < 0.45) return null;
+      const yAt = o => { for (let k = a; k < b; k++) { const p0 = P[k], p1 = P[k + 1]; if (p1[0] > p0[0] && o >= p0[0] && o <= p1[0]) return p0[1] + (p1[1] - p0[1]) * (o - p0[0]) / (p1[0] - p0[0]); } return P[a][1]; };
+      return { o0: P[a][0], o1: P[b][0], yAt };
+    };
+    const grad = (c0, c1, fd, k0 = 0.8, k1 = 0.1) => (px, py, pz, nx, ny, nz, o) => o.copy(col(c0)).lerp(col(c1), clamp(ny * k0 + k1)).multiplyScalar(fd);
+    let lanterns = 0, lit = 0, chimneys = 0, glows = 0;
+    for (const { S } of this.wallSamples) {
+      let next = r() * gap[1];
+      for (const s of S) {
+        if (s.u < next) continue;
+        const sp = span(s); if (!sp) continue;
+        next = s.u + gap[0] + r() * (gap[1] - gap[0]);
+        const w = sp.o1 - sp.o0; if (w < 0.5) continue;
+        const o = sp.o0 + 0.25 + Math.pow(r(), 1.4) * Math.max(0.01, w - 0.5), y = sp.yAt(o);
+        const x = s.x + s.nx * o + s.tx * (r() - 0.5) * 0.6, z = s.z + s.nz * o + s.tz * (r() - 0.5) * 0.6;
+        const fd = topFade(o, s.D), hMax = s.f > 0.15 ? 9 : 0.7 * o, face = Math.atan2(-s.nx, -s.nz), k = r();
+        if (th === 'shrine') {
+          if (k < 0.34 && hMax > 0.95) { // cloud-pruned pine: crooked trunk carrying three flat pads
+            const sc = Math.min(1.25, 0.8 + r() * 0.45, hMax / 1.25), lx = (r() - 0.5) * 0.3, lz = (r() - 0.5) * 0.3;
+            WD.add(SH.cyl6(), M(x, y - 0.02, z, 0.07 * sc, 1.0 * sc, 0.07 * sc, lx, r() * TAU, lz), col(moon ? '#3a3040' : '#5a3a2a'));
+            const pine = grad(moon ? '#1a3440' : '#244a2a', moon ? '#64969e' : '#76aa52', fd, 0.9, 0.05);
+            for (const [ox, oy, oz, ps] of [[lx * 0.9, 1.0, lz * 0.9, 0.5], [0.24, 0.62, 0.12, 0.34], [-0.22, 0.74, -0.14, 0.3]]) {
+              const px = x + ox * sc, py = y + oy * sc, pz = z + oz * sc, R = ps * sc;
+              for (let q = 0; q < 4; q++) { const a = q / 4 * TAU + r(), d = q ? R * 0.5 : 0; WD.add(SH.puff(), M(px + Math.cos(a) * d, py + (q ? -0.02 : 0.05) * sc, pz + Math.sin(a) * d, R * (q ? 0.55 : 0.62), R * 0.3, R * (q ? 0.55 : 0.62), 0, r() * TAU, 0), null, pine); }
+            }
+          } else if (k < 0.56 && hMax > 1.2) { // bamboo clump
+            for (let i = 0, m = 4 + Math.floor(r() * 3); i < m; i++) {
+              const bx = x + (r() - 0.5) * 0.45, bz = z + (r() - 0.5) * 0.45, hh = (1.3 + r() * 0.9) * Math.min(1, hMax / 2.3), lx = (r() - 0.5) * 0.14, lz = (r() - 0.5) * 0.14;
+              WD.add(SH.cyl6(), M(bx, y - 0.02, bz, 0.028, hh, 0.028, lx, 0, lz), null, (a, py, c, nx, ny, nz, oc) => { oc.copy(col(moon ? '#6a9a88' : '#7cb04c')); if (Math.abs(Math.sin((py - y) * 9)) > 0.95) oc.multiplyScalar(0.72); oc.multiplyScalar(fd); });
+              for (let q = 0; q < 2; q++) WD.add(SH.puff(), M(bx + lx * hh + (r() - 0.5) * 0.28, y + hh * (0.7 + q * 0.22), bz + lz * hh + (r() - 0.5) * 0.28, 0.22, 0.07, 0.22, (r() - 0.5) * 0.4, r() * TAU, (r() - 0.5) * 0.4), null, grad(moon ? '#3a6a64' : '#4e8a36', moon ? '#8ac0b0' : '#a8d470', fd));
+            }
+          } else if (k < 0.74 && hMax > 0.75 && lanterns < 26) { // small stone lantern, about half of them lit
+            const on = r() < 0.55; lanterns++;
+            this.toro(WD, WG, x, z, face, 0.6, on ? (moon ? '#9ac4ff' : '#ffb060') : false, on ? (moon ? '#bfe0ff' : '#ffc070') : '#5a4c48', y - 0.02, moon ? '#9a9cb4' : '#a8a2a6', moon ? '#7a7c94' : '#8a8488');
+            if (on && lit++ < 8) addLight(x - s.nx * 0.3, y + 0.55, z - s.nz * 0.3, moon ? '#9ac4ff' : '#ffb870', 3, 4.5, 0.5);
+          } else { // moss mound, a stone or two, sometimes a fern
+            for (let i = 0; i < 3; i++) WD.add(SH.hemiLo(), M(x + (r() - 0.5) * 0.55, y - 0.02, z + (r() - 0.5) * 0.55, 0.18 + r() * 0.2, 0.08 + r() * 0.08, 0.18 + r() * 0.2, 0, r() * TAU, 0), null, grad(moon ? '#2e5058' : '#3e6a30', moon ? '#7aa8b2' : '#8ab85a', fd));
+            WD.add(SH.rock(), M(x + (r() - 0.5) * 0.4, y + 0.04, z + (r() - 0.5) * 0.4, 0.13 + r() * 0.1, 0.1 + r() * 0.06, 0.12 + r() * 0.1, r(), r() * TAU, r() * 0.3), null, grad(moon ? '#6a6e88' : '#8a847c', moon ? '#c8d0e8' : '#c4bcb0', fd, 1.2, -0.2));
+            if (r() < 0.5) this.tuft(WD, x + 0.22, y - 0.02, z - 0.16, 0.9, moon ? '#2e5a5a' : '#3e6a2c', moon ? '#8ac0c0' : '#9cc46a');
+            if (moon && glows < 14 && r() < 0.35) { glows++; const gy = y + 0.5 + r() * 0.4; WG.add(SH.sphLo(), M(x, gy, z, 0.07), col('#bfe0ff')); HA.add(x, gy, z, 0.9, '#9ac4ff', 0.55, 0.6); } // a foxfire wisp
+          }
+        } else if (th === 'kitchen') {
+          if (k < 0.34) { // a row of pickling jars and crocks
+            for (let oo = -0.45; oo < 0.45; oo += 0.24 + r() * 0.1) {
+              const jx = x + s.tx * oo, jz = z + s.tz * oo, c2 = pick(['#e8a838', '#8ac05a', '#d04a4a', '#f0e0c0', '#c8a878', '#7a5ac8']);
+              if (r() < 0.7) { const hh = 0.2 + r() * 0.14; WD.add(SH.cyl8(), M(jx, y, jz, 0.085, hh, 0.085), null, (a, py, c, nx, ny, nz, oc) => { oc.copy(col(c2)); if (Math.abs(py - y - hh * 0.45) < hh * 0.16) oc.set('#fff4e0'); }); WD.add(SH.cyl8(), M(jx, y + hh, jz, 0.095, 0.05, 0.095), col('#8a5a3a')); }
+              else { WD.add(SH.barrel(), M(jx, y, jz, 0.13, 0.26, 0.13), null, grad('#8a5a3e', '#c88a5a', fd, 0.6, 0.3)); WD.add(SH.sphLo(), M(jx, y + 0.27, jz, 0.1, 0.035, 0.1), col('#e8dcc0')); }
+            }
+          } else if (k < 0.54) { // crates, sometimes stacked
+            this.crate(WD, x, y, z, face + (r() - 0.5) * 0.4, 0.5);
+            if (hMax > 0.95 && r() < 0.5) this.crate(WD, x + (r() - 0.5) * 0.1, y + 0.5, z + (r() - 0.5) * 0.1, face + r() - 0.5, 0.38);
+          } else if (k < 0.68 && hMax > 0.85) this.barrel(WD, x, y, z, face);
+          else if (k < 0.8 && hMax > 1.0 && chimneys < 6) { // stubby chimney pipe puffing kitchen steam
+            chimneys++;
+            WD.add(SH.cyl(), M(x, y - 0.02, z, 0.17, 0.72, 0.17), null, (a, py, c, nx, ny, nz, oc) => { oc.copy(col(Math.sin(py * 14) > 0.7 ? '#8a4a36' : '#a85a40')); oc.multiplyScalar(fd); });
+            WD.add(SH.cyl(), M(x, y + 0.68, z, 0.22, 0.09, 0.22), col('#3a3036'));
+            this.steam.push(V(x, y + 0.85, z));
+          } else { // burlap sacks of rice and beans, one spilling
+            for (let i = 0, m = 1 + Math.floor(r() * 2); i < m; i++) {
+              const sx = x + s.tx * (i - 0.5) * 0.42, sz = z + s.tz * (i - 0.5) * 0.42, sc = 0.62 + r() * 0.16;
+              WD.add(SH.sph(), M(sx, y + 0.24 * sc, sz, 0.28 * sc, 0.26 * sc, 0.24 * sc, 0, face + r(), 0), null, (a, py, c, nx, ny, nz, oc) => { oc.copy(col('#a8804e')).lerp(col('#d8b884'), clamp(ny * 0.5 + 0.5)); if (Math.abs(py - y - 0.3 * sc) < 0.03) oc.multiplyScalar(0.7); oc.multiplyScalar(fd); });
+              WD.add(SH.cone(), M(sx, y + 0.44 * sc, sz, 0.1 * sc, 0.14 * sc, 0.1 * sc, Math.PI, 0, 0), col('#c8a068'));
+              WD.add(SH.cyl6(), M(sx, y + 0.43 * sc, sz, 0.075 * sc, 0.04, 0.075 * sc), col('#7a4a2a'));
+            }
+            if (r() < 0.5) for (let q = 0; q < 5; q++) WD.add(SH.sphLo(), M(x - s.nx * 0.25 + (r() - 0.5) * 0.3, y + 0.02, z - s.nz * 0.25 + (r() - 0.5) * 0.3, 0.045, 0.03, 0.045), col(pick(['#f4ecd8', '#c86a3a', '#6a8a3a'])));
+          }
+        } else if (th === 'burrow') {
+          if (k < 0.38) { // round bush, now and then with berries
+            const berries = r() < 0.4, bc = pick(['#e8504a', '#ff8ab0', '#5a6ad8']);
+            for (let i = 0, m = 3 + Math.floor(r() * 3); i < m; i++) {
+              const bs = Math.min(0.42, 0.22 + r() * 0.2, hMax * 0.6), bx = x + (r() - 0.5) * 0.6, bz = z + (r() - 0.5) * 0.6;
+              WD.add(SH.hemiLo(), M(bx, y - 0.03, bz, bs, bs * (0.8 + r() * 0.3), bs, 0, r() * TAU, 0), null, grad('#3e6a2e', '#9cc46a', fd));
+              if (berries) for (let q = 0; q < 3; q++) { const a = r() * TAU; WD.add(SH.sphLo(), M(bx + Math.cos(a) * bs * 0.7, y + bs * 0.55, bz + Math.sin(a) * bs * 0.7, 0.04), col(bc)); }
+            }
+          } else if (k < 0.62) { // flower patch in a grass tuft
+            this.tuft(WD, x, y - 0.02, z, 1.1);
+            for (let i = 0, m = 3 + Math.floor(r() * 4); i < m; i++) { // light flowers: a stem and a five-point star head
+              const fx = x + (r() - 0.5) * 0.8, fz = z + (r() - 0.5) * 0.8, hh = 0.18 + r() * 0.1, pc = col(pick(['#ffb8d0', '#fff0a0', '#ffffff', '#c8b0ff', '#ff9a7a']));
+              WD.add(SH.stem(), M(fx, y - 0.02, fz, 0.014, hh, 0.014), col('#4e8a38'));
+              WD.add(SH.star(), M(fx, y - 0.02 + hh, fz, 0.08, 0.08, 0.08, (r() - 0.5) * 0.4, r() * TAU, (r() - 0.5) * 0.4), null, (px, py, pz, nx, ny, nz, oc, lx, ly, lz) => { if (Math.hypot(lx, lz) < 0.2) oc.set('#ffc83a'); else oc.copy(pc); });
+            }
+          } else if (k < 0.74 && glows < 16) { glows++; this.mushrooms(WG, x, y - 0.02, z, r() < 0.6 ? '#8ad8ff' : '#ff9ad0', 0.7 + r() * 0.3, HA); }
+          else if (k < 0.88) { // mossy stones
+            for (let i = 0; i < 2; i++) WD.add(SH.ico(), M(x + (r() - 0.5) * 0.5, y + 0.05, z + (r() - 0.5) * 0.5, 0.18 + r() * 0.16, 0.14 + r() * 0.08, 0.18 + r() * 0.14, r(), r() * TAU, 0), null, (a, b, c, nx, ny, nz, oc) => oc.copy(col('#9a8a7e')).lerp(col('#7c9a5a'), clamp(ny * 1.6 - 0.3)).multiplyScalar(fd));
+          } else { // fallen branch with a mushroom
+            WD.add(SH.cyl6(), M(x, y + 0.06, z, 0.07, 0.9, 0.07, 0, face + (r() - 0.5), Math.PI / 2), null, grad('#6a4630', '#8a6a3e', fd, 0.4, 0.4));
+            this.mushrooms(WD, x + s.tx * 0.2, y - 0.02, z + s.tz * 0.2, '#d8563e', 0.5);
+          }
+        } else { // crystal grotto
+          if (k < 0.5) { // crystal cluster, the bigger ones glowing
+            const cc = pick(['#ff8ae0', '#7af0ff', '#c8a8ff', '#b8f4ff']), m = 3 + Math.floor(r() * 3), big = Math.min(1, hMax / 1.1);
+            for (let q = 0; q < m; q++) {
+              const d = V((r() - 0.5) * 0.8, 1, (r() - 0.5) * 0.8).normalize(), sz = (0.1 + r() * 0.1) * big;
+              WG.add(SH.crys(), MD(x + (r() - 0.5) * 0.4, y - 0.08, z + (r() - 0.5) * 0.4, d, sz, (0.4 + r() * 0.7) * big, sz, r() * TAU), null, (px, py, pz, nx, ny, nz, oc, lx, ly) => oc.copy(col(cc)).lerp(col('#ffffff'), clamp(ly * 0.55)).multiplyScalar(0.6 + 0.4 * fd));
+            }
+            if (glows++ < 30) HA.add(x, y + 0.45, z, 1.5, cc, 0.4);
+          } else if (k < 0.78) { // rime mounds
+            for (let i = 0; i < 3; i++) WD.add(SH.sphLo(), M(x + (r() - 0.5) * 0.6, y - 0.04, z + (r() - 0.5) * 0.6, 0.22 + r() * 0.16, 0.1 + r() * 0.06, 0.22 + r() * 0.16), null, grad('#b8c4f0', '#f4f8ff', fd, 0.6, 0.4));
+          } else { // frost-capped rock
+            WD.add(SH.rock(), M(x, y + 0.1, z, 0.3 + r() * 0.2, 0.22 + r() * 0.14, 0.28 + r() * 0.2, r(), r() * TAU, r() * 0.4), null, (a, b, c, nx, ny, nz, oc) => oc.copy(col('#5a4c8c')).lerp(col('#eef4ff'), clamp(ny * 1.5 - 0.5)).multiplyScalar(fd));
+          }
+        }
+      }
+    }
+    this.topCount = { lanterns, lit, chimneys, glows };
   }
   timberFrame(A, B) { // two rough posts and a lintel propping up the mossy lip
     const WD = this.wallDeco, r = this.rng;
@@ -1314,15 +1551,14 @@ export class DungeonWorld {
     b.add(SH.cyl(), M(x, y + h, z, 0.095, 0.05, 0.095), col('#8a5a3a'));
     b.add(SH.sphLo(), M(x, y + h + 0.05, z, 0.05, 0.03, 0.05), col('#e8d0a0'));
   }
-  toro(b, g, x, z, face, s = 1, lightUp = false, fire = '#ffb85a') { // stone lantern
-    const st = '#a8a2a6', dk = '#8a8488';
-    b.add(SH.cyl6(), M(x, 0, z, 0.22 * s, 0.1 * s, 0.22 * s, 0, face, 0), col(dk));
-    b.add(SH.cyl6(), M(x, 0.1 * s, z, 0.07 * s, 0.5 * s, 0.07 * s, 0, face, 0), col(st));
-    b.add(SH.cyl6(), M(x, 0.6 * s, z, 0.2 * s, 0.07 * s, 0.2 * s, 0, face, 0), col(dk));
-    g.add(SH.box(), M(x, 0.67 * s, z, 0.24 * s, 0.22 * s, 0.24 * s, 0, face, 0), null, (px, py, pz, nx, ny, nz, o) => o.set(Math.abs(ny) > 0.5 ? '#6a5a50' : fire));
-    b.add(SH.cone4(), M(x, 0.89 * s, z, 0.3 * s, 0.22 * s, 0.3 * s, 0, face + Math.PI / 4, 0), col(dk));
-    b.add(SH.sphLo(), M(x, 1.12 * s, z, 0.05 * s), col(st));
-    if (lightUp) this.halos.add(x, 0.78 * s, z, 1.2 * s, '#ffb060', 0.5, 1);
+  toro(b, g, x, z, face, s = 1, lightUp = false, fire = '#ffb85a', y0 = 0, st = '#a8a2a6', dk = '#8a8488') { // stone lantern
+    b.add(SH.cyl6(), M(x, y0, z, 0.22 * s, 0.1 * s, 0.22 * s, 0, face, 0), col(dk));
+    b.add(SH.cyl6(), M(x, y0 + 0.1 * s, z, 0.07 * s, 0.5 * s, 0.07 * s, 0, face, 0), col(st));
+    b.add(SH.cyl6(), M(x, y0 + 0.6 * s, z, 0.2 * s, 0.07 * s, 0.2 * s, 0, face, 0), col(dk));
+    g.add(SH.box(), M(x, y0 + 0.67 * s, z, 0.24 * s, 0.22 * s, 0.24 * s, 0, face, 0), null, (px, py, pz, nx, ny, nz, o) => o.set(Math.abs(ny) > 0.5 ? '#6a5a50' : fire));
+    b.add(SH.cone4(), M(x, y0 + 0.89 * s, z, 0.3 * s, 0.22 * s, 0.3 * s, 0, face + Math.PI / 4, 0), col(dk));
+    b.add(SH.sphLo(), M(x, y0 + 1.12 * s, z, 0.05 * s), col(st));
+    if (lightUp) this.halos.add(x, y0 + 0.78 * s, z, 1.2 * s, lightUp === true ? '#ffb060' : lightUp, 0.5, 1);
   }
   // ------------------------------------------------------------------ floor clutter
   buildProps() {

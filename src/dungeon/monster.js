@@ -151,7 +151,8 @@ export class Monster {
     if (this.light) { this.world.lightPool.removeSource(this.light); this.light = null; }
     const G = this.G;
     this.anim.deathT = 0;
-    G.vfx.poof(this.pos.clone().setY(0.4 * this.scale), { color: this.def.boss ? '#ffe0f0' : '#fff4fa', size: 0.6 * this.scale, n: this.def.boss ? 40 : 14 });
+    // a boss goes up in a smaller, lighter puff: 40 big opaque pink clouds used to fog the whole Victory frame
+    G.vfx.poof(this.pos.clone().setY(0.4 * this.scale), { color: this.def.boss ? '#ffe8f2' : '#fff4fa', size: (this.def.boss ? 0.42 : 0.6) * this.scale, n: this.def.boss ? 20 : 14 });
     G.vfx.petals(this.pos.clone().setY(0.5), this.def.boss ? 40 : 6);
     Events.emit('sfx', 'monster_die', { pos: this.pos });
     if (this.stats.onDeath === 'fireNova') this.mode.fireNova(this);

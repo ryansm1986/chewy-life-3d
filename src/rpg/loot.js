@@ -61,7 +61,8 @@ export function rollDrops({ mlvl = 1, rank = 'normal', mf = 0, gf = 0, rng, kind
     if (r === 'normal' || r === 'magic') r = 'rare';
     out.push({ type: 'item', item: generateItem({ ilvl: lvl, rarity: r, rng }) });
   }
-  const itemRank = rank === 'boss' ? 'unique' : rank;
+  // a boss's extra picks roll on the unique-monster table but skip the shallow-floor rare damping (items.earlyRareK)
+  const itemRank = rank === 'boss' ? 'hoard' : rank;
   for (let i = 0; i < T.picks; i++) {
     if (rng.chance(T.item.p)) out.push({ type: 'item', item: generateItem({ ilvl: lvl, mf, rank: itemRank, rng }) });
     if (rng.chance(T.potion.p)) out.push({ type: 'potion', key: rng.weighted(POTION_WEIGHTS(lvl)).key });

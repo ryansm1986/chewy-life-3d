@@ -587,6 +587,7 @@ export class Hud {
       setText(this.$.bbSub, info.title || info.sub || '');
       setCls(b, 'show', false); void b.offsetWidth; setCls(b, 'show', true);
       setCls(this.$.tc, 'has-boss', true);
+      this._bbRect = null; this._bbMeasureAt = performance.now() + 1000; // measured once the drop-in animation has settled
     } else if (frac < this.boss.frac - 0.001) { this.boss.hold = 0.4; replay(b, 'hit', 260); }
     this.boss.frac = frac;
     setText(this.$.bbPct, Math.ceil(frac * 100) + '%');
@@ -599,6 +600,36 @@ export class Hud {
       setStyle(fill, 'width', (o.frac * 100).toFixed(2) + '%');
       setStyle(ghost, 'width', (o.ghost * 100).toFixed(2) + '%');
     }
+    this.bossDodge(dt);
+  }
+  // The boss bar steps aside — fades to a ghost and lifts a little — while the boss itself projects underneath it
+  // (a tall boss standing beyond Chewy); it comes back as soon as the boss is clear of it.
+  bossDodge(dt) {
+    const b = this.$.boss, bb = this.G?.dungeon?.boss, cam = this.G?.engine?.camera;
+    let want = 0;
+    if (this.boss && bb?.alive && cam) {
+      if (!this._bbRect && performance.now() >= (this._bbMeasureAt || 0)) {
+        const r = b.getBoundingClientRect(), lift = this._bbLift || 0;
+        if (r.width > 0) this._bbRect = { l: r.left, r: r.right, t: r.top + lift, b: r.bottom + lift - 6 };
+        if (!this._bbResize) { this._bbResize = true; addEventListener('resize', () => { this._bbRect = null; }); }
+      }
+      const R = this._bbRect;
+      if (R) {
+        const v = this._bbV || (this._bbV = new THREE.Vector3()), W = innerWidth, H = innerHeight;
+        const h = this.G.dungeon.bossHeight?.(bb) ?? (bb.height || 2), rad = (bb.bodyR || bb.radius || 1) * 0.9;
+        v.copy(bb.pos).setY(bb.pos.y + h).project(cam); const hx = (v.x * 0.5 + 0.5) * W, hy = (-v.y * 0.5 + 0.5) * H;
+        v.copy(bb.pos).setY(bb.pos.y + h * 0.5).project(cam); const my = (-v.y * 0.5 + 0.5) * H;
+        v.set(bb.pos.x + cam.matrixWorld.elements[0] * rad, bb.pos.y + h * 0.5, bb.pos.z + cam.matrixWorld.elements[2] * rad).project(cam);
+        const rpx = Math.abs((v.x * 0.5 + 0.5) * W - hx) + 10;
+        // the upper body (head down to mid-height) under the bar is what hides the boss's face and wind-ups
+        if (hy < R.b && my > R.t && hx + rpx > R.l && hx - rpx < R.r) want = 1;
+      }
+    }
+    this._bbDodge = damp(this._bbDodge || 0, want, want ? 7 : 4, dt);
+    const k = this._bbDodge < 0.01 ? 0 : this._bbDodge;
+    this._bbLift = Math.round(k * 14);
+    setStyle(b, 'opacity', k ? (1 - 0.72 * k).toFixed(2) : '');
+    setStyle(b, 'translate', k ? `0 ${-this._bbLift}px` : '');
   }
 
   // ---------------------------------------------------------------- prompt

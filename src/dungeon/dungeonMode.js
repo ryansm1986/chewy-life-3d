@@ -78,18 +78,72 @@ export class DungeonMode {
     const G = this.G, E = G.engine, rig = E.rig;
     Events.emit('boss:spawn', { id: b.id, name: b.name, floor: this.floor });
     const prevDist = rig.distTarget;
-    rig.distTarget = Math.max(rig.minDist, prevDist * 0.72);
+    rig.distTarget = Math.max(rig.minDist, prevDist * 0.86);
     E.timeScale = 0.35;
     b.anim.wind = 1; b.anim.lunge = 1;
     G.vfx.ring(b.pos, { color: '#ff6a8a', r0: 0.5, r1: 7, life: 0.9 });
     G.vfx.dustRing(b.pos, 5, 26);
     rig.shake(0.9); E.post.pulse('#ff9ab0', 0.25); E.post.hitAberration(1);
     Events.emit('sfx', 'boss_roar'); G.audio?.music?.('boss', { fade: 0.5 });
-    // compact banner in the top band; it leaves early once blows are exchanged (bossEngaged)
-    G.ui?.banner?.(b.name, ['The squishiest royal in the Burrow!', 'Rain or shine, he hops to fight!', 'Something smells delicious… and dangerous!', 'Nine tails, one very bad mood.'][[5, 10, 15, 20].indexOf(this.floor % 20 || 20)] || 'appears!', { style: 'boss', duration: 2.0 });
+    // short title card kept off the boss and its health bar: the camera is about to frame Chewy + boss around the screen
+    // centre, so the card goes to the lower third when the boss stands beyond Chewy (it rises toward the bar), and just
+    // under the bar when the boss is on the camera side (it sinks toward the hotbar). It leaves early once blows are exchanged.
+    const bossAbove = (b.pos.x - G.player.pos.x) * Math.sin(rig.yaw) + (b.pos.z - G.player.pos.z) * Math.cos(rig.yaw) < 0;
+    G.ui?.banner?.(b.name, ['The squishiest royal in the Burrow!', 'Rain or shine, he hops to fight!', 'Something smells delicious… and dangerous!', 'Nine tails, one very bad mood.'][[5, 10, 15, 20].indexOf(this.floor % 20 || 20)] || 'appears!', { style: 'boss', duration: 1.7, top: bossAbove ? '64%' : '17.5%' });
     if (b.engaged) setTimeout(() => this.bossEngaged(b), 0);
     setTimeout(() => { E.timeScale = 1; b.anim.wind = 0; }, 900);
+    this.introUntil = performance.now() + 2200; // the push-in is a reveal of the boss; the two-shot framing takes over after
     setTimeout(() => { rig.distTarget = prevDist; }, 2200);
+  }
+  // ------------------------------------------------------------------ boss framing
+  // While a boss is engaged the camera frames Chewy AND the boss: the focus leans toward the boss until the pair's
+  // screen-space box (feet to head, both bodies) is centred in the playfield between the boss bar and the hotbar, and
+  // the rig pulls back 3-5 m so the box fits. Everything eases through CameraRig.bias / distBias and lets go when the
+  // boss falls, the fight drifts apart or Chewy goes down.
+  bossHeight(b) {
+    if (b._visH) return b._visH;
+    let h = (b.height || 2) * 1.05;
+    try { const box = new THREE.Box3().setFromObject(b.model.root); if (isFinite(box.max.y)) h = Math.max(1, box.max.y - b.pos.y); } catch (e) { /* keep estimate */ }
+    return (b._visH = h);
+  }
+  updateBossFraming(dt) {
+    const G = this.G, rig = G.engine.rig, b = this.boss, P = G.player;
+    const intro = performance.now() < (this.introUntil || 0); // (real time: the intro runs in slow motion)
+    let gx = 0, gz = 0, extra = 0;
+    if (b?.alive && b.aggro && b.introDone && !G.playerDead) {
+      const dx = b.pos.x - P.pos.x, dz = b.pos.z - P.pos.z, d = Math.hypot(dx, dz);
+      const w = 1 - clamp((d - 11) / 6); // a boss well out of reach doesn't drag the camera around
+      if (w > 0) {
+        const sp = Math.sin(rig.pitch), cp = Math.cos(rig.pitch), sy = Math.sin(rig.yaw), cy = Math.cos(rig.yaw);
+        // screen-plane metres relative to Chewy's feet: x right, y up (a metre of ground away from the camera = sp up)
+        const bx = dx * cy - dz * sy, by = -(dx * sy + dz * cy) * sp, H = this.bossHeight(b) * cp, R = (b.bodyR || b.radius || 1) + 0.3;
+        const top = Math.max(1.3 * cp, by + H), bot = Math.min(-0.15, by - R * sp), left = Math.min(-0.5, bx - R), right = Math.max(0.5, bx + R);
+        // lean the focus so the box centre lands on the screen centre (game.js aims the focus 0.6 m above Chewy's feet);
+        // during the roar the reveal centres the boss's upper body instead
+        const ex = intro ? bx : (left + right) / 2, ey = (intro ? by + H * 0.55 : (top + bot) / 2) - 0.6 * cp;
+        gx = cy * ex - sy * ey / sp; gz = -sy * ex - cy * ey / sp;
+        const gl = Math.hypot(gx, gz), cap = (intro ? 0.85 : 0.7) * d + 1; if (gl > cap) { gx *= cap / gl; gz *= cap / gl; }
+        // pull back until the box fits the band between the HUD rows (~68% of the view height, ~62% of its width)
+        const base = rig.distTarget, tanH = Math.tan(THREE.MathUtils.degToRad(G.engine.camera.fov / 2)), asp = G.engine.camera.aspect;
+        const needV = ((top - bot) / 2 + 0.7) / (0.68 * tanH) - base, needH = ((right - left) / 2 + 0.8) / (0.62 * tanH * asp) - base;
+        extra = intro ? 0 : clamp(Math.max(3, needV, needH), 0, 5);
+        gx *= w; gz *= w; extra *= w;
+      }
+    }
+    rig.biasTarget.set(gx, 0, gz); rig.distBiasTarget = extra;
+    rig.biasRate = intro ? 6 / Math.max(0.3, G.engine.timeScale) : 2.2; // the reveal swings over quickly, even in slow motion
+  }
+  // after a warm-arena boss falls: ease the dungeon grade to a neutral / slightly cool, less saturated look for ~2 s
+  // (the kitchen's own warm gain + saturation on top of the golden victory effects is what washed the frame orange)
+  updateVictoryGrade() {
+    if (this.victoryT == null || !this.victoryWarm) return;
+    const now = performance.now(); if (!this.victoryAt) this.victoryAt = now;
+    const t = (now - this.victoryAt) / 1000, e = t < 0.25 ? t / 0.25 : t < 2.4 ? 1 : Math.max(0, 1 - (t - 2.4) / 1.6);
+    const gr = this.G.engine.post.grade.uniforms, gd = this.theme.grade || {}, g0 = gd.gain || [1.05, 1.0, 0.95], s0 = gd.sat ?? 1.1;
+    const k = e * e * (3 - 2 * e);
+    gr.get('uGain').value.set(g0[0] + (0.95 - g0[0]) * k, g0[1] + (0.99 - g0[1]) * k, g0[2] + (1.04 - g0[2]) * k);
+    gr.get('uSat').value = s0 + (0.9 - s0) * k;
+    if (t > 4) this.victoryT = null;
   }
   bossTelegraph(dur) { this.sigDimT = Math.max(this.sigDimT || 0, dur); }
   // first blow either way (Chewy hits the boss / the boss starts an attack): the intro banner steps aside
@@ -208,6 +262,7 @@ export class DungeonMode {
     const pot = { team: 'enemy', breakable: true, alive: true, pos: p.clone(), radius: 0.32, height: 0.6, life: 1, lifeMax: 1, stats: { def: 0, res: {}, level: 1 }, status: {}, name: 'Pot',
       takeDamage: () => {
         if (!pot.alive) return; pot.alive = false; this.combat.remove(pot); W.collision.remove(col); mesh.parent?.remove(mesh);
+        g.dispose(); // out of the scene now, so floor teardown would never free it (materials stay: their programs are shared)
         G.vfx.poof(p.clone().setY(0.3), { color: '#e8d0b0', n: 8, size: 0.4 });
         for (let i = 0; i < 8; i++) G.vfx.dot.spawn({ x: p.x, y: 0.4, z: p.z, vx: rand(-3, 3), vy: rand(2, 4), vz: rand(-3, 3), life: 0.6, size: 0.12, color: colA, alpha: 1, alpha1: 1, grav: 12 });
         Events.emit('sfx', 'pot_break');
@@ -315,8 +370,12 @@ export class DungeonMode {
     const G = this.G;
     G.ui?.setBoss?.(null);
     G.engine.timeScale = 0.35; setTimeout(() => { G.engine.timeScale = 1; }, 1400);
-    G.engine.post.pulse('#fff4d8', 0.35);
-    G.vfx.victory(b.pos.clone());
+    // The Oni's Kitchen is already orange-on-cream: its victory gets a cool mint / sky palette, a softer flash and a
+    // brief neutral grade (updateVictoryGrade) so the moment reads as a celebration instead of an orange wash.
+    const warm = this.layout.theme === 'kitchen';
+    G.engine.post.pulse(warm ? '#e8f6ff' : '#fff4d8', warm ? 0.16 : 0.35);
+    G.vfx.victory(b.pos.clone(), warm ? { ring: '#9ff0d8', ring2: '#bfe0ff', pillar: '#e8f8ff', light: '#c8ecff', sparkle: ['#c8fff0', '#ffffff', '#c8e8ff'], k: 0.45 } : {});
+    this.victoryT = 0; this.victoryWarm = warm; this.sigilCalm = true; // the broken seal: the arena sigil settles down
     G.vfx.calm?.(2.5); // a level-up from this kill celebrates quietly under the banner instead of bleaching the screen
     G.ui?.floats?.hush?.(2.8); // clear the damage numbers off the stage for the moment
     G.ui?.banner?.('Victory!', `${b.name} was defeated!`, { style: 'victory', xp });
@@ -402,12 +461,14 @@ export class DungeonMode {
     if (this.playerLight) this.playerLight.pos.copy(G.player.pos).setY(G.player.pos.y + 1.8);
     // boss bar
     if (this.boss?.alive && this.boss.aggro) G.ui?.setBoss?.({ name: this.boss.name, hp: this.boss.life, max: this.boss.lifeMax });
+    this.updateBossFraming(dt);
     // skill VFX that land on the boss are toned down (vfx.dampAt) so it stays readable under fire
     if (G.vfx) { const dm = this._dampers ||= []; dm.length = 0; if (this.boss?.alive) dm.push(this.boss); G.vfx.dampers = dm; }
     // the arena sigil sinks into the floor while a boss telegraph is live, so the warning owns the floor
     const sd = this.world.floorMesh?.material?.userData?.u?.uSigDim;
-    if (sd) { this.sigDimT = Math.max(0, (this.sigDimT || 0) - dt); const want = this.sigDimT > 0 && this.boss?.alive ? 0.3 : 1; sd.value += (want - sd.value) * Math.min(1, dt * (want < sd.value ? 14 : 3)); }
+    if (sd) { this.sigDimT = Math.max(0, (this.sigDimT || 0) - dt); const want = this.sigDimT > 0 && this.boss?.alive ? 0.3 : this.sigilCalm ? 0.45 : 1; sd.value += (want - sd.value) * Math.min(1, dt * (want < sd.value ? (this.sigilCalm ? 4 : 14) : 3)); }
+    this.updateVictoryGrade(dt);
     this.world.update(dt, t, G.vfx, G.player.pos);
   }
-  dispose() { this.loot.clear(); this.monsters.length = 0; }
+  dispose() { this.loot.clear(); this.monsters.length = 0; this.G.engine.rig.clearBias?.(); }
 }

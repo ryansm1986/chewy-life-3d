@@ -41,6 +41,9 @@ export class SpiritPup extends Actor {
     this.G.combat.remove(this); this.G.world.lightPool.removeSource(this.glowSrc);
     if (!silent) this.G.vfx.poof(this.pos.clone().setY(0.4), { color: '#bfe0ff', n: 12 });
     this.dispose();
+    // Actor.dispose leaves the contact shadow's own plane + canvas texture behind (one of each per summon)
+    // (the material itself is left alone: disposing it could release the shared program and recompile on the next summon)
+    const sh = this.shadow; sh.geometry.dispose(); sh.material.map?.dispose();
   }
   update(dt) {
     if (!this.alive) return;

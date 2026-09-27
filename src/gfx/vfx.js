@@ -8,7 +8,15 @@ const _v = new THREE.Vector3();
 const C = h => new THREE.Color(h);
 const DAMP_MIN = 0.25; // additive effects sitting right on a boss keep 25% of their brightness
 
+// speech-bubble textures are shared by every VFX instance (the village one and each dungeon floor's): one canvas per
+// kind for the whole session, so floors don't leave a fresh set of uploaded textures behind on every visit
+const EMOTE_TEX = new Map();
 function emoteTexture(kind) {
+  let t = EMOTE_TEX.get(kind);
+  if (!t) EMOTE_TEX.set(kind, t = drawEmote(kind));
+  return t;
+}
+function drawEmote(kind) {
   const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
   // bubble
   g.fillStyle = '#fffaf0'; g.strokeStyle = '#4a2c2a'; g.lineWidth = 6;
@@ -43,7 +51,7 @@ export class VFX {
     this.leaf = new ParticleLayer(scene, leafParticleTexture(), { additive: false, max: 400, order: 11 });
     this.layers = [this.glow, this.spark, this.smoke, this.dot, this.petal, this.leaf];
     this.fx = []; // mesh effects {update(dt)->bool, obj}
-    this.emoteTex = new Map();
+    this.emoteTex = EMOTE_TEX;
     this.lightPool = null;
     // Readability near big bodies: live bosses registered here ({pos, bodyR|radius, height, alive}) tone down every
     // additive glow / spark / flash / flash-light that lands on them, so a storm of skill effects can't turn the boss
@@ -162,20 +170,23 @@ export class VFX {
   levelUp(p) {
     const calm = performance.now() < (this.calmUntil || 0);
     this.pillar(p, { color: '#ffe070', life: 1.6, r: 0.7, h: 7, opacity: calm ? 0.35 : 0.8 });
-    this.ring(p, { color: '#ffe070', r0: 0.2, r1: 3.2, life: 0.8 });
+    this.ring(p, { color: '#ffe070', r0: 0.2, r1: 3.2, life: 0.8, opacity: calm ? 0.4 : 0.9 });
     for (let i = 0, n = calm ? 16 : 40; i < n; i++) { const a = rand(0, TAU), r = rand(0.2, 0.9); this.spark.spawn({ x: p.x + Math.cos(a) * r, y: p.y + rand(0, 0.5), z: p.z + Math.sin(a) * r, vy: rand(1.5, 4.5), life: rand(0.8, 1.6), size: rand(0.2, 0.45), size1: 0.02, color: i % 3 ? '#ffe070' : '#ffffff', alpha: 1, alpha1: 0, spin: rand(-4, 4) }); }
     this.petals(p.clone().setY(p.y + 1), calm ? 12 : 24, 1);
     this.light(p, '#ffe070', calm ? 4 : 14, calm ? 5 : 9, 1.2);
   }
   /** Boss defeated: a golden shockwave, a soft light column, petal rain and staggered sparkle bursts — celebratory
    *  without a bloom-bleaching flash light. */
-  victory(p) {
-    this.ring(p, { color: '#ffe070', r0: 0.5, r1: 6.5, life: 0.9 });
-    this.ring(p, { color: '#ffc8e0', r0: 0.3, r1: 4, life: 0.7 });
-    this.pillar(p, { color: '#ffe8a0', life: 1.6, r: 1.1, h: 9, opacity: 0.4 });
+  // pal (optional): { ring, ring2, pillar, light, sparkle:[3], k } — warm arenas (the Oni's Kitchen) pass a cool palette and
+  // k < 1 so the celebration contrasts with the floor instead of adding more orange to an already orange frame
+  victory(p, pal = {}) {
+    const k = pal.k ?? 1;
+    this.ring(p, { color: pal.ring || '#ffe070', r0: 0.5, r1: 6.5, life: 0.9, opacity: 0.9 * k });
+    this.ring(p, { color: pal.ring2 || '#ffc8e0', r0: 0.3, r1: 4, life: 0.7, opacity: 0.9 * k });
+    this.pillar(p, { color: pal.pillar || '#ffe8a0', life: 1.6, r: 1.1, h: 9, opacity: 0.4 * k });
     this.petals(p.clone().setY(p.y + 1.6), 40, 1.8);
-    this.light(p, '#ffe070', 5, 8, 1.0);
-    ['#fff2a0', '#ffc8e0', '#c8e8ff'].forEach((c, i) => setTimeout(() => this.sparkle(p.clone().setY(p.y + 1 + i * 0.5), { n: 18, color: c, r: 1.8, rise: 2, size: 0.34 }), i * 220));
+    this.light(p, pal.light || '#ffe070', 5 * k, 8, 1.0);
+    (pal.sparkle || ['#fff2a0', '#ffc8e0', '#c8e8ff']).forEach((c, i) => setTimeout(() => this.sparkle(p.clone().setY(p.y + 1 + i * 0.5), { n: 18, color: c, r: 1.8, rise: 2, size: 0.34 }), i * 220));
   }
 
   // ------------------------------------------------------------------ mesh effects
@@ -288,11 +299,10 @@ export class VFX {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(r * 2, r * 2), mat); m.rotation.x = -Math.PI / 2; m.position.set(p.x, p.y + 0.07, p.z); m.renderOrder = 9;
     return this.add(m, (dt, t) => { mat.uniforms.uK.value = clamp(t / time); mat.uniforms.uT.value = t; }, time + 0.05);
   }
-  emoteTexture(kind) { if (!this.emoteTex.has(kind)) this.emoteTex.set(kind, emoteTexture(kind)); return this.emoteTex.get(kind); }
+  emoteTexture(kind) { return emoteTexture(kind); }
   // speech-bubble emote that follows an actor
   emote(actor, kind = 'heart', life = 1.8) {
-    if (!this.emoteTex.has(kind)) this.emoteTex.set(kind, emoteTexture(kind));
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.emoteTex.get(kind), transparent: true, depthWrite: false, depthTest: false, toneMapped: false }));
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: emoteTexture(kind), transparent: true, depthWrite: false, depthTest: false, toneMapped: false }));
     s.renderOrder = 20;
     const h = (actor.rig?.height || 1.2) + 0.55;
     return this.add(s, (dt, t) => {
