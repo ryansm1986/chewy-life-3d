@@ -31,7 +31,9 @@ import { installServices } from './world/services.js';
 import { Waterfall } from './world/waterfall.js';
 import { VillageMinimap, DungeonMinimap } from './world/minimap.js';
 
-async function tryImport(path) { try { return await import(/* @vite-ignore */ path); } catch (e) { console.warn('[boot] optional module missing', path, e.message); return null; } }
+// UI and audio load in parallel with the world. The import() paths must be literal so Vite bundles them for the
+// production build (a variable path with @vite-ignore worked on the dev server but 404'd in dist: no UI, no sound).
+async function tryImport(name, load) { try { return await load(); } catch (e) { console.warn('[boot] optional module missing', name, e.message); return null; } }
 
 export async function boot() {
   const engine = new Engine();
@@ -47,7 +49,7 @@ export async function boot() {
   G.actions.recompute();
   G.skillParams = (id) => skillRuntime(id, G.state, G.derived)?.params;
 
-  const [uiMod, audioMod] = await Promise.all([P.has('noui') ? null : tryImport('./ui/ui.js'), P.has('noaudio') ? null : tryImport('./audio/audio.js')]);
+  const [uiMod, audioMod] = await Promise.all([P.has('noui') ? null : tryImport('ui', () => import('./ui/ui.js')), P.has('noaudio') ? null : tryImport('audio', () => import('./audio/audio.js'))]);
   G.audio = audioMod?.Audio || null;
   try { G.audio?.init?.(); } catch (e) { console.warn('[audio] init failed', e); }
 

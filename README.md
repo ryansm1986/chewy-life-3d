@@ -49,6 +49,7 @@ Dev pages live under `/?test=…` (`sandbox`, `chars`, `monsters`, `dungeon`, `b
 
 ## Testing
 - `node tools/test-rpg.mjs` — ~4.8M checks on items, affixes, stats, levelling and drop tables.
+- `node tools/qa/prod-smoke.mjs` — builds the game, serves the bundle and checks the UI/audio load with no errors (run before shipping launcher changes)
 - `node tools/qa/run-all.mjs` — browser scenario suite (needs `npm run dev`): village↔Burrow round trips and leak checks,
   combat stress with every skill, all four bosses, death, village sim + save/load, inventory edge cases, dialogue/story,
   input edge cases. Each scenario (`tools/qa/s*.mjs`) can also run on its own.
