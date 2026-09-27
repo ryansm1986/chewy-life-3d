@@ -93,7 +93,9 @@ export async function boot() {
   function syncTownsfolk() {
     const homes = sim.list.filter(r => r.data.type === 'home' && (r.data.residents || 0) > 0);
     const want = Math.min(16, Math.max(0, Math.round(sim.stats.population * 0.6) - 4));
-    while (folk.length < want && homes.length) {
+    // one newcomer per check: building a villager costs ~20 ms, so several at once was a visible hitch (and arriving
+    // one by one reads better anyway)
+    if (folk.length < want && homes.length) {
       const h = homes[folk.length % homes.length];
       const spec = randomVillagerSpec();
       const anchors = [L.plaza, ...sim.list.filter(r => r.data.type === 'shop').map(r => ({ x: r.door.x, z: r.door.z }))];
@@ -413,7 +415,8 @@ export async function boot() {
     if (it && Input.hit('f') && performance.now() > (G.interactCooldown || 0)) it.onInteract();
     if (Input.mouse.wheel) rig.zoom(Input.mouse.wheel);
     // target frame
-    if (hoverEnemy && !hoverEnemy.breakable) G.ui?.setTarget?.({ name: hoverEnemy.name, hp: hoverEnemy.life, max: hoverEnemy.lifeMax, rarity: hoverEnemy.rank, mods: (hoverEnemy.stats.mods || []).map(m => m) });
+    if (hoverEnemy && !hoverEnemy.breakable && hoverEnemy !== G.dungeon?.boss) G.ui?.setTarget?.( // the boss already has its big bar
+      { name: hoverEnemy.name, hp: hoverEnemy.life, max: hoverEnemy.lifeMax, rarity: hoverEnemy.rank, mods: (hoverEnemy.stats.mods || []).map(m => m) });
     else G.ui?.setTarget?.(null);
   }
   function usePotion(key) {

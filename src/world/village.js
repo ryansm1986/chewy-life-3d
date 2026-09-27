@@ -1,7 +1,7 @@
 // SimCity-style village simulation: placement, zoning (R/C/W), road access, service coverage, RCI demand,
 // organic growth & level-ups, residents, daily income. Renders buildings via the buildings kit.
 import * as THREE from 'three';
-import { BUILDINGS, buildModel, setNight, sizeOf, bridgeDeckHeight } from './buildings/index.js';
+import { BUILDINGS, buildModel, setNight, sizeOf, bridgeDeckHeight, getTemplate, VARIANTS } from './buildings/index.js';
 import { T, WORLD } from './terrain.js';
 import { LANDMARKS } from './layout.js';
 import { Events } from '../core/events.js';
@@ -28,6 +28,8 @@ const NEED_FIX = { water: 'a Well or Water Tower', joy: 'a Park, Benches or Flow
 const pct = v => `${Math.round(v * 100)}%`;
 const sgn = v => `${v >= 0 ? '+' : '−'}${Math.round(Math.abs(v) * 100)}%`;
 
+const noStencil = (r, sc, cam, geo, mat) => { mat.stencilWrite = false; };
+const restoreStencil = (r, sc, cam, geo, mat) => { mat.stencilWrite = true; };
 export class VillageSim {
   constructor(G, world) {
     this.G = G; this.world = world; this.terrain = world.terrain;
@@ -44,7 +46,24 @@ export class VillageSim {
   }
   get S() { return this.G.state.village; }
   // ------------------------------------------------------------------ setup / persistence
+  // Zoned buildings grow with a random variant/level; building a template the first time costs 5-20 ms, which showed
+  // as a hitch right when a home popped up. Pre-build them one at a time in idle moments instead.
+  prewarmTemplates() {
+    if (this._prewarm) return;
+    const q = this._prewarm = [];
+    for (const [id, d] of Object.entries(BUILDINGS)) if (d.zone) for (let lv = 1; lv <= (d.levels || 1); lv++) for (let v = 0; v < VARIANTS; v++) q.push([id, lv, v]);
+    const one = () => { const [id, lv, v] = q.shift(); try { getTemplate(id, lv, v); } catch (e) { /* unknown combo */ } };
+    const ric = globalThis.requestIdleCallback || (f => setTimeout(() => f({ timeRemaining: () => 8, didTimeout: true }), 120));
+    const step = dl => {
+      const G = this.G, screenBusy = G.titleActive || G.ui?.dlg?.active || G.mode !== 'village';
+      if (screenBusy) { const t = performance.now(); while (q.length && performance.now() - t < 12) one(); } // nobody sees a hitch here
+      else if (q.length && (dl.timeRemaining() > 3 || dl.didTimeout)) one();
+      if (q.length) screenBusy ? setTimeout(() => step({ timeRemaining: () => 0 }), 30) : ric(step, { timeout: 400 });
+    };
+    ric(step, { timeout: 400 });
+  }
   init() {
+    setTimeout(() => this.prewarmTemplates(), 3000); // after boot settles
     const V = this.G.state.village;
     if (!V.buildings) {
       V.buildings = []; V.zones = []; V.paths = []; V.day = 1; V.income = [];
@@ -166,7 +185,18 @@ export class VillageSim {
     const g = new THREE.Group(); g.add(model.group);
     const p = this.worldPos(b);
     g.position.copy(p); g.rotation.y = -b.rot * Math.PI / 2;
-    g.traverse(o => { if (o.isMesh) { o.castShadow = o.castShadow !== false; o.receiveShadow = true; const m = o.material; if (m?.userData?.u?.uOcclOn) { m.userData.u.uOcclOn.value = 1; markOccluder(m); } } });
+    // Only real buildings may trigger the x-ray silhouette: small models (decor, lanterns, wells, stalls) share the same
+    // materials, so their draws switch stencil writing off just for themselves (stencil is not part of the program key).
+    const [fw, fd] = this.dims(b.type, b.rot, b.level);
+    const box = new THREE.Box3().setFromObject(model.group), tall = box.max.y - box.min.y > 1.7;
+    const occluder = BUILDINGS[b.type].cat !== 'decor' && tall && fw * fd >= 4;
+    g.traverse(o => {
+      if (!o.isMesh) return;
+      o.castShadow = o.castShadow !== false; o.receiveShadow = true;
+      const m = o.material; if (!m?.userData?.u?.uOcclOn) return;
+      m.userData.u.uOcclOn.value = 1; markOccluder(m);
+      if (!occluder) { o.onBeforeRender = noStencil; o.onAfterRender = restoreStencil; }
+    });
     this.group.add(g);
     const [w, d] = this.dims(b.type, b.rot, b.level);
     for (let z = b.z; z < b.z + d; z++) for (let x = b.x; x < b.x + w; x++) { this.occ[z * WORLD + x] = b.idx; this.zone[z * WORLD + x] = 0; }

@@ -143,7 +143,12 @@ export class Dialogue {
       if (this.typing) this.advance();
       this.choose(+k - 1); return true;
     }
-    if (k === 'Escape') { if (!this.choices?.length) { if (this.typing) this.advance(); else this.finish(-1); } return true; }
+    if (k === 'Escape') {
+      if (!this.choices?.length) { if (this.typing) this.advance(); else this.finish(-1); return true; }
+      // every menu ends with its leave option ("Bye!", "Never mind", "Not yet"…): Esc takes it, so a menu is never a trap
+      if (this.typing) this.advance();
+      this.choose(this.choices.length - 1); return true;
+    }
     return true; // swallow gameplay keys while talking
   }
 }
