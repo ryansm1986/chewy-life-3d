@@ -651,6 +651,25 @@ export function enableXray(rig, color = '#ffd9a0', opacity = 0.55) {
     m.stencilZPass = THREE.ReplaceStencilOp; m.stencilFail = THREE.KeepStencilOp; m.stencilZFail = THREE.KeepStencilOp;
   }
   const xm = new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, depthFunc: THREE.GreaterDepth, fog: false, toneMapped: false });
+  // a soft fresnel silhouette (bright rim, faint fill) rather than a flat pale blob
+  xm.onBeforeCompile = sh => {
+    const V = `#include <project_vertex>
+      #ifdef USE_SKINNING
+        vXN = normalize(normalMatrix * objectNormal);
+      #else
+        vXN = normalize(normalMatrix * normal);
+      #endif
+      vXV = -mvPosition.xyz;`;
+    const F = `float rimX = 1.0 - abs(dot(normalize(vXN), normalize(vXV)));
+      diffuseColor.a *= 0.22 + 0.9 * rimX * rimX;
+      outgoingLight = mix(outgoingLight, vec3(1.0), rimX * rimX * 0.35);
+      #include <opaque_fragment>`;
+    const P = `#include <common>
+      varying vec3 vXN; varying vec3 vXV;`;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', P).replace('#include <project_vertex>', V);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', P).replace('#include <opaque_fragment>', F);
+  };
+  xm.customProgramCacheKey = () => 'xray-fresnel';
   xm.stencilWrite = true; xm.stencilRef = STENCIL_OCCLUDER; xm.stencilFunc = THREE.EqualStencilFunc;
   xm.stencilFail = THREE.KeepStencilOp; xm.stencilZFail = THREE.KeepStencilOp; xm.stencilZPass = THREE.KeepStencilOp;
   for (const mesh of rig.meshes) {

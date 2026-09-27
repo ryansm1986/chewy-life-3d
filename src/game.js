@@ -203,7 +203,7 @@ export async function boot() {
     d.dispose();
     d.world.lightPool.clear();
     if (G.vfx !== vVfx) G.vfx.clear();
-    disposeScene(d.world.scene, [d.world.mask]);
+    disposeScene(d.world.scene, [d.world.mask, d.world.decoTex]); // data textures held in uniforms
     for (const k of [...vCombat.entities]) if (k.breakable || k.mode === d) vCombat.remove(k);
     player.interactTarget = null; player.pendingLoot = null; player.moveTarget = null;
     skills.queued = null;

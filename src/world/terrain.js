@@ -273,8 +273,22 @@ const TERRAIN_FRAG_COLOR = /* glsl */`
   grass = mix(grass, g4, smoothstep(0.55, 0.75, 1.0 - n2) * 0.5);
   vec3 sand = mix(vec3(0.97, 0.88, 0.68), vec3(0.93, 0.80, 0.62), n3);
   float sandAmt = 1.0 - smoothstep(0.3, 0.75, h + (n1 - 0.5) * 0.5);
-  vec3 rock = mix(vec3(0.60, 0.56, 0.66), vec3(0.80, 0.75, 0.74), smoothstep(0.3, 0.7, n3));
-  rock = mix(rock, vec3(0.50, 0.62, 0.42), smoothstep(0.6, 0.8, n1) * 0.6); // moss
+  // painted cliff faces: wavy sediment bands (warm sandstone / cool slate), dark seams between them, embedded stones,
+  // lichen, and moss drips hanging down from the grassy lip above
+  float along = wp.x * 0.83 + wp.z * 0.57;
+  float strata = h * 2.6 + sin(along * 0.9) * 0.22 + sin(along * 2.3 + 1.7) * 0.08 + (n1 - 0.5) * 0.35;
+  float band = fract(strata), bandId = floor(strata);
+  float bh = fract(sin(bandId * 12.9898) * 43758.5453);
+  vec3 rockA = vec3(0.78, 0.66, 0.58), rockB = vec3(0.62, 0.58, 0.70), rockC = vec3(0.86, 0.78, 0.66);
+  vec3 rock = bh < 0.4 ? rockA : bh < 0.75 ? rockB : rockC;
+  rock *= 0.9 + 0.2 * n3;                                                        // brushy value variation
+  rock *= mix(0.62, 1.0, smoothstep(0.0, 0.1, band) * smoothstep(1.0, 0.86, band)); // seams between layers
+  vec2 cst = voronoi(vec2(along * 1.6, h * 3.2));
+  rock = mix(rock, rock * vec3(1.08, 1.04, 1.0), (1.0 - smoothstep(0.0, 0.35, cst.x)) * step(0.72, cst.y) * 0.8); // stones
+  rock = mix(rock, vec3(0.62, 0.70, 0.50), smoothstep(0.62, 0.82, n2) * 0.45);  // lichen patches
+  float drip = smoothstep(0.55, 0.95, sin(along * 7.0 + n1 * 5.0) * 0.5 + 0.5) * smoothstep(0.8, 0.35, slope);
+  rock = mix(rock, vec3(0.42, 0.62, 0.34), drip * 0.7);                           // moss drips under the lip
+  rock *= mix(0.78, 1.0, smoothstep(-0.2, 0.6, h));                               // damp, darker foot
   float rockAmt = smoothstep(0.30, 0.5, slope + (n2 - 0.5) * 0.25);
   vec3 col = grass;
   col = mix(col, sand, sandAmt);
