@@ -1,8 +1,10 @@
-// Chewy — the player. WASD / click-to-move, dodge roll, interaction, weapon visuals and grass bending.
+// Chewy — the player. WASD / click-to-move (routed round walls, buildings, trees and water by core/nav.js), dodge roll,
+// interaction, weapon visuals and grass bending.
 import * as THREE from 'three';
 import { Actor } from './actor.js';
 import { buildHumanoid, CAST, boneSwordGeo, tennisBall, enableXray } from './charKit.js';
 import { Input } from '../core/input.js';
+import { navFor, PathFollow } from '../core/nav.js';
 import { Events } from '../core/events.js';
 import { U } from '../gfx/materials.js';
 import { clamp } from '../core/util.js';
@@ -14,6 +16,9 @@ export class Player extends Actor {
     this.G = G;
     enableXray(rig, '#ffc890', 0.6);
     this.moveTarget = null; this.interactTarget = null;
+    // click-to-move route toward moveTarget (the melee assist and loot pickup steer through moveTarget too)
+    this.route = new PathFollow({ replan: 0.12, far: 0.6 });
+    this.navDir = new THREE.Vector3(); this.navOn = false;
     this.rollT = 0; this.rollDir = new THREE.Vector3(); this.rollCd = 0;
     this.stepAcc = 0;
     this.inputDir = new THREE.Vector3();
@@ -71,6 +76,7 @@ export class Player extends Actor {
     // external speed modifiers (buffs, chill auras)
     this.slowT = Math.max(0, (this.slowT || 0) - dt);
     this.speedMul = (G.combat?.moveMul?.() || 1) * (G.derived?.moveMul || 1) * (this.slowT > 0 ? 1 - (this.slowAmt || 0.3) : 1) * (G.combat?.buffs?.shrineZoom ? 1.35 : 1);
+    if (this.navWorld !== this.world) { this.navWorld = this.world; const nav = navFor(this.world); if (nav && !nav.built) nav.build(); } // ~5-8 ms, once per world (behind the load / iris)
     if (G.playerDead) { super.update(dt); return; }
     if (this.knock && this.knock.lengthSq() > 0.01) { const b = this.pos.clone(); this.pos.addScaledVector(this.knock, dt); this.knock.multiplyScalar(Math.exp(-10 * dt)); this.world.collision?.resolve(this.pos, this.radius, b); }
     if (this.leap || this.dash) { this.pos.y = this.world.heightAt(this.pos.x, this.pos.z); super.update(dt); return; }
@@ -85,15 +91,21 @@ export class Player extends Actor {
       if (Input.hit('space') && !this.controlLocked && !G.ui?.anyModal?.()) {
         if (this.roll(dir.lengthSq() ? dir : new THREE.Vector3())) Input.consume('space');
       }
+      const navWas = this.navOn; this.navOn = false;
       if (dir.lengthSq() > 0 && !this.busyAction()) moved = this.step(dir, dt, this.speedMul * (this.canMoveWhileActing ? 0.75 : 1));
       else if (this.moveTarget && !this.busyAction()) {
-        const arrived = this.moveTo(this.moveTarget.x, this.moveTarget.z, dt, this.speedMul, this.interactTarget ? (this.interactTarget.radius || 1.2) : 0.12);
+        const it = this.interactTarget, mt = this.moveTarget;
+        if (it?.pos) { mt.x = it.pos.x; mt.z = it.pos.z; } // a villager walks on while Chewy heads over
+        const stop = it ? (it.radius || 1.2) : 0.12;
+        const r = this.walkTo(mt.x, mt.z, dt, stop, navWas);
         moved = 1;
-        if (arrived) {
-          const it = this.interactTarget; this.moveTarget = null; this.interactTarget = null;
-          if (it) { this.faceTo(it.pos.x, it.pos.z); it.onInteract?.(); }
+        if (r) {
+          this.moveTarget = null; this.interactTarget = null; this.route.clear();
+          // interact on arrival (or from the closest spot the map allows, if that's still near enough)
+          if (it && (r === 1 || Math.hypot(it.pos.x - this.pos.x, it.pos.z - this.pos.z) < stop + 0.8)) { this.faceTo(it.pos.x, it.pos.z); it.onInteract?.(); }
         }
       }
+      if (!this.moveTarget && this.route.pts) this.route.clear();
     }
     // footsteps
     this.stepAcc += this.anim.speed * dt;
@@ -101,6 +113,33 @@ export class Player extends Actor {
     // grass bending around Chewy
     U.uBenders.value[0].set(this.pos.x, this.pos.y, this.pos.z, 0.55);
     super.update(dt);
+  }
+  get nav() { return navFor(this.world); } // this world's clearance grid (debug / tests)
+  // walk toward (tx, tz) along a route round obstacles: 0 walking, 1 arrived within stop, 2 got as close as the map
+  // allows (target walled off / inside something), -1 no route (walled in, or wedged for a while)
+  walkTo(tx, tz, dt, stop, smooth = true) {
+    const px = this.pos.x, pz = this.pos.z;
+    if (Math.hypot(tx - px, tz - pz) < stop) return 1;
+    const nav = navFor(this.world);
+    if (!nav) return this.moveTo(tx, tz, dt, this.speedMul, stop) ? 1 : 0;
+    const f = this.route, w = f.steer(nav, px, pz, tx, tz, dt);
+    if (!w) { // no route at all (standing somewhere the grid calls solid): the old straight walk, still watched
+      if (this.moveTo(tx, tz, dt, this.speedMul, stop)) return 1;
+      this.navOn = true;
+      return f.watch(nav, this.pos.x, this.pos.z, this.speed * this.speedMul * dt, dt) ? -1 : 0;
+    }
+    const dx = w.x - px, dz = w.z - pz, d = Math.hypot(dx, dz);
+    if (f.last && (d < (f.exact ? 0.02 : 0.2))) return f.exact ? 1 : 2;
+    // ease the heading into each new leg instead of snapping (not on the final approach: no orbiting the goal)
+    const nd = this.navDir, k = smooth && !(f.last && d < 0.8) ? 1 - Math.exp(-dt * 16) : 1;
+    nd.x += (dx / d - nd.x) * k; nd.z += (dz / d - nd.z) * k; nd.y = 0;
+    const l = Math.hypot(nd.x, nd.z); if (l < 1e-4) nd.set(dx / d, 0, dz / d); else nd.multiplyScalar(1 / l);
+    const slow = f.last ? Math.min(1, d / (this.speed * this.speedMul * dt + 1e-6)) : 1;
+    this.step(nd, dt, this.speedMul * slow);
+    this.navOn = true;
+    const gaveUp = f.watch(nav, this.pos.x, this.pos.z, this.speed * this.speedMul * slow * dt, dt);
+    if (f.stuck && f.last && Math.hypot(tx - this.pos.x, tz - this.pos.z) < 0.5) return f.exact ? 1 : 2; // pressed against it: close enough
+    return gaveUp ? -1 : 0;
   }
   busyAction() { const a = this.anim.action; return a && ['swing', 'swing2', 'throw', 'cast', 'bark', 'slam', 'pickup', 'drink'].includes(a.name) && !this.canMoveWhileActing; }
 }

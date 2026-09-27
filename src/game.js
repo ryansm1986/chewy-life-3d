@@ -398,9 +398,13 @@ export async function boot() {
         if (hoverEnemy && melee && Math.hypot(tgt.x - player.pos.x, tgt.z - player.pos.z) > reach) { skills.approachTo(hb[0] || 'attack', hoverEnemy); } // D2-style: one click walks up and swings
         else { player.moveTarget = null; skills.tryCast(hb[0] || 'attack', tgt, hoverEnemy); }
       } else {
-        const it = Input.mouseHit(0) ? pickInteractAtMouse() : null;
+        const hit = Input.mouseHit(0), it = hit ? pickInteractAtMouse() : null;
+        // a click walks to the spot under the cursor at the press; holding steers once the cursor moves or after a
+        // moment (so the camera following Chewy doesn't drag a short click's destination along with it)
+        if (hit) player.pressAt = { x: Input.mouse.x, y: Input.mouse.y, t: performance.now() };
+        const p0 = player.pressAt, steer = !p0 || performance.now() - p0.t > 250 || Math.hypot(Input.mouse.x - p0.x, Input.mouse.y - p0.y) > 4;
         if (it) { player.interactTarget = it; player.moveTarget = it.pos.clone(); }
-        else if (!player.interactTarget) player.moveTarget = aim;
+        else if (!player.interactTarget && (hit || steer)) player.moveTarget = aim;
       }
     }
     if (Input.mouseDown(2) && !Input.mouse.overUI && hb[1]) skills.tryCast(hb[1], hoverEnemy ? hoverEnemy.pos : aim, hoverEnemy);

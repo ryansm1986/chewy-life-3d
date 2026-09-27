@@ -61,7 +61,8 @@ export async function installProbes(page) {
     QA.mem = () => {
       const G = window.G, r = G.engine.renderer;
       return { geo: r.info.memory.geometries, tex: r.info.memory.textures, progs: r.info.programs?.length || 0,
-        villageChildren: G.village.world.scene.children.length, villageSources: G.village.world.lightPool.sources.size,
+        villageChildren: G.village.world.scene.children.length - 2 * (G.npcs || []).length, // villagers (rig + contact shadow) move in over time
+        villagers: (G.npcs || []).length, villageSources: G.village.world.lightPool.sources.size,
         villageInteract: G.village.world.interactables.length, vfxFx: G.village.vfx.fx.length,
         lootLabels: document.querySelectorAll('.l-world .ll, .ll').length, floats: document.querySelectorAll('.l-world > *').length };
     };

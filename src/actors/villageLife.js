@@ -3,8 +3,9 @@
 //    veggie patches, flower beds, statues, notice board, wells, lanterns, hot spring, home yards, fishing banks.
 //    A slot is claimed by one villager at a time; slots are rebuilt on 'village:changed' (claims carry over by id,
 //    vanished slots are flagged dead so their user wraps up).
-//  - NAV: a tile-grid A* (paths/plaza cheap, grass dearer, buildings/trees/water blocked) + string-pulling, so
-//    villagers stroll along the paths and around buildings instead of sliding along walls. Throttled per frame.
+//  - NAV: a tile-grid A* (paths/plaza cheap, grass dearer, buildings/trees/water blocked; the search itself is the
+//    shared GridAStar in core/nav.js) + string-pulling, so villagers stroll along the paths and around buildings
+//    instead of sliding along walls. Throttled per frame.
 //  - PROPS: tiny shared-geometry broom / watering can / fishing rod that villagers hold in rig.parts.handR.
 import * as THREE from 'three';
 import { Events } from '../core/events.js';
@@ -12,6 +13,7 @@ import { BUILDINGS } from '../world/buildings/index.js';
 import { T, WORLD } from '../world/terrain.js';
 import { paint, merge, xf } from '../gfx/geom.js';
 import { rand, TAU } from '../core/util.js';
+import { GridAStar } from '../core/nav.js';
 
 const NOCOL = new Set(['flowerBed', 'bridge', 'fence', 'park']); // walk-through (see VillageSim.spawnModel)
 const BLOCK = 255;
@@ -24,9 +26,7 @@ class NavGrid {
     this.life = life;
     const N = WORLD * WORLD;
     this.cost = new Uint8Array(N);       // 0 = unknown, BLOCK = solid, else cost*10
-    this.g = new Float32Array(N); this.from = new Int32Array(N); this.seen = new Uint32Array(N); this.shut = new Uint32Array(N);
-    this.gen = 1;
-    this.heap = new Int32Array(N); this.hf = new Float32Array(N); this.hn = 0;
+    this.astar = new GridAStar(WORLD, WORLD);
     this.dirty = true;
   }
   // raw cost of one tile (before the wall-clearance pass)
@@ -77,20 +77,6 @@ class NavGrid {
   }
   blocked(x, z) { if (x < 0 || z < 0 || x >= WORLD || z >= WORLD) return true; return this.cost[z * WORLD + x] === BLOCK; }
   costAt(x, z) { return this.cost[Math.floor(z) * WORLD + Math.floor(x)]; }
-  _push(n, f) {
-    let i = this.hn++; const H = this.heap, F = this.hf;
-    while (i > 0) { const p = (i - 1) >> 1; if (F[p] <= f) break; H[i] = H[p]; F[i] = F[p]; i = p; }
-    H[i] = n; F[i] = f;
-  }
-  _pop() {
-    const H = this.heap, F = this.hf, top = H[0], n = --this.hn;
-    if (n > 0) {
-      const last = H[n], lf = F[n]; let i = 0;
-      for (;;) { let c = 2 * i + 1; if (c >= n) break; if (c + 1 < n && F[c + 1] < F[c]) c++; if (F[c] >= lf) break; H[i] = H[c]; F[i] = F[c]; i = c; }
-      H[i] = last; F[i] = lf;
-    }
-    return top;
-  }
   // A* from (sx,sz) to (tx,tz) in world units. Returns a flat [x0,z0,x1,z1,...] waypoint list (ends at the exact
   // target) or null. Start / goal tiles may be solid (standing beside a building, a bench seat).
   find(sx, sz, tx, tz, maxNodes = 5000) {
@@ -99,34 +85,8 @@ class NavGrid {
     const s = (Math.floor(sz) * W + Math.floor(sx)) | 0, goal = (Math.floor(tz) * W + Math.floor(tx)) | 0;
     if (s < 0 || goal < 0 || s >= W * W || goal >= W * W) return null;
     if (s === goal) return [tx, tz];
-    const gen = ++this.gen; if (gen > 4e9) { this.seen.fill(0); this.shut.fill(0); this.gen = 1; }
-    const G = this.g, from = this.from, seen = this.seen, shut = this.shut;
-    const gx = goal % W, gz = (goal / W) | 0;
-    const h = n => { const dx = Math.abs((n % W) - gx), dz = Math.abs(((n / W) | 0) - gz); return (dx + dz + (1.4142 - 2) * Math.min(dx, dz)) * 10; };
-    this.hn = 0; G[s] = 0; seen[s] = gen; from[s] = -1; this._push(s, h(s));
-    let found = false, count = 0;
-    while (this.hn) {
-      const n = this._pop();
-      if (shut[n] === gen) continue; shut[n] = gen;
-      if (n === goal) { found = true; break; }
-      if (++count > maxNodes) break;
-      const x = n % W, z = (n / W) | 0;
-      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
-        if (!dx && !dz) continue;
-        const nx = x + dx, nz = z + dz; if (nx < 0 || nz < 0 || nx >= W || nz >= W) continue;
-        const m = nz * W + nx;
-        let c = cost[m];
-        if (c === BLOCK) { if (m !== goal) continue; c = 10; }
-        if (dx && dz && (cost[z * W + nx] === BLOCK || cost[nz * W + x] === BLOCK)) continue; // no corner cutting
-        const ng = G[n] + c * (dx && dz ? 1.4142 : 1);
-        if (seen[m] === gen && ng >= G[m]) continue;
-        seen[m] = gen; G[m] = ng; from[m] = n; this._push(m, ng + h(m));
-      }
-    }
-    if (!found) return null;
-    const tiles = [];
-    for (let n = goal; n !== -1; n = from[n]) tiles.push(n);
-    tiles.reverse();
+    const tiles = this.astar.search(cost, s, goal, maxNodes, 10);
+    if (!tiles) return null;
     // string-pull: keep a waypoint only where a straight shot would leave cheap tiles or hit something solid
     const pts = [sx, sz]; let a = 0;
     const cx = n => (n % W) + 0.5, cz = n => ((n / W) | 0) + 0.5;

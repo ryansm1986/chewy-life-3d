@@ -5,6 +5,7 @@ import { buildBoston, enableXray } from './charKit.js';
 import { Events } from '../core/events.js';
 import { U } from '../gfx/materials.js';
 import { rand, chance } from '../core/util.js';
+import { navFor, PathFollow } from '../core/nav.js';
 
 export class Companion extends Actor {
   constructor(world, G) {
@@ -16,6 +17,7 @@ export class Companion extends Actor {
     this.idleT = 0;
     this.target = null; // combat target (set by combat AI)
     this.barkT = rand(6, 14);
+    this.route = new PathFollow({ replan: 0.4, far: 1.2 }); this.losT = 0; this.routed = false; // detours round walls
     // combat entity fields (registered with Combat while in the Burrow)
     this.team = 'ally'; this.height = 0.6; this.res = {}; this.status = {};
     this.lifeMax = 80; this.life = 80; this.fainted = 0; this.biteCd = 0;
@@ -52,7 +54,7 @@ export class Companion extends Actor {
     const tgt = G.combat.nearest(p.pos, 'ally', 7.5, e => !e.breakable);
     if (!tgt) return false;
     const d = Math.hypot(tgt.pos.x - this.pos.x, tgt.pos.z - this.pos.z);
-    if (d > tgt.radius + 0.45) { this.moveTo(tgt.pos.x, tgt.pos.z, dt, 1.25, tgt.radius + 0.4); }
+    if (d > tgt.radius + 0.45) { this.follow(tgt.pos.x, tgt.pos.z, dt, 1.25, tgt.radius + 0.4); }
     else {
       this.faceTo(tgt.pos.x, tgt.pos.z);
       if (this.biteCd <= 0) {
@@ -84,7 +86,7 @@ export class Companion extends Actor {
       // run to a spot beside/behind Chewy
       const side = new THREE.Vector3(Math.cos(p.facing), 0, -Math.sin(p.facing));
       const tx = p.pos.x - Math.sin(p.facing) * 1.1 + side.x * 0.7, tz = p.pos.z - Math.cos(p.facing) * 1.1 + side.z * 0.7;
-      this.moveTo(tx, tz, dt, d > 5 ? 1.5 : 1.05, 0.3);
+      this.follow(tx, tz, dt, d > 5 ? 1.5 : 1.05, 0.3);
       this.idleT = 0; this.wanderTarget = null; this.anim.mood = 0.5;
       if (this.anim.action?.name === 'sit') this.anim.stop('sit');
     } else {
@@ -92,8 +94,9 @@ export class Companion extends Actor {
       if (this.wanderTarget) {
         if (this.moveTo(this.wanderTarget.x, this.wanderTarget.z, dt, 0.5, 0.2)) this.wanderTarget = null;
       } else if (this.idleT > 2 && chance(dt * 0.25)) {
-        const a = rand(0, Math.PI * 2);
-        this.wanderTarget = new THREE.Vector3(p.pos.x + Math.cos(a) * 1.8, 0, p.pos.z + Math.sin(a) * 1.8);
+        // sniff around somewhere open (not tucked behind a bench, lamp or wall where he'd be hidden)
+        const a = rand(0, Math.PI * 2), x = p.pos.x + Math.cos(a) * 1.8, z = p.pos.z + Math.sin(a) * 1.8;
+        if (this.world.walkable?.(x, z) !== false && !this.world.collision?.solidAt(x, z, 0.5) && (this.G.mode !== 'village' || !this.G.sim?.buildingAt?.(x, z))) this.wanderTarget = new THREE.Vector3(x, 0, z);
       } else {
         this.faceTo(p.pos.x, p.pos.z);
         if (this.idleT > 5 && !this.anim.action) this.anim.play('sit');
@@ -104,6 +107,19 @@ export class Companion extends Actor {
     if (this.barkT < 0) { this.barkT = rand(10, 25); this.bark(); }
     U.uBenders.value[1].set(this.pos.x, this.pos.y, this.pos.z, 0.4);
     super.update(dt);
+  }
+  // moveTo that detours round walls when the straight line is blocked (line of sight re-checked 4x a second; a route is
+  // only searched while it is blocked, at most every 0.4 s)
+  follow(x, z, dt, mul, stop) {
+    const nav = navFor(this.world);
+    if (nav && (this.losT -= dt) <= 0) { this.losT = 0.25; this.routed = !nav.los(this.pos.x, this.pos.z, x, z); if (!this.routed) this.route.clear(); }
+    if (!nav || !this.routed) return this.moveTo(x, z, dt, mul, stop);
+    if (Math.hypot(x - this.pos.x, z - this.pos.z) < stop) return true;
+    const w = this.route.steer(nav, this.pos.x, this.pos.z, x, z, dt);
+    if (!w) return this.moveTo(x, z, dt, mul, stop); // no route (standing somewhere odd): plain walk
+    if (w.last && !w.exact && Math.hypot(w.x - this.pos.x, w.z - this.pos.z) < 0.25) return true; // as close as he can get
+    this.moveTo(w.x, w.z, dt, mul, 0.01);
+    return false;
   }
   bark() { this.anim.play('bark', { force: false }); Events.emit('sfx', 'bark_small', { pos: this.pos }); }
 }
