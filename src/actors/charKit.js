@@ -53,15 +53,15 @@ const shade = (amt = 0.12) => (p, n, o, c) => { o.copy(c).multiplyScalar(1 - amt
 //   head: ellipsoid scale · cheek: low-side fullness · snout: [length, width, height, centre height] on the unit head
 //   tufts: cheek fur points · eye: [spacing, height] on the unit head
 export const SPECIES = {
-  dog: { hs: 0.76, body: [1.0, 1.06], square: 0.08, head: [1.02, 0.94, 0.98], cheek: 0.12, snout: [0.74, 0.3, 0.28, -0.3], nose: [0.05, 0.036, 0.036], ears: 'rose', tail: 'dog', tufts: 0.05, eye: [0.4, 0.1] },
+  dog: { hs: 0.76, body: [1.0, 1.06], square: 0.08, head: [1.02, 0.94, 0.98], cheek: 0.12, snout: [0.52, 0.4, 0.33, -0.3], nose: [0.056, 0.04, 0.038], ears: 'rose', tail: 'dog', tufts: 0.05, eye: [0.4, 0.1] },
   cat: { hs: 0.76, body: [0.94, 1.02], square: 0.12, taper: -0.1, head: [1.12, 0.92, 0.96], cheek: 0.14, snout: [0.14, 0.3, 0.22, -0.32], nose: [0.03, 0.022, 0.022], ears: 'cat', tail: 'cat', whiskers: true, tufts: 0.05, eye: [0.42, 0.06] },
-  bunny: { hs: 0.72, body: [0.96, 1.08], taper: 0.1, longFace: 0.16, head: [0.94, 1.08, 0.96], cheek: 0.13, snout: [0.16, 0.28, 0.22, -0.32], nose: [0.028, 0.02, 0.02], ears: 'bunny', tail: 'puff', eye: [0.42, 0.06] },
-  bear: { hs: 0.72, body: [1.2, 1.1], square: 0.4, limb: 1.18, head: [1.1, 0.96, 0.98], cheek: 0.1, snout: [0.3, 0.36, 0.28, -0.34], nose: [0.046, 0.034, 0.032], ears: 'bear', tail: 'stub', eye: [0.38, 0.08] },
-  fox: { hs: 0.74, body: [0.9, 1.1], taper: -0.12, head: [1.06, 0.9, 0.98], cheek: 0.18, snout: [0.6, 0.28, 0.24, -0.3], nose: [0.036, 0.028, 0.028], ears: 'fox', tail: 'fox', tufts: 0.08, eye: [0.4, 0.1] },
-  panda: { hs: 0.74, body: [1.28, 1.02], square: 0.22, taper: 0.14, belly: true, limb: 1.12, head: [1.12, 0.96, 0.98], cheek: 0.1, snout: [0.24, 0.34, 0.26, -0.34], nose: [0.044, 0.032, 0.03], ears: 'bear', tail: 'stub', patches: true, eye: [0.4, 0.06] },
+  bunny: { foot: 'long', hs: 0.72, body: [0.96, 1.08], taper: 0.1, longFace: 0.16, head: [0.94, 1.08, 0.96], cheek: 0.13, snout: [0.16, 0.28, 0.22, -0.32], nose: [0.028, 0.02, 0.02], ears: 'bunny', tail: 'puff', eye: [0.42, 0.06] },
+  bear: { foot: 'bear', hand: 'bear', hs: 0.72, body: [1.2, 1.1], square: 0.4, limb: 1.18, head: [1.1, 0.96, 0.98], cheek: 0.1, snout: [0.3, 0.36, 0.28, -0.34], nose: [0.046, 0.034, 0.032], ears: 'bear', tail: 'stub', eye: [0.38, 0.08] },
+  fox: { foot: 'fox', hand: 'fox', hs: 0.74, body: [0.9, 1.1], taper: -0.12, head: [1.06, 0.9, 0.98], cheek: 0.18, snout: [0.6, 0.28, 0.24, -0.3], nose: [0.036, 0.028, 0.028], ears: 'fox', tail: 'fox', tufts: 0.08, eye: [0.4, 0.1] },
+  panda: { foot: 'bear', hand: 'bear', hs: 0.74, body: [1.28, 1.02], square: 0.22, taper: 0.14, belly: true, limb: 1.12, head: [1.12, 0.96, 0.98], cheek: 0.1, snout: [0.24, 0.34, 0.26, -0.34], nose: [0.044, 0.032, 0.03], ears: 'bear', tail: 'stub', patches: true, eye: [0.4, 0.06] },
   tanuki: { hs: 0.75, body: [1.2, 1.0], square: 0.15, belly: true, head: [1.1, 0.94, 0.98], cheek: 0.16, snout: [0.4, 0.3, 0.26, -0.3], nose: [0.042, 0.03, 0.03], ears: 'tanuki', tail: 'tanuki', mask: true, tufts: 0.07, eye: [0.4, 0.08] },
-  frog: { hs: 0.84, body: [1.18, 0.92], square: 0.3, neckless: 0.07, belly: true, head: [1.42, 0.74, 1.02], cheek: 0.06, snout: null, nose: null, ears: 'none', tail: 'none', frogEyes: true, eye: [0.45, 0.62] },
-  duck: { hs: 0.76, body: [1.12, 1.0], taper: 0.08, belly: true, head: [1.0, 1.0, 0.98], cheek: 0.05, snout: null, beak: true, nose: null, ears: 'none', tail: 'duck', eye: [0.4, 0.12] },
+  frog: { foot: 'web', hand: 'web', hs: 0.84, body: [1.18, 0.92], square: 0.3, neckless: 0.07, belly: true, head: [1.42, 0.74, 1.02], cheek: 0.06, snout: null, nose: null, ears: 'none', tail: 'none', frogEyes: true, eye: [0.45, 0.62] },
+  duck: { foot: 'web', hs: 0.76, body: [1.12, 1.0], taper: 0.08, belly: true, head: [1.0, 1.0, 0.98], cheek: 0.05, snout: null, beak: true, nose: null, ears: 'none', tail: 'duck', eye: [0.4, 0.12] },
   human: { hs: 0.84, body: [1.0, 1.0], head: [0.97, 1.04, 0.95], cheek: 0.02, chin: 0.2, snout: null, nose: [0.028, 0.022, 0.022], ears: 'human', tail: 'none', human: true, eye: [0.38, 0.04] },
 };
 const RH = 0.27; // head radius before the species scale
@@ -98,7 +98,7 @@ class Rig {
   constructor(spec) {
     this.spec = spec;
     this.root = new THREE.Group(); this.root.name = spec.name || 'char';
-    this.mat = makeToon({ vertexColors: true, objectBrush: true, brush: 0.1, rim: 0.55, term: [-0.02, 0.28], shadowSat: 0.4 });
+    this.mat = makeToon({ vertexColors: true, objectBrush: true, brush: 0.025, rim: 0.6, term: [-0.02, 0.28], shadowSat: 0.4 }); // clean colour blocks
     this.outMat = makeOutline(spec.outline || INK, spec.outlineW ?? 0.012);
     this.parts = {};
     this.meshes = [];
@@ -212,7 +212,8 @@ export function cloneRig(src) {
 export function buildHumanoid(spec) {
   const R = new Rig(spec);
   const sp = SPECIES[spec.species] || SPECIES.dog;
-  const fur = spec.fur || '#c98f5e', fur2 = spec.fur2 || '#fff2e0', fur3 = spec.fur3 || fur;
+  const fur = spec.fur || '#c98f5e', fur2 = spec.fur2 || '#fff2e0', fur3 = spec.fur3 || (sp.patches ? '#2a2630' : fur);
+  const limbC = sp.patches ? fur3 : null; // pandas: black arms and legs
   const skin = sp.human ? (spec.skin || '#ffe2cf') : fur;
   const of = spec.outfit || {};
   const topC = of.topColor || '#6ea8ff', topC2 = of.topColor2 || '#ffffff', botC = of.bottomColor || '#4a4a6a';
@@ -233,24 +234,29 @@ export function buildHumanoid(spec) {
   // --- torso: a bean, narrow at the shoulders and fuller at the belly, a little flatter front-to-back (no more ball)
   // dense profile (spline through the key points) so painted necklines and belly patches have crisp edges
   const key = [[0.001, -0.02], [0.13, 0.0], [0.163, 0.055], [0.165, 0.125], [0.148, 0.2], [0.115, 0.262], [0.078, 0.305], [0.001, 0.33]].map(([r, y]) => new THREE.Vector2(r, y));
-  const prof = new THREE.SplineCurve(key).getPoints(30); prof[0].set(0.001, -0.02); prof[prof.length - 1].set(0.001, 0.33);
-  const torso = new THREE.LatheGeometry(prof, 40);
+  const prof = new THREE.SplineCurve(key).getPoints(44); prof[0].set(0.001, -0.02); prof[prof.length - 1].set(0.001, 0.33);
+  const torso = new THREE.LatheGeometry(prof, 56);
   torso.scale(bw, 1.06 * bh, 0.86 * (0.5 + bw * 0.5));
   const top = of.top || 'shirt';
+  const bare = top === 'none' && !of.bottom; // Pokopia-style: just fur plus a signature accessory, no trousers
   paint(torso, (p, n, o) => {
     const front = p.z > 0;
     let c = C(topC);
     if (top === 'none') c = C(fur);
     if (top === 'dress' && p.y < 0.12) c = C(topC).lerp(C('#ffffff'), 0.05);
-    if (p.y < 0.055 && top !== 'dress') c = C(botC);
+    if (p.y < 0.055 && top !== 'dress' && !bare) c = C(botC);
     if (top === 'overalls' && p.y < 0.18) c = C(botC);
     if (top === 'overalls' && front && Math.abs(p.x) < 0.055 && p.y < 0.24) c = C(botC);
     // V-neck opening shows fur / chest blaze
     if ((top === 'gi' || top === 'kimono') && front && p.y > 0.17 && Math.abs(p.x) < (p.y - 0.17) * 0.75 * bw) c = spec.patterns?.chestBlaze ? C('#fffaf2') : C(sp.human ? skin : fur2);
     if ((top === 'gi' || top === 'kimono') && front && p.y > 0.17 && Math.abs(Math.abs(p.x) - (p.y - 0.17) * 0.75 * bw) < 0.012) c = C(topC2 === '#ffffff' ? topC : topC2).multiplyScalar(0.8); // lapel edge
     if (top === 'none' && spec.patterns?.chestBlaze && front && Math.abs(p.x) < 0.045 + (p.y - 0.1) * 0.1 && p.y > 0.06) c = C('#fffaf2');
-    if (top === 'none' && front && p.y > 0.04 && p.y < 0.26 && (p.x * p.x) / 0.01 + ((p.y - 0.14) ** 2) / 0.011 < 1) c = C(fur2);
-    if (sp.belly && (top === 'none' || top === 'overalls') && front && p.y > 0.04 && p.y < 0.24 && (p.x * p.x) / (0.012 * bw * bw) + ((p.y - 0.13) ** 2) / 0.009 < 1) c = C(fur2);
+    // belly patch: a soft-edged oval (a hard vertex-colour cut stair-steps on the lathe grid)
+    if ((top === 'none' || (sp.belly && top === 'overalls')) && front) {
+      const e = sp.belly ? (p.x * p.x) / (0.012 * bw * bw) + ((p.y - 0.13) ** 2) / 0.0095 : (p.x * p.x) / 0.01 + ((p.y - 0.14) ** 2) / 0.011;
+      const k = smooth(1.25, 0.8, e) * smooth(-0.02, 0.05, p.z);
+      if (k > 0) c = c.clone().lerp(C(fur2), k);
+    }
     if (of.apron && front && p.y > 0.02 && p.y < 0.24 && Math.abs(p.x) < 0.12) c = C(of.apron);
     o.copy(c).multiplyScalar(1 - 0.1 * clamp(0.5 - n.y));
   });
@@ -277,28 +283,53 @@ export function buildHumanoid(spec) {
 
   // --- legs & feet: a tapered leg and a proper foot (longer, flatter, soft pads) — reads as a creature, not a peg
   for (const [g, s] of [[legL, 1], [legR, -1]]) {
-    const pants = top === 'dress' ? (of.socks || '#ffffff') : (of.bottom === 'shorts' ? skin : botC);
+    const pants = top === 'dress' ? (of.socks || '#ffffff') : (of.bottom === 'shorts' || bare ? (limbC || skin) : botC);
     const parts = [xf(cap(0.058 * lk, 0.1, pants, [0, -0.095, 0]), { s: [1, 1, 0.92] })];
     if (of.bottom === 'shorts' && top !== 'dress') parts.push(cap(0.068, 0.03, botC, [0, -0.045, 0]));
     const footC = sp.human ? (of.shoes || '#d8443a') : (spec.patterns?.socks ? '#fffaf2' : fur3);
-    parts.push(ell(0.07, 0.052, 0.112, footC, [0, -0.222, 0.035], [0, 0, 0], 18, shade(0.15)));
-    if (!sp.human && sp !== SPECIES.duck) {
-      for (const t of [-1, 0, 1]) parts.push(ell(0.018, 0.013, 0.011, INK, [t * 0.03, -0.232, 0.142]));
-      parts.push(ell(0.04, 0.008, 0.05, spec.pads || '#f2b8b0', [0, -0.272, 0.04])); // paw pad peeking under the foot
+    const foot = sp.foot || 'paw';
+    if (foot === 'long') { // bunny: long flat hind feet
+      parts.push(ell(0.062, 0.042, 0.15, footC, [0, -0.232, 0.07], [0, 0, 0], 18, shade(0.12)));
+      parts.push(ell(0.034, 0.008, 0.08, spec.pads || '#f6c4c8', [0, -0.272, 0.08]));
+    } else if (foot === 'web') { // frog / duck: splayed webbed feet with round toe tips
+      const wc = sp === SPECIES.duck ? '#ff9a3a' : footC;
+      parts.push(ell(0.085, 0.022, 0.09, wc, [0, -0.255, 0.06], [0, 0, 0], 18, shade(0.1)));
+      for (const t of [-1, 0, 1]) parts.push(ell(0.026, 0.02, 0.026, wc, [t * 0.055, -0.25, 0.13 - Math.abs(t) * 0.02]));
+    } else if (foot === 'bear') { // big round paws with claws
+      parts.push(ell(0.085, 0.06, 0.11, footC, [0, -0.218, 0.03], [0, 0, 0], 18, shade(0.15)));
+      for (const t of [-1, -0.33, 0.33, 1]) parts.push(xf(cone(0.01, 0.03, '#fff6e8', [0, 0, 0], [Math.PI / 2, 0, 0], 6), { p: [t * 0.045, -0.228, 0.138] }));
+      parts.push(ell(0.048, 0.008, 0.06, spec.pads || '#6a4a44', [0, -0.276, 0.03]));
+    } else if (foot === 'fox') { // slim legs ending in small dark 'socks' and pointed paws
+      parts.push(ell(0.06, 0.05, 0.1, spec.sock || fur3, [0, -0.225, 0.04], [0, 0, 0], 18, shade(0.15)));
+      parts.push(xf(cap(0.05, 0.05, spec.sock || fur3, [0, -0.17, 0]), { s: [1, 1, 0.92] }));
+    } else {
+      parts.push(ell(0.07, 0.052, 0.112, footC, [0, -0.222, 0.035], [0, 0, 0], 18, shade(0.15)));
+      if (!sp.human) {
+        for (const t of [-1, 0, 1]) parts.push(ell(0.018, 0.013, 0.011, INK, [t * 0.03, -0.232, 0.142]));
+        parts.push(ell(0.04, 0.008, 0.05, spec.pads || '#f2b8b0', [0, -0.272, 0.04])); // paw pad peeking under the foot
+      }
     }
     R.add(g, merge(parts), 'leg');
   }
   // --- arms: slimmer, longer, with a mitten paw and a little thumb
   for (const [g, s] of [[armL, 1], [armR, -1]]) {
-    const sleeve = top === 'none' ? fur : (top === 'overalls' ? of.shirt || '#ffffff' : topC);
+    const sleeve = top === 'none' ? (limbC || fur) : (top === 'overalls' ? of.shirt || '#ffffff' : topC);
     const r = (sp.human ? 0.042 : 0.047) * lk;
     const parts = [cap(r, 0.14, sleeve, [0, -0.095, 0])];
     if (top === 'gi' || top === 'kimono') parts.push(paint(new THREE.CylinderGeometry(r + 0.014, r + 0.024, 0.07, 14).translate(0, -0.12, 0), (p, n, o) => o.set(sleeve)));
     if (top === 'dress') parts.push(ell(0.064, 0.052, 0.064, topC, [0, -0.03, 0]));
     if (of.wraps) { for (const [y, rr] of [[-0.18, r - 0.002], [-0.155, r]]) parts.push(paint(xf(new THREE.CylinderGeometry(rr, rr, 0.028, 12), { p: [0, y, 0.004], r: [0.1, 0, 0.12] }), (p, n, o) => o.set(of.wraps))); }
-    const handC = sp.human ? skin : fur;
-    parts.push(ell(0.048, 0.056, 0.042, handC, [0, -0.228, 0.01], [0, 0, 0], 16, shade(0.1)));
-    parts.push(ell(0.018, 0.026, 0.018, handC, [-s * 0.038, -0.212, 0.026], [0, 0, s * 0.5]));
+    const handC = sp.human ? skin : (sp.hand === 'fox' ? (spec.sock || fur3) : (limbC || fur));
+    if (sp.hand === 'web') { // frog: slim fingers with round pads
+      parts.push(ell(0.036, 0.04, 0.03, handC, [0, -0.222, 0.01], [0, 0, 0], 14, shade(0.1)));
+      for (const t of [-1, 0, 1]) parts.push(ell(0.016, 0.016, 0.016, handC, [t * 0.026, -0.262, 0.018]));
+    } else if (sp.hand === 'bear') { // big paw with a pale pad
+      parts.push(ell(0.058, 0.062, 0.05, handC, [0, -0.232, 0.01], [0, 0, 0], 16, shade(0.1)));
+      parts.push(ell(0.03, 0.03, 0.01, spec.pads || '#6a4a44', [0, -0.238, 0.056]));
+    } else {
+      parts.push(ell(0.048, 0.056, 0.042, handC, [0, -0.228, 0.01], [0, 0, 0], 16, shade(0.1)));
+      parts.push(ell(0.018, 0.026, 0.018, handC, [-s * 0.038, -0.212, 0.026], [0, 0, s * 0.5]));
+    }
     R.add(g, merge(parts), 'arm');
   }
   // --- head

@@ -113,6 +113,18 @@ export class Player extends Actor {
     // grass bending around Chewy
     U.uBenders.value[0].set(this.pos.x, this.pos.y, this.pos.z, 0.55);
     super.update(dt);
+    this.carrySword(dt);
+  }
+  // Keep the bone sword at its relaxed carry angle while walking: the walk cycle's arm swing and forward lean used to
+  // tip it level like a lance. Attacks and skills (any animator action) pose it freely.
+  carrySword(dt) {
+    if (this.weaponType !== 'sword') return;
+    const arm = this.rig.parts.armR, body = this.rig.parts.body, R = this.anim.rest;
+    const ra = R.get(arm), rb = R.get(body); if (!ra || !rb) return;
+    const want = this.anim.action ? 0 : 1;
+    this._carry = (this._carry ?? 1) + (want - (this._carry ?? 1)) * Math.min(1, dt * 14);
+    const tilt = (arm.rotation.x - ra.r.x) + (body.rotation.x - rb.r.x);
+    this.sword.rotation.x = Math.PI * 0.78 - tilt * this._carry;
   }
   get nav() { return navFor(this.world); } // this world's clearance grid (debug / tests)
   // walk toward (tx, tz) along a route round obstacles: 0 walking, 1 arrived within stop, 2 got as close as the map
