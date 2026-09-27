@@ -14,6 +14,10 @@ const _p = new THREE.Vector3();
 const PLAYER_VR = 0.36; // Chewy's visual body radius (his collision radius is 0.3)
 // big-body hit tints: warm and saturated so they add little luminance (≈ 0.08 at amp 0.2) — pale bosses sit near the bloom threshold
 const SOFT_TINT = new THREE.Color('#ff8a7a'), SOFT_CRIT = new THREE.Color('#ffc070');
+// Boss telegraph colours, picked against each arena's sigil (burrow pink, shrine gold, kitchen orange, sanctum blue):
+// King Mochi's slam is a deep red on pink, Lord Karakasa's spin a crimson on gold, Oni Chef's fire pots a hot
+// lemon-white on the orange checker, Tamamo's foxfire / blinks warm gold / pink on the blue sanctum.
+export const TELE = { slam: '#ff2a48', spin: '#ff3050', firepot: '#fff05a', barrage: '#ffc83a', blinkFrom: '#ff7ab8', blinkTo: '#fff0a8' };
 
 // Contact disc under every monster: soft painted shadow + a thin footprint ring (ink for normal monsters, the elite
 // colour for champions / uniques / bosses) so a pack reads as separate bodies instead of one blob.
@@ -367,9 +371,12 @@ export class Monster {
     this.state = 'blinkwind'; this.stateT = 0; this.blinkDur = this.enraged ? 0.55 : 0.75;
     this.blinkTo = new THREE.Vector3(best.x, 0, best.z);
     this.kit?.play('cast', { speed: 0.55 / this.blinkDur });
-    G.vfx.telegraph(this.pos, this.bodyR * 1.4, this.blinkDur, '#8ab8ff');
-    G.vfx.telegraph(this.blinkTo, this.bodyR * 1.2, this.blinkDur, '#b8d4ff');
-    G.vfx.ring(this.pos, { color: '#9ac4ff', r0: this.bodyR * 1.8, r1: 0.3, life: this.blinkDur, opacity: 0.8 });
+    // warm telegraphs: her arena sigil and foxfire are blue, so blue rings vanished into it (pink = where she leaves,
+    // gold-white = where she lands)
+    this.mode.bossTelegraph?.(this.blinkDur);
+    G.vfx.telegraph(this.pos, this.bodyR * 1.4, this.blinkDur, TELE.blinkFrom);
+    G.vfx.telegraph(this.blinkTo, this.bodyR * 1.2, this.blinkDur, TELE.blinkTo);
+    G.vfx.ring(this.pos, { color: '#ffd89a', r0: this.bodyR * 1.8, r1: 0.3, life: this.blinkDur, opacity: 0.8 });
     Events.emit('sfx', 'ghost_wail', { pos: this.pos });
     return true;
   }
@@ -403,12 +410,13 @@ export class Monster {
     this.anim.wind = 1;
     this.kit?.play(A.type === 'ranged' ? 'throw' : 'swing', { speed: 0.9 / A.windup * 0.4 });
     const vfx = this.G.vfx;
+    if (this.def.boss) this.mode.bossTelegraph?.(A.windup + (A.proj === 'firepot' ? 1.3 : 0.1)); // the sigil steps back while it winds up
     if (A.type === 'aoe') this.telegraph = vfx.telegraph(this.pos, A.radius, A.windup, '#c8e070');
-    else if (A.type === 'slam') { this.telegraph = vfx.telegraph(this.atkPoint, A.radius, A.windup, '#ff5a6a'); }
-    else if (A.type === 'spin') this.telegraph = vfx.telegraph(this.pos, A.radius, A.windup, '#ff5a6a');
+    else if (A.type === 'slam') { this.telegraph = vfx.telegraph(this.atkPoint, A.radius, A.windup, this.def.boss ? TELE.slam : '#ff5a6a'); }
+    else if (A.type === 'spin') this.telegraph = vfx.telegraph(this.pos, A.radius, A.windup, this.def.boss ? TELE.spin : '#ff5a6a');
     else if (A.type === 'charge') { this.chargeDir = target.pos.clone().sub(this.pos).setY(0).normalize(); }
     else if (A.type === 'barrage' && A.proj === 'foxfire') { // foxfire gathers: blue ring at her feet + motes drawn in
-      this.telegraph = vfx.telegraph(this.pos, this.bodyR * 1.6, A.windup, '#8ab8ff');
+      this.telegraph = vfx.telegraph(this.pos, this.bodyR * 1.6, A.windup, TELE.barrage);
       vfx.undamped(() => vfx.sparkle(this.pos.clone().setY(this.height * 0.45), { n: 14, color: '#9ac4ff', r: this.bodyR, life: A.windup, size: 0.35, rise: 0.4 }));
     }
     if (this.def.boss) { Events.emit('sfx', 'boss_roar'); this.mode.bossEngaged?.(this); }
@@ -441,7 +449,7 @@ export class Monster {
               const sp = A.spread || 2, blast = A.blast || 1.8, time = A.spread ? rand(0.85, 1.2) : 0.9;
               const to = target.pos.clone().add(new THREE.Vector3(rand(-sp, sp), 0, rand(-sp, sp)));
               C.spawn({ team: 'enemy', kind: 'firepot', pos: this.pos.clone().setY(1.2 * this.scale), lob: { to, h: 3.5, time }, onEnd: (p) => this.mode.explodeAt(p.pos, blast, Math.round(roll() * (A.dmgMul || 1)), 'fire', this) });
-              G.vfx.telegraph(to, blast, time, '#ff7a3a');
+              G.vfx.telegraph(to, blast, time, this.def.boss ? TELE.firepot : '#ff7a3a');
             } else {
               C.spawn({ team: 'enemy', kind: A.proj, pos: this.pos.clone().setY(0.6 * this.scale + 0.2), dir, speed: A.speed, range: A.range * 1.4, radius: 0.3, homing: A.proj === 'foxfire' ? (A.homing ?? 1.2) : 0, onHit: (e) => this.dealTo(e, Math.round(roll() * (A.dmgMul || 1)), el) }).homeTarget = target;
             }

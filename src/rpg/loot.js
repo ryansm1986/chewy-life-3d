@@ -22,6 +22,13 @@ export const TREASURE = {
   unique: { picks: 3, coins: { p: 1, mul: [6, 12] }, item: { p: 0.7 }, potion: { p: 0.5 }, material: { p: 0.6, n: [2, 4] }, gem: { p: 0.14 } },
   boss: { picks: 5, coins: { p: 1, mul: [10, 20], piles: 3 }, item: { p: 0.9 }, potion: { p: 0.8 }, material: { p: 1, n: [4, 8] }, gem: { p: 0.6 }, guaranteed: 'rare' },
 };
+/**
+ * Building basics (wood / stone). The village-building loop runs on these (mid-tier buildings want 16-26 wood + 10-24
+ * stone), so on top of the themed material roll every kill has a chance at a small bundle, early floors pay out more,
+ * chests always hold a bundle and clearing a floor leaves a supply cache (floorClearDrops): ~1-2 floors per building.
+ */
+export const BASICS = { normal: { p: 0.1, n: [1, 2] }, champion: { p: 0.4, n: [2, 3] }, unique: { p: 0.85, n: [3, 5] }, boss: { p: 1, n: [6, 10] } };
+export const basicsBoost = lvl => (lvl <= 7 ? 1.5 : lvl <= 13 ? 1.25 : 1);
 export const POTION_WEIGHTS = lvl => [
   { key: 'heart', w: 64 }, { key: 'zoom', w: 30 }, { key: 'rejuv', w: 4 + Math.min(10, lvl / 5) },
 ];
@@ -61,6 +68,12 @@ export function rollDrops({ mlvl = 1, rank = 'normal', mf = 0, gf = 0, rng, kind
   }
   if (rng.chance(T.material.p)) out.push({ type: 'material', key: rollMaterial(lvl, rng, kind), n: rng.int(T.material.n[0], T.material.n[1]) });
   if (rank === 'boss' && rng.chance(0.7)) out.push({ type: 'material', key: rollMaterial(lvl + 10, rng), n: rng.int(2, 4) });
+  const Bs = BASICS[rank] || BASICS.normal;
+  if (rng.chance(Math.min(1, Bs.p * basicsBoost(lvl)))) {
+    const n = rng.int(Bs.n[0], Bs.n[1]);
+    if (rank === 'boss') out.push({ type: 'material', key: 'wood', n }, { type: 'material', key: 'stone', n: Math.max(2, n - 2) });
+    else out.push({ type: 'material', key: rng.chance(0.58) ? 'wood' : 'stone', n });
+  }
   if (rng.chance(T.gem.p)) out.push({ type: 'gem', item: makeGem(rng.pick(GEM_TYPES), rollGemTier(lvl, rng)) });
   return out;
 }
@@ -85,6 +98,19 @@ export function chestDrops(level = 1, quality = 0, rng, mf = 0) {
   if (rng.chance([0.4, 0.7, 1][q])) out.push({ type: 'potion', key: rng.weighted(POTION_WEIGHTS(lvl)).key });
   if (q === 2) out.push({ type: 'potion', key: 'rejuv' });
   if (rng.chance([0.6, 0.8, 1][q])) out.push({ type: 'material', key: rollMaterial(lvl + q * 5, rng), n: rng.int(1 + q * 2, 3 + q * 3) });
+  // every chest keeps a bundle of building supplies
+  out.push({ type: 'material', key: 'wood', n: rng.int(2 + q * 2, 4 + q * 3) }, { type: 'material', key: 'stone', n: rng.int(1 + q * 2, 3 + q * 2) });
   if (rng.chance([0.04, 0.2, 0.6][q])) out.push({ type: 'gem', item: makeGem(rng.pick(GEM_TYPES), rollGemTier(lvl + q * 8, rng)) });
   return out;
+}
+
+/** Supply cache left when every monster on a floor is gone (wood + stone + a coin purse). */
+export function floorClearDrops(level = 1, rng) {
+  rng = toRng(rng);
+  const lvl = Math.max(1, Math.round(level));
+  return [
+    { type: 'material', key: 'wood', n: rng.int(3, 5) + Math.floor(lvl / 6) },
+    { type: 'material', key: 'stone', n: rng.int(2, 4) + Math.floor(lvl / 8) },
+    { type: 'coins', n: coinsFor(lvl, [4, 8], 0, rng) },
+  ];
 }

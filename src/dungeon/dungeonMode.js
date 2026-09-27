@@ -5,7 +5,7 @@ import { DungeonWorld } from './dungeonWorld.js';
 import { Monster } from './monster.js';
 import { MONSTERS } from './monsters.js';
 import { GroundLoot } from '../combat/groundLoot.js';
-import { rollDrops, chestDrops } from '../rpg/loot.js';
+import { rollDrops, chestDrops, floorClearDrops } from '../rpg/loot.js';
 import { xpForKill } from '../rpg/stats.js';
 import { makeToon, makeOutline } from '../gfx/materials.js';
 import { paint, merge, RoundedBox } from '../gfx/geom.js';
@@ -91,6 +91,7 @@ export class DungeonMode {
     setTimeout(() => { E.timeScale = 1; b.anim.wind = 0; }, 900);
     setTimeout(() => { rig.distTarget = prevDist; }, 2200);
   }
+  bossTelegraph(dur) { this.sigDimT = Math.max(this.sigDimT || 0, dur); }
   // first blow either way (Chewy hits the boss / the boss starts an attack): the intro banner steps aside
   bossEngaged(b) {
     if (!b.engaged) b.engaged = true;
@@ -276,25 +277,49 @@ export class DungeonMode {
     let xp = xpForKill(m.stats.xp, m.level, G.state.player.lvl);
     if (this.combat.buffs.shrineXp) xp = Math.round(xp * 1.5);
     xp = Math.round(xp * (1 + (D.xpBonus || 0) / 100));
+    const isBoss = m === this.boss;
+    // the Victory banner goes up before the xp lands, so a level-up from the kill folds into it (no second banner)
+    if (isBoss) this.onBossDefeated(m, xp);
     G.actions.addXp(xp);
-    // batch xp into one floating number above Chewy instead of one per kill
-    this.xpAcc = (this.xpAcc || 0) + xp;
-    if (!this.xpTimer) this.xpTimer = setTimeout(() => { this.xpTimer = null; if (this.xpAcc > 0 && this.G.player) this.G.ui?.float?.(this.G.player.pos.clone().setY(this.G.player.pos.y + 2.0), `+${this.xpAcc} xp`, { kind: 'xp' }); this.xpAcc = 0; }, 550);
+    // batch xp into one floating number above Chewy instead of one per kill (a boss's xp is shown on the Victory banner)
+    if (!isBoss) {
+      this.xpAcc = (this.xpAcc || 0) + xp;
+      if (!this.xpTimer) this.xpTimer = setTimeout(() => { this.xpTimer = null; if (this.xpAcc > 0 && this.G.player) this.G.ui?.float?.(this.G.player.pos.clone().setY(this.G.player.pos.y + 2.0), `+${this.xpAcc} xp`, { kind: 'xp' }); this.xpAcc = 0; }, 550);
+    }
     if (D.lifeOnKill) G.actions.heal(D.lifeOnKill);
-    // drops
+    // drops (a boss's hoard bursts out a beat later, once the Victory banner has had the stage)
     const mf = (D.mf || 0) + (this.combat.buffs.shrineLuck ? 60 : 0);
     const drops = rollDrops({ mlvl: m.level, rank: m.rank, mf, gf: D.gf || 0, kind: m.stats.kind });
-    if (drops.length) this.loot.drop(m.pos.clone().setY(0.3), drops);
+    const at = m.pos.clone().setY(0.3);
+    if (drops.length && isBoss) setTimeout(() => { if (G.dungeon !== this) return; G.vfx.ring(at, { color: '#ffe070', r0: 0.3, r1: 3.2, life: 0.6 }); G.vfx.sparkle(at.clone().setY(0.8), { n: 30, color: '#fff2a0', r: 1.2, rise: 1.6 }); Events.emit('sfx', 'chest_open'); this.loot.drop(at, drops); }, 1050);
+    else if (drops.length) this.loot.drop(at, drops);
     Events.emit('monster:killed', { id: m.id, rank: m.rank, floor: this.floor });
-    if (m === this.boss) this.onBossDefeated(m);
+    this.checkFloorClear();
   }
-  onBossDefeated(b) {
+  // every monster on the floor gone: a supply cache (wood / stone / coins) pops out at Chewy's feet
+  checkFloorClear() {
+    if (this.floorCleared || this.monsters.some(m => m.alive)) return;
+    this.floorCleared = true;
+    const G = this.G;
+    setTimeout(() => {
+      if (G.dungeon !== this || !G.player) return;
+      const p = G.player.pos.clone().setY(0.4);
+      G.vfx.sparkle(p.clone().setY(1), { n: 24, color: '#ffe8a0', r: 0.9, rise: 1.4 });
+      G.vfx.ring(p, { color: '#8fe0c0', r0: 0.3, r1: 2.4, life: 0.6 });
+      Events.emit('sfx', 'chest_open');
+      G.ui?.toast?.('Floor cleared! A cache of building supplies', { icon: 'wood', color: '#8fe0c0' });
+      this.loot.drop(p, floorClearDrops(this.layout.mlvl));
+    }, this.boss === null && this.layout.boss ? 2600 : 700);
+  }
+  onBossDefeated(b, xp = 0) {
     const G = this.G;
     G.ui?.setBoss?.(null);
     G.engine.timeScale = 0.35; setTimeout(() => { G.engine.timeScale = 1; }, 1400);
-    G.engine.post.pulse('#fff4d8', 0.6);
-    G.vfx.levelUp(b.pos.clone());
-    G.ui?.banner?.('Victory!', `${b.name} was defeated!`, { style: 'levelup' });
+    G.engine.post.pulse('#fff4d8', 0.35);
+    G.vfx.victory(b.pos.clone());
+    G.vfx.calm?.(2.5); // a level-up from this kill celebrates quietly under the banner instead of bleaching the screen
+    G.ui?.floats?.hush?.(2.8); // clear the damage numbers off the stage for the moment
+    G.ui?.banner?.('Victory!', `${b.name} was defeated!`, { style: 'victory', xp });
     Events.emit('boss:dead', { id: b.id, floor: this.floor });
     Events.emit('sfx', 'ui_levelup');
     // stairs appear where the boss fell + a return portal
@@ -379,6 +404,9 @@ export class DungeonMode {
     if (this.boss?.alive && this.boss.aggro) G.ui?.setBoss?.({ name: this.boss.name, hp: this.boss.life, max: this.boss.lifeMax });
     // skill VFX that land on the boss are toned down (vfx.dampAt) so it stays readable under fire
     if (G.vfx) { const dm = this._dampers ||= []; dm.length = 0; if (this.boss?.alive) dm.push(this.boss); G.vfx.dampers = dm; }
+    // the arena sigil sinks into the floor while a boss telegraph is live, so the warning owns the floor
+    const sd = this.world.floorMesh?.material?.userData?.u?.uSigDim;
+    if (sd) { this.sigDimT = Math.max(0, (this.sigDimT || 0) - dt); const want = this.sigDimT > 0 && this.boss?.alive ? 0.3 : 1; sd.value += (want - sd.value) * Math.min(1, dt * (want < sd.value ? 14 : 3)); }
     this.world.update(dt, t, G.vfx, G.player.pos);
   }
   dispose() { this.loot.clear(); this.monsters.length = 0; }

@@ -11,6 +11,8 @@ function project(camera, x, y, z) {
   return { x: (V.x * 0.5 + 0.5) * innerWidth, y: (-V.y * 0.5 + 0.5) * innerHeight, ok: V.z < 1 && V.z > -1 };
 }
 const RARITY_COL = { magic: '#6ea8ff', rare: '#ffd84a', unique: '#ff9a3c', set: '#5ee07a' };
+// screen rect a live top-band banner (boss Victory!) keeps for itself: loot labels that would stack into it wait
+let reservedRect = null;
 const PALETTE = ['#ff8fb0', '#ffcf4a', '#8fe0c0', '#8fd0ff', '#c3b3ff', '#fff6e8', '#ffbcd6'];
 
 // ------------------------------------------------------------------ floating text
@@ -34,9 +36,15 @@ export class Floats {
     this.root = el('div', 'floats'); layer.appendChild(this.root);
     this.pool = []; this.active = [];
   }
+  /** Big moments (boss Victory!): clear the numbers off the stage and keep them quiet for `sec` (Chewy's hurt / heal still show). */
+  hush(sec = 2.5) {
+    this.hushUntil = performance.now() + sec * 1000;
+    for (const o of this.active) if (!o.dying) o.dying = FADE;
+  }
   spawn(pos, text, opts = {}) {
     let kind = KIND[opts.kind] ? opts.kind : 'dmg';
     const now = performance.now();
+    if (now < (this.hushUntil || 0) && kind !== 'hurt' && kind !== 'heal') return null; // only Chewy's own life changes still show
     const y0 = (pos.y || 0) + (opts.yOff ?? 0);
     const num = (kind === 'dmg' || kind === 'crit') ? NUM_RE.exec(text) : null;
     if (num) {
@@ -76,7 +84,7 @@ export class Floats {
       if (k) { f.stackX = (k % 2 ? 1 : -1) * Math.min(26, 10 + k * 4); f.drift *= 0.35; }
     }
     this.active.push(f);
-    this.cap();
+    this.cap(now < (this.hushUntil || 0) ? 4 : MAX_FLOATS);
     return f;
   }
   paint(f) {
@@ -88,10 +96,10 @@ export class Floats {
     f.n.innerHTML = html;
   }
   // keep at most MAX_FLOATS live: the oldest non-crit (else the oldest) fades out quickly
-  cap() {
+  cap(max = MAX_FLOATS) {
     let live = 0;
     for (const o of this.active) if (!o.dying) live++;
-    while (live > MAX_FLOATS) {
+    while (live > max) {
       let victim = null;
       for (const o of this.active) if (!o.dying && o.kind !== 'crit' && (!victim || o.born < victim.born)) victim = o;
       if (!victim) for (const o of this.active) if (!o.dying && (!victim || o.born < victim.born)) victim = o;
@@ -217,18 +225,57 @@ function confettiHTML(n = 46) {
   return h;
 }
 
+// confetti shower for banners that live in the top band: pieces burst sideways and rain down over the arena
+function showerHTML(n = 56) {
+  let h = '';
+  for (let i = 0; i < n; i++) {
+    const a = Math.PI * (0.02 + 0.96 * Math.random()), d = 140 + Math.random() * 420, up = Math.random() < 0.35;
+    const shape = ['rect', 'petal', 'star', 'dot'][i % 4];
+    h += `<i class="cf ${shape}" style="--dx:${(Math.cos(a) * d * 1.3).toFixed(0)}px;--dy:${(up ? -40 - Math.random() * 60 : Math.sin(a) * d * 0.35).toFixed(0)}px;--fall:${(260 + Math.random() * 320).toFixed(0)}px;--c:${PALETTE[i % PALETTE.length]};--r:${(Math.random() * 1080 - 540).toFixed(0)}deg;--d:${(0.05 + Math.random() * 0.35).toFixed(2)}s;--t:${(1.9 + Math.random() * 1.1).toFixed(2)}s"></i>`;
+  }
+  return h;
+}
+
 // ------------------------------------------------------------------ banners
 export class Banners {
   constructor(layer, fxLayer) { this.root = el('div', 'banners'); layer.appendChild(this.root); this.q = []; this.busy = false; this.fxLayer = fxLayer; }
   show(title, sub = '', opts = {}) {
     const style = opts.style || 'default';
+    // a level-up earned by the boss kill folds into the Victory banner (a chip on it) instead of stacking a second banner
+    if (style === 'levelup' && this.foldLevel(sub, opts)) return;
     // area banners replace each other; others queue
     if (style === 'area') this.q = this.q.filter(b => b.style !== 'area');
     const key = style + '|' + title + '|' + sub;
     if (this.q.some(b => b.key === key) || (this.busy && this.cur === key)) return;
-    this.q.push({ key, title, sub, style, dur: opts.duration, jp: opts.jp });
+    const item = { key, title, sub, style, dur: opts.duration, jp: opts.jp, xp: opts.xp, lvl: opts.lvl };
+    if (style === 'victory') {
+      // Victory owns the moment: it jumps the queue; a level-up banner that popped up a beat earlier, or a boss intro
+      // banner still up after a very quick kill, yields to it
+      const L = this.live;
+      if (L && ((L.style === 'levelup' && performance.now() - L.shownAt < 1600) || L.style === 'boss')) { if (L.style === 'levelup') item.lvl = item.lvl || L.lvl; L.instant = true; clearTimeout(L.timer); L.done(); }
+      for (const b of this.q) if (b.style === 'levelup') item.lvl = item.lvl || b.lvl;
+      this.q = this.q.filter(b => b.style !== 'levelup');
+      this.q = this.q.filter(b => b.style !== 'boss');
+      this.q.unshift(item);
+      if (this.q.length > 3) this.q.length = 3; // trim from the back: the Victory stays first
+    } else this.q.push(item);
     if (this.q.length > 3) this.q.splice(0, this.q.length - 3);
     if (!this.busy) this.next();
+  }
+  foldLevel(sub, opts) {
+    const lvl = opts.lvl || +((/(\d+)/.exec(sub || '') || [])[1]) || 0;
+    const v = this.live?.style === 'victory' ? this.live : this.q.find(b => b.style === 'victory');
+    if (!v) return false;
+    v.lvl = Math.max(v.lvl || 0, lvl);
+    if (v.node) this.levelChip(v.node, v.lvl);
+    return true;
+  }
+  levelChip(node, lvl) {
+    const row = node.querySelector('.bn-chips'); if (!row || !lvl) return;
+    let c = row.querySelector('.chip-lvl');
+    if (!c) { c = el('div', 'bn-chip chip-lvl'); row.appendChild(c); }
+    c.innerHTML = `${glyph('star')}<span>Level up! <b>Lv ${lvl}</b></span>`;
+    c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop');
   }
   async next() {
     // hold queued banners while a dialogue is on screen (they would cover the conversation)
@@ -237,12 +284,19 @@ export class Banners {
     if (!b) { this.busy = false; this.cur = null; return; }
     this.busy = true; this.cur = b.key;
     if (this.root.children.length > 2) for (const c of [...this.root.children].slice(0, -1)) c.remove();
-    let dur = b.dur || { levelup: 2.8, area: 3.2, boss: 2.0, quest: 2.8, default: 2.4 }[b.style] || 2.4;
-    if (this.q.length) dur *= 0.7;
-    this.root.dataset.style = b.style; // boss banners sit in the top band, clear of the arena
+    let dur = b.dur || { levelup: 2.8, area: 3.2, boss: 2.0, quest: 2.8, victory: 3.6, default: 2.4 }[b.style] || 2.4;
+    if (this.q.length && b.style !== 'victory') dur *= 0.7;
+    this.root.dataset.style = b.style; // boss / victory banners sit in the top band, clear of the arena
     const n = el('div', `bn bn-${b.style}`);
     const L = letters(b.title, 'lt');
-    if (b.style === 'levelup') {
+    if (b.style === 'victory') {
+      n.innerHTML = `<div class="bn-vrays"></div><div class="bn-conf">${showerHTML(58)}</div>
+        <div class="bn-jp">${glyph('sparkle')}しょうり！${glyph('sparkle')}</div>
+        <div class="bn-vcore"><div class="bn-ribbon"><i></i><i></i></div><div class="bn-title">${L}</div>${b.sub ? `<div class="bn-sub">${esc(b.sub)}</div>` : ''}</div>
+        <div class="bn-chips">${b.xp ? `<div class="bn-chip chip-xp">${glyph('sparkle')}<span>+${fmt(b.xp)} xp</span></div>` : ''}</div>
+        ${[[-330, -18, 30, 0], [310, -34, 24, 0.35], [-250, 58, 20, 0.7], [270, 52, 26, 1.05], [-40, -70, 18, 0.5], [120, -64, 16, 0.9]].map(([x, y, s, d]) => `<i class="bn-tw" style="--x:${x}px;--y:${y}px;--s:${s}px;--d:${d}s">${glyph('star')}</i>`).join('')}`;
+      if (b.lvl) this.levelChip(n, b.lvl);
+    } else if (b.style === 'levelup') {
       n.innerHTML = `<div class="bn-rays"></div><div class="bn-ring"></div><div class="bn-conf">${confettiHTML()}</div>
         <div class="bn-jp">レベルアップ！</div><div class="bn-title">${L}</div>${b.sub ? `<div class="bn-sub">${esc(b.sub)}</div>` : ''}`;
     } else if (b.style === 'area') {
@@ -257,12 +311,19 @@ export class Banners {
       n.innerHTML = `<div class="bn-title">${L}</div>${b.sub ? `<div class="bn-sub">${esc(b.sub)}</div>` : ''}`;
     }
     this.root.appendChild(n);
+    if (b.style === 'victory') { // measured once the letters have landed; released when it leaves
+      const core = n.querySelector('.bn-vcore'), chips = n.querySelector('.bn-chips');
+      setTimeout(() => { if (!n.isConnected || n.classList.contains('out')) return; const a = core.getBoundingClientRect(), c = chips.getBoundingClientRect(); reservedRect = { left: Math.min(a.left, c.left) - 70, right: Math.max(a.right, c.right) + 70, top: a.top - 30, bottom: Math.max(a.bottom, c.bottom) + 8, n }; }, 120);
+    }
     // shown for `dur`, or until dismiss(style) cuts it short (e.g. the boss banner leaves as soon as the fight starts)
     const shownAt = performance.now();
-    await new Promise(res => { const cur = this.live = { style: b.style, shownAt, done: res }; cur.timer = setTimeout(res, dur * 1000); });
-    clearTimeout(this.live?.timer); this.live = null;
+    let cur;
+    await new Promise(res => { cur = this.live = { style: b.style, shownAt, done: res, node: n, lvl: b.lvl || (b.style === 'levelup' ? +((/(\d+)/.exec(b.sub || '') || [])[1]) || 0 : 0) }; cur.timer = setTimeout(res, dur * 1000); });
+    clearTimeout(cur.timer); if (this.live === cur) this.live = null;
+    if (reservedRect?.n === n) reservedRect = null;
+    if (cur.instant) { n.remove(); this.next(); return; } // pre-empted (a Victory took the stage)
     n.classList.add('out');
-    await wait(b.style === 'boss' ? 420 : 650);
+    await wait(b.style === 'boss' ? 420 : b.style === 'victory' ? 560 : 650);
     n.remove();
     this.next();
   }
@@ -356,6 +417,10 @@ export class LootLabels {
         for (const r of placed) if (Math.abs(r.x - o.x) < (r.w + w) / 2 && Math.abs(r.y - y) < (r.h + h) / 2) { y = r.y - (r.h + h) / 2 - 1; hit = true; }
         if (!hit) break;
       }
+      // a label that would climb into the Victory banner waits (hidden) until the banner has left
+      const R = reservedRect, held = !!R && y > R.top && y - h < R.bottom && o.x + w / 2 > R.left && o.x - w / 2 < R.right;
+      if (held !== !!o.held) { o.held = held; o.n.classList.toggle('held', held); }
+      if (held) continue;
       placed.push({ x: o.x, y, w, h });
       o.n.style.transform = `translate3d(${o.x.toFixed(1)}px,${y.toFixed(1)}px,0) translate(-50%,-100%) scale(${scale})`;
     }

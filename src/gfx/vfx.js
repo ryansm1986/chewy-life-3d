@@ -156,12 +156,26 @@ export class VFX {
   petals(p, n = 12, spread = 0.6) {
     for (let i = 0; i < n; i++) this.petal.spawn({ x: p.x + rand(-spread, spread), y: p.y + rand(0, 0.6), z: p.z + rand(-spread, spread), vx: rand(-1, 1), vy: rand(0.5, 2), vz: rand(-1, 1), life: rand(1, 1.8), size: rand(0.12, 0.2), color: '#ffffff', alpha: 1, alpha1: 0, drag: 2, grav: 1.5, spin: rand(-6, 6), stretch: 0.8 });
   }
+  /** Keep the next few seconds' celebrations modest (a boss Victory already fills the screen; a level-up on top of it
+   *  would bleach it with a second pillar + flash light). */
+  calm(sec = 2) { this.calmUntil = performance.now() + sec * 1000; }
   levelUp(p) {
-    this.pillar(p, { color: '#ffe070', life: 1.6, r: 0.7, h: 7 });
+    const calm = performance.now() < (this.calmUntil || 0);
+    this.pillar(p, { color: '#ffe070', life: 1.6, r: 0.7, h: 7, opacity: calm ? 0.35 : 0.8 });
     this.ring(p, { color: '#ffe070', r0: 0.2, r1: 3.2, life: 0.8 });
-    for (let i = 0; i < 40; i++) { const a = rand(0, TAU), r = rand(0.2, 0.9); this.spark.spawn({ x: p.x + Math.cos(a) * r, y: p.y + rand(0, 0.5), z: p.z + Math.sin(a) * r, vy: rand(1.5, 4.5), life: rand(0.8, 1.6), size: rand(0.2, 0.45), size1: 0.02, color: i % 3 ? '#ffe070' : '#ffffff', alpha: 1, alpha1: 0, spin: rand(-4, 4) }); }
-    this.petals(p.clone().setY(p.y + 1), 24, 1);
-    this.light(p, '#ffe070', 14, 9, 1.2);
+    for (let i = 0, n = calm ? 16 : 40; i < n; i++) { const a = rand(0, TAU), r = rand(0.2, 0.9); this.spark.spawn({ x: p.x + Math.cos(a) * r, y: p.y + rand(0, 0.5), z: p.z + Math.sin(a) * r, vy: rand(1.5, 4.5), life: rand(0.8, 1.6), size: rand(0.2, 0.45), size1: 0.02, color: i % 3 ? '#ffe070' : '#ffffff', alpha: 1, alpha1: 0, spin: rand(-4, 4) }); }
+    this.petals(p.clone().setY(p.y + 1), calm ? 12 : 24, 1);
+    this.light(p, '#ffe070', calm ? 4 : 14, calm ? 5 : 9, 1.2);
+  }
+  /** Boss defeated: a golden shockwave, a soft light column, petal rain and staggered sparkle bursts — celebratory
+   *  without a bloom-bleaching flash light. */
+  victory(p) {
+    this.ring(p, { color: '#ffe070', r0: 0.5, r1: 6.5, life: 0.9 });
+    this.ring(p, { color: '#ffc8e0', r0: 0.3, r1: 4, life: 0.7 });
+    this.pillar(p, { color: '#ffe8a0', life: 1.6, r: 1.1, h: 9, opacity: 0.4 });
+    this.petals(p.clone().setY(p.y + 1.6), 40, 1.8);
+    this.light(p, '#ffe070', 5, 8, 1.0);
+    ['#fff2a0', '#ffc8e0', '#c8e8ff'].forEach((c, i) => setTimeout(() => this.sparkle(p.clone().setY(p.y + 1 + i * 0.5), { n: 18, color: c, r: 1.8, rise: 2, size: 0.34 }), i * 220));
   }
 
   // ------------------------------------------------------------------ mesh effects
@@ -244,16 +258,35 @@ export class VFX {
     const dk = this.dk(b);
     return this.add(grp, (dt, t) => { const k = clamp(t / life); m.material.opacity = dk * (1 - k) * (0.6 + 0.4 * Math.random()); m2.material.opacity = dk * 0.25 * (1 - k); }, life);
   }
-  // ground AoE telegraph (enemy windups): fills from center to edge over `time`
+  // ground AoE telegraph (enemy windups): fills from center to edge over `time`.
+  // Built to read on ANY floor (incl. a same-hued boss sigil): a dark translucent veil + ink contour give contrast on bright
+  // floors, a hot near-white rim line and sweeping front give it on dark ones; crawling hatch stripes mark the danger area
+  // and the rim pulses faster as the fill nears the edge.
   telegraph(p, r, time, color = '#ff5a5a') {
     const mat = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, toneMapped: false,
-      uniforms: { uK: { value: 0 }, uC: { value: C(color) } },
+      uniforms: { uK: { value: 0 }, uT: { value: 0 }, uC: { value: C(color) } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-      fragmentShader: 'uniform float uK; uniform vec3 uC; varying vec2 vUv; void main(){ float d = length(vUv-0.5)*2.0; if (d>1.0) discard; float edge = smoothstep(0.88,0.95,d)*(1.0-smoothstep(0.97,1.0,d)); float fill = step(d, uK)*0.28 + smoothstep(uK-0.06, uK, d)*step(d,uK)*0.4; gl_FragColor = vec4(uC, edge*0.9 + fill); }',
+      fragmentShader: /* glsl */`uniform float uK, uT; uniform vec3 uC; varying vec2 vUv;
+        void main() {
+          vec2 q = vUv - 0.5; float d = length(q) * 2.0; if (d > 1.0) discard;
+          float aa = fwidth(d) * 1.3, inside = step(d, uK);
+          float ink = smoothstep(0.84 - aa, 0.84, d) * (1.0 - smoothstep(1.0 - aa, 1.0, d));
+          float rim = smoothstep(0.875 - aa, 0.875, d) * (1.0 - smoothstep(0.95, 0.95 + aa, d));
+          float lead = smoothstep(uK - 0.14, uK, d) * inside;
+          float hatch = smoothstep(0.42, 0.5, abs(fract((q.x - q.y) * 6.0 + uT * 1.4) - 0.5) * 2.0 - 0.1);
+          float urg = 0.72 + 0.28 * sin(uT * (9.0 + 22.0 * uK));
+          vec3 hot = mix(uC, vec3(1.0), 0.36), ink3 = vec3(0.13, 0.05, 0.1);
+          vec3 col = ink3; float a = 0.24;
+          col = mix(col, uC, inside * (0.6 + 0.3 * hatch)); a = mix(a, 0.36 + 0.18 * hatch, inside);
+          col = mix(col, hot, lead); a = max(a, lead * 0.82);
+          col = mix(col, ink3, ink); a = max(a, ink * 0.72);
+          col = mix(col, hot, rim); a = max(a, rim * (0.7 + 0.3 * urg));
+          gl_FragColor = vec4(col, a);
+        }`,
     });
     const m = new THREE.Mesh(new THREE.PlaneGeometry(r * 2, r * 2), mat); m.rotation.x = -Math.PI / 2; m.position.set(p.x, p.y + 0.07, p.z); m.renderOrder = 9;
-    return this.add(m, (dt, t) => { mat.uniforms.uK.value = clamp(t / time); }, time + 0.05);
+    return this.add(m, (dt, t) => { mat.uniforms.uK.value = clamp(t / time); mat.uniforms.uT.value = t; }, time + 0.05);
   }
   emoteTexture(kind) { if (!this.emoteTex.has(kind)) this.emoteTex.set(kind, emoteTexture(kind)); return this.emoteTex.get(kind); }
   // speech-bubble emote that follows an actor

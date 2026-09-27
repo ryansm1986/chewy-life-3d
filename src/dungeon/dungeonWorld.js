@@ -47,7 +47,39 @@ const SH = {
   crys: () => tpl('crys', () => new THREE.LatheGeometry([new THREE.Vector2(0.001, -0.05), new THREE.Vector2(0.85, 0), new THREE.Vector2(1, 0.12), new THREE.Vector2(1, 0.7), new THREE.Vector2(0.001, 1)], 6), true),
   disc: () => tpl('disc', () => new THREE.CylinderGeometry(1, 1, 1, 16).translate(0, 0.5, 0)),
   plane: () => tpl('plane', () => new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)),
+  // ---- set-dressing templates (low poly: they are scattered by the hundred)
+  tuft: k => tpl('tuft' + k, () => tuftGeo(k * 7919 + 11, 11)),
+  leaf: () => tpl('leaf', () => fanGeo(8, (a) => [Math.cos(a), Math.sin(a) * 0.46], 0.22)),
+  star: () => tpl('star', () => fanGeo(10, (a, i) => { const r = i % 2 ? 0.42 : 1; return [Math.cos(a) * r, Math.sin(a) * r]; }, 0.12)),
+  stem: () => tpl('stem', () => new THREE.CylinderGeometry(0.6, 1, 1, 3, 1, true).translate(0, 0.5, 0), true),
+  hemiLo: () => tpl('hemiLo', () => new THREE.SphereGeometry(1, 8, 3, 0, TAU, 0, Math.PI / 2)),
+  cylLo: () => tpl('cylLo', () => new THREE.CylinderGeometry(1, 1, 1, 6, 1, true).translate(0, 0.5, 0)),
 };
+// bent, fanned grass blades (local y 0..~1 = root..tip)
+function tuftGeo(seed, n) {
+  const r = mulberry32(seed), P = [];
+  for (let i = 0; i < n; i++) {
+    const g = new THREE.CylinderGeometry(0, 1, 1, 3, 2, true).translate(0, 0.5, 0).toNonIndexed(), p = g.attributes.position;
+    const a = i / n * TAU + r() * 0.7, lean = 0.2 + r() * 0.45, h = 0.5 + r() * 0.5, w = 0.08 + r() * 0.05, off = 0.02 + r() * 0.12, tw = r() * TAU;
+    for (let k = 0; k < p.count; k++) {
+      const x = p.getX(k) * w, y = p.getY(k), z = p.getZ(k) * w * 0.4;
+      const cx = x * Math.cos(tw) - z * Math.sin(tw), cz = x * Math.sin(tw) + z * Math.cos(tw), bend = off + lean * y * y;
+      P.push(Math.cos(a) * bend + cx, y * h, Math.sin(a) * bend + cz);
+    }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.computeVertexNormals();
+  return g;
+}
+// flat upward-facing fan (leaf / petal star) with a raised centre fold; outline(a, i) -> [x, z]
+function fanGeo(n, outline, lift) {
+  const P = [];
+  for (let i = 0; i < n; i++) {
+    const a0 = i / n * TAU, a1 = (i + 1) / n * TAU, [x0, z0] = outline(a0, i), [x1, z1] = outline(a1, i + 1);
+    P.push(0, lift, 0, x1, 0, z1, x0, 0, z0); // counter-clockwise seen from above
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.computeVertexNormals();
+  return g;
+}
 
 class Batch {
   constructor() { this.n = 0; this.cap = 0; this.P = null; this.N = null; this.C = null; this.reserve(4096); }
@@ -228,7 +260,7 @@ float twinkle(vec2 p, float sc, float thr) {
 }
 `;
 const FLOOR_PARS = /* glsl */`
-uniform sampler2D uInfo; uniform float uSize; uniform vec3 uF0, uF1, uF2, uVoid, uSig;
+uniform sampler2D uInfo, uDeco; uniform float uSize, uSigDim; uniform vec3 uF0, uF1, uF2, uVoid, uSig;
 uniform vec4 uRoom[16]; uniform vec4 uRoomK[16]; uniform vec4 uBoss;
 vec3 fG;
 ${NOISE_GLSL}
@@ -255,8 +287,26 @@ vec3 planks(vec2 a, vec3 base) {
 `;
 const FLOOR_THEME = {
   burrow: /* glsl */`
+    // broad painted soil variation: warm clay swirls and cool dark loam, so big rooms never read as one flat tan
+    float bigS = fbm(p * 0.05 + 11.0), bigT = vn(p * 0.021 + 3.0);
+    c = mix(c, c * vec3(1.12, 0.94, 0.8), smoothstep(0.56, 0.76, bigS) * 0.6);
+    c = mix(c, c * vec3(0.8, 0.8, 0.8), smoothstep(0.44, 0.22, bigS) * 0.5);
+    c = mix(c, c * vec3(0.95, 1.02, 0.93), smoothstep(0.55, 0.8, bigT) * 0.45);
     float trail = smoothstep(1.2, 2.4, wd) * (rid == 0 ? 0.9 : 0.35);
     c = mix(c, c * vec3(1.14, 1.08, 1.0), trail * smoothstep(0.35, 0.65, vn(p * 0.35)));
+    // worn trails (decor g): compacted pale soil, a trodden darker margin and scattered grit
+    float tr = smoothstep(0.24, 0.66, dc.g + (vn(p * 1.1) - 0.5) * 0.3);
+    c = mix(c, c * vec3(1.14, 1.08, 0.98), tr * 0.75);
+    c *= 1.0 - smoothstep(0.08, 0.3, dc.g) * (1.0 - smoothstep(0.3, 0.55, dc.g)) * 0.16;
+    // dry cracked earth (decor b): raised plates split by dark crazing
+    if (dc.b > 0.02) {
+      float ck = smoothstep(0.1, 0.55, dc.b + (vn(p * 1.7) - 0.5) * 0.35);
+      vec2 wq = p + vec2(vn(p * 0.9), vn(p * 0.9 + 5.0)) * 0.8;
+      float l1 = abs(vn(wq * 1.1 + 3.0) - 0.5), l2 = abs(vn(wq * 2.4 + 11.0) - 0.5);
+      float crk = max(smoothstep(0.022, 0.004, l1), smoothstep(0.016, 0.003, l2) * step(0.45, vn(wq * 0.8 + 2.0)));
+      c = mix(c, c * vec3(1.07, 1.03, 0.96), smoothstep(0.02, 0.12, min(l1, l2 + 0.04)) * ck * 0.5);
+      c = mix(c, c * 0.55, crk * ck);
+    }
     // moss patches (thicker towards walls) with tiny clover flowers
     float mn = fbm(p * 0.13 + 3.0) + smoothstep(1.7, 0.6, wd) * 0.2 + (nB - 0.5) * 0.12;
     float moss = smoothstep(0.615, 0.64, mn), mossHi = smoothstep(0.67, 0.76, mn);
@@ -279,19 +329,21 @@ const FLOOR_THEME = {
     if (pc > 0.02) {
       vec2 tc; vec3 v = vor(p * 2.4, tc);
       float has = step(0.7, v.z) * clamp(pc, 0.0, 1.0) * (1.0 - moss * 0.8), rr = 0.12 + v.z * 0.1;
-      c *= 1.0 - smoothstep(rr + 0.14, rr, length(tc - vec2(0.06, 0.08))) * 0.4 * has;
-      float peb = smoothstep(rr, rr - 0.05, v.x) * has;
+      // small, soft contact shadow offset away from the light, then a clearly lighter stone with a lit crown
+      c *= 1.0 - smoothstep(rr + 0.05, rr - 0.02, length(tc - vec2(0.05, 0.07))) * 0.28 * has;
+      float peb = smoothstep(rr, rr - 0.04, v.x) * has;
       float lit = clamp(dot(normalize(-tc + 1e-4), vec2(0.54, 0.84)) * 0.5 + 0.5, 0.0, 1.0);
-      vec3 pcol = mix(c * 1.12, ${glc('#b8a898')}, 0.35 + 0.25 * h1(vec2(v.z * 91.0, 2.0))) * (0.82 + 0.3 * lit * smoothstep(0.0, rr, v.x));
+      vec3 pcol = mix(${glc('#c4b4a2')}, ${glc('#9c8c80')}, h1(vec2(v.z * 91.0, 2.0)) * 0.6) * (0.86 + 0.34 * lit * smoothstep(0.0, rr, v.x));
       c = mix(c, pcol, peb);
     }
     // little puddles with sparkles
-    float pn = vn(p * 0.11 + 41.0) + (nB - 0.5) * 0.08, away = smoothstep(1.6, 2.6, wd);
+    float pn = vn(p * 0.11 + 41.0) + (vn(p * 0.8 + 3.0) - 0.5) * 0.035, away = smoothstep(1.6, 2.6, wd) * (1.0 - smoothstep(0.15, 0.45, dc.r)) * (1.0 - tr * 0.7);
     float wet = smoothstep(0.7, 0.765, pn) * away, pud = smoothstep(0.765, 0.78, pn) * away;
     c = mix(c, c * 0.68, wet * 0.7);
     vec3 wat = mix(${glc('#4a78a0')}, ${glc('#a8d8f0')}, smoothstep(0.78, 0.9, pn) * 0.5 + vn(p * 0.8 + uTime * 0.05) * 0.35);
     c = mix(c, wat, pud);
-    c = mix(c, ${glc('#e8f8ff')}, smoothstep(0.765, 0.772, pn) * (1.0 - smoothstep(0.776, 0.785, pn)) * away * 0.7);
+    float pfw = fwidth(pn) * 1.5;
+    c = mix(c, ${glc('#e8f8ff')}, smoothstep(0.765 - pfw, 0.765, pn) * (1.0 - smoothstep(0.765 + pfw, 0.765 + pfw * 2.5, pn)) * away * 0.7);
     fG += ${glc('#c8f0ff')} * (twinkle(p, 3.2, 0.7) * pud * 2.2 + pud * 0.06);
     // leaf litter & fallen petals drifting toward the walls (small painted leaves with a soft drop shadow and a vein)
     {
@@ -307,21 +359,80 @@ const FLOOR_THEME = {
         c = mix(c, lcol * 0.72, leaf * lp * smoothstep(0.01, 0.0, abs(q.y)) * 0.55);
       }
     }
+    // lush meadows (decor r): a painted shade ring, then dappled clumps of grass-moss; flower sprinkles where accent (a)
+    float lu = smoothstep(0.28, 0.62, dc.r + (fbm(p * 0.7 + 4.0) - 0.5) * 0.5);
+    if (lu > 0.001) {
+      // painterly grass-moss: smooth two-tone base, then soft rotated brush dabs (no cell edges) and a fine grain
+      float g1 = fbm(p * 0.9 + 9.0);
+      vec3 gcol = mix(${glc('#557e3e')}, ${glc('#80aa58')}, smoothstep(0.25, 0.75, g1));
+      vec2 gc; vec3 gv = vor(p * 4.2 + 9.0, gc);
+      float ga = gv.z * 31.0, gcs = cos(ga), gsn = sin(ga); vec2 gq = vec2(gcs * gc.x - gsn * gc.y, gsn * gc.x + gcs * gc.y);
+      float dab = smoothstep(1.0, 0.25, length(gq / vec2(0.38, 0.15)));
+      gcol = mix(gcol, gv.z > 0.55 ? ${glc('#a4c878')} : ${glc('#4a7236')}, dab * 0.4);
+      gcol = mix(gcol, ${glc('#b4cc84')}, smoothstep(0.55, 0.85, vn(p * 0.8 + 2.0)) * 0.3);
+      gcol *= 0.92 + 0.14 * vn(p * 13.0);
+      c = mix(c, c * 0.7, smoothstep(0.0, 0.2, lu) * (1.0 - smoothstep(0.2, 0.45, lu)) * 0.7);
+      c = mix(c, gcol, smoothstep(0.18, 0.5, lu));
+      float fa = smoothstep(0.2, 0.6, dc.a) * smoothstep(0.35, 0.7, lu);
+      if (fa > 0.01) {
+        vec2 fc = floor(p * 3.4); vec2 fo2 = fract(p * 3.4) - 0.5 - (h2(fc + 3.0) - 0.5) * 0.55; float fh2 = h1(fc + 17.0);
+        float has = step(0.5, fh2) * fa;
+        vec3 fcol = fh2 > 0.9 ? ${glc('#fff6f0')} : fh2 > 0.78 ? ${glc('#ffb8d4')} : fh2 > 0.64 ? ${glc('#ffe27a')} : ${glc('#c8b4ff')};
+        float fr = length(fo2), pet = smoothstep(0.13, 0.09, fr * (1.0 + 0.35 * cos(atan(fo2.y, fo2.x) * 5.0)));
+        c = mix(c, c * 0.7, smoothstep(0.17, 0.1, length(fo2 - vec2(0.03, -0.03))) * has * 0.6);
+        c = mix(c, fcol, pet * has);
+        c = mix(c, ${glc('#ffc83a')}, smoothstep(0.04, 0.02, fr) * has);
+      }
+    }
   `,
   crystal: /* glsl */`
+    // broad mineral colour drift: amethyst-stained and cold slate regions
+    float bigS = fbm(p * 0.05 + 11.0);
+    c = mix(c, c * vec3(1.06, 0.9, 1.14), smoothstep(0.55, 0.75, bigS) * 0.6);
+    c = mix(c, c * vec3(0.84, 0.92, 0.98), smoothstep(0.45, 0.25, bigS) * 0.5);
     vec2 tc; vec3 v = vor(p * 0.6, tc);
-    float gap = smoothstep(0.015, 0.06, v.y);
+    float tr = smoothstep(0.24, 0.66, dc.g + (vn(p * 1.1) - 0.5) * 0.3); // worn, polished run
+    float gap = mix(smoothstep(0.015, 0.06, v.y), 1.0, tr * 0.55);
     c *= 0.86 + v.z * 0.22;
     c *= 1.0 + smoothstep(0.16, 0.04, v.y) * gap * 0.12 * clamp(dot(normalize(-tc + 1e-4), vec2(0.54, 0.84)), -1.0, 1.0);
     c = mix(c * 0.55, c, gap);
+    c = mix(c, c * vec3(1.1, 1.1, 1.14), tr * 0.5);
     float cr = abs(vn(p * 1.4 + v.z * 13.0) - 0.5);
     c = mix(c, c * 0.7, smoothstep(0.018, 0.0, cr) * step(0.6, v.z) * 0.8);
-    // frost patches (heavier near walls) with glints
-    float fn = fbm(p * 0.12 + 5.0) + smoothstep(1.6, 0.6, wd) * 0.3 + (nB - 0.5) * 0.1;
-    float fr = smoothstep(0.56, 0.64, fn);
-    vec3 frost = mix(${glc('#d4dcff')}, ${glc('#f4f8ff')}, vn(p * 2.5));
-    c = mix(c, frost, fr * 0.82);
-    fG += ${glc('#dff4ff')} * twinkle(p, 4.0, 0.78) * fr * 1.8;
+    // rime: crisp crystalline frost in drifts along the walls and on the accent patches (was a soft white cloud that
+    // read as fog lying on the floor): hard edge, low cover, faceted sparkle
+    float fn = fbm(p * 0.12 + 5.0) * 0.85 + dc.a * 0.4 + smoothstep(1.4, 0.6, wd) * 0.14 + (nB - 0.5) * 0.08;
+    float fr = smoothstep(0.64, 0.665, fn);
+    if (fr > 0.001) {
+      vec2 rc; vec3 rv = vor(p * 3.1 + 2.0, rc);
+      vec3 frost = mix(${glc('#b8c4f4')}, ${glc('#e8eeff')}, smoothstep(0.2, 0.9, rv.z)) * (0.9 + 0.12 * vn(p * 2.5));
+      c = mix(c, mix(c * 1.18, frost, 0.55), fr * 0.7);
+      c = mix(c, ${glc('#f4f8ff')}, fr * smoothstep(0.035, 0.0, rv.y) * 0.45);
+      fG += ${glc('#dff4ff')} * twinkle(p, 4.0, 0.8) * fr * 1.4;
+    }
+    // glowing lichen (decor r): teal speckle mats
+    float lu = smoothstep(0.3, 0.62, dc.r + (fbm(p * 0.8 + 4.0) - 0.5) * 0.45);
+    if (lu > 0.001) {
+      float mt = smoothstep(0.42, 0.6, fbm(p * 1.9 + 3.0) + lu * 0.25) * lu; // clumpy mats, not an even coat
+      c = mix(c, c * vec3(0.6, 0.84, 0.88), mt * 0.6);
+      c = mix(c, c * vec3(0.8, 1.05, 1.02), mt * smoothstep(0.55, 0.8, vn(p * 6.0)) * 0.5);
+      vec2 lc2; vec3 lv = vor(p * 5.0 + 1.0, lc2);
+      float sp = smoothstep(0.11, 0.04, lv.x * (0.8 + 0.5 * h1(vec2(lv.z * 31.0, 1.0)))) * step(0.7, lv.z) * mt;
+      vec3 lcol = lv.z > 0.94 ? ${glc('#ff9ae8')} : ${glc('#6af0e0')};
+      c = mix(c, lcol, sp * 0.8);
+      fG += lcol * sp * (0.45 + 0.25 * sin(uTime * 2.0 + lv.z * 40.0));
+    }
+    // glowing fissures (decor b)
+    if (dc.b > 0.02) {
+      float ck = smoothstep(0.1, 0.55, dc.b + (vn(p * 1.7) - 0.5) * 0.35);
+      vec2 wq = p + vec2(vn(p * 0.7), vn(p * 0.7 + 5.0)) * 1.2;
+      float l1 = abs(vn(wq * 0.8 + 3.0) - 0.5), l2 = abs(vn(wq * 1.9 + 11.0) - 0.5) + 0.004;
+      float e = max(smoothstep(0.02, 0.004, l1), smoothstep(0.012, 0.003, l2) * step(0.5, vn(wq * 0.6))) * ck;
+      vec3 ec = mix(${glc('#8af4ff')}, ${glc('#ff8ae0')}, step(0.55, vn(p * 0.2 + 7.0)));
+      c = mix(c, c * 0.6, smoothstep(0.07, 0.0, min(l1, l2)) * ck * 0.6);
+      c = mix(c, ec, e * 0.85);
+      fG += ec * e * (0.9 + 0.3 * sin(uTime * 1.5 + p.x * 0.7));
+    }
     // glowing cracks around embedded crystal shards
     vec2 gp = p * 0.5; vec2 gi = floor(gp); float gh = h1(gi + 11.0);
     if (gh > 0.83 && wd > 0.9) {
@@ -390,6 +501,22 @@ const FLOOR_THEME = {
     } else {
       c = ori > 120.0 ? planks(p.yx, plankBase) : planks(p, plankBase);
     }
+    // wear: trodden runs go a little dull and grassy-grey, big soft sun-bleach / age patches
+    float tr = smoothstep(0.24, 0.66, dc.g + (vn(p * 1.1) - 0.5) * 0.3);
+    c = mix(c, c * vec3(0.9, 0.92, 0.86), tr * 0.45);
+    float bigS = fbm(p * 0.05 + 11.0);
+    c = mix(c, c * vec3(1.06, 1.02, 0.94), smoothstep(0.58, 0.78, bigS) * 0.5);
+    c = mix(c, c * vec3(0.88, 0.86, 0.86), smoothstep(0.42, 0.22, bigS) * 0.4);
+    // drifts of fallen sakura petals (decor a) with soft contact shade
+    float pa = smoothstep(0.15, 0.55, dc.a + (vn(p * 1.4) - 0.5) * 0.3);
+    if (pa > 0.01) {
+      vec2 pc2; vec3 pv = vor(p * 2.3 + 13.0, pc2);
+      float ang = pv.z * 40.0, cs2 = cos(ang), sn2 = sin(ang); vec2 q = vec2(cs2 * pc2.x - sn2 * pc2.y, sn2 * pc2.x + cs2 * pc2.y);
+      float has = step(1.0 - pa * 0.8, pv.z);
+      float pet = smoothstep(1.0, 0.75, length(q / vec2(0.24, 0.14)) + 0.35 * smoothstep(0.0, -0.18, q.x) * (1.0 - smoothstep(0.03, 0.0, abs(q.y))));
+      c = mix(c, c * 0.8, smoothstep(1.2, 0.8, length((q + vec2(0.03, 0.05)) / vec2(0.26, 0.16))) * has * 0.5);
+      c = mix(c, mix(${glc('#ffc4da')}, ${glc('#fff0f4')}, h1(vec2(pv.z * 17.0, 3.0))), pet * has);
+    }
     #ifdef MOON
     c = mix(c, c * vec3(0.8, 0.9, 1.16), 0.55); // moon-washed timber & tatami
     #endif
@@ -432,14 +559,27 @@ const FLOOR_THEME = {
       fG += ${glc('#ff7a2a')} * em * 1.5;
     }
     // spilled flour and sauce splats
-    float fl = smoothstep(0.62, 0.72, fbm(p * 0.35 + 21.0)) * smoothstep(0.64, 0.72, vn(p * 0.07 + 5.0));
-    c = mix(c, ${glc('#fbf6ee')}, fl * 0.75);
+    float fl = smoothstep(0.66, 0.69, fbm(p * 0.35 + 21.0) + (vn(p * 3.0) - 0.5) * 0.04) * smoothstep(0.64, 0.72, vn(p * 0.07 + 5.0));
+    c = mix(c, ${glc('#fbf6ee')}, fl * (0.42 + 0.22 * step(0.55, vn(p * 11.0)))); // crisp-edged dusting, not a soft cloud
     float sn = vn(p * 0.5 + 77.0) * 0.72 + vn(p * 2.1 + 3.0) * 0.28, zone = smoothstep(0.62, 0.7, vn(p * 0.06 + 9.0));
     float sauce = smoothstep(0.7, 0.72, sn) * zone;
     vec2 dcc = floor(p * 3.0); float dh = h1(dcc + 1.7);
     float drop = step(0.93, dh) * smoothstep(0.16, 0.1, length(fract(p * 3.0) - 0.5 - (h2(dcc) - 0.5) * 0.5)) * smoothstep(0.62, 0.7, sn) * zone;
     c = mix(c, ${glc('#f0c060')} * (0.95 + 0.1 * vn(p * 5.0)), clamp(sauce + drop, 0.0, 1.0) * 0.55);
     c = mix(c, ${glc('#fff0b0')}, smoothstep(0.73, 0.76, sn) * zone * 0.3);
+    // wear & grime: trodden runs dull and warm, sooty corners (decor r), cracked tiles (b), flour drifts (a)
+    float tr = smoothstep(0.24, 0.66, dc.g + (vn(p * 1.1) - 0.5) * 0.3);
+    c = mix(c, c * vec3(0.9, 0.86, 0.8), tr * 0.4);
+    float gr2 = smoothstep(0.3, 0.7, dc.r + (fbm(p * 0.7) - 0.5) * 0.5);
+    c = mix(c, c * vec3(0.66, 0.6, 0.58), gr2 * 0.55);
+    if (dc.b > 0.02) {
+      float ck = smoothstep(0.15, 0.6, dc.b + (vn(p * 1.7) - 0.5) * 0.3);
+      vec2 kc; vec3 kv = vor(p * 1.6 + 5.0, kc);
+      float ln = abs(vn(p * 2.3 + kv.z * 9.0) - 0.5);
+      c = mix(c, c * 0.55, (smoothstep(0.03, 0.0, kv.y) * 0.8 + smoothstep(0.02, 0.0, ln) * step(0.5, kv.z)) * ck);
+    }
+    float fa = smoothstep(0.25, 0.75, dc.a + (vn(p * 1.3) - 0.5) * 0.3);
+    c = mix(c, ${glc('#fbf4e8')}, fa * (0.22 + 0.2 * smoothstep(0.3, 0.8, vn(p * 3.5))));
   `,
 };
 const FLOOR_BOSS = /* glsl */`
@@ -456,10 +596,13 @@ const FLOOR_BOSS = /* glsl */`
     float star = smoothstep(0.05, 0.0, abs(r - R * 0.2 * (1.0 + 0.35 * cos(a * 5.0))) - 0.05);
     float sig = max(max(ring1, ring2), max(max(ring3, petal), max(dots, star)));
     float pulse = 0.6 + 0.4 * sin(uTime * 1.8 - r * 0.35);
-    c = mix(c, mix(c, uSig, 0.3), pfill * 0.55 + smoothstep(R * 0.36, R * 0.34, r) * 0.25);
+    // uSigDim < 1 while the boss winds up: the sigil sinks into a muted, darker wash so the telegraph owns the floor
+    vec3 sigC = mix(c * 0.8, uSig, 0.25 + 0.75 * uSigDim);
+    c = mix(c, mix(c, sigC, 0.3), (pfill * 0.55 + smoothstep(R * 0.36, R * 0.34, r) * 0.25) * uSigDim);
     c = mix(c, c * 0.72, smoothstep(R + 0.9, R + 0.2, r) * (1.0 - ring1) * step(R, r) * 0.6);
-    c = mix(c, uSig, sig * 0.92);
-    fG += uSig * sig * 0.5 * pulse;
+    c = mix(c, sigC, sig * (0.35 + 0.57 * uSigDim));
+    c *= 1.0 - (1.0 - uSigDim) * 0.22 * smoothstep(R + 0.6, R - 0.4, r);
+    fG += uSig * sig * 0.5 * pulse * uSigDim * uSigDim;
   }
 `;
 
@@ -488,15 +631,51 @@ const WALL_H = { burrow: [2.5, 1.3, 0.55], crystal: [2.9, 1.2, 0.55], shrine: [2
 const WALL_GLSL = {
   burrow: /* glsl */`
     if (vWall.z > 0.5) {
-      float u = vWall.x, v = vWall.y;
-      diffuseColor.rgb *= 0.88 + 0.12 * smoothstep(-0.4, 0.4, sin(v * 6.5 + vn(vec2(u * 0.35, 1.0)) * 4.0));
+      float u = vWall.x, v = vWall.y, lip = vWall.w * 0.715; // the face pattern hands over to the mossy lip colour here
+      // painted strata: wavy bands of red clay, dark loam and pale sand with a thin seam between them
+      float wv = v * 1.35 + (vn(vec2(u * 0.16, 3.0)) - 0.5) * 0.9 + sin(u * 0.4 + uSeed) * 0.12;
+      float bi = floor(wv), bf = fract(wv), bh = h1(vec2(bi, uSeed + 7.0));
+      vec3 st = bh < 0.34 ? vec3(1.12, 0.9, 0.78) : bh < 0.67 ? vec3(0.84, 0.8, 0.78) : vec3(1.12, 1.07, 0.94);
+      diffuseColor.rgb *= mix(vec3(1.0), st, 0.8);
+      diffuseColor.rgb *= 1.0 - smoothstep(0.07, 0.0, min(bf, 1.0 - bf)) * 0.22;
+      diffuseColor.rgb *= 0.92 + 0.08 * sin(v * 17.0 + vn(vec2(u * 0.9, v * 2.0)) * 5.0); // fine sediment lines
+      // large colour drift along the face
+      diffuseColor.rgb *= mix(vec3(0.94, 0.97, 1.0), vec3(1.06, 1.0, 0.92), smoothstep(0.3, 0.7, vn(vec2(u * 0.07, 1.0))));
+      // embedded stones with a lit top and a dark underside
       vec2 q = vec2(u, v) * 3.0; vec2 qi = floor(q); vec2 qf = fract(q) - 0.5 - (h2(qi) - 0.5) * 0.5; float ph = h1(qi + 9.0);
-      float pb = step(0.8, ph) * smoothstep(0.2, 0.14, length(qf * vec2(1.0, 1.4)));
-      diffuseColor.rgb = mix(diffuseColor.rgb, ${glc('#c0b0a0')} * (0.8 + 0.3 * ph), pb);
+      float pd = length(qf * vec2(1.0, 1.4)), pb = step(0.78, ph) * smoothstep(0.2, 0.14, pd);
+      diffuseColor.rgb *= 1.0 - step(0.78, ph) * smoothstep(0.26, 0.18, length((qf + vec2(0.0, 0.06)) * vec2(1.0, 1.4))) * (1.0 - pb) * 0.35;
+      diffuseColor.rgb = mix(diffuseColor.rgb, ${glc('#c4b4a4')} * (0.78 + 0.3 * ph) * (0.85 + 0.3 * smoothstep(-0.1, 0.12, qf.y)), pb);
+      // thin roots threading down from the lip
+      float ru = u * 1.1 + sin(v * 2.6 + h1(vec2(floor(u * 1.1), 4.0)) * 6.0) * 0.18, rcol = floor(ru);
+      float rlen = 0.4 + h1(vec2(rcol, 8.0)) * 1.2, root = step(0.72, h1(vec2(rcol, 2.0))) * step(lip - v, rlen) * step(v, lip);
+      root *= smoothstep(0.05, 0.015, abs(fract(ru) - 0.5)) * smoothstep(rlen, rlen * 0.6, lip - v);
+      diffuseColor.rgb = mix(diffuseColor.rgb, ${glc('#5a3a26')}, root * 0.85);
+      // moss drips hanging from the grassy lip: a solid band right under it, then rounded tongues of varied length
+      float dv = lip - v;
+      if (dv < 1.0) {
+        float cu = u / 0.23, ci = floor(cu), fx = fract(cu) - 0.5;
+        float len = (0.08 + 0.62 * h1(vec2(ci, 5.0) + uSeed)) * step(0.3, h1(vec2(ci, 11.0)));
+        float t = clamp(dv / max(len, 1e-3), 0.0, 1.0), wdt = mix(0.5, 0.16, t * t);
+        float drip = step(dv, len) * smoothstep(wdt, wdt - 0.09, abs(fx));
+        drip = max(drip, smoothstep(0.1 + 0.06 * sin(u * 3.0), 0.02, dv));
+        vec3 mc = mix(${glc('#4e7a3c')}, ${glc('#86ac5c')}, smoothstep(0.0, 0.35, 1.0 - dv / max(len, 0.1)) * 0.7 + h1(vec2(ci, 2.0)) * 0.3);
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.72, smoothstep(0.0, 0.06, dv - len) * (1.0 - smoothstep(0.06, 0.14, dv - len)) * step(0.3, h1(vec2(ci, 11.0))) * 0.6);
+        diffuseColor.rgb = mix(diffuseColor.rgb, mc, drip * step(dv, 0.95));
+      }
+      diffuseColor.rgb *= mix(0.72, 1.0, smoothstep(0.0, 0.35, v)); // damp, darker foot
     }`,
   crystal: /* glsl */`
     if (vWall.z > 0.5) {
       float u = vWall.x, v = vWall.y;
+      // layered rock: tilted bands of violet, slate and pale amethyst + colour drift along the face
+      float wv = v * 1.1 + u * 0.12 + (vn(vec2(u * 0.2, 5.0)) - 0.5) * 0.8;
+      float bh = h1(vec2(floor(wv), uSeed + 3.0)), bf = fract(wv);
+      diffuseColor.rgb *= mix(vec3(1.0), bh < 0.34 ? vec3(1.1, 0.92, 1.16) : bh < 0.67 ? vec3(0.82, 0.88, 0.98) : vec3(1.16, 1.12, 1.2), 0.75);
+      diffuseColor.rgb *= 1.0 - smoothstep(0.06, 0.0, min(bf, 1.0 - bf)) * 0.25;
+      diffuseColor.rgb *= mix(vec3(0.92, 0.96, 1.04), vec3(1.06, 0.96, 1.02), smoothstep(0.3, 0.7, vn(vec2(u * 0.07, 2.0))));
+      // frost-rimmed ledges on the upper face
+      diffuseColor.rgb = mix(diffuseColor.rgb, ${glc('#dfe6ff')}, smoothstep(0.035, 0.0, min(bf, 1.0 - bf)) * step(0.55, h1(vec2(floor(wv), 9.0))) * smoothstep(0.8, 1.6, v) * 0.7);
       float vein = abs(vn(vec2(u * 0.8, v * 1.1) + 3.0) - 0.5);
       float ve = smoothstep(0.035, 0.0, vein) * step(0.52, vn(vec2(u * 0.17, 7.0)));
       vec3 vc = mix(${glc('#ff9ae8')}, ${glc('#8af4ff')}, step(0.5, vn(vec2(u * 0.05, 3.0))));
@@ -567,8 +746,12 @@ export class DungeonWorld {
     this.flames = []; this.steam = [];
     // static batches: props, wall dressing (fades with the player cut-away), and emissive bits
     this.solid = new Chunks(); this.wallDeco = new Chunks(); this.glow = new Chunks(); this.wallGlow = new Chunks(); this.halos = new Halos();
+    this.clutter = new Chunks(40); // small ground dressing (tufts, leaves, pebbles, petals): no shadow casting
     this.floorGlows = new FloorGlows(); this.shaftBatch = new Shafts();
-    this.buildInfo(); this.buildFloor(); this.buildWalls(); this.buildProps(); this.buildLights(); this.buildShafts(); this.buildCenterpieces(); this.buildArena();
+    // set dressing has its own random stream so the older passes keep their exact placement
+    this.drng = mulberry32(layout.floor * 7717 + (layout.rooms[0]?.x || 0) * 131 + (layout.rooms[0]?.y || 0) * 17 + 3);
+    this.buildInfo(); this.buildDecoMap(); this.buildFloor(); this.buildWalls(); this.buildProps(); this.buildLights(); this.buildShafts(); this.buildCenterpieces(); this.buildArena();
+    this.buildDressing();
     this.shaftBatch.build(scene, C(T.accent).lerp(C('#ffffff'), 0.55)); this.floorGlows.build(scene);
     const matSolid = makeToon({ vertexColors: true, brush: 0.18, rim: 0.35 });
     const matSolidOcc = makeToon({ vertexColors: true, brush: 0.18, rim: 0.35, occluder: true });
@@ -576,6 +759,7 @@ export class DungeonWorld {
     const matGlow = makeToon({ vertexColors: true, rim: 0.5, fragOut: glowOut });
     const matGlowOcc = makeToon({ vertexColors: true, rim: 0.5, fragOut: glowOut, occluder: true });
     this.solid.build(scene, matSolid); this.wallDeco.build(scene, matSolidOcc);
+    this.clutterMeshes = this.clutter.build(scene, matSolid, false, true);
     this.glow.build(scene, matGlow, false); this.wallGlow.build(scene, matGlowOcc, false);
     this.halos.build(scene);
   }
@@ -624,6 +808,85 @@ export class DungeonWorld {
     tex.magFilter = tex.minFilter = THREE.LinearFilter; tex.needsUpdate = true;
     this.info = tex; this.mask = tex;
   }
+  // arrival / stairs / waypoint / boss ring stay clear of 3D dressing (world coords)
+  keepClear(x, z, pad = 0) {
+    const L = this.L, c = (cx, cy, r) => Math.hypot(x - (cx + 0.5) * CELL, z - (cy + 0.5) * CELL) < r * CELL + pad;
+    if (c(L.start.x, L.start.y, 3.2)) return true;
+    if (L.stairs && c(L.stairs.x, L.stairs.y, 1.8)) return true;
+    if (L.waypoint && c(L.waypoint.x, L.waypoint.y, 2)) return true;
+    for (const o of L.chests) if (c(o.x, o.y, 0.75)) return true;
+    for (const o of L.shrines) if (c(o.x, o.y, 0.8)) return true;
+    for (const o of L.pots) if (c(o.x, o.y, 0.55)) return true;
+    if (this.arena && Math.hypot(x - this.arena.x, z - this.arena.z) < this.arena.R + 1.2 + pad) return true;
+    return false;
+  }
+  // ------------------------------------------------------------------ painted decor map (2 texels per cell, linear filtered)
+  // r lush (moss meadow / lichen), g worn path, b cracks, a accent (flowers / petals / rime / flour). The floor shader paints
+  // patches from it and buildDressing() puts matching 3D set dressing on the same spots, so paint and props agree.
+  buildDecoMap() {
+    const L = this.L, { W, H, at, rooms } = L, K = 2, TW = W * K, TH = H * K, N = this.noise, r = this.drng, th = this.th;
+    const roomId = L.roomId || new Uint8Array(W * H), dist = this.wallDist;
+    const D = this.deco = new Float32Array(TW * TH * 4);
+    this.decoK = K; this.decoW = TW; this.decoH = TH;
+    const b = L.bossRoom;
+    if (b) { const c = this.cellToWorld(b.cx, b.cy); this.arena = { x: c.x, z: c.z, R: Math.min(b.w, b.h) * CELL * 0.5 - 2.4 }; }
+    // soft blob in world units (1 in the middle, 0 at rad, noisy rim)
+    const disc = (x, z, rad, ch, amt = 1, wob = 0.3) => {
+      const tx0 = Math.max(0, Math.floor((x - rad) * K / CELL)), tx1 = Math.min(TW - 1, Math.ceil((x + rad) * K / CELL));
+      const tz0 = Math.max(0, Math.floor((z - rad) * K / CELL)), tz1 = Math.min(TH - 1, Math.ceil((z + rad) * K / CELL));
+      for (let tz = tz0; tz <= tz1; tz++) for (let tx = tx0; tx <= tx1; tx++) {
+        const wx = (tx + 0.5) * CELL / K, wz = (tz + 0.5) * CELL / K;
+        const d = Math.hypot(wx - x, wz - z) / rad + N.n2(wx * 0.55 + ch * 7, wz * 0.55) * wob;
+        const v = clamp((1 - d) / 0.5) * amt, k = (tz * TW + tx) * 4 + ch;
+        if (v > D[k]) D[k] = v;
+      }
+    };
+    const curve = (ax, az, bx, bz, w, ch, amt) => { // gently bowed stroke (quadratic bezier)
+      const len = Math.hypot(bx - ax, bz - az); if (len < 0.5) return;
+      const bow = (r() - 0.5) * len * 0.35, mx = (ax + bx) / 2 - (bz - az) / len * bow, mz = (az + bz) / 2 + (bx - ax) / len * bow;
+      const n = Math.ceil(len / (w * 0.45));
+      for (let i = 0; i <= n; i++) { const t = i / n, u = 1 - t; disc(u * u * ax + 2 * u * t * mx + t * t * bx, u * u * az + 2 * u * t * mz + t * t * bz, w * (1 - 0.25 * t), ch, amt, 0.12); }
+    };
+    const P = { // per-biome recipe: [lush blobs, crack blobs, accent blobs] per ~50 m² of room, and whether rooms get trails
+      burrow: { lush: 1.3, crack: 0.5, acc: 0.9, path: 1 }, crystal: { lush: 0.7, crack: 0.8, acc: 1.0, path: 1 },
+      shrine: { lush: 0, crack: 0, acc: 1.1, path: 1 }, kitchen: { lush: 0.5, crack: 0.8, acc: 0.8, path: 1 },
+    }[th];
+    const cellsOf = rm => { const out = []; for (let y = rm.y - 1; y <= rm.y + rm.h; y++) for (let x = rm.x - 1; x <= rm.x + rm.w; x++) if (at(x, y) && roomId[y * W + x] === rm.id) out.push([x, y]); return out; };
+    for (const rm of rooms) {
+      const cells = cellsOf(rm); if (!cells.length) continue;
+      const area = cells.length * CELL * CELL, boss = rm.kind === 'boss';
+      const pickCell = (dMin, dMax) => { for (let t = 0; t < 30; t++) { const c = cells[Math.floor(r() * cells.length)], d = dist[c[1] * W + c[0]]; if (d >= dMin && d <= dMax) return c; } return null; };
+      const toW = c => [(c[0] + 0.5 + (r() - 0.5) * 0.8) * CELL, (c[1] + 0.5 + (r() - 0.5) * 0.8) * CELL];
+      const count = k => { const f = k * area / 50; return Math.floor(f) + (r() < f % 1 ? 1 : 0); };
+      // trails: every corridor mouth wanders in toward the room's heart
+      if (P.path && !boss) {
+        const mouths = [];
+        for (const [x, y] of cells) {
+          let m = false; for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (at(x + ox, y + oy) && !roomId[(y + oy) * W + x + ox]) m = true;
+          if (!m) continue;
+          const near = mouths.find(q => Math.abs(q.x / q.n - x) + Math.abs(q.y / q.n - y) < 3);
+          if (near) { near.x += x; near.y += y; near.n++; } else mouths.push({ x, y, n: 1 });
+        }
+        const cx = (rm.cx + 0.5) * CELL, cz = (rm.cy + 0.5) * CELL;
+        for (const q of mouths) curve((q.x / q.n + 0.5) * CELL, (q.y / q.n + 0.5) * CELL, cx + (r() - 0.5) * 2, cz + (r() - 0.5) * 2, th === 'shrine' || th === 'kitchen' ? 1.0 : 0.9, 1, 0.9);
+      }
+      // lush patches hug the walls (moss grows where it's damp and nobody treads)
+      for (let i = count(P.lush); i-- > 0;) { const c = pickCell(1, boss ? 1 : 3); if (c) { const [x, z] = toW(c); disc(x, z, 1.6 + r() * 2.0, 0, 1, 0.35); } }
+      for (let i = count(P.crack); i-- > 0;) { const c = pickCell(boss ? 1 : 2, boss ? 1 : 9); if (c) { const [x, z] = toW(c); disc(x, z, 1.3 + r() * 1.3, 2, 0.6 + r() * 0.4, 0.3); } }
+      for (let i = count(P.acc); i-- > 0;) { const c = pickCell(1, boss ? 1 : th === 'shrine' ? 3 : 4); if (c) { const [x, z] = toW(c); disc(x, z, 0.9 + r() * 1.4, 3, 0.7 + r() * 0.3, 0.35); } }
+    }
+    // corridors read as trodden runs too
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (at(x, y) && !roomId[y * W + x] && r() < 0.5) disc((x + 0.5) * CELL, (y + 0.5) * CELL, 1.3, 1, 0.55, 0.2);
+    const data = new Uint8Array(TW * TH * 4);
+    for (let i = 0; i < data.length; i++) data[i] = Math.round(clamp(D[i]) * 255);
+    const tex = new THREE.DataTexture(data, TW, TH, THREE.RGBAFormat);
+    tex.magFilter = tex.minFilter = THREE.LinearFilter; tex.needsUpdate = true;
+    this.decoTex = tex;
+  }
+  decoAt(x, z) { // bilinear-free lookup (nearest texel) of the decor map at a world position -> [lush, path, crack, accent]
+    const K = this.decoK, tx = clamp(Math.floor(x * K / CELL), 0, this.decoW - 1), tz = clamp(Math.floor(z * K / CELL), 0, this.decoH - 1), k = (tz * this.decoW + tx) * 4, D = this.deco;
+    return [D[k], D[k + 1], D[k + 2], D[k + 3]];
+  }
   buildFloor() {
     const { W, rooms } = this.L, T = this.theme;
     const size = W * CELL;
@@ -637,7 +900,7 @@ export class DungeonWorld {
     const SIG = { burrow: '#ffc2dc', crystal: '#8af0ff', shrine: '#ffd24a', kitchen: '#ff8a3a', moon: '#7c9cff' };
     const mat = makeToon({
       brush: 0.2, brushScale: 0.25, rim: 0, shadowSat: 0.5,
-      uniforms: { uInfo: { value: this.info }, uSize: { value: size }, uF0: { value: C(T.floor[0]) }, uF1: { value: C(T.floor[1]) }, uF2: { value: C(T.floor[2]) }, uVoid: { value: C(T.fog) }, uSig: { value: C(SIG[this.variant] || SIG[this.th]) }, uRoom: { value: uRoom }, uRoomK: { value: uRoomK }, uBoss: { value: uBoss } },
+      uniforms: { uInfo: { value: this.info }, uDeco: { value: this.decoTex }, uSigDim: { value: 1 }, uSize: { value: size }, uF0: { value: C(T.floor[0]) }, uF1: { value: C(T.floor[1]) }, uF2: { value: C(T.floor[2]) }, uVoid: { value: C(T.fog) }, uSig: { value: C(SIG[this.variant] || SIG[this.th]) }, uRoom: { value: uRoom }, uRoomK: { value: uRoomK }, uBoss: { value: uBoss } },
       fragPars: (this.variant === 'moon' ? '#define MOON\n' : '') + FLOOR_PARS,
       fragColor: /* glsl */`
         {
@@ -647,12 +910,14 @@ export class DungeonWorld {
           vec4 cin = texelFetch(uInfo, ivec2(floor(p / ${CELL.toFixed(1)})), 0);
           int rid = int(cin.g * 255.0 + 0.5); float ori = cin.b * 255.0;
           float nA = texture2D(uBrush, p * 0.045).g, nB = texture2D(uBrush, p * 0.11).r;
+          vec4 dc = texture2D(uDeco, p / uSize);
           vec3 c = mix(uF1, uF0, smoothstep(0.38, 0.62, nA));
           c = mix(c, uF2, smoothstep(0.55, 0.75, nB) * 0.5);
           fG = vec3(0.0);
           ${FLOOR_THEME[this.th]}
           ${FLOOR_BOSS}
           c *= mix(0.58, 1.0, smoothstep(0.45, 1.3, wd));   // painted contact shade along the wall base
+          c *= mix(0.88, 1.0, smoothstep(1.0, 3.6, wd));    // and a broad room vignette: rooms read as volumes, not flat plates
           c = mix(uVoid * 0.6, c, smoothstep(0.2, 0.62, m));
           fG *= smoothstep(0.4, 0.7, m);
           diffuseColor.rgb = c;
@@ -771,7 +1036,7 @@ export class DungeonWorld {
             if ((role === 'face' || role === 'brick') && y < 0.5) _c.multiplyScalar(0.8);
             colA.push(_c.r, _c.g, _c.b);
           }
-          wallA.push(u, kind === 2 ? v : y, kind);
+          wallA.push(u, kind === 2 ? v : y, kind, s.h);
         }
       }
       for (let i = 0; i < n; i++) for (let k = 0; k < K - 1; k++) {
@@ -785,14 +1050,14 @@ export class DungeonWorld {
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(colA, 3));
-    g.setAttribute('aWall', new THREE.Float32BufferAttribute(wallA, 3));
+    g.setAttribute('aWall', new THREE.Float32BufferAttribute(wallA, 4));
     g.setIndex(vbase > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1));
     g.computeVertexNormals();
     const mat = makeToon({
       vertexColors: true, brush: th === 'crystal' ? 0.18 : 0.26, brushScale: 0.5, rim: 0.28, occluder: true, term: [-0.05, 0.35],
       uniforms: { uSeed: { value: (this.L.floor * 3.7) % 11 } },
-      vertexPars: 'attribute vec3 aWall; varying vec3 vWall;', vertexWorld: 'vWall = aWall;',
-      fragPars: `varying vec3 vWall; uniform float uSeed; vec3 wG; ${NOISE_GLSL}`,
+      vertexPars: 'attribute vec4 aWall; varying vec4 vWall;', vertexWorld: 'vWall = aWall;',
+      fragPars: `varying vec4 vWall; uniform float uSeed; vec3 wG; ${NOISE_GLSL}`,
       fragColor: `wG = vec3(0.0); ${WALL_GLSL[th]}`,
       fragOut: 'outgoingLight += wG;',
     });
@@ -1431,6 +1696,255 @@ export class DungeonWorld {
     for (let i = 0; i < spots.length; i += 3) { const s = spots[i]; this.lightPool.addSource({ pos: V(s.x, 1.8, s.z), color: C(moon ? '#8ab0ff' : this.theme.light), intensity: 9, radius: 9, flicker: 0.8 }); }
     if (moon) this.lightPool.addSource({ pos: V(A.x, 7, A.z), color: C('#b8c8ff'), intensity: 5, radius: 16, flicker: 0.05 });
   }
+  // ------------------------------------------------------------------ set dressing (decor-map driven, all batched)
+  // Small ground clutter goes into the non-shadow-casting `clutter` chunks; the few bigger pieces (lanterns, tables,
+  // bonsai, roots) into `solid` / `glow`. Only wall-hugging pieces get colliders, so the fighting space stays open.
+  buildDressing() {
+    const th = this.th, r = this.drng, L = this.L, K = this.decoK, TW = this.decoW, TH = this.decoH, D = this.deco, dist = this.wallDist;
+    const CL = this.clutter, B = this.solid, GL = this.glow;
+    const roomId = L.roomId || new Uint8Array(L.W * L.H);
+    const free = (x, z, pad = 0.25) => this.walkable(x, z) && !this.keepClear(x, z) && !this.collision.solidAt(x, z, pad);
+    // a wall-hugging spot that is not a corridor mouth (a collider there could plug the way through)
+    const quiet = (x, z) => { const cx = Math.floor(x / CELL), cy = Math.floor(z / CELL), rid = roomId[cy * L.W + cx]; if (!rid) return false; for (let oy = -2; oy <= 2; oy++) for (let ox = -2; ox <= 2; ox++) if (L.at(cx + ox, cy + oy) && roomId[(cy + oy) * L.W + cx + ox] !== rid) return false; return true; };
+    const jit = (c, a = 0.08) => col(c).clone().offsetHSL((r() - 0.5) * a * 0.3, (r() - 0.5) * a, (r() - 0.5) * a);
+    const n = { tuft: 0, flower: 0, leaf: 0, pebble: 0, mush: 0, prop: 0 };
+    for (let tz = 0; tz < TH; tz++) for (let tx = 0; tx < TW; tx++) {
+      const k = (tz * TW + tx) * 4, lush = D[k], path = D[k + 1], crack = D[k + 2], acc = D[k + 3];
+      const x = (tx + 0.1 + r() * 0.8) * CELL / K, z = (tz + 0.1 + r() * 0.8) * CELL / K;
+      const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+      if (!L.at(cx, cz)) continue;
+      const wd = dist[cz * L.W + cx]; // 1 = right next to a wall
+      const roll = r();
+      if (th === 'burrow') {
+        if (lush > 0.42 && roll < 0.62 * lush) { // grass clumps on the meadows
+          if (!free(x, z, 0.05)) continue;
+          const m = 1 + Math.floor(r() * 2.4);
+          for (let i = 0; i < m; i++) this.ddTuft(CL, x + (r() - 0.5) * 0.7, z + (r() - 0.5) * 0.7, 0.9 + r() * 0.7, '#3c6a2c', '#aad076'), n.tuft++;
+          if (acc > 0.3 && r() < 0.7) for (let i = 0, f = 1 + Math.floor(r() * 3); i < f; i++) this.ddFlower(CL, x + (r() - 0.5) * 0.8, z + (r() - 0.5) * 0.8, 0.8 + r() * 0.5, ['#ffb8d4', '#fff0a0', '#ffffff', '#c8b0ff', '#ff9a7a'][Math.floor(r() * 5)]), n.flower++;
+        } else if (lush > 0.12 && lush <= 0.42 && roll < 0.22) { // clover at the meadow rim
+          if (!free(x, z, 0.05)) continue;
+          for (let i = 0; i < 3; i++) this.ddLeaf(CL, x + (r() - 0.5) * 0.3, z + (r() - 0.5) * 0.3, 0.55 + r() * 0.3, jit('#6aa04a'));
+          n.leaf += 3;
+        } else if (wd === 1 && roll < 0.34) { // leaf litter, pebbles and toadstools gather along the wall foot
+          if (!free(x, z, 0.02)) continue;
+          const kk = r();
+          if (kk < 0.55) { for (let i = 0, m = 3 + Math.floor(r() * 5); i < m; i++) this.ddLeaf(CL, x + (r() - 0.5) * 0.9, z + (r() - 0.5) * 0.9, 0.8 + r() * 0.5, jit(['#c89a50', '#d67a48', '#9cae62', '#b8643e', '#e0b060'][Math.floor(r() * 5)], 0.12)), n.leaf++; }
+          else if (kk < 0.82) { for (let i = 0, m = 2 + Math.floor(r() * 3); i < m; i++) this.ddPebble(CL, x + (r() - 0.5) * 0.7, z + (r() - 0.5) * 0.7, 0.06 + r() * 0.09, jit('#a89888', 0.1)), n.pebble++; }
+          else { this.ddMushrooms(CL, x, z, 0.7 + r() * 0.5, r() < 0.5 ? '#d8563e' : '#c89a64'); n.mush++; }
+        } else if (path > 0.2 && path < 0.55 && roll < 0.1) { // grit along the trail edges
+          if (!free(x, z, 0.02)) continue;
+          for (let i = 0; i < 2; i++) this.ddPebble(CL, x + (r() - 0.5) * 0.5, z + (r() - 0.5) * 0.5, 0.04 + r() * 0.05, jit('#b8a898', 0.1));
+          n.pebble += 2;
+        } else if (crack > 0.4 && roll < 0.05) { // a dry, straw-coloured tuft in the cracked patches
+          if (free(x, z, 0.05)) { this.ddTuft(CL, x, z, 0.7 + r() * 0.3, '#8a7a44', '#d8c47a'); n.tuft++; }
+        } else if (wd >= 2 && lush < 0.1 && path < 0.2 && roll < 0.035) { // the odd fallen leaf / stone out in the open
+          if (!free(x, z, 0.02)) continue;
+          if (r() < 0.7) this.ddLeaf(CL, x, z, 0.9 + r() * 0.4, jit(['#c89a50', '#d67a48', '#9cae62'][Math.floor(r() * 3)], 0.12)); else this.ddPebble(CL, x, z, 0.07 + r() * 0.07, jit('#a89888', 0.1));
+          n.leaf++;
+        }
+      } else if (th === 'crystal') {
+        if (lush > 0.4 && roll < 0.4 * lush) { // lichen mats sprout tiny glowing crystals and pale crystal-grass
+          if (!free(x, z, 0.05)) continue;
+          if (r() < 0.5) { this.ddSprouts(GL, x, z, 0.6 + r() * 0.6, r() < 0.7 ? '#7af0e8' : '#ff9ae8'); n.prop++; }
+          else { this.ddTuft(CL, x, z, 0.8 + r() * 0.5, '#6a70b8', '#dfe8ff'); n.tuft++; }
+        } else if (acc > 0.35 && roll < 0.2) { // frost-capped rubble on the rime
+          if (!free(x, z, 0.02)) continue;
+          for (let i = 0, m = 1 + Math.floor(r() * 3); i < m; i++) this.ddPebble(CL, x + (r() - 0.5) * 0.6, z + (r() - 0.5) * 0.6, 0.06 + r() * 0.1, jit('#7a70b0', 0.1), '#eef4ff'), n.pebble++;
+        } else if (wd === 1 && roll < 0.22) {
+          if (!free(x, z, 0.02)) continue;
+          if (r() < 0.75) { for (let i = 0, m = 2 + Math.floor(r() * 4); i < m; i++) this.ddPebble(CL, x + (r() - 0.5) * 0.8, z + (r() - 0.5) * 0.8, 0.05 + r() * 0.12, jit('#6a5c9c', 0.1), '#c8d0ff'), n.pebble++; }
+          else { this.ddSprouts(GL, x, z, 0.8 + r() * 0.7, ['#ff8ae0', '#7af0ff', '#c8a8ff'][Math.floor(r() * 3)]); n.prop++; }
+        } else if (crack > 0.45 && roll < 0.06) {
+          if (free(x, z, 0.05)) { this.ddSprouts(GL, x, z, 0.5 + r() * 0.4, '#8af4ff'); n.prop++; }
+        } else if (wd >= 2 && roll < 0.025 && free(x, z, 0.02)) { this.ddPebble(CL, x, z, 0.06 + r() * 0.08, jit('#7a70b0', 0.1), '#dfe6ff'); n.pebble++; }
+      } else if (th === 'shrine') {
+        if (acc > 0.3 && roll < 0.45 * acc) { // a few loose petals lie on top of the painted drift
+          if (!free(x, z, 0.02)) continue;
+          for (let i = 0, m = 2 + Math.floor(r() * 3); i < m; i++) this.ddLeaf(CL, x + (r() - 0.5) * 0.7, z + (r() - 0.5) * 0.7, 0.6 + r() * 0.3, jit(r() < 0.7 ? '#ffc0d8' : '#fff0f4', 0.06)), n.leaf++;
+        } else if (wd === 1 && roll < 0.13 && free(x, z, 0.3)) {
+          const face = this.wallFace(cx, cz), kk = r();
+          if (kk < 0.22) { this.ddCandles(x, z); n.prop++; }
+          else if (kk < 0.4 && quiet(x, z) && free(x, z, 0.5)) { this.ddAndon(x, z, face, (this.andons = (this.andons || 0) + 1) % 3 === 1); this.collision.addCircle(x, z, 0.24); n.prop++; }
+          else if (kk < 0.5) { this.scrolls(CL, x, z, face); n.prop++; }
+          else if (kk < 0.62 && quiet(x, z)) { this.ddBonsai(x, z); this.collision.addCircle(x, z, 0.3); n.prop++; }
+          else if (kk < 0.74 && quiet(x, z) && free(x, z, 0.6)) { this.ddLowTable(x, z, face); this.collision.addCircle(x, z, 0.45); n.prop++; }
+          else if (kk < 0.86) { for (const e of [-1, 1]) this.cushion(CL, x + Math.cos(face) * e * 0.38, z - Math.sin(face) * e * 0.38, face + (r() - 0.5) * 0.3); n.prop++; }
+          else { this.ddBooks(x, z, face); n.prop++; }
+        } else if (wd >= 2 && roll < 0.004 && free(x, z, 0.4)) { this.cushion(CL, x, z, r() * TAU); n.prop++; }
+      } else { // kitchen
+        if (acc > 0.35 && roll < 0.14) { // flour heaps and crumbs on the flour drifts
+          if (!free(x, z, 0.02)) continue;
+          CL.add(SH.sphLo(), M(x, 0, z, 0.16 + r() * 0.14, 0.05 + r() * 0.04, 0.14 + r() * 0.12, 0, r() * TAU, 0), null, (a, b, c, nx, ny, nz, o) => o.copy(col('#fbf4ea')).multiplyScalar(0.9 + 0.1 * ny));
+          n.prop++;
+        } else if (lush > 0.4 && roll < 0.1) { // crumbs in the greasy corners
+          if (!free(x, z, 0.02)) continue;
+          for (let i = 0; i < 3; i++) this.ddPebble(CL, x + (r() - 0.5) * 0.5, z + (r() - 0.5) * 0.5, 0.03 + r() * 0.03, jit('#c8904e', 0.12));
+          n.pebble += 3;
+        } else if (crack > 0.45 && roll < 0.08) { // broken tile shards
+          if (!free(x, z, 0.02)) continue;
+          for (let i = 0; i < 3; i++) CL.add(SH.box(), M(x + (r() - 0.5) * 0.5, 0, z + (r() - 0.5) * 0.5, 0.08 + r() * 0.08, 0.025, 0.06 + r() * 0.06, (r() - 0.5) * 0.3, r() * TAU, 0), col(r() < 0.5 ? '#d88458' : '#f0e2c6'));
+          n.prop++;
+        } else if (wd === 1 && roll < 0.08 && free(x, z, 0.3)) {
+          const face = this.wallFace(cx, cz), kk = r();
+          if (kk < 0.4) { this.ddVeggies(x, z); n.prop++; }
+          else if (kk < 0.6) { this.ddPlates(x, z); n.prop++; }
+          else if (kk < 0.78 && quiet(x, z)) { this.ddBucket(x, z, face); this.collision.addCircle(x, z, 0.28); n.prop++; }
+          else { this.ddEggs(x, z); n.prop++; }
+        } else if (wd >= 2 && roll < 0.01 && free(x, z, 0.1)) { this.ddVeggies(x, z, 1); n.prop++; }
+      }
+    }
+    if (th === 'burrow') { this.ddRoots(); this.ddPathLanterns(); this.ddFairyRings(); }
+    if (th === 'crystal') this.ddPathLanterns('#8af0ff');
+    this.dressCount = n;
+  }
+  wallFace(cx, cz) { const at = this.L.at; const dx = (at(cx + 1, cz) ? 0 : 1) - (at(cx - 1, cz) ? 0 : 1), dz = (at(cx, cz + 1) ? 0 : 1) - (at(cx, cz - 1) ? 0 : 1); return Math.atan2(-dx, -dz); }
+  ddTuft(b, x, z, s, c0, c1) {
+    const r = this.drng, a = col(c0).clone().offsetHSL((r() - 0.5) * 0.03, (r() - 0.5) * 0.1, (r() - 0.5) * 0.06), t = col(c1).clone().offsetHSL((r() - 0.5) * 0.03, (r() - 0.5) * 0.1, (r() - 0.5) * 0.08);
+    b.add(SH.tuft(Math.floor(r() * 3)), M(x, 0, z, 0.3 * s, (0.26 + r() * 0.1) * s, 0.3 * s, 0, r() * TAU, 0), null, (px, py, pz, nx, ny, nz, o, lx, ly) => o.copy(a).lerp(t, clamp(ly * 1.15)));
+  }
+  ddFlower(b, x, z, s, c) {
+    const r = this.drng, tx = (r() - 0.5) * 0.3, tz = (r() - 0.5) * 0.3, h = (0.16 + r() * 0.1) * s, pc = col(c);
+    b.add(SH.stem(), M(x, 0, z, 0.012 * s, h, 0.012 * s, tx, 0, tz), col('#4e8a38'));
+    _E.set(tx, 0, tz, 'YXZ'); _Q.setFromEuler(_E); const tip = V(0, h, 0).applyQuaternion(_Q); // head sits on the tilted stem's tip
+    b.add(SH.star(), M(x + tip.x, tip.y, z + tip.z, 0.07 * s, 0.07 * s, 0.07 * s, tx * 1.5, r() * TAU, tz * 1.5), null, (px, py, pz, nx, ny, nz, o, lx, ly, lz) => { if (Math.hypot(lx, lz) < 0.2) o.set('#ffc83a'); else o.copy(pc).multiplyScalar(0.92 + 0.08 * Math.hypot(lx, lz)); });
+  }
+  ddLeaf(b, x, z, s, c) {
+    const r = this.drng, lc = c.isColor ? c : col(c), dk = lc.clone().multiplyScalar(0.8);
+    b.add(SH.leaf(), M(x, 0.008, z, 0.1 * s, 0.05 * s, 0.1 * s, (r() - 0.5) * 0.25, r() * TAU, (r() - 0.5) * 0.25), null, (px, py, pz, nx, ny, nz, o, lx, ly) => o.copy(ly > 0.1 ? lc : dk));
+  }
+  ddPebble(b, x, z, s, c, top = null) {
+    const r = this.drng, pc = c.isColor ? c : col(c), tc = top ? col(top) : null;
+    b.add(SH.rock(), M(x, s * 0.2, z, s, s * (0.5 + r() * 0.3), s * (0.7 + r() * 0.4), r() * 0.4, r() * TAU, r() * 0.4), null, (px, py, pz, nx, ny, nz, o) => { o.copy(pc).multiplyScalar(0.8 + 0.3 * clamp(ny * 0.5 + 0.5)); if (tc && ny > 0.55) o.lerp(tc, 0.75); });
+  }
+  ddMushrooms(b, x, z, s, cap) {
+    const r = this.drng, cc = col(cap);
+    for (let i = 0, m = 2 + Math.floor(r() * 3); i < m; i++) {
+      const k = i ? 0.5 + r() * 0.4 : 1, a = r() * TAU, d = i ? 0.1 + r() * 0.14 : 0, px = x + Math.cos(a) * d * s, pz = z + Math.sin(a) * d * s, hh = 0.2 * s * k;
+      b.add(SH.cylLo(), M(px, 0, pz, 0.035 * s * k, hh, 0.035 * s * k), col('#f4e8d4'));
+      b.add(SH.hemiLo(), M(px, hh * 0.9, pz, 0.12 * s * k, 0.09 * s * k, 0.12 * s * k, (r() - 0.5) * 0.3, 0, (r() - 0.5) * 0.3), null, (qx, qy, qz, nx, ny, nz, o, lx, ly, lz) => { o.copy(cc); if (ly > 0.5 && Math.sin(lx * 9) * Math.sin(lz * 9) > 0.35) o.set('#fff8ee'); if (ly < 0.1) o.set('#f0dcc0'); });
+    }
+  }
+  ddSprouts(b, x, z, s, c) { // a knot of little glowing crystal points
+    const r = this.drng, cc = col(c);
+    for (let i = 0, m = 2 + Math.floor(r() * 3); i < m; i++) {
+      const d = V((r() - 0.5) * 0.8, 1, (r() - 0.5) * 0.8).normalize(), sz = (0.035 + r() * 0.03) * s;
+      b.add(SH.crys(), MD(x + (r() - 0.5) * 0.2 * s, -0.02, z + (r() - 0.5) * 0.2 * s, d, sz, (0.14 + r() * 0.22) * s, sz, r() * TAU), null, (px, py, pz, nx, ny, nz, o, lx, ly) => o.copy(cc).lerp(col('#ffffff'), clamp(ly * 0.6)));
+    }
+    if (r() < 0.4) this.halos.add(x, 0.2 * s, z, 0.7 * s, c, 0.28);
+  }
+  ddRoots() { // gnarled roots arching out of the wall foot and diving back into the soil
+    const r = this.drng, B = this.solid;
+    for (const { S } of this.wallSamples) {
+      let next = 2 + r() * 5;
+      for (const s of S) {
+        if (s.u < next) continue;
+        next = s.u + 4 + r() * 6;
+        if (r() < 0.35) continue;
+        const out = 0.9 + r() * 1.3, side = (r() - 0.5) * 1.2;
+        const ex = s.x - s.nx * out + s.tx * side, ez = s.z - s.nz * out + s.tz * side;
+        if (!this.walkable(ex, ez) || this.keepClear(ex, ez) || this.collision.solidAt(ex, ez, 0.2)) continue;
+        const R0 = 0.07 + r() * 0.05, mx = (s.x + ex) / 2 - s.nx * 0.1, mz = (s.z + ez) / 2 - s.nz * 0.1, arch = 0.14 + r() * 0.2;
+        const g = tube([{ p: V(s.x + s.nx * 0.2, 0.34, s.z + s.nz * 0.2), r: R0 * 1.3 }, { p: V(s.x - s.nx * 0.2, 0.16, s.z - s.nz * 0.2), r: R0 }, { p: V(mx, arch, mz), r: R0 * 0.8 }, { p: V(ex + (s.x - ex) * 0.2, 0.05, ez + (s.z - ez) * 0.2), r: R0 * 0.55 }, { p: V(ex, -0.06, ez), r: R0 * 0.35 }], 5, false);
+        B.addGeo(g, s.x, s.z, null, (x, y, z, nx, ny, nz, o) => o.copy(col('#6a4630')).lerp(col('#a07a58'), clamp(ny * 0.5 + 0.3)).lerp(col('#7c9a5a'), clamp(ny * 2 - 1.5) * 0.6));
+        if (r() < 0.5) this.ddTuft(this.clutter, mx - s.nx * 0.3 + s.tx * 0.2, mz - s.nz * 0.3 + s.tz * 0.2, 0.8, '#4a7434', '#a4c870');
+      }
+    }
+  }
+  ddPathLanterns(light = '#ffc47a') { // one little lantern on a stake beside a trail in most rooms
+    const r = this.drng, L = this.L, B = this.solid, GL = this.glow, HA = this.halos, crystal = this.th === 'crystal';
+    let placed = 0;
+    for (const rm of L.rooms) {
+      if (rm.kind === 'boss' || rm.kind === 'start' || r() < 0.3 || placed >= 9) continue;
+      for (let t = 0; t < 40; t++) {
+        const x = (rm.x + r() * rm.w) * CELL, z = (rm.y + r() * rm.h) * CELL, [, path] = this.decoAt(x, z);
+        if (path < 0.25 || path > 0.5 || !this.walkable(x, z) || this.keepClear(x, z, 0.5) || this.collision.solidAt(x, z, 0.7)) continue;
+        if (crystal) { // crystal lamp: a pale shard on a rock
+          this.ddPebble(B, x, z, 0.22, col('#5a4c8c'), '#dfe6ff');
+          GL.add(SH.crys(), MD(x, 0.1, z, V(0, 1, 0), 0.08, 0.55, 0.08, r()), null, (px, py, pz, nx, ny, nz, o, lx, ly) => o.copy(col(light)).lerp(col('#ffffff'), clamp(ly * 0.6)));
+          HA.add(x, 0.45, z, 1.3, light, 0.45);
+        } else {
+          B.add(SH.cyl6(), M(x, 0, z, 0.035, 1.0, 0.035, (r() - 0.5) * 0.08, 0, (r() - 0.5) * 0.08), col('#6a4a34'));
+          B.add(SH.cyl6(), M(x, 0.96, z, 0.022, 0.3, 0.022, 0, r() * TAU, Math.PI / 2), col('#6a4a34'));
+          B.add(SH.cyl(), M(x, 0.62, z, 0.006, 0.3, 0.006), col('#3a2a2a'));
+          GL.add(SH.sph(), M(x, 0.56, z, 0.1, 0.13, 0.1), null, (px, py, pz, nx, ny, nz, o) => { o.set('#ffd28a'); if (Math.abs(py - 0.56) > 0.1) o.set('#b8583a'); });
+          B.add(SH.cone(), M(x, 0.66, z, 0.12, 0.07, 0.12), col('#4a3a3a'));
+          HA.add(x, 0.56, z, 1.2, light, 0.55, 1);
+        }
+        this.lightPool.addSource({ pos: V(x, 0.8, z), color: C(light), intensity: 3.5, radius: 5, flicker: crystal ? 0.15 : 0.7 });
+        this.collision.addCircle(x, z, 0.14);
+        placed++;
+        break;
+      }
+    }
+  }
+  ddFairyRings() { // a ring of little toadstools on an open patch of floor in some rooms
+    const r = this.drng, L = this.L;
+    for (const rm of L.rooms) {
+      if (rm.kind === 'boss' || r() < 0.55) continue;
+      for (let t = 0; t < 20; t++) {
+        const x = (rm.x + 1.5 + r() * (rm.w - 3)) * CELL, z = (rm.y + 1.5 + r() * (rm.h - 3)) * CELL, R = 0.7 + r() * 0.5;
+        let ok = true; for (let a = 0; a < 8 && ok; a++) { const px = x + Math.cos(a / 8 * TAU) * R, pz = z + Math.sin(a / 8 * TAU) * R; ok = this.walkable(px, pz) && !this.keepClear(px, pz) && !this.collision.solidAt(px, pz, 0.1); }
+        if (!ok) continue;
+        const cap = r() < 0.5 ? '#e8604a' : '#f0e4d0', m = 9 + Math.floor(r() * 5);
+        for (let i = 0; i < m; i++) { const a = i / m * TAU + r() * 0.3, rr = R * (0.9 + r() * 0.2), px = x + Math.cos(a) * rr, pz = z + Math.sin(a) * rr, s = 0.45 + r() * 0.35;
+          this.clutter.add(SH.cylLo(), M(px, 0, pz, 0.03 * s, 0.17 * s, 0.03 * s), col('#f4e8d4'));
+          this.clutter.add(SH.hemiLo(), M(px, 0.15 * s, pz, 0.1 * s, 0.075 * s, 0.1 * s), null, (qx, qy, qz, nx, ny, nz, o, lx, ly, lz) => { o.set(cap); if (ly > 0.5 && Math.sin(lx * 9) * Math.sin(lz * 9) > 0.35) o.set('#fff8ee'); if (ly < 0.1) o.set('#f0dcc0'); });
+        }
+        break;
+      }
+    }
+  }
+  ddCandles(x, z) { // a cluster of stubby candles with little flames
+    const r = this.drng, B = this.clutter, GL = this.glow;
+    for (let i = 0, m = 2 + Math.floor(r() * 3); i < m; i++) {
+      const px = x + (r() - 0.5) * 0.35, pz = z + (r() - 0.5) * 0.35, h = 0.1 + r() * 0.16;
+      B.add(SH.cylLo(), M(px, 0, pz, 0.035, h, 0.035), null, (a, b, c, nx, ny, nz, o) => o.set(ny > 0.5 ? '#fff4e4' : '#f4e8d8'));
+      GL.add(SH.sphLo(), M(px, h + 0.035, pz, 0.018, 0.04, 0.018), col('#ffc860'));
+    }
+    this.halos.add(x, 0.3, z, 0.9, '#ffb060', 0.45, 1);
+  }
+  ddAndon(x, z, face, lit) { // paper floor lamp: square lattice shade on four legs, glowing warm
+    const B = this.solid, GL = this.glow;
+    for (let i = 0; i < 4; i++) { const a = face + Math.PI / 4 + i * Math.PI / 2; B.add(SH.cyl6(), M(x + Math.cos(a) * 0.19, 0, z + Math.sin(a) * 0.19, 0.022, 0.95, 0.022), col('#4a2e22')); }
+    GL.add(SH.box(), M(x, 0.3, z, 0.3, 0.5, 0.3, 0, face, 0), null, (px, py, pz, nx, ny, nz, o, lx, ly, lz) => { o.set(Math.abs(ny) > 0.5 ? '#5a3a2a' : '#f0c888'); if (Math.abs(ny) < 0.5 && (Math.abs(Math.sin(ly * 18)) > 0.93 || Math.abs(Math.sin((lx + lz) * 14)) > 0.95)) o.set('#6a4230'); });
+    B.add(SH.box(), M(x, 0.8, z, 0.36, 0.04, 0.36, 0, face, 0), col('#4a2e22'));
+    B.add(SH.box(), M(x, 0.26, z, 0.36, 0.04, 0.36, 0, face, 0), col('#4a2e22'));
+    this.halos.add(x, 0.55, z, 1.5, '#ffc070', 0.5, 0.6);
+    if (lit) this.lightPool.addSource({ pos: V(x, 0.9, z), color: C('#ffb870'), intensity: 3, radius: 4.5, flicker: 0.4 });
+  }
+  ddBonsai(x, z) {
+    const r = this.drng, B = this.solid;
+    B.add(SH.rbox(), M(x, 0, z, 0.42, 0.16, 0.3, 0, r() * TAU, 0), col('#3a5a7a'));
+    B.addGeo(tube([{ p: V(x, 0.14, z), r: 0.045 }, { p: V(x + 0.06, 0.3, z + 0.02), r: 0.035 }, { p: V(x - 0.04, 0.44, z - 0.02), r: 0.025 }], 5, false), x, z, col('#6a4a34'));
+    for (const [ox, oy, oz, s] of [[-0.1, 0.44, 0, 0.16], [0.1, 0.36, 0.04, 0.13], [0, 0.52, -0.04, 0.12]]) B.add(SH.ico(), M(x + ox, oy, z + oz, s, s * 0.6, s * 0.9, 0, r() * TAU, 0), null, (a, b, c, nx, ny, nz, o) => o.copy(col('#4e7e3c')).lerp(col('#8ab85a'), clamp(ny * 0.8)));
+  }
+  ddLowTable(x, z, face) { // chabudai with a teapot and two cups, a cushion beside it
+    const B = this.solid, r = this.drng;
+    B.add(SH.disc(), M(x, 0.26, z, 0.42, 0.05, 0.42), null, (a, b, c, nx, ny, nz, o) => o.set(ny > 0.5 ? '#9a5a36' : '#6a3a24'));
+    for (let i = 0; i < 4; i++) { const a = i / 4 * TAU + 0.6; B.add(SH.cyl6(), M(x + Math.cos(a) * 0.28, 0, z + Math.sin(a) * 0.28, 0.03, 0.27, 0.03), col('#5a3420')); }
+    B.add(SH.sph(), M(x, 0.36, z, 0.09, 0.07, 0.09), col('#e8e4dc')); B.add(SH.cyl(), M(x + 0.1, 0.36, z, 0.012, 0.08, 0.012, 0, 0, -0.9), col('#e8e4dc'));
+    B.add(SH.sphLo(), M(x, 0.44, z, 0.03), col('#3a6a8a'));
+    for (const a of [1.2, 2.6]) B.add(SH.cylLo(), M(x + Math.cos(a) * 0.22, 0.31, z + Math.sin(a) * 0.22, 0.03, 0.045, 0.03), col('#6a9a7a'));
+    this.cushion(this.clutter, x - Math.sin(face) * 0.7, z - Math.cos(face) * 0.7, face + (r() - 0.5) * 0.4);
+  }
+  ddBooks(x, z, face) { const r = this.drng; for (let i = 0; i < 3 + Math.floor(r() * 3); i++) this.clutter.add(SH.box(), M(x + (r() - 0.5) * 0.04, i * 0.05, z + (r() - 0.5) * 0.04, 0.3, 0.05, 0.22, 0, face + (r() - 0.5) * 0.5, 0), null, (a, b, c, nx, ny, nz, o) => o.set(ny > 0.5 ? '#fff4e0' : ['#8a3a4a', '#3a5a8a', '#5a7a4a', '#c89a3a'][i % 4])); }
+  ddVeggies(x, z, n0 = 0) {
+    const r = this.drng, B = this.clutter;
+    for (let i = 0, m = n0 || 2 + Math.floor(r() * 3); i < m; i++) {
+      const px = x + (r() - 0.5) * 0.6, pz = z + (r() - 0.5) * 0.6, k = r(), a = r() * TAU;
+      if (k < 0.35) { B.add(SH.cone(), M(px, 0.05, pz, 0.045, 0.24, 0.045, Math.PI / 2, a, 0), col('#ff8a2a')); B.add(SH.sphLo(), M(px - Math.sin(a) * 0.02, 0.05, pz - Math.cos(a) * 0.02, 0.03, 0.03, 0.05), col('#6ab04c')); }
+      else if (k < 0.65) B.add(SH.sph(), M(px, 0.07, pz, 0.075, 0.07, 0.075), col(r() < 0.5 ? '#e0423a' : '#c8528a'));
+      else { B.add(SH.sph(), M(px, 0.07, pz, 0.08, 0.075, 0.08), col('#f4e8c8')); B.add(SH.cone(), M(px, 0.13, pz, 0.025, 0.06, 0.025), col('#c8b890')); }
+    }
+  }
+  ddPlates(x, z) { const r = this.drng; for (let i = 0; i < 3 + Math.floor(r() * 4); i++) this.clutter.add(SH.disc(), M(x + (r() - 0.5) * 0.03, i * 0.03, z + (r() - 0.5) * 0.03, 0.17, 0.028, 0.17), null, (a, b, c, nx, ny, nz, o, lx, ly, lz) => o.set(Math.hypot(lx, lz) > 0.8 && ny > 0.5 ? '#4a7ac8' : '#f8f4ee')); }
+  ddBucket(x, z, face) {
+    const B = this.solid;
+    B.add(SH.taper(), M(x, 0.34, z, 0.2, 0.34, 0.2, Math.PI, 0, 0), null, (a, b, c, nx, ny, nz, o, lx, ly) => o.set(Math.abs(ly - 0.2) < 0.05 || Math.abs(ly - 0.8) < 0.05 ? '#5a5058' : '#b07a48'));
+    B.add(SH.torus(), M(x, 0.36, z, 0.17, 0.2, 0.17, 0, face, 1.3), col('#5a5058'));
+    B.add(SH.cyl6(), M(x + 0.1, 0.05, z, 0.02, 1.1, 0.02, 0.25, face, 0.3), col('#c89868'));
+  }
+  ddEggs(x, z) { const r = this.drng, B = this.clutter; B.add(SH.cyl(), M(x, 0, z, 0.22, 0.12, 0.22), null, (a, b, c, nx, ny, nz, o) => o.copy(col('#c89858')).multiplyScalar(Math.sin(b * 90) > 0 ? 1 : 0.82)); for (let i = 0; i < 5; i++) { const a = i / 5 * TAU + r(); B.add(SH.sph(), M(x + Math.cos(a) * 0.09, 0.14, z + Math.sin(a) * 0.09, 0.05, 0.065, 0.05), col(i % 2 ? '#fff8ee' : '#f0d8b8')); } }
   banner(x, z, face, c1, c2, motif) { // nobori flag on a pole, emblem painted in vertex colours
     const B = this.solid;
     B.add(SH.cyl(), M(x, 0, z, 0.05, 3.1, 0.05), col('#4a3430'));

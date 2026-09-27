@@ -56,6 +56,22 @@ function glowBillboard(color, size = 0.5) {
 // Monsters get a view-space fresnel edge on top of the lit rim so dark bodies (dust bunnies, oni) separate from the floor
 // (weighted toward dark bodies: on pale ones a bright edge would melt neighbours together, the ink outline does that job)
 const EDGE_OUT = 'outgoingLight += vec3(1.0, 0.94, 0.86) * pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 3.0) * 0.34 * (1.0 - 0.85 * clamp(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11)) * 1.6, 0.0, 1.0));';
+// Bosses: soft luminance knee. The dungeon bloom starts at luminance 0.6, so a pale boss (King Mochi, Tamamo) or a white
+// apron / toque under warm lights would glow as a blob, and a hit tint on top washed it out completely. Above 0.44 the
+// light is compressed toward 0.64 (hue kept), which leaves a crisp, readable body with only a whisper of bloom.
+export const LUM_CAP = /* glsl */`
+  { float lmC = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
+    if (lmC > 0.44) { float nlC = 0.44 + 0.2 * (1.0 - exp(-(lmC - 0.44) / 0.2)); outgoingLight *= nlC / lmC; } }`;
+/** Add LUM_CAP to a material built elsewhere (the humanoid kit's rig material) by chaining its onBeforeCompile. */
+export function capLuminance(mat) {
+  if (!mat || mat.userData.lumCap) return mat;
+  mat.userData.lumCap = true;
+  const prev = mat.onBeforeCompile, key = mat.customProgramCacheKey;
+  mat.onBeforeCompile = (sh, r) => { prev?.call(mat, sh, r); sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `${LUM_CAP}\n#include <opaque_fragment>`); };
+  mat.customProgramCacheKey = () => (key ? key.call(mat) : '') + '|lumcap';
+  mat.needsUpdate = true;
+  return mat;
+}
 function finish(parts, opts = {}) {
   const mat = makeToon({ vertexColors: true, objectBrush: true, brush: 0.1, rim: 0.7, term: [-0.02, 0.3], ...(opts.mat || {}), fragOut: EDGE_OUT + (opts.mat?.fragOut || '') });
   const geo = merge(parts);
@@ -100,7 +116,7 @@ const BUILD = {
         parts.push(paint(tube([{ p: V(s * 0.1, 0.302, 0.405), r: 0.02 }, { p: V(s * 0.14, 0.315, 0.385), r: 0.014 }, { p: V(s * 0.15, 0.345, 0.378), r: 0.01 }, { p: V(s * 0.13, 0.36, 0.385), r: 0.006 }], 6, true), (p, n, o) => o.set('#a8683e')));
       }
     }
-    return finish(parts);
+    return finish(parts, v.king ? { mat: { fragOut: LUM_CAP } } : {});
   },
   dustbunny(v) {
     const parts = [];
@@ -205,7 +221,7 @@ const BUILD = {
       parts.push(paint(tg, (p, n, o) => { o.set('#ff6a8a'); if (Math.abs(p.x - 0.03 - (0.8 - p.y) * 0.1) < 0.012) o.set('#e04a6a'); }));
     }
     // the tongue hangs under the canopy where only the dark ground bounce reaches it: let the pink self-light a little
-    return finish(parts, { mat: { fragOut: 'outgoingLight += diffuseColor.rgb * 0.3 * step(0.8, diffuseColor.r) * step(0.16, diffuseColor.b) * step(diffuseColor.g, 0.3);' } });
+    return finish(parts, { mat: { fragOut: 'outgoingLight += diffuseColor.rgb * 0.3 * step(0.8, diffuseColor.r) * step(0.16, diffuseColor.b) * step(diffuseColor.g, 0.3);' + (v.lord ? LUM_CAP : '') } });
   },
   wisp(v) {
     const col = v.color || '#7ab8ff';
@@ -264,7 +280,7 @@ const BUILD = {
     parts.push(paint(xf(new THREE.CylinderGeometry(0.018, 0.018, 0.7, 6), { p: [-0.5, 0.66, 0.18], r: [0.25, 0, 0.35] }), (p, n, o) => o.set('#b88a5a')));
     const bowl = new THREE.SphereGeometry(0.1, 12, 8, 0, TAU, Math.PI / 2, Math.PI / 2); bowl.translate(-0.62, 0.98, 0.27);
     parts.push(...shell(paint(bowl, (p, n, o) => o.set(STEEL)), 0.9, '#9aa0ac'));
-    return finish(parts);
+    return finish(parts, { mat: { fragOut: LUM_CAP } });
   },
   tamamo(v) { // Tamamo-no-Mae: white kitsune in an indigo kimono, fan of nine foxfire-tipped tails, fox mask + kanzashi, orbiting wisps
     const rig = buildHumanoid({ name: 'Tamamo', species: 'fox', fur: v.color || '#f8eee6', fur2: '#ffffff', earColor: '#fff8f2', earInner: '#c8a8ff', eye: '#ff3a6a', blush: '#ffb0d0', outfit: { top: 'kimono', topColor: '#3c2c78', topColor2: '#ffd24a', bottomColor: '#281a50', sash: '#ffcf3a' } });
@@ -280,6 +296,7 @@ const BUILD = {
       tp.push(paint(g, (p, n, o) => { o.copy(WH); if (t > 0.55) o.lerp(LAV, clamp((t - 0.55) / 0.2)); if (t > 0.78) o.lerp(TIP, clamp((t - 0.78) / 0.18)); o.multiplyScalar(0.92 + 0.08 * clamp(n.y + 0.5)); }));
     }
     const tailGeo = merge(tp);
+    capLuminance(rig.mat); // white fur under moonlight + her own foxfire light sat far above the bloom threshold
     const N = 9, tails = new THREE.InstancedMesh(tailGeo, rig.mat, N), tailsOl = new THREE.InstancedMesh(tailGeo, rig.outMat, N);
     tails.castShadow = true; tails.receiveShadow = true; tails.frustumCulled = tailsOl.frustumCulled = false;
     const fan = new THREE.Group(); fan.position.set(0, 0.06, -0.16); P.body.add(fan); fan.add(tails, tailsOl);
@@ -305,7 +322,7 @@ const BUILD = {
     const fl = new THREE.LatheGeometry([[0.001, -0.075], [0.05, -0.06], [0.07, -0.02], [0.066, 0.03], [0.05, 0.08], [0.034, 0.14], [0.02, 0.2], [0.008, 0.26], [0.001, 0.3]].map(([r, y]) => new THREE.Vector2(r, y)), 10);
     const fp = fl.attributes.position; for (let i = 0; i < fp.count; i++) { const y = fp.getY(i); fp.setX(i, fp.getX(i) + Math.max(0, y) * Math.max(0, y) * 1.4); } // tail curls upward (x becomes y below)
     fl.rotateZ(Math.PI / 2);
-    const wg = paint(fl, (p, n, o) => { const k = clamp((-p.x + 0.06) / 0.34); o.setRGB(1.7 - k * 1.1, 1.9 - k * 1.0, 2.2 - k * 0.3); });
+    const wg = paint(fl, (p, n, o) => { const k = clamp((-p.x + 0.06) / 0.34); o.setRGB(1.25 - k * 0.8, 1.45 - k * 0.75, 1.85 - k * 0.3); }); // blooms as foxfire without bleaching her
     const NW = 7, wisps = new THREE.InstancedMesh(wg, new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, fog: false }), NW);
     const wh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), glowBillboard('#3a6aff', 0.7), NW); // soft additive halo per wisp
     wisps.frustumCulled = wh.frustumCulled = false; wh.renderOrder = 9; rig.root.add(wisps, wh);

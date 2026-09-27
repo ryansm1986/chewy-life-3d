@@ -35,9 +35,10 @@ export function newGameState() {
     version: 1,
     player: {
       name: 'Chewy', lvl: 1, xp: 0, stats: { str: 10, dex: 10, vit: 12, ene: 8 }, statPts: 0, skillPts: 1,
-      skills: { chomp: 1 }, hotbar: ['attack', 'chomp', null, null, null, null],
+      // starter skills: one free point in each weapon's bread-and-butter skill so both weapon sets have a right-click
+      skills: { chomp: 1, throw: 1 }, hotbar: ['attack', 'chomp', null, null, null, null],
       life: null, zoom: null, activeWeapon: 0,
-      mouseSets: [['attack', 'chomp'], ['attack', null]], // per weapon set [LMB, RMB] (see swapWeapons)
+      mouseSets: [['attack', 'chomp'], ['attack', 'throw']], // per weapon set [LMB, RMB] (see swapWeapons)
     },
     coins: 350,
     materials: { wood: 45, stone: 30, petal: 10, crystal: 1, bone: 2, mochi: 0, silk: 1, lantern: 2 },
@@ -154,6 +155,23 @@ export function createActions(G) {
     const live = P.mouseSets[P.activeWeapon === 1 ? 1 : 0];
     P.hotbar[0] = live[0]; P.hotbar[1] = live[1];
     return P.mouseSets;
+  }
+  /** Saves from before the starter Throw: grant it once (Chomp's free twin) and fill any empty right-click with the
+   *  set's best skill, so the ball set never swaps in with a dead RMB. */
+  function migrateStarterSkills() {
+    const st = S(), P = st.player, flags = st.flags || (st.flags = {});
+    if (flags.starterThrow) return;
+    flags.starterThrow = true;
+    if (!(P.skills.throw > 0)) P.skills.throw = 1;
+    const sets = ensureMouseSets(), act = P.activeWeapon === 1 ? 1 : 0;
+    for (const i of [0, 1]) {
+      const pair = i === act ? [P.hotbar[0] ?? null, P.hotbar[1] ?? null] : sets[i];
+      if (pair[1]) continue;
+      const rmb = defaultRmb(i);
+      if (!rmb) continue;
+      sets[i] = [pair[0] ?? 'attack', rmb];
+      if (i === act) P.hotbar[1] = rmb;
+    }
   }
   /** A set whose weapon changed type (e.g. a ball equipped where the sword was) trades skills that no longer fit for defaults. */
   function refitSets() {
@@ -491,6 +509,6 @@ export function createActions(G) {
     addSkillPts, addStatPts, respec, socket, getItem, firstFree, canEquip, equipProblem, setPieces,
     mouseSet, ensureMouseSets, setWeaponType,
   };
-  if (G.state) { ensureMouseSets(); recompute(true); }
+  if (G.state) { ensureMouseSets(); migrateStarterSkills(); recompute(true); }
   return api;
 }

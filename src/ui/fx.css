@@ -94,6 +94,42 @@
 .bn-boss .bn-vig { background: radial-gradient(ellipse 45% 40% at 50% 52%, transparent 35%, rgba(90, 0, 20, .38) 100%); animation-duration: 2.2s; }
 .bn-boss.out { animation: bnOutUp .42s ease-in forwards; }
 @keyframes bnOutUp { to { opacity: 0; transform: translateY(-24px) scale(.92); filter: blur(3px); } }
+/* boss Victory!: lives in the top band (the arena, the loot fountain and Chewy stay clear); gold letters on a ribbon,
+   soft rays, confetti raining down over the arena, twinkling stars and chips for the xp / level-up it brought */
+.banners[data-style="victory"] { top: 6.5%; }
+.bn-victory { animation: vicIn .5s cubic-bezier(.2, 1.4, .4, 1) both; }
+@keyframes vicIn { from { transform: translateY(-40px) scale(.7); opacity: 0; } }
+.bn-victory .bn-title { font-size: 66px; color: #ffe066; -webkit-text-stroke: 10px #4a2410; text-shadow: 0 7px 0 #4a2410, 0 0 34px rgba(255, 190, 60, .75); letter-spacing: 3px; }
+.bn-victory .bn-title .lt { animation: ltDrop .7s cubic-bezier(.3, 1.7, .5, 1) both, ltBounce 1.4s ease-in-out infinite; animation-delay: calc(.08s + var(--i) * .045s), calc(.9s + var(--i) * .08s); }
+.bn-victory .bn-jp { display: flex; align-items: center; justify-content: center; gap: 6px; color: #ffd0e0; font-size: 17px; letter-spacing: 6px; margin-bottom: 2px; -webkit-text-stroke: 4px #4a2410; }
+.bn-victory .bn-jp .gl { width: 18px; height: 18px; animation: twinkle 1.2s ease-in-out infinite; }
+.bn-victory .bn-sub { font-size: 18px; margin-top: 4px; color: #fff4e0; -webkit-text-stroke: 5px #4a2410; animation-delay: .35s; }
+.bn-vcore { position: relative; display: inline-block; padding: 4px 48px 9px; }
+.bn-ribbon { position: absolute; left: 0; right: 0; top: 10px; bottom: 0; z-index: -1; animation: ribbonIn .55s .05s cubic-bezier(.2, 1.2, .4, 1) both; }
+.bn-ribbon::before { content: ''; position: absolute; inset: 0; background: linear-gradient(#ff9aba, #e8577e 70%, #d8456e); border: 4px solid #4a2410; border-radius: 12px; box-shadow: 0 6px 0 rgba(74, 36, 16, .55), inset 0 3px 0 rgba(255, 255, 255, .35); }
+.bn-ribbon i { position: absolute; top: 18px; bottom: -16px; width: 74px; background: linear-gradient(#e8577e, #b8345a); z-index: -1; }
+.bn-ribbon i:first-child { left: -54px; clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 28% 50%); }
+.bn-ribbon i:last-child { right: -54px; clip-path: polygon(0 0, 100% 0, 72% 50%, 100% 100%, 0 100%); }
+@keyframes ribbonIn { from { transform: scaleX(0); opacity: 0; } }
+.bn-vrays { position: absolute; left: 50%; top: 50%; width: 900px; height: 900px; margin: -450px 0 0 -450px; z-index: -2; border-radius: 50%; pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 226, 130, .5) 0 8deg, rgba(255, 226, 130, 0) 8deg 18deg); -webkit-mask: radial-gradient(circle, #000 8%, transparent 46%); mask: radial-gradient(circle, #000 8%, transparent 46%);
+  animation: raysIn .6s ease-out both, spin 18s linear infinite; }
+.bn-victory .bn-conf { top: 40%; }
+.bn-chips { display: flex; gap: 10px; justify-content: center; margin-top: 8px; min-height: 30px; }
+.bn-chip { display: flex; align-items: center; gap: 6px; padding: 4px 13px 5px 8px; border: 3px solid #4a2410; border-radius: 999px; font: 700 16px/1 var(--font); color: #4a2410;
+  background: linear-gradient(#fff8e6, #ffe7b8); box-shadow: 0 3px 0 rgba(74, 36, 16, .5); animation: chipIn .5s .55s var(--pop) both; }
+.bn-chip .gl { width: 20px; height: 20px; }
+.bn-chip b { color: #c2410c; }
+.chip-xp { background: linear-gradient(#f6f0ff, #dccfff); }
+.chip-lvl { background: linear-gradient(#fff4b0, #ffd24a); }
+.chip-lvl .gl { animation: spin 2.4s linear infinite; }
+.bn-chip.pop { animation: chipIn .5s var(--pop) both; }
+@keyframes chipIn { from { transform: scale(.2) translateY(10px); opacity: 0; } }
+.bn-tw { position: absolute; left: 50%; top: 50%; width: var(--s); height: var(--s); margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2); translate: var(--x) var(--y); color: #fff3a0; filter: drop-shadow(0 0 6px rgba(255, 230, 120, .95));
+  animation: vicTw 1.6s ease-in-out var(--d) infinite both; }
+.bn-tw .gl { width: 100%; height: 100%; }
+@keyframes vicTw { 0%, 100% { transform: scale(.3) rotate(0); opacity: 0; } 40% { transform: scale(1.1) rotate(40deg); opacity: 1; } 70% { transform: scale(.8) rotate(70deg); opacity: .8; } }
+.bn-victory.out { animation: bnOutUp .56s ease-in forwards; }
 .bn-quest .bn-title { font-size: 64px; color: #ffe066; text-shadow: 0 8px 0 var(--ink), 0 0 36px rgba(255, 200, 80, .8); }
 .bn-scroll .gl { width: 62px; height: 62px; animation: slotPop .7s var(--pop) both, bob 1.4s ease-in-out .7s infinite; filter: drop-shadow(0 4px 0 rgba(74, 44, 42, .35)); }
 
@@ -123,6 +159,7 @@
 .ll.r-unique, .ll.r-set { box-shadow: 0 3px 0 rgba(0, 0, 0, .3), 0 0 12px color-mix(in srgb, var(--rc) 70%, transparent); }
 .ll.click span { animation: slotPop .3s var(--pop); }
 .ll.gone { opacity: 0 !important; transition: opacity .25s; }
+.ll.held { opacity: 0 !important; pointer-events: none !important; transition: opacity .15s; }
 
 /* iris transition */
 .iris { position: absolute; inset: 0; display: none; pointer-events: none; }
