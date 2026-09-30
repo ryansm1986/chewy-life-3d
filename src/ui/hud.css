@@ -14,7 +14,37 @@
 
 /* ---------------------------------------------------------------- top-left: player card */
 .hud-tl { left: 16px; top: 14px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
-.pcard { display: flex; align-items: center; gap: 10px; }
+.pcard { display: flex; align-items: center; gap: 10px; position: relative; }
+/* the other hero (docs/HEROES.md §4): a small bubble tucked under the portrait; Tab / click switches, the ring is the cooldown */
+.hsw { position: absolute; left: -8px; top: 58px; width: 46px; height: 46px; padding: 0; border: 0; background: none; pointer-events: auto; cursor: pointer; z-index: 2; transition: transform .25s var(--spring); }
+.hsw[hidden] { display: none; }
+.hsw:hover { transform: scale(1.12) rotate(6deg); }
+.hsw-face { position: absolute; inset: 3px; border-radius: 50%; overflow: hidden; border: 3px solid var(--ink); background: radial-gradient(circle at 50% 30%, #fff 0, #e4fbf6 55%, #b8ece2 100%); box-shadow: 0 3px 0 rgba(74, 44, 42, .35); }
+.hsw-face .p3d, .hsw-face .portrait { position: absolute; left: -8%; top: 4%; width: 116% !important; height: 116% !important; }
+.hsw-cd { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); pointer-events: none; }
+.hsw-cd circle { fill: none; stroke: rgba(74, 44, 42, .55); stroke-width: 5; stroke-dasharray: 110; stroke-dashoffset: 110; }
+.hsw.cooling .hsw-face { filter: saturate(.4) brightness(.85); }
+.hsw .kc { position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); font-size: 10px; padding: 1px 5px; }
+.hsw-lv { position: absolute; right: -4px; top: -4px; min-width: 18px; height: 18px; border-radius: 9px; display: grid; place-items: center; font: 700 11px/1 var(--font);
+  background: radial-gradient(circle at 35% 30%, #fff5c4, #ffcf4a 60%, #f0a830); border: 2px solid var(--ink); }
+.pc-bub.heroswap .pc-face, .hsw.heroswap .hsw-face { animation: heroSwap .7s var(--pop); }
+@keyframes heroSwap { 0% { transform: scale(.4) rotate(-40deg); opacity: 0; } 60% { transform: scale(1.12) rotate(6deg); opacity: 1; } 100% { transform: none; } }
+.hud[data-hero="moka"] .pc-face { background: radial-gradient(circle at 50% 30%, #fff 0, #e4fbf6 50%, #a8e6da 100%); box-shadow: 0 5px 0 rgba(74, 44, 42, .35), inset 0 -6px 0 rgba(92, 224, 208, .3); }
+.hud[data-hero="moka"] .pc-name .jp { color: #9ff0e4; }
+/* the hero card that sweeps across while the camera changes heroes */
+.hero-card { position: absolute; left: 50%; top: 22%; display: flex; align-items: center; gap: 14px; padding: 10px 26px 10px 12px; border: 4px solid var(--ink); border-radius: 60px;
+  background: linear-gradient(100deg, #fffaf2 0%, #fff 55%, color-mix(in srgb, var(--hc) 30%, #fff) 100%); box-shadow: 0 6px 0 rgba(74, 44, 42, .35), 0 0 0 5px color-mix(in srgb, var(--hc) 55%, #fff) inset;
+  opacity: 0; transform: translate(-50%, 0) translateX(-60vw) rotate(-4deg); pointer-events: none; }
+.hero-card.show { animation: heroCard 1.7s both; }
+@keyframes heroCard { 0% { opacity: 0; transform: translate(-50%, 0) translateX(-60vw) rotate(-6deg); } 16% { opacity: 1; transform: translate(-50%, 0) translateX(2vw) rotate(1deg); }
+  24% { transform: translate(-50%, 0) rotate(0); } 80% { opacity: 1; transform: translate(-50%, 0) translateX(-1vw) rotate(0); } 100% { opacity: 0; transform: translate(-50%, 0) translateX(60vw) rotate(4deg); } }
+.hc-face { position: relative; width: 74px; height: 74px; border-radius: 50%; overflow: hidden; border: 4px solid var(--ink); background: radial-gradient(circle at 50% 30%, #fff, color-mix(in srgb, var(--hc) 35%, #fff)); flex: none; }
+.hc-face .p3d, .hc-face .portrait { position: absolute; left: -8%; top: 4%; width: 116% !important; height: 116% !important; }
+.hc-t { display: flex; flex-direction: column; line-height: 1.05; }
+.hc-t small { font: 600 12px var(--font); color: var(--ink2); letter-spacing: .6px; text-transform: uppercase; }
+.hc-t b { font: 700 32px/1 var(--font); color: #fff; -webkit-text-stroke: 7px var(--ink); paint-order: stroke fill; text-shadow: 0 3px 0 var(--ink); display: flex; align-items: baseline; gap: 8px; }
+.hc-t b .jp { font-size: 14px; -webkit-text-stroke: 4px var(--ink); color: var(--hc); }
+.hc-t span { font: 600 15px var(--font); color: var(--ink); }
 .pc-bub { position: relative; width: 88px; height: 88px; pointer-events: auto; cursor: pointer; transition: transform .3s var(--spring); }
 .pc-bub:hover { transform: scale(1.06) rotate(-4deg); }
 .pc-face { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; border: 4px solid var(--ink);

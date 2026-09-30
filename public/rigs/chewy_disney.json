@@ -1,0 +1,395 @@
+{
+ "name": "chewy_disney",
+ "scale": 1.15,
+ "height": 1.208,
+ "bones": [
+  {
+   "name": "root",
+   "parent": null,
+   "pos": [
+    0.0,
+    0.0,
+    -0.0
+   ]
+  },
+  {
+   "name": "hips",
+   "parent": "root",
+   "pos": [
+    0.0,
+    0.3795,
+    -0.0
+   ]
+  },
+  {
+   "name": "spine",
+   "parent": "hips",
+   "pos": [
+    0.0,
+    0.4945,
+    -0.0
+   ]
+  },
+  {
+   "name": "chest",
+   "parent": "spine",
+   "pos": [
+    0.0,
+    0.598,
+    -0.0
+   ]
+  },
+  {
+   "name": "neck",
+   "parent": "chest",
+   "pos": [
+    0.0,
+    0.713,
+    -0.0
+   ]
+  },
+  {
+   "name": "head",
+   "parent": "neck",
+   "pos": [
+    0.0,
+    0.8165,
+    0.00575
+   ]
+  },
+  {
+   "name": "jaw",
+   "parent": "head",
+   "pos": [
+    0.0,
+    0.84985,
+    0.05796
+   ]
+  },
+  {
+   "name": "eye_L",
+   "parent": "head",
+   "pos": [
+    0.07728,
+    0.93743,
+    0.11592
+   ]
+  },
+  {
+   "name": "lidU_L",
+   "parent": "head",
+   "pos": [
+    0.07728,
+    0.93743,
+    0.11592
+   ]
+  },
+  {
+   "name": "lidD_L",
+   "parent": "head",
+   "pos": [
+    0.07728,
+    0.93743,
+    0.11592
+   ]
+  },
+  {
+   "name": "brow_L",
+   "parent": "head",
+   "pos": [
+    0.07728,
+    1.00183,
+    0.11978
+   ]
+  },
+  {
+   "name": "lip_L",
+   "parent": "head",
+   "pos": [
+    0.07213,
+    0.87947,
+    0.2035
+   ]
+  },
+  {
+   "name": "ear_L",
+   "parent": "head",
+   "pos": [
+    0.11077,
+    1.04047,
+    -0.03606
+   ]
+  },
+  {
+   "name": "earTip_L",
+   "parent": "ear_L",
+   "pos": [
+    0.14237,
+    1.12688,
+    -0.06097
+   ]
+  },
+  {
+   "name": "upperarm_L",
+   "parent": "chest",
+   "pos": [
+    0.1219,
+    0.6785,
+    -0.0
+   ]
+  },
+  {
+   "name": "forearm_L",
+   "parent": "upperarm_L",
+   "pos": [
+    0.1725,
+    0.5405,
+    -0.0161
+   ]
+  },
+  {
+   "name": "hand_L",
+   "parent": "forearm_L",
+   "pos": [
+    0.1978,
+    0.4255,
+    0.0092
+   ]
+  },
+  {
+   "name": "thigh_L",
+   "parent": "hips",
+   "pos": [
+    0.0713,
+    0.4025,
+    -0.0
+   ]
+  },
+  {
+   "name": "shin_L",
+   "parent": "thigh_L",
+   "pos": [
+    0.07705,
+    0.23,
+    0.0138
+   ]
+  },
+  {
+   "name": "foot_L",
+   "parent": "shin_L",
+   "pos": [
+    0.08165,
+    0.092,
+    -0.0046
+   ]
+  },
+  {
+   "name": "eye_R",
+   "parent": "head",
+   "pos": [
+    -0.07728,
+    0.93743,
+    0.11592
+   ]
+  },
+  {
+   "name": "lidU_R",
+   "parent": "head",
+   "pos": [
+    -0.07728,
+    0.93743,
+    0.11592
+   ]
+  },
+  {
+   "name": "lidD_R",
+   "parent": "head",
+   "pos": [
+    -0.07728,
+    0.93743,
+    0.11592
+   ]
+  },
+  {
+   "name": "brow_R",
+   "parent": "head",
+   "pos": [
+    -0.07728,
+    1.00183,
+    0.11978
+   ]
+  },
+  {
+   "name": "lip_R",
+   "parent": "head",
+   "pos": [
+    -0.07213,
+    0.87947,
+    0.2035
+   ]
+  },
+  {
+   "name": "ear_R",
+   "parent": "head",
+   "pos": [
+    -0.11077,
+    1.04047,
+    -0.03606
+   ]
+  },
+  {
+   "name": "earTip_R",
+   "parent": "ear_R",
+   "pos": [
+    -0.14237,
+    1.12688,
+    -0.06097
+   ]
+  },
+  {
+   "name": "upperarm_R",
+   "parent": "chest",
+   "pos": [
+    -0.1219,
+    0.6785,
+    -0.0
+   ]
+  },
+  {
+   "name": "forearm_R",
+   "parent": "upperarm_R",
+   "pos": [
+    -0.1725,
+    0.5405,
+    -0.0161
+   ]
+  },
+  {
+   "name": "hand_R",
+   "parent": "forearm_R",
+   "pos": [
+    -0.1978,
+    0.4255,
+    0.0092
+   ]
+  },
+  {
+   "name": "thigh_R",
+   "parent": "hips",
+   "pos": [
+    -0.0713,
+    0.4025,
+    -0.0
+   ]
+  },
+  {
+   "name": "shin_R",
+   "parent": "thigh_R",
+   "pos": [
+    -0.07705,
+    0.23,
+    0.0138
+   ]
+  },
+  {
+   "name": "foot_R",
+   "parent": "shin_R",
+   "pos": [
+    -0.08165,
+    0.092,
+    -0.0046
+   ]
+  },
+  {
+   "name": "tail1",
+   "parent": "hips",
+   "pos": [
+    0.0,
+    0.414,
+    -0.1035
+   ]
+  },
+  {
+   "name": "tail2",
+   "parent": "tail1",
+   "pos": [
+    0.0,
+    0.3795,
+    -0.1955
+   ]
+  },
+  {
+   "name": "tail3",
+   "parent": "tail2",
+   "pos": [
+    0.0,
+    0.437,
+    -0.276
+   ]
+  },
+  {
+   "name": "tail4",
+   "parent": "tail3",
+   "pos": [
+    0.0138,
+    0.5405,
+    -0.322
+   ]
+  }
+ ],
+ "layout": [
+  {
+   "name": "position",
+   "type": "f4",
+   "itemSize": 3,
+   "normalized": false,
+   "offset": 0,
+   "count": 124677
+  },
+  {
+   "name": "normal",
+   "type": "i2",
+   "itemSize": 3,
+   "normalized": true,
+   "offset": 498708,
+   "count": 124677
+  },
+  {
+   "name": "uv",
+   "type": "f4",
+   "itemSize": 2,
+   "normalized": false,
+   "offset": 748064,
+   "count": 83118
+  },
+  {
+   "name": "skinIndex",
+   "type": "u1",
+   "itemSize": 4,
+   "normalized": false,
+   "offset": 1080536,
+   "count": 166236
+  },
+  {
+   "name": "skinWeight",
+   "type": "u1",
+   "itemSize": 4,
+   "normalized": true,
+   "offset": 1246772,
+   "count": 166236
+  },
+  {
+   "name": "index",
+   "type": "u4",
+   "itemSize": 1,
+   "normalized": false,
+   "offset": 1413008,
+   "count": 188400
+  }
+ ],
+ "vertexCount": 41559,
+ "outlineIndexCount": 180300,
+ "bin": "chewy_disney.bin",
+ "tex": "chewy_disney.png",
+ "normalTex": "chewy_disney_n.png"
+}

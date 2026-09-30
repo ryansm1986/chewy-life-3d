@@ -1,4 +1,4 @@
-// Allied summons: spirit pups (Pack Call) and the squeaky decoy (Fetch Mastery).
+// Allied summons: spirit pups (Pack Call), the squeaky decoy (Fetch Mastery), and Moka's Decoy Duck + Spirit Retriever.
 import * as THREE from 'three';
 import { Actor } from '../actors/actor.js';
 import { buildBoston, cloneRig } from '../actors/charKit.js';
@@ -19,7 +19,8 @@ export function pupPrewarmRig() { return (prewarmPup ||= pupRig()); }
 import { makeToon, makeOutline } from '../gfx/materials.js';
 import { paint, merge } from '../gfx/geom.js';
 import { Events } from '../core/events.js';
-import { rand, dist, TAU, clamp } from '../core/util.js';
+import { rand, dist, TAU, clamp, dampAngle } from '../core/util.js';
+import { spellFx } from '../gfx/spellFx.js';
 
 export class SpiritPup extends Actor {
   constructor(G, pos, p) {
@@ -100,5 +101,174 @@ export class Decoy {
       this.G.combat.inRadius(this.pos.x, this.pos.z, this.p.cloudRadius, 'ally', e => { this.G.combat.hitMonster(e, { dmgPct: this.p.dmgPct, element: 'stink', source: 'decoy', from: this.pos, noCrit: true }); e.applyStatus?.('poison', 2, this.G.derived.dmgMax * 0.15); });
     }
     if (this.t > this.p.duration) this.expire();
+  }
+}
+
+// ================================================================== Moka's Duck Hunt summons (models + VFX in gfx/spellFx.js)
+const _dv = new THREE.Vector3();
+const isFoe = e => e.alive && e.team === 'enemy' && !e.breakable;
+// Decoy Duck: a wind-up rubber duck that waddles to the target point and quacks; every monster within its lure radius
+// must go for it (monster.pickTarget reads tauntFor). Pops in confetti (and damage) when it breaks or runs down.
+export class DuckDecoy {
+  constructor(G, from, to, p) {
+    this.G = G; this.p = p; this.team = 'ally'; this.alive = true; this.taunt = true; this.radius = 0.32; this.height = 0.55; this.res = {};
+    this.pos = from.clone(); this.to = to.clone(); this.lifeMax = p.life; this.life = p.life;
+    this.fx = spellFx(G); this.model = this.fx.duckModel();
+    this.t = 0; this.acc = p.quack * 0.6; this.sq = 0; this.yaw = Math.atan2(to.x - from.x, to.z - from.z); this.moving = true;
+    G.combat.add(this);
+    G.vfx.poof(this.pos.clone().setY(this.pos.y + 0.3), { color: '#fff4c0', n: 8, size: 0.5 });
+    this.sync(0);
+  }
+  tauntFor(m) { return Math.hypot(m.pos.x - this.pos.x, m.pos.z - this.pos.z) < this.p.lureRadius ? 99 : 0; }
+  takeDamage(dmg) { if (!this.alive) return; this.life -= dmg; this.sq = 1; Events.emit('sfx', 'squeak', { vol: 0.45 }); if (this.life <= 0) this.pop(); }
+  heal(n) { this.life = Math.min(this.lifeMax, this.life + n); }
+  update(dt) {
+    if (!this.alive) return;
+    const G = this.G, p = this.p;
+    this.t += dt;
+    const dx = this.to.x - this.pos.x, dz = this.to.z - this.pos.z, d = Math.hypot(dx, dz);
+    this.moving = d > 0.12;
+    if (this.moving) {
+      const step = Math.min(d, 3.4 * dt); _dv.copy(this.pos);
+      this.pos.x += dx / d * step; this.pos.z += dz / d * step;
+      G.world.collision?.resolve(this.pos, this.radius, _dv);
+      if (Math.hypot(this.pos.x - _dv.x, this.pos.z - _dv.z) < step * 0.3) this.to.copy(this.pos); // bumped into a wall: sit here
+      this.yaw = dampAngle(this.yaw, Math.atan2(dx, dz), 10, dt);
+      if (Math.random() < dt * 6) G.vfx.dust(this.pos, { n: 1, size: 0.15 });
+    } else if (G.player) { // arrived: turn round to show off (three-quarter view, so the wind-up key shows)
+      this.yaw = dampAngle(this.yaw, Math.atan2(G.player.pos.x - this.pos.x, G.player.pos.z - this.pos.z) + 0.7, 5, dt);
+    }
+    this.pos.y = G.world.heightAt(this.pos.x, this.pos.z);
+    this.acc += dt;
+    if (this.acc >= p.quack) {
+      this.acc = 0; this.sq = 1;
+      this.fx.quack(this.pos, { r: p.lureRadius });
+      Events.emit('sfx', 'quack', { pos: this.pos, vol: 0.7, pitch: 1.05 });
+      G.combat.inRadius(this.pos.x, this.pos.z, p.lureRadius, 'ally', e => { if (isFoe(e)) e.applyStatus?.('slow', 1.1, p.slow); });
+    }
+    this.sq = Math.max(0, this.sq - dt * 4);
+    if (this.t > p.duration) return this.pop();
+    this.sync(dt);
+  }
+  sync(dt) {
+    const m = this.model, w = this.moving ? Math.sin(this.t * 17) : 0, s = this.sq * Math.sin(this.sq * 9), S = 1.35;
+    m.root.position.set(this.pos.x, this.pos.y + (this.moving ? Math.abs(w) * 0.06 : 0), this.pos.z);
+    m.root.rotation.set(this.moving ? -0.08 : 0, this.yaw + (this.moving ? w * 0.14 : Math.sin(this.t * 2.2) * 0.2), this.moving ? w * 0.2 : 0);
+    m.root.scale.set(S * (1 + s * 0.22), S * (1 - s * 0.28), S * (1 + s * 0.22));
+    m.key.rotation.z += dt * (this.moving ? 12 : 3);
+    m.halo.material.opacity = 0.22 + 0.1 * Math.sin(this.t * 5);
+  }
+  pop() {
+    if (!this.alive) return; this.alive = false;
+    const G = this.G, p = this.p, at = this.pos.clone();
+    G.combat.remove(this);
+    this.fx.confetti(at, 40); this.fx.splash(at, { r: 1.1 }); this.fx.text('POP!', at.clone().setY(at.y + 1), { a: '#fff4a0', b: '#ff8fb0', size: 1.2, life: 0.7 });
+    Events.emit('sfx', 'confetti_pop', { pos: at });
+    G.combat.inRadius(at.x, at.z, p.popRadius, 'ally', e => G.combat.hitMonster(e, { dmgPct: p.dmgPct, from: at, knock: 1, source: 'decoy' }));
+    this.fx.giveDuck(this.model);
+  }
+  expire(silent) {
+    if (!this.alive) return; this.alive = false;
+    this.G.combat.remove(this);
+    if (!silent) this.fx.confetti(this.pos, 20);
+    this.fx.giveDuck(this.model);
+  }
+}
+
+// Spirit Retriever: a spectral golden retriever (one-draw-call mesh posed by SpellFX) that trots after Moka, bites the
+// nearest foe and now and then lets out a dazing bark. Stays until knocked out (or the floor / hero changes).
+export class SpiritRetriever {
+  constructor(G, pos, p) {
+    this.G = G; this.team = 'ally'; this.alive = true; this.radius = 0.3; this.height = 0.8; this.res = { frost: 30, zap: 30 };
+    this.fx = spellFx(G); this.model = this.fx.retrieverModel();
+    this.pos = pos.clone(); this.yaw = G.player?.facing || 0; this.phase = 0; this.move = 0; this.t = 0;
+    this.biteT = -1; this.barkT = -1; this.biteCd = 0.3; this.barkCd = 1.5; this.alpha = 0; this.hurt = 0; this.target = null; this.retarget = 0;
+    this.refresh(p, true);
+    G.combat.add(this);
+    this.lightPos = this.pos.clone().setY(this.pos.y + 0.8);
+    this.glowSrc = G.world.lightPool?.addSource({ pos: this.lightPos, color: new THREE.Color('#ffd070'), intensity: 2.4, radius: 3.6 });
+    G.vfx.pillar(this.pos, { color: '#ffe8a0', r: 0.6, h: 6, life: 0.7, opacity: 0.7 });
+    this.fx.starBurst(this.pos.clone().setY(this.pos.y + 0.6), { r: 1.2, n: 14 });
+    this.pose();
+  }
+  refresh(p, first) {
+    this.p = p; this.lifeMax = p.life; this.life = p.life;
+    if (!first) { this.fx.starBurst(this.pos.clone().setY(this.pos.y + 0.6), { r: 0.9, n: 10 }); this.G.vfx.heal(this.pos.clone()); }
+  }
+  takeDamage(dmg) { if (!this.alive) return; this.life -= dmg; this.hurt = 1; if (this.life <= 0) this.expire(); }
+  heal(n) { this.life = Math.min(this.lifeMax, this.life + n); }
+  update(dt) {
+    if (!this.alive) return;
+    const G = this.G, P = G.player, p = this.p;
+    if (!P) return;
+    this.t += dt; this.biteCd -= dt; this.barkCd -= dt; this.hurt = Math.max(0, this.hurt - dt * 4);
+    this.alpha = Math.min(1, this.alpha + dt * 3);
+    // pick a foe near Moka (re-evaluated a few times a second)
+    this.retarget -= dt;
+    if (this.retarget <= 0 || !this.target?.alive) {
+      this.retarget = 0.3; this.target = null; let bd = 1e9;
+      for (const e of G.combat.entities) {
+        if (!isFoe(e)) continue;
+        const dm = dist(e.pos.x, e.pos.z, P.pos.x, P.pos.z); if (dm > 9) continue;
+        const d = dist(e.pos.x, e.pos.z, this.pos.x, this.pos.z) + dm * 0.4;
+        if (d < bd) { bd = d; this.target = e; }
+      }
+    }
+    let gx, gz, stop;
+    const T = this.target;
+    if (T) { gx = T.pos.x; gz = T.pos.z; stop = (T.radius || 0.3) + 0.45; }
+    else { const b = P.facing + Math.PI * 0.8; gx = P.pos.x + Math.sin(b) * 1.3; gz = P.pos.z + Math.cos(b) * 1.3; stop = 0.35; }
+    if (dist(P.pos.x, P.pos.z, this.pos.x, this.pos.z) > 14) { // left behind: blink back to Moka in a puff of stars
+      this.fx.starBurst(this.pos.clone().setY(this.pos.y + 0.5), { r: 0.8, n: 8 });
+      this.pos.set(P.pos.x - Math.sin(P.facing), 0, P.pos.z - Math.cos(P.facing)); this.pos.y = G.world.heightAt(this.pos.x, this.pos.z);
+      this.fx.starBurst(this.pos.clone().setY(this.pos.y + 0.5), { r: 0.8, n: 8 });
+    }
+    const dx = gx - this.pos.x, dz = gz - this.pos.z, d = Math.hypot(dx, dz);
+    let want = 0;
+    if (d > stop && this.biteT < 0) {
+      const sp = p.speed * (T ? 1 : clamp((d - stop) / 1.5, 0.3, 1)), step = Math.min(d - stop, sp * dt);
+      _dv.copy(this.pos); this.pos.x += dx / d * step; this.pos.z += dz / d * step;
+      G.world.collision?.resolve(this.pos, this.radius, _dv);
+      want = clamp(step / Math.max(1e-4, p.speed * dt));
+      this.yaw = dampAngle(this.yaw, Math.atan2(dx, dz), 12, dt);
+    } else if (T) this.yaw = dampAngle(this.yaw, Math.atan2(dx, dz), 14, dt);
+    this.pos.y = G.world.heightAt(this.pos.x, this.pos.z);
+    this.move += (want - this.move) * Math.min(1, dt * 10);
+    this.phase += dt * (6 + 9 * this.move) * this.move;
+    // bite
+    if (T && d <= stop + 0.15 && this.biteCd <= 0 && this.biteT < 0) { this.biteT = 0; this.biteCd = p.biteCd; this.bitten = false; }
+    if (this.biteT >= 0) {
+      this.biteT += dt;
+      if (!this.bitten && this.biteT > 0.12 && T?.alive) {
+        this.bitten = true;
+        G.combat.hitMonster(T, { dmgPct: p.dmgPct, from: this.pos, knock: 0.3, source: 'retriever' });
+        this.fx.sparkBurst(T.pos.clone().setY(T.pos.y + (T.height || 1) * 0.5), { n: 6, speed: 3, size: 0.26 });
+        Events.emit('sfx', 'bark_small', { pitch: 1.2, vol: 0.5 });
+      }
+      if (this.biteT > 0.32) this.biteT = -1;
+    }
+    // dazing bark when foes crowd in
+    if (this.barkCd <= 0 && T && d < p.barkRadius) {
+      this.barkCd = p.barkEvery; this.barkT = 0;
+      Events.emit('sfx', 'retriever_bark', { pos: this.pos });
+      G.vfx.ring(this.pos, { color: '#ffe8a0', r0: 0.3, r1: p.barkRadius, life: 0.4, y: 0.5 });
+      G.combat.inRadius(this.pos.x, this.pos.z, p.barkRadius, 'ally', e => { if (!isFoe(e)) return; G.combat.hitMonster(e, { dmgPct: p.dmgPct * 0.35, from: this.pos, stun: p.barkStun, knock: 0.8, source: 'retriever' }); if (!e.def?.boss) this.fx.dizzy(e, p.barkStun); });
+    }
+    if (this.barkT >= 0) { this.barkT += dt; if (this.barkT > 0.45) this.barkT = -1; }
+    if (Math.random() < dt * (4 + 8 * this.move)) this.fx.pa.spawn({ frame: 2, x: this.pos.x + rand(-0.25, 0.25), y: this.pos.y + rand(0.2, 0.8), z: this.pos.z + rand(-0.3, 0.3), vy: 0.5, life: 0.6, size: rand(0.12, 0.22), size1: 0.02, color: '#ffe8a0', alpha: 0.9, alpha1: 0 });
+    this.lightPos.set(this.pos.x, this.pos.y + 0.8, this.pos.z);
+    this.pose();
+  }
+  pose() {
+    const b = this.biteT >= 0 ? Math.sin(clamp(this.biteT / 0.32) * Math.PI) : 0, k = this.barkT >= 0 ? Math.sin(clamp(this.barkT / 0.45) * Math.PI) : 0;
+    this.fx.poseRetriever(this.model, { x: this.pos.x, y: this.pos.y, z: this.pos.z, yaw: this.yaw, t: this.t, move: this.move, phase: this.phase, bite: b, bark: k, alpha: this.alpha * (1 - this.hurt * 0.5 * (0.5 + 0.5 * Math.sin(this.t * 40))), scale: 1.2 });
+  }
+  expire(silent) {
+    if (!this.alive) return; this.alive = false;
+    const G = this.G;
+    G.combat.remove(this);
+    if (this.glowSrc) G.world.lightPool?.removeSource(this.glowSrc);
+    if (!silent) { this.fx.starBurst(this.pos.clone().setY(this.pos.y + 0.6), { r: 1, n: 12 }); G.vfx.poof(this.pos.clone().setY(this.pos.y + 0.4), { color: '#fff0c0', n: 10 }); Events.emit('sfx', 'whine', { vol: 0.5 }); }
+    this.fx.giveRetriever(this.model);
   }
 }

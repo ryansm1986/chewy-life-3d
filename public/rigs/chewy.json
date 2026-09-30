@@ -1,0 +1,85 @@
+{
+ "name": "Chewy",
+ "spec": "yfmkvc",
+ "signature": "kwbovt",
+ "tex": "chewy.png",
+ "bones": [
+  1,
+  2,
+  6,
+  8,
+  10,
+  11,
+  14,
+  17,
+  20,
+  24,
+  28,
+  35,
+  40,
+  43,
+  46
+ ],
+ "mouth": 10,
+ "vertexCount": 13888,
+ "shellIndexCount": 44952,
+ "layout": [
+  {
+   "name": "position",
+   "type": "f4",
+   "itemSize": 3,
+   "normalized": false,
+   "offset": 0,
+   "count": 41664
+  },
+  {
+   "name": "normal",
+   "type": "i2",
+   "itemSize": 3,
+   "normalized": true,
+   "offset": 166656,
+   "count": 41664
+  },
+  {
+   "name": "skinUv",
+   "type": "f4",
+   "itemSize": 2,
+   "normalized": false,
+   "offset": 249984,
+   "count": 27776
+  },
+  {
+   "name": "color",
+   "type": "f4",
+   "itemSize": 3,
+   "normalized": false,
+   "offset": 361088,
+   "count": 41664
+  },
+  {
+   "name": "skinIndex",
+   "type": "u1",
+   "itemSize": 4,
+   "normalized": false,
+   "offset": 527744,
+   "count": 55552
+  },
+  {
+   "name": "skinWeight",
+   "type": "u1",
+   "itemSize": 4,
+   "normalized": true,
+   "offset": 583296,
+   "count": 55552
+  },
+  {
+   "name": "index",
+   "type": "u2",
+   "itemSize": 1,
+   "normalized": false,
+   "offset": 638848,
+   "count": 66387
+  }
+ ],
+ "bin": "chewy.bin"
+}

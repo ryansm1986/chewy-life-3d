@@ -65,6 +65,7 @@ export class Actor {
   }
   dispose() {
     this.world.scene.remove(this.rig.root); this.world.scene.remove(this.shadow);
+    this.shadow.geometry.dispose(); this.shadow.material.dispose(); // (its own plane + material; the soft texture is shared)
     this.rig.dispose?.();
   }
 }

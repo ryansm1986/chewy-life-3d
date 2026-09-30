@@ -1,9 +1,11 @@
 // Character lineup test: /?test=chars[&act=swing][&walk=1][&only=chewy][&dist=8]
 import * as THREE from 'three';
 import { makeStage } from './_stage.js';
-import { buildHumanoid, buildBoston, CAST, boneSwordGeo, tennisBall, contactShadow } from '../actors/charKit.js';
+import { buildHumanoid, buildBoston, CAST, REFINED_CAST, boneSwordGeo, tennisBall, contactShadow } from '../actors/charKit.js';
 import { Animator } from '../actors/animator.js';
 import { makeToon } from '../gfx/materials.js';
+import { loadRefinedRigs } from '../actors/refinedRigs.js';
+import { loadDisneyChewy, disneyReady, buildDisneyChewy } from '../actors/disneyChewy.js';
 
 export const VILLAGER_SPECS = [
   { name: 'Mochi', species: 'cat', fur: '#fff4ea', fur2: '#ffffff', fur3: '#f4a860', earColor: '#f4a860', outfit: { top: 'kimono', topColor: '#ff9ec0', bottomColor: '#6a4a6a', sash: '#ffd24a' } },
@@ -16,7 +18,8 @@ export const VILLAGER_SPECS = [
   { name: 'Ahiru', species: 'duck', fur: '#fff8ec', fur2: '#ffffff', outfit: { top: 'shirt', topColor: '#6ab0ff', bottomColor: '#ffffff', bottom: 'shorts', hat: 'straw' } },
 ];
 
-export default function () {
+export default async function () {
+  await Promise.all([loadRefinedRigs(REFINED_CAST), loadDisneyChewy()]); // &procrigs: procedural skins, &chewy=classic: toon Chewy
   const P = new URLSearchParams(location.search);
   const S = makeStage({ ground: 30, hour: +(P.get('hour') ?? 10), dist: +(P.get('dist') ?? 11), center: [0, 0] });
   const only = P.get('only');
@@ -30,15 +33,15 @@ export default function () {
     return anim;
   };
   const face = Math.PI / 4; // towards camera
-  const specs = [['chewy', CAST.chewy], ['rosie', CAST.rosie], ...VILLAGER_SPECS.map(s => [s.name.toLowerCase(), s])];
+  const specs = [['chewy', CAST.chewy], ['moka', CAST.moka], ['rosie', CAST.rosie], ...VILLAGER_SPECS.map(s => [s.name.toLowerCase(), s])];
   let i = 0;
   const lineup = only ? specs.filter(([k]) => k === only) : specs;
   for (const [k, spec] of lineup) {
-    const rig = buildHumanoid(spec);
+    const rig = k === 'chewy' && disneyReady() ? buildDisneyChewy() : buildHumanoid(spec);
     const col = i % 5, row = Math.floor(i / 5);
     const x = only ? 0 : (col - 2) * 1.3 + row * 0.6, z = only ? 0 : row * 1.5 - 0.6;
     if (k === 'chewy') {
-      const sw = new THREE.Mesh(boneSwordGeo(), rig.mat); sw.castShadow = true;
+      const sw = new THREE.Mesh(boneSwordGeo(), rig.propMat || rig.mat); sw.castShadow = true;
       sw.rotation.set(Math.PI * 0.62, 0, 0); sw.position.set(0, -0.02, 0.02);
       rig.parts.handR.add(sw); rig.weapon = sw;
     }
@@ -61,6 +64,6 @@ export default function () {
       a.sh.position.set(a.rig.root.position.x, 0.02, a.rig.root.position.z);
     }
   });
-  window.actors = actors;
+  window.actors = actors; window.stage = S;
   S.ready();
 }

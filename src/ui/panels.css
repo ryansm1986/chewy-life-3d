@@ -320,7 +320,7 @@
 @keyframes pawHop { 0%, 100% { transform: translateY(0) rotate(-10deg); } 40% { transform: translateY(-10px) rotate(8deg) scale(1.1); } }
 .mn-zz { font: 600 14px var(--font); color: var(--ink2); margin-top: 6px; }
 .mn-zz span { display: inline-block; font-weight: 700; color: var(--sky); animation: zz 2s ease-in-out infinite; margin-left: 1px; }
-.mn-zz span:nth-child(2) { animation-delay: .3s; } .mn-zz span:nth-child(3) { animation-delay: .6s; }
+.mn-zz span:nth-of-type(2) { animation-delay: .3s; } .mn-zz span:nth-of-type(3) { animation-delay: .6s; } .mn-zz .mn-who { font-weight: inherit; }
 @keyframes zz { 0%, 100% { transform: translateY(0); opacity: .4; } 50% { transform: translateY(-6px) rotate(-10deg); opacity: 1; } }
 .mn-btns { display: flex; flex-direction: column; gap: 11px; padding: 0 20px 6px; }
 .mn-btns .btn { justify-content: center; width: 100%; }
@@ -508,3 +508,52 @@
 .bi-row.hasbar .bi-t { flex: none; width: 104px; }
 .bi-rows .bi-sh { margin-top: 5px; }
 .bi-note { margin-top: 4px; font: 500 11.5px/1.35 var(--font); color: var(--ink2); font-style: italic; text-align: center; }
+
+/* ---------------- Travel Map (ui/travel.js) */
+.p-travel { width: 940px; }
+.tv-wrap { display: flex; gap: 16px; align-items: stretch; }
+.tv-map { position: relative; width: 560px; height: 440px; flex: none; border: 4px solid var(--ink); border-radius: 18px; overflow: hidden; box-shadow: inset 0 0 0 4px #fff6e8, 0 5px 0 rgba(74, 44, 42, .3); background: #cfeff4; }
+.tv-cv { width: 100%; height: 100%; display: block; }
+.tv-compass { position: absolute; right: 10px; top: 8px; display: grid; place-items: center; width: 42px; height: 42px; color: var(--ink); font: 700 13px var(--font); }
+.tv-compass .gl { position: absolute; width: 42px; height: 42px; opacity: .55; }
+.tv-compass b { position: relative; }
+.tv-pins { position: absolute; inset: 0; }
+.tv-pin { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 2px; border: 0; background: none; cursor: pointer; pointer-events: auto; padding: 0; transition: transform .25s var(--spring); }
+.tv-pin:hover { transform: translate(-50%, -50%) scale(1.08); }
+.tv-pin-ic { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; border: 4px solid var(--ink); background: radial-gradient(circle at 40% 30%, #fff, color-mix(in srgb, var(--pc) 45%, #fff)); box-shadow: 0 4px 0 rgba(74, 44, 42, .35); }
+.tv-pin-ic .gl { width: 32px; height: 32px; }
+.tv-pin-n { font: 700 13px/1 var(--font); color: #fff; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; white-space: nowrap; display: flex; gap: 4px; align-items: baseline; }
+.tv-pin-n b { font-size: 11px; color: #ffe8a0; }
+.tv-pin.locked .tv-pin-ic { filter: saturate(.2) brightness(.92); background: radial-gradient(circle at 40% 30%, #fff, #d8d0c8); }
+.tv-pin.locked .tv-pin-n { opacity: .75; }
+.tv-pin.sel .tv-pin-n { margin-top: 10px; }
+.tv-card { position: relative; overflow: hidden; }
+.tv-wm { position: absolute; right: -28px; bottom: -34px; width: 190px; height: 190px; opacity: .13; transform: rotate(-12deg); pointer-events: none; }
+.tv-wm .gl { width: 100%; height: 100%; }
+.tv-card > *:not(.tv-wm) { position: relative; }
+.tv-pin.sel .tv-pin-ic { box-shadow: 0 0 0 5px #fff, 0 0 0 9px var(--pc), 0 6px 0 rgba(74, 44, 42, .35); animation: tvPulse 1.6s ease-in-out infinite; }
+@keyframes tvPulse { 50% { transform: scale(1.07); } }
+.tv-stamp { position: absolute; right: -16px; top: -8px; font: 700 12px/1 var(--font); color: #fff; background: #d8403a; border: 2px solid #8a1f1a; border-radius: 4px; padding: 3px 3px; transform: rotate(14deg); box-shadow: 0 2px 0 rgba(0,0,0,.2); }
+.tv-here { position: absolute; left: -14px; top: -10px; width: 26px; height: 26px; animation: tvHop 1.2s ease-in-out infinite; }
+.tv-here .gl { width: 26px; height: 26px; }
+@keyframes tvHop { 50% { transform: translateY(-5px); } }
+.tv-side { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.tv-card { flex: 1; border: 4px solid var(--ink); border-radius: 18px; padding: 14px 16px; background: linear-gradient(170deg, #fffaf2, color-mix(in srgb, var(--pc, #ff8fb0) 16%, #fff8ee)); box-shadow: 0 5px 0 rgba(74, 44, 42, .3); display: flex; flex-direction: column; gap: 10px; }
+.tv-hd { display: flex; align-items: center; gap: 10px; }
+.tv-hd .tv-ic { display: grid; place-items: center; width: 50px; height: 50px; border-radius: 14px; border: 3px solid var(--ink); background: color-mix(in srgb, var(--pc, #ff8fb0) 40%, #fff); flex: none; }
+.tv-hd .tv-ic .gl { width: 34px; height: 34px; }
+.tv-hd b { display: block; font: 700 22px/1.05 var(--font); color: var(--ink); }
+.tv-hd .jp { font: 600 13px var(--font); color: var(--ink2); }
+.tv-sub { margin: 0; font: 500 14px/1.35 var(--font); color: var(--ink2); }
+.tv-rows { display: flex; flex-direction: column; gap: 6px; }
+.tv-rows > div { display: flex; justify-content: space-between; gap: 10px; font: 500 14px var(--font); border-bottom: 2px dotted rgba(74, 44, 42, .2); padding-bottom: 4px; }
+.tv-rows span { color: var(--ink2); white-space: nowrap; }
+.tv-rows b { font-weight: 700; text-align: right; }
+.tv-rows .fit.good b { color: #3a9a5a; } .tv-rows .fit.hard b { color: #d8503a; } .tv-rows .fit.easy b { color: #5a8ad8; }
+.tv-beat { font-style: normal; color: #d8403a; font-size: 12px; }
+.tv-st { display: flex; align-items: center; gap: 8px; font: 600 14px var(--font); padding: 10px 12px; border-radius: 12px; border: 3px dashed rgba(74, 44, 42, .35); }
+.tv-st .gl { width: 22px; height: 22px; }
+.tv-st.locked { color: #8a6a5a; background: rgba(255, 255, 255, .5); }
+.tv-st.here { color: #3a8a6a; background: rgba(200, 255, 230, .5); }
+.tv-go { align-self: stretch; justify-content: center; font-size: 19px; padding: 12px 18px; background: linear-gradient(#fff, color-mix(in srgb, var(--pc, #ff8fb0) 35%, #fff)); }
+.tv-foot { font: 500 12px var(--font); color: var(--ink2); text-align: center; }

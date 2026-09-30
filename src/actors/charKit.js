@@ -8,14 +8,23 @@ import { tennisBallTexture } from '../gfx/textures.js';
 import { mulberry32, TAU, clamp } from '../core/util.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { applyRefined, patchSkinMaterial } from './refinedRigs.js';
+import { chewyStyle } from './disneyChewy.js';
+import { furMaterial, buildDisneyHead, headKind, speciesColors, disneyHand, disneyFoot, handKindFor, footKindFor, tag, paintFn, mergeIndexed, tubeGeo, disneyWizardHat } from './disneyKit.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const C = h => new THREE.Color(h);
 const INK = '#3a2230';
+// 'disney' (default): sculpted Disney-style cast (disneyKit.js), no ink outline; 'classic': the Pokopia-style chibi kit
+export const kitStyle = () => { const k = new URLSearchParams(location.search).get('kit'); return k || (chewyStyle() === 'classic' ? 'classic' : 'disney'); };
+// tessellation multiplier: 1 in game; the Blender refine export (tools/blender) builds at 3 so painted colour edges are crisp
+let DETAIL = 1;
+const headDetail = () => DETAIL * (DETAIL > 1 ? 2 : 1); // faces are where the atlas has the most texels
+export function setKitDetail(k) { DETAIL = k; }
 
 // ------------------------------------------------------------------ primitive builders (vertex coloured)
 function ell(rx, ry, rz, color, p = [0, 0, 0], r = [0, 0, 0], seg = 20, fn = null) {
-  const g = new THREE.SphereGeometry(1, seg, Math.max(8, Math.round(seg * 0.7)));
+  const g = new THREE.SphereGeometry(1, seg * DETAIL, Math.max(8, Math.round(seg * 0.7)) * DETAIL);
   g.scale(rx, ry, rz);
   if (r[0] || r[1] || r[2]) g.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(...r)));
   g.translate(...p);
@@ -23,21 +32,21 @@ function ell(rx, ry, rz, color, p = [0, 0, 0], r = [0, 0, 0], seg = 20, fn = nul
   return paint(g, fn ? (pp, n, o) => fn(pp, n, o, c) : (pp, n, o) => o.copy(c));
 }
 function cap(r, len, color, p = [0, 0, 0], rot = [0, 0, 0], fn = null) {
-  const g = new THREE.CapsuleGeometry(r, len, 6, 14);
+  const g = new THREE.CapsuleGeometry(r, len, 6 * DETAIL, 14 * DETAIL, DETAIL > 1 ? 8 * DETAIL : 1);
   if (rot[0] || rot[1] || rot[2]) g.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(...rot)));
   g.translate(...p);
   const c = C(color);
   return paint(g, fn ? (pp, n, o) => fn(pp, n, o, c) : (pp, n, o) => o.copy(c));
 }
 function cone(r, h, color, p, rot = [0, 0, 0], seg = 12, sx = 1, sz = 1) {
-  const g = new THREE.ConeGeometry(r, h, seg, 2);
+  const g = new THREE.ConeGeometry(r, h, seg * DETAIL, 2 * DETAIL);
   g.scale(sx, 1, sz);
   g.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(...rot)));
   g.translate(...p);
   return paint(g, (pp, n, o) => o.copy(C(color)));
 }
 function torus(R, r, color, p, rot = [Math.PI / 2, 0, 0], arc = TAU) {
-  const g = new THREE.TorusGeometry(R, r, 8, 24, arc);
+  const g = new THREE.TorusGeometry(R, r, 8 * DETAIL, 24 * DETAIL, arc);
   g.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(...rot)));
   g.translate(...p);
   return paint(g, (pp, n, o) => o.copy(C(color)));
@@ -95,15 +104,21 @@ export function tennisBall(r = 0.1) {
 
 // ------------------------------------------------------------------ character assembly
 class Rig {
-  constructor(spec) {
+  constructor(spec, disney = kitStyle() === 'disney') {
     this.spec = spec;
     this.root = new THREE.Group(); this.root.name = spec.name || 'char';
-    this.mat = makeToon({ vertexColors: true, objectBrush: true, brush: 0.025, rim: 0.6, term: [-0.02, 0.28], shadowSat: 0.4 }); // clean colour blocks
+    this.disney = disney;
+    this.mat = disney ? furMaterial() : makeToon({ vertexColors: true, objectBrush: true, brush: 0.025, rim: 0.6, term: [-0.02, 0.28], shadowSat: 0.4 }); // clean colour blocks
+    // props held or worn (tools, nightcaps, swords) keep plain vertex colours: the fur shader reads uv as fur amount
+    this.propMat = disney ? makeToon({ vertexColors: true, objectBrush: true, brush: 0.025, rim: 0.6, term: [-0.02, 0.28], shadowSat: 0.4 }) : this.mat;
+    this.defaultFur = 0;
+    this.skinData = new Map(); // mesh -> { bones: [a, b], w: Float32Array } two-bone blend per vertex (sculpted jaws)
     this.outMat = makeOutline(spec.outline || INK, spec.outlineW ?? 0.012);
     this.parts = {};
     this.meshes = [];
   }
-  add(parent, geo, name, { outline = true, shadow = true } = {}) {
+  add(parent, geo, name, { outline = true, shadow = true, fur } = {}) {
+    if (this.disney) { outline = false; if (fur !== undefined || !geo.userData.kit) tag(geo, fur ?? this.defaultFur); }
     const m = new THREE.Mesh(geo, this.mat);
     m.castShadow = shadow; m.receiveShadow = true; m.name = name;
     parent.add(m); this.meshes.push(m);
@@ -137,19 +152,24 @@ class Rig {
       let g = inRoot.get(m);
       if (!g) {
         g = m.geometry.clone().applyMatrix4(m4.multiplyMatrices(rootInv, m.matrixWorld));
-        if (g.index || !g.attributes.uv || !g.attributes.color || Object.keys(g.attributes).length !== 4) g = merge([g]);
+        if (this.disney) { /* kept indexed: mergeIndexed below */ }
+        else if (g.index || !g.attributes.uv || !g.attributes.color || Object.keys(g.attributes).length !== 4) g = merge([g]);
         inRoot.set(m, g);
       }
       return g;
     };
     const bakeList = list => {
       const geos = list.map(partGeo);
-      const out = mergeGeometries(geos, false);
+      const out = this.disney ? mergeIndexed(geos) : mergeGeometries(geos, false);
       const n = out.attributes.position.count, si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
       let o = 0;
       list.forEach((m, j) => {
         const bi = boneOf(m === mouth ? this.parts.mouth : m.parent), c = geos[j].attributes.position.count;
-        for (let i = o; i < o + c; i++) { si[i * 4] = bi; sw[i * 4] = 1; }
+        const sd = this.skinData.get(m);
+        if (sd) { // blended: bone a gets 1 - w, bone b gets w
+          const b0 = boneOf(sd.bones[0]), b1 = boneOf(sd.bones[1]);
+          for (let i = 0; i < c; i++) { const k = (o + i) * 4, w = sd.w[i]; si[k] = b0; sw[k] = 1 - w; si[k + 1] = b1; sw[k + 1] = w; }
+        } else for (let i = o; i < o + c; i++) { si[i * 4] = bi; sw[i * 4] = 1; }
         o += c;
       });
       out.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4));
@@ -157,7 +177,8 @@ class Rig {
       return out;
     };
     const bodyGeo = bakeList(toon);
-    const olGeo = bakeList(toon.filter(m => m.userData.outline));
+    const outlined = toon.filter(m => m.userData.outline);
+    const olGeo = outlined.length ? bakeList(outlined) : null;
     // remove the original part meshes (and their outline shells)
     for (const m of toon) { m.userData.outline?.parent?.remove(m.userData.outline); m.parent?.remove(m); }
     // bones must be real Bone-like objects for the skeleton: groups work since only matrixWorld is used
@@ -172,7 +193,7 @@ class Rig {
       return sm;
     };
     const body = mk(bodyGeo, this.mat, 'body_skin'); body.castShadow = true; body.receiveShadow = true;
-    const ol = mk(olGeo, this.outMat, 'outline_skin'); ol.castShadow = false;
+    const ol = olGeo ? mk(olGeo, this.outMat, 'outline_skin') : null; if (ol) ol.castShadow = false;
     this.meshes = [body]; this.skeleton = skeleton; this.skin = body; this.outline = ol;
     return this;
   }
@@ -180,26 +201,27 @@ class Rig {
   // player's weapons use shared cached geometry and are left alone.
   dispose() {
     if (!this.sharedGeo) { this.skin?.geometry.dispose(); this.outline?.geometry.dispose(); }
-    this.skeleton?.dispose(); this.mat.dispose(); this.outMat.dispose();
+    this.skeleton?.dispose(); this.mat.dispose(); this.outMat.dispose(); if (this.propMat !== this.mat) this.propMat.dispose();
   }
 }
 
 // A new rig that shares a baked rig's geometry (cheap: no procedural build, no GPU upload) but has its own
 // bones, skeleton and materials, so it animates and flashes independently. Used for summons such as spirit pups.
 export function cloneRig(src) {
-  const R = new Rig(src.spec);
+  const R = new Rig(src.spec, !!src.disney);
   const root = cloneSkinned(src.root);
   const a = [], b = [];
   src.root.traverse(o => a.push(o)); root.traverse(o => b.push(o));
   const map = new Map(a.map((o, i) => [o, b[i]]));
-  for (const k of ['height', 'quadruped', 'offsetY']) if (k in src) R[k] = src[k];
+  for (const k of ['height', 'quadruped', 'offsetY', 'earGain']) if (k in src) R[k] = src[k];
   R.root = root;
   for (const [k, o] of Object.entries(src.parts)) R.parts[k] = Array.isArray(o) ? o.map(x => map.get(x)) : map.get(o);
-  R.skin = map.get(src.skin); R.outline = map.get(src.outline); R.meshes = [R.skin]; R.skeleton = R.skin.skeleton;
-  R.outline.bind(R.skeleton, R.outline.bindMatrix); // one skeleton (one bone texture) for body + outline
+  R.skin = map.get(src.skin); R.outline = src.outline ? map.get(src.outline) : null; R.meshes = [R.skin]; R.skeleton = R.skin.skeleton;
+  R.outline?.bind(R.skeleton, R.outline.bindMatrix); // one skeleton (one bone texture) for body + outline
   R.mat.emissive.copy(src.mat.emissive); R.mat.emissiveIntensity = src.mat.emissiveIntensity;
   R.mat.transparent = src.mat.transparent; R.mat.opacity = src.mat.opacity;
-  R.skin.material = R.mat; R.outline.material = R.outMat;
+  if (src.skinTex) { patchSkinMaterial(R.mat, src.skinTex); R.skinTex = src.skinTex; }
+  R.skin.material = R.mat; if (R.outline) R.outline.material = R.outMat;
   R.sharedGeo = true;
   return R;
 }
@@ -212,14 +234,17 @@ export function cloneRig(src) {
 // Rigs built ahead of time (prebuildHumanoid) are handed out by buildHumanoid for the same spec object, so a villager
 // can be constructed mid-play without the ~20 ms build.
 const PREBUILT = new WeakMap();
-export function prebuildHumanoid(spec) { if (!PREBUILT.has(spec)) PREBUILT.set(spec, makeHumanoid(spec)); return spec; }
+export function prebuildHumanoid(spec) { if (!PREBUILT.has(spec)) PREBUILT.set(spec, makeAny(spec)); return spec; }
+export const rawHumanoid = spec => makeHumanoid(spec, true, false); // unbaked part meshes (Blender refine export, classic)
+export const rawDisneyHumanoid = spec => makeDisneyHumanoid(spec, true); // unbaked (tests)
 export function buildHumanoid(spec) {
   const r = PREBUILT.get(spec);
   if (r) { PREBUILT.delete(spec); return r; }
-  return makeHumanoid(spec);
+  return makeAny(spec);
 }
-function makeHumanoid(spec) {
-  const R = new Rig(spec);
+const makeAny = spec => (kitStyle() === 'disney' ? makeDisneyHumanoid(spec) : makeHumanoid(spec));
+function makeHumanoid(spec, raw = false, disney = false) {
+  const R = new Rig(spec, disney);
   const sp = SPECIES[spec.species] || SPECIES.dog;
   const fur = spec.fur || '#c98f5e', fur2 = spec.fur2 || '#fff2e0', fur3 = spec.fur3 || (sp.patches ? '#2a2630' : fur);
   const limbC = sp.patches ? fur3 : null; // pandas: black arms and legs
@@ -245,8 +270,8 @@ function makeHumanoid(spec) {
   // --- torso: a bean, narrow at the shoulders and fuller at the belly, a little flatter front-to-back (no more ball)
   // dense profile (spline through the key points) so painted necklines and belly patches have crisp edges
   const key = [[0.001, -0.02], [0.13, 0.0], [0.163, 0.055], [0.165, 0.125], [0.148, 0.2], [0.115, 0.262], [0.078, 0.305], [0.001, 0.33]].map(([r, y]) => new THREE.Vector2(r, y));
-  const prof = new THREE.SplineCurve(key).getPoints(44); prof[0].set(0.001, -0.02); prof[prof.length - 1].set(0.001, 0.33);
-  const torso = new THREE.LatheGeometry(prof, 56);
+  const prof = new THREE.SplineCurve(key).getPoints(44 * DETAIL); prof[0].set(0.001, -0.02); prof[prof.length - 1].set(0.001, 0.33);
+  const torso = new THREE.LatheGeometry(prof, 56 * DETAIL);
   torso.scale(bw, 1.06 * bh, 0.86 * (0.5 + bw * 0.5));
   const top = of.top || 'shirt';
   const bare = top === 'none' && !of.bottom; // Pokopia-style: just fur plus a signature accessory, no trousers
@@ -283,7 +308,8 @@ function makeHumanoid(spec) {
   R.add(body, merge(torsoParts).scale(1, TS, 1), 'torso');
 
   // tail
-  if (sp.tail !== 'none') buildTail(R, body, sp.tail, fur, fur2, spec);
+  const tailKind = spec.tail || sp.tail; // (Moka: a Boykin's docked stub)
+  if (tailKind !== 'none') buildTail(R, body, tailKind, fur, fur2, spec);
 
   // scarf (with trailing tails as a separate swinging group)
   if (of.scarf) {
@@ -331,7 +357,8 @@ function makeHumanoid(spec) {
     const parts = [cap(r, 0.14 + dA, sleeve, [0, -0.095 - dA / 2, 0])];
     if (top === 'gi' || top === 'kimono') parts.push(paint(new THREE.CylinderGeometry(r + 0.014, r + 0.024, 0.07, 14).translate(0, -0.12, 0), (p, n, o) => o.set(sleeve)));
     if (top === 'dress') parts.push(ell(0.064, 0.052, 0.064, topC, [0, -0.03, 0]));
-    if (of.wraps) { for (const [y, rr] of [[-0.18, r - 0.002], [-0.155, r]]) parts.push(paint(xf(new THREE.CylinderGeometry(rr, rr, 0.028, 12), { p: [0, y, 0.004], r: [0.1, 0, 0.12] }), (p, n, o) => o.set(of.wraps))); }
+    // bandage bands sit just proud of the sleeve all the way round (flush bands z-fought with the arm into white noise)
+    if (of.wraps) { for (const [y, rr] of [[-0.18, r + 0.005], [-0.155, r + 0.007]]) parts.push(paint(xf(new THREE.CylinderGeometry(rr, rr, 0.028, 12 * DETAIL), { p: [0, y, 0.004], r: [0.1, 0, 0.12] }), (p, n, o) => o.set(of.wraps))); }
     const handC = sp.human ? skin : (sp.hand === 'fox' ? (spec.sock || fur3) : (limbC || fur));
     if (sp.hand === 'web') { // frog: slim fingers with round pads
       parts.push(ell(0.036, 0.04, 0.03, handC, [0, -0.222, 0.01], [0, 0, 0], 14, shade(0.1)));
@@ -355,7 +382,217 @@ function makeHumanoid(spec) {
 
   R.root.scale.setScalar(spec.scale || 1);
   R.height = 1.22 * (spec.scale || 1); // longer legs + torso
-  return R.bake();
+  return raw ? R : !R.disney && applyRefined(R) ? R : R.bake();
+}
+
+// ------------------------------------------------------------------ Disney-style humanoid (sculpted parts: disneyKit.js)
+// Same skeleton, part names and body plans as the classic kit (the Animator, poses, props and seats keep working);
+// the head is sculpted per species with a hinged jaw, lidded eyes and cupped ears, hands have fingers, feet have toes,
+// and clothes are layers with collar bands, cuffs, hems, folds and a knotted sash. No ink outline.
+function flatBand(R0, hh, t, seg = 44) { // a ring of cloth with a rounded-rectangle section, round the y axis
+  const r = Math.min(hh, t / 2) * 0.9, a = R0 - t / 2, b = R0 + t / 2, pts = [];
+  const arc = (cx, cy, a0) => { for (let i = 0; i <= 3; i++) { const q = a0 + (i / 3) * Math.PI / 2; pts.push(new THREE.Vector2(cx + Math.cos(q) * r, cy + Math.sin(q) * r)); } };
+  arc(a + r, -hh + r, Math.PI); arc(b - r, -hh + r, -Math.PI / 2); arc(b - r, hh - r, 0); arc(a + r, hh - r, Math.PI / 2);
+  pts.push(pts[0].clone());
+  return new THREE.LatheGeometry(pts, seg);
+}
+function clothStrip(len, w0, w1, t) { // a flat tapering strip hanging down from y = 0
+  const g = new THREE.BoxGeometry(1, len, t, 1, 5, 1), P = g.attributes.position;
+  for (let i = 0; i < P.count; i++) { const u = 0.5 - P.getY(i) / len; P.setX(i, P.getX(i) * (w0 + (w1 - w0) * u)); }
+  g.translate(0, -len / 2, 0); g.computeVertexNormals();
+  return g;
+}
+const kitGeo = g => { g.userData.kit = true; return g; };
+const tinted = (g, hex, fur = 0) => paintFn(g, (x, y, z, nx, ny, nz, o) => { o.set(hex).multiplyScalar(1 - 0.08 * clamp(0.4 - ny)); return fur; });
+
+function makeDisneyHumanoid(spec, raw = false) {
+  const R = new Rig(spec, true);
+  const sp = SPECIES[spec.species] || SPECIES.dog;
+  const kind = headKind(spec, sp), cols = speciesColors(spec, sp);
+  const fur = spec.fur || '#c98f5e', fur2 = spec.fur2 || '#fff2e0', fur3 = spec.fur3 || (sp.patches ? '#2a2630' : fur);
+  const limbC = sp.patches ? fur3 : null;
+  const skin = sp.human ? (spec.skin || '#ffe2cf') : fur;
+  const of = spec.outfit || {};
+  const topC = of.topColor || '#6ea8ff', topC2 = of.topColor2 || '#ffffff', botC = of.bottomColor || '#4a4a6a';
+  const trimC = topC2 !== '#ffffff' ? topC2 : C(topC).multiplyScalar(0.72).getStyle();
+  const FUR = sp.human ? 0 : 1;
+
+  // --- hierarchy: the classic kit's bones and part names (the Animator and the NPC poses depend on them), with
+  // leaner Disney proportions: a narrower, shallower torso with a waist, a neck, longer legs, slimmer limbs, smaller
+  // paws. Species body plans still differ (bears and pandas stay the burliest), just less.
+  const [bw0, bh0] = sp.body || [1, 1], lk0 = sp.limb || 1;
+  const bw = 0.8 * (1 + (bw0 - 1) * 0.55), lk = 1 + (lk0 - 1) * 0.6;
+  const dL = (sp.legs ?? 0.05) + 0.045, dA = 0.045, TS = 1.12, bh = bh0 * TS, HIP = 0.27 + dL, NECK = 0.03 - (sp.neckless || 0);
+  const body = R.group(R.root, 'body', [0, HIP, 0]);
+  const legX = 0.078 * bw;
+  const legL = R.group(R.root, 'legL', [legX, HIP, 0]);
+  const legR = R.group(R.root, 'legR', [-legX, HIP, 0]);
+  const head = R.group(body, 'head', [0, 0.415 * bh + NECK + 0.02, 0.012]);
+
+  // --- torso: a lean bean (chest over a gentle waist), with cloth folds and fur where the fur shows
+  const key = [[0.001, -0.02], [0.128, 0.0], [0.15, 0.05], [0.136, 0.118], [0.148, 0.198], [0.132, 0.262], [0.086, 0.306], [0.001, 0.33]].map(([r, y]) => new THREE.Vector2(r, y));
+  const prof = new THREE.SplineCurve(key).getPoints(40); prof[0].set(0.001, -0.02); prof[prof.length - 1].set(0.001, 0.33);
+  const top = of.top || 'shirt', bare = top === 'none' && !of.bottom, wrap = top === 'gi' || top === 'kimono';
+  const dz = 0.74 * (0.6 + 0.4 * bw0), sy = 1.06 * bh;
+  const radiusAt = y => { // the torso's radius at a (scaled) height
+    const u = y / sy; for (let i = 1; i < prof.length; i++) if (prof[i].y >= u) { const a = prof[i - 1], b = prof[i], t = (u - a.y) / (b.y - a.y || 1); return a.x + (b.x - a.x) * t; }
+    return 0.001;
+  };
+  const armR0 = (sp.human ? 0.033 : 0.037) * lk;                       // arm radius
+  const armX = radiusAt(0.282 * bh / TS) * bw + armR0 * 0.5;           // shoulders sit on the torso's side
+  const armL = R.group(body, 'armL', [armX, 0.282 * bh, 0]);
+  const armR = R.group(body, 'armR', [-armX, 0.282 * bh, 0]);
+  R.group(armL, 'handL', [0, -0.235 - dA, 0.02]); R.group(armR, 'handR', [0, -0.235 - dA, 0.02]);
+  R.group(body, 'back', [0, 0.17 * bh, -radiusAt(0.16) * dz - 0.02]);
+  const torso = new THREE.LatheGeometry(prof, 44);
+  torso.scale(bw, sy, dz);
+  if (wrap || top === 'shirt') { // the skirt of the gi / kimono / shirt hangs in soft folds below the belt
+    const P = torso.attributes.position;
+    for (let i = 0; i < P.count; i++) {
+      const x = P.getX(i), y = P.getY(i), z = P.getZ(i), k = smooth(0.075, 0.02, y) * smooth(-0.02, 0.01, y) * (wrap ? 0.022 : 0.012);
+      if (k > 0) { const a = Math.atan2(x, z), f = 1 + k * Math.sin(a * 13 + y * 30) + k * 0.6; P.setX(i, x * f); P.setZ(i, z * f); }
+    }
+    torso.computeVertexNormals();
+  }
+  const skinC = C(sp.human ? skin : fur), fur2C = C(fur2), blazeC = C('#fffaf2');
+  paintFn(torso, (x, y, z, nx, ny, nz, o) => {
+    const front = z > 0; let c = C(topC), f = 0;
+    if (top === 'none') { c = C(fur); f = FUR; }
+    if (top === 'dress' && y < 0.12) c = C(topC).lerp(C('#ffffff'), 0.05);
+    if (y < 0.055 && top !== 'dress' && !bare) { c = C(botC); f = 0; }
+    if (top === 'overalls' && y < 0.18) c = C(botC);
+    if (top === 'overalls' && front && Math.abs(x) < 0.055 && y < 0.24) c = C(botC);
+    if (wrap && front && y > 0.17 && Math.abs(x) < (y - 0.17) * 0.75 * bw) { c = spec.patterns?.chestBlaze ? blazeC.clone() : (sp.human ? skinC.clone() : fur2C.clone()); f = FUR; }
+    if (top === 'none' && spec.patterns?.chestBlaze && front && Math.abs(x) < 0.045 + (y - 0.1) * 0.1 && y > 0.06) c = blazeC.clone();
+    if ((top === 'none' || (sp.belly && top === 'overalls')) && front) {
+      const e = sp.belly ? (x * x) / (0.012 * bw * bw) + ((y - 0.13) ** 2) / 0.0095 : (x * x) / 0.01 + ((y - 0.14) ** 2) / 0.011;
+      const k = smooth(1.25, 0.8, e) * smooth(-0.02, 0.05, z);
+      if (k > 0) c = c.clone().lerp(fur2C, k);
+    }
+    if (of.apron && front && y > 0.02 && y < 0.24 && Math.abs(x) < 0.12) { c = C(of.apron); f = 0; }
+    o.copy(c).multiplyScalar(1 - 0.1 * clamp(0.5 - ny));
+    return f;
+  });
+  const torsoParts = [torso];
+  { // neck: from inside the shoulders up into the head
+    const n0 = 0.3 * sy, n1 = (0.415 * bh + NECK + 0.02) / TS, nr = (sp.human ? 0.03 : 0.036) * (0.8 + 0.2 * bw0);
+    const neck = new THREE.CylinderGeometry(nr, nr * 1.15, n1 - n0, 16, 1, true).translate(0, (n0 + n1) / 2, 0);
+    const nc = sp.human ? skin : (spec.patterns?.chestBlaze || wrap ? fur2 : fur);
+    torsoParts.push(tinted(neck, nc, FUR));
+  }
+  const ellipse = (y, lift, a0 = 0, a1 = TAU, n = 40) => { // points round the torso at height y, `lift` off the surface
+    const r = radiusAt(y), pts = [];
+    for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; pts.push([Math.sin(a) * (r * bw + lift), y, Math.cos(a) * (r * dz + lift)]); }
+    return pts;
+  };
+  if (wrap) { // collar bands along the V and round the back of the neck
+    const side = s => { const pts = []; for (let y = 0.172; y <= 0.335; y += 0.012) { const r = radiusAt(y), x = Math.min(s * (y - 0.17) * 0.75 * bw, r * bw * 0.92), xx = s > 0 ? x : Math.max(s * (y - 0.17) * 0.75 * bw, -r * bw * 0.92); const zz = dz * r * Math.sqrt(Math.max(0, 1 - (xx / (r * bw)) ** 2)); pts.push([xx, y, zz + 0.004]); } return pts; };
+    const L = side(1), Rr = side(-1), yb = 0.34, ang = p => Math.atan2(p[0], p[2]);
+    const back = ellipse(yb, 0.004, ang(L[L.length - 1]), TAU + ang(Rr[Rr.length - 1]), 24);
+    torsoParts.push(tinted(tubeGeo([...L.reverse(), ...back, ...Rr], 0.0115, 7), trimC));
+  }
+  if (wrap || top === 'shirt') torsoParts.push(tinted(tubeGeo(ellipse(0.062, 0.018 + (wrap ? 0.018 : 0.009), 0, TAU, 56), 0.009, 6), wrap ? trimC : C(topC).multiplyScalar(0.85).getStyle())); // rolled hem
+  if (top === 'shirt') torsoParts.push(tinted(flatBand(0.075, 0.012, 0.018).translate(0, 0.335, 0).scale(bw, 1, dz), C(topC).multiplyScalar(0.88).getStyle())); // collar
+  if (of.sash) { // wrapped sash, knot and two tails
+    torsoParts.push(tinted(flatBand(radiusAt(0.085) + 0.024, 0.024, 0.016).translate(0, 0.085, 0).scale(bw, 1, dz), of.sash));
+    const kz = radiusAt(0.085) * dz + 0.03, kx = 0.055 * bw;
+    torsoParts.push(tinted(new THREE.SphereGeometry(1, 14, 10).scale(0.026, 0.024, 0.016).translate(kx, 0.085, kz), of.sash));
+    torsoParts.push(tinted(clothStrip(0.1, 0.034, 0.042, 0.006).rotateZ(0.1).translate(kx - 0.008, 0.075, kz + 0.002), C(of.sash).multiplyScalar(0.93).getStyle()));
+    torsoParts.push(tinted(clothStrip(0.085, 0.03, 0.038, 0.006).rotateZ(-0.35).translate(kx + 0.01, 0.075, kz - 0.002), C(of.sash).multiplyScalar(0.88).getStyle()));
+  }
+  if (top === 'overalls') { // straps over the shoulders and two buttons
+    for (const s of [1, -1]) {
+      torsoParts.push(tinted(tubeGeo([[s * 0.04, 0.2, radiusAt(0.2) * dz + 0.004], [s * 0.052, 0.3, radiusAt(0.3) * dz + 0.004], [s * 0.06, 0.34, 0.0], [s * 0.052, 0.25, -radiusAt(0.25) * dz - 0.004]], 0.008, 5), botC));
+      torsoParts.push(tinted(new THREE.SphereGeometry(0.011, 10, 8).scale(1, 1, 0.5).translate(s * 0.045, 0.205, radiusAt(0.205) * dz + 0.008), '#f4d06a'));
+    }
+  }
+  if (top === 'dress') { // A-line skirt with folds, a white hem and a collar
+    const sk = new THREE.LatheGeometry([[0.001, -0.05], [0.215, -0.05], [0.215, -0.035], [0.172, 0.05], [0.136, 0.12]].map(([r, y]) => new THREE.Vector2(r, y)), 64);
+    const P = sk.attributes.position;
+    for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), k = 0.035 * smooth(0.1, -0.04, y), f = 1 + k * Math.sin(Math.atan2(x, z) * 11); P.setX(i, x * f); P.setZ(i, z * f * 0.9); }
+    sk.computeVertexNormals();
+    torsoParts.push(tinted(sk, topC));
+    torsoParts.push(tinted(tubeGeo(Array.from({ length: 65 }, (_, i) => { const a = (i / 64) * TAU; return [Math.sin(a) * 0.22 * (1 + 0.035 * Math.sin(a * 11)), -0.045, Math.cos(a) * 0.22 * 0.9 * (1 + 0.035 * Math.sin(a * 11))]; }), 0.01, 6), topC2));
+    torsoParts.push(tinted(flatBand(0.064, 0.014, 0.026).translate(0, 0.3, 0), topC2));
+  }
+  if (of.bag) { const bz = radiusAt(0.15) * dz + 0.03; torsoParts.push(tinted(new THREE.SphereGeometry(1, 16, 12).scale(0.07, 0.08, 0.04).translate(0, 0.15, -bz), of.bag)); torsoParts.push(tinted(xf(new THREE.TorusGeometry(0.14, 0.01, 8, 32), { p: [0, 0.2, 0], r: [Math.PI / 2 - 0.5, 0, 0], s: [bw / 0.85, 1, dz / 0.85] }), of.bag)); }
+  R.add(body, kitGeo(mergeIndexed(torsoParts).scale(1, TS, 1)), 'torso');
+
+  // --- tail (fur)
+  R.defaultFur = FUR;
+  const tailKind = spec.tail || sp.tail; // (Moka: a Boykin's docked stub)
+  if (tailKind !== 'none') buildTail(R, body, tailKind, fur, fur2, spec);
+  R.defaultFur = 0;
+
+  // --- neckerchief: a band, a knot and two points (+ the swinging tails behind)
+  if (of.scarf) {
+    const yN = 0.305 * bh;
+    const nz = 0.08;
+    const band = flatBand(0.075, 0.024, 0.018, 40).rotateX(0.12).scale(1, 1, 0.92).translate(0, yN, 0.004);
+    const knot = new THREE.SphereGeometry(1, 12, 10).scale(0.025, 0.022, 0.018).translate(0, yN - 0.02, nz);
+    const pts = [1, -1].map(s => clothStrip(0.065, 0.045, 0.004, 0.006).rotateZ(s * 0.35).rotateX(-0.25).translate(s * 0.011, yN - 0.03, nz + 0.004));
+    R.add(body, kitGeo(mergeIndexed([tinted(band, of.scarf), tinted(knot, of.scarf), ...pts.map(p => tinted(p, C(of.scarf).multiplyScalar(0.92).getStyle()))])), 'scarf');
+    const tails = R.group(body, 'scarfTail', [0.02, 0.3 * TS, -0.085]);
+    R.add(tails, kitGeo(mergeIndexed([tinted(clothStrip(0.11, 0.045, 0.03, 0.007).rotateX(0.5).rotateZ(0.15).translate(0.02, -0.02, -0.03), of.scarf), tinted(clothStrip(0.09, 0.04, 0.026, 0.007).rotateX(0.4).rotateZ(-0.2).translate(-0.04, -0.02, -0.02), of.scarf)])), 'scarfTails');
+  }
+
+  // --- legs (pants gathered into a cuff, or fur) and sculpted feet with toes
+  for (const [g] of [[legL], [legR]]) {
+    const inPants = top !== 'dress' && !(of.bottom === 'shorts' || bare);
+    const legC = top === 'dress' ? (of.socks || '#ffffff') : (inPants ? botC : (limbC || skin));
+    const lr = 0.045 * lk + (inPants ? 0.009 : 0), yTop = -0.045, yBot = -(HIP - 0.045) + lr; // hip to inside the foot
+    const leg = new THREE.CapsuleGeometry(lr, yTop - yBot, 6, 16, 8);
+    leg.translate(0, (yTop + yBot) / 2, 0); leg.scale(1, 1, 0.92);
+    if (inPants) { const P = leg.attributes.position; for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), f = 1 + 0.06 * Math.sin(Math.atan2(x, z) * 7 + y * 60) * smooth(-0.05, -0.1, y); P.setX(i, x * f); P.setZ(i, z * f); } leg.computeVertexNormals(); }
+    const parts = [tinted(leg, legC, inPants || top === 'dress' ? 0 : FUR)];
+    if (inPants) parts.push(tinted(flatBand(0.047 * lk + 0.006, 0.012, 0.014).translate(0, -(HIP - 0.1), 0), C(botC).multiplyScalar(0.85).getStyle()));
+    if (of.bottom === 'shorts' && top !== 'dress') parts.push(tinted(new THREE.CapsuleGeometry(0.057, 0.04, 4, 16).translate(0, -0.05, 0), botC));
+    const fk = footKindFor(sp), footC = sp.human ? (of.shoes || '#d8443a') : fk === 'web' && sp === SPECIES.duck ? '#ff9a3a' : (spec.patterns?.socks ? '#fffaf2' : sp.foot === 'fox' ? (spec.sock || fur3) : (limbC || fur3));
+    parts.push(disneyFoot(fk, footC, sp.human || fk === 'web' ? 0 : FUR, sp.human ? null : spec.pads || (fk === 'web' ? null : '#3a2320')).scale(0.84, 0.86, 0.86).translate(0, -HIP, -0.026));
+    R.add(g, kitGeo(mergeIndexed(parts)), 'leg');
+  }
+  // --- arms: sleeve (or fur) and a sculpted hand with fingers and a thumb
+  for (const [g, s] of [[armL, 1], [armR, -1]]) {
+    const sleeve = top === 'none' ? (limbC || fur) : (top === 'overalls' ? of.shirt || '#ffffff' : topC);
+    const bareArm = top === 'none';
+    const r = armR0;
+    const arm = new THREE.CapsuleGeometry(r, 0.14 + dA, 6, 16, 6).translate(0, -0.095 - dA / 2, 0);
+    { const P = arm.attributes.position; for (let i = 0; i < P.count; i++) { const y = P.getY(i), k = 1 - 0.14 * smooth(-0.1, -0.2, y); P.setX(i, P.getX(i) * k); P.setZ(i, P.getZ(i) * k); } arm.computeVertexNormals(); } // tapers to the wrist
+    const parts = [tinted(arm, sleeve, bareArm ? FUR : 0)];
+    if (wrap) { // wide sleeve with a rolled cuff
+      parts.push(tinted(new THREE.CylinderGeometry(r + 0.012, r + 0.02, 0.07, 18, 1, true).translate(0, -0.12, 0), sleeve));
+      parts.push(tinted(flatBand(r + 0.02, 0.008, 0.011, 24).translate(0, -0.155, 0), trimC));
+    } else if (top === 'shirt' || top === 'overalls') parts.push(tinted(flatBand(r + 0.006, 0.007, 0.01, 20).translate(0, -0.1, 0), C(sleeve).multiplyScalar(0.85).getStyle()));
+    if (top === 'dress') parts.push(tinted(new THREE.SphereGeometry(1, 16, 12).scale(0.052, 0.046, 0.052).translate(0, -0.03, 0), topC));
+    if (of.wraps) for (const [y, rr] of [[-0.18 - dA, r + 0.005], [-0.155 - dA, r + 0.007]]) parts.push(tinted(xf(new THREE.CylinderGeometry(rr, rr, 0.028, 16), { p: [0, y, 0.004], r: [0.1, 0, 0.12] }), of.wraps));
+    const handC = sp.human ? skin : (sp.hand === 'fox' ? (spec.sock || fur3) : (limbC || fur));
+    parts.push(disneyHand(handKindFor(sp), s, handC, sp.human ? 0 : FUR).scale(0.84, 0.84, 0.84).translate(0, -0.185 - dA, 0.004));
+    R.add(g, kitGeo(mergeIndexed(parts)), 'arm');
+  }
+
+  // --- head
+  const H = buildDisneyHead(head, spec, sp, cols, kind);
+  for (const [parent, g, name, skin] of H.geos) { const m = R.add(parent, kitGeo(g), name); if (skin) R.skinData.set(m, skin); }
+  Object.assign(R.parts, H.parts); R.parts.eyes = []; R.parts.brows = [];
+  // hats and bows were designed for the classic head: they sit on an anchor scaled to the sculpted skull
+  const hatS = 0.544 / H.K;
+  const hatAnchor = R.group(head, 'hatAnchor', [0, H.top - 0.012, -0.005]);
+  hatAnchor.scale.setScalar(hatS); hatAnchor.userData.hatScale = hatS;
+  // Moka's floppy wizard hat is sculpted for the Disney head (disneyKit), in head space; the rest sit on the hat anchor
+  if (of.hat === 'wizard') R.add(R.group(head, 'hatBone', [0, 0, 0]), kitGeo(disneyWizardHat({ color: of.hatColor || '#3fb0a0', band: of.sash || '#8a6ad8' })), 'hat'); // (own bone: a nightcap can scale it away)
+  else if (of.hat) buildHat(R, hatAnchor, of.hat, of.hatColor || '#f4c04a', sp);
+  if (of.bow) {
+    const bowG = R.group(head, 'bowAnchor', [0.07, 0.118, 0.02]); bowG.scale.setScalar(hatS); bowG.rotation.set(0.3, 0, -0.35);
+    R.add(bowG, merge([ell(0.08, 0.055, 0.036, of.bow, [-0.065, 0.02, 0], [0.5, 0, 0.45]), ell(0.08, 0.055, 0.036, of.bow, [0.065, -0.01, -0.01], [0.5, 0, -0.35]), ell(0.036, 0.036, 0.036, of.bow, [0, 0.005, 0.01])]), 'bow');
+  }
+  if (spec.hair) { // classic curls, scaled to the sculpted skull (the curls get the fur shader's strands too)
+    const hg = R.group(head, 'hairAnchor', [0, 0.035, -0.012]); hg.scale.setScalar(hatS * 1.06);
+    R.defaultFur = 1; buildHair(R, hg, spec.hair, sp); R.defaultFur = 0;
+  }
+  if (kind === 'dog' || kind === 'spaniel') R.earGain = kind === 'spaniel' ? 1.6 : 2.2; // (long hanging ears want less spring gain)
+  R.root.scale.setScalar(spec.scale || 1);
+  R.height = (1.22 + 0.045 + NECK) * (spec.scale || 1);
+  return raw ? R : R.bake();
 }
 
 // Sculpt a head from a dense unit sphere. deform() is analytic, so face features can be placed exactly on the
@@ -406,7 +643,7 @@ function buildHead(R, head, sp, spec, { fur, fur2, fur3, skin }) {
   const S = sculptor(sp);
   const muzC = C(spec.muzzleColor || fur2), baseC = C(sp.human ? skin : fur);
   // skull
-  let headG = new THREE.SphereGeometry(1, 48, 34);
+  let headG = new THREE.SphereGeometry(1, 48 * headDetail(), 34 * headDetail());
   let pa = headG.attributes.position;
   headG.deleteAttribute('uv'); headG.deleteAttribute('normal');
   headG = mergeVertices(headG, 1e-4); // weld the UV seam first: no shading crease after sculpting
@@ -509,7 +746,7 @@ function buildHead(R, head, sp, spec, { fur, fur2, fur3, skin }) {
   mouth.position.copy(mq); mouth.scale.set(1, 0.01, 1); mouth.visible = false;
   head.add(mouth); R.parts.mouth = mouth;
 
-  buildEars(R, head, sp.ears, spec, fur, fur2, fur3, S);
+  buildEars(R, head, spec.earKind === 'spaniel' ? 'floppy' : sp.ears, spec, fur, fur2, fur3, S); // classic: long spaniel ears → floppy
   if (spec.hair) buildHair(R, head, spec.hair, sp);
   return { at: S.at, top: RH * sp.head[1] * 0.93 };
 }
@@ -559,6 +796,11 @@ function buildTail(R, body, kind, fur, fur2, spec) {
   } else if (kind === 'dog') {
     g.rotation.x = -0.9;
     R.add(g, merge([cap(0.042, 0.1, fur, [0, 0.06, 0]), cap(0.036, 0.08, fur, [0, 0.16, 0.025], [0.35, 0, 0]), ell(0.045, 0.06, 0.045, spec.patterns?.tailTip ? '#fffaf2' : fur, [0, 0.23, 0.05])]), 'tailMesh');
+  } else if (kind === 'cat' && R.disney) {
+    g.rotation.x = -0.35;
+    const pts = [[0, 0, 0, 0.032], [0, 0.02, -0.07, 0.033], [0.01, 0.1, -0.12, 0.032], [0.03, 0.2, -0.11, 0.03], [0.05, 0.28, -0.06, 0.027], [0.07, 0.3, -0.02, 0.02]];
+    const t = tube(pts.map(([x, y, z, r]) => ({ p: V(x, y, z), r })), 10, true);
+    R.add(g, paint(t, (p, n, o) => o.set(p.y > 0.24 && spec.patterns?.tailTip ? '#fffaf2' : fur)), 'tailMesh', { fur: 1 });
   } else if (kind === 'cat') {
     g.rotation.x = -1.15;
     R.add(g, curve([[0, 0, 0], [0, 0.13, -0.02], [0, 0.26, 0.04], [0.06, 0.35, 0.1], [0.1, 0.38, 0.06]], 0.03, fur), 'tailMesh');
@@ -623,18 +865,59 @@ function buildHair(R, head, hair, sp = SPECIES.human) {
 // Pokémon-style little Boston: sculpted head with a short, wide snout, white blaze and muzzle, big glossy eyes,
 // tall bat ears; a trim barrel body on slightly longer legs.
 const BOSTON = { head: [1.08, 0.96, 0.96], cheek: 0.12, snout: [0.3, 0.4, 0.3, -0.3], nose: [0.05, 0.034, 0.034], eye: [0.44, 0.08] };
-export function buildBoston(spec = {}) {
-  const R = new Rig({ name: 'Shadow', ...spec });
+// Disney-style Shadow: the sculpted Boston head (bat ears, short wide muzzle, white blaze and muzzle, big round eyes
+// with lids, a hinged jaw), a barrel body with a white chest, a collar and tag, and paws with toes. Same bones as the
+// classic quadruped (the Animator's poseQuad and the sit pose depend on them).
+function makeDisneyBoston(spec = {}) {
+  const R = new Rig({ name: 'Shadow', ...spec }, true);
+  const black = spec.fur || '#34303f', white = '#fbf6f0', collar = spec.collar || '#4aa8f0';
+  if (!spec.fur) R.mat.userData.u.uRimStr.value = 1.1; // slate rim keeps the little black dog readable at night
+  const sp = { human: false }, cols = speciesColors({ fur: black, fur2: white, earColor: black, earInner: '#f0a0a8', blush: 'none' }, sp);
+  const body = R.group(R.root, 'body', [0, 0.3, 0]);
+  const bg = new THREE.CapsuleGeometry(0.11, 0.23, 10, 24, 8); bg.rotateX(Math.PI / 2); bg.scale(0.88, 1.06, 1); // trim, deep-chested
+  paintFn(bg, (x, y, z, nx, ny, nz, o) => {
+    o.set(black);
+    const chest = smooth(0.06, 0.12, z) * smooth(0.08, 0.02, y), belly = smooth(-0.45, -0.75, ny) * smooth(-0.1, -0.04, z);
+    o.lerp(C(white), Math.max(chest, belly));
+    o.multiplyScalar(1 - 0.08 * clamp(0.4 - ny));
+    return 1;
+  });
+  const band = new THREE.TorusGeometry(0.092, 0.017, 10, 36); band.rotateX(Math.PI / 2 - 0.9); band.scale(0.95, 1, 1); band.translate(0, 0.07, 0.16);
+  const tag = new THREE.CylinderGeometry(0.02, 0.02, 0.006, 16).rotateX(Math.PI / 2).translate(0, -0.02, 0.246);
+  R.add(body, kitGeo(mergeIndexed([bg, tinted(band, collar), tinted(tag, '#ffd24a')])), 'torso');
+  // head
+  const head = R.group(body, 'head', [0, 0.16, 0.2]);
+  const Hd = buildDisneyHead(head, { ...spec, species: 'boston', fur: black, fur2: white, nose: '#141018', blush: 'none' }, sp, cols, 'boston');
+  for (const [parent, g, name, skin] of Hd.geos) { const m = R.add(parent, kitGeo(g), name); if (skin) R.skinData.set(m, skin); }
+  Object.assign(R.parts, Hd.parts); R.parts.eyes = []; R.parts.brows = [];
+  // legs with white socks and toed paws
+  const legs = [];
+  for (const [x, z, n] of [[0.078, 0.13, 'legFL'], [-0.078, 0.13, 'legFR'], [0.078, -0.13, 'legBL'], [-0.078, -0.13, 'legBR']]) {
+    const g = R.group(R.root, n, [x, 0.27, z]);
+    const leg = new THREE.CapsuleGeometry(0.034, 0.18, 6, 16, 4).translate(0, -0.12, 0).scale(1, 1, 0.9); // reaches into the paw
+    const paw = disneyFoot('paw', white, 1, '#3a2a30').scale(0.7, 0.7, 0.62).translate(0, -0.27, -0.012);
+    R.add(g, kitGeo(mergeIndexed([tinted(leg, black, 1), paw])), 'leg');
+    legs.push(g);
+  }
+  R.parts.legs = legs;
+  const tail = R.group(body, 'tail', [0, 0.06, -0.23]);
+  R.add(tail, kitGeo(tinted(new THREE.ConeGeometry(0.03, 0.09, 12, 2).translate(0, 0.04, 0).rotateX(-0.6), black, 1)), 'tailMesh');
+  R.quadruped = true; R.height = 0.62; R.earGain = 1.6;
+  return R.bake();
+}
+export function buildBoston(spec = {}, raw = false) {
+  if (!raw && kitStyle() === 'disney') return makeDisneyBoston(spec);
+  const R = new Rig({ name: 'Shadow', ...spec }, false);
   const black = spec.fur || '#34303f', white = '#fbf6f0', collar = spec.collar || '#4aa8f0';
   if (!spec.fur) R.mat.userData.u.uRimStr.value = 1.25; // slate rim keeps the little black dog readable at night
   const body = R.group(R.root, 'body', [0, 0.3, 0]);
   // barrel body (a touch slimmer and deeper-chested), white chest and belly
-  const bg = new THREE.CapsuleGeometry(0.122, 0.22, 8, 18); bg.rotateX(Math.PI / 2); bg.scale(0.92, 1.04, 1);
+  const bg = new THREE.CapsuleGeometry(0.122, 0.22, 8 * DETAIL, 18 * DETAIL, DETAIL > 1 ? 10 * DETAIL : 1); bg.rotateX(Math.PI / 2); bg.scale(0.92, 1.04, 1);
   paint(bg, (p, n, o) => { o.set(black); if (p.z > 0.1 && p.y < 0.06) o.set(white); if (n.y < -0.6 && p.z > -0.06) o.set(white); o.multiplyScalar(1 - 0.08 * clamp(0.4 - n.y)); });
   R.add(body, merge([bg, xf(torus(0.092, 0.02, collar, [0, 0.07, 0.16], [Math.PI / 2 - 0.9, 0, 0]), { s: [0.95, 1, 1] }), ell(0.026, 0.032, 0.012, '#ffd24a', [0, -0.018, 0.245])]), 'torso');
   const head = R.group(body, 'head', [0, 0.16, 0.2]);
   const rh = 0.155, S = sculptor(BOSTON, rh);
-  let hg = new THREE.SphereGeometry(1, 40, 28);
+  let hg = new THREE.SphereGeometry(1, 40 * headDetail(), 28 * headDetail());
   hg.deleteAttribute('uv'); hg.deleteAttribute('normal');
   hg = mergeVertices(hg, 1e-4);
   const pa = hg.attributes.position, mk = new Float32Array(pa.count);
@@ -683,7 +966,7 @@ export function buildBoston(spec = {}) {
   R.add(tail, xf(cone(0.03, 0.09, black, [0, 0.04, 0], [0, 0, 0], 10), { r: [-0.6, 0, 0] }), 'tailMesh');
   R.quadruped = true;
   R.height = 0.62;
-  return R.bake();
+  return raw ? R : applyRefined(R) ? R : R.bake();
 }
 
 // X-ray silhouette: when a character is hidden behind scenery, draw a soft coloured silhouette through it.
@@ -754,4 +1037,14 @@ export const CAST = {
     hair: { style: 'curly', color: '#6b3a22', color2: '#8e5634' },
     outfit: { top: 'dress', topColor: '#ff8fb0', topColor2: '#ffffff', socks: '#ffffff', shoes: '#d8443a', bow: '#e8364a' },
   },
+  // Moka, the Boykin Spaniel mage (docs/HEROES.md): the procedural fallback; the baked film model is heroModels.js
+  moka: {
+    name: 'Moka', species: 'dog', earKind: 'spaniel', voice: 1.1, fur: '#7a4a34', fur2: '#8c5a40', fur3: '#603a26', earColor: '#7e4e34', earInner: '#48261a', tail: 'stub',
+    nose: '#4a2418', iris: '#e8a93a', eye: '#e8a93a', muzzleColor: '#906048', blush: '#ff9aa6', muzzleScale: 0.94,
+    patterns: {}, brows: false,
+    outfit: { top: 'kimono', topColor: '#b8a4e8', topColor2: '#f4c04a', bottomColor: '#7a68b0', sash: '#8a6ad8', scarf: '#4fc4b4', hat: 'wizard', hatColor: '#3fb0a0' },
+  },
 };
+
+// characters with a Blender-refined skin in public/rigs (tools/blender/build.mjs exports exactly these specs)
+export const REFINED_CAST = { chewy: CAST.chewy, shadow: { name: 'Shadow' } };

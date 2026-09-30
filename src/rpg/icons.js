@@ -962,12 +962,327 @@ function drawMaterial(g, key) {
   }
 }
 
+// ================================================================== weapons: staffs (Moka)
+// Drawn along +x then rotated −45° like the swords: butt bottom-left, head top-right. Variants: drift (driftwood crook),
+// duck (duck-call horn), coral, star, sun, moon. colors = [wood, orb, accent].
+function staffOrb(g, x, y, r, col) {
+  glow(g, x, y, r * 2.4, col, 0.75);
+  circ(g, x, y, r); paint(g, volR(g, col, x, y, r, 0.62, 0.38), 1.6);
+  g.save(); circ(g, x, y, r - 0.6); g.clip();
+  g.strokeStyle = hexA(L(col, 0.6), 0.7); g.lineWidth = 1; g.beginPath(); g.arc(x + r * 0.2, y + r * 0.3, r * 0.7, 3.6, 5.2); g.stroke();
+  g.restore();
+  shine(g, x - r * 0.35, y - r * 0.42, r * 0.34, r * 0.2, -0.6, 0.92);
+  sparkle(g, x + r * 0.35, y + r * 0.25, r * 0.32, '#ffffff', 0.85);
+}
+function drawStaff(g, v, cols, noShadow) {
+  const [wood = '#b89a74', orbC = '#5ce0d0', acc = '#4a8adf'] = cols || [];
+  if (!noShadow) shadow(g, 25, 15, 3.2);
+  g.save(); g.rotate(-Math.PI / 4); g.translate(-2, 1);
+  const x0 = -27, x1 = 13;
+  // shaft (a little wavy, driftwood-ish), knots, butt knob
+  g.beginPath(); g.moveTo(x0, -2); g.quadraticCurveTo(-12, -3.6, 2, -2.3); g.quadraticCurveTo(8, -1.8, x1, -2.6); g.lineTo(x1, 2.4); g.quadraticCurveTo(8, 1.9, 2, 2.5); g.quadraticCurveTo(-12, 3.8, x0, 2.4); g.closePath();
+  paint(g, lin(g, 0, -3.5, 0, 3.5, [[0, L(wood, 0.4)], [0.5, wood], [1, D(wood, 0.32)]]), 1.7);
+  g.fillStyle = hexA(D(wood, 0.35), 0.85); ell(g, -17, 0.4, 1.5, 0.9); g.fill(); ell(g, -4, -0.6, 1.2, 0.8); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 1; g.beginPath(); g.moveTo(-24, -1.1); g.quadraticCurveTo(-12, -2.3, 8, -1.3); g.stroke();
+  knob(g, x0 - 0.5, 0.2, 2.9, D(wood, 0.1), 1.5);
+  // grip wrap
+  g.save(); rr(g, -9, -3.4, 8, 6.8, 2); g.clip(); g.fillStyle = acc; g.fillRect(-10, -4, 10, 8); g.strokeStyle = L(acc, 0.45); g.lineWidth = 1.3; for (let x = -10; x < 2; x += 2.6) { g.beginPath(); g.moveTo(x, -4); g.lineTo(x + 3, 4); g.stroke(); } g.restore();
+  rr(g, -9, -3.4, 8, 6.8, 2); stroke(g, INK, 1.4);
+  const ox = 20, oy = -0.5;
+  switch (v) {
+    case 'duck': { // a duck-call horn with a little rubber duck charm
+      g.beginPath(); g.moveTo(x1 - 1, -2.6); g.lineTo(24, -5.6); g.quadraticCurveTo(26.5, 0, 24, 5.6); g.lineTo(x1 - 1, 2.6); g.closePath(); paint(g, vol(g, L(wood, 0.1), x1, -6, 25, 6), 1.6);
+      rr(g, 15.5, -3.6, 2.4, 7.2, 1); paint(g, acc, 1.2);
+      staffOrb(g, 26.5, 0, 4.4, orbC);
+      g.beginPath(); g.moveTo(16.5, 3); g.quadraticCurveTo(15, 8, 13.5, 10.5); stroke(g, INK, 1.2);
+      circ(g, 13, 12.5, 2.6); paint(g, volR(g, '#ffd84a', 13, 12.5, 2.6), 1.1); circ(g, 13.6, 10.3, 1.6); paint(g, '#ffd84a', 1); g.beginPath(); g.moveTo(15, 10.3); g.lineTo(16.6, 10.8); g.lineTo(15, 11.3); g.fillStyle = '#ff9a3a'; g.fill();
+      break;
+    }
+    case 'coral': { // branching coral cradling the orb
+      g.strokeStyle = INK; g.lineCap = 'round';
+      const br = [[x1, 0, 18, -6.5], [x1, 0, 18, 6.5], [16, -4.5, 22, -9], [16, 4.5, 22, 9], [18, -6.5, 25, -6], [18, 6.5, 25, 6]];
+      for (const [a, b, c, d] of br) { g.lineWidth = 4.6; g.strokeStyle = INK; g.beginPath(); g.moveTo(a, b); g.lineTo(c, d); g.stroke(); }
+      for (const [a, b, c, d] of br) { g.lineWidth = 2.6; g.strokeStyle = acc; g.beginPath(); g.moveTo(a, b); g.lineTo(c, d); g.stroke(); }
+      staffOrb(g, ox + 1, oy + 0.5, 5.2, orbC);
+      for (const [x, y] of [[22, -9], [22, 9], [25, -6], [25, 6]]) { circ(g, x, y, 1.6); paint(g, L(acc, 0.3), 1); }
+      break;
+    }
+    case 'star': { // a golden star frame round the orb
+      roundStar(g, ox + 1, oy, 11.5, 6.2, 5, 0); paint(g, volR(g, acc, ox + 1, oy, 11.5, 0.55, 0.3), 1.8);
+      roundStar(g, ox + 1, oy, 7.5, 4.2, 5, 0); g.fillStyle = hexA(D(acc, 0.35), 0.9); g.fill();
+      staffOrb(g, ox + 1, oy, 4.6, orbC);
+      sparkle(g, 30, -8, 2.6, '#fffbe0'); sparkle(g, 12, -11, 2, '#fffbe0');
+      break;
+    }
+    case 'sun': { // sunburst rays
+      for (let i = 0; i < 10; i++) { const a = (i / 10) * TAU; g.beginPath(); g.moveTo(ox + 1 + Math.cos(a - 0.2) * 5.5, oy + Math.sin(a - 0.2) * 5.5); g.lineTo(ox + 1 + Math.cos(a) * (i % 2 ? 9.5 : 11.5), oy + Math.sin(a) * (i % 2 ? 9.5 : 11.5)); g.lineTo(ox + 1 + Math.cos(a + 0.2) * 5.5, oy + Math.sin(a + 0.2) * 5.5); g.closePath(); paint(g, vol(g, acc, ox - 10, -11, ox + 12, 11, 0.5, 0.25), 1.3); }
+      staffOrb(g, ox + 1, oy, 6, orbC);
+      break;
+    }
+    case 'moon': { // a crescent-moon crook
+      g.beginPath(); g.arc(ox + 1, oy, 10, 1.9, TAU - 1.9 + TAU * 0, true); g.arc(ox + 4.5, oy, 7.2, TAU - 1.6, 1.6); g.closePath();
+      g.beginPath(); g.arc(ox, oy, 10.5, Math.PI * 0.62, Math.PI * 1.38 + TAU, false); g.arc(ox - 2.8, oy, 8.2, Math.PI * 1.28, Math.PI * 0.72, true); g.closePath();
+      paint(g, vol(g, acc, ox - 11, -11, ox + 4, 11, 0.55, 0.25), 1.7);
+      staffOrb(g, ox + 3.5, oy, 5, orbC);
+      sparkle(g, ox + 10, oy - 8, 2.2, '#ffffff');
+      break;
+    }
+    default: { // drift: a driftwood crook with a blue ribbon
+      g.beginPath(); g.moveTo(x1 - 1, 0); g.bezierCurveTo(21, -1, 27, -5, 25, -11); g.bezierCurveTo(23, -16, 15, -15, 14, -10);
+      stroke(g, INK, 6.4); g.beginPath(); g.moveTo(x1 - 1, 0); g.bezierCurveTo(21, -1, 27, -5, 25, -11); g.bezierCurveTo(23, -16, 15, -15, 14, -10); stroke(g, wood, 3.8);
+      g.beginPath(); g.moveTo(x1 - 1, -0.8); g.bezierCurveTo(20, -2, 25, -5.5, 24, -10.5); stroke(g, L(wood, 0.45), 1);
+      staffOrb(g, 19.5, -7, 5.2, orbC);
+      g.beginPath(); g.moveTo(13, 1); g.bezierCurveTo(11, 6, 15, 8, 12, 13); stroke(g, INK, 4); g.beginPath(); g.moveTo(13, 1); g.bezierCurveTo(11, 6, 15, 8, 12, 13); stroke(g, acc, 2.4);
+      g.beginPath(); g.moveTo(14, 1.5); g.bezierCurveTo(17, 5, 15, 9, 18, 12); stroke(g, INK, 4); g.beginPath(); g.moveTo(14, 1.5); g.bezierCurveTo(17, 5, 15, 9, 18, 12); stroke(g, L(acc, 0.2), 2.4);
+    }
+  }
+  g.restore();
+}
+
+// ================================================================== Moka's skill art
+function waterOrbArt(g, x, y, r, col = '#5ce0d0') {
+  glow(g, x, y, r * 1.9, col, 0.6);
+  circ(g, x, y, r); paint(g, rad(g, x, y, r, [[0, L(col, 0.55)], [0.6, col], [1, D(col, 0.35)]], x - r * 0.35, y - r * 0.4), 1.8);
+  g.save(); circ(g, x, y, r - 0.8); g.clip(); g.strokeStyle = hexA('#ffffff', 0.55); g.lineWidth = 1.2; g.beginPath(); g.arc(x + r * 0.3, y + r * 0.4, r * 0.8, 3.5, 5.3); g.stroke(); g.restore();
+  shine(g, x - r * 0.35, y - r * 0.42, r * 0.34, r * 0.2, -0.6, 0.95); circ(g, x + r * 0.35, y - r * 0.5, r * 0.09); g.fillStyle = '#fff'; g.fill();
+}
+function drop(g, x, y, s, col = '#8ff0ff', rot = 0) {
+  g.save(); g.translate(x, y); g.rotate(rot); g.beginPath(); g.moveTo(0, -s * 1.5); g.bezierCurveTo(s * 0.4, -s * 0.7, s, -0.1 * s, s, s * 0.35); g.arc(0, s * 0.35, s, 0, Math.PI); g.bezierCurveTo(-s, -0.1 * s, -s * 0.4, -s * 0.7, 0, -s * 1.5); g.closePath();
+  paint(g, volR(g, col, -s * 0.2, 0, s * 1.2, 0.55, 0.3), Math.max(1, s * 0.4)); shine(g, -s * 0.35, s * 0.1, s * 0.22, s * 0.35, -0.3, 0.9); g.restore();
+}
+function waveCurl(g, x, y, s, col = '#4fd0d8') {
+  g.save(); g.translate(x, y); g.scale(s, s);
+  const shape = () => { g.beginPath(); g.moveTo(-24, 18); g.bezierCurveTo(-22, 2, -10, -16, 8, -16); g.bezierCurveTo(20, -16, 26, -6, 20, 1); g.bezierCurveTo(16, -6, 8, -6, 6, 0); g.bezierCurveTo(4, 8, 12, 14, 24, 18); g.closePath(); };
+  shape(); paint(g, lin(g, 0, -16, 0, 18, [[0, L(col, 0.45)], [0.55, col], [1, D(col, 0.35)]]), 2.1);
+  // foam claws on the lip
+  for (const [cx, cy, r] of [[19, -2, 3.2], [15, -8.5, 3.6], [8, -12.5, 3.6], [0, -12, 3.2]]) { circ(g, cx, cy, r); paint(g, CREAM, 1.4); }
+  g.strokeStyle = hexA('#ffffff', 0.8); g.lineWidth = 1.6; g.beginPath(); g.moveTo(-17, 12); g.bezierCurveTo(-14, 0, -6, -8, 4, -9); g.stroke();
+  g.restore();
+}
+function starShape(g, x, y, r, col = '#ffd36a', lw = 1.7, rot = 0) { roundStar(g, x, y, r, r * 0.5, 5, -Math.PI / 2 + rot); paint(g, volR(g, col, x, y, r, 0.55, 0.3), lw); shine(g, x - r * 0.3, y - r * 0.28, r * 0.24, r * 0.14, -0.6, 0.85); }
+function rubberDuck(g, x, y, s, key = true) {
+  g.save(); g.translate(x, y); g.scale(s, s);
+  if (key) { g.beginPath(); g.moveTo(-12, -3); g.lineTo(-17, -5); stroke(g, INK, 3.4); g.beginPath(); g.moveTo(-12, -3); g.lineTo(-17, -5); stroke(g, '#e8b848', 1.8); for (const dy of [-3.2, 3.2]) { ell(g, -19.5, -5 + dy, 2.6, 2.2); paint(g, '#e8b848', 1.3); } }
+  ell(g, 0, 5, 14, 9.5); paint(g, vol(g, '#ffd84a', -14, -4, 14, 14, 0.45, 0.25), 2);
+  g.beginPath(); g.moveTo(-12, 2); g.quadraticCurveTo(-18, -4, -13, -7); g.quadraticCurveTo(-10, -1, -8, 1); g.closePath(); paint(g, '#ffd84a', 1.6);
+  ell(g, -2, 5, 6.5, 4, -0.2); paint(g, vol(g, '#ffc234', -8, 1, 4, 9, 0.3, 0.2), 1.4);
+  circ(g, 6, -8, 7.5); paint(g, volR(g, '#ffd84a', 6, -8, 7.5), 1.9);
+  g.beginPath(); g.moveTo(11.5, -8); g.quadraticCurveTo(19, -8.5, 18.5, -5.5); g.quadraticCurveTo(15, -3.5, 11, -5); g.closePath(); paint(g, '#ff9a3a', 1.4);
+  circ(g, 8, -10, 1.6); g.fillStyle = INK; g.fill(); circ(g, 8.5, -10.6, 0.55); g.fillStyle = '#fff'; g.fill();
+  ell(g, 5.5, -5.5, 2, 1.2); g.fillStyle = hexA('#ff8aa8', 0.8); g.fill();
+  shine(g, -6, -1, 4, 2, -0.4, 0.75); shine(g, 3, -12, 2.2, 1.2, -0.5, 0.8);
+  g.restore();
+}
+function featherArt(g, x, y, len, rot, col = '#fff0d0', tip = '#ffb04a') {
+  g.save(); g.translate(x, y); g.rotate(rot);
+  const f = () => { g.beginPath(); g.moveTo(-len / 2, 0); g.bezierCurveTo(-len * 0.3, -len * 0.22, len * 0.3, -len * 0.2, len / 2, 0); g.bezierCurveTo(len * 0.3, len * 0.2, -len * 0.3, len * 0.22, -len / 2, 0); g.closePath(); };
+  f(); paint(g, lin(g, -len / 2, 0, len / 2, 0, [[0, tip], [0.55, col], [1, '#ffffff']]), 1.6);
+  g.strokeStyle = hexA(D(tip, 0.2), 0.6); g.lineWidth = 0.9; for (let i = -3; i <= 3; i++) { const xx = i * len * 0.11; g.beginPath(); g.moveTo(xx, 0); g.lineTo(xx + len * 0.08, -len * 0.14); g.moveTo(xx, 0); g.lineTo(xx + len * 0.08, len * 0.14); g.stroke(); }
+  g.beginPath(); g.moveTo(-len * 0.62, 0); g.lineTo(len * 0.46, 0); stroke(g, D(tip, 0.25), 1.4);
+  g.restore();
+}
+function goldenHead(g, x, y, s, a = 1) { // friendly golden retriever face (front)
+  g.save(); g.translate(x, y); g.scale(s, s); g.globalAlpha = a;
+  for (const k of [-1, 1]) { g.beginPath(); g.moveTo(k * 7, -8); g.bezierCurveTo(k * 16, -9, k * 17, 4, k * 12, 9); g.bezierCurveTo(k * 9, 6, k * 7, 0, k * 6, -4); g.closePath(); paint(g, vol(g, '#e0a040', k * 6, -9, k * 16, 9, 0.3, 0.3), 1.6); }
+  g.beginPath(); g.moveTo(-9, -3); g.bezierCurveTo(-10, -14, 10, -14, 9, -3); g.bezierCurveTo(9, 5, 5, 10, 0, 10); g.bezierCurveTo(-5, 10, -9, 5, -9, -3); g.closePath(); paint(g, volR(g, '#ffc868', 0, -2, 11, 0.4, 0.25), 1.8);
+  ell(g, 0, 5, 5.5, 4.2); paint(g, '#ffe6ae', 1.2);
+  ell(g, 0, 3, 2.6, 1.9); g.fillStyle = INK; g.fill(); shine(g, -0.8, 2.4, 0.9, 0.5, 0, 0.8);
+  for (const k of [-1, 1]) { circ(g, k * 3.8, -3, 1.5); g.fillStyle = INK; g.fill(); circ(g, k * 3.8 - 0.4, -3.5, 0.5); g.fillStyle = '#fff'; g.fill(); }
+  g.beginPath(); g.moveTo(-1.8, 7); g.quadraticCurveTo(0, 11, 1.8, 7); g.closePath(); paint(g, '#ff8aa0', 1);
+  g.restore();
+}
+function mallardArt(g, x, y, s, rot = 0, a = 1) {
+  g.save(); g.translate(x, y); g.rotate(rot); g.scale(s, s); g.globalAlpha = a;
+  g.beginPath(); g.moveTo(-3, -1); g.quadraticCurveTo(-8, -11, -1, -12); g.quadraticCurveTo(2, -6, 3, -1); g.closePath(); paint(g, lin(g, 0, -12, 0, 0, [[0, '#e8fff8'], [1, '#9fe0d8']]), 1.4);
+  ell(g, 0, 2, 8.5, 5); paint(g, vol(g, '#b8f0e8', -8, -3, 8, 7, 0.4, 0.25), 1.6);
+  circ(g, 7.5, -1.5, 3.8); paint(g, volR(g, '#5ad890', 7.5, -1.5, 3.8), 1.4);
+  g.beginPath(); g.moveTo(10.5, -1.5); g.lineTo(14.5, -0.5); g.lineTo(10.5, 0.8); g.closePath(); paint(g, '#ffd23a', 1.1);
+  g.beginPath(); g.arc(6.5, 1.8, 3, 0.6, 2.5); stroke(g, '#ffffff', 1.3);
+  circ(g, 8.5, -2.4, 0.8); g.fillStyle = INK; g.fill();
+  g.restore();
+}
+function drawMokaSkill(g, id) {
+  switch (id) {
+    case 'attack_staff': {
+      g.save(); g.translate(-5, 5); g.scale(0.8, 0.8); drawStaff(g, 'drift', ['#b89a74', '#5ce0d0', '#4a8adf'], true); g.restore();
+      for (let i = 0; i < 3; i++) ribbonStroke(g, () => { g.beginPath(); g.moveTo(4 + i * 3, -6 - i * 3); g.lineTo(12 + i * 3, -13 - i * 3); }, 1.6);
+      starShape(g, 18, -17, 6, '#bff6ee', 1.5); sparkle(g, 23, -8, 2.4, '#ffffff');
+      return true;
+    }
+    case 'splash': {
+      g.beginPath(); g.moveTo(-22, 20); g.quadraticCurveTo(-18, 8, -14, 14); g.quadraticCurveTo(-11, 4, -7, 13); g.quadraticCurveTo(-3, 6, 0, 20); g.closePath(); paint(g, lin(g, 0, 4, 0, 20, [[0, '#dffcff'], [1, '#5ccfd8']]), 1.6);
+      for (const [x, y, s, r] of [[-19, 3, 1.7, -0.5], [-9, 0, 1.5, 0.3], [2, 8, 1.4, 0.8]]) drop(g, x, y, s, '#8ff0ff', r);
+      for (let i = 0; i < 3; i++) ribbonStroke(g, () => { g.beginPath(); g.moveTo(-6 + i * 4, -2 - i * 3); g.lineTo(2 + i * 4, -9 - i * 3); }, 2);
+      waterOrbArt(g, 11, -11, 11);
+      return true;
+    }
+    case 'tideMastery': {
+      waveCurl(g, 0, 4, 0.95);
+      starShape(g, 12, -13, 8.5, '#ffcf4a', 1.8);
+      drop(g, -16, -14, 2.2, '#8ff0ff', -0.3);
+      return true;
+    }
+    case 'bubble': {
+      const f = fxg(g); f.save(); f.fillStyle = rad(f, 0, 0, 24, [[0, 'rgba(200,250,255,0.1)'], [0.8, 'rgba(160,230,255,0.25)'], [1, 'rgba(255,255,255,0)']]); circ(f, 0, 0, 24); f.fill(); f.restore();
+      circ(g, 0, 0, 21); g.fillStyle = 'rgba(210,248,255,0.35)'; g.fill();
+      g.save(); circ(g, 0, 0, 21); g.clip();
+      for (const [c, w] of [['#ff9ad8', 3], ['#ffe07a', 2.4], ['#8ff0d8', 2.4], ['#9ab8ff', 2.2]]) { g.strokeStyle = hexA(c, 0.75); g.lineWidth = w; g.beginPath(); g.arc(0, 0, 19.5 - w * 1.1 * ['#ff9ad8', '#ffe07a', '#8ff0d8', '#9ab8ff'].indexOf(c), Math.PI * 0.1, Math.PI * 0.95); g.stroke(); }
+      g.restore();
+      circ(g, 0, 0, 21); stroke(g, INK, 2); circ(g, 0, 0, 19.8); stroke(g, 'rgba(255,255,255,0.85)', 1.4);
+      g.save(); g.scale(0.62, 0.62); g.fillStyle = '#8a5a3a'; g.beginPath(); g.ellipse(0, 8, 10, 8, 0, 0, TAU); g.fill(); for (const [x, y] of [[-10, -4], [-3.5, -10], [3.5, -10], [10, -4]]) { g.beginPath(); g.ellipse(x, y, 4.2, 5, 0, 0, TAU); g.fill(); } g.restore();
+      g.beginPath(); g.arc(0, 0, 15, Math.PI * 1.1, Math.PI * 1.45); stroke(g, '#ffffff', 3.6); circ(g, -5, -15.5, 1.6); g.fillStyle = '#fff'; g.fill();
+      return true;
+    }
+    case 'shake': {
+      for (let i = 0; i < 3; i++) ribbonStroke(g, () => { g.beginPath(); g.arc(0, 2, 15 + i * 5.5, -0.9 + i * 2.1, 0.4 + i * 2.1); }, 2.4 - i * 0.4);
+      // a wet round dog face, eyes squeezed shut, ears flying
+      for (const k of [-1, 1]) { g.beginPath(); g.moveTo(k * 7, -6); g.bezierCurveTo(k * 18, -12, k * 21, -2, k * 16, 3); g.bezierCurveTo(k * 13, 0, k * 10, -2, k * 8, -1); g.closePath(); paint(g, vol(g, '#6a3a24', k * 7, -12, k * 21, 3, 0.3, 0.25), 1.6); }
+      circ(g, 0, 1, 11); paint(g, volR(g, '#8a5234', 0, 1, 11, 0.35, 0.25), 1.9);
+      ell(g, 0, 5, 6, 4.4); paint(g, '#c08a60', 1.2); ell(g, 0, 3.2, 2.4, 1.7); g.fillStyle = INK; g.fill();
+      for (const k of [-1, 1]) { g.beginPath(); g.moveTo(k * 6.2, -2); g.lineTo(k * 3, -0.6); g.lineTo(k * 6.2, 0.8); stroke(g, INK, 1.5); }
+      for (const [x, y, s, r] of [[-20, -14, 1.9, -0.8], [19, -15, 1.7, 0.8], [22, 9, 1.8, 2.2], [-22, 11, 1.6, -2.3], [2, -21, 1.6, 0], [-4, 21, 1.4, 3.1]]) drop(g, x, y, s, '#8ff0ff', r);
+      return true;
+    }
+    case 'puddleHop': {
+      for (const [x, y, w] of [[-14, 16, 11], [14, 15, 12]]) { ell(g, x, y, w, 4.2); paint(g, lin(g, 0, y - 4, 0, y + 4, [[0, '#b8fbff'], [1, '#4cc4d0']]), 1.6); ell(g, x - 2, y - 1, w * 0.45, 1.2); g.fillStyle = 'rgba(255,255,255,0.7)'; g.fill(); }
+      g.save(); g.setLineDash([3, 3.4]); g.beginPath(); g.moveTo(-13, 11); g.quadraticCurveTo(0, -30, 13, 9); stroke(g, INK, 2.2); g.restore();
+      g.save(); g.translate(0, -12); g.scale(0.55, 0.55); g.fillStyle = '#8a5a3a'; g.beginPath(); g.ellipse(0, 8, 10, 8, 0, 0, TAU); g.fill(); for (const [x, y] of [[-10, -4], [-3.5, -10], [3.5, -10], [10, -4]]) { g.beginPath(); g.ellipse(x, y, 4.2, 5, 0, 0, TAU); g.fill(); } g.restore();
+      for (const [x, y, s, r] of [[9, 6, 1.5, 0.6], [19, 7, 1.4, 1.2], [15, 3, 1.2, 0.2]]) drop(g, x, y, s, '#8ff0ff', r);
+      return true;
+    }
+    case 'whirlpool': {
+      glow(g, 0, 2, 26, '#5ce0d0', 0.55);
+      ell(g, 0, 3, 23, 16); paint(g, rad(g, 0, 3, 23, [[0, '#0e4a66'], [0.45, '#2a9ab4'], [1, '#8ff0f0']]), 2);
+      for (let i = 0; i < 3; i++) { g.save(); g.translate(0, 3); g.scale(1, 0.7); g.rotate(i * TAU / 3); g.beginPath(); for (let k = 0; k <= 24; k++) { const t = k / 24, a = t * 4.2, r = 3 + t * 18; const x = Math.cos(a) * r, y = Math.sin(a) * r; k ? g.lineTo(x, y) : g.moveTo(x, y); } g.strokeStyle = hexA('#f0ffff', 0.95); g.lineWidth = 2.6 - 0 * i; g.stroke(); g.restore(); }
+      ell(g, 0, 3, 4.5, 3); g.fillStyle = '#062a3c'; g.fill();
+      ell(g, 0, 3, 23, 16); stroke(g, INK, 2);
+      drop(g, -18, -14, 1.7, '#8ff0ff', -0.7); drop(g, 17, -15, 1.5, '#8ff0ff', 0.7);
+      return true;
+    }
+    case 'greatWave': {
+      waveCurl(g, -1, 3, 1.18, '#35b8d0');
+      for (const [x, y] of [[20, -12], [-15, -21], [25, 2]]) sparkle(g, x, y, 2.6, '#ffffff');
+      g.beginPath(); g.moveTo(-27, 22); g.quadraticCurveTo(0, 17, 27, 22); stroke(g, CREAM, 2.4);
+      return true;
+    }
+    case 'kibble': {
+      for (const [x0, y0, x1, y1] of [[-22, 18, -6, 4], [-18, 22, 4, 12], [-24, 10, -12, -10]]) { g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo((x0 + x1) / 2 - 6, (y0 + y1) / 2 - 6, x1, y1); stroke(g, hexA('#fff6c0', 0.9), 3); g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo((x0 + x1) / 2 - 6, (y0 + y1) / 2 - 6, x1, y1); stroke(g, hexA('#b89aff', 0.7), 1.2); }
+      starShape(g, -3, 0, 8, '#ffd36a'); starShape(g, 9, 10, 7, '#ffcf8a', 1.6, 0.4); starShape(g, -9, -14, 6.5, '#ffe08a', 1.5, -0.3);
+      sparkle(g, 16, -12, 3.4, '#fff6c0'); sparkle(g, 20, 0, 2.2, '#e0d0ff');
+      return true;
+    }
+    case 'starMastery': {
+      glow(g, 0, 0, 24, '#b89aff', 0.6);
+      g.beginPath(); g.ellipse(0, 3, 21, 7, -0.25, 0, TAU); stroke(g, INK, 4.4); g.beginPath(); g.ellipse(0, 3, 21, 7, -0.25, 0, TAU); stroke(g, '#b89aff', 2.4);
+      starShape(g, 0, 0, 15, '#ffd36a', 2);
+      for (const [x, y, r] of [[-17, -14, 3], [18, -12, 2.4], [15, 16, 2]]) sparkle(g, x, y, r, '#fff6c0');
+      return true;
+    }
+    case 'squeak': {
+      for (let i = 0; i < 3; i++) ribbonStroke(g, () => { g.beginPath(); g.arc(0, 4, 17 + i * 5, Math.PI * 1.05, Math.PI * 1.95); }, 2.4 - i * 0.5);
+      g.save(); g.translate(0, 6); g.rotate(-0.25); bonePath(g, -12, 12, 4.6, 6); paint(g, vol(g, '#ff9ccc', -18, -10, 18, 10, 0.45, 0.25), 2); g.restore();
+      g.fillStyle = '#ff5a8a'; ell(g, 0, 6, 3, 2); g.fill();
+      for (const [x, y] of [[-18, -8], [18, -10]]) { g.save(); g.translate(x, y); g.beginPath(); g.moveTo(-2, -5); g.lineTo(0, 2); g.lineTo(2, -5); g.closePath(); paint(g, '#ffe07a', 1.2); circ(g, 0, 5, 1.6); paint(g, '#ffe07a', 1); g.restore(); }
+      starShape(g, 0, -15, 5, '#fff2a0', 1.4);
+      return true;
+    }
+    case 'pawRune': {
+      glow(g, 0, 2, 26, '#ffd36a', 0.65);
+      ell(g, 0, 4, 23, 16); stroke(g, INK, 4); ell(g, 0, 4, 23, 16); stroke(g, '#ffe08a', 2.2);
+      for (let i = 0; i < 8; i++) { const a = (i / 8) * TAU; const x = Math.cos(a) * 19, y = 4 + Math.sin(a) * 12.5; if (i % 2) { circ(g, x, y, 1.4); g.fillStyle = '#fff6c0'; g.fill(); } else sparkle(g, x, y, 2.6, '#fff6c0'); }
+      g.save(); g.translate(0, 3); g.scale(1, 0.72); g.shadowColor = '#ffe8a0'; g.shadowBlur = 8;
+      g.beginPath(); g.ellipse(0, 5, 8.5, 7, 0, 0, TAU); for (const [x, y] of [[-9, -5], [-3.2, -10], [3.2, -10], [9, -5]]) { g.moveTo(x + 3.6, y); g.ellipse(x, y, 3.6, 4.4, 0, 0, TAU); }
+      g.fillStyle = '#ffd36a'; g.fill(); g.shadowBlur = 0; g.lineWidth = 2.2; g.strokeStyle = INK; g.stroke(); g.restore();
+      return true;
+    }
+    case 'moonbeam': {
+      g.fillStyle = lin(g, 0, -12, 0, 22, [[0, hexA('#e0e0ff', 0.15)], [0.6, hexA('#e8e8ff', 0.8)], [1, hexA('#ffffff', 0.95)]]);
+      g.beginPath(); g.moveTo(-5, -10); g.lineTo(5, -10); g.lineTo(9, 20); g.lineTo(-9, 20); g.closePath(); g.fill();
+      ell(g, 0, 20, 13, 3.4); g.fillStyle = hexA('#ffffff', 0.9); g.fill(); ell(g, 0, 20, 13, 3.4); stroke(g, hexA('#9a8ae8', 0.9), 1.3);
+      g.beginPath(); g.arc(-2, -15, 10, 0.7, TAU - 0.7); g.arc(4, -18, 8.5, TAU - 1.05, 1.05, true); g.closePath(); paint(g, vol(g, '#fff6c0', -12, -25, 8, -5, 0.4, 0.15), 1.8);
+      for (const [x, y, r] of [[14, -8, 2.4], [-14, 4, 1.8], [11, 10, 1.6]]) sparkle(g, x, y, r, '#ffffff');
+      return true;
+    }
+    case 'constellation': {
+      const pts = [[-19, 12], [-8, -6], [6, 2], [17, -14], [14, 16]];
+      g.save(); g.lineWidth = 2; g.strokeStyle = hexA('#fff2c0', 0.95); g.shadowColor = '#b89aff'; g.shadowBlur = 5;
+      g.beginPath(); g.moveTo(...pts[0]); g.lineTo(...pts[1]); g.lineTo(...pts[2]); g.lineTo(...pts[3]); g.moveTo(...pts[2]); g.lineTo(...pts[4]); g.stroke(); g.restore();
+      pts.forEach(([x, y], i) => starShape(g, x, y, i === 2 ? 6.5 : 4.8, i % 2 ? '#ffe08a' : '#ffd36a', 1.4, i * 0.3));
+      sparkle(g, -2, -18, 2.4, '#e0d0ff');
+      return true;
+    }
+    case 'meteor': {
+      const f = fxg(g); f.save(); f.translate(4, 4); f.rotate(Math.PI * 0.75);
+      for (const [w, len, c] of [[13, 30, '#ff6a2a'], [8.5, 25, '#ffb04a'], [4, 19, '#fff3a0']]) { f.beginPath(); f.moveTo(-w, 4); f.quadraticCurveTo(-w * 0.5, len * 0.8, 0, len + 8); f.quadraticCurveTo(w * 0.5, len * 0.8, w, 4); f.closePath(); f.fillStyle = lin(f, 0, 0, 0, len + 8, [[0, hexA(c, 0.95)], [1, hexA(c, 0)]]); f.fill(); }
+      f.restore();
+      g.save(); g.translate(6, 6); g.rotate(-0.8); bonePath(g, -11, 11, 5, 6.2); paint(g, vol(g, '#e8b070', -17, -11, 17, 11, 0.4, 0.3), 2);
+      g.fillStyle = hexA('#8a4a28', 0.6); for (const [x, y] of [[-6, -2], [-6, 2], [6, -2], [6, 2]]) { circ(g, x, y, 1); g.fill(); } g.restore();
+      for (const [x, y, r] of [[-12, -14, 2.2], [-4, -20, 1.6], [-18, -6, 1.4]]) { circ(g, x, y, r); paint(g, '#c88a4c', 1); }
+      return true;
+    }
+    case 'duckDecoy': {
+      for (const [x, y, r] of [[-15, 17, 3], [17, 16, 2.4]]) { ell(g, x, y, r * 2, r * 0.8); g.fillStyle = hexA('#8ff0ff', 0.7); g.fill(); }
+      rubberDuck(g, 1, 3, 1.15);
+      for (let i = 0; i < 2; i++) ribbonStroke(g, () => { g.beginPath(); g.arc(18, -12, 5 + i * 4.5, -1.3, 0.1); }, 1.6);
+      return true;
+    }
+    case 'retriever': {
+      glow(g, 0, 0, 24, '#ffd070', 0.55);
+      goldenHead(g, 0, 3, 1.25);
+      starShape(g, 15, -15, 6, '#ffcf4a', 1.5);
+      return true;
+    }
+    case 'fetchLeash': {
+      g.beginPath(); g.ellipse(9, -6, 11, 8, -0.4, 0, TAU); stroke(g, INK, 6.4); g.beginPath(); g.ellipse(9, -6, 11, 8, -0.4, 0, TAU); stroke(g, '#ffa040', 4); g.beginPath(); g.ellipse(9, -6, 11, 8, -0.4, 3.6, 5.2); stroke(g, '#fff0a0', 1.4);
+      g.beginPath(); g.moveTo(-1, 0); g.bezierCurveTo(-8, 8, -16, 6, -21, 18); stroke(g, INK, 5.6); g.beginPath(); g.moveTo(-1, 0); g.bezierCurveTo(-8, 8, -16, 6, -21, 18); stroke(g, '#ffa040', 3.2);
+      g.save(); g.setLineDash([2, 3]); g.beginPath(); g.moveTo(-1, 0); g.bezierCurveTo(-8, 8, -16, 6, -21, 18); stroke(g, '#fff0a0', 1.2); g.restore();
+      circ(g, -1, 0, 3.2); paint(g, volR(g, '#ffd84a', -1, 0, 3.2), 1.4);
+      for (let i = 0; i < 3; i++) ribbonStroke(g, () => { g.beginPath(); g.moveTo(-2 - i * 5, -12 - i * 2); g.lineTo(-9 - i * 5, -9 - i * 2); }, 1.8);
+      starShape(g, 9, -6, 4.5, '#ffe08a', 1.2);
+      return true;
+    }
+    case 'feathers': {
+      featherArt(g, -4, -8, 30, -0.9); featherArt(g, 4, -2, 32, -0.4, '#fff4d8', '#8fd068'); featherArt(g, 6, 8, 28, 0.15);
+      for (const [x, y, r] of [[18, -16, 3], [22, 4, 2.2], [-18, 14, 2]]) sparkle(g, x, y, r, '#fff6c0');
+      return true;
+    }
+    case 'duckCall': {
+      g.save(); g.translate(-6, 6); g.rotate(-0.55);
+      rr(g, -16, -4, 14, 8, 3); paint(g, vol(g, '#b07a4a', -16, -4, -2, 4), 1.8);
+      g.beginPath(); g.moveTo(-3, -4.5); g.lineTo(10, -8); g.quadraticCurveTo(13, 0, 10, 8); g.lineTo(-3, 4.5); g.closePath(); paint(g, vol(g, '#c98f5e', -3, -8, 12, 8), 1.8);
+      rr(g, -5, -5, 3, 10, 1); paint(g, '#ffb04a', 1.2);
+      g.restore();
+      for (let i = 0; i < 3; i++) ribbonStroke(g, () => { g.beginPath(); g.arc(4, -4, 7 + i * 5, -1.3, 0.2); }, 2.2 - i * 0.4);
+      for (const [x, y] of [[20, -18], [23, 6]]) { g.save(); g.translate(x, y); g.beginPath(); g.ellipse(0, 3, 3, 2.3, -0.4, 0, TAU); g.rect(1.8, -5, 1.6, 8); paint(g, '#8fd068', 1.1); g.restore(); }
+      return true;
+    }
+    case 'spiritRetriever': {
+      glow(g, 0, 0, 26, '#ffe8a0', 0.7);
+      goldenHead(g, 0, 0, 1.15, 0.88);
+      g.save(); g.globalAlpha = 0.8; g.beginPath(); g.moveTo(-10, 12); g.quadraticCurveTo(-6, 22, -2, 14); g.quadraticCurveTo(2, 22, 6, 14); g.quadraticCurveTo(10, 22, 12, 12); g.lineTo(12, 10); g.lineTo(-10, 10); g.closePath(); paint(g, lin(g, 0, 10, 0, 22, [[0, '#fff4c0'], [1, hexA('#ffd890', 0.2)]]), 1.2); g.restore();
+      for (const [x, y, r] of [[-18, -14, 2.8], [18, -16, 2.2], [20, 10, 2]]) sparkle(g, x, y, r, '#ffffff');
+      return true;
+    }
+    case 'mallards': {
+      mallardArt(g, -12, -8, 0.95, 0.5, 0.95); mallardArt(g, 12, -10, 0.95, 0.5, 0.95); mallardArt(g, 0, 4, 1.15, 0.6, 1);
+      for (const [x, y] of [[-6, 20], [8, 21]]) { g.beginPath(); g.moveTo(x - 6, y); g.quadraticCurveTo(x, y - 7, x + 6, y); stroke(g, hexA('#8ff0ff', 0.9), 2); }
+      sparkle(g, 20, 8, 2.4, '#e8fff8');
+      return true;
+    }
+  }
+  return false;
+}
+
 // ================================================================== skills
 const SKILL_BG = {
   bone: ['#fff0d2', '#e0a870', '#b8703e'], fetch: ['#ffd4c4', '#f07a5e', '#c23a2e'], spirit: ['#e2eaff', '#8fa4f0', '#4a58c0'], attack: ['#fffaf0', '#d8c8b0', '#a08870'],
+  tide: ['#dcfff8', '#6fd8cc', '#2a8f9a'], star: ['#fff4d0', '#b8a0f0', '#5a48b8'], duck: ['#fff0d8', '#f0b060', '#b8702a'],
 };
-const SKILL_TREE = { chomp: 'bone', boneMastery: 'bone', whirl: 'bone', dig: 'bone', guard: 'bone', frenzy: 'bone', bonestorm: 'bone', throw: 'fetch', fetchMastery: 'fetch', ricochet: 'fetch', multi: 'fetch', decoy: 'fetch', blaze: 'fetch', fetchstorm: 'fetch', woof: 'spirit', goodboy: 'spirit', zoom: 'spirit', packcall: 'spirit', treat: 'spirit', howl: 'spirit', moonhowl: 'spirit' };
-const PASSIVE = new Set(['boneMastery', 'guard', 'frenzy', 'fetchMastery', 'goodboy']);
+const SKILL_TREE = { chomp: 'bone', boneMastery: 'bone', whirl: 'bone', dig: 'bone', guard: 'bone', frenzy: 'bone', bonestorm: 'bone', throw: 'fetch', fetchMastery: 'fetch', ricochet: 'fetch', multi: 'fetch', decoy: 'fetch', blaze: 'fetch', fetchstorm: 'fetch', woof: 'spirit', goodboy: 'spirit', zoom: 'spirit', packcall: 'spirit', treat: 'spirit', howl: 'spirit', moonhowl: 'spirit',
+  splash: 'tide', tideMastery: 'tide', bubble: 'tide', shake: 'tide', puddleHop: 'tide', whirlpool: 'tide', greatWave: 'tide',
+  kibble: 'star', starMastery: 'star', squeak: 'star', pawRune: 'star', moonbeam: 'star', constellation: 'star', meteor: 'star',
+  duckDecoy: 'duck', retriever: 'duck', fetchLeash: 'duck', feathers: 'duck', duckCall: 'duck', spiritRetriever: 'duck', mallards: 'duck' };
+const PASSIVE = new Set(['boneMastery', 'guard', 'frenzy', 'fetchMastery', 'goodboy', 'tideMastery', 'starMastery', 'retriever']);
 const CREAM = '#fffaf0';
 function tennis(g, x, y, r, col = '#e8362a') {
   circ(g, x, y, r); paint(g, volR(g, col, x, y, r, 0.5, 0.35), Math.max(1.2, r * 0.14));
@@ -999,6 +1314,7 @@ function ghostPup(g, x, y, s, a = 0.9) {
   g.restore();
 }
 function drawSkill(g, id) {
+  if (drawMokaSkill(g, id)) return;
   switch (id) {
     case 'attack': {
       g.save(); g.translate(-3, 3); g.scale(0.78, 0.78); drawSword(g, 'bone', ['#f4e8cf', '#c23b3b', '#f2e4c6'], true); g.restore();
@@ -1200,7 +1516,7 @@ function skillTile(g, tree, passive) {
 }
 
 // ================================================================== public API
-const SHAPES = { sword: drawSword, ball: drawBall, hat: drawHat, outfit: drawOutfit, collar: drawCollar, charm: drawCharm, boots: drawBoots, paws: drawPaws };
+const SHAPES = { sword: drawSword, ball: drawBall, staff: drawStaff, hat: drawHat, outfit: drawOutfit, collar: drawCollar, charm: drawCharm, boots: drawBoots, paws: drawPaws };
 /** Icon for an Item (gear, gem, material item, potion item). Cached by shape+variant+colors+rarity. */
 export function itemIcon(item) {
   if (!item) return '';

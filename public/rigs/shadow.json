@@ -1,0 +1,82 @@
+{
+ "name": "Shadow",
+ "spec": "41i32i",
+ "signature": "zmw97u",
+ "tex": "shadow.png",
+ "bones": [
+  1,
+  4,
+  8,
+  10,
+  12,
+  13,
+  16,
+  19,
+  22,
+  25,
+  28,
+  31
+ ],
+ "mouth": 12,
+ "vertexCount": 7432,
+ "shellIndexCount": 15798,
+ "layout": [
+  {
+   "name": "position",
+   "type": "f4",
+   "itemSize": 3,
+   "normalized": false,
+   "offset": 0,
+   "count": 22296
+  },
+  {
+   "name": "normal",
+   "type": "i2",
+   "itemSize": 3,
+   "normalized": true,
+   "offset": 89184,
+   "count": 22296
+  },
+  {
+   "name": "skinUv",
+   "type": "f4",
+   "itemSize": 2,
+   "normalized": false,
+   "offset": 133776,
+   "count": 14864
+  },
+  {
+   "name": "color",
+   "type": "f4",
+   "itemSize": 3,
+   "normalized": false,
+   "offset": 193232,
+   "count": 22296
+  },
+  {
+   "name": "skinIndex",
+   "type": "u1",
+   "itemSize": 4,
+   "normalized": false,
+   "offset": 282416,
+   "count": 29728
+  },
+  {
+   "name": "skinWeight",
+   "type": "u1",
+   "itemSize": 4,
+   "normalized": true,
+   "offset": 312144,
+   "count": 29728
+  },
+  {
+   "name": "index",
+   "type": "u2",
+   "itemSize": 1,
+   "normalized": false,
+   "offset": 341872,
+   "count": 37788
+  }
+ ],
+ "bin": "shadow.bin"
+}

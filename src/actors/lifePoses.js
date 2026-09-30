@@ -159,4 +159,24 @@ export const LIFE_ACTIONS = {
     A.y += Math.abs(Math.sin(u * Math.PI * 2)) * 0.05 * k; A.eyesHappy = 1; A.happy = 1;
   } },
   nod: { dur: 0.8, pose: (u, P, A) => { A.head.x += Math.max(0, Math.sin(u * Math.PI * 3)) * 0.2 * (1 - u); A.happy = 1; } },
+
+  // ---- woken up by a knock at night (npc.js sleepy doorstep answer)
+  // a big yawn: head tipped back, one paw politely over the mouth, the other arm stretching up, up on the toes
+  sleepyYawn: { dur: 2.4, pose: (u, P, A) => {
+    const k = inOut(u, 0.22, 0.3), top = smoothstep(0.25, 0.5, u) * (1 - smoothstep(0.7, 0.88, u));
+    A.head.x += -0.36 * k; A.head.z += 0.14 * k; A.body.x += -0.1 * k; A.sq += -0.04 * k + 0.02 * top * Math.sin(u * 30);
+    A.armR.x += -1.45 * k; A.armR.z += 0.62 * k;                  // paw over the mouth
+    A.armL.x += -0.2 * k; A.armL.z += -2.5 * k * (0.7 + 0.3 * top); // the other arm stretches up
+    A.y += 0.025 * top; A.mouth = Math.max(A.mouth, k * (0.6 + 0.4 * top)); A.eyesClosed = k > 0.3 ? 1 : 0.6;
+  } },
+  // standing at the door half asleep: heavy lids, a slow sway, and every few seconds the head sinks… and snaps back up
+  drowsy: { dur: 99, hold: true, pose: (t, P, A) => {
+    const k = ease.outQuad(clamp(t / 0.4)), cyc = (t % 4.6) / 4.6;
+    const drop = smoothstep(0.3, 0.78, cyc) * (1 - smoothstep(0.8, 0.86, cyc)), jolt = Math.sin(clamp((cyc - 0.8) / 0.14) * Math.PI);
+    A.head.x += (0.1 + 0.34 * drop - 0.12 * jolt) * k; A.head.z += (Math.sin(t * 0.8) * 0.1 + 0.08 * drop) * k;
+    A.body.x += (0.03 + 0.1 * drop) * k; A.body.y += Math.sin(t * 0.9) * 0.08 * k;
+    A.armR.x += -0.2 * k; A.armR.z += 0.3 * k; A.armL.x += -0.2 * k; A.armL.z += -0.3 * k; // paws together in front
+    A.y += (-0.012 * drop + 0.015 * jolt) * k; A.sq += (0.015 * Math.sin(t * 1.3) + 0.03 * jolt) * k;
+    A.eyesClosed = drop > 0.35 ? 1 : 0.6;
+  } },
 };

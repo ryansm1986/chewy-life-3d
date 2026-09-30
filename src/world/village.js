@@ -114,7 +114,7 @@ export class VillageSim {
     const L = LANDMARKS;
     const pre = (type, lm, rot) => this.place(type, Math.round(lm.x - (rot % 2 ? sizeOf(type)[1] : sizeOf(type)[0]) / 2), Math.round(lm.z - (rot % 2 ? sizeOf(type)[0] : sizeOf(type)[1]) / 2), rot, { free: true, silent: true, force: true });
     pre('townHall', L.townHall, 0);
-    pre('chewyHouse', L.chewyHouse, 1);
+    pre('chewyHouse', L.chewyHouse, 3); // door faces east, onto the path that leads to it
     pre('rosieShop', L.rosieShop, 3);
     pre('dungeonGate', { x: L.dungeon.x, z: L.dungeon.z - 0.5 }, 0);
     this.place('fountain', 55, 59, 0, { free: true, silent: true, force: true });
@@ -140,6 +140,7 @@ export class VillageSim {
       if (x < 3 || z < 3 || x >= WORLD - 3 || z >= WORLD - 3) return { ok: false, why: 'Too close to the edge' };
       const i = z * WORLD + x;
       if (this.occ[i] >= 0 && this.occ[i] !== ignore) return { ok: false, why: 'Something is already here' };
+      if (type !== 'bridge' && this.world.details?.reserved.has(i)) return { ok: false, why: 'Something is already here' }; // signpost, lanterns, jizo...
       const t = tr.tiles[i];
       if (type !== 'bridge' && (t === T.WATER || t === T.SAND)) return { ok: false, why: 'Too wet!' };
       if (t === T.ROCK) return { ok: false, why: 'Too rocky' };

@@ -26,11 +26,20 @@ const KIND = {
   miss: { life: 0.9, rise: 1.0, size: 0.85 },
   block: { life: 0.9, rise: 1.0, size: 0.85 },
   status: { life: 1.4, rise: 1.4, size: 0.85 },
+  pickup: { life: 1.3, rise: 0.45, size: 0.8, cls: 'status' }, // one merged "+2 [wood] +1 [stone]" line (opts.html)
 };
 // Numeric dmg/crit floats that land near the same world spot within MERGE_MS become one number (summed, crit style if
 // any hit was a crit, with a little scale bump). At most MAX_FLOATS live at once — the oldest non-crit fades out fast.
+// opts.ref (the target's "minor hit" size, e.g. 5% of its life): smaller numbers shrink and fade so big hits stand out.
 const MERGE_MS = 150, MERGE_R2 = 0.65 * 0.65, MAX_FLOATS = 14, FADE = 0.12;
 const NUM_RE = /^([+\-−]?)(\d+)(!?)$/;
+// weight of a numeric float against its target: size / opacity multipliers (1 = a normal hit)
+function hitWeight(f) {
+  if (!f.ref) { f.om = 1; return 1; }
+  const w = Math.min(1, f.val / f.ref);
+  f.om = 0.5 + 0.5 * w;
+  return (0.56 + 0.44 * w) * (f.val >= f.ref * 4 ? 1.12 : 1);
+}
 export class Floats {
   constructor(layer) {
     this.root = el('div', 'floats'); layer.appendChild(this.root);
@@ -56,7 +65,7 @@ export class Floats {
         if (dx * dx + dy * dy + dz * dz > MERGE_R2) continue;
         o.val += +num[2]; o.hits++;
         if (kind === 'crit' && o.kind !== 'crit') { o.kind = 'crit'; o.life = Math.max(o.life, KIND.crit.life); o.rise = KIND.crit.rise; o.base = KIND.crit.size * (opts.scale || 1); o.n.className = 'fl k-crit'; }
-        o.size = o.base * Math.min(1.45, 1 + 0.07 * (o.hits - 1));
+        o.size = o.base * Math.min(1.45, 1 + 0.07 * (o.hits - 1)) * hitWeight(o);
         o.bump = 1;
         this.paint(o);
         return o;
@@ -66,20 +75,21 @@ export class Floats {
     if (this.active.length > 260) this.release(0);
     let n = this.pool.pop();
     if (!n) { n = el('div'); this.root.appendChild(n); }
-    n.className = 'fl k-' + kind;
+    n.className = 'fl k-' + (K.cls || kind);
     n.style.color = opts.color || '';
     n.style.opacity = '0';
     const base = K.size * (opts.scale || 1);
-    const f = { n, x: pos.x, y: y0, z: pos.z, t: 0, born: now, life: K.life, rise: K.rise, base, size: base, kind, text, bump: 0,
-      num: !!num, sign: num ? (num[1] === '−' ? '-' : num[1]) : '', val: num ? +num[2] : 0, hits: 1, col: opts.color || '',
+    const f = { n, x: pos.x, y: y0, z: pos.z, t: 0, born: now, life: K.life, rise: K.rise, base, size: base, kind, text, bump: 0, html: kind === 'pickup' ? opts.html : null,
+      num: !!num, sign: num ? (num[1] === '−' ? '-' : num[1]) : '', val: num ? +num[2] : 0, hits: 1, col: opts.color || '', ref: num ? opts.ref || 0 : 0, om: 1,
       drift: (Math.random() - 0.5) * (kind === 'crit' ? 24 : 30), stack: 0, stackX: 0, push: 0, pushT: 0, sx: 0, sy: 0, rot: kind === 'crit' ? (Math.random() - 0.5) * 16 : (Math.random() - 0.5) * 6 };
+    if (f.ref) { f.size = base * hitWeight(f); if (f.om < 0.8) { f.life *= 0.8; f.rise *= 0.7; f.drift *= 0.5; } } // chip damage: small, faint, brief
     this.paint(f);
     // stacking: a new number near young ones pushes them up into a tidy zig-zag column instead of overlapping
     const cam = this.camera;
     if (cam) {
       const p = project(cam, f.x, f.y, f.z); f.sx = p.x; f.sy = p.y;
       let k = 0;
-      const h = 26 * base;
+      const h = 26 * f.size;
       for (const o of this.active) if (!o.dying && o.t < 0.7 && Math.abs(o.sx - p.x) < 70 && Math.abs(o.sy - p.y) < 48) { o.pushT += h; k++; }
       if (k) { f.stackX = (k % 2 ? 1 : -1) * Math.min(26, 10 + k * 4); f.drift *= 0.35; }
     }
@@ -90,7 +100,8 @@ export class Floats {
   paint(f) {
     const text = f.num ? `${f.sign}${f.val}${f.kind === 'crit' ? '!' : ''}` : f.text;
     let html = esc(text);
-    if (f.kind === 'crit') html = `${glyph('star', 'fl-star')}<span>${esc(text)}</span>`;
+    if (f.html) html = f.html; // (built by the caller from trusted glyphs / numbers)
+    else if (f.kind === 'crit') html = `${glyph('star', 'fl-star')}<span>${esc(text)}</span>`;
     else if (f.kind === 'coins') html = `${glyph('coin')}<span>${esc(text)}</span>`;
     else if (f.kind === 'xp') html = `<span>${esc(text)}</span>`;
     f.n.innerHTML = html;
@@ -127,7 +138,7 @@ export class Floats {
       if (f.kind === 'crit' && a < 0.35) s *= 1 + Math.sin(a * 40) * 0.06 * (1 - a / 0.35);
       if (f.bump > 0) { s *= 1 + 0.3 * f.bump; f.bump = Math.max(0, f.bump - dt * 6); }
       s *= f.size * scale;
-      let op = u < 0.65 ? 1 : 1 - (u - 0.65) / 0.35;
+      let op = (u < 0.65 ? 1 : 1 - (u - 0.65) / 0.35) * f.om;
       if (f.dying) op *= Math.max(0, f.dying / FADE);
       const x = p.x + (f.drift * u + (f.stackX || 0)) * scale, y = p.y - (f.stack + f.push) * scale;
       f.n.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) translate(-50%,-50%) rotate(${(f.rot * (1 - u)).toFixed(1)}deg) scale(${s.toFixed(3)})`;
@@ -137,56 +148,123 @@ export class Floats {
 }
 
 // ------------------------------------------------------------------ toasts
-// Max 4 live toasts; identical texts merge into one (×N badge, timer restarts); bursts are rate-limited
-// through a small queue so a chatty village sim can never flood the DOM.
+// At most TOAST_MAX on screen; the rest wait in a short queue ordered by priority (errors → news → Shadow's tips)
+// and are dropped once stale. Identical texts merge (×N badge, timer restarts); similar ones (same words, other
+// numbers: "Howl! +20% damage", "likes you more! (3/10)") refresh the live toast in place; a burst of loot pickups
+// folds into one queued toast headlined by the best find ("Set item! · +2 more"). When the stack is full the
+// oldest toast retires early once it has had a fair read, so fresh news never waits behind stale news.
+const TOAST_MAX = 2;
+const TOAST_ERR = new Set(['#ff6a5a', '#ff8a8a', '#ff6a7a', '#ff8f7a']); // "Bag is full!" & co: direct feedback
+const TOAST_RANK = { normal: 0, magic: 1, rare: 2, set: 3, unique: 4 };
+const toastSim = (text, o) => text.replace(/[+\-−]?\d[\d,.]*%?/g, '#') + '|' + (o.sub || '');
+function toastPri(o) {
+  if (o.priority) return o.priority === 'high' ? 2 : o.priority === 'low' ? 0 : 1;
+  if (o.sub === 'Shadow') return 0;
+  return TOAST_ERR.has(String(o.color || '').toLowerCase()) && !o.rarity ? 2 : 1;
+}
+function toastWait(pri, text, o) { // ms a toast may wait in the queue before it is stale
+  if (o.maxWait) return o.maxWait * 1000;
+  if (pri === 2) return 2500;
+  if (pri === 0) return 20000;
+  return (TOAST_RANK[o.rarity] ?? 0) >= 2 || /^Quest|Waypoint|likes you more/.test(text) ? 12000 : 6000;
+}
 export class Toasts {
   constructor(layer) { this.root = el('div', 'toasts'); layer.appendChild(this.root); this.live = []; this.q = []; this.last = 0; this.timer = null; }
+  /** the stack is full or something is waiting — optional news (Shadow's tips) can hold back */
+  get busy() { return this.live.length >= TOAST_MAX || this.q.length > 0; }
+  /** retire live toasts and drop queued ones of priority ≤ maxPri (0 = Shadow's tips, e.g. when a boss fight starts) */
+  retire(maxPri = 0) {
+    for (const t of this.live) if (!t._dying && t._pri <= maxPri) this.kill(t, true);
+    this.q = this.q.filter(x => x.pri > maxPri);
+  }
   show(text, opts = {}) {
     if (typeof opts === 'string') opts = { icon: opts };
     text = String(text ?? '');
     if (!text) return null;
-    const key = text + '|' + (opts.sub || '');
-    const dup = this.live.find(t => t._key === key && !t._dying);
+    const key = text + '|' + (opts.sub || ''), sim = toastSim(text, opts), now = performance.now();
+    const on = this.live.filter(t => !t._dying);
+    const dup = on.find(t => t._key === key);
     if (dup) { this.bumpDup(dup, opts); return dup; }
-    const qd = this.q.find(x => x.key === key);
-    if (qd) { qd.n++; return null; }
-    this.q.push({ key, text, opts, n: 1 });
-    if (this.q.length > 8) this.q.splice(0, this.q.length - 8);
+    const near = on.find(t => t._sim === sim);
+    if (near) { this.retext(near, text, opts); return near; }
+    const qd = this.q.find(x => x.key === key || x.sim === sim);
+    if (qd) { if (qd.key === key) qd.n++; else Object.assign(qd, { key, text, opts, n: 1 }); qd.at = now; this.pump(); return null; }
+    const loot = !!opts.rarity || opts.group === 'loot';
+    const ql = loot && this.q.find(x => x.loot);
+    if (ql) { // a burst of pickups: one toast headlines the best find, the rest become "+N more"
+      if ((TOAST_RANK[opts.rarity] ?? 0) > (TOAST_RANK[ql.opts.rarity] ?? 0)) Object.assign(ql, { key, sim, text, opts });
+      ql.more++; ql.at = now; this.pump(); return null;
+    }
+    const pri = toastPri(opts);
+    this.q.push({ key, sim, text, opts, n: 1, at: now, pri, wait: toastWait(pri, text, opts), loot, more: 0 });
+    if (this.q.length > 6) { this.q.sort((a, b) => b.pri - a.pri || a.at - b.at); this.q.length = 6; }
     this.pump();
     return null;
   }
   pump() {
     if (this.timer || !this.q.length) return;
     const wait = Math.max(0, this.last + 140 - performance.now());
-    this.timer = setTimeout(() => {
-      this.timer = null;
-      const x = this.q.shift();
-      if (x) { this.last = performance.now(); const t = this.make(x.text, x.opts); if (x.n > 1) this.bumpDup(t, x.opts, x.n - 1); }
-      this.pump();
-    }, wait);
+    this.timer = setTimeout(() => { this.timer = null; this.step(); }, wait);
   }
-  make(text, opts) {
+  step() {
+    const now = performance.now();
+    this.q = this.q.filter(x => now - x.at < x.wait); // stale news is dropped
+    if (!this.q.length) return;
+    this.q.sort((a, b) => b.pri - a.pri || a.at - b.at);
+    const head = this.q[0];
+    if (this.live.length >= TOAST_MAX) {
+      // full: retire the oldest toast that doesn't outrank the head once it has been readable for a moment
+      // (its exit then calls pump() again); otherwise wait for a natural exit
+      const minShow = head.pri === 2 ? 600 : 2200;
+      const cand = this.live.filter(t => !t._dying && t._pri <= head.pri).sort((a, b) => a._pri - b._pri || a._born - b._born)[0];
+      if (!cand) return;
+      const age = now - cand._born;
+      if (age >= minShow) this.kill(cand, true);
+      else this.timer = setTimeout(() => { this.timer = null; this.step(); }, minShow - age + 20);
+      return;
+    }
+    this.q.shift();
+    this.last = now;
+    const t = this.make(head.text, head.opts, head.more);
+    t._pri = head.pri;
+    if (head.n > 1) this.bumpDup(t, head.opts, head.n - 1);
+    this.pump();
+  }
+  make(text, opts, more = 0) {
     const icon = opts.icon || 'sparkle';
     const col = opts.color || (opts.rarity ? rarityColor(opts.rarity) : '#ff8fb0');
     const ic = opts.iconURL ? `<img src="${opts.iconURL}" alt="">` : (/^[a-zA-Z]+$/.test(icon) ? glyph(icon) : `<span class="emo">${esc(icon)}</span>`);
     const dur = opts.duration || 3.6;
     const t = el('div', 'toast' + (opts.rarity ? ' r-' + opts.rarity : ''));
-    t._key = text + '|' + (opts.sub || ''); t._dur = dur; t._n = 1;
+    t._key = text + '|' + (opts.sub || ''); t._sim = toastSim(text, opts); t._dur = dur; t._n = 1; t._pri = 1; t._born = performance.now();
     t.style.setProperty('--tc', col);
     t.style.setProperty('--dur', dur + 's');
-    t.innerHTML = `<div class="t-ic">${ic}</div><div class="t-tx">${opts.html ? text : esc(text)}${opts.sub ? `<small>${esc(opts.sub)}</small>` : ''}</div><b class="t-n"></b><div class="t-bar"></div>`;
+    t.innerHTML = `<div class="t-ic">${ic}</div><div class="t-tx">${this.textHTML(text, opts, more)}</div><b class="t-n"></b><div class="t-bar"></div>`;
     this.root.appendChild(t);
     this.live.push(t);
-    // hard cap: retire the oldest live toasts (they finish their exit animation, then leave the DOM)
+    // hard cap (the queue normally keeps us under it): retire the oldest live toasts
     const alive = this.live.filter(x => !x._dying);
-    for (let i = 0; i < alive.length - 4; i++) this.kill(alive[i], true);
+    for (let i = 0; i < alive.length - TOAST_MAX; i++) this.kill(alive[i], true);
     t._to = setTimeout(() => this.kill(t), dur * 1000);
     t.addEventListener('click', () => this.kill(t));
     return t;
   }
+  textHTML(text, opts, more = 0) {
+    const sub = [opts.sub, more ? `+${more} more` : ''].filter(Boolean).join(' · ');
+    return `${opts.html ? text : esc(text)}${sub ? `<small>${esc(sub)}</small>` : ''}`;
+  }
+  // a similar toast arrived (same words, new numbers): show the latest text on the live toast
+  retext(t, text, opts) {
+    t._key = text + '|' + (opts.sub || '');
+    t.querySelector('.t-tx').innerHTML = this.textHTML(text, opts);
+    this.refresh(t);
+  }
   bumpDup(t, opts, add = 1) {
     t._n += add;
     const n = t.querySelector('.t-n'); n.textContent = '×' + t._n; n.classList.remove('pop'); void n.offsetWidth; n.classList.add('pop');
+    this.refresh(t);
+  }
+  refresh(t) {
     clearTimeout(t._to); t._to = setTimeout(() => this.kill(t), (t._dur || 3.6) * 1000);
     const bar = t.querySelector('.t-bar'); bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = '';
   }
@@ -195,7 +273,7 @@ export class Toasts {
     t._dying = true; clearTimeout(t._to);
     t.style.setProperty('--h', t.offsetHeight + 'px');
     t.classList.add('out');
-    setTimeout(() => { t.remove(); const i = this.live.indexOf(t); if (i >= 0) this.live.splice(i, 1); }, fast ? 260 : 520);
+    setTimeout(() => { t.remove(); const i = this.live.indexOf(t); if (i >= 0) this.live.splice(i, 1); this.pump(); }, fast ? 260 : 520);
   }
 }
 
@@ -371,7 +449,8 @@ export class LootLabels {
       if (o) { l.classList.add('click'); if (o.onClick) o.onClick(o.id, o); else this.cb?.(o.id, o); }
     });
   }
-  add({ id, name, color, worldPos, rarity, always, qty, onClick }) {
+  // lift: metres above worldPos where the label's bottom edge sits (ground loot passes the item itself and a small lift)
+  add({ id, name, color, worldPos, rarity, always, qty, onClick, lift = 0.35 }) {
     id = String(id);
     if (this.map.has(id)) this.remove(id, true);
     if (!rarity && color) rarity = Object.keys(RARITY_COL).find(k => RARITY_COL[k] === String(color).toLowerCase());
@@ -380,7 +459,7 @@ export class LootLabels {
     n.style.setProperty('--rc', color || rarityColor(rarity));
     n.innerHTML = `<span>${esc(name)}${qty > 1 ? ` <small>×${qty}</small>` : ''}</span>`;
     this.root.appendChild(n);
-    const o = { id, n, pos: new THREE.Vector3(worldPos.x, worldPos.y ?? 0, worldPos.z), always: always ?? ['rare', 'unique', 'set'].includes(rarity), t: 0, w: n.offsetWidth || 100, h: n.offsetHeight || 26, vis: null, x: 0, y: 0, onClick };
+    const o = { id, n, pos: new THREE.Vector3(worldPos.x, worldPos.y ?? 0, worldPos.z), lift, k: 0, kx: 0, always: always ?? ['rare', 'unique', 'set'].includes(rarity), t: 0, w: n.offsetWidth || 100, h: n.offsetHeight || 26, vis: null, x: 0, y: 0, onClick };
     this.map.set(id, o);
     return o;
   }
@@ -397,33 +476,51 @@ export class LootLabels {
   onClick(fn) { this.cb = fn; }
   update(dt, camera, scale) {
     if (!camera || !this.map.size) return;
-    const placed = [];
+    const placed = []; // boxes {l, r, t, b} (px)
     const list = [];
     for (const o of this.map.values()) {
       o.t += dt;
       const vis = !this.hidden && (this.all || o.always || o.t < 3.2);
       if (vis !== o.vis) { o.vis = vis; o.n.classList.toggle('show', vis); }
       if (!vis) continue;
-      const p = project(camera, o.pos.x, o.pos.y + 0.35, o.pos.z);
+      const p = project(camera, o.pos.x, o.pos.y + o.lift, o.pos.z);
       if (!p.ok || p.x < -100 || p.y < -50 || p.x > innerWidth + 100 || p.y > innerHeight + 50) { o.n.classList.remove('show'); o.vis = null; continue; }
       o.x = p.x; o.y = p.y;
       list.push(o);
     }
+    // keep clear of Chewy (this.avoid = his position, set by the loot owner): his body is a pre-placed box, so labels
+    // of loot at his feet settle beside / below him instead of burying him
+    const A = this.avoid;
+    let body = null;
+    if (A && list.length) {
+      const f = project(camera, A.x, A.y, A.z), hd = project(camera, A.x, A.y + 1.25, A.z);
+      if (f.ok && hd.ok) { const w = (f.y - hd.y) * 0.36; placed.push(body = { l: f.x - w, r: f.x + w, t: hd.y, b: f.y + 4 }); }
+    }
     list.sort((a, b) => b.y - a.y);
+    const hitAt = (x, w, y, h, pad) => { for (const r of placed) if (x + w / 2 + pad > r.l && x - w / 2 - pad < r.r && y + pad > r.t && y - h - pad < r.b) return true; return false; };
     for (const o of list) {
-      const w = o.w * scale, h = o.h * scale + 2;
-      let y = o.y;
-      for (let guard = 0; guard < 20; guard++) {
-        let hit = false;
-        for (const r of placed) if (Math.abs(r.x - o.x) < (r.w + w) / 2 && Math.abs(r.y - y) < (r.h + h) / 2) { y = r.y - (r.h + h) / 2 - 1; hit = true; }
-        if (!hit) break;
+      const w = o.w * scale, h = o.h * scale + 2, step = h + 1;
+      // a label whose home overlaps Chewy may instead slide sideways just clear of him (toward its item's side)
+      const side = body && o.x + w / 2 > body.l && o.x - w / 2 < body.r ? (o.x < (body.l + body.r) / 2 ? body.l - 3 - (o.x + w / 2) : body.r + 3 - (o.x - w / 2)) : 0;
+      const sx = Math.abs(side) < w * 0.75 ? side : 0;
+      // nearest free slot around the item: home first (with a little hysteresis once displaced), then last frame's
+      // slot, then beside Chewy, then alternating up / down (also beside him)
+      let k = null, kx = 0;
+      const tryAt = (dx, s, pad = 0) => { if (hitAt(o.x + dx, w, o.y + s * step, h, pad)) return false; k = s; kx = dx; return true; };
+      if (!tryAt(0, 0, o.k || o.kx ? 3 : 0) && !((o.k || o.kx) && tryAt(o.kx, o.k)) && !(sx && tryAt(sx, 0)))
+        for (let i = 1; i <= 7 && k == null; i++) for (const s of [-i, i]) if (tryAt(0, s) || (sx && tryAt(sx, s))) break;
+      let x = o.x, y;
+      if (k != null) { o.k = k; o.kx = kx; x += kx; y = o.y + k * step; }
+      else { // crowded: climb above everything in the way (the old behaviour)
+        o.k = o.kx = 0; y = o.y;
+        for (let guard = 0; guard < 20; guard++) { let hit = false; for (const r of placed) if (x + w / 2 > r.l && x - w / 2 < r.r && y > r.t && y - h < r.b) { y = r.t - 1; hit = true; } if (!hit) break; }
       }
       // a label that would climb into the Victory banner waits (hidden) until the banner has left
-      const R = reservedRect, held = !!R && y > R.top && y - h < R.bottom && o.x + w / 2 > R.left && o.x - w / 2 < R.right;
+      const R = reservedRect, held = !!R && y > R.top && y - h < R.bottom && x + w / 2 > R.left && x - w / 2 < R.right;
       if (held !== !!o.held) { o.held = held; o.n.classList.toggle('held', held); }
       if (held) continue;
-      placed.push({ x: o.x, y, w, h });
-      o.n.style.transform = `translate3d(${o.x.toFixed(1)}px,${y.toFixed(1)}px,0) translate(-50%,-100%) scale(${scale})`;
+      placed.push({ l: x - w / 2, r: x + w / 2, t: y - h, b: y });
+      o.n.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) translate(-50%,-100%) scale(${scale})`;
     }
   }
 }

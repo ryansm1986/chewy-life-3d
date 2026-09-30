@@ -1,10 +1,12 @@
-// Executes Chewy's skills: animation timing, zoom costs, cooldowns, hit shapes, projectiles and VFX.
+// Executes the heroes' skills: animation timing, zoom costs, cooldowns, hit shapes, projectiles and VFX.
+// Chewy's casts are below; Moka's (cast_splash … cast_mallards, the staff bolt, Moonbeam's channel) are mixed in from mokaSpells.js.
 import * as THREE from 'three';
 import { skillRuntime, usable, getSkill } from '../rpg/skills.js';
 import { Events } from '../core/events.js';
 import { rand, TAU, clamp, dist, angleDiff } from '../core/util.js';
 import { SpiritPup, Decoy } from './allies.js';
 import { ringTexture } from '../gfx/textures.js';
+import { installMokaSpells, setSpellGame } from './mokaSpells.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const ELEM_COL = { phys: '#fffaf0', fire: '#ffae5a', frost: '#9fe0ff', zap: '#fff27a', stink: '#b8e880', holy: '#fff0b0' };
@@ -17,6 +19,7 @@ export class SkillRunner {
   constructor(G) {
     this.G = G; this.cds = {}; this.channel = null; this.combo = 0; this.orbits = [];
     this.queued = null;
+    setSpellGame(G);
   }
   get combat() { return this.G.combat; }
   rt(id) { return skillRuntime(id, this.G.state, this.G.derived); }
@@ -34,14 +37,14 @@ export class SkillRunner {
       const E = G.state.equipment, alt = G.state.player.activeWeapon === 1 ? E.weapon : E.weaponAlt; // the weapon NOT in hand
       if (alt && alt.wtype === def.wep) { G.actions.swapWeapons(); this.syncWeapon(); Events.emit('sfx', 'ui_equip'); }
       else {
-        if (!this._noWepT || G.engine.time - this._noWepT > 1.5) { this._noWepT = G.engine.time; G.ui?.float?.(P.pos.clone().setY(1.6), def.wep === 'ball' ? 'No ball equipped!' : 'No bone sword equipped!', { kind: 'status', color: '#9fd0ff' }); Events.emit('sfx', 'ui_error'); }
+        if (!this._noWepT || G.engine.time - this._noWepT > 1.5) { this._noWepT = G.engine.time; G.ui?.float?.(P.pos.clone().setY(1.6), def.wep === 'ball' ? 'No ball equipped!' : def.wep === 'staff' ? 'No staff equipped!' : 'No bone sword equipped!', { kind: 'status', color: '#9fd0ff' }); Events.emit('sfx', 'ui_error'); }
         return false;
       }
     }
     const u = usable(id, G.state, G.derived);
     if (!u.ok) { if (!this._warnT || G.engine.time - this._warnT > 1) { this._warnT = G.engine.time; G.ui?.float?.(P.pos.clone().setY(1.6), u.why, { kind: 'status', color: '#9fd0ff' }); Events.emit('sfx', 'ui_error'); } return false; }
     if ((this.cds[id] || 0) > 0) return false;
-    if (id === 'whirl' && this.channel?.id === 'whirl') return true;
+    if (this.channel && this.channel.id === id) return true; // already channelling (Tail Spin, Moonbeam)
     const R = this.rt(id); if (!R) return false;
     // melee: never swing at thin air when a monster was clicked — walk up (too far) or lunge (just out of reach)
     let melee = null;
@@ -183,6 +186,7 @@ export class SkillRunner {
   // ---------------------------------------------------------------- basic attack
   cast_attack(R, aim, target) {
     const G = this.G, P = G.player, p = R.params;
+    if (p.bolt) return this.cast_staffBolt(R, aim, target); // Moka's staff: a free sparkle bolt
     if (p.projectile) {
       P.anim.play('throw', { speed: this.animSpeed(0.5), onEvent: ev => { if (ev === 'release') this.throwBall({ dmgPct: p.dmgPct, speed: p.speed, range: p.range, pierce: p.pierce, returns: true }, aim); } });
       return;
@@ -262,7 +266,7 @@ export class SkillRunner {
     const G = this.G, P = G.player, p = R.params;
     const bones = [];
     for (let i = 0; i < p.count; i++) {
-      const m = new THREE.Mesh(this.G.player.sword.geometry, this.G.player.rig.mat); m.scale.setScalar(0.9); m.castShadow = true;
+      const m = new THREE.Mesh(this.G.player.sword.geometry, this.G.player.rig.propMat || this.G.player.rig.mat); m.scale.setScalar(0.9); m.castShadow = true;
       G.world.scene.add(m); bones.push({ m, a: i / p.count * TAU, hit: new Map() });
     }
     const rune = G.vfx.decal(P.pos, { r: p.radius * 1.15, color: '#ffe6a8', additive: true, opacity: 0.5, life: p.duration, spin: 1.5, tex: ringTexture() });
@@ -433,9 +437,10 @@ export class SkillRunner {
     if (this.queued) { this.queued.t -= dt; if (this.queued.t <= 0) this.queued = null; else if (!P.anim.busy()) { const q = this.queued; this.queued = null; this.tryCast(q.id, q.target?.alive ? q.target.pos.clone() : q.aim, q.target); } }
     this.updateApproach(dt);
     this.updateMelee(dt);
-    // channel (Tail Spin)
-    if (this.channel && G.derived.weaponType !== 'sword') this.endChannel(); // Tail Spin needs the bone sword
-    if (this.channel) {
+    // channels (Tail Spin; Moka's Moonbeam) — each needs its weapon
+    if (this.channel) { const cw = getSkill(this.channel.id)?.wep; if (cw && G.derived.weaponType !== cw) this.endChannel(); }
+    if (this.channel && this.channel.id !== 'whirl') this.updateMoonbeam(dt, input);
+    else if (this.channel) {
       const c = this.channel, p = c.R.params;
       c.t += dt; c.acc += dt;
       if (!input.holding('whirl') || G.playerDead) { this.endChannel(); }
@@ -482,9 +487,14 @@ export class SkillRunner {
     }
     for (const x of this.pups || []) x.update(dt);
     for (const x of this.decoys || []) x.update(dt);
+    this.updateMoka(dt);
     this.keepOutOfBigBodies();
   }
-  endChannel() { const P = this.G.player; this.channel = null; P.anim.stop('spin'); P.canMoveWhileActing = false; }
+  endChannel() {
+    const P = this.G.player, c = this.channel; this.channel = null;
+    if (!c || c.id === 'whirl') P?.anim.stop('spin'); else { c.end?.(); P?.anim.stop('beam'); }
+    if (P) P.canMoveWhileActing = false;
+  }
   clearAll() {
     this.melee = null; this.approach = null;
     if (this.channel) this.endChannel();
@@ -493,5 +503,7 @@ export class SkillRunner {
     this.orbits.length = 0; this.channel = null;
     for (const x of this.pups || []) x.expire(true); this.pups = [];
     for (const x of this.decoys || []) x.expire(true); this.decoys = [];
+    this.clearMoka();
   }
 }
+installMokaSpells(SkillRunner.prototype);

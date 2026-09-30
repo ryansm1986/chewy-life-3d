@@ -2,27 +2,27 @@
 import * as THREE from 'three';
 import { makeToon, U } from './materials.js';
 
-export function makeWater({ heightTex, worldSize, size = 420, level = 0, center = [56, 56], deep = '#2a86c0', shallow = '#63d8d4', foam = '#ffffff' }) {
+export function makeWater({ heightTex, worldSize, size = 420, level = 0, center = [56, 56], deep = '#2a86c0', shallow = '#63d8d4', foam = '#ffffff', origin = [0, 0] }) {
   const geo = new THREE.PlaneGeometry(size, size, 1, 1);
   geo.rotateX(-Math.PI / 2);
   geo.translate(center[0], level, center[1]);
   const mat = makeToon({
     transparent: true, rim: 0, brush: 0.05, shadowSat: 0.2, term: [-1.0, -0.5],
     uniforms: {
-      uHeight: { value: heightTex }, uWorld: { value: worldSize }, uLevel: { value: level },
+      uHeight: { value: heightTex }, uWorld: { value: worldSize }, uLevel: { value: level }, uOrigin: { value: new THREE.Vector2(...origin) }, // (origin: where the height texture starts; regions)
       uDeep: { value: new THREE.Color(deep) }, uShallow: { value: new THREE.Color(shallow) }, uFoamCol: { value: new THREE.Color(foam) },
       uSunDir: U.uSunDir,
       uSky: U.uSkyHor,
     },
     fragPars: /* glsl */`
-      uniform sampler2D uHeight; uniform float uWorld; uniform float uLevel;
+      uniform sampler2D uHeight; uniform float uWorld; uniform float uLevel; uniform vec2 uOrigin;
       uniform vec3 uDeep; uniform vec3 uShallow; uniform vec3 uFoamCol; uniform vec3 uSunDir; uniform vec3 uSky;
       float wDepth; float wFoam;
       float wn(vec2 p) { return texture2D(uBrush, p).r; }
     `,
     fragColor: /* glsl */`
       {
-        vec2 tuv = vCWorld.xz / uWorld;
+        vec2 tuv = (vCWorld.xz - uOrigin) / uWorld;
         float th = texture2D(uHeight, clamp(tuv, 0.002, 0.998)).r;
         if (tuv.x < 0.0 || tuv.y < 0.0 || tuv.x > 1.0 || tuv.y > 1.0) th = -3.0;
         wDepth = max(uLevel - th, 0.0);

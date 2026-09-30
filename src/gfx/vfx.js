@@ -6,6 +6,10 @@ import { rand, TAU, clamp, ease } from '../core/util.js';
 
 const _v = new THREE.Vector3();
 const C = h => new THREE.Color(h);
+// Extensions (e.g. Moka's SpellFX in spellFx.js): make(vfx) → { update(dt), clear(), prewarm?(renderer, camera) }, one per
+// VFX instance (the village's and each floor's), so their meshes live in that world's scene and go with it.
+const EXTENSIONS = [];
+export function registerVfxExtension(make) { EXTENSIONS.push(make); }
 const DAMP_MIN = 0.25; // additive effects sitting right on a boss keep 25% of their brightness
 
 // speech-bubble textures are shared by every VFX instance (the village one and each dungeon floor's): one canvas per
@@ -67,6 +71,8 @@ export class VFX {
         return raw(o);
       };
     }
+    this.ext = [];
+    for (const make of EXTENSIONS) { try { const e = make(this); if (e) this.ext.push(e); } catch (err) { console.warn('[vfx] extension failed', err); } }
   }
   setLightPool(lp) { this.lightPool = lp; }
   // the boss's own telegraphs (wind-up swirls etc.) must stay loud: spawn them inside undamped(() => …)
@@ -85,28 +91,44 @@ export class VFX {
     }
     return k;
   }
-  light(pos, color, intensity = 6, radius = 6, life = 0.3) { if (this.dampers.length) intensity *= this.dampAt(pos.x, pos.y, pos.z) ** 1.5; this.lightPool?.flash(pos, color, intensity, radius, life); }
+  light(pos, color, intensity = 6, radius = 6, life = 0.3) {
+    if (!pos.isVector3) pos = new THREE.Vector3(pos.x, pos.y, pos.z); // (the pool clones it: plain { x, y, z } points are fine too)
+    if (this.dampers.length) intensity *= this.dampAt(pos.x, pos.y, pos.z) ** 1.5; this.lightPool?.flash(pos, color, intensity, radius, life);
+  }
   update(dt) {
     const cam = this.engine.camera;
     for (const l of this.layers) l.update(dt, cam);
     for (let i = this.fx.length - 1; i >= 0; i--) {
       const f = this.fx[i];
       f.t += dt;
-      if (f.update(dt, f.t) === false || (f.life && f.t >= f.life)) { if (f.obj) { f.obj.parent?.remove(f.obj); f.obj.traverse?.(o => { o.geometry?.dispose?.(); }); } this.fx.splice(i, 1); }
+      if (f.update(dt, f.t) === false || (f.life && f.t >= f.life)) { if (f.obj) { f.obj.parent?.remove(f.obj); f.obj.traverse?.(o => { if (o.isMesh) o.geometry?.dispose?.(); }); } this.fx.splice(i, 1); }
     }
+    for (const e of this.ext) e.update(dt);
   }
-  clear() { for (const l of this.layers) l.clear(); for (const f of this.fx) f.obj?.parent?.remove(f.obj); this.fx.length = 0; }
+  // (effect geometries are per effect: freed here too, or a floor left mid-effect would keep them uploaded — shared
+  // sprite geometry is left alone)
+  clear() { for (const l of this.layers) l.clear(); for (const f of this.fx) { f.obj?.parent?.remove(f.obj); f.obj?.traverse?.(o => { if (o.isMesh) o.geometry?.dispose?.(); }); } this.fx.length = 0; for (const e of this.ext) e.clear?.(); }
   add(obj, update, life = 0) { if (obj) this.scene.add(obj); const f = { obj, update, t: 0, life }; this.fx.push(f); return f; }
 
-  // compile every effect's shader up front (call behind a loading transition) so first use doesn't hitch
+  // Compile every effect's shader up front (call behind a loading transition) so first use doesn't hitch. compile()
+  // only links programs: the effect meshes are also DRAWN for a few real frames (culling off, far below the floor,
+  // behind the transition) so the driver finishes each program and the vertex layouts at a real draw, and every
+  // effect texture is uploaded now — otherwise that work lands on the first Chomp / Blaze of the floor.
   prewarm(renderer, camera) {
-    const p = new THREE.Vector3(0, -50, 0);
-    this.ring(p); this.slash(p, 0); this.pillar(p); this.telegraph(p, 1, 1);
+    const p = new THREE.Vector3(0, -50, 0), n0 = this.fx.length;
+    this.ring(p); this.ring(p, { flat: false }); this.slash(p, 0); this.pillar(p); this.telegraph(p, 1, 1);
+    this.decal(p); this.decal(p, { additive: true }); this.decal(p, { additive: true, tex: ringTexture() });
     this.lightning(p, p.clone().setY(-49)); this.emote({ pos: p, rig: { height: 1 } }, 'heart', 0.1); this.emote({ pos: p, rig: { height: 1 } }, '!', 0.1);
     this.sparks(p); this.poof(p); this.fire(p); this.petals(p); this.stink(p);
+    for (const e of this.ext) { try { e.prewarm?.(renderer, camera); } catch (err) { console.warn('[vfx] extension prewarm failed', err); } }
     for (const l of this.layers) l.update(0.016, camera);
+    for (const t of [glowTexture(), sparkleTexture(), smokeTexture(), softDotTexture(), petalTexture(), ringTexture(), slashTexture(), shaftTexture(), leafParticleTexture()]) { try { renderer.initTexture(t); } catch (e) { /* ignore */ } }
     try { renderer.compile(this.scene, camera); } catch (e) { /* ignore */ }
-    this.clear();
+    const warm = this.fx.slice(n0); // (the particles simply live out their short lives down there)
+    for (const f of warm) { f.obj?.traverse?.(o => { o.frustumCulled = false; }); f.update = () => true; f.life = 0; }
+    let frames = 0;
+    const done = () => { if (++frames < 3) return requestAnimationFrame(done); for (const f of warm) { const i = this.fx.indexOf(f); if (i >= 0) this.fx.splice(i, 1); f.obj?.parent?.remove(f.obj); f.obj?.traverse?.(o => { if (o.isMesh) o.geometry?.dispose?.(); }); } };
+    requestAnimationFrame(done);
   }
   // ------------------------------------------------------------------ particle presets
   sparks(p, { n = 10, color = '#fff2a0', speed = 5, size = 0.35, life = 0.35, up = 1.5, grav = 6 } = {}) {
@@ -189,6 +211,12 @@ export class VFX {
     (pal.sparkle || ['#fff2a0', '#ffc8e0', '#c8e8ff']).forEach((c, i) => setTimeout(() => this.sparkle(p.clone().setY(p.y + 1 + i * 0.5), { n: 18, color: c, r: 1.8, rise: 2, size: 0.34 }), i * 220));
   }
 
+  /** Hero hand-off (heroes.js): a starlight column + paw glyph that flashes the outgoing hero's colour, then blooms in
+   *  the incoming one's (~0.65 s, pooled in SpellFX, lit via light()). */
+  heroSwap(pos, { from = '#e8475c', to = '#2fb8a8' } = {}) {
+    if (this.spell?.heroSwap) return this.spell.heroSwap(pos, { from, to });
+    this.pillar(pos, { color: to, r: 0.8, h: 7, life: 0.7 }); this.ring(pos, { color: to, r0: 0.3, r1: 3, life: 0.5 }); this.sparkle(pos.clone().setY(pos.y + 0.8), { n: 16, color: to, r: 0.8 });
+  }
   // ------------------------------------------------------------------ mesh effects
   ring(p, { color = '#ffffff', r0 = 0.2, r1 = 2, life = 0.4, flat = true, opacity = 0.9, y = 0.06 } = {}) {
     opacity *= flat ? 1 : this.dk(p); // camera-facing rings sit over whatever they're centred on

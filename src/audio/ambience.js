@@ -2,6 +2,7 @@
 // (birds, furin wind chimes, crickets, frogs, owl, bubbles, drips...). Deterministic for a given seed so the
 // offline render check can drive it synchronously.
 import { Voice, noiseBuffer, mulberry32, hitBuffer, HIT_BASE } from './core.js';
+import { AMB } from '../regions/sfx/ambient.js'; // the regions' distinctive voices (shared with their env_* sfx)
 
 export class AmbiencePlayer {
   constructor(graph, name, { seed, start } = {}) {
@@ -131,8 +132,43 @@ function swell(A, t, { f0, f1, q = 7, len = 4, v = 0.2, color = 'pink', rev = 0.
   s.noise({ pts: [[0, f0], [len * 0.5, f1], [len, f0 * 0.9]], q, a: len * 0.4, h: len * 0.2, d: len * 0.4, lin: true, v, color, rev, pan: A.r(-0.6, 0.6) });
 }
 
+// ---- regions (docs/REGIONS.md). The distinctive voices (shishi-odoshi, gulls, crows, waves, the temple bell…) live in
+// src/regions/sfx/ambient.js; `amb` plays one with the ambience's seeded randomness.
+const amb = (A, voice, t, o) => AMB[voice](A.voice(t), (a, b) => A.r(a, b), o);
+// A creaking culm: a slow, hollow groan (a buzzy saw through a narrow band, sagging in pitch).
+function culmCreak(A, t) {
+  const s = A.voice(t), f = A.r(170, 290), len = A.r(0.4, 0.9);
+  s.tone({ pts: [[0, f], [len, f * A.r(0.82, 0.93)]], type: 'sawtooth', a: 0.08, h: len * 0.5, d: len * 0.4, lin: true, v: 0.02, bp: A.r(550, 850), bq: 6, am: [A.r(14, 24), 0.55], rev: 0.45, pan: A.r(-0.8, 0.8) });
+}
+// Culms knocking together in a gust: a few hollow "tok"s (a closed tube's odd harmonic).
+function culmKnock(A, t) {
+  const s = A.voice(t), n = 2 + ((A.rng() * 4) | 0), pan = A.r(-0.8, 0.8); let at = 0;
+  for (let i = 0; i < n; i++) {
+    const f = A.r(420, 760), v = A.r(0.025, 0.05);
+    s.tone({ at, pts: [[0, f * 1.06], [0.012, f]], a: 0.001, d: 0.12, v, pan, rev: 0.5 });
+    s.tone({ at, f: f * 3.01, a: 0.001, d: 0.03, v: v * 0.2, pan, rev: 0.5 });
+    at += A.r(0.07, 0.3);
+  }
+}
+// Dry leaves skittering along the ground on a gust: a scatter of tiny crackles over a soft brush.
+function leafSkitter(A, t) {
+  const s = A.voice(t), n = 5 + ((A.rng() * 8) | 0), pan = A.r(-0.8, 0.8), len = A.r(0.3, 0.8);
+  for (let i = 0; i < n; i++) s.noise({ at: A.r(0, len), f: A.r(2400, 5200), q: 3, a: 0.001, d: A.r(0.006, 0.016), v: A.r(0.02, 0.05), pan, rev: 0.2 });
+  s.noise({ f: A.r(2500, 3500), q: 0.9, a: len * 0.3, h: len * 0.3, d: len * 0.4, lin: true, v: 0.012, pan, rev: 0.2 });
+}
+// A brook or river: a moving band of water noise and its babble (a sparser, quieter cousin of the village stream).
+function brook(A, { gain = 0.05, pan = 0, rate = [0.08, 0.3], bub = 0.016 }) {
+  const b = A.bed({ color: 'white', filters: [['bandpass', 1000, 0.7]], gain, pan });
+  A.every(0.6, 1.6, t => { b.f[0].frequency.setTargetAtTime(A.r(750, 1400), t, 0.4); b.g.gain.setTargetAtTime(gain * A.r(0.65, 1.25), t, 0.4); }, 0.01);
+  A.every(rate[0], rate[1], t => {
+    const s = A.voice(t), f = 360 * Math.pow(2, A.rng() * 2);
+    s.tone({ pts: [[0, f], [A.r(0.02, 0.05), f * A.r(1.3, 1.8)]], a: 0.002, d: A.r(0.03, 0.06), v: A.r(0.3, 1) * bub, pan: pan + A.r(-0.3, 0.3) });
+  }, 0.05);
+}
+
 // Output trims so the beds sit at similar perceived loudness (calibrated with the render check).
-const AMB_GAIN = { village: 1.2, night: 1.8, water: 1, dungeon: 1.4, dungeon_shrine: 1.4, dungeon_kitchen: 1.3, dungeon_crystal: 1.5, dungeon_moon: 1.7 };
+const AMB_GAIN = { village: 1.2, night: 1.8, water: 1, dungeon: 1.4, dungeon_shrine: 1.4, dungeon_kitchen: 1.3, dungeon_crystal: 1.5, dungeon_moon: 1.7,
+  region_bamboo: 1.3, region_maple: 1.3, region_tidepool: 1.1, region_onsen: 2.4 };
 
 export const AMBIENCES = {
   village(A) {
@@ -245,9 +281,76 @@ export const AMBIENCES = {
       for (const [at, f, h] of [[0, 390, 0.18], [0.5, 375, 0.1], [0.72, 360, 0.25]]) s.tone({ at, pts: [[0, f * 0.96], [0.06, f]], a: 0.05, h, d: 0.18, lin: true, v: 0.03, lp: 900, pan, rev: 0.6 });
     }, 12);
   },
+
+  // ---- regions (docs/REGIONS.md)
+  // Whispering Bamboo Grove: the grove's breath with a bright rustle of bamboo leaves on the gusts, culms creaking and
+  // knocking together, a little stream, distant sparrows and warblers (the bush warbler now and then), the shishi-odoshi.
+  region_bamboo(A) {
+    wind(A, { gain: 0.13, lp: 900, gust: [2, 5], rustle: 0.08, chimes: false });
+    brook(A, { gain: 0.04, pan: 0.4 });
+    A.every(4, 11, t => culmCreak(A, t), 2);
+    A.every(6, 15, t => culmKnock(A, t), 4);
+    A.every(2.5, 7, t => {
+      const r = A.rng();
+      if (r > 0.88 && t - (A.st.ug ?? -99) > 30) { uguisu(A, t); A.st.ug = t; }
+      else if (r < 0.5) sparrow(A, t); else warble(A, t);
+    }, 1);
+    A.every(16, 30, t => amb(A, 'shishiOdoshi', t, { v: 0.7, pan: A.r(0.1, 0.6), rev: 0.6 }), 7);
+  },
+  // Momiji Hollow: wind in the maples, dry leaves skittering, the river nearby and the waterfall's low roar far off,
+  // crows, warblers, a sika deer calling, an evening temple bell, a couple of autumn crickets as the sun goes down.
+  region_maple(A) {
+    wind(A, { gain: 0.11, lp: 720, gust: [2, 6], rustle: 0.05, chimes: false });
+    A.every(1.5, 5, t => leafSkitter(A, t), 1);
+    brook(A, { gain: 0.06, pan: -0.35, rate: [0.1, 0.35], bub: 0.014 });
+    A.bed({ color: 'pink', filters: [['lowpass', 520, 0], ['highpass', 90, 0]], gain: 0.07, pan: 0.5, rev: 0.3 });
+    A.every(9, 22, t => amb(A, 'crow', t, { v: A.r(0.35, 0.75), pan: A.r(-0.8, 0.8), rev: 0.55 }), 3);
+    A.every(4, 10, t => (A.rng() < 0.6 ? warble(A, t) : sparrow(A, t)), 2);
+    A.every(26, 48, t => amb(A, 'deer', t, { v: A.r(0.4, 0.7), pan: A.r(-0.7, 0.7), rev: 0.75 }), 11);
+    A.every(45, 80, t => amb(A, 'templeBell', t, { v: 0.45, pan: A.r(-0.6, 0.6), rev: 0.85 }), 20);
+    for (let k = 0; k < 2; k++) {
+      const c = { f: A.r(3800, 4600), pan: A.r(-0.8, 0.8), pulses: 3 + k, rate: A.r(22, 30), v: A.r(0.006, 0.01) };
+      const gap = A.r(0.7, 1.2);
+      A.every(gap * 0.9, gap * 1.1, t => cricketChirp(A, t, c), A.r(0, 0.5));
+    }
+  },
+  // Shiokaze Tidepools: the salty breeze, the sea's low wash, waves rolling in and breaking, gulls, the tide pools'
+  // little bubbles and drips, crabs clicking on the rocks.
+  region_tidepool(A) {
+    wind(A, { gain: 0.09, lp: 1100, gust: [2, 5], rustle: 0.02, chimes: false });
+    A.bed({ color: 'brown', filters: [['lowpass', 380, 0]], gain: 0.14 });
+    A.every(4.5, 8.5, t => amb(A, 'wave', t, { v: A.r(0.55, 1), pan: A.r(-0.5, 0.5), rev: 0.3 }), 0.4);
+    A.every(5, 13, t => amb(A, 'gull', t, { v: A.r(0.35, 0.85), pan: A.r(-0.85, 0.85), rev: 0.4 }), 2);
+    A.every(0.4, 1.6, t => {
+      const s = A.voice(t), n = 1 + ((A.rng() * 3) | 0), pan = A.r(-0.6, 0.6); let at = 0;
+      for (let i = 0; i < n; i++) { const f = A.r(500, 1200); s.tone({ at, pts: [[0, f], [0.03, f * A.r(1.4, 2)]], a: 0.002, d: 0.04, v: A.r(0.01, 0.025), pan, rev: 0.2 }); at += A.r(0.03, 0.12); }
+    }, 0.3);
+    A.every(2.5, 6, t => drip(A, t, 0.045), 1);
+    A.every(6, 14, t => {
+      const s = A.voice(t), n = 3 + ((A.rng() * 5) | 0), pan = A.r(-0.8, 0.8); let at = 0;
+      for (let i = 0; i < n; i++) { s.noise({ at, f: A.r(3000, 5000), q: 5, a: 0.001, d: 0.008, v: A.r(0.03, 0.06), pan }); at += A.r(0.04, 0.1); }
+    }, 3);
+  },
+  // Yukimi Onsen: a soft snowy wind (the snow eats the highs) with a thin whistle at the eaves, steam hissing off the
+  // springs and their low bubbling, the lanterns' flames crackling and fluttering, a distant temple bell, snow sliding
+  // off laden branches.
+  region_onsen(A) {
+    wind(A, { gain: 0.1, lp: 460, gust: [3, 7], rustle: 0.008, chimes: false });
+    A.every(10, 20, t => swell(A, t, { f0: A.r(900, 1200), f1: A.r(1500, 2100), q: 12, len: 3.5, v: 0.05, color: 'white', rev: 0.6 }), 5);
+    A.bed({ color: 'white', filters: [['highpass', 3000, 0], ['lowpass', 7000, 0]], gain: 0.007, pan: -0.2 });
+    A.every(0.25, 1, t => {
+      const s = A.voice(t), n = 1 + ((A.rng() * 3) | 0), pan = A.r(-0.5, 0.2), r = (a, b) => A.r(a, b); let at = 0;
+      for (let i = 0; i < n; i++) { AMB.blup(s, r, { v: A.r(0.3, 0.8), pan, at }); at += A.r(0.05, 0.2); }
+    }, 0.2);
+    A.every(0.12, 0.8, t => { const s = A.voice(t); s.noise({ f: A.r(1500, 3800), q: 3, a: 0.001, d: A.r(0.005, 0.016), v: A.r(0.012, 0.04), pan: A.r(-0.3, 0.4) }); }, 0.3);
+    A.every(5, 11, t => { const s = A.voice(t); s.noise({ ft: 'lowpass', f: A.r(260, 420), a: 0.3, h: 0.2, d: 0.5, lin: true, v: 0.05, color: 'brown', pan: A.r(-0.3, 0.3) }); }, 3);
+    A.every(28, 50, t => amb(A, 'templeBell', t, { v: 0.6, pan: A.r(-0.6, 0.6), rev: 0.85 }), 6);
+    A.every(14, 30, t => amb(A, 'snowfall', t, { v: A.r(0.5, 1), pan: A.r(-0.7, 0.7), rev: 0.35 }), 8);
+  },
 };
 
-// Biome ambience per Burrow theme (gen.js THEMES keys).
-export const BIOME_AMBIENCES = { burrow: 'dungeon', shrine: 'dungeon_shrine', kitchen: 'dungeon_kitchen', crystal: 'dungeon_crystal', moon: 'dungeon_moon' };
+// Biome ambience per Burrow theme (gen.js THEMES keys) and per outdoor region (layout.theme = region id).
+export const BIOME_AMBIENCES = { burrow: 'dungeon', shrine: 'dungeon_shrine', kitchen: 'dungeon_kitchen', crystal: 'dungeon_crystal', moon: 'dungeon_moon',
+  bamboo: 'region_bamboo', maple: 'region_maple', tidepool: 'region_tidepool', onsen: 'region_onsen' };
 
 export const AMBIENCE_NAMES = Object.keys(AMBIENCES);

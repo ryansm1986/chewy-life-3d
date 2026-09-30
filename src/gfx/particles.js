@@ -1,16 +1,25 @@
 // CPU-simulated, GPU-billboarded particle system. One instanced draw per (texture, blend) layer.
+// Optional texture atlas: new ParticleLayer(scene, atlasTex, { grid: 4 }) and spawn({ frame: 0..15 }) (frame 0 = top-left).
+// Dead particle records are recycled (no per-spawn garbage in long fights); an empty layer skips its draw call.
 import * as THREE from 'three';
 
 const VERT = /* glsl */`
 attribute vec3 iPos;
 attribute vec4 iColor;
 attribute vec3 iMisc; // size, rotation, stretch
+#ifdef ATLAS
+attribute float iFrame;
+uniform float uGrid;
+#endif
 varying vec2 vUv;
 varying vec4 vColor;
 uniform vec3 uCamRight;
 uniform vec3 uCamUp;
 void main() {
   vUv = uv;
+#ifdef ATLAS
+  vUv = (uv + vec2(mod(iFrame, uGrid), uGrid - 1.0 - floor(iFrame / uGrid))) / uGrid;
+#endif
   vColor = iColor;
   float s = iMisc.x, r = iMisc.y;
   vec2 q = position.xy;
@@ -31,10 +40,15 @@ void main() {
   gl_FragColor = c;
 }`;
 
+const _col = new THREE.Color();
+const _fwd = new THREE.Vector3();
+const FREE_MAX = 1024;
+
 export class ParticleLayer {
-  constructor(scene, map, { additive = true, max = 3000, depthTest = true, order = 10 } = {}) {
+  constructor(scene, map, { additive = true, max = 3000, depthTest = true, order = 10, grid = 0 } = {}) {
     this.max = max; this.n = 0;
     this.p = []; // particle objects
+    this.free = []; // recycled particle objects
     const g = new THREE.InstancedBufferGeometry();
     const quad = new THREE.PlaneGeometry(1, 1);
     g.index = quad.index; g.attributes.position = quad.attributes.position; g.attributes.uv = quad.attributes.uv;
@@ -42,42 +56,48 @@ export class ParticleLayer {
     this.aCol = new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4); this.aCol.setUsage(THREE.DynamicDrawUsage);
     this.aMisc = new THREE.InstancedBufferAttribute(new Float32Array(max * 3), 3); this.aMisc.setUsage(THREE.DynamicDrawUsage);
     g.setAttribute('iPos', this.aPos); g.setAttribute('iColor', this.aCol); g.setAttribute('iMisc', this.aMisc);
+    this.aFrame = null;
+    if (grid > 1) { this.aFrame = new THREE.InstancedBufferAttribute(new Float32Array(max), 1); this.aFrame.setUsage(THREE.DynamicDrawUsage); g.setAttribute('iFrame', this.aFrame); }
     g.instanceCount = 0;
     this.uniforms = { uMap: { value: map }, uCamRight: { value: new THREE.Vector3(1, 0, 0) }, uCamUp: { value: new THREE.Vector3(0, 1, 0) } };
+    if (grid > 1) this.uniforms.uGrid = { value: grid };
     this.mat = new THREE.ShaderMaterial({
       vertexShader: VERT, fragmentShader: FRAG, uniforms: this.uniforms, transparent: true, depthWrite: false, depthTest,
-      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, defines: grid > 1 ? { ATLAS: '' } : {},
     });
     this.mesh = new THREE.Mesh(g, this.mat);
     this.mesh.frustumCulled = false; this.mesh.renderOrder = order;
     this.geo = g;
     scene.add(this.mesh);
   }
-  // spawn one particle; o: {x,y,z, vx,vy,vz, life, size, size1, color(THREE.Color|hex), alpha, alpha1, rot, spin, drag, grav, stretch, fn}
+  // spawn one particle; o: {x,y,z, vx,vy,vz, life, size, size1, color(THREE.Color|hex), color1, alpha, alpha1, rot, spin, drag, grav,
+  // stretch, fn(q, dt, k), fadeIn, flicker, frame (atlas layers)} → the particle record (fn may keep extra fields on it)
   spawn(o) {
-    if (this.p.length >= this.max) this.p.shift();
-    const c = o.color instanceof THREE.Color ? o.color : new THREE.Color(o.color ?? '#ffffff');
-    this.p.push({
-      x: o.x, y: o.y, z: o.z, vx: o.vx || 0, vy: o.vy || 0, vz: o.vz || 0, t: 0, life: o.life || 1,
-      s0: o.size ?? 0.3, s1: o.size1 ?? (o.size ?? 0.3), r: c.r, g: c.g, b: c.b, c1: o.color1 ? new THREE.Color(o.color1) : null,
-      a0: o.alpha ?? 1, a1: o.alpha1 ?? 0, rot: o.rot ?? Math.random() * 6.28, spin: o.spin || 0, drag: o.drag ?? 0, grav: o.grav ?? 0,
-      stretch: o.stretch || 1, fn: o.fn || null, fadeIn: o.fadeIn || 0, flicker: o.flicker || 0,
-    });
+    if (this.p.length >= this.max) { const old = this.p.shift(); if (this.free.length < FREE_MAX) this.free.push(old); }
+    const c = o.color instanceof THREE.Color ? o.color : _col.set(o.color ?? '#ffffff');
+    const q = this.free.pop() || { _c1: null };
+    q.x = o.x; q.y = o.y; q.z = o.z; q.vx = o.vx || 0; q.vy = o.vy || 0; q.vz = o.vz || 0; q.t = 0; q.life = o.life || 1;
+    q.s0 = o.size ?? 0.3; q.s1 = o.size1 ?? (o.size ?? 0.3); q.r = c.r; q.g = c.g; q.b = c.b;
+    q.c1 = o.color1 ? (q._c1 ||= new THREE.Color()).set(o.color1) : null;
+    q.a0 = o.alpha ?? 1; q.a1 = o.alpha1 ?? 0; q.rot = o.rot ?? Math.random() * 6.28; q.spin = o.spin || 0; q.drag = o.drag ?? 0; q.grav = o.grav ?? 0;
+    q.stretch = o.stretch || 1; q.fn = o.fn || null; q.fadeIn = o.fadeIn || 0; q.flicker = o.flicker || 0; q.frame = o.frame || 0;
+    this.p.push(q);
+    return q;
   }
   update(dt, camera) {
-    camera.matrixWorld.extractBasis(this.uniforms.uCamRight.value, this.uniforms.uCamUp.value, new THREE.Vector3());
+    camera.matrixWorld.extractBasis(this.uniforms.uCamRight.value, this.uniforms.uCamUp.value, _fwd);
     const P = this.p; let w = 0;
-    const pos = this.aPos.array, col = this.aCol.array, misc = this.aMisc.array;
+    const pos = this.aPos.array, col = this.aCol.array, misc = this.aMisc.array, fr = this.aFrame ? this.aFrame.array : null;
     for (let i = 0; i < P.length; i++) {
       const q = P[i];
       q.t += dt;
-      if (q.t >= q.life) continue;
+      if (q.t >= q.life) { if (this.free.length < FREE_MAX) { q.fn = null; this.free.push(q); } continue; }
       const k = q.t / q.life;
       q.vy -= q.grav * dt;
       const dr = Math.exp(-q.drag * dt); q.vx *= dr; q.vy *= dr; q.vz *= dr;
       q.x += q.vx * dt; q.y += q.vy * dt; q.z += q.vz * dt;
       q.rot += q.spin * dt;
-      if (q.fn) q.fn(q, dt, k);
+      if (q.fn) { q.fn(q, dt, k); if (q.t >= q.life) { if (this.free.length < FREE_MAX) { q.fn = null; this.free.push(q); } continue; } }
       P[w++] = q;
       const j = w - 1;
       if (j >= this.max) continue;
@@ -89,11 +109,14 @@ export class ParticleLayer {
       if (q.c1) { r += (q.c1.r - r) * k; g += (q.c1.g - g) * k; b += (q.c1.b - b) * k; }
       col[j * 4] = r; col[j * 4 + 1] = g; col[j * 4 + 2] = b; col[j * 4 + 3] = Math.max(0, a);
       misc[j * 3] = q.s0 + (q.s1 - q.s0) * k; misc[j * 3 + 1] = q.rot; misc[j * 3 + 2] = q.stretch;
+      if (fr) fr[j] = q.frame;
     }
     P.length = w;
     this.geo.instanceCount = Math.min(w, this.max);
+    this.mesh.visible = w > 0;
     this.aPos.needsUpdate = true; this.aCol.needsUpdate = true; this.aMisc.needsUpdate = true;
+    if (this.aFrame) this.aFrame.needsUpdate = true;
   }
-  clear() { this.p.length = 0; this.geo.instanceCount = 0; }
+  clear() { for (const q of this.p) if (this.free.length < FREE_MAX) { q.fn = null; this.free.push(q); } this.p.length = 0; this.geo.instanceCount = 0; this.mesh.visible = false; }
   dispose() { this.mesh.parent?.remove(this.mesh); this.geo.dispose(); this.mat.dispose(); }
 }

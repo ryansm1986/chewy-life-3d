@@ -5,16 +5,20 @@
 // (facing, gestures, emotes, babble), greet and watch Chewy, and never walk through Chewy, Shadow or each other
 // (look-ahead sidestep + soft separation). Everybody has a bedtime: at night they walk to their doorstep, turn to the
 // door, step in (warm light spill, door sound) and are tucked in; in the morning they step back out the same way.
-// Chewy can knock on a door at night; a villager an active quest step needs waits up on the doorstep instead.
-// Talking to Chewy pauses everything.
+// Chewy can knock on a door at night: the villager shuffles out in a nightcap, yawns, mumbles a sleepy hello and a
+// goodnight (no shop / request menus), waves and goes back to bed. A villager an active quest step needs waits up on
+// the doorstep instead (and talks normally). Talking to Chewy pauses everything.
 import * as THREE from 'three';
 import { Actor } from './actor.js';
 import { buildHumanoid } from './charKit.js';
 import { rand, chance, dist, pick, clamp, damp, angleDiff } from '../core/util.js';
 import { Events } from '../core/events.js';
-import { VillageLife, propGeo, ROD_TIP, CAN_SPOUT, BROOM_HEAD } from './villageLife.js';
+import { Input } from '../core/input.js';
+import { VillageLife, propGeo, nightcapGeo, ROD_TIP, CAN_SPOUT, BROOM_HEAD } from './villageLife.js';
 import { gibberish } from '../audio/babble.js';
 import { SEAT_LIFT } from './lifePoses.js';
+import { NIGHT_CHAT } from '../world/story.js';
+import { heroText } from '../rpg/classes.js';
 
 const PLAYER_VR = 0.36, PET_VR = 0.34;
 const _dir = new THREE.Vector3(), _prev = new THREE.Vector3(), _w = new THREE.Vector3();
@@ -53,16 +57,23 @@ const LIKES = {
   pan: { bench: 3.5, rim: 2, chat: 1.5 },
   tanu: { counter: 3.5, browse: 2.5, chat: 2 },
   kero: { fish: 5, admire: 1.5 },
+  // the heroes on their day off (docs/HEROES.md §5): Chewy fishes, naps on benches and bothers everyone for a chat;
+  // Moka reads the notice board, browses the shops and sits by the fountain (water!)
+  chewy: { fish: 2.5, bench: 2, chat: 2.5, admire: 1.5, stroll: 1.5 },
+  moka: { board: 3.5, browse: 2.5, rim: 2.5, fish: 1.8, garden: 1.6, chat: 2 },
 };
 const FOLK_LIKES = ['bench', 'garden', 'farm', 'fish', 'counter', 'browse', 'admire', 'sweep', 'chat', 'onsen', 'board'];
 // bedtimes [in, out] in game hours. Rosie keeps her shop lit a little later; Kitsune (lantern gazing) and Kero (night
 // fishing, the hot spring) are the night owls, but the whole cast is tucked in by 23:30. Townsfolk head home at dusk
 // (19:15-20:00) and wake 5:30-6:30, staggered so doors open one by one.
-const BED = { rosie: [22.9, 6.6], mochi: [21.6, 7.0], usagi: [20.8, 6.0], kuma: [21.0, 5.8], kitsune: [23.3, 7.6], pan: [22.2, 8.0], tanu: [22.6, 7.2], kero: [23.0, 6.4] };
+const BED = { chewy: [22.4, 7.0], moka: [22.0, 6.6], rosie: [22.9, 6.6], mochi: [21.6, 7.0], usagi: [20.8, 6.0], kuma: [21.0, 5.8], kitsune: [23.3, 7.6], pan: [22.2, 8.0], tanu: [22.6, 7.2], kero: [23.0, 6.4] };
+// nightcap colours (townsfolk pick one from their id)
+const CAP_COLOR = { chewy: '#e0443a', moka: '#5cc8b8', rosie: '#ff8fb0', mochi: '#ffb3cf', usagi: '#9fe0c0', kuma: '#8fb8ff', kitsune: '#c9a0ff', pan: '#ffd36e', tanu: '#8fd0ff', kero: '#ffb07a' };
+const CAP_FOLK = ['#8fb8ff', '#ffb3cf', '#9fe0c0', '#c9a0ff', '#ffd36e', '#ffb07a'];
 
 export class Villager extends Actor {
-  constructor(world, G, spec, { id, anchor, home = null, wander = 5, role = 'villager' } = {}) {
-    super(world, buildHumanoid(spec), { radius: 0.28, speed: 1.6, name: spec.name });
+  constructor(world, G, spec, { id, anchor, home = null, wander = 5, role = 'villager', rig = null } = {}) {
+    super(world, rig || buildHumanoid(spec), { radius: 0.28, speed: 1.6, name: spec.name });
     this.G = G; this.id = id || spec.name.toLowerCase(); this.spec = spec;
     this.anchor = new THREE.Vector3(anchor.x, 0, anchor.z);
     this.home = home; this.wanderR = wander; this.role = role;
@@ -70,7 +81,7 @@ export class Villager extends Actor {
     this.talking = false; this.greeted = 0;
     this.setPos(anchor.x + rand(-1, 1), anchor.z + rand(-1, 1));
     this.faceTarget = rand(0, Math.PI * 2);
-    this.interact = { pos: this.pos, radius: 1.3, label: `Talk to ${spec.name}`, onInteract: () => this.G.talkTo?.(this), actor: this };
+    this.interact = { pos: this.pos, radius: 1.3, label: `Talk to ${spec.name}`, onInteract: () => this.interacted(), actor: this };
     // daily life
     this.life = null; this.warm = false;
     this.act = null; this.chat = null; this.benchChat = null; this.chatCD = rand(4, 20); this.chatTalk = 0;
@@ -82,11 +93,46 @@ export class Villager extends Actor {
     // home & bedtime (see villageLife.homeFor / doorInfo)
     this.homeRec = null; this.homeInfo = null; this._hv = -1; this.bedNow = false; this.homeTries = 0;
     this.door = null; this.doorScale = 1; this.doorLift = 0; this.knocked = false; this.knockT = 0; this.needT = 0; this.needOut = false;
+    this.knockWait = 0; this.sleepy = false; this.sleepyWait = 0; this.zzzT = 0; this.cap = null; // woken by a knock
+    // a hero nobody is playing (heroes.js): lives in Chewy's house, no hearts / gifts / quests
+    this.hero = role === 'hero'; this.homeFixed = this.hero;
+    this.frozen = false; // Moka before she joins: waits by the fountain
+  }
+  dispose() {
+    this.line?.geometry.dispose(); // the fishing line (props and the bobber share cached geometry)
+    super.dispose();
+  }
+  /** Leaving town for good (a hero about to be played): let go of seats, chats, door prompts. */
+  retire() {
+    this.clearTask();
+    if (this.benchChat) this.endBenchChat();
+    this.setNightcap(false);
+    if (this.homeRec) this.life?.wakeUp(this, this.homeRec);
+    this.talking = false; this.visible = true;
+  }
+  // waiting to be met (Moka by the fountain): reads a little, looks up and waves when the player comes close
+  frozenTick(dt, p, pd) {
+    const w = this.scriptWalk; // a scripted entrance (heroes.introJoin): trot to a spot, then carry on
+    if (w) {
+      w.t += dt;
+      if (this.moveTo(w.x, w.z, dt, w.speed, 0.2) || w.t > 8) { this.scriptWalk = null; w.done?.(); }
+      return;
+    }
+    this.greeted -= dt;
+    if (p && pd < 7) { this.faceTo(p.pos.x, p.pos.z); if (this.greeted <= 0 && pd < 4.5 && !this.talking) { this.greeted = 12; this.anim.play('wave'); this.emote('!'); } }
+    else if (!this.anim.action && (this.fidgetT -= dt) <= 0) { this.fidgetT = rand(5, 9); this.anim.play(pick(['lookAround', 'nod', 'stretch'])); }
   }
   get hour() { return this.G.day?.hour ?? 12; }
   update(dt) {
     const G = this.G;
     const life = this.life || (this.life = VillageLife.get(G));
+    if (this.frozen) {
+      const p = G.player, pd = p ? dist(p.pos.x, p.pos.z, this.pos.x, this.pos.z) : 99;
+      if (this.talking && p) this.faceTo(p.pos.x, p.pos.z); else this.frozenTick(dt, p, pd);
+      this.interact.pos = this.pos; this.anim.talk = this.talking ? 0.8 : 0;
+      super.update(dt);
+      return;
+    }
     if (!life) return this.legacyUpdate(dt);
     life.frame();
     if (this._hv !== life.ver) this.resolveHome(life);
@@ -97,7 +143,8 @@ export class Villager extends Actor {
       this.knockT += dt;
       if (this.wasTalking || this.knockT > 4) this.knocked = false;
     }
-    const bed = this.bedNow = inBed && !need && !this.knocked;
+    const bed = this.bedNow = inBed && !need && !(this.knocked && this.knockT >= this.knockWait); // (a knock: a moment to get to the door)
+    if (this.sleepy && !inBed && !this.talking && !this.knocked && !this.door && this.sleepyWait <= 0) { this.sleepy = false; this.setNightcap(false); } // knocked up at dawn: it's morning now
     if (!this.warm) { this.warm = true; if (life.warmup()) { if (bed) this.tuckIn(true); else if (chance(0.75)) this.decide(true); } }
     // someone else (intro, tests, story) reset us to idle: drop whatever we were doing
     if (this.state === 'idle' && (this.act || this.goal || this.chat)) this.clearTask();
@@ -105,8 +152,13 @@ export class Villager extends Actor {
     if (this.talking) {
       if (!this.wasTalking) this.onTalk();
       if (p) { this.faceTo(p.pos.x, p.pos.z); this.faceTarget += this.faceBias || 0; }
+      if (this.sleepy) this.drowsyTick(dt);
     } else if (this.door) {
       this.doorTick(dt, pd);
+    } else if (this.sleepyWait > 0) { // just opened the door mid-yawn: blink at Chewy, then mumble
+      this.sleepyWait -= dt;
+      if (p) this.faceTo(p.pos.x, p.pos.z);
+      if (this.sleepyWait <= 0) this.sleepyAnswer();
     } else if (bed) {
       this.nightTick(dt, pd);
     } else if (!this.visible && this.state !== 'inside') {
@@ -508,6 +560,7 @@ export class Villager extends Actor {
   tuckIn(silent) {
     this.clearTask();
     if (this.seated) this.seated = false;
+    if (this.sleepy || this.cap) { this.sleepy = false; this.sleepyWait = 0; this.setNightcap(false); }
     if (!silent && this.visible) this.G.vfx?.dust?.(this.pos, { n: 5, color: '#ffffff', size: 0.45 });
     this.door = null; this.doorScale = 1; this.doorLift = 0; this.homeTries = 0;
     this.visible = false; this.state = 'hidden';
@@ -518,11 +571,11 @@ export class Villager extends Actor {
     const H = this.homeInfo;
     this.clearTask();
     if (!H) return this.tuckIn(false);
-    const p = this.G.player, bye = p && !this.G.playerDead && pd < 6 && chance(0.75);
+    const p = this.G.player, bye = p && !this.G.playerDead && (this.sleepy || (pd < 6 && chance(0.75)));
     const sh = clamp(dist(H.step.x, H.step.z, this.pos.x, this.pos.z) / 1.6, 0.4, 1.5); // shuffle onto the step
-    this.door = { dir: 'in', t: 0, H, sx: this.pos.x, sz: this.pos.z, sh, bye: bye ? 1.15 : 0, open: false };
+    this.door = { dir: 'in', t: 0, H, sx: this.pos.x, sz: this.pos.z, sh, bye: bye ? (this.sleepy ? 1.7 : 1.15) : 0, open: false };
     this.state = 'door'; this.homeTries = 0;
-    if (bye) { this.faceTo(p.pos.x, p.pos.z); this.anim.play('wave'); this.emote(chance(0.5) ? 'zzz' : 'heart'); }
+    if (bye) { this.faceTo(p.pos.x, p.pos.z); this.anim.play('wave'); this.emote(this.sleepy || chance(0.5) ? 'zzz' : 'heart'); }
   }
   // morning (or a knock): the door opens and we step out onto the doorstep
   stepOut() {
@@ -534,7 +587,60 @@ export class Villager extends Actor {
     this.door = { dir: 'out', t: 0, H, open: false };
     this.state = 'door'; this.doorScale = 0.62; this.doorLift = 1;
   }
-  answerDoor() { if (this.visible || this.door) return; this.knocked = true; this.knockT = 0; }
+  answerDoor() {
+    if (this.visible || this.door || this.knocked) return;
+    this.knocked = true; this.knockT = 0;
+    // woken up: a sleepy answer (nightcap, yawn, a drowsy goodnight) — unless a quest step needs us, then a normal chat
+    this.sleepy = this.inBed() && !this.needOut && this.G.story?.markerFor?.(this.id) !== '!';
+    this.knockWait = this.sleepy ? 1.3 : 0.3; // shuffling to the door takes a moment
+    if (this.sleepy) this.setNightcap(true);
+  }
+  interacted() {
+    if (this.sleepy) { // off back to bed: a sleepy wave is all Chewy gets now
+      if (!this.talking && this.anim.action?.name !== 'wave') { this.anim.play('wave'); this.emote('zzz'); }
+      return;
+    }
+    this.G.talkTo?.(this);
+  }
+  // the nightcap (the day hat, if any, goes on the hook: its baked bone is scaled away) — on the head's hat anchor
+  setNightcap(on) {
+    const P = this.rig.parts, head = P.head, anchor = P.hatAnchor;
+    if (on && !this.cap && head) {
+      const f = ((parseInt(this.id.replace(/\D/g, ''), 10) || this.id.length) * 7) % CAP_FOLK.length;
+      const m = this.cap = new THREE.Mesh(nightcapGeo(CAP_COLOR[this.id] || CAP_FOLK[f]), this.rig.propMat || this.rig.mat);
+      m.scale.setScalar(anchor?.userData.hatScale ?? 1); // sculpted (Disney-style) heads carry a smaller hat anchor
+      m.castShadow = true;
+      if (anchor && anchor.parent === head) m.position.copy(anchor.position); else m.position.set(0, 0.4, 0);
+      m.rotation.set(-0.1, 0.35, -0.12);
+      head.add(m);
+      if (anchor) anchor.scale.setScalar(0.001);
+      P.hatBone?.scale.setScalar(0.001); // (Moka's sculpted wizard hat)
+    } else if (!on && this.cap) {
+      this.cap.parent?.remove(this.cap); this.cap = null;
+      if (anchor) anchor.scale.setScalar(anchor.userData.hatScale ?? 1);
+      P.hatBone?.scale.setScalar(1);
+    }
+    this.interact.label = this.cap ? `Goodnight, ${this.spec.name}` : `Talk to ${this.spec.name}`;
+  }
+  // Chewy knocked after bedtime: two drowsy lines and a goodnight, no menus (story.js NIGHT_CHAT)
+  sleepyAnswer() {
+    const G = this.G, P = G.player;
+    if (this.talking) return;
+    const L = NIGHT_CHAT[this.folk ? 'folk' : this.id] || NIGHT_CHAT.folk;
+    this.talking = true; if (P) P.controlLocked = true;
+    this.zzzT = 2.5;
+    const done = () => {
+      this.talking = false; if (P) P.controlLocked = false;
+      G.interactCooldown = performance.now() + 350; Input.consume('f');
+    };
+    const say = G.ui?.dialogue ? G.ui.dialogue({ speaker: this.spec.name, portrait: G.portrait?.(this.id), lines: [pick(L.hi), pick(L.bye)].map(l => heroText(l, G.state)), choices: [{ text: 'Sorry! Sleep tight 🌙' }], voice: this.spec.voice }) : Promise.resolve(null);
+    say.then(done, done);
+  }
+  // listening half asleep: a drowsy sway with a nod-off every few seconds, a "zzz" now and then
+  drowsyTick(dt) {
+    if (!this.anim.action) this.anim.play('drowsy');
+    if ((this.zzzT -= dt) <= 0) { this.zzzT = rand(3.5, 5); this.emote('zzz'); }
+  }
   doorTick(dt, pd) {
     const D = this.door, H = D.H, pos = this.pos;
     D.t += dt;
@@ -563,7 +669,10 @@ export class Villager extends Actor {
     this.doorScale = 0.62 + 0.38 * Math.sqrt(e);
     if (u < 1) return;
     this.door = null; this.doorScale = 1; this.doorLift = 0; this.state = 'idle'; this.t = rand(1.5, 3);
-    if (this.knocked) { // Chewy knocked: blink at him, then chat
+    if (this.knocked && this.sleepy) { // woken up: a big yawn, "zzz", then a mumbled hello (update → sleepyAnswer)
+      this.sleepyWait = 1.0; this.emote('zzz'); this.anim.play('sleepyYawn');
+      if (pd < 18) Events.emit('sfx', 'yawn', { pos: this.pos, pitch: this.spec.voice || 1, vol: 0.9 });
+    } else if (this.knocked) { // Chewy knocked: blink at him, then chat
       this.emote('?');
       this.G.talkTo?.(this);
     } else {
@@ -791,14 +900,14 @@ export class Villager extends Actor {
     if (!kind) return;
     const P = this.props || (this.props = {});
     let m = P[kind];
-    if (!m) { m = P[kind] = new THREE.Mesh(propGeo(kind), this.rig.mat); m.castShadow = true; }
+    if (!m) { m = P[kind] = new THREE.Mesh(propGeo(kind), this.rig.propMat || this.rig.mat); m.castShadow = true; }
     m.rotation.set(0, 0, 0); m.position.set(0, -0.02, 0.02);
     this.rig.parts.handR.add(m); this.prop = m;
     if (kind === 'rod') {
       if (!this.line) {
         const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
         this.line = new THREE.Line(g, lineMat); this.line.frustumCulled = false;
-        this.bobber = new THREE.Mesh(propGeo('bobber'), this.rig.mat); this.bobber.castShadow = false;
+        this.bobber = new THREE.Mesh(propGeo('bobber'), this.rig.propMat || this.rig.mat); this.bobber.castShadow = false;
       }
       this.world.scene.add(this.line, this.bobber);
     }

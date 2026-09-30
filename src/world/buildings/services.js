@@ -8,6 +8,7 @@ import { chochin, toro, pot, barrel, crate, bush, tree, flowerPatch, signboard, 
 import { nobori, bucket, stoneDog, shimenawa, pinwheel } from './props2.js';
 import { symbol, flatSymbol } from './symbols.js';
 import { LAMP } from './homes.js';
+import { charm, rainChain, emaRack, omikuji, tanabata, towelRack, namePlate, eaveCharm } from './trim.js';
 import { clamp, TAU } from '../../core/util.js';
 
 // ------------------------------------------------------------------ well (1x1)
@@ -157,6 +158,9 @@ export function shrine(B) {
   for (const x of [-1.2, 1.2]) B.at([x, 0, 1.0], 0, () => toro(B, { s: 0.6 }));
   B.at([-1.1, 0, -1.1], 0, () => tree(B, { kind: 'sakura', s: 0.6 }));
   B.at([1.2, 0, -1.2], 0, () => bamboo(B, { n: 3, h: 1.6, spread: 0.2 }));
+  // wishes: an ema rack on one side of the approach, an omikuji line tied full of fortunes on the other
+  B.at([-1.3, 0, -0.1], PI / 2, () => emaRack(B, { w: 0.7, h: 0.9 }));
+  B.at([1.32, 0, -0.1], -PI / 2, () => omikuji(B, { w: 0.75, h: 0.85 }));
   stepStones(B, 0, 0.35, 0, 1.45, 3);
   B.light([0, 1.2, 0.3], { color: '#ffc070', intensity: 3, radius: 6, flicker: 0.6 });
   B.door.set(0, 0, 1.5);
@@ -199,7 +203,10 @@ export function onsen(B) {
     });
     roof(B, { type: 'gable', w, d, y0: y0 + h, over: 0.26, gOver: 0.2, H: 0.55, curve: 0.3, lift: 0.14, liftW: 0.35, thick: 0.1, ribW: 0.22, ribAmp: 0.03, color: ROOFS.teal, vent: false });
     B.at([0, y0 + h + 0.05, d / 2 + 0.3], 0, () => chochin(B, { r: 0.1, h: 0.2, cord: 0.05, color: '#fff0d0' }));
+    B.at([-0.42, y0 + h + 0.02, d / 2 + 0.2], 0, () => charm(B, 'furin', { color: '#bfe6ff' }));
   });
+  // towels drying on a rack behind the pool
+  B.at([0.2, 0, -1.45], 0, () => towelRack(B, { colors: ['#ffffff', '#8fd0ff'] }));
   // wooden buckets + stools + towel
   B.at([0.95, 0, 0.9], 0, () => { bucket(B, { r: 0.12, h: 0.16 }); B.at([0, 0.16, 0], 0.3, () => bucket(B, { r: 0.11, h: 0.15 })); });
   B.at([1.35, 0, 0.55], 0, () => bucket(B, { r: 0.12, h: 0.16, water: true }));
@@ -239,6 +246,11 @@ export function clinic(B) {
     const ring = G.torus(0.36, 0.04, 5, 20); B.add(ring, '#ff7a8a');
     B.at([0, 0, 0.04], 0, () => symbol(B, 'pawHeart', 0.52));
   });
+  // opening-hours plaque by the door, a bell, a wind chime and a rain chain at the right corner
+  onFace(B, blk, 'f', 0.93, y0 + 0.92, () => namePlate(B, { w: 0.14, h: 0.28, wood: '#fff6f0' }));
+  eaveCharm(B, info, 0.8, d / 2 + 0.22, 'bell');
+  eaveCharm(B, info, -0.35, d / 2 + 0.22, 'furin', { color: '#ffd0d8' });
+  { const cx = w / 2 + 0.14, cz = d / 2 - 0.05; rainChain(B, cx, info.underAt(cx, cz), cz, 0, { color: '#9ab0b8' }); }
   B.pop();
   B.at([-0.85, 0, 1.05], 0, () => bench(B, { w: 0.9, wood: '#e8f0ee', legs: '#8aa0a8' }));
   B.at([1.2, 0, 1.2], 0, () => pot(B, { plant: 'flowers', flowers: ['#ff8fb0', '#ffffff'] }));
@@ -265,7 +277,12 @@ export function school(B) {
   const info = roof(B, { type: 'irimoya', w, d, y0: y0 + h, over: 0.4, H: 0.9, curve: 0.4, lift: 0.26, liftW: 0.7, thick: 0.14, ribW: 0.28, color: roofCol, gable: 'plaster', tg: 0.52 });
   onFace(B, blk, 'f', 0, y0 + h - 0.02, () => B.at([0, 0, 0.26], 0, () => roof(B, { type: 'shed', w: 1.2, d: 0.46, y0: -0.04, over: 0.1, gOver: 0.12, H: 0.18, curve: 0.2, lift: 0.1, liftW: 0.3, thick: 0.07, ribW: 0.22, ribAmp: 0.03, course: 0, color: roofCol })));
   B.at([0, y0 + h + 0.35, d / 2 + 0.12], 0, () => signboard(B, { sym: 'book', w: 0.7, h: 0.36, symSize: 0.3 }));
+  // children's touches: teru teru bozu in a row under the front eave, a rain chain at the left corner
+  for (let i = 0; i < 3; i++) eaveCharm(B, info, -1.35 + i * 0.16, d / 2 + 0.2, 'teru', { color: ['#ff7a8a', '#6ab0ff', '#ffd24a'][i] });
+  { const cx = -(w / 2 + 0.14), cz = d / 2 - 0.05; rainChain(B, cx, info.underAt(cx, cz), cz, 0); }
   B.pop();
+  // tanabata bamboo full of wishes beside the entrance
+  B.at([-1.0, 0, 0.62], 0, () => tanabata(B, { h: 2.0 }));
   // bell tower (right)
   const tx = 1.45, tz = -0.55, tH = 2.6;
   B.push([tx, 0, tz]);

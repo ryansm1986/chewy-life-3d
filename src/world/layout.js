@@ -5,7 +5,7 @@ export const LANDMARKS = {
   plaza: { x: 56, z: 60.5 },
   spawn: { x: 57.5, z: 63.6 },
   townHall: { x: 56, z: 51, w: 6, d: 4, rot: 0 },
-  chewyHouse: { x: 45.5, z: 63.5, w: 3, d: 3, rot: Math.PI / 2 },
+  chewyHouse: { x: 45.5, z: 63.5, w: 3, d: 3, rot: -Math.PI / 2 }, // door east (+x), onto its path
   rosieShop: { x: 66.5, z: 57.5, w: 4, d: 3, rot: -Math.PI / 2 },
   dungeon: { x: 90, z: 38.5 },       // torii + burrow entrance on the shrine hill
   shrine: { x: 88, z: 42 },
@@ -13,6 +13,7 @@ export const LANDMARKS = {
   pond: { x: 71, z: 73 },
   waterfall: { x: 50, z: 12.5 },
   beach: { x: 48, z: 98 },
+  travel: { x: 21.4, z: 53.2, rot: 0.35 }, // the Wayfarer's Post at the end of the west trail (docs/REGIONS.md)
 };
 
 export const PATHS = [
@@ -68,7 +69,7 @@ export function applyLayout(terrain) {
 export const CAMERA_SIDE = 7;
 const SIGHTLINES = [
   // [landmark key, extra side clearance, camera-side reach]
-  ['townHall', 2.5, CAMERA_SIDE], ['rosieShop', 2.5, CAMERA_SIDE + 1], ['chewyHouse', 2.5, CAMERA_SIDE], ['dungeon', 2, CAMERA_SIDE],
+  ['townHall', 2.5, CAMERA_SIDE], ['rosieShop', 2.5, CAMERA_SIDE + 1], ['chewyHouse', 2.5, CAMERA_SIDE], ['dungeon', 2, CAMERA_SIDE], ['travel', 1.2, CAMERA_SIDE - 1],
 ];
 export function treeKeepOut(x, z, canopy = 2) {
   const P = LANDMARKS.plaza;
@@ -96,5 +97,6 @@ export function reservedAt(x, z) {
   if (Math.hypot(x - LANDMARKS.dungeon.x, z - LANDMARKS.dungeon.z) < 8) return true;
   if (Math.hypot(x - LANDMARKS.plaza.x, z - LANDMARKS.plaza.z) < 11.5) return true;
   if (Math.hypot(x - LANDMARKS.bridgeW.x, z - LANDMARKS.bridgeW.z) < 5.5) return true;
+  if (Math.hypot(x - LANDMARKS.travel.x, z - LANDMARKS.travel.z) < 3.2) return true;
   return false;
 }

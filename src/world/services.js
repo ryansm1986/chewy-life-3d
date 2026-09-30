@@ -31,7 +31,10 @@ export function installServices(G) {
   };
   // ---------------------------------------------------------------- Chewy's cottage
   G.openHome = () => lock(async () => {
-    const c = await say("Chewy's Cottage", ['Home sweet home. Shadow is already curled up on the cushion.'], [{ text: 'Open my treasure chest (stash)' }, { text: 'Sleep until morning 💤' }, { text: 'Leave' }], G.portrait?.('chewy'));
+    // the hero you're not playing lives here too: say what they're up to if they're home
+    const H = G.heroes, other = H?.villagers?.[H.next?.() || ''], home = other && (!other.visible || other.state === 'inside' || other.state === 'hidden');
+    const OTHER = { moka: 'Moka is snoozing on a pile of library books, one ear flopped over her nose.', chewy: 'Chewy is snoring in his basket, still hugging his tennis ball.' };
+    const c = await say("Chewy's Cottage", ['Home sweet home. Shadow is already curled up on the cushion.', ...(home && OTHER[other.id] ? [OTHER[other.id]] : [])], [{ text: 'Open my treasure chest (stash)' }, { text: 'Sleep until morning 💤' }, { text: 'Leave' }], G.portrait?.(G.state.activeHero || 'chewy'));
     if (c === 0) ui()?.open?.('stash');
     else if (c === 1) G.sleep();
   });

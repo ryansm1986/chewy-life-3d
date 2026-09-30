@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { Events } from '../core/events.js';
 import { BUILDINGS } from '../world/buildings/index.js';
 import { T, WORLD } from '../world/terrain.js';
-import { paint, merge, xf } from '../gfx/geom.js';
+import { paint, merge, xf, tube } from '../gfx/geom.js';
 import { rand, TAU } from '../core/util.js';
 import { GridAStar } from '../core/nav.js';
 
@@ -163,6 +163,22 @@ function buildProps() {
   PROP_GEO = { broom, can, rod: rodG, bobber: bob };
 }
 export function propGeo(kind) { if (!PROP_GEO) buildProps(); return PROP_GEO[kind]; }
+// Nightcap for a villager woken by a knock: a striped cone that flops over to one side, a fluffy brim and a pom-pom.
+// Origin = the head's hat anchor (top of the head); one cached geometry per colour.
+const CAPS = new Map();
+export function nightcapGeo(color = '#8fb8ff') {
+  let g = CAPS.get(color); if (g) return g;
+  const main = col(color), cream = col('#fff6e8');
+  const curve = new THREE.CatmullRomCurve3([[0, -0.03, 0], [0.01, 0.12, -0.01], [0.05, 0.25, -0.03], [0.15, 0.31, -0.05], [0.25, 0.25, -0.06], [0.29, 0.13, -0.06]].map(a => new THREE.Vector3(...a)));
+  const N = 20, RAD = 14, pts = [];
+  for (let i = 0; i <= N; i++) { const u = i / N; pts.push({ p: curve.getPoint(u), r: 0.235 * Math.pow(1 - u, 1.25) + 0.022 }); }
+  const cone = paint(tube(pts, RAD, true), (p, n, o, i) => o.copy(Math.floor(i / (RAD + 1)) % 5 >= 3 ? cream : main));
+  const brim = paint(xf(new THREE.TorusGeometry(0.235, 0.05, 8, 22), { p: [0, -0.03, 0], r: [Math.PI / 2, 0, 0], s: [1, 1, 0.8] }), (p, n, o) => o.copy(cream).multiplyScalar(0.94 + 0.06 * n.y));
+  const pom = paint(xf(new THREE.IcosahedronGeometry(0.06, 1), { p: [0.3, 0.1, -0.06] }), (p, n, o) => o.copy(cream));
+  g = merge([cone, brim, pom]);
+  CAPS.set(color, g);
+  return g;
+}
 export const ROD_TIP = new THREE.Vector3(0, 0, 1.02);
 export const CAN_SPOUT = new THREE.Vector3(0, -0.01, 0.285);
 export const BROOM_HEAD = new THREE.Vector3(0, -0.74, 0);
@@ -492,7 +508,9 @@ export class VillageLife {
   dropKnock(k) { const a = this.world.interactables, i = a.indexOf(k.inter); if (i >= 0) a.splice(i, 1); }
   knock(rec) {
     const k = this.knocks.get(rec); const v = k && this.knockFirst(k);
-    if (v) v.answerDoor?.();
+    if (!v || v.knocked) return; // already on their way to the door
+    Events.emit('sfx', 'door_knock', { pos: k.inter.pos, vol: 0.9 });
+    v.answerDoor?.();
   }
   // conversation partner for v: a nearby villager who is free to stop and talk
   partner(v, maxD = 9) {

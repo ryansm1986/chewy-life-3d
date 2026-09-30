@@ -1,6 +1,7 @@
 // Renders cute 3D bust portraits of characters to data-URLs (cached) for dialogue boxes and panels.
 import * as THREE from 'three';
 import { buildHumanoid, buildBoston, CAST } from '../actors/charKit.js';
+import { heroModelReady, buildHeroModel } from '../actors/heroModels.js';
 import { U } from './materials.js';
 
 export class Portraits {
@@ -24,19 +25,24 @@ export class Portraits {
     return url;
   }
   render(id) {
-    const spec = id === 'chewy' ? CAST.chewy : id === 'rosie' ? CAST.rosie : this.specs.get(id);
-    const rig = id === 'shadow' ? buildBoston() : spec ? buildHumanoid(spec) : null;
+    const spec = id === 'chewy' ? CAST.chewy : id === 'rosie' ? CAST.rosie : this.specs.get(id) || (id === 'moka' ? CAST.moka : null);
+    // baked heroes (Chewy, Moka: heroModels.js) when loaded, else their kit spec
+    const rig = id === 'shadow' ? buildBoston() : heroModelReady(id) ? buildHeroModel(id) : spec ? buildHumanoid(spec) : null;
     if (!rig) return null;
     // hide outlines slightly thinner for close-ups
     rig.outMat.userData.width.value = 0.008;
     const head = rig.parts.head;
     rig.root.updateMatrixWorld(true);
     const hp = new THREE.Vector3(); head.getWorldPosition(hp);
+    // the baked Disney Chewy's head bone is at the neck; the sculpted kit heads are a size smaller than the classic ones
+    let big = rig.bakedDisney ? 1.3 : rig.disney ? 0.82 : 1;
+    if (rig.bakedDisney) hp.y += 0.1; else if (rig.disney) hp.y += 0.03;
+    if (id === 'moka') { big *= rig.bakedDisney ? 1.1 : rig.disney ? 1.3 : 1.15; hp.y += rig.bakedDisney ? 0.05 : 0.07; } // her hat brim and long ears in frame
     rig.root.rotation.y = -0.25;
     this.scene.add(rig.root);
     const quad = !!rig.quadruped;
     // head-and-shoulders framing (the Pokémon-style heads are smaller than the old ball heads)
-    this.cam.position.set(hp.x + 0.25, hp.y + (quad ? 0.1 : 0.06), hp.z + (quad ? 1.45 : 1.72));
+    this.cam.position.set(hp.x + 0.25 * big, hp.y + (quad ? 0.1 : 0.06), hp.z + (quad ? 1.45 : 1.72 * big));
     this.cam.lookAt(hp.x, hp.y - (quad ? 0.02 : 0.07), hp.z);
     const r = this.engine.renderer;
     const prevRT = r.getRenderTarget(), prevBg = this.scene.background;

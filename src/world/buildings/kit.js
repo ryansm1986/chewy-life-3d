@@ -108,6 +108,36 @@ export const G = {
   plane(w, h, sx = 1, sy = 1) { return new THREE.PlaneGeometry(w, h, sx, sy); },
   lathe(pts, seg = 10) { return new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg); },
   ico(r, detail = 1) { return new THREE.IcosahedronGeometry(r, detail); },
+  // Timber: a box whose four long edges are bevelled (flat facets catch the rim light like a planed beam).
+  // 28 triangles instead of the rounded box's 108. c = bevel size.
+  beam(w, h, d, c = 0.018) {
+    const L = Math.max(w, h, d), ax = L === w ? 0 : L === h ? 1 : 2;
+    const [a, b] = ax === 0 ? [h, d] : ax === 1 ? [w, d] : [w, h];
+    c = Math.min(c, a * 0.3, b * 0.3);
+    const ha = a / 2, hb = b / 2;
+    const ring = [[ha, hb - c], [ha - c, hb], [-ha + c, hb], [-ha, hb - c], [-ha, -hb + c], [-ha + c, -hb], [ha - c, -hb], [ha, -hb + c]];
+    const pos = [], hl = L / 2;
+    const P = (u, v, s) => (ax === 0 ? [s, u, v] : ax === 1 ? [u, s, v] : [u, v, s]);
+    for (let i = 0; i < 8; i++) {
+      const [u0, v0] = ring[i], [u1, v1] = ring[(i + 1) % 8];
+      pos.push(...P(u0, v0, -hl), ...P(u1, v1, -hl), ...P(u1, v1, hl), ...P(u0, v0, -hl), ...P(u1, v1, hl), ...P(u0, v0, hl));
+    }
+    for (let i = 1; i < 7; i++) {
+      const [u0, v0] = ring[0], [u1, v1] = ring[i], [u2, v2] = ring[i + 1];
+      pos.push(...P(u0, v0, hl), ...P(u1, v1, hl), ...P(u2, v2, hl), ...P(u0, v0, -hl), ...P(u2, v2, -hl), ...P(u1, v1, -hl));
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    // winding differs per axis permutation: fix orientation so every face points away from the centre
+    const p = g.attributes.position, e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), n = new THREE.Vector3(), cen = new THREE.Vector3();
+    const A = new THREE.Vector3(), Bv = new THREE.Vector3(), Cv = new THREE.Vector3();
+    for (let i = 0; i < p.count; i += 3) {
+      A.fromBufferAttribute(p, i); Bv.fromBufferAttribute(p, i + 1); Cv.fromBufferAttribute(p, i + 2);
+      n.crossVectors(e1.subVectors(Bv, A), e2.subVectors(Cv, A)); cen.copy(A).add(Bv).add(Cv);
+      if (n.dot(cen) < 0) { p.setXYZ(i + 1, Cv.x, Cv.y, Cv.z); p.setXYZ(i + 2, Bv.x, Bv.y, Bv.z); }
+    }
+    g.computeVertexNormals();
+    return g;
+  },
 };
 
 // Axis-aligned bar between two points (for beams, posts, rails)
@@ -139,6 +169,15 @@ export class Builder {
   pick(a) { return a[Math.floor(this.r() * a.length) % a.length]; }
   chance(p) { return this.r() < p; }
   wob(a = 0.04) { return (this.r() - 0.5) * 2 * a; }
+  // Detail RNG: a second stream for trim / dressing so adding details never reshuffles the main stream
+  // (tree shapes, stone jitter and yard props stay exactly as they were for every seed).
+  dr() { if (!this._dr) this._dr = mulberry32(((this.seed + 7) * 2246822519) >>> 0); return this._dr(); }
+  drand(a = 0, b = 1) { return a + (b - a) * this.dr(); }
+  dpick(a) { return a[Math.floor(this.dr() * a.length) % a.length]; }
+  dchance(p) { return this.dr() < p; }
+  dwob(a = 0.04) { return (this.dr() - 0.5) * 2 * a; }
+  // richness 0 (humble) .. 2 (rich); set per model in getTemplate (models.js DETAIL), 1 when unknown
+  get richness() { return this.detail ?? 1; }
   // transform stack. p:[x,y,z], ry yaw, s scale (number|[x,y,z]), rx/rz tilts
   push(p = [0, 0, 0], ry = 0, s = 1, rx = 0, rz = 0) {
     this.stack.push(this.m.clone());

@@ -3,8 +3,19 @@
 import { C, G, PI, ROOF_LIST, WALL_TINTS, ROOFS } from './kit.js';
 import { roof } from './roofs.js';
 import { foundation, walls, onFace, shoji, roundWindow, door, noren, engawa, posts, chimney, stepStones, flowerBox, hood, fence, FLOWERS } from './parts.js';
-import { chochin, pot, barrel, crate, bush, tree, flowerPatch } from './props.js';
+import { chochin, pot, barrel, crate, bush, tree, flowerPatch, mailbox } from './props.js';
+import { choppingBlock, firewood, laundry, wateringCan, hedge, veggieBed } from './props2.js';
 import { flatSymbol } from './symbols.js';
+import { eaveCharm, charm, broom, stoopStone, rainChain, futon, asagao, weeds } from './trim.js';
+
+const CHARMS = ['teru', 'garlic', 'persimmon', 'gourd', 'furin', 'teru'];
+// zabuton cushion + tea tray set out on an engawa (local, deck top at y=0)
+function teaSet(B) {
+  const cush = G.box(0.3, 0.05, 0.3, 0.02); cush.translate(0, 0.025, 0); B.add(cush, B.dpick(['#e86a6a', '#6a8ac8', '#8ac070', '#e8a04a']));
+  const tray = G.box(0.26, 0.02, 0.18, 0); tray.translate(0.34, 0.01, 0.02); B.add(tray, C.woodDark);
+  const pot = G.sph(0.05, 7, 5); pot.scale(1, 0.85, 1); pot.translate(0.3, 0.06, 0.02); B.add(pot, '#8aa88a');
+  const cup = G.cyl(0.022, 0.018, 0.04, 6); cup.translate(0.4, 0.04, 0.04); B.add(cup, '#fff6ea');
+}
 
 export const LAMP = { color: '#ffb468', intensity: 3.2, radius: 5.5, flicker: 0.6, nightOnly: true };
 const mossOf = c => (c === ROOFS.slate || c === ROOFS.teal || c === ROOFS.moss ? 0.35 : 0.05);
@@ -53,10 +64,23 @@ export function homeL1(B) {
   if (v % 2 === 0) chimney(B, -side * 0.35, -0.26, info.yAt(-side * 0.35, -0.26) - 0.25, info.ridgeY + 0.02, 0.85);
   B.at([dx + side * 0.48, y0 + h + 0.02, d / 2 + 0.22], 0, () => chochin(B, { r: 0.1, h: 0.2, cord: 0.08, color: v % 4 === 3 ? C.pink : C.red }));
   B.light([dx + side * 0.48, 1.25, d / 2 + 0.3], LAMP);
+  // a humble cottage's touches: a charm under the eave, a door stone, a broom against the side wall
+  eaveCharm(B, info, -side * 0.5, d / 2 + 0.16, CHARMS[(v + 1) % CHARMS.length]);
+  stoopStone(B, dx, y0 * 0.7, d / 2 + 0.2, 0.48);
+  onFace(B, blk, side > 0 ? 'r' : 'l', side > 0 ? 0.4 : -0.4, 0, () => B.at([0, 0, 0.1], 0, () => broom(B), 1, 0, side * 0.12));
+  // morning glories climbing strings up to the side window on some cottages; weeds at the wall foot on all
+  if (v % 4 === 2) onFace(B, blk, 'l', 0.1, 0, () => B.at([0, 0, 0.16], 0, () => asagao(B, 0.56, y0 + 1.1)));
+  for (const f of v % 4 === 2 ? ['b'] : ['b', 'l']) onFace(B, blk, f, 0, 0, () => B.at([0, 0, 0.14], 0, () => weeds(B, f === 'b' ? w - 0.3 : d - 0.3, 3)));
   B.pop();
   stepStones(B, dx, zc + d / 2 + 0.3, dx + 0.1, 0.98, 2);
-  yardProps(B, [[-side * 0.72, 0.72], [side * 0.8, -0.8]]);
-  if (v % 3 === 1) B.at([-side * 0.2, 0, 0.78], 0, () => flowerPatch(B, { w: 0.5, d: 0.3, n: 6 }));
+  // a lived-in yard: firewood by the chimney wall, the axe left in its block, a low hedge or a mailbox out front
+  if (v % 2 === 0) B.at([-side * 0.84, 0, zc - 0.05], -side * PI / 2, () => firewood(B, { w: 0.62, h: 0.4, d: 0.2 }));
+  if (v % 4 === 0) B.at([-side * 0.68, 0, 0.7], B.rand(0, 1), () => choppingBlock(B));
+  else if (v % 4 === 3) B.at([0, 0, 0.9], 0, () => hedge(B, side > 0 ? -0.95 : 0.25, side > 0 ? -0.25 : 0.95, { h: 0.3, d: 0.22, flowers: ['#ffb0d0', '#ffffff'] }));
+  else yardProps(B, [[-side * 0.72, 0.72]]);
+  yardProps(B, [[side * 0.8, -0.8]]);
+  if (v % 2 === 1) B.at([side * 0.84, 0, 0.8], side * 0.3, () => mailbox(B, ['#e8403a', '#4a78c8', '#6ab06a', '#e8903a'][(v >> 1) % 4]), 0.8);
+  if (v % 3 === 1) { B.at([-side * 0.2, 0, 0.78], 0, () => flowerPatch(B, { w: 0.5, d: 0.3, n: 6 })); B.at([-side * 0.52, 0, 0.62], 0.6, () => wateringCan(B)); }
   B.door.set(dx, 0, 0.95);
   B.height = info.ridgeY + 0.35;
 }
@@ -91,19 +115,36 @@ export function homeL2(B) {
   const postTop = y0 + h - 0.24;
   posts(B, [-w / 2 + 0.02, w / 2 - 0.02], d / 2 + pd - 0.06, postTop, C.timber, 0.06);
   const beam = G.box(w + 0.1, 0.11, 0.1, 0.02); beam.translate(0, postTop - 0.02, d / 2 + pd - 0.06); B.add(beam, C.timber);
-  B.at([0, 0, d / 2 + pd / 2 - 0.04], 0, () => roof(B, {
+  const pz = d / 2 + pd / 2 - 0.04;
+  let porch;
+  B.at([0, 0, pz], 0, () => { porch = roof(B, {
     type: 'shed', w: w + 0.05, d: pd, y0: postTop + 0.04, over: 0.18, gOver: 0.12, H: 0.3, curve: 0.3, lift: 0.14, liftW: 0.4,
     thick: 0.1, ribW: 0.27, ribAmp: 0.035, course: 0, color: roofCol,
-  }));
+  }); });
   for (const sx of [-1, 1]) B.at([sx * (w / 2 - 0.3), postTop - 0.06, d / 2 + pd - 0.02], 0, () => chochin(B, { r: 0.11, h: 0.22, cord: 0.04, color: v % 3 === 2 ? C.pink : C.red }));
   B.light([0, 1.35, d / 2 + pd + 0.2], LAMP);
+  // porch life: a wind chime on the beam, drying persimmons (or a rain charm), a rain chain at the corner,
+  // a cushion and a tea tray on the engawa
+  B.at([-side * 0.12, postTop - 0.08, d / 2 + pd - 0.06], 0, () => charm(B, 'furin', { color: ['#bfe6ff', '#ffd0e0', '#d8f0c0'][v % 3] }));
+  if (v % 2 === 0) for (let i = 0; i < 3; i++) B.at([-side * (0.42 + i * 0.1), postTop - 0.07, d / 2 + pd - 0.07], 0, () => charm(B, 'persimmon'));
+  else B.at([-side * 0.5, postTop - 0.08, d / 2 + pd - 0.06], 0, () => charm(B, 'teru', { color: ['#ff7a8a', '#6ab0ff', '#ffd24a', '#8fe0c0'][(v >> 1) % 4] }));
+  { const cx = -side * (w / 2 - 0.02), cz = d / 2 + pd + 0.08; rainChain(B, cx, porch.underAt(cx, cz - pz), cz, 0); }
+  B.at([-side * 0.36, y0 + 0.02, d / 2 + 0.52], side > 0 ? PI : 0, () => teaSet(B));
+  onFace(B, blk, 'b', 0, 0, () => B.at([0, 0, 0.14], 0, () => weeds(B, w - 0.4, 3)));
   B.at([side * -0.75, y0 + 0.02, d / 2 + 0.3], 0, () => pot(B, { plant: v % 2 ? 'pine' : 'flowers', r: 0.13, flowers: [B.pick(FLOWERS)] }));
   if (v % 3 === 0) B.at([-side * 0.2, y0 + 0.02, d / 2 + 0.22], PI, () => crate(B, { s: 0.24 }));
   if (v % 3 !== 2) chimney(B, side * -0.6, -0.35, info.yAt(side * -0.6, -0.35) - 0.3, info.ridgeY - 0.02);
   B.pop();
   const sz = zc + d / 2 + pd;
   stepStones(B, dx, sz + 0.15, dx + side * 0.1, 1.4, 2);
-  yardProps(B, [[side * 1.2, 1.15], [-side * 1.25, 1.2], [-side * 1.25, -1.2]]);
+  const line = v % 3 !== 2, hedged = v % 2 === 0;
+  // laundry drying along the side yard, firewood on the other wall, a hedge or a mailbox by the path
+  if (line) B.at([-side * 1.34, 0, -0.5], PI / 2, () => laundry(B, { L: 1.3, h: 1.15, colors: [['#ffffff', '#8fd0ff', '#ff9ec0', '#ffe07a'], ['#fff6ea', '#ffb86a', '#8fe0c0', '#ffffff'], ['#c8a8ff', '#ffffff', '#ff8fb0', '#8fd0ff']][v % 3] }));
+  if (v % 4 !== 1) B.at([side * 1.3, 0, -0.55], side * PI / 2, () => firewood(B, { w: 0.8, h: 0.44, d: 0.22 }));
+  if (hedged) B.at([0, 0, 1.4], 0, () => hedge(B, side > 0 ? -1.45 : 0.3, side > 0 ? -0.3 : 1.45, { flowers: v % 4 === 0 ? ['#ffb0d0', '#ffffff'] : null }));
+  yardProps(B, v % 2 ? [[side * 1.2, 1.15]] : [[side * 1.2, 1.15], [-side * 1.25, 1.2]]);
+  if (!line) yardProps(B, [[-side * 1.25, -1.2]]);
+  if (v % 2 === 1) B.at([-side * 1.2, 0, 1.22], -side * 0.3, () => mailbox(B, ['#e8403a', '#4a78c8', '#6ab06a', '#e8903a'][(v >> 1) % 4]), 0.85);
   B.at([-side * 0.55, 0, 1.15], 0, () => flowerPatch(B, { w: 0.7, d: 0.4, n: 8 }));
   if (v % 4 === 1) B.at([side * 1.2, 0, -0.2], PI / 2, () => fence(B, [-0.8, 0], [0.8, 0], { style: 'bamboo', h: 0.55 }));
   B.door.set(dx, 0, 1.4);
@@ -167,12 +208,23 @@ export function homeL3(B) {
   B.light([0, 1.3, zb1 + 0.3], { ...LAMP, color: '#ffb0a0' });
   B.at([side * (w2 / 2 + 0.05), y2 + h2 + 0.02, z2 + d2 / 2 + 0.3], 0, () => chochin(B, { r: 0.11, h: 0.22, cord: 0.05, color: C.red }));
   if (v % 2 === 0) chimney(B, -side * 0.5, z2 - 0.25, top.yAt(-side * 0.5, -0.25) - 0.2, top.ridgeY, 0.9);
+  // villa life: a futon airing over the balcony rail, a wind chime and persimmons under the upper eave,
+  // rain chains off the lower roof, a cushion on the veranda
+  futon(B, side * 0.12, by + rh + 0.03, zb1, { w: 0.6, color: ['#ff9ec0', '#8fc8ff', '#ffd27a', '#b8e0a0'][v % 4], pattern: ['#ffffff', '#fff6ea', '#e8604a', '#ffffff'][v % 4] });
+  B.at([-side * 0.3, y2 + h2 - 0.02, z2 + d2 / 2 + 0.26], 0, () => charm(B, 'furin', { color: ['#ffd0e0', '#bfe6ff'][v % 2] }));
+  for (let i = 0; i < 2; i++) B.at([side * (0.25 + i * 0.12), y2 + h2 - 0.02, z2 + d2 / 2 + 0.24], 0, () => charm(B, v % 2 ? 'persimmon' : 'garlic'));
+  { const cx = -side * (w2 / 2 + 0.12), cz = d2 / 2 + 0.2; rainChain(B, cx, top.underAt(cx, cz), z2 + cz, by, { color: '#c8a060' }); }
+  B.at([-side * 0.5, y0 + 0.02, d / 2 + 0.3], side > 0 ? PI : 0, () => teaSet(B));
   B.pop();
   // blossom tree + garden
   B.at([-side * 1.12, 0, 1.08], 0, () => tree(B, { kind: 'sakura', s: 0.62 }));
   stepStones(B, dx, zc + d / 2 + 0.6, dx, 1.45, 2);
   yardProps(B, [[side * 1.22, 1.22], [side * 1.25, -1.2]]);
   B.at([-side * 0.1, 0, 1.28], 0, () => flowerPatch(B, { w: 0.45, d: 0.3, n: 5, colors: ['#ff9ec0', '#ffffff', '#ffbcd6'] }));
+  // kitchen garden on the side, firewood on the far wall, a watering can by the flowers
+  B.at([side * 1.33, 0, -0.35], PI / 2, () => veggieBed(B, { w: 0.9, d: 0.28 }));
+  B.at([-side * 1.3, 0, -0.7], -side * PI / 2, () => firewood(B, { w: 0.7, h: 0.42, d: 0.2 }));
+  B.at([-side * 0.45, 0, 1.3], 0.5, () => wateringCan(B, v % 2 ? '#e8807a' : '#6ab0d8'));
   B.door.set(dx, 0, 1.45);
   B.height = top.ridgeY + 0.3;
 }

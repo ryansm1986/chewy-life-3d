@@ -8,6 +8,7 @@ import { skillIconURL, hotbarIconURL, skillDef, skillCost, xpProgress, potionIco
 import { simpleTip } from './tooltip.js';
 
 const TAU = Math.PI * 2;
+const HERO_JP = { chewy: 'チューイ', moka: 'モカ' };
 const SLOT_KEYS = ['LMB', 'RMB', '1', '2', '3', '4'];
 
 // ------------------------------------------------------------------ Orb (canvas liquid)
@@ -176,7 +177,8 @@ export class Hud {
     R.innerHTML = `
     <div class="hud-tl">
       <div class="pcard">
-        <div class="pc-bub" data-open="character"><div class="pc-face">${portrait('chewy')}</div><div class="pc-lv"><small>Lv</small><span>1</span></div></div>
+        <div class="pc-bub" data-open="character"><div class="pc-face">${portrait(this.G?.state?.activeHero || 'chewy')}</div><div class="pc-lv"><small>Lv</small><span>1</span></div></div>
+        <button class="hsw" hidden><div class="hsw-face"></div><svg class="hsw-cd" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17.5"/></svg><span class="hsw-lv"></span><span class="kc sm">Tab</span></button>
         <div class="pc-info">
           <div class="pc-name">Chewy<span class="jp">チューイ</span></div>
           <div class="pc-xp"><i></i></div>
@@ -246,7 +248,7 @@ export class Hud {
         <button class="build-btn" data-open="build">${glyph('hammer')}<span class="bb-l">Build</span><span class="kc">B</span></button>
       </div>
       <div class="menubtns">
-        ${[['inventory', 'bag', 'I', 'Bag'], ['character', 'star', 'C', 'Chewy'], ['skills', 'sparkle', 'K', 'Skills'], ['quests', 'book', 'J', 'Journal'], ['map', 'map', 'M', 'Map'], ['menu', 'gear', 'Esc', 'Menu']]
+        ${[['inventory', 'bag', 'I', 'Bag'], ['character', 'star', 'C', 'Character'], ['skills', 'sparkle', 'K', 'Skills'], ['quests', 'book', 'J', 'Journal'], ['map', 'map', 'M', 'Map'], ['menu', 'gear', 'Esc', 'Menu']]
     .map(([n, g, k, l]) => `<button class="mb" data-open="${n}" data-tip="${l}">${glyph(g)}<span class="kc">${k}</span><span class="mb-dot"></span></button>`).join('')}
       </div>
     </div>`;
@@ -263,7 +265,15 @@ export class Hud {
       lvbStat: q('.lvb.stat'), lvbSkill: q('.lvb.skill'),
       xp: q('.xp'), xpLv: q('.xp-lv span'), xpFill: q('.xp-fill'), xpGain: q('.xp-gain'), xpT: q('.xp-t'),
       hotbar: q('.hotbar'), dock: q('.dock'), vtools: q('.vtools'), rci: q('.rci'), rciFoot: q('.rci-foot'), menubtns: q('.menubtns'),
+      face: q('.pc-face'), name: q('.pc-name'), bub: q('.pc-bub'), hsw: q('.hsw'), hswFace: q('.hsw-face'), hswCd: q('.hsw-cd circle'), hswLv: q('.hsw-lv'),
     };
+    // the other hero's mini portrait (docs/HEROES.md §4): Tab or a click switches, the ring shows the cooldown
+    this.$.hsw.addEventListener('click', e => { e.stopPropagation(); this.ui.G?.heroes?.switchTo(); });
+    tip.bind(this.$.hsw, () => {
+      const H = this.ui.G?.heroes, id = H?.next(); if (!id) return '';
+      const hp = this.st.heroes?.[id]?.player || {}, C = H.cls(id);
+      return simpleTip(`${esc(C.name)} <span class="jp">${HERO_JP[id] || ''}</span>`, `Level ${hp.lvl || 1} ${esc(C.title)} · hanging out in town.<br><span class="tt-dim">Press <span class="kc sm">Tab</span> or click to play as ${esc(C.name)}.</span>`);
+    });
     // orbs
     this.life = new Orb('life'); this.zoom = new Orb('zoom');
     q('.orb-slot.l').appendChild(this.life.el); q('.orb-slot.r').appendChild(this.zoom.el);
@@ -287,7 +297,7 @@ export class Hud {
     ws.innerHTML = `<div class="ws-in"><span class="ws-ic"></span><b class="ws-n"></b></div>`;
     hb.appendChild(ws);
     ws.addEventListener('click', e => { e.stopPropagation(); const G = this.ui.G; if (!G?.actions?.swapWeapons || G.mode === 'title') return; G.actions.swapWeapons(); G.audio?.play?.('ui_equip'); });
-    tip.bind(ws, () => { const set = this.pl.activeWeapon === 1 ? 1 : 0, wt = this.d.weaponType || 'sword'; return simpleTip(`Weapon set ${set ? 'II' : 'I'} · ${wt === 'ball' ? 'Tennis Ball' : 'Bone Sword'}`, `Each weapon set remembers its own ${glyph('mouseL')} / ${glyph('mouseR')} skills.<br><span class="tt-dim">Press <span class="kc sm">X</span> or click to swap.</span>`); });
+    tip.bind(ws, () => { const set = this.pl.activeWeapon === 1 ? 1 : 0, wt = this.d.weaponType || 'sword'; return simpleTip(`Weapon set ${set ? 'II' : 'I'} · ${wt === 'ball' ? 'Tennis Ball' : wt === 'staff' ? 'Staff' : 'Bone Sword'}`, `Each weapon set remembers its own ${glyph('mouseL')} / ${glyph('mouseR')} skills.<br><span class="tt-dim">Press <span class="kc sm">X</span> or click to swap.</span>`); });
     hb.appendChild(el('div', 'hb-sep'));
     this.belt = [['heart', 'Q', 'Heart Potion', 'Restores Life'], ['zoom', 'E', 'Zoom Potion', 'Restores Zoom'], ['rejuv', 'R', 'Rejuv Potion', 'Restores Life and Zoom']].map(([k, key, name, desc]) => {
       const s = el('div', 'belt b-' + k);
@@ -305,7 +315,7 @@ export class Hud {
       replay(b, 'pressed', 300);
     });
     for (const b of R.querySelectorAll('.mb')) tip.bind(b, () => simpleTip(b.dataset.tip, `<span class="tt-dim">Hotkey: ${b.querySelector('.kc').textContent}</span>`));
-    tip.bind(q('.pc-bub'), () => simpleTip('Chewy', `Level ${this.pl.lvl || 1} adventurer pup.<br><span class="tt-dim">Click for character sheet (C)</span>`));
+    tip.bind(q('.pc-bub'), () => { const C = this.ui.G?.heroes?.cls(); return simpleTip(esc(this.pl.name || 'Chewy'), `Level ${this.pl.lvl || 1} ${esc(C?.title || 'adventurer pup')}.<br><span class="tt-dim">Click for character sheet (C)</span>`); });
     tip.bind(this.$.pal, () => { const s = this.shadowHP(); return simpleTip('Shadow', `Loyal Boston terrier sidekick.<br>Life ${Math.ceil(s.cur)} / ${Math.round(s.max)}`); });
     tip.bind(this.$.xp, () => { const x = xpProgress(this.pl); return simpleTip(`Level ${this.pl.lvl || 1}`, `Experience ${fmt(x.cur)} / ${fmt(x.need)} <span class="tt-dim">(${Math.floor(x.frac * 100)}%)</span>`); });
     tip.bind(this.$.coins, () => simpleTip(`${glyph('coin')} Coins <span class="jp">小判</span>`, `Spend at Rosie's Treats and on village buildings.`));
@@ -323,9 +333,43 @@ export class Hud {
     this.mm.acc = 1;
   }
 
+  // ---------------------------------------------------------------- heroes
+  // the active hero's face / name, and the switch button for the other hero
+  heroTick() {
+    const G = this.G, H = G.heroes, id = this.st.activeHero || 'chewy', nx = H?.next() || null;
+    const key = id + '|' + nx;
+    if (key !== this.cache.hero) {
+      const first = this.cache.hero === undefined;
+      this.cache.hero = key;
+      this.$.face.innerHTML = portrait(id);
+      this.$.name.innerHTML = `${esc(this.pl.name || 'Chewy')}<span class="jp">${HERO_JP[id] || ''}</span>`;
+      this.root.dataset.hero = id;
+      this.$.hsw.hidden = !nx;
+      if (nx) this.$.hswFace.innerHTML = portrait(nx);
+      // a new hero's numbers are not "gains": no level-up / xp-gain flourish for the swap itself
+      this.cache.lvl = null; this.cache.xf = null; this.cache.sp = null; this.cache.kp = null; this.wsKey = undefined;
+      if (!first) { replay(this.$.bub, 'heroswap', 700); if (nx) replay(this.$.hsw, 'heroswap', 700); }
+    }
+    if (!nx) return;
+    const f = H.T ? 1 : clamp((H.cd || 0) / 2);
+    const fr = Math.round(f * 100) / 100;
+    if (fr !== this.cache.hswCd) { this.cache.hswCd = fr; setStyle(this.$.hswCd, 'strokeDashoffset', String((1 - fr) * 110)); setCls(this.$.hsw, 'cooling', fr > 0); }
+    const lv = this.st.heroes?.[nx]?.player?.lvl || 1;
+    if (lv !== this.cache.hswLv) { this.cache.hswLv = lv; setText(this.$.hswLv, String(lv)); }
+  }
+  /** The sweep-in card while the camera changes heroes: portrait, name, class title. */
+  heroCard({ id, name, title, color }) {
+    let c = this.heroCardEl;
+    if (!c) { c = this.heroCardEl = el('div', 'hero-card'); this.root.appendChild(c); }
+    c.style.setProperty('--hc', color || '#ff8fb0');
+    c.innerHTML = `<div class="hc-face">${portrait(id)}</div><div class="hc-t"><small>Now playing</small><b>${esc(name)}<span class="jp">${HERO_JP[id] || ''}</span></b><span>${esc(title || '')}</span></div>`;
+    replay(c, 'show', 1700);
+  }
+
   // ---------------------------------------------------------------- per frame
   update(dt) {
     if (!this.G || this.mode === 'title') return;
+    this.heroTick();
     const st = this.st, p = this.pl, d = this.d;
     // orbs
     const lifeMax = d.lifeMax || p.lifeMax || 100, zoomMax = d.zoomMax || p.zoomMax || 50;
@@ -340,7 +384,7 @@ export class Hud {
       const first = this.wsKey === undefined;
       this.wsKey = wsKey;
       const [set, wt] = wsKey.split(':');
-      this.wsBadge.querySelector('.ws-ic').innerHTML = glyph(wt === 'ball' ? 'ball' : 'sword');
+      this.wsBadge.querySelector('.ws-ic').innerHTML = glyph(wt === 'ball' ? 'ball' : wt === 'staff' ? 'staff' : 'sword');
       this.wsBadge.querySelector('.ws-n').textContent = set === '1' ? 'II' : 'I';
       this.$.hotbar.dataset.ws = wt;
       if (!first) { replay(this.wsBadge, 'flip', 520); for (const k of [0, 1]) replay(this.slots[k].el, 'swap', 450); }
@@ -499,7 +543,13 @@ export class Hud {
   setLocation(name, sub) {
     this.cache.loc = name ? { name, sub: sub || '' } : null;
     this.cache.clockSig = null;
-    if (sub) { const f = this.$.floor; f.querySelector('b').textContent = sub; f.querySelector('span').textContent = floorJP(sub); }
+    if (sub) {
+      const f = this.$.floor, b = f.querySelector('b'), jp = /[^ -]/.test(sub);
+      b.textContent = sub; f.querySelector('span').textContent = floorJP(sub);
+      // an outdoor region's badge carries its Japanese name (3-4 kanji): shrink to fit the round badge
+      b.style.fontSize = jp && sub.length >= 4 ? '13px' : jp && sub.length === 3 ? '17px' : '';
+      b.style.letterSpacing = jp && sub.length >= 3 ? '-1px' : '';
+    }
   }
 
   updateQuests() {
@@ -587,7 +637,7 @@ export class Hud {
       setText(this.$.bbSub, info.title || info.sub || '');
       setCls(b, 'show', false); void b.offsetWidth; setCls(b, 'show', true);
       setCls(this.$.tc, 'has-boss', true);
-      this._bbRect = null; this._bbMeasureAt = performance.now() + 1000; // measured once the drop-in animation has settled
+      this._bbRect = null; this._band = null; // re-measured on the next request (layout offsets: valid during the drop-in)
     } else if (frac < this.boss.frac - 0.001) { this.boss.hold = 0.4; replay(b, 'hit', 260); }
     this.boss.frac = frac;
     setText(this.$.bbPct, Math.ceil(frac * 100) + '%');
@@ -602,18 +652,36 @@ export class Hud {
     }
     this.bossDodge(dt);
   }
+  // The boss bar's settled screen rect (name + bar frame). Layout offsets ignore the drop-in animation's and the dodge's
+  // transforms, so it is exact from the first frame the bar shows; cached until the next boss / a resize.
+  bossBarRect() {
+    const b = this.$.boss;
+    if (!this.boss || !b.offsetHeight) return null;
+    if (this._bbRect) return this._bbRect;
+    if (!this._bbResize) { this._bbResize = true; addEventListener('resize', () => { this._bbRect = null; this._band = null; }); }
+    const fr = b.querySelector('.bb-frame'), tc = this.$.tc.getBoundingClientRect(); // (.hud-tc only carries a translateX)
+    const x = tc.left + b.offsetLeft, y = tc.top + b.offsetTop;
+    return (this._bbRect = { l: x, r: x + b.offsetWidth, t: y, b: tc.top + fr.offsetTop + fr.offsetHeight + 5 }); // (+ its drop shadow)
+  }
+  // The playfield band a boss fight is framed into (screen px): from the bottom of the boss bar down to the top of the
+  // hotbar dock / orbs, clear of the side panels. Re-measured every 2 s (the dock slides with the UI mode).
+  playBand() {
+    const now = performance.now();
+    if (this._band && now < this._band.until) return this._band;
+    const bar = this.bossBarRect();
+    let bottom = innerHeight * 0.83;
+    for (const e of this.$.bc.querySelectorAll('.dock, .orb-slot')) { const r = e.getBoundingClientRect(); if (r.height > 8 && r.top > innerHeight * 0.5) bottom = Math.min(bottom, r.top); }
+    return (this._band = { t: bar ? bar.b : innerHeight * 0.12, b: bottom, l: innerWidth * 0.17, r: innerWidth * 0.83, until: now + 2000 });
+  }
   // The boss bar steps aside — fades to a ghost and lifts a little — while the boss itself projects underneath it
-  // (a tall boss standing beyond Chewy); it comes back as soon as the boss is clear of it.
+  // (a tall boss standing beyond Chewy); it comes back as soon as the boss is clear of it. During the boss's intro
+  // reveal (the roar + title card) it stays a half-faded ghost and settles in when the fight begins.
   bossDodge(dt) {
     const b = this.$.boss, bb = this.G?.dungeon?.boss, cam = this.G?.engine?.camera;
     let want = 0;
     if (this.boss && bb?.alive && cam) {
-      if (!this._bbRect && performance.now() >= (this._bbMeasureAt || 0)) {
-        const r = b.getBoundingClientRect(), lift = this._bbLift || 0;
-        if (r.width > 0) this._bbRect = { l: r.left, r: r.right, t: r.top + lift, b: r.bottom + lift - 6 };
-        if (!this._bbResize) { this._bbResize = true; addEventListener('resize', () => { this._bbRect = null; }); }
-      }
-      const R = this._bbRect;
+      if (performance.now() < (this.G.dungeon.introUntil || 0)) want = 0.75;
+      const R = this.bossBarRect();
       if (R) {
         const v = this._bbV || (this._bbV = new THREE.Vector3()), W = innerWidth, H = innerHeight;
         const h = this.G.dungeon.bossHeight?.(bb) ?? (bb.height || 2), rad = (bb.bodyR || bb.radius || 1) * 0.9;
@@ -677,7 +745,7 @@ export class Hud {
     const h = this.ui.pop?.querySelector?.('.pop-h');
     if (!h || h.querySelector('.pop-ws')) return;
     const wt = this.d.weaponType || 'sword', set = this.pl.activeWeapon === 1 ? 'II' : 'I';
-    h.insertAdjacentHTML('beforeend', `<span class="pop-ws" data-ws="${wt}">${glyph(wt === 'ball' ? 'ball' : 'sword')}Set ${set}</span>`);
+    h.insertAdjacentHTML('beforeend', `<span class="pop-ws" data-ws="${wt}">${glyph(wt === 'ball' ? 'ball' : wt === 'staff' ? 'staff' : 'sword')}Set ${set}</span>`);
   }
   flashBelt(k) { const b = this.belt.find(x => x.k === k); if (b) replay(b.el, b.v > 0 ? 'press' : 'deny', 360); }
   slotTip(i) {
@@ -687,7 +755,7 @@ export class Hud {
     const def = skillDef(id);
     const lvl = this.pl.skills?.[id] || (id === 'attack' ? 1 : 0);
     const cost = skillCost(id, this.st);
-    const wep = id === 'attack' ? (this.d.weaponType === 'ball' ? 'Basic attack · Red Tennis Ball' : 'Basic attack · Bone Sword') : '';
+    const wep = id === 'attack' ? (this.d.weaponType === 'ball' ? 'Basic attack · Red Tennis Ball' : this.d.weaponType === 'staff' ? 'Basic attack · Sparkle Bolt' : 'Basic attack · Bone Sword') : '';
     const setNote = i < 2 ? `<br><span class="tt-dim">Weapon set ${this.pl.activeWeapon === 1 ? 'II' : 'I'} — <span class="kc sm">X</span> swaps to the other set's mouse skills</span>` : '';
     return simpleTip(`${esc(def?.name || id)} <span class="kc sm">${key}</span>`, `${def?.desc ? esc(def.desc) + '<br>' : ''}<span class="tt-dim">${id === 'attack' ? wep : 'Level ' + lvl}${cost ? ` · ${Math.round(cost * 10) / 10} Zoom` : ''}</span>${setNote}`);
   }

@@ -19,7 +19,8 @@
 import { Events } from '../core/events.js';
 import { computeStats, xpToNext, LEVEL_CAP } from './stats.js';
 import { SKILLS, canLearn } from './skills.js';
-import { starterItems, EQUIP_SLOT_ITEM, meetsReq, socketGem, POTIONS, targetSlot, SET_ITEMS } from './items.js';
+import { starterItems, starterStaff, generateItem, EQUIP_SLOT_ITEM, meetsReq, socketGem, POTIONS, targetSlot, SET_ITEMS } from './items.js';
+import { CLASSES, HERO_IDS, canWield } from './classes.js';
 import { uid as rid } from '../core/util.js';
 
 export const INV_SIZE = 40;
@@ -28,23 +29,41 @@ export const POTION_CAP = { heart: 15, zoom: 15, rejuv: 8 };
 export const STAT_KEYS = ['str', 'dex', 'vit', 'ene'];
 export const HOTBAR_SIZE = 6;
 
-/** Fresh save, exactly per docs/ARCHITECTURE.md, with the starter Bone Sword (weapon) and Red Tennis Ball (weaponAlt). */
-export function newGameState() {
-  const { sword, ball } = starterItems();
+const emptyEquipment = () => ({ weapon: null, weaponAlt: null, hat: null, outfit: null, collar: null, charm1: null, charm2: null, boots: null, paws: null });
+
+/** A level-1 hero of class `id` with its starter kit → { player, equipment } (docs/HEROES.md §2). */
+export function newHeroState(id) {
+  const C = CLASSES[id] || CLASSES.chewy, S0 = C.starter;
+  const equipment = emptyEquipment();
+  if (C.id === 'moka') equipment.weapon = starterStaff();
+  else { const { sword, ball } = starterItems(); equipment.weapon = sword; equipment.weaponAlt = ball; }
   return {
-    version: 1,
     player: {
-      name: 'Chewy', lvl: 1, xp: 0, stats: { str: 10, dex: 10, vit: 12, ene: 8 }, statPts: 0, skillPts: 1,
-      // starter skills: one free point in each weapon's bread-and-butter skill so both weapon sets have a right-click
-      skills: { chomp: 1, throw: 1 }, hotbar: ['attack', 'chomp', null, null, null, null],
+      cls: C.id, name: C.name, lvl: 1, xp: 0, stats: { ...C.base }, statPts: 0, skillPts: 1,
+      // starter skills: a free point in each weapon's bread-and-butter skill so every weapon set has a right-click
+      skills: { ...S0.skills }, hotbar: [...S0.hotbar],
       life: null, zoom: null, activeWeapon: 0,
-      mouseSets: [['attack', 'chomp'], ['attack', 'throw']], // per weapon set [LMB, RMB] (see swapWeapons)
+      mouseSets: S0.mouseSets.map(p => [...p]), // per weapon set [LMB, RMB] (see swapWeapons)
     },
+    equipment,
+  };
+}
+
+/** Fresh save, per docs/ARCHITECTURE.md + docs/HEROES.md: one progression per hero, one shared household.
+ *  state.player / state.equipment are live references to the active hero's objects (see normalizeHeroes). */
+export function newGameState() {
+  const heroes = {};
+  for (const id of HERO_IDS) heroes[id] = newHeroState(id);
+  return {
+    version: 2,
+    activeHero: 'chewy',
+    heroes,
+    player: heroes.chewy.player,
+    equipment: heroes.chewy.equipment,
     coins: 350,
     materials: { wood: 45, stone: 30, petal: 10, crystal: 1, bone: 2, mochi: 0, silk: 1, lantern: 2 },
     potions: { heart: 3, zoom: 2, rejuv: 0 },
     inventory: Array(INV_SIZE).fill(null),
-    equipment: { weapon: sword, weaponAlt: ball, hat: null, outfit: null, collar: null, charm1: null, charm2: null, boots: null, paws: null },
     stash: Array(STASH_SIZE).fill(null),
     quests: { active: [], done: [] },
     friends: {},
@@ -52,6 +71,32 @@ export function newGameState() {
     dungeon: { deepest: 0, waypoints: [1] },
     day: 1, hour: 8.5, flags: {},
   };
+}
+
+/** Make any save (v1: a single top-level Chewy; v2: state.heroes) consistent: every hero exists, and
+ *  state.player / state.equipment point at the active hero's objects. Mutates and returns st. */
+export function normalizeHeroes(st) {
+  if (!st) return st;
+  st.heroes = st.heroes || {};
+  st.flags = st.flags || {};
+  if (!HERO_IDS.includes(st.activeHero)) st.activeHero = 'chewy';
+  // a top-level player (v1 saves, or in-memory state) is the active hero's live data
+  if (st.player) st.heroes[st.activeHero] = { player: st.player, equipment: st.equipment || emptyEquipment() };
+  for (const id of HERO_IDS) {
+    const h = st.heroes[id] || (st.heroes[id] = newHeroState(id));
+    h.equipment = Object.assign(h.equipment || {}, { ...emptyEquipment(), ...(h.equipment || {}) });
+    h.player.cls = id;
+    h.player.name = h.player.name || CLASSES[id].name;
+  }
+  st.player = st.heroes[st.activeHero].player;
+  st.equipment = st.heroes[st.activeHero].equipment;
+  st.version = Math.max(st.version || 1, 2);
+  return st;
+}
+/** What goes into localStorage: everything except the live player/equipment aliases (they live in heroes). */
+export function saveableState(st) {
+  const { player, equipment, ...rest } = st;
+  return rest;
 }
 
 const clone = o => (typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
@@ -96,6 +141,8 @@ export function createActions(G) {
     if (P.lvl < (r.lvl || 1)) return `Requires level ${r.lvl}`;
     if ((r.str || 0) > D.str) return `Requires ${r.str} Strength`;
     if ((r.dex || 0) > D.dex) return `Requires ${r.dex} Dexterity`;
+    if ((r.ene || 0) > D.ene) return `Requires ${r.ene} Energy`;
+    if (it.wtype && !canWield(P.cls || 'chewy', it.wtype)) return `That's ${CLASSES[it.wtype === 'staff' ? 'moka' : 'chewy'].name}'s — switch heroes to use it!`;
     return '';
   }
   const canEquip = (it, slot) => !equipProblem(it, slot || targetSlot(it, S()));
@@ -134,13 +181,15 @@ export function createActions(G) {
   // player.mouseSets. The active set's pair is always live in hotbar[0..1] (so input / HUD keep reading the hotbar);
   // swapWeapons() files the live pair under the set being put away and brings the other set's pair in.
   // Keys 1–4 (hotbar[2..5]) are shared by both sets.
-  const setWeaponType = i => (S().equipment[i ? 'weaponAlt' : 'weapon']?.wtype) || (i ? 'ball' : 'sword');
+  const setWeaponType = i => (S().equipment[i ? 'weaponAlt' : 'weapon']?.wtype) || (S().player.cls === 'moka' ? 'staff' : i ? 'ball' : 'sword');
   const fitsSet = (id, i) => !id || id === 'attack' || !SKILLS[id]?.wep || SKILLS[id].wep === setWeaponType(i);
   const knows = id => S().player.skills[id] > 0 && SKILLS[id] && SKILLS[id].kind !== 'passive' && SKILLS[id].kind !== 'aura';
   /** Best right-click skill for a weapon set: the weapon's most-trained spammable skill, else its other actives. */
   function defaultRmb(i) {
     const P = S().player, wt = setWeaponType(i);
-    const pref = wt === 'ball' ? ['throw', 'ricochet', 'multi', 'blaze', 'fetchstorm', 'decoy'] : ['chomp', 'dig', 'whirl', 'bonestorm'];
+    const pref = wt === 'ball' ? ['throw', 'ricochet', 'multi', 'blaze', 'fetchstorm', 'decoy']
+      : wt === 'staff' ? ['splash', 'kibble', 'feathers', 'moonbeam', 'constellation', 'whirlpool', 'shake', 'greatWave', 'meteor']
+      : ['chomp', 'dig', 'whirl', 'bonestorm'];
     let best = null;
     pref.forEach((id, k) => { if (!knows(id)) return; const sc = (P.skills[id] || 0) * 10 - k * (k < 4 ? 1 : 25); if (!best || sc > best.sc) best = { id, sc }; });
     return best ? best.id : null;
@@ -160,7 +209,7 @@ export function createActions(G) {
    *  set's best skill, so the ball set never swaps in with a dead RMB. */
   function migrateStarterSkills() {
     const st = S(), P = st.player, flags = st.flags || (st.flags = {});
-    if (flags.starterThrow) return;
+    if (flags.starterThrow || (P.cls && P.cls !== 'chewy')) return;
     flags.starterThrow = true;
     if (!(P.skills.throw > 0)) P.skills.throw = 1;
     const sets = ensureMouseSets(), act = P.activeWeapon === 1 ? 1 : 0;
@@ -447,10 +496,17 @@ export function createActions(G) {
     const P = S().player, sets = ensureMouseSets();
     return i === (P.activeWeapon === 1 ? 1 : 0) ? [P.hotbar[0] ?? null, P.hotbar[1] ?? null] : [...sets[i]];
   }
+  /** Catch-up: a hero more than 2 levels below the highest (joined) hero earns double XP (docs/HEROES.md §2). */
+  function catchUp() {
+    const st = S(), P = st.player;
+    let top = P.lvl;
+    for (const id in st.heroes || {}) if (id === 'chewy' || st.flags?.[`${id}Joined`]) top = Math.max(top, st.heroes[id].player.lvl);
+    return top - P.lvl > 2;
+  }
   function addXp(n) {
     const P = S().player;
     if (P.lvl >= LEVEL_CAP || !(n > 0)) return 0;
-    const gained = Math.max(1, Math.round(n * (1 + (d().xpBonus || 0) / 100)));
+    const gained = Math.max(1, Math.round(n * (1 + (d().xpBonus || 0) / 100) * (catchUp() ? 2 : 1)));
     const from = P.lvl;
     P.xp += gained;
     while (P.lvl < LEVEL_CAP && P.xp >= xpToNext(P.lvl)) {
@@ -463,7 +519,7 @@ export function createActions(G) {
     if (P.lvl > from) {
       P.life = null; P.zoom = null;
       recompute();
-      emit('player:levelup', { lvl: P.lvl, from, gained: P.lvl - from });
+      emit('player:levelup', { lvl: P.lvl, from, gained: P.lvl - from, hero: P.cls || 'chewy', name: P.name || 'Chewy' });
     }
     return gained;
   }
@@ -473,7 +529,8 @@ export function createActions(G) {
   function respec() {
     const P = S().player;
     let sp = 0;
-    for (const k of STAT_KEYS) { const base = { str: 10, dex: 10, vit: 12, ene: 8 }[k]; sp += P.stats[k] - base; P.stats[k] = base; }
+    const base0 = (CLASSES[P.cls] || CLASSES.chewy).base;
+    for (const k of STAT_KEYS) { const base = base0[k]; sp += P.stats[k] - base; P.stats[k] = base; }
     let kp = 0;
     for (const id in P.skills) kp += P.skills[id];
     P.skills = {};
@@ -500,6 +557,46 @@ export function createActions(G) {
   /** Count of equipped pieces of a set (for UI). */
   const setPieces = setId => Object.values(S().equipment).filter(e => e && e.setId === setId).map(e => SET_ITEMS[e.setPiece]?.id);
 
+  // ------------------------------------------------------------ heroes (docs/HEROES.md)
+  /** Make hero `id` the active one: state.player / state.equipment re-point at its objects. The hero being put away
+   *  keeps its own progression; its current life/zoom reset to full (it goes home to rest). */
+  function setActiveHero(id) {
+    const st = S();
+    if (!st.heroes?.[id] || st.activeHero === id) return false;
+    syncLiveSet();
+    const prev = st.player;
+    prev.life = null; prev.zoom = null;
+    hots.length = 0;
+    st.activeHero = id;
+    st.player = st.heroes[id].player;
+    st.equipment = st.heroes[id].equipment;
+    ensureMouseSets(); migrateStarterSkills();
+    recompute(true);
+    emit('hero:changed', { id, from: prev.cls || 'chewy' });
+    emit('equip:changed', { slot: 'weapon', hero: true });
+    emit('inv:changed', { c: 'inv' });
+    emit('stats:changed', G.derived);
+    emit('hotbar:changed', { hotbar: st.player.hotbar });
+    return true;
+  }
+  /** A hero joining late starts near the pack's level (2 below the top hero), with those points to spend and a
+   *  magic weapon of their class, so they are playable in the Burrow right away. */
+  function prepareJoin(id) {
+    const st = S(), h = st.heroes?.[id];
+    if (!h) return 0;
+    let top = 1;
+    for (const k in st.heroes) if (k !== id && (k === 'chewy' || st.flags?.[`${k}Joined`])) top = Math.max(top, st.heroes[k].player.lvl);
+    const lvl = Math.max(1, Math.min(LEVEL_CAP, top - 2));
+    const P = h.player;
+    if (P.lvl < lvl) {
+      const up = lvl - P.lvl;
+      P.lvl = lvl; P.xp = 0; P.statPts += up * 5; P.skillPts += up;
+      const w = h.equipment.weapon;
+      if (lvl >= 3 && w && w.rarity === 'normal') h.equipment.weapon = generateItem({ ilvl: lvl, slot: 'weapon', wtype: w.wtype, rarity: 'magic' });
+    }
+    return P.lvl;
+  }
+
   const api = {
     // contract
     equip, unequip, swapWeapons, moveItem, dropItem, pickup, usePotion, sellItem, buyItem, learnSkill, addStat,
@@ -508,7 +605,8 @@ export function createActions(G) {
     tickRegen, activeHots, addPotion, heal, restoreZoom, spendZoom, damage, restoreAll, life, zoom,
     addSkillPts, addStatPts, respec, socket, getItem, firstFree, canEquip, equipProblem, setPieces,
     mouseSet, ensureMouseSets, setWeaponType,
+    setActiveHero, prepareJoin, isCatchingUp: catchUp,
   };
-  if (G.state) { ensureMouseSets(); migrateStarterSkills(); recompute(true); }
+  if (G.state) { normalizeHeroes(G.state); ensureMouseSets(); migrateStarterSkills(); recompute(true); }
   return api;
 }

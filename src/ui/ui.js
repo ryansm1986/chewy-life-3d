@@ -17,6 +17,7 @@ import { BuildPanel, InspectCard } from './build.js';
 import { QuestArrow } from './questArrow.js';
 import { ShopPanel } from './shop.js';
 import { MapPanel, QuestPanel, normQuest } from './map.js';
+import { TravelPanel } from './travel.js';
 import { MenuPanel } from './menu.js';
 import { Title } from './title.js';
 import { itemName, itemIconURL, skillIconURL } from './rpg.js';
@@ -61,7 +62,7 @@ export const UI = {
     this.titleScreen = new Title(this);
     this.panels = {
       inventory: new InventoryPanel(this), stash: new StashPanel(this), character: new CharacterPanel(this), skills: new SkillsPanel(this),
-      quests: new QuestPanel(this), map: new MapPanel(this), shop: new ShopPanel(this), build: new BuildPanel(this), menu: new MenuPanel(this),
+      quests: new QuestPanel(this), map: new MapPanel(this), travel: new TravelPanel(this), shop: new ShopPanel(this), build: new BuildPanel(this), menu: new MenuPanel(this),
     };
     this.skills = this.panels.skills;
     // popover + skill drag ghost
@@ -215,7 +216,7 @@ export const UI = {
       return;
     }
     if (this.isOpen('menu')) return;
-    const map = { KeyI: 'inventory', KeyC: 'character', KeyK: 'skills', KeyJ: 'quests', KeyM: 'map', Tab: 'map' };
+    const map = { KeyI: 'inventory', KeyC: 'character', KeyK: 'skills', KeyJ: 'quests', KeyM: 'map' }; // (Tab switches heroes: game.js)
     if (map[code]) { e.preventDefault(); this.toggle(map[code]); return; }
     if (code === 'KeyB') { if (this.mode === 'village' && !this.G?.build && this._buildProvider) this.openBuild(); return; } // the game toggles G.build itself
     const dig = /^Digit([1-4])$/.exec(code);
@@ -258,6 +259,7 @@ export const UI = {
   // ------------------------------------------------------------------ messages
   toast(text, opts = {}) { if (!this.ready) return null; return this.toasts.show(text, opts); },
   banner(title, sub = '', opts = {}) { if (!this.ready) return; this.banners.show(title, sub, opts); this.events.emit('ui:banner', { title, style: opts.style }); },
+  heroCard(o) { if (this.ready) this.hud?.heroCard?.(o); },
   float(worldPos, text, opts = {}) { if (!this.ready || !worldPos) return; this.floats.spawn(worldPos, String(text), opts); },
   dialogue(opts) { if (!this.ready) return Promise.resolve(-1); this.hidePopover(); this.tip.hide(); return this.dlg.open(opts); },
   setTarget(info) { if (this.ready) this.hud.setTarget(info); },

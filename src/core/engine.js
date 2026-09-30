@@ -24,18 +24,21 @@ export class CameraRig {
     // own, independent of whoever drives focus / distTarget, so zoom and follow code need not know about them.
     this.bias = new THREE.Vector3(); this.biasTarget = new THREE.Vector3();
     this.distBias = 0; this.distBiasTarget = 0; this.biasRate = 2.2;
+    // follow speed multiplier for the target / distance easing: a slow-motion moment (boss roar) sets 1 / timeScale so
+    // the camera still moves at real-time speed while the world crawls
+    this.followMul = 1;
     this._f = new THREE.Vector3();
   }
   snap() { this.bias.copy(this.biasTarget); this.distBias = this.distBiasTarget; this.target.copy(this.focus).add(this.bias); this.dist = this.distTarget; this.yaw = this.yawTarget; this.update(0); }
   /** drop any framing bias at once (mode switches) */
-  clearBias() { this.bias.set(0, 0, 0); this.biasTarget.set(0, 0, 0); this.distBias = this.distBiasTarget = 0; }
+  clearBias() { this.bias.set(0, 0, 0); this.biasTarget.set(0, 0, 0); this.distBias = this.distBiasTarget = 0; this.followMul = 1; }
   shake(a) { this.shakeAmt = Math.max(this.shakeAmt, a * this.shakeMul); }
   zoom(d) { this.distTarget = clamp(this.distTarget * (1 + d * 0.1), this.minDist, this.maxDist); }
   update(dt) {
-    const k = dt > 0 ? 1 - Math.exp(-6 * dt) : 1;
+    const fm = this.followMul || 1, k = dt > 0 ? 1 - Math.exp(-6 * dt * fm) : 1;
     if (dt > 0) { const kb = 1 - Math.exp(-this.biasRate * dt); this.bias.lerp(this.biasTarget, kb); this.distBias += (this.distBiasTarget - this.distBias) * kb; } // (snap() jumps)
     this.target.lerp(this._f.copy(this.focus).add(this.bias), k);
-    this.dist = dt > 0 ? damp(this.dist, this.distTarget, 8, dt) : this.distTarget;
+    this.dist = dt > 0 ? damp(this.dist, this.distTarget, 8 * fm, dt) : this.distTarget;
     this.yaw = dt > 0 ? damp(this.yaw, this.yawTarget, 7, dt) : this.yawTarget;
     const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
     this._off.set(Math.sin(this.yaw) * cp, sp, Math.cos(this.yaw) * cp).multiplyScalar(this.dist + this.distBias);

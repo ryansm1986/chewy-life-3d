@@ -34,6 +34,7 @@ export class Terrain {
     const S = this.S = WORLD * this.RES + 1;
     this.h = new Float32Array(S * S);
     this.tiles = new Uint8Array(WORLD * WORLD);
+    this.wear = new Uint8Array(WORLD * WORLD); // trodden grass 0..255 (details.js: path corners, plaza thresholds)
     this.plazaCenter = new THREE.Vector2(56, 60);
     this.center = { x: 56, z: 60 };
     this.pond = POND;
@@ -132,7 +133,7 @@ export class Terrain {
       D[i * 4] = t === T.PATH ? 255 : 0;
       D[i * 4 + 1] = t === T.PLAZA ? 255 : 0;
       D[i * 4 + 2] = t === T.FIELD ? 255 : 0;
-      D[i * 4 + 3] = (t === T.GRASS) ? 255 : 0; // grass allowed
+      D[i * 4 + 3] = (t === T.GRASS) ? 255 - this.wear[i] * 0.7 : 0; // grass allowed (worn grass: thinner, < 0.55 = bare)
     }
     this.tileTex.needsUpdate = true;
   }
@@ -152,6 +153,7 @@ export class Terrain {
       uniforms: {
         uTiles: { value: this.tileTex }, uOverlay: { value: this.overlayTex }, uOverlayAmt: { value: 0 }, uOverlayMode: { value: 1 },
         uWorld: { value: WORLD }, uGrid: { value: 0 }, uCursor: { value: new THREE.Vector4(-99, -99, 0, 0) },
+        uPlazaC: { value: this.plazaCenter.clone() }, // centre of the fountain ring in the plaza paving
         uCursorCol: { value: new THREE.Vector4(1, 1, 0.85, 0.12) },
       },
       fragPars: TERRAIN_FRAG_PARS + POOL_GLSL,
@@ -240,6 +242,7 @@ vec3 applyBuildOverlay(vec3 col, vec3 wp, float blade) {
 const TERRAIN_FRAG_PARS = /* glsl */`
 uniform sampler2D uTiles;
 uniform float uWorld;
+uniform vec2 uPlazaC;
 ${OVERLAY_GLSL}
 vec2 vHash2(vec2 p) { p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return fract(sin(p) * 43758.5453); }
 // returns (edge distance, cell id hash)
@@ -271,6 +274,11 @@ const TERRAIN_FRAG_COLOR = /* glsl */`
   vec3 grass = mix(g2, g1, smoothstep(0.38, 0.62, n1));
   grass = mix(grass, g3, smoothstep(0.52, 0.72, n2) * 0.7);
   grass = mix(grass, g4, smoothstep(0.55, 0.75, 1.0 - n2) * 0.5);
+  // trodden earth: worn grass tiles (alpha < 1, see Terrain.wear) and the yards under buildings (alpha 0), patchy
+  float wornA = clamp((1.0 - tl.a) * 1.6 - (tl.r + tl.g + tl.b) * 4.0, 0.0, 1.0) * smoothstep(0.6, 0.8, h);
+  float wornN = smoothstep(0.3, 0.8, wornA + (n1 - 0.5) * 0.55 + (n3 - 0.5) * 0.4);
+  vec3 earth = mix(vec3(0.62, 0.53, 0.40), vec3(0.72, 0.62, 0.46), n3);
+  grass = mix(grass, mix(grass * 0.86, earth, 0.7), wornN * 0.9);
   vec3 sand = mix(vec3(0.97, 0.88, 0.68), vec3(0.93, 0.80, 0.62), n3);
   float sandAmt = 1.0 - smoothstep(0.3, 0.75, h + (n1 - 0.5) * 0.5);
   // painted cliff faces: wavy sediment bands (warm sandstone / cool slate), dark seams between them, embedded stones,
@@ -309,15 +317,49 @@ const TERRAIN_FRAG_COLOR = /* glsl */`
   vec3 pathCol = mix(vec3(0.56, 0.62, 0.40), stone, gap);
   pathCol = mix(vec3(0.84, 0.72, 0.56), pathCol, smoothstep(0.52, 0.7, pe)); // dusty border
   col = mix(col, pathCol, pathAmt);
-  // plaza: big square pavers
+  // plaza: big square pavers in running bond (a few rosy / lavender ones, mossy joints in patches), a curb band of
+  // small cobbles along the edge (it also marks the thresholds where paths come in), and a ring of radial pavers
+  // around the fountain
   float pz = tl.g + (n3 - 0.5) * 0.3;
   float plazaAmt = smoothstep(0.4, 0.55, pz);
-  vec2 cell = wp.xz * 1.0; vec2 fc = fract(cell + vec2(0.5 * step(0.5, fract(floor(cell.y) * 0.5)), 0.0));
-  float pave = smoothstep(0.0, 0.06, fc.x) * smoothstep(1.0, 0.94, fc.x) * smoothstep(0.0, 0.06, fc.y) * smoothstep(1.0, 0.94, fc.y);
-  float ph = vHash2(floor(cell + vec2(0.5 * step(0.5, fract(floor(cell.y) * 0.5)), 0.0))).x;
-  vec3 plaza = mix(vec3(0.90, 0.84, 0.78), vec3(0.98, 0.92, 0.84), ph);
-  plaza = mix(vec3(0.70, 0.64, 0.62), plaza, pave);
-  col = mix(col, plaza, plazaAmt);
+  if (plazaAmt > 0.001) {
+    vec2 cell = wp.xz * 1.0; vec2 poff = vec2(0.5 * step(0.5, fract(floor(cell.y) * 0.5)), 0.0);
+    vec2 fc = fract(cell + poff), pid = floor(cell + poff);
+    float pave = smoothstep(0.0, 0.06, fc.x) * smoothstep(1.0, 0.94, fc.x) * smoothstep(0.0, 0.06, fc.y) * smoothstep(1.0, 0.94, fc.y);
+    float ph = vHash2(pid).x, ph2 = vHash2(pid + 17.3).y;
+    vec3 plaza = mix(vec3(0.90, 0.84, 0.78), vec3(0.98, 0.92, 0.84), ph);
+    plaza = mix(plaza, vec3(0.96, 0.84, 0.83), step(0.87, ph2) * 0.75);
+    plaza = mix(plaza, vec3(0.86, 0.84, 0.92), step(ph2, 0.09) * 0.75);
+    plaza *= 0.97 + 0.06 * n3;
+    vec3 joint = mix(vec3(0.70, 0.64, 0.62), vec3(0.52, 0.64, 0.40), smoothstep(0.52, 0.72, n2) * 0.85);
+    plaza = mix(joint, plaza, pave);
+    // fountain ring: three courses of radial pavers between two dark bands
+    vec2 rq = wp.xz - uPlazaC; float rr = length(rq);
+    if (rr < 2.62) {
+      float ang = atan(rq.y, rq.x) / 6.28318 + 0.5;
+      float cr = (rr - 1.1) / 0.45, ci = floor(cr), cf = fract(cr);
+      float nseg = floor(6.28318 * (1.1 + (ci + 0.5) * 0.45) / 0.52);
+      float sg = ang * nseg + ci * 0.5, sf = fract(sg), arc = 6.28318 * rr / nseg;
+      float rj = smoothstep(0.0, 0.07, cf) * smoothstep(1.0, 0.93, cf) * smoothstep(0.0, 0.035, sf * arc) * smoothstep(0.0, 0.035, (1.0 - sf) * arc);
+      float rh = vHash2(vec2(floor(sg), ci + 3.0)).x;
+      vec3 ringC = mod(ci, 2.0) < 0.5 ? vec3(0.97, 0.88, 0.84) : vec3(0.90, 0.88, 0.95);
+      ringC *= 0.94 + 0.1 * rh;
+      vec3 ringP = mix(vec3(0.66, 0.60, 0.62), ringC, rj);
+      float band = step(2.45, rr) + step(rr, 1.1);
+      vec3 bandC = mix(vec3(0.62, 0.58, 0.68), vec3(0.72, 0.68, 0.76), smoothstep(0.3, 0.7, fract(ang * 90.0)) * 0.6);
+      ringP = mix(ringP, bandC, band);
+      plaza = mix(plaza, ringP, smoothstep(2.62, 2.56, rr));
+    }
+    // curb band at the edge: small rounded cobbles
+    float edgeB = smoothstep(0.86, 0.78, tl.g + (n1 - 0.5) * 0.06);
+    if (edgeB > 0.001) {
+      vec2 cv = voronoi(wp.xz * 3.6);
+      vec3 cob = mix(vec3(0.78, 0.73, 0.74), vec3(0.88, 0.82, 0.80), cv.y) * (0.94 + 0.08 * n3);
+      cob = mix(vec3(0.58, 0.56, 0.52), cob, smoothstep(0.03, 0.12, cv.x));
+      plaza = mix(plaza, cob, edgeB);
+    }
+    col = mix(col, plaza, plazaAmt);
+  }
   diffuseColor.rgb = col;
 }
 `;

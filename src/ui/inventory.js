@@ -218,7 +218,7 @@ export class ItemDrag {
     if (a.c === 'inv') {
       if (it.kind === 'gear') {
         const req = meetsReq(it, this.ui.G.state, this.ui.G.derived);
-        if (!req.ok) { this.deny(a); this.ui.toast("Chewy can't use that yet!", { icon: 'lock', color: '#ff6a7a' }); return; }
+        if (!req.ok) { this.deny(a); this.ui.toast(`${this.st.player?.name || 'Chewy'} can't use that${req.other ? '' : ' yet'}!`, { icon: 'lock', color: '#ff6a7a' }); return; }
         r = A.equip?.(a.i);
         if (r !== false) { const sl = equipSlotsFor(it); for (const x of sl) this.markPop({ c: 'equip', i: x }); this.ui.sfx?.('equip'); }
       } else r = A.useItem ? A.useItem(a) : A.use ? A.use(a) : undefined;
@@ -273,6 +273,13 @@ export class InventoryPanel extends Panel {
   }
   render() {
     const st = this.st, d = this.d, eq = st.equipment || {}, inv = st.inventory || [];
+    const hero = st.activeHero || 'chewy';
+    if (hero !== this._hero) { // the paper doll shows whoever is being played (the bag itself is shared)
+      this._hero = hero;
+      const por = this.body.querySelector('.doll-por'); por.innerHTML = portrait(hero) + '<div class="doll-shadow"></div>';
+      this.body.querySelector('.doll-name').firstChild.textContent = (st.player?.name || 'Chewy') + ' ';
+      this.body.querySelector('.doll').dataset.hero = hero;
+    }
     for (const k of EQUIP_SLOTS) paintSlot(this.eq[k], eq[k], this.ui);
     for (let i = 0; i < 40; i++) paintSlot(this.cells[i], inv[i], this.ui);
     const aw = st.player?.activeWeapon ? 'weaponAlt' : 'weapon';

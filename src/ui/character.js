@@ -7,10 +7,10 @@ import { xpProgress } from './rpg.js';
 import { simpleTip } from './tooltip.js';
 
 const ATTR = [
-  { k: 'str', n: 'Strength', jp: '力', g: 'swords', c: '#ff8f7a', tip: 'Adds damage to Bone Sword attacks and lets Chewy wear heavier gear.' },
+  { k: 'str', n: 'Strength', jp: '力', g: 'swords', c: '#ff8f7a', tip: 'Adds damage to Bone Sword attacks (Chewy) and lets you wear heavier gear.' },
   { k: 'dex', n: 'Dexterity', jp: '速', g: 'ball', c: '#ffcf4a', tip: 'Adds damage to thrown balls, improves block chance and crit chance a little.' },
   { k: 'vit', n: 'Vitality', jp: '体', g: 'heart', c: '#ff8fb0', tip: 'Each point grants extra Life and a bit of Life regeneration.' },
-  { k: 'ene', n: 'Energy', jp: '気', g: 'bolt', c: '#8fd0ff', tip: 'Each point grants extra Zoom (skill energy) and Zoom regeneration.' },
+  { k: 'ene', n: 'Energy', jp: '気', g: 'bolt', c: '#8fd0ff', tip: 'Each point grants extra Zoom (skill energy) and Zoom regeneration. With a staff (Moka) it also adds +1% spell damage.' },
 ];
 
 const n0 = v => Math.round(+v || 0);
@@ -23,7 +23,7 @@ const GROUPS = [
   { id: 'off', name: 'Offense', jp: '攻撃', g: 'swords', rows: [
     ['Damage', d => `${n0(d.dmgMin)}–${n0(d.dmgMax)}`, 'Damage range of a basic attack with your active weapon.', 1],
     ['Damage bonus', d => `+${pct(d.dmgPct)}`, 'Percent bonus applied to all weapon and skill damage.', 1],
-    ['Attack speed', d => (d.aspd ? `${(+d.aspd).toFixed(2)}/s` : pct(d.atkSpeed)), 'How many attacks per second Chewy performs.', 1],
+    ['Attack speed', d => (d.aspd ? `${(+d.aspd).toFixed(2)}/s` : pct(d.atkSpeed)), 'How many attacks per second you perform.', 1],
     ['Crit chance', d => pct(d.crit), 'Chance for a hit to be a critical strike (big gold numbers!).', 1],
     ['Crit damage', d => `+${pct(d.critDmg)}`, 'Extra damage dealt by critical strikes.', 1],
     ['Cast speed', d => `+${pct(d.castSpeed)}`, 'Faster skill casting animations.', 0, d => d.castSpeed],
@@ -49,12 +49,12 @@ const GROUPS = [
     ['Fire', 'resFire', '#ff9a3c', 'fire'], ['Frost', 'resFrost', '#8fd0ff', 'frost'], ['Zap', 'resZap', '#ffe44a', 'zap'], ['Stink', 'resStink', '#9ad86a', 'stink'],
   ] },
   { id: 'misc', name: 'Other', jp: 'その他', g: 'clover', rows: [
-    ['Move speed', d => `+${pct(d.moveSpeed)}`, 'How fast Chewy trots around.', 1],
+    ['Move speed', d => `+${pct(d.moveSpeed)}`, 'How fast you trot around.', 1],
     ['Magic find', d => `+${pct(d.mf)}`, 'Better chance that dropped items are Magic, Rare or Unique.', 1],
     ['Coin find', d => `+${pct(d.gf)}`, 'More coins from monsters and chests.', 1],
     ['XP bonus', d => `+${pct(d.xpBonus)}`, 'Extra experience from every defeated monster.', 0, d => d.xpBonus],
     ['Cooldown', d => `−${pct(d.cdr)}`, 'Cooldown reduction for all skills.', 0, d => d.cdr],
-    ['All skills', d => `+${n0(d.allSkills)}`, 'Bonus levels to every skill Chewy knows.', 0, d => d.allSkills],
+    ['All skills', d => `+${n0(d.allSkills)}`, 'Bonus levels to every skill you know.', 0, d => d.allSkills],
     ['Shadow damage', d => `+${pct(d.shadowDmg)}`, "Bonus to Shadow's bites and pounces.", 1],
     ['Shadow life', d => `+${pct(d.shadowLife)}`, "Bonus to Shadow's maximum Life.", 1],
   ] },
@@ -111,6 +111,16 @@ export class CharacterPanel extends Panel {
   }
   render() {
     const st = this.st, p = st.player || {}, d = this.d;
+    const hero = st.activeHero || 'chewy';
+    if (hero !== this._hero) { // whoever is being played
+      this._hero = hero;
+      const b = this.body;
+      b.querySelector('.ch-por').innerHTML = portrait(hero);
+      b.querySelector('.ch-name').innerHTML = `${esc(p.name || 'Chewy')} <span class="jp">${hero === 'moka' ? 'モカ' : 'チューイ'}</span>`;
+      b.querySelector('.ch-cls').innerHTML = `Level <b class="ch-lv">${p.lvl || 1}</b> · ${hero === 'moka' ? 'Tidewater Mage of the Hollow' : 'Pup of the Blossom Dojo'}`;
+      this.$.lv = b.querySelector('.ch-lv');
+      b.dataset.hero = hero;
+    }
     setText(this.$.lv, String(p.lvl || 1));
     const x = xpProgress(p);
     this.$.xp.style.width = (x.frac * 100).toFixed(1) + '%';

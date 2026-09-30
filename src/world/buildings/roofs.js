@@ -2,12 +2,16 @@
 // ridge caps with onigawara end tiles, hip ridges, irimoya (hip-and-gable) and round / polygonal roofs.
 import * as THREE from 'three';
 import { clamp, lerp, Noise } from '../../core/util.js';
-import { tube } from '../../gfx/geom.js';
+import { tube, puff } from '../../gfx/geom.js';
 import { G, V, C, col, shade, mixc, PI } from './kit.js';
 
 const _noise = new Noise(913);
 const prof = (t, c) => (1 - c) * t + c * t * t;
 const ribShape = ph => { const f = ph - Math.floor(ph); return Math.pow(Math.sin(f * PI), 0.6); };
+// integer hash → 0..1 (per-tile colour variety, lichen spots)
+const hash3 = (a, b, c) => { let h = Math.imul(a | 0, 374761393) ^ Math.imul(b | 0, 668265263) ^ Math.imul(c | 0, 2147483647); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+const LICHEN = [new THREE.Color('#c8cca0'), new THREE.Color('#d6ceb0'), new THREE.Color('#b4c49c')];
+const _up = new THREE.Vector3(0, 1, 0), _q = new THREE.Quaternion();
 
 // Build a geometry from positions/colours/indices
 function mkGeo(pos, cols, idx, smooth = true) {
@@ -51,10 +55,23 @@ export function roof(B, o) {
     B.push([0, 0, 0], PI / 2);
     const info = roofCore(B, { ...o, w: o.d, d: o.w });
     B.pop();
-    const yAt = info.yAt;
-    return { ...info, yAt: (x, z) => yAt(-z, x) };
+    const yAt = info.yAt, underAt = info.underAt;
+    return { ...info, yAt: (x, z) => yAt(-z, x), underAt: underAt && ((x, z) => underAt(-z, x)) };
   }
   return roofCore(B, o);
+}
+
+// underside height of the eave at (x, z) including the corner upturn (for hanging charms / rain chains)
+function addUnderAt(out, R, type, o, A, Bz) {
+  const X = o.w / 2 + (o.gOver ?? 0.35);
+  const liftAt = (dc, t, eL) => { const W = Math.min(R.liftW, eL * 0.28); return R.lift * Math.exp(-(dc * dc) / (W * W)) * (1 - t) * (1 - t); };
+  const tOf = (x, z) => (type === 'gable' ? clamp((Bz - Math.abs(z)) / Bz) : type === 'shed' ? clamp((Bz - z) / (2 * Bz)) : clamp(Math.min(A - Math.abs(x), Bz - Math.abs(z)) / Bz));
+  out.underAt = (x, z) => {
+    const t = tOf(x, z);
+    let dc, eL;
+    if (type === 'gable' || type === 'shed') { dc = X - Math.abs(x); eL = 2 * X; } else if (A - Math.abs(x) < Bz - Math.abs(z)) { dc = Bz - Math.abs(z); eL = 2 * Bz; } else { dc = A - Math.abs(x); eL = 2 * A; }
+    return out.yAt(x, z) + liftAt(Math.max(0, dc), t, eL) - R.thick;
+  };
 }
 
 function roofCore(B, o) {
@@ -68,11 +85,18 @@ function roofCore(B, o) {
     moss: o.moss ?? 0, mossCol: col(o.mossColor || '#7cae5a'),
   };
   R.k = o.k ?? clamp((o.d / 2 + over) / 1.35, 0.22, 1.25); // ornament scale
+  // trim: rich = 0 humble .. 2 rich (defaults to the model's), seed for per-tile variety,
+  // ends = round tile-end discs (nokigawara) along the eaves, lichen = pale spots on a few tiles
+  R.rich = o.rich ?? B.richness; R.seed = (B.seed * 31 + (o.seedOff ?? 0) + Math.round(o.w * 97 + o.d * 13)) | 0;
+  R.ends = o.ends ?? (R.ribW >= 0.19 && R.k >= 0.3);
+  R.lichen = o.lichen ?? (R.rich === 0 ? 0.06 : R.rich === 1 ? 0.03 : 0.01);
+  R.mossClumps = o.mossClumps ?? (R.moss >= 0.2 && R.rich < 2 && R.k >= 0.45 ? (R.rich === 0 ? 2 : 1) : 0);
+  R.oniRich = o.oniRich ?? R.rich;
   if (type === 'shed') R.H = o.H ?? Bz * 0.5;
   const tw = over / (type === 'shed' ? 2 * Bz : Bz);
   R.yb = o.y0 - R.H * prof(tw, R.curve) + R.thick;
   const capCol = o.cap || mixc(shade(o.color || '#5d6f9e', 0.78), '#f6eef4', 0.1);
-  const out = { yb: R.yb, H: R.H, A, Bz, ridgeY: R.yb + R.H };
+  const out = { yb: R.yb, H: R.H, A, Bz, ridgeY: R.yb + R.H, thick: R.thick };
 
   if (type === 'hip') {
     const hipAll = { c0: true, c1: true, eave: true, hip1: true };
@@ -86,14 +110,14 @@ function roofCore(B, o) {
     const L = A - Bz;
     if (L > 0.3 * R.k) ridge(B, R, -L, L, R.yb + R.H, capCol, o.oni !== false, o);
     else finial(B, R.yb + R.H, capCol, o.finial, R.k);
-    out.yAt = (x, z) => R.yb + R.H * prof(clamp(1 - Math.min(A - Math.abs(x), Bz - Math.abs(z)) / Bz), R.curve);
+    out.yAt = (x, z) => R.yb + R.H * prof(clamp(Math.min(A - Math.abs(x), Bz - Math.abs(z)) / Bz), R.curve);
   } else if (type === 'gable') {
     const X = o.w / 2 + gOver;
     face(B, R, { E0: [-X, Bz], E1: [X, Bz], R0: [-X, 0], R1: [X, 0], t0: 0, t1: 1, c0: true, c1: true, d0: [-1, 0.4], d1: [1, 0.4], eave: true, open0: true, open1: true, barge: true });
     face(B, R, { E0: [X, -Bz], E1: [-X, -Bz], R0: [X, 0], R1: [-X, 0], t0: 0, t1: 1, c0: true, c1: true, d0: [1, -0.4], d1: [-1, -0.4], eave: true, open0: true, open1: true, barge: true });
     for (const sx of [-1, 1]) gableTri(B, R, o, sx * o.w / 2, sx, 0, Bz, o.y0);
     ridge(B, R, -X - 0.05, X + 0.05, R.yb + R.H, capCol, o.oni !== false, o);
-    out.yAt = (x, z) => R.yb + R.H * prof(clamp(1 - (Bz - Math.abs(z)) / Bz), R.curve);
+    out.yAt = (x, z) => R.yb + R.H * prof(clamp((Bz - Math.abs(z)) / Bz), R.curve);
   } else if (type === 'irimoya') {
     const tg = o.tg ?? 0.5;
     const xg = A - Bz * tg;
@@ -112,7 +136,7 @@ function roofCore(B, o) {
     const yTop = R.yb + R.H * prof(tg, R.curve) + R.ribAmp * 0.5;
     for (const sx of [-1, 1]) gableTri(B, R, o, sx * xg, sx, tg, Bz, yTop);
     ridge(B, R, -X - 0.05, X + 0.05, R.yb + R.H, capCol, o.oni !== false, o);
-    out.yAt = (x, z) => R.yb + R.H * prof(clamp(1 - Math.min(A - Math.abs(x), Bz - Math.abs(z)) / Bz), R.curve);
+    out.yAt = (x, z) => R.yb + R.H * prof(clamp(Math.min(A - Math.abs(x), Bz - Math.abs(z)) / Bz), R.curve);
   } else if (type === 'skirt') {
     // pent roof ring (lower tier of a two-storey house); upper storey sits on the plate at topY
     const tt = o.tTop ?? 0.45;
@@ -127,7 +151,7 @@ function roofCore(B, o) {
     const pw = 2 * (A - Bz * tt), pd = 2 * Bz * (1 - tt);
     const plate = G.box(pw + 0.08, 0.1, pd + 0.08, 0.03); plate.translate(0, Y1 + 0.01, 0); B.add(plate, R.under);
     out.topY = Y1 + 0.06; out.openW = pw; out.openD = pd;
-    out.yAt = (x, z) => R.yb + R.H * prof(clamp(1 - Math.min(A - Math.abs(x), Bz - Math.abs(z)) / Bz), R.curve);
+    out.yAt = (x, z) => R.yb + R.H * prof(clamp(Math.min(A - Math.abs(x), Bz - Math.abs(z)) / Bz), R.curve);
   } else if (type === 'shed') {
     // single slope rising from the front eave (+z) to the back (-z)
     const X = o.w / 2 + gOver;
@@ -136,6 +160,7 @@ function roofCore(B, o) {
     out.ridgeY = R.yb + R.H;
     out.yAt = (x, z) => R.yb + R.H * prof(clamp((Bz - z) / (2 * Bz)), R.curve);
   }
+  addUnderAt(out, R, type, o, A, Bz);
   return out;
 }
 
@@ -151,8 +176,9 @@ function face(B, R, f) {
   const ts = new Set([f.t0, f.t1]);
   const step = R.course > 0 ? R.course / slopeLen : 0;
   if (step > 0) for (let k = 0; k * step < f.t1; k++) {
-    for (const tt of [k * step, (k + 0.8) * step]) if (tt > f.t0 + 1e-3 && tt < f.t1 - 1e-3) ts.add(tt);
+    for (const tt of [k * step, (k + 0.86) * step]) if (tt > f.t0 + 1e-3 && tt < f.t1 - 1e-3) ts.add(tt);
   } else for (let t = f.t0 + 0.12; t < f.t1 - 0.03; t += 0.12) ts.add(t);
+  const fi = R.fi = (R.fi ?? 0) + 1;
   const rows = [...ts].sort((a, b) => a - b);
   const W = Math.min(R.liftW, eL * 0.28);
   const P = (s, t, mode) => { // mode 0 top ribbed, 1 underside, 2 top smooth
@@ -166,21 +192,30 @@ function face(B, R, f) {
       const d = near0 ? f.d0 : f.d1, dl = Math.hypot(d[0], d[1]);
       x += d[0] / dl * up * 0.45; z += d[1] / dl * up * 0.45;
     }
-    let y = R.yb + R.H * prof(t, R.curve) + up, rib = 0, fr = 0;
+    let y = R.yb + R.H * prof(t, R.curve) + up, rib = 0, fr = 0, ci = 0, ri = 0;
     if (mode === 0) {
-      if (R.ribW > 0) { rib = ribShape((x0 * dir[0] + z0 * dir[1]) / R.ribW + 0.5); y += rib * R.ribAmp; }
-      if (step > 0) { const u = t / step + 1e-4; fr = u - Math.floor(u); y += (1 - fr) * R.courseAmp; }
+      if (R.ribW > 0) { const u = (x0 * dir[0] + z0 * dir[1]) / R.ribW; rib = ribShape(u + 0.5); ci = Math.round(u); y += rib * R.ribAmp; }
+      if (step > 0) { const u = t / step + 1e-4; ri = Math.floor(u); fr = u - ri; y += (1 - fr) * R.courseAmp; }
     } else if (mode === 1) y -= R.thick;
     else y += R.ribAmp * 0.6 + R.courseAmp * 0.5;
-    return { p: V(x, y, z), rib, fr, up };
+    return { p: V(x, y, z), rib, fr, up, ci, ri };
   };
-  // top surface
+  // top surface: tile columns with dark valleys, course lips with a shadow line under each butt edge,
+  // a little per-tile colour variety (hand-laid kawara) and a few lichen-spotted tiles
   const pos = [], cols = [], idx = [];
   const cb = R.color, tmp = new THREE.Color();
+  const hs = R.seed + fi * 101;
   for (let j = 0; j < rows.length; j++) for (let i = 0; i <= ns; i++) {
     const q = P(i / ns, rows[j], 0);
     pos.push(q.p.x, q.p.y, q.p.z);
-    tmp.copy(cb).multiplyScalar((0.8 + 0.26 * q.rib) * (1.07 - 0.2 * q.fr) * (1 + q.up * 0.25));
+    const shadowLine = step > 0 ? 1.08 - 0.3 * Math.pow(q.fr, 1.5) : 1;
+    tmp.copy(cb).multiplyScalar((0.75 + 0.31 * q.rib) * shadowLine * (1 + q.up * 0.25));
+    if (R.ribW > 0) {
+      const hj = hash3(q.ci, q.ri, hs);
+      const kk = 0.955 + 0.09 * hj, ww = (hash3(q.ri, q.ci, hs + 3) - 0.5) * 0.05;
+      tmp.r *= kk * (1 + ww); tmp.g *= kk; tmp.b *= kk * (1 - ww);
+      if (R.lichen > 0 && q.rib > 0.8 && q.fr > 0.05 && hash3(q.ci * 3 + 1, q.ri, hs + 11) < R.lichen) tmp.lerp(LICHEN[(hj * 3) | 0], 0.32);
+    }
     if (R.moss > 0) {
       const m = clamp((_noise.n2(q.p.x * 0.9 + 3, q.p.z * 0.9) * 0.5 + 0.5 - 0.55) * 4) * R.moss * (1 - rows[j] * 0.6);
       tmp.lerp(R.mossCol, m * 0.85);
@@ -193,6 +228,18 @@ function face(B, R, f) {
     idx.push(a, b, c, a, c, d);
   }
   B.add(mkGeo(pos, cols, idx), null);
+  // soft moss cushions tucked on a few lower courses (older, humbler roofs)
+  if (R.mossClumps && !f.topBand) for (let m = 0; m < R.mossClumps; m++) {
+    if (B.dchance(0.35)) continue;
+    const s = B.drand(0.18, 0.82), t = lerp(f.t0 + 0.03, f.t0 + (f.t1 - f.t0) * 0.3, B.dr());
+    const kk = clamp(R.k, 0.6, 1.1), mc = mixc('#' + R.color.getHexString(), B.dpick(['#6f9c50', '#7aa458', '#668f4a']), 0.5);
+    for (let c = 0; c < 3; c++) {
+      const q = P(clamp(s + (c ? B.dwob(0.045) : 0), 0.05, 0.95), t + (c ? B.dwob(0.025) : 0), 0), r = B.drand(0.055, 0.085) * kk * (c ? 0.8 : 1);
+      const g = puff(V(0, 0, 0), r, { detail: 0, noise: 0.3, squash: 0.36, seed: R.seed + m * 7 + c });
+      g.rotateY(B.drand(0, PI)); g.translate(q.p.x, q.p.y - r * 0.1, q.p.z);
+      B.add(g, c ? shade(mc, 0.94 + c * 0.08) : mc);
+    }
+  }
   // underside (soffit)
   const upos = [], ucol = [], uidx = [];
   const urows = [f.t0, lerp(f.t0, f.t1, 0.25), f.t1];
@@ -214,6 +261,7 @@ function face(B, R, f) {
     const T = [], U = [];
     for (let i = 0; i <= ns; i++) { T.push(P(i / ns, f.t0, 0).p); U.push(P(i / ns, f.t0, 1).p); }
     B.add(band(T, U, R.edge, outE), null);
+    if (R.ends && R.ribW > 0) tileEnds(B, R, P, f, dir, eL);
   }
   if (f.topBand) {
     const T = [], U = [];
@@ -234,6 +282,50 @@ function face(B, R, f) {
     const tTop = f.hipT ?? f.t1, pts = [];
     for (let k = 0; k <= 10; k++) { const t = lerp(tTop, f.t0, k / 10); const q = P(1, t, 2).p; q.y += 0.02; pts.push({ p: q, r: 0.075 * R.k }); }
     capTube(B, pts, R);
+  }
+}
+
+// A coin facing +y: front fan (centre vertex painted `mid`) + side band, no hidden back cap (3·seg triangles)
+function discGeo(r, dep, seg, body, mid) {
+  const pos = [], cols = [], h = dep / 2;
+  const put = (x, y, z, c) => { pos.push(x, y, z); cols.push(c.r, c.g, c.b); };
+  for (let k = 0; k < seg; k++) {
+    const a0 = k / seg * PI * 2, a1 = (k + 1) / seg * PI * 2;
+    const x0 = Math.cos(a0) * r, z0 = Math.sin(a0) * r, x1 = Math.cos(a1) * r, z1 = Math.sin(a1) * r;
+    put(0, h, 0, mid); put(x1, h, z1, body); put(x0, h, z0, body);
+    put(x0, h, z0, body); put(x1, h, z1, body); put(x1 * 0.94, -h, z1 * 0.94, body);
+    put(x0, h, z0, body); put(x1 * 0.94, -h, z1 * 0.94, body); put(x0 * 0.94, -h, z0 * 0.94, body);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+// Round tile-end discs (nokigawara) at every tile column along an eave, tipped a little upward so they read from
+// the high game camera. Humble roofs: plain discs; richer roofs get a painted mon (a soft dot) on each disc.
+function tileEnds(B, R, P, f, dir, eL) {
+  const t0 = f.t0;
+  const X0 = s => lerp(lerp(f.E0[0], f.E1[0], s), lerp(f.R0[0], f.R1[0], s), t0);
+  const Z0 = s => lerp(lerp(f.E0[1], f.E1[1], s), lerp(f.R0[1], f.R1[1], s), t0);
+  const a0 = X0(0) * dir[0] + Z0(0) * dir[1], a1 = X0(1) * dir[0] + Z0(1) * dir[1];
+  if (a1 - a0 < 1e-3) return;
+  const r = clamp(Math.min(R.ribW * 0.31, R.thick * 0.44), 0.035, 0.1), dep = 0.04;
+  const margin = R.ribW * 0.7;
+  const body = col(mixc('#' + R.color.getHexString(), R.edge, 0.16)).multiplyScalar(0.9);
+  const mon = R.rich >= 2 ? body.clone().lerp(col('#a8742a'), 0.6) : body.clone().multiplyScalar(0.72);
+  const tA = Math.min(t0 + 0.05, f.t1);
+  for (let k = Math.ceil(a0 / R.ribW); k * R.ribW <= a1; k++) {
+    const s = (k * R.ribW - a0) / (a1 - a0);
+    if (s * eL < margin || (1 - s) * eL < margin) continue;
+    const top = P(s, t0, 0).p, inn = P(s, tA, 0).p;
+    const D = top.clone().sub(inn); D.y = 0; if (D.lengthSq() < 1e-8) continue;
+    D.normalize(); D.y = 0.42; D.normalize();
+    const g = discGeo(r, dep, 9, body, R.rich >= 1 ? mon : body);
+    g.applyQuaternion(_q.setFromUnitVectors(_up, D));
+    g.translate(top.x + D.x * 0.01, top.y - r * 1.05, top.z + D.z * 0.01);
+    B.add(g, null);
   }
 }
 
@@ -268,7 +360,12 @@ function ridge(B, R, x0, x1, y, capCol, oni, o) {
   B.add(cap, capCol);
   const band2 = G.box(len + 0.12, 0.06 * k, 0.22 * k, 0.025 * k); band2.translate((x0 + x1) / 2, y + 0.17 * k, 0);
   B.add(band2, shade(capCol, 1.18));
+  // stacked noshi tiles: two dark courses along both sides of the cap
+  if (k >= 0.35) for (const yy of [0.02, 0.085]) {
+    const ln = G.box(len + 0.05, 0.02 * k, 0.3 * k + 0.014, 0); ln.translate((x0 + x1) / 2, y + yy * k, 0); B.add(ln, shade(capCol, 0.72));
+  }
   if (!oni) return;
+  const rich = R.oniRich ?? 1;
   for (const [x, s] of [[x0, -1], [x1, 1]]) {
     if (o.shachi) { shachihoko(B, x - s * 0.02, y + 0.12, s); continue; }
     B.push([x + s * 0.02, y, 0], 0, k);
@@ -278,6 +375,11 @@ function ridge(B, R, x0, x1, y, capCol, oni, o) {
     const face = G.cyl(0.09, 0.09, 0.04, 12); face.rotateZ(PI / 2); face.translate(s * 0.07, 0.15, 0);
     B.add(face, o.oniFace || shade(capCol, 1.35));
     const dot = G.sph(0.035, 6, 4); dot.translate(s * 0.095, 0.15, 0); B.add(dot, o.oniFace ? capCol : shade(capCol, 0.8));
+    if (rich >= 1) { // toribusuma: the little round tile poking out over the oni
+      const tb = G.cyl(0.05, 0.055, 0.2, 6); tb.rotateZ(PI / 2); tb.translate(s * 0.08, 0.33, 0); B.add(tb, shade(capCol, 1.1));
+      const tbe = G.cyl(0.056, 0.056, 0.02, 6); tbe.rotateZ(PI / 2); tbe.translate(s * 0.185, 0.33, 0); B.add(tbe, rich >= 2 ? C.gold : shade(capCol, 1.3));
+    }
+    if (rich >= 2) { const rim = G.torus(0.1, 0.018, 4, 12); rim.rotateY(PI / 2); rim.translate(s * 0.09, 0.15, 0); B.add(rim, C.gold); }
     B.pop();
   }
 }

@@ -73,7 +73,7 @@ export class Monster {
     // visual body radius (incl. champion/unique scale) used to keep bodies apart; collision with rock keeps using radius
     this.bodyR = def.boss ? (def.vr || def.radius) : (def.vr || def.radius) * (scale / (def.scale || 1));
     this.height = (this.model.rig ? 1.15 : 1.0) * scale;
-    this.pos = new THREE.Vector3(x, 0, z);
+    this.pos = new THREE.Vector3(x, this.world.heightAt(x, z), z); // (pos.y = the ground: regions have terrain)
     this.facing = rand(0, TAU);
     this.speed = def.speed * this.stats.speedMul;
     this.status = {};
@@ -94,6 +94,7 @@ export class Monster {
     this.summoned = 0;
     this.telegraph = null;
     this.sync();
+    def.onSpawn?.(this);
   }
   get level() { return this.stats.level; }
   // speech-bubble emote above the head (vfx.emote reads rig.height; big bosses would otherwise get it inside their body)
@@ -101,12 +102,14 @@ export class Monster {
   // big / elite bodies get the soft hit flash and soft hit VFX (champion packs are re-ranked after construction)
   get big() { return !!this.def.boss || this.rank === 'champion' || this.rank === 'unique' || this.scale >= 1.4; }
   sync() {
-    const r = this.model.root;
-    r.position.set(this.pos.x, this.world.heightAt(this.pos.x, this.pos.z) + (this.kit ? (this.model.rig.offsetY || 0) : 0), this.pos.z);
+    const r = this.model.root, gy = this.pos.y = this.world.heightAt(this.pos.x, this.pos.z);
+    r.position.set(this.pos.x, gy + (this.kit ? (this.model.rig.offsetY || 0) : 0), this.pos.z);
     r.rotation.y = this.facing;
-    this.shadow.position.set(this.pos.x, 0.025, this.pos.z);
-    if (this.light) this.light.pos.set(this.pos.x + Math.sin(this.facing) * 1.5, 3.6, this.pos.z + Math.cos(this.facing) * 1.5);
+    this.shadow.position.set(this.pos.x, gy + 0.025, this.pos.z);
+    if (this.light) this.light.pos.set(this.pos.x + Math.sin(this.facing) * 1.5, gy + 3.6, this.pos.z + Math.cos(this.facing) * 1.5);
   }
+  /** A point `k` m above the ground under this monster (VFX / projectile origins). */
+  lift(k) { return new THREE.Vector3(this.pos.x, this.pos.y + k, this.pos.z); }
   heal(n) { this.life = Math.min(this.lifeMax, this.life + n); }
   takeDamage(dmg, { element = 'phys', crit = false, knock = 0, stun = 0, from = null } = {}) {
     if (!this.alive) return;
@@ -152,12 +155,33 @@ export class Monster {
     const G = this.G;
     this.anim.deathT = 0;
     // a boss goes up in a smaller, lighter puff: 40 big opaque pink clouds used to fog the whole Victory frame
-    G.vfx.poof(this.pos.clone().setY(0.4 * this.scale), { color: this.def.boss ? '#ffe8f2' : '#fff4fa', size: (this.def.boss ? 0.42 : 0.6) * this.scale, n: this.def.boss ? 20 : 14 });
-    G.vfx.petals(this.pos.clone().setY(0.5), this.def.boss ? 40 : 6);
+    G.vfx.poof(this.lift(0.4 * this.scale), { color: this.def.boss ? '#ffe8f2' : '#fff4fa', size: (this.def.boss ? 0.42 : 0.6) * this.scale, n: this.def.boss ? 20 : 14 });
+    G.vfx.petals(this.lift(0.5), this.def.boss ? 40 : 6);
     Events.emit('sfx', 'monster_die', { pos: this.pos });
     if (this.stats.onDeath === 'fireNova') this.mode.fireNova(this);
+    this.def.onDeath?.(this);
     this.mode.onMonsterDeath(this);
     setTimeout(() => this.dispose(), 480);
+  }
+  // A boss's summoned add when its master falls: out of the fight at once (no more attacks, can't be hit), then after
+  // `delay` s it bursts into sparkles and squashes away. No xp, no loot.
+  vanish(delay = 0) {
+    if (!this.alive) return;
+    this.alive = false; this.life = 0; this.vanished = true;
+    this.cancelAttack(); this.knock.set(0, 0, 0);
+    if (this.light) { this.world.lightPool.removeSource(this.light); this.light = null; }
+    const M = this.mode, i = M.monsters.indexOf(this); if (i >= 0) M.monsters.splice(i, 1);
+    M.combat?.remove(this);
+    (M.dying ||= []).push(this); // keeps idling (deathT < 0) until its turn to poof
+    const go = () => {
+      if (this.disposed || this.G.dungeon !== M) return;
+      const G = this.G, p = this.lift(Math.max(0.35, (this.height || 1) * 0.5));
+      G.vfx.sparkle(p, { n: 14, color: '#fff2c8', r: 0.45 * this.scale, rise: 1.4, size: 0.3 });
+      G.vfx.poof(p, { color: '#fff4fa', n: 7, size: 0.42 * this.scale });
+      this.anim.deathT = 0;
+      setTimeout(() => this.dispose(), 480);
+    };
+    if (delay > 0) setTimeout(go, delay * 1000); else go();
   }
   dispose() {
     this.world.scene.remove(this.model.root, this.shadow);
@@ -191,7 +215,8 @@ export class Monster {
         this.move(away, dt, 1.1 * slowMul); moving = true;
       } else if (this.aggro) {
         const A = this.def.attack;
-        if (this.def.pattern === 'kitsune') moving = this.kitsuneAI(dt, target, d, slowMul);
+        if (this.def.ai) moving = this.def.ai(this, dt, target, d, slowMul); // region monsters / bosses: their own behaviour
+        else if (this.def.pattern === 'kitsune') moving = this.kitsuneAI(dt, target, d, slowMul);
         else if (this.state === 'windup' || this.state === 'attack') moving = this.runAttack(dt, target, d);
         else if (this.state === 'rest') { // post-barrage breather: stands still, open to hits
           this.faceTo(target.pos.x, target.pos.z, dt * 0.3);
@@ -226,6 +251,7 @@ export class Monster {
     }
     // elite shimmer
     if (this.eliteColor && Math.random() < dt * 6) G.vfx.spark.spawn({ x: this.pos.x + rand(-0.4, 0.4) * this.scale, y: rand(0.2, 1.1) * this.scale, z: this.pos.z + rand(-0.4, 0.4) * this.scale, vy: 0.6, life: 0.7, size: 0.22, color: this.eliteColor, alpha: 0.9, alpha1: 0 });
+    this.def.update?.(this, dt, moving);
     this.anim.update(dt, moving, this.speed);
     if (this.kit) this.kit.update(dt, this.pos);
     this.sync();
@@ -267,7 +293,7 @@ export class Monster {
     const G = this.G; let best = G.playerDead ? null : G.player, bd = best ? dist(best.pos.x, best.pos.z, this.pos.x, this.pos.z) : 1e9;
     for (const e of this.mode.combat.entities) {
       if (!e.alive || e.team !== 'ally' || e.untargetable) continue;
-      const d = dist(e.pos.x, e.pos.z, this.pos.x, this.pos.z) - (e.taunt ? 6 : 0);
+      const d = dist(e.pos.x, e.pos.z, this.pos.x, this.pos.z) - (e.tauntFor ? e.tauntFor(this) : e.taunt ? 6 : 0); // (Moka's Decoy Duck: tauntFor = must-bite within its lure)
       if (d < bd - 1) { bd = d; best = e; }
     }
     return best;
@@ -383,11 +409,11 @@ export class Monster {
   }
   doBlink() {
     const G = this.G, to = this.blinkTo, from = this.pos.clone();
-    this.pos.set(to.x, 0, to.z);
+    this.pos.set(to.x, this.world.heightAt(to.x, to.z), to.z);
     G.vfx.undamped(() => { // puffs of foxfire where she vanished and where she lands
-      G.vfx.poof(from.setY(0.8), { color: '#c8dcff', n: 16, size: 0.9 });
+      G.vfx.poof(from.setY(from.y + 0.8), { color: '#c8dcff', n: 16, size: 0.9 });
       G.vfx.sparks(from, { n: 12, color: '#9ac4ff', speed: 5, size: 0.4 });
-      G.vfx.poof(this.pos.clone().setY(0.8), { color: '#c8dcff', n: 16, size: 0.9 });
+      G.vfx.poof(this.lift(0.8), { color: '#c8dcff', n: 16, size: 0.9 });
     });
     G.vfx.ring(this.pos, { color: '#9ac4ff', r0: 0.3, r1: this.bodyR * 2.2, life: 0.4 });
     Events.emit('sfx', 'portal');
@@ -399,9 +425,9 @@ export class Monster {
   blink(target) {
     const a = rand(0, TAU); const x = target.pos.x + Math.cos(a) * 2.5, z = target.pos.z + Math.sin(a) * 2.5;
     if (!this.world.walkable(x, z)) return;
-    this.G.vfx.poof(this.pos.clone().setY(0.4), { color: '#c9b8ff', n: 8 });
-    this.pos.set(x, 0, z); this.stateT = 0;
-    this.G.vfx.poof(this.pos.clone().setY(0.4), { color: '#c9b8ff', n: 8 });
+    this.G.vfx.poof(this.lift(0.4), { color: '#c9b8ff', n: 8 });
+    this.pos.set(x, this.world.heightAt(x, z), z); this.stateT = 0;
+    this.G.vfx.poof(this.lift(0.4), { color: '#c9b8ff', n: 8 });
     Events.emit('sfx', 'portal');
   }
   startAttack(target, d) {
@@ -418,7 +444,7 @@ export class Monster {
     else if (A.type === 'charge') { this.chargeDir = target.pos.clone().sub(this.pos).setY(0).normalize(); }
     else if (A.type === 'barrage' && A.proj === 'foxfire') { // foxfire gathers: blue ring at her feet + motes drawn in
       this.telegraph = vfx.telegraph(this.pos, this.bodyR * 1.6, A.windup, TELE.barrage);
-      vfx.undamped(() => vfx.sparkle(this.pos.clone().setY(this.height * 0.45), { n: 14, color: '#9ac4ff', r: this.bodyR, life: A.windup, size: 0.35, rise: 0.4 }));
+      vfx.undamped(() => vfx.sparkle(this.lift(this.height * 0.45), { n: 14, color: '#9ac4ff', r: this.bodyR, life: A.windup, size: 0.35, rise: 0.4 }));
     }
     if (this.def.boss) { Events.emit('sfx', 'boss_roar'); this.mode.bossEngaged?.(this); }
   }
@@ -449,10 +475,10 @@ export class Monster {
             if (A.proj === 'firepot') { // a staggered rain of pots, each with its own landing circle
               const sp = A.spread || 2, blast = A.blast || 1.8, time = A.spread ? rand(0.85, 1.2) : 0.9;
               const to = target.pos.clone().add(new THREE.Vector3(rand(-sp, sp), 0, rand(-sp, sp)));
-              C.spawn({ team: 'enemy', kind: 'firepot', pos: this.pos.clone().setY(1.2 * this.scale), lob: { to, h: 3.5, time }, onEnd: (p) => this.mode.explodeAt(p.pos, blast, Math.round(roll() * (A.dmgMul || 1)), 'fire', this) });
-              G.vfx.telegraph(to, blast, time, this.def.boss ? TELE.firepot : '#ff7a3a');
+              const pot = C.spawn({ team: 'enemy', kind: 'firepot', pos: this.lift(1.2 * this.scale), lob: { to, h: 3.5, time }, onEnd: (p) => this.mode.explodeAt(p.pos, blast, Math.round(roll() * (A.dmgMul || 1)), 'fire', this) });
+              pot.tele = G.vfx.telegraph(to, blast, time, this.def.boss ? TELE.firepot : '#ff7a3a'); // (fizzled with the pot on a boss defeat)
             } else {
-              C.spawn({ team: 'enemy', kind: A.proj, pos: this.pos.clone().setY(0.6 * this.scale + 0.2), dir, speed: A.speed, range: A.range * 1.4, radius: 0.3, homing: A.proj === 'foxfire' ? (A.homing ?? 1.2) : 0, onHit: (e) => this.dealTo(e, Math.round(roll() * (A.dmgMul || 1)), el) }).homeTarget = target;
+              C.spawn({ team: 'enemy', kind: A.proj, pos: this.lift(0.6 * this.scale + 0.2), dir, speed: A.speed, range: A.range * 1.4, radius: 0.3, homing: A.proj === 'foxfire' ? (A.homing ?? 1.2) : 0, onHit: (e) => this.dealTo(e, Math.round(roll() * (A.dmgMul || 1)), el) }).homeTarget = target;
             }
           }
           Events.emit('sfx', A.proj === 'acorn' ? 'throw' : A.proj === 'foxfire' ? 'ghost_wail' : 'fire_whoosh', { pos: this.pos });

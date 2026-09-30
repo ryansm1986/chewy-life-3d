@@ -4,7 +4,8 @@
 // spectral centroid / high-frequency energy, flagging silent, clipping, overly long or harsh sounds.
 import { Audio, renderOffline, SFX_GROUPS, SFX_NAMES, TRACK_NAMES, STING_NAMES, AMBIENCE_NAMES, BABBLE_VOICES, DEFAULT_VOLUMES, gibberish } from '../audio/audio.js';
 
-const LONG_OK = { player_die: 3.2, ghost_wail: 2.6, howl: 2.6, portal: 2.8, build_complete: 2.8, ui_levelup: 2.8, waypoint: 2.8, villager_chatter: 3.5, pickup_rare: 2.6, chest_open: 2.6, ui_quest: 2.6, ui_quest_done: 2.6, pickup_unique: 2.8, victory_sfx: 2.8 };
+const LONG_OK = { player_die: 3.2, ghost_wail: 2.6, howl: 2.6, portal: 2.8, build_complete: 2.8, ui_levelup: 2.8, waypoint: 2.8, villager_chatter: 3.5, pickup_rare: 2.6, chest_open: 2.6, ui_quest: 2.6, ui_quest_done: 2.6, pickup_unique: 2.8, victory_sfx: 2.8, env_wave: 3.6, env_temple_bell: 3,
+  tengu_storm: 3.4, umi_rise: 2.7, umi_wave: 3.1, umi_tide: 4.1, umi_defeat: 3.7 };
 
 export default function () {
   document.title = 'Chewy Life 3D — Audio';

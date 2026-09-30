@@ -70,6 +70,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1c1424; }
 .tabs { display: flex; gap: 6px; }
 .tab { display: flex; align-items: center; gap: 6px; padding: 6px 12px 7px; border: 3px solid var(--ink); border-radius: 14px 14px 10px 10px; background: linear-gradient(#fff, #fff3e4);
   font: 700 14px/1 var(--font); cursor: pointer; box-shadow: 0 3px 0 var(--ink); transition: transform .22s var(--spring), background .2s; pointer-events: auto; white-space: nowrap; }
+.tab[hidden] { display: none !important; }
 .tab .gl { width: 20px; height: 20px; transition: transform .3s var(--spring); }
 .tab:hover { transform: translateY(-3px); }
 .tab:hover .gl { transform: rotate(-12deg) scale(1.15); }

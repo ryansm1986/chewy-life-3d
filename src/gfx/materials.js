@@ -133,18 +133,32 @@ float bayer4(vec2 p) {
   float m[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
   return (m[i] + 0.5) / 16.0;
 }
+// Clean circular cut-away around Chewy (uOccl: his screen px, the cut radius px, his view depth), fully open inside,
+// only for surfaces well in front of him. The in-front test is strictly binary (no depth band): a surface near Chewy's
+// depth (a wall he leans on, a lantern or bench beside him) is never cut, and sloped walls / roofs crossing the
+// threshold get a clean line. The circle's edge is feathered over ~2.5 device px (fine interleaved-gradient dither
+// that SMAA smooths). uOcclOn: 0 off (small village props: propTwin() in world/village.js), 1 buildings / trees,
+// 2 dungeon walls (same, plus cCutRim: a few px just outside the cut, which the material's fragOut inks as the cut's
+// edge). OCCL_ANCHOR (dungeon props: lanterns, torii, shelves, statues): the test uses the view depth of the part's
+// anchor instead of the fragment's (vOcclAnchor = anchor depth, part top), so a part standing >= 0.4 m in front of
+// Chewy is removed whole inside the circle (never sliced at a height) and parts under 0.5 m tall are never cut.
+#ifdef OCCL_ANCHOR
+varying vec2 vOcclAnchor;
+#endif
+float cCutRim = 0.0;
 void occlusionFade(float fragDepth) {
   if (uOcclOn < 0.5) return;
-  vec2 d = gl_FragCoord.xy - uOccl.xy;
-  float r = length(d * vec2(1.0, 1.15)) / uOccl.z;
-  if (r > 1.0) return;
-  // clean circular cutaway (fully open inside) with a thin dithered rim, only for surfaces well in front of Chewy.
-  // The in-front test is strictly binary (no depth band): a surface near Chewy's depth (a wall he leans on, a lantern or
-  // bench beside him) is never dithered, and sloped walls/roofs crossing the threshold get a clean cut, not a Bayer ramp.
-  // (Small props opt out entirely via uOcclOn = 0: see propTwin() in world/village.js.)
+#ifdef OCCL_ANCHOR
+  if (vOcclAnchor.y < 0.5 || uOccl.w - vOcclAnchor.x < 0.4) return;
+#else
   if (uOccl.w - fragDepth < 1.15) return;
-  float k = smoothstep(1.0, 0.96, r);
-  if (k > 0.97 || bayer4(gl_FragCoord.xy) < k) discard;
+#endif
+  vec2 d = gl_FragCoord.xy - uOccl.xy;
+  float e = length(d * vec2(1.0, 1.15)) - uOccl.z; // device px outside the cut's edge (< 0 inside)
+  if (uOcclOn > 1.5) cCutRim = 1.0 - smoothstep(1.0, 3.5, e);
+  if (e > 0.0) return;
+  float ign = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+  if (e < -2.5 || ign < -e * 0.4) discard;
 }
 float cloudShadowAt(vec3 p) {
   vec2 q = p.xz * 0.012 + uCloudOffset;

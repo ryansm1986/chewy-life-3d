@@ -5,9 +5,10 @@ import { C, G, V, PI, ROOFS, shade, col, mixc } from './kit.js';
 import { roof } from './roofs.js';
 import { foundation, walls, onFace, shoji, roundWindow, door, noren, engawa, posts, chimney, steps, stepStones, flowerBox, hood, fence, STONES, FLOWERS } from './parts.js';
 import { chochin, toro, pot, barrel, crate, bush, tree, flowerPatch, signboard, mailbox, bell, torii, rock, logPile, woodStack, bamboo } from './props.js';
-import { nobori, awning, bow, cake, cupcake, donut, anvil, bucket, shimenawa, stoneDog, cafeTable } from './props2.js';
+import { nobori, awning, bow, cake, cupcake, donut, anvil, bucket, shimenawa, stoneDog, cafeTable, laundry, firewood, wateringCan } from './props2.js';
 import { symbol, flatSymbol } from './symbols.js';
 import { LAMP } from './homes.js';
+import { charm, rainChain, kadomatsu, toolRack, eaveCharm } from './trim.js';
 import { clamp, TAU } from '../../core/util.js';
 
 // ------------------------------------------------------------------ Blossom Hall (6x4)
@@ -55,6 +56,14 @@ export function townHall(B) {
   B.anim({ p: [0, 0.62, 0], kind: 'swing', axis: [1, 0, 0], speed: 1.6, amp: 0.18 }, () => bell(B, { r: 0.13, color: C.gold }));
   B.pop();
   B.pop();
+  // hall dressing: rain chains down the outer veranda posts onto the deck, wind chimes between the lanterns,
+  // kadomatsu flanking the stairs
+  for (const sx of [-1, 1]) {
+    const cx = sx * 2.5, cz = zc + d / 2 + 0.45;
+    rainChain(B, cx, low.underAt(cx, cz - zc), cz, y0 + 0.02, { color: C.bronze });
+    B.at([sx * 2.12, y0 + h - 0.2, zc + d / 2 + 0.5], 0, () => charm(B, 'furin', { color: sx > 0 ? '#bfe6ff' : '#ffd0e0' }));
+    B.at([sx * 0.98, y0 + 0.02, zc + d / 2 + 0.55], 0, () => kadomatsu(B, 0.8));
+  }
   // banners, stone lanterns, planters
   for (const [x, c, s] of [[-2.7, '#ff8fb0', 'sakura'], [2.7, C.indigo, 'bell']]) B.at([x, 0, 1.55], x < 0 ? 0 : PI, () => nobori(B, { h: 2.5, w: 0.44, color: c, sym: s }));
   for (const x of [-1.35, 1.35]) B.at([x, 0, 1.72], 0, () => toro(B, { s: 0.8 }));
@@ -102,9 +111,14 @@ export function chewyHouse(B) {
   B.at([0, y0 + ph + 0.2, pd / 2 + 0.2], 0, () => symbol(B, 'bone', 0.46, { depth: 0.07 }));
   B.at([0, pr.ridgeY + 0.1, pd / 2 - 0.02], 0, () => symbol(B, 'paw', 0.16, { colors: ['#8a4a2c'] }));
   B.at([0.22, y0 + ph - 0.04, pd / 2 + 0.08], 0, () => chochin(B, { r: 0.1, h: 0.2, cord: 0.05, color: C.red }));
+  // Chewy's own rain charm (with floppy ears) on the other side of the arch
+  B.at([-0.26, y0 + ph - 0.02, pd / 2 + 0.08], 0, () => charm(B, 'teruDog'));
   B.pop();
   B.light([px + 0.2, 1.3, pz + 0.7], LAMP);
   B.at([0, info.ridgeY + 0.14, d / 2 + 0.28], 0, () => symbol(B, 'bone', 0.36, { depth: 0.06 }));
+  // a rain chain off the left eave, a wind chime at the right, a bone-shaped name plate by the side window
+  { const cx = -(w / 2 + 0.2), cz = d / 2 - 0.12; rainChain(B, cx, info.underAt(cx, cz), cz, 0, { color: '#c8a060' }); }
+  eaveCharm(B, info, w / 2 + 0.2, d / 2 - 0.3, 'furin', { color: '#ffd0e0' });
   B.pop();
   // yard: mailbox, dog bowl, tennis ball, picket fence, flowers
   B.at([1.05, 0, 1.2], -0.3, () => mailbox(B));
@@ -118,6 +132,10 @@ export function chewyHouse(B) {
   B.at([-1.15, 0, 0.9], 0, () => flowerPatch(B, { w: 0.5, d: 0.45, n: 7, colors: ['#ffd24a', '#ff8fb0', '#ffffff'] }));
   B.at([1.2, 0, -1.2], 0, () => bush(B, { r: 0.3, flowers: ['#ff9ec0'] }));
   B.at([-1.2, 0, -1.2], 0, () => barrel(B, { r: 0.16, h: 0.34 }));
+  // Chewy's gi and red scarf drying on the line, firewood under the chimney, a watering can by the flowers
+  B.at([1.33, 0, -0.2], PI / 2, () => laundry(B, { L: 1.2, h: 1.15, colors: ['#2c3a6a', '#e8403a', '#ffffff', '#2c3a6a'] }));
+  B.at([-1.26, 0, -0.35], -PI / 2, () => firewood(B, { w: 0.7, h: 0.42, d: 0.2 }));
+  B.at([-0.72, 0, 1.12], 2.2, () => wateringCan(B, '#e8807a'));
   stepStones(B, 0.1, 0.55, 0.1, 1.35, 3);
   B.door.set(0.1, 0, 1.45);
   B.height = 3.6;
@@ -173,6 +191,10 @@ export function rosieShop(B) {
   });
   B.at([0, info.ridgeY + 0.05, 0], 0, () => cupcake(B, { r: 0.12, color: '#ff9ec0' }));
   chimney(B, 1.0, -0.4, info.yAt(1.0, -0.4) - 0.2, info.ridgeY - 0.1, 0.8);
+  // a shop bell under the awning by the door, a pink wind chime at the far end, a rain chain at the right corner
+  B.at([1.42, y0 + h - 0.28, d / 2 + 0.34], 0, () => charm(B, 'bell'));
+  B.at([-1.5, y0 + h - 0.28, d / 2 + 0.34], 0, () => charm(B, 'furin', { color: '#ffc0d8' }));
+  { const cx = w / 2 + 0.12, cz = d / 2 - 0.1; rainChain(B, cx, info.underAt(cx, cz), cz, 0, { color: '#e8a0b0' }); }
   B.pop();
   // outdoor café bits + chalkboard + flowers
   B.at([-1.55, 0, 1.05], 0, () => cafeTable(B, { cloth: '#fff0f4', umbrella: '#ff8fb0' }));
@@ -201,6 +223,9 @@ export function boneSmith(B) {
   onFace(B, blk, 'f', -0.5, y0 + 0.8, () => shoji(B, { w: 0.42, h: 0.4, frame: '#6a4a3a' }));
   onFace(B, blk, 'r', 0, y0 + 0.8, () => shoji(B, { w: 0.55, h: 0.42, frame: '#6a4a3a' }));
   const info = roof(B, { type: 'gable', w, d, y0: y0 + h, over: 0.36, gOver: 0.28, H: 0.78, curve: 0.35, lift: 0.2, liftW: 0.5, thick: 0.14, ribW: 0.26, color: roofCol, gable: 'wood', moss: 0.3 });
+  // smith's tools hung on the planks under the windows, a straw hat and tongs on the side wall
+  onFace(B, blk, 'f', -0.5, y0 + 0.52, () => toolRack(B, 0.52, 0, { tools: ['tongs', 'hammer', 'tongs'] }));
+  onFace(B, blk, 'r', 0.05, y0 + 0.5, () => toolRack(B, 0.55, 0, { tools: ['hat', 'saw', 'hammer'] }));
   B.pop();
   // forge: stone hearth with glowing mouth + coal bed, hood and tall chimney (left)
   const fx = -0.85, fz = -0.55;
@@ -276,6 +301,21 @@ export function dungeonGate(B) {
     const core = G.sph(0.08, 8, 6); B.glow(core, '#ffe0ff', { tint: 1, hot: true });
   });
   shimenawa(B, { w: 1.55, y: cy + cr + 0.22, sag: 0.16, z: cz + 0.2 });
+  // paper ofuda talismans pasted on the ring stones, a little offering stand with kagami mochi beside the mouth
+  for (const a of [0.35, 1.25, PI - 0.4]) B.at([Math.cos(a) * (cr + 0.12), cy + Math.sin(a) * (cr + 0.12), cz + 0.2], 0, () => {
+    const slip = G.box(0.09, 0.2, 0.012, 0); B.add(slip, '#fff8ea');
+    const band = G.box(0.07, 0.035, 0.016, 0); band.translate(0, 0.05, 0); B.add(band, '#e8403a');
+    const ink = G.box(0.02, 0.1, 0.016, 0); ink.translate(0, -0.03, 0); B.add(ink, C.ink);
+  }, 1, -0.25, a - PI / 2 + B.dwob(0.2));
+  B.at([-1.05, 0, 0.3], 0.35, () => {
+    for (const s of [-1, 1]) { const l = G.box(0.05, 0.4, 0.05, 0); l.translate(s * 0.14, 0.2, 0); B.add(l, C.woodPale); }
+    const top = G.box(0.38, 0.05, 0.3, 0); top.translate(0, 0.42, 0); B.add(top, C.woodPale);
+    const tray = G.box(0.26, 0.05, 0.22, 0); tray.translate(0, 0.47, 0); B.add(tray, '#f0dcb0');
+    const m1 = G.sph(0.09, 8, 5); m1.scale(1, 0.5, 1); m1.translate(0, 0.53, 0); B.add(m1, '#fffaf2');
+    const m2 = G.sph(0.065, 8, 5); m2.scale(1, 0.55, 1); m2.translate(0, 0.585, 0); B.add(m2, '#fffaf2');
+    const mk = G.sph(0.03, 6, 4); mk.translate(0, 0.625, 0); B.add(mk, '#ffa040');
+    const leaf = G.box(0.16, 0.008, 0.05, 0); leaf.rotateY(0.4); leaf.translate(0, 0.505, 0.02); B.add(leaf, '#5a9a48');
+  });
   // vermilion torii in front
   B.at([0, 0, 1.55], 0, () => torii(B, { w: 1.8, h: 1.85 }));
   for (const x of [-1.55, 1.55]) B.at([x, 0, 1.35], 0, () => toro(B, { s: 0.72 }));

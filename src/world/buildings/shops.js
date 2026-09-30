@@ -5,9 +5,10 @@ import { C, G, V, PI, ROOFS, ROOF_LIST, WALL_TINTS, shade, col } from './kit.js'
 import { roof } from './roofs.js';
 import { foundation, walls, onFace, shoji, roundWindow, door, noren, engawa, posts, chimney, stepStones, flowerBox, hood, fence, STONES, FLOWERS } from './parts.js';
 import { chochin, pot, barrel, crate, produce, bush, tree, flowerPatch, signboard, lanternPost } from './props.js';
-import { nobori, awning, parasol, teaBench, stool, cafeTable, cake, cupcake, donut, wheel, bucket, pinwheel, pottery } from './props2.js';
+import { nobori, awning, parasol, teaBench, stool, cafeTable, cake, cupcake, donut, wheel, bucket, pinwheel, pottery, sack } from './props2.js';
 import { symbol, flatSymbol } from './symbols.js';
 import { LAMP } from './homes.js';
+import { charm, fudaRow, sudare, rainChain, battari, hangSign } from './trim.js';
 import { TAU } from '../../core/util.js';
 
 // ------------------------------------------------------------------ L1: food stall cart
@@ -40,6 +41,10 @@ export function shopL1(B) {
     signboard(B, { sym: S.sym, w: 0.56, h: 0.36, symSize: 0.3, symColors: S.name === 'onigiri' ? ['#ffffff', '#2a3a30'] : undefined });
   });
   for (const sx of [-1, 1]) B.at([sx * (cw / 2 + 0.08), pT - 0.02, cd / 2 + 0.12], 0, () => chochin(B, { r: 0.09, h: 0.18, cord: 0.06, color: S.name === 'tea' ? '#e8e0c8' : C.red }));
+  // stall dressing: menu plaques hung on the cart front, a rolled blind along the back beam, a bell at the back corner
+  B.at([0, 0, cd / 2 + 0.005], 0, () => fudaRow(B, cw - 0.24, ch - 0.04, { n: 5, z: 0.012, rail: C.woodMid, colors: ['#f0d8a8', '#e8604a', '#f0d8a8', '#8fbf70', '#f0d8a8'] }));
+  B.at([0, 0, -cd / 2 - 0.02], PI, () => sudare(B, cw - 0.12, pT - 0.1, { z: 0.02, drop: v % 2 ? 0.28 : 0 }));
+  B.at([cw / 2 - 0.04, pT - 0.04, -cd / 2 + 0.02], 0, () => charm(B, v % 3 === 1 ? 'furin' : 'bell'));
   // wares on the counter
   B.push([0, ch + 0.03, 0.05]);
   if (S.name === 'tea') {
@@ -74,6 +79,11 @@ export function shopL1(B) {
     B.at([0.75, 0, 0.72], 0, () => (S.name === 'onigiri' ? crate(B, { s: 0.28 }) : barrel(B, { r: 0.15, h: 0.32 })));
   }
   B.at([-0.8, 0, -0.75], 0, () => crate(B, { s: 0.26 }));
+  // stock for the day behind the cart, and a little menu board out front
+  if (S.name === 'onigiri') { B.at([0.72, 0, -0.72], 0.3, () => sack(B, { r: 0.15 })); B.at([0.45, 0, -0.85], -0.4, () => sack(B, { r: 0.12 })); }
+  else if (S.name === 'tea') B.at([0.7, 0, -0.75], 0.2, () => { crate(B, { s: 0.26, wood: '#c8a878' }); B.at([0, 0.22, 0], 0, () => pottery(B, { n: 3, spread: 0.06 })); });
+  else B.at([0.72, 0, -0.72], 0.2, () => produce(B, { kind: 'fish', s: 0.28 }));
+  B.at([-0.92, 0, 0.42], 0.55, () => signboard(B, { sym: S.sym, w: 0.3, h: 0.36, style: 'aframe', color: '#3a4a44', frame: C.woodLight, symSize: 0.22 }));
   B.light([0, 1.4, 0.6], { ...LAMP, intensity: 2.8, radius: 5 });
   B.door.set(0, 0, 0.95);
   B.height = 2.5;
@@ -113,6 +123,12 @@ export function shopL2(B) {
   });
   for (const sx of [-1, 1]) B.at([sx * (w / 2 - 0.12), y0 + h - 0.2, d / 2 + 0.52], 0, () => chochin(B, { r: 0.1, h: 0.2, cord: 0.02, color: S.name === 'cafe' ? '#fff0d0' : C.red }));
   if (S.name === 'bakery') chimney(B, 0.7, -0.3, info.yAt(0.7, -0.3) - 0.2, info.ridgeY + 0.1, 0.9);
+  // machiya front: a fold-down bench under the side window, a shop bell by the door, a rain chain off the hood
+  if (S.name !== 'cafe') onFace(B, blk, 'f', 0.95, 0, () => battari(B, 0.4, 0.36));
+  // a little hanging sign on chains from an iron bracket at the front corner of the side wall
+  onFace(B, blk, 'r', -0.52, y0 + 1.3, () => hangSign(B, S.sym, { w: 0.34, h: 0.3, symSize: 0.24 }));
+  B.at([0.62, y0 + h - 0.26, d / 2 + 0.36], 0, () => charm(B, S.name === 'flower' ? 'furin' : 'bell', { color: '#ffd0e0' }));
+  rainChain(B, -(w / 2 + 0.02), y0 + h - 0.24, d / 2 + 0.42, 0);
   B.pop();
   const fz = zc + d / 2;
   // outside displays per shop
@@ -146,6 +162,10 @@ export function shopL2(B) {
       for (let i = 0; i < 3; i++) { const bl = G.box(0.1, 0.1, 0.1, 0.02); bl.translate(0.3 + B.wob(0.04), 0.1 + i * 0.1, 0.2); B.add(bl, B.pick(['#ff8fb0', '#6ab0ff', '#ffd24a'])); }
     });
   }
+  // deliveries stacked against the side wall, a potted plant beside the door
+  B.at([1.36, 0, -0.95], 0.08, () => { crate(B, { s: 0.28 }); B.at([0.01, 0.24, 0.02], 0.35, () => crate(B, { s: 0.22, wood: C.woodLight })); });
+  B.at([1.36, 0, -0.45], 0.4, () => (S.name === 'bakery' ? sack(B, { r: 0.13 }) : barrel(B, { r: 0.13, h: 0.3 })));
+  if (S.name !== 'bakery') B.at([0.62, 0, fz + 0.2], 0, () => pot(B, { plant: S.name === 'cafe' ? 'pine' : 'flowers', r: 0.12, flowers: [B.pick(FLOWERS), B.pick(FLOWERS)] }));
   stepStones(B, -0.2, fz + 0.2, -0.2, 1.4, 2);
   B.light([0, 1.4, fz + 0.8], LAMP);
   B.door.set(-0.2, 0, 1.4);
@@ -196,6 +216,10 @@ export function shopL3(B) {
     const ropePts = []; for (let k = 0; k <= 10; k++) { const t = k / 10; ropePts.push(new THREE.Vector3(-bw / 2 + 0.1 + t * (bw - 0.2), by + 1.08 - Math.sin(t * PI) * 0.12, zb1 - 0.02)); }
     for (let k = 0; k < 10; k++) { const b = G.box(0.012, 0.012, ropePts[k].distanceTo(ropePts[k + 1]), 0); const m = new THREE.Matrix4().lookAt(ropePts[k], ropePts[k + 1], V(0, 1, 0)); b.applyMatrix4(m); b.translate((ropePts[k].x + ropePts[k + 1].x) / 2, (ropePts[k].y + ropePts[k + 1].y) / 2, ropePts[k].z); B.add(b, C.ink); }
     B.at([0, top.ridgeY - 0.35, z2 + d2 / 2 + 0.45], 0, () => signboard(B, { sym: 'dango', w: 0.46, h: 0.66, symSize: 0.54, color: '#fff6e8', frame: C.vermilion }));
+    // menu plaques along the balcony edge, half-lowered blinds on the upper doors, wind chimes at the corners
+    B.at([0, 0, zb1 + 0.05], 0, () => fudaRow(B, bw - 0.6, by - 0.19, { n: 9, z: 0.012, rail: C.vermilion, colors: ['#e8c890', '#d8503a', '#e8c890', '#f0dcb0'] }));
+    B.at([0, 0, z2 + d2 / 2], 0, () => sudare(B, 1.4, y2 + 1.1, { drop: 0.34, z: 0.1 }));
+    for (const sx of [-1, 1]) B.at([sx * (bw / 2 - 0.05), by + 1.02, zb1 - 0.02], 0, () => charm(B, 'furin', { color: sx > 0 ? '#ffd0e0' : '#bfe6ff' }));
   } else {
     // department store: striped awnings, corner vertical sign, banners, flags
     onFace(B, blk, 'f', 0, y0 + h - 0.05, () => awning(B, { w: w + 0.06, d: 0.46, y: 0, drop: 0.26, colors: ['#4a78c8', '#fff6f0'], n: 12 }));
@@ -208,7 +232,12 @@ export function shopL3(B) {
       const p = G.cyl(0.02, 0.02, 0.8, 5); p.translate(0, 0.2, 0); B.add(p, C.woodDark);
       const fl = G.plane(0.4, 0.26, 3, 2); fl.translate(0.21, 0.46, 0); B.cloth(fl, '#ff8fb0', { x0: 0, x1: 0.42, yTop: 0.59, yBot: 0.33 });
     });
+    // store bunting under the upper eave + bells by the entrance
+    for (let i = 0; i < 4; i++) B.at([-0.75 + i * 0.5, y2 + h2 - 0.04, z2 + d2 / 2 + 0.26], 0, () => charm(B, 'fishFlag', { color: ['#ff8fb0', '#8fd0ff', '#ffd24a', '#8fe0c0'][i] }));
+    for (const sx of [-1, 1]) B.at([sx * 0.78, y0 + h - 0.1, d / 2 + 0.3], 0, () => charm(B, 'bell'));
   }
+  // rain chains off the lower roof's side eaves
+  for (const sx of [-1, 1]) { const cx = sx * (w / 2 + 0.1), cz = -0.2; rainChain(B, cx, low.underAt(cx, cz), cz, 0, { color: tea ? '#c8a060' : C.bronze }); }
   B.pop();
   // street-side
   if (tea) {

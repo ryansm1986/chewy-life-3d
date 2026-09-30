@@ -8,7 +8,10 @@ import { DayNight } from './gfx/sky.js';
 import { Player } from './actors/player.js';
 import { Companion } from './actors/companion.js';
 import { Villager } from './actors/npc.js';
-import { CAST, prebuildHumanoid } from './actors/charKit.js';
+import { CAST, REFINED_CAST, prebuildHumanoid } from './actors/charKit.js';
+import { loadRefinedRigs } from './actors/refinedRigs.js';
+import { chewyStyle, setChewyStyle } from './actors/disneyChewy.js';
+import { loadHeroModels, chewyModel, setChewyModel } from './actors/heroModels.js';
 import { VILLAGERS, randomVillagerSpec } from './actors/roster.js';
 import { U } from './gfx/materials.js';
 import { glowTexture } from './gfx/textures.js';
@@ -18,8 +21,14 @@ import { Combat } from './combat/combat.js';
 import { SkillRunner } from './combat/skillRunner.js';
 import { pupPrewarmRig } from './combat/allies.js';
 import { DungeonMode } from './dungeon/dungeonMode.js';
+import { RegionMode } from './regions/regionMode.js';
+import { REGIONS, REGION_IDS, regionState, regionUnlocked } from './regions/index.js';
+import { addTravelPost } from './world/travelPost.js';
+import { MONSTERS } from './dungeon/monsters.js';
 import { GroundLoot } from './combat/groundLoot.js';
-import { newGameState, createActions } from './rpg/actions.js';
+import { newGameState, createActions, normalizeHeroes, saveableState } from './rpg/actions.js';
+import { CLASSES } from './rpg/classes.js';
+import { HeroManager } from './actors/heroes.js';
 import { skillRuntime } from './rpg/skills.js';
 import { disposeScene } from './gfx/dispose.js';
 import { VillageSim } from './world/village.js';
@@ -29,7 +38,8 @@ import { Portraits } from './gfx/portraits.js';
 import { BuildingThumbs } from './gfx/thumbs.js';
 import { installServices } from './world/services.js';
 import { Waterfall } from './world/waterfall.js';
-import { VillageMinimap, DungeonMinimap } from './world/minimap.js';
+import { VillageMinimap, DungeonMinimap, RegionMinimap } from './world/minimap.js';
+import { prewarmWorld } from './world/prewarm.js';
 
 // UI and audio load in parallel with the world. The import() paths must be literal so Vite bundles them for the
 // production build (a variable path with @vite-ignore worked on the dev server but 404'd in dist: no UI, no sound).
@@ -43,13 +53,18 @@ export async function boot() {
 
   // ---- persistent state + actions
   const saved = !P.has('fresh') && loadSave();
-  G.state = saved || newGameState();
+  G.state = normalizeHeroes(saved || newGameState()); // one progression per hero, state.player = the active hero (docs/HEROES.md)
+  if (P.has('hero') && G.state.heroes[P.get('hero')]) { // debug / tests: start as another hero (?hero=moka)
+    const id = P.get('hero'); G.state.activeHero = id; G.state.player = G.state.heroes[id].player; G.state.equipment = G.state.heroes[id].equipment;
+    if (id !== 'chewy') G.state.flags[`${id}Joined`] = true;
+  }
   if (G.state.player.life === 0) G.state.player.life = null;
   G.actions = createActions(G);
   G.actions.recompute();
   G.skillParams = (id) => skillRuntime(id, G.state, G.derived)?.params;
 
-  const [uiMod, audioMod] = await Promise.all([P.has('noui') ? null : tryImport('ui', () => import('./ui/ui.js')), P.has('noaudio') ? null : tryImport('audio', () => import('./audio/audio.js'))]);
+  // Blender-refined skins for Chewy and Shadow must be in memory before their rigs (and portraits) are built
+  const [uiMod, audioMod] = await Promise.all([P.has('noui') ? null : tryImport('ui', () => import('./ui/ui.js')), P.has('noaudio') ? null : tryImport('audio', () => import('./audio/audio.js')), loadRefinedRigs(REFINED_CAST), loadHeroModels(['chewy', 'moka'])]);
   G.audio = audioMod?.Audio || null;
   try { G.audio?.init?.(); } catch (e) { console.warn('[audio] init failed', e); }
 
@@ -77,7 +92,7 @@ export async function boot() {
 
   // ---- actors
   const L = village.landmarks;
-  const player = G.player = new Player(village, G);
+  const player = G.player = new Player(village, G, G.state.activeHero);
   player.setPos(L.spawn.x, L.spawn.z); player.faceTarget = player.facing = Math.PI * 0.25;
   player.setWeapon(G.derived.weaponType || 'sword');
   const shadow = G.companion = new Companion(village, G);
@@ -90,6 +105,9 @@ export async function boot() {
   rosie.speed = 1.8; npcs.push(rosie);
   for (const v of VILLAGERS) npcs.push(new Villager(village, G, v.spec, { id: v.id, anchor: v.anchor, wander: v.wander || 5 }));
   const skills = G.skills = new SkillRunner(G);
+  // the heroes nobody is playing live in town (Moka waits by the fountain until she joins)
+  const heroes = G.heroes = new HeroManager(G);
+  heroes.spawnBench();
   // townsfolk move in as homes fill up (capped for performance)
   const folk = [], FOLK_MAX = 16;
   // Building a villager costs ~20 ms: a visible hitch if it happens mid-play. Newcomers' rigs are pre-built while
@@ -118,21 +136,45 @@ export async function boot() {
   }
   setInterval(syncTownsfolk, 8000); setTimeout(syncTownsfolk, 1500);
 
+  addTravelPost(G, village); // the Wayfarer's Post: the Travel Map to the outdoor regions
   // fallback gate interaction if the Burrow landmark is missing
   if (!sim.S.buildings.some(b => b.type === 'dungeonGate')) village.interactables.push({ pos: new THREE.Vector3(L.dungeon.x, village.heightAt(L.dungeon.x, L.dungeon.z), L.dungeon.z + 1.6), radius: 1.8, label: 'Enter the Burrow', onInteract: () => G.openBurrowMenu() });
 
   // ---- 3D portraits (also replace the UI's SVG busts so the HUD/title/paper doll show the real characters)
   const portraits = new Portraits(engine);
   for (const v of VILLAGERS) portraits.register(v.id, v.spec);
+  portraits.register('moka', CAST.moka);
   G.portrait = (id) => portraits.get(id);
   G.thumbs = new BuildingThumbs(engine);
   try {
     const pm = await import('./ui/portraits.js');
-    for (const id of ['chewy', 'shadow', 'rosie']) { const url = portraits.get(id); if (url) pm.PORTRAITS[id] = () => `<img class="p3d" src="${url}" alt="" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block">`; }
+    for (const id of ['chewy', 'shadow', 'rosie', 'moka']) { const url = portraits.get(id); if (url) pm.PORTRAITS[id] = () => `<img class="p3d" src="${url}" alt="" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block">`; }
+    G.refreshChewyPortrait = () => { // after a model swap: re-render the bust and update the HUD face
+      portraits.cache.delete('chewy'); const url = portraits.get('chewy'); if (!url) return;
+      pm.PORTRAITS.chewy = () => `<img class="p3d" src="${url}" alt="" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block">`;
+      for (const el of document.querySelectorAll('.pc-face')) el.innerHTML = pm.PORTRAITS.chewy();
+    };
   } catch (e) { console.warn('[portraits] ui override failed', e); }
 
   // ---- UI
   if (uiMod?.UI) { G.ui = uiMod.UI; try { G.ui.init(G); G.ui.setMode?.('village'); } catch (e) { console.error('[ui] init failed', e); G.ui = null; } }
+  if (G.ui) { // Settings > Disney style: the sculpted cast (Disney Chewy + disneyKit villagers) or the classic toon kit.
+    // Every character is built at boot, so switching saves and reloads (the save keeps all progress).
+    G.ui.settings.disneyChewy = chewyStyle() === 'disney';
+    G.ui.settings.toyChewy = chewyModel() === 'toy'; // Toybox (new) vs Storybook baked Chewy (both need the Disney style)
+    G.ui.onSetting((k, v) => {
+      if (k === 'toyChewy') {
+        setChewyModel(v ? 'toy' : 'disney');
+        G.ui.toast?.(v ? 'Switching to Toybox Chewy…' : 'Switching to Storybook Chewy…');
+        setTimeout(() => { try { G.save?.(); } catch (e) { console.warn('[style] save failed', e); } location.reload(); }, 450);
+        return;
+      }
+      if (k !== 'disneyChewy') return;
+      setChewyStyle(v ? 'disney' : 'classic');
+      G.ui.toast?.(v ? 'Switching to the Disney style…' : 'Switching to the classic style…');
+      setTimeout(() => { try { G.save?.(); } catch (e) { console.warn('[style] save failed', e); } location.reload(); }, 450);
+    });
+  }
   // defensive rate limit: collapse duplicate toasts and cap bursts
   if (G.ui?.toast) {
     const raw = G.ui.toast.bind(G.ui); const recent = new Map(); let bucket = 3, lastT = performance.now();
@@ -177,10 +219,10 @@ export async function boot() {
     if (a) { const [n, extra] = a; if (n === 'villager_chatter') G.audio?.babble?.('hello!', { pitch: o.pitch || 1, pos: o.pos, vol: 0.5 }); else G.audio?.play?.(n, { ...o, ...extra }); return; }
     G.audio?.play?.(name, o);
   });
-  const stepSound = () => { if (G.mode !== 'dungeon') return 'footstep_grass'; const th = G.dungeon?.layout?.theme; return th === 'shrine' || th === 'moon' || th === 'kitchen' ? 'footstep_wood' : 'footstep_stone'; };
+  const stepSound = () => { if (G.mode !== 'dungeon') return 'footstep_grass'; if (G.dungeon?.isRegion) return G.dungeon.region.footstep?.(G.player.pos, G.world) || 'footstep_grass'; const th = G.dungeon?.layout?.theme; return th === 'shrine' || th === 'moon' || th === 'kitchen' ? 'footstep_wood' : 'footstep_stone'; };
   Events.on('footstep', (p) => { G.audio?.play?.(stepSound(), { vol: 0.35 }); if (Math.random() < 0.5) G.vfx.dust(p, { n: 1, size: 0.18 }); });
   Events.on('emote', ({ actor, kind }) => G.vfx.emote(actor, kind));
-  Events.on('player:levelup', ({ lvl }) => { G.vfx.levelUp(player.pos.clone()); G.ui?.banner?.('Level Up!', `Chewy is now level ${lvl}`, { style: 'levelup' }); G.audio?.play?.('ui_levelup'); G.actions.restoreAll(); shadow.recalc(); });
+  Events.on('player:levelup', ({ lvl }) => { G.vfx.levelUp(player.pos.clone()); G.ui?.banner?.('Level Up!', `${player.name} is now level ${lvl}`, { style: 'levelup' }); G.audio?.play?.('ui_levelup'); G.actions.restoreAll(); shadow.recalc(); });
   Events.on('player:dead', () => onPlayerDeath());
   Events.on('item:drop', ({ item }) => {
     if (!item) return;
@@ -220,47 +262,74 @@ export async function boot() {
     skills.queued = null;
     if (d === dungeon) dungeon = G.dungeon = null;
   }
-  G.enterDungeon = (floor = 1) => {
+  // A combat world: a Burrow floor (DungeonMode) or an outdoor region (RegionMode, docs/REGIONS.md) — same entry sequence.
+  function enterCombatWorld(makeMode, buildArg, { location, sub, floor = null, region = null, tip = true }) {
     const go = () => {
       skills.clearAll();
       disposeDungeon();
-      dungeon = G.dungeon = new DungeonMode(G);
+      dungeon = G.dungeon = makeMode();
       // the floor's combat must exist BEFORE build(): breakable pots register themselves with G.combat
       const combat = new Combat(G, null);
       G.combat = combat;
-      const world = dungeon.build(floor);
+      const world = dungeon.build(buildArg);
       combat.world = world;
       const vfx = new VFX(engine, world.scene); vfx.setLightPool(world.lightPool);
       swapWorld(world, vfx, combat);
       G.mode = 'dungeon';
       dungeon.start();
       vfx.prewarm(engine.renderer, engine.camera);
-      // compile every projectile / decal material now (behind the transition) so the first skill burst doesn't hitch
-      for (const kind of ['ball', 'blaze', 'fireball', 'foxfire', 'spark', 'acorn', 'firepot', 'bone', 'moonball']) combat.spawn({ team: 'ally', kind, pos: new THREE.Vector3(0, -60, 0), dir: new THREE.Vector3(1, 0, 0), speed: 1, range: 0.001 });
-      vfx.decal(new THREE.Vector3(0, -60, 0), { life: 0.05 }); vfx.decal(new THREE.Vector3(0, -60, 0), { life: 0.05, additive: true });
+      // every projectile look (ball, blaze, fireball, foxfire, pots...) is compiled AND drawn below the floor for the same
+      // few frames as the pup below (vfx.prewarm does the same for rings / slashes / decals), so the first Chomp / Blaze
+      // doesn't pay for the driver's shader finish and texture uploads
+      const looks = combat.projectileLooks(); for (const m of looks) { m.position.set(0, -60, 0); m.traverse(o => { o.frustumCulled = false; }); world.scene.add(m); }
       // the prewarm pup is also DRAWN for a few real frames (culling off, far below the floor, behind the transition):
       // compile() only links programs — the GPU driver builds the final shader and uploads the skinned geometry / bone
       // texture at the first real draw, which otherwise lands on the first Pack Call as a 35-50 ms frame
       const pup = pupPrewarmRig(); pup.root.position.set(0, -60, 0); world.scene.add(pup.root);
       pup.root.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
       try { engine.renderer.compile(world.scene, engine.camera); } catch (e) { /* ignore */ }
-      let pupFrames = 0; const pupOut = () => { if (++pupFrames < 3 && pup.root.parent === world.scene) requestAnimationFrame(pupOut); else world.scene.remove(pup.root); };
+      let pupFrames = 0; const pupOut = () => { if (++pupFrames < 3 && pup.root.parent === world.scene) requestAnimationFrame(pupOut); else world.scene.remove(pup.root, ...looks); };
       requestAnimationFrame(pupOut);
       const s = dungeon.startPos;
       player.setPos(s.x, s.z); player.moveTarget = null; shadow.setPos(s.x + 0.8, s.z + 0.8);
       combat.add(shadow); shadow.recalc();
-      rig.distTarget = 27; rig.focus.copy(player.pos); rig.snap();
+      rig.distTarget = region ? 24 : 27; rig.focus.copy(player.pos); rig.snap();
       G.ui?.setMode?.('dungeon');
-      G.ui?.setLocation?.(dungeon.theme.name, `B${floor}F`);
-      G.ui?.minimap?.setProvider?.(new DungeonMinimap(G, dungeon));
-      G.audio?.music?.(dungeon.layout.boss ? 'boss' : 'dungeon'); G.audio?.ambience?.('dungeon');
-      Events.emit('mode:changed', { mode: 'dungeon', floor });
+      G.ui?.setLocation?.(location(), sub);
+      G.ui?.minimap?.setProvider?.(region ? new RegionMinimap(G, dungeon) : new DungeonMinimap(G, dungeon));
+      G.audio?.music?.(dungeon.layout.boss && !region ? 'boss' : 'dungeon'); G.audio?.ambience?.('dungeon');
+      Events.emit('mode:changed', { mode: 'dungeon', floor, region });
       save();
       // first visit: one short, non-blocking tip from Shadow; the rest arrive when they become useful (see hints())
-      if (!G.state.flags.burrowTut) { G.state.flags.burrowTut = true; setTimeout(() => G.mode === 'dungeon' && hint('fight', '*Yip!* Click a monster to bonk it — right-click for Chomp Slash!'), 1800); }
+      if (tip && !G.state.flags.burrowTut) { G.state.flags.burrowTut = true; setTimeout(() => G.mode === 'dungeon' && hint('fight', player.hero === 'moka' ? '*Yip!* Click a monster to zap it — right-click for Splash Bolt!' : '*Yip!* Click a monster to bonk it — right-click for Chomp Slash!'), 1800); }
     };
     if (G.ui?.transition) G.ui.transition(go); else go();
+  }
+  G.enterDungeon = (floor = 1) => enterCombatWorld(() => new DungeonMode(G), floor, { location: () => dungeon.theme.name, sub: `B${floor}F`, floor });
+  G.enterRegion = (id) => {
+    const def = REGIONS[id]; if (!def) return;
+    enterCombatWorld(() => new RegionMode(G, id), undefined, { location: () => def.name, sub: def.jp, region: id });
   };
+  // The Travel Map (ui/travel.js) reads places from here: Blossom Hollow + the four regions (docs/REGIONS.md §1)
+  G.travel = {
+    list: () => {
+      const R = regionState(G.state), here = G.mode === 'village' ? 'village' : G.dungeon?.regionId;
+      const home = { id: 'village', name: 'Blossom Hollow', short: 'Blossom Hollow', jp: 'さくら村', sub: "Home: the cottage, Rosie's treats and a nap by the fountain.", color: '#ff8fb0', unlocked: G.mode !== 'dungeon' || !!G.dungeon?.isRegion, here: here === 'village', why: 'Use a portal to leave the Burrow' };
+      return [home, ...REGION_IDS.map(id => {
+        const d = REGIONS[id], u = regionUnlocked(G.state, id), mon = id => MONSTERS[id]?.name;
+        return { id, name: d.name, short: d.name.split(' ').slice(-2).join(' '), jp: d.jp, sub: d.sub, color: d.color, levels: d.levels, unlocked: u.ok, why: u.why,
+          here: here === id, visits: R.visits[id] || 0, cleared: R.cleared[id] || 0, boss: mon(d.boss) || null, monsters: d.monsters.map(mon).filter(Boolean) };
+      })];
+    },
+    go: (id) => {
+      G.ui?.close?.('travel', true);
+      if (id === 'village') { if (G.mode === 'dungeon') G.returnToVillage(); return; }
+      if (!regionUnlocked(G.state, id).ok) return;
+      regionState(G.state).unlocked[id] = true;
+      G.enterRegion(id);
+    },
+  };
+  G.openTravel = (opts = {}) => { if (G.ui?.open) G.ui.open('travel', opts); else G.enterRegion(opts.select || 'bamboo'); };
   G.returnToVillage = (dead = false) => {
     G.leavingDungeon = true;
     const go = () => {
@@ -268,11 +337,11 @@ export async function boot() {
       // a Burrow-only conversation (Shadow's combat tutorial) must not follow Chewy home
       if (G.ui?.dlg?.active && G.tutorialOpen) { G.ui.dlg.finish(-1); G.state.flags.burrowTut = false; }
       skills.clearAll();
-      const old = dungeon;
+      const old = dungeon, fromRegion = !!old?.isRegion;
       swapWorld(village, vVfx, vCombat);
       disposeDungeon(old);
       G.mode = 'village';
-      const home = dead ? { x: L.chewyHouse.x + 2.2, z: L.chewyHouse.z } : { x: L.dungeon.x, z: L.dungeon.z + 3.2 };
+      const home = dead ? { x: L.chewyHouse.x + 2.2, z: L.chewyHouse.z } : fromRegion && L.travel ? { x: L.travel.x + 1.6, z: L.travel.z + 1.2 } : { x: L.dungeon.x, z: L.dungeon.z + 3.2 };
       player.setPos(home.x, home.z); shadow.setPos(home.x + 0.8, home.z + 0.6);
       player.anim.stop(); G.playerDead = false; G.actions.restoreAll(); shadow.fainted = 0; shadow.untargetable = false; shadow.anim.stop(); shadow.recalc(); shadow.life = shadow.lifeMax;
       G.ui?.lootLabel?.clear?.();
@@ -282,7 +351,7 @@ export async function boot() {
       G.ui?.minimap?.setProvider?.(vMap);
       G.audio?.music?.(day.isNight() ? 'village_night' : 'village_day'); G.audio?.ambience?.(day.isNight() ? 'night' : 'village');
       Events.emit('mode:changed', { mode: 'village' });
-      if (dead) setTimeout(() => G.ui?.dialogue?.({ speaker: 'Rosie', portrait: G.portrait('rosie'), lines: ['Chewy! Shadow dragged you all the way home by your scarf!', "Let's patch you up. Maybe bring more Heart Treats next time, okay?"] }), 900);
+      if (dead) setTimeout(() => G.ui?.dialogue?.({ speaker: 'Rosie', portrait: G.portrait('rosie'), lines: [`${player.name}! Shadow dragged you all the way home by your ${CLASSES[player.hero]?.garment || 'scarf'}!`, "Let's patch you up. Maybe bring more Heart Treats next time, okay?"] }), 900);
       save();
     };
     if (G.ui?.transition) G.ui.transition(go); else go();
@@ -303,7 +372,7 @@ export async function boot() {
     if (G.playerDead) return;
     G.playerDead = true; skills.clearAll();
     player.anim.play('die'); engine.timeScale = 0.4; engine.post.pulse('#3a2040', 0.3);
-    G.ui?.banner?.('Oof!', 'Chewy needs a nap… Shadow will drag him home.', { style: 'area' });
+    G.ui?.banner?.('Oof!', `${player.name} needs a nap… Shadow will drag ${CLASSES[player.hero]?.pron.obj || 'him'} home.`, { style: 'area' });
     G.audio?.play?.('player_die');
     const lost = Math.floor(G.state.coins * 0.1); if (lost > 0) { G.state.coins -= lost; Events.emit('coins:changed', { coins: G.state.coins }); }
     setTimeout(() => { engine.timeScale = 1; G.returnToVillage(true); }, 2600);
@@ -321,7 +390,7 @@ export async function boot() {
     if (npc.talking) return;
     npc.talking = true; player.controlLocked = true;
     const done = () => { npc.talking = false; player.controlLocked = false; G.interactCooldown = performance.now() + 350; Input.consume('f'); };
-    G.story.talk(npc).then(done, (e) => { console.error(e); done(); });
+    (npc.hero ? heroes.talk(npc) : G.story.talk(npc)).then(done, (e) => { console.error(e); done(); }); // the other hero: chat / switch / join
   };
   function nearestInteract() {
     let best = null, bd = 1e9;
@@ -430,6 +499,7 @@ export async function boot() {
     if (Input.hit('r')) usePotion('rejuv');
     if (Input.hit('x')) { G.actions.swapWeapons(); player.setWeapon(G.derived.weaponType || 'sword'); G.audio?.play?.('ui_equip'); G.vfx.sparkle(player.pos.clone().setY(0.8), { n: 6 }); }
     if (Input.hit('t') && G.mode === 'dungeon') G.returnToVillage();
+    if (Input.hit('tab')) { Input.consume?.('tab'); heroes.switchTo(); } // switch heroes (zoom out, hand-off, zoom in)
     const it = nearestInteract();
     G.ui?.setInteract?.(it ? it.label : null);
     if (it && Input.hit('f') && performance.now() > (G.interactCooldown || 0)) it.onInteract();
@@ -449,16 +519,39 @@ export async function boot() {
 
   // ---- contextual hints: one-line tips from Shadow, each shown once, never blocking play
   const H = () => (G.state.flags.hints ||= {});
-  // one tip on screen at a time, none mid boss fight except the life-saving potion tip; a tip that has to wait is
-  // simply offered again on a later check (its flag is only set once it is shown)
-  let hintBusyUntil = 0;
-  function hint(id, text) {
+  // one tip at a time, and only in a quiet moment: never over a banner, a boss fight (intro to victory), a big
+  // scuffle, a dialogue, an open panel, a screen transition or a busy toast stack (the life-saving potion tip only
+  // waits for dialogue / transitions). A tip that has to wait keeps its flag unset: hints() offers it again while its
+  // condition holds, and one-off tips (retry) stay pending for up to 30 s in the same mode.
+  let hintBusyUntil = 0, hintBannerT = -1e9;
+  const hintPending = new Map();
+  // a live boss that is fighting, introducing itself or about to (Chewy is in its chamber)
+  const bossFight = () => { const b = G.mode === 'dungeon' ? G.dungeon?.boss : null; return !!(b?.alive && (b.aggro || b.introDone || b.pos.distanceTo(player.pos) < 14)); };
+  function hintHold(urgent) {
+    const ui = G.ui;
+    if (G.titleActive || G.playerDead || ui?.dlg?.active || ui?.iris?.active) return true;
+    if (urgent) return false;
+    const now = performance.now();
+    if (ui?.banners?.busy) hintBannerT = now; // (a beat of calm after a banner, e.g. the victory, before any tip)
+    if (ui?.anyModal?.() || now - hintBannerT < 3000 || ui?.toasts?.busy) return true;
+    if (G.mode === 'dungeon' && G.dungeon) {
+      if (bossFight()) return true;
+      let n = 0;
+      for (const m of G.dungeon.monsters) if (m.alive && m.aggro && m.pos.distanceTo(player.pos) < 10 && ++n >= 4) return true;
+    }
+    return false;
+  }
+  function hint(id, text, retry = true) {
     if (H()[id] || !G.ui?.toast) return;
     const now = performance.now();
-    if (now < hintBusyUntil) return;
-    if (id !== 'potion' && G.mode === 'dungeon' && G.dungeon?.boss?.alive && G.dungeon.boss.aggro) return;
+    if (now < hintBusyUntil || hintHold(id === 'potion')) {
+      if (retry && !hintPending.has(id)) hintPending.set(id, { text, mode: G.mode, until: now + 30000 });
+      return;
+    }
+    hintPending.delete(id);
     H()[id] = true; hintBusyUntil = now + 7500;
-    G.ui.toast(text.replace(/\*/g, ''), { color: '#9fd0ff', iconURL: G.portrait('shadow'), duration: 7, sub: 'Shadow' });
+    const o = { color: '#9fd0ff', iconURL: G.portrait('shadow'), duration: 7, sub: 'Shadow', priority: id === 'potion' ? 'high' : 'low' };
+    if (G.ui.toasts?.show) G.ui.toasts.show(text.replace(/\*/g, ''), o); else G.ui.toast(text.replace(/\*/g, ''), o); // straight to the queue: a shown tip is never rate-dropped
     G.audio?.play?.('bark_small', { vol: 0.5 });
   }
   G.hint = hint;
@@ -466,21 +559,30 @@ export async function boot() {
   function hints(dt) {
     hintT -= dt; if (hintT > 0 || G.playerDead) return; hintT = 0.5;
     if (G.ui?.dlg?.active) return;
-    const D = G.derived, st = G.state;
+    if (bossFight()) G.ui?.toasts?.retire?.(0); // a tip still up when the boss wakes steps aside (the potion tip stays)
+    const now = performance.now();
+    for (const [id, p] of hintPending) { // one-off tips that had to wait (e.g. the first-visit fight tip)
+      if (now > p.until || p.mode !== G.mode || H()[id]) hintPending.delete(id);
+      else { hint(id, p.text); break; }
+    }
+    const D = G.derived, st = G.state, tip = (id, text) => hint(id, text, false); // condition tips re-offer themselves
     if (G.mode === 'dungeon' && G.dungeon) {
-      if (G.actions.life() < D.lifeMax * 0.5 && st.potions.heart > 0) hint('potion', 'Ouch! Press Q to munch a Heart Treat.');
-      if (st.player.skillPts > 0 && st.player.lvl >= 2) hint('skills', 'You have a skill point! Press K to learn something new.');
-      if (st.player.statPts > 0 && st.player.lvl >= 2 && H().skills) hint('stats', 'Stat points too! Press C to get stronger.');
-      const sp = G.dungeon.stairsPos; if (sp && sp.distanceTo(player.pos) < 7) hint('stairs', 'Stairs! Press F to burrow deeper.');
-      if (G.dungeon.monsters.some(m => m.alive && m.aggro && m.def.attack?.type === 'ranged' && m.pos.distanceTo(player.pos) < 9)) hint('ball', 'They throw things! Press X to swap to your tennis ball — Space to roll away.');
-      if ((G.dungeon.loot?.list || []).some(e => e.d.type === 'item' && e.to.distanceTo(player.pos) < 5)) hint('loot', 'Shiny! Walk over loot to grab it. Press I to see your bag.');
+      if (G.actions.life() < D.lifeMax * 0.5 && st.potions.heart > 0) tip('potion', 'Ouch! Press Q to munch a Heart Treat.');
+      if (st.player.skillPts > 0 && st.player.lvl >= 2) tip('skills', 'You have a skill point! Press K to learn something new.');
+      if (st.player.statPts > 0 && st.player.lvl >= 2 && H().skills) tip('stats', 'Stat points too! Press C to get stronger.');
+      const sp = G.dungeon.stairsPos; if (sp && sp.distanceTo(player.pos) < 7) tip('stairs', 'Stairs! Press F to burrow deeper.');
+      if (player.hero === 'chewy' && G.dungeon.monsters.some(m => m.alive && m.aggro && m.def.attack?.type === 'ranged' && m.pos.distanceTo(player.pos) < 9)) tip('ball', 'They throw things! Press X to swap to your tennis ball — Space to roll away.');
+      if (player.hero === 'moka' && G.dungeon.monsters.some(m => m.alive && m.aggro && m.pos.distanceTo(player.pos) < 2.5)) tip('mokaRange', 'Too close! Moka is squishy — Space to roll away and splash them from afar.');
+      if ((G.dungeon.loot?.list || []).some(e => e.d.type === 'item' && e.to.distanceTo(player.pos) < 5)) tip('loot', 'Shiny! Walk over loot to grab it. Press I to see your bag.');
     } else if (G.mode === 'village' && !G.titleActive) {
-      if (st.quests.done.includes('burrow1') && !G.buildMode) hint('build', 'Press B to plan the village — paint zones and friends will build there!');
+      if (st.quests.done.includes('burrow1') && !G.buildMode) tip('build', 'Press B to plan the village — paint zones and friends will build there!');
+      if (regionUnlocked(st, 'bamboo').ok) tip('travel', "The Wayfarer's Post by the bamboo points to new lands! Walk the west trail to find it.");
+      if (heroes.joined('moka') && !heroes.T && heroes.cd <= 0) tip('tabSwitch', `Press Tab to play as ${heroes.name(heroes.next())} — ${heroes.name()} will hang out in town.`);
     }
   }
 
   // ---- save / load
-  function save() { try { if (G.playerDead || G.state.player.life === 0) G.state.player.life = null; /* never persist a knocked-out Chewy */ G.state.hour = day.hour; G.state.day = day.day; localStorage.setItem('chewy3d.save', JSON.stringify(G.state)); } catch (e) { /* storage unavailable */ } }
+  function save() { try { if (G.playerDead || G.state.player.life === 0) G.state.player.life = null; /* never persist a knocked-out Chewy */ G.state.hour = day.hour; G.state.day = day.day; localStorage.setItem('chewy3d.save', JSON.stringify(saveableState(G.state))); } catch (e) { /* storage unavailable */ } }
   G.save = save;
   setInterval(save, 30000);
   addEventListener('beforeunload', save);
@@ -500,7 +602,7 @@ export async function boot() {
   const skip = sessionStorage.getItem('chewy3d.skipTitle');
   sessionStorage.removeItem('chewy3d.skipTitle');
   G.titleActive = false;
-  const showTitle = G.ui?.setMode && !skip && !P.has('fresh') && !P.has('floor') && !P.has('notitle');
+  const showTitle = G.ui?.setMode && !skip && !P.has('fresh') && !P.has('floor') && !P.has('region') && !P.has('notitle');
   if (showTitle) {
     G.titleActive = true; player.controlLocked = true;
     G.ui.setMode('title');
@@ -511,7 +613,7 @@ export async function boot() {
       newGame: () => { try { localStorage.removeItem('chewy3d.save'); } catch (e) { /* */ } sessionStorage.setItem('chewy3d.skipTitle', 'new'); location.reload(); },
       continue: () => startGame(false),
     });
-  } else if (skip === 'new' || (P.has('fresh') && !P.has('floor') && !P.has('nointro'))) setTimeout(() => intro(), 1200);
+  } else if (skip === 'new' || (P.has('fresh') && !P.has('floor') && !P.has('region') && !P.has('nointro'))) setTimeout(() => intro(), 1200);
   function startGame(isNew) {
     const go = () => {
       G.titleActive = false; player.controlLocked = false;
@@ -561,6 +663,7 @@ export async function boot() {
     player.controlLocked = false;
     G.story.markTalk('rosie');
     G.ui?.toast?.('Tip: I bag · K skills · C character · J quests · X swap weapon', { color: '#8fd0ff' });
+    setTimeout(() => heroes.introJoin(), 2600); // …and a bookish spaniel mage has been waiting to meet Chewy
   }
 
   // ---- floating quest markers over NPCs ('!' something for you, '?' quest giver, gift = friendship reward)
@@ -570,6 +673,7 @@ export async function boot() {
     markerT -= dt;
     if (markerT <= 0) {
       markerT = 0.5;
+      for (const [n, m] of markers) if (!npcs.includes(n)) { village.scene.remove(m); m.material.dispose(); markers.delete(n); } // (a hero who left town to be played)
       for (const n of npcs) {
         const kind = G.mode === 'village' && n.visible ? G.story.markerFor(n.id) : null;
         let m = markers.get(n);
@@ -599,8 +703,10 @@ export async function boot() {
     skills.update(dt, skillInput);
     G.combat.update(dt);
     if (G.mode === 'village') for (const n of npcs) n.update(dt);
+    heroes.update(rdt);
     // camera follows with a little look-ahead
-    if (G.introFocus) rig.focus.set(G.introFocus.x, player.pos.y + 0.6, G.introFocus.z);
+    if (G.heroFocus) rig.focus.set(G.heroFocus.x, (G.heroFocus.y || player.pos.y) + 0.6, G.heroFocus.z); // hero switch: the camera glides between them
+    else if (G.introFocus) rig.focus.set(G.introFocus.x, player.pos.y + 0.6, G.introFocus.z);
     else if (buildMode.active && G.buildFocus) rig.focus.set(G.buildFocus.x, player.pos.y + 0.6, G.buildFocus.z);
     else if (!G.titleActive) {
       const lead = new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing)).multiplyScalar(Math.min(1, player.anim.speed / 4) * 1.2);
@@ -623,7 +729,7 @@ export async function boot() {
     } else {
       dungeon.update(dt, engine.time);
       G.world.updateSun(rig.target);
-      G.world.lightPool.update(dt, rig.target, engine.time, 1);
+      G.world.lightPool.update(dt, rig.target, engine.time, dungeon?.isRegion ? (dungeon.region.mood?.night ?? 0) : 1);
     }
     G.vfx.update(dt);
     syncBuffs();
@@ -635,9 +741,11 @@ export async function boot() {
     if (fpsEl) { fpsEl.style.display = fpsOn ? '' : 'none'; fpsAcc += dt; fpsN++; if (fpsAcc > 0.5) { fpsEl.textContent = `${Math.round(fpsN / fpsAcc)} fps`; fpsAcc = 0; fpsN = 0; } }
     requestAnimationFrame(frame);
   }
+  if (!P.has('floor') && !P.has('region')) prewarmWorld(engine, village.scene); // draw the whole village once behind the boot splash: no first zoom-out hitch
   requestAnimationFrame(frame);
   if (P.has('floor')) setTimeout(() => G.enterDungeon(+P.get('floor')), 100);
-  setTimeout(() => { window.__ready = true; const b = document.getElementById('boot'); if (b) { b.classList.add('gone'); setTimeout(() => b.remove(), 700); } }, P.has('floor') ? 2500 : 400);
+  else if (P.has('region') && REGIONS[P.get('region')]) setTimeout(() => G.enterRegion(P.get('region')), 100);
+  setTimeout(() => { window.__ready = true; const b = document.getElementById('boot'); if (b) { b.classList.add('gone'); setTimeout(() => b.remove(), 700); } }, P.has('floor') || P.has('region') ? 2500 : 400);
 }
 
 function loadSave() {

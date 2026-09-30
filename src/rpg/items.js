@@ -9,6 +9,7 @@
 import { RNG, uid as rid } from '../core/util.js';
 import { computeStats } from './stats.js';
 import { SKILLS } from './skills.js';
+import { CLASSES, WEAPON_CLASS, canWield } from './classes.js';
 
 // ================================================================== constants
 export const RARITY = {
@@ -70,6 +71,7 @@ function addBase(id, o) {
 }
 const sword = (id, name, tier, lvl, dmg, aspd, req, sockets, variant, colors) => addBase(id, { name, slot: 'weapon', wtype: 'sword', tier, lvl, dmg, aspd, req, sockets, icon: { shape: 'sword', variant, colors } });
 const ball = (id, name, tier, lvl, dmg, aspd, req, sockets, variant, colors) => addBase(id, { name, slot: 'weapon', wtype: 'ball', tier, lvl, dmg, aspd, req, sockets, icon: { shape: 'ball', variant, colors } });
+const staff = (id, name, tier, lvl, dmg, aspd, req, sockets, variant, colors) => addBase(id, { name, slot: 'weapon', wtype: 'staff', tier, lvl, dmg, aspd, req, sockets, icon: { shape: 'staff', variant, colors } });
 const armor = (slot, id, name, tier, lvl, def, req, sockets, variant, colors) => addBase(id, { name, slot, tier, lvl, def, req, sockets, icon: { shape: slot, variant, colors } });
 const jewel = (slot, id, name, tier, lvl, variant, colors) => addBase(id, { name, slot, tier, lvl, sockets: 0, icon: { shape: slot, variant, colors } });
 
@@ -98,6 +100,19 @@ ball('lanternBall', 'Lantern Ball', 1, 28, [16, 34], 1.2, { dex: 55 }, 3, 'lante
 ball('proBall', 'Pro Tour Ball', 1, 33, [18, 40], 1.2, { dex: 62 }, 3, 'tennis', ['#d4f05a', '#ffffff', '#a0c030']);
 ball('cometBall', 'Comet Ball', 2, 40, [24, 50], 1.25, { dex: 72 }, 3, 'comet', ['#ff8a3a', '#fff3a0', '#ffcf4a']);
 ball('meteorBall', 'Meteor Ball', 2, 45, [30, 62], 1.1, { str: 50, dex: 80 }, 3, 'meteor', ['#5a4a5a', '#ff6a2a', '#ffcf4a']);
+// ---- Staffs (Moka; energy scaling) — [wood, orb, accent]
+staff('driftwoodStaff', 'Driftwood Staff', 0, 1, [3, 7], 1.1, {}, 2, 'drift', ['#b89a74', '#5ce0d0', '#4a8adf']);
+staff('duckCallStaff', 'Duck-Call Staff', 0, 5, [4, 10], 1.15, {}, 2, 'duck', ['#c98f5e', '#ffe070', '#ff9a3a']);
+staff('coralCrook', 'Coral Crook', 0, 9, [6, 14], 1.05, { ene: 20 }, 3, 'coral', ['#ff9a8a', '#8fe8ff', '#ffd0e0']);
+staff('seaglassStaff', 'Sea-Glass Staff', 0, 13, [7, 17], 1.1, { ene: 26 }, 3, 'drift', ['#8fb8a8', '#b8fff0', '#2fb8a8']);
+staff('starlightStaff', 'Starlight Staff', 1, 20, [12, 27], 1.1, { ene: 38 }, 3, 'star', ['#5a4a8a', '#fff0a0', '#b89aff']);
+staff('lighthouseStaff', 'Lighthouse Staff', 1, 24, [13, 29], 1.15, { ene: 44 }, 2, 'sun', ['#f4f0e8', '#ffd84a', '#e8503a']);
+staff('moonCrook', 'Moon Crook', 1, 28, [17, 35], 1.05, { ene: 52 }, 3, 'moon', ['#3a3a6a', '#dfe8ff', '#8fb8ff']);
+staff('tidecallerStaff', 'Tidecaller', 1, 33, [19, 41], 1.1, { ene: 60 }, 3, 'coral', ['#2f6a8a', '#5ce0d0', '#f4c04a']);
+staff('mallardScepter', 'Mallard Scepter', 2, 40, [25, 50], 1.15, { ene: 72 }, 3, 'duck', ['#3f7a4a', '#ffe070', '#8fd068']);
+staff('siriusStaff', 'Sirius Staff', 2, 45, [31, 62], 1.1, { ene: 82 }, 3, 'star', ['#2c2a5a', '#ffffff', '#ffd36a']);
+staff('abyssalCrook', 'Abyssal Crook', 2, 50, [38, 76], 1.0, { ene: 95 }, 3, 'moon', ['#1f2a4a', '#7ae8ff', '#b89aff']);
+staff('sunriseStaff', 'Sunrise Staff', 2, 55, [36, 72], 1.2, { ene: 104 }, 3, 'sun', ['#fff3e0', '#ff9a3a', '#ffcf4a']);
 ball('planetBall', 'Ringed Planet Ball', 2, 50, [34, 70], 1.2, { dex: 95 }, 3, 'planet', ['#8fd0ff', '#ffbcd6', '#ffffff']);
 ball('supernovaBall', 'Supernova Ball', 2, 55, [36, 76], 1.3, { dex: 105 }, 3, 'nova', ['#c86aff', '#ffe0ff', '#ffcf4a']);
 // ---- Hats — [main, band, accent]
@@ -357,14 +372,26 @@ export const SET_ITEM_IDS = Object.keys(SET_ITEMS);
 const SLOT_WEIGHT = { weapon: 1.5, hat: 1, outfit: 1, boots: 0.9, paws: 0.9, collar: 0.45, charm: 0.65 };
 
 /** Pick a base appropriate for ilvl (newer bases are likelier). */
+// Weapon drops favour the hero being played (docs/HEROES.md §2): set by HeroManager on every switch.
+let LOOT_CLASS = 'chewy';
+export function setLootClass(cls) { LOOT_CLASS = cls || 'chewy'; }
+const CLASS_WTYPES = { chewy: ['sword', 'ball'], moka: ['staff'] };
 export function pickBase(ilvl, slot, wtype, rng) {
   rng = toRng(rng);
   let slots = slot ? [slot] : SLOTS;
   const byslot = s => GEAR_BASE_IDS.map(id => ITEM_BASES[id]).filter(b => b.slot === s && b.lvl <= Math.max(1, ilvl) && (!wtype || b.wtype === wtype));
   slots = slots.filter(s => byslot(s).length);
-  if (!slots.length) return ITEM_BASES[wtype === 'ball' ? 'redTennisBall' : 'boneSword'];
+  if (!slots.length) return ITEM_BASES[wtype === 'ball' ? 'redTennisBall' : wtype === 'staff' ? 'driftwoodStaff' : 'boneSword'];
   const s = rng.weighted(slots.map(x => ({ x, w: SLOT_WEIGHT[x] || 1 }))).x;
-  const cands = byslot(s).map(b => ({ b, w: 1 / (1 + Math.max(0, ilvl - b.lvl) / 8) }));
+  let pool = byslot(s);
+  if (s === 'weapon' && !wtype) {
+    // 75% the active hero's weapon types, 25% the other heroes' (the bag and stash are shared)
+    const mine = CLASS_WTYPES[LOOT_CLASS] || CLASS_WTYPES.chewy;
+    const want = rng.next() < 0.75 ? mine : Object.values(CLASS_WTYPES).flat().filter(t => !mine.includes(t));
+    const sub = pool.filter(b => want.includes(b.wtype));
+    if (sub.length) pool = sub;
+  }
+  const cands = pool.map(b => ({ b, w: 1 / (1 + Math.max(0, ilvl - b.lvl) / 8) }));
   return rng.weighted(cands).b;
 }
 
@@ -430,6 +457,7 @@ const RARE_A = ['Biscuit', 'Mochi', 'Grumble', 'Snuggle', 'Moon', 'Thunder', 'Br
 const RARE_B = {
   sword: ['Chomper', 'Fang', 'Gnaw', 'Bonker', 'Cleaver', 'Tooth', 'Crunch', 'Snapper'],
   ball: ['Fetch', 'Bounce', 'Orb', 'Comet', 'Squeak', 'Sphere', 'Boing', 'Zoomer'],
+  staff: ['Crook', 'Wand', 'Tide', 'Beacon', 'Branch', 'Rod', 'Splash', 'Quack'],
   hat: ['Crown', 'Topper', 'Brow', 'Visage', 'Hood', 'Cap'], outfit: ['Coat', 'Shell', 'Wrap', 'Cozy', 'Robe', 'Hide'],
   collar: ['Chime', 'Loop', 'Promise', 'Tag', 'Choker', 'Ring'], charm: ['Trinket', 'Token', 'Wish', 'Spark', 'Knot', 'Omen'],
   boots: ['Stride', 'Tread', 'Pounce', 'Scamper', 'Trot', 'Hop'], paws: ['Grip', 'Swipe', 'Mitt', 'Clutch', 'Paw', 'Knuckle'],
@@ -604,6 +632,13 @@ export function socketGem(item, gem) {
   return { ok: true, why: '' };
 }
 
+/** Moka's starter: a plain Driftwood Staff. */
+export function starterStaff() {
+  const it = blankItem(ITEM_BASES.driftwoodStaff, 'normal', 1, toRng(new RNG(11)));
+  finalize(it);
+  return it;
+}
+
 /** Starter kit: a plain Bone Sword and Red Tennis Ball. → { sword, ball } */
 export function starterItems() {
   const rng = toRng(new RNG(7));
@@ -634,8 +669,8 @@ export function shopStock(lvl, seed = 1) {
   const out = [];
   const ilvl = () => clamp(lvl + rng.int(-2, 3), 1, 60);
   const add = it => { it.price = buyPrice(it); out.push(it); };
-  add(generateItem({ ilvl: ilvl(), slot: 'weapon', wtype: 'sword', rarity: rng.chance(0.5) ? 'magic' : 'normal', rng }));
-  add(generateItem({ ilvl: ilvl(), slot: 'weapon', wtype: 'ball', rarity: rng.chance(0.5) ? 'magic' : 'normal', rng }));
+  // two weapons for whoever is shopping (Chewy: a sword and a ball; Moka: two staffs)
+  for (const wtype of LOOT_CLASS === 'moka' ? ['staff', 'staff'] : ['sword', 'ball']) add(generateItem({ ilvl: ilvl(), slot: 'weapon', wtype, rarity: rng.chance(0.5) ? 'magic' : 'normal', rng }));
   for (const slot of ['hat', 'outfit', 'boots', 'paws']) add(generateItem({ ilvl: ilvl(), slot, rarity: rng.chance(0.45) ? 'magic' : 'normal', rng }));
   add(generateItem({ ilvl: ilvl(), slot: rng.chance(0.5) ? 'collar' : 'charm', rarity: 'magic', rng }));
   add(generateItem({ ilvl: ilvl(), slot: 'charm', rarity: 'magic', rng }));
@@ -660,6 +695,7 @@ export function itemKindName(it) {
   if (it.kind === 'gem') return 'Treat Gem';
   if (it.wtype === 'sword') return 'Bone Sword';
   if (it.wtype === 'ball') return 'Ball';
+  if (it.wtype === 'staff') return 'Staff';
   return SLOT_NAMES[it.slot] || 'Item';
 }
 /** Does the player meet the item's requirements? */
@@ -669,7 +705,9 @@ export function meetsReq(it, state, derived) {
   const lvl = state.player.lvl;
   const str = derived ? derived.str : state.player.stats.str;
   const dex = derived ? derived.dex : state.player.stats.dex;
-  return lvl >= (r.lvl || 1) && str >= (r.str || 0) && dex >= (r.dex || 0);
+  if (it.wtype && !canWield(state.player.cls || 'chewy', it.wtype)) return false; // another hero's weapon
+  const ene = derived ? derived.ene : state.player.stats.ene;
+  return lvl >= (r.lvl || 1) && str >= (r.str || 0) && dex >= (r.dex || 0) && ene >= (r.ene || 0);
 }
 /** Which equipment slot would this item go into (for compare / quick-equip)? */
 export function targetSlot(it, state) {
@@ -745,9 +783,9 @@ export function itemTooltip(it, state, derived) {
   const subtitle = (it.rarity === 'rare' || it.rarity === 'unique' || it.rarity === 'set' ? b.name + ' · ' : '') + tierName + kind + (it.rarity !== 'normal' ? ` · ${RARITY[it.rarity].name}` : '');
   if (it.dmg) {
     const d = itemDamage(it);
-    L(`${it.wtype === 'ball' ? 'Throw' : 'Swing'} Damage: ${d[0]} to ${d[1]}`, d[2] ? C.blue : C.white);
+    L(`${it.wtype === 'ball' ? 'Throw' : it.wtype === 'staff' ? 'Spell' : 'Swing'} Damage: ${d[0]} to ${d[1]}`, d[2] ? C.blue : C.white);
     L(`Attack Speed: ${speedLabel(it.aspd)} (${it.aspd.toFixed(2)}/s)`, C.white);
-    L(it.wtype === 'ball' ? 'Thrown · bounces back to you · scales with Dexterity' : 'Melee · wide swing · scales with Strength', C.grey);
+    L(it.wtype === 'ball' ? 'Thrown · bounces back to you · scales with Dexterity' : it.wtype === 'staff' ? 'Sparkle bolt · powers every spell · scales with Energy' : 'Melee · wide swing · scales with Strength', C.grey);
   }
   if (it.def) {
     let ed = 0; for (const a of it.affixes) if (a.stat === 'def') ed += a.value;
@@ -789,5 +827,9 @@ function reqLines(it, state, derived) {
   if ((r.lvl || 1) > 1) out.push({ text: `Required Level: ${r.lvl}`, met: lvl >= r.lvl });
   if (r.str) out.push({ text: `Required Strength: ${r.str}`, met: str >= r.str });
   if (r.dex) out.push({ text: `Required Dexterity: ${r.dex}`, met: dex >= r.dex });
+  if (r.ene) { const ene = derived ? derived.ene : state ? state.player.stats.ene : 999; out.push({ text: `Required Energy: ${r.ene}`, met: ene >= r.ene }); }
+  const who = it.wtype && WEAPON_CLASS[it.wtype];
+  const cls = state?.player?.cls || 'chewy';
+  if (who && (cls !== who || state?.flags?.mokaJoined)) out.push({ text: `${CLASSES[who].name}'s weapon`, met: cls === who });
   return out;
 }

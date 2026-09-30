@@ -4,6 +4,7 @@ import { makeToon, makeGlow } from '../gfx/materials.js';
 import { tennisBallTexture, glowTexture } from '../gfx/textures.js';
 import { Events } from '../core/events.js';
 import { rand, TAU } from '../core/util.js';
+import { spellFx } from '../gfx/spellFx.js';
 
 let ballGeo, ballMat, acornGeo, acornMat, potGeo, potMat, acornCap;
 function ballMesh(r = 0.12) {
@@ -37,7 +38,16 @@ const VIS = {
   firepot: { mesh: potMesh, trail: '#ffb070', fire: true },
   bone: { mesh: () => glowSprite('#fff6e0', 0.8), trail: '#fff6e0' },
   moonball: { mesh: () => { const g = new THREE.Group(); g.add(ballMesh(0.2), glowSprite('#ffe8a0', 1.8)); return g; }, trail: '#fff0b0', trailSize: 0.7 },
+  // Moka's spells (looks + trails live in gfx/spellFx.js; the floor prewarm gets an empty group — SpellFX prewarms its own)
+  waterorb: { mesh: p => (p ? spellFx(p.G).orbMesh() : new THREE.Group()), trailFn: (p, dt) => spellFx(p.G).trailOrb(p, dt) },
+  sparkbolt: { mesh: p => (p ? spellFx(p.G).boltMesh() : new THREE.Group()), trailFn: (p, dt) => spellFx(p.G).trailBolt(p, dt) },
+  kibble: { mesh: p => (p ? spellFx(p.G).kibbleMesh() : new THREE.Group()), trailFn: (p, dt) => spellFx(p.G).trailKibble(p, dt) },
+  feather: { mesh: p => (p ? spellFx(p.G).featherMesh() : new THREE.Group()), trailFn: (p, dt) => spellFx(p.G).trailFeather(p, dt) },
 };
+
+// every projectile look (ball, blaze, fireball, foxfire, pots...), for the floor prewarm (game.js): the caller shows
+// them below the floor for a few real frames so their programs and textures are finished before the first throw
+export function projectileLooks() { return Object.values(VIS).map(v => v.mesh()); }
 
 export class Projectile {
   // o: {team, kind, pos, dir, speed, range, radius, dmgPct|dmg, element, level, pierce, bounces, bounceRange, returns,
@@ -51,7 +61,7 @@ export class Projectile {
     this.traveled = 0; this.alive = true; this.hitSet = new Set(); this.returning = false;
     const vis = VIS[this.kind] || VIS.ball;
     this.vis = vis;
-    this.mesh = vis.mesh(); this.mesh.position.copy(this.pos);
+    this.mesh = vis.mesh(this); this.mesh.position.copy(this.pos);
     this.G.world.scene.add(this.mesh);
     this.t = 0;
     if (o.lob) { this.lob = { from: this.pos.clone(), to: o.lob.to.clone(), h: o.lob.h || 3, time: o.lob.time || 0.8 }; }
@@ -115,6 +125,7 @@ export class Projectile {
     }
     this.mesh.position.copy(this.pos);
     if (this.mesh.isMesh || this.mesh.isGroup) { this.mesh.rotation.x += dt * 18; this.mesh.rotation.z += dt * 7; }
+    if (this.vis.trailFn) this.vis.trailFn(this, dt);
     if (this.vis.trail) {
       if (this.vis.fire) vfx.fire(this.pos, 2, { spread: 0.1, size: this.vis.fireSize || 0.4 });
       else vfx.glow.spawn({ x: this.pos.x, y: this.pos.y, z: this.pos.z, life: 0.32, size: this.vis.trailSize || 0.45, size1: 0.04, color: this.vis.trail, alpha: 0.75, alpha1: 0 });

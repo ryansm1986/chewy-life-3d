@@ -5,6 +5,7 @@
 //   duck  [level, seconds] — big moments dip the music bus under themselves
 // Aesthetic: soft, round and cute — sine/triangle bodies, low-passed noise, pentatonic sparkles, bonks & boings.
 import { babble, gibberish } from './babble.js';
+import { REGION_SFX } from '../regions/sfx/index.js'; // region monsters / bosses / environments (docs/REGIONS.md)
 
 const R = (a, b) => a + Math.random() * (b - a);
 const mf = m => 440 * Math.pow(2, (m - 69) / 12);
@@ -15,10 +16,11 @@ const brass = (s, at, f, h, v) => s.tone({ at, f, stack: [['sawtooth', -5, 0.5],
 
 export const SFX = {
   // ------------------------------------------------------------------------------------------ UI
-  // hover: a tiny bubble "tik" — the quietest thing in the game (UI also rate-limits it)
-  ui_hover: { vary: 0.06, max: 1, gap: 0.06, fn(s) {
-    s.tone({ pts: [[0, 1650], [0.018, 2250]], a: 0.002, d: 0.028, v: 0.1 });
-    s.noise({ f: 4200, q: 3, a: 0.001, d: 0.007, v: 0.025 });
+  // hover: a tiny wooden-bubble "tik" — the quietest thing in the game (rate-limited here and in the UI)
+  ui_hover: { vary: 0.05, max: 1, gap: 0.09, fn(s) {
+    s.tone({ pts: [[0, 2100], [0.02, 1650]], a: 0.001, d: 0.04, v: 0.22 });
+    s.tone({ f: 3300, type: 'triangle', a: 0.001, d: 0.012, v: 0.05 });
+    s.noise({ f: 2900, q: 2.5, a: 0.001, d: 0.006, v: 0.07 });
   } },
   ui_click: { vary: 0.04, max: 3, gap: 0.03, fn(s) {
     s.tone({ f: 1250, f2: 820, glide: 0.03, a: 0.001, d: 0.06, v: 0.34 });
@@ -158,19 +160,22 @@ export const SFX = {
   } },
 
   // ------------------------------------------------------------------------------------------ footsteps
+  // soft paw pats: a little mid-range texture (1-3 kHz) so they read at a low level, a gentle low thump for weight
   footstep_grass: { vary: 0.12, max: 3, gap: 0.05, fn(s) {
-    s.noise({ f: R(1800, 2800), q: 0.8, a: 0.012, d: 0.07, v: 0.26 });
-    s.noise({ ft: 'lowpass', f: 700, a: 0.004, d: 0.05, v: 0.16, color: 'pink' });
+    s.noise({ f: R(1700, 2500), q: 0.9, a: 0.008, d: 0.075, v: 0.5 });
+    s.noise({ ft: 'lowpass', f: 650, a: 0.003, d: 0.05, v: 0.35, color: 'pink' });
+    s.tone({ f: 150, f2: 110, a: 0.002, d: 0.05, v: 0.12 });
   } },
   footstep_stone: { vary: 0.1, max: 3, gap: 0.05, fn(s) {
-    s.noise({ f: R(2800, 3800), q: 1.6, a: 0.001, d: 0.03, v: 0.28 });
-    s.tone({ f: 230, f2: 170, a: 0.001, d: 0.04, v: 0.16 });
-    s.noise({ ft: 'lowpass', f: 500, a: 0.001, d: 0.03, v: 0.15 });
+    s.noise({ f: R(2200, 2800), q: 1.2, a: 0.002, d: 0.05, v: 0.7 });
+    s.tone({ f: 1500, f2: 1150, a: 0.002, d: 0.05, v: 0.12 });
+    s.tone({ f: 240, f2: 180, a: 0.001, d: 0.04, v: 0.15 });
   } },
   footstep_wood: { vary: 0.1, max: 3, gap: 0.05, fn(s) {
-    s.tone({ f: 190, f2: 150, type: 'triangle', a: 0.002, d: 0.09, v: 0.3, lp: 900 });
-    s.tone({ f: 410, a: 0.001, d: 0.045, v: 0.1 });
-    s.noise({ f: 950, q: 3, a: 0.001, d: 0.04, v: 0.3 });
+    s.tone({ f: 210, f2: 165, type: 'triangle', a: 0.002, d: 0.07, v: 0.22, lp: 1100 });
+    s.tone({ f: 560, f2: 490, a: 0.001, d: 0.06, v: 0.3 });
+    s.tone({ f: 1100, f2: 950, a: 0.001, d: 0.04, v: 0.1 });
+    s.noise({ f: 1200, q: 2.5, a: 0.002, d: 0.05, v: 0.85 });
   } },
 
   // ------------------------------------------------------------------------------------------ combat
@@ -333,6 +338,15 @@ export const SFX = {
     s.bell({ at: 0.55, f: 1568, d: 0.6, v: 0.09, rev: 0.4 });
     s.sparkle({ at: 0.6, n: 3, base: 2093, v: 0.035 });
   } },
+  // Chewy knocks on a villager's door at night: tok-tok… tok
+  door_knock: { vary: 0.04, max: 1, gap: 0.5, fn(s) {
+    [0, 0.17, 0.4].forEach((at, i) => {
+      const k = i === 2 ? 0.8 : 1;
+      s.tone({ at, f: 190, f2: 140, type: 'triangle', a: 0.001, d: 0.09, v: 0.45 * k, lp: 1000 });
+      s.tone({ at, f: 620, f2: 540, a: 0.001, d: 0.04, v: 0.16 * k });
+      s.noise({ at, f: 1300, q: 2.5, a: 0.001, d: 0.03, v: 0.45 * k, rev: 0.3 });
+    });
+  } },
   door_open: { vary: 0.05, max: 2, fn(s) {
     s.noise({ pts: [[0, 850], [0.35, 1350]], q: 1.2, a: 0.05, h: 0.2, d: 0.14, v: 0.35, color: 'pink' });
     s.tone({ at: 0.36, f: 420, f2: 330, a: 0.001, d: 0.08, v: 0.25 });
@@ -385,6 +399,214 @@ export const SFX = {
     for (let i = 0; i < 6; i++) { const f = R(700, 1800); s.tone({ at: R(0.03, 0.32), f, f2: f * 1.8, glide: 0.03, a: 0.001, d: 0.05, v: 0.08 }); }
   } },
 
+  // ------------------------------------------------------------------------------------------ Moka's spells
+  // staff sparkle bolt: a quick glassy "tsing" with a zip
+  moka_bolt: { vary: 0.07, max: 4, gap: 0.04, fn(s) {
+    s.tone({ f: 900, f2: 2400, glide: 0.07, type: 'triangle', a: 0.003, d: 0.09, v: 0.1, lp: 5000 });
+    s.fm({ at: 0.02, f: 2637, ratio: 2, index: 0.8, id: 0.05, a: 0.001, d: 0.22, v: 0.09, rev: 0.25 });
+    s.noise({ ft: 'highpass', f: 5000, a: 0.005, d: 0.12, v: 0.05 });
+    s.sparkle({ at: 0.05, n: 2, base: 3136, v: 0.022, spread: 0.12, d: 0.25 });
+  } },
+  // Splash Bolt leaving the staff: a round "bloop"
+  splash_cast: { vary: 0.08, max: 3, gap: 0.04, fn(s) {
+    s.tone({ pts: [[0, 260], [0.07, 880]], a: 0.004, d: 0.12, v: 0.3, lp: 2200 });
+    s.noise({ f: 900, f2: 2200, q: 1.2, a: 0.004, d: 0.08, v: 0.18 });
+    s.tone({ at: 0.05, f: 1320, f2: 1760, a: 0.002, d: 0.06, v: 0.05 });
+  } },
+  // a juicy splash (bolt impacts, puddles, mallards)
+  water_splash: { vary: 0.1, max: 4, gap: 0.03, fn(s) {
+    s.noise({ f: 1500, f2: 450, q: 0.8, a: 0.003, d: 0.34, v: 0.55, rev: 0.2 });
+    s.noise({ ft: 'highpass', f: 3800, a: 0.002, d: 0.14, v: 0.18 });
+    s.tone({ f: 170, f2: 70, a: 0.002, d: 0.14, v: 0.22 });
+    for (let i = 0; i < 7; i++) { const f = R(800, 2000); s.tone({ at: R(0.03, 0.34), f, f2: f * 1.9, glide: 0.025, a: 0.001, d: 0.045, v: 0.07 }); }
+  } },
+  // Bubble Barrier: a breathy blow and a stretchy rising wobble
+  bubble_up: { vary: 0.04, max: 1, fn(s) {
+    s.noise({ f: 700, f2: 1600, q: 1.4, a: 0.12, h: 0.1, d: 0.2, v: 0.18, color: 'pink' });
+    s.tone({ pts: [[0, 300], [0.35, 720]], vib: [11, 40], type: 'triangle', a: 0.06, h: 0.15, d: 0.2, v: 0.16, lp: 2600 });
+    s.tone({ at: 0.38, pts: [[0, 500], [0.05, 1100]], a: 0.002, d: 0.1, v: 0.18 });
+    s.bell({ at: 0.42, f: 2093, d: 0.7, v: 0.07, rev: 0.45, partials: GLASS });
+  } },
+  bubble_hit: { vary: 0.1, max: 2, gap: 0.08, fn(s) {
+    s.tone({ pts: [[0, 560], [0.1, 380]], vib: [18, 60], type: 'triangle', a: 0.002, d: 0.16, v: 0.2, lp: 2400 });
+    s.noise({ f: 1200, q: 2, a: 0.001, d: 0.04, v: 0.12 });
+  } },
+  bubble_pop: { vary: 0.06, max: 2, fn(s) {
+    s.noise({ ft: 'highpass', f: 2500, a: 0.001, d: 0.03, v: 0.45 });
+    s.tone({ f: 1500, f2: 380, glide: 0.06, a: 0.001, d: 0.09, v: 0.3 });
+    s.noise({ at: 0.03, f: 1300, f2: 500, q: 0.8, a: 0.004, d: 0.3, v: 0.35, rev: 0.25 });
+    s.sparkle({ at: 0.06, n: 4, base: 2349, v: 0.03, spread: 0.3 });
+  } },
+  // Wet Dog Shake: brrrrrr (flapping ears) + a spray
+  shake_spray: { vary: 0.05, max: 2, fn(s) {
+    s.noise({ f: 900, q: 1.1, am: [26, 0.85], a: 0.03, h: 0.35, d: 0.15, v: 0.45, color: 'pink' });
+    s.tone({ f: 140, am: [26, 0.7], type: 'triangle', a: 0.02, h: 0.3, d: 0.1, v: 0.12, lp: 600 });
+    s.noise({ at: 0.05, ft: 'highpass', f: 3500, a: 0.05, h: 0.2, d: 0.25, v: 0.16, rev: 0.2 });
+    for (let i = 0; i < 9; i++) { const f = R(900, 2200); s.tone({ at: R(0.08, 0.55), f, f2: f * 1.8, glide: 0.02, a: 0.001, d: 0.04, v: 0.06 }); }
+  } },
+  puddle_dive: { vary: 0.05, max: 1, fn(s) {
+    s.tone({ pts: [[0, 820], [0.16, 180]], a: 0.004, d: 0.2, v: 0.3, lp: 2000 });
+    s.noise({ f: 1200, f2: 400, q: 0.9, a: 0.004, d: 0.25, v: 0.3 });
+  } },
+  puddle_pop: { vary: 0.05, max: 1, fn(s) {
+    s.tone({ pts: [[0, 200], [0.12, 950]], a: 0.004, d: 0.16, v: 0.3, lp: 2400 });
+    s.noise({ at: 0.04, f: 1500, f2: 500, q: 0.8, a: 0.003, d: 0.3, v: 0.4, rev: 0.2 });
+    s.sparkle({ at: 0.12, n: 3, base: 2093, v: 0.03 });
+  } },
+  // Whirlpool: a churning, gurgling swirl
+  whirlpool: { vary: 0.05, max: 2, gap: 0.3, fn(s) {
+    s.noise({ pts: [[0, 350], [0.5, 1300], [1.2, 480]], q: 3, am: [5.5, 0.5], a: 0.25, h: 0.4, d: 0.55, lin: true, v: 0.42, rev: 0.3 });
+    s.tone({ pts: [[0, 95], [1.1, 70]], vib: [5, 40], a: 0.2, h: 0.5, d: 0.4, v: 0.12 });
+    for (let i = 0; i < 6; i++) s.tone({ at: R(0.1, 1.0), pts: [[0, R(250, 400)], [0.06, R(600, 900)]], a: 0.004, d: 0.07, v: 0.09, lp: 1800 });
+  } },
+  // Great Wave: a rising roar that curls over and crashes into fizzing foam
+  wave_roar: { vary: 0.03, max: 1, duck: [0.65, 1.2], fn(s) {
+    s.noise({ pts: [[0, 250], [0.5, 1500], [1.3, 500]], ft: 'lowpass', q: 1.2, a: 0.35, h: 0.3, d: 0.8, lin: true, v: 0.7, color: 'pink', rev: 0.3 });
+    s.noise({ ft: 'lowpass', f: 500, f2: 180, a: 0.3, h: 0.4, d: 0.8, v: 0.35, color: 'brown' });
+    s.noise({ at: 0.5, ft: 'highpass', f: 4000, a: 0.2, d: 0.8, v: 0.18, am: [14, 0.5], rev: 0.3 });
+    s.tone({ pts: [[0, 110], [0.5, 150], [1.2, 70]], a: 0.3, h: 0.3, d: 0.6, v: 0.12 });
+    for (let i = 0; i < 10; i++) { const f = R(900, 2200); s.tone({ at: R(0.5, 1.4), f, f2: f * 1.8, glide: 0.025, a: 0.001, d: 0.05, v: 0.06 }); }
+  } },
+  // Kibble Missiles: a crunchy handful + a starry twinkle
+  kibble_toss: { vary: 0.06, max: 2, gap: 0.05, fn(s) {
+    for (let i = 0; i < 3; i++) s.noise({ at: i * 0.03, f: R(1800, 3000), q: 2.5, a: 0.001, d: 0.025, v: 0.3 });
+    s.tone({ f: 700, f2: 1600, glide: 0.08, type: 'triangle', a: 0.004, d: 0.1, v: 0.08 });
+    s.sparkle({ at: 0.05, n: 4, base: 2349, v: 0.035, spread: 0.25 });
+  } },
+  kibble_hit: { vary: 0.12, max: 4, gap: 0.03, fn(s) {
+    s.bell({ f: R(2093, 2637), d: 0.35, v: 0.07, rev: 0.3, partials: GLASS });
+    s.noise({ f: 2600, q: 2, a: 0.001, d: 0.02, v: 0.14 });
+    s.tone({ f: 600, f2: 300, a: 0.001, d: 0.05, v: 0.12 });
+  } },
+  // Squeaky Nova: a giant rubber-toy SQUEEE-ak, then a bouncy boom
+  squeak_big: { vary: 0.05, max: 1, fn(s) {
+    s.tone({ pts: [[0, 900], [0.05, 1550], [0.17, 1320], [0.3, 1750]], stack: [['sawtooth', 0, 0.6], ['square', 6, 0.35]], vib: [16, 45], a: 0.01, h: 0.2, d: 0.1, v: 0.12, bp: 1600, bq: 2.2, lp: 4200 });
+    s.tone({ at: 0.02, pts: [[0, 1800], [0.1, 3000], [0.28, 2600]], type: 'triangle', a: 0.01, h: 0.15, d: 0.1, v: 0.04 });
+    s.tone({ at: 0.18, f: 190, f2: 80, glide: 0.2, a: 0.002, d: 0.3, v: 0.35 });
+    s.noise({ at: 0.18, pts: [[0, 400], [0.1, 1800], [0.3, 500]], q: 1.2, a: 0.02, d: 0.3, v: 0.3, color: 'pink' });
+    s.sparkle({ at: 0.28, n: 4, base: 2093, v: 0.03, spread: 0.35 });
+  } },
+  // Paw Rune stamped on the floor: soft thump + a glint
+  rune_stamp: { vary: 0.05, max: 2, fn(s) {
+    s.tone({ f: 220, f2: 120, a: 0.002, d: 0.12, v: 0.3 });
+    s.noise({ ft: 'lowpass', f: 900, a: 0.002, d: 0.06, v: 0.3, color: 'pink' });
+    s.bell({ at: 0.05, f: 1568, d: 0.9, v: 0.08, rev: 0.45 });
+    s.bell({ at: 0.1, f: 2349, d: 0.7, v: 0.05, rev: 0.45 });
+  } },
+  // …and when it erupts: a rising chime run over a starry whoosh
+  rune_chime: { vary: 0.03, max: 2, fn(s) {
+    [1568, 2093, 2637, 3136].forEach((f, i) => s.bell({ at: i * 0.045, f, d: 0.8, v: 0.075, rev: 0.45 }));
+    s.noise({ pts: [[0, 600], [0.3, 4200]], q: 2, a: 0.03, d: 0.35, v: 0.3, rev: 0.3 });
+    s.tone({ f: 160, f2: 70, a: 0.002, d: 0.25, v: 0.3 });
+    s.sparkle({ at: 0.2, n: 6, base: 2637, v: 0.035, spread: 0.5 });
+  } },
+  // Moonbeam: a shimmering arrival, then a soft choir hum retriggered while the beam is held
+  moonbeam_start: { vary: 0.02, max: 1, fn(s) {
+    s.tone({ f: 330, stack: [['sine', 0, 1], ['sine', 6, 0.5, 1.5], ['sine', -5, 0.35, 2]], vib: [5, 12], a: 0.15, h: 0.2, d: 0.5, v: 0.14, rev: 0.5 });
+    s.noise({ ft: 'highpass', f: 5500, a: 0.2, d: 0.6, v: 0.14, am: [10, 0.5], rev: 0.5 });
+    [1318, 1760, 2637].forEach((f, i) => s.bell({ at: 0.06 + i * 0.07, f, d: 1, v: 0.06, rev: 0.55 }));
+  } },
+  moonbeam_hum: { vary: 0.03, max: 2, gap: 0.3, fn(s) {
+    s.tone({ f: 330, stack: [['sine', 0, 1], ['sine', 7, 0.45, 1.5], ['triangle', -4, 0.2, 2]], vib: [4.5, 10], a: 0.18, h: 0.25, d: 0.3, lin: true, v: 0.07, lp: 2400, rev: 0.5 });
+    s.noise({ ft: 'highpass', f: 6000, a: 0.2, h: 0.2, d: 0.3, lin: true, v: 0.045, am: [9, 0.5] });
+  } },
+  moonbeam_tick: { vary: 0.15, max: 3, gap: 0.08, fn(s) { s.bell({ f: R(2349, 3136), d: 0.3, v: 0.05, rev: 0.4, partials: GLASS }); } },
+  // Constellation Link: a zappy little chime per star (pitch climbs along the chain)
+  star_chain: { vary: 0.04, max: 4, gap: 0.03, fn(s) {
+    s.fm({ f: 1760, ratio: 2.01, index: 1.2, id: 0.06, a: 0.001, d: 0.28, v: 0.1, rev: 0.35 });
+    s.noise({ f: 2600, q: 1, am: [70, 0.8, 'square'], a: 0.002, d: 0.07, v: 0.12, lp: 6000 });
+    s.tone({ f: 1100, f2: 2200, glide: 0.04, a: 0.001, d: 0.05, v: 0.05 });
+  } },
+  constellation_twinkle: { vary: 0.02, max: 1, fn(s) {
+    [1568, 2093, 2637, 3520].forEach((f, i) => s.bell({ at: i * 0.02, f, d: 1.1, v: 0.06, rev: 0.55 }));
+    s.noise({ ft: 'highpass', f: 6000, a: 0.05, d: 0.6, v: 0.12, am: [13, 0.5], rev: 0.4 });
+    s.sparkle({ at: 0.1, n: 7, base: 2637, v: 0.035, spread: 0.6 });
+  } },
+  // Treat Meteor: a cartoon falling whistle over a growing rumble…
+  meteor_whistle: { vary: 0.02, max: 1, fn(s) {
+    s.tone({ pts: [[0, 2300], [0.95, 650]], type: 'triangle', vib: [7, 18], a: 0.05, h: 0.75, d: 0.12, lin: true, v: 0.09, lp: 4000, rev: 0.25 });
+    s.noise({ pts: [[0, 300], [1.0, 1100]], ft: 'lowpass', a: 0.5, h: 0.4, d: 0.1, lin: true, v: 0.35, color: 'pink' });
+    for (let i = 0; i < 8; i++) s.noise({ at: R(0.2, 0.95), f: R(2500, 5000), q: 3, a: 0.001, d: 0.012, v: 0.15 });
+  } },
+  // …and a big, round, crunchy BOOM (biscuit!)
+  meteor_boom: { vary: 0.04, max: 1, duck: [0.55, 1.2], fn(s) {
+    s.tone({ f: 130, f2: 38, glide: 0.5, a: 0.002, d: 0.7, v: 0.6 });
+    s.noise({ ft: 'lowpass', f: 1600, f2: 150, a: 0.003, d: 1.0, v: 0.8, color: 'brown', rev: 0.3 });
+    s.noise({ ft: 'lowpass', f: 3500, f2: 400, a: 0.002, d: 0.35, v: 0.45, color: 'pink' });
+    for (let i = 0; i < 6; i++) s.noise({ at: 0.05 + i * R(0.03, 0.06), f: R(1500, 2800), q: 2, a: 0.001, d: 0.03, v: 0.35 });
+    s.sparkle({ at: 0.35, n: 6, base: 2093, v: 0.04, spread: 0.7 });
+  } },
+  // Decoy Duck / Duck Call / mallards: a proper little quack
+  quack: { vary: 0.08, max: 3, gap: 0.08, fn(s) {
+    s.voice({ f: [[0, 480], [0.035, 610], [0.17, 400]], type: 'sawtooth',
+      form: [[0, [760, 1350, 2600]], [0.06, [1050, 1550, 2800]], [0.17, [700, 1200, 2400]]],
+      amp: [[0, 0], [0.01, 1], [0.1, 0.85], [0.19, 0]], q: [6, 8, 9], fg: [1, 0.7, 0.35], breath: 0.15, rough: 0.45, roughF: 75, body: 0.2, v: 0.4, rev: 0.12 });
+  } },
+  // winding the rubber duck's key: click-click-click-boing
+  duck_windup: { vary: 0.05, max: 1, fn(s) {
+    for (let i = 0; i < 6; i++) { const at = i * (0.07 - i * 0.006); s.noise({ at, f: 3200, q: 3, a: 0.001, d: 0.012, v: 0.35 }); s.tone({ at, f: 2400, a: 0.001, d: 0.015, v: 0.06 }); }
+    s.tone({ at: 0.36, pts: [[0, 300], [0.08, 620], [0.2, 480]], vib: [20, 50], type: 'triangle', a: 0.004, d: 0.22, v: 0.16, lp: 2400 });
+  } },
+  confetti_pop: { vary: 0.05, max: 2, fn(s) {
+    s.noise({ f: 1400, q: 0.7, a: 0.001, d: 0.06, v: 0.5 });
+    s.tone({ f: 700, f2: 180, glide: 0.08, a: 0.001, d: 0.1, v: 0.3 });
+    for (let i = 0; i < 10; i++) s.noise({ at: R(0.03, 0.45), f: R(3000, 6000), q: 3, a: 0.001, d: 0.015, v: 0.14 });
+    s.sparkle({ at: 0.08, n: 5, base: 2349, v: 0.035, spread: 0.4 });
+  } },
+  // Fetch!: the leash whooshes out… and snaps taut
+  leash_throw: { vary: 0.06, max: 2, fn(s) {
+    s.noise({ pts: [[0, 600], [0.08, 2600], [0.2, 900]], q: 1.8, a: 0.02, d: 0.16, v: 0.45 });
+    s.fm({ at: 0.06, f: 1760, ratio: 1.5, index: 0.8, id: 0.06, a: 0.001, d: 0.2, v: 0.06, rev: 0.3 });
+  } },
+  leash_snap: { vary: 0.06, max: 2, fn(s) {
+    s.noise({ ft: 'highpass', pts: [[0, 2500], [0.03, 6500]], a: 0.001, d: 0.05, v: 0.5 });
+    s.tone({ f: 1500, f2: 280, glide: 0.07, a: 0.001, d: 0.1, v: 0.22 });
+    s.tone({ at: 0.04, pts: [[0, 260], [0.07, 520], [0.18, 380]], vib: [20, 50], type: 'triangle', a: 0.004, d: 0.18, v: 0.12, lp: 2200 });
+  } },
+  // Feather Flurry: a soft fluttering burst
+  feather_flutter: { vary: 0.07, max: 2, gap: 0.05, fn(s) {
+    s.noise({ f: 1700, q: 1.2, am: [32, 0.8], a: 0.02, h: 0.12, d: 0.22, v: 0.4, color: 'pink' });
+    s.noise({ pts: [[0, 800], [0.1, 2800], [0.3, 1200]], q: 1.4, a: 0.02, d: 0.25, v: 0.22 });
+    s.sparkle({ at: 0.05, n: 2, base: 2637, v: 0.025, spread: 0.2 });
+  } },
+  // Duck Call: a reedy duck-call toot
+  duck_call: { vary: 0.04, max: 1, fn(s) {
+    s.tone({ pts: [[0, 620], [0.08, 880], [0.34, 640]], stack: [['sawtooth', 0, 0.7], ['square', 5, 0.25]], vib: [9, 35, 0.06], a: 0.02, h: 0.22, d: 0.12, v: 0.12, bp: 1100, bq: 3, lp: 3200, rev: 0.25 });
+    s.noise({ f: 1400, q: 3, am: [48, 0.6], a: 0.02, h: 0.2, d: 0.1, v: 0.1 });
+  } },
+  // Spirit Retriever: a big friendly ghostly woof
+  retriever_bark: { vary: 0.05, max: 2, gap: 0.12, fn(s) {
+    s.voice({ f: [[0, 300], [0.03, 440], [0.09, 400], [0.24, 250]],
+      form: [[0, [420, 1000, 2400]], [0.04, [760, 1300, 2600]], [0.14, [560, 1050, 2300]], [0.25, [380, 850, 2100]]],
+      amp: [[0, 0], [0.014, 1], [0.09, 0.8], [0.25, 0]], q: [5, 7, 9], fg: [1, 0.65, 0.3], breath: 0.3, rough: 0.18, roughF: 48, body: 0.4, v: 0.5, rev: 0.45 });
+    s.bell({ at: 0.05, f: 1568, d: 0.6, v: 0.04, rev: 0.55 });
+  } },
+  spirit_summon: { vary: 0.02, max: 1, fn(s) {
+    s.tone({ f: 220, f2: 660, glide: 0.45, stack: [['sine', 0, 1], ['sine', 6, 0.45, 1.5]], a: 0.1, h: 0.2, d: 0.45, v: 0.15, vib: [6, 12], rev: 0.45 });
+    s.noise({ pts: [[0, 500], [0.45, 4200]], q: 2.5, a: 0.3, d: 0.3, v: 0.22, rev: 0.4 });
+    [1046, 1318, 1568, 2093].forEach((f, i) => s.bell({ at: 0.3 + i * 0.05, f, d: 0.9, v: 0.06, rev: 0.5 }));
+  } },
+  // Mallard Squadron: a flock of wings swooping in
+  mallard_wings: { vary: 0.04, max: 1, fn(s) {
+    s.noise({ f: 1000, q: 1, am: [13, 0.75], a: 0.35, h: 0.4, d: 0.5, lin: true, v: 0.45, color: 'pink', rev: 0.2 });
+    s.noise({ at: 0.15, f: 1600, q: 1.2, am: [17, 0.7], a: 0.3, h: 0.3, d: 0.5, lin: true, v: 0.25 });
+    s.noise({ pts: [[0, 300], [0.8, 1800], [1.3, 600]], ft: 'lowpass', a: 0.4, d: 0.8, v: 0.25, color: 'pink' });
+  } },
+  // hero hand-off (heroes.js): a soft magical whoosh-sparkle as the camera pulls out…
+  hero_swap: { vary: 0.02, max: 1, fn(s) {
+    s.noise({ pts: [[0, 400], [0.45, 2600], [0.8, 900]], q: 2, a: 0.3, h: 0.1, d: 0.4, lin: true, v: 0.35, rev: 0.4 });
+    s.tone({ pts: [[0, 330], [0.6, 990]], stack: [['sine', -6, 0.6], ['sine', 6, 0.6]], a: 0.25, h: 0.15, d: 0.35, lin: true, v: 0.1, rev: 0.45 });
+    s.sparkle({ at: 0.25, n: 6, base: 2349, v: 0.035, spread: 0.6 });
+    s.bell({ at: 0.55, f: 1760, d: 0.9, v: 0.06, rev: 0.5 });
+  } },
+  // …and a warm chime when the new hero lands
+  hero_arrive: { vary: 0, max: 1, fn(s) {
+    [523, 659, 784, 1046].forEach((f, i) => s.pluck({ at: i * 0.05, f, kind: 'koto', v: 0.22, rev: 0.35, lp: 5000 }));
+    [1046, 1318, 1568].forEach((f, i) => s.bell({ at: 0.2 + i * 0.015, f, d: 1.2, v: 0.06, rev: 0.5 }));
+    s.tone({ at: 0.18, ...PON, v: 0.2 });
+    s.sparkle({ at: 0.3, n: 5, base: 2093, v: 0.035, spread: 0.5 });
+  } },
+
   // ------------------------------------------------------------------------------------------ critters
   bird_chirp: { vary: 0.12, max: 3, fn(s) {
     const n = 2 + ((Math.random() * 3) | 0), base = R(2500, 3400);
@@ -395,6 +617,13 @@ export const SFX = {
       form: [[0, [380, 2200, 3000]], [0.15, [820, 1700, 2800]], [0.45, [620, 1100, 2600]], [0.58, [450, 900, 2400]]],
       amp: [[0, 0], [0.05, 0.9], [0.4, 1], [0.6, 0]], q: [6, 9, 10], breath: 0.12, body: 0.25, v: 0.4, rev: 0.15 });
   } },
+  // a villager woken by a knock: a breathy rising "haaa-aum" (pitch follows the villager's voice)
+  yawn: { vary: 0.05, max: 1, gap: 1, fn(s) {
+    s.voice({ f: [[0, 300], [0.3, 400], [0.75, 350], [1.15, 230]], vib: [4, 12, 0.3],
+      form: [[0, [600, 1100, 2500]], [0.35, [850, 1250, 2700]], [0.9, [520, 950, 2400]], [1.2, [320, 750, 2200]]],
+      amp: [[0, 0], [0.12, 0.55], [0.5, 1], [0.95, 0.7], [1.25, 0]], q: [5, 7, 9], breath: 0.6, body: 0.3, v: 0.35, rev: 0.2 });
+    s.noise({ ft: 'lowpass', f: 1400, a: 0.2, h: 0.5, d: 0.5, v: 0.08, color: 'pink' });
+  } },
   villager_chatter: { vary: 0.15, max: 2, gap: 0.3, fn(s, o) {
     const dur = babble(s.ctx, s.out, o.text || gibberish(), { t: s.t0, pitch: s.P, speed: o.speed ?? 1, voice: o.voice || 'cute' });
     s.mark(s.t0 + dur);
@@ -403,16 +632,23 @@ export const SFX = {
 
 // Level trims, calibrated with the offline render check (targets: UI ≈0.25–0.35 peak, combat ≈0.45–0.6, big moments ≈0.5–0.65).
 const TRIM = {
-  ui_hover: 0.75, ui_click: 0.6, ui_tab: 1.4, ui_coin: 1.8, ui_buy: 1.5, ui_learn: 1.7, ui_equip: 1.3, ui_toast: 1.2,
+  ui_hover: 0.7, ui_click: 0.6, ui_tab: 1.4, ui_coin: 1.8, ui_buy: 1.5, ui_learn: 1.7, ui_equip: 1.3, ui_toast: 1.2,
   pickup_item: 1.3, pickup_gold: 2.5, pickup_rare: 1.6, drop_item: 0.95,
   pickup_magic: 1.65, pickup_gem: 1.2, pickup_unique: 1.3, ui_quest_done: 1.15, victory_sfx: 1.5,
-  footstep_grass: 2.2, footstep_stone: 1.1, footstep_wood: 0.7,
+  footstep_grass: 3.0, footstep_stone: 2.2, footstep_wood: 1.9, // (the game plays steps at vol 0.35)
+  door_knock: 0.7, yawn: 0.25,
   swing: 2.6, swing_heavy: 1.45, throw: 3.3, dash: 3.3, hit_crit: 1.15, player_hurt: 0.6, monster_die: 1.5, ghost_wail: 0.7, boss_roar: 0.55, player_die: 0.5,
   bark: 0.9, bark_small: 0.4, howl: 0.37, whine: 0.3, dig: 2,
   fire_whoosh: 1.15, stink: 0.75, heal: 1.4, potion_drink: 1.6, door_open: 1.5, portal: 1.2, build_place: 1.1, bulldoze: 0.95,
   chest_open: 1.7, waypoint: 1.2, splash: 1.8, bird_chirp: 1.6, cat_meow: 0.3,
+  // Moka (calibrated with the ?test=audio render check against hit_flesh / bark / zap)
+  moka_bolt: 1.8, splash_cast: 1.1, water_splash: 1.6, bubble_up: 1.8, bubble_hit: 1.5, bubble_pop: 1.3, shake_spray: 1.8, puddle_dive: 1.0, puddle_pop: 1.7,
+  whirlpool: 2.2, wave_roar: 1.0, kibble_toss: 3.0, kibble_hit: 1.8, squeak_big: 1.3, rune_stamp: 1.4, rune_chime: 1.4, moonbeam_start: 1.3, moonbeam_hum: 1.6,
+  moonbeam_tick: 2.5, star_chain: 2.6, constellation_twinkle: 2.0, meteor_whistle: 1.2, meteor_boom: 0.72, quack: 1.1, duck_windup: 2.0, confetti_pop: 1.5,
+  leash_throw: 4.0, leash_snap: 1.2, feather_flutter: 3.0, duck_call: 4.0, retriever_bark: 0.8, spirit_summon: 1.4, mallard_wings: 2.2, hero_swap: 1.6, hero_arrive: 1.4,
 };
 for (const [k, v] of Object.entries(TRIM)) SFX[k].trim = v;
+for (const k in REGION_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = REGION_SFX[k]; } // (each carries its own trim)
 
 export const SFX_NAMES = Object.keys(SFX);
 
@@ -423,6 +659,8 @@ export const SFX_GROUPS = {
   Combat: ['swing', 'swing_heavy', 'throw', 'ball_bounce', 'hit_flesh', 'hit_crit', 'monster_hit', 'monster_die', 'slime_bounce', 'ghost_wail', 'boss_roar', 'player_hurt', 'player_die'],
   Dogs: ['bark', 'bark_small', 'howl', 'whine', 'dig'],
   Skills: ['explosion_small', 'fire_whoosh', 'frost', 'zap', 'stink', 'heal', 'buff', 'dash'],
-  World: ['potion_drink', 'door_open', 'portal', 'build_place', 'build_complete', 'bulldoze', 'chest_open', 'waypoint', 'splash'],
-  Critters: ['bird_chirp', 'cat_meow', 'villager_chatter'],
+  World: ['potion_drink', 'door_open', 'door_knock', 'portal', 'build_place', 'build_complete', 'bulldoze', 'chest_open', 'waypoint', 'splash'],
+  Critters: ['bird_chirp', 'cat_meow', 'yawn', 'villager_chatter'],
+  Moka: ['moka_bolt', 'splash_cast', 'water_splash', 'bubble_up', 'bubble_hit', 'bubble_pop', 'shake_spray', 'puddle_dive', 'puddle_pop', 'whirlpool', 'wave_roar', 'kibble_toss', 'kibble_hit', 'squeak_big', 'rune_stamp', 'rune_chime', 'moonbeam_start', 'moonbeam_hum', 'moonbeam_tick', 'star_chain', 'constellation_twinkle', 'meteor_whistle', 'meteor_boom', 'quack', 'duck_windup', 'confetti_pop', 'leash_throw', 'leash_snap', 'feather_flutter', 'duck_call', 'retriever_bark', 'spirit_summon', 'mallard_wings'],
+  Heroes: ['hero_swap', 'hero_arrive'],
 };

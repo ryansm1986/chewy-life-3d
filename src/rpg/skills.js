@@ -13,14 +13,19 @@
 //
 // D2 level gate: putting the Nth point into a skill needs character level >= req + (N-1).
 
+import { MOKA_TREES, MOKA_SKILLS } from './skillsMoka.js';
+
 export const MAX_SKILL_LVL = 20;
 export const ROW_REQ = [1, 6, 12, 18, 24, 30];
 
+// every hero's trees (cls = the hero who learns them; see classes.js). The UI shows the active hero's three.
 export const TREES = [
-  { id: 'bone', name: 'Bone Arts', sub: 'Bone Sword', color: '#f0d9b0', accent: '#e8475c', desc: 'Up-close chomps, spins and slams. Strength makes it hit harder.' },
-  { id: 'fetch', name: 'Fetch Mastery', sub: 'Red Tennis Ball', color: '#ffb3a0', accent: '#e8362a', desc: 'Throws, trick shots and ball storms. Dexterity makes it hit harder.' },
-  { id: 'spirit', name: 'Pack Spirit', sub: 'Any weapon', color: '#b8d0ff', accent: '#5a7ae0', desc: 'Barks, auras, Shadow and the ghostly spirit pups.' },
+  { id: 'bone', cls: 'chewy', name: 'Bone Arts', sub: 'Bone Sword', color: '#f0d9b0', accent: '#e8475c', desc: 'Up-close chomps, spins and slams. Strength makes it hit harder.' },
+  { id: 'fetch', cls: 'chewy', name: 'Fetch Mastery', sub: 'Red Tennis Ball', color: '#ffb3a0', accent: '#e8362a', desc: 'Throws, trick shots and ball storms. Dexterity makes it hit harder.' },
+  { id: 'spirit', cls: 'chewy', name: 'Pack Spirit', sub: 'Any weapon', color: '#b8d0ff', accent: '#5a7ae0', desc: 'Barks, auras, Shadow and the ghostly spirit pups.' },
+  ...MOKA_TREES,
 ];
+export const treesFor = cls => TREES.filter(t => (t.cls || 'chewy') === (cls || 'chewy'));
 
 const r1 = v => Math.round(v * 10) / 10;
 const r2 = v => Math.round(v * 100) / 100;
@@ -299,11 +304,15 @@ const DEFS = {
   },
 };
 
+// Moka's skills live in skillsMoka.js (same format)
+for (const id in MOKA_SKILLS) { if (DEFS[id]) throw new Error(`skill id clash: ${id}`); DEFS[id] = MOKA_SKILLS[id]; }
+
 /** Bind info/params so they also work when destructured (no reliance on `this`). */
 function bindDef(d) {
   for (const k of ['info', 'params', 'cost', 'cd']) { const fn = d[k]; d[k] = (...a) => fn.apply(d, a); }
   return d;
 }
+const TREE_CLS = {}; // tree id → hero class (filled below from TREES)
 for (const id in DEFS) {
   const d = bindDef(DEFS[id]);
   d.id = id;
@@ -311,6 +320,8 @@ for (const id in DEFS) {
   d.pre = d.pre || [];
   d.syn = d.syn || [];
 }
+for (const t of TREES) TREE_CLS[t.id] = t.cls || 'chewy';
+for (const id in DEFS) DEFS[id].cls = TREE_CLS[DEFS[id].tree] || 'chewy';
 
 export const SKILLS = DEFS;
 export const SKILL_IDS = Object.keys(DEFS);
@@ -322,11 +333,12 @@ export const ATTACK = bindDef({
   desc: 'Swing your bone sword or throw your ball. Free, forever, and very satisfying.',
   params(l, d) {
     if (d && d.weaponType === 'ball') return { dmgPct: 100, speed: 15 * (d.ballSpeed || 1), range: 11, pierce: d.pierce || 0, returns: true, projectile: true };
+    if (d && d.weaponType === 'staff') return { dmgPct: 100, speed: 15, range: 11, pierce: 0, returns: false, projectile: true, bolt: true }; // Moka: a free little sparkle bolt
     return { dmgPct: 100, radius: 1.8, arc: 110, knockback: 0.25, projectile: false };
   },
   info(l, d) {
     const p = this.params(l, d);
-    return [`Damage: 100% weapon damage${dmgRange(100, d)}`, p.projectile ? 'Thrown — bounces back to you' : 'Melee swing'];
+    return [`Damage: 100% weapon damage${dmgRange(100, d)}`, p.bolt ? 'A sparkly magic bolt from your staff' : p.projectile ? 'Thrown — bounces back to you' : 'Melee swing'];
   },
 });
 
@@ -359,6 +371,7 @@ export function canLearn(id, state) {
   const d = DEFS[id];
   if (!d) return { ok: false, why: 'Unknown skill' };
   const P = state.player;
+  if (d.cls && d.cls !== (P.cls || 'chewy')) return { ok: false, why: "Another hero's skill" };
   const base = P.skills[id] || 0;
   if (base >= MAX_SKILL_LVL) return { ok: false, why: 'Mastered!' };
   const need = d.req + base;
@@ -394,7 +407,8 @@ export function usable(id, state, derived, curZoom) {
   if (!d) return { ok: false, why: 'Unknown skill' };
   if (d.kind === 'passive' || d.kind === 'aura') return { ok: false, why: 'Passive skill' };
   if (id !== 'attack' && effectiveLevel(id, state, derived) <= 0) return { ok: false, why: 'Not learned' };
-  if (d.wep && derived && derived.weaponType !== d.wep) return { ok: false, why: d.wep === 'sword' ? 'Needs a Bone Sword (X to swap)' : 'Needs a Ball (X to swap)' };
+  if (d.cls && state.player?.cls && d.cls !== state.player.cls) return { ok: false, why: 'Not your skill!' };
+  if (d.wep && derived && derived.weaponType !== d.wep) return { ok: false, why: d.wep === 'sword' ? 'Needs a Bone Sword (X to swap)' : d.wep === 'staff' ? 'Needs a staff' : 'Needs a Ball (X to swap)' };
   const lvl = effectiveLevel(id, state, derived);
   const zoom = curZoom != null ? curZoom : (state.player.zoom == null ? (derived ? derived.zoomMax : 1e9) : state.player.zoom);
   if (d.kind !== 'channel' && zoom < d.cost(lvl)) return { ok: false, why: 'Not enough zoom!' };

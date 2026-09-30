@@ -1,19 +1,29 @@
-// Chewy — the player. WASD / click-to-move (routed round walls, buildings, trees and water by core/nav.js), dodge roll,
-// interaction, weapon visuals and grass bending.
+// The player's body: whichever hero is being played (Chewy, Moka — see heroes.js; setHero swaps rig and weapons).
+// WASD / click-to-move (routed round walls, buildings, trees and water by core/nav.js), dodge roll, interaction,
+// weapon visuals and grass bending.
 import * as THREE from 'three';
 import { Actor } from './actor.js';
 import { buildHumanoid, CAST, boneSwordGeo, tennisBall, enableXray } from './charKit.js';
+import { buildHeroModel, heroModelReady } from './heroModels.js';
+import { makeStaff, attachStaff, tickStaff, disposeStaff, STAFF_GRIP } from './heroGear.js';
+import { Animator } from './animator.js';
 import { Input } from '../core/input.js';
 import { navFor, PathFollow } from '../core/nav.js';
 import { Events } from '../core/events.js';
 import { U } from '../gfx/materials.js';
 import { clamp } from '../core/util.js';
+import { CLASSES } from '../rpg/classes.js';
+
+const STAFF_UP = STAFF_GRIP.rotation[0];
+const STAFF_CASTS = new Set(['staffBolt', 'staffCast', 'skyCast', 'wetShake', 'summon', 'yank', 'puddleHop', 'surf', 'beam', 'duckCall', 'cast', 'swing', 'swing2', 'throw']);
+// actions that root the player (WASD won't walk out of them); Moka's staff casts included (animator.js ACTIONS)
+const BUSY = new Set(['swing', 'swing2', 'throw', 'cast', 'bark', 'slam', 'pickup', 'drink', 'staffBolt', 'staffCast', 'skyCast', 'wetShake', 'summon', 'yank', 'puddleHop', 'surf', 'beam', 'duckCall']);
 
 export class Player extends Actor {
-  constructor(world, G) {
-    const rig = buildHumanoid(CAST.chewy);
-    super(world, rig, { radius: 0.3, speed: 4.4, name: 'Chewy' });
-    this.G = G;
+  constructor(world, G, hero = 'chewy') {
+    const rig = Player.buildRig(undefined, hero);
+    super(world, rig, { radius: 0.3, speed: 4.4, name: CLASSES[hero]?.name || 'Chewy' });
+    this.G = G; this.hero = hero;
     enableXray(rig, '#ffc890', 0.6);
     this.moveTarget = null; this.interactTarget = null;
     // click-to-move route toward moveTarget (the melee assist and loot pickup steer through moveTarget too)
@@ -24,17 +34,77 @@ export class Player extends Actor {
     this.inputDir = new THREE.Vector3();
     this.controlLocked = false;
     // weapons
-    this.sword = new THREE.Mesh(boneSwordGeo(), rig.mat); this.sword.castShadow = true;
     this.ball = tennisBall(0.1);
-    this.swordBack = new THREE.Mesh(boneSwordGeo(), rig.mat); this.swordBack.castShadow = true; this.swordBack.scale.setScalar(0.8);
-    this.swordBack.position.set(0.02, -0.02, -0.02); this.swordBack.rotation.set(0.1, 0, 2.5);
-    rig.parts.back.add(this.swordBack);
+    this.makeSwords(rig);
     this.weaponType = 'sword';
     this.setWeapon('sword');
     this.speedMul = 1;
   }
+  /** A hero's rig: the baked film model (heroModels.js: public/rigs/<hero>_disney.*) when loaded, else the kit spec. */
+  static buildRig(style, hero = 'chewy') {
+    const baked = (style ?? (heroModelReady(hero) ? 'disney' : 'classic')) === 'disney' && heroModelReady(hero);
+    return baked ? buildHeroModel(hero) : buildHumanoid(CAST[hero] || CAST.chewy);
+  }
+  /** Become another hero (heroes.js): new rig, animator, weapons, name — same position, facing and nav state. */
+  setHero(id) {
+    if (!CLASSES[id] || id === this.hero) return false;
+    this.hero = id; this.name = CLASSES[id].name;
+    this.replaceRig(Player.buildRig(undefined, id));
+    return true;
+  }
+  replaceRig(rig) {
+    const old = this.rig;
+    this.dropStaff();
+    this.world.scene.remove(old.root); old.dispose?.();
+    this.rig = rig; this.anim = new Animator(rig);
+    enableXray(rig, '#ffc890', 0.6);
+    this.world.scene.add(rig.root);
+    this.makeSwords(rig); this.setWeapon(this.weaponType);
+    this.rollT = 0; this.invuln = false;
+    this.sync();
+  }
+  makeSwords(rig) {
+    const mat = rig.propMat || rig.mat; // the Disney skin material samples its texture atlas; props keep vertex colours
+    const geo = Player.swordGeo ||= boneSwordGeo(); // one geometry for every rig the player ever gets (hero switches rebuild the rig)
+    this.sword = new THREE.Mesh(geo, mat); this.sword.castShadow = true;
+    this.swordBack = new THREE.Mesh(geo, mat); this.swordBack.castShadow = true; this.swordBack.scale.setScalar(0.8);
+    this.swordBack.position.set(0.02, -0.02, -0.02); this.swordBack.rotation.set(0.1, 0, 2.5);
+    rig.parts.back.add(this.swordBack);
+  }
+  // Settings > Disney Chewy: rebuild the model in place (same position, facing, weapon)
+  swapModel(style) {
+    const old = this.rig, rig = Player.buildRig(style, this.hero);
+    if (rig.disney === !!old.disney) { rig.dispose?.(); return; }
+    this.replaceRig(rig);
+  }
+  /** The staff for the equipped staff item's look (variant + colours from its icon). */
+  equippedLook() {
+    const st = this.G.state, it = st?.equipment?.[st.player?.activeWeapon === 1 ? 'weaponAlt' : 'weapon'];
+    return it?.icon || {};
+  }
+  dropStaff() {
+    const s = this.staff; if (!s) return;
+    s.parent?.remove(s); disposeStaff(s);
+    this.staff = null; this.staffKey = null;
+  }
+  // the staff for the equipped item (heroGear.js: six designs by icon variant, tinted by its colours), upright at her side
+  showStaff(look) {
+    const key = `${look.variant || ''}|${(look.colors || []).join(',')}`;
+    if (this.staff && this.staffKey === key && this.staff.parent === this.rig.parts.handR) return;
+    this.dropStaff();
+    const s = this.staff = makeStaff(look); this.staffKey = key;
+    attachStaff(s, this.rig.parts.handR);
+  }
   setWeapon(type, look = {}) {
     this.weaponType = type;
+    if (type === 'staff') { // Moka: the staff in hand; the (Chewy-only) sword and ball stay parked and hidden
+      this.showStaff(look.colors ? look : this.equippedLook());
+      this.sword.scale.setScalar(0.0001); this.sword.castShadow = false;
+      this.ball.scale.setScalar(0.0001); this.ball.castShadow = false;
+      this.swordBack.visible = false;
+      return;
+    }
+    this.dropStaff();
     const h = this.rig.parts.handR;
     // both stay attached (the idle one shrunk to nothing) so each shader is compiled up front — no hitch on the first swap
     if (this.sword.parent !== h) h.add(this.sword);
@@ -86,7 +156,7 @@ export class Player extends Actor {
       moved = this.step(this.rollDir, dt, 2.1);
       this.invuln = true;
     } else {
-      this.invuln = false;
+      this.invuln = !!G.heroSwitching; // (nothing lands during a hero hand-off)
       const dir = this.readMoveInput();
       if (dir.lengthSq() > 0) { this.moveTarget = null; this.interactTarget = null; }
       if (Input.hit('space') && !this.controlLocked && !G.ui?.anyModal?.()) {
@@ -115,11 +185,23 @@ export class Player extends Actor {
     U.uBenders.value[0].set(this.pos.x, this.pos.y, this.pos.z, 0.55);
     super.update(dt);
     this.carrySword(dt);
+    this.carryStaff(dt);
+    if (this.staff) tickStaff(this.staff, dt);
+  }
+  // Moka's staff stays upright while she walks (the arm swing would wave it like a baton); casts pose it freely
+  carryStaff(dt) {
+    const s = this.staff; if (!s || this.weaponType !== 'staff') return;
+    const arm = this.rig.parts.armR, body = this.rig.parts.body, R = this.anim.rest;
+    const ra = R.get(arm), rb = R.get(body); if (!ra || !rb) return;
+    const a = this.anim.action, want = a && STAFF_CASTS.has(a.name) ? 0 : 1; // casts aim the staff themselves (mokaSpells); waves, cheers, rolls keep it upright
+    this._scarry = (this._scarry ?? 1) + (want - (this._scarry ?? 1)) * Math.min(1, dt * 14);
+    const tilt = (arm.rotation.x - ra.r.x) + (body.rotation.x - rb.r.x);
+    s.rotation.x = STAFF_UP - tilt * this._scarry;
   }
   // Keep the bone sword at its relaxed carry angle while walking: the walk cycle's arm swing and forward lean used to
   // tip it level like a lance. Attacks and skills (any animator action) pose it freely.
   carrySword(dt) {
-    if (this.weaponType !== 'sword') return;
+    if (this.weaponType !== 'sword' || this.hero !== 'chewy') return;
     // In the village the sword rides on his back (he was leaning on it like a cane); it comes out for any attack or
     // skill and goes back a few seconds later. In the Burrow it stays in hand.
     if (this.anim.action) this._drawnT = 3;
@@ -165,5 +247,5 @@ export class Player extends Actor {
     if (f.stuck && f.last && Math.hypot(tx - this.pos.x, tz - this.pos.z) < 0.5) return f.exact ? 1 : 2; // pressed against it: close enough
     return gaveUp ? -1 : 0;
   }
-  busyAction() { const a = this.anim.action; return a && ['swing', 'swing2', 'throw', 'cast', 'bark', 'slam', 'pickup', 'drink'].includes(a.name) && !this.canMoveWhileActing; }
+  busyAction() { const a = this.anim.action; return a && BUSY.has(a.name) && !this.canMoveWhileActing; }
 }

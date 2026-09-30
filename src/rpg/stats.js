@@ -31,6 +31,8 @@
 //   'treeSkills.bone' / 'skillBonus.packcall' dotted keys add into the nested objects.
 import { SKILLS, SKILL_IDS, effectiveLevel, synergyMult } from './skills.js';
 import { SETS, EQUIP_SLOTS } from './items.js';
+import { CLASSES } from './classes.js';
+import { mokaPassives } from './skillsMoka.js';
 
 export const LEVEL_CAP = 60;
 export const RES_CAP = 75;
@@ -94,6 +96,7 @@ export const zoomFormula = (ene, lvl) => 20 + ene * 2.5 + lvl * 2;
 
 export function computeStats(state) {
   const P = state.player;
+  const CL = CLASSES[P.cls || 'chewy'] || CLASSES.chewy;
   const eq = state.equipment || {};
   const lvl = P.lvl || 1;
   const weaponSlot = P.activeWeapon === 1 ? 'weaponAlt' : 'weapon';
@@ -122,7 +125,9 @@ export function computeStats(state) {
   d.vit = P.stats.vit + acc.vit;
   d.ene = P.stats.ene + acc.ene;
   d.allSkills = acc.allSkills;
-  d.treeSkills = { bone: acc.treeSkills.bone || 0, fetch: acc.treeSkills.fetch || 0, spirit: acc.treeSkills.spirit || 0 };
+  d.cls = CL.id;
+  d.treeSkills = {};
+  for (const t of ['bone', 'fetch', 'spirit', 'tide', 'star', 'duck']) d.treeSkills[t] = acc.treeSkills[t] || 0;
   d.skillBonus = { ...acc.skillBonus };
 
   // skill levels & synergies
@@ -139,7 +144,7 @@ export function computeStats(state) {
   const w = eq[weaponSlot];
   d.weaponSlot = weaponSlot;
   d.unarmed = !w;
-  d.weaponType = w ? w.wtype : 'sword';
+  d.weaponType = w ? w.wtype : (CL.weapons[0] === 'staff' ? 'staff' : 'sword'); // bare paws: the class's own style
   let masteryPct = 0, masteryCrit = 0;
   d.ballSpeed = 1;
   let extraPierce = 0;
@@ -150,7 +155,7 @@ export function computeStats(state) {
     const p = SP('fetchMastery'); masteryPct += p.dmgPct; masteryCrit += p.crit; d.ballSpeed = 1 + p.ballSpeed / 100; extraPierce += p.pierce;
   }
   d.dmgPct = acc.dmgPct + masteryPct;
-  d.statDmgPct = d.weaponType === 'ball' ? d.dex : d.str; // 1% per point, like D2
+  d.statDmgPct = d[CL.dmgStat[d.weaponType] || 'str'] || 0; // 1% per point, like D2 (Str sword, Dex ball, Ene staff)
   const wd = w ? w.dmg : [1, 3];
   const mult = Math.max(0.1, 1 + (d.dmgPct + d.statDmgPct) / 100);
   d.dmgMin = Math.max(1, Math.round((wd[0] + acc.dmgMin) * mult));
@@ -187,8 +192,8 @@ export function computeStats(state) {
   for (const e of ['Fire', 'Frost', 'Zap', 'Stink']) d['res' + e] = Math.round(clamp(acc['res' + e] + d.resAll, -100, RES_CAP));
 
   // life / zoom
-  d.lifeMax = Math.round(lifeFormula(d.vit, lvl) + acc.lifeMax);
-  d.zoomMax = Math.round(zoomFormula(d.ene, lvl) + acc.zoomMax);
+  d.lifeMax = Math.round(CL.life(d.vit, lvl) + acc.lifeMax);
+  d.zoomMax = Math.round(CL.zoom(d.ene, lvl) + acc.zoomMax);
   d.lifeRegen = r1(d.vit * 0.03 + acc.lifeRegen + auraRegen);
   d.zoomRegen = r2((d.zoomMax * 0.025 + 0.5) * Math.max(0, 1 + acc.zoomRegen / 100));
 
@@ -210,6 +215,8 @@ export function computeStats(state) {
   if (L('packcall') > 0) { const p = SP('packcall'); d.shadowDmg += p.shadowDmg; d.shadowLife += p.shadowLife; }
   d.frenzy = L('frenzy') > 0 ? SP('frenzy') : null;
   d.setCounts = setCounts;
+  d.treeDmgPct = { tide: 0, star: 0, duck: 0 };
+  if (CL.id === 'moka') mokaPassives(d, L, state);
   return d;
 }
 

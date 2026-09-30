@@ -5,6 +5,7 @@ import { makeWater } from '../gfx/water.js';
 import { LightPool } from '../core/engine.js';
 import { U } from '../gfx/materials.js';
 import { Vegetation } from './vegetation.js';
+import { Details } from './details.js';
 import { applyLayout, reservedAt, distToPaths, LANDMARKS } from './layout.js';
 import { Collision } from './collision.js';
 
@@ -36,11 +37,17 @@ export class VillageWorld {
     this.veg = new Vegetation(this);
     this.veg.build((x, z) => !reservedAt(x, z) && distToPaths(x, z) > 0.5, engine.quality);
     scene.add(this.veg.group);
+    this.decks = []; // walkable platforms over water (bridges, the pond dock): {x0,z0,x1,z1,h:(x,z)=>y}
+    // small land details (curb stones, clover, reeds, the dock, bunting...) share the vegetation records and colliders
+    // (&nodetails in the URL skips them, for A/B perf checks)
+    if (!(typeof location !== 'undefined' && /[?&]nodetails\b/.test(location.search))) {
+      this.details = new Details(this, engine.quality).build();
+      scene.add(this.details.group);
+    }
     this._snap = new THREE.Vector3();
     // collision: vegetation trunks/rocks + terrain (deep water, cliffs, map edge)
     this.collision = new Collision(4);
     for (const c of this.veg.colliders) c.ref = this.collision.addCircle(c.x, c.z, c.r);
-    this.decks = []; // walkable platforms over water (bridges): {x0,z0,x1,z1,h:(x,z)=>y}
     this.collision.blockFn = (x, z) => !this.walkable(x, z);
     this.interactables = [];
     this.landmarks = LANDMARKS;
@@ -53,11 +60,15 @@ export class VillageWorld {
     const h = this.terrain.heightAt(x, z);
     return h > -0.22 && this.terrain.slopeAt(x, z) < 0.5;
   }
-  onVegRemoved(rec) { if (rec.col?.ref) this.collision.remove(rec.col.ref); }
+  onVegRemoved(rec) {
+    if (rec.col?.ref) this.collision.remove(rec.col.ref);
+    if (rec.lights) { for (const l of rec.lights) this.lightPool.removeSource(l); rec.lights = null; }
+  }
   nearPath(x, z, d) { return distToPaths(x, z) < d; }
   onSky(o, day) {
     U.uSunDir.value.copy(day.sunDir);
     U.uSkyHor.value.copy(o.hor);
+    this.details?.setNight(o.night);
   }
   // keep the shadow frustum centred on the camera focus, snapped to texels to avoid shimmer
   updateSun(focus, sunDir) {

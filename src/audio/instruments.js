@@ -270,6 +270,84 @@ export const INST = {
     for (let i = 0; i < n; i++) e = INST.shime(ctx, dest, t + (i / n) * dur, 0, vel * (0.35 + 0.65 * (i / n)));
     return e;
   },
+  // ---- region instruments (docs/REGIONS.md)
+  // Shinobue / nohkan: a bright bamboo transverse flute. Quicker speech than the flute, a reedy upper partial, strong
+  // edge noise (festival flute, Tengu). opts.hishigi = the Noh flute's piercing overblown shriek (a fast scoop up).
+  fue(ctx, dest, t, m, vel, dur, o = {}) {
+    const s = V(ctx, dest, t), f = mtof(m), a = o.hishigi ? 0.06 : 0.035, hold = Math.max(0.03, dur - a), rel = 0.14;
+    const pts = o.hishigi ? [[0, f * 0.72], [0.07, f * 1.015], [0.14, f]] : [[0, f * 0.985], [0.05, f]];
+    s.tone({ pts, stack: [['sine', 0, 1], ['triangle', 2, 0.42], ['sine', 0, 0.1, 2]], a, h: hold, d: rel, lin: true, v: 0.13 * vel, vib: [5.8, 14, 0.22], lp: 3800, lq: 0 });
+    s.noise({ f: f * 2, q: 4, a: 0.03, h: hold, d: rel, lin: true, v: 0.26 * vel });
+    s.noise({ ft: 'highpass', f: 3800, a: 0.004, d: 0.045, v: 0.06 * vel });
+    return s.end;
+  },
+  // Tuned bamboo tube knock (kokiriko / shishi-odoshi "tok"): a hollow tone with the odd harmonic of a closed tube.
+  bamboo(ctx, dest, t, m, vel) {
+    const s = V(ctx, dest, t), f = m ? mtof(m) : 620;
+    s.tone({ pts: [[0, f * 1.06], [0.012, f]], a: 0.001, d: 0.16, v: 0.3 * vel });
+    s.tone({ f: f * 3.01, a: 0.001, d: 0.035, v: 0.06 * vel });
+    s.noise({ f: Math.min(f * 4, 5000), q: 2.5, a: 0.001, d: 0.012, v: 0.13 * vel });
+    return s.end;
+  },
+  // Tanuki belly drum (Danzaburō): a huge round "pon~" that bends up like a kotsuzumi, and the palm slap. m re-pitches.
+  belly(ctx, dest, t, m, vel) {
+    const s = V(ctx, dest, t), k = m ? mtof(m) / 92 : 1;
+    s.tone({ pts: [[0, 92 * k], [0.05, 132 * k], [0.35, 118 * k]], a: 0.004, d: 0.55, v: 0.5 * vel });
+    s.tone({ pts: [[0, 185 * k], [0.05, 262 * k]], type: 'triangle', a: 0.002, d: 0.12, v: 0.1 * vel, lp: 900 });
+    s.noise({ ft: 'lowpass', f: 650, a: 0.002, d: 0.06, v: 0.35 * vel, color: 'pink' });
+    return s.end;
+  },
+  // Ōdaiko: the huge festival drum (Umibōzu, the storms) — a slow, deep boom with a long body.
+  odaiko(ctx, dest, t, m, vel) {
+    const s = V(ctx, dest, t);
+    s.tone({ pts: [[0, 74], [0.25, 45]], a: 0.003, d: 1.4, v: 0.5 * vel });
+    s.tone({ pts: [[0, 150], [0.08, 88]], type: 'triangle', a: 0.002, d: 0.28, v: 0.13 * vel, lp: 700 });
+    s.noise({ ft: 'lowpass', f: 420, a: 0.002, d: 0.3, v: 0.36 * vel, color: 'brown' });
+    s.noise({ f: 1100, q: 1, a: 0.001, d: 0.03, v: 0.11 * vel });
+    return s.end;
+  },
+  // Warm "steam" pad (Yukimi Onsen): the pad's triangles breathing slowly, with a soft breath band above each note.
+  steam(ctx, dest, t, m, vel, dur) {
+    const s = V(ctx, dest, t), f = mtof(m), a = Math.min(1.6, dur * 0.45), h = Math.max(0, dur - a);
+    s.tone({ f, stack: [['triangle', -8, 0.5], ['triangle', 8, 0.5], ['sine', 0, 0.7]], a, h, d: 1.8, lin: true, v: 0.07 * vel, lp: 950, lq: -2, am: [0.3, 0.12] });
+    s.noise({ f: f * 3, q: 7, a: a * 1.2, h, d: 1.6, lin: true, v: 0.1 * vel, color: 'pink' });
+    return s.end;
+  },
+  // A gust of wind as an instrument (Tengu): a band of noise swelling up and away; m = the peak frequency, dur = length.
+  gust(ctx, dest, t, m, vel, dur) {
+    const s = V(ctx, dest, t), f = m ? mtof(m) : 1200, d = Math.max(0.4, dur);
+    s.noise({ pts: [[0, f * 0.35], [d * 0.55, f], [d, f * 0.5]], q: 2.2, a: d * 0.5, h: d * 0.1, d: d * 0.4, lin: true, v: 0.22 * vel, color: 'pink' });
+    s.noise({ pts: [[0, f * 0.8], [d * 0.55, f * 2], [d, f]], q: 7, a: d * 0.5, h: d * 0.1, d: d * 0.4, lin: true, v: 0.05 * vel });
+    return s.end;
+  },
+  // An ocean surge (Umibōzu): brown noise opening up as the swell rises, a fizz of foam as it crests; dur = swell length.
+  surge(ctx, dest, t, m, vel, dur) {
+    const s = V(ctx, dest, t), d = Math.max(0.8, dur);
+    s.noise({ ft: 'lowpass', pts: [[0, 180], [d * 0.6, 900], [d, 260]], q: 0.8, a: d * 0.6, d: d * 0.4 + 0.5, lin: true, v: 0.35 * vel, color: 'brown' });
+    s.noise({ ft: 'highpass', f: 2500, a: d * 0.62, d: d * 0.35 + 0.8, v: 0.03 * vel, lp: 6000 });
+    return s.end;
+  },
+  // Blizzard swirl (Yuki-onna): a whirling band of icy noise; dur = length.
+  blizzard(ctx, dest, t, m, vel, dur) {
+    const s = V(ctx, dest, t), d = Math.max(0.5, dur);
+    s.noise({ pts: [[0, 1800], [d * 0.5, 4200], [d, 2200]], q: 1.4, a: d * 0.45, h: d * 0.1, d: d * 0.45, lin: true, v: 0.1 * vel, am: [6.5, 0.45] });
+    s.noise({ pts: [[0, 650], [d * 0.5, 1300], [d, 750]], q: 3, a: d * 0.5, d: d * 0.5, lin: true, v: 0.09 * vel, color: 'pink', am: [4.1, 0.3] });
+    return s.end;
+  },
+  // Ice bell: an eerie glassy bell whose partials come in slowly beating pairs (Yuki-onna, snowflake glints).
+  icebell(ctx, dest, t, m, vel) {
+    const s = V(ctx, dest, t);
+    s.bell({ f: mtof(m), d: 2.2, v: 0.085 * vel, partials: [[1, 1, 1], [1.0035, 0.7, 0.9], [2.41, 0.3, 0.45], [2.418, 0.2, 0.4], [4.9, 0.08, 0.2], [7.2, 0.03, 0.12]] });
+    return s.end;
+  },
+  // Icicle metallophone (Yuki-onna's ostinato): a struck glassy bar with a free bar's inharmonic partials (1, 2.76, 5.4,
+  // 8.93) that dies fast, and a tiny tick of ice on the strike. Cold where the marimba is warm.
+  icicle(ctx, dest, t, m, vel) {
+    const s = V(ctx, dest, t);
+    s.bell({ f: mtof(m), d: 0.55, v: 0.2 * vel, partials: [[1, 1, 1], [2.76, 0.55, 0.45], [5.4, 0.26, 0.22], [8.93, 0.09, 0.12]] });
+    s.noise({ ft: 'highpass', f: 5200, a: 0.001, d: 0.01, v: 0.04 * vel });
+    return s.end;
+  },
 };
 
 // ------------------------------------------------------------------------------------------ pre-render cache
@@ -283,6 +361,7 @@ const CACHE = { // instrument → [buffer seconds, takes]
   marimba: [1.1, 1], kalimba: [1.4, 1], glock: [1.2, 1], steelpan: [1.1, 1], chime: [1.5, 1], rin: [2.2, 1], drip: [0.15, 1],
   taiko: [0.7, 2], shime: [0.2, 3], ka: [0.07, 3], kane: [0.36, 2], pon: [0.45, 2], shaker: [0.09, 3], tick: [0.05, 1],
   woodblock: [0.1, 2], heartbeat: [0.36, 1], snap: [0.07, 3], kick: [0.34, 1], bubble: [0.1, 1], boing: [0.24, 1],
+  bamboo: [0.2, 2], belly: [0.62, 2], odaiko: [1.6, 2], icebell: [2.4, 1], icicle: [0.6, 1],
 };
 const RAW = {}, pre = new Map(), queue = [], MAX_SAMPLES = 2.5e6;
 let cachedSamples = 0, pumping = false, rr = 0;

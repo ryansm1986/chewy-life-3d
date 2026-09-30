@@ -6,7 +6,7 @@ import { Panel } from './panel.js';
 const CONTROLS = [
   [['LMB'], 'Move / attack / talk'], [['RMB'], 'Use right-click skill'], [['1', '2', '3', '4'], 'Hotbar skills'], [['Q', 'E'], 'Heart / Zoom potion'],
   [['F'], 'Interact'], [['X'], 'Swap weapons'], [['I'], 'Bag'], [['C'], 'Character'], [['K'], 'Skills'], [['J'], 'Journal'],
-  [['M', 'Tab'], 'Map'], [['B'], 'Build (village)'], [['Alt'], 'Show loot labels'], [['Esc'], 'Close / menu'],
+  [['M'], 'Map'], [['Tab'], 'Switch hero'], [['B'], 'Build (village)'], [['Alt'], 'Show loot labels'], [['Esc'], 'Close / menu'],
 ];
 
 export class MenuPanel extends Panel {
@@ -20,7 +20,7 @@ export class MenuPanel extends Panel {
   init() {
     this.body.innerHTML = `<div class="mn-views">
       <div class="mn-v mn-main">
-        <div class="mn-hero"><div class="mn-paws">${glyph('paw')}${glyph('paw')}${glyph('paw')}</div><div class="mn-zz">Chewy is taking a little break<span>z</span><span>z</span><span>z</span></div></div>
+        <div class="mn-hero"><div class="mn-paws">${glyph('paw')}${glyph('paw')}${glyph('paw')}</div><div class="mn-zz"><b class="mn-who">Chewy</b> is taking a little break<span>z</span><span>z</span><span>z</span></div></div>
         <div class="mn-btns">
           <button class="btn big mint" data-a="resume">${glyph('play')}Resume</button>
           <button class="btn big" data-a="settings">${glyph('gear')}Settings</button>
@@ -36,6 +36,8 @@ export class MenuPanel extends Panel {
         <div class="set-row"><div class="set-n">${glyph('sparkle')}UI size</div><div class="sld"><input type="range" min="80" max="125" data-k="uiScale"><b></b></div></div>
         <div class="set-row"><div class="set-n">${glyph('bolt')}Screen shake</div><button class="tog" data-k="shake"><i></i></button></div>
         <div class="set-row"><div class="set-n">${glyph('star')}Show FPS</div><button class="tog" data-k="showFps"><i></i></button></div>
+        <div class="set-row"><div class="set-n">${glyph('sparkle')}Disney style</div><button class="tog" data-k="disneyChewy"><i></i></button></div>
+        <div class="set-row"><div class="set-n">${glyph('star')}Toybox Chewy</div><button class="tog" data-k="toyChewy"><i></i></button></div>
         <div class="mn-foot"><button class="btn" data-a="back">${glyph('swap')}Back</button></div>
       </div>
       <div class="mn-v mn-controls">
@@ -71,7 +73,9 @@ export class MenuPanel extends Panel {
     if (vv) replay(vv, 'enter', 500);
     this.sync();
   }
-  onOpen() { this.setView(this.opts.view || 'main'); this.panel.classList.toggle('from-title', this.opts.from === 'title'); }
+  onOpen() {
+    const who = this.panel.querySelector('.mn-who'); if (who) who.textContent = this.ui.G?.state?.player?.name || 'Chewy'; // whoever is being played
+    this.setView(this.opts.view || 'main'); this.panel.classList.toggle('from-title', this.opts.from === 'title'); }
   sync() {
     const s = this.ui.settings;
     const seg = this.body.querySelector('.seg[data-k="quality"]');

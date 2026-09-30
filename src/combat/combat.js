@@ -3,9 +3,12 @@ import * as THREE from 'three';
 import { rollHit, playerDamageTaken, rollBlock, ELEMENT_COLORS } from '../rpg/stats.js';
 import { Events } from '../core/events.js';
 import { rand, clamp, TAU } from '../core/util.js';
-import { Projectile } from './projectile.js';
+import { Projectile, projectileLooks } from './projectile.js';
 
 const _v = new THREE.Vector3();
+// damage-number weight: hits below this size (5% of a monster's life, 1.5% of a boss's much larger pool) float up
+// smaller and fainter, so the big hits in a dense fight stand out (ui/fx.js Floats)
+const minorHit = m => (m.lifeMax || 0) * (m.def?.boss ? 0.015 : 0.05);
 
 export class Combat {
   constructor(G, world) {
@@ -67,9 +70,12 @@ export class Combat {
   }
   applyDamageToMonster(m, dmg, { element = 'phys', crit = false, knock = 0, stun = 0, from = null, silent = false } = {}) {
     const G = this.G;
+    // per-monster damage filter (region monsters: Heike-gani's armoured front) — docs/REGIONS.md §3.4
+    // (m.def?: pots and other breakables are hit through here too and have no def)
+    if (m.def?.damageTaken) { dmg = m.def.damageTaken(m, dmg, { element, crit, from }); if (!(dmg > 0)) return; dmg = Math.max(1, Math.round(dmg)); }
     m.takeDamage(dmg, { element, crit, knock, stun, from });
     if (!silent) {
-      G.ui?.float?.(m.pos.clone().setY(m.pos.y + (m.height || 1) + 0.2), crit ? `${dmg}!` : `${dmg}`, { kind: crit ? 'crit' : 'dmg', color: element !== 'phys' ? ELEMENT_COLORS[element] : undefined });
+      G.ui?.float?.(m.pos.clone().setY(m.pos.y + (m.height || 1) + 0.2), crit ? `${dmg}!` : `${dmg}`, { kind: crit ? 'crit' : 'dmg', color: element !== 'phys' ? ELEMENT_COLORS[element] : undefined, ref: minorHit(m) });
       if (m.big) {
         // big bodies: burst on the side facing the attacker at chest height (not over the face), small flash, rate-limited
         const t = G.engine.time || 0;
@@ -93,6 +99,11 @@ export class Combat {
     if (rollBlock(G.derived)) { G.ui?.float?.(p.pos.clone().setY(p.pos.y + 1.4), 'Block!', { kind: 'status', color: '#9fd0ff' }); G.vfx.sparks(p.pos.clone().setY(1), { n: 6, color: '#bfe6ff' }); Events.emit('sfx', 'block'); return 0; }
     let dmg = playerDamageTaken(G.derived, raw, element, level);
     if (this.buffs.cursed?.t > 0) dmg *= 1 + this.buffs.cursed.pct / 100;
+    // Moka's Bubble Barrier soaks the hit first (mokaSpells.absorb → what gets through)
+    if (G.skills?.bubbleShield) {
+      dmg = G.skills.absorb(dmg);
+      if (dmg < 0.5) { G.ui?.float?.(p.pos.clone().setY(p.pos.y + 1.4), 'Bloop!', { kind: 'status', color: '#9ff6ff' }); return 0; }
+    }
     dmg = Math.max(1, Math.round(dmg));
     const r = G.actions.damage(dmg);
     p.anim.hit('#ff6a6a'); if (!p.anim.action || p.anim.action.name === 'hurt') p.anim.play('hurt');
@@ -120,6 +131,8 @@ export class Combat {
     }
   }
   spawn(opts) { const p = new Projectile(this, opts); this.projectiles.push(p); return p; }
+  /** a fresh mesh of every projectile look (for the floor prewarm in game.js) */
+  projectileLooks() { return projectileLooks(); }
   // ground zones: {pos, radius, t, life, tick, onTick(zone), team, visual}
   addZone(z) { z.t = 0; z.acc = 0; this.zones.push(z); return z; }
   update(dt) {
@@ -130,8 +143,8 @@ export class Combat {
       const s = e.status;
       for (const k of ['stun', 'fear', 'freeze']) if (s[k] > 0) s[k] -= dt;
       if (s.slow?.t > 0) s.slow.t -= dt;
-      if (s.burn?.t > 0) { s.burn.t -= dt; s.burn.acc = (s.burn.acc || 0) + dt; if (s.burn.acc > 0.5) { s.burn.acc = 0; this.applyDamageToMonster(e, Math.max(1, Math.round(s.burn.dps * 0.5)), { element: 'fire', silent: true }); G.vfx.fire(e.pos.clone().setY(0.5), 2); G.ui?.float?.(e.pos.clone().setY(1.2), `${Math.round(s.burn.dps * 0.5)}`, { kind: 'dmg', color: '#ff9a3c' }); } }
-      if (s.poison?.t > 0) { s.poison.t -= dt; s.poison.acc = (s.poison.acc || 0) + dt; if (s.poison.acc > 0.5) { s.poison.acc = 0; this.applyDamageToMonster(e, Math.max(1, Math.round(s.poison.dps * 0.5)), { element: 'stink', silent: true }); G.vfx.stink(e.pos.clone().setY(0.4), 1); } }
+      if (s.burn?.t > 0) { s.burn.t -= dt; s.burn.acc = (s.burn.acc || 0) + dt; if (s.burn.acc > 0.5) { s.burn.acc = 0; this.applyDamageToMonster(e, Math.max(1, Math.round(s.burn.dps * 0.5)), { element: 'fire', silent: true }); G.vfx.fire(e.pos.clone().setY(e.pos.y + 0.5), 2); G.ui?.float?.(e.pos.clone().setY(e.pos.y + 1.2), `${Math.round(s.burn.dps * 0.5)}`, { kind: 'dmg', color: '#ff9a3c', ref: minorHit(e) }); } }
+      if (s.poison?.t > 0) { s.poison.t -= dt; s.poison.acc = (s.poison.acc || 0) + dt; if (s.poison.acc > 0.5) { s.poison.acc = 0; this.applyDamageToMonster(e, Math.max(1, Math.round(s.poison.dps * 0.5)), { element: 'stink', silent: true }); G.vfx.stink(e.pos.clone().setY(e.pos.y + 0.4), 1); } }
     }
     // player buffs
     for (const k of Object.keys(this.buffs)) { const b = this.buffs[k]; if (b.t !== undefined) { b.t -= dt; if (b.t <= 0) { if (k === 'frenzy') b.stacks = 0; delete this.buffs[k]; } } }

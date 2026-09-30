@@ -1,7 +1,8 @@
 // Runs one Burrow floor: world + monsters + combat + loot + interactables + flow-field pathing.
 import * as THREE from 'three';
 import { generate, CELL, THEMES } from './gen.js';
-import { DungeonWorld } from './dungeonWorld.js';
+import { DungeonWorld, propCutMat } from './dungeonWorld.js';
+import { chestGeometry, potGeometry, potColor } from './lootModels.js';
 import { Monster } from './monster.js';
 import { MONSTERS } from './monsters.js';
 import { GroundLoot } from '../combat/groundLoot.js';
@@ -77,61 +78,151 @@ export class DungeonMode {
   bossIntro(b) {
     const G = this.G, E = G.engine, rig = E.rig;
     Events.emit('boss:spawn', { id: b.id, name: b.name, floor: this.floor });
-    const prevDist = rig.distTarget;
-    rig.distTarget = Math.max(rig.minDist, prevDist * 0.86);
+    try { b.def.intro?.(b, this); } catch (e) { console.warn('[boss] intro hook failed', e); } // (region bosses: their own entrance)
+    this.bossProfile(b); // (measured now, while the roar freezes the frame, not on some later frame)
     E.timeScale = 0.35;
     b.anim.wind = 1; b.anim.lunge = 1;
     G.vfx.ring(b.pos, { color: '#ff6a8a', r0: 0.5, r1: 7, life: 0.9 });
     G.vfx.dustRing(b.pos, 5, 26);
     rig.shake(0.9); E.post.pulse('#ff9ab0', 0.25); E.post.hitAberration(1);
     Events.emit('sfx', 'boss_roar'); G.audio?.music?.('boss', { fade: 0.5 });
-    // short title card kept off the boss and its health bar: the camera is about to frame Chewy + boss around the screen
-    // centre, so the card goes to the lower third when the boss stands beyond Chewy (it rises toward the bar), and just
-    // under the bar when the boss is on the camera side (it sinks toward the hotbar). It leaves early once blows are exchanged.
-    const bossAbove = (b.pos.x - G.player.pos.x) * Math.sin(rig.yaw) + (b.pos.z - G.player.pos.z) * Math.cos(rig.yaw) < 0;
-    G.ui?.banner?.(b.name, ['The squishiest royal in the Burrow!', 'Rain or shine, he hops to fight!', 'Something smells delicious… and dangerous!', 'Nine tails, one very bad mood.'][[5, 10, 15, 20].indexOf(this.floor % 20 || 20)] || 'appears!', { style: 'boss', duration: 1.7, top: bossAbove ? '64%' : '17.5%' });
+    // short title card kept off Chewy and the boss's face: solve the reveal's two-shot now (where both will stand on
+    // screen once the camera has swung over) and slide the card into the emptiest strip of the band between them.
+    // It leaves early once blows are exchanged.
+    G.ui?.banner?.(b.name, b.def.subtitle || ['The squishiest royal in the Burrow!', 'Rain or shine, he hops to fight!', 'Something smells delicious… and dangerous!', 'Nine tails, one very bad mood.'][[5, 10, 15, 20].indexOf(this.floor % 20 || 20)] || 'appears!', { style: 'boss', duration: 1.7, top: this.titleCardTop(b) });
     if (b.engaged) setTimeout(() => this.bossEngaged(b), 0);
     setTimeout(() => { E.timeScale = 1; b.anim.wind = 0; }, 900);
-    this.introUntil = performance.now() + 2200; // the push-in is a reveal of the boss; the two-shot framing takes over after
-    setTimeout(() => { rig.distTarget = prevDist; }, 2200);
+    this.introUntil = performance.now() + 2200; // the reveal: a quick, tight two-shot (it may push in); the roomier fight framing follows
   }
   // ------------------------------------------------------------------ boss framing
-  // While a boss is engaged the camera frames Chewy AND the boss: the focus leans toward the boss until the pair's
-  // screen-space box (feet to head, both bodies) is centred in the playfield between the boss bar and the hotbar, and
-  // the rig pulls back 3-5 m so the box fits. Everything eases through CameraRig.bias / distBias and lets go when the
-  // boss falls, the fight drifts apart or Chewy goes down.
-  bossHeight(b) {
-    if (b._visH) return b._visH;
-    let h = (b.height || 2) * 1.05;
-    try { const box = new THREE.Box3().setFromObject(b.model.root); if (isFinite(box.max.y)) h = Math.max(1, box.max.y - b.pos.y); } catch (e) { /* keep estimate */ }
-    return (b._visH = h);
+  // While a boss is engaged the camera frames Chewy AND the boss: the pair's real screen box (the boss's measured
+  // silhouette incl. crown / toque / umbrella / ears, Chewy from ear tips to feet) is kept between the bottom of the boss
+  // bar and the top of the hotbar, centred in that band. A few Newton steps a frame on the actual projection (warm-started
+  // from the last frame) give the focus lean and the pull-back; CameraRig.bias / distBias ease toward them. The intro
+  // reveal uses the same fit with tighter margins (it may push in a little); the fight keeps a roomier two-shot. Lets go
+  // when the boss falls, the fight drifts apart or Chewy goes down.
+  // Silhouette profile, measured once from the posed model (every visible vertex, skinned) in the boss's own frame: the
+  // full height, the highest point, and per height band x 8 bearings the farthest reach from its centre (a fan of tails
+  // behind Tamamo only lifts the silhouette while it points away from the camera). Non-rig bodies hop / squash on a
+  // pivot: framing follows that live.
+  bossProfile(b) {
+    if (b._prof) return b._prof;
+    const NB = 12, NS = 8, v = new THREE.Vector3(), S = [];
+    let H = 0, top = null;
+    const face = b.model.root.rotation.y || 0;
+    try {
+      const root = b.model.root; root.updateMatrixWorld(true);
+      root.traverse(o => {
+        if (!o.isMesh) return; for (let p = o; p; p = p.parent) if (!p.visible) return;
+        const pa = o.geometry.attributes.position, step = Math.max(1, Math.floor(pa.count / 3000));
+        for (let i = 0; i < pa.count; i += step) {
+          if (o.isSkinnedMesh) o.getVertexPosition(i, v); else v.fromBufferAttribute(pa, i);
+          v.applyMatrix4(o.matrixWorld);
+          const dx = v.x - b.pos.x, dz = v.z - b.pos.z, h = v.y - b.pos.y, s = [Math.atan2(dx, dz) - face, Math.hypot(dx, dz), h];
+          S.push(s); if (h > H) { H = h; top = s; }
+        }
+      });
+    } catch (e) { S.length = 0; H = 0; }
+    if (!(H > 0.5) || !top) { H = (b.height || 2) * 1.05; top = [0, 0, H]; }
+    // [bearing (local), reach, height] of the farthest vertex per (band, bearing sector), then the very top
+    const best = new Array(NB * NS).fill(null);
+    for (const s of S) {
+      const k = clamp(Math.floor(s[2] / H * NB), 0, NB - 1), j = ((Math.floor((s[0] / TAU + 4) * NS) % NS) + NS) % NS, i = k * NS + j;
+      if (!best[i] || s[1] > best[i][1]) best[i] = s;
+    }
+    const pts = best.filter(Boolean); pts.push(top);
+    if (pts.length < 4) for (let j = 0; j < NS; j++) pts.push([j / NS * TAU, b.bodyR || 1, H * 0.5]);
+    const pv = b.model.rig ? null : b.model.pivot || null;
+    return (b._prof = { H, pts, pv, py: pv ? pv.position.y : 0, ps: pv ? pv.scale.y : 1 });
   }
+  bossHeight(b) { return this.bossProfile(b).H; }
   updateBossFraming(dt) {
     const G = this.G, rig = G.engine.rig, b = this.boss, P = G.player;
     const intro = performance.now() < (this.introUntil || 0); // (real time: the intro runs in slow motion)
     let gx = 0, gz = 0, extra = 0;
     if (b?.alive && b.aggro && b.introDone && !G.playerDead) {
-      const dx = b.pos.x - P.pos.x, dz = b.pos.z - P.pos.z, d = Math.hypot(dx, dz);
+      const d = Math.hypot(b.pos.x - P.pos.x, b.pos.z - P.pos.z);
       const w = 1 - clamp((d - 11) / 6); // a boss well out of reach doesn't drag the camera around
-      if (w > 0) {
-        const sp = Math.sin(rig.pitch), cp = Math.cos(rig.pitch), sy = Math.sin(rig.yaw), cy = Math.cos(rig.yaw);
-        // screen-plane metres relative to Chewy's feet: x right, y up (a metre of ground away from the camera = sp up)
-        const bx = dx * cy - dz * sy, by = -(dx * sy + dz * cy) * sp, H = this.bossHeight(b) * cp, R = (b.bodyR || b.radius || 1) + 0.3;
-        const top = Math.max(1.3 * cp, by + H), bot = Math.min(-0.15, by - R * sp), left = Math.min(-0.5, bx - R), right = Math.max(0.5, bx + R);
-        // lean the focus so the box centre lands on the screen centre (game.js aims the focus 0.6 m above Chewy's feet);
-        // during the roar the reveal centres the boss's upper body instead
-        const ex = intro ? bx : (left + right) / 2, ey = (intro ? by + H * 0.55 : (top + bot) / 2) - 0.6 * cp;
-        gx = cy * ex - sy * ey / sp; gz = -sy * ex - cy * ey / sp;
-        const gl = Math.hypot(gx, gz), cap = (intro ? 0.85 : 0.7) * d + 1; if (gl > cap) { gx *= cap / gl; gz *= cap / gl; }
-        // pull back until the box fits the band between the HUD rows (~68% of the view height, ~62% of its width)
-        const base = rig.distTarget, tanH = Math.tan(THREE.MathUtils.degToRad(G.engine.camera.fov / 2)), asp = G.engine.camera.aspect;
-        const needV = ((top - bot) / 2 + 0.7) / (0.68 * tanH) - base, needH = ((right - left) / 2 + 0.8) / (0.62 * tanH * asp) - base;
-        extra = intro ? 0 : clamp(Math.max(3, needV, needH), 0, 5);
-        gx *= w; gz *= w; extra *= w;
-      }
-    }
+      if (w > 0) { const f = this.solveBossFrame(b, intro); gx = f.x * w; gz = f.z * w; extra = f.e * w; }
+      else this._fr = null;
+    } else this._fr = null;
     rig.biasTarget.set(gx, 0, gz); rig.distBiasTarget = extra;
-    rig.biasRate = intro ? 6 / Math.max(0.3, G.engine.timeScale) : 2.2; // the reveal swings over quickly, even in slow motion
+    // the reveal swings over quickly, in real time even while the roar runs in slow motion
+    const slow = 1 / Math.max(0.3, G.engine.timeScale);
+    rig.biasRate = intro ? 10 * slow : 2.2; rig.followMul = intro ? 1.6 * slow : 1;
+  }
+  // screen top (a CSS %) for the boss title card: a ~128 px strip slid to where it hides the least of Chewy (above all),
+  // the boss's upper body (its face) and the rest of the boss, judged at the reveal framing the camera is about to settle on
+  titleCardTop(b) {
+    const Hh = innerHeight, CARD = 128;
+    let f = null;
+    try { this._fr = null; for (let i = 0; i < 3; i++) f = this.solveBossFrame(b, true, i === 2); } catch (e) { f = null; }
+    this._fr = null;
+    if (!f?.boxes) return '17.5%';
+    const { chewy: c, boss: o, band } = f.boxes, face = { t: o.t, b: o.t + (o.b - o.t) * 0.55 };
+    const ov = (a, t) => Math.max(0, Math.min(a.b, t + CARD) - Math.max(a.t, t));
+    let best = null;
+    for (let t = Math.max(Hh * 0.1, band.t - 24); t <= Math.min(band.b, Hh * 0.84) - CARD + 24; t += 6) {
+      const cost = ov(c, t) * 4 + ov(face, t) * 1.5 + ov(o, t) * 0.5 + Math.abs(t + CARD / 2 - (band.t + band.b) / 2) * 0.05;
+      if (!best || cost < best.cost) best = { t, cost };
+    }
+    return best ? (best.t / Hh * 100).toFixed(1) + '%' : '17.5%';
+  }
+  // → { x, z: world lean added to the camera focus, e: extra distance[, boxes: screen boxes of Chewy / the boss / the band] }
+  solveBossFrame(b, intro, withBoxes = false) {
+    const G = this.G, rig = G.engine.rig, cam = G.engine.camera, P = G.player;
+    const sp = Math.sin(rig.pitch), cp = Math.cos(rig.pitch), sy = Math.sin(rig.yaw), cy = Math.cos(rig.yaw);
+    const W = innerWidth, Hh = innerHeight, tanH = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)), asp = cam.aspect;
+    // CameraRig.update: eye = target + (sy·cp, sp, cy·cp)·dist, looking at the target
+    const Ax = -sy, Az = -cy, Rx = cy, Rz = -sy; // ground axes: away from the camera (screen up), right
+    const fx = -sy * cp, fy = -sp, fz = -cy * cp, ux = -sy * sp, uy = cp, uz = -cy * sp; // view direction, camera up
+    const pts = this._fpts ||= [];
+    let n = 0; const add = (x, y, z) => { const q = pts[n] ||= [0, 0, 0]; q[0] = x; q[1] = y; q[2] = z; n++; };
+    // Chewy: ear tips, feet (camera side), shoulders
+    const px = P.pos.x, py = P.pos.y, pz = P.pos.z;
+    add(px + Ax * 0.2, py + 1.32, pz + Az * 0.2); add(px - Ax * 0.35, py, pz - Az * 0.35); add(px - Rx * 0.45, py + 0.6, pz - Rz * 0.45); add(px + Rx * 0.45, py + 0.6, pz + Rz * 0.45);
+    // boss: its silhouette points turned to its current facing, lifted / squashed with its hop
+    const pr = this.bossProfile(b), pv = pr.pv, ks = pv ? pv.scale.y / (pr.ps || 1) : 1, hop = pv ? pv.position.y - pr.py : 0;
+    const bx = b.pos.x, by = b.pos.y + hop, bz = b.pos.z, fa = b.model.root.rotation.y || 0;
+    for (const [a, r, h] of pr.pts) add(bx + Math.sin(a + fa) * r, by + h * ks, bz + Math.cos(a + fa) * r);
+    const F = rig.focus, D0 = rig.distTarget, box = this._fbox ||= { t: 0, b: 0, l: 0, r: 0 };
+    // screen box (px) of every point with the camera aimed at focus + lean (u away, v right) from distance D
+    const ext = (u, v, D, i0 = 0, i1 = n) => {
+      const ex = F.x + Ax * u + Rx * v - fx * D, ey = F.y - fy * D, ez = F.z + Az * u + Rz * v - fz * D;
+      let t = 1e9, bo = -1e9, l = 1e9, r = -1e9;
+      for (let i = i0; i < i1; i++) {
+        const q = pts[i], X = q[0] - ex, Y = q[1] - ey, Z = q[2] - ez, zc = X * fx + Y * fy + Z * fz;
+        if (zc < 0.5) continue;
+        const sx = (0.5 + 0.5 * (X * Rx + Z * Rz) / (zc * tanH * asp)) * W, syy = (0.5 - 0.5 * (X * ux + Y * uy + Z * uz) / (zc * tanH)) * Hh;
+        if (syy < t) t = syy; if (syy > bo) bo = syy; if (sx < l) l = sx; if (sx > r) r = sx;
+      }
+      box.t = t; box.b = bo; box.l = l; box.r = r; return box;
+    };
+    // the band: under the boss bar, above the hotbar dock / orbs, clear of the side panels (HUD measures it)
+    const band = G.ui?.hud?.playBand?.();
+    const bt = (band ? band.t : Hh * 0.12) + (intro ? 14 : 18), bb = (band ? band.b : Hh * 0.83) - 14;
+    const bl = (band ? band.l : W * 0.17) + 24, br = (band ? band.r : W * 0.83) - 24;
+    const eMin = intro ? -0.14 * D0 : 2.5, eMax = 11;
+    let s = this._fr;
+    if (!s) { const dx = bx - px, dz = bz - pz; s = this._fr = { u: (dx * Ax + dz * Az) * 0.5, v: (dx * Rx + dz * Rz) * 0.5, e: 3 }; }
+    for (let it = 0; it < 3; it++) {
+      let q = ext(s.u, s.v, D0 + s.e); // spans shrink ~1/D: pull back (or push in) until the box fits the band
+      const kz = Math.max((q.b - q.t) / Math.max(60, bb - bt), (q.r - q.l) / Math.max(60, br - bl));
+      s.e = clamp((D0 + s.e) * kz - D0, eMin, eMax);
+      q = ext(s.u, s.v, D0 + s.e); const cyy = (q.t + q.b) / 2, cxx = (q.l + q.r) / 2;
+      q = ext(s.u + 0.5, s.v, D0 + s.e); const dyu = ((q.t + q.b) / 2 - cyy) * 2;
+      q = ext(s.u, s.v + 0.5, D0 + s.e); const dxv = ((q.l + q.r) / 2 - cxx) * 2;
+      if (Math.abs(dyu) > 1e-3) s.u += clamp(((bt + bb) / 2 - cyy) / dyu, -4, 4);
+      if (Math.abs(dxv) > 1e-3) s.v += clamp(((bl + br) / 2 - cxx) / dxv, -4, 4);
+    }
+    // never lean beyond the pair itself
+    const cap = 0.85 * Math.hypot(bx - px, bz - pz) + 1.2, L = Math.hypot(s.u, s.v);
+    const k = L > cap ? cap / L : 1, out = { x: (Ax * s.u + Rx * s.v) * k, z: (Az * s.u + Rz * s.v) * k, e: s.e };
+    if (withBoxes) {
+      const u = s.u * k, v = s.v * k, D = D0 + s.e, c = { ...ext(u, v, D, 0, 4) };
+      out.boxes = { chewy: c, boss: { ...ext(u, v, D, 4, n) }, band: { t: bt, b: bb } };
+    }
+    return out;
   }
   // after a warm-arena boss falls: ease the dungeon grade to a neutral / slightly cool, less saturated look for ~2 s
   // (the kitchen's own warm gain + saturation on top of the golden victory effects is what washed the frame orange)
@@ -155,7 +246,7 @@ export class DungeonMode {
     for (let i = 0; i < n; i++) {
       const a = i / n * TAU; const x = boss.pos.x + Math.cos(a) * 2.5, z = boss.pos.z + Math.sin(a) * 2.5;
       if (!this.world.walkable(x, z)) continue;
-      const m = new Monster(this, id, { level: this.layout.mlvl, x, z, rng: () => this.rng.next() }); m.aggro = true;
+      const m = new Monster(this, id, { level: this.layout.mlvl, x, z, rng: () => this.rng.next() }); m.aggro = true; m.bossAdd = true; // (vanishes with its boss)
       this.monsters.push(m); this.combat.add(m);
       this.G.vfx.poof(V(x, 0.4, z), { color: '#e0d0ff', n: 10 });
     }
@@ -235,8 +326,7 @@ export class DungeonMode {
   makeChest(p, quality) {
     const W = this.world, G = this.G;
     const gold = quality === 'gold';
-    const body = new RoundedBox(0.9, 0.5, 0.6, 2, 0.08); body.translate(0, 0.25, 0); paint(body, (q, n, o) => { o.set(gold ? '#d8a040' : '#a0683a'); if (Math.abs(q.x) > 0.38) o.set(gold ? '#ffe070' : '#6a4a30'); });
-    const lidG = new RoundedBox(0.92, 0.25, 0.62, 2, 0.1); lidG.translate(0, 0.12, 0.31); paint(lidG, (q, n, o) => { o.set(gold ? '#e8b050' : '#b07a4a'); if (Math.abs(q.x) > 0.38) o.set(gold ? '#ffe070' : '#6a4a30'); });
+    const { body, lid: lidG } = chestGeometry(gold); // planked body with iron fittings; the lid's hinge is its origin (lootModels.js)
     const mat = makeToon({ vertexColors: true, rim: 0.5 });
     const g = new THREE.Group(); const b = new THREE.Mesh(body, mat); const lid = new THREE.Mesh(lidG, mat); lid.position.set(0, 0.5, -0.31);
     b.castShadow = lid.castShadow = true; g.add(b, lid); g.position.copy(p); g.rotation.y = rand(-0.5, 0.5) + Math.PI / 4;
@@ -252,10 +342,8 @@ export class DungeonMode {
   }
   makePot(p) {
     const G = this.G, W = this.world;
-    const g = new THREE.SphereGeometry(0.3, 12, 10); g.scale(1, 1.1, 1); g.translate(0, 0.32, 0);
-    const colA = this.layout.theme === 'crystal' ? '#8a80b0' : '#b07a54';
-    paint(g, (q, n, o) => { o.set(colA); if (q.y > 0.55) o.set('#6a4a3a'); if (Math.abs(q.y - 0.35) < 0.04) o.set('#e8d0a0'); });
-    const mesh = new THREE.Mesh(g, makeToon({ vertexColors: true, rim: 0.4 })); mesh.position.copy(p); mesh.castShadow = true;
+    const g = potGeometry(this.layout.theme), colA = potColor(this.layout.theme); // a biome pot with rim, lid and painted motifs (lootModels.js)
+    const mesh = new THREE.Mesh(g, makeToon({ vertexColors: true, rim: 0.4 })); mesh.position.copy(p); mesh.rotation.y = rand(-0.4, 0.4); mesh.castShadow = true;
     const ol = new THREE.Mesh(g, makeOutline('#3a2230', 0.012)); mesh.add(ol);
     W.scene.add(mesh);
     const col = W.collision.addCircle(p.x, p.z, 0.3);
@@ -284,7 +372,8 @@ export class DungeonMode {
     }[type];
     const base = new RoundedBox(0.8, 1.1, 0.8, 2, 0.12); base.translate(0, 0.55, 0); paint(base, (q, n, o) => o.set('#b8b0c4').lerp(new THREE.Color('#e0d8e8'), Math.max(0, n.y)));
     const roof = new THREE.ConeGeometry(0.7, 0.45, 4); roof.rotateY(Math.PI / 4); roof.translate(0, 1.32, 0); paint(roof, (q, n, o) => o.set('#6a5a8a'));
-    const mesh = new THREE.Mesh(merge([base, roof]), makeToon({ vertexColors: true, rim: 0.4 })); mesh.position.copy(p); mesh.castShadow = true; W.scene.add(mesh);
+    const sg = merge([base, roof]); sg.setAttribute('aAnchor', new THREE.Float32BufferAttribute(Array.from({ length: sg.attributes.position.count }, () => [p.x, p.z, 1.55]).flat(), 3)); // (cut away like the floor's props)
+    const mesh = new THREE.Mesh(sg, propCutMat({ vertexColors: true, rim: 0.4 })); mesh.position.copy(p); mesh.castShadow = true; W.scene.add(mesh);
     const orb = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12), makeToon({ color: INFO.color, emissive: INFO.color, emissiveIntensity: 1.5 })); orb.position.copy(p).add(V(0, 0.8, 0.42)); W.scene.add(orb);
     const light = W.lightPool.addSource({ pos: orb.position.clone(), color: new THREE.Color(INFO.color), intensity: 5, radius: 5, flicker: 0.3 });
     const sh = { ...INFO, used: false, use: () => {
@@ -362,7 +451,7 @@ export class DungeonMode {
       G.vfx.sparkle(p.clone().setY(1), { n: 24, color: '#ffe8a0', r: 0.9, rise: 1.4 });
       G.vfx.ring(p, { color: '#8fe0c0', r0: 0.3, r1: 2.4, life: 0.6 });
       Events.emit('sfx', 'chest_open');
-      G.ui?.toast?.('Floor cleared! A cache of building supplies', { icon: 'wood', color: '#8fe0c0' });
+      G.ui?.toast?.(this.isRegion ? 'Every camp cleared! A cache of building supplies' : 'Floor cleared! A cache of building supplies', { icon: 'wood', color: '#8fe0c0' });
       this.loot.drop(p, floorClearDrops(this.layout.mlvl));
     }, this.boss === null && this.layout.boss ? 2600 : 700);
   }
@@ -379,6 +468,7 @@ export class DungeonMode {
     G.vfx.calm?.(2.5); // a level-up from this kill celebrates quietly under the banner instead of bleaching the screen
     G.ui?.floats?.hush?.(2.8); // clear the damage numbers off the stage for the moment
     G.ui?.banner?.('Victory!', `${b.name} was defeated!`, { style: 'victory', xp });
+    this.clearBossFight(b);
     Events.emit('boss:dead', { id: b.id, floor: this.floor });
     Events.emit('sfx', 'ui_levelup');
     // stairs appear where the boss fell + a return portal
@@ -387,12 +477,33 @@ export class DungeonMode {
       if (G.dungeon !== this) return;
       // stairs and portal go to open floor near where the boss fell (never inside rock, even against a wall)
       const sp = this.openSpotNear(p, 2, 1.3), pp = this.openSpotNear(p, 2, 1.2, sp);
-      this.makeStairs(sp);
-      this.world.interactables.push({ pos: sp, radius: 1.3, label: `Burrow deeper (Floor ${this.floor + 1})`, onInteract: () => G.enterDungeon(this.floor + 1) });
+      if (!this.isRegion) { // (an outdoor region has no stairs: just the way home)
+        this.makeStairs(sp);
+        this.world.interactables.push({ pos: sp, radius: 1.3, label: `Burrow deeper (Floor ${this.floor + 1})`, onInteract: () => G.enterDungeon(this.floor + 1) });
+      }
       this.makePortal(pp, '#ffe070');
       this.world.interactables.push({ pos: pp, radius: 1.2, label: 'Return to Blossom Hollow', onInteract: () => G.returnToVillage() });
     }, 1500);
     this.boss = null;
+  }
+  // The fight ends with the boss: its summoned adds burst into sparkles (a quick chain, nearest first, no xp / loot),
+  // hostile shots still in the air fizzle (with their landing circles), and boss toasts that haven't been read yet
+  // ("…is getting really mad!") are withdrawn so nothing stale follows the Victory banner.
+  clearBossFight(b) {
+    const G = this.G, P = G.player;
+    const adds = this.monsters.filter(m => m.alive && m.bossAdd).sort((a, c) => a.pos.distanceToSquared(P.pos) - c.pos.distanceToSquared(P.pos));
+    adds.forEach((m, i) => m.vanish(0.12 + i * 0.07));
+    for (const p of this.combat.projectiles) {
+      if (p.team !== 'enemy' || !p.alive) continue;
+      G.vfx.sparks(p.pos.clone(), { n: 5, color: '#fff2c8', speed: 2.5, size: 0.24 });
+      p.alive = false; // Combat.update disposes it next frame
+      if (p.tele) p.tele.life = Math.min(p.tele.life || 99, p.tele.t + 0.05);
+    }
+    const T = G.ui?.toasts, stale = s => typeof s === 'string' && s.startsWith(b.name);
+    try {
+      if (Array.isArray(T?.q)) T.q = T.q.filter(x => !stale(x.text ?? x.key));
+      for (const t of [...(T?.live || [])]) if (stale(t._key ?? t.textContent)) T.kill?.(t, true);
+    } catch (e) { /* the toast queue changed shape: nothing to withdraw */ }
   }
   // nearest point about `d` away from `c` whose surroundings (radius r) are open floor; avoids `avoid`
   openSpotNear(c, d = 2, r = 1.2, avoid = null) {

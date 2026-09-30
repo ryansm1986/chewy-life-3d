@@ -1,4 +1,5 @@
 // Shop (Rosie's Treats): keeper bubble, Buy / Sell tabs, price tags, fly-to-bag on purchase.
+import { heroText } from '../rpg/classes.js';
 import { el, esc, fmt, replay, setText, rarityColor } from './dom.js';
 import { glyph, glyphURL } from './glyphs.js';
 import { portraitHTML } from './portraits.js';
@@ -37,7 +38,7 @@ export class ShopPanel extends Panel {
     this.render();
   }
   itemAt(i) { return this.entries?.[i]?.item || null; }
-  say(t) { this.$.say.innerHTML = esc(t).replace(/\*([^*]+)\*/g, '<span class="em">$1</span>'); replay(this.$.bub, 'talk', 500); }
+  say(t) { t = heroText(t, this.ui.G?.state); this.$.say.innerHTML = esc(t).replace(/\*([^*]+)\*/g, '<span class="em">$1</span>'); replay(this.$.bub, 'talk', 500); }
   price(e) { return e.price ?? e.item?.price ?? (e.potion ? potionInfo(e.potion)?.price ?? 25 : e.item ? buyPrice(e.item) : 10); }
   render() {
     const st = this.st;

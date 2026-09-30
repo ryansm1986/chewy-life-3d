@@ -118,7 +118,7 @@ export class DungeonMinimap {
     const fit = o.big && b[2] >= b[0];
     const span = fit ? Math.max(40, (Math.max(b[2] - b[0], b[3] - b[1]) + 6) * CELL) / (o.zoom || 1) : o.big ? L.W * CELL : 44, k = size / span;
     ctx.save(); ctx.clearRect(0, 0, size, size);
-    ctx.fillStyle = '#2a2038'; ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = this.bg || '#2a2038'; ctx.fillRect(0, 0, size, size);
     ctx.translate(size / 2, size / 2); ctx.rotate(mapRot(G.engine.rig.yaw));
     const cx = fit ? (b[0] + b[2] + 1) / 2 * CELL : o.big ? L.W * CELL / 2 : p.x, cz = fit ? (b[1] + b[3] + 1) / 2 * CELL : o.big ? L.H * CELL / 2 : p.z;
     ctx.imageSmoothingEnabled = false;
@@ -128,6 +128,7 @@ export class DungeonMinimap {
     for (const m of this.mode.monsters) if (m.alive && seen(m.pos.x, m.pos.z) && m.pos.distanceTo(p) < 16) dot(m.pos.x, m.pos.z, m.rank === 'boss' ? 5 : m.rank !== 'normal' ? 3.5 : 2.4, m.rank === 'boss' ? '#ff3a6a' : m.rank === 'unique' ? '#ffb030' : m.rank === 'champion' ? '#6aa8ff' : '#ff7a7a');
     if (this.mode.stairsPos && seen(this.mode.stairsPos.x, this.mode.stairsPos.z)) dot(this.mode.stairsPos.x, this.mode.stairsPos.z, 5, '#8fd0ff');
     if (this.mode.startPos) dot(this.mode.startPos.x - 1.6, this.mode.startPos.z - 1.6, 4.5, '#b89aff');
+    this.extra?.(ctx, dot, seen, cx, cz, k, o);
     questPin(ctx, G, cx, cz, k, o.time ?? performance.now() / 1000, o.big ? 0 : size / 2 - 22);
     // waypoint (diamond) once its room has been seen
     const wp = L.waypoint;
@@ -140,5 +141,29 @@ export class DungeonMinimap {
     ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(5, 5); ctx.lineTo(0, 2.5); ctx.lineTo(-5, 5); ctx.closePath();
     ctx.fillStyle = '#ff8a3a'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
     ctx.restore();
+  }
+}
+
+// Outdoor regions (docs/REGIONS.md): the land in its own colours (world.mapColor), a wider view (you can see farther
+// outside than in a burrow), the trail and — once seen — the boss arena.
+export class RegionMinimap extends DungeonMinimap {
+  constructor(G, mode) { super(G, mode); this.bg = mode.region?.mood?.fog?.color || '#3a4a3a'; this.R = 10; }
+  reveal() {
+    const L = this.mode.layout, W = this.mode.world, p = this.G.player.pos, cx = Math.floor(p.x / CELL), cy = Math.floor(p.z / CELL), R = this.R;
+    const key = cy * L.W + cx; if (key === this.lastCell) return; this.lastCell = key;
+    const g = this.g;
+    for (let y = cy - R; y <= cy + R; y++) for (let x = cx - R; x <= cx + R; x++) {
+      if (x < 0 || y < 0 || x >= L.W || y >= L.H || (x - cx) ** 2 + (y - cy) ** 2 > R * R) continue;
+      const i = y * L.W + x; if (this.seen[i]) continue; this.seen[i] = 1;
+      const b = this.box; if (x < b[0]) b[0] = x; if (y < b[1]) b[1] = y; if (x > b[2]) b[2] = x; if (y > b[3]) b[3] = y;
+      const wx = (x + 0.5) * CELL, wz = (y + 0.5) * CELL;
+      g.fillStyle = W.mapColor?.(wx, wz) || this.mode.region?.color || '#8ac070'; g.fillRect(x * 4, y * 4, 4, 4);
+      if (!L.at(x, y)) { g.fillStyle = 'rgba(20,16,30,.38)'; g.fillRect(x * 4, y * 4, 4, 4); } // not walkable: shaded
+    }
+  }
+  extra(ctx, dot, seen, cx, cz, k, o) {
+    const A = this.mode.layout.arena; if (!A || !seen(A.x, A.z)) return;
+    ctx.save(); ctx.strokeStyle = 'rgba(255,74,106,.8)'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.arc((A.x - cx) * k, (A.z - cz) * k, A.r * k, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
   }
 }

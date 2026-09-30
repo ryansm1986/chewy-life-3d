@@ -1,8 +1,9 @@
-// Skill trees (Bone Arts / Fetch Mastery / Pack Spirit) + hotbar assignment (popover, drag, hover+1-4).
+// Skill trees (the active hero's three: Bone Arts / Fetch Mastery / Pack Spirit, or Moka's Tidewater / Starlight Kibble /
+// Duck Hunt) + hotbar assignment (popover, drag, hover+1-4).
 import { el, esc, replay, setText } from './dom.js';
 import { glyph } from './glyphs.js';
 import { Panel } from './panel.js';
-import { TREES, skillList, skillDef, skillIconURL, hotbarIconURL, skillInfoLines, canLearnSkill, effLevel, treeInfo } from './rpg.js';
+import { TREES, treesFor, skillList, skillDef, skillIconURL, hotbarIconURL, skillInfoLines, canLearnSkill, effLevel, treeInfo } from './rpg.js';
 
 const COLW = 118, ROWH = 80, NODE = 64, PADX = 64, PADY = 26;
 const SLOT_NAMES = ['LMB', 'RMB', '1', '2', '3', '4'];
@@ -60,6 +61,9 @@ export class SkillsPanel extends Panel {
   }
   render() {
     const p = this.st.player || {};
+    // only the trees of the hero being played (Chewy: bone/fetch/spirit, Moka: tide/star/duck)
+    const cls = p.cls || 'chewy';
+    if ((TREES.find(t => t.id === this.tree)?.cls || 'chewy') !== cls) { this.tree = treesFor(cls)[0].id; this._treeSig = null; }
     const pts = p.skillPts || 0;
     setText(this.$.pts, String(pts));
     setText(this.$.ptsW, pts === 1 ? 'point' : 'points');
@@ -69,6 +73,7 @@ export class SkillsPanel extends Panel {
       const n = all.filter(s => s.tree === t.id).reduce((a, s) => a + this.lvl(s.id), 0);
       const tab = this.body.querySelector(`.tab[data-t="${t.id}"]`);
       tab.classList.toggle('on', t.id === this.tree);
+      tab.hidden = t.cls !== cls;
       setText(tab.querySelector('.tab-n'), String(n));
     }
     const T = treeInfo(this.tree);

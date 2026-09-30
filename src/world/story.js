@@ -1,4 +1,5 @@
 // Story quests (Rosie), villager friendship (hearts, gifts, daily chats) and villager requests.
+import { heroText } from '../rpg/classes.js';
 import { Events } from '../core/events.js';
 import { BUILDINGS } from './buildings/index.js';
 import { VILLAGERS } from '../actors/roster.js';
@@ -30,6 +31,18 @@ const CHAT = {
   kero: ['The koi told me it will rain on Tuesday. They are rarely wrong.', 'Ribbit. That means "hello" and also "nice scarf".', 'Please do not skip stones in my pond. The koi are sensitive.'],
 };
 const GIFT_LINES = { love: ['For me?! You shouldn\'t have! (Please do again.)', 'This is exactly what I wanted!!'], like: ['Oh, how thoughtful! Thank you, Chewy!', 'That\'s sweet of you.'], meh: ['Oh! …Thank you. I\'ll find a use for it. Somewhere.'] };
+// Knocking after bedtime (npc.js sleepyAnswer): a drowsy hello (hi) and a goodnight (bye) per villager; 'folk' = townsfolk.
+export const NIGHT_CHAT = {
+  rosie: { hi: ["Mmh… Chewy? It's so late… *yawn* The shop's closed, silly.", "Chewy?! …Oh. I thought you were the tooth fairy. *yawn*"], bye: ["Come back in the morning and I'll have warm mochi. Night night~", "Tell Shadow goodnight from me… zzz…"] },
+  mochi: { hi: ["Mmh… Chewy? It's so late… *yawn* I was dreaming in watercolours.", "Purrr… whuh? Oh, it's you. I was curled up in a moonbeam."], bye: ["Let's paint the sunrise tomorrow… if I wake up for it. Goodnight~", "Nine more naps… goodnight, Chewy."] },
+  usagi: { hi: ["Chewy? *yawn* The carrots are asleep… and so was I.", "Mmh… is it morning? No? Then why is my nose twitching?"], bye: ["Hop along home, okay? The flowers need their beauty sleep too.", "Goodnight… dream of dandelions~"] },
+  kuma: { hi: ["Hrrmm…? *yawn* The dough is rising, little one… and so will I. At dawn.", "Mmph. Chewy? The bakery's asleep. So is its baker."], bye: ["I'll save you a warm melon-pan. Now off to bed… goodnight.", "Sleep tight. Honey dreams…"] },
+  kitsune: { hi: ["Oh… Chewy. Even foxes sleep eventually. *yawn*", "The lanterns said you'd come knocking. They didn't say how late…"], bye: ["Go home now, the moon will walk you there. Goodnight.", "Sleep well. Mind the shadows on the way~"] },
+  pan: { hi: ["Zzz… zzz… huh? Chewy? I was napping. Professionally.", "*yawn* …Is it breakfast? It feels like second dinner."], bye: ["Back to bed… this pillow won't hug itself. Nighty night.", "Zzz… goodnight, Chewy… zzz…"] },
+  tanu: { hi: ["Whuh—! Oh, Chewy. *yawn* Shop's closed. Even for good boys.", "Mmh… if this is about the umbrella, it was only a LITTLE haunted."], bye: ["Come by tomorrow for the sleepyhead discount. Goodnight~", "Night night. Don't tell anyone I sleep in a teapot."] },
+  kero: { hi: ["Ribb… *yawn* …it. Chewy? The koi are asleep. So was I.", "Croak… mmh. The pond is so quiet at night, isn't it?"], bye: ["Goodnight, Chewy. Dream of lily pads.", "Sleep well. Ribbit means goodnight too."] },
+  folk: { hi: ["Mmh… Chewy? It's so late… *yawn*", "Oh! You startled me… I was already in my pyjamas. *yawn*", "*yawn* …Is everything okay? It's the middle of the night!"], bye: ["Get some sleep, okay? Goodnight~", "See you in the morning, Chewy. Sweet dreams!", "Shh… the whole village is asleep. Goodnight!"] },
+};
 const HEART_REWARDS = { 3: { coins: 100, text: 'Here, a little something for being such a good friend!' }, 6: { item: 'magic', text: 'I found this and thought of you!' }, 9: { item: 'rare', text: 'You\'re my best friend in the whole village. Take this, please!' } };
 
 export class Story {
@@ -112,6 +125,7 @@ export class Story {
   }
   // what marker (if any) should float above this NPC: '!' = has something for you, '?' = waiting on your progress
   markerFor(id) {
+    if (id === 'moka' && !this.G.state.flags?.mokaJoined) return '!'; // waiting by the fountain to meet the pack
     for (const q of this.Q.active) { const d = this.def(q.id); const s = d?.steps[q.step]; if (s?.type === 'talk' && s.npc === id) return '!'; }
     const f = this.G.state.friends[id];
     if (f?.pendingReward) return 'gift';
@@ -157,7 +171,7 @@ export class Story {
         if (G.mode === 'village') {
           const gate = G.sim?.list.find(r => r.data.type === 'dungeonGate');
           if (gate) return { pos: gate.door, label: 'The Burrow', kind: 'place' };
-        } else if (G.mode === 'dungeon' && (s.type === 'floor' || s.type === 'boss') && G.dungeon) {
+        } else if (G.mode === 'dungeon' && (s.type === 'floor' || s.type === 'boss') && G.dungeon && !G.dungeon.isRegion) { // (Burrow quests point nowhere in an outdoor region)
           if (s.type === 'boss' && G.dungeon.boss?.alive) return { pos: G.dungeon.boss.pos, label: G.dungeon.boss.name, kind: 'place' };
           if (G.dungeon.stairsPos) return { pos: G.dungeon.stairsPos, label: 'Stairs down', kind: 'place' };
         }
@@ -204,7 +218,8 @@ export class Story {
   async talk(npc) {
     const G = this.G, ui = G.ui, id = npc.id, f = this.friend(id), day = G.day?.day || 1;
     const portrait = G.portrait?.(id);
-    const say = (lines, choices) => ui?.dialogue ? ui.dialogue({ speaker: npc.name, portrait, lines, choices, voice: npc.spec.voice }) : Promise.resolve(null);
+    // villagers' lines are written to Chewy: heroText addresses whoever is being played
+    const say = (lines, choices) => ui?.dialogue ? ui.dialogue({ speaker: npc.name, portrait, lines: lines.map(l => heroText(l, this.G.state)), choices: choices?.map(c => ({ ...c, text: heroText(c.text, this.G.state) })), voice: npc.spec.voice }) : Promise.resolve(null);
     if (f.talkedDay !== day) { f.talkedDay = day; this.addHearts(id, 2); }
     // story talk steps
     this.markTalk(id);

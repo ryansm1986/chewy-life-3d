@@ -59,6 +59,100 @@ const ACTIONS = {
   dig: { dur: 0.9, pose: (t, P, A) => { const s = Math.sin(t * 26); A.body.x += 0.55; A.armR.x += -1.2 + s * 0.7; A.armL.x += -1.2 - s * 0.7; A.sq += 0.06; A.tailWag = 2.5; } },
   sit: { dur: 99, hold: true, pose: (t, P, A) => { if (P.legs) return; /* quadrupeds sit in poseQuad */ const k = ease.outQuad(clamp(t / 0.3)); A.y += -0.12 * k; A.legL.x += -1.4 * k; A.legR.x += -1.4 * k; A.sq += 0.04 * k; } },
   spin: { dur: 99, hold: true, pose: (t, P, A) => { A.spin = t * 16; A.armR.z += 1.4; A.armL.z += -1.4; A.armR.x += -0.2; } },
+
+  // ---- Moka's staff casts (staff in handR; mokaSpells points the staff through each one, see STAFF there)
+  // quick flick: basic sparkle bolt, Kibble Missiles, Feather Flurry
+  staffBolt: { dur: 0.36, ev: { release: 0.45 }, pose: (t, P, A) => {
+    const wind = ease.outCubic(clamp(t / 0.4)), flick = ease.outQuad(clamp((t - 0.4) / 0.16)), rec = ease.inOutQuad(clamp((t - 0.6) / 0.4));
+    A.armR.x += lerp(lerp(0, -2.1, wind), -1.35, flick) * (1 - rec); A.armR.z += 0.25 * wind * (1 - rec);
+    A.armL.x += -0.35 * wind * (1 - rec); A.armL.z += 0.4 * wind * (1 - rec);
+    A.body.y += lerp(0.28 * wind, -0.32, flick) * (1 - rec); A.body.x += 0.12 * flick * (1 - rec);
+    A.sq += 0.05 * wind * (1 - flick) - 0.05 * flick * (1 - rec); A.head.x += -0.08 * wind * (1 - rec); A.earKick += 1.5 * flick * (1 - rec);
+  } },
+  // raise the staff with a little hop, then thrust it at the target (Splash Bolt, Whirlpool, runes, links…)
+  staffCast: { dur: 0.5, ev: { cast: 0.5 }, pose: (t, P, A) => {
+    const up = ease.outBack(clamp(t / 0.45)), fw = ease.outQuad(clamp((t - 0.45) / 0.15)), rec = ease.inOutQuad(clamp((t - 0.62) / 0.38));
+    A.armR.x += lerp(-2.7 * up, -1.45, fw) * (1 - rec); A.armR.z += 0.3 * up * (1 - rec);
+    A.armL.x += lerp(-0.9 * up, 0.35, fw) * (1 - rec); A.armL.z += 0.55 * up * (1 - rec);
+    A.y += 0.07 * Math.sin(clamp(t / 0.45) * Math.PI);
+    A.body.x += lerp(-0.1 * up, 0.2, fw) * (1 - rec); A.body.y += 0.15 * up * (1 - fw);
+    A.sq += 0.07 * up * (1 - fw) - 0.07 * fw * (1 - rec); A.head.x += -0.18 * up * (1 - rec); A.earKick += 2 * fw * (1 - rec); A.tailWag = 1.5;
+  } },
+  // both paws and the staff to the sky (Treat Meteor, Squeaky Nova, Mallard Squadron)
+  skyCast: { dur: 0.75, ev: { cast: 0.6 }, pose: (t, P, A) => {
+    const up = ease.outBack(clamp(t / 0.5)), pump = Math.sin(clamp((t - 0.55) / 0.2) * Math.PI), rec = ease.inOutQuad(clamp((t - 0.72) / 0.28));
+    A.armR.x += (-3.0 * up + 0.25 * pump) * (1 - rec); A.armL.x += (-2.8 * up + 0.2 * pump) * (1 - rec);
+    A.armR.z += 0.35 * up * (1 - rec); A.armL.z += -0.35 * up * (1 - rec);
+    A.head.x += -0.42 * up * (1 - rec); A.y += (0.06 * up + 0.08 * pump) * (1 - rec);
+    A.sq += (-0.08 * up + 0.1 * pump) * (1 - rec); A.body.x += -0.12 * up * (1 - rec); A.earKick += 2.5 * pump; A.tailWag = 2.5; A.happy = up > 0.9 ? 1 : 0;
+  } },
+  // Wet Dog Shake: brace, then the full-body post-bath shake (head and body twisting against each other, ears flying)
+  wetShake: { dur: 0.8, ev: { shake: 0.2 }, pose: (t, P, A) => {
+    const tt = t * 0.8, crouch = ease.outQuad(clamp(t / 0.18)) * (1 - clamp((t - 0.2) / 0.1));
+    const env = clamp((t - 0.16) / 0.08) * (1 - ease.inQuad(clamp((t - 0.62) / 0.2))), w = Math.sin(tt * 55), w2 = Math.sin(tt * 55 + 1.3);
+    A.sq += 0.12 * crouch + Math.abs(w) * 0.04 * env; A.head.x += 0.25 * crouch;
+    A.body.y += w * 0.6 * env; A.head.y += -w * 0.75 * env; A.body.z += w2 * 0.14 * env; A.head.z += w * 0.28 * env;
+    A.armR.z += (1.0 + w * 0.45) * env; A.armL.z += -(1.0 - w * 0.45) * env; A.armR.x += -0.45 * env; A.armL.x += -0.45 * env;
+    A.earKick += w * 7 * env; A.tailWag = 4 * env; A.eyesClosed = env > 0.3 ? 1 : 0;
+    A.y += Math.abs(Math.sin(tt * 27)) * 0.05 * env + 0.1 * Math.sin(clamp((t - 0.8) / 0.2) * Math.PI);
+    if (t > 0.82) A.eyesHappy = 1;
+  } },
+  // a twirl of the staff and a pirouette (Decoy Duck, Spirit Retriever)
+  summon: { dur: 0.8, ev: { summon: 0.62 }, pose: (t, P, A) => {
+    const tw = clamp(t / 0.6), thrust = ease.outQuad(clamp((t - 0.6) / 0.12)), rec = ease.inOutQuad(clamp((t - 0.72) / 0.28));
+    A.spin = ease.inOutQuad(tw) * TAU;
+    A.armR.x += (-1.6 + Math.sin(tw * TAU * 1.5) * 0.7) * (1 - thrust) * (1 - rec) + -1.6 * thrust * (1 - rec); A.armR.z += Math.cos(tw * TAU * 1.5) * 0.8 * (1 - thrust) * (1 - rec);
+    A.armL.z += -1.1 * Math.sin(tw * Math.PI) * (1 - rec); A.armL.x += -0.3 * (1 - rec);
+    A.y += 0.12 * Math.sin(tw * Math.PI); A.sq += -0.06 * Math.sin(tw * Math.PI) + 0.06 * thrust * (1 - rec);
+    A.head.x += -0.15 * thrust * (1 - rec); A.happy = 1; A.eyesHappy = t > 0.6 ? 1 : 0; A.tailWag = 3;
+  } },
+  // Fetch!: fling the leash out, then yank it back with a lean
+  yank: { dur: 0.7, ev: { lash: 0.3, yank: 0.62 }, pose: (t, P, A) => {
+    const out = ease.outBack(clamp(t / 0.3)), hold = clamp((t - 0.3) / 0.28), pull = ease.outQuad(clamp((t - 0.58) / 0.14)), rec = ease.inOutQuad(clamp((t - 0.78) / 0.22));
+    A.armR.x += (lerp(0, -1.9, out) + 1.6 * pull) * (1 - rec) - 0.06 * Math.sin(hold * 20) * (1 - pull); A.armR.z += 0.2 * out * (1 - rec);
+    A.armL.x += (-0.8 * out + 0.5 * pull) * (1 - rec);
+    A.body.x += (0.18 * out - 0.4 * pull) * (1 - rec); A.body.y += (-0.2 * out + 0.3 * pull) * (1 - rec);
+    A.legL.x += 0.35 * pull * (1 - rec); A.legR.x += -0.25 * pull * (1 - rec);
+    A.sq += (0.05 * out - 0.06 * pull) * (1 - rec); A.earKick += 3 * pull * (1 - rec); A.mouth = Math.max(A.mouth, 0.6 * pull * (1 - rec));
+  } },
+  // Puddle Hop: crouch, dive head-first into the floor, pop out of the other puddle with paws up
+  puddleHop: { dur: 0.75, ev: { dive: 0.3, under: 0.44, pop: 0.6 }, pose: (t, P, A) => {
+    const crouch = ease.outQuad(clamp(t / 0.18)), dive = ease.inQuad(clamp((t - 0.18) / 0.22)), pop = clamp((t - 0.52) / 0.2), land = clamp((t - 0.72) / 0.28);
+    const under = t > 0.4 && t < 0.52;
+    let y = -1.3 * dive; if (t >= 0.52) y = -1.3 + 1.6 * ease.outBack(pop) - 0.3 * clamp((t - 0.62) / 0.1);
+    if (under) y = -1.3;
+    A.y += y * (1 - land);
+    A.sq += 0.14 * crouch * (1 - dive) - 0.14 * dive * (1 - pop) - 0.12 * Math.sin(pop * Math.PI) + 0.12 * Math.sin(land * Math.PI);
+    A.body.x += (0.3 * crouch + 0.35 * dive) * (1 - pop);
+    A.armR.x += (0.6 * crouch - 2.9 * dive) * (1 - pop) + -2.7 * Math.sin(pop * Math.PI * 0.5) * (1 - land); A.armL.x += (0.6 * crouch - 2.9 * dive) * (1 - pop) + -2.7 * Math.sin(pop * Math.PI * 0.5) * (1 - land);
+    A.earKick += 3 * pop * (1 - land); A.eyesClosed = dive > 0.3 && pop < 0.3 ? 1 : 0; A.happy = pop > 0.5 ? 1 : 0;
+  } },
+  // Great Wave: hop up onto the crest, surf it for a beat (balance!), drop off
+  surf: { dur: 1.1, ev: { wave: 0.12 }, pose: (t, P, A) => {
+    const tt = t * 1.1, crouch = ease.outQuad(clamp(t / 0.12)) * (1 - clamp((t - 0.12) / 0.08));
+    const up = ease.outBack(clamp((t - 0.12) / 0.16)), down = ease.inQuad(clamp((t - 0.74) / 0.16)), land = Math.sin(clamp((t - 0.88) / 0.12) * Math.PI);
+    const ride = up * (1 - down), sway = Math.sin(tt * 7);
+    A.y += 1.45 * ride + 0.08 * Math.sin(tt * 11) * ride;
+    A.sq += 0.12 * crouch + 0.1 * land - 0.04 * ride;
+    A.body.x += 0.22 * ride; A.body.z += sway * 0.12 * ride; A.body.y += 0.35 * ride;
+    A.armL.z += -1.35 * ride + sway * 0.2 * ride; A.armR.z += 0.9 * ride; A.armR.x += -1.2 * ride;
+    A.legL.x += -0.55 * ride; A.legR.x += 0.45 * ride; A.head.x += -0.12 * ride;
+    A.earKick += 2 * sway * ride; A.happy = ride > 0.5 ? 1 : 0; A.eyesHappy = ride > 0.5 ? 1 : 0; A.tailWag = 3 * ride;
+  } },
+  // Moonbeam channel: the staff held high, a gentle sway
+  beam: { dur: 99, hold: true, pose: (t, P, A) => {
+    const k = ease.outQuad(clamp(t / 0.2));
+    A.armR.x += -2.95 * k; A.armL.x += -2.5 * k; A.armR.z += 0.2 * k; A.armL.z += -0.35 * k;
+    A.head.x += -0.32 * k; A.body.z += Math.sin(t * 3) * 0.04 * k; A.sq += -0.04 * k + Math.sin(t * 9) * 0.012;
+    A.earKick += Math.sin(t * 5) * 0.4 * k; A.eyesHappy = 1; A.tailWag = 1.5;
+  } },
+  // Duck Call: the staff to the lips for a toot, a bounce on the honk
+  duckCall: { dur: 0.6, ev: { cast: 0.42 }, pose: (t, P, A) => {
+    const lift = ease.outBack(clamp(t / 0.3)), honk = Math.sin(clamp((t - 0.38) / 0.18) * Math.PI), rec = ease.inOutQuad(clamp((t - 0.7) / 0.3));
+    A.armR.x += -1.35 * lift * (1 - rec); A.armR.z += 1.05 * lift * (1 - rec); A.armL.x += -0.9 * lift * (1 - rec); A.armL.z += -0.6 * lift * (1 - rec);
+    A.head.x += (-0.15 * lift - 0.2 * honk) * (1 - rec); A.sq += -0.1 * honk; A.y += 0.1 * honk; A.mouth = Math.max(A.mouth, honk);
+    A.earKick += 4 * honk; A.tailWag = 2;
+  } },
 };
 // villager daily-life poses (bench sitting, chores, chat gestures, idle fidgets) live in lifePoses.js
 for (const k in LIFE_ACTIONS) if (!ACTIONS[k]) ACTIONS[k] = LIFE_ACTIONS[k];
@@ -122,17 +216,31 @@ export class Animator {
     this.blinkK = Math.max(0, this.blinkK - dt * 7);
     const bl = Math.max(A.eyesClosed, Math.sin(this.blinkK * Math.PI));
     for (const e of this.P.eyes || []) e.scale.y = Math.max(0.08, 1 - bl) * (A.eyesHappy ? 0.35 : 1);
-    // mouth (talk / bark)
+    // mouth (talk / bark): talking opens on uneven syllables rather than a steady flap
+    const syl = Math.max(0, Math.sin(this.t * 15) * 0.7 + Math.sin(this.t * 6.1 + 1.3) * 0.5);
+    const o = Math.max(A.mouth, this.talk > 0 ? Math.min(1, syl) * this.talk : 0);
     const m = this.P.mouth;
-    if (m) {
-      const talkOpen = this.talk > 0 ? (Math.sin(this.t * 18) * 0.5 + 0.5) * this.talk : 0;
-      const o = Math.max(A.mouth, talkOpen);
-      m.visible = o > 0.05; const k = o > 0.05 ? 1 : 0.0001; m.scale.set(k, Math.max(0.01, o) * k, k);
-    }
+    if (m) { m.visible = o > 0.05; const k = o > 0.05 ? 1 : 0.0001; m.scale.set(k, Math.max(0.01, o) * k, k); }
+    this.face(dt, A, bl, o);
     // flash
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 6);
     const mat = this.rig.mat;
     mat.emissive.copy(this.flashColor).multiplyScalar(this.flash * this.flash * 0.55 / (mat.emissiveIntensity || 1)).add(this.baseEmissive);
+  }
+  // rigs with a sculpted face (the Disney Chewy): the jaw drops instead of a mouth decal scaling, lids close over the
+  // eyes instead of the eyes squashing, and the lip corners lift with the mood
+  face(dt, A, blink, open) {
+    const P = this.P;
+    if (P.jaw) { const r = this.rest.get(P.jaw); P.jaw.rotation.x = r.r.x + open * 0.42; }
+    if (P.lids) {
+      const squint = A.eyesHappy ? 0.4 : 0;
+      for (const l of P.lids) { const r = this.rest.get(l); l.rotation.x = r.r.x + Math.max(blink, squint) * 1.22; }
+      for (const l of P.lidsLow || []) { const r = this.rest.get(l); l.rotation.x = r.r.x - 0.1 - squint * 0.35; }
+    }
+    if (P.lips) {
+      this.smile = damp(this.smile ?? 0.4, A.happy || this.mood ? 1 : 0.4, 6, dt);
+      for (const l of P.lips) { const r = this.rest.get(l); l.position.set(r.p.x, r.p.y + 0.007 * this.smile, r.p.z - 0.004 * this.smile); }
+    }
   }
   _set(o, rx, ry, rz) { const r = this.rest.get(o); o.rotation.set(r.r.x + rx, r.r.y + ry, r.r.z + rz); }
   poseBiped(dt, A) {
@@ -150,7 +258,7 @@ export class Animator {
     const rb = this.rest.get(P.body);
     const breathe = Math.sin(t * 2.3) * 0.014 * (1 - mv);
     P.body.position.y = rb.p.y + bob * (0.04 + run * 0.05) * mv + A.y * 0 ;
-    P.body.rotation.set(rb.r.x + (0.1 + run * 0.16) * mv + A.body.x + A.lean + (A.roll || 0), rb.r.y + A.body.y + (A.spin || 0), rb.r.z + Math.sin(ph) * 0.05 * mv);
+    P.body.rotation.set(rb.r.x + (0.1 + run * 0.16) * mv + A.body.x + A.lean + (A.roll || 0), rb.r.y + A.body.y + (A.spin || 0), rb.r.z + Math.sin(ph) * 0.05 * mv + A.body.z);
     // squash & stretch on root
     const sq = A.sq + breathe - bob * 0.03 * mv * (1 + run);
     const root = this.rig.root, sc = this.rig.spec.scale || 1;
@@ -200,10 +308,21 @@ export class Animator {
       const e = P[k]; if (!e) return;
       const S = this.ear[i];
       const target = drive + Math.sin(this.t * 1.3 + i) * 0.03;
+      const g = this.rig.earGain || 1; // big sculpted ears (Disney Chewy) swing further and flick now and then
+      if (this.rig.earGain) {
+        S.tw = (S.tw ?? 1 + Math.random() * 3) - dt;
+        if (S.tw < 0) { S.tw = 2.5 + Math.random() * 4; S.v += (Math.random() < 0.5 ? -1 : 1) * (4 + Math.random() * 4); }
+      }
       S.v += ((target - S.a) * 90 - S.v * 9) * dt; S.a += S.v * dt;
       const r = this.rest.get(e);
       const tip = e.userData.tip;
-      if (tip) { const tr = this.rest.get(tip); tip.rotation.x = tr.r.x + S.a * 1.4; e.rotation.set(r.r.x + S.a * 0.25, r.r.y, r.r.z); }
+      if (tip) {
+        const tr = this.rest.get(tip), a = S.a * 1.4 * g;
+        // soft limits: the flap may flip well up (perked) but only fold a little tighter (further would pass into the skull)
+        tip.rotation.x = tr.r.x + (a < 0 ? Math.tanh(a / 1.05) * 1.05 : Math.tanh(a / 0.6) * 0.6);
+        const b = Math.tanh(S.a * 0.25 * g / 0.35) * 0.35;
+        e.rotation.set(r.r.x + b, r.r.y, r.r.z + (i ? -1 : 1) * S.a * 0.12 * (g - 1));
+      }
       else e.rotation.set(r.r.x + S.a * (e.userData.soft ? 0.9 : 0.4), r.r.y, r.r.z + (i ? -1 : 1) * S.a * 0.2);
     });
     if (P.scarfTail) {

@@ -9,6 +9,7 @@ import { RARITY } from '../rpg/items.js';
 import { Events } from '../core/events.js';
 import { POTION_CAP } from '../rpg/actions.js';
 import { rand, TAU, dist, uid } from '../core/util.js';
+import { glyph } from '../ui/glyphs.js';
 
 const RCOL = { normal: '#f4efe6', magic: '#6ea8ff', rare: '#ffd84a', unique: '#ff9a3c', set: '#5ee07a' };
 const MAT_COL = { wood: '#b07a4a', stone: '#b8b0c0', petal: '#ffb0d0', crystal: '#9ae8ff', bone: '#fff4e0', mochi: '#ffe0ec', silk: '#e8e0ff', lantern: '#ff8a4a' };
@@ -85,7 +86,8 @@ export class GroundLoot {
     const ol = new THREE.Mesh(mesh.geometry, makeOutline('#3a2230', 0.012)); mesh.add(ol);
     this.world.scene.add(mesh);
     const e = { id: uid(), d, mesh, from, to, t: 0, fly: 0.55, beam, color, label, spin: rand(-3, 3) };
-    if (label) this.G.ui?.lootLabel?.add?.({ id: e.id, name: label, color, worldPos: to.clone().setY(to.y + 0.5), onClick: () => this.tryPickup(e, true) });
+    // the label stands on the item itself (not at Chewy's height), so a pile of drops doesn't bury him
+    if (label) this.G.ui?.lootLabel?.add?.({ id: e.id, name: label, color, worldPos: to, lift: 0.16, onClick: () => this.tryPickup(e, true) });
     if (e.beam) e.light = this.world.lightPool.addSource({ pos: to.clone().setY(1), color: new THREE.Color(color), intensity: 3, radius: 3.5 });
     this.list.push(e);
     Events.emit('sfx', 'drop_item', { pos: to });
@@ -98,11 +100,25 @@ export class GroundLoot {
     if (!ok) return false;
     this.remove(e);
     const p = e.to.clone().setY(e.to.y + 0.4);
-    if (e.d.type === 'coins') { G.vfx.coins(p, 6); Events.emit('sfx', 'pickup_gold'); G.ui?.float?.(p, `+${e.d.n}`, { kind: 'coins' }); }
+    if (e.d.type === 'coins') { G.vfx.coins(p, 6); Events.emit('sfx', 'pickup_gold'); this.tally('coin', e.d.n); }
     else if (e.d.type === 'potion') { G.vfx.sparkle(p, { n: 5, color: POT_COL[e.d.key] }); Events.emit('sfx', 'pickup_item'); }
-    else if (e.d.type === 'material') { G.vfx.sparkle(p, { n: 4, color: MAT_COL[e.d.key] }); Events.emit('sfx', 'pickup_item'); G.ui?.float?.(p, `+${e.d.n} ${e.d.key}`, { kind: 'status', color: MAT_COL[e.d.key] }); }
+    else if (e.d.type === 'material') { G.vfx.sparkle(p, { n: 4, color: MAT_COL[e.d.key] }); Events.emit('sfx', 'pickup_item'); this.tally(e.d.key, e.d.n); }
     else { G.vfx.sparkle(p, { n: 10, color: e.color }); Events.emit('sfx', ['unique', 'set', 'rare'].includes(e.d.item?.rarity) ? 'pickup_rare' : 'pickup_item'); G.ui?.pickupFly?.(e.d.item, p); }
     return true;
+  }
+  // coin / material pickups within ~0.5 s share one short line over Chewy's head ("+34 ¢  +1 wood  +2 stone", glyphs)
+  // instead of a "+1 WOOD" pop per piece
+  tally(key, n) {
+    const T = this.picks ||= { t: 0, n: new Map() };
+    if (!T.n.size) T.t = 0;
+    T.n.set(key, (T.n.get(key) || 0) + (n || 1));
+  }
+  flushPicks() {
+    const T = this.picks, P = this.G.player;
+    if (!T?.n.size) return;
+    const html = [...T.n].map(([k, n]) => `<span style="color:${k === 'coin' ? '#ffd84a' : MAT_COL[k] || '#fff'}">+${n}</span>${glyph(k)}`).join('<i style="width:6px"></i>');
+    T.n.clear();
+    if (P) this.G.ui?.float?.(P.pos.clone().setY(P.pos.y + 1.5), '+', { kind: 'pickup', html });
   }
   canTake(d) {
     if (d.type === 'potion') return (this.G.state.potions[d.key] || 0) < (POTION_CAP[d.key] ?? 15);
@@ -117,6 +133,8 @@ export class GroundLoot {
   }
   update(dt) {
     const G = this.G, P = G.player;
+    if (this.picks?.n.size && (this.picks.t += dt) >= 0.5) this.flushPicks();
+    if (G.ui?.labels) G.ui.labels.avoid = P && !G.playerDead ? P.pos : null; // loot labels keep clear of Chewy
     for (const e of [...this.list]) {
       e.t += dt;
       if (e.t < e.fly) {
@@ -140,5 +158,5 @@ export class GroundLoot {
       }
     }
   }
-  clear() { this.disposed = true; for (const e of [...this.list]) this.remove(e); }
+  clear() { this.disposed = true; this.picks?.n.clear(); for (const e of [...this.list]) this.remove(e); }
 }

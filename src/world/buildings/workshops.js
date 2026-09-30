@@ -8,6 +8,7 @@ import { chochin, barrel, crate, produce, bush, logPile, woodStack, signboard, r
 import { cabbage, carrot, pumpkin, scarecrow, net, fishRack, boat, bucket, pottery, wheel } from './props2.js';
 import { symbol, flatSymbol } from './symbols.js';
 import { LAMP } from './homes.js';
+import { charm, toolRack, glassFloats, eaveCharm } from './trim.js';
 import { clamp, TAU } from '../../core/util.js';
 
 // small open shed on 4 posts with a shed roof (local, centred, front +z)
@@ -50,6 +51,7 @@ export function farm(B, L) {
       walls(B, { w, d, h, y0: 0.05, planks: '#b08a64', frame: C.woodMid });
       onFace(B, { w, d }, 'f', 0, 0.05, () => door(B, { w: 0.4, h: 0.7, style: 'wood' }));
       roof(B, { type: 'gable', w, d, y0: 0.95, over: 0.14, gOver: 0.12, H: 0.36, curve: 0.2, lift: 0.1, liftW: 0.25, thick: 0.08, ribW: 0.2, ribAmp: 0.025, course: 0, color: ROOFS.terracotta, vent: false, oni: false });
+      onFace(B, { w, d }, 'r', 0, 0.78, () => toolRack(B, 0.4, 0, { tools: ['hat', 'basket'] }));
     });
     B.at([0.2, 0, 1.3], 0, () => produce(B, { kind: 'apple', s: 0.3 }));
     B.at([-0.5, 0, 1.32], 0, () => { pumpkin(B, 1.2); });
@@ -63,6 +65,10 @@ export function lumber(B, L) {
   // work shed with sawhorse and a log being cut
   B.at([-0.35, 0, -0.45], 0, () => {
     openShed(B, { w: 1.6, d: 1.2, h: 1.55, color: ROOFS.moss });
+    // plank back wall with the saws, a straw hat and a coil of rope hung on it
+    for (let i = 0; i < 5; i++) { const pl = G.box(1.46, 0.15, 0.035, 0); pl.translate(0, 0.28 + i * 0.16, -0.58); B.add(pl, B.dpick(['#b08a64', '#a88060', '#bc946c'])); }
+    B.at([0, 1.0, -0.56], 0, () => toolRack(B, 1.1, 0, { tools: ['saw', 'hat', 'saw', 'hammer'] }));
+    const rope = G.torus(0.11, 0.03, 4, 10); rope.translate(0.62, 0.62, -0.53); B.add(rope, '#e0cc98');
     for (const sx of [-0.45, 0.45]) {
       for (const s of [-1, 1]) { const l = G.box(0.05, 0.62, 0.05, 0); l.rotateX(s * 0.3); l.translate(sx, 0.3, s * 0.08); B.add(l, C.woodDark); }
     }
@@ -137,6 +143,9 @@ export function kiln(B, L) {
     const wheelT = G.cyl(0.2, 0.2, 0.05, 12); wheelT.translate(0, 0.55, 0.2); B.add(wheelT, C.woodDark);
     const legT = G.cyl(0.08, 0.14, 0.52, 8); legT.translate(0, 0.26, 0.2); B.add(legT, C.woodMid);
     const clayLump = G.lathe([[0.001, 0], [0.1, 0], [0.12, 0.08], [0.08, 0.16], [0.001, 0.16]], 10); clayLump.translate(0, 0.58, 0.2); B.add(clayLump, clay);
+    // a gourd charm and a wind chime from the front beam
+    B.at([-0.3, 1.43, 0.45], 0, () => charm(B, 'gourd'));
+    B.at([0.3, 1.43, 0.45], 0, () => charm(B, 'furin', { color: '#d8f0c0' }));
   });
   B.at([0.85, 0, 0.9], 0, () => pottery(B, { n: L >= 2 ? 6 : 3, spread: 0.3 }));
   B.at([1.25, 0, 1.25], 0, () => woodStack(B, { w: 0.4, h: 0.3, d: 0.25 }));
@@ -164,6 +173,9 @@ export function fishingHut(B, L) {
   const info = roof(B, { type: 'gable', ridge: 'z', w, d, y0: y0 + h, over: 0.28, gOver: 0.22, H: 0.72, curve: 0.3, lift: 0.14, liftW: 0.4, thick: 0.12, ribW: 0.24, ribAmp: 0.035, color: ROOFS.teal, moss: 0.3 });
   const step = G.box(0.6, 0.08, 0.3, 0.02); step.translate(-0.25, 0.18, d / 2 + 0.18); B.add(step, C.woodLight);
   B.at([0.5, y0 + h - 0.05, d / 2 + 0.2], 0, () => chochin(B, { r: 0.09, h: 0.18, cord: 0.04, color: '#fff0d0' }));
+  // glass floats in rope nets on the side wall, little fish drying under the eave
+  onFace(B, { w, d }, 'r', 0.05, y0 + 0.5, () => glassFloats(B, { n: L >= 2 ? 3 : 2 }));
+  for (let i = 0; i < (L >= 2 ? 3 : 2); i++) eaveCharm(B, info, w / 2 + 0.12, -0.55 + i * 0.14, 'fishes');
   B.pop();
   // net drying frame (left) + fish rack + boat + barrels
   B.at([-0.72, 0, 0.4], PI / 2, () => {

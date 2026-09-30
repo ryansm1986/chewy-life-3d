@@ -5,6 +5,7 @@ import { puff, tube } from '../../gfx/geom.js';
 import { G, V, C, PI, shade, col } from './kit.js';
 import { STONES } from './parts.js';
 import { flatSymbol } from './symbols.js';
+import { lrng, faceColors, nz, mossStone, leafGeo } from './props.js';
 import { clamp, TAU } from '../../core/util.js';
 
 // Nobori banner: pole with a tall cloth flag hanging from a top bar
@@ -115,10 +116,18 @@ export function anvil(B) {
   const handle = G.cyl(0.016, 0.016, 0.26, 4); handle.rotateZ(PI / 2); handle.translate(-0.18, 0.72, 0.02); B.add(handle, C.woodLight);
 }
 
+// Cart wheel (in the local XY plane, axle along z): wooden felloe with an iron tyre and nail heads, eight tapered
+// spokes, a turned hub with an iron band and a cap
 export function wheel(B, { r = 0.32, color = C.woodMid } = {}) {
-  const rim = G.torus(r, 0.035, 5, 16); B.add(rim, color);
-  const hub = G.cyl(0.06, 0.06, 0.08, 8); hub.rotateX(PI / 2); B.add(hub, C.woodDark);
-  for (let i = 0; i < 3; i++) { const sp = G.box(0.025, r * 2 - 0.04, 0.025, 0); sp.rotateZ(i / 3 * PI); B.add(sp, color); }
+  const fel = G.torus(r - 0.01, 0.034, 5, 20); fel.scale(1, 1, 1.25); B.add(fel, (p, n, o) => o.set(color).multiplyScalar(0.92 + 0.1 * clamp(n.z * n.z)));
+  const tyre = G.cyl(r + 0.03, r + 0.03, 0.05, 20, true); tyre.rotateX(PI / 2); B.add(tyre, C.iron);
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * TAU, sp = G.cyl(0.013, 0.02, r - 0.07, 5); sp.translate(0, (r - 0.07) / 2 + 0.05, 0); sp.rotateZ(a); B.add(sp, shade(color, 1.06));
+    const nl = G.disc(0.009, 4); nl.translate(Math.cos(a + 0.2) * (r + 0.031), Math.sin(a + 0.2) * (r + 0.031), 0.026); B.add(nl, '#8a8898');
+  }
+  const hub = G.lathe([[0.001, -0.07], [0.045, -0.07], [0.065, -0.04], [0.07, 0], [0.065, 0.04], [0.045, 0.07], [0.001, 0.07]], 10); hub.rotateX(PI / 2); B.add(hub, C.woodDark);
+  const band = G.cyl(0.072, 0.072, 0.02, 10, true); band.rotateX(PI / 2); B.add(band, C.iron);
+  const cap = G.cyl(0.028, 0.034, 0.03, 8); cap.rotateX(PI / 2); cap.translate(0, 0, 0.085); B.add(cap, C.iron);
 }
 
 // Crops
@@ -186,24 +195,44 @@ export function boat(B, { L = 1.4, color = '#f0e8d8', trim = '#4a78b0' } = {}) {
   const inner = new THREE.SphereGeometry(0.47, 14, 4, 0, TAU, PI / 2, PI / 2); inner.scale(L, 0.44, 0.52); inner.translate(0, 0.25, 0);
   const inv = inner.index ? inner.toNonIndexed() : inner; // flip to face inward
   const p = inv.attributes.position; for (let i = 0; i < p.count; i += 3) { const x = p.getX(i + 1), y = p.getY(i + 1), z = p.getZ(i + 1); p.setXYZ(i + 1, p.getX(i + 2), p.getY(i + 2), p.getZ(i + 2)); p.setXYZ(i + 2, x, y, z); }
-  inv.computeVertexNormals(); B.add(inv, C.woodLight);
+  inv.computeVertexNormals(); B.add(inv, (p, n, o) => o.set(C.woodLight).multiplyScalar(Math.abs(Math.sin(p.x * 14 / L)) < 0.12 ? 0.8 : 1)); // floor boards
   const rim = G.torus(0.5, 0.03, 4, 16); rim.rotateX(PI / 2); rim.scale(L, 1, 0.55); rim.translate(0, 0.25, 0); B.add(rim, C.woodMid);
-  const seat = G.box(0.1, 0.04, 0.5, 0); seat.translate(0, 0.2, 0); B.add(seat, C.woodLight);
+  for (const x of [-0.3, 0.3]) { const seat = G.box(0.1, 0.04, 0.5, 0); seat.translate(x * L, 0.2, 0); B.add(seat, C.woodLight); }
+  // ribs inside the hull and a painted strake + name spot outside
+  for (let i = -2; i <= 2; i++) { // ribs follow the inner hull section (an ellipse that narrows toward bow and stern)
+    const k = Math.sqrt(1 - (0.32 * i) ** 2) * 0.99, rib = G.torus(0.46, 0.012, 3, 10, PI); rib.rotateZ(PI); rib.rotateY(PI / 2);
+    rib.scale(1, 0.45 * k, 0.53 * k); rib.translate(i * 0.16 * L, 0.25, 0); B.add(rib, shade(C.woodLight, 0.8));
+  }
+  const strake = G.torus(0.5, 0.012, 3, 24); strake.rotateX(PI / 2); strake.scale(L * 0.975, 1, 0.55 * 0.975); strake.translate(0, 0.19, 0); B.add(strake, '#fff6ea'); // painted strake, follows the hull
+  const ring = G.torus(0.025, 0.007, 3, 8); ring.rotateY(PI / 2); ring.translate(L * 0.5 + 0.01, 0.24, 0); B.add(ring, C.iron);
 }
 
+// Wooden bucket: staves (seams + tones), two iron hoops, a dark inside, a rope handle between two lugs
 export function bucket(B, { r = 0.1, h = 0.14, color = C.woodLight, water = false } = {}) {
-  const g = G.cyl(r, r * 0.85, h, 10, true); g.translate(0, h / 2, 0); B.add(g, color);
-  const bot = G.cyl(r * 0.85, r * 0.85, 0.01, 10); bot.translate(0, 0.005, 0); B.add(bot, shade(color, 0.8));
-  for (const y of [0.25, 0.8]) { const b = G.torus(r * (1 - y * 0.15) + 0.004, 0.009, 3, 12); b.rotateX(PI / 2); b.translate(0, h * y, 0); B.add(b, C.iron); }
-  if (water) { const wtr = G.disc(r * 0.95, 10); wtr.rotateX(-PI / 2); wtr.translate(0, h * 0.8, 0); B.add(wtr, C.water, 'water'); }
+  const rr = lrng(B), staves = 9, base = col(color), tones = Array.from({ length: staves }, () => base.clone().offsetHSL(0, (rr() - 0.5) * 0.08, (rr() - 0.5) * 0.08));
+  const g = G.cyl(r, r * 0.85, h, staves * 2, true); g.translate(0, h / 2, 0);
+  B.add(faceColors(g, (p, n, o, c) => {
+    const si = Math.floor(((Math.atan2(c.z, c.x) / TAU + 1) % 1) * staves) % staves, v = ((Math.atan2(p.z, p.x) / TAU + 1) % 1) * staves;
+    o.copy(tones[si]).multiplyScalar(Math.abs(v - Math.round(v)) < 0.1 ? 0.72 : 1);
+  }), null);
+  const inner = G.cyl(r * 0.94, r * 0.8, h * 0.96, 12, true); inner.scale(-1, 1, 1); inner.translate(0, h * 0.5, 0); B.add(inner, shade(color, 0.6)); // mirrored: faces inward
+  const bot = G.cyl(r * 0.85, r * 0.85, 0.01, 10); bot.translate(0, 0.012, 0); B.add(bot, shade(color, 0.55));
+  for (const y of [0.25, 0.8]) { const R = r * (0.85 + 0.15 * y) + 0.004, b = G.cyl(R, R, 0.016, 14, true); b.translate(0, h * y, 0); B.add(b, C.iron); }
+  for (const s of [-1, 1]) { const lug = G.box(0.022, 0.05, 0.02, 0); lug.translate(s * (r + 0.004), h + 0.012, 0); B.add(lug, shade(color, 0.9)); }
+  const hp = []; for (let k = 0; k <= 6; k++) { const t = k / 6; hp.push({ p: V((t * 2 - 1) * (r + 0.004), h + 0.03 + Math.sin(t * PI) * r * 0.7, 0), r: 0.006 }); }
+  B.add(tube(hp, 3, false), '#e8d4a0');
+  if (water) { const wtr = G.disc(r * 0.92, 12); wtr.rotateX(-PI / 2); wtr.translate(0, h * 0.8, 0); B.add(wtr, C.water, 'water'); }
 }
 
 // Cute stone guardian dog (komainu) facing +z
 export function stoneDog(B, { s = 1, ball = 1 } = {}) {
   B.push([0, 0, 0], 0, s);
-  const base = G.box(0.4, 0.2, 0.36, 0.04); base.translate(0, 0.1, 0); B.add(base, STONES[2]);
-  const body = G.sph(0.16, 10, 8); body.scale(1, 1.1, 1.15); body.translate(0, 0.36, -0.03); B.add(body, STONES[0]);
+  const base = G.box(0.4, 0.2, 0.36, 0.04); base.translate(0, 0.1, 0); B.add(base, mossStone(STONES[2], 0.4, 12));
+  const band = G.box(0.42, 0.03, 0.38, 0.01); band.translate(0, 0.19, 0); B.add(band, STONES[3]);
+  const body = G.sph(0.16, 10, 8); body.scale(1, 1.1, 1.15); body.translate(0, 0.36, -0.03); B.add(body, mossStone(STONES[0], 0.2, 14));
   const head = G.sph(0.14, 10, 8); head.translate(0, 0.58, 0.05); B.add(head, STONES[0]);
+  for (let k = 0; k < 7; k++) { const a = (k / 6 - 0.5) * 2.6, c = G.sph(0.045, 6, 4); c.translate(Math.sin(a) * 0.13, 0.5 + Math.cos(a) * 0.05, Math.cos(a) * 0.06 - 0.02); B.add(c, STONES[4]); } // curly mane
+  for (const sx of [-1, 1]) { const paw = G.sph(0.05, 6, 4); paw.scale(1, 0.7, 1.3); paw.translate(sx * 0.08, 0.225, 0.12); B.add(paw, STONES[0]); }
   for (const sx of [-1, 1]) { const ear = G.sph(0.06, 6, 4); ear.scale(0.6, 1.2, 0.8); ear.rotateZ(sx * 0.7); ear.translate(sx * 0.12, 0.64, 0.02); B.add(ear, STONES[4]); }
   const snout = G.sph(0.07, 8, 6); snout.scale(1.1, 0.8, 1); snout.translate(0, 0.54, 0.17); B.add(snout, STONES[3]);
   const nose = G.sph(0.026, 5, 4); nose.translate(0, 0.565, 0.235); B.add(nose, C.ink);
@@ -250,4 +279,90 @@ export function pinwheel(B, { h = 0.9, colors = ['#ff6f7f', '#ffd24a', '#6ab0ff'
     }
     const pin = G.sph(0.02, 5, 4); B.add(pin, C.gold);
   });
+}
+
+// ------------------------------------------------------------------ home yards
+// Chopping block (a short round of log) with the axe left in it, a few split pieces and chips around
+export function choppingBlock(B) {
+  const blk = G.cyl(0.15, 0.17, 0.26, 10); blk.translate(0, 0.13, 0);
+  B.add(blk, (p, n, o) => { if (n.y > 0.8) o.set('#ecc890').lerp(col('#c89a68'), (Math.sin(Math.hypot(p.x, p.z) * 90) * 0.5 + 0.5) * 0.5); else o.set('#7a5642').multiplyScalar(0.85 + 0.15 * Math.sin(Math.atan2(p.z, p.x) * 8)); });
+  B.at([0.02, 0.27, 0], 0.4, () => {
+    const handle = G.cyl(0.018, 0.022, 0.5, 6); handle.translate(0, 0.25, 0); handle.rotateZ(-0.5); B.add(handle, C.woodLight);
+    const head = G.box(0.05, 0.1, 0.14, 0.012); head.translate(0, 0.02, 0.03); B.add(head, '#8a8894');
+    const edge = G.box(0.052, 0.02, 0.14, 0.004); edge.translate(0, -0.035, 0.03); B.add(edge, '#d8d8e0');
+  });
+  for (let i = 0; i < 3; i++) {
+    const s = G.box(0.07, 0.06, 0.24, 0.015); s.rotateY(B.rand(0, PI)); s.translate(B.wob(0.28) + 0.18, 0.03, B.wob(0.22));
+    B.add(s, (p, n, o) => o.set(Math.abs(n.z) > 0.8 ? '#f0cc98' : '#c89a68'));
+  }
+}
+// Firewood stacked against a wall (runs along local x), with a little shingle roof
+export function firewood(B, { w = 0.7, h = 0.46, d = 0.24, roofed = true } = {}) {
+  for (let y = 0.05; y < h; y += 0.095) for (let x = -w / 2 + 0.05; x < w / 2 - 0.02; x += 0.095) {
+    const g = G.cyl(0.045, 0.045, d * B.rand(0.9, 1.05), 5); g.rotateX(PI / 2); g.rotateZ(B.rand(0, 1)); g.translate(x + B.wob(0.01), y, B.wob(0.02));
+    B.add(g, (p, nn, o) => { if (Math.abs(nn.z) > 0.9) o.set(B.pick(['#f0cc98', '#e8c08a'])); else o.set(B.pick(['#8a5e44', '#9a6a4a', '#7a5040'])); });
+  }
+  if (roofed) {
+    const r = G.box(w + 0.14, 0.035, d + 0.14, 0.012); r.rotateX(0.22); r.translate(0, h + 0.07, 0.01); B.add(r, C.timber);
+    for (const sx of [-1, 1]) { const p = G.box(0.04, h + 0.08, 0.04, 0); p.translate(sx * (w / 2 + 0.03), (h + 0.08) / 2, d / 2); B.add(p, C.woodDark); }
+  }
+}
+// Laundry line between two T-posts along local x, with towels and little clothes pegged on
+export function laundry(B, { L = 1.3, h = 1.2, colors = ['#ffffff', '#8fd0ff', '#ff9ec0', '#ffe07a'] } = {}) {
+  for (const sx of [-1, 1]) {
+    const p = G.cyl(0.03, 0.035, h, 6); p.translate(sx * L / 2, h / 2, 0); B.add(p, C.woodMid);
+    const t = G.box(0.03, 0.03, 0.26, 0.008); t.translate(sx * L / 2, h - 0.03, 0); B.add(t, C.woodMid);
+  }
+  const sag = 0.07, y0 = h - 0.05, at = t => V(-L / 2 + L * t, y0 - Math.sin(t * PI) * sag, 0);
+  const pts = []; for (let k = 0; k <= 10; k++) pts.push({ p: at(k / 10), r: 0.007 });
+  B.add(tube(pts, 3, false), '#f4f0e8');
+  const items = [[0.18, 0.2, 0.3], [0.4, 0.16, 0.2], [0.62, 0.24, 0.34], [0.84, 0.12, 0.16]];
+  items.forEach(([t, w, hh], i) => {
+    const p = at(t), g = G.plane(w, hh, 2, 3); g.translate(0, -hh / 2, 0);
+    B.at([p.x, p.y, p.z], 0, () => B.cloth(g, colors[i % colors.length], { x0: -w / 2, x1: w / 2, yTop: 0, yBot: -hh }));
+    for (const sx of [-1, 1]) { const peg = G.box(0.012, 0.04, 0.012, 0); peg.translate(p.x + sx * w * 0.35, p.y - 0.005, 0.005); B.add(peg, C.woodLight); }
+  });
+}
+// Watering can (spout toward +x)
+export function wateringCan(B, color = '#6ab0d8') {
+  const body = G.cyl(0.07, 0.08, 0.14, 10); body.translate(0, 0.07, 0); B.add(body, color);
+  const sp = tube([{ p: V(0.06, 0.04, 0), r: 0.014 }, { p: V(0.17, 0.13, 0), r: 0.01 }], 5, false); B.add(sp, color);
+  const rose = G.cyl(0.022, 0.012, 0.03, 6); rose.rotateZ(-0.9); rose.translate(0.18, 0.14, 0); B.add(rose, shade(color, 0.8));
+  const h = G.torus(0.05, 0.01, 4, 8, PI); h.translate(-0.02, 0.14, 0); B.add(h, shade(color, 0.85));
+}
+// Low clipped hedge along local x from x0 to x1 (sways a touch with the shared leaf wind)
+export function hedge(B, x0, x1, { h = 0.34, d = 0.26, color = '#4f9a50', flowers = null } = {}) {
+  const n = Math.max(2, Math.round((x1 - x0) / 0.22)), rr = lrng(B);
+  for (let i = 0; i < n; i++) {
+    const x = x0 + (i + 0.5) * (x1 - x0) / n, r = d * 0.62;
+    const c = V(x, h * 0.55, B.wob(0.02)), g = puff(c, r, { detail: 1, noise: 0.16, squash: h / (r * 1.7), seed: B.seed + i * 3 });
+    const base = col(color), hi = col('#9ad870');
+    B.add(g, (p, nn, o) => o.copy(base).lerp(hi, clamp(nn.y * 0.7) * 0.6).multiplyScalar(0.92 + 0.12 * nz(p.x * 12, p.y * 12 + p.z * 9)), 'leaf');
+    if (flowers && B.chance(0.5)) { const f = G.sph(0.035, 5, 4); f.translate(x + B.wob(0.06), h * 0.9, B.wob(0.08)); B.add(f, B.pick(flowers), 'leaf'); }
+    // clipped leaf texture: small leaves sticking out of the surface
+    for (let k = 0; k < 10; k++) {
+      const u = -0.1 + rr() * 1.0, th = rr() * TAU, sr = Math.sqrt(Math.max(0, 1 - u * u));
+      const L = 0.06 + rr() * 0.03, lf = leafGeo(L, L * 0.38); lf.rotateZ(-0.2 - rr() * 0.4); lf.rotateY(-th);
+      lf.translate(c.x + sr * Math.cos(th) * r * 0.95, c.y + u * r * (h / (r * 1.7)) * 0.95, c.z + sr * Math.sin(th) * r * 0.95);
+      B.add(lf, base.clone().lerp(hi, 0.2 + rr() * 0.4), 'leaf');
+    }
+  }
+}
+// Tiny kitchen garden: a soil bed with rows of sprouts and a couple of cabbages
+export function veggieBed(B, { w = 0.8, d = 0.5 } = {}) {
+  const bed = G.box(w, 0.1, d, 0.04); bed.translate(0, 0.05, 0); B.add(bed, '#8a5e44');
+  for (const sz of [-1, 1]) { const e = G.box(w + 0.06, 0.12, 0.05, 0.015); e.translate(0, 0.06, sz * (d / 2 + 0.02)); B.add(e, C.woodMid); }
+  for (let r = 0; r < 2; r++) for (let i = 0; i < 4; i++) {
+    const x = -w / 2 + 0.12 + i * (w - 0.24) / 3, z = (r - 0.5) * d * 0.5;
+    if ((i + r) % 3 === 0) { const c = G.sph(0.07, 7, 5); c.scale(1, 0.8, 1); c.translate(x, 0.14, z); B.add(c, (p, nn, o) => o.set('#8ccf6a').lerp(col('#d8f0a0'), clamp(nn.y))); }
+    else for (let k = 0; k < 3; k++) { const l = G.sph(0.03, 5, 3); l.scale(0.6, 1.6, 0.4); l.rotateZ((k - 1) * 0.6); l.translate(x + (k - 1) * 0.02, 0.15, z); B.add(l, '#5aa84a', 'leaf'); }
+  }
+}
+// Tied grain / flour sack
+export function sack(B, { r = 0.17, color = '#f4ead8', band = '#c8a070' } = {}) {
+  const g = G.sph(r, 9, 7); g.scale(1, 1.25, 0.9); g.translate(0, r * 1.1, 0);
+  const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); if (y > r * 1.8) { const k = 1 - (y - r * 1.8) / (r * 0.6) * 0.55; p.setX(i, p.getX(i) * k); p.setZ(i, p.getZ(i) * k); } }
+  g.computeVertexNormals(); B.add(g, (pp, n, o) => o.set(color).multiplyScalar(0.9 + 0.1 * clamp(n.y + 0.5)));
+  const tie = G.torus(r * 0.32, 0.018, 4, 10); tie.rotateX(PI / 2); tie.translate(0, r * 2.12, 0); B.add(tie, band);
+  const tuft = G.cone(r * 0.35, r * 0.4, 7); tuft.translate(0, r * 2.4, 0); B.add(tuft, color);
 }

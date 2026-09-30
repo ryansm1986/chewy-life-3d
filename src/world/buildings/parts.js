@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { puff, tube } from '../../gfx/geom.js';
 import { G, V, C, PI, bar, shade, mixc } from './kit.js';
 import { shapeGeo } from './symbols.js';
+import { wallSpan, streak, plasterPatch, sudare, grille, shutterBox } from './trim.js';
 
 export const STONES = ['#d9d0c8', '#c9bfc6', '#b8adb8', '#e4dcd2', '#cfc4b8', '#bdb4c4'];
 
@@ -41,7 +42,10 @@ export function foundation(B, { w, d, h = 0.3, cx = 0, cz = 0, color = C.stoneDa
     const g = puff(V(0, 0, 0), r, { detail: 1, noise: 0.28, squash: 0.72, seed: i * 7 + B.seed });
     g.scale(nx ? 0.5 : 1.2, h / (r * 1.7) * B.rand(0.65, 0.9), nz ? 0.5 : 1.2);
     g.translate(cx + x - nx * 0.01, h * B.rand(0.38, 0.5), cz + z - nz * 0.01);
-    B.add(g, B.pick(STONES));
+    const st = B.pick(STONES);
+    // older foundations: moss on the tops of some stones
+    if (B.dchance(B.richness === 0 ? 0.4 : B.richness === 1 ? 0.18 : 0)) { const sc = new THREE.Color(st), mc = new THREE.Color(B.dpick(['#7cae5a', '#8cbc62', '#6e9e52'])); B.add(g, (p, n, o) => o.copy(sc).lerp(mc, Math.min(1, Math.max(0, (n.y - 0.35) * 1.6)) * 0.85)); }
+    else B.add(g, st);
   }
 }
 
@@ -63,13 +67,14 @@ export function walls(B, o) {
     const body = G.box(w, h, d, 0.05); body.translate(cx, y0 + h / 2, cz);
     B.add(body, { grad: [shade(plaster, 0.93), plaster] });
   }
+  // corner posts, head beam, sill plate (planed timber: bevelled beams, far cheaper than rounded boxes)
   const pt = 0.13;
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    const g = G.box(pt, h + 0.04, pt, 0.03); g.translate(cx + sx * (w / 2 - pt * 0.25), y0 + h / 2, cz + sz * (d / 2 - pt * 0.25)); B.add(g, frame);
+    const g = G.beam(pt, h + 0.04, pt, 0.025); g.translate(cx + sx * (w / 2 - pt * 0.25), y0 + h / 2, cz + sz * (d / 2 - pt * 0.25)); B.add(g, frame);
   }
-  ring(B, cx, cz, w + 0.05, d + 0.05, y0 + h - 0.06, 0.12, 0.09, frame);
-  ring(B, cx, cz, w + 0.06, d + 0.06, y0 + 0.05, 0.1, 0.09, shade(frame, 0.92));
-  if (o.rail !== false && !o.planks && !o.koshi) ring(B, cx, cz, w + 0.03, d + 0.03, y0 + h * (o.railAt ?? 0.36), 0.05, 0.05, frame);
+  ring(B, cx, cz, w + 0.05, d + 0.05, y0 + h - 0.06, 0.12, 0.09, frame, 0);
+  ring(B, cx, cz, w + 0.06, d + 0.06, y0 + 0.05, 0.1, 0.09, shade(frame, 0.92), 0);
+  if (o.rail !== false && !o.planks && !o.koshi) ring(B, cx, cz, w + 0.03, d + 0.03, y0 + h * (o.railAt ?? 0.36), 0.05, 0.05, frame, 0);
   if (o.koshi) {
     const kh = o.koshiH ?? 0.44;
     for (const side of ['f', 'r', 'b', 'l']) {
@@ -77,7 +82,7 @@ export function walls(B, o) {
       if (o.koshiSkip?.includes(side)) continue;
       onFace(B, { w, d, cx, cz }, side, 0, y0 + 0.12 + kh / 2, () => {
         const p = G.box(L - 0.16, kh, 0.05, 0.015); p.translate(0, 0, 0.01); B.add(p, o.koshi);
-        const cap = G.box(L - 0.12, 0.05, 0.08, 0.015); cap.translate(0, kh / 2, 0.02); B.add(cap, shade(o.koshi, 0.8));
+        const cap = G.beam(L - 0.12, 0.05, 0.08, 0.015); cap.translate(0, kh / 2, 0.02); B.add(cap, shade(o.koshi, 0.8));
         const n = Math.round((L - 0.16) / 0.15);
         for (let i = 1; i < n; i++) { const g = G.box(0.018, kh - 0.04, 0.012, 0); g.translate(-(L - 0.16) / 2 + i * (L - 0.16) / n, -0.01, 0.037); B.add(g, shade(o.koshi, 0.8)); }
       });
@@ -87,6 +92,35 @@ export function walls(B, o) {
   if (o.posts) for (const [side, us] of Object.entries(o.posts)) for (const u of us) onFace(B, { w, d, cx, cz }, side, u, y0 + h / 2, () => {
     const g = G.box(0.13, h, 0.06, 0.02); g.translate(0, 0, 0.01); B.add(g, frame);
   });
+  // remembered so windows / doors placed next can frame themselves to this wall (trim.wallSpan)
+  B._wall = { m: B.m.clone(), y0, h, w, d, cx, cz, plaster, frame, planks: !!o.planks, koshiTop: o.koshi ? y0 + 0.12 + (o.koshiH ?? 0.44) : null };
+  if (o.weather !== false) weatherWalls(B, { w, d, h, y0, cx, cz, planks: o.planks, koshi: o.koshi });
+}
+
+// Humble walls show their age: a patch or two of flaked plaster (lath showing) low on a side wall.
+// Richer walls stay clean. Planks get a couple of darker replaced boards instead.
+function weatherWalls(B, { w, d, h, y0, cx, cz, planks, koshi }) {
+  const rich = B.richness;
+  if (planks) {
+    const n = rich === 0 ? 3 : 1;
+    for (let i = 0; i < n; i++) {
+      const side = B.dpick(['r', 'l', 'b']), L = side === 'b' ? w : d;
+      onFace(B, { w, d, cx, cz }, side, B.drand(-L / 2 + 0.3, L / 2 - 0.3), y0 + B.drand(0.15, h - 0.35), () => {
+        const g = G.box(B.drand(0.25, 0.45), 0.16, 0.008, 0); g.translate(0, 0, 0.004); B.add(g, B.dpick(['#c8a070', '#8a6a52', '#b89878']));
+        for (const s of [-1, 1]) { const nail = G.box(0.02, 0.02, 0.01, 0); nail.translate(s * 0.08, 0, 0.01); B.add(nail, C.iron); }
+      });
+    }
+    return;
+  }
+  if (rich >= 2 || !B.dchance(rich === 0 ? 0.9 : 0.4)) return;
+  const n = rich === 0 ? B.dpick([1, 2, 2]) : 1;
+  const yLow = koshi ? y0 + 0.12 + 0.44 + 0.2 : y0 + 0.3;
+  for (let i = 0; i < n; i++) {
+    const side = B.dpick(['r', 'l', 'b']), L = side === 'b' ? w : d;
+    if (L < 1) continue;
+    const u = (B.dchance(0.5) ? 1 : -1) * (L / 2 - B.drand(0.2, 0.3));
+    onFace(B, { w, d, cx, cz }, side, u, 0, () => plasterPatch(B, 0, Math.min(yLow + B.drand(0, 0.25), y0 + h - 0.3), B.drand(0.75, 1.05)));
+  }
 }
 
 // rectangle frame in local face space (z out)
@@ -109,6 +143,41 @@ export function shoji(B, o = {}) {
   if (o.sill !== false) { const s = G.box(w + 0.16, 0.06, 0.13, 0.02); s.translate(0, -h / 2 - 0.02, 0.07); B.add(s, frame); }
   if (o.box) B.at([0, -h / 2 - 0.16, 0.14], 0, () => flowerBox(B, { w: w + 0.08, colors: o.flowers }));
   if (o.hood) hood(B, w + 0.3, h / 2 + 0.12, o.hood);
+  if (o.trim !== false) openingTrim(B, w, h, { frame, box: o.box, hood: o.hood, dress: o.dress, kind: 'window' });
+}
+
+// Framing + dressing around an opening in the current face frame (opening centred at local 0, size w x h):
+// flanking posts from the sill plate to the head beam (so the wall reads as timber-framed panels), a head
+// beam (kamoi), a rain stain under the sill, and per-building window dressing chosen once per model:
+// humble → storm-shutter box or a rolled blind, middling → bamboo blinds, rich → lattice grilles.
+export function openingTrim(B, w, h, { frame = C.timber, box = false, hood: hasHood = false, dress, kind = 'window', round = false } = {}) {
+  const ws = wallSpan(B);
+  const rich = B.richness;
+  if (ws && ws.yb < -h / 2 && ws.yt > h / 2) {
+    // flanking posts on the bigger (level 2+) walls, only where they leave a real plaster panel before the corner
+    const px = (round ? w / 2 + 0.06 : w / 2 + 0.07);
+    for (const s of [-1, 1]) {
+      if (rich < 1 || ws.planks || Math.abs(ws.u + s * px) > ws.L / 2 - 0.34) continue;
+      const g = G.beam(0.075, ws.yt - ws.yb - 0.16, 0.05, 0.012); g.translate(s * px, (ws.yt + ws.yb) / 2, 0.018); B.add(g, frame);
+    }
+    if (!hasHood && ws.yt - h / 2 > 0.16) { const k = G.beam(Math.min(w + 0.3, ws.L - 0.2), 0.06, 0.06, 0.012); k.translate(0, h / 2 + 0.06, 0.03); B.add(k, frame); }
+    if (!box && !ws.planks && kind === 'window') streak(B, B.dwob(0.05), -h / 2 - 0.06, Math.max(ws.koshiTop ?? ws.yb + 0.12, -h / 2 - 0.62), 0.32);
+  }
+  if (kind !== 'window' || round) return;
+  const style = dress ?? (B._dress ??= pickDress(B));
+  if (style === 'sudare') sudare(B, w - 0.02, h / 2 + 0.01, { drop: B.dchance(0.5) ? h * B.drand(0.3, 0.5) : 0, z: 0.09 });
+  else if (style === 'grille') grille(B, w - 0.06, h - 0.08, { color: shade(frame, 1.05) });
+  else if (style === 'shutter' && !box && ws) {
+    // storm-shutter box on whichever side has room before the corner post
+    const need = w / 2 + 0.34, right = ws.L / 2 - ws.u, left = ws.L / 2 + ws.u;
+    const s = right > need && (left <= need || B.dchance(0.5)) ? 1 : left > need ? -1 : 0;
+    if (s) shutterBox(B, s * (w / 2 + 0.2), h, { color: shade(frame, 1.12) });
+  }
+  void rich;
+}
+function pickDress(B) {
+  const r = B.richness;
+  return r === 0 ? B.dpick(['shutter', 'sudare', 'none']) : r === 1 ? B.dpick(['sudare', 'sudare', 'shutter', 'grille']) : B.dpick(['grille', 'grille', 'sudare']);
 }
 
 // small tiled hood (hisashi) above a window / door, local face frame
@@ -137,6 +206,7 @@ export function roundWindow(B, o = {}) {
     }
   }
   if (o.box) B.at([0, -r - 0.12, 0.14], 0, () => flowerBox(B, { w: r * 2 + 0.1, colors: o.flowers }));
+  if (o.trim !== false) openingTrim(B, r * 2, r * 2, { frame, box: o.box, round: true });
 }
 
 // Sliding door (local face frame, bottom at y=0). style: 'shoji' | 'wood' | 'lattice' | 'round'
@@ -179,6 +249,28 @@ export function door(B, o = {}) {
   const lin = G.box(w + 0.24, 0.13, 0.12, 0.03); lin.translate(0, h + 0.06, 0.05); B.add(lin, frame);
   for (const s of [-1, 1]) { const p = G.box(0.11, h, 0.1, 0.025); p.translate(s * (w / 2 + 0.03), h / 2, 0.05); B.add(p, frame); }
   const th = G.box(w + 0.2, 0.05, 0.14, 0.02); th.translate(0, 0.02, 0.06); B.add(th, shade(frame, 0.9));
+  if (o.trim !== false) doorTrim(B, w, h, frame, style);
+}
+
+// Pull handles on the sliding panels and, on richer buildings, a ranma transom (lattice + glowing paper)
+// between the lintel and the wall's head beam.
+function doorTrim(B, w, h, frame, style) {
+  const pw = w / 2 + 0.02;
+  for (const s of [-1, 1]) {
+    const hx = s * (w / 4 - 0.005) - s * (pw / 2 - 0.09), hz = 0.03 + (s > 0 ? 0.025 : 0) + 0.03;
+    const pull = G.box(0.035, 0.11, 0.012, 0); pull.translate(hx, h * 0.5, hz); B.add(pull, '#3a2a28');
+    const ring = G.box(0.05, 0.13, 0.006, 0); ring.translate(hx, h * 0.5, hz - 0.004); B.add(ring, C.bronze);
+  }
+  const ws = wallSpan(B); if (!ws || B.richness < 1) return;
+  const y0 = h + 0.14, y1 = ws.yt - 0.13;
+  if (y1 - y0 < 0.13) return;
+  const rh = Math.min(0.3, y1 - y0), ry = y0 + rh / 2, rw = w + 0.1;
+  const pane = G.box(rw - 0.06, rh - 0.05, 0.02, 0); pane.translate(0, ry, 0.012); B.glow(pane, C.paper);
+  const fr = G.box(rw, 0.035, 0.05, 0); fr.translate(0, y0 + rh - 0.018, 0.03); B.add(fr, frame);
+  const n = B.richness >= 2 ? 7 : 5;
+  for (let i = 1; i < n; i++) { const b = G.box(0.022, rh - 0.04, 0.02, 0); b.translate(-rw / 2 + i * rw / n, ry, 0.03); B.add(b, frame); }
+  if (B.richness >= 2) { const m = G.box(rw - 0.06, 0.02, 0.02, 0); m.translate(0, ry, 0.031); B.add(m, frame); }
+  void style;
 }
 
 // Noren curtain hanging from y (top) in local face frame. strips of cloth with a white hem & optional symbol
@@ -233,10 +325,18 @@ export function chimney(B, x, z, yBase, yTop, s = 1) {
     const hh = (yTop - yBase) / n;
     const g = G.box(W + B.wob(0.03), hh + 0.02, W + B.wob(0.03), 0.05);
     g.rotateY(B.wob(0.08)); g.translate(x + B.wob(0.015), yBase + hh * (i + 0.5), z + B.wob(0.015));
-    B.add(g, B.pick(STONES));
+    const st = B.pick(STONES);
+    B.add(g, i === n - 1 ? mixc(st, '#6a6070', 0.38) : st); // soot on the top course
   }
   const cap = G.box(W + 0.12, 0.08, W + 0.12, 0.035); cap.translate(x, yTop + 0.04, z); B.add(cap, C.stoneDark);
   const pot = G.cyl(0.08 * s, 0.1 * s, 0.16 * s, 8); pot.translate(x, yTop + 0.08 + 0.08 * s, z); B.add(pot, C.terracotta);
+  const lip = G.cyl(0.092 * s, 0.092 * s, 0.03 * s, 8); lip.translate(x, yTop + 0.08 + 0.15 * s, z); B.add(lip, mixc(C.terracotta, '#4a3a3a', 0.45));
+  if (B.dchance(B.richness >= 1 ? 0.55 : 0.35)) { // a little iron rain hat on two stilts
+    const y1 = yTop + 0.08 + 0.16 * s + 0.07;
+    for (const sx of [-1, 1]) { const p = G.box(0.025, y1 - yTop - 0.08, 0.025, 0); p.translate(x + sx * 0.1 * s, (y1 + yTop + 0.08) / 2, z); B.add(p, C.iron); }
+    for (const sx of [-1, 1]) { const sl = G.box(0.17 * s, 0.03, 0.3 * s, 0); sl.rotateZ(-sx * 0.55); sl.translate(x + sx * 0.07 * s, y1 + 0.045 * s, z); B.add(sl, '#5a5864'); }
+    const rid = G.box(0.035, 0.035, 0.31 * s, 0); rid.translate(x, y1 + 0.085 * s, z); B.add(rid, '#4a4854');
+  }
   B.smokeAt([x, yTop + 0.2 + 0.16 * s, z]);
 }
 

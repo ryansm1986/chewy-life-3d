@@ -15,6 +15,13 @@ export { BUILDINGS, CATEGORIES, sizeOf, bridgeDeckHeight };
 export const VARIANTS = 8;
 
 const cache = new Map();
+// How dressed-up a model is (B.detail, 0 humble .. 2 rich): trim, eave charms, tile-end discs, window dressing.
+// Per level for levelled buildings; landmarks are rich, workshops stay humble.
+const DETAIL = {
+  home: [0, 1, 2], shop: [0, 1, 2], farm: [0, 1], lumber: [0, 1], kiln: [0, 1], fishingHut: [0, 1],
+  townHall: 2, rosieShop: 2, shrine: 2, chewyHouse: 1, clinic: 1, school: 1, onsen: 1, boneSmith: 1,
+};
+function detailOf(id, level) { const d = DETAIL[id]; return Array.isArray(d) ? d[Math.min(d.length, level) - 1] : d ?? 1; }
 function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
 export function variantOf(seed = 0) { return (((seed | 0) % VARIANTS) + VARIANTS) % VARIANTS; }
 
@@ -29,7 +36,7 @@ export function getTemplate(id, level = 1, seed = 0) {
   let tpl = cache.get(key);
   if (!tpl) {
     const B = new Builder((hashStr(id) + level * 977 + v * 7919) >>> 0);
-    B.variant = v; B.level = level; B.id = id;
+    B.variant = v; B.level = level; B.id = id; B.detail = detailOf(id, level);
     B.footprint = [...sizeOf(id, level)];
     MODELS[id](B, level, v);
     tpl = B.finish();

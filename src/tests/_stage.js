@@ -39,7 +39,7 @@ export function makeStage({ ground = 60, hour = 10, center = [0, 0], dist = 30, 
   engine.rig.minDist = 4; engine.rig.maxDist = 200;
   if (engine.params.has('yaw')) engine.rig.yawTarget = +engine.params.get('yaw');
   if (engine.params.has('pitch')) engine.rig.pitch = +engine.params.get('pitch');
-  if (engine.params.has('cx')) engine.rig.focus.set(+engine.params.get('cx'), 0.5, +engine.params.get('cz'));
+  if (engine.params.has('cx')) engine.rig.focus.set(+engine.params.get('cx'), +(engine.params.get('cy') ?? 0.5), +engine.params.get('cz'));
   engine.rig.snap();
   const updaters = [];
   const S = {
@@ -61,7 +61,7 @@ export function makeStage({ ground = 60, hour = 10, center = [0, 0], dist = 30, 
       if (Input.hit('q')) engine.rig.yawTarget += Math.PI / 4;
       if (Input.hit('e')) engine.rig.yawTarget -= Math.PI / 4;
     }
-    for (const fn of updaters) fn(dt, engine.time);
+    for (const fn of updaters) { try { fn(dt, engine.time); } catch (e) { console.error('[stage] updater failed', e); } } // (a throw must not stop the frame loop: window.advance() would hang)
     engine.rig.update(dt);
     sun.target.position.copy(engine.rig.target);
     sun.position.copy(engine.rig.target).addScaledVector(day.sunDir, 70);

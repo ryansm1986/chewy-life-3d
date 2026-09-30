@@ -297,7 +297,7 @@ const BUILD = {
     }
     const tailGeo = merge(tp);
     capLuminance(rig.mat); // white fur under moonlight + her own foxfire light sat far above the bloom threshold
-    const N = 9, tails = new THREE.InstancedMesh(tailGeo, rig.mat, N), tailsOl = new THREE.InstancedMesh(tailGeo, rig.outMat, N);
+    const N = 9, tails = new THREE.InstancedMesh(tailGeo, rig.propMat || rig.mat, N), tailsOl = new THREE.InstancedMesh(tailGeo, rig.outMat, N);
     tails.castShadow = true; tails.receiveShadow = true; tails.frustumCulled = tailsOl.frustumCulled = false;
     const fan = new THREE.Group(); fan.position.set(0, 0.06, -0.16); P.body.add(fan); fan.add(tails, tailsOl);
     // --- kanzashi hairpins with dangling sakura + a white fox mask worn on the side of the head
@@ -414,6 +414,14 @@ export class MonsterAnim {
     this.m.mat.emissive.copy(this.flashC).multiplyScalar(this.flash * this.flashAmp);
   }
 }
+
+/** Region monsters / bosses (src/regions/monsters/index.js) add their definitions and model builders here. */
+export function registerMonsters(defs = {}, builders = {}) {
+  for (const id in defs) { if (MONSTERS[id]) throw new Error(`monster id clash: ${id}`); MONSTERS[id] = defs[id]; }
+  for (const k in builders) { if (BUILD[k]) throw new Error(`monster builder clash: ${k}`); BUILD[k] = builders[k]; }
+}
+// the shared model kit, for region monster files (docs/REGIONS.md §3.4)
+export { ell, cone, eyes, blush, shell, glowBillboard, finish, EDGE_OUT, INK };
 
 export function buildMonster(id, variantIdx = 0) {
   const def = MONSTERS[id];
