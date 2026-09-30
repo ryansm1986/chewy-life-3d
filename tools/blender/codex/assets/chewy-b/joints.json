@@ -1,0 +1,203 @@
+{
+  "units": "metres",
+  "coordinate_system": "Blender Z-up, front -Y; character left is +X",
+  "hips": [
+    0,
+    0.015,
+    0.353
+  ],
+  "spine": [
+    0,
+    0.015,
+    0.469
+  ],
+  "chest": [
+    0,
+    0.013,
+    0.6
+  ],
+  "neck": [
+    0,
+    0.007,
+    0.667
+  ],
+  "head": [
+    0,
+    0,
+    0.9299999999999999
+  ],
+  "jaw_pivot": [
+    0,
+    -0.146,
+    0.808
+  ],
+  "eyes": {
+    "R": [
+      -0.16200000047683716,
+      -0.19360855221748352,
+      0.902999997138977
+    ],
+    "L": [
+      0.16200000047683716,
+      -0.19361940026283264,
+      0.902999997138977
+    ]
+  },
+  "ears": {
+    "R": {
+      "base": [
+        -0.22161097007391517,
+        0.003332376480102539,
+        1.119
+      ],
+      "fold": [
+        -0.25214484500113193,
+        0.08817270398139954,
+        1.255
+      ],
+      "tip": [
+        -0.3141254691561086,
+        0.09525042772293091,
+        1.184
+      ]
+    },
+    "L": {
+      "base": [
+        0.22160648421437318,
+        0.00309908390045166,
+        1.119
+      ],
+      "fold": [
+        0.2528022353780124,
+        0.08792176842689514,
+        1.2579999999999998
+      ],
+      "tip": [
+        0.31205549433672675,
+        0.09512856602668762,
+        1.184
+      ]
+    }
+  },
+  "arms": {
+    "R": {
+      "shoulder": [
+        -0.188,
+        0.013,
+        0.641
+      ],
+      "elbow": [
+        -0.284,
+        -0.002,
+        0.51
+      ],
+      "wrist": [
+        -0.363,
+        -0.022,
+        0.405
+      ]
+    },
+    "L": {
+      "shoulder": [
+        0.188,
+        0.013,
+        0.641
+      ],
+      "elbow": [
+        0.284,
+        -0.002,
+        0.51
+      ],
+      "wrist": [
+        0.363,
+        -0.022,
+        0.405
+      ]
+    }
+  },
+  "legs": {
+    "L": {
+      "hip": [
+        0.119,
+        0.014,
+        0.364
+      ],
+      "knee": [
+        0.137,
+        0.007,
+        0.25
+      ],
+      "ankle": [
+        0.146,
+        0.011,
+        0.121
+      ],
+      "toe": [
+        0.164,
+        -0.145,
+        0.075
+      ]
+    },
+    "R": {
+      "hip": [
+        -0.119,
+        0.014,
+        0.364
+      ],
+      "knee": [
+        -0.137,
+        0.007,
+        0.25
+      ],
+      "ankle": [
+        -0.146,
+        0.011,
+        0.121
+      ],
+      "toe": [
+        -0.164,
+        -0.145,
+        0.075
+      ]
+    }
+  },
+  "tail": [
+    [
+      0,
+      0.128,
+      0.348
+    ],
+    [
+      0,
+      0.206,
+      0.325
+    ],
+    [
+      0.01,
+      0.275,
+      0.346
+    ],
+    [
+      0.015,
+      0.307,
+      0.402
+    ],
+    [
+      0.015,
+      0.304,
+      0.452
+    ],
+    [
+      0.013,
+      0.286,
+      0.485
+    ]
+  ],
+  "notes": [
+    "No armature or weights in phase 1.",
+    "Eyes are independent closed socket-fitted globes with the original anatomical pivots; the round-13 aperture grew upward while its lower edge stayed fixed. Nasal/upward gaze is painted because inward/upward rest rotation loses white coverage in the locked sockets. Apply a matching neutral gaze offset during phase 2; validate aim limits, and refit spherical globe backs/sockets if wide rotation is required.",
+    "Ears have 40 longitudinal stations / 39 full cross-section rings through surface-relaxed solid cupped wedges and padded folds; broad faces yaw 30 degrees outward. Authored normal depth .12 head widths at the base, tapering to .05 near the hanging tips, with rounded convex backs. Tail has 24 longitudinal rings.",
+    "No torso skin under gi, arm skin under wraps, or thigh skin under pants.",
+    "Costume and visible skin islands need weights and selective welding during phase 2."
+  ]
+}
