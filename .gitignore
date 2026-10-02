@@ -2,3 +2,4 @@ node_modules/
 dist/
 *.log
 tools/blender/work/
+tools/qa/tmp/

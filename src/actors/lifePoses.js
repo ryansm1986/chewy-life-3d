@@ -122,8 +122,8 @@ export const LIFE_ACTIONS = {
 
   // ---- one-shot fidgets & reactions
   stretch: { dur: 1.9, pose: (u, P, A) => {
-    const k = inOut(u, 0.3, 0.3);
-    A.armR.z += 2.75 * k; A.armL.z += -2.75 * k; A.armR.x += -0.25 * k; A.armL.x += -0.25 * k;
+    const k = inOut(u, 0.3, 0.3), up = P.toyArms ? -2.25 : 2.75; // (Toybox kit rigs: short arms under a big head stretch outward-up, or they'd vanish into it)
+    A.armR.z += up * k; A.armL.z += -up * k; A.armR.x += -0.25 * k; A.armL.x += -0.25 * k;
     A.body.x += -0.14 * k; A.head.x += -0.22 * k; A.sq += -0.07 * k; A.y += 0.03 * k;
     A.eyesClosed = k > 0.6 ? 1 : 0; A.mouth = Math.max(A.mouth, 0.5 * clamp((k - 0.7) / 0.3));
   } },
@@ -166,7 +166,7 @@ export const LIFE_ACTIONS = {
     const k = inOut(u, 0.22, 0.3), top = smoothstep(0.25, 0.5, u) * (1 - smoothstep(0.7, 0.88, u));
     A.head.x += -0.36 * k; A.head.z += 0.14 * k; A.body.x += -0.1 * k; A.sq += -0.04 * k + 0.02 * top * Math.sin(u * 30);
     A.armR.x += -1.45 * k; A.armR.z += 0.62 * k;                  // paw over the mouth
-    A.armL.x += -0.2 * k; A.armL.z += -2.5 * k * (0.7 + 0.3 * top); // the other arm stretches up
+    A.armL.x += -0.2 * k; A.armL.z += (P.toyArms ? 2.1 : -2.5) * k * (0.7 + 0.3 * top); // the other arm stretches up (outward on Toybox kit rigs)
     A.y += 0.025 * top; A.mouth = Math.max(A.mouth, k * (0.6 + 0.4 * top)); A.eyesClosed = k > 0.3 ? 1 : 0.6;
   } },
   // standing at the door half asleep: heavy lids, a slow sway, and every few seconds the head sinks… and snaps back up

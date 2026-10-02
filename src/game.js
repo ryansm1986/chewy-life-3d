@@ -11,7 +11,7 @@ import { Villager } from './actors/npc.js';
 import { CAST, REFINED_CAST, prebuildHumanoid } from './actors/charKit.js';
 import { loadRefinedRigs } from './actors/refinedRigs.js';
 import { chewyStyle, setChewyStyle } from './actors/disneyChewy.js';
-import { loadHeroModels, chewyModel, setChewyModel } from './actors/heroModels.js';
+import { loadHeroModels, chewyModel, setChewyModel, heroModelReady, buildHeroModel } from './actors/heroModels.js';
 import { VILLAGERS, randomVillagerSpec } from './actors/roster.js';
 import { U } from './gfx/materials.js';
 import { glowTexture } from './gfx/textures.js';
@@ -64,7 +64,7 @@ export async function boot() {
   G.skillParams = (id) => skillRuntime(id, G.state, G.derived)?.params;
 
   // Blender-refined skins for Chewy and Shadow must be in memory before their rigs (and portraits) are built
-  const [uiMod, audioMod] = await Promise.all([P.has('noui') ? null : tryImport('ui', () => import('./ui/ui.js')), P.has('noaudio') ? null : tryImport('audio', () => import('./audio/audio.js')), loadRefinedRigs(REFINED_CAST), loadHeroModels(['chewy', 'moka'])]);
+  const [uiMod, audioMod] = await Promise.all([P.has('noui') ? null : tryImport('ui', () => import('./ui/ui.js')), P.has('noaudio') ? null : tryImport('audio', () => import('./audio/audio.js')), loadRefinedRigs(REFINED_CAST), loadHeroModels(['chewy', 'moka', 'shadow', 'rosie'])]);
   G.audio = audioMod?.Audio || null;
   try { G.audio?.init?.(); } catch (e) { console.warn('[audio] init failed', e); }
 
@@ -101,7 +101,7 @@ export async function boot() {
   // Rosie minds her shop from the front (camera side of the door) so she's always visible
   const shopRec = sim.list.find(r => r.data.type === 'rosieShop');
   const rosieAnchor = shopRec ? { x: shopRec.door.x + 0.9, z: shopRec.door.z + 0.9 } : { x: L.rosieShop.x - 2.4, z: L.rosieShop.z + 0.5 };
-  const rosie = new Villager(village, G, CAST.rosie, { id: 'rosie', anchor: rosieAnchor, wander: 1.4, role: 'shop' });
+  const rosie = new Villager(village, G, CAST.rosie, { id: 'rosie', anchor: rosieAnchor, wander: 1.4, role: 'shop', rig: heroModelReady('rosie') ? buildHeroModel('rosie') : null }); // the Toybox Rosie when it's loaded
   rosie.speed = 1.8; npcs.push(rosie);
   for (const v of VILLAGERS) npcs.push(new Villager(village, G, v.spec, { id: v.id, anchor: v.anchor, wander: v.wander || 5 }));
   const skills = G.skills = new SkillRunner(G);
@@ -165,7 +165,7 @@ export async function boot() {
     G.ui.onSetting((k, v) => {
       if (k === 'toyChewy') {
         setChewyModel(v ? 'toy' : 'disney');
-        G.ui.toast?.(v ? 'Switching to Toybox Chewy…' : 'Switching to Storybook Chewy…');
+        G.ui.toast?.(v ? 'Switching to the Toybox heroes…' : 'Switching to the Storybook heroes…');
         setTimeout(() => { try { G.save?.(); } catch (e) { console.warn('[style] save failed', e); } location.reload(); }, 450);
         return;
       }

@@ -767,7 +767,7 @@ export function disneyFoot(kind, color, fur, pads) {
 }
 export const handKindFor = sp => (sp.human ? 'human' : sp.hand === 'bear' ? 'bear' : sp.hand === 'web' ? 'web' : sp.hand === 'fox' ? 'fox' : 'paw');
 export const footKindFor = sp => (sp.human ? 'shoe' : sp.foot === 'bear' ? 'bear' : sp.foot === 'long' ? 'long' : sp.foot === 'web' ? 'web' : 'paw');
-export { tag, paintFn, solid, copy, tubeGeo };
+export { tag, paintFn, solid, copy, tubeGeo, mirrored, jawParts, jawWeight, lipY, earFrame, leaf2d, slab };
 
 // dev: slit size per species (tools and tests)
 export function debugJaw(kind) {

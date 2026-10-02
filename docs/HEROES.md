@@ -100,7 +100,7 @@ free little sparkle bolt. Hotbar hints on first join. Staff bases span tiers lik
 ## 7. Code map
 - `src/rpg/classes.js` — class table. `src/rpg/skillsMoka.js` — Moka's skill defs (merged into SKILLS).
 - `src/actors/heroes.js` — HeroManager: roster, state linking, switching + transition, NPC-mode heroes, Shadow.
-- `src/actors/heroModels.js` — baked hero models (Chewy, Moka); `src/actors/heroGear.js` — staff geometry.
+- `src/actors/heroModels.js` — baked hero models (Chewy, Moka, and Shadow on the quad contract); `src/actors/heroGear.js` — staff geometry.
 - `src/combat/mokaSpells.js` — SkillRunner cast implementations for Moka; `src/gfx/spellFx.js` — spell VFX.
 - Blender: `tools/blender/disney/moka.py` (build.py `char=moka`), export `public/rigs/moka_disney.*` (63.9k tris, the
   same 37 bones as Chewy). Kit fallback: `CAST.moka` + disneyKit's 'spaniel' head and `disneyWizardHat()`.

@@ -1,4 +1,5 @@
 // Character lineup test: /?test=chars[&act=swing][&walk=1][&only=chewy][&dist=8]
+//   &hats: every species x hat;  &folk=12[&seed=7]: a grid of random townsfolk (roster.randomVillagerSpec) instead of the cast; &kit=toy|disney|classic
 import * as THREE from 'three';
 import { makeStage } from './_stage.js';
 import { buildHumanoid, buildBoston, CAST, REFINED_CAST, boneSwordGeo, tennisBall, contactShadow } from '../actors/charKit.js';
@@ -6,20 +7,18 @@ import { Animator } from '../actors/animator.js';
 import { makeToon } from '../gfx/materials.js';
 import { loadRefinedRigs } from '../actors/refinedRigs.js';
 import { loadDisneyChewy, disneyReady, buildDisneyChewy } from '../actors/disneyChewy.js';
+import { loadHeroModel, heroModelReady, buildHeroModel } from '../actors/heroModels.js';
+import { VILLAGERS, randomVillagerSpec } from '../actors/roster.js';
 
+// the named villagers (roster.js) plus a duck and a dog, the townsfolk species without a named villager
 export const VILLAGER_SPECS = [
-  { name: 'Mochi', species: 'cat', fur: '#fff4ea', fur2: '#ffffff', fur3: '#f4a860', earColor: '#f4a860', outfit: { top: 'kimono', topColor: '#ff9ec0', bottomColor: '#6a4a6a', sash: '#ffd24a' } },
-  { name: 'Usagi', species: 'bunny', fur: '#ffffff', fur2: '#fff8f4', earColor: '#ffffff', outfit: { top: 'overalls', topColor: '#8fd0ff', bottomColor: '#5a8ad8', shirt: '#fff0a8', hat: 'flower', hatColor: '#ffb0d0' } },
-  { name: 'Kuma', species: 'bear', fur: '#a86a44', fur2: '#e8c49a', outfit: { top: 'shirt', topColor: '#7cc45a', bottomColor: '#5a4a3a', apron: '#fff6e8', hat: 'chef' } },
-  { name: 'Kitsune', species: 'fox', fur: '#ff9a4a', fur2: '#fff4e8', earColor: '#ff8a3a', outfit: { top: 'kimono', topColor: '#6a5ad0', bottomColor: '#3a3060', sash: '#ff5a6a' } },
-  { name: 'Pan', species: 'panda', fur: '#fbf8f4', fur2: '#ffffff', outfit: { top: 'shirt', topColor: '#ff7a8a', bottomColor: '#3a3a4a', bottom: 'shorts' } },
-  { name: 'Tanu', species: 'tanuki', fur: '#a08070', fur2: '#f0e0d0', fur3: '#4a3a34', earColor: '#4a3a34', outfit: { top: 'gi', topColor: '#4a8a5a', bottomColor: '#3a3a3a', hat: 'leaf' } },
-  { name: 'Kero', species: 'frog', fur: '#8ad86a', fur2: '#e8f8c8', outfit: { top: 'shirt', topColor: '#ffd24a', bottomColor: '#4a6ab0', scarf: '#e8503a' } },
+  ...VILLAGERS.map(v => v.spec),
   { name: 'Ahiru', species: 'duck', fur: '#fff8ec', fur2: '#ffffff', outfit: { top: 'shirt', topColor: '#6ab0ff', bottomColor: '#ffffff', bottom: 'shorts', hat: 'straw' } },
+  { name: 'Shiba', species: 'dog', fur: '#e8c89a', fur2: '#fff8f0', outfit: { top: 'gi', topColor: '#ff8fb0', bottomColor: '#4a4a6a', sash: '#ffd24a' } },
 ];
 
 export default async function () {
-  await Promise.all([loadRefinedRigs(REFINED_CAST), loadDisneyChewy()]); // &procrigs: procedural skins, &chewy=classic: toon Chewy
+  await Promise.all([loadRefinedRigs(REFINED_CAST), loadDisneyChewy(), loadHeroModel('shadow'), loadHeroModel('rosie'), loadHeroModel('moka')]); // &procrigs: procedural skins, &chewy=classic: toon Chewy
   const P = new URLSearchParams(location.search);
   const S = makeStage({ ground: 30, hour: +(P.get('hour') ?? 10), dist: +(P.get('dist') ?? 11), center: [0, 0] });
   const only = P.get('only');
@@ -32,14 +31,22 @@ export default async function () {
     actors.push({ rig, anim, sh, x, z, base: new THREE.Vector3(x, 0, z) });
     return anim;
   };
-  const face = Math.PI / 4; // towards camera
-  const specs = [['chewy', CAST.chewy], ['moka', CAST.moka], ['rosie', CAST.rosie], ...VILLAGER_SPECS.map(s => [s.name.toLowerCase(), s])];
+  const face = Math.PI / 4 + +(P.get('face') ?? 0); // towards camera (&face=0.6: a three-quarter view, 1.57 the side)
+  const folk = +(P.get('folk') || 0);
+  let seed = +(P.get('seed') || 7); const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const hats = P.has('hats'); // &hats: every species x every hat (ear-aware hat placement check)
+  const HAT_KINDS = ['straw', 'beret', 'flower', 'bandana', 'leaf', 'chef'], SPC = ['cat', 'fox', 'bunny', 'dog', 'bear', 'panda', 'tanuki', 'frog', 'duck'];
+  const FURC = { cat: '#ffd8a8', fox: '#ff9a4a', bunny: '#ffffff', dog: '#e8c89a', bear: '#a86a44', panda: '#fbf8f4', tanuki: '#a08070', frog: '#8ad86a', duck: '#fff8ec' };
+  const specs = hats ? HAT_KINDS.flatMap(h => SPC.map(sp => [`${sp}-${h}`, { name: sp, species: sp, fur: FURC[sp], fur2: '#fff8f0', ...(sp === 'tanuki' ? { fur3: '#4a3a34', earColor: '#4a3a34' } : {}), outfit: { top: 'shirt', topColor: '#8fd0ff', bottomColor: '#4a4a6a', hat: h, hatColor: '#ff8fb0' } }]))
+    : folk ? Array.from({ length: folk }, (_, i) => { const s = randomVillagerSpec(rand); return [`folk${i}`, s]; })
+    : [['chewy', CAST.chewy], ['moka', CAST.moka], ['rosie', CAST.rosie], ...VILLAGER_SPECS.map(s => [s.name.toLowerCase(), s])];
+  if (folk) window.folkSpecs = specs.map(([, s]) => `${s.name} ${s.species} ${s.outfit.top}${s.outfit.hat ? ' +' + s.outfit.hat : ''}${s.outfit.scarf ? ' +scarf' : ''}${s.outfit.bag ? ' +bag' : ''}${s.outfit.bottom ? ' ' + s.outfit.bottom : ''}`);
   let i = 0;
   const lineup = only ? specs.filter(([k]) => k === only) : specs;
   for (const [k, spec] of lineup) {
-    const rig = k === 'chewy' && disneyReady() ? buildDisneyChewy() : buildHumanoid(spec);
-    const col = i % 5, row = Math.floor(i / 5);
-    const x = only ? 0 : (col - 2) * 1.3 + row * 0.6, z = only ? 0 : row * 1.5 - 0.6;
+    const rig = (k === 'rosie' || k === 'moka') && heroModelReady(k) ? buildHeroModel(k) : k === 'chewy' && disneyReady() ? buildDisneyChewy() : buildHumanoid(spec);
+    const cols = hats ? 9 : folk ? 4 : 5, col = i % cols, row = Math.floor(i / cols);
+    const x = only ? 0 : hats ? (col - 4) * 0.95 : folk ? (col - 1.5) * 1.1 : (col - 2) * 1.3 + row * 0.6, z = only ? 0 : hats ? row * 1.1 - 2.75 : folk ? row * 1.3 - 1.3 : row * 1.5 - 0.6;
     if (k === 'chewy') {
       const sw = new THREE.Mesh(boneSwordGeo(), rig.propMat || rig.mat); sw.castShadow = true;
       sw.rotation.set(Math.PI * 0.62, 0, 0); sw.position.set(0, -0.02, 0.02);
@@ -48,7 +55,7 @@ export default async function () {
     add(rig, x, z, face);
     i++;
   }
-  if (!only || only === 'shadow') { const sh = buildBoston(); add(sh, only ? 0 : 1.9, only ? 0 : 1.6, face); }
+  if (!folk && !hats && (!only || only === 'shadow')) { const sh = heroModelReady('shadow') ? buildHeroModel('shadow') : buildBoston(); add(sh, only ? 0 : 1.9, only ? 0 : 1.6, face); }
   const act = P.get('act');
   const walk = P.has('walk');
   S.onUpdate((dt, t) => {

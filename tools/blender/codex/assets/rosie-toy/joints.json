@@ -1,0 +1,171 @@
+{
+  "units": "metres",
+  "coordinate_system": "Blender Z-up, front -Y; character left is +X",
+  "hips": [
+    0,
+    0.015,
+    0.353
+  ],
+  "spine": [
+    0,
+    0.015,
+    0.469
+  ],
+  "chest": [
+    0,
+    0.014,
+    0.6
+  ],
+  "neck": [
+    0,
+    0.012,
+    0.675
+  ],
+  "head": [
+    0.0,
+    -0.02,
+    0.876
+  ],
+  "jaw_pivot": [
+    0,
+    -0.046,
+    0.7564
+  ],
+  "eyes": {
+    "R": [
+      -0.13222674928805606,
+      -0.21887471407365464,
+      0.8938059703291505
+    ],
+    "L": [
+      0.13222674928805606,
+      -0.21887471407365464,
+      0.8938059703291505
+    ]
+  },
+  "ears": {
+    "R": {
+      "base": [
+        -0.26163273925758157,
+        0.06756007003473191,
+        0.8491949933901138
+      ],
+      "fold": [
+        -0.27934288467507573,
+        0.05830249402104179,
+        0.85
+      ],
+      "tip": [
+        -0.29262549373819635,
+        0.0513593120107742,
+        0.8506037549574146
+      ]
+    },
+    "L": {
+      "base": [
+        0.26163273925758157,
+        0.06756007003473191,
+        0.8491949933901138
+      ],
+      "fold": [
+        0.27934288467507573,
+        0.05830249402104179,
+        0.85
+      ],
+      "tip": [
+        0.29262549373819635,
+        0.0513593120107742,
+        0.8506037549574146
+      ]
+    }
+  },
+  "arms": {
+    "R": {
+      "shoulder": [
+        -0.235,
+        0.014,
+        0.632
+      ],
+      "elbow": [
+        -0.292,
+        -0.01,
+        0.533
+      ],
+      "wrist": [
+        -0.336,
+        -0.023,
+        0.459
+      ]
+    },
+    "L": {
+      "shoulder": [
+        0.235,
+        0.014,
+        0.632
+      ],
+      "elbow": [
+        0.292,
+        -0.01,
+        0.533
+      ],
+      "wrist": [
+        0.336,
+        -0.023,
+        0.459
+      ]
+    }
+  },
+  "legs": {
+    "R": {
+      "hip": [
+        -0.104,
+        0.015,
+        0.353
+      ],
+      "knee": [
+        -0.107,
+        0.01,
+        0.254
+      ],
+      "ankle": [
+        -0.108,
+        0.007,
+        0.125
+      ],
+      "toe": [
+        -0.108,
+        -0.123,
+        0.062
+      ]
+    },
+    "L": {
+      "hip": [
+        0.104,
+        0.015,
+        0.353
+      ],
+      "knee": [
+        0.107,
+        0.01,
+        0.254
+      ],
+      "ankle": [
+        0.108,
+        0.007,
+        0.125
+      ],
+      "toe": [
+        0.108,
+        -0.123,
+        0.062
+      ]
+    }
+  },
+  "tail": [],
+  "notes": [
+    "Phase 1: no rig, weights or animations. Tail key kept for the Chewy schema; Rosie has no tail.",
+    "Head skin = zero surface of a smooth SDF ball (cranium + cheek mass + jaw + nose button), radially projected, analytic normals.",
+    "Eyelid holes ringed by 6 concentric loops each, rim rolled 4.5 mm in behind separate lens eyeballs; 3 loops around the mouth; 5 around the nose.",
+    "Hair: closed envelope base, 3 bang pillows, 6 crown pillows, 10 closed curls, bow; joined as Rosie_hair (rigid head follower)."
+  ]
+}

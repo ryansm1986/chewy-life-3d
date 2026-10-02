@@ -136,6 +136,37 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   skill from tools/blender/work/codex/chewy-b, exported with `tools/blender/codex/hero_export.py`). `chewyModel()` picks
   toy | disney (`?chewymodel=`, Settings > Toybox Chewy), and a missing file falls back to the Storybook model. `HERO_MODELS.chewyToy`
   holds its tint, ear gain and palm / back attach points. prod-smoke requires it whenever chewy_b.json ships.
+- The companion is the **Toybox Shadow** (`public/rigs/shadow_toy.*`, sources in tools/blender/codex/assets/shadow-toy):
+  a quadruped exported with `hero_export.py --contract quad`. That's 21 bones: the legs hang off root, and there are lid,
+  jaw and lip joints.
+  - `buildHeroModel` builds `poseQuad`'s parts when `meta.contract === 'quad'`, and the Companion and portraits use it
+    when it's loaded. Otherwise they fall back to the kit `buildBoston`.
+  - `HERO_MODELS.shadow.darkGrade` counters the grade pass's violet lift on his near-black coat, in the hero shader.
+    Portraits zero it, because they render ungraded.
+  - Install a re-export with `python tools/blender/codex/install_rig.py <export dir> <name>`, which copies all four
+    files. prod-smoke requires `shadow_toy` whenever it ships.
+- Rosie the baker is the **Toybox Rosie** (`public/rigs/rosie_toy.*`, sources in tools/blender/codex/assets/rosie-toy): a
+  villager on the 37-bone hero contract. `game.js` builds her Villager with `buildHeroModel('rosie')` when it's loaded, and
+  falls back to the kit `CAST.rosie` otherwise.
+  - Her HERO_MODELS entry adds per-model Animator overrides: `wave` ('out' waves and cheers outward; Moka uses 'front') and `squint`
+    ([upper, lower] happy lids).
+  - It also sets `darkGrade` for her hair and a `hat` anchor for the nightcap.
+  - prod-smoke requires `rosie_toy` whenever it ships.
+- Moka's default baked model is the **Toybox Moka** (`public/rigs/moka_toy.*`, sources in tools/blender/codex/assets/moka-toy).
+  - `cfgFor` loads `mokaToy` first and falls back to the Storybook `moka_disney`, like Chewy. The Settings toggle is
+    "Toybox heroes".
+  - Her entry sets `wave: 'front'`, `darkGrade` and `palm`.
+  - prod-smoke requires `moka_toy` when playing Moka whenever it ships.
+- **The procedural NPCs (villagers, townsfolk, humanoid monsters) are Toybox-style** by default: `src/actors/toyKit.js`, through
+  `makeToyHumanoid` in charKit.js. The targets are the 7 approved sheets in tools/blender/work/codex/npc-kit/sheets.
+  - **Style:** `kitStyle()` follows the "Toybox heroes" setting (off gives the Disney kit), and "Disney style" off gives the
+    classic kit. `?kit=toy|disney|classic` overrides both.
+  - **Eyes:** oval holes cut into one smooth skull; eye pads creased the face and zigzagged the toon band.
+  - **Lids and lashes:** the lid ribbons carry the blink ∪, and the lower lids carry the happy ^ (`rig.squint`). The lash line
+    sits on a small bone in `parts.eyes`, so the Animator's eye squash tucks it behind the lids.
+  - **Colour and hats:** vertex-colour `darkGrade`, and ear-aware hats per species.
+  - **Poses:** `parts.toyArms` makes stretch and yawn raise the arms outward (lifePoses.js).
+  - **Test pages:** `/?test=chars&folk=12&seed=N` (townsfolk grid) and `&hats` (species × hat).
 - Villager/story lines are written to Chewy: wrap them in `heroText(s, state)` to address whoever is being played.
 
 ## Regions (src/regions/ — design, contracts and ownership: docs/REGIONS.md)

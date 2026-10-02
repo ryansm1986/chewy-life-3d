@@ -97,6 +97,16 @@ const common = ['-m', model, '-c', `model_reasoning_effort='${effort}'`, '-c', "
   '-C', dir, '--add-dir', MODELS, '--json', '-o', path.join(dir, `reply-${n}.md`), ...opt.images.flatMap(im => ['-i', path.resolve(im)])];
 const args = cmd === 'start' ? [...pre, 'exec', ...common, '-'] : [...pre, 'exec', ...common, 'resume', readSess().thread, '-'];
 console.log(`codex-blender: ${cmd} ${opt.task} (round ${n}) on ${model} / ${effort} via ${bin}${pre.length ? ' (npx: install Codex CLI 0.159+ globally to skip this)' : ''}`);
+// one run per task at a time (a second resume on the same thread would interleave both turns)
+const lock = path.join(dir, 'run.lock');
+if (fs.existsSync(lock)) {
+  const L = JSON.parse(fs.readFileSync(lock, 'utf8') || '{}');
+  let alive = false; try { process.kill(L.pid, 0); alive = true; } catch { /* stale */ }
+  if (alive) die(`task ${opt.task} is already running (round ${L.round}, pid ${L.pid}, since ${L.since}); wait for it to finish`);
+}
+fs.writeFileSync(lock, JSON.stringify({ pid: process.pid, round: n, since: new Date().toISOString() }));
+const unlock = () => { try { if (JSON.parse(fs.readFileSync(lock, 'utf8')).pid === process.pid) fs.unlinkSync(lock); } catch { /* gone */ } };
+process.on('exit', unlock);
 const t0 = Date.now();
 const ev = fs.createWriteStream(path.join(dir, `events-${n}.jsonl`));
 const win = process.platform === 'win32', q = a => (win && /[\s"&|<>^()]/.test(a) ? `"${a.replace(/"/g, '""')}"` : a);

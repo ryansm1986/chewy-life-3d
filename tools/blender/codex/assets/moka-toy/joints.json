@@ -1,0 +1,238 @@
+{
+  "units": "metres",
+  "coordinate_system": "Blender Z-up, front -Y; character left is +X",
+  "hips": [
+    0,
+    0.006,
+    0.365
+  ],
+  "spine": [
+    0,
+    0.0,
+    0.47
+  ],
+  "chest": [
+    0,
+    -0.006,
+    0.59
+  ],
+  "neck": [
+    0,
+    0.005,
+    0.672
+  ],
+  "arms": {
+    "L": {
+      "shoulder": [
+        0.15,
+        -0.02,
+        0.6
+      ],
+      "elbow": [
+        0.21,
+        -0.028,
+        0.528
+      ],
+      "wrist": [
+        0.26,
+        -0.036,
+        0.456
+      ]
+    },
+    "R": {
+      "shoulder": [
+        -0.15,
+        -0.02,
+        0.6
+      ],
+      "elbow": [
+        -0.21,
+        -0.028,
+        0.528
+      ],
+      "wrist": [
+        -0.26,
+        -0.036,
+        0.456
+      ]
+    }
+  },
+  "legs": {
+    "L": {
+      "hip": [
+        0.102,
+        0.006,
+        0.365
+      ],
+      "knee": [
+        0.11,
+        0.001,
+        0.235
+      ],
+      "ankle": [
+        0.118,
+        -0.004,
+        0.105
+      ],
+      "toe": [
+        0.135,
+        -0.15,
+        0.04
+      ]
+    },
+    "R": {
+      "hip": [
+        -0.102,
+        0.006,
+        0.365
+      ],
+      "knee": [
+        -0.11,
+        0.001,
+        0.235
+      ],
+      "ankle": [
+        -0.118,
+        -0.004,
+        0.105
+      ],
+      "toe": [
+        -0.135,
+        -0.15,
+        0.04
+      ]
+    }
+  },
+  "tail": [
+    [
+      0.0,
+      0.15,
+      0.318
+    ],
+    [
+      0,
+      0.208,
+      0.31
+    ],
+    [
+      0.012,
+      0.24,
+      0.346
+    ],
+    [
+      -0.01,
+      0.23,
+      0.384
+    ]
+  ],
+  "palm_R": [
+    -0.2836441520613024,
+    -0.04505738853305993,
+    0.40198493826229875
+  ],
+  "palm_L": [
+    0.2836441520613024,
+    -0.04505738853305993,
+    0.40198493826229875
+  ],
+  "palm_R_grip_axis": [
+    0,
+    0,
+    1.0
+  ],
+  "satchel": [
+    0.22428011546712456,
+    -0.19074343376863376,
+    0.33719993112479973
+  ],
+  "duck": [
+    0.04,
+    -0.22282776902142773,
+    0.404
+  ],
+  "head": [
+    0.0,
+    -0.03728,
+    0.86296
+  ],
+  "jaw_pivot": [
+    0,
+    -0.0956,
+    0.7365999999999999
+  ],
+  "eyes": {
+    "R": [
+      -0.12179234110801893,
+      -0.20384431218545926,
+      0.9096883048616259
+    ],
+    "L": [
+      0.12179234110801893,
+      -0.20384431218545926,
+      0.9096883048616259
+    ]
+  },
+  "ears": {
+    "L": {
+      "base": [
+        0.22841999999999998,
+        0.062055624596047326,
+        0.9309999999999999
+      ],
+      "fold": [
+        0.38203826086956527,
+        0.062055624596047326,
+        0.5932299999999999
+      ],
+      "tip": [
+        0.38394,
+        0.062055624596047326,
+        0.46443999999999996
+      ]
+    },
+    "R": {
+      "base": [
+        -0.22841999999999998,
+        0.062055624596047326,
+        0.9309999999999999
+      ],
+      "fold": [
+        -0.38203826086956527,
+        0.062055624596047326,
+        0.5932299999999999
+      ],
+      "tip": [
+        -0.38394,
+        0.062055624596047326,
+        0.46443999999999996
+      ]
+    }
+  },
+  "hat": {
+    "pivot": [
+      0.0,
+      0.05020000000000001,
+      1.061248
+    ],
+    "tip": [
+      0.2610563639228592,
+      0.26429249152316514,
+      1.1620627857369368
+    ],
+    "moon": [
+      0.2557715038504068,
+      0.261826223489354,
+      1.0941199857369368
+    ]
+  },
+  "notes": [
+    "Phase 1: no rig, weights or animations. Same keys as rosie-opus joints.json plus palm_R / palm_L (and hat, satchel, duck).",
+    "head = the head centre (radial origin), not the nod pivot; the rig should put the head bone at the base of the skull.",
+    "Head skin = zero surface of a smooth SDF ball (cranium + cheek + brow + lower-cheek + muzzle + chin + hidden hat fill + nose), analytic normals.",
+    "Eyelid holes ringed by 6 loops each with the rim rolled 4.5 mm in behind separate lens eyeballs; 3 loops round the mouth, 4 round the nose.",
+    "Ears: separate pieces (Moka_ear_L / _R), 11 curl lobes stacked along the length + ribbon tie; pivot = ears.base, fold = the tie.",
+    "Hat: one rigid piece (Moka_hat), pivot = hat.pivot (band base centre). Tail: Moka_tail, pivot = tail[0].",
+    "palm_R: centre of the softly closed right fist (a staff passes through it along palm_R_grip_axis); palm_L: relaxed mitten palm.",
+    "Outer robe: open front, back split from z 0.47 m (wider round the tail), 18 rings x 44 columns; sleeves 10 rings; limbs are ring stacks (joint loops)."
+  ]
+}

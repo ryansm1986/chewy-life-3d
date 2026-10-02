@@ -11,12 +11,23 @@ import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { applyRefined, patchSkinMaterial } from './refinedRigs.js';
 import { chewyStyle } from './disneyChewy.js';
 import { furMaterial, buildDisneyHead, headKind, speciesColors, disneyHand, disneyFoot, handKindFor, footKindFor, tag, paintFn, mergeIndexed, tubeGeo, disneyWizardHat } from './disneyKit.js';
+import { toyMaterial, buildToyBody, TOY_KINDS } from './toyKit.js';
+import { chewyModel } from './heroModels.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const C = h => new THREE.Color(h);
 const INK = '#3a2230';
-// 'disney' (default): sculpted Disney-style cast (disneyKit.js), no ink outline; 'classic': the Pokopia-style chibi kit
-export const kitStyle = () => { const k = new URLSearchParams(location.search).get('kit'); return k || (chewyStyle() === 'classic' ? 'classic' : 'disney'); };
+// The procedural cast's style. 'toy' (default): the Toybox kit (toyKit.js), the same toy line as the baked Toybox
+// heroes; 'disney': the sculpted Storybook kit (disneyKit.js); 'classic': the Pokopia-style chibi kit with ink outlines.
+// ?kit=toy|disney|classic overrides. Otherwise it follows the Settings: "Disney style" off -> classic; "Toybox heroes"
+// off (the Storybook heroes) -> the Disney kit, so the villagers always match the heroes they stand next to.
+export const kitStyle = () => {
+  const k = new URLSearchParams(location.search).get('kit');
+  if (k) return k;
+  if (chewyStyle() === 'classic') return 'classic';
+  return chewyModel() === 'toy' ? 'toy' : 'disney';
+};
+const sculpted = () => kitStyle() !== 'classic'; // toy and disney both bake one skinned mesh without ink hulls
 // tessellation multiplier: 1 in game; the Blender refine export (tools/blender) builds at 3 so painted colour edges are crisp
 let DETAIL = 1;
 const headDetail = () => DETAIL * (DETAIL > 1 ? 2 : 1); // faces are where the atlas has the most texels
@@ -104,11 +115,11 @@ export function tennisBall(r = 0.1) {
 
 // ------------------------------------------------------------------ character assembly
 class Rig {
-  constructor(spec, disney = kitStyle() === 'disney') {
+  constructor(spec, disney = sculpted(), style = disney ? 'disney' : 'classic') {
     this.spec = spec;
     this.root = new THREE.Group(); this.root.name = spec.name || 'char';
     this.disney = disney;
-    this.mat = disney ? furMaterial() : makeToon({ vertexColors: true, objectBrush: true, brush: 0.025, rim: 0.6, term: [-0.02, 0.28], shadowSat: 0.4 }); // clean colour blocks
+    this.mat = disney && style === 'toy' ? toyMaterial() : disney ? furMaterial() : makeToon({ vertexColors: true, objectBrush: true, brush: 0.025, rim: 0.6, term: [-0.02, 0.28], shadowSat: 0.4 }); // clean colour blocks
     // props held or worn (tools, nightcaps, swords) keep plain vertex colours: the fur shader reads uv as fur amount
     this.propMat = disney ? makeToon({ vertexColors: true, objectBrush: true, brush: 0.025, rim: 0.6, term: [-0.02, 0.28], shadowSat: 0.4 }) : this.mat;
     this.defaultFur = 0;
@@ -208,14 +219,14 @@ class Rig {
 // A new rig that shares a baked rig's geometry (cheap: no procedural build, no GPU upload) but has its own
 // bones, skeleton and materials, so it animates and flashes independently. Used for summons such as spirit pups.
 export function cloneRig(src) {
-  const R = new Rig(src.spec, !!src.disney);
+  const R = new Rig(src.spec, !!src.disney, src.toy ? 'toy' : undefined);
   const root = cloneSkinned(src.root);
   const a = [], b = [];
   src.root.traverse(o => a.push(o)); root.traverse(o => b.push(o));
   const map = new Map(a.map((o, i) => [o, b[i]]));
-  for (const k of ['height', 'quadruped', 'offsetY', 'earGain']) if (k in src) R[k] = src[k];
+  for (const k of ['height', 'quadruped', 'offsetY', 'earGain', 'squint', 'toy']) if (k in src) R[k] = src[k];
   R.root = root;
-  for (const [k, o] of Object.entries(src.parts)) R.parts[k] = Array.isArray(o) ? o.map(x => map.get(x)) : map.get(o);
+  for (const [k, o] of Object.entries(src.parts)) R.parts[k] = Array.isArray(o) ? o.map(x => map.get(x)) : o && typeof o === 'object' ? map.get(o) : o;
   R.skin = map.get(src.skin); R.outline = src.outline ? map.get(src.outline) : null; R.meshes = [R.skin]; R.skeleton = R.skin.skeleton;
   R.outline?.bind(R.skeleton, R.outline.bindMatrix); // one skeleton (one bone texture) for body + outline
   R.mat.emissive.copy(src.mat.emissive); R.mat.emissiveIntensity = src.mat.emissiveIntensity;
@@ -242,7 +253,8 @@ export function buildHumanoid(spec) {
   if (r) { PREBUILT.delete(spec); return r; }
   return makeAny(spec);
 }
-const makeAny = spec => (kitStyle() === 'disney' ? makeDisneyHumanoid(spec) : makeHumanoid(spec));
+const makeAny = spec => { const k = kitStyle(); return k === 'toy' ? makeToyHumanoid(spec) : k === 'disney' ? makeDisneyHumanoid(spec) : makeHumanoid(spec); };
+export const rawToyHumanoid = spec => makeToyHumanoid(spec, true); // unbaked (tests)
 function makeHumanoid(spec, raw = false, disney = false) {
   const R = new Rig(spec, disney);
   const sp = SPECIES[spec.species] || SPECIES.dog;
@@ -383,6 +395,23 @@ function makeHumanoid(spec, raw = false, disney = false) {
   R.root.scale.setScalar(spec.scale || 1);
   R.height = 1.22 * (spec.scale || 1); // longer legs + torso
   return raw ? R : !R.disney && applyRefined(R) ? R : R.bake();
+}
+
+// ------------------------------------------------------------------ Toybox humanoid (toyKit.js)
+// The Toybox toy line: about 2.4 heads, a big squircle head, a bean body, chunky limbs and mitten paws (see toyKit.js).
+// Same bones and part names as the other kits. Species the toy kit has no head for (humans: Rosie's kit fallback)
+// are built by the Disney kit, which shares the skeleton contract.
+function makeToyHumanoid(spec, raw = false) {
+  if (!TOY_KINDS.includes(spec.species)) return makeDisneyHumanoid(spec, raw);
+  const R = new Rig(spec, true, 'toy');
+  R.classicHat = (anchor, kind, color) => { anchor.scale.setScalar(1.15); anchor.userData.hatScale = 1.15; buildHat(R, anchor, kind, color, SPECIES[spec.species] || SPECIES.dog); }; // kabuto, wizard: the classic hats
+  buildToyBody(R, spec);
+  if (raw) return R;
+  R.bake();
+  const dbg = new URLSearchParams(location.search).get('toyhide') || '';
+  if (dbg.includes('recv')) R.skin.receiveShadow = false; // dev: shadow-acne check
+  if (dbg.includes('cast')) R.skin.castShadow = false;
+  return R;
 }
 
 // ------------------------------------------------------------------ Disney-style humanoid (sculpted parts: disneyKit.js)
@@ -906,7 +935,7 @@ function makeDisneyBoston(spec = {}) {
   return R.bake();
 }
 export function buildBoston(spec = {}, raw = false) {
-  if (!raw && kitStyle() === 'disney') return makeDisneyBoston(spec);
+  if (!raw && sculpted()) return makeDisneyBoston(spec); // (the Toybox Shadow is the baked hero; its kit fallback stays Disney)
   const R = new Rig({ name: 'Shadow', ...spec }, false);
   const black = spec.fur || '#34303f', white = '#fbf6f0', collar = spec.collar || '#4aa8f0';
   if (!spec.fur) R.mat.userData.u.uRimStr.value = 1.25; // slate rim keeps the little black dog readable at night

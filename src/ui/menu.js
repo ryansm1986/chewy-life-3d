@@ -37,7 +37,7 @@ export class MenuPanel extends Panel {
         <div class="set-row"><div class="set-n">${glyph('bolt')}Screen shake</div><button class="tog" data-k="shake"><i></i></button></div>
         <div class="set-row"><div class="set-n">${glyph('star')}Show FPS</div><button class="tog" data-k="showFps"><i></i></button></div>
         <div class="set-row"><div class="set-n">${glyph('sparkle')}Disney style</div><button class="tog" data-k="disneyChewy"><i></i></button></div>
-        <div class="set-row"><div class="set-n">${glyph('star')}Toybox Chewy</div><button class="tog" data-k="toyChewy"><i></i></button></div>
+        <div class="set-row"><div class="set-n">${glyph('star')}Toybox heroes</div><button class="tog" data-k="toyChewy"><i></i></button></div>
         <div class="mn-foot"><button class="btn" data-a="back">${glyph('swap')}Back</button></div>
       </div>
       <div class="mn-v mn-controls">

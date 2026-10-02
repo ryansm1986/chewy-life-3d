@@ -25,6 +25,17 @@ export const HERO_MODELS = {
   // the "Toybox" Chewy (tools/blender/work/codex/chewy-b, the codex-blender skill): the default Chewy model; the
   // Storybook (Disney) one above stays selectable (Settings > Toybox Chewy, ?chewymodel=disney) and is the fallback
   chewyToy: { file: 'chewy_b', name: 'Chewy', outline: '#2a1812', earGain: 1.6, tint: [1.05, 1.12, 1.18], palm: [0, -0.055, 0.015], back: [0, 0.13, -0.17] }, // tint: under the warm toon light and grade the painted chocolate reads maroon; a cool lift brings back the sheet's chocolate
+  // the Toybox Shadow (tools/blender/codex/assets/shadow-toy, built by an Opus agent with the toybox-character skill): a
+  // quadruped. darkGrade: the grade pass lifts dark pixels toward violet (post.js uLift), so his slate-black coat read
+  // purple; [desat, r, g, b] pulls the hue out of the dark texels and biases them (0..255 sRGB units) against the lift
+  shadow: { file: 'shadow_toy', name: 'Shadow', outline: '#1c181e', earGain: 0, sitDrop: 0.08, darkGrade: [1, -4, 14, -9] },
+  // the Toybox Rosie (tools/blender/codex/assets/rosie-toy, built by an Opus agent with the toybox-character skill): a
+  // villager, not a playable hero (game.js hands her Villager this rig); hat: the nightcap anchor on her curls [x, y, z, scale]; wave: 'out' waves and cheers outward, squint: her happy lids [upper, lower] (animator.js);
+  // darkGrade: the warm grade turned her chocolate hair maroon (a tint would grey her skin), so only the dark texels shift
+  rosie: { file: 'rosie_toy', name: 'Rosie', outline: '#4e2a18', earGain: 0, darkGrade: [0.4, -10, 6, 4], wave: 'out', squint: [0.40, -0.26], palm: [0, -0.05, 0.012], back: [0, 0.1, -0.15], hat: [0, 0.44, -0.03, 1.15] },
+  // the Toybox Moka (tools/blender/codex/assets/moka-toy, the toybox-character skill, Opus builder): the default Moka; the
+  // Storybook one below stays the fallback. Its attach points and grade are set when the rig lands.
+  mokaToy: { file: 'moka_toy', name: 'Moka', outline: '#2a1510', earGain: 0.45, darkGrade: [0.2, 4, 16, 12], wave: 'front', palm: [0, -0.054, 0.009], back: [0, 0.02, -0.13] },
   moka: { file: 'moka_disney', name: 'Moka', outline: '#2a1510', earGain: 1.7, earFlip: true, palm: [0, -0.045, 0.012], back: [0, 0.02, -0.13] },
 };
 
@@ -42,7 +53,9 @@ export function chewyModel() {
   try { return localStorage.getItem('chewy.model') || 'toy'; } catch { return 'toy'; }
 }
 export function setChewyModel(m) { try { localStorage.setItem('chewy.model', m); } catch { /* private mode */ } }
-const cfgFor = id => (id === 'chewy' && chewyModel() === 'toy' ? [HERO_MODELS.chewyToy, HERO_MODELS.chewy] : [HERO_MODELS[id]]);
+// the Toybox heroes load first, falling back to the Storybook model (the "Toybox heroes" setting / ?chewymodel= picks)
+const TOY = { chewy: 'chewyToy', moka: 'mokaToy' };
+const cfgFor = id => (TOY[id] && chewyModel() === 'toy' ? [HERO_MODELS[TOY[id]], HERO_MODELS[id]] : [HERO_MODELS[id]]);
 
 const ASSETS = new Map();  // id -> { meta, buf, tex, ntex, geo?, olGeo? }
 const LOADING = new Map(); // id -> Promise<boolean>
@@ -106,6 +119,17 @@ function geometry(A) {
 const HALF_TURN = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
 
 /** A fresh rig of a loaded hero (shares the geometry; own bones, skeleton and materials). */
+// cfg.darkGrade, on the painted texel before lighting (sRGB-ish): texels darker than luminance 0.30 blend toward their own
+// grey by x and take the yzw offset, fading out by 0.42 (the dark-coat counterpart of a tint, which would move the whites
+// too). Portraits render without the grade pass and zero the uniform (gfx/portraits.js).
+const DARK_GRADE = /* glsl */`
+  {
+    vec3 sc = pow(max(diffuseColor.rgb, 0.0), vec3(1.0 / 2.2));
+    float l = dot(sc, vec3(0.2126, 0.7152, 0.0722));
+    float w = clamp((0.42 - l) / 0.12, 0.0, 1.0);
+    sc += w * (uDarkGrade.x * (vec3(l) - sc) + uDarkGrade.yzw);
+    diffuseColor.rgb = pow(max(sc, 0.0), vec3(2.2));
+  }`;
 export function buildHeroModel(id, spec = null) {
   const A = ASSETS.get(id); if (!A) throw new Error(`hero model ${id} not loaded`);
   const cfg = A.cfg || HERO_MODELS[id];
@@ -129,13 +153,20 @@ export function buildHeroModel(id, spec = null) {
     B[b.name].position.copy(parent.worldToLocal(tmp.copy(abs[b.name])));
   }
   // attachment points the game expects: the paws that hold the weapon, the spot on the back for a sheathed one
-  const S = meta.scale;
+  const S = meta.scale, quad = meta.contract === 'quad';
   const palm = n => { const g = new THREE.Group(); g.name = n; g.position.set(cfg.palm[0] * S, cfg.palm[1] * S, cfg.palm[2] * S); B[n === 'handR' ? 'hand_R' : 'hand_L'].add(g); return g; };
-  const back = new THREE.Group(); back.name = 'back'; back.position.set(cfg.back[0] * S, cfg.back[1] * S, cfg.back[2] * S); B.chest.add(back);
-  B.ear_L.userData.tip = B.earTip_L; B.ear_R.userData.tip = B.earTip_R;
+  const back = quad ? null : new THREE.Group();
+  if (back) { back.name = 'back'; back.position.set(cfg.back[0] * S, cfg.back[1] * S, cfg.back[2] * S); B.chest.add(back); }
+  if (!quad) { B.ear_L.userData.tip = B.earTip_L; B.ear_R.userData.tip = B.earTip_R; } // (quadrupeds' upright ears swing whole)
+  let hatAnchor = null; // where a villager's nightcap goes (npc.js setNightcap); without one it sits 0.4 above the head bone
+  if (cfg.hat) { hatAnchor = new THREE.Group(); hatAnchor.name = 'hatAnchor'; hatAnchor.position.set(cfg.hat[0] * S, cfg.hat[1] * S, cfg.hat[2] * S); hatAnchor.userData.hatScale = cfg.hat[3] ?? 1; B.head.add(hatAnchor); }
   root.updateMatrixWorld(true);
 
-  const mat = makeToon({ map: tex, objectBrush: true, brush: 0, rim: 0.5, term: [-0.04, 0.34], shadowSat: 0.35 });
+  const dg = cfg.darkGrade;
+  const mat = makeToon({
+    map: tex, objectBrush: true, brush: 0, rim: 0.5, term: [-0.04, 0.34], shadowSat: 0.35,
+    ...(dg && { fragPars: 'uniform vec4 uDarkGrade;', fragColor: DARK_GRADE, uniforms: { uDarkGrade: { value: new THREE.Vector4(dg[0], dg[1] / 255, dg[2] / 255, dg[3] / 255) } } }),
+  });
   if (ntex) { mat.normalMap = ntex; mat.normalScale.set(0.45, 0.45); }
   if (cfg.tint) mat.color.setRGB(...cfg.tint);
   const outMat = makeOutline(cfg.outline, 0.0045);
@@ -152,15 +183,19 @@ export function buildHeroModel(id, spec = null) {
   const outline = mk(olGeo, outMat, 'outline_skin'); outline.castShadow = false;
   outline.visible = false; // film look: no ink hull (it also pokes through the eye, nose and mouth hollows)
 
-  const parts = {
+  const parts = quad ? { // the kit Boston's parts (Animator.poseQuad): the legs hang off the root, the head and tail off the body
+    body: B.body, head: B.head, legs: [B.legFL, B.legFR, B.legBL, B.legBR], earL: B.ear_L, earR: B.ear_R, tail: B.tail1,
+    jaw: B.jaw, lids: [B.lidU_L, B.lidU_R], lidsLow: [B.lidD_L, B.lidD_R], lips: [B.lip_L, B.lip_R], eyes: [], brows: [],
+    eyeballs: [B.eye_L, B.eye_R],
+  } : {
     body: B.spine, head: B.head, armL: B.upperarm_L, armR: B.upperarm_R, handL: palm('handL'), handR: palm('handR'),
-    legL: B.thigh_L, legR: B.thigh_R, earL: B.ear_L, earR: B.ear_R, tail: B.tail1, back,
+    legL: B.thigh_L, legR: B.thigh_R, earL: B.ear_L, earR: B.ear_R, tail: B.tail1, back, hatAnchor, wave: cfg.wave,
     jaw: B.jaw, lids: [B.lidU_L, B.lidU_R], lidsLow: [B.lidD_L, B.lidD_R], lips: [B.lip_L, B.lip_R], eyes: [], brows: [],
     eyeballs: [B.eye_L, B.eye_R],
   };
   return {
     spec: spec || { name: cfg.name }, hero: id, root, parts, mat, outMat, propMat, meshes: [skin], skin, outline, skeleton, height: meta.height,
-    disney: true, bakedDisney: true, sharedGeo: true, earGain: cfg.earGain, model: cfg.file,
+    disney: true, bakedDisney: true, sharedGeo: true, earGain: cfg.earGain, model: cfg.file, quadruped: quad, sitDrop: cfg.sitDrop, squint: cfg.squint,
     dispose() { skeleton.dispose(); mat.dispose(); outMat.dispose(); propMat.dispose(); },
   };
 }

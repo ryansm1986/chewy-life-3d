@@ -52,8 +52,10 @@ const ACTIONS = {
   hurt: { dur: 0.32, pose: (t, P, A) => { const k = Math.sin(clamp(t) * Math.PI); A.body.x += -0.35 * k; A.head.x += -0.3 * k; A.armR.z += -0.5 * k; A.armL.z += 0.5 * k; A.sq += 0.08 * k; A.flinch = k; } },
   die: { dur: 1.2, hold: true, pose: (t, P, A) => { const k = ease.outBounce(clamp(t / 0.7)); A.body.x += -1.35 * k; A.y += -0.1 * k; A.armR.z += -1.2 * k; A.armL.z += 1.2 * k; A.eyesClosed = 1; A.legL.x += -0.9 * k; A.legR.x += -1.2 * k; } },
   roll: { dur: 0.42, pose: (t, P, A) => { const k = ease.inOutQuad(clamp(t)); A.roll = k * TAU; A.sq += 0.25 * Math.sin(k * Math.PI); A.armR.x += -1.2 * Math.sin(k * Math.PI); A.armL.x += -1.2 * Math.sin(k * Math.PI); A.legL.x += -1.2 * Math.sin(k * Math.PI); A.legR.x += -1.2 * Math.sin(k * Math.PI); A.y += 0.15 * Math.sin(k * Math.PI); } },
-  wave: { dur: 1.3, pose: (t, P, A) => { const w = Math.sin(clamp(t) * Math.PI); A.armR.z += 2.5 * clamp(w * 3); A.armR.x += -0.3 * w; A.armR.zWave = Math.sin(t * 22) * 0.35 * clamp(w * 3); A.head.z += 0.12 * w; A.happy = 1; } },
-  happy: { dur: 1.0, pose: (t, P, A) => { const j = Math.abs(Math.sin(t * Math.PI * 2)); A.y += j * 0.28; A.sq += -0.1 * j + 0.08 * (1 - j); A.armR.z += 2.4; A.armL.z += -2.4; A.armR.x += -0.2; A.armL.x += -0.2; A.happy = 1; A.eyesHappy = 1; } },
+  // wave / happy raise the arms inward-up (+z on armR). P.wave changes that for short arms under a big head: 'out' raises them
+  // outward-up (the Toybox Rosie), 'front' forward-up in front of the face (the Toybox Moka, whose long ears hang beside the arms)
+  wave: { dur: 1.3, pose: (t, P, A) => { const w = Math.sin(clamp(t) * Math.PI); const k3 = clamp(w * 3); A.armR.z += (P.wave === 'out' ? -1.85 : P.wave === 'front' ? -0.3 : 2.5) * k3; A.armR.x += P.wave === 'front' ? -2.1 * k3 : -0.3 * w; A.armR.zWave = Math.sin(t * 22) * 0.35 * clamp(w * 3); A.head.z += 0.12 * w; A.happy = 1; } },
+  happy: { dur: 1.0, pose: (t, P, A) => { const j = Math.abs(Math.sin(t * Math.PI * 2)); A.y += j * 0.28; A.sq += -0.1 * j + 0.08 * (1 - j); const up = P.wave === 'out' ? -1.8 : P.wave === 'front' ? -0.35 : 2.4, fx = P.wave === 'front' ? -2.3 : -0.2; A.armR.z += up; A.armL.z += -up; A.armR.x += fx; A.armL.x += fx; A.happy = 1; A.eyesHappy = 1; } },
   pickup: { dur: 0.45, ev: { grab: 0.4 }, pose: (t, P, A) => { const k = Math.sin(clamp(t) * Math.PI); A.body.x += 0.6 * k; A.armR.x += -1.2 * k; A.armL.x += -1.2 * k; A.sq += 0.1 * k; A.y += -0.06 * k; } },
   drink: { dur: 0.7, pose: (t, P, A) => { const k = Math.sin(clamp(t) * Math.PI); A.armR.x += -2.2 * k; A.armR.z += 0.6 * k; A.head.x += -0.35 * k; A.eyesHappy = k > 0.5 ? 1 : 0; } },
   dig: { dur: 0.9, pose: (t, P, A) => { const s = Math.sin(t * 26); A.body.x += 0.55; A.armR.x += -1.2 + s * 0.7; A.armL.x += -1.2 - s * 0.7; A.sq += 0.06; A.tailWag = 2.5; } },
@@ -233,9 +235,11 @@ export class Animator {
     const P = this.P;
     if (P.jaw) { const r = this.rest.get(P.jaw); P.jaw.rotation.x = r.r.x + open * 0.42; }
     if (P.lids) {
-      const squint = A.eyesHappy ? 0.4 : 0;
-      for (const l of P.lids) { const r = this.rest.get(l); l.rotation.x = r.r.x + Math.max(blink, squint) * 1.22; }
-      for (const l of P.lidsLow || []) { const r = this.rest.get(l); l.rotation.x = r.r.x - 0.1 - squint * 0.35; }
+      // happy squint: upper lids +0.488 (0.4 of a blink), lower lids −0.24 (held at −0.1 otherwise); rig.squint = [upper, lower]
+      // overrides it per model (a tall wrapped eye like the Toybox Rosie's reads happier with less upper lid)
+      const sq = this.rig.squint, up = A.eyesHappy ? (sq ? sq[0] : 0.488) : 0, low = A.eyesHappy ? (sq ? sq[1] : -0.24) : -0.1;
+      for (const l of P.lids) { const r = this.rest.get(l); l.rotation.x = r.r.x + Math.max(blink * 1.22, up); }
+      for (const l of P.lidsLow || []) { const r = this.rest.get(l); l.rotation.x = r.r.x + low; }
     }
     if (P.lips) {
       this.smile = damp(this.smile ?? 0.4, A.happy || this.mood ? 1 : 0.4, 6, dt);
@@ -287,7 +291,7 @@ export class Animator {
     // sit: the body pitches up at the front so the rump settles onto the ground (only the body drops, the front paws stay
     // planted), the haunches come down and the hind legs fold forward along the ground; the head counter-tilts to look ahead
     const sk = sitting ? ease.outQuad(Math.min(1, this.action.t / 0.3)) : 0;
-    for (const L of [BL, BR]) L.position.y = this.rest.get(L).p.y - 0.17 * sk;
+    for (const L of [BL, BR]) L.position.y = this.rest.get(L).p.y - (this.rig.sitDrop ?? 0.17) * sk; // (baked dogs with short legs drop less)
     if (sk) { this._set(BL, -1.45 * sk, 0, 0); this._set(BR, -1.45 * sk, 0, 0); A.body.x -= 0.5 * sk; A.head.x += 0.38 * sk; }
     const rb = this.rest.get(P.body);
     const bob = Math.abs(Math.sin(ph));

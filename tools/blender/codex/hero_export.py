@@ -4,7 +4,7 @@
 #   public/rigs/<name>.png   the colour atlas;  <name>_n.png  a flat normal map (the baked heroes' material expects one)
 #
 #   blender --background RIG.blend --python tools/blender/codex/hero_export.py -- --out DIR --name chewy_b
-#           [--rig ARMATURE_NAME] [--height 1.2] [--no-outline eye,tongue,mouth,lid] [--scale 1]
+#           [--rig ARMATURE_NAME] [--height 1.2] [--no-outline eye,tongue,mouth,lid] [--scale 1] [--contract hero|quad]
 #
 # Contract (docs: .claude/skills/codex-blender/SKILL.md, "Rigging for the game"):
 #  - one armature; bone names = the hero contract (HERO_BONES below); every deforming mesh has only an Armature
@@ -26,10 +26,23 @@ for s in 'LR':
                    f'ear_{s}': 'head', f'earTip_{s}': f'ear_{s}', f'upperarm_{s}': 'chest', f'forearm_{s}': f'upperarm_{s}',
                    f'hand_{s}': f'forearm_{s}', f'thigh_{s}': 'hips', f'shin_{s}': f'thigh_{s}', f'foot_{s}': f'shin_{s}'})
 
+# Quadruped contract (--contract quad: Shadow, animals). Mirrors the kit Boston (charKit.buildBoston) and Animator.poseQuad:
+# body = the barrel (bob, pitch, roll; pivot at its centre), head under neck under body, the legs are children of ROOT (they
+# don't follow the body's pitch: the sit pose pitches the body up while the hind legs fold), tail1-2 on the body's rear.
+# No earTip: upright ears swing whole (the Animator's no-tip ear spring).
+QUAD_BONES = ['root', 'body', 'neck', 'head', 'jaw', 'eye_L', 'lidU_L', 'lidD_L', 'lip_L', 'ear_L', 'eye_R', 'lidU_R', 'lidD_R', 'lip_R', 'ear_R',
+              'legFL', 'legFR', 'legBL', 'legBR', 'tail1', 'tail2']
+QUAD_PARENT = {'root': None, 'body': 'root', 'neck': 'body', 'head': 'neck', 'jaw': 'head', 'legFL': 'root', 'legFR': 'root', 'legBL': 'root', 'legBR': 'root',
+               'tail1': 'body', 'tail2': 'tail1'}
+for s_ in 'LR':
+    QUAD_PARENT.update({f'eye_{s_}': 'head', f'lidU_{s_}': 'head', f'lidD_{s_}': 'head', f'lip_{s_}': 'head', f'ear_{s_}': 'head'})
+
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 def arg(k, d=None): return argv[argv.index(k) + 1] if k in argv else d
 OUT = os.path.abspath(arg('--out', '.')); NAME = arg('--name', 'hero'); SCALE = float(arg('--scale', '1'))
 HEIGHT = arg('--height'); NO_OUTLINE = [s for s in (arg('--no-outline', 'eye,tongue,mouth,lid')).split(',') if s]
+CONTRACT = arg('--contract', 'hero')
+if CONTRACT == 'quad': HERO_BONES, PARENT = QUAD_BONES, QUAD_PARENT
 os.makedirs(OUT, exist_ok=True)
 log = lambda *a: print('[hero_export]', *a)
 warn = []
@@ -133,7 +146,7 @@ flat.pixels.foreach_set(np.tile([0.5, 0.5, 1.0, 1.0], 16).astype(np.float32)); f
 
 height = float(HEIGHT) if HEIGHT else float(pos[:, 1].max())
 bones = [{'name': b, 'parent': PARENT[b], 'pos': to_three(heads[b]).round(5).tolist()} for b in HERO_BONES]
-meta = {'name': NAME, 'scale': SCALE, 'height': round(height, 3), 'bones': bones, 'layout': layout,
+meta = {'name': NAME, 'contract': CONTRACT, 'scale': SCALE, 'height': round(height, 3), 'bones': bones, 'layout': layout,
         'vertexCount': int(base), 'outlineIndexCount': int(outline_count), 'bin': NAME + '.bin', 'tex': NAME + '.png', 'normalTex': NAME + '_n.png'}
 json.dump(meta, open(os.path.join(OUT, NAME + '.json'), 'w'), indent=1)
 for w_ in warn: log('WARNING', w_)

@@ -15,10 +15,11 @@ export default function () {
   const r = buildHumanoid(VILLAGERS[0].spec); out.tris = r.skin.geometry.index.count / 3; r.dispose();
   window.__bench = out; window.__ready = true;
 }
-// per-part triangle counts: /?test=kitbench&parts
-import { rawDisneyHumanoid } from '../actors/charKit.js';
+// per-part triangle counts: /?test=kitbench&parts[&id=kuma]
+import { rawDisneyHumanoid, rawToyHumanoid, kitStyle } from '../actors/charKit.js';
 if (new URLSearchParams(location.search).has('parts')) {
-  const R = rawDisneyHumanoid(VILLAGERS[0].spec), out = {};
+  const id = new URLSearchParams(location.search).get('id'), v = VILLAGERS.find(x => x.id === id) || VILLAGERS[0];
+  const R = (kitStyle() === 'toy' ? rawToyHumanoid : rawDisneyHumanoid)(v.spec), out = {};
   R.root.traverse(o => { if (o.isMesh && o.geometry.index) out[o.name] = (out[o.name] || 0) + o.geometry.index.count / 3; });
   window.__parts = out;
 }

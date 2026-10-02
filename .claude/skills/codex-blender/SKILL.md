@@ -37,6 +37,10 @@ Everything lives in the repo:
   - anything that needs per-instance variation at runtime;
   - the refined character skins, which have their own pipeline in `tools/blender/build.mjs`.
 
+> **Characters**: for a new or redesigned character in the Toybox Chibi style, use the **toybox-character** skill
+> (`.claude/skills/toybox-character/SKILL.md`). It runs this skill's runner through concept → user approval → model →
+> rig → game integration, with the review tools and lessons from the Toybox Chewy.
+
 ## 0. Concept sheets first (optional, recommended for characters and hero assets)
 Before modelling, Codex can **draw model sheets** with its image-generation tool, so the user can pick a design:
 ```bash

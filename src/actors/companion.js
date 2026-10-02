@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { Actor } from './actor.js';
 import { buildBoston, enableXray } from './charKit.js';
+import { heroModelReady, buildHeroModel } from './heroModels.js';
 import { Events } from '../core/events.js';
 import { U } from '../gfx/materials.js';
 import { rand, chance, TAU } from '../core/util.js';
@@ -14,7 +15,7 @@ const SLOTS = [[1.1, 0.7], [1.1, -0.7], [0.2, 1.05], [0.2, -1.05], [-0.6, 1.0], 
 
 export class Companion extends Actor {
   constructor(world, G) {
-    super(world, buildBoston(), { radius: 0.22, speed: 4.2, name: 'Shadow' });
+    super(world, heroModelReady('shadow') ? buildHeroModel('shadow') : buildBoston(), { radius: 0.22, speed: 4.2, name: 'Shadow' }); // the baked Toybox Shadow when loaded
     this.G = G;
     enableXray(this.rig, '#9fc8ff', 0.55);
     this.state = 'follow'; this.stateT = 0;
