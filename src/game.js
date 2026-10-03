@@ -41,6 +41,7 @@ import { Waterfall } from './world/waterfall.js';
 import { VillageMinimap, DungeonMinimap, RegionMinimap } from './world/minimap.js';
 import { prewarmWorld } from './world/prewarm.js';
 import { WORLD } from './world/layout.js';
+import { installLife } from './life/index.js';
 
 // UI and audio load in parallel with the world. The import() paths must be literal so Vite bundles them for the
 // production build (a variable path with @vite-ignore worked on the dev server but 404'd in dist: no UI, no sound).
@@ -85,7 +86,7 @@ export async function boot() {
   const sim = G.sim = new VillageSim(G, village);
   G.village = { world: village, vfx: vVfx, ambient, combat: vCombat }; // before init: buildings register chimney smoke with the ambient
   sim.init();
-  village.onNewDay = d => { sim.flushDigest(); sim.onNewDay(d); };
+  village.onNewDay = d => { sim.flushDigest(); sim.onNewDay(d); G.life?.onNewDay(d); }; // (+ the homestead: crops grow overnight)
   const buildMode = G.build = new BuildMode(G, sim);
   G.village = { world: village, vfx: vVfx, ambient, combat: vCombat };
   G.world = village; G.combat = vCombat;
@@ -210,6 +211,7 @@ export async function boot() {
   function syncBuffs() {
     const B = G.combat?.buffs || {}; const list = [];
     for (const [k, b] of Object.entries(B)) { const inf = BUFF_INFO[k]; if (!inf || (k === 'frenzy' && !b.stacks)) continue; list.push({ id: k, name: k === 'frenzy' ? `${inf[0]} ×${b.stacks}` : inf[0], glyph: inf[1], color: inf[2], time: b.t > 0 ? b.t : 0 }); }
+    const meal = G.life?.kitchen?.mealBuff(); if (meal) list.unshift(meal); // Well Fed (life/meals.js)
     G.ui?.setBuffs?.(list);
   }
 
@@ -384,8 +386,10 @@ export async function boot() {
   G.ui?.setQuestProvider?.(() => G.story.uiList());
   G.questTarget = () => (G.titleActive || G.playerDead ? null : G.story.target());
   installServices(G);
+  installLife(G, village); // farming, the pantry, the Seed Stall (docs/HOMESTEAD.md)
   const vMap = new VillageMinimap(G);
   Events.on('village:changed', () => { vMap.dirty = true; });
+  Events.on('garden:till', () => { vMap.dirty = true; }); // (Chewy's bed turns from lawn to soil on the map)
   G.ui?.minimap?.setProvider?.(vMap);
   G.talkTo = (npc) => {
     if (npc.talking) return;
@@ -502,6 +506,7 @@ export async function boot() {
     if (Input.hit('q')) usePotion('heart');
     if (Input.hit('e')) usePotion('zoom');
     if (Input.hit('r')) usePotion('rejuv');
+    if (Input.hit('g')) G.life?.kitchen?.quickEat(); // the quick meal (docs/HOMESTEAD.md §4)
     if (Input.hit('x')) { G.actions.swapWeapons(); player.setWeapon(G.derived.weaponType || 'sword'); G.audio?.play?.('ui_equip'); G.vfx.sparkle(player.pos.clone().setY(0.8), { n: 6 }); }
     if (Input.hit('t') && G.mode === 'dungeon') G.returnToVillage();
     if (Input.hit('tab')) { Input.consume?.('tab'); heroes.switchTo(); } // switch heroes (zoom out, hand-off, zoom in)
@@ -704,6 +709,7 @@ export async function boot() {
     else handleInput(dt);
     G.actions.tickRegen(dt);
     player.update(dt);
+    G.life?.update(dt);
     shadow.update(dt);
     skills.update(dt, skillInput);
     G.combat.update(dt);

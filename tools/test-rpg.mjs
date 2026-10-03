@@ -1,5 +1,7 @@
 // RPG data/logic self-test: node tools/test-rpg.mjs [--quiet]
-// Validates schemas & invariants, simulates leveling 1→60, prints sample items/tooltips and drop-rate tables.
+// Validates schemas & invariants, simulates leveling 1→60, prints sample items/tooltips and drop-rate tables, and
+// tests the homestead's pure math (docs/HOMESTEAD.md): the pantry, recipes and mixes, Well Fed in computeStats, the
+// garden's growth rules, the fish tables and the reel sim.
 import { RNG } from '../src/core/util.js';
 import { Events } from '../src/core/events.js';
 import { SKILLS, SKILL_IDS, TREES, ATTACK, synergyMult, effectiveLevel, canLearn, skillRuntime, usable, ROW_REQ } from '../src/rpg/skills.js';
@@ -12,7 +14,14 @@ import {
   applyRandomMods, LEVEL_CAP, RES_CAP, monsterPhysDR, playerPhysDR,
 } from '../src/rpg/stats.js';
 import { rollDrops, chestDrops, MATERIAL_KEYS } from '../src/rpg/loot.js';
-import { createActions, newGameState } from '../src/rpg/actions.js';
+import { createActions, newGameState, normalizeHeroes, saveableState } from '../src/rpg/actions.js';
+import { CLASSES, HERO_IDS } from '../src/rpg/classes.js';
+import { PANTRY, PANTRY_IDS, KINDS as PKINDS, CROPS, CROP_IDS, LOVED, sellPrice, seedDrops, forageDrops, pantryHas, pantryList } from '../src/life/pantry.js';
+import { RECIPES, RECIPE_IDS, STATIONS, STARTERS, COOKBOOK, cookbookOf, knows, learn, spendFor, maxCook, haveOf, matchMix, fallbackMix, cookableAt, hintFor, teachesOf } from '../src/life/cooking.js';
+import { BUFFS, mealFor, mealActive } from '../src/life/meals.js';
+import { growNight, harvestCrop, isRipe, SPRINKLE } from '../src/life/gardenRules.js';
+import { FISH, FISH_IDS, SPOTS, biters, rollFish, rollSize, recordCatch, timeOf, MILESTONES } from '../src/life/fishData.js';
+import { ReelSim } from '../src/life/reelSim.js';
 
 const quiet = process.argv.includes('--quiet');
 let fails = 0, checks = 0;
@@ -30,7 +39,9 @@ const lpad = (s, n) => String(s).padStart(n);
 
 // ------------------------------------------------------------------ skills
 hr('SKILLS');
-ok(SKILL_IDS.length === 21, 'exactly 21 skills');
+// two heroes (docs/HEROES.md): Chewy's three trees (bone / fetch / spirit) and Moka's (tide / star / duck), 21 skills each
+ok(SKILL_IDS.length === 42 && TREES.length === 6, 'exactly 42 skills in 6 trees');
+for (const h of HERO_IDS) ok(SKILL_IDS.filter(id => SKILLS[id].cls === h).length === 21, `${h} has 21 skills`);
 for (const t of TREES) {
   const ids = SKILL_IDS.filter(id => SKILLS[id].tree === t.id);
   ok(ids.length === 7, `tree ${t.id} has 7 skills`);
@@ -46,7 +57,7 @@ for (const id of [...SKILL_IDS, 'attack']) {
   ok(id === 'attack' || s.req === ROW_REQ[s.row], `${id} req matches row`);
   ok(KINDS.includes(s.kind), `${id} kind valid`);
   ok(ELS.includes(s.element), `${id} element valid`);
-  ok([null, 'sword', 'ball'].includes(s.wep), `${id} wep valid`);
+  ok([null, 'sword', 'ball', 'staff'].includes(s.wep) && (id === 'attack' || !s.wep || (s.wep === 'staff') === (s.cls === 'moka')), `${id} wep valid`);
   for (const p of s.pre) ok(SKILLS[p] && SKILLS[p].tree === s.tree && SKILLS[p].row < s.row, `${id} prereq ${p} valid`);
   for (const y of s.syn) ok(!!SKILLS[y.id] && fin(y.p), `${id} synergy ${y.id} valid`);
   for (let l = 1; l <= 30; l++) {
@@ -75,13 +86,13 @@ for (const id of GEAR_BASE_IDS) {
   tierCount[b.tier]++;
   ok(['weapon', 'hat', 'outfit', 'collar', 'charm', 'boots', 'paws'].includes(b.slot), `base ${id} slot`);
   ok(b.icon && b.icon.shape && b.icon.variant && b.icon.colors.length === 3, `base ${id} icon`);
-  if (b.slot === 'weapon') ok(['sword', 'ball'].includes(b.wtype) && fin(b.dmg[0]) && b.dmg[1] > b.dmg[0] && fin(b.aspd), `weapon ${id} stats`);
+  if (b.slot === 'weapon') ok(['sword', 'ball', 'staff'].includes(b.wtype) && fin(b.dmg[0]) && b.dmg[1] > b.dmg[0] && fin(b.aspd), `weapon ${id} stats`);
   if (['hat', 'outfit', 'boots', 'paws'].includes(b.slot)) ok(b.def && b.def[1] >= b.def[0], `armor ${id} def`);
   ok(b.tier === 0 ? b.lvl < 20 : b.tier === 1 ? b.lvl >= 20 && b.lvl < 40 : b.lvl >= 40, `base ${id} tier/lvl consistent`);
 }
 for (const slot of ['weapon', 'hat', 'outfit', 'collar', 'charm', 'boots', 'paws'])
   for (const t of [0, 1, 2]) ok(GEAR_BASE_IDS.some(id => ITEM_BASES[id].slot === slot && ITEM_BASES[id].tier === t), `slot ${slot} has tier ${t}`);
-for (const wt of ['sword', 'ball']) for (const t of [0, 1, 2]) ok(GEAR_BASE_IDS.some(id => ITEM_BASES[id].wtype === wt && ITEM_BASES[id].tier === t), `${wt} has tier ${t}`);
+for (const wt of ['sword', 'ball', 'staff']) for (const t of [0, 1, 2]) ok(GEAR_BASE_IDS.some(id => ITEM_BASES[id].wtype === wt && ITEM_BASES[id].tier === t), `${wt} has tier ${t}`);
 const prefixes = AFFIXES.filter(a => a.type === 'prefix').length, suffixes = AFFIXES.filter(a => a.type === 'suffix').length;
 ok(AFFIXES.length >= 45, '>=45 named affixes');
 ok(new Set(AFFIXES.map(a => a.id)).size === AFFIXES.length, 'affix ids unique');
@@ -313,7 +324,11 @@ hr('ACTIONS');
   ok(G.derived && G.derived.lifeMax > 0, 'derived set on create');
   const S = G.state;
   // state shape
-  ok(S.version === 1 && S.inventory.length === 40 && S.stash.length === 60 && S.player.hotbar.length === 6, 'state shape');
+  ok(S.version === 2 && S.inventory.length === 40 && S.stash.length === 60 && S.player.hotbar.length === 6, 'state shape');
+  ok(S.activeHero === 'chewy' && HERO_IDS.every(h => S.heroes[h]?.player?.cls === h) && S.player === S.heroes.chewy.player && S.equipment === S.heroes.chewy.equipment, 'state shape: one progression per hero, live aliases');
+  ok(S.heroes.moka.equipment.weapon?.wtype === 'staff' && !('player' in saveableState(S)) && !('equipment' in saveableState(S)), 'state shape: Moka starts with a staff; the aliases are not saved');
+  { const v1 = JSON.parse(JSON.stringify(saveableState(S))); delete v1.heroes; v1.player = JSON.parse(JSON.stringify(S.player)); v1.equipment = JSON.parse(JSON.stringify(S.equipment)); v1.version = 1;
+    const n = normalizeHeroes(v1); ok(n.version === 2 && n.player === n.heroes.chewy.player && !!n.heroes.moka, 'a v1 save normalises to v2'); }
   ok(S.equipment.weapon.base === 'boneSword' && S.equipment.weaponAlt.base === 'redTennisBall', 'starter equipped');
   ok(JSON.parse(JSON.stringify(S)).equipment.weapon.name === 'Bone Sword', 'state JSON-serialisable');
   // pickup & stacking
@@ -530,6 +545,138 @@ if (!quiet) {
     for (const r of t.req) log(`    ${r.met ? '✓' : '✗'} ${r.text}`);
     if (t.compare.length) log('    vs equipped: ' + t.compare.map(c => c.text).join(', '));
   }
+}
+
+// ------------------------------------------------------------------ homestead (docs/HOMESTEAD.md)
+hr('HOMESTEAD');
+{
+  const seq = seed => { const r = new RNG(seed); return () => r.next(); };
+  // ---- the pantry
+  const byKind = k => PANTRY_IDS.filter(id => PANTRY[id].kind === k).length;
+  ok(PANTRY_IDS.length === 50 && byKind('seed') === 8 && byKind('crop') === 8 && byKind('fish') === 15 && byKind('forage') === 4 && byKind('dish') === 15, 'pantry: 50 goods (8 seeds, 8 crops, 15 fish, 4 forage, 15 dishes)');
+  for (const id of PANTRY_IDS) {
+    const d = PANTRY[id];
+    ok(PKINDS.includes(d.kind) && d.name && d.jp && d.desc && fin(d.value) && d.value > 0, `pantry ${id} complete`);
+    if (d.kind === 'seed') ok(!!CROPS[d.crop] && fin(d.price) && d.price > 0, `seed ${id} grows a crop, has a price`);
+    if (d.kind === 'dish') ok(d.food && d.food.heal > 0 && d.food.heal <= 1 && !!BUFFS[d.food.buff] && d.food.tier >= 1 && d.food.tier <= 3 && d.food.mins >= 5, `dish ${id} food valid`);
+  }
+  for (const id of CROP_IDS) { const C = CROPS[id]; ok(C.days >= 1 && C.rank >= 1 && C.yield[0] >= 1 && C.yield[1] >= C.yield[0] && (!C.regrow || C.regrow < C.days) && !!PANTRY[id + 'Seed'], `crop ${id} rules`); }
+  for (const [who, id] of Object.entries(LOVED)) ok(PANTRY[id]?.kind === 'dish' && PANTRY[id].lovedBy.includes(who), `${who} loves ${id}`);
+  ok(PANTRY.koi.likedBy.includes('kero') && PANTRY.carrot.likedBy.includes('usagi'), 'liked: fish for Kero, carrots for Usagi');
+  ok(sellPrice('grilledFish', 'rosie') === Math.round(PANTRY.grilledFish.value * 1.25) && sellPrice('koi', 'kero') === Math.round(PANTRY.koi.value * 1.3) && sellPrice('turnip', 'usagi') === Math.round(PANTRY.turnip.value * 1.25), 'sell prices: each specialist pays a premium');
+  ok(sellPrice('koi') === PANTRY.koi.value && sellPrice('grilledFish', 'kero') < sellPrice('grilledFish', 'rosie') && sellPrice('nope') === 0, 'sell prices: plain worth elsewhere; unknown ids are worth nothing');
+  { const st = { pantry: { turnip: 3, koi: 1, onigiri: 2, carrotSeed: 1 } };
+    ok(pantryHas(st, { turnip: 3, koi: 1 }) && !pantryHas(st, { turnip: 4 }) && !pantryHas(st, { melon: 1 }), 'pantryHas: all or nothing');
+    ok(pantryList(st).map(e => e.id).join() === 'carrotSeed,turnip,koi,onigiri' && pantryList(st, 'fish').length === 1, 'pantryList: by kind, filterable'); }
+  { const r = seq(7); let n = 0, ids = new Set(); for (let i = 0; i < 3000; i++) for (const d of seedDrops(8, 'boss', r)) { n += d.n; ids.add(d.key); ok(d.type === 'pantry' && PANTRY[d.key]?.kind === 'seed' && d.n >= 1 && d.n <= 3, 'seed drop shape'); }
+    ok(n > 1000 && ids.size >= 6, 'seed drops: bosses drop seeds often, of many kinds');
+    const r2 = seq(8); let m = 0; for (let i = 0; i < 3000; i++) m += seedDrops(1, 'normal', r2).length; ok(m > 40 && m < 220, 'seed drops: a normal kill rarely drops one');
+    const r3 = seq(9); const fk = new Set(); for (let i = 0; i < 400; i++) for (const d of forageDrops('tidepool', 'boss', r3)) fk.add(d.key);
+    ok([...fk].every(k => PANTRY[k].kind === 'forage') && fk.has('seaweed') && forageDrops('nowhere', 'boss', seq(1)).length === 0, 'forage drops: the region\'s own finds (none outside the regions)'); }
+
+  // ---- recipes and mixes
+  ok(RECIPE_IDS.length === 15 && RECIPE_IDS.every(id => PANTRY[id]?.kind === 'dish') && PANTRY_IDS.filter(id => PANTRY[id].kind === 'dish').every(id => RECIPES[id]), 'recipes: one per dish');
+  ok(STARTERS.join() === 'grilledFish,roastedVeggies,onigiri', 'recipes: the three starters');
+  const MATS = new Set(MATERIAL_KEYS);
+  for (const id of RECIPE_IDS) {
+    const R = RECIPES[id], L = R.learn;
+    ok(R.at.length && R.at.every(s => STATIONS[s]) && R.ing.length && R.ing.every(x => x.n >= 1 && (x.k === 'fish' || x.k === 'crop' || (x.k.startsWith('mat:') ? MATS.has(x.k.slice(4)) : !!PANTRY[x.k] && PANTRY[x.k].kind !== 'dish'))), `recipe ${id} stations + ingredients valid`);
+    ok(L === 'starter' || !!(L.from || L.quest || L.book || L.request), `recipe ${id} can be learned`);
+    ok(L === 'starter' || hintFor(id).how.length > 5, `recipe ${id} has a hint`);
+    ok(!R.at.includes('oven') || R.at.length === 1, `recipe ${id}: baked goods only at the oven`);
+  }
+  ok(RECIPE_IDS.filter(id => cookableAt(id, 'campfire')).sort().join() === 'grilledFish,grilledTrout,roastedVeggies', 'campfires cook simple recipes only');
+  ok(COOKBOOK.every(p => p.price > 0 && !RECIPES[p.id].learn.from || RECIPES[p.id].learn.book) && teachesOf('kuma').hearts.includes('honeyCake') && teachesOf('usagi').request.includes('cabbageRolls'), 'cookbook pages, villager teachers');
+  { const st = {}; const c = cookbookOf(st); ok(STARTERS.every(id => knows(st, id)) && !knows(st, 'sushiPlatter') && learn(st, 'sushiPlatter', 3) && !learn(st, 'sushiPlatter', 4) && c.known.sushiPlatter === 3 && !learn(st, 'nope'), 'cookbook: starters known, learning once'); }
+  { const st = { pantry: { rice: 2, salmon: 1, crucian: 2, loach: 1, moonKoi: 1, carrot: 3, turnip: 1 }, materials: { mochi: 1 } };
+    const sp = spendFor(st, 'sushiPlatter', 1);
+    ok(sp && sp.pantry.rice === 1 && sp.pantry.loach === 1 && sp.pantry.crucian === 2 && !sp.pantry.moonKoi && !sp.pantry.salmon, 'spendFor: wildcards take the cheapest fish first, never the Moon Koi');
+    ok(maxCook(st, 'sushiPlatter') === 1 && maxCook(st, 'grilledFish') === 4 && maxCook(st, 'salmonOnigiri') === 1 && maxCook(st, 'roastedVeggies') === 3 && maxCook(st, 'melonBread') === 0, 'maxCook counts what the pantry allows (rice is a crop too)');
+    const both = spendFor({ pantry: { rice: 1, salmon: 1, crucian: 1 } }, 'salmonOnigiri', 1); ok(both && both.pantry.salmon === 1 && !both.pantry.crucian, 'spendFor: a named fish is reserved for its own slot');
+    ok(spendFor({ pantry: { salmon: 1 } }, 'salmonOnigiri', 1) === null && spendFor(st, 'grilledFish', 99) === null, 'spendFor: null when short');
+    ok(haveOf(st, 'fish') === 4 && haveOf(st, 'crop') === 6 && haveOf(st, 'mat:mochi') === 1 && haveOf(st, 'rice') === 2, 'haveOf: wildcards, materials, named goods'); }
+  // every recipe's exact ingredients (wildcards as plain crucian carp / turnips) make it back at its own station
+  const concrete = R => { const out = {}; for (const { k, n } of R.ing) { const id = k === 'fish' ? 'crucian' : k === 'crop' ? 'turnip' : k; out[id] = (out[id] || 0) + n; } return out; };
+  for (const id of RECIPE_IDS) ok(matchMix(concrete(RECIPES[id]), RECIPES[id].at[0]) === id, `mix: ${id}'s own ingredients make it`);
+  ok(matchMix({ salmon: 1, rice: 1 }) === 'salmonOnigiri' && matchMix({ trout: 1 }) === 'grilledTrout' && matchMix({ koi: 1 }) === 'grilledFish', 'mix: the most specific recipe wins');
+  ok(matchMix({ strawberry: 1, 'mat:mochi': 1 }) === null && matchMix({ strawberry: 1, 'mat:mochi': 1 }, 'oven') === 'strawberryMochi' && matchMix({ salmon: 1, rice: 1 }, 'campfire') === null, 'mix: stations matter');
+  ok(matchMix({ carrot: 2, turnip: 1 }) === null && matchMix({}) === null && matchMix({ moonKoi: 1 }) === null, 'mix: extras or a lone Moon Koi make no recipe');
+  ok(fallbackMix({ crucian: 1, turnip: 2 }) === 'grilledFish' && fallbackMix({ rice: 1, turnip: 1 }) === 'onigiri' && fallbackMix({ turnip: 1, carrot: 1, honey: 1 }) === 'roastedVeggies' && fallbackMix({ turnip: 1 }) === null && fallbackMix({ honey: 2 }) === null, 'mix fallbacks: fish, rice, two crops; else nothing');
+
+  // ---- Well Fed in computeStats
+  const st0 = newGameState(), d0 = computeStats(st0);
+  const fed = (buff, tier, left = 100) => { const s = newGameState(); s.player.meal = { dish: 'x', buff, tier, left, dur: 600 }; return computeStats(s); };
+  ok(!d0.meal, 'no meal: no Well Fed');
+  ok(fed('strong', 1).dmgPct === d0.dmgPct + 10 && fed('strong', 2).dmgPct === d0.dmgPct + 16 && fed('strong', 3).dmgPct === d0.dmgPct + 25 && fed('strong', 3).dmgMax > d0.dmgMax, 'Strong I-III: +10/16/25% damage');
+  ok(fed('swift', 1).moveSpeed === d0.moveSpeed + 8 && fed('swift', 1).atkSpeed === d0.atkSpeed + 8 && fed('swift', 3).moveMul > d0.moveMul, 'Swift: move and attack speed');
+  ok(fed('hearty', 1).lifeMax === Math.round(d0.lifeMax * 1.08) && fed('hearty', 3).lifeMax === Math.round(d0.lifeMax * 1.18) && fed('hearty', 2).lifeRegen > d0.lifeRegen, 'Hearty: max life and regen');
+  ok(fed('lucky', 2).mf === d0.mf + 35 && fed('lucky', 2).gf === d0.gf + 35, 'Lucky: magic find and coins');
+  ok(fed('zen', 1).zoomRegen > d0.zoomRegen && fed('zen', 3).cdr === d0.cdr + 12, 'Zen: zoom regen and cooldowns');
+  ok(!fed('strong', 3, 0).meal && fed('strong', 3, 0).dmgPct === d0.dmgPct && fed('strong', 2).meal.buff === 'strong' && fed('strong', 2).meal.tier === 2, 'a spent meal counts for nothing; derived.meal says what is active');
+  { const s = newGameState(); s.activeHero = 'moka'; s.player = s.heroes.moka.player; s.equipment = s.heroes.moka.equipment; const dm = computeStats(s); s.player.meal = { dish: 'x', buff: 'strong', tier: 1, left: 9 }; ok(computeStats(s).dmgPct === dm.dmgPct + 10 && !s.heroes.chewy.player.meal, 'Well Fed per hero (Moka\'s own)'); }
+  for (const b of Object.keys(BUFFS)) for (const t of [1, 2, 3]) ok(!/NaN|undefined/.test(BUFFS[b].text(t)), `buff ${b} ${t} text`);
+  { const m = mealFor('grilledFish', PANTRY.grilledFish.food); ok(m.left === 480 && m.dur === 480 && m.buff === 'strong' && m.tier === 1 && mealActive(m) && !mealActive({ ...m, left: 0 }), 'mealFor: minutes to seconds of play'); }
+
+  // ---- eating and cooking through the actions
+  { const G = { state: newGameState() }, A = createActions(G), S = G.state, ev = [];
+    const off = ['meal:eaten', 'meal:expired', 'dish:cooked', 'recipe:learned'].map(e => Events.on(e, p => ev.push(e)));
+    A.addPantry('crucian', 2); A.addPantry('rice', 1); A.addPantry('salmon', 1);
+    A.damage(Math.round(G.derived.lifeMax * 0.6));
+    const l0 = A.life(), c = A.cook('grilledFish', 2);
+    ok(c && c.n === 2 && S.pantry.grilledFish === 2 && !S.pantry.crucian && S.cookbook.cooked.grilledFish === 2, 'cook ×2: spends two fish, adds two dishes');
+    ok(A.cook('grilledFish', 2) === null && S.pantry.grilledFish === 2 && S.pantry.salmon === 1, 'cook: nothing happens when short (one fish left, the salmon)');
+    const r = A.eat('grilledFish');
+    ok(r && Math.abs(A.life() - l0 - Math.round(G.derived.lifeMax * 0.35)) <= 1 && S.player.meal.buff === 'strong' && G.derived.dmgPct === 10 && S.cookbook.quick === 'grilledFish' && S.pantry.grilledFish === 1, 'eat: the heal, Well Fed in the stats, the quick meal');
+    const m = A.cook('salmonOnigiri', 1, { picks: { rice: 1, salmon: 1 }, learn: true });
+    ok(m && S.pantry.salmonOnigiri === 1 && knows(S, 'salmonOnigiri') && !S.pantry.rice, 'cook a mix: spends the picks, learns the recipe');
+    A.eat('salmonOnigiri'); ok(S.player.meal.tier === 2 && G.derived.dmgPct === 16, 'a new dish replaces the buff');
+    ok(!A.tickMeal(30) && S.player.meal.left === 570 && A.tickMeal(600) && !S.player.meal && G.derived.dmgPct === 0, 'tickMeal: counts down, expiry restores the stats');
+    ok(!A.spendMix({ rice: 1 }) && !A.learnRecipe('grilledFish') && A.learnRecipe('misoSoup'), 'spendMix all-or-nothing; learnRecipe only new ones');
+    ok(['dish:cooked', 'meal:eaten', 'recipe:learned', 'meal:expired'].every(e => ev.includes(e)), 'cooking events');
+    off.forEach(f => f?.()); }
+
+  // ---- the garden's growth rules
+  { const r = { till: true, crop: 'turnip', stage: 0, wet: true };
+    ok(growNight(r).step === 'grew' && r.stage === 1 && !r.wet, 'a watered crop grows a stage; the soil dries');
+    ok(growNight(r).step === 'thirsty' && r.stage === 1, 'a dry night pauses it (nothing dies)');
+    r.wet = true; const g = growNight(r); ok(g.ripe && r.stage === 2 && isRipe(r), 'ripe after its days (turnips: 2)');
+    r.wet = true; ok(growNight(r).step === null && r.stage === 2, 'a ripe crop stays ripe');
+    const n = harvestCrop(r, () => 0.99); ok(n === 2 && r.crop === null && r.stage === 0 && !isRipe(r), 'harvest: its yield, then tilled soil');
+    const s = { crop: 'strawberry', stage: 4, wet: true }; ok(harvestCrop(s, () => 0) === 2 && s.crop === 'strawberry' && s.stage === 2 && !s.wet, 'strawberries step back two days and keep fruiting');
+    const w = { till: true, wet: true }; ok(growNight(w).step === null && !w.wet, 'bare soil just dries');
+    ok(SPRINKLE.length === 8 && !SPRINKLE.some(([x, z]) => !x && !z), 'a sprinkler waters its 8 neighbours'); }
+  { // a whole crop cycle per crop, watered every day
+    for (const id of CROP_IDS) { const r = { crop: id, stage: 0 }; let nights = 0; while (!isRipe(r) && nights < 20) { r.wet = true; growNight(r); nights++; } ok(nights === CROPS[id].days, `${id} ripens in ${CROPS[id].days} watered nights`); } }
+
+  // ---- fish tables
+  ok(FISH_IDS.length === 15 && FISH_IDS.every(id => PANTRY[id]?.kind === 'fish'), 'fish: 15, all in the pantry');
+  for (const id of FISH_IDS) { const f = FISH[id]; ok(Object.keys(f.spots).every(s => SPOTS[s]) && f.d > 0 && f.d < 1 && f.size[1] > f.size[0] && ['smooth', 'darter', 'sinker', 'floater'].includes(f.beh), `fish ${id} valid`); }
+  for (const s of Object.keys(SPOTS)) for (const h of [10, 19, 23]) ok(biters(s, h).length >= 1, `something bites at ${s} at ${h}:00`);
+  ok(timeOf(6) === 'day' && timeOf(16.9) === 'day' && timeOf(17) === 'evening' && timeOf(21) === 'night' && timeOf(3) === 'night', 'times of day');
+  { const r = seq(5); const c = {}; for (let i = 0; i < 4000; i++) { const f = rollFish('pond', 23, 1, r); c[f] = (c[f] || 0) + 1; }
+    ok(c.moonKoi > 0 && c.moonKoi < c.goldKoi && c.goldKoi < c.crucian && !c.koi, 'the pond at night: crucian, rarer gold koi, a rare Moon Koi, no white koi');
+    const r2 = seq(6); let m2 = 0; for (let i = 0; i < 4000; i++) if (rollFish('pond', 23, 2, r2) === 'moonKoi') m2++; ok(m2 > c.moonKoi, 'the Moonlit Rod favours rare fish');
+    const r3 = seq(4); let lo = 1e9, hi = 0, big = 0; for (let i = 0; i < 3000; i++) { const z = rollSize('koi', r3); lo = Math.min(lo, z); hi = Math.max(hi, z); if (z > 66) big++; }
+    ok(lo >= 30 && hi <= 70 && big > 20 && big < 400, 'sizes: in range, now and then a whopper'); }
+  { const st = {}; const a = recordCatch(st, 'koi', 40, { spot: 'pond', hour: 10, day: 3 }), b = recordCatch(st, 'koi', 45);
+    ok(a.first && !a.record && b.record && !b.first && st.fishLog.koi.best === 45 && st.fishLog.koi.n === 2 && st.fishLog.koi.day === 3 && st.fishLog.koi.time === 'day', 'records: first, record, best, count');
+    let ms = []; for (const id of FISH_IDS) { const r = recordCatch(st, id, 20); if (r.milestone) ms.push(r.milestone); } ok(ms.join() === MILESTONES.join(), 'milestones at 5, 10 and 15 kinds'); }
+
+  // ---- the reel sim
+  const bot = (d, beh, zone, drain, seed, cap = 40) => { // the s15 bot: hold while the fish is above the zone's middle
+    const s = new ReelSim({ d, beh, zone, drain, rng: seq(seed) }); let t = 0;
+    while (!s.done && t < cap) { s.step(1 / 60, s.f > s.z + s.zh * 0.5 + s.v * 0.28); t += 1 / 60; }
+    return { done: s.done, t };
+  };
+  { let ok1 = 0, tt = 0; for (let k = 0; k < 60; k++) { const r = bot(0.18, 'smooth', 0.28, 1, 100 + k); if (r.done === 'catch') { ok1++; tt += r.t; } }
+    ok(ok1 >= 57 && tt / ok1 > 2.5 && tt / ok1 < 6, `reel: an easy fish is caught in a few seconds (${ok1}/60, ${(tt / Math.max(1, ok1)).toFixed(1)}s)`); }
+  { let r1 = 0, r2 = 0; for (let k = 0; k < 80; k++) { if (bot(0.78, 'darter', 0.28, 1, 300 + k).done === 'catch') r1++; if (bot(0.78, 'darter', 0.36, 0.82, 300 + k).done === 'catch') r2++; }
+    ok(r1 < 72 && r2 > r1, `reel: the Moon Koi is hard, easier with the Moonlit Rod (${r1} vs ${r2} of 80)`); }
+  { const s = new ReelSim({ d: 0.4, rng: seq(2) }); s.f = s.ft = 0.95; s.tt = 99; let t = 0; while (!s.done && t < 10) { s.step(1 / 60, false); t += 1 / 60; }
+    ok(s.done === 'escape' && s.m === 0 && t < 3, 'reel: letting go loses the fish within a couple of seconds');
+    ok(s.step(1 / 60, true) === 'escape', 'reel: done is final'); }
+  { const s = new ReelSim({ rng: seq(3) }); for (let i = 0; i < 600; i++) s.step(1 / 60, true); ok(s.z === 1 - s.zh && s.z + s.zh <= 1, 'reel: the zone stops at the top'); }
+  { const s = new ReelSim({ rng: seq(3) }); s.step(10, false); ok(Math.abs(s.t - 0.05) < 1e-9, 'reel: a long frame is clamped'); }
 }
 
 // icons module must import without a DOM

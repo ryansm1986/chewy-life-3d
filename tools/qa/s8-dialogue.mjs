@@ -20,6 +20,8 @@ try {
       await sleep(page, 300);
       const chosen = await drainDialogue(page, [...picks]);
       await sleep(page, 300);
+      // "Give a gift" opens the paged gift picker (docs/HOMESTEAD.md §4): 1 gives the first thing on the page
+      if (await page.evaluate(() => window.G.ui.isOpen('gift'))) { await page.keyboard.press('Digit1'); await sleep(page, 400); chosen.push(...await drainDialogue(page)); await sleep(page, 300); }
       if (await page.evaluate(() => window.G.ui.isOpen('shop'))) { await page.keyboard.press('Escape'); await sleep(page, 300); }
       await settle();
       const st = await state();
@@ -108,7 +110,7 @@ try {
 
   // services: home, town hall, board, smith — each must release controls
   const svcProblems = [];
-  for (const [fn, picks] of [['openHome', [2]], ['openTownHall', [1]], ['openBoard', []], ['openSmith', [3]]]) {
+  for (const [fn, picks] of [['openHome', [3]], ['openTownHall', [1]], ['openBoard', []], ['openSmith', [3]]]) {
     await page.evaluate(fn => { window.G[fn](); }, fn); // (never return the pending promise: CDP awaitPromise on it crashed the renderer)
     await sleep(page, 300); await drainDialogue(page, [...picks]); await sleep(page, 300);
     if (await page.evaluate(() => window.G.ui.anyModal())) { await page.keyboard.press('Escape'); await sleep(page, 300); }

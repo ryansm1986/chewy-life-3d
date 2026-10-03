@@ -6,6 +6,9 @@ import { glyph, glyphURL, MATERIALS } from './glyphs.js';
 import { portrait } from './portraits.js';
 import { skillIconURL, hotbarIconURL, skillDef, skillCost, xpProgress, potionIconURL, potionInfo, materialIconURL, skillUsable } from './rpg.js';
 import { simpleTip } from './tooltip.js';
+import { pantryIcon } from '../life/pantryIcons.js';
+import { PANTRY } from '../life/pantry.js';
+import { BUFFS, TIER_NAMES } from '../life/meals.js';
 
 const TAU = Math.PI * 2;
 const HERO_JP = { chewy: 'チューイ', moka: 'モカ' };
@@ -307,6 +310,16 @@ export class Hud {
       tip.bind(s, () => { const I = potionInfo(k) || { name, desc }; return simpleTip(I.name, `${esc(I.desc)}<br>You have <b>${this.st.potions?.[k] || 0}</b>.<br><span class="tt-dim">Press ${key} or click to drink.</span>`); });
       return { k, el: s, n: s.querySelector('.bt-n'), v: -1 };
     });
+    // the quick meal (G): the last dish eaten, else the most filling one in the pantry (life/kitchen.js quickEat)
+    const ms = el('div', 'belt b-meal');
+    ms.innerHTML = `<div class="hb-in"><img class="bt-ic" alt="" draggable="false"><span class="bt-bowl">${glyph('heart')}</span><b class="bt-n">0</b><div class="hb-fl"></div></div><span class="kc hb-k">G</span>`;
+    hb.appendChild(ms);
+    ms.addEventListener('click', () => this.ui.G?.life?.kitchen?.quickEat?.());
+    tip.bind(ms, () => { const id = this.mealSlot.id, d = id && PANTRY[id], B = d && BUFFS[d.food.buff]; return d ? simpleTip(`Quick meal · ${esc(d.name)}`, `Heals ${Math.round(d.food.heal * 100)}% life · Well Fed: <b>${B.name} ${TIER_NAMES[d.food.tier]}</b> (${d.food.mins} min)<br>You have <b>${this.st.pantry?.[id] || 0}</b>.<br><span class="tt-dim">Press G or click to eat. Eat any dish from the Pantry to make it your quick meal.</span>`) : simpleTip('Quick meal', 'No dishes yet.<br><span class="tt-dim">Cook at home or at a campfire, then press G to eat.</span>'); });
+    this.mealSlot = { el: ms, img: ms.querySelector('.bt-ic'), n: ms.querySelector('.bt-n'), id: undefined, v: -1 };
+    // buff chips: a tooltip from their data-tip ("Title — details"; the chips are rebuilt as buffs change)
+    this.$.buffs.addEventListener('mouseover', e => { const c = e.target.closest('.buff'); if (!c || c === this._bHov) return; this._bHov = c; const [t, ...r] = (c.dataset.tip || '').split(' — '); const m = c.querySelector('i')?.textContent; this.ui.tip.show(simpleTip(esc(t), `${esc(r.join(' — '))}${m ? `<br><span class="tt-dim">${esc(m)} left</span>` : ''}`), '', c); });
+    this.$.buffs.addEventListener('mouseout', e => { const c = e.target.closest('.buff'); if (c && !c.contains(e.relatedTarget)) { this._bHov = null; this.ui.tip.hide(c); } });
     // clicks that open panels
     R.addEventListener('click', e => {
       const b = e.target.closest('[data-open]'); if (!b) return;
@@ -419,6 +432,10 @@ export class Hud {
       const n = st.potions?.[b.k] || 0;
       if (n !== b.v) { if (b.v >= 0 && n > b.v) replay(b.el, 'gain', 500); b.v = n; setText(b.n, String(n)); setCls(b.el, 'none', n <= 0); if (b.k === 'rejuv') setCls(b.el, 'has', n > 0); }
     }
+    // the quick-meal slot: shows while there's a dish to eat (or one was chosen)
+    const M = this.mealSlot, qid = this.ui.G?.life?.kitchen?.quickId?.() || null, qn = qid ? st.pantry?.[qid] || 0 : 0;
+    if (qid !== M.id) { M.id = qid; if (qid) M.img.src = pantryIcon(qid); setCls(M.el, 'has', !!qid); replay(M.el, 'swap', 450); }
+    if (qn !== M.v) { if (M.v >= 0 && qn > M.v) replay(M.el, 'gain', 500); M.v = qn; setText(M.n, String(qn)); setCls(M.el, 'none', qn <= 0); }
     // xp + level
     const lvl = p.lvl || 1;
     if (lvl !== this.cache.lvl) {
@@ -730,10 +747,10 @@ export class Hud {
   }
 
   setBuffs(list = []) {
-    const sig = list.map(b => b.id + ':' + Math.ceil(b.time || 0)).join();
+    const sig = list.map(b => b.id + ':' + Math.ceil(b.time || 0) + (b.iconURL || '')).join();
     if (sig === this.cache.buffs) return;
     this.cache.buffs = sig;
-    this.$.buffs.innerHTML = list.map(b => `<div class="buff" style="--bc:${b.color || '#ffcf4a'}" data-tip="${esc(b.name || '')}">${b.glyph ? glyph(b.glyph) : `<span>${b.icon || '✦'}</span>`}${b.time ? `<i>${b.time > 60 ? Math.ceil(b.time / 60) + 'm' : Math.ceil(b.time) + 's'}</i>` : ''}</div>`).join('');
+    this.$.buffs.innerHTML = list.map(b => `<div class="buff${b.meal ? ' meal' : ''}" style="--bc:${b.color || '#ffcf4a'}" data-tip="${esc(b.name || '')}">${b.iconURL ? `<img src="${b.iconURL}" alt="">` : b.glyph ? glyph(b.glyph) : `<span>${b.icon || '✦'}</span>`}${b.time ? `<i>${b.time > 60 ? Math.ceil(b.time / 60) + 'm' : Math.ceil(b.time) + 's'}</i>` : ''}</div>`).join('');
   }
 
   // ---------------------------------------------------------------- flashes
@@ -747,6 +764,7 @@ export class Hud {
     const wt = this.d.weaponType || 'sword', set = this.pl.activeWeapon === 1 ? 'II' : 'I';
     h.insertAdjacentHTML('beforeend', `<span class="pop-ws" data-ws="${wt}">${glyph(wt === 'ball' ? 'ball' : wt === 'staff' ? 'staff' : 'sword')}Set ${set}</span>`);
   }
+  flashMeal(ok) { const M = this.mealSlot; if (M) replay(M.el, ok ? 'press' : 'deny', 360); }
   flashBelt(k) { const b = this.belt.find(x => x.k === k); if (b) replay(b.el, b.v > 0 ? 'press' : 'deny', 360); }
   slotTip(i) {
     const id = this.pl.hotbar?.[i];

@@ -23,7 +23,9 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
 - Isolated dev scenes: `src/tests/NAME.js` exporting `default function()`; open with `/?test=NAME`. Each module owner makes
   their own test page. Set `window.__ready = true` when the scene is ready to screenshot.
 - Post debug: `&off=ao,tilt,main,smaa` disables passes, `&raw` renders without post, `&q=0|1|2` quality, `&hour=13` time of day.
-- QA: `node tools/qa/run-all.mjs [s1 s5 ...]` (11 browser scenarios). Profilers: `tools/qa/profile-boot.mjs` (boot → ready),
+- QA: `node tools/qa/run-all.mjs [s1 s5 ...]` (the browser scenarios s1-s15; s15 is the homestead).
+  Perf: `village-perf.mjs [runs]` (the village at three camera spots), `homestead-perf.mjs [runs]` (a fully planted,
+  ripe garden and a reel in progress, each against the same spot without). Profilers: `tools/qa/profile-boot.mjs` (boot → ready),
   `profile-burst.mjs` / `profile-stress.mjs` (long frames in big fights, `CASTS=a,b` env to bisect skills), `boot-time.mjs`.
 - `Play Chewy Life.cmd` builds (`vite build`, ~1 s) and serves the production bundle on :4173.
 
@@ -237,6 +239,44 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
 - RegionWorld.dispose frees what the scene teardown can't reach (the weather mask texture, batches, the light pool).
   s13 checks round trips for texture/geometry growth.
 
+## Homestead: farming, fishing, cooking (src/life/ — design and as-built notes: docs/HOMESTEAD.md)
+- `installLife(G, village)` (life/index.js, from game.js after the sim, story and services) builds
+  `G.life = { tools, garden, fishing, kitchen, update(dt), onNewDay(day), onTalk(npc, say), markerFor(id), teach(recipe),
+  onRequestDone(giver) }` and Usagi's Seed Stall. `G.life.update` runs after `player.update`; `village.onNewDay` calls
+  `G.life.onNewDay`; `Story.talk` awaits `G.life.onTalk` (Kero's rod and gifts, villagers teaching recipes) and
+  `Story.markerFor` asks `G.life.markerFor`.
+- **Pure data / math** (node-tested in tools/test-rpg.mjs): `pantry.js` (the 50 goods, prices and buyers, loved and
+  liked tastes, seed and forage drops), `cooking.js` (recipes, stations, learning, ingredient planning, mixes),
+  `meals.js` (Well Fed), `gardenRules.js` (growth, harvest, sprinklers), `fishData.js` (spots, hours, sizes, the Fish
+  Log), `reelSim.js` (the reel minigame's physics).
+- **The Pantry**: `state.pantry = { id: n }`, household. Actions: `addPantry`, `hasPantry`, `spendPantry` (all or
+  nothing), `sellPantry(id, n, buyer)`, `buyPantry`, `pantryCount`, `eat`, and a `{ type: 'pantry', key, n }` pickup.
+  The Pantry view is a tab of the inventory panel (P).
+- **Tools** (`tools.js`): props in `rig.parts.handR` (the hoe, the can, the seed pouch, the rods, the ladle) with a short
+  posed action, or held (`hold` / `release`). `player.toolOut` keeps the sword sheathed. Moving cancels a chore.
+- **Garden** (`garden.js`): Chewy's 4×3 bed plus every Veggie Patch field. ONE interactable follows the tile in front of
+  the player (village interactables stay stable, s1). Three BatchedMeshes with one slot per tile. F tills, plants
+  (the seed picker), waters and harvests by what the tile needs. Growth happens on `onNewDay`.
+- **Fishing** (`fishing.js`, `fishSocial.js`): one interactable per world follows the water ahead. The session runs
+  cast → wait → bite → reel (`ui/reel.js` draws a `ReelSim`) → catch. `recordCatch` updates the Fish Log, and the
+  `fish:caught` event feeds quests. Kero's quest gives the rod; his Fishing Hut sells rods and buys fish.
+- **Cooking** (`kitchen.js`, `cookSocial.js`, `ui/cook.js`):
+  - Stations: the cottage kitchen, a campfire camp by every Burrow / region arrival point (simple recipes), and
+    Rosie's oven (baked goods).
+  - The Cook panel's recipes and "Try a mix" go through `kitchen.cookBatch` → `actions.cook`.
+  - Eating sets the hero's Well Fed meal (`player.meal`), which `computeStats` folds in (`mealAcc` / `mealPost`) and
+    `kitchen.update` ticks down. The HUD shows a chip (game.js syncBuffs) and the G quick-meal belt slot.
+- **Villagers**: gifts go through the paged picker (`ui/gift.js`, `ui.pickGift`); loved dishes +16, liked +8, others
+  +3. Homestead requests are appended to `requestFlow`'s templates, as `deliver` steps with `pantry: true`.
+- **Shops** (ui/shop.js options):
+  - `pantry: [{ id, price }]` sells pantry goods;
+  - `goods: [{ id, name, icon, price, locked?, once?, onBuy }]` sells one-off wares (rods, cookbook pages);
+  - `sellKinds` / `buyer` / `noBagSell` make the Sell tab buy pantry goods at a specialist's price.
+- **Quest steps** (story.js): `fish(n)`, `plant(n)`, `harvest(n)`, `cook(n)`, and `deliver` with `pantry: true`.
+  Rewards may carry `recipe` and `pantry`.
+- **Meshes that visit combat worlds** (the float, line, catch, ice hole, campfire, stove pot) use their own materials,
+  never the village's shared `MATS()`, because a combat world's teardown disposes what it finds.
+
 ## Persistent state `G.state` (JSON-serialisable, saved to localStorage)
 ```js
 state = {
@@ -256,6 +296,13 @@ state = {
              zones:[[x,z,t]], paths:[[x,z]], day, income, stats, migrationNote? },   // (owned by the village sim)
   dungeon: { deepest:0, waypoints:[1] },
   day: 1, hour: 8.5, flags: {},
+  // the homestead (docs/HOMESTEAD.md; household, lazy-init: old saves load with empty ones)
+  pantry: { turnip: 3, koi: 1, onigiri: 2 }, pantryFound: { id: day },
+  garden: { v, tiles: [{ x, z, till?, crop?, stage?, wet? }], day, seeded: { plotId: true }, lastSeed },
+  fishing: { rod: 0|1|2, milestones: [5, ...], gotRod?, pendingMilestone?, lastRecord? },
+  fishLog: { id: { n, best, day, spot, time } },
+  cookbook: { known: { recipe: day }, cooked: { recipe: n }, quick },
+  // per hero: heroes[id].player.meal = { dish, buff, tier, left (s of play), dur } (Well Fed)
 }
 ```
 
@@ -283,15 +330,20 @@ Rarity colours: normal `#f4efe6`, magic `#6ea8ff`, rare `#ffd84a`, unique `#ff9a
 `equip(invIdx)`, `unequip(slot)`, `swapWeapons()`, `moveItem(from:{c:'inv'|'stash'|'equip', i}, to:{c,i})`, `dropItem(from)`,
 `pickup(item)→bool`, `usePotion('heart'|'zoom'|'rejuv')`, `sellItem(from)`, `buyItem(item, price)`, `learnSkill(id)`, `addStat(key)`,
 `setHotbar(slot, skillId)`, `addXp(n)`, `addCoins(n)`, `spendCoins(n)→bool`, `addMaterial(k,n)`, `hasMaterials(cost)`, `spendMaterials(cost)→bool`, `recompute()`.
+Homestead: `addPantry(id,n)`, `hasPantry(req)`, `spendPantry(req)→bool`, `sellPantry(id,n,buyer)→coins`, `buyPantry(id,price,n)`,
+`pantryCount(id)`, `eat(id)→{heal,meal}`, `cook(recipe,n,{picks,learn})`, `spendMix(picks)`, `learnRecipe(id)`, `tickMeal(dt)`.
 
 ## Events (Events.emit(name, payload))
 `inv:changed`, `equip:changed`, `stats:changed`, `coins:changed`, `materials:changed`, `potions:changed`, `player:levelup {lvl}`,
 `skill:learned {id,lvl}`, `item:pickup {item}`, `item:drop {item}`, `quest:update`, `toast {text, icon, color}`,
 `mode:changed {mode}`, `village:changed`, `friend:changed {id}`, `boss:spawn`, `boss:dead`, `player:dead`.
+Homestead: `pantry:changed {id,n,delta,first}`, `garden:till|plant|water|harvest {i,...}`, `garden:newDay`,
+`fish:caught {id,size,spot,first,record}`, `fishing:rod`, `dish:cooked {id,n}`, `recipe:learned {id}`, `meal:eaten {id,heal,meal}`,
+`meal:expired`, `gift:given {id,key,love,pts}`.
 
 ## UI (src/ui/) — HTML/CSS overlay above the canvas (`#ui`), lots of spring/bounce animations
 `UI.init(G)`, `UI.update(dt)`, `UI.toggle(name)` / `open` / `close` / `isOpen` / `anyModal()` for
-`inventory|character|skills|quests|map|build|menu|shop|stash`, `UI.toast(text,opts)`, `UI.banner(title, sub, {style})`,
+`inventory|character|skills|quests|map|build|menu|shop|stash|seeds|cook|gift`, `UI.toast(text,opts)`, `UI.banner(title, sub, {style})`,
 `UI.float(worldPos, text, {kind:'dmg'|'crit'|'heal'|'xp'|'coins'|'miss'|'status', color})`,
 `UI.dialogue({speaker, portrait, lines, choices})→Promise`, `UI.setTarget(info|null)`, `UI.setBoss(info|null)`,
 `UI.setInteract(text|null)`, `UI.transition(fn)`, `UI.lootLabel(add/remove)`.

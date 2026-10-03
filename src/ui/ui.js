@@ -3,6 +3,7 @@ import './style.css';
 import './hud.css';
 import './panels.css';
 import './fx.css';
+import './life.css';
 import { Events as CoreEvents } from '../core/events.js';
 import { el, clamp, isTyping, esc, rarityColor } from './dom.js';
 import { glyph } from './glyphs.js';
@@ -19,6 +20,10 @@ import { ShopPanel } from './shop.js';
 import { MapPanel, QuestPanel, normQuest } from './map.js';
 import { TravelPanel } from './travel.js';
 import { MenuPanel } from './menu.js';
+import { SeedPickerPanel, pantryGain, pantryTipHTML } from './pantry.js';
+import { CookPanel } from './cook.js';
+import { GiftPickerPanel } from './gift.js';
+import { ReelBar } from './reel.js';
 import { Title } from './title.js';
 import { itemName, itemIconURL, skillIconURL } from './rpg.js';
 import { Vector3 } from 'three';
@@ -58,11 +63,15 @@ export const UI = {
     this.inspectCard = new InspectCard(this, this.layers.over);
     this.qarrow = new QuestArrow(this, this.layers.world);
     this.drag = new ItemDrag(this);
+    this.reel = new ReelBar(this, this.layers.hud); // the fishing reel bar (docs/HOMESTEAD.md)
     this.dlg = new Dialogue(this);
     this.titleScreen = new Title(this);
     this.panels = {
       inventory: new InventoryPanel(this), stash: new StashPanel(this), character: new CharacterPanel(this), skills: new SkillsPanel(this),
       quests: new QuestPanel(this), map: new MapPanel(this), travel: new TravelPanel(this), shop: new ShopPanel(this), build: new BuildPanel(this), menu: new MenuPanel(this),
+      seeds: new SeedPickerPanel(this), // (F on tilled soil: docs/HOMESTEAD.md)
+      cook: new CookPanel(this), // (the kitchen, campfires, Rosie's oven)
+      gift: new GiftPickerPanel(this), // ("Give a gift" in a villager's chat)
     };
     this.skills = this.panels.skills;
     // popover + skill drag ghost
@@ -109,6 +118,10 @@ export const UI = {
     on('mode:changed', p => this.setMode(p?.mode || p));
     on('village:changed', () => this.panels.build.refresh());
     on('potions:changed', () => this.panels.shop.refresh());
+    on('pantry:changed', () => { this.panels.inventory.refresh(); this.panels.shop.refresh(); this.panels.cook.refresh(); });
+    on('recipe:learned', () => this.panels.cook.refresh());
+    on('materials:changed', () => this.panels.cook.refresh());
+    on('fish:caught', () => this.panels.quests.refresh());
     on('hotbar:changed', () => this.panels.skills.refresh());
     on('boss:dead', () => this.setBoss(null));
   },
@@ -155,7 +168,8 @@ export const UI = {
     if (name === 'menu' || name === 'map') { this.drag.cancel(); this.hidePopover(); }
     if (name === 'build') { this.close('inventory'); for (const q of ['character', 'skills', 'quests', 'shop', 'stash']) this.close(q); }
     else if (p.side !== 'center' && this.isOpen('build')) this.close('build');
-    if ((name === 'shop' || name === 'stash') && !this.isOpen('inventory')) { this.panels.inventory.open(); this._autoInv = true; this._order.push('inventory'); }
+    // (a homestead stall, which trades only in pantry goods, shows the Pantry beside it rather than the Bag)
+    if ((name === 'shop' || name === 'stash') && !this.isOpen('inventory')) { this.panels.inventory.open(name === 'shop' ? { view: opts?.noBagSell ? 'pantry' : 'bag' } : {}); this._autoInv = true; this._order.push('inventory'); }
     p.open(opts || {});
     this._order = this._order.filter(n => n !== name); this._order.push(name);
     this._raise(p);
@@ -197,6 +211,21 @@ export const UI = {
   // build-mode hover card (data from VillageSim.inspect) at screen position x,y; null hides it
   buildInspect(info, x, y) { if (!this.ready) return; if (!info || this.mode !== 'village' || this.dlg.active || this.isOpen('menu')) this.inspectCard.hide(); else this.inspectCard.show(info, x, y); },
   refreshItems() { for (const n of ['inventory', 'stash', 'character', 'shop']) this.panels[n].refresh(); },
+  /** P: the inventory panel on its Pantry tab (or closed again). */
+  togglePantry() {
+    const inv = this.panels.inventory;
+    if (this.isOpen('inventory') && inv.view === 'pantry') { this._user = true; try { this.close('inventory'); } finally { this._user = false; } return; }
+    if (this.isOpen('inventory')) { inv.setView('pantry'); this.sfx('tab'); return; }
+    this.toggle('inventory', { view: 'pantry' });
+  },
+  /** A pantry item was gained in the world: toast ("New!" on a first discovery) and the icon flies into the bag. */
+  pantryGain(id, n, o) { pantryGain(this, id, n, o); },
+  pantryTipHTML(id, extra) { return pantryTipHTML(id, this.G?.state, extra); },
+  /** The paged gift picker → Promise<key | null>. o: { name, portrait, items: [{ key, name, n, pantry, love }] } */
+  pickGift(o) {
+    if (!this.ready) return Promise.resolve(null);
+    return new Promise(res => this.open('gift', { ...o, onPick: res }));
+  },
 
   // ------------------------------------------------------------------ keyboard
   onKey(e) {
@@ -217,7 +246,9 @@ export const UI = {
     }
     if (this.isOpen('menu')) return;
     const map = { KeyI: 'inventory', KeyC: 'character', KeyK: 'skills', KeyJ: 'quests', KeyM: 'map' }; // (Tab switches heroes: game.js)
-    if (map[code]) { e.preventDefault(); this.toggle(map[code]); return; }
+    if (code === 'KeyI' && this.isOpen('inventory') && this.panels.inventory.view === 'pantry') { e.preventDefault(); this.panels.inventory.setView('bag'); this.sfx('tab'); return; }
+    if (map[code]) { e.preventDefault(); this.toggle(map[code], code === 'KeyI' ? { view: 'bag' } : undefined); return; }
+    if (code === 'KeyP') { e.preventDefault(); this.togglePantry(); return; } // the Pantry (docs/HOMESTEAD.md)
     if (code === 'KeyB') { if (this.mode === 'village' && !this.G?.build && this._buildProvider) this.openBuild(); return; } // the game toggles G.build itself
     const dig = /^Digit([1-4])$/.exec(code);
     if (dig) {

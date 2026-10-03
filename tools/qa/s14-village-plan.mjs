@@ -91,7 +91,8 @@ try {
   // f) rank rings
   const f = await page.evaluate(async () => {
     const G = window.G, sim = G.sim, S = sim.S, { PLOTS, PLOT_BY_ID } = await import('/src/world/plots.js');
-    const out = [];
+    const out = [], day1 = { rank: sim.stats.rank, ring: S.ringRank };
+    G.day.day = 2; sim.checkRings(); // (districts never open on day 1; the next morning, onNewDay opens any rank already reached)
     for (const want of [2, 3, 4]) {
       for (let k = 0; k < 60 && sim.stats.rank < want; k++) {
         for (const b of S.buildings) if (b.type === 'home') b.residents = [2, 4, 6][b.level - 1];
@@ -105,9 +106,10 @@ try {
       await new Promise(r => setTimeout(r, 400)); // the toast goes out on the next quiet frames
     }
     const T = G.world.terrain;
-    return { out, paved: { outer: T.tile(117.6, 182) === 1, hamlet: T.tile(178, 121) === 1, terraces: T.tile(94, 81.2) === 1 }, toasts: window.QA.toasts.filter(t => /New district/.test(t)) };
+    return { out, day1, paved: { outer: T.tile(117.6, 182) === 1, hamlet: T.tile(178, 121) === 1, terraces: T.tile(94, 81.2) === 1 }, toasts: window.QA.toasts.filter(t => /New district/.test(t)) };
   });
   R.check('rank rings open their districts at ranks 2, 3 and 4 (plots unlocked, stub streets paved)', f.out.every(o => o.ring >= o.want && o.open) && f.paved.outer && f.paved.hamlet && f.paved.terraces, JSON.stringify(f));
+  R.check('no district opens on day 1, even once the starter village reaches rank 2', f.day1.ring === 1, JSON.stringify(f.day1));
   R.check('each new district gets its toast', f.toasts.length >= 3, JSON.stringify(f.toasts));
 
   // g) long walks, fishing

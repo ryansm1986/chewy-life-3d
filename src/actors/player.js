@@ -204,9 +204,9 @@ export class Player extends Actor {
     if (this.weaponType !== 'sword' || this.hero !== 'chewy') return;
     // In the village the sword rides on his back (he was leaning on it like a cane); it comes out for any attack or
     // skill and goes back a few seconds later. In the Burrow it stays in hand.
-    if (this.anim.action) this._drawnT = 3;
+    if (this.anim.action && !this.toolOut) this._drawnT = 3;
     this._drawnT = Math.max(0, (this._drawnT || 0) - dt);
-    const sheathed = this.G.mode === 'village' && this._drawnT <= 0;
+    const sheathed = (this.G.mode === 'village' && this._drawnT <= 0) || !!this.toolOut; // (a homestead tool is in the paw: life/tools.js)
     if (sheathed !== this._sheathed) {
       this._sheathed = sheathed;
       this.sword.scale.setScalar(sheathed ? 0.0001 : 1); this.sword.castShadow = !sheathed;

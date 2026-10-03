@@ -1551,3 +1551,5 @@ export function skillIcon(id) {
 }
 /** Big list of every icon (for the test sheet). */
 export const ICON_SHAPES = SHAPES;
+/** The drawing primitives, for other icon sets in the same painted look (life/pantryIcons.js). */
+export const ICON_KIT = { INK, TAU, L, D, rr, circ, ell, lin, rad, vol, volR, paint, stroke, shine, sparkle, starPath, roundStar, heartPath, glow, hexA, shadow, seeded, compose, cached, drawBone };

@@ -16,12 +16,19 @@
 // buyItem(item, price) accepts an Item or a potion descriptor { kind:'potion', key }.
 // addXp emits ONE 'player:levelup' {lvl, from, gained} per call even on multi-level-ups (lvl = the new level).
 // damage(n) emits 'player:dead' once when life reaches 0. Extra event: 'hotbar:changed' {hotbar}.
+//
+// PANTRY (docs/HOMESTEAD.md §1): state.pantry = { [id]: qty } is a shared, unlimited counter map (seeds, crops, fish,
+// forage, dishes; defs in life/pantry.js), lazy-init so old saves load clean. addPantry / spendPantry / sellPantry / eat
+// emit 'pantry:changed' { id, n, delta, first? } (first = a first-ever discovery, remembered in state.pantryFound).
 import { Events } from '../core/events.js';
 import { computeStats, xpToNext, LEVEL_CAP } from './stats.js';
 import { SKILLS, canLearn } from './skills.js';
 import { starterItems, starterStaff, generateItem, EQUIP_SLOT_ITEM, meetsReq, socketGem, POTIONS, targetSlot, SET_ITEMS } from './items.js';
 import { CLASSES, HERO_IDS, canWield } from './classes.js';
 import { uid as rid } from '../core/util.js';
+import { PANTRY, pantryOf, pantryHas, sellPrice as pantrySellPrice } from '../life/pantry.js';
+import { RECIPES, cookbookOf, spendFor, learn as learnRecipeIn } from '../life/cooking.js';
+import { mealFor, mealActive } from '../life/meals.js';
 
 export const INV_SIZE = 40;
 export const STASH_SIZE = 60;
@@ -296,6 +303,7 @@ export function createActions(G) {
         case 'coins': addCoins(x.n); return true;
         case 'potion': return addPotion(x.key, x.n || 1);
         case 'material': addMaterial(x.key, x.n || 1); return true;
+        case 'pantry': return addPantry(x.key, x.n || 1, { src: 'pickup' }) > 0;
         case 'item': case 'gem': return pickup(x.item);
         default: return false;
       }
@@ -442,6 +450,107 @@ export function createActions(G) {
     emit('materials:changed', { cost });
     return true;
   }
+
+  // ------------------------------------------------------------ pantry (docs/HOMESTEAD.md §1)
+  /** Add (or with n < 0 take) pantry items. Returns the new count. o.src tags the event ('pickup', 'harvest', 'buy'...). */
+  function addPantry(id, n = 1, o = {}) {
+    if (!PANTRY[id] || !n) return 0;
+    const st = S(), p = pantryOf(st), found = st.pantryFound ||= {};
+    const v = Math.max(0, (p[id] || 0) + Math.round(n));
+    if (v) p[id] = v; else delete p[id];
+    const first = n > 0 && !found[id];
+    if (first) found[id] = st.day || 1;
+    if (!o.silent) emit('pantry:changed', { id, n: v, delta: Math.round(n), first, src: o.src || null });
+    return v;
+  }
+  const pantryCount = id => S().pantry?.[id] || 0;
+  const hasPantry = req => pantryHas(S(), req || {});
+  /** Take every item of req ({ id: n }) or nothing. */
+  function spendPantry(req, o = {}) {
+    if (!hasPantry(req)) { if (!o.quiet) toast('Not enough in the pantry!', '#ff6a5a'); return false; }
+    for (const k in req) if (req[k] > 0) addPantry(k, -req[k], { silent: true });
+    emit('pantry:changed', { spend: req, src: o.src || null });
+    return true;
+  }
+  /** Sell up to n of a pantry item (buyer: 'rosie' | 'kero' | 'usagi' | null, see life/pantry.js sellPrice). → coins. */
+  function sellPantry(id, n = 1, buyer = null) {
+    n = Math.min(Math.max(0, Math.round(n)), pantryCount(id));
+    if (!n) return 0;
+    const v = pantrySellPrice(id, buyer) * n;
+    addPantry(id, -n, { src: 'sell' });
+    addCoins(v);
+    return v;
+  }
+  /** Buy n of a pantry item at `price` coins each (the Seed Stall). */
+  function buyPantry(id, price, n = 1) {
+    if (!PANTRY[id]) return false;
+    if (!spendCoins(Math.round(price * n))) return false;
+    addPantry(id, n, { src: 'buy' });
+    return true;
+  }
+  /** Eat a dish: heals a chunk of max life at once and leaves the hero Well Fed (life/meals.js: one buff at a time,
+   *  a new dish replaces it; it lives on the hero's player object, so it travels and saves with them). It also becomes
+   *  the G quick meal. → { heal, id, meal } | null */
+  function eat(id) {
+    const d = PANTRY[id];
+    if (!d?.food || pantryCount(id) <= 0) return null;
+    if (life() <= 0) return null;
+    addPantry(id, -1, { src: 'eat' });
+    const P = S().player, prev = P.meal || null;
+    P.meal = mealFor(id, d.food);
+    cookbookOf(S()).quick = id;
+    const D = recompute(), heal0 = Math.round(D.lifeMax * (d.food.heal || 0.3)); // (after the buff: Hearty's bigger max)
+    const healed = heal(heal0);
+    restoreZoom(Math.round(D.zoomMax * (d.food.heal || 0.3) * 0.5));
+    emit('meal:eaten', { id, heal: healed, meal: P.meal, replaced: mealActive(prev) ? prev : null });
+    return { id, heal: healed, meal: P.meal };
+  }
+  /** Count the active hero's Well Fed down (seconds of play); when it runs out the stats go back. → true on expiry */
+  function tickMeal(dt) {
+    const P = S().player, m = P.meal;
+    if (!m) return false;
+    m.left -= dt;
+    if (m.left > 0) return false;
+    P.meal = null; recompute();
+    emit('meal:expired', { id: m.dish, buff: m.buff });
+    return true;
+  }
+  /** Cook a recipe `times` times: spends its ingredients (wildcards take the cheapest fish / crops first) and adds the
+   *  dish to the pantry. o: { learn: also learn it (a discovery), picks: spend this exact mix instead ("Try a mix"),
+   *  src }. → { id, n, spent } | null when short. */
+  function cook(id, times = 1, o = {}) {
+    const R = RECIPES[id]; times = Math.max(1, Math.round(times));
+    if (!R) return null;
+    let spend;
+    if (o.picks) { if (!spendMix(o.picks)) return null; spend = { picks: o.picks }; times = 1; }
+    else {
+      spend = spendFor(S(), id, times); if (!spend) return null;
+      if (Object.keys(spend.mats).length && !spendMaterials(spend.mats)) return null;
+      for (const k in spend.pantry) addPantry(k, -spend.pantry[k], { silent: true });
+    }
+    if (o.learn) learnRecipe(id);
+    const c = cookbookOf(S()); c.cooked[id] = (c.cooked[id] || 0) + times;
+    addPantry(id, times, { src: 'cook' });
+    emit('dish:cooked', { id, n: times, spent: spend, src: o.src || null });
+    return { id, n: times, spent: spend };
+  }
+  /** Spend a free-form mix (the Cook panel's "Try a mix"): { pantryId | 'mat:x': n } — all or nothing. */
+  function spendMix(picks) {
+    const st = S(), pan = {}, mats = {};
+    for (const [k, n] of Object.entries(picks || {})) { if (!(n > 0)) continue; if (k.startsWith('mat:')) mats[k.slice(4)] = n; else pan[k] = n; }
+    if (!pantryHas(st, pan) || !hasMaterials(mats)) return false;
+    if (Object.keys(mats).length) spendMaterials(mats);
+    for (const k in pan) addPantry(k, -pan[k], { silent: true });
+    emit('pantry:changed', { spend: pan, src: 'cook' });
+    return true;
+  }
+  /** Learn a recipe (villager, quest, cookbook page, discovery). → true when it's new. */
+  function learnRecipe(id, o = {}) {
+    if (!learnRecipeIn(S(), id, S().day || 1)) return false;
+    emit('recipe:learned', { id, src: o.src || null });
+    return true;
+  }
+  const d0 = () => d();
 
   // ------------------------------------------------------------ progression
   function learnSkill(id) {
@@ -606,6 +715,8 @@ export function createActions(G) {
     addSkillPts, addStatPts, respec, socket, getItem, firstFree, canEquip, equipProblem, setPieces,
     mouseSet, ensureMouseSets, setWeaponType,
     setActiveHero, prepareJoin, isCatchingUp: catchUp,
+    // pantry (docs/HOMESTEAD.md)
+    addPantry, hasPantry, spendPantry, sellPantry, buyPantry, eat, pantryCount, tickMeal, cook, spendMix, learnRecipe,
   };
   if (G.state) { normalizeHeroes(G.state); ensureMouseSets(); migrateStarterSkills(); recompute(true); }
   return api;

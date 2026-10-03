@@ -93,6 +93,7 @@ export class VillageMinimap {
     for (const n of G.npcs || []) if (n.visible) dot(n.pos.x, n.pos.z, n.id === 'rosie' ? 4 : 2.6, n.id === 'rosie' ? '#ff6a9a' : '#fff6e8', night > 0.5 ? '#1e1830' : '#4a2c2a');
     const L = G.village.world.landmarks;
     dot(L.dungeon.x, L.dungeon.z, 5, '#b89aff');
+    if (G.seedStall) dot(G.seedStall.pos.x, G.seedStall.pos.z, 4, '#8fe0a0'); // Usagi's Seed Stall (docs/HOMESTEAD.md)
     // the big map: the expansion rings' stub streets (dashed until their rank opens them) and the district names
     const ring = G.sim?.ringRank?.() || 1;
     if (o.big) {

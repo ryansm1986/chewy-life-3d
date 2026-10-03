@@ -5,8 +5,14 @@ import { BUILDINGS } from './buildings/index.js';
 import { VILLAGERS } from '../actors/roster.js';
 import { generateItem, makeUnique, UNIQUE_IDS } from '../rpg/items.js';
 import { rand, randInt, pick, uid } from '../core/util.js';
+import { PANTRY, CROPS, CROP_IDS, pantryList } from '../life/pantry.js';
+import { RECIPES } from '../life/cooking.js';
+import { MATERIALS } from '../ui/glyphs.js';
+import { pantryIcon } from '../life/pantryIcons.js';
 
 // step types: talk(npc) | collect(material,n) | kill(monster?,n) | boss(id) | floor(n) | build(type,n) | pop(n) | zone(n)
+//   | fish(n) (catch n fish: life/fishing.js 'fish:caught') | plant(n) / harvest(n) (life/garden.js) | cook(n) dishes
+//   | deliver(npc, mat, n, pantry?) (a material, or with pantry: true a pantry good — crops, fish, dishes)
 export const QUESTS = {
   welcome: { title: 'Welcome Home, Chewy', giver: 'rosie', desc: 'Rosie wants to show you around Blossom Hollow.', steps: [{ type: 'talk', npc: 'rosie', text: 'Say hi to Rosie' }], reward: { coins: 50, xp: 20 }, next: 'burrow1' },
   burrow1: { title: 'Something Squishy', giver: 'rosie', desc: 'Strange squeaks echo from the Burrow on the shrine hill. Go take a peek!', steps: [{ type: 'kill', n: 8, text: 'Defeat yokai in the Burrow' }, { type: 'collect', mat: 'mochi', n: 3, text: 'Bring back Mochi Jelly' }], reward: { coins: 120, xp: 80, potions: { heart: 3 } }, next: 'homes' },
@@ -17,6 +23,11 @@ export const QUESTS = {
   umbrella: { title: 'Umbrella Trouble', giver: 'rosie', desc: 'Umbrellas keep hopping out of the Burrow at night. Their lord waits on Floor 10.', steps: [{ type: 'floor', n: 10, text: 'Reach Floor 10' }, { type: 'boss', id: 'kasaLord', text: 'Defeat Lord Karakasa' }], reward: { coins: 1200, xp: 2500, skillPts: 1, unique: true }, next: 'onsen' },
   onsen: { title: 'Hot Spring Dreams', giver: 'kuma', desc: 'Kuma dreams of a steamy hot spring for sore paws. (Needs village rank 3.)', steps: [{ type: 'build', btype: 'onsen', n: 1, text: 'Build a Hot Spring' }, { type: 'pop', n: 30, text: 'Reach 30 villagers' }], reward: { coins: 800, xp: 3000 }, next: 'oni' },
   oni: { title: "Oni's Kitchen Nightmare", giver: 'rosie', desc: 'Someone is stealing all the dumplings. The trail leads to Floor 15.', steps: [{ type: 'floor', n: 15, text: 'Reach Floor 15' }, { type: 'boss', id: 'oniChef', text: 'Defeat Oni Chef Gorobei' }], reward: { coins: 3000, xp: 12000, skillPts: 1, unique: true }, next: 'tails' },
+  // the homestead (docs/HOMESTEAD.md): offered from day 2 (life/fishSocial.js); Kero hands over the rod at the talk step
+  keroRod: { title: "Pond Guardian's Apprentice", giver: 'kero', desc: 'Kero the pond guardian has a spare fishing rod — and opinions about floats. Go and find him.', steps: [{ type: 'talk', npc: 'kero', text: 'Visit Kero, the pond guardian' }, { type: 'fish', n: 3, text: 'Catch 3 fish' }], reward: { coins: 150, xp: 60, hearts: 10 }, next: null },
+  // Usagi's starter-pack quest (offered with the starter seeds, life/index.js) leads into Rosie's taste test
+  firstSprouts: { title: 'First Sprouts', giver: 'usagi', desc: 'Usagi can\'t wait to see your first harvest! Plant seeds in your garden bed (F), water them every day and pick what grows.', steps: [{ type: 'plant', n: 3, text: 'Plant 3 seeds' }, { type: 'harvest', n: 3, text: 'Harvest 3 crops' }], reward: { coins: 120, xp: 50, hearts: 10, recipe: 'carrotSoup', pantry: { strawberrySeed: 2 } }, next: 'tasteTest' },
+  tasteTest: { title: 'Taste Test', giver: 'rosie', desc: 'Rosie wants to taste your cooking! Cook at home (your cottage), at a campfire in the Burrow, or bake with her at the shop.', steps: [{ type: 'cook', n: 3, text: 'Cook 3 dishes' }, { type: 'talk', npc: 'rosie', text: 'Let Rosie have a taste' }], reward: { coins: 200, xp: 80, hearts: 10, recipe: 'strawberryMochi', mats: { mochi: 2 } }, next: null },
   tails: { title: 'Nine Tails of Moonlight', giver: 'kitsune', desc: 'The old fox spirit Tamamo stirs on Floor 20. Kitsune believes only a good boy can calm her.', steps: [{ type: 'floor', n: 20, text: 'Reach Floor 20' }, { type: 'boss', id: 'nineTails', text: 'Calm Tamamo, the Nine-Tailed' }], reward: { coins: 10000, xp: 40000, skillPts: 2, unique: true }, next: null },
 };
 
@@ -29,6 +40,16 @@ const CHAT = {
   pan: ['Zzz… oh! Hi Chewy. I was practicing kemari. In my dreams.', 'Bamboo is a food, a flute and a bed. Perfect plant.', 'Want to nap together sometime? Professionally?'],
   tanu: ['This leaf hat? Pure fashion. Definitely not a disguise.', 'I can get you a great deal on a slightly haunted umbrella.', 'Coins make the nicest jingle, don\'t they?'],
   kero: ['The koi told me it will rain on Tuesday. They are rarely wrong.', 'Ribbit. That means "hello" and also "nice scarf".', 'Please do not skip stones in my pond. The koi are sensitive.'],
+};
+// a villager's loved dish (life/pantry.js LOVED): their own special thank-you
+const LOVED_LINES = {
+  usagi: ['Carrot soup?! Hop hop HOP! It\'s my absolute favourite in the whole wide world!'],
+  rosie: ['Strawberry mochi… for ME? *sniff* You remembered! I\'m going to cry into it. Happily!'],
+  kuma: ['Honey cake! Oh my, oh my. The glaze is perfect. You have a baker\'s paws, Chewy.'],
+  kero: ['A salt-grilled trout. …Ribbit. This is the best thing that has happened to me all season.'],
+  pan: ['Melon bread… crunchy outside, fluffy inside… I\'m going to nap SO well after this. Zzz…'],
+  mochi: ['A whole sushi platter?! Purrrr… I\'m going to paint it before I eat it. Then eat the painting. No wait.'],
+  kitsune: ['The Moon Koi Bento… The old songs speak of this dish. You honour the shrine, little one.'],
 };
 const GIFT_LINES = { love: ['For me?! You shouldn\'t have! (Please do again.)', 'This is exactly what I wanted!!'], like: ['Oh, how thoughtful! Thank you, Chewy!', 'That\'s sweet of you.'], meh: ['Oh! …Thank you. I\'ll find a use for it. Somewhere.'] };
 // Knocking after bedtime (npc.js sleepyAnswer): a drowsy hello (hi) and a goodnight (bye) per villager; 'folk' = townsfolk.
@@ -57,6 +78,10 @@ export class Story {
     Events.on('mode:changed', e => { if (e.mode === 'dungeon') this.progress('floor', e); });
     Events.on('village:changed', () => this.progress('build'));
     Events.on('materials:changed', () => this.progress('collect'));
+    Events.on('fish:caught', e => this.progress('fish', e));
+    Events.on('garden:plant', e => this.progress('plant', e));
+    Events.on('garden:harvest', e => this.progress('harvest', e));
+    Events.on('dish:cooked', e => this.progress('cook', e));
     setInterval(() => this.progress('pop'), 5000);
   }
   get Q() { return this.G.state.quests; }
@@ -89,6 +114,8 @@ export class Story {
       if (s.type === 'buildAny' && q.base === undefined) q.base = this.G.state.village.buildings.filter(b => s.btypes.includes(b.type)).length;
       if (kind === 'kill' && s.type === 'kill' && (!s.monster || s.monster === e.id)) { q.prog++; changed = true; }
       if (kind === 'boss' && s.type === 'boss' && s.id === e.id) { q.prog = 1; changed = true; }
+      if (kind === 'fish' && s.type === 'fish') { q.prog++; changed = true; }
+      if ((kind === 'plant' || kind === 'harvest' || kind === 'cook') && s.type === kind) { q.prog += kind === 'cook' ? e?.n || 1 : 1; changed = true; }
       if (this.stepDone(q, s)) {
         q.step++; q.prog = 0; changed = true;
         if (q.step >= d.steps.length) this.complete(q, d);
@@ -108,6 +135,9 @@ export class Story {
     if (r.mats) for (const k in r.mats) A.addMaterial(k, r.mats[k]);
     if (r.potions) for (const k in r.potions) A.addPotion(k, r.potions[k]);
     if (r.unique) this.giveItem(makeUnique(pick(UNIQUE_IDS), Math.max(5, G.state.player.lvl)));
+    if (r.pantry) for (const k in r.pantry) { A.addPantry(k, r.pantry[k], { src: 'quest' }); G.ui?.pantryGain?.(k, r.pantry[k], {}); }
+    if (r.recipe) setTimeout(() => G.life?.teach?.(r.recipe, { from: d.giver, src: 'quest' }), 1800);
+    if (d.request && d.steps.some(s => s.pantry)) setTimeout(() => G.life?.onRequestDone?.(d.giver), 2200);
     if (r.hearts && d.giver) this.addHearts(d.giver, r.hearts);
     G.ui?.banner?.('Quest Complete!', d.title, { style: 'quest' });
     Events.emit('sfx', 'ui_levelup');
@@ -129,6 +159,7 @@ export class Story {
     for (const q of this.Q.active) { const d = this.def(q.id); const s = d?.steps[q.step]; if (s?.type === 'talk' && s.npc === id) return '!'; }
     const f = this.G.state.friends[id];
     if (f?.pendingReward) return 'gift';
+    const lm = this.G.life?.markerFor?.(id); if (lm) return lm; // (the homestead: Kero's Fish Log gifts)
     if (this.Q.active.some(q => { const d = this.def(q.id); return d && d.giver === id && !d.request; })) return '?';
     return null;
   }
@@ -149,13 +180,16 @@ export class Story {
     for (const q of this.Q.active) {
       const d = this.def(q.id), s = d?.steps[q.step];
       if (s?.type !== 'deliver' || s.npc !== id) continue;
-      if ((G.state.materials[s.mat] || 0) < s.n) return { need: s };
-      G.actions.spendMaterials({ [s.mat]: s.n }); q.delivered = true;
+      if (this.haveFor(s) < s.n) return { need: s };
+      if (s.pantry) G.actions.spendPantry({ [s.mat]: s.n }, { src: 'request' }); else G.actions.spendMaterials({ [s.mat]: s.n });
+      q.delivered = true;
       this.progress('deliver');
       return { done: s };
     }
     return null;
   }
+  /** how many of a deliver step's goods the household has (materials, or pantry goods for a homestead request) */
+  haveFor(s) { const st = this.G.state; return s.pantry ? st.pantry?.[s.mat] || 0 : st.materials[s.mat] || 0; }
   // where the current objective is, for the on-screen quest pointer → { pos, label, kind } | null
   target() {
     const G = this.G, st = G.state;
@@ -165,7 +199,7 @@ export class Story {
     for (const q of order) {
       const d = this.def(q.id), s = d.steps[q.step]; if (!s) continue;
       if (s.type === 'talk') { const t = npcPos(s.npc); if (t) return t; continue; }
-      if (s.type === 'deliver') { if ((st.materials[s.mat] || 0) >= s.n) { const t = npcPos(s.npc); if (t) return t; } continue; }
+      if (s.type === 'deliver') { if (this.haveFor(s) >= s.n) { const t = npcPos(s.npc); if (t) return t; } continue; }
       const burrowStep = ['kill', 'floor', 'boss'].includes(s.type) || (s.type === 'collect' && s.mat === 'mochi');
       if (burrowStep) {
         if (G.mode === 'village') {
@@ -187,7 +221,7 @@ export class Story {
       const done = i < q.step;
       let have = 0, need = s.n || 1;
       if (i === q.step) {
-        if (s.type === 'collect' || s.type === 'deliver') have = st.materials[s.mat] || 0;
+        if (s.type === 'collect' || s.type === 'deliver') have = this.haveFor(s);
         else if (s.type === 'build') have = st.village.buildings.filter(b => b.type === s.btype).length;
         else if (s.type === 'buildAny') have = st.village.buildings.filter(b => s.btypes.includes(b.type)).length - (q.base || 0);
         else if (s.type === 'pop') have = G.sim?.stats.population || 0;
@@ -223,6 +257,7 @@ export class Story {
     if (f.talkedDay !== day) { f.talkedDay = day; this.addHearts(id, 2); }
     // story talk steps
     this.markTalk(id);
+    if (!npc.folk && this.G.life?.onTalk) await this.G.life.onTalk(npc, say); // (the homestead: Kero's rod, gifts, records)
     // pending heart reward
     if (f.pendingReward && HEART_REWARDS[f.pendingReward]?.item && G.actions.firstFree('inv') < 0) {
       await say(["I have a present for you… but your bag looks stuffed! I'll keep it safe until you have room."]);
@@ -245,30 +280,75 @@ export class Story {
     const choices = [{ text: 'Chat' }, { text: 'Give a gift 🎁' }];
     if (!req && this.canRequest(id)) choices.push({ text: 'Need any help? 📝' });
     if (id === 'rosie') choices.push({ text: "Open Rosie's shop 🍰" });
+    if (id === 'rosie' && G.life?.kitchen) choices.push({ text: 'Bake with Rosie 🧁' }); // her oven (docs/HOMESTEAD.md §4)
+    if (id === 'usagi' && G.openSeedStall) choices.push({ text: 'Seeds, please! 🌱' }); // her Seed Stall (docs/HOMESTEAD.md)
+    if (id === 'kero' && G.openFishHut) choices.push({ text: 'Fishing gear & fish trades 🎣' }); // his Fishing Hut
     choices.push({ text: 'Bye!' });
     const c = await say(lines, choices);
     const pickText = choices[c]?.text || '';
     if (pickText.startsWith('Chat')) await say([pick(CHAT[id] || ['…']), `(Friendship: ${'♥'.repeat(f.hearts)}${'♡'.repeat(10 - f.hearts)})`]);
-    else if (pickText.startsWith('Give')) await this.giftFlow(npc, say);
+    else if (pickText.startsWith('Give')) await this.giftFlow(npc, say, G.ui?.pickGift ? o => G.ui.pickGift(o) : null);
+    else if (pickText.startsWith('Bake')) G.life?.kitchen?.open('oven', npc.pos);
     else if (pickText.startsWith('Need')) await this.requestFlow(npc, say);
     else if (pickText.startsWith('Open')) G.openShop?.();
+    else if (pickText.startsWith('Seeds')) await G.openSeedStall?.();
+    else if (pickText.startsWith('Fishing')) G.openFishHut?.();
   }
-  async giftFlow(npc, say) {
+  /** Everything giftable for this villager: pantry dishes, then fish, crops and forage (no seeds), then materials.
+   *  → [{ key, name, n, pantry, love: 'loved' | 'liked' | null }] */
+  giftItems(id) {
+    const st = this.G.state, ORDER = ['dish', 'fish', 'crop', 'forage'], rank = l => (l === 'loved' ? 0 : l === 'liked' ? 1 : 2);
+    const pan = pantryList(st).filter(e => ORDER.includes(e.def.kind)).map(e => ({ key: e.id, name: e.def.name, n: e.n, pantry: true, kind: e.def.kind, v: e.def.value,
+      love: e.def.lovedBy?.includes(id) ? 'loved' : e.def.likedBy?.includes(id) ? 'liked' : null }));
+    pan.sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind) || rank(a.love) - rank(b.love) || b.v - a.v);
+    const mats = Object.entries(st.materials).filter(([, n]) => n > 0).map(([k, n]) => ({ key: k, name: MATERIALS[k]?.name || k, n, pantry: false, love: this.likesOf(id).includes(k) ? 'liked' : null }));
+    return [...pan, ...mats];
+  }
+  /** "Give a gift": pickGift(o) → Promise<key|null> (the paged gift picker, ui/gift.js); without one, a paged
+   *  dialogue menu. Loved dishes +16 hearts with their own line, liked things +8, anything else +3. */
+  async giftFlow(npc, say, pickGift = null) {
     const G = this.G, id = npc.id, f = this.friend(id), day = G.day?.day || 1;
     if (f.giftDay === day) return say(['You already gave me something today! Save some for tomorrow~']);
-    const have = Object.entries(G.state.materials).filter(([k, n]) => n > 0);
-    if (!have.length) return say(['Aww, your pockets are empty! That\'s okay.']);
-    const c = await say(['Ooh, a present? What is it?'], [...have.slice(0, 6).map(([k, n]) => ({ text: `${k} (${n})` })), { text: 'Never mind' }]);
-    if (c == null || c >= Math.min(6, have.length)) return;
-    const [mat] = have[c];
-    G.actions.spendMaterials({ [mat]: 1 });
+    const items = this.giftItems(id);
+    if (!items.length) return say(['Aww, your pockets are empty! That\'s okay.']);
+    let key = null;
+    if (pickGift) key = await pickGift({ id, name: npc.name, portrait: G.portrait?.(id), items });
+    else for (let page = 0; ;) {
+      const sl = items.slice(page * 5, page * 5 + 5), more = items.length > page * 5 + 5;
+      const c = await say([page ? 'Anything else in there?' : 'Ooh, a present? What is it?'], [...sl.map(e => ({ text: `${e.name} (${e.n})${e.love ? ' ♥' : ''}` })), ...(more ? [{ text: 'More… ▸' }] : []), { text: 'Never mind' }]);
+      if (c == null) return;
+      if (c < sl.length) { key = sl[c].key; break; }
+      if (more && c === sl.length) { page++; continue; }
+      return;
+    }
+    const it = key && items.find(e => e.key === key); if (!it) return;
+    if (it.pantry ? !G.actions.spendPantry({ [key]: 1 }, { quiet: true, src: 'gift' }) : !G.actions.spendMaterials({ [key]: 1 })) return;
     f.giftDay = day;
-    const love = this.likesOf(id).includes(mat);
-    this.addHearts(id, love ? 8 : 3);
-    G.vfx?.emote?.(npc, love ? 'heart' : 'sparkle', 2);
+    const pts = it.love === 'loved' ? 16 : it.love === 'liked' ? 8 : 3;
+    this.addHearts(id, pts);
+    G.vfx?.emote?.(npc, it.love ? 'heart' : 'sparkle', 2);
     npc.anim.play('happy');
-    Events.emit('sfx', love ? 'ui_levelup' : 'ui_coin');
-    return say([pick(love ? GIFT_LINES.love : GIFT_LINES.like)]);
+    if (it.love === 'loved') { G.vfx?.sparkle?.(npc.pos.clone().setY(npc.pos.y + 1.4), { n: 22, color: '#ff8fb0', r: 0.7, rise: 1.2 }); G.vfx?.sparkle?.(npc.pos.clone().setY(npc.pos.y + 1.4), { n: 10, color: '#fff3b8', r: 0.5, rise: 1.4 }); }
+    Events.emit('sfx', it.love === 'loved' ? 'gift_loved' : it.love ? 'ui_levelup' : 'ui_coin');
+    G.ui?.toast?.(`${it.love === 'loved' ? `${this.nameOf(id)} LOVES it!` : it.love ? `${this.nameOf(id)} likes it!` : `${this.nameOf(id)} thanks you`} <span class="t-heal">+${pts} ♥</span>`, { html: true, iconURL: it.pantry ? pantryIcon(key) : null, icon: it.pantry ? null : 'heart', color: '#ff8fb0', sub: `${it.name} for ${this.nameOf(id)} · ${this.friend(id).hearts}/10 hearts` });
+    Events.emit('gift:given', { id, key, love: it.love, pts });
+    const line = it.love === 'loved' ? pick(LOVED_LINES[id] || GIFT_LINES.love) : pick(it.love ? GIFT_LINES.love : GIFT_LINES.like);
+    return say([line]);
+  }
+  /** Requests for crops, fish and dishes (docs/HOMESTEAD.md §4): a crop the stall sells at this rank, a fish once you
+   *  have a rod, a dish you know how to cook once you've cooked something. */
+  homesteadRequests(npc) {
+    const G = this.G, st = G.state, id = npc.id, out = [], rank = G.sim?.stats?.rank || 1;
+    const deliver = (mat, n, text, ask) => ({ steps: [{ type: 'deliver', mat, n, pantry: true, npc: id, text }], text: ask });
+    const crops = CROP_IDS.filter(c => CROPS[c].rank <= rank);
+    if (crops.length) { const c = pick(crops), n = randInt(2, 4); out.push(deliver(c, n, `Bring ${n} ${PANTRY[c].name.toLowerCase()} to ${npc.name}`, `Could you bring me ${n} ${PANTRY[c].name.toLowerCase()}? Fresh from your garden, if you can!`)); }
+    if (st.fishing?.rod) {
+      const seen = Object.keys(st.fishLog || {}).filter(f => (PANTRY[f]?.rare || 0) < 2), f = pick(seen.length ? seen : ['crucian', 'koi', 'loach']);
+      out.push(deliver(f, 1, `Bring a ${PANTRY[f].name.toLowerCase()} to ${npc.name}`, `I'm craving a ${PANTRY[f].name.toLowerCase()}… could you catch one for me?`));
+    }
+    const cooked = Object.keys(st.cookbook?.cooked || {}).filter(r => RECIPES[r] && (PANTRY[r].food?.tier || 1) <= 2);
+    if (cooked.length) { const r = pick(cooked); out.push(deliver(r, 1, `Cook ${PANTRY[r].name} for ${npc.name}`, `Would you cook me some ${PANTRY[r].name.toLowerCase()}? I heard yours is the best!`)); }
+    return out;
   }
   canRequest(id) { const f = this.friend(id); return (f.reqDay || 0) !== (this.G.day?.day || 1); }
   async requestFlow(npc, say) {
@@ -279,6 +359,7 @@ export class Story {
       { steps: [{ type: 'deliver', mat, n: randInt(2, 5), npc: id, text: `Bring ${mat} to ${npc.name}` }], text: `Could you bring me some ${mat}? I'm making something special!` },
       { steps: [{ type: 'kill', n: randInt(10, 20), text: 'Defeat yokai in the Burrow' }], text: 'The yokai keep knocking over my flower pots… could you shoo some away?' },
       { steps: [{ type: 'buildAny', btypes: ['bench', 'flowerBed', 'sakuraPlanter'], n: 1, text: 'Build a bench, flower bed or planter' }], text: 'The village could use somewhere cute to sit. Would you build something?' },
+      ...this.homesteadRequests(npc), // (appended: the first three keep their places)
     ];
     const t = pick(templates);
     const c = await say([t.text], [{ text: 'Leave it to me!' }, { text: 'Maybe later' }]);

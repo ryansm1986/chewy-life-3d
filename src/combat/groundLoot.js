@@ -10,6 +10,7 @@ import { Events } from '../core/events.js';
 import { POTION_CAP } from '../rpg/actions.js';
 import { rand, TAU, dist, uid } from '../core/util.js';
 import { glyph } from '../ui/glyphs.js';
+import { PANTRY, CROPS } from '../life/pantry.js';
 
 const RCOL = { normal: '#f4efe6', magic: '#6ea8ff', rare: '#ffd84a', unique: '#ff9a3c', set: '#5ee07a' };
 const MAT_COL = { wood: '#b07a4a', stone: '#b8b0c0', petal: '#ffb0d0', crystal: '#9ae8ff', bone: '#fff4e0', mochi: '#ffe0ec', silk: '#e8e0ff', lantern: '#ff8a4a' };
@@ -43,6 +44,15 @@ function matGeo(key) {
     const g = new THREE.IcosahedronGeometry(0.11, 1); g.translate(0, 0.1, 0); return paint(g, (p, n, o) => o.set(c));
   });
 }
+// a seed packet (or a little cloth bundle for other pantry goods): docs/HOMESTEAD.md
+function pantryGeo(key) {
+  return geo('pantry' + key, () => {
+    const d = PANTRY[key], band = new THREE.Color(d?.crop ? (CROPS[d.crop].color === '#fbf6ee' || CROPS[d.crop].color === '#f4e4f0' ? CROPS[d.crop].accent : CROPS[d.crop].color) : '#8fe0a0');
+    const pk = new THREE.BoxGeometry(0.2, 0.26, 0.035); pk.translate(0, 0.16, 0); paint(pk, (p, n, o) => o.set(p.y > 0.24 ? band : '#fff4dc'));
+    const win = new THREE.CircleGeometry(0.055, 12); win.translate(0, 0.15, 0.0185); paint(win, (p, n, o) => o.copy(band).lerp(new THREE.Color('#ffffff'), 0.25));
+    const g = merge([pk, win]); g.rotateX(-0.25); return g;
+  });
+}
 function gemGeo() { return geo('gem', () => { const g = new THREE.OctahedronGeometry(0.11, 0); g.scale(1, 1.2, 1); g.translate(0, 0.14, 0); return paint(g, (p, n, o) => o.set('#ffffff').lerp(new THREE.Color('#dddddd'), 0.2)); }); }
 function bundleGeo() {
   return geo('bundle', () => {
@@ -71,6 +81,7 @@ export class GroundLoot {
     if (d.type === 'coins') { mesh = new THREE.Mesh(coinGeo(), makeToon({ vertexColors: true, rim: 0.7, emissive: '#ffb030', emissiveIntensity: 0.25 })); }
     else if (d.type === 'potion') { mesh = new THREE.Mesh(potionGeo(d.key), makeToon({ vertexColors: true, rim: 0.6, emissive: POT_COL[d.key], emissiveIntensity: 0.3 })); }
     else if (d.type === 'material') { mesh = new THREE.Mesh(matGeo(d.key), makeToon({ vertexColors: true, rim: 0.6 })); }
+    else if (d.type === 'pantry') { mesh = new THREE.Mesh(pantryGeo(d.key), makeToon({ vertexColors: true, rim: 0.6, emissive: '#fff0c0', emissiveIntensity: 0.15 })); color = '#8fe0a0'; }
     else if (d.type === 'gem') { const gc = d.item?.color || d.item?.icon?.colors?.[0] || '#ff6a8a'; mesh = new THREE.Mesh(gemGeo(), makeToon({ vertexColors: true, color: gc, rim: 0.8, emissive: gc, emissiveIntensity: 0.6 })); color = gc; label = d.item?.name; }
     else if (d.type === 'item') {
       const it = d.item; color = RCOL[it.rarity] || '#ffffff';
@@ -96,6 +107,7 @@ export class GroundLoot {
     const G = this.G, P = G.player;
     if (!clicked && e.d.type === 'item' && e.d.item.rarity === 'normal' && !G.state.flags?.autoPickNormal) return false;
     if (clicked && dist(P.pos.x, P.pos.z, e.to.x, e.to.z) > 1.8) { P.moveTarget = e.to.clone(); P.pendingLoot = e; return false; }
+    const first = e.d.type === 'pantry' && !(G.state.pantryFound || {})[e.d.key];
     const ok = G.actions.pickup(e.d);
     if (!ok) return false;
     this.remove(e);
@@ -103,6 +115,7 @@ export class GroundLoot {
     if (e.d.type === 'coins') { G.vfx.coins(p, 6); Events.emit('sfx', 'pickup_gold'); this.tally('coin', e.d.n); }
     else if (e.d.type === 'potion') { G.vfx.sparkle(p, { n: 5, color: POT_COL[e.d.key] }); Events.emit('sfx', 'pickup_item'); }
     else if (e.d.type === 'material') { G.vfx.sparkle(p, { n: 4, color: MAT_COL[e.d.key] }); Events.emit('sfx', 'pickup_item'); this.tally(e.d.key, e.d.n); }
+    else if (e.d.type === 'pantry') { G.vfx.sparkle(p, { n: 8, color: '#bff0a0' }); Events.emit('sfx', 'pickup_magic'); G.ui?.pantryGain?.(e.d.key, e.d.n || 1, { first, worldPos: p }); }
     else { G.vfx.sparkle(p, { n: 10, color: e.color }); Events.emit('sfx', ['unique', 'set', 'rare'].includes(e.d.item?.rarity) ? 'pickup_rare' : 'pickup_item'); G.ui?.pickupFly?.(e.d.item, p); }
     return true;
   }

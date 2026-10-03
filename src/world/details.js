@@ -16,13 +16,13 @@ import { puff, tube, paint, merge } from '../gfx/geom.js';
 import { brushTexture } from '../gfx/textures.js';
 import { mulberry32, TAU, clamp, Noise } from '../core/util.js';
 import { T, WORLD } from './terrain.js';
-import { LANDMARKS, STREETS, SQUARES, TERRACES, STREET_LAMPS, distToPaths, openPaths, PLAZA, PLAZA_HALF, POND, HILL, ISLAND, inTown, squareDist } from './layout.js';
+import { LANDMARKS, STREETS, SQUARES, TERRACES, STREET_LAMPS, distToPaths, openPaths, PLAZA, PLAZA_HALF, POND, HILL, ISLAND, inTown, squareDist, CHEWY_GARDEN } from './layout.js';
 import { PLOTS, plotFrame, plotSetback, plotSpot, plotLocal, plotFacing } from './plots.js';
 import { fenceSection } from './buildings/decor.js';
 import { Builder, G, C, PI, shade, bar } from './buildings/kit.js';
 const nz = (() => { const n = new Noise(5151); return (x, y) => n.n2(x, y); })();
 import { toro, chochin, crate, bench, pot, bush, rock as kitRock, lanternPost, mossCap, mossLine, leafGeo, lrng } from './buildings/props.js';
-import { boat, bucket, nobori, parasol, teaBench, stool, pottery, cabbage, carrot, pumpkin } from './buildings/props2.js';
+import { boat, bucket, nobori, parasol, teaBench, stool, pottery } from './buildings/props2.js';
 import { barrel, produce, tree, mailbox, flowerPatch, woodStack, logPile } from './buildings/props.js';
 import { symbol } from './buildings/symbols.js';
 import { STONES } from './buildings/parts.js';
@@ -1311,9 +1311,8 @@ export class Details {
       pots: [0, 1].map(v => kit(185 + v, B => pot(B, { r: 0.19, h: 0.27, color: v ? '#d8c8b0' : C.terracotta, plant: v ? 'pine' : 'flowers', flowers: ['#ff8fb0', '#ffffff'] }))),
       crates: kit(188, B => { crate(B, { s: 0.42 }); B.at([0.52, 0, 0.12], 0.4, () => barrel(B, { r: 0.19, h: 0.42 })); B.at([0.04, 0.42, 0.02], 0.35, () => crate(B, { s: 0.3 })); }),
       wood: kit(189, B => { woodStack(B, { w: 0.9, h: 0.5, d: 0.42 }); B.at([0.75, 0, 0.1], 0.2, () => logPile(B, { n: 3, L: 0.8, r: 0.1 })); }),
-      crops: [B => cabbage(B, 1.1), B => carrot(B, 1.2), B => pumpkin(B, 1)].map((f, v) => kit(190 + v, f)),
     };
-    this.yards = new Map(); this.builtPlots = new Set(); this.yardGroups = [];
+    this.yards = new Map(); this.builtPlots = new Set(); this.yardGroups = []; this.fields = new Map();
     for (const p of PLOTS) {
       if (p.fixed && p.fixed !== 'chewyHouse') continue;
       this.plotYard(p, K);
@@ -1348,6 +1347,9 @@ export class Details {
     const kind = p.fixed ? 'home' : p.allows.includes('home') ? 'home' : p.allows.includes('shop') ? 'shop' : p.allows.includes('farm') ? 'farm' : p.allows.some(t => ['lumber', 'kiln', 'fishingHut'].includes(t)) ? 'works' : 'deco';
     const g = this.yardGroup([p.id]);
     const clearOfBox = (u, v) => Math.hypot(Math.max(0, u0 - u, u - u1), Math.max(0, s - v, v - v1)); // distance to the building box
+    // Chewy's garden bed (layout.CHEWY_GARDEN, life/garden.js) stays clear of the yard dressing
+    const GB = p.fixed === 'chewyHouse' ? CHEWY_GARDEN : null;
+    const inBed = (u, v, m = 0.7) => { if (!GB) return false; const [x, z] = W(u, v); return x > GB.x - m && x < GB.x + GB.w + m && z > GB.z - m && z < GB.z + GB.d + m; };
     // ---- fences / hedges: the back always, the sides by chance (a side shared with a neighbour is drawn once)
     const style = kind === 'farm' || kind === 'works' ? 'rail' : kind === 'shop' || kind === 'deco' ? 'hedge' : ['picket', 'picket', 'hedge', 'bamboo', 'hedge'][Math.floor(rnd() * 5)];
     const run = (grp, ua, va, ub, vb, st) => {
@@ -1386,31 +1388,32 @@ export class Details {
       used.push(far);
     }
     // ---- the front yard: a garden bed (or pots for a shop) in a front corner, a mailbox or a bench now and then
-    const fronts = corners.filter(c => c.v < 1 && !used.includes(c));
+    const fronts = corners.filter(c => c.v < 1 && !used.includes(c) && !inBed(c.u, 0.62));
     if (kind === 'shop') {
       for (const du of [-0.8, 0.8]) { const [x, z] = W(sm + du, 0.42); this.yardPiece(g, K.pots[du < 0 ? 0 : 1], x, z, face); g.cols.push({ c: true, x, z, r: 0.2 }); }
     } else if (kind !== 'farm') {
       const bed = fronts[Math.floor(rnd() * fronts.length)];
       if (bed) { const [x, z] = W(bed.u, 0.62); this.yardPiece(g, K.beds[Math.floor(rnd() * 3)], x, z, face); used.push(bed); }
       if (kind === 'deco') { const other = fronts.find(c => !used.includes(c)); if (other) { const [x, z] = W(other.u, 0.62); this.yardPiece(g, K.beds[Math.floor(rnd() * 3)], x, z, face); } }
-      if (kind === 'home' && rnd() < 0.55) { const [x, z] = W(sm + 0.8, 0.3); this.yardPiece(g, K.mailbox[Math.floor(rnd() * 2)], x, z, face); g.cols.push({ c: true, x, z, r: 0.14 }); }
+      if (kind === 'home' && rnd() < 0.55 && !inBed(sm + 0.8, 0.3)) { const [x, z] = W(sm + 0.8, 0.3); this.yardPiece(g, K.mailbox[Math.floor(rnd() * 2)], x, z, face); g.cols.push({ c: true, x, z, r: 0.14 }); }
       const spare = fronts.find(c => !used.includes(c));
-      if (spare && s >= 1.8 && rnd() < (kind === 'deco' ? 0.6 : 0.3)) { const [x, z] = W(spare.u, 1.05); this.yardPiece(g, K.bench, x, z, face); g.cols.push({ c: true, x, z, r: 0.45 }); }
+      if (spare && s >= 1.8 && rnd() < (kind === 'deco' ? 0.6 : 0.3) && !inBed(spare.u, 1.05)) { const [x, z] = W(spare.u, 1.05); this.yardPiece(g, K.bench, x, z, face); g.cols.push({ c: true, x, z, r: 0.45 }); }
     }
-    // ---- a farm plot: tilled field rows with crops round the veggie patch
+    // ---- a farm plot: tilled field rows round the veggie patch. The tiles are the player's garden (life/garden.js
+    // fieldTiles): its soil mounds and crops are drawn there, so no static crops here.
     if (kind === 'farm') {
       const tiles = [];
       for (let z = Math.ceil(p.z + 0.6); z < p.z + p.d - 0.6; z++) for (let x = Math.ceil(p.x + 0.6); x < p.x + p.w - 0.6; x++) {
         const [u, v] = this.toLocal(p, x + 0.5, z + 0.5);
         if (clearOfBox(u, v) < 0.5 || (Math.abs(u - sm) < 0.9 && v < s + 0.2) || x + 1 > p.x + p.w - 0.6 || z + 1 > p.z + p.d - 0.6) continue;
         tiles.push(z * WORLD + x);
-        const crop = K.crops[(Math.floor(u) + Math.floor(v)) % 3];
-        for (const o of [-0.25, 0.25]) { const cx = x + 0.5 + (p.door === 'E' || p.door === 'W' ? o : 0), cz = z + 0.5 + (p.door === 'E' || p.door === 'W' ? 0 : o); this.yardPiece(g, crop, cx, cz, rnd() * TAU, 1, 0.9 + rnd() * 0.25); }
       }
-      g.field = tiles;
+      g.field = tiles; this.fields.set(p.id, tiles);
     }
     this.count('yard');
   }
+  // the tilled field tiles of a farm plot (tile indices z * WORLD + x; [] for other plots)
+  fieldTiles(id) { return this.fields?.get(id) || []; }
   // world -> plot-local (u, v)
   toLocal(p, x, z) {
     switch (p.door) {

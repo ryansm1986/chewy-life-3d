@@ -310,9 +310,12 @@ export class VillageSim {
   }
   // rank rings (docs/VILLAGE_PLAN.md §3, 8): when the village rank first reaches a ring's rank, its stub streets are
   // paved, its plots unlock and a toast names the new district. S.ringRank never goes down.
+  // A district never opens on the first day: the starter village fills its homes within seconds (10 → 12+ villagers),
+  // which used to open the outer South Meadows before Chewy had done anything. It opens with the next morning.
   checkRings() {
     const V = this.S, rank = this.stats.rank, have = this.ringRank();
     if (rank <= have) return;
+    if ((this.G.day?.day ?? this.G.state?.day ?? 1) <= 1) return;
     for (let r = have + 1; r <= rank; r++) {
       for (const P of PATHS) if (P.rank === r) this.openStreet(P);
       for (const D of Object.values(DISTRICTS)) if (D.ring === r) (this.ringNews ||= []).push(D.name);
@@ -337,7 +340,7 @@ export class VillageSim {
       if (x < 3 || z < 3 || x >= WORLD - 3 || z >= WORLD - 3) return { ok: false, why: 'Too close to the edge' };
       const i = z * WORLD + x;
       if (this.occ[i] >= 0 && this.occ[i] !== ignore) return { ok: false, why: 'Something is already here' };
-      if (!plot && type !== 'bridge' && this.reserveTile[i] >= 0) return { ok: false, why: 'Keep the plots clear' };
+      if (!plot && type !== 'bridge' && this.reserveTile[i] >= 0 && !(type === 'sprinkler' && this.G.life?.garden?.tiles.has(i))) return { ok: false, why: 'Keep the plots clear' }; // (a sprinkler may stand in any garden bed)
       if (type !== 'bridge' && this.world.details?.reserved.has(i)) return { ok: false, why: 'Something is already here' }; // signpost, lanterns, jizo...
       const t = tr.tiles[i];
       if (type !== 'bridge' && (t === T.WATER || t === T.SAND)) return { ok: false, why: 'Too wet!' };
@@ -509,6 +512,7 @@ export class VillageSim {
       case 'boneSmith': return mk('Visit the Bonesmith', () => G.openSmith?.());
       case 'bulletinBoard': return mk('Read the Notice Board', () => G.openBoard?.(), 1.1);
       case 'dungeonGate': return mk('Enter the Burrow', () => G.openBurrowMenu?.(), 1.8);
+      case 'fishingHut': return mk("Kero's Fishing Hut", () => G.openFishHut?.()); // (rods, and fish sell best here: docs/HOMESTEAD.md)
       default: return null;
     }
   }
@@ -782,6 +786,7 @@ export class VillageSim {
     const parts = [`+${coins} coins`, ...Object.entries(mats).map(([k, n]) => `+${n} ${k}`)];
     this.G.ui?.banner?.(`Day ${day}`, `Village income: ${parts.join(', ')}`, { style: 'quest' });
     this.S.income = [{ day, coins, mats }, ...(this.S.income || [])].slice(0, 7);
+    this.checkRings(); // (a rank reached on day 1 opens its district this morning)
   }
   // ------------------------------------------------------------------ overlays (build mode)
   setOverlay(mode) { this.overlayMode = mode; this.paintOverlay(); this.terrain.material.userData.u.uOverlayAmt.value = mode ? 1 : 0; }

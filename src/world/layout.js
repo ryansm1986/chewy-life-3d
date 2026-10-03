@@ -342,6 +342,12 @@ for (const P of openPaths(1)) for (const e of [P.pts[0], P.pts[P.pts.length - 1]
   JUNCTIONS.push({ x, z, street: P.id });
 }
 
+// ------------------------------------------------------------------ the homestead (docs/HOMESTEAD.md)
+// Chewy's garden bed: whole tiles x..x+w, z..z+d in his front yard, south of the stepping stones (the yard dressing
+// keeps clear of it). The Seed Stall: Usagi's cart on the lawn between the South Meadows park and its neighbour.
+export const CHEWY_GARDEN = { x: 91, z: 128, w: 4, d: 3 };
+export const SEED_STALL = { x: 122.4, z: 159.4, rot: Math.PI / 4 }; // (front toward the camera and the lawn)
+
 // ------------------------------------------------------------------ named villagers' anchors (their districts)
 export const ANCHORS = {
   kuma: { x: L.rosieShop.x + 6, z: L.rosieShop.z + 5.5 },   // the market bakery row

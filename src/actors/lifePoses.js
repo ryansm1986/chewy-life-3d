@@ -69,6 +69,24 @@ export const LIFE_ACTIONS = {
     A.head.x += 0.2 * k; A.head.y += Math.sin(t * 0.5) * 0.2 * k; A.sq += 0.06 * k;
     A.legL.x += 0.12 * k; A.legR.x += -0.1 * k; A.tailWag = 1;
   } },
+  // tilling with the hoe (life/tools.js): two chops — both paws raise it high, then swing it down into the soil
+  till: { dur: 1.1, ev: { chop: 0.36, chop2: 0.86 }, pose: (u, P, A) => {
+    const v = (u < 0.5 ? u : u - 0.5) / 0.5, k = ease.outQuad(clamp(u / 0.08)) * (1 - ease.inOutQuad(clamp((u - 0.9) / 0.1)));
+    const raise = ease.outQuad(clamp(v / 0.5)), strike = ease.inQuad(clamp((v - 0.5) / 0.22)), settle = clamp((v - 0.72) / 0.28);
+    const ax = ((-0.6 - 2.1 * raise) * (1 - strike) - 0.15 * strike) * (1 - settle) - 0.45 * settle;
+    A.armR.x += ax * k; A.armL.x += ax * k; A.armR.z += 0.3 * k; A.armL.z += -0.3 * k;
+    A.body.x += ((-0.16 * raise) * (1 - strike) + 0.45 * strike * (1 - settle * 0.4)) * k;
+    A.head.x += (0.14 + 0.12 * strike) * k; A.legL.x += -0.25 * k; A.legR.x += 0.1 * k;
+    A.sq += (0.07 * strike * (1 - settle) - 0.03 * raise * (1 - strike)) * k; A.y += 0.04 * raise * (1 - strike) * k;
+  } },
+  // casting the rod (life/fishing.js): wind it back over the shoulder with a little twist, flick it forward, settle
+  // into the 'fish' hold (the float leaves the rod at 'release')
+  rodCast: { dur: 0.72, ev: { release: 0.58 }, pose: (u, P, A) => {
+    const back = ease.outQuad(clamp(u / 0.42)), flick = ease.outBack(clamp((u - 0.45) / 0.18)), k = 1 - flick;
+    A.armR.x += -1.0 - 1.85 * back * k + 0.1 * flick; A.armR.z += 0.38; A.armL.x += -0.85 - 0.9 * back * k; A.armL.z += -0.36;
+    A.body.y += 0.42 * back * k - 0.1 * flick; A.body.x += -0.14 * back * k + 0.12 * flick * (1 - clamp((u - 0.75) / 0.25));
+    A.head.x += -0.12 * back * k + 0.1 * flick; A.sq += 0.05 * back * k - 0.04 * flick; A.earKick += 2 * flick * k;
+  } },
   fish: { dur: 99, hold: true, pose: (t, P, A) => {
     const k = ease.outQuad(clamp(t / 0.4)), bob = Math.sin(t * 1.1);
     A.armR.x += (-1.0 + 0.05 * bob) * k; A.armR.z += 0.38 * k; A.armL.x += (-0.85 + 0.05 * bob) * k; A.armL.z += -0.36 * k;
@@ -152,6 +170,22 @@ export const LIFE_ACTIONS = {
     A.body.x += -0.14 * k; A.sq += Math.sin(u * 44) * 0.035 * k; A.mouth = Math.max(A.mouth, 0.7 * k);
     A.armR.x += -0.5 * k; A.armR.z += 0.45 * k; A.armL.x += -0.5 * k; A.armL.z += -0.45 * k;
     A.eyesHappy = 1; A.happy = 1; A.head.x += -0.12 * k;
+  } },
+  // cooking (life/kitchen.js): stirring the pot with the ladle in little circles, the other paw steadying it, a hungry
+  // lean over the steam; 'season' (an event at the end) is the sprinkle that finishes the dish
+  cook: { dur: 99, hold: true, pose: (t, P, A) => {
+    const k = ease.outQuad(clamp(t / 0.3)), a = t * 7.5, sx = Math.sin(a), cz = Math.cos(a);
+    A.armR.x += (-0.95 + 0.16 * sx) * k; A.armR.z += (0.32 + 0.14 * cz) * k;
+    A.armL.x += -0.7 * k; A.armL.z += -0.42 * k;
+    A.body.x += (0.18 + 0.03 * sx) * k; A.body.y += 0.08 * cz * k; A.head.x += 0.22 * k; A.head.z += 0.06 * sx * k;
+    A.sq += 0.012 * Math.sin(a * 2) * k; A.tailWag = 1; A.happy = 1;
+  } },
+  // eating a dish: both paws up to the mouth, three happy munches, a satisfied little bounce
+  munch: { dur: 1.15, pose: (u, P, A) => {
+    const k = inOut(u, 0.14, 0.22), m = Math.max(0, Math.sin(u * Math.PI * 6)) * (1 - smoothstep(0.7, 0.85, u)), hop = smoothstep(0.78, 0.9, u) * (1 - smoothstep(0.9, 1, u));
+    A.armR.x += -1.35 * k; A.armR.z += 0.62 * k; A.armL.x += -1.35 * k; A.armL.z += -0.62 * k;
+    A.head.x += (0.12 - 0.08 * m) * k; A.mouth = Math.max(A.mouth || 0, 0.7 * m * k); A.sq += 0.03 * m * k;
+    A.y += 0.06 * hop; A.eyesHappy = 1; A.happy = 1; A.earKick += 1.5 * hop;
   } },
   clap: { dur: 1.2, pose: (u, P, A) => {
     const k = inOut(u, 0.15, 0.2), c = Math.sin(u * 32) * 0.22;

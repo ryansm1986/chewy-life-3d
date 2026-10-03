@@ -23,7 +23,7 @@
 //   weaponType               'sword' | 'ball' (unarmed counts as 'sword')
 // Extras (safe to ignore): lvl, resAll, skillBonus{id:n}, statDmgPct, critMul, atkMul, castMul, moveMul, ballSpeed (mult),
 //   unarmed, weaponSlot, skillLevels{id:effLvl}, synergy{id:mult}, frenzy{perStack,maxStacks,duration}|null,
-//   auras[{id,lvl,radius,...}], setCounts{setId:n}, dmgAvg.
+//   auras[{id,lvl,radius,...}], setCounts{setId:n}, dmgAvg, meal{buff,tier,dish} (Well Fed, life/meals.js).
 //
 // Affix value semantics (item affixes add into these; only computeStats interprets them):
 //   dmgMin/dmgMax = flat added to weapon base damage; def = flat defense (enhanced-defense affixes are pre-converted
@@ -33,6 +33,7 @@ import { SKILLS, SKILL_IDS, effectiveLevel, synergyMult } from './skills.js';
 import { SETS, EQUIP_SLOTS } from './items.js';
 import { CLASSES } from './classes.js';
 import { mokaPassives } from './skillsMoka.js';
+import { mealAcc, mealPost } from '../life/meals.js';
 
 export const LEVEL_CAP = 60;
 export const RES_CAP = 75;
@@ -117,6 +118,8 @@ export function computeStats(state) {
     if (!S) continue;
     for (const b of setBonusesActive(sid, setCounts[sid])) addStat(acc, b.stat, b.value);
   }
+  // Well Fed: the hero's last meal (life/meals.js; P.meal = { buff, tier, left }) counts like gear while it lasts
+  mealAcc(P.meal, (k, v) => addStat(acc, k, v));
 
   const d = {};
   d.lvl = lvl;
@@ -217,6 +220,7 @@ export function computeStats(state) {
   d.setCounts = setCounts;
   d.treeDmgPct = { tide: 0, star: 0, duck: 0 };
   if (CL.id === 'moka') mokaPassives(d, L, state);
+  mealPost(P.meal, d); // (Hearty's max life / regen, and d.meal for the UI)
   return d;
 }
 

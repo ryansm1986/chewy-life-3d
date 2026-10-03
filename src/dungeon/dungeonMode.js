@@ -7,6 +7,7 @@ import { Monster } from './monster.js';
 import { MONSTERS } from './monsters.js';
 import { GroundLoot } from '../combat/groundLoot.js';
 import { rollDrops, chestDrops, floorClearDrops } from '../rpg/loot.js';
+import { seedDrops, forageDrops } from '../life/pantry.js';
 import { xpForKill } from '../rpg/stats.js';
 import { makeToon, makeOutline } from '../gfx/materials.js';
 import { paint, merge, RoundedBox } from '../gfx/geom.js';
@@ -336,6 +337,8 @@ export class DungeonMode {
       let t = 0; (this.spinners ||= []).push((dt) => { t += dt; lid.rotation.x = -Math.min(1.9, t * 7); });
       G.vfx.sparkle(p.clone().setY(0.7), { n: 20, color: gold ? '#ffe070' : '#fff4d8', r: 0.5 }); G.vfx.light(p.clone().setY(1), '#ffe0a0', 10, 6, 0.8);
       const drops = chestDrops(this.layout.mlvl, gold ? 'golden' : 'plain', undefined, G.derived.mf || 0);
+      drops.push(...seedDrops(this.layout.mlvl, gold ? 'chest2' : 'chest0')); // (homestead seeds, docs/HOMESTEAD.md)
+      if (this.isRegion) drops.push(...forageDrops(this.regionId, gold ? 'chest2' : 'chest0')); // (and the region's forage)
       setTimeout(() => this.loot.drop(p.clone().setY(0.5), drops), 250);
     } };
     return chest;
@@ -434,6 +437,8 @@ export class DungeonMode {
     // drops (a boss's hoard bursts out a beat later, once the Victory banner has had the stage)
     const mf = (D.mf || 0) + (this.combat.buffs.shrineLuck ? 60 : 0);
     const drops = rollDrops({ mlvl: m.level, rank: m.rank, mf, gf: D.gf || 0, kind: m.stats.kind });
+    drops.push(...seedDrops(m.level, m.rank)); // (homestead seeds, docs/HOMESTEAD.md)
+    if (this.isRegion) drops.push(...forageDrops(this.regionId, m.rank));
     const at = m.pos.clone().setY(0.3);
     if (drops.length && isBoss) setTimeout(() => { if (G.dungeon !== this) return; G.vfx.ring(at, { color: '#ffe070', r0: 0.3, r1: 3.2, life: 0.6 }); G.vfx.sparkle(at.clone().setY(0.8), { n: 30, color: '#fff2a0', r: 1.2, rise: 1.6 }); Events.emit('sfx', 'chest_open'); this.loot.drop(at, drops); }, 1050);
     else if (drops.length) this.loot.drop(at, drops);

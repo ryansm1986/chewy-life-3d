@@ -6,6 +6,7 @@
 // Aesthetic: soft, round and cute — sine/triangle bodies, low-passed noise, pentatonic sparkles, bonks & boings.
 import { babble, gibberish } from './babble.js';
 import { REGION_SFX } from '../regions/sfx/index.js'; // region monsters / bosses / environments (docs/REGIONS.md)
+import { SFX as LIFE_SFX } from '../life/life.sfx.js'; // the homestead: farming, fishing, cooking (docs/HOMESTEAD.md)
 
 const R = (a, b) => a + Math.random() * (b - a);
 const mf = m => 440 * Math.pow(2, (m - 69) / 12);
@@ -649,6 +650,7 @@ const TRIM = {
 };
 for (const [k, v] of Object.entries(TRIM)) SFX[k].trim = v;
 for (const k in REGION_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = REGION_SFX[k]; } // (each carries its own trim)
+for (const k in LIFE_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = LIFE_SFX[k]; }
 
 export const SFX_NAMES = Object.keys(SFX);
 

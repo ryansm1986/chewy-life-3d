@@ -22,6 +22,7 @@ export function installServices(G) {
       name: "Rosie's Treats", keeper: 'rosie', portrait: G.portrait?.('rosie'),
       stock: G.shopStock(),
       potions: ['heart', 'zoom', 'rejuv'],
+      ...(G.rosieShopExtras?.() || {}), // (the homestead: her cookbook pages, honey, and she buys dishes: life/cookSocial.js)
       onBuy: (item, price) => { const ok = G.actions.buyItem(item, price); if (ok && item.kind !== 'potion') { const s = G.state.shop.items; const i = s.indexOf(item); if (i >= 0) s.splice(i, 1); } return ok; },
     });
     Events.emit('sfx', 'ui_open');
@@ -34,14 +35,16 @@ export function installServices(G) {
     // the hero you're not playing lives here too: say what they're up to if they're home
     const H = G.heroes, other = H?.villagers?.[H.next?.() || ''], home = other && (!other.visible || other.state === 'inside' || other.state === 'hidden');
     const OTHER = { moka: 'Moka is snoozing on a pile of library books, one ear flopped over her nose.', chewy: 'Chewy is snoring in his basket, still hugging his tennis ball.' };
-    const c = await say("Chewy's Cottage", ['Home sweet home. Shadow is already curled up on the cushion.', ...(home && OTHER[other.id] ? [OTHER[other.id]] : [])], [{ text: 'Open my treasure chest (stash)' }, { text: 'Sleep until morning 💤' }, { text: 'Leave' }], G.portrait?.(G.state.activeHero || 'chewy'));
+    const cook = !!G.life?.kitchen; // (the homestead kitchen: docs/HOMESTEAD.md §4)
+    const c = await say("Chewy's Cottage", ['Home sweet home. Shadow is already curled up on the cushion.', ...(home && OTHER[other.id] ? [OTHER[other.id]] : [])], [{ text: 'Open my treasure chest (stash)' }, ...(cook ? [{ text: 'Cook something 🍳' }] : []), { text: 'Sleep until morning 💤' }, { text: 'Leave' }], G.portrait?.(G.state.activeHero || 'chewy'));
     if (c === 0) ui()?.open?.('stash');
-    else if (c === 1) G.sleep();
+    else if (cook && c === 1) G.life.kitchen.open('kitchen');
+    else if (c === (cook ? 2 : 1)) G.sleep();
   });
   G.sleep = () => {
     const go = () => {
       const d = G.day; const h = d.hour;
-      if (h >= 6) { d.day++; } d.hour = 6.5; d._lastHour = 6.5;
+      d.day++; d.hour = 6.5; d._lastHour = 6.5; // (sleeping always crosses the 6:00 day change, even from 2 am: crops grow)
       G.village.world.onNewDay?.(d.day);
       G.actions.restoreAll();
       G.state.day = d.day;

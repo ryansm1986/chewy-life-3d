@@ -4,8 +4,8 @@ import { glyph } from './glyphs.js';
 import { Panel } from './panel.js';
 
 const CONTROLS = [
-  [['LMB'], 'Move / attack / talk'], [['RMB'], 'Use right-click skill'], [['1', '2', '3', '4'], 'Hotbar skills'], [['Q', 'E'], 'Heart / Zoom potion'],
-  [['F'], 'Interact'], [['X'], 'Swap weapons'], [['I'], 'Bag'], [['C'], 'Character'], [['K'], 'Skills'], [['J'], 'Journal'],
+  [['LMB'], 'Move / attack / talk'], [['RMB'], 'Use right-click skill'], [['1', '2', '3', '4'], 'Hotbar skills'], [['Q', 'E'], 'Heart / Zoom potion'], [['G'], 'Quick meal'],
+  [['F'], 'Interact'], [['X'], 'Swap weapons'], [['I'], 'Bag'], [['P'], 'Pantry'], [['C'], 'Character'], [['K'], 'Skills'], [['J'], 'Journal'],
   [['M'], 'Map'], [['Tab'], 'Switch hero'], [['B'], 'Build (village)'], [['Alt'], 'Show loot labels'], [['Esc'], 'Close / menu'],
 ];
 

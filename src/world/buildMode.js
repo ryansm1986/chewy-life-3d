@@ -20,7 +20,7 @@ function stakeGeo() {
   ]);
 }
 
-const RANK_REQ = { shrine: 2, boneSmith: 2, waterTower: 2, fountain: 2, onsen: 3, clinic: 3, school: 3, koiStatue: 3, chewyStatue: 4, bridge: 2 };
+const RANK_REQ = { shrine: 2, boneSmith: 2, waterTower: 2, fountain: 2, onsen: 3, clinic: 3, school: 3, koiStatue: 3, chewyStatue: 4, bridge: 2, sprinkler: 3 };
 
 export class BuildMode {
   constructor(G, sim) {
