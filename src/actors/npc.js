@@ -211,12 +211,12 @@ export class Villager extends Actor {
       kind = 'stroll';
     }
     if (kind === 'stroll') {
-      const q = life.nav.randomPathNear(this.anchor.x, this.anchor.z, 13);
+      const q = life.nav.randomPathNear(this.anchor.x, this.anchor.z, 20); // (the 2x town: strolls reach the next street)
       if (q) { if (teleport) { this.setPos(q.x, q.z); this.anim.first = true; return; } return this.go(q.x, q.z, { kind: 'stroll', speed: rand(0.7, 0.85) }); }
       kind = 'idle';
     }
     if (ACT[kind]) {
-      const sl = life.claim(this, kind, near, this.folk ? 24 : 19, teleport) || (near !== this.anchor ? life.claim(this, kind, this.anchor, 19, teleport) : null);
+      const sl = life.claim(this, kind, near, this.folk ? 38 : 30, teleport) || (near !== this.anchor ? life.claim(this, kind, this.anchor, 30, teleport) : null);
       if (sl) {
         if (teleport) return this.beginAct(sl, true);
         const sp = sl.spot || sl;

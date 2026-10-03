@@ -21,9 +21,10 @@ async function open(q, wait) {
 const snap = async (page, name) => { const f = path.join(OUT, `tour_${tag}_${name}.png`); await page.screenshot({ path: f }); console.log('saved', f); };
 if (which !== 'dungeon') {
   const page = await open('?fresh&nointro&hour=10.5', 3000);
-  // [name, x, z, camera distance, yaw]
-  const spots = [['plaza', 56, 61, 16, 0.785], ['homes', 46, 64, 14, 0.785], ['shops', 64, 57, 14, 2.3], ['pond', 70, 72, 16, 0.785],
-    ['shrinepath', 80, 50, 16, 0.785], ['bridge', 33, 58.5, 14, 0.785], ['north', 51, 40, 16, 0.785], ['wide', 58, 62, 34, 0.785]];
+  // [name, x, z, camera distance, yaw] (Blossom Hollow 2.0, docs/VILLAGE_PLAN.md: the plaza at (112, 121))
+  const spots = [['plaza', 112, 123, 16, 0.785], ['homes', 93, 136, 14, 0.785], ['shops', 138, 121.5, 14, 2.3], ['pond', 133, 141, 16, 0.785],
+    ['shrinepath', 160, 95, 16, 0.785], ['bridge', 64.5, 117.5, 14, 0.785], ['north', 100.8, 84, 16, 0.785], ['wide', 114, 124, 34, 0.785],
+    ['meadows', 130.5, 157, 16, 0.785], ['works', 87, 104, 16, 0.785]];
   for (const [name, x, z, d, yaw] of spots) {
     await page.evaluate(([x, z, d, yaw]) => { G.player.setPos(x, z); G.companion?.setPos(x + 1, z + 0.5); const r = G.engine.rig; r.focus.copy(G.player.pos); r.distTarget = d; r.yawTarget = yaw; r.snap(); }, [x, z, d, yaw]);
     await page.waitForTimeout(900);

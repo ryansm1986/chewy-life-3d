@@ -65,18 +65,18 @@ try {
     n++;
     await page.evaluate((n) => {
       const G = window.G, sim = G.sim, QA = window.QA, L = QA.simLog, S = sim.S;
-      const P = { x: 56, z: 60 };
+      const P = G.world.landmarks.plaza; // (Blossom Hollow 2.0: the plaza at (112, 121), a 224 m island)
       G.state.coins = 99999; for (const k of Object.keys(G.state.materials)) G.state.materials[k] = 999;
       sim.tickT = 99; // force simulate + grow on the next frame
       sim.stats.rank = 5; // unlock everything
       const before = S.buildings.length;
       // paint a zone block
-      if (n % 3 === 0) { const t = 1 + (n % 9 === 0 ? 2 : n % 2); L.zones += sim.autoZone(t, 1, 6, 34, 3 + (n % 3)); }
+      if (n % 3 === 0) { const t = 1 + (n % 9 === 0 ? 2 : n % 2); L.zones += sim.autoZone(t, 1, 8, 60); } // (zones paint whole plots)
       // place something (valid auto-site + a blind random attempt that may be rejected)
       const types = ['home', 'shop', 'farm', 'well', 'stoneLantern', 'streetLamp', 'park', 'bench', 'flowerBed', 'sakuraPlanter', 'lanternString', 'fence', 'waterTower', 'clinic', 'school', 'onsen', 'koiStatue', 'miniTorii', 'kiln', 'lumber', 'fishingHut', 'fountain'];
       const type = types[n % types.length];
-      const b = sim.autoPlace(type, P.x, P.z, 5, 34, true); if (b) L.placed++;
-      const rx = 10 + ((n * 37) % 90), rz = 10 + ((n * 53) % 90);
+      const b = sim.autoPlace(type, P.x, P.z, 5, 50, true); if (b) L.placed++; // (plot types take a free plot)
+      const rx = 20 + ((n * 37) % 184), rz = 20 + ((n * 53) % 184);
       const b2 = sim.place(types[(n * 7) % types.length], rx, rz, n % 4, { silent: true }); if (b2) L.placed++; else L.rejected++;
       // remove a random non-prebuilt building (every 2nd tick), prefer grown / leveled ones
       if (n % 2 === 0) {

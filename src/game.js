@@ -40,6 +40,7 @@ import { installServices } from './world/services.js';
 import { Waterfall } from './world/waterfall.js';
 import { VillageMinimap, DungeonMinimap, RegionMinimap } from './world/minimap.js';
 import { prewarmWorld } from './world/prewarm.js';
+import { WORLD } from './world/layout.js';
 
 // UI and audio load in parallel with the world. The import() paths must be literal so Vite bundles them for the
 // production build (a variable path with @vite-ignore worked on the dev server but 404'd in dist: no UI, no sound).
@@ -69,7 +70,7 @@ export async function boot() {
   try { G.audio?.init?.(); } catch (e) { console.warn('[audio] init failed', e); }
 
   // ---- village
-  const village = new VillageWorld(engine);
+  const village = new VillageWorld(engine, { rank: G.state.village?.ringRank || 1 }); // (ring streets already unlocked are paved)
   const day = G.day = new DayNight(village, engine.post);
   day.hour = P.has('hour') ? +P.get('hour') : (G.state.hour ?? 8.5);
   day.day = G.state.day || 1;
@@ -77,7 +78,7 @@ export async function boot() {
   G.vfx = vVfx;
   const ambient = new Ambient(G, village, vVfx);
   setTimeout(() => vVfx.prewarm(engine.renderer, engine.camera), 200);
-  const waterfall = new Waterfall(village, vVfx, { x: village.landmarks.waterfall.x });
+  const waterfall = new Waterfall(village, vVfx); // (at LANDMARKS.waterfall)
   const vCombat = new Combat(G, village);
   const vLoot = new GroundLoot(G, village);
   G.villageLoot = vLoot;
@@ -449,7 +450,11 @@ export async function boot() {
     const depth = -_o.clone().applyMatrix4(cam.matrixWorldInverse).z;
     _o.project(cam);
     const pr = engine.renderer.getPixelRatio();
-    U.uOccl.value.set((_o.x * 0.5 + 0.5) * innerWidth * pr, (_o.y * 0.5 + 0.5) * innerHeight * pr, innerHeight * pr * 0.15, depth);
+    // the cut is a person-sized hole: 15% of the screen height at the gameplay distances (22-27), shrinking as the camera
+    // pulls back so it stays the same size in the world (a fixed screen radius sliced whole crowns into wedges in the
+    // title, build and overview views)
+    const occR = innerHeight * pr * 0.15 * Math.min(1, 26 / Math.max(1, rig.dist + rig.distBias));
+    U.uOccl.value.set((_o.x * 0.5 + 0.5) * innerWidth * pr, (_o.y * 0.5 + 0.5) * innerHeight * pr, occR, depth);
   }
 
   // ---- per-frame input
@@ -462,7 +467,7 @@ export async function boot() {
       const { f, r } = rig.groundAxes(); const d = new THREE.Vector3();
       if (Input.down('w')) d.add(f); if (Input.down('s')) d.sub(f); if (Input.down('d')) d.add(r); if (Input.down('a')) d.sub(r);
       G.buildFocus.addScaledVector(d, dt * 16);
-      G.buildFocus.x = Math.max(10, Math.min(102, G.buildFocus.x)); G.buildFocus.z = Math.max(10, Math.min(102, G.buildFocus.z));
+      G.buildFocus.x = Math.max(10, Math.min(WORLD - 10, G.buildFocus.x)); G.buildFocus.z = Math.max(10, Math.min(WORLD - 10, G.buildFocus.z));
       if (Input.hit('q')) { rig.yawTarget += Math.PI / 2; Events.emit('sfx', 'ui_tab'); }
       if (Input.hit('e')) { rig.yawTarget -= Math.PI / 2; Events.emit('sfx', 'ui_tab'); }
       return;
@@ -722,7 +727,7 @@ export async function boot() {
       sim.update(dt, engine.time);
       buildMode.update(dt);
       ambient.update(dt, engine.time);
-      if (player.pos.z < 40) waterfall.update(dt, engine.time, day);
+      if (Math.hypot(player.pos.x - L.waterfall.x, player.pos.z - L.waterfall.z) < 70) waterfall.update(dt, engine.time, day); // (mist + spray only nearby)
       villageAmbience(dt);
       vLoot.update(dt);
       updateMarkers(rdt);

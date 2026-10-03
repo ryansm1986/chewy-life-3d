@@ -1,0 +1,2575 @@
+{
+ "version": 2,
+ "activeHero": "chewy",
+ "heroes": {
+  "chewy": {
+   "player": {
+    "cls": "chewy",
+    "name": "Chewy",
+    "lvl": 6,
+    "xp": 0,
+    "stats": {
+     "str": 10,
+     "dex": 10,
+     "vit": 12,
+     "ene": 8
+    },
+    "statPts": 0,
+    "skillPts": 1,
+    "skills": {
+     "chomp": 1,
+     "throw": 1
+    },
+    "hotbar": [
+     "attack",
+     "chomp",
+     null,
+     null,
+     null,
+     null
+    ],
+    "life": null,
+    "zoom": null,
+    "activeWeapon": 0,
+    "mouseSets": [
+     [
+      "attack",
+      "chomp"
+     ],
+     [
+      "attack",
+      "throw"
+     ]
+    ]
+   },
+   "equipment": {
+    "weapon": {
+     "uid": "it00x11lkw0",
+     "kind": "gear",
+     "base": "boneSword",
+     "slot": "weapon",
+     "rarity": "normal",
+     "name": "Bone Sword",
+     "ilvl": 1,
+     "tier": 0,
+     "req": {
+      "lvl": 1
+     },
+     "affixes": [],
+     "sockets": 0,
+     "gems": [],
+     "value": 6,
+     "icon": {
+      "shape": "sword",
+      "variant": "bone",
+      "colors": [
+       "#f4e8cf",
+       "#c23b3b",
+       "#f2e4c6"
+      ]
+     },
+     "wtype": "sword",
+     "dmg": [
+      3,
+      7
+     ],
+     "aspd": 1.15
+    },
+    "weaponAlt": {
+     "uid": "itwcqzpzik1",
+     "kind": "gear",
+     "base": "redTennisBall",
+     "slot": "weapon",
+     "rarity": "normal",
+     "name": "Red Tennis Ball",
+     "ilvl": 1,
+     "tier": 0,
+     "req": {
+      "lvl": 1
+     },
+     "affixes": [],
+     "sockets": 0,
+     "gems": [],
+     "value": 6,
+     "icon": {
+      "shape": "ball",
+      "variant": "tennis",
+      "colors": [
+       "#e8362a",
+       "#fff3e0",
+       "#ff8a70"
+      ]
+     },
+     "wtype": "ball",
+     "dmg": [
+      2,
+      6
+     ],
+     "aspd": 1.2
+    },
+    "hat": null,
+    "outfit": null,
+    "collar": null,
+    "charm1": null,
+    "charm2": null,
+    "boots": null,
+    "paws": null
+   }
+  },
+  "moka": {
+   "player": {
+    "cls": "moka",
+    "name": "Moka",
+    "lvl": 1,
+    "xp": 0,
+    "stats": {
+     "str": 8,
+     "dex": 10,
+     "vit": 10,
+     "ene": 16
+    },
+    "statPts": 0,
+    "skillPts": 1,
+    "skills": {
+     "splash": 1
+    },
+    "hotbar": [
+     "attack",
+     "splash",
+     null,
+     null,
+     null,
+     null
+    ],
+    "life": null,
+    "zoom": null,
+    "activeWeapon": 0,
+    "mouseSets": [
+     [
+      "attack",
+      "splash"
+     ],
+     [
+      "attack",
+      "splash"
+     ]
+    ]
+   },
+   "equipment": {
+    "weapon": {
+     "uid": "iteukfgp872",
+     "kind": "gear",
+     "base": "driftwoodStaff",
+     "slot": "weapon",
+     "rarity": "normal",
+     "name": "Driftwood Staff",
+     "ilvl": 1,
+     "tier": 0,
+     "req": {
+      "lvl": 1
+     },
+     "affixes": [],
+     "sockets": 0,
+     "gems": [],
+     "value": 6,
+     "icon": {
+      "shape": "staff",
+      "variant": "drift",
+      "colors": [
+       "#b89a74",
+       "#5ce0d0",
+       "#4a8adf"
+      ]
+     },
+     "wtype": "staff",
+     "dmg": [
+      3,
+      7
+     ],
+     "aspd": 1.1
+    },
+    "weaponAlt": null,
+    "hat": null,
+    "outfit": null,
+    "collar": null,
+    "charm1": null,
+    "charm2": null,
+    "boots": null,
+    "paws": null
+   }
+  }
+ },
+ "coins": 4321,
+ "materials": {
+  "wood": 200,
+  "stone": 200,
+  "petal": 200,
+  "crystal": 200,
+  "bone": 200,
+  "mochi": 200,
+  "silk": 200,
+  "lantern": 200
+ },
+ "potions": {
+  "heart": 3,
+  "zoom": 2,
+  "rejuv": 0
+ },
+ "inventory": [
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null
+ ],
+ "stash": [
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null
+ ],
+ "quests": {
+  "active": [
+   {
+    "id": "welcome",
+    "step": 0,
+    "prog": 0
+   }
+  ],
+  "done": [
+   "burrow1"
+  ],
+  "requests": {}
+ },
+ "friends": {},
+ "village": {
+  "buildings": [
+   {
+    "id": "l1x8oe8p",
+    "idx": 0,
+    "type": "townHall",
+    "x": 53,
+    "z": 49,
+    "rot": 0,
+    "level": 1,
+    "seed": 2158,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0,
+     "light": 0,
+     "joy": 0.5976675748825073,
+     "health": 0,
+     "learn": 0.6599632501602173,
+     "road": true
+    }
+   },
+   {
+    "id": "fkvjdl1t",
+    "idx": 1,
+    "type": "chewyHouse",
+    "x": 44,
+    "z": 62,
+    "rot": 3,
+    "level": 1,
+    "seed": 3929,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.5757359266281128,
+     "light": 0,
+     "joy": 0.28661125898361206,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "zn5er9u3",
+    "idx": 2,
+    "type": "rosieShop",
+    "x": 65,
+    "z": 56,
+    "rot": 3,
+    "level": 1,
+    "seed": 1321,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 0.3878679573535919,
+     "health": 0.7526136636734009,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "jnwluzas",
+    "idx": 3,
+    "type": "dungeonGate",
+    "x": 88,
+    "z": 36,
+    "rot": 0,
+    "level": 1,
+    "seed": 3236,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0,
+     "light": 0.9292893409729004,
+     "joy": 0,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "q9u4ekba",
+    "idx": 4,
+    "type": "fountain",
+    "x": 55,
+    "z": 59,
+    "rot": 0,
+    "level": 1,
+    "seed": 5133,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 0.8512193560600281,
+     "joy": 1,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "6o2ahkr8",
+    "idx": 5,
+    "type": "bridge",
+    "x": 28,
+    "z": 57,
+    "rot": 1,
+    "level": 1,
+    "seed": 6156,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0,
+     "light": 0,
+     "joy": 0,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "ce4d1a6y",
+    "idx": 6,
+    "type": "home",
+    "x": 52,
+    "z": 68,
+    "rot": 3,
+    "level": 3,
+    "seed": 4966,
+    "residents": 6,
+    "built": 1,
+    "q": {
+     "water": 0.5,
+     "light": 0.46334367990493774,
+     "joy": 0.7662522792816162,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    },
+    "happy": 0.6628974378108978
+   },
+   {
+    "id": "a2v8h6sw",
+    "idx": 7,
+    "type": "home",
+    "x": 63,
+    "z": 61,
+    "rot": 2,
+    "level": 3,
+    "seed": 8814,
+    "residents": 6,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 0.6365726590156555,
+     "health": 0.5313850045204163,
+     "learn": 0,
+     "road": true
+    },
+    "happy": 0.8357124149799348
+   },
+   {
+    "id": "tda52jcs",
+    "idx": 8,
+    "type": "home",
+    "x": 47,
+    "z": 57,
+    "rot": 0,
+    "level": 2,
+    "seed": 7160,
+    "residents": 4,
+    "built": 1,
+    "q": {
+     "water": 0.800000011920929,
+     "light": 1,
+     "joy": 0.5981959104537964,
+     "health": 0,
+     "learn": 0.5437927842140198,
+     "road": true
+    },
+    "happy": 0.7767386198043823
+   },
+   {
+    "id": "p5pmsxpd",
+    "idx": 9,
+    "type": "home",
+    "x": 61,
+    "z": 67,
+    "rot": 2,
+    "level": 1,
+    "seed": 903,
+    "residents": 2,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 0.3454415500164032,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    },
+    "happy": 0.7363603875041008
+   },
+   {
+    "id": "l3q8jl9l",
+    "idx": 10,
+    "type": "home",
+    "x": 65,
+    "z": 66,
+    "rot": 1,
+    "level": 1,
+    "seed": 8833,
+    "residents": 2,
+    "built": 1,
+    "q": {
+     "water": 0.674039900302887,
+     "light": 0,
+     "joy": 0,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    },
+    "happy": 0.46850997507572173
+   },
+   {
+    "id": "3b69wl75",
+    "idx": 11,
+    "type": "home",
+    "x": 48,
+    "z": 64,
+    "rot": 2,
+    "level": 1,
+    "seed": 1508,
+    "residents": 2,
+    "built": 1,
+    "q": {
+     "water": 0.4900980591773987,
+     "light": 0.7316718697547913,
+     "joy": 1,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    },
+    "happy": 0.7456917017698288
+   },
+   {
+    "id": "lquyqxwt",
+    "idx": 12,
+    "type": "shop",
+    "x": 57,
+    "z": 68,
+    "rot": 1,
+    "level": 2,
+    "seed": 5057,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.6837722063064575,
+     "light": 1,
+     "joy": 0.9933802485466003,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "fv8toxxk",
+    "idx": 13,
+    "type": "shop",
+    "x": 59,
+    "z": 53,
+    "rot": 0,
+    "level": 2,
+    "seed": 5785,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.540380597114563,
+     "light": 1,
+     "joy": 0,
+     "health": 0,
+     "learn": 0.41851481795310974,
+     "road": true
+    }
+   },
+   {
+    "id": "zi7odecl",
+    "idx": 14,
+    "type": "shop",
+    "x": 53,
+    "z": 71,
+    "rot": 3,
+    "level": 1,
+    "seed": 1060,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0,
+     "light": 0,
+     "joy": 0.7066112756729126,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "sid0l12l",
+    "idx": 15,
+    "type": "well",
+    "x": 62,
+    "z": 61,
+    "rot": 2,
+    "level": 1,
+    "seed": 2732,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 0.7588589787483215,
+     "health": 0.46334367990493774,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "p9326lf8",
+    "idx": 16,
+    "type": "well",
+    "x": 57,
+    "z": 66,
+    "rot": 1,
+    "level": 1,
+    "seed": 1900,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "nw6m8n6a",
+    "idx": 17,
+    "type": "park",
+    "x": 57,
+    "z": 71,
+    "rot": 1,
+    "level": 1,
+    "seed": 1891,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0,
+     "light": 0,
+     "joy": 0.6000000238418579,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "v7tkm3i4",
+    "idx": 18,
+    "type": "farm",
+    "x": 47,
+    "z": 51,
+    "rot": 3,
+    "level": 2,
+    "seed": 4823,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0,
+     "light": 1,
+     "joy": 0.4576975107192993,
+     "health": 0,
+     "learn": 0.8322948813438416,
+     "road": true
+    }
+   },
+   {
+    "id": "rwnrlz4d",
+    "idx": 19,
+    "type": "lumber",
+    "x": 51,
+    "z": 45,
+    "rot": 1,
+    "level": 2,
+    "seed": 7725,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0,
+     "light": 0,
+     "joy": 0.2818019390106201,
+     "health": 0,
+     "learn": 0.804743766784668,
+     "road": true
+    }
+   },
+   {
+    "id": "nmljv6rv",
+    "idx": 20,
+    "type": "stoneLantern",
+    "x": 51,
+    "z": 56,
+    "rot": 0,
+    "level": 1,
+    "seed": 39,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.5,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0.6420544981956482,
+     "road": true
+    }
+   },
+   {
+    "id": "8fdgjqbw",
+    "idx": 21,
+    "type": "stoneLantern",
+    "x": 60,
+    "z": 56,
+    "rot": 0,
+    "level": 1,
+    "seed": 5114,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "mau2svn6",
+    "idx": 22,
+    "type": "stoneLantern",
+    "x": 51,
+    "z": 64,
+    "rot": 0,
+    "level": 1,
+    "seed": 538,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.5,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "qd490kut",
+    "idx": 23,
+    "type": "stoneLantern",
+    "x": 60,
+    "z": 64,
+    "rot": 0,
+    "level": 1,
+    "seed": 2106,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 0.7975077629089355,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "s4v16eji",
+    "idx": 24,
+    "type": "sakuraPlanter",
+    "x": 53,
+    "z": 58,
+    "rot": 0,
+    "level": 1,
+    "seed": 7511,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0.5171697735786438,
+     "road": true
+    }
+   },
+   {
+    "id": "mj3qvi6f",
+    "idx": 25,
+    "type": "sakuraPlanter",
+    "x": 59,
+    "z": 58,
+    "rot": 0,
+    "level": 1,
+    "seed": 8176,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "q2us864d",
+    "idx": 26,
+    "type": "bench",
+    "x": 54,
+    "z": 63,
+    "rot": 0,
+    "level": 1,
+    "seed": 2779,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "h6rwsub3",
+    "idx": 27,
+    "type": "bench",
+    "x": 58,
+    "z": 63,
+    "rot": 0,
+    "level": 1,
+    "seed": 599,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "aqu2jwke",
+    "idx": 28,
+    "type": "flowerBed",
+    "x": 55,
+    "z": 57,
+    "rot": 0,
+    "level": 1,
+    "seed": 2938,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.6175735592842102,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0.5145878195762634,
+     "road": true
+    }
+   },
+   {
+    "id": "ru4o0wul",
+    "idx": 29,
+    "type": "flowerBed",
+    "x": 57,
+    "z": 57,
+    "rot": 0,
+    "level": 1,
+    "seed": 7194,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0.4517071843147278,
+     "road": true
+    }
+   },
+   {
+    "id": "7f630crs",
+    "idx": 30,
+    "type": "bulletinBoard",
+    "x": 56,
+    "z": 56,
+    "rot": 0,
+    "level": 1,
+    "seed": 5366,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.8984869122505188,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0.5223756432533264,
+     "road": true
+    }
+   },
+   {
+    "id": "fkcoudey",
+    "idx": 31,
+    "type": "streetLamp",
+    "x": 50,
+    "z": 59,
+    "rot": 0,
+    "level": 1,
+    "seed": 1604,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.7763931751251221,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0.4993754029273987,
+     "road": true
+    }
+   },
+   {
+    "id": "wnbe51cw",
+    "idx": 32,
+    "type": "streetLamp",
+    "x": 51,
+    "z": 57,
+    "rot": 3,
+    "level": 1,
+    "seed": 924,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.5757359266281128,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0.5930294990539551,
+     "road": true
+    }
+   },
+   {
+    "id": "uxbrjv2a",
+    "idx": 33,
+    "type": "streetLamp",
+    "x": 60,
+    "z": 65,
+    "rot": 3,
+    "level": 1,
+    "seed": 6079,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 0.9988197088241577,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "eh85dlhm",
+    "idx": 34,
+    "type": "streetLamp",
+    "x": 62,
+    "z": 59,
+    "rot": 0,
+    "level": 1,
+    "seed": 4405,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 1,
+     "health": 0.5052273273468018,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "qxwny5fy",
+    "idx": 35,
+    "type": "streetLamp",
+    "x": 52,
+    "z": 56,
+    "rot": 2,
+    "level": 1,
+    "seed": 9951,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.4343145787715912,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0.6283482909202576,
+     "road": true
+    }
+   },
+   {
+    "id": "th9mqe81",
+    "idx": 36,
+    "type": "flowerBed",
+    "x": 50,
+    "z": 61,
+    "rot": 2,
+    "level": 1,
+    "seed": 3944,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.7763931751251221,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "vldl39jb",
+    "idx": 37,
+    "type": "flowerBed",
+    "x": 61,
+    "z": 57,
+    "rot": 1,
+    "level": 1,
+    "seed": 8850,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 1,
+     "health": 0.46000000834465027,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "9jx33ue0",
+    "idx": 38,
+    "type": "flowerBed",
+    "x": 50,
+    "z": 60,
+    "rot": 0,
+    "level": 1,
+    "seed": 5810,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.800000011920929,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0.4494321048259735,
+     "road": true
+    }
+   },
+   {
+    "id": "9307y4dv",
+    "idx": 39,
+    "type": "flowerBed",
+    "x": 56,
+    "z": 67,
+    "rot": 0,
+    "level": 1,
+    "seed": 2242,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.858578622341156,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "sr25lvc5",
+    "idx": 40,
+    "type": "home",
+    "x": 44,
+    "z": 58,
+    "rot": 0,
+    "level": 1,
+    "seed": 335,
+    "residents": 2,
+    "built": 1,
+    "q": {
+     "water": 0.6837722063064575,
+     "light": 0.5,
+     "joy": 0,
+     "health": 0,
+     "learn": 0.4517071843147278,
+     "road": true
+    },
+    "happy": 0.5435284107923507
+   },
+   {
+    "id": "ibe7hgtv",
+    "idx": 41,
+    "type": "home",
+    "x": 70,
+    "z": 59,
+    "rot": 2,
+    "level": 1,
+    "seed": 2701,
+    "residents": 2,
+    "built": 1,
+    "q": {
+     "water": 0.7736153602600098,
+     "light": 0,
+     "joy": 0.4918334484100342,
+     "health": 0.8102633357048035,
+     "learn": 0,
+     "road": true
+    },
+    "happy": 0.6568753689527512
+   },
+   {
+    "id": "ddrcopvc",
+    "idx": 42,
+    "type": "home",
+    "x": 52,
+    "z": 74,
+    "rot": 3,
+    "level": 1,
+    "seed": 6364,
+    "residents": 2,
+    "built": 1,
+    "q": {
+     "water": 0,
+     "light": 0,
+     "joy": 0.6670078635215759,
+     "health": 0.5490010976791382,
+     "learn": 0,
+     "road": true
+    },
+    "happy": 0.4942020207643509
+   },
+   {
+    "id": "0a96xjsw",
+    "idx": 43,
+    "type": "home",
+    "x": 70,
+    "z": 54,
+    "rot": 0,
+    "level": 1,
+    "seed": 9950,
+    "residents": 2,
+    "built": 1,
+    "q": {
+     "water": 0.6446832418441772,
+     "light": 0,
+     "joy": 0.5151472091674805,
+     "health": 0.8658359050750732,
+     "learn": 0,
+     "road": true
+    },
+    "happy": 0.6332494080066682
+   },
+   {
+    "id": "9qj67pgt",
+    "idx": 44,
+    "type": "shop",
+    "x": 56,
+    "z": 75,
+    "rot": 1,
+    "level": 1,
+    "seed": 8340,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0,
+     "light": 0,
+     "joy": 0.7486934065818787,
+     "health": 0.5570552945137024,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "kyzt69u5",
+    "idx": 45,
+    "type": "shop",
+    "x": 39,
+    "z": 61,
+    "rot": 2,
+    "level": 1,
+    "seed": 466,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0,
+     "light": 0,
+     "joy": 0,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "jry3zv3p",
+    "idx": 46,
+    "type": "farm",
+    "x": 40,
+    "z": 56,
+    "rot": 0,
+    "level": 1,
+    "seed": 7948,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0,
+     "light": 0,
+     "joy": 0,
+     "health": 0,
+     "learn": 0.41636911034584045,
+     "road": true
+    }
+   },
+   {
+    "id": "wgk4lfxq",
+    "idx": 47,
+    "type": "kiln",
+    "x": 55,
+    "z": 78,
+    "rot": 1,
+    "level": 1,
+    "seed": 3000,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0,
+     "light": 0,
+     "joy": 0.7175531983375549,
+     "health": 0.7419302463531494,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "8epc7qch",
+    "idx": 48,
+    "type": "fishingHut",
+    "x": 46,
+    "z": 43,
+    "rot": 3,
+    "level": 1,
+    "seed": 5740,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0,
+     "light": 0,
+     "joy": 0,
+     "health": 0,
+     "learn": 0.7204915285110474,
+     "road": true
+    }
+   },
+   {
+    "id": "d9ihf1lg",
+    "idx": 49,
+    "type": "lumber",
+    "x": 50,
+    "z": 78,
+    "rot": 3,
+    "level": 1,
+    "seed": 5681,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0,
+     "light": 0,
+     "joy": 0.4451581537723541,
+     "health": 0.7419302463531494,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "6xitvz4s",
+    "idx": 50,
+    "type": "well",
+    "x": 48,
+    "z": 60,
+    "rot": 3,
+    "level": 1,
+    "seed": 9059,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0.444909930229187,
+     "road": true
+    }
+   },
+   {
+    "id": "lsu8jgfs",
+    "idx": 51,
+    "type": "waterTower",
+    "x": 66,
+    "z": 60,
+    "rot": 2,
+    "level": 1,
+    "seed": 899,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 0.9667108058929443,
+     "joy": 0.3836669325828552,
+     "health": 0.699999988079071,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "j8avy95k",
+    "idx": 52,
+    "type": "park",
+    "x": 50,
+    "z": 52,
+    "rot": 2,
+    "level": 1,
+    "seed": 4723,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0,
+     "light": 1,
+     "joy": 0.996353268623352,
+     "health": 0,
+     "learn": 0.7863999009132385,
+     "road": true
+    }
+   },
+   {
+    "id": "0b1op900",
+    "idx": 53,
+    "type": "clinic",
+    "x": 69,
+    "z": 56,
+    "rot": 3,
+    "level": 1,
+    "seed": 2594,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.7525126338005066,
+     "light": 0,
+     "joy": 0.5099999904632568,
+     "health": 1,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "dmsf79u7",
+    "idx": 54,
+    "type": "school",
+    "x": 48,
+    "z": 48,
+    "rot": 2,
+    "level": 1,
+    "seed": 7370,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0,
+     "light": 0,
+     "joy": 0.4144602417945862,
+     "health": 0,
+     "learn": 0.9750000238418579,
+     "road": true
+    }
+   },
+   {
+    "id": "dxtjezgu",
+    "idx": 55,
+    "type": "shrine",
+    "x": 72,
+    "z": 56,
+    "rot": 1,
+    "level": 1,
+    "seed": 7914,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.6308794021606445,
+     "light": 0,
+     "joy": 0.6000000238418579,
+     "health": 0.8199999928474426,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "yx2fp9bt",
+    "idx": 56,
+    "type": "onsen",
+    "x": 52,
+    "z": 81,
+    "rot": 2,
+    "level": 1,
+    "seed": 1113,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0,
+     "light": 0,
+     "joy": 0.5745441317558289,
+     "health": 0.9575735926628113,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "l0i0txxj",
+    "idx": 57,
+    "type": "koiStatue",
+    "x": 53,
+    "z": 55,
+    "rot": 1,
+    "level": 1,
+    "seed": 5758,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0.6526889204978943,
+     "road": true
+    }
+   },
+   {
+    "id": "11nv2drh",
+    "idx": 58,
+    "type": "chewyStatue",
+    "x": 51,
+    "z": 65,
+    "rot": 2,
+    "level": 1,
+    "seed": 4256,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.5,
+     "light": 0.7316718697547913,
+     "joy": 0.8287689685821533,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "95ujiasg",
+    "idx": 59,
+    "type": "miniTorii",
+    "x": 62,
+    "z": 60,
+    "rot": 1,
+    "level": 1,
+    "seed": 5940,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 1,
+     "health": 0.48735976219177246,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "0dx7nlt5",
+    "idx": 60,
+    "type": "lanternString",
+    "x": 61,
+    "z": 64,
+    "rot": 3,
+    "level": 1,
+    "seed": 5530,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 0.7972902059555054,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "owr1r2kn",
+    "idx": 61,
+    "type": "bench",
+    "x": 50,
+    "z": 64,
+    "rot": 2,
+    "level": 1,
+    "seed": 2919,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.5527864098548889,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "lnjlgw78",
+    "idx": 62,
+    "type": "bench",
+    "x": 50,
+    "z": 63,
+    "rot": 1,
+    "level": 1,
+    "seed": 979,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.639444887638092,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "t2uxl7tj",
+    "idx": 63,
+    "type": "bench",
+    "x": 49,
+    "z": 61,
+    "rot": 1,
+    "level": 1,
+    "seed": 520,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.858578622341156,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "7yscf6nz",
+    "idx": 64,
+    "type": "bench",
+    "x": 50,
+    "z": 62,
+    "rot": 2,
+    "level": 1,
+    "seed": 8691,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.7171573042869568,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "7pux4pqj",
+    "idx": 65,
+    "type": "stoneLantern",
+    "x": 57,
+    "z": 67,
+    "rot": 1,
+    "level": 1,
+    "seed": 1807,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "7fv7u9f6",
+    "idx": 66,
+    "type": "stoneLantern",
+    "x": 52,
+    "z": 55,
+    "rot": 3,
+    "level": 1,
+    "seed": 6802,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0.675000011920929,
+     "road": true
+    }
+   },
+   {
+    "id": "pty4zyg9",
+    "idx": 67,
+    "type": "stoneLantern",
+    "x": 63,
+    "z": 60,
+    "rot": 1,
+    "level": 1,
+    "seed": 9082,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 0.7967908382415771,
+     "health": 0.5430536270141602,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "vtdyqnnx",
+    "idx": 68,
+    "type": "fence",
+    "x": 48,
+    "z": 61,
+    "rot": 1,
+    "level": 1,
+    "seed": 8076,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.8999999761581421,
+     "light": 1,
+     "joy": 1,
+     "health": 0,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "abxiw7jz",
+    "idx": 69,
+    "type": "fence",
+    "x": 64,
+    "z": 59,
+    "rot": 0,
+    "level": 1,
+    "seed": 3398,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 0.7221675515174866,
+     "health": 0.6205266714096069,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "g0p3d9mo",
+    "idx": 70,
+    "type": "fence",
+    "x": 64,
+    "z": 60,
+    "rot": 3,
+    "level": 1,
+    "seed": 8172,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 1,
+     "light": 1,
+     "joy": 0.7353950142860413,
+     "health": 0.5975077748298645,
+     "learn": 0,
+     "road": true
+    }
+   },
+   {
+    "id": "r14qlkn4",
+    "idx": 71,
+    "type": "fence",
+    "x": 47,
+    "z": 60,
+    "rot": 3,
+    "level": 1,
+    "seed": 9254,
+    "residents": 0,
+    "built": 1,
+    "q": {
+     "water": 0.8999999761581421,
+     "light": 1,
+     "joy": 0.8518867492675781,
+     "health": 0,
+     "learn": 0.4359742999076843,
+     "road": true
+    }
+   }
+  ],
+  "zones": [
+   [
+    46,
+    39,
+    3
+   ],
+   [
+    47,
+    39,
+    3
+   ],
+   [
+    48,
+    39,
+    3
+   ],
+   [
+    46,
+    40,
+    3
+   ],
+   [
+    47,
+    40,
+    3
+   ],
+   [
+    48,
+    40,
+    3
+   ],
+   [
+    52,
+    40,
+    1
+   ],
+   [
+    53,
+    40,
+    1
+   ],
+   [
+    54,
+    40,
+    1
+   ],
+   [
+    46,
+    41,
+    3
+   ],
+   [
+    47,
+    41,
+    3
+   ],
+   [
+    48,
+    41,
+    3
+   ],
+   [
+    52,
+    41,
+    1
+   ],
+   [
+    53,
+    41,
+    1
+   ],
+   [
+    54,
+    41,
+    1
+   ],
+   [
+    52,
+    42,
+    1
+   ],
+   [
+    53,
+    42,
+    1
+   ],
+   [
+    54,
+    42,
+    1
+   ],
+   [
+    45,
+    44,
+    2
+   ],
+   [
+    45,
+    45,
+    2
+   ],
+   [
+    46,
+    45,
+    2
+   ],
+   [
+    47,
+    45,
+    2
+   ],
+   [
+    48,
+    45,
+    2
+   ],
+   [
+    45,
+    46,
+    2
+   ],
+   [
+    46,
+    46,
+    2
+   ],
+   [
+    47,
+    46,
+    2
+   ],
+   [
+    48,
+    46,
+    2
+   ],
+   [
+    45,
+    47,
+    2
+   ],
+   [
+    46,
+    47,
+    2
+   ],
+   [
+    47,
+    47,
+    2
+   ],
+   [
+    48,
+    47,
+    2
+   ],
+   [
+    75,
+    48,
+    2
+   ],
+   [
+    76,
+    48,
+    2
+   ],
+   [
+    77,
+    48,
+    2
+   ],
+   [
+    75,
+    49,
+    2
+   ],
+   [
+    76,
+    49,
+    2
+   ],
+   [
+    77,
+    49,
+    2
+   ],
+   [
+    75,
+    50,
+    2
+   ],
+   [
+    76,
+    50,
+    2
+   ],
+   [
+    77,
+    50,
+    2
+   ],
+   [
+    69,
+    52,
+    1
+   ],
+   [
+    70,
+    52,
+    1
+   ],
+   [
+    71,
+    52,
+    1
+   ],
+   [
+    72,
+    52,
+    1
+   ],
+   [
+    69,
+    53,
+    1
+   ],
+   [
+    70,
+    53,
+    1
+   ],
+   [
+    71,
+    53,
+    1
+   ],
+   [
+    72,
+    53,
+    1
+   ],
+   [
+    69,
+    54,
+    1
+   ],
+   [
+    72,
+    54,
+    1
+   ],
+   [
+    43,
+    55,
+    1
+   ],
+   [
+    44,
+    55,
+    1
+   ],
+   [
+    45,
+    55,
+    1
+   ],
+   [
+    46,
+    55,
+    1
+   ],
+   [
+    69,
+    55,
+    1
+   ],
+   [
+    72,
+    55,
+    1
+   ],
+   [
+    43,
+    56,
+    1
+   ],
+   [
+    44,
+    56,
+    1
+   ],
+   [
+    45,
+    56,
+    1
+   ],
+   [
+    46,
+    56,
+    1
+   ],
+   [
+    43,
+    57,
+    1
+   ],
+   [
+    44,
+    57,
+    1
+   ],
+   [
+    45,
+    57,
+    1
+   ],
+   [
+    46,
+    57,
+    1
+   ],
+   [
+    43,
+    58,
+    1
+   ],
+   [
+    46,
+    58,
+    1
+   ],
+   [
+    75,
+    58,
+    3
+   ],
+   [
+    76,
+    58,
+    3
+   ],
+   [
+    77,
+    58,
+    3
+   ],
+   [
+    74,
+    59,
+    3
+   ],
+   [
+    75,
+    59,
+    3
+   ],
+   [
+    76,
+    59,
+    3
+   ],
+   [
+    77,
+    59,
+    3
+   ],
+   [
+    74,
+    60,
+    3
+   ],
+   [
+    75,
+    60,
+    3
+   ],
+   [
+    76,
+    60,
+    3
+   ],
+   [
+    77,
+    60,
+    3
+   ],
+   [
+    68,
+    61,
+    1
+   ],
+   [
+    69,
+    61,
+    1
+   ],
+   [
+    70,
+    61,
+    1
+   ],
+   [
+    74,
+    61,
+    3
+   ],
+   [
+    75,
+    61,
+    3
+   ],
+   [
+    76,
+    61,
+    3
+   ],
+   [
+    77,
+    61,
+    3
+   ],
+   [
+    41,
+    62,
+    1
+   ],
+   [
+    42,
+    62,
+    1
+   ],
+   [
+    67,
+    62,
+    1
+   ],
+   [
+    68,
+    62,
+    1
+   ],
+   [
+    69,
+    62,
+    1
+   ],
+   [
+    70,
+    62,
+    1
+   ],
+   [
+    39,
+    63,
+    1
+   ],
+   [
+    40,
+    63,
+    1
+   ],
+   [
+    41,
+    63,
+    1
+   ],
+   [
+    42,
+    63,
+    1
+   ],
+   [
+    67,
+    63,
+    1
+   ],
+   [
+    68,
+    63,
+    1
+   ],
+   [
+    69,
+    63,
+    1
+   ],
+   [
+    70,
+    63,
+    1
+   ],
+   [
+    39,
+    64,
+    1
+   ],
+   [
+    40,
+    64,
+    1
+   ],
+   [
+    41,
+    64,
+    1
+   ],
+   [
+    42,
+    64,
+    1
+   ],
+   [
+    67,
+    64,
+    1
+   ],
+   [
+    68,
+    64,
+    1
+   ],
+   [
+    69,
+    64,
+    1
+   ],
+   [
+    70,
+    64,
+    1
+   ],
+   [
+    39,
+    65,
+    1
+   ],
+   [
+    40,
+    65,
+    1
+   ],
+   [
+    41,
+    65,
+    1
+   ],
+   [
+    42,
+    65,
+    1
+   ],
+   [
+    62,
+    70,
+    1
+   ],
+   [
+    63,
+    70,
+    1
+   ],
+   [
+    64,
+    70,
+    1
+   ],
+   [
+    62,
+    71,
+    1
+   ],
+   [
+    63,
+    71,
+    1
+   ],
+   [
+    64,
+    71,
+    1
+   ],
+   [
+    62,
+    72,
+    1
+   ],
+   [
+    63,
+    72,
+    1
+   ],
+   [
+    64,
+    72,
+    1
+   ],
+   [
+    49,
+    74,
+    3
+   ],
+   [
+    50,
+    74,
+    3
+   ],
+   [
+    51,
+    74,
+    3
+   ],
+   [
+    49,
+    75,
+    3
+   ],
+   [
+    50,
+    75,
+    3
+   ],
+   [
+    51,
+    75,
+    3
+   ],
+   [
+    58,
+    75,
+    2
+   ],
+   [
+    59,
+    75,
+    2
+   ],
+   [
+    49,
+    76,
+    3
+   ],
+   [
+    50,
+    76,
+    3
+   ],
+   [
+    51,
+    76,
+    3
+   ],
+   [
+    52,
+    76,
+    3
+   ],
+   [
+    58,
+    76,
+    2
+   ],
+   [
+    59,
+    76,
+    2
+   ],
+   [
+    49,
+    77,
+    3
+   ],
+   [
+    50,
+    77,
+    3
+   ],
+   [
+    51,
+    77,
+    3
+   ],
+   [
+    52,
+    77,
+    3
+   ],
+   [
+    56,
+    77,
+    2
+   ],
+   [
+    57,
+    77,
+    2
+   ],
+   [
+    58,
+    77,
+    2
+   ],
+   [
+    59,
+    77,
+    2
+   ],
+   [
+    58,
+    78,
+    2
+   ],
+   [
+    59,
+    78,
+    2
+   ]
+  ],
+  "paths": [
+   [
+    59,
+    66
+   ],
+   [
+    60,
+    66
+   ],
+   [
+    59,
+    67
+   ],
+   [
+    60,
+    67
+   ],
+   [
+    60,
+    68
+   ],
+   [
+    60,
+    69
+   ],
+   [
+    60,
+    70
+   ],
+   [
+    60,
+    71
+   ]
+  ],
+  "day": 1,
+  "income": [],
+  "stats": {
+   "population": 30,
+   "jobs": 35,
+   "happiness": 0.6553765745460988,
+   "homes": 10,
+   "shops": 5,
+   "workshops": 6,
+   "rank": 3,
+   "demand": {
+    "R": 1,
+    "C": 0.4375,
+    "W": -0.1875
+   }
+  }
+ },
+ "dungeon": {
+  "deepest": 4,
+  "waypoints": [
+   1,
+   3
+  ]
+ },
+ "day": 1,
+ "hour": 8.521505714287077,
+ "flags": {
+  "starterThrow": true,
+  "layoutTest": "v1"
+ },
+ "regions": {
+  "unlocked": {},
+  "cleared": {},
+  "visits": {}
+ }
+}

@@ -4,23 +4,32 @@ import { Terrain, WORLD } from './terrain.js';
 import { makeWater } from '../gfx/water.js';
 import { LightPool } from '../core/engine.js';
 import { U } from '../gfx/materials.js';
-import { Vegetation } from './vegetation.js';
+import { Vegetation, SHADOW_ONLY_LAYER } from './vegetation.js';
 import { Details } from './details.js';
+import * as Layout from './layout.js';
 import { applyLayout, reservedAt, distToPaths, LANDMARKS } from './layout.js';
+import { validatePlots } from './plots.js';
+import { sizeOf } from './buildings/catalog.js';
 import { Collision } from './collision.js';
 
 export class VillageWorld {
-  constructor(engine) {
-    this.engine = engine;
+  // rank: the village's ring rank (state.village.ringRank): the expansion rings' stub streets up to it are paved
+  constructor(engine, { rank = 1 } = {}) {
+    this.engine = engine; this.rank = rank;
     const scene = this.scene = new THREE.Scene();
     scene.background = new THREE.Color('#cfe6ff');
     scene.fog = new THREE.Fog('#cfe6ff', 60, 140);
     this.terrain = new Terrain(3);
-    applyLayout(this.terrain);
+    applyLayout(this.terrain, rank);
+    // the plot table must fit the land (docs/VILLAGE_PLAN.md §4): fail loudly in dev
+    if (import.meta.env?.DEV) {
+      const rep = validatePlots(this.terrain, Layout, sizeOf);
+      for (const e of rep.errors) console.error('[plots] ' + e);
+    }
     this.terrainMesh = this.terrain.mesh();
     scene.add(this.terrainMesh);
     scene.add(this.terrain.skirt());
-    this.water = makeWater({ heightTex: this.terrain.heightTex, worldSize: WORLD });
+    this.water = makeWater({ heightTex: this.terrain.heightTex, worldSize: WORLD, center: [WORLD / 2, WORLD / 2], size: WORLD * 3.75 });
     scene.add(this.water);
 
     // lights
@@ -31,10 +40,12 @@ export class VillageWorld {
     const q = engine.quality;
     sun.shadow.mapSize.set(q >= 2 ? 4096 : 2048, q >= 2 ? 4096 : 2048);
     const sc = sun.shadow.camera; sc.left = -34; sc.right = 34; sc.top = 34; sc.bottom = -34; sc.near = 1; sc.far = 160;
+    sc.layers.enable(SHADOW_ONLY_LAYER); // the crowns' shadow-only foliage masses (vegetation.js)
     sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03; sun.shadow.radius = 3;
     scene.add(sun); scene.add(sun.target);
     this.lightPool = new LightPool(scene, 8);
     this.veg = new Vegetation(this);
+    this.veg.bin = 64; // spatial bins for the many-instance batches (VILLAGE_PLAN.md §8)
     this.veg.build((x, z) => !reservedAt(x, z) && distToPaths(x, z) > 0.5, engine.quality);
     scene.add(this.veg.group);
     this.decks = []; // walkable platforms over water (bridges, the pond dock): {x0,z0,x1,z1,h:(x,z)=>y}
@@ -73,7 +84,7 @@ export class VillageWorld {
   // keep the shadow frustum centred on the camera focus, snapped to texels to avoid shimmer
   updateSun(focus, sunDir) {
     const sun = this.sun;
-    const texel = (68 / sun.shadow.mapSize.x);
+    const sc = sun.shadow.camera, texel = (sc.right - sc.left) / sun.shadow.mapSize.x;
     const f = this._snap.copy(focus);
     // snap in light space
     const lightMat = new THREE.Matrix4().lookAt(new THREE.Vector3(), sunDir.clone().negate(), new THREE.Vector3(0, 1, 0));
@@ -83,5 +94,6 @@ export class VillageWorld {
     sun.position.copy(f).addScaledVector(sunDir, 70);
     sun.target.updateMatrixWorld();
   }
-  update(dt, t) {}
+  // per frame: grass chunks beyond the fog are hidden (vegetation.updateGrass)
+  update(dt, t) { this.veg.updateGrass?.(this.engine.camera.position); }
 }

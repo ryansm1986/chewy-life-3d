@@ -60,6 +60,48 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
 - `src/core/engine.js` `Engine` (renderer, `rig` camera, `post`, `tick()`, `render()`, `mouseGround()`), `LightPool`.
 - `src/gfx/*` materials, post, sky (DayNight), water, textures, geom. `src/world/terrain.js`, `vegetation.js`, `layout.js`, `villageWorld.js`.
 
+## The town plan: Blossom Hollow 2.0 (src/world/layout.js, plots.js, islandShape.js; design: docs/VILLAGE_PLAN.md)
+- **One source of truth.** `layout.js` holds `WORLD = 224` (1 tile = 1 m) and the island's features (`ISLAND`,
+  `PLATEAU`, `NORTH` cliffs, `HILL`, `BAMBOO`, `POND`, `BASIN`, `RIVER`, `TERRACES`). It also holds the squares (`PLAZA`
+  18 × 15 m at (112, 121), the forecourt, the market square), `LANDMARKS`, `STREETS` / `PATHS` (`rank > 1` = a ring's
+  stub street, paved when that rank opens), `GREEN_BELTS`, the streetscape (`STREET_LAMPS`, `STREET_TREES`,
+  `JUNCTIONS`), the keep-outs (`treeKeepOut`, `doorKeepOut`, `reservedAt`) and the named villagers' `ANCHORS`.
+  Terrain, vegetation, details, the sim, the waterfall, the sea, the build camera and the villagers read it, so moving a
+  landmark moves everything tied to it. `islandShape.js` is the pure heightfield. `layout.js` imports nothing from
+  terrain.
+- **Plots** (`plots.js`): `{ id, district, x, z, w, d, door, allows, max, rank, fixed?, starter?, level?, zone? }` in whole
+  tiles, plus `DISTRICTS` (10, with map labels; `ring` = the rank that opens it). The helpers:
+  - `plotSpot` places a building centred on the frontage, its front on the setback line;
+  - `plotReserve` is the box decorations stay out of;
+  - `plotLocal` gives yard coordinates;
+  - `validatePlots` checks every plot is dry and flat, off the streets, facing one, free of overlaps, with a spot for
+    each type. It runs at boot in dev, in `tools/qa/plan-map.mjs` and in s14.
+- **VillageSim on plots** (`village.js`):
+  - Every `PLOT_TYPES` building stands on a plot (`b.plot`, `sim.plotUse`). `place()` refuses one off its plot's spot.
+  - `paintZone` paints whole free, open plots; plotless land paints nothing (`lastZoneHits`).
+  - `findLot` picks a zoned plot. `growSpot` / `levelUp` grow inside the plot, toward its back, and stop at its max
+    (`atCap`).
+  - `checkRings` opens rings by rank, records them in `village.ringRank` (which never goes down), paves the stub streets
+    and toasts "New district: …".
+  - `paintOverlay('build')` tints plots: free, built (district colour) and locked.
+- **New game:** `seedStarterVillage` puts the landmarks on their fixed plots and the starter buildings on their starter
+  plots, the same way for each `village.seed`. Then come the plaza furniture, the junction benches and 5 zoned plots.
+- **Old saves:** `migrate()` runs when `village.layoutVersion < 2`. It keeps every building's id, type, level, residents
+  and seed. It moves the landmarks to their fixed plots and plot buildings to plots by district role, opening the next
+  ring if they run out. Decorations keep their arrangement round the plaza. Old zones and paths are dropped, and a
+  toast shows once (`village.migrationNote`). The migration is deterministic and idempotent.
+- **Yards** (`details.js` `plotYards`, shown per plot by `setPlotBuilt`): fences or hedges, a bed, a small tree, stepping
+  stones, a mailbox or a bench, and crop rows on farms. They are drawn in the shared batches; their colliders exist only
+  while the plot is built. Build mode adds corner stakes on free plots (`buildMode.refreshStakes`).
+- **Perf** (VILLAGE_PLAN.md §8): terrain in 32 m chunks (2 vertices/m in town, 1 outside). Grass density is tiered by
+  distance from the town, and `updateGrass` hides chunks past the fog. Many-instance batches are split into 64 m bins.
+  The village's batches are `StaticBatchedMesh`: culling spheres are baked once, and a pass whose draw list hasn't changed
+  skips re-uploading its indirect texture. Tree spacing and records use spatial
+  hashes, and street distance a 16 m segment index.
+- Tools: `tools/qa/plan-map.mjs` (the plan drawn from the real code, in Node), `village-plan-shots.mjs` (overhead and
+  play shots; `GROW=4` fast-forwards a rank-4 town; `FIXTURE=` shoots a migrated save), `village-perf.mjs` (A/B frame
+  times, triangles, memory), `make-v1-fixture.mjs`, and the s14 scenario.
+
 ## Characters (src/actors/charKit.js)
 - `buildHumanoid(spec)` / `buildBoston(spec)` assemble part meshes under animated groups, then `Rig.bake()` merges every part
   into ONE rigidly skinned mesh + one outline (the groups become the skeleton's bones; the mouth becomes a bone that the
@@ -86,7 +128,10 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
   `at(u, v, lift)` returns a point (+normal) on that surface, so eyes, nose, mouth, blush, brows and ears sit exactly on
   the face. Face details are merged without an ink hull (`faceDetails`); only volumes get outlines.
 - Occluders: scenery that can hide Chewy/Shadow stamps stencil 2 (`markOccluder`, applied by `makeToon({occluder})` and
-  village buildings); the x-ray pass draws only over stencil 2.
+  village buildings); the x-ray pass draws only over stencil 2. The circular cutaway round Chewy (`U.uOccl`, set in
+  game.js `updateOcclusion`) is 15% of the screen height at the gameplay distances. It shrinks with the camera
+  distance (× 26 / dist), so it stays a person-sized hole in the title, build and overview views and doesn't slice whole
+  crowns into wedges.
 
 ## Village life (src/actors/villageLife.js, npc.js, lifePoses.js)
 - `G.villageLife` (created by the first villager update) owns activity slots derived from `G.sim.list` (benches,
@@ -96,11 +141,14 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
   `G.villageLife.force(villager, kind)` is a debug hook. Poses in lifePoses.js only move `rig.parts` groups.
 - Villagers have homes (`VillageLife.homeFor` / `doorInfo`, doorstep outside the collider) and bedtimes (`BED` in
   npc.js); at night they step in through the door, Chewy can knock, and quest-targeted villagers wait on the doorstep.
+- The 2× town: claim ranges 30 / 38 m (named / townsfolk), strolls 20 m. The tile A* searches up to 24,000 nodes with
+  a 1.15-weighted heuristic. Fishing spots are found by landmark (the pond, the river by the bridge), and the named cast's
+  anchors are `layout.ANCHORS`. `NavGrid.touchRect` re-costs tiles whose colliders changed (yard fences).
 - Small props (not occluders) use material clones with the cutaway off; only buildings/trees write the x-ray stencil.
 
 ## Navigation (src/core/nav.js)
-- Shared `GridAStar` + per-world 0.5 m clearance grid (`navFor(world)`, exposed as `player.nav` for tests) and
-  `PathFollow`. Click-to-move, melee approach, interact targets, loot pickup and Shadow's catch-up route through it;
+- Shared `GridAStar` + per-world 0.5 m clearance grid (`navFor(world)`, exposed as `player.nav` for tests; 448 × 448
+  cells in the village, `findPath` capped at 60,000 nodes) and `PathFollow`. Click-to-move, melee approach, interact targets, loot pickup and Shadow's catch-up route through it;
   WASD stays direct. Collider changes are detected lazily (collision objects carry a `_nid`).
 - Input: a press released before the next frame stays down for exactly one frame, so every poller sees taps.
 
@@ -204,7 +252,8 @@ state = {
   equipment: { weapon:null, weaponAlt:null, hat:null, outfit:null, collar:null, charm1:null, charm2:null, boots:null, paws:null },
   stash: Array(60).fill(null),
   quests: { active:[], done:[] }, friends: { /* villagerId: {hearts, talkedDay, gifts} */ },
-  village: { /* owned by the village sim */ },
+  village: { layoutVersion:2, ringRank:1, seed, buildings:[{ id, idx, type, x, z, rot, level, seed, residents, built, plot? }],
+             zones:[[x,z,t]], paths:[[x,z]], day, income, stats, migrationNote? },   // (owned by the village sim)
   dungeon: { deepest:0, waypoints:[1] },
   day: 1, hour: 8.5, flags: {},
 }
@@ -267,7 +316,8 @@ floor's teardown / a pot breaking frees only its own buffers); DungeonMode.makeC
 
 ## Land details (src/world/details.js)
 Curb stones, trodden grass, wildflower drifts, forest-edge ferns/logs/mushrooms, the pond dock and reeds, bridge-bank
-dressing, plaza bunting/signpost/hopscotch, the shrine approach, beach shells — built once from VillageWorld and drawn
+dressing, plaza bunting/signpost/hopscotch, the forecourt, the market square, Pond Loop benches, terrace walls, street
+lanterns, plot yards, the shrine approach, beach shells — built once from VillageWorld and drawn
 through vegetation's batches as vegetation records, so buildings/paths/zones that claim the ground clear them (with
 their colliders and lights). Big set-pieces reserve their tiles (VillageSim.canPlace refuses them). Details that belong
 to a building (firewood, laundry, mailbox, crates, menu boards) live in its template (src/world/buildings/*).

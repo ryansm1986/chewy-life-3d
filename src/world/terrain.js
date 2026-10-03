@@ -1,85 +1,33 @@
 // Island terrain: heightfield, painted tile layer (paths / plaza / fields), GPU texture mirrors for shaders.
+// The island's shape and every feature on it come from the town plan (layout.js) through islandShape.js.
 import * as THREE from 'three';
-import { Noise, clamp, smoothstep, lerp } from '../core/util.js';
+import { Noise, clamp, lerp } from '../core/util.js';
 import { makeToon, POOL_GLSL } from '../gfx/materials.js';
+import { WORLD, T, LANDMARKS, POND, RIVER, PLATEAU } from './layout.js';
+import { islandHeight, riverDist } from './islandShape.js';
 
-export const WORLD = 112;
-export const T = { GRASS: 0, PATH: 1, PLAZA: 2, FIELD: 3, SAND: 4, ROCK: 5, WATER: 6 };
+export { WORLD, T, riverDist };
 
-// river control points (x,z) from the waterfall pool down to the sea
-const RIVER = [[50, 14], [49, 22], [45, 30], [38, 38], [33, 47], [32, 56], [34, 66], [31, 76], [26, 86], [22, 96], [18, 112]];
-const POND = { x: 71, z: 73, r: 5.2 };
-
-function segDist(px, pz, ax, az, bx, bz) {
-  const vx = bx - ax, vz = bz - az, wx = px - ax, wz = pz - az;
-  const t = clamp((wx * vx + wz * vz) / (vx * vx + vz * vz));
-  const dx = px - (ax + vx * t), dz = pz - (az + vz * t);
-  return { d: Math.sqrt(dx * dx + dz * dz), t };
-}
-export function riverDist(x, z) {
-  let best = 1e9;
-  for (let i = 0; i < RIVER.length - 1; i++) {
-    const [ax, az] = RIVER[i], [bx, bz] = RIVER[i + 1];
-    const r = segDist(x, z, ax, az, bx, bz);
-    if (r.d < best) best = r.d;
-  }
-  return best;
-}
+// render mesh: 32 m chunks, 2 vertices / m in the town (the plateau and its rim), 1 / m beyond (VILLAGE_PLAN.md §8)
+const CHUNK = 32, HI_R = PLATEAU.flat + 6;
 
 export class Terrain {
   constructor(seed = 3) {
     this.noise = new Noise(seed);
     this.N = WORLD; // tiles
-    this.RES = 2;   // height samples per tile
+    this.RES = 2;   // height samples per tile (gameplay heights; the render mesh is coarser outside the town)
     const S = this.S = WORLD * this.RES + 1;
     this.h = new Float32Array(S * S);
     this.tiles = new Uint8Array(WORLD * WORLD);
     this.wear = new Uint8Array(WORLD * WORLD); // trodden grass 0..255 (details.js: path corners, plaza thresholds)
-    this.plazaCenter = new THREE.Vector2(56, 60);
-    this.center = { x: 56, z: 60 };
+    const F = LANDMARKS.fountain;
+    this.plazaCenter = new THREE.Vector2(F.x, F.z); // centre of the fountain ring in the plaza paving
+    this.center = { x: PLATEAU.x, z: PLATEAU.z };
     this.pond = POND;
     this.river = RIVER;
     this.build();
   }
-  rawHeight(x, z) {
-    const n = this.noise;
-    const cx = 56, cz = 58;
-    const dx = (x - cx) / 50, dz = (z - cz) / 50;
-    const edge = Math.sqrt(dx * dx + dz * dz) + n.fbm(x * 0.03, z * 0.03, 3) * 0.12;
-    // island falloff to seabed
-    let h = 1.0 - smoothstep(0.78, 1.0, edge) * 2.8;
-    // gentle rolling ground
-    h += n.fbm(x * 0.05 + 11, z * 0.05, 3) * 0.35;
-    // village plateau flattening
-    const vd = Math.hypot(x - 56, z - 60);
-    const flat = 1 - smoothstep(20, 30, vd);
-    h = lerp(h, 1.0 + n.fbm(x * 0.08, z * 0.08, 2) * 0.05, flat);
-    // northern mountains / cliff wall
-    const north = smoothstep(27, 12, z + n.fbm(x * 0.07, 5, 2) * 4);
-    let mnt = 2.4 + (26 - z) * 0.32 + n.fbm(x * 0.05, z * 0.05 + 3, 4) * 2.2 + Math.max(0, n.n2(x * 0.08, z * 0.08)) * 1.5;
-    const st = 2.2, fr = mnt / st - Math.floor(mnt / st);
-    mnt = Math.floor(mnt / st) * st + smoothstep(0.7, 1.0, fr) * st; // painted terraces / cliffs
-    h = lerp(h, Math.max(h, mnt), north);
-    // east shrine hill (plateau with soft rim)
-    const hd = Math.hypot((x - 88) * 0.9, z - 42);
-    const hill = smoothstep(13, 7, hd);
-    h = lerp(h, 3.4 + n.fbm(x * 0.2, z * 0.2) * 0.08, hill);
-    // west bamboo rise
-    const wd = Math.hypot(x - 18, z - 52);
-    h += smoothstep(16, 4, wd) * 0.9;
-    // river channel
-    const rd = riverDist(x, z);
-    const riverW = 2.4 + smoothstep(20, 100, z) * 1.2;
-    const bank = smoothstep(riverW + 3.0, riverW - 0.2, rd);
-    h = lerp(h, -0.9 - (1 - rd / (riverW + 3)) * 0.3, bank * (z > 12 ? 1 : 0));
-    // waterfall basin at the foot of the cliff
-    const wb = Math.hypot(x - 50, z - 16);
-    h = lerp(h, -1.0, smoothstep(6, 3.5, wb));
-    // koi pond
-    const pd = Math.hypot(x - POND.x, z - POND.z) + n.n2(x * 0.3, z * 0.3) * 0.5;
-    h = lerp(h, -0.7, smoothstep(POND.r + 2.2, POND.r - 1.2, pd));
-    return h;
-  }
+  rawHeight(x, z) { return islandHeight(this.noise, x, z); }
   build() {
     const S = this.S, R = this.RES;
     for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) this.h[j * S + i] = this.rawHeight(i / R, j / R);
@@ -117,7 +65,11 @@ export class Terrain {
     const hz = this.heightAt(x, z + e) - this.heightAt(x, z - e);
     return new THREE.Vector3(-hx, 2 * e, -hz).normalize();
   }
-  slopeAt(x, z) { return 1 - this.normalAt(x, z).y; }
+  // 1 - normal.y, without allocating
+  slopeAt(x, z) {
+    const hx = this.heightAt(x + 0.5, z) - this.heightAt(x - 0.5, z), hz = this.heightAt(x, z + 0.5) - this.heightAt(x, z - 0.5);
+    return 1 - 1 / Math.sqrt(hx * hx + 1 + hz * hz);
+  }
   tile(x, z) { x = Math.floor(x); z = Math.floor(z); if (x < 0 || z < 0 || x >= WORLD || z >= WORLD) return T.WATER; return this.tiles[z * WORLD + x]; }
   setTile(x, z, t, sync = true) {
     if (x < 0 || z < 0 || x >= WORLD || z >= WORLD) return;
@@ -137,18 +89,20 @@ export class Terrain {
     }
     this.tileTex.needsUpdate = true;
   }
+  // chunk (ci, cj) is drawn at 2 vertices / m when it touches the town
+  chunkRes(ci, cj) {
+    const x0 = ci * CHUNK, z0 = cj * CHUNK, P = PLATEAU;
+    const dx = Math.max(x0 - P.x, 0, P.x - x0 - CHUNK), dz = Math.max(z0 - P.z, 0, P.z - z0 - CHUNK);
+    return Math.hypot(dx, dz) < HI_R ? 2 : 1;
+  }
+  // One mesh per 32 m chunk (frustum-culled), sharing the material. Normals come straight from the heightfield so
+  // chunks shade seamlessly; where a fine chunk meets a coarse one its in-between edge vertices sit on the coarse
+  // chunk's edge (no cracks).
   mesh() {
-    const S = this.S, size = WORLD;
-    const geo = new THREE.PlaneGeometry(size, size, S - 1, S - 1);
-    geo.rotateX(-Math.PI / 2);
-    geo.translate(size / 2, 0, size / 2);
-    const pos = geo.attributes.position;
-    for (let k = 0; k < pos.count; k++) {
-      const x = pos.getX(k), z = pos.getZ(k);
-      pos.setY(k, this.heightAt(x, z));
-    }
-    geo.computeVertexNormals();
-    const mat = makeToon({
+    const NC = Math.ceil(WORLD / CHUNK);
+    const res = []; for (let j = 0; j < NC; j++) for (let i = 0; i < NC; i++) res.push(this.chunkRes(i, j));
+    const resAt = (i, j) => (i < 0 || j < 0 || i >= NC || j >= NC ? 2 : res[j * NC + i]);
+    const mat = this.material = makeToon({
       brush: 0.16, brushScale: 0.22, rim: 0.0, shadowSat: 0.45,
       uniforms: {
         uTiles: { value: this.tileTex }, uOverlay: { value: this.overlayTex }, uOverlayAmt: { value: 0 }, uOverlayMode: { value: 1 },
@@ -160,22 +114,52 @@ export class Terrain {
       fragColor: TERRAIN_FRAG_COLOR,
       fragOut: TERRAIN_FRAG_OUT,
     });
-    this.material = mat;
-    const m = new THREE.Mesh(geo, mat);
-    m.receiveShadow = true;
-    m.name = 'terrain';
-    return m;
+    const group = new THREE.Group(); group.name = 'terrain';
+    let tris = 0;
+    for (let cj = 0; cj < NC; cj++) for (let ci = 0; ci < NC; ci++) {
+      const r = resAt(ci, cj), n = CHUNK * r, x0 = ci * CHUNK, z0 = cj * CHUNK, row = n + 1;
+      const pos = new Float32Array(row * row * 3), nor = new Float32Array(row * row * 3), uv = new Float32Array(row * row * 2);
+      // edges that border a coarser chunk: [-z, +z, -x, +x]
+      const coarse = r === 2 ? [resAt(ci, cj - 1) === 1, resAt(ci, cj + 1) === 1, resAt(ci - 1, cj) === 1, resAt(ci + 1, cj) === 1] : [false, false, false, false];
+      for (let b = 0; b <= n; b++) for (let a = 0; a <= n; a++) {
+        const x = x0 + a / r, z = z0 + b / r, k = b * row + a;
+        let y = this.heightAt(x, z);
+        if ((a & 1) && ((b === 0 && coarse[0]) || (b === n && coarse[1]))) y = (this.heightAt(x - 0.5, z) + this.heightAt(x + 0.5, z)) / 2;
+        if ((b & 1) && ((a === 0 && coarse[2]) || (a === n && coarse[3]))) y = (this.heightAt(x, z - 0.5) + this.heightAt(x, z + 0.5)) / 2;
+        pos[k * 3] = x; pos[k * 3 + 1] = y; pos[k * 3 + 2] = z;
+        const hx = this.heightAt(x + 0.5, z) - this.heightAt(x - 0.5, z), hz = this.heightAt(x, z + 0.5) - this.heightAt(x, z - 0.5), il = 1 / Math.sqrt(hx * hx + 1 + hz * hz);
+        nor[k * 3] = -hx * il; nor[k * 3 + 1] = il; nor[k * 3 + 2] = -hz * il;
+        uv[k * 2] = x / WORLD; uv[k * 2 + 1] = 1 - z / WORLD;
+      }
+      const idx = new (row * row > 65535 ? Uint32Array : Uint16Array)(n * n * 6);
+      let q = 0;
+      for (let b = 0; b < n; b++) for (let a = 0; a < n; a++) {
+        const i0 = b * row + a, i1 = i0 + 1, i2 = i0 + row, i3 = i2 + 1;
+        idx[q++] = i0; idx[q++] = i2; idx[q++] = i1; idx[q++] = i1; idx[q++] = i2; idx[q++] = i3;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+      geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+      geo.setIndex(new THREE.BufferAttribute(idx, 1));
+      geo.computeBoundingSphere(); geo.computeBoundingBox();
+      const m = new THREE.Mesh(geo, mat);
+      m.receiveShadow = true; m.name = `terrain:${ci},${cj}`;
+      group.add(m); tris += n * n * 2;
+    }
+    group.userData.tris = tris;
+    return group;
   }
   // uniform objects the grass shares so it renders the same build overlay as the ground
   overlayUniforms() {
     const u = this.material?.userData?.u; if (!u) return null;
     return { uOverlay: u.uOverlay, uOverlayAmt: u.uOverlayAmt, uOverlayMode: u.uOverlayMode, uGrid: u.uGrid, uCursor: u.uCursor, uCursorCol: u.uCursorCol };
   }
-  // big seabed skirt around the island so the sea has something under it
+  // big seabed skirt around (and under the edges of) the island so the sea has something under it
   skirt() {
-    const g = new THREE.RingGeometry(WORLD * 0.72, 420, 64, 1);
+    const g = new THREE.RingGeometry(WORLD * 0.45, WORLD * 3.75, 64, 1);
     g.rotateX(-Math.PI / 2); g.translate(WORLD / 2, -3.2, WORLD / 2);
-    const m = new THREE.Mesh(g, makeToon({ color: '#3c8fa0', rim: 0, brush: 0.05 }));
+    const m = new THREE.Mesh(g, makeToon({ color: '#8ea888', rim: 0, brush: 0.05 })); // (≈ the terrain's own underwater tint: no seam where it ends)
     return m;
   }
 }

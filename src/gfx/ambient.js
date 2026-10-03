@@ -4,6 +4,7 @@ import { rand, TAU, clamp, smoothstep, chance } from '../core/util.js';
 import { U, makeToon } from './materials.js';
 import { shaftTexture, glowTexture } from './textures.js';
 import { paint, merge, xf } from './geom.js';
+import { PLAZA_HALF, POND } from '../world/layout.js';
 
 function butterflyMesh(color) {
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
@@ -82,7 +83,7 @@ export class Ambient {
     const pond = world.landmarks?.pond;
     if (pond) for (let i = 0; i < 7; i++) {
       const m = koiMesh(i); m.castShadow = false; world.scene.add(m);
-      this.koi.push({ m, a: rand(0, TAU), r: rand(1.2, 3.8), sp: rand(0.25, 0.5) * (i % 2 ? 1 : -1), y: rand(-0.35, -0.18), c: pond });
+      this.koi.push({ m, a: rand(0, TAU), r: POND.r * rand(0.25, 0.7), sp: rand(0.25, 0.5) * (i % 2 ? 1 : -1), y: rand(-0.35, -0.18), c: pond });
     }
     // light shafts (golden hour)
     this.shafts = [];
@@ -227,7 +228,8 @@ export class Ambient {
         if (lanternNight > 0.5 && Math.random() < dt * 0.25) {
           L.active = true; L.t = 0; L.life = rand(28, 42);
           const c = this.world.landmarks?.plaza || focus;
-          L.p.set(c.x + rand(-14, 14), this.world.heightAt(c.x, c.z) + 0.6, c.z + rand(-14, 14));
+          const S = PLAZA_HALF.x * 2.6; // (over the town core: about 2.6x the plaza's half-size, as before)
+          L.p.set(c.x + rand(-S, S), this.world.heightAt(c.x, c.z) + 0.6, c.z + rand(-S, S));
         }
         continue;
       }

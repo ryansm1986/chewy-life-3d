@@ -6,6 +6,19 @@ import { Input } from '../core/input.js';
 import { Events } from '../core/events.js';
 import { WORLD } from './terrain.js';
 import { ease, damp } from '../core/util.js';
+import { makeToon } from '../gfx/materials.js';
+import { paint, merge, xf } from '../gfx/geom.js';
+import { PLOTS, DISTRICTS, plotZones } from './plots.js';
+
+// Build-mode lot markers: a little wooden stake with a pink ribbon on each corner of every free, open plot
+function stakeGeo() {
+  const c = hex => (p, n, o) => o.set(hex);
+  return merge([
+    paint(xf(new THREE.BoxGeometry(0.07, 0.62, 0.07), { p: [0, 0.31, 0] }), c('#c89a6a')),
+    paint(xf(new THREE.ConeGeometry(0.06, 0.1, 4), { p: [0, 0.67, 0] }), c('#a87a52')),
+    paint(xf(new THREE.BoxGeometry(0.16, 0.06, 0.02), { p: [0.07, 0.55, 0], r: [0, 0.3, 0] }), c('#ff8fb0')),
+  ]);
+}
 
 const RANK_REQ = { shrine: 2, boneSmith: 2, waterTower: 2, fountain: 2, onsen: 3, clinic: 3, school: 3, koiStatue: 3, chewyStatue: 4, bridge: 2 };
 
@@ -18,6 +31,24 @@ export class BuildMode {
     this.prevDist = 34;
     this.view = 0; // 0..1 build-view blend (grass shrink)
     this.lastCur = null;
+    this.stakes = null; // InstancedMesh of lot markers (built on first use)
+    Events.on('village:changed', () => { if (this.active) this.refreshStakes(); });
+  }
+  // stakes on the corners of every free, open plot (Build mode only)
+  refreshStakes() {
+    const sim = this.sim, list = PLOTS.filter(pl => !pl.fixed && sim.plotOpen(pl) && sim.plotFree(pl));
+    if (!this.stakes) {
+      this.stakes = new THREE.InstancedMesh(stakeGeo(), makeToon({ vertexColors: true, rim: 0.3, brush: 0.1 }), PLOTS.length * 4);
+      this.stakes.name = 'plotStakes'; this.stakes.castShadow = false; this.stakes.frustumCulled = false;
+      sim.world.scene.add(this.stakes);
+    }
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+    let n = 0;
+    for (const pl of list) for (const [x, z] of [[pl.x + 0.25, pl.z + 0.25], [pl.x + pl.w - 0.25, pl.z + 0.25], [pl.x + 0.25, pl.z + pl.d - 0.25], [pl.x + pl.w - 0.25, pl.z + pl.d - 0.25]]) {
+      q.setFromAxisAngle(up, (x * 3.1 + z * 1.7) % 6.28); m.compose(p.set(x, sim.terrain.heightAt(x, z) - 0.03, z), q, sc); this.stakes.setMatrixAt(n++, m);
+    }
+    this.stakes.count = n; this.stakes.instanceMatrix.needsUpdate = true;
+    this.stakes.visible = this.active;
   }
   overlay(mode) {
     this.sim.setOverlay(mode);
@@ -59,6 +90,7 @@ export class BuildMode {
       stats: () => ({ ...this.sim.stats, demand: this.sim.demand, rankInfo: this.rankInfo() }),
     });
     this.sim.showNeedIcons?.(true);
+    this.refreshStakes();
     Events.emit('sfx', 'ui_open');
   }
   exit() {
@@ -68,6 +100,7 @@ export class BuildMode {
     this.G.engine.rig.distTarget = this.prevDist;
     this.G.engine.rig.yawTarget = Math.round((this.G.engine.rig.yawTarget - Math.PI / 4) / (Math.PI / 2)) * (Math.PI / 2) + Math.PI / 4;
     this.overlay(null);
+    if (this.stakes) this.stakes.visible = false;
     this.sim.terrain.material.userData.u.uGrid.value = 0;
     this.sim.terrain.material.userData.u.uCursor.value.set(-99, -99, 0, 0);
     if (this.G.ui?.isOpen?.('build')) this.G.ui.close('build');
@@ -142,12 +175,19 @@ export class BuildMode {
       const zname = { 1: 'homes', 2: 'shops', 3: 'workshops', 0: 'unzoned' }[this.tool.zone ?? 0];
       let hint;
       if (this.tool.kind === 'path') hint = this.tool.erase ? 'Drag to remove paths' : 'Drag to lay stone paths';
-      else if (this.drag) hint = `${x1 - x0 + 1}×${z1 - z0 + 1} · ${n} tiles → ${zname}`;
-      else hint = `Drag to paint a ${zname} zone · villagers build there when there is demand`;
+      else if (this.drag) hint = `${x1 - x0 + 1}×${z1 - z0 + 1} → ${zname} on the plots it covers`;
+      else {
+        const pl = sim.plotOf(cur.x, cur.z);
+        hint = !pl ? 'Zones grow only on plots: paint over the marked lots'
+          : !sim.plotOpen(pl) ? `${DISTRICTS[pl.district]?.name || 'This district'} opens at village rank ${pl.rank}`
+          : this.tool.zone && !plotZones(pl).includes(this.tool.zone) ? `This plot is not for ${zname}`
+          : `Click or drag to paint a ${zname} zone · villagers build there when there is demand`;
+      }
       G.ui?.setInteract?.(hint);
       if (!Input.mouseDown(0) && this.drag) { // finish on mouse-up even if released over the palette
         if (this.tool.kind === 'zone') {
           const k = sim.paintZone(x0, z0, x1, z1, this.tool.zone);
+          if (!sim.lastZoneHits && this.tool.zone) G.ui?.toast?.('Zones only grow on plots: paint over the marked lots', { color: '#ffb0bc' });
           if (k) {
             Events.emit('sfx', 'build_place', { vol: 0.5 });
             G.vfx.sparkle(new THREE.Vector3((x0 + x1 + 1) / 2, sim.terrain.heightAt(x0, z0) + 0.3, (z0 + z1 + 1) / 2), { n: 10 + Math.min(20, k), r: Math.min(4, (x1 - x0) / 2 + 0.5), color: zc });
@@ -159,22 +199,28 @@ export class BuildMode {
     }
     if (overUI) return;
     if (this.tool.kind === 'building') {
-      if (Input.hit('r')) { this.rot = (this.rot + 1) % 4; Events.emit('sfx', 'ui_click'); }
-      const [w, d] = sim.dims(this.tool.type, this.rot);
-      const x0 = Math.round(cur.p.x - w / 2), z0 = Math.round(cur.p.z - d / 2);
-      const chk = sim.canPlace(this.tool.type, x0, z0, this.rot);
-      const afford = G.actions.hasMaterials(BUILDINGS[this.tool.type].cost);
+      const type = this.tool.type, pl = sim.plotOf(cur.p.x, cur.p.z);
+      // on a plot that allows it: the building snaps to the plot, its door to the street (no free rotation)
+      const snap = pl && !pl.fixed && pl.allows.includes(type) ? sim.spotFor(pl, type, 1) : null;
+      if (!snap && Input.hit('r')) { this.rot = (this.rot + 1) % 4; Events.emit('sfx', 'ui_click'); }
+      const rot = snap ? snap.rot : this.rot;
+      const [w, d] = sim.dims(type, rot);
+      const x0 = snap ? snap.x : Math.round(cur.p.x - w / 2), z0 = snap ? snap.z : Math.round(cur.p.z - d / 2);
+      let chk = snap ? sim.canPlace(type, x0, z0, rot, 1, -1, pl.id) : sim.needsPlot(type) ? { ok: false, why: pl ? `This plot isn't for a ${BUILDINGS[type].name}` : `Build the ${BUILDINGS[type].name} on a free plot` } : sim.canPlace(type, x0, z0, rot);
+      if (chk.ok && snap && !sim.plotOpen(pl)) chk = { ok: false, why: `${DISTRICTS[pl.district]?.name || 'This district'} opens at village rank ${pl.rank}` };
+      else if (chk.ok && snap && !sim.plotFree(pl)) chk = { ok: false, why: 'This plot is taken' };
+      const afford = G.actions.hasMaterials(BUILDINGS[type].cost);
       const ok = chk.ok && afford;
       U.uCursor.value.set(x0 + w / 2, z0 + d / 2, w, d); this.cursorCol(ok ? '#8affb0' : '#ff7a8a', 0.3);
       // ghost follows smoothly with a little hop
       const target = new THREE.Vector3(x0 + w / 2, sim.terrain.heightAt(x0 + w / 2, z0 + d / 2) + 0.05, z0 + d / 2);
       this.ghost.position.x = damp(this.ghost.position.x, target.x, 22, dt); this.ghost.position.z = damp(this.ghost.position.z, target.z, 22, dt);
       this.ghost.position.y = target.y + Math.abs(Math.sin(G.engine.time * 4)) * 0.08;
-      this.ghost.rotation.y = damp(this.ghost.rotation.y, -this.rot * Math.PI / 2, 16, dt);
+      this.ghost.rotation.y = damp(this.ghost.rotation.y, -rot * Math.PI / 2, 16, dt);
       if (ok !== this.ghostOk) { this.ghostOk = ok; this.ghost.traverse(o => { if (o.isMesh) o.material = ok ? this.okMat : this.badMat; }); }
-      G.ui?.setInteract?.(ok ? 'Click to build · R to rotate' : (!chk.ok ? chk.why : 'Not enough materials'));
+      G.ui?.setInteract?.(ok ? (snap ? `Click to build on this ${DISTRICTS[pl.district]?.name || ''} plot` : 'Click to build · R to rotate') : (!chk.ok ? chk.why : 'Not enough materials'));
       if (Input.mouseHit(0)) {
-        const b = sim.place(this.tool.type, x0, z0, this.rot);
+        const b = sim.place(type, x0, z0, rot, snap ? { plot: pl.id } : {});
         if (b) { G.vfx.sparkle(target.clone().setY(target.y + 1), { n: 20, r: 1.2 }); if (BUILDINGS[this.tool.type].unique) this.setTool(null); }
       }
     } else if (this.tool.kind === 'bulldoze') {

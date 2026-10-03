@@ -2,10 +2,13 @@
 import { T, WORLD } from './terrain.js';
 import { CELL } from '../dungeon/gen.js';
 import { BUILDINGS } from './buildings/index.js';
+import { PATHS } from './layout.js';
+import { DISTRICTS } from './plots.js';
 
 // canvas rotation that puts the camera's forward direction at the top of the map
 const mapRot = yaw => -Math.PI / 2 - Math.atan2(-Math.cos(yaw), -Math.sin(yaw));
 const TILE_COL = { [T.GRASS]: '#8fd070', [T.PATH]: '#f0dcc0', [T.PLAZA]: '#fff0dc', [T.FIELD]: '#b08058', [T.SAND]: '#f6e2b0', [T.ROCK]: '#b8aec0', [T.WATER]: '#6ac8e8' };
+const RGB = {};
 const CAT_COL = { home: '#ff9ab0', shop: '#8fc8ff', craft: '#ffc870', service: '#b8a0ff', decor: '#a8e090', special: '#ff7a5a' };
 
 // current quest objective (G.questTarget) as a pulsing gold pin; on the small disc it sticks to the rim when out of range
@@ -35,12 +38,19 @@ export class VillageMinimap {
     const G = this.G, tr = G.village.world.terrain, S = WORLD * this.scale;
     const c = this.base || (this.base = document.createElement('canvas')); c.width = c.height = S;
     const g = c.getContext('2d');
+    // the ground: one pixel per tile written into an ImageData (a fillRect per tile is slow on the 224 m island),
+    // scaled up without smoothing
+    const gc = this.ground || (this.ground = document.createElement('canvas')); gc.width = gc.height = WORLD;
+    const gg = gc.getContext('2d'), img = gg.createImageData(WORLD, WORLD), D = img.data;
     for (let z = 0; z < WORLD; z++) for (let x = 0; x < WORLD; x++) {
       const h = tr.heightAt(x + 0.5, z + 0.5);
       let col = h < 0.02 ? (h < -1 ? '#4aa8d8' : '#6ac8e8') : TILE_COL[tr.tile(x, z)] || '#8fd070';
       if (h > 2.5 && col === '#8fd070') col = h > 5 ? '#6aa860' : '#7abc68';
-      g.fillStyle = col; g.fillRect(x * this.scale, z * this.scale, this.scale, this.scale);
+      const rgb = RGB[col] || (RGB[col] = [parseInt(col.slice(1, 3), 16), parseInt(col.slice(3, 5), 16), parseInt(col.slice(5, 7), 16)]);
+      const k = (z * WORLD + x) * 4; D[k] = rgb[0]; D[k + 1] = rgb[1]; D[k + 2] = rgb[2]; D[k + 3] = 255;
     }
+    gg.putImageData(img, 0, 0);
+    g.imageSmoothingEnabled = false; g.drawImage(gc, 0, 0, S, S); g.imageSmoothingEnabled = true;
     for (const b of G.state.village.buildings || []) {
       const [w, d] = G.sim.dims(b.type, b.rot, b.level);
       g.fillStyle = CAT_COL[BUILDINGS[b.type]?.cat] || '#ffffff';
@@ -60,15 +70,22 @@ export class VillageMinimap {
     }
     this.dirty = false;
   }
+  // o.big: the Map panel (the whole island at zoom 1; the wheel zooms in toward Chewy, never past the coast)
   draw(ctx, size, pp, o = {}) {
     if (this.dirty || !this.base) this.rebuild();
-    const G = this.G, p = G.player.pos, span = o.big ? WORLD : 40, k = size / span;
+    const G = this.G, p = G.player.pos, zoom = o.big ? Math.max(0.5, o.zoom || 1) : 1, span = o.big ? WORLD / zoom : 40, k = size / span;
     ctx.save();
     ctx.clearRect(0, 0, size, size);
     // rotate so the map matches the camera (camera yaw 45°: screen-up = world -x-z)
     ctx.translate(size / 2, size / 2);
-    ctx.rotate(mapRot(G.engine.rig.yaw));
-    const cx = o.big ? WORLD / 2 : p.x, cz = o.big ? WORLD / 2 : p.z;
+    const rot = mapRot(G.engine.rig.yaw);
+    ctx.rotate(rot);
+    let cx = p.x, cz = p.z;
+    if (o.big) { // centre: the island's at zoom <= 1, sliding toward Chewy as it zooms in (kept inside the map)
+      const t = Math.min(1, Math.max(0, (zoom - 1) / 1.5)), half = span / 2;
+      cx = WORLD / 2 + (p.x - WORLD / 2) * t; cz = WORLD / 2 + (p.z - WORLD / 2) * t;
+      if (zoom > 1) { cx = Math.min(WORLD - half, Math.max(half, cx)); cz = Math.min(WORLD - half, Math.max(half, cz)); }
+    }
     ctx.drawImage(this.base, (-cx) * k, (-cz) * k, WORLD * k, WORLD * k);
     const night = Math.max(0, Math.min(1, G.day?.out?.night ?? 0));
     if (night > 0.02 && this.night) { ctx.globalAlpha = night; ctx.drawImage(this.night, (-cx) * k, (-cz) * k, WORLD * k, WORLD * k); ctx.globalAlpha = 1; }
@@ -76,6 +93,17 @@ export class VillageMinimap {
     for (const n of G.npcs || []) if (n.visible) dot(n.pos.x, n.pos.z, n.id === 'rosie' ? 4 : 2.6, n.id === 'rosie' ? '#ff6a9a' : '#fff6e8', night > 0.5 ? '#1e1830' : '#4a2c2a');
     const L = G.village.world.landmarks;
     dot(L.dungeon.x, L.dungeon.z, 5, '#b89aff');
+    // the big map: the expansion rings' stub streets (dashed until their rank opens them) and the district names
+    const ring = G.sim?.ringRank?.() || 1;
+    if (o.big) {
+      ctx.save(); ctx.setLineDash([4, 4]); ctx.lineCap = 'round';
+      for (const P of PATHS) {
+        if (P.rank <= ring) continue;
+        ctx.strokeStyle = 'rgba(120, 110, 130, .75)'; ctx.lineWidth = Math.max(1.5, P.w * k);
+        ctx.beginPath(); P.pts.forEach(([x, z], i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, (x - cx) * k, (z - cz) * k)); ctx.stroke();
+      }
+      ctx.restore();
+    }
     // quest objective pin (falls back to a sparkle on the quest giver)
     if (!questPin(ctx, G, cx, cz, k, o.time ?? performance.now() / 1000, o.big ? 0 : size / 2 - 22)) {
       const q = G.state.quests.active?.[0];
@@ -86,6 +114,26 @@ export class VillageMinimap {
     ctx.save(); ctx.translate((p.x - cx) * k, (p.z - cz) * k); ctx.rotate(Math.atan2(Math.cos(G.player.facing), Math.sin(G.player.facing)) + Math.PI / 2);
     ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(5, 5); ctx.lineTo(0, 2.5); ctx.lineTo(-5, 5); ctx.closePath();
     ctx.fillStyle = '#ff8a3a'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
+    ctx.restore();
+    if (o.big) this.labels(ctx, size, rot, cx, cz, k, zoom, ring);
+  }
+  // district names, upright (drawn after the rotated map, placed through the same rotation); a ring not yet opened says
+  // which rank opens it
+  labels(ctx, size, rot, cx, cz, k, zoom, ring) {
+    const c = Math.cos(rot), s = Math.sin(rot);
+    ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    const fs = Math.round(Math.min(17, 11 + zoom * 2.2));
+    for (const D of Object.values(DISTRICTS)) {
+      if (!D.label) continue;
+      const dx = (D.label[0] - cx) * k, dz = (D.label[1] - cz) * k;
+      const x = size / 2 + dx * c - dz * s, y = size / 2 + dx * s + dz * c;
+      if (x < -40 || y < -20 || x > size + 40 || y > size + 20) continue;
+      const locked = D.ring && D.ring > ring;
+      ctx.font = `800 ${fs}px Fredoka, "M PLUS Rounded 1c", system-ui, sans-serif`;
+      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255, 250, 240, .9)'; ctx.fillStyle = locked ? '#7a7088' : '#5a3440';
+      ctx.strokeText(D.name, x, y); ctx.fillText(D.name, x, y);
+      if (locked) { ctx.font = `700 ${fs - 3}px Fredoka, "M PLUS Rounded 1c", system-ui, sans-serif`; ctx.strokeText(`opens at rank ${D.ring}`, x, y + fs); ctx.fillText(`opens at rank ${D.ring}`, x, y + fs); }
+    }
     ctx.restore();
   }
 }

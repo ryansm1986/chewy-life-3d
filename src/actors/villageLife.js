@@ -17,6 +17,7 @@ import { T, WORLD } from '../world/terrain.js';
 import { paint, merge, xf, tube } from '../gfx/geom.js';
 import { rand, TAU } from '../core/util.js';
 import { GridAStar } from '../core/nav.js';
+import { POND, riverX, LANDMARKS } from '../world/layout.js';
 
 const NOCOL = new Set(['flowerBed', 'bridge', 'fence', 'park']); // walk-through (see VillageSim.spawnModel)
 const BLOCK = 255;
@@ -64,7 +65,9 @@ class NavGrid {
     if (this.occ0) {
       changed = [];
       for (let i = 0; i < N; i++) if (occ[i] !== this.occ0[i] || tiles[i] !== this.tiles0[i]) { changed.push(i); if (changed.length > 1500) { changed = null; break; } }
+      if (changed && this.touched) for (const i of this.touched) changed.push(i);
     }
+    this.touched = null;
     if (!changed) {
       for (let i = 0; i < N; i++) this.base[i] = this.tileBase(i, typeOf);
       for (let i = 0; i < N; i++) this.finish(i);
@@ -83,17 +86,23 @@ class NavGrid {
     }
     this.dirty = false;
   }
+  // colliders changed without the tiles changing (a plot's yard fences): re-cost these tiles on the next rebuild
+  touchRect(x0, z0, x1, z1) {
+    const t = this.touched ||= [];
+    for (let z = Math.max(0, Math.floor(z0)); z <= Math.min(WORLD - 1, Math.floor(z1)); z++) for (let x = Math.max(0, Math.floor(x0)); x <= Math.min(WORLD - 1, Math.floor(x1)); x++) t.push(z * WORLD + x);
+    this.dirty = true;
+  }
   blocked(x, z) { if (x < 0 || z < 0 || x >= WORLD || z >= WORLD) return true; return this.cost[z * WORLD + x] === BLOCK; }
   costAt(x, z) { return this.cost[Math.floor(z) * WORLD + Math.floor(x)]; }
   // A* from (sx,sz) to (tx,tz) in world units. Returns a flat [x0,z0,x1,z1,...] waypoint list (ends at the exact
   // target) or null. Start / goal tiles may be solid (standing beside a building, a bench seat).
-  find(sx, sz, tx, tz, maxNodes = 5000) {
+  find(sx, sz, tx, tz, maxNodes = 24000) {
     if (this.dirty) this.rebuild();
     const W = WORLD, cost = this.cost;
     const s = (Math.floor(sz) * W + Math.floor(sx)) | 0, goal = (Math.floor(tz) * W + Math.floor(tx)) | 0;
     if (s < 0 || goal < 0 || s >= W * W || goal >= W * W) return null;
     if (s === goal) return [tx, tz];
-    const tiles = this.astar.search(cost, s, goal, maxNodes, 10);
+    const tiles = this.astar.search(cost, s, goal, maxNodes, 10, false, 1.15);
     if (!tiles) return null;
     // string-pull: keep a waypoint only where a straight shot would leave cheap tiles or hit something solid
     const pts = [sx, sz]; let a = 0;
@@ -341,9 +350,12 @@ export class VillageLife {
   // water's-edge spots near the village (pond, river, shore), computed once
   fishing() {
     if (this.fishSpots) return this.fishSpots;
-    const W = this.world, ter = W.terrain, P = W.landmarks?.plaza || { x: 56, z: 60 };
+    const W = this.world, ter = W.terrain, B = LANDMARKS.bridgeW;
     const cands = [];
-    for (let z = Math.floor(P.z - 30); z < P.z + 30; z++) for (let x = Math.floor(P.x - 30); x < P.x + 30; x++) {
+    // search boxes by landmark: the koi pond (three spots) and the river banks up- and downstream of the bridge (two)
+    const boxes = [{ x0: POND.x - POND.r - 5, x1: POND.x + POND.r + 5, z0: POND.z - POND.r - 5, z1: POND.z + POND.r + 5, n: 3, cx: POND.x, cz: POND.z }];
+    for (const dz of [-14, 12]) { const z = B.z + dz, x = riverX(z); boxes.push({ x0: x - 9, x1: x + 9, z0: z - 6, z1: z + 6, n: 1, cx: x, cz: z }); }
+    for (const bx of boxes) for (let z = Math.floor(bx.z0); z < bx.z1; z++) for (let x = Math.floor(bx.x0); x < bx.x1; x++) {
       const cx = x + 0.5, cz = z + 0.5;
       if (!W.walkable(cx, cz) || W.collision.solidAt(cx, cz, 0.35) || W.deckAt(cx, cz)) continue;
       for (let k = 0; k < 8; k++) {
@@ -353,21 +365,22 @@ export class VillageLife {
         let ex = cx, ez = cz;
         for (let i = 0; i < 8 && W.walkable(ex + dx * 0.15, ez + dz * 0.15) && !W.collision.solidAt(ex + dx * 0.15, ez + dz * 0.15, 0.3); i++) { ex += dx * 0.15; ez += dz * 0.15; }
         ex -= dx * 0.2; ez -= dz * 0.2;
-        cands.push({ x: ex, z: ez, face: a, d: Math.hypot(cx - P.x, cz - P.z) + Math.random() * 4 });
+        cands.push({ x: ex, z: ez, face: a, d: Math.random(), box: bx });
         break;
       }
     }
     cands.sort((a, b) => a.d - b.d);
-    const out = [];
+    const out = [], per = new Map();
     for (const c of cands) {
-      if (out.length >= 5) break;
+      if ((per.get(c.box) || 0) >= c.box.n) continue;
       if (out.some(o => Math.hypot(o.x - c.x, o.z - c.z) < 5)) continue;
+      per.set(c.box, (per.get(c.box) || 0) + 1);
       out.push({ id: `fish:${out.length}`, kind: 'fish', x: c.x, z: c.z, face: c.face, bobX: c.x + Math.sin(c.face) * 1.7, bobZ: c.z + Math.cos(c.face) * 1.7 });
     }
     return (this.fishSpots = out);
   }
   // best free slot of a kind for villager v (distance-weighted random; owners of a home prefer their own yard)
-  claim(v, kind, near, maxD = 22, teleport = false) {
+  claim(v, kind, near, maxD = 34, teleport = false) {
     const list = this.byKind.get(kind); if (!list) return null;
     let best = null, bs = -1, bspot = null;
     for (const sl of list) {

@@ -16,11 +16,14 @@ import { puff, tube, paint, merge } from '../gfx/geom.js';
 import { brushTexture } from '../gfx/textures.js';
 import { mulberry32, TAU, clamp, Noise } from '../core/util.js';
 import { T, WORLD } from './terrain.js';
-import { LANDMARKS, PATHS, distToPaths } from './layout.js';
+import { LANDMARKS, STREETS, SQUARES, TERRACES, STREET_LAMPS, distToPaths, openPaths, PLAZA, PLAZA_HALF, POND, HILL, ISLAND, inTown, squareDist } from './layout.js';
+import { PLOTS, plotFrame, plotSetback, plotSpot, plotLocal, plotFacing } from './plots.js';
+import { fenceSection } from './buildings/decor.js';
 import { Builder, G, C, PI, shade, bar } from './buildings/kit.js';
 const nz = (() => { const n = new Noise(5151); return (x, y) => n.n2(x, y); })();
 import { toro, chochin, crate, bench, pot, bush, rock as kitRock, lanternPost, mossCap, mossLine, leafGeo, lrng } from './buildings/props.js';
-import { boat, bucket, nobori } from './buildings/props2.js';
+import { boat, bucket, nobori, parasol, teaBench, stool, pottery, cabbage, carrot, pumpkin } from './buildings/props2.js';
+import { barrel, produce, tree, mailbox, flowerPatch, woodStack, logPile } from './buildings/props.js';
 import { symbol } from './buildings/symbols.js';
 import { STONES } from './buildings/parts.js';
 
@@ -28,6 +31,9 @@ const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const col = h => new THREE.Color(h);
 const UP = V(0, 1, 0);
 const P0 = LANDMARKS.plaza;
+// is (x, z) on (or within m of) a building plot? Ground set pieces (logs, stumps) stay off the lots
+const onPlot = (x, z, m = 0) => PLOTS.some(p => x > p.x - m && x < p.x + p.w + m && z > p.z - m && z < p.z + p.d + m);
+const hillDist = (x, z) => Math.hypot((x - HILL.x) * 0.9, z - HILL.z);
 
 // ------------------------------------------------------------------ materials
 // same painted look as the building kit, but batching-aware (vegToon re-derives the world position per instance)
@@ -686,7 +692,8 @@ export class Details {
     this.group = new THREE.Group(); this.group.name = 'details';
     this.mats = detailMats();
     this.batches = [];
-    const mk = (name, opts) => { const b = new Batch('d:' + name, this.mats[name], opts); this.batches.push(b); return b; };
+    // (bin: many-instance batches of small pieces are split into spatial cells, see vegetation.js Batch)
+    const mk = (name, opts) => { const b = new Batch('d:' + name, this.mats[name], { bin: world.veg.bin, ...opts }); this.batches.push(b); return b; };
     this.b = {
       body: mk('body'), stone: mk('stone', { sort: false }),
       flat: mk('flat', { castShadow: false, sort: false }), grass: mk('grass', { castShadow: false, sort: false }),
@@ -726,8 +733,7 @@ export class Details {
   rec(x, z, { big = false, col = 0, kind = 'detail', s = 1 } = {}) {
     const r = { kind, x, z, y: this.H(x, z), s, big, parts: [], alive: true };
     if (col) { r.col = { x, z, r: col }; this.veg.colliders.push(r.col); }
-    this.veg.instances.push(r);
-    return r;
+    return this.veg.addRecord(r);
   }
   sat(owner, rec) { if (owner) (owner.sat ||= []).push(rec); return rec; }
   reserve(x, z, r) {
@@ -769,14 +775,16 @@ export class Details {
   // ---------------------------------------------------------------- build
   build() {
     const t0 = performance.now();
+    this.streets = openPaths(this.world.rank || 1);
     try {
       const img = brushTexture().image;
       this.brushS = img.width; this.brushData = img.getContext('2d').getImageData(0, 0, img.width, img.height).data;
     } catch (e) { this.brushData = null; }
-    const steps = ['wear', 'pond', 'bridge', 'plaza', 'shrine', 'northPath', 'forest', 'trees', 'paths', 'lawns', 'beach'];
+    const steps = ['wear', 'pond', 'bridge', 'plaza', 'forecourt', 'market', 'pondPark', 'terraceWalls', 'streetLamps', 'plotYards', 'shrine', 'northPath', 'forest', 'trees', 'paths', 'lawns', 'beach'];
     this.ms = {};
     for (const s of steps) { const t = performance.now(); this[s](); this.ms[s] = +(performance.now() - t).toFixed(1); }
     for (const b of this.batches) b.build(this.group);
+    for (const g of this.yardGroups || []) this.showYard(g, false); // yards show once their plot is built (setPlotBuilt)
     this.brushData = null; this.occ = null;
     this.ms.total = +(performance.now() - t0).toFixed(1);
     return this;
@@ -801,7 +809,7 @@ export class Details {
       tr.wear[j * W + i] = Math.round(clamp(w) * 255);
     }
     // path mouths that open onto grass (a door, the pond bank, trail ends)
-    for (const Pt of PATHS) for (const [e, f] of [[Pt.pts[0], Pt.pts[1]], [Pt.pts[Pt.pts.length - 1], Pt.pts[Pt.pts.length - 2]]]) {
+    for (const Pt of this.streets) for (const [e, f] of [[Pt.pts[0], Pt.pts[1]], [Pt.pts[Pt.pts.length - 1], Pt.pts[Pt.pts.length - 2]]]) {
       const dx = e[0] - f[0], dz = e[1] - f[1], L = Math.hypot(dx, dz), x = e[0] + dx / L * (Pt.w / 2 + 0.6), z = e[1] + dz / L * (Pt.w / 2 + 0.6);
       const i = Math.floor(x), j = Math.floor(z);
       if (tiles[j * W + i] === T.GRASS) tr.wear[j * W + i] = Math.max(tr.wear[j * W + i], 190);
@@ -823,7 +831,7 @@ export class Details {
     };
     // path ends that stop in the open (bridge heads, doors, the pond, far trail ends): keep their mouths clear
     const caps = [];
-    for (const Pt of PATHS) for (const e of [Pt.pts[0], Pt.pts[Pt.pts.length - 1]]) {
+    for (const Pt of this.streets) for (const e of [Pt.pts[0], Pt.pts[Pt.pts.length - 1]]) {
       const [x, z] = e;
       let nearPlaza = false;
       for (let dz = -2; dz <= 2 && !nearPlaza; dz++) for (let dx = -2; dx <= 2; dx++) if (pv(Math.floor(x) + dx, Math.floor(z) + dz) === 2) { nearPlaza = true; break; }
@@ -894,8 +902,8 @@ export class Details {
     const G0 = this.quality >= 2 ? 2.0 : 2.6;
     for (let z = 5; z < WORLD - 5; z += G0) for (let x = 5; x < WORLD - 5; x += G0) {
       const px = x + rnd() * G0, pz = z + rnd() * G0;
-      const dP = Math.hypot(px - P0.x, pz - P0.z), dPath = distToPaths(px, pz);
-      if (dP > 38 && dPath > 6) continue;
+      const dP = squareDist(PLAZA, px, pz) + 5.4, dPath = distToPaths(px, pz);
+      if (!inTown(px, pz) && dPath > 6) continue;
       if (!ok(px, pz, 0.3)) continue;
       const b = N.n2(px * 0.15 + 17, pz * 0.15 - 5), c = N.n2(px * 0.06 - 9, pz * 0.06 + 3);
       const roll = rnd(), pDrift = clamp(0.3 + b * 1.4, 0.16, 0.8);
@@ -936,8 +944,7 @@ export class Details {
     const shrooms = [[0, true], [1, true], [2, false], [3, false]].map(([v, red]) => this.geo('mush' + v, () => mushroomGeo(v, red)));
     const trees = this.veg.instances.filter(r => r.alive && TREE_KINDS.has(r.kind));
     for (const t of trees) {
-      const dP = Math.hypot(t.x - P0.x, t.z - P0.z);
-      if (dP > 44 && distToPaths(t.x, t.z) > 8) continue;
+      if (!inTown(t.x, t.z, 10) && distToPaths(t.x, t.z) > 8) continue;
       const kind = t.kind;
       if (fallen[kind]) {
         const n = kind === 'sakura' ? 3 + Math.floor(rnd() * 3) : kind === 'momiji' ? 4 + Math.floor(rnd() * 3) : 2 + Math.floor(rnd() * 2);
@@ -967,16 +974,17 @@ export class Details {
   }
   // ---------------------------------------------------------------- forest edge: fallen logs and stumps beside the trails
   forest() {
-    const rnd = mulberry32(3131), trees = this.veg.instances.filter(r => r.alive && TREE_KINDS.has(r.kind));
+    const rnd = mulberry32(3131), veg = this.veg;
+    const treesNear = (x, z, r) => { let n = 0; veg.recordsIn(x - r, z - r, x + r, z + r, t => { if (t.alive && TREE_KINDS.has(t.kind) && Math.hypot(t.x - x, t.z - z) < r) n++; }); return n; };
     const placed = [];
     const logPcs = [logPiece(11, 1.7), logPiece(12, 1.3)], stumpPcs = [stumpPiece(21), stumpPiece(22)];
-    for (const Pt of PATHS) for (let s = 0; s < Pt.pts.length - 1; s++) {
+    for (const Pt of this.streets) for (let s = 0; s < Pt.pts.length - 1; s++) {
       const [ax, az] = Pt.pts[s], [bx, bz] = Pt.pts[s + 1], L = Math.hypot(bx - ax, bz - az), dx = (bx - ax) / L, dz = (bz - az) / L;
       for (let u = 1.5; u < L - 1; u += 2.5) for (const side of [-1, 1]) {
         const off = Pt.w / 2 + 1.7 + rnd() * 1.8, x = ax + dx * u - dz * off * side, z = az + dz * u + dx * off * side;
-        if (Math.hypot(x - P0.x, z - P0.z) < 15 || placed.some(([px, pz]) => Math.hypot(px - x, pz - z) < 8)) continue;
+        if (squareDist(PLAZA, x, z) < 9 || onPlot(x, z, 1.2) || placed.some(([px, pz]) => Math.hypot(px - x, pz - z) < 8)) continue;
         if (this.tile(x, z) !== T.GRASS || this.H(x, z) < 0.6 || this.slope(x, z) > 0.2 || distToPaths(x, z) < 1.5 || !this.free(x, z, 1.0)) continue;
-        if (trees.filter(t => Math.hypot(t.x - x, t.z - z) < 6).length < 2) continue;
+        if (treesNear(x, z, 6) < 2) continue;
         if (rnd() < 0.5) continue;
         const isLog = placed.length % 2 === 0, rot = Math.atan2(dx, dz) + PI / 2 + (rnd() - 0.5) * 0.8;
         if (isLog) {
@@ -1001,12 +1009,12 @@ export class Details {
     const wl = [];
     for (let k = 0; k < 96; k++) {
       const a = k / 96 * TAU, cx = Math.cos(a), cz = Math.sin(a);
-      let d = 2; while (d < 11 && this.H(Pd.x + cx * d, Pd.z + cz * d) < 0) d += 0.05;
+      let d = 2; while (d < Pd.r + 7 && this.H(Pd.x + cx * d, Pd.z + cz * d) < 0) d += 0.05;
       wl.push({ a, d, x: Pd.x + cx * d, z: Pd.z + cz * d, cx, cz });
     }
-    // dock: from the end of the pond path straight out along +x
-    const zD = 70.9;
-    let xs = 63; while (xs < Pd.x && this.H(xs, zD) > 0.12) xs += 0.05;
+    // dock: from the end of the Pond Walk straight out along +x
+    const pw = STREETS.pond.pts[STREETS.pond.pts.length - 1], zD = pw[1] + 0.9;
+    let xs = pw[0] - 3.5; while (xs < Pd.x && this.H(xs, zD) > 0.12) xs += 0.05;
     const x0 = xs - 0.95, x1 = xs + 2.4, yd = clamp(this.H(x0, zD) + 0.06, 0.26, 0.5);
     const dock = dockPiece(77, x1 - x0, yd);
     this.piece(dock, x0, zD, PI / 2, { y: 0, big: false, kind: 'dock', keep: 0.6 });
@@ -1016,7 +1024,7 @@ export class Details {
     this.dock = { x0, x1, z: zD, y: yd };
     // reeds in three clumps along the waterline, away from the dock and the path mouth
     const reeds = [0, 1, 2, 3].map(v => this.geo('reed' + v, () => reedGeo(v)));
-    for (const ca of [0.35, 1.9, 3.55, 4.7]) {
+    for (const ca of [0.35, 1.1, 1.9, 2.75, 3.55, 4.7, 5.5]) {
       for (let i = 0; i < 4; i++) {
         const w = wl[Math.floor(((ca + (rnd() - 0.5) * 0.55) / TAU) * 96 + 96) % 96];
         const inset = -0.1 + rnd() * 0.45, x = w.x - w.cx * inset, z = w.z - w.cz * inset;
@@ -1030,8 +1038,8 @@ export class Details {
     const pads = [0, 1, 2, 3].map(v => this.geo('lily' + v, () => lilyGeo(v, false))), lotus = [0, 1].map(v => this.geo('lotus' + v, () => lilyGeo(v + 10, true)));
     const frog = this.geo('frog', frogGeo);
     let frogged = false;
-    for (const ra of [0.9, 2.6, 4.2, 5.6]) {
-      const d0 = 2.4 + rnd() * 1.2, cx = Pd.x + Math.cos(ra) * d0, cz = Pd.z + Math.sin(ra) * d0;
+    for (const ra of [0.9, 1.8, 2.6, 3.4, 4.2, 5.0, 5.6]) {
+      const d0 = Pd.r * (0.3 + rnd() * 0.3), cx = Pd.x + Math.cos(ra) * d0, cz = Pd.z + Math.sin(ra) * d0;
       const rec = this.rec(cx, cz, { kind: 'lilies' });
       const n = 4 + Math.floor(rnd() * 4);
       for (let i = 0; i < n; i++) {
@@ -1059,7 +1067,7 @@ export class Details {
       this.count('pondPebbles');
     }
     // mossy rocks half in the water, and a stone lantern on a rock across from the dock
-    for (const ra of [1.3, 2.3, 3.1, 4.3, 5.3]) {
+    for (const ra of [1.3, 2.3, 3.1, 3.8, 4.3, 5.3, 6.0]) {
       const w = wl[Math.floor(ra / TAU * 96) % 96], inset = 0.05 + rnd() * 0.35, x = w.x - w.cx * inset, z = w.z - w.cz * inset;
       if (onDock(x, z)) continue;
       const g = this.geo('boulder' + (Math.floor(ra) % 3), () => boulderGeo(Math.floor(ra) * 11 + 5));
@@ -1074,8 +1082,8 @@ export class Details {
       const rec = this.piece(benchPiece(6), x, z, Math.atan2(-w.cx, -w.cz), { col: 0.5, kind: 'bench', keep: 0.6 });
       this.mark(x, z, 0.8);
       // stepping stones from the end of the pond path to the bench
-      const pe = PATHS[5].pts[PATHS[5].pts.length - 1], sx = pe[0] - 0.9, sz = pe[1] + 0.6;
-      if (Math.hypot(sx - x, sz - z) < 6) this.steppingStones(sx, sz, x + w.cx * 0.2 + 0.35, z + w.cz * 0.2 + 0.5, this.sat(rec, this.rec((sx + x) / 2, (sz + z) / 2, { kind: 'stepping' })));
+      const sx = pw[0] - 0.9, sz = pw[1] + 0.6;
+      if (Math.hypot(sx - x, sz - z) < 10) this.steppingStones(sx, sz, x + w.cx * 0.2 + 0.35, z + w.cz * 0.2 + 0.5, this.sat(rec, this.rec((sx + x) / 2, (sz + z) / 2, { kind: 'stepping' })));
       break;
     }
     {
@@ -1147,22 +1155,23 @@ export class Details {
   // ---------------------------------------------------------------- the plaza: signpost, lantern bunting, hopscotch
   plaza() {
     const P = P0;
-    // village signpost at the west edge of the plaza (arrows point along the paths)
-    const sx = 52.3, sz = 62.9;
+    // village signpost at the west edge of the plaza (arrows point along the streets they name)
+    const sx = P.x - PLAZA_HALF.x + 2.0, sz = P.z + 2.6;
+    const toward = (pt) => Math.atan2(pt[1] - sz, pt[0] - sx);
     const arms = [
-      { a: Math.atan2(-1.2, -9), sym: 'leaf', color: '#bfe0a0' },     // west: bridge & bamboo grove
-      { a: Math.atan2(-9, -2.5), sym: 'star', color: '#ffe6b0' },     // north: waterfall
-      { a: Math.atan2(-9, 13), sym: 'bell', color: '#ffc8c8' },       // east: shrine & the Burrow
-      { a: Math.atan2(15, 0), sym: 'fish', color: '#c8e4ff' },        // south: beach
+      { a: toward(STREETS.mainW.pts[2]), sym: 'leaf', color: '#bfe0a0' },    // west: bridge & bamboo grove
+      { a: toward(STREETS.falls.pts[1]), sym: 'star', color: '#ffe6b0' },    // north: waterfall
+      { a: toward(STREETS.shrine.pts[2]), sym: 'bell', color: '#ffc8c8' },   // east: shrine & the Burrow
+      { a: toward(STREETS.beach.pts[2]), sym: 'fish', color: '#c8e4ff' },    // south: beach
     ];
     this.piece(signpostPiece(5, arms), sx, sz, 0, { col: 0.14, kind: 'signpost', keep: 0.3 });
     // lantern bunting on tall poles at three of the plaza's inner corners (paved, inside the ring the starter village
     // keeps free of random lots): strings along the back (north and west) edges and one garland across the middle that
     // hangs crosswise to the default camera (nothing runs along the view axis or in front of the plaza)
-    const ph = 3.1, c = [[P.x - 3.8, P.z - 3.3], [P.x + 3.8, P.z - 3.3], [P.x - 3.8, P.z + 3.7]];
+    const ph = 3.1, c = [[P.x - PLAZA.hw - 0.6, P.z - PLAZA.hd - 0.6], [P.x + PLAZA.hw + 0.6, P.z - PLAZA.hd - 0.6], [P.x - PLAZA.hw - 0.6, P.z + PLAZA.hd + 1.0]];
     const pole = polePiece(3, ph);
     const recs = c.map(([x, z]) => { const r = this.piece(pole, x, z, 0, { col: 0.12, kind: 'buntingPole', keep: 0.15 }); r.top = V(x, this.H(x, z) + ph - 0.12, z); return r; });
-    const strings = [[0, 1, 0.55], [0, 2, 0.5], [1, 2, 0.85]];
+    const strings = [[0, 1, 0.8], [0, 2, 0.75], [1, 2, 1.05]]; // (sag grows with the span)
     for (const [a, b, sag] of strings) {
       const A = recs[a].top, Bt = recs[b].top;
       const pc = buntingPiece(a * 7 + b, A, Bt, sag, true);
@@ -1192,9 +1201,259 @@ export class Details {
       for (let k = 0; k < hp.length - 1; k++) line(hp[k][0], hp[k][1], hp[k + 1][0], hp[k + 1][1], '#ff9ec0', 0.03);
       return merge(parts);
     });
-    const hx = 55.95, hz = 62.05;
+    const F = LANDMARKS.fountain, hx = F.x - 0.05, hz = F.z + 2.9; // just south of the fountain's paving ring
     const hrec = this.rec(hx, hz + 1, { kind: 'chalk' }); hrec.keep = true;
     this.put('flat', chalk, hx, this.H(hx, hz) + 0.012, hz, { rot: 0, rec: hrec });
+  }
+  // ---------------------------------------------------------------- the Town Hall forecourt: stone lanterns and potted pines by the door
+  forecourt() {
+    const H = LANDMARKS.townHall, S = SQUARES.forecourt, zDoor = H.z + H.d / 2;
+    for (const sx of [-1, 1]) {
+      const x = H.x + sx * (H.w / 2 + 0.7), z = zDoor + 1.0;
+      this.piece(toroPiece(70 + (sx > 0 ? 1 : 0), 0.82), x, z, 0, { y: this.H(x, z) - 0.02, col: 0.3, kind: 'forecourtLantern', keep: 0.35 });
+      const bx = S.x + sx * (S.hw + S.round - 0.8), bz = S.z + 0.4;
+      this.piece(kit(76 + (sx > 0 ? 1 : 0), B => pot(B, { r: 0.26, h: 0.32, color: '#b8b0a4', plant: 'pine' })), bx, bz, 0, { col: 0.28, kind: 'forecourtPine', keep: 0.3, light: false });
+      this.mark(x, z, 0.5); this.mark(bx, bz, 0.5);
+    }
+  }
+  // ---------------------------------------------------------------- the market square: banners at the corners, parasols with tea
+  // benches, crates of produce and a barrel in the middle (the ring by the stalls stays open for shoppers)
+  market() {
+    const S = SQUARES.market, rnd = mulberry32(6262);
+    const banners = [['#e8403a', 'sakura', '#fff6ea'], ['#2f4a7a', 'bell', '#fff6ea'], ['#ffb03a', 'star', '#5a3020'], ['#fff6ea', 'fish', '#e8403a']]
+      .map(([c, sym, symColor], i) => kit(90 + i, B => B.at([-0.2, 0, 0], 0, () => nobori(B, { h: 2.3, w: 0.4, color: c, sym, symColor, hem: c === '#fff6ea' ? '#e8403a' : '#fff6ea' })), 0.01));
+    const ex = S.hw + S.round - 0.6, ez = S.hd + S.round - 0.6;
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([cx, cz], i) => {
+      const x = S.x + cx * ex, z = S.z + cz * ez;
+      this.piece(banners[i], x, z, PI / 4, { col: 0.12, kind: 'marketBanner', keep: 0.2, light: false });
+      this.mark(x, z, 0.4);
+    });
+    // a tea corner (parasol, red-felt bench, stools) and a produce corner (crates, a barrel, pottery)
+    const tea = kit(95, B => { parasol(B, { r: 0.95, h: 1.9, color: '#ff8fb0' }); B.at([0.15, 0, 0.75], 0, () => teaBench(B, { w: 1.0 })); B.at([-0.75, 0, 0.35], 0, () => stool(B)); });
+    const shop = kit(96, B => {
+      B.at([0, 0, 0], 0.2, () => crate(B, { s: 0.4 })); B.at([0, 0.4, 0], 0.5, () => produce(B, { kind: 'apple', s: 0.34 }));
+      B.at([0.55, 0, 0.18], -0.3, () => crate(B, { s: 0.36 })); B.at([0.55, 0.36, 0.18], 0.1, () => produce(B, { kind: 'veg', s: 0.3 }));
+      B.at([-0.6, 0, 0.25], 0, () => barrel(B, { r: 0.22, h: 0.46 })); B.at([0.15, 0, 0.75], 0, () => pottery(B, { n: 4, spread: 0.26 }));
+    });
+    this.piece(tea, S.x - 1.8, S.z - 1.6, PI / 4, { col: 0.55, kind: 'marketTea', keep: 1.0 });
+    this.piece(shop, S.x + 1.9, S.z + 1.4, PI / 4 + (rnd() - 0.5) * 0.3, { col: 0.6, kind: 'marketProduce', keep: 0.9 });
+    this.mark(S.x - 1.8, S.z - 1.6, 1.2); this.mark(S.x + 1.9, S.z + 1.4, 1.1);
+  }
+  // ---------------------------------------------------------------- the Pond Park: benches along the Pond Loop, facing the water
+  pondPark() {
+    const Pd = this.terrain.pond, loop = STREETS.pondLoop;
+    if (!loop) return;
+    let k = 0;
+    for (const t of [0.12, 0.3, 0.62, 0.8]) {
+      // a point along the loop, then step out from the pond to the far verge
+      const P = loop.pts, i = Math.min(P.length - 2, Math.floor(t * (P.length - 1))), f = t * (P.length - 1) - i;
+      const lx = P[i][0] + (P[i + 1][0] - P[i][0]) * f, lz = P[i][1] + (P[i + 1][1] - P[i][1]) * f;
+      const dx = lx - Pd.x, dz = lz - Pd.z, dl = Math.hypot(dx, dz) || 1, off = loop.w / 2 + 0.75;
+      const x = lx + dx / dl * off, z = lz + dz / dl * off;
+      if (this.tile(x, z) !== T.GRASS || this.slope(x, z) > 0.25 || !this.free(x, z, 0.7) || distToPaths(x, z) < 0.3) continue;
+      this.piece(benchPiece(20 + k), x, z, Math.atan2(-dx, -dz), { col: 0.5, kind: 'parkBench', keep: 0.6 });
+      this.mark(x, z, 0.8); k++;
+    }
+    this.count('parkBench', k);
+  }
+  // ---------------------------------------------------------------- the North-West Terraces: dry-stone walls along the risers
+  // Two staggered courses of mossy stones along each shelf's riser, so the shelves read as terraces; gaps where a street
+  // climbs through and where the river bank or the mask's soft ends take over.
+  terraceWalls() {
+    const Tr = TERRACES, rnd = mulberry32(7373);
+    const stones = [0, 1, 2].map(v => this.geo('mstone' + v, () => stoneGeo(v * 5 + 31, 1)));
+    let n = 0;
+    for (const [za, zb] of Tr.steps) {
+      const zr = (za + zb) / 2;
+      // (the riser climbs toward -z: the wall's face looks down the slope, toward the default camera)
+      for (let x = Tr.x0 + 0.6; x < Tr.x1 - 0.4; x += 0.48 + rnd() * 0.1) {
+        for (const [dz, s0] of [[0.5, 0.66], [0.05, 0.54]]) {
+          const z = zr + dz + (rnd() - 0.5) * 0.08, px = x + (dz < 0.3 ? 0.24 : 0);
+          if (distToPaths(px, z) < 0.45 || this.H(px, z) < 0.7 || this.tile(px, z) === T.WATER) continue;
+          const rec = this.rec(px, z, { kind: 'terraceWall' });
+          const s = s0 + rnd() * 0.1;
+          this.put('stone', stones[Math.floor(rnd() * 3)], px, this.H(px, z) - 0.05, z, { rot: (rnd() - 0.5) * 0.8, s: [s * 1.3, s * 1.05, s * 0.9], tilt: 0.08, color: STONE_TINTS[Math.floor(rnd() * STONE_TINTS.length)], rec });
+          n++;
+        }
+      }
+    }
+    this.count('terraceWall', n);
+  }
+  // ---------------------------------------------------------------- street lanterns (layout.STREET_LAMPS)
+  // Paper lanterns on posts along Main Street, Market Street, the North Avenue and Beach Lane, their arm over the
+  // street. They reserve their tile and light the neighbourhood like a Lantern Post (VillageSim.computeCoverage).
+  streetLamps() {
+    const post = kit(141, B => { lanternPost(B, { h: 1.8, color: '#e8503a' }); B.light([0, 1.52, 0.34], { color: '#ffb060', intensity: 3.2, radius: 6.5, flicker: 0.4 }); }, 0.01);
+    this.lamps = [];
+    for (const q of STREET_LAMPS) {
+      const t = this.tile(q.x, q.z);
+      if (t === T.WATER || t === T.PATH || t === T.PLAZA || this.H(q.x, q.z) < 0.5 || this.slope(q.x, q.z) > 0.3) continue;
+      this.piece(post, q.x, q.z, q.face, { y: this.H(q.x, q.z) - 0.02, col: 0.14, kind: 'streetLamp', keep: 0.3 });
+      this.mark(q.x, q.z, 0.4);
+      this.lamps.push({ x: q.x, z: q.z });
+    }
+    this.count('streetLamp', this.lamps.length);
+  }
+  // ---------------------------------------------------------------- plot yards (docs/VILLAGE_PLAN.md §4)
+  // Every plot that can hold a home, shop, workshop, field or garden gets a yard: fences or hedges on one to three
+  // sides, a garden bed and a small tree (or pots / crates), stepping stones from the door to the street, sometimes a
+  // mailbox or a bench; a farm plot gets tilled field rows with crops. Deterministic per plot id. Everything is built
+  // once into the shared batches, hidden, and shown while the plot holds a building (setPlotBuilt). The records are not
+  // vegetation records, so building placement never clears them; their colliders come and go with the yard.
+  plotYards() {
+    const K = this.yardKits = {
+      picket: kit(150, B => fenceSection(B, 'picket', 0.55)), bamboo: kit(151, B => fenceSection(B, 'bamboo', 0.75)), rail: kit(152, B => fenceSection(B, 'rail', 0.6)),
+      hedge: kit(153, B => { for (const [x, r] of [[-0.3, 0.26], [0.02, 0.29], [0.33, 0.25]]) B.at([x, 0, 0], 0, () => bush(B, { r, n: 2, color: '#4f8a44', sway: false })); }, 0.015),
+      beds: [0, 1, 2].map(v => kit(160 + v, B => flowerPatch(B, { w: 1.05, d: 0.62, n: 12, colors: [['#ff9ec8', '#ffffff', '#ffd24a'], ['#b8a8ff', '#8fd0ff', '#ffffff'], ['#ff6f7f', '#ffd27a', '#fff0f6']][v] }))),
+      trees: ['sakura', 'round', 'maple'].map((kind, v) => kit(170 + v, B => tree(B, { kind, s: 1 }))),
+      mailbox: ['#e8403a', '#5a8ad8'].map((c, v) => kit(180 + v, B => mailbox(B, c))),
+      bench: benchPiece(183),
+      pots: [0, 1].map(v => kit(185 + v, B => pot(B, { r: 0.19, h: 0.27, color: v ? '#d8c8b0' : C.terracotta, plant: v ? 'pine' : 'flowers', flowers: ['#ff8fb0', '#ffffff'] }))),
+      crates: kit(188, B => { crate(B, { s: 0.42 }); B.at([0.52, 0, 0.12], 0.4, () => barrel(B, { r: 0.19, h: 0.42 })); B.at([0.04, 0.42, 0.02], 0.35, () => crate(B, { s: 0.3 })); }),
+      wood: kit(189, B => { woodStack(B, { w: 0.9, h: 0.5, d: 0.42 }); B.at([0.75, 0, 0.1], 0.2, () => logPile(B, { n: 3, L: 0.8, r: 0.1 })); }),
+      crops: [B => cabbage(B, 1.1), B => carrot(B, 1.2), B => pumpkin(B, 1)].map((f, v) => kit(190 + v, f)),
+    };
+    this.yards = new Map(); this.builtPlots = new Set(); this.yardGroups = [];
+    for (const p of PLOTS) {
+      if (p.fixed && p.fixed !== 'chewyHouse') continue;
+      this.plotYard(p, K);
+    }
+  }
+  yardGroup(plots) {
+    const g = { plots, rec: { kind: 'yard', x: 0, z: 0, parts: [], alive: true, keep: true }, cols: [], live: null, vis: true, field: null };
+    this.yardGroups.push(g);
+    for (const id of plots) { let a = this.yards.get(id); if (!a) this.yards.set(id, a = []); a.push(g); }
+    return g;
+  }
+  // a kit piece stretched along its local x (fence and hedge runs)
+  yardPiece(g, pc, x, z, rot, sx = 1, s = 1) {
+    _q.setFromAxisAngle(UP, rot); _m4.compose(_p.set(x, this.H(x, z) - 0.02, z), _q, _s.set(sx * s, s, s));
+    for (const k of ['body', 'glow', 'leaf', 'cloth']) if (pc[k]) this.b[k].add(pc[k], _m4, null, g.rec);
+  }
+  plotYard(p, K) {
+    const rnd = mulberry32([...p.id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7));
+    const { F, D } = plotFrame(p), face = plotFacing(p), W = (u, v) => plotLocal(p, u, v);
+    // the biggest building's box in plot-local coordinates (u0..u1 along the frontage, v0..v1 deep)
+    let s, u0, u1, v1;
+    if (p.fixed) { // Chewy's cottage: its landmark footprint
+      const Lk = LANDMARKS[p.fixed], ri = Lk.ri || 0, w = ri % 2 ? Lk.d : Lk.w, d = ri % 2 ? Lk.w : Lk.d;
+      const [a0, b0] = [Lk.x - w / 2, Lk.z - d / 2];
+      const c = [[a0, b0], [a0 + w, b0 + d]].map(([x, z]) => this.toLocal(p, x, z));
+      u0 = Math.min(c[0][0], c[1][0]); u1 = Math.max(c[0][0], c[1][0]); s = Math.min(c[0][1], c[1][1]); v1 = Math.max(c[0][1], c[1][1]);
+    } else {
+      const b = plotSpot(p, p.max, p.max); if (!b) return;
+      const c = [[b.x, b.z], [b.x + b.w, b.z + b.d]].map(([x, z]) => this.toLocal(p, x, z));
+      u0 = Math.min(c[0][0], c[1][0]); u1 = Math.max(c[0][0], c[1][0]); s = plotSetback(p); v1 = Math.max(c[0][1], c[1][1]);
+    }
+    const kind = p.fixed ? 'home' : p.allows.includes('home') ? 'home' : p.allows.includes('shop') ? 'shop' : p.allows.includes('farm') ? 'farm' : p.allows.some(t => ['lumber', 'kiln', 'fishingHut'].includes(t)) ? 'works' : 'deco';
+    const g = this.yardGroup([p.id]);
+    const clearOfBox = (u, v) => Math.hypot(Math.max(0, u0 - u, u - u1), Math.max(0, s - v, v - v1)); // distance to the building box
+    // ---- fences / hedges: the back always, the sides by chance (a side shared with a neighbour is drawn once)
+    const style = kind === 'farm' || kind === 'works' ? 'rail' : kind === 'shop' || kind === 'deco' ? 'hedge' : ['picket', 'picket', 'hedge', 'bamboo', 'hedge'][Math.floor(rnd() * 5)];
+    const run = (grp, ua, va, ub, vb, st) => {
+      const [ax, az] = W(ua, va), [bx, bz] = W(ub, vb), len = Math.hypot(bx - ax, bz - az); if (len < 0.6) return;
+      const n = Math.max(1, Math.round(len / (st === 'hedge' ? 0.95 : 1))), L = len / n, rot = Math.atan2(-(bz - az), bx - ax);
+      for (let i = 0; i < n; i++) { const t = (i + 0.5) / n; this.yardPiece(grp, K[st], ax + (bx - ax) * t, az + (bz - az) * t, rot, L * (st === 'hedge' ? 1.05 : 1), st === 'hedge' ? 0.92 : 1); }
+      const th = st === 'hedge' ? 0.5 : 0.16;
+      grp.cols.push({ x0: Math.min(ax, bx) - (az === bz ? 0 : th / 2), z0: Math.min(az, bz) - (az === bz ? th / 2 : 0), x1: Math.max(ax, bx) + (az === bz ? 0 : th / 2), z1: Math.max(az, bz) + (az === bz ? th / 2 : 0) });
+    };
+    const inset = 0.3;
+    run(g, inset, D - inset, F - inset, D - inset, style);
+    const sides = kind === 'farm' ? [0, 1] : kind === 'shop' ? [] : kind === 'home' ? [0, 1].filter(() => rnd() < 0.6) : [rnd() < 0.5 ? 0 : 1];
+    for (const side of sides) {
+      const u = side ? F - inset : inset, nb = this.sideNeighbour(p, side);
+      if (nb && nb.id < p.id) continue; // the neighbour draws the shared fence
+      const grp = nb ? this.yardGroup([p.id, nb.id]) : g;
+      run(grp, u, kind === 'farm' ? 0.6 : 1.1, u, D - inset - 0.25, nb && kind !== 'farm' ? 'hedge' : style);
+    }
+    // ---- stepping stones from the street edge to the door
+    const sm = F / 2;
+    if (s > 1.1) {
+      const [ax, az] = W(sm, 0.2), [bx, bz] = W(sm, s - 0.25); this.steppingStones(ax, az, bx, bz, g.rec);
+      // the grass along the stones is trodden (thin blades, earth showing) so the path reads under the lawn
+      g.wear = [];
+      for (let v = 0.2; v < s; v += 0.5) { const [x, z] = W(sm, v), i = Math.floor(z) * WORLD + Math.floor(x); if (!g.wear.includes(i)) g.wear.push(i); }
+    }
+    // ---- the far corner (the one farthest from the camera, which looks from +x+z): a small tree, or crates / a woodpile
+    const corners = [[0.85, 0.8], [F - 0.85, 0.8], [0.85, D - 0.8], [F - 0.85, D - 0.8]].map(([u, v]) => { const [x, z] = W(u, v); return { u, v, x, z, room: clearOfBox(u, v) }; });
+    corners.sort((a, b) => (a.x + a.z) - (b.x + b.z));
+    const far = corners.find(c => Math.abs(c.u - sm) > 1.4 && c.room > 0.55);
+    const used = [];
+    if (far) {
+      if (kind === 'works' || kind === 'farm') { this.yardPiece(g, rnd() < 0.5 ? K.crates : K.wood, far.x, far.z, face + (rnd() - 0.5) * 0.6); g.cols.push({ c: true, x: far.x, z: far.z, r: 0.45 }); }
+      else if (kind === 'shop') { this.yardPiece(g, K.crates, far.x, far.z, face + (rnd() - 0.5) * 0.6, 1, 0.9); g.cols.push({ c: true, x: far.x, z: far.z, r: 0.42 }); }
+      else { const ts = clamp(far.room / 0.95, 0.65, 1.15); this.yardPiece(g, K.trees[Math.floor(rnd() * 3)], far.x, far.z, rnd() * TAU, 1, ts); g.cols.push({ c: true, x: far.x, z: far.z, r: 0.2 * ts }); }
+      used.push(far);
+    }
+    // ---- the front yard: a garden bed (or pots for a shop) in a front corner, a mailbox or a bench now and then
+    const fronts = corners.filter(c => c.v < 1 && !used.includes(c));
+    if (kind === 'shop') {
+      for (const du of [-0.8, 0.8]) { const [x, z] = W(sm + du, 0.42); this.yardPiece(g, K.pots[du < 0 ? 0 : 1], x, z, face); g.cols.push({ c: true, x, z, r: 0.2 }); }
+    } else if (kind !== 'farm') {
+      const bed = fronts[Math.floor(rnd() * fronts.length)];
+      if (bed) { const [x, z] = W(bed.u, 0.62); this.yardPiece(g, K.beds[Math.floor(rnd() * 3)], x, z, face); used.push(bed); }
+      if (kind === 'deco') { const other = fronts.find(c => !used.includes(c)); if (other) { const [x, z] = W(other.u, 0.62); this.yardPiece(g, K.beds[Math.floor(rnd() * 3)], x, z, face); } }
+      if (kind === 'home' && rnd() < 0.55) { const [x, z] = W(sm + 0.8, 0.3); this.yardPiece(g, K.mailbox[Math.floor(rnd() * 2)], x, z, face); g.cols.push({ c: true, x, z, r: 0.14 }); }
+      const spare = fronts.find(c => !used.includes(c));
+      if (spare && s >= 1.8 && rnd() < (kind === 'deco' ? 0.6 : 0.3)) { const [x, z] = W(spare.u, 1.05); this.yardPiece(g, K.bench, x, z, face); g.cols.push({ c: true, x, z, r: 0.45 }); }
+    }
+    // ---- a farm plot: tilled field rows with crops round the veggie patch
+    if (kind === 'farm') {
+      const tiles = [];
+      for (let z = Math.ceil(p.z + 0.6); z < p.z + p.d - 0.6; z++) for (let x = Math.ceil(p.x + 0.6); x < p.x + p.w - 0.6; x++) {
+        const [u, v] = this.toLocal(p, x + 0.5, z + 0.5);
+        if (clearOfBox(u, v) < 0.5 || (Math.abs(u - sm) < 0.9 && v < s + 0.2) || x + 1 > p.x + p.w - 0.6 || z + 1 > p.z + p.d - 0.6) continue;
+        tiles.push(z * WORLD + x);
+        const crop = K.crops[(Math.floor(u) + Math.floor(v)) % 3];
+        for (const o of [-0.25, 0.25]) { const cx = x + 0.5 + (p.door === 'E' || p.door === 'W' ? o : 0), cz = z + 0.5 + (p.door === 'E' || p.door === 'W' ? 0 : o); this.yardPiece(g, crop, cx, cz, rnd() * TAU, 1, 0.9 + rnd() * 0.25); }
+      }
+      g.field = tiles;
+    }
+    this.count('yard');
+  }
+  // world -> plot-local (u, v)
+  toLocal(p, x, z) {
+    switch (p.door) {
+      case 'S': return [x - p.x, p.z + p.d - z];
+      case 'N': return [x - p.x, z - p.z];
+      case 'E': return [z - p.z, p.x + p.w - x];
+      default: return [z - p.z, x - p.x];
+    }
+  }
+  // the plot sharing side 0 (u = 0) or 1 (u = F) of p, if any
+  sideNeighbour(p, side) {
+    const alongX = p.door === 'E' || p.door === 'W';
+    return PLOTS.find(q => {
+      if (q === p) return false;
+      if (!alongX) { const x = side ? p.x + p.w : p.x, qx = side ? q.x : q.x + q.w; return Math.abs(qx - x) < 0.7 && Math.min(p.z + p.d, q.z + q.d) - Math.max(p.z, q.z) > Math.min(p.d, q.d) * 0.5; }
+      const z = side ? p.z + p.d : p.z, qz = side ? q.z : q.z + q.d;
+      return Math.abs(qz - z) < 0.7 && Math.min(p.x + p.w, q.x + q.w) - Math.max(p.x, q.x) > Math.min(p.w, q.w) * 0.5;
+    }) || null;
+  }
+  // VillageSim: a plot got (or lost) its building → its yard shows (or hides), with its colliders and field rows
+  setPlotBuilt(id, on) {
+    if (!this.yards) return;
+    if (on) this.builtPlots.add(id); else this.builtPlots.delete(id);
+    for (const g of this.yards.get(id) || []) this.showYard(g, g.plots.some(q => this.builtPlots.has(q)));
+  }
+  showYard(g, v) {
+    if (g.vis === v) return;
+    g.vis = v;
+    for (const { bm, id } of g.rec.parts) bm.setVisibleAt(id, v);
+    const col = this.world.collision;
+    if (v && !g.live) g.live = g.cols.map(c => c.c ? col.addCircle(c.x, c.z, c.r, 'yard') : col.addRect(c.x0, c.z0, c.x1, c.z1, 'yard'));
+    else if (!v && g.live) { for (const o of g.live) col.remove(o); g.live = null; }
+    if (g.wear) {
+      const W = this.terrain.wear;
+      g.wear0 ||= g.wear.map(i => W[i]);
+      g.wear.forEach((i, k) => { W[i] = v ? Math.max(g.wear0[k], 235) : g.wear0[k]; });
+      if (!g.field) this.terrain.syncTiles();
+    }
+    if (g.field) {
+      const tiles = this.terrain.tiles;
+      for (const i of g.field) if (v ? tiles[i] === T.GRASS : tiles[i] === T.FIELD) tiles[i] = v ? T.FIELD : T.GRASS;
+      this.terrain.syncTiles();
+    }
   }
   // a short trail of flat stepping stones across the lawn from (ax, az) to (bx, bz)
   steppingStones(ax, az, bx, bz, rec) {
@@ -1212,15 +1471,15 @@ export class Details {
   camSides(dx, dz) { return (dz - dx) > 0 ? [1, -1] : [-1, 1]; }
   // ---------------------------------------------------------------- the way to the shrine: stone lantern pairs, jizo
   shrine() {
-    const path = PATHS[0];
-    // walk the path from the hill foot up to the gate; a lantern pair every ~4.5 m
+    const path = STREETS.shrine;
+    // walk the road from the hill's foot up to the gate; a lantern pair every ~4.5 m
     const pts = path.pts;
     let acc = 0, next = 0, n = 0;
     for (let s = 0; s < pts.length - 1; s++) {
       const [ax, az] = pts[s], [bx, bz] = pts[s + 1], L = Math.hypot(bx - ax, bz - az), dx = (bx - ax) / L, dz = (bz - az) / L;
       for (let u = 0; u < L; u += 0.25) {
         const x = ax + dx * u, z = az + dz * u, d = acc + u;
-        if (x < 76.5 || Math.hypot(x - LANDMARKS.dungeon.x, z - LANDMARKS.dungeon.z) < 4.2 || d < next) continue;
+        if (hillDist(x, z) > HILL.foot + 1 || Math.hypot(x - LANDMARKS.dungeon.x, z - LANDMARKS.dungeon.z) < 4.2 || d < next) continue;
         next = d + 4.6;
         for (const side of [-1, 1]) {
           let off = path.w / 2 + 0.55, px, pz;
@@ -1238,7 +1497,9 @@ export class Details {
     const banners = [['#e8403a', 'sakura', '#fff6ea'], ['#fff6ea', 'sakura', '#e8403a'], ['#2f4a7a', 'bell', '#fff6ea']]
       .map(([c, sym, symColor], i) => kit(80 + i, B => B.at([-0.2, 0, 0], 0, () => nobori(B, { h: 2.2, w: 0.38, color: c, sym, symColor, hem: c === '#fff6ea' ? '#e8403a' : '#fff6ea' })), 0.01));
     let nf = 0;
-    for (let sg = 2; sg <= 4; sg++) {
+    // (the segments that run up to the hill, before the last climb to the gate)
+    const climb = pts.findIndex(q => hillDist(q[0], q[1]) < HILL.foot + 2);
+    for (let sg = Math.max(0, climb - 2); sg <= Math.min(pts.length - 3, climb); sg++) {
       const [ax, az] = pts[sg], [bx, bz] = pts[sg + 1], L = Math.hypot(bx - ax, bz - az), dx = (bx - ax) / L, dz = (bz - az) / L;
       const side = this.camSides(dx, dz)[0];
       for (let u = 1.4; u < L - 0.6; u += 3.1) {
@@ -1250,7 +1511,7 @@ export class Details {
     }
     // jizo trio beside the path where it starts to climb (facing the path)
     {
-      const [ax, az] = pts[2], [bx, bz] = pts[3], t = 0.55, x = ax + (bx - ax) * t, z = az + (bz - az) * t, L = Math.hypot(bx - ax, bz - az), dx = (bx - ax) / L, dz = (bz - az) / L;
+      const sj = Math.max(0, climb - 1), [ax, az] = pts[sj], [bx, bz] = pts[sj + 1], t = 0.55, x = ax + (bx - ax) * t, z = az + (bz - az) * t, L = Math.hypot(bx - ax, bz - az), dx = (bx - ax) / L, dz = (bz - az) / L;
       for (const side of this.camSides(dx, dz)) {
         const px = x - dz * (path.w / 2 + 0.9) * side, pz = z + dx * (path.w / 2 + 0.9) * side;
         if (!this.free(px, pz, 0.6) || this.tile(px, pz) !== T.GRASS) continue;
@@ -1262,7 +1523,7 @@ export class Details {
   }
   // ---------------------------------------------------------------- the waterfall trail: a wayside shrine and a bench
   northPath() {
-    const path = PATHS[4], pts = path.pts;
+    const path = STREETS.falls, pts = path.pts;
     const spots = [[1, 0.45, 'hokora'], [2, 0.5, 'bench']];
     for (const [s, t, what] of spots) {
       const [ax, az] = pts[s], [bx, bz] = pts[s + 1], L = Math.hypot(bx - ax, bz - az), dx = (bx - ax) / L, dz = (bz - az) / L;
@@ -1283,12 +1544,12 @@ export class Details {
     const kinds = ['scallop', 'scallop', 'spiral', 'star'];
     const shells = kinds.map((k, i) => [0, 1].map(v => this.geo(`shell:${k}${i}${v}`, () => shellGeo(v * 5 + i, k))));
     let n = 0, drift = 0;
-    for (let i = 0; i < 1400 && n < 60; i++) {
-      const x = B0.x + (rnd() - 0.5) * 60, z = B0.z + (rnd() - 0.5) * 30;
+    for (let i = 0; i < 2800 && n < 120; i++) {
+      const x = B0.x + (rnd() - 0.5) * 120, z = B0.z + (rnd() - 0.5) * 60;
       const h = this.H(x, z);
-      if (this.tile(x, z) !== T.SAND || h < 0.04 || h > 0.42 || Math.hypot(x - 56, z - 58) < 36) continue;
+      if (this.tile(x, z) !== T.SAND || h < 0.04 || h > 0.42 || Math.hypot(x - ISLAND.x, z - ISLAND.z) < ISLAND.r * 0.72) continue;
       const rec = this.rec(x, z, { kind: 'shell' });
-      if (drift < 4 && rnd() < 0.08 && h > 0.12) {
+      if (drift < 7 && rnd() < 0.08 && h > 0.12) {
         this.piece(driftwoodPiece(drift + 1), x, z, rnd() * TAU, { y: h - 0.03, rec, light: false });
         drift++;
       } else {

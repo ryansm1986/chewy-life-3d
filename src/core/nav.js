@@ -318,7 +318,7 @@ export class WorldNav {
   }
   // route from (sx,sz) toward (tx,tz): { pts:[x0,z0,x1,z1,...] (waypoints, start excluded), x, z (where it ends),
   // exact (ends at the target, not at the nearest reachable spot) } or null when the agent is walled in
-  findPath(sx, sz, tx, tz, maxNodes = 30000) {
+  findPath(sx, sz, tx, tz, maxNodes = 60000) { // (the 224 m village: 448 x 448 cells)
     const t0 = performance.now(), st = this.stats;
     this.sync();
     if (this.regionsDirty) this.labels();

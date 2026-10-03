@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { U } from '../gfx/materials.js';
 import { rand } from '../core/util.js';
+import { LANDMARKS } from './layout.js';
 
 const FALL_VS = /* glsl */`
 varying vec2 vUv; varying vec3 vW;
@@ -23,7 +24,8 @@ void main() {
 }`;
 
 export class Waterfall {
-  constructor(world, vfx, { x = 50, zTop = 10.2, zBot = 14.8, width = 3.4 } = {}) {
+  // x / z: LANDMARKS.waterfall (the lip is 2.3 m behind it, the foot 2.3 m in front)
+  constructor(world, vfx, { x = LANDMARKS.waterfall.x, zTop = LANDMARKS.waterfall.z - 2.3, zBot = LANDMARKS.waterfall.z + 2.3, width = 3.4 } = {}) {
     this.world = world; this.vfx = vfx;
     const top = Math.max(world.terrain.heightAt(x, zTop - 1), world.terrain.heightAt(x, zTop)) + 0.1;
     this.top = top; this.base = new THREE.Vector3(x, -0.1, zBot);

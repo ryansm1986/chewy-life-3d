@@ -281,7 +281,7 @@ export function lanternString(B) {
 // One fence section along x (-0.5..0.5). picket: posts with pyramid caps and gold knobs, back rails, round-topped
 // white pickets with nail heads and a grubby foot; bamboo: noded canes lashed to split-bamboo rails with dark cord;
 // rail: rustic split rails with bark on stout posts.
-function fenceSection(B, style, h) {
+export function fenceSection(B, style, h) {
   const rr = lrng(B), L = 1;
   const post = (x, color, cap = true) => {
     const p = G.box(0.1, h + 0.1, 0.1, 0.02); p.rotateY((rr() - 0.5) * 0.12); p.translate(x, (h + 0.1) / 2, 0);

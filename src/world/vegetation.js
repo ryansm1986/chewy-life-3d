@@ -6,13 +6,19 @@ import { leafCardTexture, floretTexture, makeCanvas } from '../gfx/textures.js';
 import { branch, puff, cards, paint, merge, xf, tube } from '../gfx/geom.js';
 import { mulberry32, TAU, clamp, Noise } from '../core/util.js';
 import { T, WORLD, OVERLAY_GLSL } from './terrain.js';
-import { treeKeepOut } from './layout.js';
+import { treeKeepOut, inTown, PLATEAU, NORTH, HILL, BAMBOO, GREEN_BELTS, STREET_TREES } from './layout.js';
 import { mossCap, mossLine, mossyStone } from './buildings/props.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const col = h => new THREE.Color(h);
 const cols = (...h) => h.map(col);
 const UP = V(0, 1, 0);
+// Crowns are leaf and blossom cards only (the owner's call: "one or the other", 2026-10-02). The smooth foliage masses
+// are still built (they shape where the cards go) but render only into the sun's shadow map, on this layer, so trees
+// keep a soft, solid shadow without showing a smooth blob through the leaves. The sun's shadow camera enables it.
+export const SHADOW_ONLY_LAYER = 1;
+// inner leaf layer: darker cards set inside the shell so crowns read full and deep, not see-through
+const INNER = 0.78;
 const _N = new Noise(311);
 
 // ------------------------------------------------------------------ trees
@@ -382,12 +388,13 @@ function buildPine(B, seed) {
       B.cards.spray([att, mid, tip], side, 0.46 + r() * 0.14, rd.clone().multiplyScalar(0.5).add(V(0, 0.85, 0)).normalize(), k % 2 ? 'S1' : 'S2', fr0, fr1.clone().offsetHSL(0, 0, (r() - 0.5) * 0.08));
     }
     // needle tufts covering the top
-    const nt = Math.round(4 + q.R * 10);
-    for (let k = 0; k < nt; k++) {
-      const a = r() * TAU, f = Math.sqrt(r()) * 0.8, rd = dirAt(a), ro = rim(a) * f;
-      const p = q.c.clone().addScaledVector(rd, ro).add(V(0, q.h * (1 - f * f * 0.85) + 0.02, 0));
-      const nn = V(0, 1, 0).addScaledVector(rd, 0.3 + f * 0.6).normalize();
-      B.cards.cluster(r, p, nn, 0.62 + r() * 0.34, k % 2 ? 'C1' : 'C2', pick(r, tuft), 0.6);
+    const nt = Math.round(9 + q.R * 20), nu = Math.round(4 + q.R * 7);
+    for (let k = 0; k < nt + nu; k++) {
+      const under = k >= nt; // a darker layer through the pad's middle and belly, so a pad never reads hollow from the side
+      const a = r() * TAU, f = Math.sqrt(r()) * (under ? 0.8 : 0.92), rd = dirAt(a), ro = rim(a) * f;
+      const p = q.c.clone().addScaledVector(rd, ro).add(V(0, under ? q.h * 0.15 - q.hb * 0.4 * r() : q.h * (1 - f * f * 0.85) + 0.02, 0));
+      const nn = V(0, under ? 0.4 : 1, 0).addScaledVector(rd, 0.3 + f * 0.6).normalize();
+      B.cards.cluster(r, p, nn, (under ? 0.75 : 0.62) + r() * 0.34, k % 2 ? 'C1' : 'C2', under ? pick(r, stops).clone().lerp(pick(r, tuft), 0.45) : pick(r, tuft), 0.6);
     }
   });
 }
@@ -418,12 +425,13 @@ function buildSakura(B, seed) {
   M.forEach((m, mi) => {
     const rx = m.r * 1.18, ry = m.r * (m.top ? 0.5 : 0.6), kAt = geos[mi].userData.m.k;
     // a shell of blossom clusters over the upper / outer surface, sticking out past the mass for a frothy silhouette
-    const nc = m.top ? 40 : 27;
-    for (let k = 0; k < nc; k++) {
-      const dir = V(r() - 0.5, -0.3 + r() * 1.25, r() - 0.5); if (m.d) dir.addScaledVector(m.d, 0.45);
+    const nc = m.top ? 60 : 42, ni = m.top ? 18 : 12;
+    for (let k = 0; k < nc + ni; k++) {
+      const inner = k >= nc;
+      const dir = V(r() - 0.5, (inner ? -0.1 : -0.3) + r() * 1.25, r() - 0.5); if (m.d) dir.addScaledVector(m.d, 0.45);
       dir.normalize();
-      const p = m.c.clone().add(V(dir.x * rx, dir.y * ry, dir.z * rx).multiplyScalar(kAt(dir.x, dir.y, dir.z) * (0.98 + r() * 0.16)));
-      B.cards.cluster(r, p, dir.clone().lerp(UP, 0.25).normalize(), 1.05 + r() * 0.45, k % 2 ? 'C1' : 'C2', pick(r, bloom), 0.6);
+      const p = m.c.clone().add(V(dir.x * rx, dir.y * ry, dir.z * rx).multiplyScalar(kAt(dir.x, dir.y, dir.z) * (inner ? INNER + r() * 0.12 : 0.98 + r() * 0.16)));
+      B.cards.cluster(r, p, dir.clone().lerp(UP, 0.25).normalize(), (inner ? 1.25 : 1.05) + r() * 0.45, k % 2 ? 'C1' : 'C2', inner ? pick(r, stops).clone().lerp(pick(r, bloom), 0.35) : pick(r, bloom), 0.6);
     }
     if (!m.rim) return;
     // weeping strands curtaining the outer rim: arc out, then fall
@@ -515,11 +523,12 @@ function buildRound(B, seed, ginkgo) {
   geos.forEach((g, i) => B.masses.push(paintMass(cullBuried(g, g.userData.m, geos.map(q => q.userData.m)), stops, { y0, y1, hi, hiAmt: 0.12, under: 0.74, patch: 0.14, seed: i })));
   M.forEach((m, mi) => { // leaf-card shell (top-heavy) + a few sprays under the lower rim
     const kAt = geos[mi].userData.m.k;
-    const nc = Math.round(18 + m.r * 14);
-    for (let k = 0; k < nc; k++) {
+    const nc = Math.round(30 + m.r * 22), ni = Math.round(9 + m.r * 9);
+    for (let k = 0; k < nc + ni; k++) {
+      const inner = k >= nc;
       const dir = V(r() - 0.5, -0.35 + r() * 1.55, r() - 0.5).normalize(); // top-heavy: the camera looks down on crowns
-      const p = m.c.clone().add(V(dir.x * m.r, dir.y * m.r * m.sy, dir.z * m.r).multiplyScalar(kAt(dir.x, dir.y, dir.z) * (0.98 + r() * 0.16)));
-      B.cards.cluster(r, p, dir, 0.95 + r() * 0.4, k % 2 ? 'C1' : 'C2', pick(r, leafC), 0.6, dir.clone().lerp(p.clone().sub(crown).normalize(), 0.5).normalize());
+      const p = m.c.clone().add(V(dir.x * m.r, dir.y * m.r * m.sy, dir.z * m.r).multiplyScalar(kAt(dir.x, dir.y, dir.z) * (inner ? INNER + r() * 0.12 : 0.98 + r() * 0.16)));
+      B.cards.cluster(r, p, dir, (inner ? 1.15 : 0.95) + r() * 0.4, k % 2 ? 'C1' : 'C2', inner ? pick(r, stops).clone().lerp(pick(r, leafC), 0.3) : pick(r, leafC), 0.6, dir.clone().lerp(p.clone().sub(crown).normalize(), 0.5).normalize());
     }
     const nsp = 3;
     for (let k = 0; k < nsp; k++) {
@@ -596,14 +605,15 @@ function buildBush(kind, seed) {
   const geos = M.map((m, i) => mass(m.c, m.r, { detail: 2, sy: 0.82, lumps: 0.35, rough: 0.08, seed: seed * 13 + i, crown, crownMix: 0.5, belly: 0.45 }));
   const green = kind === 'azalea' ? cols('#2a5230', '#3c7240', '#52904a', '#6aa854') : kind === 'box' ? cols('#1f4a2c', '#2e6436', '#427e46', '#58964e') : cols('#28563a', '#387640', '#4c904a', '#62a652');
   const masses = geos.map((g, i) => paintMass(cullBuried(g, g.userData.m, geos.map(q => q.userData.m)), green, { y0: 0.05, y1: 1.05, hi: col('#9ccc62'), hiAmt: 0.18, under: 0.72, patch: 0.14, seed: i }));
-  const leaves = new CardSet(), blooms = new CardSet();
+  const leaves = new CardSet(), blooms = new CardSet(), berries = [];
   const leafC = kind === 'box' ? cols('#4f9a50', '#5aa656', '#46904a', '#68b05c') : cols('#6cb452', '#7cc05a', '#8ccc62', '#5ea84c');
   M.forEach((m, mi) => {
-    const kAt = geos[mi].userData.m.k, nc = Math.round(9 + m.r * 16);
-    for (let k = 0; k < nc; k++) {
+    const kAt = geos[mi].userData.m.k, nc = Math.round(15 + m.r * 26), ni = Math.round(4 + m.r * 8);
+    for (let k = 0; k < nc + ni; k++) {
+      const inner = k >= nc;
       const dir = V(r() - 0.5, -0.25 + r() * 1.3, r() - 0.5).normalize();
-      const p = m.c.clone().add(V(dir.x * m.r, dir.y * m.r * 0.82, dir.z * m.r).multiplyScalar(kAt(dir.x, dir.y, dir.z) * (0.97 + r() * 0.12)));
-      leaves.cluster(r, p, dir, 0.5 + r() * 0.22, k % 2 ? 'C1' : 'C2', pick(r, leafC), 0.6, dir.clone().lerp(p.clone().sub(crown).normalize(), 0.5).normalize());
+      const p = m.c.clone().add(V(dir.x * m.r, dir.y * m.r * 0.82, dir.z * m.r).multiplyScalar(kAt(dir.x, dir.y, dir.z) * (inner ? INNER + r() * 0.12 : 0.97 + r() * 0.12)));
+      leaves.cluster(r, p, dir, (inner ? 0.6 : 0.5) + r() * 0.22, k % 2 ? 'C1' : 'C2', inner ? pick(r, green).clone().lerp(pick(r, leafC), 0.35) : pick(r, leafC), 0.6, dir.clone().lerp(p.clone().sub(crown).normalize(), 0.5).normalize());
     }
   });
   if (kind === 'box') { // berries: little glossy red spheres tucked into the upper surface (smooth-normal icosahedra)
@@ -614,7 +624,7 @@ function buildBush(kind, seed) {
       for (let j = 0; j < bp.count; j++) { const v = V(bp.getX(j), bp.getY(j), bp.getZ(j)).normalize(); bn[j * 3] = v.x; bn[j * 3 + 1] = v.y; bn[j * 3 + 2] = v.z; }
       b.setAttribute('normal', new THREE.BufferAttribute(bn, 3)); b.translate(p.x, p.y, p.z);
       paint(b, (pp, nn, o) => o.set('#e83a3a').lerp(col('#ffb0a0'), clamp(nn.y * 0.8 - 0.3)));
-      masses.push(b);
+      berries.push(b);
     }
   } else {
     const pal = kind === 'hydrangea' ? (r() < 0.5 ? cols('#8aa8ff', '#a6b4ff', '#b8a0ff', '#c8d4ff') : cols('#ff9ec8', '#f0a8e8', '#ffb8d8', '#e890d0')) : cols('#ff5a98', '#ff7aa8', '#ff9ec0', '#f86890');
@@ -625,7 +635,7 @@ function buildBush(kind, seed) {
       blooms.cluster(r, p, dir.clone().lerp(UP, 0.3).normalize(), kind === 'hydrangea' ? 0.5 + r() * 0.14 : 0.3 + r() * 0.08, i % 2 ? 'C1' : 'C2', pick(r, pal), 0.4);
     }
   }
-  return { mass: merge(masses), leaves: leaves.geo(), blooms: kind === 'box' ? null : blooms.geo() };
+  return { mass: merge(masses), leaves: leaves.geo(), blooms: kind === 'box' ? null : blooms.geo(), berries: berries.length ? merge(berries) : null };
 }
 
 // ------------------------------------------------------------------ grass blade + flower + susuki meshes
@@ -697,6 +707,7 @@ function rockGeo(seed) {
 // makeToon's vertex injection only knows InstancedMesh, so vegToon() re-derives the world position and the wind
 // origin from batchingMatrix inside the vertexWorld hook (shared by the colour and the shadow-depth programs).
 const WIND_ID = { grass: 1, tree: 2, leaf: 3, cloth: 4, reed: 5 };
+const GRASS_FAR = 152; // camera distance beyond which a grass chunk is fully fogged (fog far 140 + the chunk's radius)
 // Trees (sway: 1 = bark / masses, 2 = cards): outer limbs, pads and sprays sway more than the core. The extra offset grows
 // with distance from the trunk axis in local space (the same function for bark and foliage, so pads stay on their
 // branches) with a phase per limb; hanging sprays (card atlas right half: uv.x > 0.5, uv.y = 0 at the attachment) swing
@@ -810,9 +821,12 @@ const BARK = {
 // Material factories (a fresh material per call; the village builds one set, the prop showcase test page another)
 export const VEG_MATS = {
   bark: () => vegToon({ ...BARK, vertexColors: true, wind: 'tree', sway: 1, brush: 0.3, brushScale: 1.2, rim: 0.2, occluder: true }),
-  foliage: ({ occluder = true } = {}) => {
+  // shadowOnly: the masses only cast the crown's shadow (SHADOW_ONLY_LAYER); the leaf cards are what you see
+  foliage: ({ occluder = true, shadowOnly = false } = {}) => {
     LEAF_EDGE.uniforms.uFloret.value = floretTexture();
-    return vegToon({ ...LEAF_EDGE, fragOut: MOONLIT, occluder, vertexColors: true, wind: 'leaf', sway: 1, brush: 0.22, brushScale: 0.8, rim: 0.55, shadowSat: 0.5, term: [-0.15, 0.4] });
+    const m = vegToon({ ...LEAF_EDGE, fragOut: MOONLIT, occluder, vertexColors: true, wind: 'leaf', sway: 1, brush: 0.22, brushScale: 0.8, rim: 0.55, shadowSat: 0.5, term: [-0.15, 0.4] });
+    if (shadowOnly) m.userData.shadowOnly = true;
+    return m;
   },
   // the maple is mostly cards (airy tiers), so its cards cast the dappled shadow; elsewhere the masses do
   cards: (kind, { occluder = true } = {}) => vegToon({ fragOut: MOONLIT, occluder, noShadowCast: kind !== 'momiji', vertexColors: true, wind: 'leaf', sway: 2, map: cardAtlas(kind), alphaTest: CARD_ALPHA, side: THREE.DoubleSide, noFlip: true, brush: 0.12, rim: 0.55, shadowSat: 0.3, term: [-0.45, 0.35] }),
@@ -827,9 +841,84 @@ export const VEG_MATS = {
 export const VEG_BUILD = { tree: buildTree, bush: buildBush, rock: v => rockGeo(v * 11 + 3), susuki: susukiGeo, bamboo: buildBamboo };
 
 const WHITE = new THREE.Color(1, 1, 1);
+// bin: cell size (m) for spatial bins. A batch with many instances of small geometries (flowers, curb stones, reeds...)
+// is split into one BatchedMesh per cell, so a whole off-screen cell is culled by its bounding sphere and the
+// per-instance frustum test (main + shadow pass) only runs for the cells in view. Big geometries (trees, buildings'
+// props) stay in one mesh: a copy per cell would cost too much memory, and they have few instances anyway.
+const BIN_MIN_ITEMS = 600, BIN_MAX_VERTS = 16000;
+// Static batches (the village's vegetation and land details never move): each instance's world bounding sphere is
+// baked once, so the per-pass frustum test (main + shadow camera) is six plane checks per instance instead of three's
+// matrix fetch + sphere transform per instance. The draw-list logic mirrors THREE.BatchedMesh.onBeforeRender (r186);
+// anything unusual (wireframe, array cameras, a custom sort) falls back to it.
+const _fr = new THREE.Frustum(), _fm = new THREE.Matrix4(), _fi = new THREE.Matrix4(), _fv = new THREE.Vector3(), _ff = new THREE.Vector3();
+const FPL = new Float32Array(24), FLIST = [], FPOOL = [];
+const byNear = (a, b) => a.z - b.z, byFar = (a, b) => b.z - a.z;
+class StaticBatchedMesh extends THREE.BatchedMesh {
+  bakeSpheres() {
+    const info = this._instanceInfo, n = info.length, S = this._sph = new Float32Array(n * 4), m = new THREE.Matrix4(), sp = new THREE.Sphere();
+    for (let i = 0; i < n; i++) {
+      if (!info[i].active) continue;
+      this.getMatrixAt(i, m);
+      const r = this.getBoundingSphereAt(info[i].geometryIndex, sp);
+      if (!r) { S[i * 4 + 3] = 1e6; continue; } // (no bounds: never culled)
+      sp.applyMatrix4(m); S[i * 4] = sp.center.x; S[i * 4 + 1] = sp.center.y; S[i * 4 + 2] = sp.center.z; S[i * 4 + 3] = sp.radius;
+    }
+  }
+  onBeforeRender(renderer, scene, camera, geometry, material) {
+    if (!this._sph || material.wireframe || camera.isArrayCamera || this.customSort) { this._drawHash = -1; return super.onBeforeRender(renderer, scene, camera, geometry, material); }
+    if (!this._visibilityChanged && !this.perObjectFrustumCulled && !this.sortObjects) return;
+    const index = geometry.getIndex(), bpe = index === null ? 1 : index.array.BYTES_PER_ELEMENT;
+    const info = this._instanceInfo, starts = this._multiDrawStarts, counts = this._multiDrawCounts, geos = this._geometryInfo, S = this._sph;
+    const indirect = this._indirectTexture.image.data, cull = this.perObjectFrustumCulled;
+    if (cull) {
+      _fm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).multiply(this.matrixWorld);
+      _fr.setFromProjectionMatrix(_fm, camera.coordinateSystem, camera.reversedDepth);
+      for (let k = 0; k < 6; k++) { const pl = _fr.planes[k]; FPL[k * 4] = pl.normal.x; FPL[k * 4 + 1] = pl.normal.y; FPL[k * 4 + 2] = pl.normal.z; FPL[k * 4 + 3] = pl.constant; }
+    }
+    const inside = (k) => {
+      const x = S[k], y = S[k + 1], z = S[k + 2], nr = -S[k + 3];
+      for (let p = 0; p < 24; p += 4) if (FPL[p] * x + FPL[p + 1] * y + FPL[p + 2] * z + FPL[p + 3] < nr) return false;
+      return true;
+    };
+    let n = 0;
+    if (this.sortObjects) {
+      _fi.copy(this.matrixWorld).invert();
+      _fv.setFromMatrixPosition(camera.matrixWorld).applyMatrix4(_fi);
+      _ff.set(0, 0, -1).transformDirection(camera.matrixWorld).transformDirection(_fi);
+      let L = 0;
+      for (let i = 0, l = info.length; i < l; i++) {
+        const it0 = info[i]; if (!it0.visible || !it0.active) continue;
+        const k = i * 4; if (cull && !inside(k)) continue;
+        const g = geos[it0.geometryIndex];
+        let it = FPOOL[L]; if (!it) FPOOL[L] = it = { start: 0, count: 0, z: 0, index: 0 };
+        it.start = g.start; it.count = g.count; it.index = i;
+        it.z = (S[k] - _fv.x) * _ff.x + (S[k + 1] - _fv.y) * _ff.y + (S[k + 2] - _fv.z) * _ff.z;
+        FLIST[L++] = it;
+      }
+      FLIST.length = L;
+      FLIST.sort(material.transparent ? byFar : byNear);
+      for (let j = 0; j < L; j++) { const it = FLIST[j]; starts[n] = it.start * bpe; counts[n] = it.count; indirect[n] = it.index; n++; }
+    } else {
+      for (let i = 0, l = info.length; i < l; i++) {
+        const it0 = info[i]; if (!it0.visible || !it0.active) continue;
+        if (cull && !inside(i * 4)) continue;
+        const g = geos[it0.geometryIndex];
+        starts[n] = g.start * bpe; counts[n] = g.count; indirect[n] = i; n++;
+      }
+    }
+    // the indirect texture only needs re-uploading when the draw list changed since the last pass (a bin fully in view
+    // draws the same list in the main and the shadow pass, frame after frame)
+    let h = Math.imul(n, 2654435761) >>> 0;
+    for (let i = 0; i < n; i++) h = (Math.imul(h ^ indirect[i], 16777619) + i) >>> 0;
+    if (h !== this._drawHash || n !== this._drawN) { this._indirectTexture.needsUpdate = true; this._drawHash = h; this._drawN = n; }
+    this._multiDrawCount = n;
+    this._multiDrawBytesPerElement = bpe;
+    this._visibilityChanged = false;
+  }
+}
 export class Batch {
-  constructor(name, mat, { castShadow = true, receiveShadow = true, sort = true } = {}) {
-    this.name = name; this.mat = mat; this.castShadow = castShadow; this.receiveShadow = receiveShadow; this.sort = sort;
+  constructor(name, mat, { castShadow = true, receiveShadow = true, sort = true, bin = 0 } = {}) {
+    this.name = name; this.mat = mat; this.castShadow = castShadow; this.receiveShadow = receiveShadow; this.sort = sort; this.bin = bin;
     this.geos = []; this.items = [];
   }
   add(geo, m4, color, rec) {
@@ -837,26 +926,40 @@ export class Batch {
     if (gi < 0) { gi = this.geos.length; this.geos.push(geo); }
     this.items.push({ gi, m: m4.clone(), c: color ? color.clone() : WHITE, rec });
   }
-  build(group) {
-    if (!this.items?.length) return null;
-    const verts = this.geos.reduce((a, g) => a + g.attributes.position.count, 0);
-    const idx = this.geos.reduce((a, g) => a + (g.index ? g.index.count : 0), 0);
-    const bm = new THREE.BatchedMesh(this.items.length, verts, Math.max(1, idx), this.mat);
+  // one BatchedMesh holding these items (and only the geometries they use)
+  _mesh(items, group) {
+    const gis = [...new Set(items.map(it => it.gi))];
+    const verts = gis.reduce((a, gi) => a + this.geos[gi].attributes.position.count, 0);
+    const idx = gis.reduce((a, gi) => a + (this.geos[gi].index ? this.geos[gi].index.count : 0), 0);
+    // (the village's batches are static: baked culling spheres, see StaticBatchedMesh)
+    const bm = new (this.bin ? StaticBatchedMesh : THREE.BatchedMesh)(items.length, verts, Math.max(1, idx), this.mat);
     bm.name = 'veg:' + this.name;
-    const ids = this.geos.map(g => bm.addGeometry(g));
-    for (const it of this.items) {
-      const id = bm.addInstance(ids[it.gi]);
+    const ids = new Map(gis.map(gi => [gi, bm.addGeometry(this.geos[gi])]));
+    for (const it of items) {
+      const id = bm.addInstance(ids.get(it.gi));
       bm.setMatrixAt(id, it.m); bm.setColorAt(id, it.c);
       it.rec.parts.push({ bm, id });
     }
     bm.castShadow = this.castShadow && !this.mat.userData.noCast; bm.receiveShadow = this.receiveShadow;
+    if (this.mat.userData.shadowOnly) { bm.layers.set(SHADOW_ONLY_LAYER); bm.castShadow = true; }
     bm.sortObjects = this.sort; bm.perObjectFrustumCulled = true;
     applyDepth(bm);
     bm.computeBoundingBox(); bm.computeBoundingSphere();
+    bm.bakeSpheres?.();
     group.add(bm);
-    this.items = null; // free the staging copies
-    this.mesh = bm;
     return bm;
+  }
+  build(group) {
+    if (!this.items?.length) return null;
+    const verts = this.geos.reduce((a, g) => a + g.attributes.position.count, 0);
+    if (this.bin && this.items.length >= BIN_MIN_ITEMS && verts <= BIN_MAX_VERTS) {
+      const cells = new Map(), B = this.bin;
+      for (const it of this.items) { const k = Math.floor(it.m.elements[12] / B) * 1024 + Math.floor(it.m.elements[14] / B); let c = cells.get(k); if (!c) cells.set(k, c = []); c.push(it); }
+      this.meshes = [...cells.values()].map(items => this._mesh(items, group));
+    } else this.meshes = [this._mesh(this.items, group)];
+    this.items = null; // free the staging copies
+    this.mesh = this.meshes[0];
+    return this.mesh;
   }
 }
 
@@ -867,11 +970,25 @@ export class Vegetation {
     this.terrain = world.terrain;
     this.group = new THREE.Group(); this.group.name = 'vegetation';
     this.instances = []; // {kind, x, z, y, s, big, parts:[{bm, id}], alive, col?}
+    this.recBins = new Map(); // 8 m cells -> records (local clearing: a building only looks at its neighbourhood)
     this.colliders = [];
     this.batches = [];
     this.noise = new Noise(77);
+    this.bin = 0; // spatial bin size for batches (the village sets it; regions keep one mesh per batch)
   }
-  batch(name, mat, opts) { const b = new Batch(name, mat, opts); this.batches.push(b); return b; }
+  batch(name, mat, opts) { const b = new Batch(name, mat, { bin: this.bin, ...opts }); this.batches.push(b); return b; }
+  addRecord(rec) {
+    this.instances.push(rec);
+    const k = Math.floor(rec.x / 8) * 1024 + Math.floor(rec.z / 8);
+    let a = this.recBins.get(k); if (!a) this.recBins.set(k, a = []); a.push(rec);
+    return rec;
+  }
+  // records whose position is inside the rectangle (8 m cells)
+  recordsIn(x0, z0, x1, z1, fn) {
+    for (let i = Math.floor(x0 / 8); i <= Math.floor(x1 / 8); i++) for (let j = Math.floor(z0 / 8); j <= Math.floor(z1 / 8); j++) {
+      const a = this.recBins.get(i * 1024 + j); if (a) for (const r of a) fn(r);
+    }
+  }
   // Queue instances: variants = [[geoPart0, geoPart1...], ...]; batches = [Batch per part]
   _place(variants, batches, placements, { kind = 'x', collide = 0 } = {}) {
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), c = new THREE.Color(), up = V(0, 1, 0);
@@ -880,10 +997,10 @@ export class Vegetation {
       p.set(pl.x, pl.y, pl.z); q.setFromAxisAngle(up, pl.rot); s.setScalar(pl.s); if (pl.sy) s.y *= pl.sy;
       m4.compose(p, q, s);
       if (pl.tint) c.set(pl.tint); else if (pl.hue) c.setRGB(...pl.hue); else c.setRGB(1, 1, 1);
-      const rec = { kind, x: pl.x, z: pl.z, y: pl.y, s: pl.s, big, parts: [], alive: true };
+      const rec = { kind, x: pl.x, z: pl.z, y: pl.y, s: pl.s, big, parts: [], alive: true, keep: !!pl.keep };
       variants[pl.v % variants.length].forEach((g, pi) => batches[pi].add(g, m4, c, rec));
       if (collide) { rec.col = { x: pl.x, z: pl.z, r: collide * pl.s }; this.colliders.push(rec.col); }
-      this.instances.push(rec);
+      this.addRecord(rec);
     }
   }
   _kill(rec) {
@@ -897,25 +1014,26 @@ export class Vegetation {
   // Remove vegetation (not grass) inside a rectangle; returns count
   clearRect(x0, z0, x1, z1, pad = 0.3) {
     let n = 0;
-    for (const rec of this.instances) {
-      if (!rec.alive || rec.keep) continue; // keep: landmark details that reserve their own tiles (details.js)
+    this.recordsIn(x0 - pad, z0 - pad, x1 + pad, z1 + pad, rec => {
+      if (!rec.alive || rec.keep) return; // keep: landmark details that reserve their own tiles (details.js)
       if (rec.x > x0 - pad && rec.x < x1 + pad && rec.z > z0 - pad && rec.z < z1 + pad) { this._kill(rec); n++; }
-    }
+    });
     return n;
   }
   // Clear around a building: small plants within `pad`, big trees whose canopy would overlap the roof (`canopy`),
   // and — on the camera side (+x/+z) — far enough that no crown hides the facade (`front`).
   clearAround(x0, z0, x1, z1, { pad = 0.6, canopy = 2.3, front = 3.6 } = {}) {
     let n = 0;
-    for (const rec of this.instances) {
-      if (!rec.alive || rec.keep) continue;
+    const m = Math.max(pad, canopy * 1.2, front);
+    this.recordsIn(x0 - m, z0 - m, x1 + m, z1 + m, rec => {
+      if (!rec.alive || rec.keep) return;
       const r = rec.big ? canopy * Math.min(1.2, rec.s) : pad, f = rec.big ? front : pad;
       if (rec.x > x0 - r && rec.x < x1 + f && rec.z > z0 - r && rec.z < z1 + f) {
         // trim the far corner of the camera-side band so it is a diagonal wedge, not a square
-        if (rec.big && rec.x > x1 + r && rec.z > z1 + r && (rec.x - x1) + (rec.z - z1) > f + r) continue;
+        if (rec.big && rec.x > x1 + r && rec.z > z1 + r && (rec.x - x1) + (rec.z - z1) > f + r) return;
         this._kill(rec); n++;
       }
-    }
+    });
     return n;
   }
   // Build-mode view: 0 = normal lawn, 1 = short, overlay-tinted grass so painted zones read clearly
@@ -933,27 +1051,55 @@ export class Vegetation {
     };
     // ---- trees
     const treeSpots = { sakura: [], momiji: [], pine: [], round: [], ginkgo: [] };
-    const taken = [];
-    const farFromTrees = (x, z, d) => taken.every(([tx, tz, td]) => (tx - x) ** 2 + (tz - z) ** 2 > (d + td) ** 2);
+    // taken spots [x, z, r] in a 4 m spatial hash (the spacing test is local, not a scan of every tree so far)
+    const taken = [], SH = new Map(), SC = 4, RMAX = 2.8;
+    const take = (x, z, r) => { taken.push([x, z, r]); const k = Math.floor(x / SC) * 1024 + Math.floor(z / SC); let a = SH.get(k); if (!a) SH.set(k, a = []); a.push([x, z, r]); };
+    const farFromTrees = (x, z, d) => {
+      const R = d + RMAX;
+      for (let i = Math.floor((x - R) / SC); i <= Math.floor((x + R) / SC); i++) for (let j = Math.floor((z - R) / SC); j <= Math.floor((z + R) / SC); j++) {
+        const a = SH.get(i * 1024 + j); if (a) for (const [tx, tz, td] of a) if ((tx - x) ** 2 + (tz - z) ** 2 <= (d + td) ** 2) return false;
+      }
+      return true;
+    };
     const tryTree = (kind, x, z, spacing = 2.4) => {
       if (treeKeepOut(x, z) || !okGround(x, z, 1.2) || !farFromTrees(x, z, spacing)) return false;
-      treeSpots[kind].push({ x, z }); taken.push([x, z, spacing]); return true;
+      treeSpots[kind].push({ x, z }); take(x, z, spacing); return true;
     };
-    for (let i = 0; i < 2600; i++) {
+    // street trees first (layout.STREET_TREES: already clear of every lot, square and door sightline; small, and kept
+    // when a building goes up next to them)
+    for (const t of STREET_TREES) {
+      if (!okGround(t.x, t.z, 0.25) || !farFromTrees(t.x, t.z, 2.2)) continue; // (a trunk 0.85 m off the paving)
+      const f = (t.x * 7.31 + t.z * 3.17) % 1; // (street trees are young: about 0.6x a park cherry, 0.75x a park maple)
+      treeSpots[t.kind].push({ x: t.x, z: t.z, keep: true, s: (t.kind === 'sakura' ? 0.56 : 0.72) + f * 0.1 }); take(t.x, t.z, 2.2);
+    }
+    // the green belts: a tree line along each belt (jittered), so the districts read as neighbourhoods
+    const brnd = mulberry32(4711);
+    for (const B of GREEN_BELTS) for (let i = 0; i < B.pts.length - 1; i++) {
+      const [ax, az] = B.pts[i], [bx, bz] = B.pts[i + 1], L = Math.hypot(bx - ax, bz - az), dx = (bx - ax) / L, dz = (bz - az) / L;
+      for (let u = brnd() * B.step * 0.5; u < L; u += B.step * (0.85 + brnd() * 0.3)) {
+        const off = (brnd() * 2 - 1) * B.r * 0.7, x = ax + dx * u - dz * off, z = az + dz * u + dx * off;
+        const k = B.kind === 'sakura' ? (brnd() < 0.82 ? 'sakura' : 'round') : (brnd() < 0.45 ? 'sakura' : brnd() < 0.65 ? 'round' : 'pine');
+        tryTree(k, x, z, k === 'sakura' ? 2.6 : 2.2);
+      }
+    }
+    // biomes from the plan (layout.js): pines on the northern cliffs, maples on the shrine hill, forest patches round
+    // the town, the odd park tree in town, pines on the coast
+    const TREE_TRIES = 2600 * 4; // the old count, scaled to the 4x area
+    for (let i = 0; i < TREE_TRIES; i++) {
       const x = 4 + rnd() * (WORLD - 8), z = 4 + rnd() * (WORLD - 8);
-      const h = H(x, z), vd = Math.hypot(x - 56, z - 60);
-      const forest = N.fbm(x * 0.045, z * 0.045, 3);
+      const h = H(x, z), vd = Math.hypot(x - PLATEAU.x, z - PLATEAU.z);
+      const forest = N.fbm(x * 0.03, z * 0.03, 3);
       let kind = null;
-      if (h > 2.6 && z < 30) kind = rnd() < 0.7 ? 'pine' : 'round';
-      else if (Math.hypot(x - 88, z - 42) < 14) kind = rnd() < 0.72 ? 'momiji' : 'ginkgo';
-      else if (vd > 17 && forest > 0.05) kind = rnd() < 0.45 ? 'sakura' : rnd() < 0.6 ? 'round' : 'pine';
-      else if (vd > 11 && vd < 26 && rnd() < 0.18) kind = 'sakura';
+      if (h > 2.6 && z < NORTH.foot + 6) kind = rnd() < 0.7 ? 'pine' : 'round';
+      else if (Math.hypot(x - HILL.x, z - HILL.z) < HILL.foot + 2) kind = rnd() < 0.72 ? 'momiji' : 'ginkgo';
+      else if (vd > PLATEAU.flat - 6 && forest > 0.05) kind = rnd() < 0.45 ? 'sakura' : rnd() < 0.6 ? 'round' : 'pine';
+      else if (vd < PLATEAU.flat && rnd() < 0.07) kind = rnd() < 0.8 ? 'sakura' : 'round';
       else if (h < 1.0 && h > 0.5 && rnd() < 0.08) kind = 'pine';
       if (kind) tryTree(kind, x, z, kind === 'sakura' ? 2.8 : 2.3);
     }
     this.extraTrees?.(tryTree);
     const barkB = this.batch('bark', VEG_MATS.bark());
-    const folB = this.batch('foliage', VEG_MATS.foliage());
+    const folB = this.batch('foliage', VEG_MATS.foliage({ shadowOnly: true }));
     for (const kind of Object.keys(treeSpots)) {
       const spots = treeSpots[kind]; if (!spots.length) continue;
       const S = TREE_SPECIES[kind];
@@ -961,41 +1107,43 @@ export class Vegetation {
       // the maple is mostly cards (airy tiers), so its cards cast the dappled shadow; elsewhere the masses do
       const cast = kind === 'momiji';
       const cardB = this.batch('cards:' + kind, VEG_MATS.cards(kind), { castShadow: cast });
-      const pl = spots.map(sp => ({ x: sp.x, z: sp.z, y: H(sp.x, sp.z), rot: rnd() * TAU, s: 0.85 + rnd() * 0.4, v: Math.floor(rnd() * 3), hue: [0.92 + rnd() * 0.16, 0.92 + rnd() * 0.12, 0.92 + rnd() * 0.12] }));
+      const pl = spots.map(sp => ({ x: sp.x, z: sp.z, y: H(sp.x, sp.z), rot: rnd() * TAU, s: sp.s ?? 0.85 + rnd() * 0.4, keep: sp.keep, v: Math.floor(rnd() * 3), hue: [0.92 + rnd() * 0.16, 0.92 + rnd() * 0.12, 0.92 + rnd() * 0.12] }));
       this._place(variants, [barkB, folB, cardB], pl, { kind, collide: S.radius });
     }
     this.treeSpots = treeSpots;
     // ---- bamboo groves (west)
     const bambooPl = [];
-    for (let i = 0; i < 400; i++) {
-      const a = rnd() * TAU, d = Math.sqrt(rnd()) * 14; const x = 17 + Math.cos(a) * d, z = 52 + Math.sin(a) * d * 1.3;
-      if (okGround(x, z, 0.8) && farFromTrees(x, z, 1.1) && !treeKeepOut(x, z, 1)) { bambooPl.push({ x, z, y: H(x, z), rot: rnd() * TAU, s: 0.9 + rnd() * 0.3, v: Math.floor(rnd() * 3) }); taken.push([x, z, 1.1]); }
+    for (let i = 0; i < 1200; i++) {
+      const a = rnd() * TAU, d = Math.sqrt(rnd()) * BAMBOO.r * 0.88; const x = BAMBOO.x + Math.cos(a) * d, z = BAMBOO.z + Math.sin(a) * d * 1.3;
+      if (okGround(x, z, 0.8) && farFromTrees(x, z, 1.1) && !treeKeepOut(x, z, 1)) { bambooPl.push({ x, z, y: H(x, z), rot: rnd() * TAU, s: 0.9 + rnd() * 0.3, v: Math.floor(rnd() * 3) }); take(x, z, 1.1); }
     }
     const bv = [0, 1, 2].map(v => { const b = buildBamboo(v); return [b.stalks, b.leaves]; });
     this._place(bv, [this.batch('bamboo', VEG_MATS.bamboo()), this.batch('bambooLeaf', VEG_MATS.bambooLeaf())], bambooPl, { kind: 'bamboo', collide: 0.6 });
     // ---- bushes
     const bushPl = { hydrangea: [], azalea: [], box: [] };
-    for (let i = 0; i < 1400; i++) {
+    for (let i = 0; i < 1400 * 3; i++) {
       const x = 4 + rnd() * (WORLD - 8), z = 4 + rnd() * (WORLD - 8);
       if (!okGround(x, z, 0.5) || !farFromTrees(x, z, 0.7)) continue;
       const nearPath = this.world.nearPath?.(x, z, 2.2);
       const k = nearPath ? (rnd() < 0.6 ? 'hydrangea' : 'azalea') : rnd() < 0.08 ? 'box' : rnd() < 0.05 ? 'azalea' : null;
       if (!k) continue;
-      bushPl[k].push({ x, z, y: H(x, z), rot: rnd() * TAU, s: 0.8 + rnd() * 0.5, v: Math.floor(rnd() * 3) }); taken.push([x, z, 0.7]);
+      bushPl[k].push({ x, z, y: H(x, z), rot: rnd() * TAU, s: 0.8 + rnd() * 0.5, v: Math.floor(rnd() * 3) }); take(x, z, 0.7);
     }
     // bushes: canopy-style masses + leaf cards + bloom cards (not x-ray occluders: they are knee-high)
-    const bushB = this.batch('bushFoliage', VEG_MATS.foliage({ occluder: false }), { sort: false });
+    const bushB = this.batch('bushFoliage', VEG_MATS.foliage({ occluder: false, shadowOnly: true }), { sort: false });
     const bushLeafB = this.batch('bushLeaves', VEG_MATS.cards('round', { occluder: false }), { castShadow: false, sort: false });
     const bushBloomB = this.batch('bushBlooms', VEG_MATS.cards('sakura', { occluder: false }), { castShadow: false, sort: false });
+    const bushBerryB = this.batch('bushBerries', VEG_MATS.bush(), { castShadow: false, sort: false });
     for (const k of Object.keys(bushPl)) {
       if (!bushPl[k].length) continue;
-      const vars = [0, 1, 2].map(v => { const b = buildBush(k, v * 3 + k.length); return b.blooms ? [b.mass, b.leaves, b.blooms] : [b.mass, b.leaves]; });
-      this._place(vars, k === 'box' ? [bushB, bushLeafB] : [bushB, bushLeafB, bushBloomB], bushPl[k], { kind: 'bush', collide: 0.35 });
+      const vars = [0, 1, 2].map(v => { const b = buildBush(k, v * 3 + k.length); return [b.mass, b.leaves, b.blooms || b.berries]; });
+      this._place(vars, [bushB, bushLeafB, k === 'box' ? bushBerryB : bushBloomB], bushPl[k], { kind: 'bush', collide: 0.35 });
     }
-    // ---- susuki fields (south / coast)
+    // ---- susuki fields (the southern meadows and the coast, outside the town)
     const suPl = [];
-    for (let i = 0; i < 900; i++) {
-      const x = 4 + rnd() * (WORLD - 8), z = 60 + rnd() * 48; const h = H(x, z);
+    for (let i = 0; i < 2400; i++) {
+      const x = 4 + rnd() * (WORLD - 8), z = PLATEAU.z + rnd() * (WORLD - 4 - PLATEAU.z); const h = H(x, z);
+      if (Math.hypot(x - PLATEAU.x, z - PLATEAU.z) < PLATEAU.flat + 4) continue;
       if (h < 0.55 || h > 1.6 || !okGround(x, z, 0.3)) continue;
       if (N.fbm(x * 0.08 + 40, z * 0.08, 2) < 0.12) continue;
       if (!farFromTrees(x, z, 0.5)) continue;
@@ -1004,7 +1152,7 @@ export class Vegetation {
     this._place([0, 1, 2].map(v => [susukiGeo(v)]), [this.batch('susuki', VEG_MATS.susuki(), { sort: false })], suPl, { kind: 'susuki' });
     // ---- rocks
     const rockPl = [];
-    for (let i = 0; i < 500; i++) {
+    for (let i = 0; i < 1500; i++) {
       const x = 4 + rnd() * (WORLD - 8), z = 4 + rnd() * (WORLD - 8);
       const t = tr.tile(x, z); if (!canPlace(x, z)) continue;
       const shore = H(x, z) > -0.4 && H(x, z) < 0.6;
@@ -1023,9 +1171,13 @@ export class Vegetation {
     const kinds = ['daisy', 'bell', 'cup'];
     const pal = ['#ffffff', '#fff2a8', '#ffb0d0', '#ff8fb8', '#c8b0ff', '#ffd27a', '#ff6f7f', '#a8d8ff'];
     const pls = { daisy: [], bell: [], cup: [] };
-    const count = quality >= 2 ? 9000 : 4000;
-    for (let i = 0; i < count; i++) {
-      const x = 3 + rnd() * (WORLD - 6), z = 3 + rnd() * (WORLD - 6);
+    // the town (the plateau and its rim) gets the old density; beyond it the meadows thin out (VILLAGE_PLAN.md §8)
+    const count = quality >= 2 ? 9000 : 4000, R0 = PLATEAU.blend + 8, outside = Math.round(count / 3);
+    for (let i = 0; i < count + outside; i++) {
+      let x, z;
+      if (i < count) { const a = rnd() * TAU, d = Math.sqrt(rnd()) * R0; x = PLATEAU.x + Math.cos(a) * d; z = PLATEAU.z + Math.sin(a) * d; }
+      else { x = 3 + rnd() * (WORLD - 6); z = 3 + rnd() * (WORLD - 6); if (inTown(x, z, 8)) continue; }
+      if (x < 3 || z < 3 || x > WORLD - 3 || z > WORLD - 3) continue;
       if (tr.tile(x, z) !== T.GRASS || !canPlace(x, z)) continue;
       const f = N.fbm(x * 0.07 + 9, z * 0.07 - 3, 3);
       if (f < 0.08 && rnd() > 0.06) continue;
@@ -1080,7 +1232,7 @@ export class Vegetation {
       `,
       fragOut: 'outgoingLight += lightPools(vCWorld) * diffuseColor.rgb * (0.7 + 0.5 * vGH); outgoingLight = applyBuildOverlay(outgoingLight, vCWorld, 1.0);',
     });
-    const CH = 16;
+    const CH = 16, village = !opts;
     const [bx0, bz0, bx1, bz1] = o.bounds || [0, 0, WORLD, WORLD];
     const cx0 = Math.floor(bx0 / CH), cz0 = Math.floor(bz0 / CH), cx1 = Math.ceil(bx1 / CH), cz1 = Math.ceil(bz1 / CH);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
@@ -1089,6 +1241,10 @@ export class Vegetation {
     const grassMeshes = this.grassMeshes ||= [];
     for (let cz = cz0; cz < cz1; cz++) for (let cx = cx0; cx < cx1; cx++) {
       const list = [];
+      // the village: full density in town, thinner on its rim and much thinner beyond (only seen from afar, through
+      // the haze); the blades are the biggest cost of the 2x island (VILLAGE_PLAN.md §8)
+      const dc = village ? Math.hypot((cx + 0.5) * CH - PLATEAU.x, (cz + 0.5) * CH - PLATEAU.z) : 0;
+      const dens = dc < PLATEAU.flat + 8 ? density : dc < PLATEAU.blend + 14 ? Math.round(density * 0.55) : Math.round(density * 0.3);
       for (let z = Math.max(bz0, cz * CH); z < Math.min(bz1, (cz + 1) * CH); z++) for (let x = Math.max(bx0, cx * CH); x < Math.min(bx1, (cx + 1) * CH); x++) {
         if (o.allow) {
           for (let k = 0; k < density; k++) {
@@ -1101,7 +1257,7 @@ export class Vegetation {
         }
         const t = tiles[z * WORLD + x];
         if (t !== T.GRASS && t !== T.PATH && t !== T.PLAZA && t !== T.FIELD) continue; // path tiles get grass back if removed
-        for (let k = 0; k < density; k++) {
+        for (let k = 0; k < dens; k++) {
           const px = x + rnd(), pz = z + rnd();
           const h = tr.heightAt(px, pz); if (h < 0.35) continue;
           list.push(px, h - 0.02, pz);
@@ -1117,9 +1273,23 @@ export class Vegetation {
       }
       im.receiveShadow = true; im.castShadow = false;
       im.computeBoundingSphere();
+      if (village) {
+        // static blades: the CPU copy of the matrices is dropped once uploaded (the GPU keeps them)
+        im.instanceMatrix.onUpload(function () { this.array = null; });
+        im.userData.cx = (cx + 0.5) * CH; im.userData.cz = (cz + 0.5) * CH;
+        (this.grassChunks ||= []).push(im);
+      }
       this.group.add(im); grassMeshes.push(im);
     }
     return mat;
+  }
+  // village: hide grass chunks the fog has swallowed (camera-distance cull; frustum culling does the rest)
+  updateGrass(cam) {
+    const ms = this.grassChunks; if (!ms || !cam) return;
+    if (this._gcx !== undefined && Math.abs(cam.x - this._gcx) + Math.abs(cam.z - this._gcz) < 2) return;
+    this._gcx = cam.x; this._gcz = cam.z;
+    const R2 = GRASS_FAR * GRASS_FAR;
+    for (const m of ms) { const dx = m.userData.cx - cam.x, dz = m.userData.cz - cam.z; m.visible = dx * dx + dz * dz < R2; }
   }
 }
 
