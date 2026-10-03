@@ -23,7 +23,8 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
 - Isolated dev scenes: `src/tests/NAME.js` exporting `default function()`; open with `/?test=NAME`. Each module owner makes
   their own test page. Set `window.__ready = true` when the scene is ready to screenshot.
 - Post debug: `&off=ao,tilt,main,smaa` disables passes, `&raw` renders without post, `&q=0|1|2` quality, `&hour=13` time of day.
-- QA: `node tools/qa/run-all.mjs [s1 s5 ...]` (the browser scenarios s1-s15; s15 is the homestead).
+- QA: `node tools/qa/run-all.mjs [s1 s5 ...]` (the browser scenarios s1-s16; s15 is the homestead, s16 the guided
+  tutorials, which every other scenario keeps off with `?nointro`).
   Perf: `village-perf.mjs [runs]` (the village at three camera spots), `homestead-perf.mjs [runs]` (a fully planted,
   ripe garden and a reel in progress, each against the same spot without). Profilers: `tools/qa/profile-boot.mjs` (boot → ready),
   `profile-burst.mjs` / `profile-stress.mjs` (long frames in big fights, `CASTS=a,b` env to bisect skills), `boot-time.mjs`.
@@ -277,6 +278,16 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
 - **Meshes that visit combat worlds** (the float, line, catch, ice hole, campfire, stove pot) use their own materials,
   never the village's shared `MATS()`, because a combat world's teardown disposes what it finds.
 
+## Guided tutorials (src/world/tutorials.js + guides.js, src/ui/tutorial.js — design: docs/TUTORIALS.md)
+- `G.tutorials` runs one guide at a time. A guide is a list of steps (say / objective / target / highlight /
+  callouts / flash / waitFor / done / on / allow). The step's world target becomes `G.questTarget` (3D arrow, edge
+  arrow, minimap). Progress lives in `state.flags.tutorials` (it resumes after a reload).
+- It pauses in dialogue, panels, transitions, switches and build mode, and anywhere outside the village, unless the
+  step allows it.
+- Old saves past a guide's start get a one-time offer. The Journal's Guides tab replays any guide.
+- Guides start on their own only when enabled: off with `?notut`, and with the QA's `?nointro` unless `?tut`
+  (remembered per tab), so s1-s15 never meet one; s16 drives them.
+
 ## Persistent state `G.state` (JSON-serialisable, saved to localStorage)
 ```js
 state = {
@@ -301,6 +312,7 @@ state = {
   garden: { v, tiles: [{ x, z, till?, crop?, stage?, wet? }], day, seeded: { plotId: true }, lastSeed },
   fishing: { rod: 0|1|2, milestones: [5, ...], gotRod?, pendingMilestone?, lastRecord? },
   fishLog: { id: { n, best, day, spot, time } },
+  // flags.tutorials = { active, [guideId]: { step, started, offered, done, skipped } } (docs/TUTORIALS.md)
   cookbook: { known: { recipe: day }, cooked: { recipe: n }, quick },
   // per hero: heroes[id].player.meal = { dish, buff, tier, left (s of play), dur } (Well Fed)
 }
@@ -340,6 +352,8 @@ Homestead: `addPantry(id,n)`, `hasPantry(req)`, `spendPantry(req)→bool`, `sell
 Homestead: `pantry:changed {id,n,delta,first}`, `garden:till|plant|water|harvest {i,...}`, `garden:newDay`,
 `fish:caught {id,size,spot,first,record}`, `fishing:rod`, `dish:cooked {id,n}`, `recipe:learned {id}`, `meal:eaten {id,heal,meal}`,
 `meal:expired`, `gift:given {id,key,love,pts}`.
+Guides: `fishing:start|cast|nibble|early|bite|reel`, `fishing:end {result}`, `home:menu`, `home:menuClosed {choice}`,
+`tutorial:start|step|done|skip|offer`.
 
 ## UI (src/ui/) — HTML/CSS overlay above the canvas (`#ui`), lots of spring/bounce animations
 `UI.init(G)`, `UI.update(dt)`, `UI.toggle(name)` / `open` / `close` / `isOpen` / `anyModal()` for

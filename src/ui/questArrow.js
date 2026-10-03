@@ -8,7 +8,7 @@ import { glyph } from './glyphs.js';
 
 const V = new THREE.Vector3();
 const NEAR = 2.5, MARK_MIN = 6;
-const ICON = { npc: 'chat', place: 'pin' };
+const ICON = { npc: 'chat', place: 'pin', tut: 'paw' };
 
 export class QuestArrow {
   constructor(ui, layer) {
@@ -54,7 +54,7 @@ export class QuestArrow {
     this.t += dt;
     const tgt = cam ? this.target() : null;
     // villagers stay in Blossom Hollow: an NPC objective has no meaning while down in the Burrow
-    if (!tgt || this.blocked() || (tgt.kind === 'npc' && this.ui.mode === 'dungeon')) { this.setMode(null); return; }
+    if (!tgt || this.blocked() || ((tgt.kind === 'npc' || tgt.kind === 'tut') && this.ui.mode === 'dungeon')) { this.setMode(null); return; }
     const pp = this.ui.hud.playerPos();
     const dist = Math.hypot(tgt.pos.x - pp.x, tgt.pos.z - pp.z);
     if (dist < NEAR) { this.setMode(null); return; }
@@ -66,7 +66,7 @@ export class QuestArrow {
     // safe area: keep clear of the quest tracker / minimap corners and the orb + hotbar dock
     const mL = 56 * s, mR = 56 * s, mT = 64 * s, mB = 190 * s;
     const on = !behind && sx > mL && sx < W - mR && sy > mT && sy < H - mB;
-    let mode = on ? (dist > MARK_MIN ? 'mark' : null) : 'edge';
+    let mode = on ? (dist > MARK_MIN && tgt.kind !== 'tut' ? 'mark' : null) : 'edge'; // (a guide's target has its own 3D arrow on screen)
     this.setMode(mode);
     if (!mode) return;
     // label (only rebuilt when it changes)

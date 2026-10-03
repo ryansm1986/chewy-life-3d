@@ -352,9 +352,10 @@ export function bonsai(B, s = 0.6) {
   }
 }
 
-// Little tree. kind: sakura | round | maple | pine. A flared trunk with root knuckles and striped bark, a few soft
-// crown masses, and the species' detail scattered over them: five-petal blossoms (sakura), star leaves (maple),
-// diamond leaves (round), needle sprigs (pine); a couple of blossoms or leaves drifting on the ground.
+// Little tree. kind: sakura | round | maple | pine. A flared trunk with root knuckles and striped bark, and a crown
+// made only of the species' detail: five-petal blossoms (sakura), star leaves (maple), diamond leaves (round), needle
+// sprigs (pine). No smooth crown masses (the owner's call, 2026-10-02: leaves only, like the vegetation trees): the
+// soft masses only steer where the detail goes, with an outer shell plus a darker inner layer so the crown reads full.
 export function tree(B, { kind = 'sakura', s = 1 } = {}) {
   const pal = {
     sakura: ['#ffc4dc', '#f79cc0', '#e27aa8', '#fff2f8'], round: ['#7cc05a', '#5aa84c', '#4a8a44', '#c4e07a'],
@@ -384,28 +385,33 @@ export function tree(B, { kind = 'sakura', s = 1 } = {}) {
   const cA = col(pal[0]), cB = col(pal[1]), cC = col(pal[2]), cH = col(pal[3]);
   const UPV = V(0, 1, 0), qt = new THREE.Quaternion();
   puffs.forEach((q, i) => {
-    const top = i === puffs.length - 1, R = q.r * 0.9, g = puff(q.c, R, { detail: top ? 2 : 1, noise: 0.24, squash: q.sq, crown, crownMix: 0.45, seed: B.seed * 3 + i });
+    const top = i === puffs.length - 1, R = q.r * 0.9;
     const t = clamp((q.c.y - crown.y + 0.6) / 1.2);
     const base = cC.clone().lerp(cB, clamp(t * 1.4)).lerp(cA, clamp(t * 1.6 - 0.4));
     base.offsetHSL(B.wob(0.012), B.wob(0.04), B.wob(0.03));
-    B.add(g, (p, n, o) => { o.copy(base).lerp(cH, clamp((n.y - 0.3) * 0.8) * 0.45); if (n.y < -0.3) o.multiplyScalar(0.85); o.multiplyScalar(0.94 + 0.12 * nz(p.x * 5, p.z * 5 + p.y * 3)); }, 'leaf');
-    // surface detail: blossoms / leaves stuck all over the upper and outer surface, in the crown's own colours, so
-    // the mass reads as a cluster of flowers or leaves rather than a ball
-    const n = Math.round((kind === 'round' ? 30 : kind === 'pine' ? 26 : kind === 'sakura' ? 36 : 24) * (top ? 1.3 : 1));
-    for (let k = 0; k < n; k++) {
-      const u = -0.2 + rr() * 1.15, th = rr() * TAU, sr = Math.sqrt(Math.max(0, 1 - u * u)), d = V(sr * Math.cos(th), u, sr * Math.sin(th));
-      const leafy = kind === 'round' || kind === 'pine';
-      const p = q.c.clone().add(V(d.x * R, d.y * R * q.sq, d.z * R).multiplyScalar((leafy ? 0.94 : 1.04) + rr() * 0.12));
+    // the crown is detail only: an outer shell over the (unrendered) mass, then a darker, bigger inner layer that
+    // fills the gaps so the crown never reads see-through
+    const leafy = kind === 'round' || kind === 'pine';
+    const nOut = Math.round((kind === 'round' ? 70 : kind === 'pine' ? 60 : kind === 'sakura' ? 80 : 56) * (top ? 1.3 : 1));
+    const nIn = Math.round(nOut * 0.35);
+    for (let k = 0; k < nOut + nIn; k++) {
+      const inner = k >= nOut;
+      const u = (inner ? -0.4 : -0.2) + rr() * (inner ? 1.3 : 1.15), th = rr() * TAU, sr = Math.sqrt(Math.max(0, 1 - u * u)), d = V(sr * Math.cos(th), u, sr * Math.sin(th));
+      const rad = inner ? 0.62 + rr() * 0.22 : (leafy ? 0.94 : 1.0) + rr() * 0.12;
+      const p = q.c.clone().add(V(d.x * R, d.y * R * q.sq, d.z * R).multiplyScalar(rad));
+      const big = inner ? 1.45 : 1.25;
       let f;
-      if (kind === 'sakura') f = blossomGeo(0.05 + rr() * 0.03, 5, 0.45);
-      else if (kind === 'maple') f = blossomGeo(0.1 + rr() * 0.03, 7, 0.42, true);
-      else f = leafGeo(kind === 'pine' ? 0.2 : 0.16, kind === 'pine' ? 0.025 : 0.06);
+      if (kind === 'sakura') f = blossomGeo((0.06 + rr() * 0.035) * big, 5, 0.45);
+      else if (kind === 'maple') f = blossomGeo((0.1 + rr() * 0.03) * big, 7, 0.42, true);
+      else f = leafGeo((kind === 'pine' ? 0.2 : 0.16) * big, (kind === 'pine' ? 0.025 : 0.06) * big);
       if (leafy) { f.rotateZ(-0.2 - rr() * 0.5); f.rotateY(-th); }
       else f.applyQuaternion(qt.setFromUnitVectors(UPV, d.clone().lerp(UPV, 0.45).normalize()));
       f.translate(p.x, p.y, p.z);
-      const fc = kind === 'sakura' ? col(['#ffffff', '#ffe4ee', '#ffd0e2', '#ffb4d0'][Math.floor(rr() * 4)])
+      let fc = kind === 'sakura' ? col(['#ffffff', '#ffe4ee', '#ffd0e2', '#ffb4d0'][Math.floor(rr() * 4)])
         : base.clone().lerp(rr() < 0.5 ? cH : cC, 0.15 + rr() * 0.4).offsetHSL((rr() - 0.5) * 0.03, 0, (rr() - 0.5) * 0.06);
-      B.add(f, kind === 'sakura' ? (pp, nn, o) => o.copy(fc).lerp(col('#e8649a'), clamp(1 - Math.hypot(pp.x - p.x, pp.z - p.z) / 0.03) * 0.55) : fc, 'leaf');
+      if (inner) fc = fc.clone().lerp(cC, 0.55).multiplyScalar(0.82); // the shaded heart of the crown
+      const ctr = p.clone();
+      B.add(f, kind === 'sakura' ? (pp, nn, o) => o.copy(fc).lerp(col('#e8649a'), clamp(1 - Math.hypot(pp.x - ctr.x, pp.z - ctr.z) / 0.03) * 0.55) : fc, 'leaf');
     }
   });
   B.pop();

@@ -32,6 +32,7 @@ const fishMats = () => (_mats ||= { body: makeToon({ vertexColors: true, brush: 
 export class Fishing {
   constructor(G, tools) {
     this.G = G; this.tools = tools; this.s = null; this.target = null; this.world = null;
+    this.tut = null; // the fishing guide's easier first cast: { biteAfter, window, fish, zone, drain, forgiveEarly } (world/guides.js)
     const self = this;
     this.inter = { pos: new THREE.Vector3(-999, -50, -999), radius: 0.95, fishing: true, get label() { return self.label(); }, onInteract: () => self.start() };
     // the float and its line (one each, moved into whichever scene the session is in)
@@ -67,13 +68,15 @@ export class Fishing {
     return riverDist(x, z) < RIVER_W(z) + 3.5 ? 'river' : 'sea';
   }
   /** Open water ahead of the player → { x, z, y, spot } | { blocked } | { danger } | null */
-  scan() {
-    const G = this.G, P = G.player, W = G.world, px = P.pos.x, pz = P.pos.z;
+  scan() { const P = this.G.player; return this.scanAt(P.pos.x, P.pos.z, P.facing); }
+  /** …or ahead of any spot on the bank (the fishing guide picks a bank spot with it) */
+  scanAt(px, pz, facing) {
+    const G = this.G, P = G.player, W = G.world;
     if (G.mode !== 'village' && W.terrain?.iceAt?.(px, pz)) return this.scanIce();
     if (this.water(px, pz)?.depth > 0.12 && !W.deckAt?.(px, pz)) return null; // (wading)
     let blocked = false;
     for (const da of [0, 0.32, -0.32, 0.62, -0.62]) {
-      const a = P.facing + da, dx = Math.sin(a), dz = Math.cos(a);
+      const a = facing + da, dx = Math.sin(a), dz = Math.cos(a);
       let first = -1, last = -1;
       for (let d = 0.9; d <= 4.2; d += 0.3) {
         const w = this.water(px + dx * d, pz + dz * d);
@@ -87,6 +90,18 @@ export class Fishing {
       return { x, z, y: w.y, spot: this.spotAt(x, z) };
     }
     return blocked ? { blocked: true } : null;
+  }
+  /** A dry bank spot near (x, z) facing open water (centre: the water to face) → { x, z, face } | null */
+  bankSpotNear(x, z, centre) {
+    const W = this.G.world, out = [];
+    for (let r = 1.5; r <= 9; r += 0.75) for (let k = 0; k < 24; k++) {
+      const a = k / 24 * Math.PI * 2, px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
+      if (this.water(px, pz) || !W.walkable?.(px, pz) || W.collision?.solidAt?.(px, pz, 0.4)) continue;
+      const face = Math.atan2(centre.x - px, centre.z - pz), t = this.scanAt(px, pz, face);
+      if (t && !t.blocked && !t.danger && Math.hypot(t.x - px, t.z - pz) < 3.2) out.push({ x: px, z: pz, face, d: r });
+      if (out.length >= 3) return out.sort((p, q) => p.d - q.d)[0];
+    }
+    return out[0] || null;
   }
   /** standing on a frozen pond: a hole in the ice just ahead, over deep enough water */
   scanIce() {
@@ -122,6 +137,7 @@ export class Fishing {
     this.s = { phase: 'cast', t: 0, world: G.world, spot: t.spot, x: t.x, z: t.z, y: t.y, ice: !!t.ice, life0: G.actions.life(), fx: 0 };
     if (t.ice) { this.hole.position.set(t.x, t.y + 0.012, t.z); this.hole.rotation.y = Math.random() * 6.28; G.world.scene.add(this.hole); }
     P.anim.play('rodCast', { onEvent: ev => { if (ev === 'release' && this.s?.phase === 'cast') this.launch(); } });
+    Events.emit('fishing:start', { spot: t.spot });
     Events.emit('sfx', 'swing', { pitch: 1.5, vol: 0.35 });
     Input.consume?.('f');
   }
@@ -131,12 +147,13 @@ export class Fishing {
     this.rodTip(_w); s.from = _w.clone();
     scene.add(this.bobber, this.line);
     this.bobber.position.copy(_w); this.bobber.visible = true; this.line.visible = true;
+    Events.emit('fishing:cast', { spot: s.spot });
     Events.emit('sfx', 'leash_throw', { pitch: 1.6, vol: 0.4 });
   }
   land() {
     const s = this.s, G = this.G, P = G.player;
     s.phase = 'wait'; s.t = 0;
-    s.wait = rand(2, 8) * (this.rod >= 2 ? 0.8 : 1);
+    s.wait = this.tut?.biteAfter ?? rand(2, 8) * (this.rod >= 2 ? 0.8 : 1); // (the fishing guide: a sure bite)
     s.nib = rand(0.7, 1.4);
     P.anim.play('fish');
     _w.set(s.x, s.y, s.z);
@@ -146,9 +163,10 @@ export class Fishing {
   }
   bite() {
     const s = this.s, G = this.G, P = G.player;
-    s.fish = rollFish(s.spot, G.day?.hour ?? 12, this.rod);
+    s.fish = this.tut?.fish || rollFish(s.spot, G.day?.hour ?? 12, this.rod);
     if (!s.fish) return this.end('Nothing seems to be biting here…');
-    s.phase = 'bite'; s.t = 0; s.window = 0.62 + (this.rod >= 2 ? 0.12 : 0);
+    s.phase = 'bite'; s.t = 0; s.window = this.tut?.window ?? 0.62 + (this.rod >= 2 ? 0.12 : 0);
+    Events.emit('fishing:bite', { fish: s.fish, window: s.window });
     G.vfx?.emote?.(P, '!', 0.9);
     Events.emit('sfx', 'splash', { vol: 0.8, pitch: 1.2 });
     Events.emit('sfx', 'bite_ping');
@@ -159,7 +177,8 @@ export class Fishing {
   reel() {
     const s = this.s, G = this.G, f = FISH[s.fish];
     s.phase = 'reel'; s.t = 0; s.click = 0;
-    s.sim = new ReelSim({ d: f.d, beh: f.beh, zone: this.rod >= 2 ? 0.36 : 0.28, drain: this.rod >= 2 ? 0.82 : 1 });
+    s.sim = new ReelSim({ d: f.d, beh: f.beh, zone: this.tut?.zone ?? (this.rod >= 2 ? 0.36 : 0.28), drain: this.tut?.drain ?? (this.rod >= 2 ? 0.82 : 1) });
+    Events.emit('fishing:reel', { fish: s.fish });
     const known = !!fishLogOf(G.state)[s.fish];
     G.ui?.reel?.start({ icon: pantryIcon(s.fish), name: PANTRY[s.fish].name, known, zone: s.sim.zh });
     Events.emit('sfx', 'reel_start');
@@ -206,6 +225,9 @@ export class Fishing {
     P.controlLocked = false; G.interactCooldown = performance.now() + 400; Input.consume?.('f');
     if (msg && !quiet) G.ui?.toast?.(msg, { icon: 'wave', color: '#8fd0ff' });
     if (escaped && !quiet) Events.emit('sfx', 'fish_escape');
+    // how it ended (the fishing guide loops on it): catch | escape (the reel) | late (the bite) | early | cancel
+    const result = s.awarded ? 'catch' : !escaped ? 'cancel' : s.phase === 'reel' ? 'escape' : s.phase === 'bite' ? 'late' : 'early';
+    Events.emit('fishing:end', { result, fish: s.fish || null });
   }
   // ---------------------------------------------------------------- per frame
   update(dt) {
@@ -237,10 +259,11 @@ export class Fishing {
       b.position.set(s.from.x + (s.x - s.from.x) * k, s.from.y + (s.y + 0.03 - s.from.y) * k + Math.sin(k * Math.PI) * (s.ice ? 0.45 : 1.1), s.from.z + (s.z - s.from.z) * k);
       if (k >= 1) this.land();
     } else if (s.phase === 'wait') {
-      if (press) return this.end('Too early — it swam off!', { escaped: true });
+      if (press && this.tut?.forgiveEarly) { Events.emit('fishing:early', {}); this.ripple(0.06, 0.3, 0.3); } // (the guide: a gentle tip, the fish stays)
+      else if (press) return this.end('Too early — it swam off!', { escaped: true });
       s.nib -= dt;
       let dip = 0;
-      if (s.nib < 0) { dip = Math.max(0, 1 + s.nib / 0.18); if (s.nib < -0.18) { s.nib = rand(0.8, 1.6); this.ripple(0.08, 0.45, 0.45); Events.emit('sfx', 'nibble'); } }
+      if (s.nib < 0) { dip = Math.max(0, 1 + s.nib / 0.18); if (s.nib < -0.18) { s.nib = rand(0.8, 1.6); this.ripple(0.08, 0.45, 0.45); Events.emit('sfx', 'nibble'); Events.emit('fishing:nibble', {}); } }
       this.bobber.position.set(s.x, s.y + 0.03 + Math.sin(s.t * 2.4) * 0.012 - dip * 0.045, s.z);
       if (s.t >= s.wait) this.bite();
     } else if (s.phase === 'bite') {

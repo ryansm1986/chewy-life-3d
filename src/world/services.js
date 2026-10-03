@@ -36,7 +36,9 @@ export function installServices(G) {
     const H = G.heroes, other = H?.villagers?.[H.next?.() || ''], home = other && (!other.visible || other.state === 'inside' || other.state === 'hidden');
     const OTHER = { moka: 'Moka is snoozing on a pile of library books, one ear flopped over her nose.', chewy: 'Chewy is snoring in his basket, still hugging his tennis ball.' };
     const cook = !!G.life?.kitchen; // (the homestead kitchen: docs/HOMESTEAD.md §4)
+    Events.emit('home:menu', {}); // (the house tour spotlights its choices: world/guides.js)
     const c = await say("Chewy's Cottage", ['Home sweet home. Shadow is already curled up on the cushion.', ...(home && OTHER[other.id] ? [OTHER[other.id]] : [])], [{ text: 'Open my treasure chest (stash)' }, ...(cook ? [{ text: 'Cook something 🍳' }] : []), { text: 'Sleep until morning 💤' }, { text: 'Leave' }], G.portrait?.(G.state.activeHero || 'chewy'));
+    Events.emit('home:menuClosed', { choice: c });
     if (c === 0) ui()?.open?.('stash');
     else if (cook && c === 1) G.life.kitchen.open('kitchen');
     else if (c === (cook ? 2 : 1)) G.sleep();

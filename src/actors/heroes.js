@@ -241,7 +241,7 @@ export class HeroManager {
     v.talking = true;
     try { await this.join('moka', v); } finally {
       v.talking = false; G.introFocus = null; rig.distTarget = prevDist; P.controlLocked = false;
-      G.ui?.toast?.('Tip: Tab switches heroes · talk to the other hero to switch too', { color: '#8fe0d0' });
+      if (!G.tutorials?.enabled) G.ui?.toast?.('Tip: Tab switches heroes · talk to the other hero to switch too', { color: '#8fe0d0' }); // (else Moka's guide shows it)
     }
   }
 }

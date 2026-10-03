@@ -16,6 +16,7 @@ import { SkillsPanel } from './skills.js';
 import { Dialogue } from './dialogue.js';
 import { BuildPanel, InspectCard } from './build.js';
 import { QuestArrow } from './questArrow.js';
+import { TutorialUI } from './tutorial.js';
 import { ShopPanel } from './shop.js';
 import { MapPanel, QuestPanel, normQuest } from './map.js';
 import { TravelPanel } from './travel.js';
@@ -64,6 +65,7 @@ export const UI = {
     this.qarrow = new QuestArrow(this, this.layers.world);
     this.drag = new ItemDrag(this);
     this.reel = new ReelBar(this, this.layers.hud); // the fishing reel bar (docs/HOMESTEAD.md)
+    this.tutorial = new TutorialUI(this, this.layers.over); // guided tutorials (docs/TUTORIALS.md; driven by world/tutorials.js)
     this.dlg = new Dialogue(this);
     this.titleScreen = new Title(this);
     this.panels = {
@@ -134,6 +136,7 @@ export const UI = {
     this.labels.update(dt, cam, this.scale);
     if (this.mode !== 'title') this.hud.update(dt);
     this.qarrow.update(dt, cam);
+    this.tutorial?.update(dt);
     this.panels.map.update?.(dt);
     if (this.settings.showFps) {
       this._fpsAcc += dt; this._fpsN++;

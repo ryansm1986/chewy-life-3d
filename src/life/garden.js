@@ -335,12 +335,18 @@ export class Garden {
       if (this.tiles.has(i) && this.usable(i) && this.tilled(i)) this.ensure(i).wet = true;
     }
   }
+  /** Chewy's bed sits by the cottage door: walking up to the door (facing it) means the door, not the corner tile */
+  facingDoor() {
+    const P = this.G.player, d = this.G.heroes?.homeDoor?.(); if (!d || !P) return false;
+    const dx = d.x - P.pos.x, dz = d.z - P.pos.z, l = Math.hypot(dx, dz);
+    return l < 1.9 && (l < 0.5 || (Math.sin(P.facing) * dx + Math.cos(P.facing) * dz) / l > 0.5);
+  }
   // ---------------------------------------------------------------- per frame
   update(dt) {
     const G = this.G, P = G.player;
     this.tools.update(dt);
     const quiet = G.mode !== 'village' || G.titleActive || G.ui?.anyModal?.() || P?.controlLocked || G.build?.active;
-    const t = quiet || this.tools.busy ? null : this.pick();
+    const t = quiet || this.tools.busy || this.facingDoor() ? null : this.pick();
     this.target = t;
     if (t != null) { const c = this.centre(t); this.inter.pos.set(c.x, c.y, c.z); }
     else this.inter.pos.set(-999, -50, -999);

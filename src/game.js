@@ -42,6 +42,7 @@ import { VillageMinimap, DungeonMinimap, RegionMinimap } from './world/minimap.j
 import { prewarmWorld } from './world/prewarm.js';
 import { WORLD } from './world/layout.js';
 import { installLife } from './life/index.js';
+import { Tutorials } from './world/tutorials.js';
 
 // UI and audio load in parallel with the world. The import() paths must be literal so Vite bundles them for the
 // production build (a variable path with @vite-ignore worked on the dev server but 404'd in dist: no UI, no sound).
@@ -384,9 +385,16 @@ export async function boot() {
   // ---- interaction helpers
   G.story = new Story(G);
   G.ui?.setQuestProvider?.(() => G.story.uiList());
-  G.questTarget = () => (G.titleActive || G.playerDead ? null : G.story.target());
+  G.questTarget = () => (G.titleActive || G.playerDead ? null : G.tutorials?.target() || G.story.target()); // (a guide's pointer first)
   installServices(G);
   installLife(G, village); // farming, the pantry, the Seed Stall (docs/HOMESTEAD.md)
+  // guided tutorials (docs/TUTORIALS.md). They start on their own unless ?notut — and the QA's ?nointro sessions count
+  // as notut (unless ?tut), remembered for the tab, so a QA reload of its own save stays quiet too.
+  {
+    let off = P.has('notut') || (P.has('nointro') && !P.has('tut'));
+    try { if (P.has('tut')) sessionStorage.removeItem('chewy3d.notut'); else if (off) sessionStorage.setItem('chewy3d.notut', '1'); else off = !!sessionStorage.getItem('chewy3d.notut'); } catch (e) { /* storage unavailable */ }
+    G.tutorials = new Tutorials(G, { enabled: !off });
+  }
   const vMap = new VillageMinimap(G);
   Events.on('village:changed', () => { vMap.dirty = true; });
   Events.on('garden:till', () => { vMap.dirty = true; }); // (Chewy's bed turns from lawn to soil on the map)
@@ -541,6 +549,7 @@ export async function boot() {
     const ui = G.ui;
     if (G.titleActive || G.playerDead || ui?.dlg?.active || ui?.iris?.active) return true;
     if (urgent) return false;
+    if (G.tutorials?.busy || ui?.tutorial?.offering) return true; // (a guide is talking: Shadow's tips wait)
     const now = performance.now();
     if (ui?.banners?.busy) hintBannerT = now; // (a beat of calm after a banner, e.g. the victory, before any tip)
     if (ui?.anyModal?.() || now - hintBannerT < 3000 || ui?.toasts?.busy) return true;
@@ -587,7 +596,7 @@ export async function boot() {
     } else if (G.mode === 'village' && !G.titleActive) {
       if (st.quests.done.includes('burrow1') && !G.buildMode) tip('build', 'Press B to plan the village — paint zones and friends will build there!');
       if (regionUnlocked(st, 'bamboo').ok) tip('travel', "The Wayfarer's Post by the bamboo points to new lands! Walk the west trail to find it.");
-      if (heroes.joined('moka') && !heroes.T && heroes.cd <= 0) tip('tabSwitch', `Press Tab to play as ${heroes.name(heroes.next())} — ${heroes.name()} will hang out in town.`);
+      if (heroes.joined('moka') && !heroes.T && heroes.cd <= 0 && !G.tutorials?.covers('switch')) tip('tabSwitch', `Press Tab to play as ${heroes.name(heroes.next())} — ${heroes.name()} will hang out in town.`);
     }
   }
 
@@ -673,7 +682,8 @@ export async function boot() {
     player.controlLocked = false;
     G.story.markTalk('rosie');
     G.ui?.toast?.('Tip: I bag · K skills · C character · J quests · X swap weapon', { color: '#8fd0ff' });
-    setTimeout(() => heroes.introJoin(), 2600); // …and a bookish spaniel mage has been waiting to meet Chewy
+    G.introJoinPending = true; // (the house tour waits for Moka's arrival scene)
+    setTimeout(async () => { try { await heroes.introJoin(); } finally { G.introJoinPending = false; } }, 2600); // …and a bookish spaniel mage has been waiting to meet Chewy
   }
 
   // ---- floating quest markers over NPCs ('!' something for you, '?' quest giver, gift = friendship reward)
@@ -710,6 +720,7 @@ export async function boot() {
     G.actions.tickRegen(dt);
     player.update(dt);
     G.life?.update(dt);
+    G.tutorials?.update(rdt);
     shadow.update(dt);
     skills.update(dt, skillInput);
     G.combat.update(dt);

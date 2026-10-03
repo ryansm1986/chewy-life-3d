@@ -23,6 +23,7 @@ Chrome / Edge recommended (WebGL2). Saves automatically to the browser's local s
 | **Q / E / R** | Heart Treat · Zoom Juice · Rejuvenation |
 | **X** | Swap **Bone Sword** ⇄ **Red Tennis Ball** |
 | **G** | Eat your quick meal (the last dish you ate) |
+| **Tab** | Switch heroes (Chewy ⇄ Moka) |
 | **I · P · C · K · J · M** | Bag · Pantry · Character · Skills · Journal (quests, Fish Log) · Map |
 | **B** | Build mode (village): place buildings, paint R/C/W zones, lay paths, bulldoze · **R** rotate |
 | **T** | Return to the village from the Burrow |
@@ -36,6 +37,9 @@ Chrome / Edge recommended (WebGL2). Saves automatically to the browser's local s
 - **Village planning**: paint *Homes*, *Shops* and *Workshops* zones and villagers build (and upgrade) there on their own when there is demand (RCI meter). Buildings need path access, water and joy to grow; services (wells, lanterns, parks, shrines, onsen, clinic, school) cover an area — toggle coverage overlays in build mode. Daily income from rent, shops and workshops. Village ranks unlock more buildings.
 - Humanoid animal villagers (cat, bunny, bear, fox, panda, tanuki, frog, duck…) with friendship hearts, daily chats, gifts they love, and requests. New townsfolk move in as homes fill up.
 - Rosie's story questline, Rosie's Treats shop, Chewy's cottage (stash + sleep), Blossom Hall ledger, notice board and the Bonesmith (reforge, sockets, tier upgrades).
+
+**Guided tutorials**
+- Shadow shows you around Chewy's Cottage and the garden, Moka teaches you to switch heroes, and Kero walks you through your first catch: a speech card, an objective card with *Skip*, bouncing arrows in the world and spotlights on the buttons that matter. Replay any guide from the Journal's **Guides** tab.
 
 **The homestead (farming, fishing, cooking)**
 - **Farming**: till, plant, water and harvest in Chewy's garden bed and the village's Veggie Patch fields. Eight crops grow a stage every watered night (a dry day only waits; nothing dies), strawberries keep fruiting, and sprinklers water their neighbours. Seeds come from **Usagi's Seed Stall** and as loot in the Burrow.
@@ -61,6 +65,6 @@ Dev pages live under `/?test=…` (`sandbox`, `chars`, `monsters`, `dungeon`, `b
 - `node tools/qa/prod-smoke.mjs` — builds the game, serves the bundle and checks the UI/audio load with no errors (run before shipping launcher changes)
 - `node tools/qa/run-all.mjs` — browser scenario suite (needs `npm run dev`): village↔Burrow round trips and leak checks,
   combat stress with every skill, all four bosses, death, village sim + save/load, inventory edge cases, dialogue/story,
-  input edge cases, the regions, the village plan and the homestead (s15: farming, fishing, cooking). Each scenario (`tools/qa/s*.mjs`) can also run on its own.
+  input edge cases, the regions, the village plan, the homestead (s15: farming, fishing, cooking) and the guided tutorials (s16). Each scenario (`tools/qa/s*.mjs`) can also run on its own.
 - `node tools/qa/village-perf.mjs 2` / `node tools/qa/homestead-perf.mjs 2` — frame-time snapshots (the village; a full garden and a reel in progress).
 - `node tools/shot.mjs --url "/?..." --out name` — headless screenshot harness used for visual iteration.

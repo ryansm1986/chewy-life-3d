@@ -251,7 +251,7 @@ export class Hud {
         <button class="build-btn" data-open="build">${glyph('hammer')}<span class="bb-l">Build</span><span class="kc">B</span></button>
       </div>
       <div class="menubtns">
-        ${[['inventory', 'bag', 'I', 'Bag'], ['character', 'star', 'C', 'Character'], ['skills', 'sparkle', 'K', 'Skills'], ['quests', 'book', 'J', 'Journal'], ['map', 'map', 'M', 'Map'], ['menu', 'gear', 'Esc', 'Menu']]
+        ${[['inventory', 'bag', 'I', 'Bag'], ['pantry', 'leaf', 'P', 'Pantry'], ['character', 'star', 'C', 'Character'], ['skills', 'sparkle', 'K', 'Skills'], ['quests', 'book', 'J', 'Journal'], ['map', 'map', 'M', 'Map'], ['menu', 'gear', 'Esc', 'Menu']]
     .map(([n, g, k, l]) => `<button class="mb" data-open="${n}" data-tip="${l}">${glyph(g)}<span class="kc">${k}</span><span class="mb-dot"></span></button>`).join('')}
       </div>
     </div>`;
@@ -324,7 +324,7 @@ export class Hud {
     R.addEventListener('click', e => {
       const b = e.target.closest('[data-open]'); if (!b) return;
       const n = b.dataset.open;
-      if (n === 'build') this.ui.openBuild(); else this.ui.toggle(n);
+      if (n === 'build') this.ui.openBuild(); else if (n === 'pantry') this.ui.togglePantry(); else this.ui.toggle(n); // (the Pantry is a view of the inventory panel)
       replay(b, 'pressed', 300);
     });
     for (const b of R.querySelectorAll('.mb')) tip.bind(b, () => simpleTip(b.dataset.tip, `<span class="tt-dim">Hotkey: ${b.querySelector('.kc').textContent}</span>`));

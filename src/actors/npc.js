@@ -119,7 +119,7 @@ export class Villager extends Actor {
       return;
     }
     this.greeted -= dt;
-    if (p && pd < 7) { this.faceTo(p.pos.x, p.pos.z); if (this.greeted <= 0 && pd < 4.5 && !this.talking) { this.greeted = 12; this.anim.play('wave'); this.emote('!'); } }
+    if (p && pd < 7) { this.faceTo(p.pos.x, p.pos.z); if (this.greeted <= 0 && pd < 4.5 && !this.talking && !this.tutClaim) { this.greeted = 12; this.anim.play('wave'); this.emote('!'); } } // (a guide's helper — Kero by the pond — shows no "!": the bite has one)
     else if (!this.anim.action && (this.fidgetT -= dt) <= 0) { this.fidgetT = rand(5, 9); this.anim.play(pick(['lookAround', 'nod', 'stretch'])); }
   }
   get hour() { return this.G.day?.hour ?? 12; }
