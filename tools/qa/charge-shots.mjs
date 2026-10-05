@@ -1,6 +1,7 @@
 // Charged-ability look review (docs/CHARGE.md): a real Burrow fight, real mouse input (hold RMB on the skill),
 // screenshots while charging at each stage and through the release.
-//   node tools/qa/charge-shots.mjs [ids...] [--close] [--perks all|none|stages] [--floor 2]
+//   node tools/qa/charge-shots.mjs [ids...] [--close | --pose] [--perks all|none|stages] [--floor 2]
+//   (--pose: a tight camera on the hero, only the wind-up and the held Stage Ⅲ: for reviewing the charge poses)
 //   SHOT_DIR=... (default: tools/blender/work/charge/shots) → charge-<id>-<stage|rel>.png
 // Time is frozen (engine.timeScale = 0) for each shot so stages and effects are caught exactly.
 import { launch, boot, waitMode, sleep } from './lib.mjs';
@@ -11,12 +12,12 @@ const argv = process.argv.slice(2);
 const flag = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
 const ids = argv.filter((a, i) => !a.startsWith('--') && !(argv[i - 1] || '').startsWith('--'));
 const IDS = ids.length ? ids : ['chomp', 'throw', 'splash'];
-const CLOSE = argv.includes('--close'), PERKS = flag('--perks', 'all'), FLOOR = +flag('--floor', 2);
+const POSE = argv.includes('--pose'), CLOSE = POSE || argv.includes('--close'), PERKS = flag('--perks', 'all'), FLOOR = +flag('--floor', 2);
 const OUT = process.env.SHOT_DIR || 'D:/projects/chewy-life-3d/tools/blender/work/charge/shots';
 fs.mkdirSync(OUT, { recursive: true });
 
 const { browser, page, errors } = await launch({ w: 1600, h: 900 });
-const snap = async name => { const f = path.join(OUT, `charge-${name}${CLOSE ? '-close' : ''}.png`); await page.screenshot({ path: f }); console.log('saved', f); };
+const snap = async name => { const f = path.join(OUT, `charge-${name}${POSE ? '-pose' : CLOSE ? '-close' : ''}.png`); await page.screenshot({ path: f }); console.log('saved', f); };
 const freeze = on => page.evaluate(on => { window.G.engine.timeScale = on ? 0 : 1; }, on);
 try {
   for (const id of IDS) {
@@ -61,11 +62,11 @@ try {
         m.pos.set(P.pos.x + d.x * r, 0, P.pos.z + d.z * r); m.lifeMax = m.life = 1e7; m.status.stun = 999; m.aggro = false; m.speed = 0;
       });
       P.faceTarget = P.facing = Math.atan2(f.x, f.z);
-      if (CLOSE) G.engine.rig.distTarget = 13;
+      if (CLOSE) G.engine.rig.distTarget = CLOSE === 'pose' ? 7 : 13;
       G.engine.rig.focus.copy(P.pos); G.engine.rig.snap();
-      window.__aimAt = P.pos.clone().addScaledVector(f, 4.2);
+      window.__aimAt = P.pos.clone().addScaledVector(f, CLOSE === 'pose' ? 2.2 : 4.2); // (the tight pose camera: keep the cursor on screen)
       return { hero: P.hero, wt: G.derived.weaponType, hb: pl.hotbar, perks, spot: window.__spot };
-    }, { id, PERKS, CLOSE });
+    }, { id, PERKS, CLOSE: POSE ? 'pose' : CLOSE });
     console.log(id, JSON.stringify(info));
     await sleep(page, 900);
     // aim the cursor at the dummies, then hold RMB
@@ -86,11 +87,12 @@ try {
       const a = await page.evaluate(() => window.G.skills.charge.active);
       if (!a || a.stage >= a.max) break;
     }
+    if (POSE) { await page.mouse.up({ button: 'right' }); await sleep(page, 1500); continue; }
     await freeze(true); await sleep(page, 80);
     await page.screenshot({ path: path.join(OUT, `charge-${id}-hud.png`), clip: { x: 500, y: 740, width: 620, height: 160 } }); await freeze(false);
     await sleep(page, 300);
     await page.mouse.up({ button: 'right' });
-    for (const [ms, tag] of [[110, 'rel1'], [170, 'rel2'], [260, 'rel3'], [420, 'rel4']]) { await sleep(page, ms); await freeze(true); await sleep(page, 120); await snap(`${id}-${tag}`); await freeze(false); }
+    for (const [ms, tag] of [[110, 'rel1'], [170, 'rel2'], [260, 'rel3'], [420, 'rel4'], [650, 'rel5']]) { await sleep(page, ms); await freeze(true); await sleep(page, 120); await snap(`${id}-${tag}`); await freeze(false); }
     const last = await page.evaluate(() => window.G.skills.charge.last);
     console.log(id, 'release', JSON.stringify(last));
   }

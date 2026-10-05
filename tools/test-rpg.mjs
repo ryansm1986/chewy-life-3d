@@ -985,6 +985,77 @@ hr('FURNITURE SOURCES');
   }
 }
 
+hr('CHARGED ABILITIES');
+// docs/CHARGE.md: the tables, the rules (stage times, costs, gating), the balance layer and the DPS-band sim
+{
+  const Ch = await import('../src/rpg/charge.js');
+  const Sim = await import('./charge-sim.mjs');
+  const { CHARGE } = Ch, r1 = v => Math.round(v * 10) / 10;
+  const ids = Object.keys(CHARGE);
+  // ---- every active skill of both heroes charges, with a full table
+  const actives = SKILL_IDS.filter(id => !['passive', 'aura'].includes(SKILLS[id].kind));
+  ok(actives.every(id => CHARGE[id]) && ids.every(id => actives.includes(id)), `charge: a table for every active skill (${ids.length})`);
+  for (const id of ids) {
+    const c = CHARGE[id];
+    ok(c.ready === true && SKILLS[id].charge === c, `charge ${id}: ready and attached to its skill`);
+    ok(typeof c.apply === 'function' && typeof c.lines === 'function' && c.title && c.blurb && c.pose && /^#[0-9a-f]{6}$/i.test(c.color), `charge ${id}: apply, lines, title, blurb, pose, colour`);
+    ok(c.perks.stages?.ranks === 2 && c.perks.quick?.ranks === 3 && Object.keys(c.perks).length === 4, `charge ${id}: Deeper Charge, Quick Wind-up + 2 more perks`);
+    for (const p of Object.values(c.perks)) ok(p.req.length >= 1 && p.req.every((v, i) => v >= 1 && (!i || v >= p.req[i - 1])) && p.ranks >= 1 && p.name && p.desc && typeof p.info === 'function', `charge ${id}.${p.id}: gating + text`);
+    if (c.tune) ok(c.tune.dmg.length === 3 && c.tune.dmg.every(v => v > 0 && v < 3) && c.tune.shape.length === 3 && c.tune.shape.every((v, i) => v >= 0 && v <= 1 && (!i || v >= c.tune.shape[i - 1])), `charge ${id}: tune (dmg > 0, shape 0..1 non-decreasing)`);
+  }
+  // ---- stage times, Quick Wind-up, costs, Efficient Focus
+  const t0 = Ch.stageTimes(CHARGE.chomp), t3 = Ch.stageTimes(CHARGE.chomp, { quick: 3 });
+  ok(t0[0] > Ch.GRACE && t0[0] < t0[1] && t0[1] < t0[2] && t0[2] < 2.5, `charge: stage times rise (${t0.map(v => v.toFixed(2)).join(' / ')} s)`);
+  ok(t3.every((v, i) => Math.abs(v - t0[i] * (1 - 3 * Ch.QUICK_PER_RANK)) < 1e-9), 'charge: Quick Wind-up 3 trims every stage by 45%');
+  ok(Ch.chargeCost(10, 1) === r1(10 * (1 + Ch.SURCHARGE)) && Ch.chargeCost(10, 3) === r1(10 * (1 + 3 * Ch.SURCHARGE)), `charge: each stage costs +${Ch.SURCHARGE * 100}% zoom (Ⅲ ×${1 + 3 * Ch.SURCHARGE})`);
+  ok(Ch.chargeCost(10, 3, { focus: 2 }) === r1(10 * (1 + 3 * (Ch.SURCHARGE - 2 * Ch.FOCUS_PER_RANK))) && Ch.chargeCost(10, 3, { focus: 2 }) > 10, 'charge: Efficient Focus lowers the surcharge, never under a tap');
+  ok(Ch.stageAt(0, t0) === 0 && Ch.stageAt(t0[0], t0) === 1 && Ch.stageAt(t0[2] + 1, t0, 1) === 1 && Ch.stageAt(t0[2], t0) === 3, 'charge: stageAt (capped at the hero\'s max)');
+  // ---- gating, buying, respec (a level-12 Chewy)
+  const st = newGameState(); st.player.lvl = 30; st.player.skillPts = 6; st.player.skills.chomp = 4;
+  ok(Ch.maxStage('chomp', st) === 1 && !Ch.canLearnPerk('chomp', 'stages', st).ok && /level 5/.test(Ch.canLearnPerk('chomp', 'stages', st).why), 'charge: Deeper Charge gated by the skill\'s level (Ⅱ at 5)');
+  ok(Ch.canLearnPerk('chomp', 'quick', st).ok && Ch.learnPerk(st, 'chomp', 'quick').ok && st.player.skillPts === 5, 'charge: buying a perk spends one skill point');
+  ok(!Ch.canLearnPerk('splash', 'quick', st).ok && /Another hero/.test(Ch.canLearnPerk('splash', 'quick', st).why), "charge: Moka's perks are hers");
+  st.player.skills.chomp = 10; Ch.learnPerk(st, 'chomp', 'stages'); Ch.learnPerk(st, 'chomp', 'stages');
+  ok(Ch.maxStage('chomp', st) === 3 && !Ch.canLearnPerk('chomp', 'stages', st).ok && Ch.perkPoints(st) === 3, 'charge: Deeper Charge 2 → Stage Ⅲ, then mastered; 3 points in perks');
+  st.player.skillPts = 0; ok(/No skill points/.test(Ch.canLearnPerk('chomp', 'wide', st).why), 'charge: no points, no perk');
+  // ---- chargeRuntime + the balance layer
+  const d = computeStats(st);
+  const R0 = skillRuntime('chomp', st, d), R1 = Ch.chargeRuntime('chomp', st, d, 1), R3 = Ch.chargeRuntime('chomp', st, d, 3), R9 = Ch.chargeRuntime('chomp', st, d, 9);
+  ok(R1.charge.stage === 1 && R3.charge.stage === 3 && R9.charge.stage === 3 && R3.cost === Ch.chargeCost(R0.cost, 3, Ch.perksOf(st, 'chomp')), 'charge: chargeRuntime (stage clamp, cost)');
+  ok(R3.params.dmgPct > R1.params.dmgPct && R1.params.dmgPct >= R0.params.dmgPct * 0.999 && R3.params.radius >= R1.params.radius, 'charge: a charged Chomp hits harder and wider than a tap, more at Ⅲ');
+  const sx = Sim.simHero('chewy'), sm = Sim.simHero('moka');
+  for (const id of ids) {
+    const H = SKILLS[id].cls === 'moka' ? sm : sx, S = H.st;
+    S.player.chargePerks = {}; const T0 = skillRuntime(id, S, H.d);
+    S.player.chargePerks = { [id]: Object.fromEntries(Object.entries(CHARGE[id].perks).map(([k, p]) => [k, p.ranks])) };
+    const Rs = [1, 2, 3].map(s => Ch.chargeRuntime(id, S, H.d, s));
+    if (T0.params.dmgPct) ok(Rs.every((R, i) => R.params.dmgPct >= T0.params.dmgPct * 0.995 && (!i || R.params.dmgPct >= Rs[i - 1].params.dmgPct * 0.995)), `charge ${id}: a charged hit never hits softer than a tap or the stage before`);
+    for (const key of ['radius', 'count', 'bounces', 'strikes', 'links', 'duration', 'distance']) if (typeof T0.params[key] === 'number') ok(Rs.every((R, i) => R.params[key] >= T0.params[key] - 1e-9 && (!i || R.params[key] >= Rs[i - 1].params[key] - 1e-9)), `charge ${id}: ${key} never shrinks with the charge`);
+    for (const key of ['count', 'bounces', 'strikes', 'links']) if (typeof Rs[2].params[key] === 'number') ok(Number.isInteger(Rs[2].params[key]), `charge ${id}: ${key} stays whole`);
+    ok(Rs.every(R => R.cost > T0.cost && R.params && Ch.chargeInfo(id, S, H.d).length === 3), `charge ${id}: costs more than a tap; tooltip lines for Ⅰ Ⅱ Ⅲ`);
+    ok(Ch.chargeInfo(id, S, H.d).every(x => x.lines.every(l => typeof l === 'string' && !/NaN|undefined/.test(l))), `charge ${id}: tooltip numbers are real`);
+  }
+  // perk bonus damage grows with the charge
+  const fake = s => ({ id: 'dig', def: SKILLS.dig, charge: { stage: s, perks: { aftershock: 1 } } });
+  ok(Ch.perkAt(fake(1), 'aftershock').pct === CHARGE.dig.perks.aftershock.pct * Ch.PERK_STAGE[0] && Ch.perkAt(fake(3), 'aftershock').pct === CHARGE.dig.perks.aftershock.pct && Ch.perkAt(fake(3), 'wide') === null, 'charge: perkAt scales a perk\'s damage by stage (and is null when not taken)');
+  // ---- the DPS-band sim (tools/charge-sim.mjs): sustained gain of a full charge, every perk, a skill build, 60 s
+  const rows = [];
+  for (const id of ids) {
+    const r = [1, 2, 3].map(s => Sim.chargeBand(id, { stage: s })), b = r.map(Sim.blendOf);
+    rows.push({ id, kind: r[2].kind, b, pack: r[2].pack, single: r[2].single, burst: r[2].burst });
+    if (r[2].kind === 'utility') { ok(b.every(x => x > 0.6 && x < 1.6), `charge band ${id}: a summon / buff stays sane (${b.join(' / ')})`); continue; }
+    ok(b[2] >= Sim.BAND[0] && b[2] <= Sim.BAND[1], `charge band ${id}: a full charge is +10–30% sustained (×${b[2]})`);
+    ok(b[0] >= Sim.STAGE_OK[0] && b[0] <= Sim.STAGE_OK[1] && b[1] >= Sim.STAGE_OK[0] && b[1] <= Sim.STAGE_OK[1], `charge band ${id}: Ⅰ and Ⅱ are sane too (×${b[0]} / ×${b[1]})`);
+    ok(r[2].burst > 1.2, `charge band ${id}: the burst is much higher (×${r[2].burst})`);
+  }
+  const dm = rows.filter(r => r.kind !== 'utility'), med = [...dm].sort((a, b) => a.b[2] - b.b[2])[dm.length >> 1].b[2];
+  ok(med >= 1.15 && med <= 1.25, `charge band: the median skill sits mid-band (×${med})`);
+  if (!quiet) {
+    log(`  ${pad('skill', 16)} ${pad('kind', 8)} ${pad('Ⅰ / Ⅱ / Ⅲ (blend)', 22)} ${pad('Ⅲ pack', 8)} ${pad('single', 8)} burst`);
+    for (const r of rows) log(`  ${pad(r.id, 16)} ${pad(r.kind, 8)} ${pad(r.b.map(v => '×' + v).join(' / '), 22)} ${pad('×' + r.pack, 8)} ${pad('×' + r.single, 8)} ×${r.burst}`);
+  }
+}
+
 hr('RESULT');
 if (fails) {
   log(`FAILED ${fails}/${checks} checks:`);

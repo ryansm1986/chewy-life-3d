@@ -160,6 +160,27 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
   `swapWeapons()` swaps pairs and emits `hotbar:changed {swap, set}`; actions `mouseSet`, `ensureMouseSets`, `setWeaponType`.
 - Melee assist in skillRunner (`approachTo`, lunge, hit-frame re-check). `G.vfx.dampers` / `vfx.undamped()` tone down
   effects on a live boss (its own telegraphs are exempt).
+- Hero moves that skip walking (dashes, drifts) go through `skills.slideHero(dir, dist)`: 0.25 m sub-steps through the
+  walk collision, never ending off the walkable floor. `skills.lineClear(a, b)` tests a straight hop.
+
+## Charged abilities (design, numbers and as-built notes: docs/CHARGE.md)
+- Hold an active skill's key to charge it, let go for a boosted release; every active skill of both heroes charges.
+  - **Data + rules** `src/rpg/charge.js`: the `CHARGE` tables (one per skill, attached as `SKILLS[id].charge`), `chargeRuntime`
+    (the charged params: the table's `apply`, then its balance `tune` via `retune`), `stageTimes`, `chargeCost`, `maxStage`,
+    `canLearnPerk` / `learnPerk`, `perkAt` (a perk with its damage scaled to the stage), `chargeInfo` (tooltip lines).
+  - **The hold** `src/combat/charge.js` (`G.skills.charge`): fed by game.js for LMB / RMB / 1–4; the 0.18 s grace, the slow
+    walk, the stages, the cancels (roll, panel, hotbar or weapon change, death, hero switch, floor change), the zoom cap,
+    Toggle / Off (`ui.settings.chargeMode`), the channel wind-up. Events `charge:start|stage|release|spinout|cancel`.
+  - **Releases** `src/combat/chargedSkills.js` + `chargedChewy.js` + `chargedMoka.js`: `charged_<id>` methods mixed into
+    SkillRunner; most replay the skill's own `cast_<id>` from the wound-back frame (`fromFrame`) and add their extras; `tame()`
+    caps the base cast's flashes, rings and crowns so foes stay readable.
+  - **Looks** `src/gfx/chargeFx.js` (`G.vfx.charge`, pooled; the charging path allocates nothing per frame), **poses**
+    `src/actors/chargePoses.js` (animator action `charge`), **HUD** `src/ui/chargeHud.js`, **K panel** `src/ui/chargePanel.js`
+    (the Charge drawer, the ⚡ chips, the tooltip section), **sounds** `src/audio/charge.sfx.js`.
+  - State: `player.chargePerks = { [skillId]: { [perkId]: rank } }` (per hero; respec refunds). Action `learnPerk(id, perkId)`,
+    event `perk:learned`.
+  - Tools: `tools/charge-table.mjs` (CHARGE.md §7), `tools/charge-sim.mjs` (the DPS band; `--solve` writes tunes), QA
+    `tools/qa/s19-charge.mjs`, look review `tools/qa/charge-shots.mjs [ids] [--close | --pose]`.
 
 ## Game context `G` (src/game.js)
 ```js
@@ -286,7 +307,7 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   step allows it.
 - Old saves past a guide's start get a one-time offer. The Journal's Guides tab replays any guide.
 - Guides start on their own only when enabled: off with `?notut`, and with the QA's `?nointro` unless `?tut`
-  (remembered per tab), so s1-s15 never meet one; s16 drives them.
+  (remembered per tab), so s1-s15 never meet one; s16 drives them (s17 the housing guides, s19 "Hold to power up!").
 
 ## Housing (src/home/ — design and as-built notes: docs/HOUSING.md)
 - **Interiors**: `G.mode = 'interior'`. One persistent `InteriorWorld` (home/interiorWorld.js: its scene, the same light
@@ -321,6 +342,7 @@ state = {
   // player / equipment below = heroes[activeHero].player / .equipment (live aliases, not saved)
   player: { cls:'chewy', name:'Chewy', lvl:1, xp:0, stats:{str:10,dex:10,vit:12,ene:8}, statPts:0, skillPts:1,
             skills:{ chomp:1 }, hotbar:['attack','chomp',null,null,null,null], // [LMB, RMB, 1, 2, 3, 4]
+            chargePerks:{ chomp:{ stages:1 } },                // charge perks bought per skill (docs/CHARGE.md)
             life:null, zoom:null, activeWeapon:0 },           // life/zoom current (null = full)
   coins: 120,
   materials: { wood:20, stone:10, petal:0, crystal:0, bone:0, mochi:0, silk:0, lantern:0 },
@@ -369,7 +391,7 @@ Rarity colours: normal `#f4efe6`, magic `#6ea8ff`, rare `#ffd84a`, unique `#ff9a
 ## Actions `G.actions` (src/rpg/actions.js) — every mutation of player/inventory goes through these, and they emit events
 `equip(invIdx)`, `unequip(slot)`, `swapWeapons()`, `moveItem(from:{c:'inv'|'stash'|'equip', i}, to:{c,i})`, `dropItem(from)`,
 `pickup(item)→bool`, `usePotion('heart'|'zoom'|'rejuv')`, `sellItem(from)`, `buyItem(item, price)`, `learnSkill(id)`, `addStat(key)`,
-`setHotbar(slot, skillId)`, `addXp(n)`, `addCoins(n)`, `spendCoins(n)→bool`, `addMaterial(k,n)`, `hasMaterials(cost)`, `spendMaterials(cost)→bool`, `recompute()`.
+`setHotbar(slot, skillId)`, `learnPerk(skillId, perkId)`, `addXp(n)`, `addCoins(n)`, `spendCoins(n)→bool`, `addMaterial(k,n)`, `hasMaterials(cost)`, `spendMaterials(cost)→bool`, `recompute()`.
 Homestead: `addPantry(id,n)`, `hasPantry(req)`, `spendPantry(req)→bool`, `sellPantry(id,n,buyer)→coins`, `buyPantry(id,price,n)`,
 `pantryCount(id)`, `eat(id)→{heal,meal}`, `cook(recipe,n,{picks,learn})`, `spendMix(picks)`, `learnRecipe(id)`, `tickMeal(dt)`.
 
@@ -382,6 +404,8 @@ Homestead: `pantry:changed {id,n,delta,first}`, `garden:till|plant|water|harvest
 `meal:expired`, `gift:given {id,key,love,pts}`.
 Guides: `fishing:start|cast|nibble|early|bite|reel`, `fishing:end {result}`, `home:menu`, `home:menuClosed {choice}`,
 `tutorial:start|step|done|skip|offer`.
+Charge: `charge:start {id,slot}`, `charge:stage {id,stage}`, `charge:release {id,stage,ok}`, `charge:spinout {id,stage,t}`,
+`charge:cancel {id,reason}`, `perk:learned {id,perk,rank}`.
 
 ## UI (src/ui/) — HTML/CSS overlay above the canvas (`#ui`), lots of spring/bounce animations
 `UI.init(G)`, `UI.update(dt)`, `UI.toggle(name)` / `open` / `close` / `isOpen` / `anyModal()` for

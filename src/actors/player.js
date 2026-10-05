@@ -60,7 +60,7 @@ export class Player extends Actor {
     enableXray(rig, '#ffc890', 0.6);
     this.world.scene.add(rig.root);
     this.makeSwords(rig); this.setWeapon(this.weaponType);
-    this.rollT = 0; this.invuln = false;
+    this.rollT = 0; this.invuln = !!this.G?.heroSwitching; // (a hero hand-off swaps the rig mid-switch: stay invulnerable through it)
     this.sync();
   }
   makeSwords(rig) {

@@ -272,13 +272,19 @@ export class ChargeController {
   updateAim() {
     if (this.aimOverride) { this.aim.copy(this.aimOverride); return; }
     if (this.fed[this.active?.slot ?? -1]) return; // game.js fed this frame's aim already
+    this.cursorGround(this.aim);
+  }
+  /** the ground point under the mouse, written into out (no allocations) → out, or null without a camera */
+  cursorGround(out) {
+    if (this.aimOverride) return out.copy(this.aimOverride);
     const E = this.G.engine, W = this.G.world;
-    if (!E?.raycaster || !E.camera) return;
+    if (!E?.raycaster || !E.camera) return null;
     E.raycaster.setFromCamera(_nv.set(Input.mouse.nx, Input.mouse.ny), E.camera);
     const ro = E.raycaster.ray.origin, rd = E.raycaster.ray.direction;
-    if (Math.abs(rd.y) < 1e-4) return;
+    if (Math.abs(rd.y) < 1e-4) return null;
     let h = 0;
-    for (let i = 0; i < 3; i++) { const t = (h - ro.y) / rd.y; this.aim.copy(ro).addScaledVector(rd, t); if (!W?.heightAt) break; h = W.heightAt(this.aim.x, this.aim.z); }
+    for (let i = 0; i < 3; i++) { const t = (h - ro.y) / rd.y; out.copy(ro).addScaledVector(rd, t); if (!W?.heightAt) break; h = W.heightAt(out.x, out.z); }
+    return out;
   }
   /** where the energy gathers: Moka's staff orb, else the paw holding the sword / ball */
   focusPoint(out) {
@@ -297,7 +303,7 @@ export class ChargeController {
       V.lit[i] = a.stage > i ? 1 : 0;
       V.aff[i] = a.aff > i ? 1 : 0;
     }
-    V.pos.copy(P.pos); V.orb = P.staff ? 1 : 0.55;
+    V.pos.copy(P.pos); V.orb = P.staff ? 1 : 0.55; V.style = a.c.pose;
     this.focusPoint(this.focus);
     chargeFx(this.G).charging(V, dt);
   }

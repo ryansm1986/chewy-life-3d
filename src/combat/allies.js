@@ -48,10 +48,21 @@ export class SpiritPup extends Actor {
   }
   update(dt) {
     if (!this.alive) return;
-    this.t += dt; this.biteCd -= dt;
+    this.t += dt; this.biteCd -= dt; this.pounceCd = (this.pounceCd ?? 1) - dt;
     if (this.t > this.p.duration) return this.expire();
     const G = this.G, P = G.player;
     const tgt = G.combat.nearest(P.pos, 'ally', 9);
+    // a charged Pack Call's Spirit Wolf pounces on foes 2-6 m away (docs/CHARGE.md)
+    if (this.pouncing) {
+      this.pouncing.t += dt; const k = Math.min(1, this.pouncing.t / 0.32);
+      this.pos.lerpVectors(this.pouncing.from, this.pouncing.to, k); this.rig.offsetY = Math.sin(k * Math.PI) * 0.9;
+      if (k >= 1) { const e = this.pouncing.e; this.pouncing = null; this.rig.offsetY = 0; if (e.alive) { G.combat.hitMonster(e, { dmgPct: this.p.pupDmgPct * 1.5, element: 'frost', source: 'pup', from: this.pos, knock: 0.8 }); e.applyStatus?.('slow', 2, 0.5); } G.vfx.ring(this.pos, { color: '#bfe0ff', r0: 0.2, r1: 1.6, life: 0.35 }); Events.emit('sfx', 'bark', { pitch: 0.75 }); }
+      super.update(dt); return;
+    }
+    if (this.pounce && tgt && this.pounceCd <= 0) {
+      const d = dist(tgt.pos.x, tgt.pos.z, this.pos.x, this.pos.z);
+      if (d > 2 && d < 6) { this.pounceCd = 3; this.pouncing = { t: 0, e: tgt, from: this.pos.clone(), to: tgt.pos.clone().add(this.pos.clone().sub(tgt.pos).setY(0).normalize().multiplyScalar(tgt.radius + 0.4)) }; this.faceTo(tgt.pos.x, tgt.pos.z); }
+    }
     if (tgt) {
       const d = dist(tgt.pos.x, tgt.pos.z, this.pos.x, this.pos.z);
       if (d > tgt.radius + 0.5) this.moveTo(tgt.pos.x, tgt.pos.z, dt, 1, tgt.radius + 0.4);
@@ -77,7 +88,7 @@ export class Decoy {
   constructor(G, pos, p) {
     this.G = G; this.p = p; this.team = 'ally'; this.alive = true; this.taunt = true; this.radius = 0.35; this.height = 0.5;
     this.pos = pos.clone(); this.pos.y = G.world.heightAt(pos.x, pos.z);
-    this.lifeMax = Math.round(G.derived.lifeMax * 0.6); this.life = this.lifeMax; this.res = {};
+    this.lifeMax = Math.round(G.derived.lifeMax * 0.6); this.life = this.lifeMax; this.res = {}; this.s0 = p.size || 1; this.radius *= this.s0; this.height *= this.s0; // (a charged Giant Squeaker is bigger)
     this.mesh = new THREE.Mesh(duckGeometry(), makeToon({ vertexColors: true, rim: 0.6 }));
     this.mesh.position.copy(this.pos); this.mesh.castShadow = true;
     const ol = new THREE.Mesh(duckGeo, makeOutline('#3a2230', 0.015)); this.mesh.add(ol);
@@ -93,7 +104,7 @@ export class Decoy {
   update(dt) {
     if (!this.alive) return;
     this.t += dt; this.acc += dt;
-    this.mesh.scale.lerp(new THREE.Vector3(1, 1, 1), 1 - Math.exp(-10 * dt));
+    this.mesh.scale.lerp(_one.setScalar(this.s0), 1 - Math.exp(-10 * dt));
     this.mesh.rotation.y += dt * 1.5; this.mesh.position.y = this.pos.y + Math.abs(Math.sin(this.t * 5)) * 0.08;
     if (this.acc >= this.p.pulse) {
       this.acc = 0;
@@ -105,7 +116,7 @@ export class Decoy {
 }
 
 // ================================================================== Moka's Duck Hunt summons (models + VFX in gfx/spellFx.js)
-const _dv = new THREE.Vector3();
+const _dv = new THREE.Vector3(), _one = new THREE.Vector3();
 const isFoe = e => e.alive && e.team === 'enemy' && !e.breakable;
 // Decoy Duck: a wind-up rubber duck that waddles to the target point and quacks; every monster within its lure radius
 // must go for it (monster.pickTarget reads tauntFor). Pops in confetti (and damage) when it breaks or runs down.
@@ -151,7 +162,7 @@ export class DuckDecoy {
     this.sync(dt);
   }
   sync(dt) {
-    const m = this.model, w = this.moving ? Math.sin(this.t * 17) : 0, s = this.sq * Math.sin(this.sq * 9), S = 1.35;
+    const m = this.model, w = this.moving ? Math.sin(this.t * 17) : 0, s = this.sq * Math.sin(this.sq * 9), S = 1.35 * (this.p.size || 1); // (a charged Mother Duck is bigger)
     m.root.position.set(this.pos.x, this.pos.y + (this.moving ? Math.abs(w) * 0.06 : 0), this.pos.z);
     m.root.rotation.set(this.moving ? -0.08 : 0, this.yaw + (this.moving ? w * 0.14 : Math.sin(this.t * 2.2) * 0.2), this.moving ? w * 0.2 : 0);
     m.root.scale.set(S * (1 + s * 0.22), S * (1 - s * 0.28), S * (1 + s * 0.22));
@@ -193,6 +204,7 @@ export class SpiritRetriever {
   }
   refresh(p, first) {
     this.p = p; this.lifeMax = p.life; this.life = p.life;
+    this.model.material.uniforms?.uCol?.value.set(p.golden ? '#ffd45a' : '#ffe2a8'); // (a charged summon glows gold)
     if (!first) { this.fx.starBurst(this.pos.clone().setY(this.pos.y + 0.6), { r: 0.9, n: 10 }); this.G.vfx.heal(this.pos.clone()); }
   }
   takeDamage(dmg) { if (!this.alive) return; this.life -= dmg; this.hurt = 1; if (this.life <= 0) this.expire(); }
@@ -201,7 +213,7 @@ export class SpiritRetriever {
     if (!this.alive) return;
     const G = this.G, P = G.player, p = this.p;
     if (!P) return;
-    this.t += dt; this.biteCd -= dt; this.barkCd -= dt; this.hurt = Math.max(0, this.hurt - dt * 4);
+    this.t += dt; this.biteCd -= dt; this.barkCd -= dt; this.hurt = Math.max(0, this.hurt - dt * 4); this.frenzyT = Math.max(0, (this.frenzyT || 0) - dt);
     this.alpha = Math.min(1, this.alpha + dt * 3);
     // pick a foe near Moka (re-evaluated a few times a second)
     this.retarget -= dt;
@@ -236,7 +248,7 @@ export class SpiritRetriever {
     this.move += (want - this.move) * Math.min(1, dt * 10);
     this.phase += dt * (6 + 9 * this.move) * this.move;
     // bite
-    if (T && d <= stop + 0.15 && this.biteCd <= 0 && this.biteT < 0) { this.biteT = 0; this.biteCd = p.biteCd; this.bitten = false; }
+    if (T && d <= stop + 0.15 && this.biteCd <= 0 && this.biteT < 0) { this.biteT = 0; this.biteCd = p.biteCd / (this.frenzyT > 0 ? 1.4 : 1); this.bitten = false; } // (Good Girl!: +40% bite speed)
     if (this.biteT >= 0) {
       this.biteT += dt;
       if (!this.bitten && this.biteT > 0.12 && T?.alive) {
@@ -261,7 +273,7 @@ export class SpiritRetriever {
   }
   pose() {
     const b = this.biteT >= 0 ? Math.sin(clamp(this.biteT / 0.32) * Math.PI) : 0, k = this.barkT >= 0 ? Math.sin(clamp(this.barkT / 0.45) * Math.PI) : 0;
-    this.fx.poseRetriever(this.model, { x: this.pos.x, y: this.pos.y, z: this.pos.z, yaw: this.yaw, t: this.t, move: this.move, phase: this.phase, bite: b, bark: k, alpha: this.alpha * (1 - this.hurt * 0.5 * (0.5 + 0.5 * Math.sin(this.t * 40))), scale: 1.2 });
+    this.fx.poseRetriever(this.model, { x: this.pos.x, y: this.pos.y, z: this.pos.z, yaw: this.yaw, t: this.t, move: this.move, phase: this.phase, bite: b, bark: k, alpha: this.alpha * (1 - this.hurt * 0.5 * (0.5 + 0.5 * Math.sin(this.t * 40))), scale: 1.2 * (this.p.size || 1) }); // (a charged Golden Retriever is bigger)
   }
   expire(silent) {
     if (!this.alive) return; this.alive = false;

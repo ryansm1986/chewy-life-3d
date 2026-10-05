@@ -34,7 +34,8 @@ try {
   await sleep(page, 400);
   const before = await page.evaluate(() => { const G = window.G; return { p: [G.player.pos.x, G.player.pos.z], npcs: G.npcs.filter(n => !n.folk).length, dist: G.engine.rig.distTarget, mem: window.QA.mem() }; });
   await tap(page, 'Tab');
-  await sleep(page, 350);
+  // (wait on the switch's own state, not the clock: under a loaded run-all 350 ms may be a frame or two, or past the hand-off)
+  await page.waitForFunction(() => { const G = window.G; return G.heroes.switching && G.engine.rig.distTarget > 24; }, null, { timeout: 5000 }).catch(() => {});
   const mid = await page.evaluate(() => { const G = window.G; return { switching: G.heroes.switching, locked: G.player.controlLocked, invuln: !!G.player.invuln, zoomedOut: G.engine.rig.distTarget > 24 }; });
   R.check('Tab starts the switch: input locked, invulnerable, camera pulls out', mid.switching && mid.locked && mid.invuln && mid.zoomedOut, JSON.stringify(mid));
   await sleep(page, SW);

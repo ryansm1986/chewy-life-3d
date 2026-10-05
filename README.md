@@ -10,6 +10,9 @@ his Boston terrier sidekick **Shadow**, and **Rosie**, a little girl with curly 
 
 Chrome / Edge recommended (WebGL2). Saves automatically to the browser's local storage.
 
+**itch.io:** `npm run build:itch` makes an upload-ready zip in `release/` (`npm run test:itch` also boots it in an
+itch-style iframe). Upload steps and page settings are in [docs/ITCH.md](docs/ITCH.md).
+
 ## Controls
 | Key / Mouse | Action |
 |---|---|
@@ -20,7 +23,7 @@ Chrome / Edge recommended (WebGL2). Saves automatically to the browser's local s
 | **F** at your garden bed | Till · plant (pick a seed: **1–9**) · water · harvest — whatever the tile needs |
 | **F** facing water | Fish: **F** when the float dips, then **hold F** (or the mouse) to keep the fish in the green |
 | **LMB on a monster** · **Shift+LMB** | Attack with your left-click skill |
-| **RMB**, **1–4** | Cast hotbar skills at the cursor (hold to keep casting / channel) |
+| **RMB**, **1–4** | Cast hotbar skills at the cursor · **tap** for a quick cast, **hold** to charge (Ⅰ → Ⅱ → Ⅲ, let go to release; channels spin / beam while held) · Settings › *Charge on hold*: On · Off · Toggle |
 | **Space** | Dodge roll |
 | **Q / E / R** | Heart Treat · Zoom Juice · Rejuvenation |
 | **X** | Swap **Bone Sword** ⇄ **Red Tennis Ball** |
@@ -49,7 +52,7 @@ Chrome / Edge recommended (WebGL2). Saves automatically to the browser's local s
 - **Upgrades and remodels**: every home has a mailbox. **Upgrade** a house (the builders' scaffold goes up and it grows, keeping its look and everything inside — the cottage too, to three levels); **Remodel** its outside with a live preview: four style sets (Machiya, Cottage, Tea House, Seaside) or any mix of roof, walls, trim, door, windows, noren, fence and festival bunting.
 
 **Guided tutorials**
-- Shadow shows you around Chewy's Cottage and the garden and then helps you make it home (decorating), Moka teaches you to switch heroes, Kero walks you through your first catch, and Tanu shows you how to remodel a house: a speech card, an objective card with *Skip*, bouncing arrows in the world and spotlights on the buttons that matter. Replay any guide from the Journal's **Guides** tab.
+- Shadow shows you around Chewy's Cottage and the garden and then helps you make it home (decorating), Moka teaches you to switch heroes, Kero walks you through your first catch, Tanu shows you how to remodel a house, and back from the Burrow Shadow shows you how to hold a skill to power it up: a speech card, an objective card with *Skip*, bouncing arrows in the world and spotlights on the buttons that matter. Replay any guide from the Journal's **Guides** tab.
 
 **The homestead (farming, fishing, cooking)**
 - **Farming**: till, plant, water and harvest in Chewy's garden bed and the village's Veggie Patch fields. Eight crops grow a stage every watered night (a dry day only waits; nothing dies), strawberries keep fruiting, and sprinklers water their neighbours. Seeds come from **Usagi's Seed Stall** and as loot in the Burrow.
@@ -62,6 +65,7 @@ Chrome / Edge recommended (WebGL2). Saves automatically to the browser's local s
 - Cute yokai monsters (mochi slimes, dust bunnies, kinoko, lantern ghosts, kasa-obake, fox-fire wisps, oni imps, tanuki bandits) in packs led by **champions** and **uniques** with D2-style modifiers (fire enchanted, frosty aura, teleporting, vampiric…).
 - Bosses every 5 floors: **King Mochi**, **Lord Karakasa**, **Oni Chef Gorobei**, **Tamamo the Nine-Tailed**.
 - **Three skill trees × 7 skills** (Bone Arts, Fetch Mastery, Pack Spirit) with synergies, 60 levels, stat points.
+- **Charged abilities**: hold any active skill to charge it (a ring fills to Stage Ⅰ, Ⅱ, Ⅲ) and let go for a bigger version — a rolling shockwave cleave, a piercing fastball, a giant squeaker, a meteor shower… Skill points buy **charge perks** per skill in the K panel's Charge card: more stages, a quicker wind-up, extra projectiles and a unique trick for every skill.
 - **Loot**: normal / magic / rare / unique / set items with affixes, sockets and treat gems; loot beams for rares+; potions, materials and coins.
 - **Shadow** fights by your side, faints and gets back up; call spirit pups, throw squeaky decoys and heal with treats.
 
@@ -71,10 +75,10 @@ icons and portraits are generated in code; all music and sound effects are synth
 Dev pages live under `/?test=…` (`sandbox`, `chars`, `monsters`, `dungeon`, `buildings` (`&style=all`), `ui`, `rpg`, `audio`, `portraits`, `furniture`, `furnsheet` (catalog sheets and room vignettes), `stall`, `upgrade`).
 
 ## Testing
-- `node tools/test-rpg.mjs` — ~4.9M checks on items, affixes, stats, levelling and drop tables, plus the homestead's math (pantry, recipes and mixes, Well Fed, growth, fish, the reel) and housing's (the furniture catalog, room shells, placement rules, the Home Rating, owners, styles, interiors growing, the shop, recipes and finds).
+- `node tools/test-rpg.mjs` — ~4.9M checks on items, affixes, stats, levelling and drop tables, plus the homestead's math (pantry, recipes and mixes, Well Fed, growth, fish, the reel) and housing's (the furniture catalog, room shells, placement rules, the Home Rating, owners, styles, interiors growing, the shop, recipes and finds), and the charged abilities (every table, stage times, costs, perk gating, the balance layer and the DPS-band sim, `tools/charge-sim.mjs`).
 - `node tools/qa/prod-smoke.mjs` — builds the game, serves the bundle and checks the UI/audio load with no errors (run before shipping launcher changes)
 - `node tools/qa/run-all.mjs` — browser scenario suite (needs `npm run dev`): village↔Burrow round trips and leak checks,
   combat stress with every skill, all four bosses, death, village sim + save/load, inventory edge cases, dialogue/story,
-  input edge cases, the regions, the village plan, the homestead (s15: farming, fishing, cooking), the guided tutorials (s16), housing (s17: interiors, decorating, villagers' homes, ratings, requests, upgrades, remodels, the housing guides) and getting furniture (s18). Each scenario (`tools/qa/s*.mjs`) can also run on its own.
+  input edge cases, the regions, the village plan, the homestead (s15: farming, fishing, cooking), the guided tutorials (s16), housing (s17: interiors, decorating, villagers' homes, ratings, requests, upgrades, remodels, the housing guides), getting furniture (s18) and charged abilities (s19: the hold, the perks, the channels, every skill, the K panel, dash bounds, the guide, perf). Each scenario (`tools/qa/s*.mjs`) can also run on its own.
 - `node tools/qa/village-perf.mjs 2` / `node tools/qa/homestead-perf.mjs 2` / `node tools/qa/housing-perf.mjs 2` — frame-time snapshots (the village; a full garden and a reel in progress; entering homes, a 60-piece room, remodels).
 - `node tools/shot.mjs --url "/?..." --out name` — headless screenshot harness used for visual iteration.

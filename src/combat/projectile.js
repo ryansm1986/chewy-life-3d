@@ -31,6 +31,7 @@ function glowSprite(color, s = 1) {
 
 const VIS = {
   ball: { mesh: () => { const g = new THREE.Group(); g.add(ballMesh(0.16), glowSprite('#ff7a6a', 0.7)); return g; }, trail: '#ff8a70', trailSize: 0.55, light: null },
+  pitball: { mesh: () => { const g = new THREE.Group(); g.add(ballMesh(0.16), glowSprite('#ff7a6a', 0.32)); return g; }, trail: '#ff8a70', trailSize: 0.26, light: null }, // a charged Multi-Fetch's many balls: lighter glow so the barrage doesn't wash out the foes
   blaze: { mesh: () => { const g = new THREE.Group(); g.add(ballMesh(0.18), glowSprite('#ff9a3c', 2.4)); return g; }, trail: '#ff9a3c', fire: true, fireSize: 0.7, light: '#ff8a3a' },
   fireball: { mesh: () => glowSprite('#ffa050', 1.1), trail: '#ff7a3a', fire: true, light: '#ff8a3a' },
   foxfire: { mesh: () => glowSprite('#8ab8ff', 1.0), trail: '#aac8ff', light: '#7aa8ff' },
@@ -47,6 +48,7 @@ const VIS = {
   // charged releases (docs/CHARGE.md): Power Throw's Fastball and Splash Bolt's big orb (o.size scales them)
   fastball: { mesh: p => { const g = new THREE.Group(); g.add(ballMesh(0.125 * (p?.o.size || 1.5))); if (p) g.add(chargeFx(p.G).fastballMesh(p.o.size || 1.5)); return g; }, trailFn: (p, dt) => chargeFx(p.G).trailFastball(p, dt) },
   bigorb: { mesh: p => (p ? chargeFx(p.G).bigOrbMesh(p.o.size || 1.8) : new THREE.Group()), trailFn: (p, dt) => chargeFx(p.G).trailBigOrb(p, dt) },
+  zapball: { mesh: p => { const g = new THREE.Group(); g.add(ballMesh(0.18)); if (p) g.add(chargeFx(p.G).zapHalo()); return g; }, trailFn: (p, dt) => chargeFx(p.G).trailZap(p, dt) },
 };
 
 // every projectile look (ball, blaze, fireball, foxfire, pots...), for the floor prewarm (game.js): the caller shows
@@ -106,7 +108,7 @@ export class Projectile {
       const nx = this.pos.x + this.dir.x * step, nz = this.pos.z + this.dir.z * step;
       // walls
       if (G.world.collision?.solidAt?.(nx, nz, 0.05)) {
-        if (this.kind === 'ball' && this.bounces > 0) {
+        if ((this.kind === 'ball' || this.kind === 'zapball' || this.kind === 'pitball') && this.bounces > 0) {
           const bx = G.world.collision.solidAt(nx, this.pos.z, 0.05), bz = G.world.collision.solidAt(this.pos.x, nz, 0.05);
           if (bx) this.dir.x *= -1; if (bz) this.dir.z *= -1; if (!bx && !bz) this.dir.negate();
           this.bounces--; Events.emit('sfx', 'ball_bounce', { pos: this.pos }); vfx.sparks(this.pos, { n: 4, color: '#fff', speed: 2, size: 0.2 });
@@ -120,7 +122,7 @@ export class Projectile {
         if (d < this.radius + (e.radius || 0.3)) {
           this.hitSet.add(e);
           this.o.onHit?.(e, this);
-          if (this.kind === 'ball' && this.o.ricochet > 0) { // bounce toward the next nearest enemy
+          if ((this.kind === 'ball' || this.kind === 'zapball' || this.kind === 'pitball') && this.o.ricochet > 0) { // bounce toward the next nearest enemy
             this.o.ricochet--;
             const next = this.c.nearest(this.pos, this.team, this.o.bounceRange || 6, x => !this.hitSet.has(x));
             if (next) { this.dir.copy(next.pos).sub(this.pos).setY(0).normalize(); this.traveled = 0; this.range = this.o.bounceRange || 6; Events.emit('sfx', 'ball_bounce'); continue; }

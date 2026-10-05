@@ -529,14 +529,14 @@ void main(){
 // moonbeam cylinder: soft volumetric sides, streaks sliding down, bright foot, fades out high up
 const VS_BEAM = /* glsl */`varying vec2 vUv; varying vec3 vN, vV;
 void main(){ vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = -mv.xyz; gl_Position = projectionMatrix * mv; }`;
-const FS_BEAM = /* glsl */`uniform float uT, uA; uniform vec3 uCol; varying vec2 vUv; varying vec3 vN, vV;
+const FS_BEAM = /* glsl */`uniform float uT, uA, uGain, uTop; uniform vec3 uCol; varying vec2 vUv; varying vec3 vN, vV;
 void main(){
   float ndv = abs(dot(normalize(vN), normalize(vV))), core = pow(ndv, 1.6);
   float st = 0.55 + 0.45 * sin(vUv.x * 6.2831853 * 5.0 + sin(vUv.y * 7.0 + uT * 1.7) * 1.4);
   float flow = 0.62 + 0.38 * sin(vUv.y * 34.0 + uT * 11.0 + vUv.x * 12.0);
-  float fy = smoothstep(1.0, 0.35, vUv.y) * (0.75 + 0.25 * smoothstep(0.0, 0.05, vUv.y)) + smoothstep(0.12, 0.0, vUv.y) * 0.6;
+  float fy = smoothstep(uTop, uTop * 0.35, vUv.y) * (0.75 + 0.25 * smoothstep(0.0, 0.05, vUv.y)) + smoothstep(0.12, 0.0, vUv.y) * 0.6; // (uTop: where the column has faded out, 0..1 of its height)
   float a = uA * core * fy * (0.45 + 0.55 * st * flow);
-  gl_FragColor = vec4(uCol * (1.0 + core * 0.9), a);
+  gl_FragColor = vec4(uCol * (1.0 + core * uGain), a);
 }`;
 // camera-facing ribbon (constellation lines, leash): position = points, aT tangent, aS side ±1, aU along 0..1
 const VS_RIBBON = /* glsl */`attribute vec3 aT; attribute float aS; attribute float aU; uniform float uW; varying float vS, vU;
@@ -685,7 +685,7 @@ export class SpellFX {
   mVortex() { return shader(VS_UV, FS_VORTEX, { uT: this.uT, uA: { value: 0 }, uCol: { value: C('#4fd8e0') }, uDeep: { value: C('#0e5a78') } }); }
   mWall() { return shader(VS_UV, FS_WALL, { uT: this.uT, uA: { value: 0 }, uCol: { value: C('#a8f4ff') } }, { side: THREE.DoubleSide }); }
   mWave() { return shader(VS_WAVE, FS_WAVE, { uT: this.uT, uA: { value: 0 }, uH: { value: 0 }, uDeep: { value: C('#11708e') }, uMid: { value: C('#35c4d6') }, uLight: { value: C('#b4fff4') } }, { side: THREE.DoubleSide }); }
-  mBeam(core) { return shader(VS_BEAM, FS_BEAM, { uT: this.uT, uA: { value: 0 }, uCol: { value: core ? C('#fffaf0') : C('#b8b8ff') } }, { side: THREE.DoubleSide, blending: THREE.AdditiveBlending }); }
+  mBeam(core) { return shader(VS_BEAM, FS_BEAM, { uT: this.uT, uA: { value: 0 }, uGain: { value: 0.9 }, uTop: { value: 1 }, uCol: { value: core ? C('#fffaf0') : C('#b8b8ff') } }, { side: THREE.DoubleSide, blending: THREE.AdditiveBlending }); }
   mRibbon(style) { return shader(VS_RIBBON, FS_RIBBON, { uT: this.uT, uA: { value: 0 }, uW: { value: 0.1 }, uStyle: { value: style }, uLen: { value: 5 }, uCol: { value: style ? C('#ffb04a') : C('#9a7aff') }, uCore: { value: style ? C('#fff2b0') : C('#fff8e0') } }, style ? {} : { blending: THREE.AdditiveBlending }); }
   mSurge() { return shader(VS_UV, FS_SURGE, { uT: this.uT, uA: { value: 0 }, uLen: { value: 8 }, uCol: { value: C('#5ad8e4') }, uDeep: { value: C('#1a86a4') } }); }
   mLure() { return shader(VS_UV, FS_LURE, { uT: this.uT, uA: { value: 0 }, uCol: { value: C('#ffb04a') }, uCol2: { value: C('#8fd068') } }); }
@@ -763,12 +763,12 @@ export class SpellFX {
     if (Math.random() < dt * 8) this.pn.spawn({ frame: F.BUBBLE, x: p.x, y: p.y, z: p.z, vy: 0.8, vx: rand(-0.4, 0.4), vz: rand(-0.4, 0.4), life: 0.5, size: rand(0.1, 0.18), size1: 0.14, color: PAL.foam, alpha: 0.9, alpha1: 0 });
   }
   /** a splash: crown, ripples, droplets, mist. r ≈ splash radius */
-  splash(pos, { r = 1.2, big = false, color = PAL.aqua } = {}) {
+  splash(pos, { r = 1.2, big = false, color = PAL.aqua, alpha = 0.95, maxH = 99 } = {}) {
     const m = this.take('crown', () => { const o = new THREE.Mesh(G_CYL(), this.mCrown()); o.renderOrder = 11; return o; });
     const life = big ? 0.7 : 0.55, U = m.material.uniforms;
-    m.position.set(pos.x, (pos.y || 0) + 0.02, pos.z); m.scale.set(r * 0.85, r * (big ? 1.5 : 1.15), r * 0.85); m.rotation.y = rand(0, TAU);
+    m.position.set(pos.x, (pos.y || 0) + 0.02, pos.z); m.scale.set(r * 0.85, Math.min(maxH, r * (big ? 1.5 : 1.15)), r * 0.85); m.rotation.y = rand(0, TAU);
     U.uSeed.value = rand(0, 100); U.uCol.value.copy(color);
-    this.run((dt, t) => { U.uK.value = t / life; U.uA.value = 0.95; return t < life; }, () => this.give('crown', m));
+    this.run((dt, t) => { U.uK.value = t / life; U.uA.value = alpha; return t < life; }, () => this.give('crown', m));
     this.ripple(pos, { r: r * (big ? 1.7 : 1.45), life: big ? 1.1 : 0.85, color });
     const n = big ? 30 : 18;
     this.pa.spawn({ frame: F.DOT, x: pos.x, y: (pos.y || 0) + 0.5, z: pos.z, life: 0.16, size: r * 1.3, size1: r * 2.4, color: PAL.foam, alpha: 0.75, alpha1: 0 });
@@ -803,10 +803,11 @@ export class SpellFX {
   /** Bubble Barrier around a moving actor. handle: hit(), pop(), end() */
   bubble(getPos) {
     const m = this.take('bubble', () => { const o = new THREE.Mesh(G_SPHERE(), this.mBubble()); o.renderOrder = 14; return o; });
-    const U = m.material.uniforms, H = { alive: true, jig: 0, popT: -1 };
-    const R = 0.92;
+    const U = m.material.uniforms, H = { alive: true, jig: 0, popT: -1, scale: 1 }; // (H.scale: a charged Mega Bubble)
+    const R0 = 0.92;
+    let R = R0;
     this.run((dt, t) => {
-      const p = getPos(_a); m.position.set(p.x, p.y + 0.66, p.z);
+      const p = getPos(_a); R = R0 * H.scale; m.position.set(p.x, p.y + 0.66 * H.scale, p.z);
       H.jig = Math.max(0, H.jig - dt * 3); U.uJ.value = H.jig;
       if (H.popT >= 0) {
         H.popT += dt; const k = H.popT / 0.14;
@@ -848,11 +849,12 @@ export class SpellFX {
   whirlpool(pos, r, dur) {
     const disk = this.take('vortex', () => { const o = new THREE.Mesh(G_PLANE(), this.mVortex()); o.renderOrder = 8; return o; });
     const wall = this.take('vwall', () => { const o = new THREE.Mesh(G_CYL(), this.mWall()); o.renderOrder = 10; return o; });
-    const cx = pos.x, cz = pos.z, y0 = pos.y || 0, UD = disk.material.uniforms, UW = wall.material.uniforms;
+    let cx = pos.x, cz = pos.z; const y0 = pos.y || 0, UD = disk.material.uniforms, UW = wall.material.uniforms;
     disk.position.set(cx, y0 + 0.035, cz); wall.position.set(cx, y0, cz);
     const light = this.vfx.lightPool?.addSource({ pos: new THREE.Vector3(cx, y0 + 0.8, cz), color: new THREE.Color('#5ce0e0'), intensity: 3.5, radius: r * 2.2, priority: 3 });
     const H = { alive: true, pos: new THREE.Vector3(cx, y0, cz), r };
     this.run((dt, t) => {
+      cx = H.pos.x; cz = H.pos.z; disk.position.set(cx, y0 + 0.035, cz); wall.position.set(cx, y0, cz); if (light) light.pos.set(cx, y0 + 0.8, cz); // (a charged Riptide drifts)
       const tin = Math.min(1, t / 0.35), tout = Math.max(0, Math.min(1, (dur - t) / 0.4)), vis = Math.min(tin, tout);
       const s = r * (0.35 + 0.65 * ease.outBack(tin)) * (0.6 + 0.4 * tout);
       disk.scale.setScalar(s); disk.rotation.y -= dt * 0.8;
@@ -1015,30 +1017,36 @@ export class SpellFX {
       if (Math.random() < dt * 6) { const a = rand(0, TAU), rr = rand(0.2, 0.9) * r; this.pa.spawn({ frame: Math.random() < 0.3 ? F.GLOWSTAR : F.SPARK, x: x + Math.cos(a) * rr, y: y0 + 0.1, z: z + Math.sin(a) * rr, vy: rand(0.4, 1), life: rand(0.6, 1), size: rand(0.12, 0.22), size1: 0.02, color: Math.random() < 0.5 ? PAL.gold : PAL.violet, alpha: 0.9, alpha1: 0 }); }
       return H.alive;
     }, () => { H.alive = false; this.give('rune', m); });
-    H.erupt = (R = 2.3) => {
+    // (soft: a charged rune's little extra runes: no pillar or flash, a thin ring, so a cluster of them stays readable)
+    H.erupt = (R = 2.3, soft = false) => {
       if (H.erupting >= 0) return; H.erupting = 0;
       const p = _b.set(x, y0, z);
-      this.vfx.pillar(p, { color: '#ffe8a0', r: 0.75, h: 5.5, life: 0.55, opacity: 0.9 });
-      this.shock(p, { r: R * 1.1, life: 0.4, w: 0.14, a: '#ffe08a', b: '#c8b0ff' });
-      for (let i = 0; i < 26; i++) {
+      if (!soft) this.vfx.pillar(p, { color: '#ffe8a0', r: 0.75, h: 5.5, life: 0.55, opacity: 0.9 });
+      this.shock(p, { r: R * 1.1, life: 0.4, w: Math.min(soft ? 0.08 : 0.14, 0.4 / (R * 1.1)), a: '#ffe08a', b: '#c8b0ff' }); // (a big charged rune's band stays about half a metre, not 0.85 m)
+      for (let i = 0, n = soft ? 10 : 26; i < n; i++) {
         const a = rand(0, TAU), s = rand(0.5, 2.6), ink = i % 2 === 0;
         this.p(ink ? 'n' : 'a', { frame: ink ? F.STAR : F.GLOWSTAR, x: x + Math.cos(a) * 0.2, y: y0 + 0.3, z: z + Math.sin(a) * 0.2, vx: Math.cos(a) * s, vy: rand(5, 10), vz: Math.sin(a) * s, life: rand(0.6, 1.0), size: rand(0.24, 0.4), size1: 0.08, color: i % 3 ? PAL.gold : PAL.violet, alpha: 1, alpha1: 0.3, grav: 14, drag: 0.8, spin: rand(-6, 6) });
       }
-      this.pa.spawn({ frame: F.PAW, x, y: y0 + 1.2, z, vy: 1.5, life: 0.5, size: 1.4, size1: 2.2, color: PAL.gold, alpha: 1, alpha1: 0 });
-      this.vfx.flash(_c.set(x, y0 + 0.6, z), '#fff0b0', 2.4, 0.2);
-      this.vfx.light(_c, '#ffe08a', 10, R * 2.4, 0.35);
+      this.pa.spawn({ frame: F.PAW, x, y: y0 + 1.2, z, vy: 1.5, life: 0.5, size: soft ? 0.9 : 1.4, size1: soft ? 1.4 : 2.2, color: PAL.gold, alpha: soft ? 0.8 : 1, alpha1: 0 });
+      if (!soft) this.vfx.flash(_c.set(x, y0 + 0.6, z), '#fff0b0', 2.4, 0.2);
+      this.vfx.light(_c.set(x, y0 + 0.6, z), '#ffe08a', soft ? 3 : 10, R * (soft ? 1.4 : 2.4), 0.3);
     };
     H.end = () => { if (H.fade == null) H.fade = 1; };
     return H;
   }
   /** Moonbeam from the sky. handle.pos is moved by the caller; handle.end() */
-  moonbeam(r = 1.3) {
+  moonbeam(r = 1.3, dim = 1) {
     const outer = this.take('beamO', () => { const o = new THREE.Mesh(G_CYL(), this.mBeam(false)); o.renderOrder = 13; return o; });
     const core = this.take('beamC', () => { const o = new THREE.Mesh(G_CYL(), this.mBeam(true)); o.renderOrder = 13; return o; });
     const pool = this.take('moonPool', () => { const o = new THREE.Mesh(G_PLANE(), this.mGlyph(moonTex())); o.renderOrder = 9; return o; });
-    pool.material.color.set('#d8d0ff');
+    pool.material.color.set('#b8b4f0');
+    // (kept as bright as the other spells: a cool core with a soft edge, low gain, so the beam never blooms the screen white)
+    outer.material.uniforms.uCol.value.set('#8288d8'); core.material.uniforms.uCol.value.set('#c8d2ff');
+    outer.material.uniforms.uGain.value = 0.15; core.material.uniforms.uGain.value = 0.12;
+    // (a moonlit column, not fog: it fades out by ~6 m up instead of 16, so from the high camera it doesn't sheet half the screen)
+    outer.material.uniforms.uTop.value = 0.38; core.material.uniforms.uTop.value = 0.45;
     const H = { alive: true, pos: new THREE.Vector3(), endT: -1, r }; // (H.r: a charged Moonbeam grows as it revs up)
-    const light = this.vfx.lightPool?.addSource({ pos: new THREE.Vector3(), color: new THREE.Color('#c8c8ff'), intensity: 6, radius: 6, priority: 5 });
+    const light = this.vfx.lightPool?.addSource({ pos: new THREE.Vector3(), color: new THREE.Color('#c8c8ff'), intensity: 2.2 * dim, radius: Math.min(3.2, r * 2), priority: 5 });
     const HT = 16;
     let rr0 = r; const rBase = r;
     this.run((dt, t) => {
@@ -1047,14 +1055,14 @@ export class SpellFX {
       let k = Math.min(1, t / 0.16);
       if (H.endT >= 0) { H.endT += dt; k *= Math.max(0, 1 - H.endT / 0.22); if (H.endT > 0.22) return false; }
       const p = H.pos, wob = 1 + Math.sin(t * 9) * 0.04;
-      outer.position.set(p.x, p.y, p.z); outer.scale.set(rc * 1.05 * k * wob, HT, rc * 1.05 * k * wob);
-      core.position.set(p.x, p.y, p.z); core.scale.set(rc * 0.42 * k, HT, rc * 0.42 * k);
+      outer.position.set(p.x, p.y, p.z); outer.scale.set(rc * 0.8 * k * wob, HT, rc * 0.8 * k * wob); // (inside its own footprint)
+      core.position.set(p.x, p.y, p.z); core.scale.set(rc * 0.34 * k, HT, rc * 0.34 * k);
       const thin = rBase / rc, thinP = Math.sqrt(rBase / r); // (a grown beam keeps the same total light: no bloom wash)
-      outer.material.uniforms.uA.value = 0.75 * k * thin * thin; core.material.uniforms.uA.value = 1.0 * k * thin;
-      pool.position.set(p.x, p.y + 0.05, p.z); pool.scale.setScalar(r * 1.35 * (0.9 + 0.1 * Math.sin(t * 6))); pool.rotation.y += dt * 0.9; pool.material.opacity = 0.85 * k * thinP;
-      if (light) { light.pos.set(p.x, p.y + 1.5, p.z); light.intensity = 6 * k; }
+      outer.material.uniforms.uA.value = 0.24 * k * thin * thin * dim; core.material.uniforms.uA.value = 0.3 * k * thin * dim;
+      pool.position.set(p.x, p.y + 0.05, p.z); pool.scale.setScalar(r * 1.05 * (0.92 + 0.08 * Math.sin(t * 6))); pool.rotation.y += dt * 0.9; pool.material.opacity = 0.38 * k * thinP * dim;
+      if (light) { light.pos.set(p.x, p.y + 1.2, p.z); light.intensity = 2.2 * k * dim; light.radius = Math.min(3.2, r * 2); }
       // dust motes drifting in the shaft, sparkles where it lands
-      for (let i = this.emit('motes', 45 * k, dt); i > 0; i--) { const a = rand(0, TAU), rr = Math.sqrt(Math.random()) * r * 0.9; this.pa.spawn({ frame: i % 4 ? F.DOT : F.SPARK, x: p.x + Math.cos(a) * rr, y: p.y + rand(0.1, 5), z: p.z + Math.sin(a) * rr, vy: rand(-0.6, 0.6), vx: rand(-0.1, 0.1), vz: rand(-0.1, 0.1), life: rand(0.7, 1.3), size: rand(0.05, 0.12), size1: 0.03, color: i % 3 ? PAL.moon : PAL.lilac, alpha: 0.9, alpha1: 0, fadeIn: 0.2, flicker: 12 }); }
+      for (let i = this.emit('motes', 45 * k, dt); i > 0; i--) { const a = rand(0, TAU), rr = Math.sqrt(Math.random()) * r * 0.9; this.pa.spawn({ frame: i % 4 ? F.DOT : F.SPARK, x: p.x + Math.cos(a) * rr * 0.8, y: p.y + rand(0.1, 3.5), z: p.z + Math.sin(a) * rr * 0.8, vy: rand(-0.6, 0.6), vx: rand(-0.1, 0.1), vz: rand(-0.1, 0.1), life: rand(0.7, 1.3), size: rand(0.05, 0.12), size1: 0.03, color: i % 3 ? PAL.moon : PAL.lilac, alpha: 0.9, alpha1: 0, fadeIn: 0.2, flicker: 12 }); }
       for (let i = this.emit('mbSpark', 20 * k, dt); i > 0; i--) { const a = rand(0, TAU); this.pa.spawn({ frame: F.GLOWSTAR, x: p.x + Math.cos(a) * r * 0.6, y: p.y + 0.15, z: p.z + Math.sin(a) * r * 0.6, vx: Math.cos(a) * 1.5, vy: rand(1, 2.5), vz: Math.sin(a) * 1.5, life: 0.45, size: rand(0.16, 0.26), size1: 0.02, color: PAL.moon, alpha: 1, alpha1: 0, drag: 2 }); }
       return H.alive || H.endT >= 0;
     }, () => { H.alive = false; this.give('beamO', outer); this.give('beamC', core); this.give('moonPool', pool); if (light) this.vfx.lightPool?.removeSource(light); });
@@ -1103,7 +1111,7 @@ export class SpellFX {
     return H;
   }
   /** Treat Meteor: a giant bone biscuit streaks down; onImpact(pos) fires on landing */
-  meteor(from, to, { time = 1, r = 3.4, onImpact } = {}) {
+  meteor(from, to, { time = 1, r = 3.4, onImpact, scale = 1 } = {}) {
     const bis = this.take('biscuit', () => { const o = new THREE.Mesh(G_BONE(), this.mat('biscuitMat', () => makeToon({ map: biscuitTex(), rim: 0.45, brush: 0.08, objectBrush: true, emissive: '#ff7a2a', emissiveIntensity: 0.6 }))); o.castShadow = true; return o; });
     const tgt = this.take('target', () => { const o = new THREE.Mesh(G_PLANE(), this.mGlyph(ringTexture())); o.renderOrder = 9; return o; });
     const inner = this.take('targetIn', () => { const o = new THREE.Mesh(G_PLANE(), this.mGlyph(glowTexture())); o.renderOrder = 9; return o; });
@@ -1112,7 +1120,7 @@ export class SpellFX {
     const light = this.vfx.lightPool?.addSource({ pos: F0.clone(), color: new THREE.Color('#ffa050'), intensity: 7, radius: 7, priority: 6 });
     const H = { alive: true, landed: false, cancel: false };
     H.end = () => { H.cancel = true; };
-    const S = 1.3;
+    const S = 1.3 * scale; // (a charged Mega Meteor is bigger, its shower's minis smaller)
     bis.scale.setScalar(S);
     this.run((dt, t) => {
       if (H.cancel) return false;
@@ -1142,8 +1150,9 @@ export class SpellFX {
       // stuck in its crater, then crumbles away
       const u = t - H.tl;
       bis.material.emissiveIntensity = Math.max(0, 0.55 * (1 - u / 0.6));
-      if (u > 0.7) {
-        const k = Math.min(1, (u - 0.7) / 0.35); bis.scale.setScalar(S * (1 - k)); bis.position.y = T0.y + 0.3 * S * (1 - k);
+      const hold = scale > 1.05 ? 0.4 : 0.7; // (a charged, bigger biscuit crumbles sooner so the foes under it read again)
+      if (u > hold) {
+        const k = Math.min(1, (u - hold) / 0.35); bis.scale.setScalar(S * (1 - k)); bis.position.y = T0.y + 0.3 * S * (1 - k);
         if (Math.random() < 0.8) this.pn.spawn({ frame: F.CRUMB, x: T0.x + rand(-0.9, 0.9), y: T0.y + rand(0.2, 0.6), z: T0.z + rand(-0.9, 0.9), vx: rand(-1.5, 1.5), vy: rand(1, 3), vz: rand(-1.5, 1.5), life: 0.6, size: rand(0.14, 0.26), size1: 0.1, color: PAL.biscuit, alpha: 1, alpha1: 1, grav: 12, spin: rand(-6, 6) });
         if (k >= 1) return false;
       } else if (Math.random() < dt * 20) this.vfx.smoke.spawn({ x: T0.x + rand(-0.8, 0.8), y: T0.y + 0.3, z: T0.z + rand(-0.8, 0.8), vy: rand(0.8, 1.5), life: 1, size: 0.6, size1: 1.4, color: '#7a6a6a', alpha: 0.35, alpha1: 0 });
@@ -1153,10 +1162,13 @@ export class SpellFX {
   }
   impact(pos, r) {
     const v = this.vfx, x = pos.x, y0 = pos.y || 0, z = pos.z;
-    v.flash(_a.set(x, y0 + 0.8, z), '#fff0c8', r * 1.6, 0.26);
-    v.light(_a, '#ffc070', 22, r * 3, 0.5);
+    // (a charged Mega Meteor's bigger r grows the hit area, not the flash: past the base 3.4 m the flash holds, the gold
+    //  ripple only reaches 2 m past the edge and fades, so the foes under it stay readable)
+    const big = Math.max(1, r / 3.4);
+    v.flash(_a.set(x, y0 + 0.8, z), '#fff0c8', Math.min(r, 3.4) * 1.6, 0.26);
+    v.light(_a, '#ffc070', 22 / big, Math.min(r, 3.4) * 3, 0.5);
     this.shock(pos, { r: r * 1.3, life: 0.5, w: 0.13, a: '#ffe0a0', b: '#ffb070' });
-    this.ripple(pos, { r: r * 1.6, life: 0.7, color: PAL.gold, alpha: 0.8 });
+    this.ripple(pos, { r: Math.min(r * 1.6, r + 2), life: 0.7, color: PAL.gold, alpha: 0.8 / big });
     v.shockwave(pos, r * 1.3, '#ffe0b0');
     v.fire(_a.set(x, y0 + 0.2, z), 28, { spread: r * 0.45, size: 0.9 });
     for (let i = 0; i < 14; i++) v.smoke.spawn({ x: x + rand(-1, 1) * r * 0.4, y: y0 + 0.3, z: z + rand(-1, 1) * r * 0.4, vx: rand(-1.5, 1.5), vy: rand(2, 4.5), vz: rand(-1.5, 1.5), life: rand(0.8, 1.2), size: rand(0.7, 1.1), size1: 2, color: '#8a7478', alpha: 0.38, alpha1: 0, drag: 2 });
@@ -1297,7 +1309,7 @@ export class SpellFX {
     pivotRot(M[6], P[6], -sw, 0, 0, 0, 0, 0); pivotRot(M[7], P[7], -sw, 0, 0, 0, 0, 0);
   }
   /** Mallard Squadron. o: { from, center, n, area, points:[Vector3]|null, onImpact(pos, i) } → handle */
-  mallards({ from, center, n = 6, area = 4, points = null, onImpact } = {}) {
+  mallards({ from, center, n = 6, area = 4, points = null, onImpact, soft = !!this._soft } = {}) { // (soft: a charged flock's many dives make lower, see-through crowns)
     const MAX = 12;
     const m = this.take('mallards', () => {
       const g = G_MALLARD().clone();
@@ -1337,7 +1349,7 @@ export class SpellFX {
           if (k >= 1) {
             b.done = true;
             this.featherBurst(_c.set(b.hit.x, b.hit.y + 0.4, b.hit.z), 7, { color: PAL.mint, color2: PAL.foam });
-            this.splash(b.hit, { r: 0.9 });
+            this.splash(b.hit, soft ? { r: 0.75, maxH: 0.75, alpha: 0.6 } : { r: 0.9 });
             this.pa.spawn({ frame: F.RING, x: b.hit.x, y: b.hit.y + 0.15, z: b.hit.z, life: 0.3, size: 0.4, size1: 2.6, color: PAL.mint, alpha: 1, alpha1: 0 });
             onImpact?.(b.hit, i);
           }

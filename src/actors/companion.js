@@ -57,7 +57,7 @@ export class Companion extends Actor {
       return true;
     }
     this.life = Math.min(this.lifeMax, this.life + this.lifeMax * 0.01 * dt);
-    this.biteCd -= dt;
+    this.biteCd -= dt; this.frenzyT = Math.max(0, (this.frenzyT || 0) - dt); // (Pack Leader: a charged Pack Call's frenzy)
     const p = G.player;
     const tgt = G.combat.nearest(p.pos, 'ally', 7.5, e => !e.breakable);
     if (!tgt) return false;
@@ -66,7 +66,7 @@ export class Companion extends Actor {
     else {
       this.faceTo(tgt.pos.x, tgt.pos.z);
       if (this.biteCd <= 0) {
-        this.biteCd = 0.9;
+        this.biteCd = 0.9 / (this.frenzyT > 0 ? 1.3 : 1);
         this.anim.play('bark', { force: true });
         const pw = G.combat.buffs.shadowPower;
         G.combat.hitMonster(tgt, { dmgPct: 55 * (1 + ((G.derived?.shadowDmg || 0) + (pw?.dmg || 0)) / 100), source: 'shadow', from: this.pos, knock: 0.2 });

@@ -9,6 +9,7 @@ import { rand, TAU, clamp, dist } from '../core/util.js';
 import { spellFx, setSpellGame, PAL } from '../gfx/spellFx.js';
 import { DuckDecoy, SpiritRetriever } from './allies.js';
 import { STAFF_GRIP, setStaffGlow } from '../actors/heroGear.js';
+import { perkAt } from '../rpg/charge.js';
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _u = new THREE.Vector3(), _t = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
@@ -170,6 +171,8 @@ const M = {
   },
   cast_puddleHop(R, aim) {
     const G = this.G, P = G.player, p = R.params, W = G.world;
+    const rt = this.returnTrip; // (Return Trip: hop back to the charged hop's dive puddle, free — docs/CHARGE.md)
+    if (rt && rt.until > (this.charge?.clock || 0)) { this.returnTrip = null; aim = rt.pos; G.actions.restoreZoom?.(R.cost); this.cds.puddleHop = 0; rt.h?.end?.(); }
     const dir = _v.set(aim.x - P.pos.x, 0, aim.z - P.pos.z); const want = Math.min(p.range, dir.length()); if (dir.lengthSq() < 1e-4) dir.copy(this.forward()); dir.normalize();
     const start = P.pos.clone(), end = P.pos.clone();
     for (let t = 0.25; t <= want + 1e-6; t += 0.25) { // furthest open floor along the line (walls stop the hop)
@@ -291,8 +294,15 @@ const M = {
     P.faceTarget = Math.atan2(b.x - P.pos.x, b.z - P.pos.z);
     if (c.hum <= 0) { c.hum = 0.42; sfx('moonbeam_hum', { vol: 0.7 }); }
     const iv = 1 / p.ticksPerSec;
+    // Twin Moons: from Stage Ⅱ a smaller beam circles the charged one (docs/CHARGE.md)
+    const twin = c.R.charge?.stage >= 2 ? perkAt(c.R, 'twin') : null;
+    if (twin) {
+      if (!c.twin) { c.twin = this.fx().moonbeam(p.radius * 0.6, 0.7); const e0 = c.end; c.end = () => { e0?.(); c.twin?.end(); }; }
+      const a = c.t * 2.2; c.twin.pos.set(b.x + Math.cos(a) * 1.8, 0, b.z + Math.sin(a) * 1.8); c.twin.pos.y = G.world.heightAt(c.twin.pos.x, c.twin.pos.z);
+    }
     if (c.acc >= iv) {
       c.acc -= iv;
+      if (twin) this.nova2(c.twin.pos.x, c.twin.pos.z, p.radius * 0.6, e => this.mokaHit(e, { dmgPct: p.dmgPct * twin.pct / 100, element: 'zap', from: c.twin.pos, slow: p.slow, slowDur: 0.6, silent: false }));
       if (!out && !G.actions.spendZoom(c.R.cost * iv)) { this.endChannel(); G.ui?.float?.(P.pos.clone().setY(1.6), 'Not enough zoom!', { kind: 'status', color: '#9fd0ff' }); return; }
       let n = 0;
       this.nova2(b.x, b.z, p.radius, e => { n++; this.mokaHit(e, { dmgPct: p.dmgPct, element: 'zap', from: b, slow: p.slow, slowDur: 0.6, silent: false }); });
@@ -301,11 +311,18 @@ const M = {
   },
   /** a charged Moonbeam fades out in a burst of moonlight where it stood */
   beamFinish(c) {
-    const G = this.G, p = c.R.params, b = c.beam.pos;
+    const G = this.G, P = G.player, p = c.R.params, b = c.beam.pos;
     this.fx().starBurst(_u.set(b.x, b.y + 0.4, b.z), { r: 1.2, n: 16, color: PAL.moon, color2: PAL.violet });
     G.vfx.charge?.burst?.(b, { r: 2.2, life: 0.4, color: PAL.moon, w: 0.12 });
     sfx('rune_chime', { pos: b }); G.engine.rig.shake(0.2);
-    this.nova2(b.x, b.z, 2, e => this.mokaHit(e, { dmgPct: p.dmgPct * (p.burstPct || 150) / 100, element: 'zap', from: b, knock: 0.6 }));
+    this.nova2(b.x, b.z, 2, e => this.mokaHit(e, { dmgPct: p.dmgPct * (p.burstPct || 70) / 100, element: 'zap', from: b, knock: 0.6 }));
+    // Crescent Cut: the beam's end sweeps out in a crescent of moonlight
+    const cut = perkAt(c.R, 'crescent');
+    if (cut) {
+      const o = b.clone(), f = Math.atan2(b.x - P.pos.x, b.z - P.pos.z), hit = new Set();
+      G.vfx.charge?.crescent?.(o, f, { arc: 5.6, r0: 0.6, r1: cut.r, life: 0.5, color: '#dfe6ff', width: 0.8, onStep: (r0, r1) => this.nova2(o.x, o.z, r1, e => { if (hit.has(e) || dist(e.pos.x, e.pos.z, o.x, o.z) + (e.radius || 0.3) < r0) return; hit.add(e); this.mokaHit(e, { dmgPct: p.dmgPct * cut.pct / 100, element: 'zap', from: o, knock: 0.8 }); }) });
+      sfx('constellation_twinkle', { pitch: 0.8 });
+    }
   },
   cast_constellation(R, aim, target) {
     const G = this.G, P = G.player, p = R.params;
@@ -341,7 +358,7 @@ const M = {
       const from = to.clone().addScaledVector(cf, -3).addScaledVector(cr, -7.5); from.y = to.y + 10.5; // streaks in across the screen
       sfx('meteor_whistle');
       this.tipFlash(PAL.gold, 1.4);
-      const h = this.fx().meteor(from, to, { time: p.delay, r: p.radius, onImpact: at => {
+      const h = this.fx().meteor(from, to, { time: p.delay, r: p.radius, scale: p.size || 1, onImpact: at => {
         sfx('meteor_boom'); G.engine.rig.shake(0.9); G.engine.hitStop = Math.max(G.engine.hitStop, 0.07); G.engine.post.pulse('#ffd8a0', 0.28);
         this.nova2(at.x, at.z, p.radius, e => {
           const dmg = this.mokaHit(e, { dmgPct: p.dmgPct, element: 'zap', knock: p.knockback, stun: p.stun, from: at });
@@ -488,9 +505,10 @@ const M = {
       let trig = false;
       for (const e of this.combat.entities) if (isFoe(e) && Math.hypot(e.pos.x - r.pos.x, e.pos.z - r.pos.z) < r.p.trigger + (e.radius || 0.3)) { trig = true; break; }
       if (trig) {
-        r.alive = false; this.runes.splice(i, 1); r.h.erupt(r.p.radius);
+        r.alive = false; this.runes.splice(i, 1); r.h.erupt(r.p.radius, r.soft);
         sfx('rune_chime', { pos: r.pos }); G.engine.rig.shake(0.3);
         this.nova2(r.pos.x, r.pos.z, r.p.radius, e => this.mokaHit(e, { dmgPct: r.p.dmgPct, element: 'zap', knock: 0.8, stun: r.p.stun, from: r.pos }));
+        r.onErupt?.(r); // (Paw Parade)
       }
     }
     // leash
@@ -539,14 +557,16 @@ const M = {
         const rx = e.pos.x - w.origin.x, rz = e.pos.z - w.origin.z, along = rx * w.dir.x + rz * w.dir.z, lat = rx * w.side.x + rz * w.side.z;
         if (Math.abs(lat) > p.width / 2 + (e.radius || 0.3) || along > h.front + 0.5 || along < h.front - 2.2) continue;
         if (!w.hit.has(e)) { w.hit.add(e); this.mokaHit(e, { dmgPct: p.dmgPct, element: 'frost', knock: 0.6, from: w.origin, chill: p.chill, chillDur: p.chillDur }); }
-        if (!falling && e.alive && !e.breakable && !e.def?.boss && along < h.front + 0.7) { // carried along on the face of the wave
-          const push = Math.min(h.front + 0.7 - along, p.speed * 1.3 * dt);
+        if (!falling && e.alive && !e.breakable && (!e.def?.boss || p.carry) && along < h.front + 0.7) { // carried along on the face of the wave (Tsunami: bosses too, a little)
+          const push = Math.min(h.front + 0.7 - along, p.speed * 1.3 * dt) * (e.def?.boss ? 0.25 : 1);
           _t.copy(e.pos); e.pos.x += w.dir.x * push; e.pos.z += w.dir.z * push; (e.world || G.world).collision?.resolve(e.pos, (e.radius || 0.3) * 0.8, _t);
         }
       }
     }
     for (const x of this.ducks || []) x.update(dt);
+    this.updateDucklings?.(dt); // (a charged Mother Duck's ducklings)
     if (this.retriever) { this.retriever.update(dt); if (!this.retriever.alive) this.retriever = null; }
+    if (this.retrieverPup) { this.retrieverPup.update(dt); if (!this.retrieverPup.alive) this.retrieverPup = null; } // (Puppy Pal)
     if (this.mokaZones?.length) this.mokaZones = this.mokaZones.filter(z => z.t < z.life && this.combat.zones.includes(z));
     if (this.mokaFx?.length) this.mokaFx = this.mokaFx.filter(h => h.alive);
   },
@@ -563,7 +583,11 @@ const M = {
     for (const z of this.mokaZones || []) { z.cancel?.(); z.dispose = null; z.update = null; z.onTick = null; z.t = z.life; } this.mokaZones = [];
     for (const h of this.mokaFx || []) h.end?.(); this.mokaFx = [];
     for (const x of this.ducks || []) x.expire(true); this.ducks = [];
+    for (const x of this.ducklings || []) x.expire(true); this.ducklings = [];
+    for (const end of this.wraps || []) end(false); this.wraps = []; // (Bubble Wrap)
     if (this.retriever) { this.retriever.expire(true); this.retriever = null; }
+    if (this.retrieverPup) { this.retrieverPup.expire(true); this.retrieverPup = null; }
+    this.returnTrip = null;
   },
 };
 

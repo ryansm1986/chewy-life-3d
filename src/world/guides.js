@@ -8,6 +8,8 @@
 //            more furniture comes from.
 //  - remodel: Tanu, the first time a mailbox is opened: the house card (Upgrade / Remodel / Enter), the style sets, a
 //            swatch, the cost.
+//  - charge: Shadow, back in town after the first Burrow trip (docs/CHARGE.md §4): hold right-click to charge a skill to
+//            Stage Ⅰ and let go, the charge perks in the K panel's Charge card, tap vs hold.
 import * as THREE from 'three';
 import { POND } from './layout.js';
 import { SKILLS } from '../rpg/skills.js';
@@ -254,5 +256,36 @@ const remodel = {
   ],
 };
 
-export const GUIDES = { switch: sw, house, fishing, makeHome, remodel };
+// ------------------------------------------------------------------ hold to power up (Shadow, docs/CHARGE.md §4)
+const rmbSkill = G => { const P = G.state.player, set = P.mouseSets?.[P.activeWeapon || 0] || P.hotbar || []; return set[1] || P.hotbar?.[1] || null; };
+const chargeOff = G => G.ui?.settings?.chargeMode === 1;
+const skillsOpen = G => G.ui?.isOpen?.('skills');
+const charge = {
+  title: 'Hold to power up!', narrator: 'shadow', color: '#ffd84a', priority: 5,
+  blurb: 'Hold a skill to charge it, let go for a bigger cast, and the charge perks in the Skills panel.',
+  offer: 'Shadow knows a trick for making your skills hit harder.',
+  icon: null,
+  trigger: G => houseDone(G) && !!G.state.flags.burrowTut,
+  locked: G => (G.state.flags.burrowTut ? null : 'Visit the Burrow first'),
+  steps: [
+    { id: 'hold', objective: 'Hold right-click until the ring lights up, then let go', skippable: true,
+      say: G => (chargeOff(G) ? 'Charging is turned off in Settings (Charge on hold) — turn it back on any time to try this!' : `Back from the Burrow! Here's a trick, ${me(G)}: *hold* right-click instead of tapping. The ring fills up to *Ⅰ* — let go when it lights up!`),
+      highlight: () => '.hud .hb.mouse',
+      on: {
+        'charge:release': (p, T) => { if (!(p.stage >= 1)) T.say('That was a tap — hold a little longer, until the ring lights up!'); },
+        'charge:cancel': (p, T) => { if (p.reason !== 'modal') T.say('A roll drops the charge. No harm done — hold it again!'); },
+      },
+      waitFor: { event: 'charge:release', test: p => p.stage >= 1 && p.ok }, done: G => chargeOff(G) },
+    { id: 'perks', say: G => `${SKILLS[rmbSkill(G)]?.charge?.title || 'A charged cast'}! It hits harder and bigger, and costs a little more zoom. Skill points buy *charge perks* too — more stages, a quicker wind-up, and a trick for every skill. Press *K* to see!`,
+      objective: 'Open your Skills (*K*)', allow: { panels: ['skills'] },
+      highlight: G => (skillsOpen(G) ? null : '.hud .mb[data-open="skills"]'), done: G => skillsOpen(G) },
+    { id: 'card', resumeAt: 'perks', say: "This is the *Charge* card: the skill's stages and its four perks. The *⚡* on a skill picks it here — a glowing one means a perk is ready to buy.", objective: 'The Charge card', allow: { panels: ['skills'] },
+      highlight: G => (skillsOpen(G) ? '.p-skills .chg-drawer' : '.hud .mb[data-open="skills"]'),
+      callouts: G => (skillsOpen(G) ? [{ el: '.p-skills .chg-stages', text: 'Stages Ⅰ Ⅱ Ⅲ', side: 'right' }, { el: '.p-skills .chg-perks', text: 'Perks: click to buy', side: 'right' }] : []),
+      ack: true },
+    { id: 'wrap', say: "Tap for a quick cast, hold for a big one — every active skill can charge. A roll drops a charge, but bumps and bites won't. Woof!", objective: 'Hold any skill to power it up', ack: true, allow: { panels: ['skills'] } },
+  ],
+};
+
+export const GUIDES = { switch: sw, house, fishing, makeHome, remodel, charge };
 export const GUIDE_IDS = Object.keys(GUIDES);

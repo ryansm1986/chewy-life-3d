@@ -52,21 +52,27 @@ const POSES = {
     A.armR.x += (-1.6 + Math.sin(w) * 0.5) * e; A.armR.z += Math.cos(w) * 0.6 * e; A.armL.z += -0.6 * e; A.armL.x += -0.3 * e;
     A.body.y += Math.sin(w * 0.5) * 0.12 * k * e; A.sq += 0.04 * k * e; A.happy = 1; A.tailWag = 2.5;
   },
-  // the duck call at the lips, cheeks puffing
+  // the duck call at the lips, the other arm flung wide to call the flock, head back, up on her toes
+  // (a big silhouette change: it has to read past Moka's hat from the high camera)
   call(t, k, A, e) {
-    A.armR.x += -1.35 * e; A.armR.z += 1.05 * e; A.armL.x += -0.9 * e; A.armL.z += -0.6 * e;
-    A.head.x += (-0.15 - 0.15 * k) * e; A.sq += -0.05 * k * e; A.earKick += 1.5 * k * e;
+    const bob = Math.sin(t * (6 + 6 * k)) * 0.06 * k;
+    A.armR.x += -1.55 * e; A.armR.z += 1.15 * e; A.armL.x += (-1.4 - 0.5 * k) * e; A.armL.z += (-1.35 - 0.25 * k) * e;
+    A.head.x += (-0.3 - 0.25 * k + bob) * e; A.body.x += (-0.12 - 0.1 * k) * e; A.sq += (-0.07 - 0.06 * k) * e; A.y += (0.05 + 0.05 * k) * e;
+    A.earKick += (1.5 + k) * e; A.legL.x += 0.15 * k * e;
   },
-  // braced to shake, shivering harder as it fills
+  // a wide braced stance, arms flung out, shivering harder as it fills (water flicks off her: chargeFx gatherStyle)
   shake(t, k, A, e) {
-    const w = Math.sin(t * (30 + 30 * k)) * (0.05 + 0.12 * k);
-    A.sq += (0.1 + 0.06 * k) * e; A.head.x += 0.2 * e; A.body.y += w * e; A.head.y += -w * 1.2 * e;
-    A.armR.z += (0.6 + w) * e; A.armL.z += (-0.6 + w) * e; A.earKick += w * 6 * e; A.eyesClosed = k > 0.5 ? 1 : 0;
+    const w = Math.sin(t * (30 + 30 * k)) * (0.06 + 0.16 * k);
+    A.sq += (0.12 + 0.08 * k) * e; A.y += -0.04 * k * e; A.head.x += 0.2 * e; A.body.y += w * e; A.head.y += -w * 1.2 * e;
+    A.armR.x += -0.5 * e; A.armL.x += -0.5 * e; A.armR.z += (1.15 + 0.2 * k + w) * e; A.armL.z += (-1.15 - 0.2 * k + w) * e;
+    A.legL.z += 0.25 * e; A.legR.z += -0.25 * e;
+    A.earKick += w * 7 * e; A.eyesClosed = k > 0.5 ? 1 : 0;
   },
-  // the staff to the lips, blowing a bubble
+  // the staff held high, blowing a bubble from its orb (bubbles stream off it: chargeFx gatherStyle), the free paw out
   bubble(t, k, A, e) {
-    A.armR.x += -1.5 * e; A.armR.z += 0.8 * e; A.armL.x += -1.1 * e; A.armL.z += -0.5 * e;
-    A.head.x += -0.1 * e; A.sq += (-0.04 - 0.05 * k) * e; A.mouth = Math.max(A.mouth, 0.4 * e);
+    A.armR.x += (-2.55 - 0.2 * k) * e; A.armR.z += 0.45 * e; A.armL.x += (-0.8 - 0.4 * k) * e; A.armL.z += (-1 - 0.2 * k) * e;
+    A.head.x += (-0.3 - 0.1 * k) * e; A.body.x += -0.08 * e; A.sq += (-0.05 - 0.06 * k) * e; A.y += 0.04 * k * e;
+    A.mouth = Math.max(A.mouth, 0.5 * e); A.earKick += 0.8 * k * e;
   },
   // the Moonbeam / Tail Spin channels keep their own action; these only exist for completeness
   beam(t, k, A, e) { POSES.sky(t, k, A, e); },

@@ -7,7 +7,10 @@ import * as THREE from 'three';
 import { Events } from '../core/events.js';
 import { rand, angleDiff } from '../core/util.js';
 import { chargeFx } from '../gfx/chargeFx.js';
+import { perkAt } from '../rpg/charge.js';
 import { PAL } from '../gfx/spellFx.js';
+import { installChargedChewy } from './chargedChewy.js';
+import { installChargedMoka } from './chargedMoka.js';
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
@@ -21,6 +24,36 @@ const M = {
     P.anim.play(name, { speed, onEvent });
     const a = P.anim.action;
     if (a && u0 > 0) a.t = a.dur * u0;
+  },
+  /** run a skill's own cast_ (fn) so that the first action it plays starts from u0 (the wind-up the charge pose held),
+   *  with hook(ev) called after each of that action's events — the charged release's extras ride on the real cast */
+  fromFrame(u0, fn, hook = null) {
+    const A = this.G.player.anim, raw = A.play, tame = this.tame.bind(this);
+    A.play = function (name, o = {}) {
+      A.play = raw;
+      const ev0 = o.onEvent;
+      raw.call(A, name, { ...o, onEvent: e => { if (ev0) tame(() => ev0(e)); if (hook) try { hook(e); } catch (err) { console.warn('[charge]', err); } } });
+      if (A.action && u0 > 0) A.action.t = A.action.dur * u0;
+    };
+    try { tame(fn); } finally { A.play = raw; }
+  },
+  /** run a base cast with its screen flashes capped: the charged radii would otherwise blow its glow sprite up over
+   *  the whole fight (the enemies must stay readable through every release) */
+  tame(fn) {
+    const V = this.G.vfx, f0 = V.flash, g0 = V.ring, S = this.G.vfx.spell, c0 = S?.splash;
+    if (V._tamed) return fn();
+    V._tamed = true; V.flash = (p, c, size = 1.4, life) => f0.call(V, p, c, Math.min(size, 2.6), life);
+    V.ring = (p, o) => g0.call(V, p, o && o.r1 > 7 ? { ...o, r1: 7 } : o); // (and its rings: a 12 m howl ring bands the whole island)
+    if (c0) { S.splash = (p, o = {}) => c0.call(S, p, { ...o, maxH: Math.min(o.maxH ?? 99, 1.6), alpha: Math.min(o.alpha ?? 0.95, 0.68) }); S._soft = true; } // (and Moka's water crowns: ≤ 1.6 m, see-through; flocks made now dive soft)
+    try { return fn(); } finally { V.flash = f0; V.ring = g0; if (c0) { S.splash = c0; S._soft = false; } V._tamed = false; }
+  },
+  /** Twister: a charged Tail Spin's spin-out drifts after the cursor */
+  spinDrift(dt) {
+    const G = this.G, P = G.player, tw = this.channel?.R?.def?.charge?.perks?.twister, a = this.charge.cursorGround(_v);
+    if (!tw || !a) return;
+    const dx = a.x - P.pos.x, dz = a.z - P.pos.z, d = Math.hypot(dx, dz);
+    if (d < 0.3) return;
+    this.slideHero(_w.set(dx / d, 0, dz / d), Math.min(d, tw.speed * dt));
   },
 
   // ================================================================== Chomp Slash → Heavy Cleave
@@ -61,11 +94,11 @@ const M = {
       if (ev !== 'release') return;
       const from = this.handPos(), base = _v.copy(aim).sub(P.pos).setY(0);
       if (base.lengthSq() < 0.01) base.copy(this.forward()); base.normalize();
-      const n = 1 + (k.split || 0), spread = (C.perks.split.spread * Math.PI) / 180, back = k.boomerang ? C.perks.boomerang.pct / 100 : 0;
+      const n = 1 + (k.split || 0), spread = (C.perks.split.spread * Math.PI) / 180, back = k.boomerang ? perkAt(R, 'boomerang').pct / 100 : 0, splitPct = perkAt(R, 'split')?.pct ?? 70;
       for (let i = 0; i < n; i++) {
         // rank 1: two balls either side of the aim; rank 2: one straight down the middle and one each side
         const a = n === 1 ? 0 : n === 2 ? (i - 0.5) * spread : (i - 1) * spread, main = n === 1 || (n === 3 && i === 1) || (n === 2);
-        const dmg = p.dmgPct * (main && n !== 2 ? 1 : n === 2 ? 0.85 : C.perks.split.pct / 100);
+        const dmg = p.dmgPct * (main && n !== 2 ? 1 : n === 2 ? 0.85 * Math.min(1, 0.5 + splitPct / 140) : splitPct / 100); // (rank 1's pair: 85% each at Ⅲ, less at lower stages)
         const dir = base.clone().applyAxisAngle(UP, a);
         this.combat.spawn({ team: 'ally', kind: 'fastball', pos: from.clone(), dir, speed: p.speed, range: p.range, radius: 0.34 + 0.04 * s, pierce: 99, returns: true, hitOnReturn: back > 0, bounces: 0, size: p.size,
           onHit: (e, pr) => {
@@ -89,12 +122,12 @@ const M = {
       const from = this.launchPoint(), to = target?.alive ? target.pos : aim;
       const base = _v.set(to.x - from.x, 0, to.z - from.z); if (base.lengthSq() < 0.01) base.copy(this.forward()); base.normalize();
       this.tipFlash(PAL.aqua, 1.2 + 0.2 * s); sfx('splash_cast', { pitch: 0.8 }); sfx('charge_whoosh', { stage: s, pitch: 1.15 });
-      const rain = k.rain ? C.perks.rain : null;
+      const rain = perkAt(R, 'rain');
       const burst = (pos, primary, kk, lead) => {
         const g = this.ground(pos.clone()), r = p.splashRadius * kk;
         const fx = this.fx();
         // the payoff is the wide ring on the ground (the slow): a modest crown, a big ripple and a ring of foam out to r
-        fx.splash(g, { r: Math.min(1.25, 0.6 + 0.2 * s) * (kk < 1 ? 0.8 : 1), big: kk >= 1 });
+        fx.splash(g, { r: Math.min(1.25, 0.6 + 0.2 * s) * (kk < 1 ? 0.8 : 1), big: kk >= 1, maxH: 1.6, alpha: 0.62 }); // (≤ 1.6 m and see-through: the foes behind stay readable)
         fx.ripple(g, { r: r * 1.08, life: 0.9, color: PAL.sea, alpha: 0.85 });
         chargeFx(G).burst(g, { r, life: 0.42, color: PAL.aqua, w: 0.1, a: 0.8 });
         fx.droplets(_w.set(g.x, g.y + 0.2, g.z), { n: 10 + 5 * s, speed: 2.1 * r, up: 4.2, size: 0.18, spread: r * 0.25 });
@@ -105,7 +138,7 @@ const M = {
       const n = 1 + (k.split || 0), spread = (C.perks.split.spread * Math.PI) / 180;
       for (let i = 0; i < n; i++) {
         const a = n === 1 ? 0 : n === 2 ? (i - 0.5) * spread : (i - 1) * spread, main = n !== 3 || i === 1, lead = n === 3 ? i === 1 : i === 0;
-        const kk = main ? (n === 2 ? 0.85 : 1) : C.perks.split.pct / 100;
+        const sp = perkAt(R, 'split')?.pct ?? 70, kk = main ? (n === 2 ? 0.85 * Math.min(1, 0.5 + sp / 140) : 1) : sp / 100;
         const dir = base.clone().applyAxisAngle(UP, a);
         const pr = this.combat.spawn({ team: 'ally', kind: 'bigorb', pos: from.clone(), dir, speed: p.speed, range: p.range, radius: 0.3 + 0.1 * p.size, size: p.size * (main ? 1 : 0.75),
           onHit: e => { pr._hitE = e; this.mokaHit(e, { dmgPct: p.dmgPct * kk, element: 'frost', knock: 0.7, from: P.pos, chill: p.chill, chillDur: p.chillDur }); burst(e.pos, e, kk, lead); },
@@ -131,4 +164,4 @@ const M = {
 };
 
 /** Mix the charged releases into SkillRunner.prototype (skillRunner.js does this at import). */
-export function installChargedSkills(proto) { Object.assign(proto, M); }
+export function installChargedSkills(proto) { Object.assign(proto, M); installChargedChewy(proto); installChargedMoka(proto); }

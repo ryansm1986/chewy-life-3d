@@ -7,7 +7,7 @@ import { rand, TAU, clamp, dist, angleDiff } from '../core/util.js';
 import { SpiritPup, Decoy } from './allies.js';
 import { ringTexture } from '../gfx/textures.js';
 import { installMokaSpells, setSpellGame } from './mokaSpells.js';
-import { chargeRuntime } from '../rpg/charge.js';
+import { chargeRuntime, perkAt } from '../rpg/charge.js';
 import { ChargeController } from './charge.js';
 import { installChargedSkills } from './chargedSkills.js';
 
@@ -17,6 +17,7 @@ const ELEM_COL = { phys: '#fffaf0', fire: '#ffae5a', frost: '#9fe0ff', zap: '#ff
 // lunge that tracks the target through the wind-up; one that is further away walks up first and swings on arrival.
 const LUNGE = 1.2, LUNGE_SPEED = 10;
 const _d = new THREE.Vector3();
+const _slide = new THREE.Vector3();
 
 export class SkillRunner {
   constructor(G) {
@@ -207,6 +208,26 @@ export class SkillRunner {
       if (hit) G.engine.rig.shake(0.12);
       this.melee = null;
     } });
+  }
+  /** move the hero along dir by dist through the walls, cliffs, doors and region bounds: in sub-steps of at most
+   *  0.25 m through the same collision as walking (a fast dash on a slow frame can't step past a thin wall), and never
+   *  ending off the walkable floor (the nav grid) — docs/CHARGE.md (dashes, drifts) */
+  slideHero(dir, dist) {
+    const G = this.G, P = G.player, W = G.world, n = Math.max(1, Math.ceil(dist / 0.25)), st = dist / n;
+    for (let i = 0; i < n; i++) {
+      _slide.copy(P.pos);
+      P.pos.x += dir.x * st; P.pos.z += dir.z * st;
+      W.collision?.resolve(P.pos, P.radius, _slide);
+      if (W.walkable && !W.walkable(P.pos.x, P.pos.z)) { P.pos.copy(_slide); break; }
+      if (Math.abs(P.pos.x - _slide.x) + Math.abs(P.pos.z - _slide.z) < st * 0.2) break; // (stopped by a wall)
+    }
+    P.pos.y = W.heightAt(P.pos.x, P.pos.z);
+  }
+  /** is the straight line from a to b open floor (no wall, closed door, cliff or region edge)? */
+  lineClear(a, b, pad = 0.25) {
+    const W = this.G.world, dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz), n = Math.max(1, Math.ceil(d / 0.25));
+    for (let i = 1; i <= n; i++) { const x = a.x + dx * i / n, z = a.z + dz * i / n; if (W.collision?.solidAt?.(x, z, pad) || (W.walkable && !W.walkable(x, z))) return false; }
+    return true;
   }
   throwBall(o, aim, kind = 'ball') {
     const G = this.G, P = G.player;
@@ -450,7 +471,7 @@ export class SkillRunner {
       c.t += dt; c.acc += dt;
       // held (or Toggle-held); a charged spin let go keeps spinning on its own for p.spinOut s (docs/CHARGE.md)
       const held = input.holding('whirl') || c.toggleHeld, out = !held && c.spinOut > 0 && P.anim.action?.name === 'spin'; // (another skill ends a spin-out)
-      if (out) c.spinOut -= dt;
+      if (out) { c.spinOut -= dt; if (ch?.perks?.twister) this.spinDrift(dt); }
       if ((!held && !out) || G.playerDead) { if (ch && c.spinOut !== undefined && !G.playerDead) this.spinFinish(c); this.endChannel(); }
       else {
         if (p.pull) { // a charged spin draws foes in
@@ -464,7 +485,8 @@ export class SkillRunner {
             G.vfx.slash(P.pos, rand(0, TAU), { arc: 3.4, r: p.radius, width: ch ? 0.8 : 0.6, color: ch ? '#ffe8a8' : '#fff4d8', life: 0.22 });
             if (ch) G.vfx.slash(P.pos, rand(0, TAU), { arc: 2.6, r: p.radius * 0.7, width: 0.45, color: ch.color, life: 0.2, reverse: true });
             Events.emit('sfx', 'swing', { vol: 0.5 });
-            this.nova(P.pos, p.radius, e => this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: p.knockback, from: P.pos }));
+            // (a charged spin also catches what it pulled in: big bodies park a little past its blades)
+            this.nova(P.pos, p.radius + (p.pull ? 0.35 : 0), e => this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: p.knockback, from: P.pos }));
           }
         }
       }
@@ -476,9 +498,7 @@ export class SkillRunner {
     if (P.dash) {
       const d = P.dash, step = Math.min(d.left, d.speed * dt);
       const before = P.pos.clone();
-      P.pos.addScaledVector(d.dir, step); d.left -= step;
-      G.world.collision?.resolve(P.pos, P.radius, before);
-      P.pos.y = G.world.heightAt(P.pos.x, P.pos.z);
+      this.slideHero(d.dir, step); d.left -= step;
       for (let i = 0; i < 2; i++) G.vfx.glow.spawn({ x: P.pos.x + rand(-0.2, 0.2), y: 0.5, z: P.pos.z + rand(-0.2, 0.2), life: 0.35, size: 0.6, size1: 0.1, color: '#ffd8a0', alpha: 0.6, alpha1: 0 });
       this.combat.inRadius(P.pos.x, P.pos.z, d.p.width, 'ally', e => { if (!d.hit.has(e)) { d.hit.add(e); this.combat.hitMonster(e, { dmgPct: d.p.dmgPct, knock: 0.6, from: P.pos }); } });
       if (d.left <= 0.001 || P.pos.distanceTo(before) < step * 0.3) { P.dash = null; P.invuln = false; }
@@ -498,7 +518,7 @@ export class SkillRunner {
         });
         if (Math.random() < 0.5) G.vfx.glow.spawn({ x: b.m.position.x, y: b.m.position.y, z: b.m.position.z, life: 0.28, size: 0.55, size1: 0.1, color: '#ffd890', alpha: 0.45, alpha1: 0 });
       }
-      if (o.t >= o.p.duration) { for (const b of o.bones) { G.vfx.poof(b.m.position, { n: 4, size: 0.3 }); b.m.parent?.remove(b.m); } this.orbits.splice(i, 1); }
+      if (o.t >= o.p.duration) { if (o.volley) this.boneVolley(o); for (const b of o.bones) { G.vfx.poof(b.m.position, { n: 4, size: 0.3 }); b.m.parent?.remove(b.m); } this.orbits.splice(i, 1); }
     }
     for (const x of this.pups || []) x.update(dt);
     for (const x of this.decoys || []) x.update(dt);
@@ -511,7 +531,10 @@ export class SkillRunner {
     G.vfx.slash(P.pos, rand(0, TAU), { arc: 6.2, r: p.radius * 1.1, width: 0.9, color: '#ffe8a8', life: 0.3 });
     G.vfx.charge?.burst?.(P.pos, { r: p.radius * 1.15, life: 0.36, color: c.R.charge.colorC || (c.R.charge.colorC = new THREE.Color(c.R.charge.color)), w: 0.12 });
     Events.emit('sfx', 'swing_heavy'); G.engine.rig.shake(0.25);
-    this.nova(P.pos, p.radius, e => { this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: 1.2, stun: p.dizzy || 0.4, from: P.pos }); if (!e.def?.boss && !e.breakable) this.fx().dizzy(e, p.dizzy || 0.4); });
+    const fin = perkAt(c.R, 'finale'); // (Dizzy Finale: a big fling)
+    if (fin) { G.vfx.charge?.crescent?.(P.pos, P.facing, { arc: 6.2, r0: p.radius * 0.6, r1: p.radius + 2.2, life: 0.4, color: c.R.charge.color, width: 0.9 }); G.engine.rig.shake(0.45); }
+    const dz = fin ? fin.dizzy : p.dizzy || 0.4;
+    this.nova(P.pos, p.radius + (fin ? 0.8 : 0), e => { this.combat.hitMonster(e, { dmgPct: fin ? p.dmgPct * fin.pct / 100 : p.dmgPct, knock: fin ? 2.6 : 1.2, stun: dz, from: P.pos }); if (!e.def?.boss && !e.breakable) this.fx().dizzy(e, dz); });
   }
   endChannel() {
     const P = this.G.player, c = this.channel; this.channel = null;

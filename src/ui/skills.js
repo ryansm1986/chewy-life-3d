@@ -4,6 +4,7 @@ import { el, esc, replay, setText } from './dom.js';
 import { glyph } from './glyphs.js';
 import { Panel } from './panel.js';
 import { TREES, treesFor, skillList, skillDef, skillIconURL, hotbarIconURL, skillInfoLines, canLearnSkill, effLevel, treeInfo } from './rpg.js';
+import { ChargeDrawer, chipState, chargeTipHTML } from './chargePanel.js';
 
 const COLW = 118, ROWH = 80, NODE = 64, PADX = 64, PADY = 26;
 const SLOT_NAMES = ['LMB', 'RMB', '1', '2', '3', '4'];
@@ -17,6 +18,7 @@ export class SkillsPanel extends Panel {
       <div class="tree-wrap"><div class="tree"><div class="tree-title"><span class="tt-jp"></span></div><svg class="links"></svg><div class="rows"></div><div class="nodes"></div></div></div>
       <div class="sk-foot">${glyph('mouseL')}Learn <span class="sep">·</span>${glyph('mouseR')}Assign <span class="sep">·</span><span class="kc sm">1</span>–<span class="kc sm">4</span> while hovering <span class="sep">·</span> Drag to hotbar</div>`;
     this.$ = { pts: this.extra.querySelector('.sk-pts b'), ptsW: this.extra.querySelector('.sk-pts span'), ptsBox: this.extra.querySelector('.sk-pts'), tree: b.querySelector('.tree'), links: b.querySelector('.links'), nodes: b.querySelector('.nodes'), rows: b.querySelector('.rows'), title: b.querySelector('.tree-title') };
+    this.chg = new ChargeDrawer(this); // (the Charge drawer docked to the tree's right: docs/CHARGE.md §4)
     b.querySelector('.sk-tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (t) this.setTree(t.dataset.t); });
     const N = this.$.nodes;
     N.addEventListener('mouseover', e => { const n = e.target.closest('.node'); if (!n || n === this._hov) return; this._hov = n; this.hoverId = n.dataset.id; this.ui.tip.show(this.tipHTML(n.dataset.id), 'skill', n); });
@@ -37,7 +39,7 @@ export class SkillsPanel extends Panel {
     addEventListener('pointerup', e => {
       const p = this._press; this._press = null;
       if (this._drag) { const id = this._drag; this._drag = null; this.ui.dragSkillEnd(id, e.clientX, e.clientY); return; }
-      if (p && e.target.closest?.('.node') === p.n) this.learn(p.id, p.n);
+      if (p && e.target.closest?.('.node') === p.n) { if (e.target.closest?.('.nd-chg')) { this.chg.show(p.id); this._treeSig = null; this.render(); this.ui.sfx?.('tab'); return; } this.learn(p.id, p.n); }
     });
   }
   lvl(id) { return this.st.player?.skills?.[id] || 0; }
@@ -81,7 +83,9 @@ export class SkillsPanel extends Panel {
     const tr = this.$.tree;
     tr.style.setProperty('--tc', T.color); tr.style.setProperty('--tb1', T.bg[0]); tr.style.setProperty('--tb2', T.bg[1]);
     tr.dataset.tree = T.id;
-    const sig = T.id + '|' + list.map(s => s.id + this.lvl(s.id) + this.state(s)).join() + '|' + (p.hotbar || []).join();
+    this.chg.pick(T.id);
+    this.chg.render();
+    const sig = T.id + '|' + list.map(s => s.id + this.lvl(s.id) + this.state(s)).join() + '|' + (p.hotbar || []).join() + '|' + JSON.stringify(p.chargePerks || {}) + '|' + pts + '|' + this.chg.id;
     if (sig === this._treeSig) return;
     this._treeSig = sig;
     this.$.title.innerHTML = `<span class="tr-wm">${glyph(T.glyph)}</span><span class="tr-jp">${T.jp}</span>`;
@@ -110,7 +114,7 @@ export class SkillsPanel extends Panel {
       let n = keep.get(s.id);
       if (!n) {
         n = el('div', 'node'); n.dataset.id = s.id;
-        n.innerHTML = `<div class="nd-ring"></div><div class="nd-in"><img alt="" draggable="false"></div><span class="nd-lv"></span><span class="nd-lock">${glyph('lock')}</span><span class="nd-hk"></span>`;
+        n.innerHTML = `<div class="nd-ring"></div><div class="nd-in"><img alt="" draggable="false"></div><span class="nd-lv"></span><span class="nd-lock">${glyph('lock')}</span><span class="nd-hk"></span><span class="nd-chg" title="Charge perks">${glyph('zap')}<b></b></span>`;
         n.querySelector('img').src = skillIconURL(s.id);
         this.$.nodes.appendChild(n);
       } else keep.delete(s.id);
@@ -124,6 +128,9 @@ export class SkillsPanel extends Panel {
       const hkEl = n.querySelector('.nd-hk');
       hkEl.textContent = hk >= 0 ? SLOT_NAMES[hk] : '';
       hkEl.classList.toggle('on', hk >= 0);
+      // the ⚡ chip: this skill's charge perks (points spent; glows when one can be bought; ringed when shown in the drawer)
+      const cs = s.passive ? null : chipState(s.id, this.st), ch = n.querySelector('.nd-chg');
+      ch.classList.toggle('on', !!cs); if (cs) { ch.querySelector('b').textContent = cs.spent ? String(cs.spent) : ''; ch.classList.toggle('spent', cs.spent > 0); ch.classList.toggle('can', cs.can); ch.classList.toggle('sel', this.chg.id === s.id); }
     }
     for (const n of keep.values()) n.remove();
     this.$.links.setAttribute('viewBox', `0 0 ${PADX * 2 + COLW * 2 + NODE} ${PADY * 2 + ROWH * 5 + NODE}`);
@@ -184,8 +191,9 @@ export class SkillsPanel extends Panel {
       ${cur.length ? `<div class="tt-sect"><div class="tt-sh">Current</div>${cur.map(l => `<div class="tt-l">${esc(l)}</div>`).join('')}</div>` : ''}
       ${next.length ? `<div class="tt-sect next"><div class="tt-sh">${lvl ? 'Next level' : 'Level 1'}</div>${next.map(l => `<div class="tt-l">${esc(l)}</div>`).join('')}</div>` : lvl >= s.maxLvl ? '<div class="tt-max">✦ Mastered! ✦</div>' : ''}
       ${reqs.length ? `<div class="tt-reqs">Requires: ${reqs.join(', ')}</div>` : ''}
+      ${!s.passive && lvl ? chargeTipHTML(id, this.st, this.d) : ''}
       ${syn ? `<div class="tt-sect syn"><div class="tt-sh">Synergies</div>${syn}</div>` : ''}
-      <div class="tt-hints"><span><b>Click</b> learn</span>${!s.passive && lvl ? '<span><b>Right-click</b> / <b>1–4</b> assign</span>' : ''}</div>
+      <div class="tt-hints"><span><b>Click</b> learn</span>${!s.passive && lvl ? '<span><b>Right-click</b> / <b>1–4</b> assign</span><span><b>⚡</b> charge perks</span>' : ''}</div>
     </div>`;
   }
   // skill → slot chooser

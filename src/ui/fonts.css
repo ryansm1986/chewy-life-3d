@@ -1,0 +1,30 @@
+/* Self-hosted UI fonts (built by tools/fonts/build-fonts.py; SIL Open Font License, see fonts/OFL-*.txt).
+   Fredoka is variable (one file covers every weight); M PLUS Rounded 1c carries the Japanese labels. */
+@font-face {
+  font-family: 'Fredoka';
+  src: url('./fonts/fredoka.woff2') format('woff2');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'M PLUS Rounded 1c';
+  src: url('./fonts/mplus-500.woff2') format('woff2');
+  font-weight: 400 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'M PLUS Rounded 1c';
+  src: url('./fonts/mplus-700.woff2') format('woff2');
+  font-weight: 600 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'M PLUS Rounded 1c';
+  src: url('./fonts/mplus-800.woff2') format('woff2');
+  font-weight: 800 900;
+  font-style: normal;
+  font-display: swap;
+}

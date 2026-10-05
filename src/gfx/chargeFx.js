@@ -9,6 +9,7 @@ import { registerVfxExtension } from './vfx.js';
 import { spellFx, F, PAL } from './spellFx.js';
 import { glowTexture, ringTexture } from './textures.js';
 import { rand, TAU, clamp, ease } from '../core/util.js';
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Color();
 const UP = new THREE.Vector3(0, 1, 0);
@@ -21,6 +22,32 @@ let FOCUS_K = 0;
 function gatherFn(q, dt, k) {
   const e = 1 - ease.inQuad(k), a = q.ga + k * q.gs;
   q.x = FOCUS.x + Math.cos(a) * q.gr * e; q.z = FOCUS.z + Math.sin(a) * q.gr * e; q.y = FOCUS.y + q.gy * e;
+}
+const PINK2 = new THREE.Color('#ff8fb0'), GOLD = new THREE.Color('#ffe08a');
+// one reused spawn spec for the per-frame charging effects (the particle pools copy it, so a held charge makes no
+// garbage per particle; the pooled particles themselves are recycled)
+const SP = { frame: 0, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 1, size: 0.3, size1: 0.3, color: '#ffffff', color1: null, alpha: 1, alpha1: 0, spin: 0, drag: 0, grav: 0, fn: null };
+function sp(frame, x, y, z, vx, vy, vz, life, size, size1, color, alpha, alpha1, spin = 0, drag = 0, grav = 0, fn = null) {
+  SP.frame = frame; SP.x = x; SP.y = y; SP.z = z; SP.vx = vx; SP.vy = vy; SP.vz = vz; SP.life = life; SP.size = size; SP.size1 = size1;
+  SP.color = color; SP.alpha = alpha; SP.alpha1 = alpha1; SP.spin = spin; SP.drag = drag; SP.grav = grav; SP.fn = fn; return SP;
+}
+// eclipse stars twinkle in and out
+function twinkleFn(q, dt, k) { const a = Math.sin(k * Math.PI); q.a0 = q.a1 = a; }
+// the picnic blanket: a soft-edged gingham square with a stitched hem (drawn once)
+let PICNIC = null;
+function picnicTex() {
+  if (PICNIC) return PICNIC;
+  const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+  g.clearRect(0, 0, 256, 256);
+  g.save(); g.beginPath(); g.roundRect(18, 18, 220, 220, 26); g.clip();
+  g.fillStyle = '#fff6ec'; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 8; i++) { g.fillStyle = 'rgba(232, 84, 104, 0.55)'; g.fillRect(18 + i * 27.5, 0, 14, 256); g.fillRect(0, 18 + i * 27.5, 256, 14); }
+  for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { g.fillStyle = 'rgba(214, 52, 80, 0.55)'; g.fillRect(18 + i * 27.5, 18 + j * 27.5, 14, 14); }
+  g.restore();
+  g.lineWidth = 7; g.strokeStyle = '#4a2c2a'; g.beginPath(); g.roundRect(18, 18, 220, 220, 26); g.stroke();
+  g.setLineDash([10, 8]); g.lineWidth = 3; g.strokeStyle = '#fff6ec'; g.beginPath(); g.roundRect(32, 32, 192, 192, 18); g.stroke();
+  PICNIC = new THREE.CanvasTexture(c); PICNIC.colorSpace = THREE.SRGBColorSpace; PICNIC.anisotropy = 4;
+  return PICNIC;
 }
 // speed lines point along their motion on screen
 function streakFn(q) {
@@ -151,6 +178,7 @@ export class ChargeFX {
   }
   get spell() { return this.vfx.spell || spellFx({ vfx: this.vfx }); }
   get pa() { return this.spell.pa; }
+  get pn() { return this.spell.pn; }
   // ------------------------------------------------------------------ pools
   take(kind, make) {
     let P = this.pools.get(kind); if (!P) this.pools.set(kind, P = []);
@@ -217,23 +245,42 @@ export class ChargeFX {
     s.renderOrder = 14; s.material.color.copy(o.color);
     s.position.copy(o.focus);
     const big = o.orb ?? 1; // (Moka's staff orb carries a big glow; a paw / ball a small one, so the hero stays readable)
-    s.scale.setScalar((0.3 + 0.5 * o.k + (o.full ? 0.07 * Math.sin(this.t * 14) : 0) + 0.35 * U.uPulse.value) * big);
+    s.scale.setScalar((0.3 + 0.5 * o.k + (o.full ? 0.07 * Math.sin(this.t * 14) : 0) + 0.2 * U.uPulse.value) * big);
     this.orbWant = (0.45 + 0.3 * o.k) * (0.6 + 0.4 * big);
     // sparkles spiralling in (more as it fills; a gentle trickle when held at full)
     const rate = o.full ? 26 : 16 + 46 * o.k, pa = this.pa;
     for (let i = this.emit('gather', rate, dt); i > 0; i--) {
       const big = Math.random() < 0.3;
-      const q = pa.spawn({ frame: big ? F.GLOWSTAR : (Math.random() < 0.5 ? F.SPARK : F.STAR), x: FOCUS.x, y: FOCUS.y, z: FOCUS.z, life: rand(0.38, 0.6), size: big ? rand(0.2, 0.3) : rand(0.12, 0.22), size1: 0.05, color: Math.random() < 0.3 ? WHITE : o.color, alpha: 0.15, alpha1: 1, spin: rand(-6, 6), fn: gatherFn });
+      const q = pa.spawn(sp(big ? F.GLOWSTAR : (Math.random() < 0.5 ? F.SPARK : F.STAR), FOCUS.x, FOCUS.y, FOCUS.z, 0, 0, 0, rand(0.38, 0.6), big ? rand(0.2, 0.3) : rand(0.12, 0.22), 0.05, Math.random() < 0.3 ? WHITE : o.color, 0.15, 1, rand(-6, 6), 0, 0, gatherFn));
       q.ga = rand(0, TAU); q.gr = rand(0.7, 1.25); q.gy = rand(-0.55, 0.6); q.gs = rand(2.5, 4.5) * (Math.random() < 0.5 ? -1 : 1);
     }
     // a soft glint at the focus
-    if (this.emit('core', 18, dt)) pa.spawn({ frame: F.GLOWSTAR, x: FOCUS.x, y: FOCUS.y, z: FOCUS.z, life: 0.16, size: 0.32 + 0.3 * o.k, size1: 0.12, color: o.color, alpha: 0.9, alpha1: 0, spin: 5 });
+    if (this.emit('core', 18, dt)) pa.spawn(sp(F.GLOWSTAR, FOCUS.x, FOCUS.y, FOCUS.z, 0, 0, 0, 0.16, 0.32 + 0.3 * o.k, 0.12, o.color, 0.9, 0, 5));
+    if (o.style) this.gatherStyle(o, dt);
+  }
+  /** the quieter wind-ups get their own gather so they read past Moka's hat: bubbles blown from the staff, droplets
+   *  flicked off a shiver, notes and feathers from a duck call (normal-blend ink sprites: they read without adding light) */
+  gatherStyle(o, dt) {
+    const k = o.k, P = o.pos, pn = this.pn, pa = this.pa;
+    if (o.style === 'bubble') {
+      for (let i = this.emit('gBub', 7 + 16 * k, dt); i > 0; i--) { const a = rand(0, TAU), r = rand(0.05, 0.35); pn.spawn(sp(F.BUBBLE, FOCUS.x + Math.cos(a) * r, FOCUS.y + rand(-0.1, 0.15), FOCUS.z + Math.sin(a) * r, Math.cos(a) * 0.5, rand(0.6, 1.3), Math.sin(a) * 0.5, rand(0.7, 1.1), rand(0.12, 0.2) + 0.1 * k, rand(0.26, 0.4) + 0.12 * k, '#ffffff', 0.95, 0, 0, 1.2)); }
+    } else if (o.style === 'shake') {
+      for (let i = this.emit('gDrop', 10 + 34 * k, dt); i > 0; i--) { const a = rand(0, TAU), v = rand(2, 3.5) + 1.5 * k; pn.spawn(sp(F.DROP, P.x + Math.cos(a) * 0.3, P.y + rand(0.5, 1.1), P.z + Math.sin(a) * 0.3, Math.cos(a) * v, rand(1.5, 3), Math.sin(a) * v, rand(0.4, 0.6), rand(0.12, 0.18), 0.08, '#8fdcff', 1, 0.6, rand(-4, 4), 0, 14)); }
+      if (this.emit('gSpray', 2 + 4 * k, dt)) pa.spawn(sp(F.RING, P.x, P.y + 0.75, P.z, 0, 0, 0, 0.32, 0.5, 1.4 + 0.6 * k, '#bfeaff', 0.55, 0));
+    } else if (o.style === 'call') {
+      // (the call's mouth is at the head: above the hero, towards the facing)
+      const hx = P.x, hy = P.y + 1.15, hz = P.z;
+      for (let i = this.emit('gNote', 3 + 7 * k, dt); i > 0; i--) { const a = rand(0, TAU); pn.spawn(sp(i % 3 ? F.NOTE : F.FEATHER, hx + Math.cos(a) * 0.25, hy, hz + Math.sin(a) * 0.25, Math.cos(a) * rand(0.6, 1.2), rand(1, 1.8), Math.sin(a) * rand(0.6, 1.2), rand(0.8, 1.1), rand(0.2, 0.28) + 0.08 * k, 0.14, i % 3 ? '#ffd84a' : '#fff6e0', 1, 0, rand(-2, 2), 1.5)); }
+      if (this.emit('gCall', 1.6 + 2.4 * k, dt)) pa.spawn(sp(F.RING, hx, hy, hz, 0, 0, 0, 0.45, 0.4, 1.6 + 0.8 * k, '#ffe08a', 0.6, 0));
+    }
   }
   /** stop showing the charge (the ring and orb fade out) */
   idle(quick = false) { this.ringWant = 0; this.orbWant = 0; this.ringQuick = quick; }
   /** a clean expanding ring of light on the ground (pooled) */
   burst(pos, { r = 1.6, life = 0.36, color = WHITE, w = 0.12, y = 0.07, a = 1 } = {}) {
     const m = this.take('burst', () => { const o = new THREE.Mesh(planeGeo(), this.mBurst()); o.renderOrder = 10; return o; });
+    // (capped: big auras reach further than this ring should go; the band stays under ~half a metre so it never sheets the screen)
+    r = Math.min(r, 6.5); w = Math.min(w, 0.5 / r);
     const U = m.material.uniforms; U.uCol.value.copy(color); U.uW.value = w; U.uA.value = a; U.uK.value = 0;
     m.position.set(pos.x, (pos.y || 0) + y, pos.z); m.scale.setScalar(r);
     this.run((dt, t) => { U.uK.value = Math.min(1, t / life); return t < life; }, () => this.give('burst', m));
@@ -244,8 +291,8 @@ export class ChargeFX {
     const sp = this.spell;
     this.burst(pos, { r: 1.5 + 0.12 * s, life: 0.32, color, w: 0.1 });
     sp.sparkBurst(focus, { n: 7 + 3 * s, color, speed: 2.6 + 0.6 * s, size: 0.26, life: 0.42, frame: F.STAR, up: 1.2 });
-    sp.castFlash(focus, color, 0.65 + 0.2 * s);
-    this.vfx.light(_a.copy(focus), '#' + color.getHexString(), 2.5 + 1.5 * s, 4, 0.2);
+    sp.castFlash(focus, color, 0.42 + 0.1 * s); // (a pop at the paw / orb, not a flash over the whole hero)
+    this.vfx.light(_a.copy(focus), '#' + color.getHexString(), 2 + 0.8 * s, 3.5, 0.2);
   }
   /** the charged release: a burst at the feet and the orb, a little bigger per stage (the skill's own effect is the star) */
   release(pos, focus, color, s) {
@@ -254,8 +301,8 @@ export class ChargeFX {
     this.burst(pos, { r: 1.45 + 0.3 * s, life: 0.34 + 0.03 * s, color, w: 0.12, a: 0.85 });
     sp.sparkBurst(focus, { n: 7 + 4 * s, color, speed: 3.5 + s, size: 0.28, life: 0.45, frame: F.GLOWSTAR, up: 1.3 });
     sp.sparkBurst(focus, { n: 3 + 2 * s, color: WHITE, speed: 4.5 + s, size: 0.18, life: 0.32, frame: F.SPARK });
-    sp.castFlash(focus, color, 0.6 + 0.15 * s);
-    this.vfx.light(_a.copy(focus), hex, 2.5 + 1.2 * s, 4.5, 0.22);
+    sp.castFlash(focus, color, 0.45 + 0.1 * s);
+    this.vfx.light(_a.copy(focus), hex, 2 + 0.8 * s, 4.5, 0.22);
   }
   /** the charge fizzled (a roll, a menu): a little puff of the colour, nothing more */
   fizzle(pos, focus, color) {
@@ -325,6 +372,91 @@ export class ChargeFX {
     const p = pr.pos, s = pr.o.size || 1.8;
     for (let i = this.emit('bo', 40 * s, dt); i > 0; i--) sp.pn.spawn({ frame: F.DROP, x: p.x + rand(-0.2, 0.2) * s, y: p.y + rand(-0.15, 0.15) * s, z: p.z + rand(-0.2, 0.2) * s, vx: -pr.dir.x * 2 + rand(-0.8, 0.8), vy: rand(0.4, 1.8), vz: -pr.dir.z * 2 + rand(-0.8, 0.8), life: rand(0.3, 0.5), size: rand(0.12, 0.22), size1: 0.05, color: i % 2 ? PAL.aqua : PAL.foam, alpha: 0.95, alpha1: 0.3, grav: 9 });
     if (Math.random() < dt * 14) sp.pn.spawn({ frame: F.BUBBLE, x: p.x, y: p.y, z: p.z, vy: 0.9, vx: rand(-0.5, 0.5), vz: rand(-0.5, 0.5), life: 0.6, size: rand(0.14, 0.24), size1: 0.18, color: PAL.foam, alpha: 0.9, alpha1: 0 });
+  }
+
+  // ------------------------------------------------------------------ Ricochet: the static-charged ball
+  zapHalo() { const sp = new THREE.Sprite(this.shared('zapHalo', () => this.mGlow('#fff27a', 0.7))); sp.scale.setScalar(0.85); return sp; }
+  trailZap(pr, dt) {
+    const p = pr.pos, pa = this.pa;
+    for (let i = this.emit('zap', 70, dt); i > 0; i--) { const a = rand(0, TAU), r = rand(0.12, 0.35); pa.spawn({ frame: F.SPARK, x: p.x + Math.cos(a) * r, y: p.y + rand(-0.15, 0.2), z: p.z + Math.sin(a) * r, vx: Math.cos(a) * 2, vy: rand(-0.5, 1.2), vz: Math.sin(a) * 2, life: rand(0.12, 0.22), size: rand(0.12, 0.22), size1: 0.03, color: Math.random() < 0.3 ? WHITE : PAL.duck, alpha: 1, alpha1: 0, spin: rand(-12, 12) }); }
+    for (let i = this.emit('zapg', 30, dt); i > 0; i--) this.vfx.glow.spawn({ x: p.x, y: p.y, z: p.z, life: 0.2, size: 0.5, size1: 0.05, color: '#fff27a', alpha: 0.45, alpha1: 0 });
+  }
+  /** a short crackling arc of static between two points (the Static Overload's spark jump) */
+  arc(a, b, color = PAL.duck) {
+    const pa = this.pa, n = 9;
+    for (let i = 0; i <= n; i++) { const k = i / n, j = Math.sin(k * Math.PI) * 0.35; pa.spawn({ frame: i % 3 ? F.SPARK : F.GLOWSTAR, x: a.x + (b.x - a.x) * k + rand(-j, j), y: a.y + (b.y - a.y) * k + rand(-j, j) * 0.6, z: a.z + (b.z - a.z) * k + rand(-j, j), life: 0.22, size: 0.24, size1: 0.05, color: i % 2 ? WHITE : color, alpha: 1, alpha1: 0, spin: rand(-10, 10) }); }
+    this.vfx.light(_a.copy(b), '#fff27a', 3, 3, 0.14);
+  }
+
+  // ------------------------------------------------------------------ Treat Toss: the picnic blanket
+  picnic(pos, r = 3, life = 5) {
+    const m = this.take('picnic', () => { const o = new THREE.Mesh(planeGeo(), new THREE.MeshBasicMaterial({ map: picnicTex(), transparent: true, opacity: 0, depthWrite: false, toneMapped: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2 })); o.renderOrder = 8; return o; });
+    const x = pos.x, y = pos.y || 0, z = pos.z, rot = rand(-0.4, 0.4);
+    m.position.set(x, y + 0.035, z); m.rotation.set(0, rot, 0);
+    const H = { alive: true };
+    this.run((dt, t) => {
+      const tin = ease.outBack(Math.min(1, t / 0.3)), tout = Math.max(0, Math.min(1, (life - t) / 0.4));
+      m.scale.setScalar(r * 0.78 * (0.4 + 0.6 * tin) * (0.8 + 0.2 * tout)); m.material.opacity = 0.92 * Math.min(1, t / 0.15) * tout;
+      if (Math.random() < dt * 5) this.spell.pn.spawn({ frame: F.HEART, x: x + rand(-r, r) * 0.55, y: y + 0.2, z: z + rand(-r, r) * 0.55, vy: 1.1, life: 0.9, size: rand(0.18, 0.26), size1: 0.1, color: Math.random() < 0.5 ? PAL.pink : PINK2, alpha: 1, alpha1: 0 });
+      return H.alive && t < life;
+    }, () => { H.alive = false; this.give('picnic', m); });
+    H.end = () => { H.alive = false; };
+    return H;
+  }
+  // ------------------------------------------------------------------ Moon Howl: Lunar Eclipse's night dome
+  eclipse(pos, r = 7, life = 4) {
+    const m = this.take('eclipse', () => { const o = new THREE.Mesh(planeGeo(), new THREE.MeshBasicMaterial({ map: glowTexture(), color: new THREE.Color('#1a1638'), transparent: true, opacity: 0, depthWrite: false, toneMapped: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2 })); o.renderOrder = 8; return o; });
+    const rim = this.take('eclipseRim', () => { const o = new THREE.Mesh(planeGeo(), new THREE.MeshBasicMaterial({ map: ringTexture(), color: new THREE.Color('#c8d0ff'), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false })); o.renderOrder = 9; return o; });
+    const x = pos.x, y = pos.y || 0, z = pos.z;
+    m.position.set(x, y + 0.04, z); rim.position.set(x, y + 0.06, z);
+    this.run((dt, t) => {
+      const tin = Math.min(1, t / 0.4), tout = Math.max(0, Math.min(1, (life - t) / 0.5)), k = Math.min(tin, tout);
+      m.scale.setScalar(r * 1.25 * (0.6 + 0.4 * ease.outCubic(tin))); m.material.opacity = 0.75 * k;
+      rim.scale.setScalar(r * (0.95 + 0.03 * Math.sin(t * 3))); rim.rotation.y += dt * 0.3; rim.material.opacity = 0.45 * k;
+      for (let i = this.emit('ecl', 30 * k, dt); i > 0; i--) { const a = rand(0, TAU), rr = Math.sqrt(Math.random()) * r * 0.9; this.pa.spawn({ frame: Math.random() < 0.3 ? F.GLOWSTAR : F.STAR, x: x + Math.cos(a) * rr, y: y + rand(0.3, 2.4), z: z + Math.sin(a) * rr, life: rand(0.6, 1.2), size: rand(0.12, 0.24), size1: 0.04, color: Math.random() < 0.5 ? PAL.moon : PAL.lilac, alpha: 0, alpha1: 0, fn: twinkleFn }); }
+      return t < life;
+    }, () => { this.give('eclipse', m); this.give('eclipseRim', rim); });
+  }
+  // ------------------------------------------------------------------ Zoomies Dash: Afterimage, a frozen golden ghost of the hero
+  ghost(rig, life = 3, color = '#ffe08a') {
+    let g = null;
+    try { g = cloneSkinned(rig.root); } catch (e) { return null; }
+    const mat = this.shared('ghost', () => new THREE.MeshBasicMaterial({ color: new THREE.Color(color), transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false }));
+    g.traverse(o => { if (o.isMesh) { if (o.material?.side === THREE.BackSide) o.visible = false; else o.material = mat; o.castShadow = false; o.frustumCulled = false; } });
+    this.scene.add(g);
+    const H = { alive: true, obj: g };
+    this.run((dt, t) => {
+      const k = Math.min(1, t / 0.15) * Math.max(0, Math.min(1, (life - t) / 0.35));
+      mat.opacity = 0.5 * k * (0.85 + 0.15 * Math.sin(t * 9));
+      if (Math.random() < dt * 14) this.pa.spawn({ frame: F.SPARK, x: g.position.x + rand(-0.3, 0.3), y: g.position.y + rand(0.2, 1.1), z: g.position.z + rand(-0.3, 0.3), vy: 0.8, life: 0.5, size: 0.18, size1: 0.03, color: GOLD, alpha: 1, alpha1: 0 });
+      return H.alive && t < life;
+    }, () => { H.alive = false; g.parent?.remove(g); });
+    H.end = () => { H.alive = false; };
+    return H;
+  }
+  // ------------------------------------------------------------------ Duck Call: bread crumbs on the ground
+  crumbs(pos, r = 1.6, life = 2) {
+    const x = pos.x, y = pos.y || 0, z = pos.z, sp = this.spell;
+    for (let i = 0; i < 26; i++) { const a = rand(0, TAU), rr = Math.sqrt(Math.random()) * r; sp.pn.spawn({ frame: F.CRUMB, x: x + Math.cos(a) * rr, y: y + 0.08, z: z + Math.sin(a) * rr, life: life * rand(0.8, 1), size: rand(0.12, 0.2), size1: 0.12, color: PAL.biscuit, alpha: 1, alpha1: 0.9, spin: rand(-2, 2) }); }
+  }
+  // ------------------------------------------------------------------ Constellation Link: the Big Dipper's ladle of starlight
+  /** seven stars in the Big Dipper's shape above `at`, linked, that swoop down onto it; onLand() when they hit */
+  dipper(at, { onLand = null, scale = 1.6 } = {}) {
+    const sp = this.spell, K = sp.constellation();
+    const D = [[-1.6, 0.5], [-0.75, 0.75], [0, 0.5], [0.6, 0.25], [0.75, -0.55], [1.7, -0.6], [1.85, 0.25]];
+    const nodes = D.map(([u, v]) => ({ pos: new THREE.Vector3(), alive: true, height: 0, u, v }));
+    const rx = CAM_R.x, rz = CAM_R.z, rl = Math.hypot(rx, rz) || 1, ax = at.x, ay = at.y || 0, az = at.z;
+    const place = h => { for (const n of nodes) n.pos.set(ax + (n.u * rx / rl) * scale, ay + h + n.v * scale, az + (n.u * rz / rl) * scale); };
+    place(5.5);
+    let prev = null;
+    nodes.forEach((n, i) => this.run((dt, t) => { if (t < i * 0.06) return true; const nn = K.node(n); if (prev) K.link(prev, nn); prev = nn; return false; }));
+    this.run((dt, t) => {
+      const k = Math.max(0, Math.min(1, (t - 0.55) / 0.35)), h = 5.5 - 5.2 * ease.inQuad(k);
+      place(h);
+      if (k >= 1) { K.twinkle(); onLand?.(); this.run((d2, t2) => t2 < 0.35, () => K.end()); return false; }
+      return true;
+    });
+    return K;
   }
 
   // ------------------------------------------------------------------ prewarm

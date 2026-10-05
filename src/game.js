@@ -209,7 +209,7 @@ export async function boot() {
     for (const [k, v] of Object.entries(G.ui.settings || {})) applySetting(k, v, G.ui.settings);
     G.ui.onMenu?.({ save: () => { save(); G.ui.toast?.('Game saved ♡', { color: '#8fe0c0' }); }, quit: () => { save(); location.reload(); } });
   }
-  const BUFF_INFO = { howl: ['Howl', 'music', '#ff9a6a'], frenzy: ['Zoomies Frenzy', 'bolt', '#ffd84a'], shrineZoom: ['Zoomies Shrine', 'bolt', '#8fe0c0'], shrineLuck: ['Lucky Cat', 'clover', '#ffd84a'], shrineXp: ['Sparkle Shrine', 'sparkle', '#b8a8ff'], cursed: ['Cursed', 'skull', '#b88aff'], shadowPower: ['Pack Call', 'shadowDog', '#8ab8ff'] };
+  const BUFF_INFO = { howl: ['Howl', 'music', '#ff9a6a'], frenzy: ['Zoomies Frenzy', 'bolt', '#ffd84a'], shrineZoom: ['Zoomies Shrine', 'bolt', '#8fe0c0'], shrineLuck: ['Lucky Cat', 'clover', '#ffd84a'], shrineXp: ['Sparkle Shrine', 'sparkle', '#b8a8ff'], cursed: ['Cursed', 'skull', '#b88aff'], shadowPower: ['Pack Call', 'shadowDog', '#8ab8ff'], moonlit: ['Moonlit Rally', 'moon', '#ffb080'] };
   function syncBuffs() {
     const B = G.combat?.buffs || {}; const list = [];
     for (const [k, b] of Object.entries(B)) { const inf = BUFF_INFO[k]; if (!inf || (k === 'frenzy' && !b.stacks)) continue; list.push({ id: k, name: k === 'frenzy' ? `${inf[0]} ×${b.stacks}` : inf[0], glyph: inf[1], color: inf[2], time: b.t > 0 ? b.t : 0 }); }

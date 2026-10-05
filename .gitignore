@@ -3,3 +3,6 @@ dist/
 *.log
 tools/blender/work/
 tools/qa/tmp/
+dist-itch/
+release/
+tools/fonts/src/

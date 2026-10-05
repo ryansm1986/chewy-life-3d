@@ -85,7 +85,11 @@ export class Combat {
           _v.set(src.x - m.pos.x, 0, src.z - m.pos.z); if (_v.lengthSq() < 1e-4) _v.set(0, 0, 1); _v.normalize().multiplyScalar((m.bodyR || m.radius || 1) * 0.85);
           G.vfx.hit(new THREE.Vector3(m.pos.x + _v.x, m.pos.y + Math.min((m.height || 1) * 0.4, 1.1), m.pos.z + _v.z), { crit, element, soft: true });
         }
-      } else G.vfx.hit(m.pos.clone().setY(m.pos.y + (m.height || 1) * 0.5), { crit, element });
+      } else {
+        // rapid repeat hits on one foe (barrages, ricochets, ticks) get the soft burst, so the stacked flashes don't white it out
+        const t = G.engine.time || 0, rapid = !crit && t - (m._hitFxT || -9) < 0.09; m._hitFxT = t;
+        G.vfx.hit(m.pos.clone().setY(m.pos.y + (m.height || 1) * 0.5), { crit, element, soft: rapid });
+      }
       Events.emit('sfx', crit ? 'hit_crit' : 'hit_flesh', { pos: m.pos });
       if (crit) { G.engine.rig.shake(0.35); G.engine.hitStop = Math.max(G.engine.hitStop, 0.05); }
       else G.engine.hitStop = Math.max(G.engine.hitStop, 0.018);
@@ -99,6 +103,8 @@ export class Combat {
     if (rollBlock(G.derived)) { G.ui?.float?.(p.pos.clone().setY(p.pos.y + 1.4), 'Block!', { kind: 'status', color: '#9fd0ff' }); G.vfx.sparks(p.pos.clone().setY(1), { n: 6, color: '#bfe6ff' }); Events.emit('sfx', 'block'); return 0; }
     let dmg = playerDamageTaken(G.derived, raw, element, level);
     if (this.buffs.cursed?.t > 0) dmg *= 1 + this.buffs.cursed.pct / 100;
+    // a charged Bone Storm's Bone Wall: a bone pops instead (docs/CHARGE.md)
+    if (G.skills?.boneBlock?.()) { G.ui?.float?.(p.pos.clone().setY(p.pos.y + 1.4), 'Bonk!', { kind: 'status', color: '#fff0c8' }); return 0; }
     // Moka's Bubble Barrier soaks the hit first (mokaSpells.absorb → what gets through)
     if (G.skills?.bubbleShield) {
       dmg = G.skills.absorb(dmg);

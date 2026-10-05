@@ -118,6 +118,14 @@ Status: **built** (2026-10-03). There are three guides, run by a small reusable 
   4. The parts are spotlit: change one (`remodel:draft { kind: 'field' }`).
   5. The cost and Remodel / As it was (Got it, or Remodel ends it: `house:remodel`).
 - QA: `tools/qa/s17-housing.mjs` sections o and p run both, end to end.
+- **Hold to power up! (Shadow)** starts the first time you're back in the village after a Burrow trip (once the house tour
+  is done; offered once to older saves) — docs/CHARGE.md §4:
+  1. Hold right-click until the ring lights up, then let go (`charge:release` at Stage Ⅰ or more; a tap or a roll gets a
+     kind word). With Settings › Charge on hold set to Off, it says where to turn it on and moves on.
+  2. Skill points buy charge perks: press K (the Skills button is spotlit).
+  3. The Charge card is spotlit, with callouts on the stages and the perks (Got it).
+  4. Wrap-up: tap vs hold, a roll drops a charge, hits don't.
+  - QA: `tools/qa/s19-charge.mjs` section g runs it end to end.
 
 ## Hooks added for the guides
 - `fishing.js`:
@@ -131,5 +139,6 @@ Status: **built** (2026-10-03). There are three guides, run by a small reusable 
   `ui/remodel.js`: `remodel:draft { kind: 'set' | 'field' }`.
 - `garden.js`: `facingDoor()`. Walking up to the cottage door now means the door, not the bed's corner tile beside it.
 - `hud.js`: a Pantry button in the menu bar.
+- `combat/charge.js`: `charge:release { id, stage, ok }`, `charge:cancel { id, reason }` (the charge guide).
 - `game.js`: `G.tutorials`, `G.introJoinPending`; `questTarget` asks the director first. Moka's join toast is skipped
   when her guide will show it.

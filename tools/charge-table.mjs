@@ -3,7 +3,7 @@
 // For every active skill: the charged release, how its numbers grow per stage at the reference skill level (normal →
 // Ⅰ / Ⅱ / Ⅲ, no perks, no gear), the stage times, the release cost, and the perks with their ranks, gates and numbers.
 import { SKILLS, TREES, skillRuntime } from '../src/rpg/skills.js';
-import { CHARGE, STAGE_MULT, NUMERAL, stageTimes, chargeCost, chargeRuntime, GRACE, SLOW, SURCHARGE } from '../src/rpg/charge.js';
+import { CHARGE, STAGE_MULT, NUMERAL, stageTimes, chargeCost, chargeRuntime, GRACE, SLOW, SURCHARGE, FOCUS_PER_RANK, PERK_STAGE } from '../src/rpg/charge.js';
 
 const li = process.argv.indexOf('--lvl'), LVL = li >= 0 ? +process.argv[li + 1] : 10;
 const D = { dmgMin: 10, dmgMax: 20, lifeMax: 300, synergy: {}, treeDmgPct: {}, ballSpeed: 1 };
@@ -25,13 +25,13 @@ const fmt = (k, v) => (k === 'chill' ? `−${Math.round(v * 100)}%` : PCT.has(k)
 const POSE = { sword: 'sword drawn back', ball: 'ball cocked', staff: 'staff raised', crouch: 'crouch', breath: 'a big breath', sky: 'paws to the sky', spin: 'the spin revs up', beam: 'the beam grows', twirl: 'staff twirl', call: 'call to the lips', shake: 'braced to shake', bubble: 'blowing a bubble' };
 
 const out = [];
-out.push(`All numbers at skill level ${LVL} with no gear, read from \`src/rpg/charge.js\` (regenerate with \`node tools/charge-table.mjs\`). Common rules: a press under ${GRACE} s is a tap; charging walks at ${Math.round(SLOW * 100)}% speed; each stage costs +${Math.round(SURCHARGE * 100)}% of the skill's zoom; the main number grows ×${STAGE_MULT.join(' / ×')} unless a skill names its own curve. Stage times are Ⅰ / Ⅱ / Ⅲ (cumulative; Quick Wind-up trims them by 15% per rank).`);
+out.push(`All numbers at skill level ${LVL} with no gear, read from \`src/rpg/charge.js\` (regenerate with \`node tools/charge-table.mjs\`). Common rules: a press under ${GRACE} s is a tap; charging walks at ${Math.round(SLOW * 100)}% speed; each stage costs +${Math.round(SURCHARGE * 100)}% of the skill's zoom; each table's curves (the main number ×${STAGE_MULT.join(' / ×')} unless it names its own) then pass through its balance tune (§9), so the numbers below are the tuned ones; a perk's bonus damage is ${PERK_STAGE.map(v => Math.round(v * 100) + '%').join(' / ')} of its listed value at Ⅰ / Ⅱ / Ⅲ. Stage times are Ⅰ / Ⅱ / Ⅲ (cumulative; Quick Wind-up trims them by 15% per rank).`);
 out.push('');
 out.push('**Common perk families** (each skill carries its own copies; ranks are bought with skill points, gated by the skill\'s hard level):');
 out.push('- **Deeper Charge** (every skill, 2 ranks, Lv 5 / 10): rank 1 adds Stage Ⅱ, rank 2 adds Stage Ⅲ.');
 out.push('- **Quick Wind-up** (every skill, 3 ranks, Lv 1 / 3 / 6): −15% charge time per rank.');
-out.push('- **Efficient Focus** (the big-cost skills, 2 ranks, Lv 3 / 8): the per-stage surcharge drops from +25% to +15% to +5%.');
-out.push('- **Split Shot** / **Wide Arc** / **Echo** (where they fit): +1 / +2 fanned projectiles at 70%; +15–20% charged area per rank; the release repeats once 0.45 s later at 50%.');
+out.push(`- **Efficient Focus** (the big-cost skills, 2 ranks, Lv 3 / 8): the per-stage surcharge drops from +${Math.round(SURCHARGE * 100)}% to +${Math.round((SURCHARGE - FOCUS_PER_RANK) * 100)}% to +${Math.round((SURCHARGE - 2 * FOCUS_PER_RANK) * 100)}%.`);
+out.push('- **Split Shot** / **Wide Arc** / **Echo** (where they fit): +1 / +2 fanned projectiles at 50%; +15–20% charged area per rank; the release repeats once 0.45 s later at 50%.');
 out.push('');
 for (const T of TREES) {
   const ids = Object.keys(CHARGE).filter(id => SKILLS[id].tree === T.id).sort((a, b) => SKILLS[a].row - SKILLS[b].row || SKILLS[a].col - SKILLS[b].col);
@@ -63,7 +63,7 @@ for (const T of TREES) {
       const rk = n => Array.from({ length: p.ranks }, (_, i) => n(i + 1));
       const what = p.id === 'stages' ? `Ⅱ at ${Math.round(stageTimes(c)[1] * 100) / 100} s, then Ⅲ at ${Math.round(stageTimes(c)[2] * 100) / 100} s`
         : p.id === 'quick' ? `Stage Ⅰ in ${rk(r => Math.round(stageTimes(c, { quick: r })[0] * 100) / 100).join(' / ')} s`
-          : p.id === 'focus' ? `+${rk(r => Math.round((SURCHARGE - 0.1 * r) * 100)).join(' / ')}% zoom per stage`
+          : p.id === 'focus' ? `+${rk(r => Math.round((SURCHARGE - FOCUS_PER_RANK * r) * 100)).join(' / ')}% zoom per stage`
             : p.id === 'split' ? `+${rk(r => r).join(' / ')} extra ${p.info(1, c).replace(/^\+1 extra (\S+).*$/, '$1')}s (${p.pct}% each), fanned`
               : p.id === 'wide' ? `${rk(r => '+' + p.pct * r + '%').join(' / ')} ${p.info(1, c).replace(/^\+\d+% /, '')}`
                 : p.info(1, c);

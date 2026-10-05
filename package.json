@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "shot": "node tools/shot.mjs"
+    "shot": "node tools/shot.mjs",
+    "build:itch": "node tools/build-itch.mjs",
+    "test:itch": "node tools/build-itch.mjs --test",
+    "fonts": "python tools/fonts/build-fonts.py"
   },
   "dependencies": {
     "n8ao": "^2.0.1",
