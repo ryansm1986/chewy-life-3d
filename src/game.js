@@ -43,6 +43,7 @@ import { prewarmWorld } from './world/prewarm.js';
 import { WORLD } from './world/layout.js';
 import { installLife } from './life/index.js';
 import { Tutorials } from './world/tutorials.js';
+import { installHousing } from './home/housing.js';
 
 // UI and audio load in parallel with the world. The import() paths must be literal so Vite bundles them for the
 // production build (a variable path with @vite-ignore worked on the dev server but 404'd in dist: no UI, no sound).
@@ -117,7 +118,7 @@ export async function boot() {
   // nobody can see a hitch (boot, title, dialogue, menus, the Burrow) and move in from this pool; newcomers arrive
   // one per check, and only wait when the pool is empty and the village is on screen.
   const folkPool = [];
-  const hitchHidden = () => G.titleActive || G.mode !== 'village' || G.ui?.dlg?.active || G.ui?.anyModal?.();
+  const hitchHidden = () => G.titleActive || (G.mode !== 'village' && G.mode !== 'interior') || G.ui?.dlg?.active || G.ui?.anyModal?.(); // (an interior is on screen: no hitches there either)
   const stockFolk = () => { if (folk.length + folkPool.length < FOLK_MAX) folkPool.push(prebuildHumanoid(randomVillagerSpec())); };
   for (let i = 0; i < 6; i++) stockFolk(); // behind the boot splash
   setInterval(() => { if (hitchHidden()) stockFolk(); }, 350);
@@ -223,13 +224,14 @@ export async function boot() {
     if (a) { const [n, extra] = a; if (n === 'villager_chatter') G.audio?.babble?.('hello!', { pitch: o.pitch || 1, pos: o.pos, vol: 0.5 }); else G.audio?.play?.(n, { ...o, ...extra }); return; }
     G.audio?.play?.(name, o);
   });
-  const stepSound = () => { if (G.mode !== 'dungeon') return 'footstep_grass'; if (G.dungeon?.isRegion) return G.dungeon.region.footstep?.(G.player.pos, G.world) || 'footstep_grass'; const th = G.dungeon?.layout?.theme; return th === 'shrine' || th === 'moon' || th === 'kitchen' ? 'footstep_wood' : 'footstep_stone'; };
+  const stepSound = () => { if (G.mode === 'interior') return 'footstep_wood'; if (G.mode !== 'dungeon') return 'footstep_grass'; if (G.dungeon?.isRegion) return G.dungeon.region.footstep?.(G.player.pos, G.world) || 'footstep_grass'; const th = G.dungeon?.layout?.theme; return th === 'shrine' || th === 'moon' || th === 'kitchen' ? 'footstep_wood' : 'footstep_stone'; };
   Events.on('footstep', (p) => { G.audio?.play?.(stepSound(), { vol: 0.35 }); if (Math.random() < 0.5) G.vfx.dust(p, { n: 1, size: 0.18 }); });
   Events.on('emote', ({ actor, kind }) => G.vfx.emote(actor, kind));
   Events.on('player:levelup', ({ lvl }) => { G.vfx.levelUp(player.pos.clone()); G.ui?.banner?.('Level Up!', `${player.name} is now level ${lvl}`, { style: 'levelup' }); G.audio?.play?.('ui_levelup'); G.actions.restoreAll(); shadow.recalc(); });
   Events.on('player:dead', () => onPlayerDeath());
   Events.on('item:drop', ({ item }) => {
     if (!item) return;
+    if (G.mode === 'interior') { if (!G.actions.pickup(item)) G.story?.giveItem?.(item); G.ui?.toast?.('No dropping things indoors — it went back in your bag', { color: '#ffd8a8' }); return; } // (houses have no ground loot)
     const loot = G.mode === 'dungeon' ? G.dungeon?.loot : vLoot;
     const p = player.pos.clone();
     loot?.drop(p, [item.kind === 'gem' ? { type: 'gem', item } : { type: 'item', item }]);
@@ -251,6 +253,7 @@ export async function boot() {
     engine.setWorld(world);
     player.changeWorld(world); shadow.changeWorld(world);
   };
+  G.swapWorld = swapWorld; // (housing: the interiors swap in and out the same way)
   // tear down a finished floor completely (entities, loot, lights, GPU resources) so nothing leaks between visits
   function disposeDungeon(d = dungeon) {
     if (!d) return;
@@ -269,6 +272,7 @@ export async function boot() {
   // A combat world: a Burrow floor (DungeonMode) or an outdoor region (RegionMode, docs/REGIONS.md) — same entry sequence.
   function enterCombatWorld(makeMode, buildArg, { location, sub, floor = null, region = null, tip = true }) {
     const go = () => {
+      if (G.mode === 'interior') G.housing?.goOut(); // (only reachable from debug / tests: houses have no Burrow door)
       skills.clearAll();
       disposeDungeon();
       dungeon = G.dungeon = makeMode();
@@ -385,9 +389,10 @@ export async function boot() {
   // ---- interaction helpers
   G.story = new Story(G);
   G.ui?.setQuestProvider?.(() => G.story.uiList());
-  G.questTarget = () => (G.titleActive || G.playerDead ? null : G.tutorials?.target() || G.story.target()); // (a guide's pointer first)
+  G.questTarget = () => (G.titleActive || G.playerDead ? null : G.tutorials?.target() || (G.mode === 'interior' ? null : G.story.target())); // (a guide's pointer first; indoors only a guide points)
   installServices(G);
   installLife(G, village); // farming, the pantry, the Seed Stall (docs/HOMESTEAD.md)
+  installHousing(G); // enterable houses, the cottage's bed / chest / stove, decorating (docs/HOUSING.md)
   // guided tutorials (docs/TUTORIALS.md). They start on their own unless ?notut — and the QA's ?nointro sessions count
   // as notut (unless ?tut), remembered for the tab, so a QA reload of its own save stays quiet too.
   {
@@ -395,7 +400,7 @@ export async function boot() {
     try { if (P.has('tut')) sessionStorage.removeItem('chewy3d.notut'); else if (off) sessionStorage.setItem('chewy3d.notut', '1'); else off = !!sessionStorage.getItem('chewy3d.notut'); } catch (e) { /* storage unavailable */ }
     G.tutorials = new Tutorials(G, { enabled: !off });
   }
-  const vMap = new VillageMinimap(G);
+  const vMap = G.villageMinimap = new VillageMinimap(G);
   Events.on('village:changed', () => { vMap.dirty = true; });
   Events.on('garden:till', () => { vMap.dirty = true; }); // (Chewy's bed turns from lawn to soil on the map)
   G.ui?.minimap?.setProvider?.(vMap);
@@ -430,6 +435,7 @@ export async function boot() {
   // which key/button holds a skill (for channeling)
   const SLOT_KEYS = [() => Input.mouseDown(0), () => Input.mouseDown(2), () => Input.down('1'), () => Input.down('2'), () => Input.down('3'), () => Input.down('4')];
   const skillInput = { holding(id) { const hb = G.state.player.hotbar; return hb.some((s, i) => s === id && SLOT_KEYS[i]()); } };
+  skills.charge.bindKeys(i => SLOT_KEYS[i]?.()); // hold-to-charge polls the hotbar keys (combat/charge.js, docs/CHARGE.md)
 
   // occlusion fade: tell shaders where Chewy is on screen
   const _o = new THREE.Vector3();
@@ -445,7 +451,7 @@ export async function boot() {
       heroWorld = w; w.scene.add(heroRing, pupRing);
       heroLight = w._heroLight ||= w.lightPool.addSource({ pos: new THREE.Vector3(), color: new THREE.Color('#ffe2b8'), intensity: 0, radius: 7, priority: 8, noPool: true });
     }
-    const dark = G.mode === 'dungeon' ? 1 : day.out.night;
+    const dark = G.mode === 'dungeon' ? 1 : G.mode === 'interior' ? (G.housing?.world?.night || 0) * 0.3 : day.out.night;
     heroLight.pos.set(player.pos.x, player.pos.y + 2.2, player.pos.z);
     heroLight.intensity = G.mode === 'dungeon' ? 0 : 3.6 * dark; // the Burrow already has its own lantern light on Chewy
     heroRing.position.set(player.pos.x, player.pos.y + 0.05, player.pos.z);
@@ -473,6 +479,8 @@ export async function boot() {
   let hoverEnemy = null;
   function handleInput(dt) {
     if (G.mode === 'village' && Input.hit('b') && !player.controlLocked && !G.ui?.isPaused?.() && !G.ui?.anyModal?.()) { buildMode.active ? buildMode.exit() : buildMode.enter(); }
+    else if (G.mode === 'interior' && Input.hit('b') && (!player.controlLocked || G.housing?.decor.active) && !G.ui?.isPaused?.() && !G.ui?.anyModal?.()) G.housing?.decor.toggle(); // (indoors B decorates: docs/HOUSING.md §2; the player is held still while decorating)
+    if (G.housing?.decor.active) return; // (decorate mode reads the mouse and WASD itself: home/decorate.js)
     if (buildMode.active) {
       if (Input.mouse.wheel) rig.zoom(Input.mouse.wheel);
       if (!G.buildFocus) G.buildFocus = player.pos.clone();
@@ -491,14 +499,15 @@ export async function boot() {
     const aim = engine.mouseGround(Input.mouse.nx, Input.mouse.ny, (x, z) => G.world.heightAt(x, z));
     hoverEnemy = G.mode === 'dungeon' && !Input.mouse.overUI ? G.combat.pickAtScreen(Input.mouse.x, Input.mouse.y, engine.camera) : null;
     // LMB: attack enemies under the cursor (or Shift+click), otherwise walk / interact
-    if (Input.mouseDown(0) && !Input.mouse.overUI) {
-      if (hoverEnemy || (Input.down('shift') && G.mode === 'dungeon')) {
+    const lmbCharge = skills.charge.owns(0); // (a charge held on LMB stays a skill press even off the monster / over the HUD)
+    if (Input.mouseDown(0) && (!Input.mouse.overUI || lmbCharge)) {
+      if (hoverEnemy || (Input.down('shift') && G.mode === 'dungeon') || lmbCharge) {
         const tgt = hoverEnemy ? hoverEnemy.pos : aim;
         const R = skillRuntime(hb[0] || 'attack', G.state, G.derived);
         const melee = R && !R.params?.projectile && !(R.params?.speed) && (R.params?.radius || 0) < 3;
         const reach = (R?.params?.radius || 1.8) + (hoverEnemy?.radius || 0.3) - 0.2;
-        if (hoverEnemy && melee && Math.hypot(tgt.x - player.pos.x, tgt.z - player.pos.z) > reach) { skills.approachTo(hb[0] || 'attack', hoverEnemy); } // D2-style: one click walks up and swings
-        else { player.moveTarget = null; skills.tryCast(hb[0] || 'attack', tgt, hoverEnemy); }
+        if (!lmbCharge && hoverEnemy && melee && Math.hypot(tgt.x - player.pos.x, tgt.z - player.pos.z) > reach) { skills.approachTo(hb[0] || 'attack', hoverEnemy); } // D2-style: one click walks up and swings
+        else { player.moveTarget = null; skills.charge.feed(0, hb[0] || 'attack', tgt, hoverEnemy); } // (a chargeable skill: tap casts, hold charges)
       } else {
         const hit = Input.mouseHit(0), it = hit ? pickInteractAtMouse() : null;
         // a click walks to the spot under the cursor at the press; holding steers once the cursor moves or after a
@@ -509,8 +518,10 @@ export async function boot() {
         else if (!player.interactTarget && (hit || steer)) player.moveTarget = aim;
       }
     }
-    if (Input.mouseDown(2) && !Input.mouse.overUI && hb[1]) skills.tryCast(hb[1], hoverEnemy ? hoverEnemy.pos : aim, hoverEnemy);
-    for (let k = 1; k <= 4; k++) if (Input.down(String(k)) && hb[k + 1]) skills.tryCast(hb[k + 1], hoverEnemy ? hoverEnemy.pos : aim, hoverEnemy);
+    const indoors = G.mode === 'interior'; // (no skills indoors: nothing to fight, and the furniture is fragile)
+    // RMB / 1-4: a tap casts; holding a chargeable skill charges it (Settings > Charge on hold), others repeat as held
+    if (!indoors && Input.mouseDown(2) && (!Input.mouse.overUI || skills.charge.owns(1)) && hb[1]) skills.charge.feed(1, hb[1], hoverEnemy ? hoverEnemy.pos : aim, hoverEnemy);
+    if (!indoors) for (let k = 1; k <= 4; k++) if (Input.down(String(k)) && hb[k + 1]) skills.charge.feed(k + 1, hb[k + 1], hoverEnemy ? hoverEnemy.pos : aim, hoverEnemy);
     if (Input.hit('q')) usePotion('heart');
     if (Input.hit('e')) usePotion('zoom');
     if (Input.hit('r')) usePotion('rejuv');
@@ -715,6 +726,7 @@ export async function boot() {
     const paused = G.ui?.isPaused?.() || (G.mode === 'dungeon' && G.ui?.dlg?.active);
     const dt = paused ? 0 : rdt;
     if (G.mode === 'village') day.update(dt);
+    else if (G.mode === 'interior') day.tick(dt); // (time passes inside; home/housing.js lights the room for the hour)
     if (G.titleActive) { rig.yawTarget += dt * 0.06; rig.yaw = rig.yawTarget; }
     else handleInput(dt);
     G.actions.tickRegen(dt);
@@ -730,10 +742,12 @@ export async function boot() {
     if (G.heroFocus) rig.focus.set(G.heroFocus.x, (G.heroFocus.y || player.pos.y) + 0.6, G.heroFocus.z); // hero switch: the camera glides between them
     else if (G.introFocus) rig.focus.set(G.introFocus.x, player.pos.y + 0.6, G.introFocus.z);
     else if (buildMode.active && G.buildFocus) rig.focus.set(G.buildFocus.x, player.pos.y + 0.6, G.buildFocus.z);
+    else if (G.decorFocus) rig.focus.set(G.decorFocus.x, 0.6, G.decorFocus.z); // (decorate mode pans over the room)
     else if (!G.titleActive) {
       const lead = new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing)).multiplyScalar(Math.min(1, player.anim.speed / 4) * 1.2);
       rig.focus.set(player.pos.x + lead.x, player.pos.y + 0.6, player.pos.z + lead.z);
     }
+    if (G.mode === 'interior') { if (!G.decorFocus) G.housing.biasFocus(rig.focus); G.housing.clampFocus(rig.focus, G.decorFocus ? -1.2 : 1.2); } // (the camera leans to the back walls and stays over the room)
     rig.update(dt);
     updateOcclusion();
     updateHero(rdt);
@@ -742,12 +756,16 @@ export async function boot() {
       village.lightPool.update(dt, rig.target, engine.time, day.night);
       village.update(dt, engine.time);
       sim.update(dt, engine.time);
+      G.housing?.ext?.update(dt); // (an upgrade's scaffold: home/exteriors.js)
       buildMode.update(dt);
       ambient.update(dt, engine.time);
       if (Math.hypot(player.pos.x - L.waterfall.x, player.pos.z - L.waterfall.z) < 70) waterfall.update(dt, engine.time, day); // (mist + spray only nearby)
       villageAmbience(dt);
       vLoot.update(dt);
       updateMarkers(rdt);
+    } else if (G.mode === 'interior') {
+      G.housing.update(dt, engine.time, rdt); // (the room, its light, the guests, decorate mode)
+      sim.update(dt, engine.time); // (the village and its economy keep ticking while you're inside)
     } else {
       dungeon.update(dt, engine.time);
       G.world.updateSun(rig.target);

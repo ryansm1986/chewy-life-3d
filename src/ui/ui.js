@@ -4,6 +4,7 @@ import './hud.css';
 import './panels.css';
 import './fx.css';
 import './life.css';
+import './home.css';
 import { Events as CoreEvents } from '../core/events.js';
 import { el, clamp, isTyping, esc, rarityColor } from './dom.js';
 import { glyph } from './glyphs.js';
@@ -17,21 +18,25 @@ import { Dialogue } from './dialogue.js';
 import { BuildPanel, InspectCard } from './build.js';
 import { QuestArrow } from './questArrow.js';
 import { TutorialUI } from './tutorial.js';
+import { ChargeHud } from './chargeHud.js';
 import { ShopPanel } from './shop.js';
 import { MapPanel, QuestPanel, normQuest } from './map.js';
 import { TravelPanel } from './travel.js';
 import { MenuPanel } from './menu.js';
 import { SeedPickerPanel, pantryGain, pantryTipHTML } from './pantry.js';
 import { CookPanel } from './cook.js';
+import { CraftPanel } from './craft.js';
 import { GiftPickerPanel } from './gift.js';
+import { DecoratePanel, HomeHud } from './decorate.js';
+import { HouseCardPanel, RemodelPanel, Preview } from './remodel.js';
 import { ReelBar } from './reel.js';
 import { Title } from './title.js';
 import { itemName, itemIconURL, skillIconURL } from './rpg.js';
 import { Vector3 } from 'three';
 
 const SETTINGS_KEY = 'chewy3d.settings';
-const DEFAULT_SETTINGS = { quality: 2, music: 0.7, sfx: 0.8, uiScale: 1, shake: true, showFps: false };
-const NON_BLOCKING = new Set(['build']); // panels that don't pause gameplay input
+const DEFAULT_SETTINGS = { quality: 2, music: 0.7, sfx: 0.8, uiScale: 1, shake: true, showFps: false, chargeMode: 0 }; // chargeMode: 0 hold to charge · 1 off · 2 toggle (docs/CHARGE.md)
+const NON_BLOCKING = new Set(['build', 'decorate']); // panels that don't pause gameplay input
 // UI sound names → src/audio sfx ids (learn / equip / level-up / toast sounds are already bound to game events by the audio module)
 const SFX_MAP = { open: 'ui_open', close: 'ui_close', tab: 'ui_tab', deny: 'ui_error', coin: 'ui_coin', buy: 'ui_buy', hover: 'ui_hover', equip: 'ui_equip', learn: 'ui_learn',
   select: 'ui_click', assign: 'ui_click', stat: 'ui_click', pick: 'ui_click', drop: 'ui_click', sort: 'ui_click', tick: 'ui_click', bag: 'ui_click', click: 'ui_click' };
@@ -74,7 +79,12 @@ export const UI = {
       seeds: new SeedPickerPanel(this), // (F on tilled soil: docs/HOMESTEAD.md)
       cook: new CookPanel(this), // (the kitchen, campfires, Rosie's oven)
       gift: new GiftPickerPanel(this), // ("Give a gift" in a villager's chat)
+      decorate: new DecoratePanel(this), // (decorate mode indoors: docs/HOUSING.md)
+      craft: new CraftPanel(this), // (the workbench: docs/HOUSING.md §3)
+      houseCard: new HouseCardPanel(this), remodel: new RemodelPanel(this), // (a house's mailbox: Upgrade / Remodel / Enter — docs/HOUSING.md §5-6)
     };
+    this.homeHud = new HomeHud(this); // (indoors: the house name, the Decorate button)
+    this.chargeHud = new ChargeHud(this); // (the hotbar's charge ring + stage pips: docs/CHARGE.md)
     this.skills = this.panels.skills;
     // popover + skill drag ghost
     this.pop = el('div', 'pop-wrap'); this.pop.innerHTML = '<div class="pop-box"></div>'; this.layers.over.appendChild(this.pop);
@@ -122,6 +132,8 @@ export const UI = {
     on('potions:changed', () => this.panels.shop.refresh());
     on('pantry:changed', () => { this.panels.inventory.refresh(); this.panels.shop.refresh(); this.panels.cook.refresh(); });
     on('recipe:learned', () => this.panels.cook.refresh());
+    on('furniture:changed', () => { this.panels.inventory.refresh(); this.panels.decorate.refresh(); });
+    for (const ev of ['coins:changed', 'materials:changed', 'village:changed']) on(ev, () => { this.panels.houseCard.refresh(); this.panels.remodel.refresh(); });
     on('materials:changed', () => this.panels.cook.refresh());
     on('fish:caught', () => this.panels.quests.refresh());
     on('hotbar:changed', () => this.panels.skills.refresh());
@@ -137,6 +149,7 @@ export const UI = {
     if (this.mode !== 'title') this.hud.update(dt);
     this.qarrow.update(dt, cam);
     this.tutorial?.update(dt);
+    if (this.mode !== 'title') this.chargeHud?.update(dt);
     this.panels.map.update?.(dt);
     if (this.settings.showFps) {
       this._fpsAcc += dt; this._fpsN++;
@@ -158,6 +171,8 @@ export const UI = {
     if (mode !== 'village') this.inspectCard?.hide();
     if (mode === 'dungeon' && !this.hud.cache.loc) this.hud.setLocation('The Burrow', 'B1F');
     if (mode === 'village') this.hud.setLocation(null);
+    if (mode !== 'interior' && this.isOpen('decorate')) this.close('decorate');
+    this.homeHud?.setMode(mode);
   },
 
   // ------------------------------------------------------------------ panels
@@ -169,8 +184,9 @@ export const UI = {
     if (p.side === 'left' || p.side === 'right') for (const q of Object.values(this.panels)) if (q !== p && q.isOpen && q.side === p.side) this.close(q.name, true);
     if (p.side === 'center') for (const q of Object.values(this.panels)) if (q !== p && q.isOpen && q.side === 'center') this.close(q.name, true);
     if (name === 'menu' || name === 'map') { this.drag.cancel(); this.hidePopover(); }
-    if (name === 'build') { this.close('inventory'); for (const q of ['character', 'skills', 'quests', 'shop', 'stash']) this.close(q); }
+    if (name === 'build' || name === 'decorate') { this.close('inventory'); for (const q of ['character', 'skills', 'quests', 'shop', 'stash', 'cook']) this.close(q); }
     else if (p.side !== 'center' && this.isOpen('build')) this.close('build');
+    else if (p.side !== 'center' && name !== 'decorate' && this.isOpen('decorate')) this.close('decorate');
     // (a homestead stall, which trades only in pantry goods, shows the Pantry beside it rather than the Bag)
     if ((name === 'shop' || name === 'stash') && !this.isOpen('inventory')) { this.panels.inventory.open(name === 'shop' ? { view: opts?.noBagSell ? 'pantry' : 'bag' } : {}); this._autoInv = true; this._order.push('inventory'); }
     p.open(opts || {});
@@ -212,6 +228,8 @@ export const UI = {
   },
   setBuildProvider(fn) { this._buildProvider = fn; },
   // build-mode hover card (data from VillageSim.inspect) at screen position x,y; null hides it
+  /** the house preview renderer (the house card and the Remodel panel share it) */
+  remodelPreview() { return (this._rmPreview ||= new Preview(this.G.engine)); },
   buildInspect(info, x, y) { if (!this.ready) return; if (!info || this.mode !== 'village' || this.dlg.active || this.isOpen('menu')) this.inspectCard.hide(); else this.inspectCard.show(info, x, y); },
   refreshItems() { for (const n of ['inventory', 'stash', 'character', 'shop']) this.panels[n].refresh(); },
   /** P: the inventory panel on its Pantry tab (or closed again). */
@@ -243,6 +261,7 @@ export const UI = {
       if (this.pop.classList.contains('show')) { this.hidePopover(); return; }
       if (this.drag.held) { this.drag.cancel(); return; }
       if (this.isOpen('build') && (this.panels.build.sel || this.panels.build.tool)) { this.panels.build.clearSelection(); this.panels.build.opts.onCancel?.(); return; }
+      if (this.isOpen('decorate') && this.G?.housing?.decor?.onEscape?.()) return; // (decorating: Esc drops what's in hand first)
       const top = [...this._order].reverse().find(n => this.panels[n]?.isOpen);
       this._user = true; try { if (top) this.close(top); else this.open('menu'); } finally { this._user = false; }
       return;

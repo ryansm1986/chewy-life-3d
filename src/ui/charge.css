@@ -1,0 +1,40 @@
+/* Hotbar charge feedback (ui/chargeHud.js, docs/CHARGE.md §4). --cc = the skill's charge colour, --k = 0..1 fill. */
+.hb .hc-sweep { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity .12s;
+  background: conic-gradient(from 0deg, color-mix(in srgb, var(--cc, #ffc24a) 55%, #fff) 0deg, var(--cc, #ffc24a) calc(var(--k, 0) * 360deg), rgba(255, 255, 255, 0) calc(var(--k, 0) * 360deg + .5deg)); }
+.hb.charging .hc-sweep { opacity: .62; }
+.hb.charging .hb-in { transform: translateY(-4px) scale(1.07); box-shadow: 0 0 0 3px #fff, 0 0 18px 5px color-mix(in srgb, var(--cc, #ffc24a) 80%, transparent), 0 3px 0 var(--ink); }
+.hb.charging.full .hb-in { animation: chFull 0.9s ease-in-out infinite; }
+.hb.chfull .hb-in { animation: chPop .6s var(--pop); }
+@keyframes chFull { 50% { box-shadow: 0 0 0 3px #fff, 0 0 26px 9px var(--cc, #ffc24a), 0 3px 0 var(--ink); } }
+@keyframes chPop { 0% { transform: translateY(-4px) scale(1.07); } 40% { transform: translateY(-6px) scale(1.18); } 100% { transform: translateY(-4px) scale(1.07); } }
+
+/* the rim fills clockwise from 12 o'clock, like the ring at the hero's feet */
+.hb .hc-rim { position: absolute; inset: -1px; pointer-events: none; opacity: 0; z-index: 2; transition: opacity .12s; }
+.hb.charging .hc-rim { opacity: 1; transform: translateY(-4px) scale(1.07); }
+.hc-rim svg { width: 100%; height: 100%; overflow: visible; }
+.hc-rim path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.hc-rim .hc-r0 { stroke: var(--ink); stroke-width: 7; opacity: .9; }
+.hc-rim .hc-r1 { stroke: var(--cc, #ffc24a); stroke-width: 4.2; stroke-dasharray: 100 100; stroke-dashoffset: calc(100 - var(--k, 0) * 100); filter: drop-shadow(0 0 2px #fff); }
+
+/* stage pips Ⅰ Ⅱ Ⅲ above the slot */
+.hb .hc-pips { position: absolute; left: 50%; top: -34px; display: flex; gap: 4px; transform: translateX(-50%) translateY(6px) scale(.6); opacity: 0; pointer-events: none; z-index: 6; transition: opacity .15s, transform .25s var(--spring); }
+.hb.charging .hc-pips { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+.hb[data-i="1"] .hc-pips { margin-left: 9px; } /* (clear of the weapon-set badge between LMB and RMB) */
+.hc-pips i { position: relative; display: grid; place-items: center; width: 23px; height: 23px; }
+.hc-pips i[hidden] { display: none; }
+.hc-pips i::before { content: ''; position: absolute; inset: 1px; border-radius: 5px; transform: rotate(45deg); background: linear-gradient(#fffdf8, #f3e4d0); border: 2.5px solid var(--ink); box-shadow: 0 2px 0 rgba(74, 44, 42, .35); transition: background .15s; }
+.hc-pips b { position: relative; font: 700 12.5px/1 var(--font); color: var(--ink2); }
+.hc-pips i.lit::before { background: radial-gradient(circle at 50% 38%, #fff 0 14%, var(--cc, #ffc24a) 46%, color-mix(in srgb, var(--cc, #ffc24a) 78%, #7a4a30) 100%); box-shadow: 0 0 0 2px #fff, 0 0 12px 3px var(--cc, #ffc24a), 0 2px 0 rgba(74, 44, 42, .35); }
+.hc-pips i.lit b { color: #fff; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
+.hc-pips i.nz::before { background: repeating-linear-gradient(45deg, #d9d2df 0 3px, #c6bdcd 3px 6px); }
+.hc-pips i.nz b { color: #8a7f94; }
+.hc-pips i.pop { animation: pipPop .52s var(--pop); }
+@keyframes pipPop { 0% { transform: scale(.4); } 60% { transform: scale(1.45); } 100% { transform: scale(1); } }
+
+/* ⚡ this skill has charge perks */
+.hb .hb-perk { position: absolute; right: -7px; top: -7px; width: 21px; height: 21px; display: none; z-index: 4; pointer-events: none; border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, #fffdf8, #ffe7b0); border: 2.5px solid var(--ink); box-shadow: 0 2px 0 rgba(74, 44, 42, .3); }
+.hb .hb-perk.on { display: grid; place-items: center; }
+.hb .hb-perk .gl, .hb .hb-perk svg { width: 15px; height: 15px; }
+.hb .hb-perk.pop { animation: pipPop .52s var(--pop); }
+.hb.empty .hb-perk { display: none; }

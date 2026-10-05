@@ -2,7 +2,8 @@
 // arched vermilion bridge (+ bridgeDeckHeight), golden bone statue.
 import * as THREE from 'three';
 import { puff, tube } from '../../gfx/geom.js';
-import { C, G, V, PI, ROOFS, shade, col } from './kit.js';
+import { C, G, V, PI, ROOFS, shade, col, mixc } from './kit.js';
+import { FENCE_COLORS } from './styles.js';
 import { STONES, FLOWERS } from './parts.js';
 import { chochin, toro, pot, bush, tree, flowerPatch, bench as benchProp, torii, rock, lrng, faceColors, blossomGeo, leafGeo, mossStone, nz } from './props.js';
 import { symbol } from './symbols.js';
@@ -278,12 +279,19 @@ export function lanternString(B) {
   B.height = 2.2;
 }
 
-// One fence section along x (-0.5..0.5). picket: posts with pyramid caps and gold knobs, back rails, round-topped
-// white pickets with nail heads and a grubby foot; bamboo: noded canes lashed to split-bamboo rails with dark cord;
-// rail: rustic split rails with bark on stout posts.
-export function fenceSection(B, style, h) {
-  const rr = lrng(B), L = 1;
+// One fence section along x (-L/2..L/2, 1 m by default). picket: posts with pyramid caps and gold knobs, back rails,
+// round-topped white pickets with nail heads and a grubby foot; bamboo: noded canes lashed to split-bamboo rails with
+// dark cord; rail: rustic split rails with bark on stout posts; rope: stout round driftwood posts with a thick twisted
+// hemp rope (and a lighter lower strand) sagging between them, wrapped round each post; hedge: a clipped hedge of leafy
+// bushes. color (optional, a fence colour from styles.js): the pickets' paint, the canes' stain, the rails, the rope
+// posts, or the hedge's flowers (natural / dark: none); without it each style keeps its own natural look.
+// opts (for runs of sections): L (section length); left: false = the run goes on to the left (no post there: the
+// section before has it, no overhanging rail); right: false = the run goes on to the right (the post stays, shared with
+// the next section, no overhanging rail). A run: first {left: true, right: false}, middle {false, false}, last {false, true}.
+export function fenceSection(B, style, h, color = null, { L = 1, left = true, right = true } = {}) {
+  const rr = lrng(B), ex = left ? 1 : 0, ex1 = right ? 1 : 0;
   const post = (x, color, cap = true) => {
+    if (x < 0 && !left) return;
     const p = G.box(0.1, h + 0.1, 0.1, 0.02); p.rotateY((rr() - 0.5) * 0.12); p.translate(x, (h + 0.1) / 2, 0);
     B.add(p, (pp, n, o) => { o.set(color).multiplyScalar(0.9 + 0.12 * nz(pp.y * 7, x * 5)); if (pp.y < 0.08) o.lerp(col('#6e8a4a'), 0.45); });
     if (cap) {
@@ -292,38 +300,61 @@ export function fenceSection(B, style, h) {
     }
   };
   if (style === 'picket') {
-    const wood = C.woodMid;
+    const wood = color ? mixc(color, C.woodMid, 0.3) : C.woodMid, paint = color || '#fff6ea', grime = color ? mixc(color, '#8a7058', 0.5) : '#a89070';
     post(-L / 2, wood); post(L / 2, wood);
     for (const y of [h * 0.28, h * 0.72]) { const r = G.box(L - 0.08, 0.06, 0.035, 0); r.translate(0, y, -0.045); B.add(r, shade(wood, 0.95)); }
-    const n = 7;
+    const n = Math.max(2, Math.round(7 * L));
     for (let i = 0; i < n; i++) {
       const x = -L / 2 + 0.1 + i * (L - 0.2) / (n - 1), ph = h * (0.9 + 0.1 * Math.sin((i / (n - 1)) * PI)) + (rr() - 0.5) * 0.02;
       const pk = G.box(0.07, ph - 0.035, 0.022, 0); pk.translate(x, (ph - 0.035) / 2, -0.015);
-      B.add(pk, (p, nn, o) => { o.set('#fff6ea').multiplyScalar(0.94 + 0.06 * clamp(nn.z)); if (p.y < 0.07) o.lerp(col('#a89070'), 0.5); });
-      for (const s of [1, -1]) { const top = new THREE.CircleGeometry(0.035, 6, 0, PI); if (s < 0) top.rotateY(PI); top.translate(x, ph - 0.035, -0.015 + s * 0.011); B.add(top, '#fff6ea'); }
+      B.add(pk, (p, nn, o) => { o.set(paint).multiplyScalar(0.94 + 0.06 * clamp(nn.z)); if (p.y < 0.07) o.lerp(col(grime), 0.5); });
+      for (const s of [1, -1]) { const top = new THREE.CircleGeometry(0.035, 6, 0, PI); if (s < 0) top.rotateY(PI); top.translate(x, ph - 0.035, -0.015 + s * 0.011); B.add(top, paint); }
       for (const y of [h * 0.28, h * 0.72]) { const nl = G.disc(0.007, 4); nl.translate(x, y, -0.003); B.add(nl, C.iron); }
     }
   } else if (style === 'bamboo') {
-    const cane = '#b8c870', node = '#8a9a50';
-    const n = 9;
+    // stained canes: natural = sun-dried gold, dark = smoked kurochiku (lashed with pale cord), white = bleached
+    const cane = color ? mixc('#b8c870', color, 0.72) : '#b8c870', node = color ? shade(cane, 0.74) : '#8a9a50';
+    const hi = color ? mixc(cane, '#fff4d8', 0.42) : '#e0e8a0', cut = color ? mixc(cane, '#fff4d8', 0.55) : '#e8dca0';
+    const rail = color ? shade(cane, 0.84) : '#9aaa58', railHi = color ? mixc(cane, '#fff4d8', 0.3) : '#c8d890';
+    const cord = color && col(cane).getHSL({}).l < 0.3 ? '#e0d0a8' : '#3a2a2a';
+    const n = Math.max(3, Math.round(9 * L));
     for (let i = 0; i < n; i++) {
       const x = -L / 2 + (i + 0.5) * L / n, hh = h + (rr() - 0.5) * 0.06, g = G.cyl(0.042, 0.047, hh, 6); g.translate(x, hh / 2, 0);
       const ph = rr() * 0.3;
-      B.add(g, (p, nn, o) => { o.set(cane).lerp(col('#e0e8a0'), clamp(nn.x * 0.3 + 0.2)); if (((p.y + ph) % 0.3) < 0.025) o.set(node); });
-      const cutTop = G.disc(0.04, 6); cutTop.rotateX(-PI / 2); cutTop.translate(x, hh + 0.001, 0); B.add(cutTop, '#e8dca0');
+      B.add(g, (p, nn, o) => { o.set(cane).lerp(col(hi), clamp(nn.x * 0.3 + 0.2)); if (((p.y + ph) % 0.3) < 0.025) o.set(node); });
+      const cutTop = G.disc(0.04, 6); cutTop.rotateX(-PI / 2); cutTop.translate(x, hh + 0.001, 0); B.add(cutTop, cut);
     }
     for (const y of [h * 0.3, h * 0.75]) {
-      const r = G.cyl(0.028, 0.028, L + 0.08, 6); r.rotateZ(PI / 2); r.translate(0, y, 0.055); B.add(r, (p, nn, o) => o.set('#9aaa58').lerp(col('#c8d890'), clamp(nn.y)));
-      for (let i = 0; i < n; i += 2) { const x = -L / 2 + (i + 0.5) * L / n, t = G.box(0.02, 0.05, 0.1, 0); t.translate(x, y, 0.03); B.add(t, '#3a2a2a'); } // cord lashings
+      const r = G.cyl(0.028, 0.028, L + (0.04 * ex + 0.04 * ex1), 6); r.rotateZ(PI / 2); r.translate((ex1 - ex) * 0.02, y, 0.055); B.add(r, (p, nn, o) => o.set(rail).lerp(col(railHi), clamp(nn.y)));
+      for (let i = 0; i < n; i += 2) { const x = -L / 2 + (i + 0.5) * L / n, t = G.box(0.02, 0.05, 0.1, 0); t.translate(x, y, 0.03); B.add(t, cord); } // cord lashings
     }
+  } else if (style === 'rope') {
+    const wood = color || '#a8988a', hemp = '#e6d2a4';
+    const rpost = x => {
+      if (x < 0 && !left) return;
+      const p = G.cyl(0.058, 0.068, h + 0.06, 8); p.rotateZ((rr() - 0.5) * 0.06); p.translate(x, (h + 0.06) / 2, 0);
+      B.add(p, (pp, n, o) => { o.set(wood).multiplyScalar(0.86 + 0.16 * nz(pp.y * 9, x * 5 + pp.z * 9)); if (pp.y < 0.08) o.lerp(col('#6e8a4a'), 0.4); });
+      const cap = new THREE.SphereGeometry(0.06, 8, 3, 0, TAU, 0, PI / 2); cap.scale(1, 0.6, 1); cap.translate(x, h + 0.055, 0); B.add(cap, mixc(wood, '#fff6ea', 0.3));
+    };
+    rpost(-L / 2); rpost(L / 2);
+    for (const [y, sag, r] of [[h * 0.84, 0.1, 0.032], [h * 0.42, 0.06, 0.022]]) {
+      const pts = []; for (let k = 0; k <= 10; k++) { const t = k / 10; pts.push({ p: V(-L / 2 + L * t, y - Math.sin(t * PI) * sag * Math.min(1, L), 0), r }); }
+      B.add(tube(pts, 6, false), (p, n, o) => o.set(hemp).multiplyScalar(0.84 + 0.18 * (Math.sin(p.x * 60 + Math.atan2(n.z, n.y) * 2) * 0.5 + 0.5)));
+      for (const x of [-L / 2, L / 2]) if (x > 0 || left) { const wr = G.torus(0.068, r * 0.9, 5, 10); wr.rotateX(PI / 2); wr.translate(x, y, 0); B.add(wr, shade(hemp, 0.88)); }
+    }
+  } else if (style === 'hedge') {
+    const plain = !color || color === FENCE_COLORS.natural.c || color === FENCE_COLORS.dark.c;
+    const fl = plain ? null : [color, mixc(color, '#ffffff', 0.45)], leafC = color === FENCE_COLORS.dark.c ? '#3f7440' : '#4f8a44';
+    const n = Math.max(1, Math.round(3 * L)), k = h / 0.55;
+    for (let i = 0; i < n; i++) { const x = -L / 2 + (i + 0.5) * L / n, r = (0.25 + rr() * 0.04) * k; B.at([x, 0, 0], 0, () => bush(B, { r, n: 2, color: leafC, sway: false, flowers: fl })); }
   } else {
-    const wood = '#8a6448';
+    const wood = color || '#8a6448', hiC = color ? mixc(color, '#fff6ea', 0.3) : '#c89a70', topC = color ? mixc(color, '#fff6ea', 0.4) : '#e8c08a';
     post(-L / 2, wood, false); post(L / 2, wood, false);
     for (const [y, sag] of [[h * 0.35, 0.02], [h * 0.8, 0.03]]) {
-      const pts = [0, 1, 2, 3, 4].map(k => ({ p: V(-L / 2 - 0.06 + (L + 0.12) * k / 4, y - Math.sin(k / 4 * PI) * sag, 0.06), r: 0.035 }));
-      B.add(tube(pts, 6, true), (p, n, o) => o.set(wood).lerp(col('#c89a70'), n.y > 0.6 ? 0.45 : 0).multiplyScalar(0.9 + 0.1 * Math.sin(p.x * 40)));
+      const pts = [0, 1, 2, 3, 4].map(k => ({ p: V(-L / 2 - 0.06 * ex + (L + (0.06 * ex + 0.06 * ex1)) * k / 4, y - Math.sin(k / 4 * PI) * sag, 0.06), r: 0.035 }));
+      B.add(tube(pts, 6, true), (p, n, o) => o.set(wood).lerp(col(hiC), n.y > 0.6 ? 0.45 : 0).multiplyScalar(0.9 + 0.1 * Math.sin(p.x * 40)));
     }
-    for (const x of [-L / 2, L / 2]) { const top = G.disc(0.05, 6); top.rotateX(-PI / 2); top.translate(x, h + 0.101, 0); B.add(top, '#e8c08a'); }
+    for (const x of [-L / 2, L / 2]) { if (x < 0 && !left) continue; const top = G.disc(0.05, 6); top.rotateX(-PI / 2); top.translate(x, h + 0.101, 0); B.add(top, topC); }
   }
 }
 export function fence(B) {

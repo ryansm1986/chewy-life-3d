@@ -23,12 +23,14 @@
 import { Events } from '../core/events.js';
 import { computeStats, xpToNext, LEVEL_CAP } from './stats.js';
 import { SKILLS, canLearn } from './skills.js';
+import { learnPerk as learnPerkIn, perkPoints } from './charge.js';
 import { starterItems, starterStaff, generateItem, EQUIP_SLOT_ITEM, meetsReq, socketGem, POTIONS, targetSlot, SET_ITEMS } from './items.js';
 import { CLASSES, HERO_IDS, canWield } from './classes.js';
 import { uid as rid } from '../core/util.js';
 import { PANTRY, pantryOf, pantryHas, sellPrice as pantrySellPrice } from '../life/pantry.js';
 import { RECIPES, cookbookOf, spendFor, learn as learnRecipeIn } from '../life/cooking.js';
 import { mealFor, mealActive } from '../life/meals.js';
+import { storable, furnitureOf } from '../home/furniture.js';
 
 export const INV_SIZE = 40;
 export const STASH_SIZE = 60;
@@ -488,6 +490,29 @@ export function createActions(G) {
     addPantry(id, n, { src: 'buy' });
     return true;
   }
+  // ------------------------------------------------------------ furniture storage (docs/HOUSING.md §2)
+  // state.furniture = { id: n } (household, lazy): furniture and the non-free wallpapers / floors. Placed things live on
+  // their house (the building record's `interior`); storing one puts it back here.
+  /** Add (or with n < 0 take) furniture. Returns the new count. Emits 'furniture:changed' { id, n, delta, first, src }. */
+  function addFurniture(id, n = 1, o = {}) {
+    if (!storable(id) || !n) return 0;
+    const st = S(), f = furnitureOf(st), found = st.furnitureFound ||= {};
+    const v = Math.max(0, (f[id] || 0) + Math.round(n));
+    if (v) f[id] = v; else delete f[id];
+    const first = n > 0 && !found[id];
+    if (first) found[id] = st.day || 1;
+    if (!o.silent) emit('furniture:changed', { id, n: v, delta: Math.round(n), first, src: o.src || null });
+    return v;
+  }
+  const furnitureCount = id => S().furniture?.[id] || 0;
+  const hasFurniture = (req = {}) => Object.entries(req).every(([k, n]) => furnitureCount(k) >= n);
+  /** Take every item of req ({ id: n }) from storage, or nothing. */
+  function spendFurniture(req, o = {}) {
+    if (!hasFurniture(req)) return false;
+    for (const k in req) if (req[k] > 0) addFurniture(k, -req[k], { silent: true });
+    emit('furniture:changed', { spend: req, src: o.src || 'place' });
+    return true;
+  }
   /** Eat a dish: heals a chunk of max life at once and leaves the hero Well Fed (life/meals.js: one buff at a time,
    *  a new dish replaces it; it lives on the hero's player object, so it travels and saves with them). It also becomes
    *  the G quick meal. → { heal, id, meal } | null */
@@ -576,6 +601,14 @@ export function createActions(G) {
     recompute();
     return true;
   }
+  /** Spend a skill point on a skill's charge perk (docs/CHARGE.md §3; rules in charge.js canLearnPerk). → rank | false */
+  function learnPerk(id, perkId) {
+    const r = learnPerkIn(S(), id, perkId);
+    if (!r.ok) { if (r.why && r.why !== 'Mastered!') toast(r.why, '#ff6a5a'); return false; }
+    emit('perk:learned', { id, perk: perkId, rank: r.rank });
+    emit('stats:changed', d());
+    return r.rank;
+  }
   function addStat(key) {
     const P = S().player;
     if (!STAT_KEYS.includes(key) || P.statPts <= 0) return false;
@@ -642,6 +675,7 @@ export function createActions(G) {
     for (const k of STAT_KEYS) { const base = base0[k]; sp += P.stats[k] - base; P.stats[k] = base; }
     let kp = 0;
     for (const id in P.skills) kp += P.skills[id];
+    kp += perkPoints(S()); P.chargePerks = {}; // (charge perks refund too)
     P.skills = {};
     P.statPts += sp;
     P.skillPts += kp;
@@ -709,7 +743,7 @@ export function createActions(G) {
   const api = {
     // contract
     equip, unequip, swapWeapons, moveItem, dropItem, pickup, usePotion, sellItem, buyItem, learnSkill, addStat,
-    setHotbar, addXp, addCoins, spendCoins, addMaterial, hasMaterials, spendMaterials, recompute,
+    setHotbar, addXp, addCoins, spendCoins, addMaterial, hasMaterials, spendMaterials, recompute, learnPerk,
     // extras
     tickRegen, activeHots, addPotion, heal, restoreZoom, spendZoom, damage, restoreAll, life, zoom,
     addSkillPts, addStatPts, respec, socket, getItem, firstFree, canEquip, equipProblem, setPieces,
@@ -717,6 +751,8 @@ export function createActions(G) {
     setActiveHero, prepareJoin, isCatchingUp: catchUp,
     // pantry (docs/HOMESTEAD.md)
     addPantry, hasPantry, spendPantry, sellPantry, buyPantry, eat, pantryCount, tickMeal, cook, spendMix, learnRecipe,
+    // furniture storage (docs/HOUSING.md)
+    addFurniture, hasFurniture, spendFurniture, furnitureCount,
   };
   if (G.state) { normalizeHeroes(G.state); ensureMouseSets(); migrateStarterSkills(); recompute(true); }
   return api;

@@ -45,7 +45,9 @@ export async function waitIdle(page, timeout = 20000) {
 export async function installProbes(page) {
   await page.evaluate(async () => {
     if (window.QA) return;
-    const { Events } = await import('/src/core/events.js');
+    // (the game's own bus: under the dev server an edited module is served as …?t=…, and a fresh import here would be
+    //  another instance that never hears the game's events)
+    const Events = window.G?.events || (await import('/src/core/events.js')).Events;
     const QA = window.QA = { Events, counts: {}, log: [] };
     // count interesting bus events (single observer: we only add ONE listener per name)
     for (const n of ['monster:killed', 'boss:dead', 'boss:spawn', 'player:dead', 'player:levelup', 'mode:changed', 'quest:update', 'toast', 'item:pickup', 'equip:changed', 'village:changed', 'friend:changed'])

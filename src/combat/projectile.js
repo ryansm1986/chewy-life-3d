@@ -5,6 +5,7 @@ import { tennisBallTexture, glowTexture } from '../gfx/textures.js';
 import { Events } from '../core/events.js';
 import { rand, TAU } from '../core/util.js';
 import { spellFx } from '../gfx/spellFx.js';
+import { chargeFx } from '../gfx/chargeFx.js';
 
 let ballGeo, ballMat, acornGeo, acornMat, potGeo, potMat, acornCap;
 function ballMesh(r = 0.12) {
@@ -43,6 +44,9 @@ const VIS = {
   sparkbolt: { mesh: p => (p ? spellFx(p.G).boltMesh() : new THREE.Group()), trailFn: (p, dt) => spellFx(p.G).trailBolt(p, dt) },
   kibble: { mesh: p => (p ? spellFx(p.G).kibbleMesh() : new THREE.Group()), trailFn: (p, dt) => spellFx(p.G).trailKibble(p, dt) },
   feather: { mesh: p => (p ? spellFx(p.G).featherMesh() : new THREE.Group()), trailFn: (p, dt) => spellFx(p.G).trailFeather(p, dt) },
+  // charged releases (docs/CHARGE.md): Power Throw's Fastball and Splash Bolt's big orb (o.size scales them)
+  fastball: { mesh: p => { const g = new THREE.Group(); g.add(ballMesh(0.125 * (p?.o.size || 1.5))); if (p) g.add(chargeFx(p.G).fastballMesh(p.o.size || 1.5)); return g; }, trailFn: (p, dt) => chargeFx(p.G).trailFastball(p, dt) },
+  bigorb: { mesh: p => (p ? chargeFx(p.G).bigOrbMesh(p.o.size || 1.8) : new THREE.Group()), trailFn: (p, dt) => chargeFx(p.G).trailBigOrb(p, dt) },
 };
 
 // every projectile look (ball, blaze, fireball, foxfire, pots...), for the floor prewarm (game.js): the caller shows
@@ -92,6 +96,10 @@ export class Projectile {
       if (L < 0.5) { Events.emit('sfx', 'ball_catch'); return false; }
       this.dir.copy(d).normalize();
       this.pos.addScaledVector(this.dir, Math.min(L, this.speed * 1.3 * dt));
+      if (this.o.hitOnReturn) { // Boomerang Fetch: everything on the way back is hit again (once)
+        const back = this.backSet || (this.backSet = new Set());
+        for (const e of this.targets()) { if (back.has(e)) continue; if (Math.hypot(e.pos.x - this.pos.x, e.pos.z - this.pos.z) < this.radius + (e.radius || 0.3)) { back.add(e); this.o.onHit?.(e, this); } }
+      }
     } else {
       if (this.o.homing && this.homeTarget?.alive) { const d = this.homeTarget.pos.clone().setY(this.pos.y).sub(this.pos).normalize(); this.dir.lerp(d, Math.min(1, dt * this.o.homing)).normalize(); }
       const step = this.speed * dt;

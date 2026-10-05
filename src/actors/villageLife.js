@@ -238,7 +238,7 @@ export class VillageLife {
   rebuild() {
     this.dirty = false; this.lastLen = this.sim.list.length;
     this.ver++; this.doorCache.clear();
-    for (const [rec, k] of this.knocks) if (!this.sim.list.includes(rec)) { this.dropKnock(k); this.knocks.delete(rec); }
+    for (const [rec, k] of this.knocks) if (!this.sim.list.includes(rec)) { if (!k.merged) this.dropKnock(k); this.knocks.delete(rec); }
     const old = new Map(this.slots.map(s => [s.id, s]));
     const out = [];
     const W = this.world, col = W.collision;
@@ -438,6 +438,7 @@ export class VillageLife {
       for (const r of list) { const d = Math.hypot(r.door.x - v.home.x, r.door.z - v.home.z); if (d < bd && (r.data.type === 'home' || d < 0.3)) { bd = d; best = r; } }
       return best;
     }
+    if (!v.hero) { const own = list.find(r => r.data.owner === v.id); if (own && this.doorInfo(own)) return own; } // (a saved owner: home/owners.js)
     const prefs = HOME_PREF[v.id] || ['home'];
     const a = v.anchor;
     for (const t of prefs) {
@@ -501,9 +502,10 @@ export class VillageLife {
   }
   // residents tucked in for the night: Chewy can knock on their door (one prompt per door, named villagers answer first)
   tuckIn(v, rec) {
-    if (!rec || rec.inter || rec.data.type === 'rosieShop') return; // shops / services keep their own door prompt
+    if (!rec || (rec.inter && !rec.inter.knockable) || rec.data.type === 'rosieShop') return; // shops / services keep their own door prompt
     const D = this.doorInfo(rec); if (!D) return;
     let k = this.knocks.get(rec);
+    if (!k && rec.inter?.knockable) { k = { who: new Set(), inter: rec.inter, merged: true }; this.knocks.set(rec, k); } // (a villager's home: its one door prompt knocks at night)
     if (!k) {
       const pos = new THREE.Vector3(D.step.x, this.world.heightAt(D.step.x, D.step.z), D.step.z);
       k = { who: new Set(), inter: { pos, radius: 1.05, label: 'Knock', onInteract: () => this.knock(rec) } };
@@ -514,10 +516,10 @@ export class VillageLife {
   wakeUp(v, rec) {
     const k = rec && this.knocks.get(rec); if (!k) return;
     k.who.delete(v);
-    if (!k.who.size) { this.dropKnock(k); this.knocks.delete(rec); } else this.knockLabel(k);
+    if (!k.who.size) { if (!k.merged) this.dropKnock(k); this.knocks.delete(rec); } else this.knockLabel(k);
   }
   knockFirst(k) { let f = null; for (const v of k.who) if (!f || (f.folk && !v.folk)) f = v; return f; }
-  knockLabel(k) { const f = this.knockFirst(k); k.inter.label = f ? `Knock on ${f.name}'s door` : 'Knock'; }
+  knockLabel(k) { if (k.merged) return; const f = this.knockFirst(k); k.inter.label = f ? `Knock on ${f.name}'s door` : 'Knock'; }
   dropKnock(k) { const a = this.world.interactables, i = a.indexOf(k.inter); if (i >= 0) a.splice(i, 1); }
   knock(rec) {
     const k = this.knocks.get(rec); const v = k && this.knockFirst(k);

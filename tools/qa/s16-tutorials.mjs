@@ -1,7 +1,8 @@
 // Scenario 16: the guided tutorials (docs/TUTORIALS.md), each end to end through real keys and clicks.
 //  a) QA sessions (?nointro without ?tut) never start one; with ?tut the director is on
 //  b) the house tour (Shadow): after Rosie's welcome → the cottage door (3D arrow, edge arrow / minimap target) → F (the
-//     prompt spotlit) → the menu (each choice spotlit) → the garden (Shadow's seeds) → till, plant, water → P → wrap-up
+//     prompt spotlit) → inside the cottage (the arrow on the chest, the bed, the stove, the door mat) → out through the
+//     mat → the garden (Shadow's seeds) → till, plant, water → P → wrap-up
 //  c) switching heroes (Moka): after her join → Tab (the switch button spotlit) → her spells, find Chewy → Tab back → wrap
 //     (Shadow's old Tab tip retired)
 //  d) fishing (Kero): after he gives the rod → the bank spot → cast (prompt spotlit) → an early press is forgiven → the
@@ -49,20 +50,18 @@ try {
   await snap('house_enter');
   R.check('at the door: "Press F" with the interaction prompt spotlit', /F/.test(enter.obj) && enter.ring, JSON.stringify(enter));
   await keyF();
-  await stepIs('house', 'menu', 8000);
-  await page.waitForFunction(() => document.querySelectorAll('.dlg-ch .dch').length >= 3 && !window.G.ui.dlg.typing, null, { timeout: 8000 }).catch(() => {});
+  await stepIs('house', 'inside', 12000);
   const seen = [];
-  for (let i = 0; i < 4; i++) {
-    await sleep(page, 1400);
-    const s = await G(() => { const r = document.querySelector('.tut-spot').getBoundingClientRect(), ch = [...document.querySelectorAll('.dlg-ch .dch')]; const hit = ch.find(b => { const q = b.getBoundingClientRect(); return Math.abs((r.top + r.height / 2) - (q.top + q.height / 2)) < 6 && Math.abs((r.left + r.width / 2) - (q.left + q.width / 2)) < 6; }); return { opt: hit?.textContent.trim() || null, say: document.querySelector('.ts-tx').textContent }; });
-    seen.push(s); if (i === 0) await snap('house_menu');
-    await sleep(page, 1400);
+  for (let i = 0; i < 4; i++) { // (the cottage's household jobs are furniture now: docs/HOUSING.md §1)
+    await sleep(page, 1500);
+    const s = await G(() => { const G = window.G, q = G.questTarget(), it = q && G.world.interactables.find(i => Math.hypot(i.pos.x - q.pos.x, i.pos.z - q.pos.z) < 0.05), A = G.world.scene.getObjectByName('tutorial:arrow'); return { mode: G.mode, use: it?.use || (it?.door ? 'door' : null), label: q?.label || null, arrow: !!A?.visible && A.parent === G.world.scene, say: document.querySelector('.ts-tx').textContent }; });
+    seen.push(s); if (i === 0) await snap('house_inside');
+    await sleep(page, 1700);
   }
-  R.check('the cottage menu: Shadow spotlights the stash, sleep and the kitchen in turn, then Leave', seen.some(s => /stash/i.test(s.opt || '') && /shared/.test(s.say)) && seen.some(s => /Sleep/.test(s.opt || '') && /income/.test(s.say)) && seen.some(s => /Cook/.test(s.opt || '') && /kitchen/.test(s.say)), JSON.stringify(seen));
-  const leaveK = await G(() => [...document.querySelectorAll('.dlg-ch .dch')].findIndex(b => /Leave/.test(b.textContent)) + 1);
-  await G(() => { const P = window.G.player; P.setPos(86, 134); P.moveTarget = null; }); // (step out into the lane first, so the garden step shows)
-  await page.keyboard.press('Digit' + leaveK); await sleep(page, 700);
-  await stepIs('house', 'garden');
+  R.check('inside the cottage: Shadow points the arrow at the treasure chest, the bed and the stove in turn, then the door mat', seen.some(s => s.use === 'stash' && /shared/.test(s.say)) && seen.some(s => s.use === 'sleep' && /income/.test(s.say)) && seen.some(s => s.use === 'cook' && /stove/.test(s.say)) && seen.some(s => s.use === 'door') && seen.every(s => s.mode === 'interior' && s.arrow), JSON.stringify(seen));
+  await G(() => { const G = window.G, m = G.world.interactables.find(i => i.door); G.player.setPos(m.pos.x, m.pos.z); G.player.moveTarget = null; });
+  await sleep(page, 300); await keyF(); // (out through the door mat)
+  await stepIs('house', 'garden', 12000);
   await sleep(page, 300); await snap('house_garden');
   const gift = await G(() => ({ seeds: window.G.state.pantry.turnipSeed || 0, flag: !!window.G.state.flags.shadowSeeds, say: document.querySelector('.ts-tx').textContent }));
   R.check("the garden: with no seeds, Shadow's housewarming gift of 3 turnip seeds (once)", gift.seeds === 3 && gift.flag && /3 turnip seeds/.test(gift.say), JSON.stringify(gift));
@@ -173,7 +172,8 @@ try {
   await stepIs('fishing', 'cast'); await sleep(page, 400); await keyF(); await stepIs('fishing', 'bite', 10000);
   await sleep(page, 1700);
   const miss = await T();
-  R.check('the Guides tab lists all three (done ✓) and replays one; a missed bite loops back to the cast with a kind word', gl.length === 3 && gl.every(x => /^done/.test(x)) && miss.step === 'cast' && /slow|again/i.test(miss.say), JSON.stringify({ gl, miss }));
+  // (the housing guides, Make it home and Remodel, are listed too: tools/qa/s17-housing.mjs runs them)
+  R.check('the Guides tab lists all three (done ✓) and replays one; a missed bite loops back to the cast with a kind word', gl.length === 5 && ['Two heroes', 'Home, sweet home', 'Fishing with Kero'].every(t => gl.some(x => /^done/.test(x) && x.endsWith(t))) && miss.step === 'cast' && /slow|again/i.test(miss.say), JSON.stringify({ gl, miss }));
   await clickSel('.to-skip'); await sleep(page, 400);
   const sk = await G(() => ({ active: window.G.tutorials.active, rec: window.G.state.flags.tutorials.fishing, tut: window.G.life.fishing.tut, dock: document.querySelector('.tut').classList.contains('on'), toast: window.QA.toasts.some(t => /Guide skipped/.test(t)) }));
   R.check('Skip ends the guide at once (normal fishing restored) and says where to replay it', !sk.active && sk.rec.skipped && sk.tut === null && !sk.dock && sk.toast, JSON.stringify(sk));
@@ -208,8 +208,9 @@ try {
   await G(() => window.G.save());
   await page.goto(`${BASE}/?notitle`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__ready === true && window.G?.player, null, { timeout: 90000 }); await setup(); await sleep(page, 6000);
-  const of4 = await G(() => ({ offer: document.querySelector('.tut-offer')?.classList.contains('on'), active: window.G.tutorials.active }));
-  R.check('…and never again after a reload', !of4.offer && !of4.active, JSON.stringify(of4));
+  const of4 = await G(() => ({ offer: document.querySelector('.tut-offer')?.classList.contains('on'), t: document.querySelector('.tf-t b')?.textContent, active: window.G.tutorials.active }));
+  // (skipping the house tour unlocks the housing guide "Make it home": that one is offered now, for the first time)
+  R.check('…and never again after a reload', (!of4.offer || of4.t === 'Make it home') && !of4.active, JSON.stringify(of4));
 } catch (e) {
   errors.push('[harness] ' + e.stack);
   try { R.note('at failure: ' + JSON.stringify(await G(() => { const G = window.G, T = G.tutorials, ui = G.ui; return { active: T.active, step: T.cur?.step?.id, entered: T.cur?.entered, paused: T.paused, why: T.cur && T.pauseReason(T.cur.step), pending: [...T.pending], offers: T.offers, rec: G.state.flags.tutorials, rod: G.state.fishing?.rod, hero: G.state.activeHero, open: Object.keys(ui.panels).filter(n => ui.isOpen(n)), dlg: ui.dlg.active, locked: G.player.controlLocked }; }))); } catch (e2) { /* page gone */ }

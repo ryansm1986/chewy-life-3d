@@ -2,11 +2,14 @@
 // Params: &only=id[,id2]  &cat=special|home|shop|craft|service|decor  &level=N  &seed=N  &variants=N (seeds per level)
 //         &focus=i (centre + zoom on the i-th placed item)  &hour=21 (night; the stage reads `hour`)  &dist= &yaw= &pitch=
 //         &labels=0  &smoke=0 (emitter preview puffs)  &doors=1 (door markers)  &pads=0 (footprint tiles)  &rot=radians  &row=width
+//         &style=machiya|cottage|teaHouse|seaside (an exterior style set: buildings/styles.js), &style=all (the variant's own
+//         look and each set, side by side), &style=roof:plum,door:round (single fields)
 // Labels show id, level, seed and triangle count. window.__info = { count, totalTris, per:{id:level:seed → tris} }.
 import * as THREE from 'three';
 import { makeStage } from './_stage.js';
 import { BUILDINGS, buildModel, setNight, CATEGORIES } from '../world/buildings/index.js';
 import { makeToon } from '../gfx/materials.js';
+import { STYLE_SETS, setStyle, cleanStyle } from '../world/buildings/styles.js';
 import { smokeTexture } from '../gfx/textures.js';
 
 export default function () {
@@ -25,7 +28,8 @@ export default function () {
     if (only && !only.includes(id)) continue;
     if (catF && def.cat !== catF) continue;
     const levels = lvl ? [Math.min(lvl, def.levels)] : Array.from({ length: def.levels }, (_, i) => i + 1);
-    for (const L of levels) for (let k = 0; k < variants; k++) items.push({ id, level: L, seed: seed0 + k, cat: def.cat });
+    const sp = P.get('style'), styles = !sp ? [null] : sp === 'all' ? [null, ...Object.keys(STYLE_SETS)] : STYLE_SETS[sp] ? [sp] : [Object.fromEntries(sp.split(',').map(kv => kv.split(':')))];
+    for (const L of levels) for (let k = 0; k < variants; k++) for (const st of styles) items.push({ id, level: L, seed: seed0 + k, cat: def.cat, style: typeof st === 'string' ? setStyle(st) : cleanStyle(st), sname: typeof st === 'string' ? st : st ? 'custom' : '' });
   }
   // build + layout: rows run along the screen-horizontal diagonal of the default iso camera (yaw 45°),
   // one row (or more, wrapped) per category; buildings stay axis-aligned facing +z.
@@ -36,7 +40,7 @@ export default function () {
   let u = 0, vr = 0, rowV = 0, lastCat = null;
   const placed = [];
   for (const it of items) {
-    const m = buildModel(it.id, { level: it.level, seed: it.seed });
+    const m = buildModel(it.id, { level: it.level, seed: it.seed, style: it.style });
     const [w, d] = m.footprint;
     const ext = (w + d) * SQ; // footprint extent along either diagonal
     if ((u > 0 && u + ext > maxRow) || (lastCat && band[it.cat] !== band[lastCat] && !only)) { u = 0; vr += rowV + gapV; rowV = 0; }
@@ -92,7 +96,7 @@ export default function () {
     for (const p of placed) {
       const el = document.createElement('div');
       el.style.cssText = 'position:absolute;transform:translate(-50%,-100%);background:rgba(255,246,232,.88);color:#4a2c2a;padding:2px 7px;border-radius:9px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.15)';
-      el.textContent = `${p.id}${BUILDINGS[p.id].levels > 1 ? ' L' + p.level : ''}${variants > 1 ? ' #' + p.seed : ''} · ${Math.round(p.m.tris / 100) / 10}k`;
+      el.textContent = `${p.id}${BUILDINGS[p.id].levels > 1 ? ' L' + p.level : ''}${variants > 1 ? ' #' + p.seed : ''}${p.sname ? ' · ' + p.sname : ''} · ${Math.round(p.m.tris / 100) / 10}k`;
       root.appendChild(el);
       labels.push({ el, pos: new THREE.Vector3(p.cx, p.m.height + 0.25, p.cz) });
     }

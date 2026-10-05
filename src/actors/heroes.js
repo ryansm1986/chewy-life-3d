@@ -109,6 +109,8 @@ export class HeroManager {
     if (G.playerDead || G.titleActive || G.leavingDungeon || G.build?.active) return 'Not right now!';
     if (ui?.dlg?.active || ui?.anyModal?.() || ui?.iris?.active || P.controlLocked) return 'Not right now!';
     if (P.leap || P.dash) return 'busy';
+    if (G.mode === 'interior' && !G.housing?.hosted(to)) return `${this.name(to)} is out and about — switch outside!`; // (indoors you swap with the hero who's home)
+    if (G.housing?.decor?.active) return 'Not while decorating!';
     return '';
   }
   switchTo(to = this.next(), { quiet = false } = {}) {
@@ -134,7 +136,7 @@ export class HeroManager {
     const G = this.G, rig = G.engine.rig, P = G.player;
     T.t += dt;
     const OUT = 0.5, PAN = T.mode === 'village' ? Math.min(1.1, 0.35 + (T.panLen || 0) * 0.02) : 0.3, IN = 0.6;
-    const far = Math.max(T.dist0 + 16, T.mode === 'village' ? 40 : 36); // high enough to read as "zooming out to the map"
+    const far = T.mode === 'interior' ? T.dist0 + 6 : Math.max(T.dist0 + 16, T.mode === 'village' ? 40 : 36); // high enough to read as "zooming out to the map" (indoors just a step back: the room is all there is)
     if (T.t < OUT) { // pull back
       const k = ease(T.t / OUT);
       rig.distTarget = T.dist0 + (far - T.dist0) * k; rig.pitch = T.pitch0 + 0.26 * k;
@@ -160,7 +162,15 @@ export class HeroManager {
     const G = this.G, P = G.player, sh = G.companion, { from, to } = T;
     const old = { x: P.pos.x, z: P.pos.z, face: P.facing };
     let arrive;
-    if (T.mode === 'village') {
+    if (T.mode === 'interior') { // at home: the other hero was in the room with you, and the old hero stays in it
+      const H = G.housing, v0 = H.hosted(to), at = v0 ? H.unhost(v0) : null;
+      this.removeVillager(to);
+      arrive = at || old;
+      const h = this.homeSpot(from), v = this.spawnVillager(from, h.x, h.z);
+      v.warm = true; v.state = 'inside'; v.visible = false;
+      H.hostHero(v, { x: old.x, z: old.z });
+      v.anim.play('wave');
+    } else if (T.mode === 'village') {
       const at = this.removeVillager(to);                 // wherever the other hero was in town…
       arrive = at || old;
       const v = this.spawnVillager(from, old.x, old.z, old.face); // …and the old hero carries on right here

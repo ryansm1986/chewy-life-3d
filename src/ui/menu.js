@@ -4,7 +4,7 @@ import { glyph } from './glyphs.js';
 import { Panel } from './panel.js';
 
 const CONTROLS = [
-  [['LMB'], 'Move / attack / talk'], [['RMB'], 'Use right-click skill'], [['1', '2', '3', '4'], 'Hotbar skills'], [['Q', 'E'], 'Heart / Zoom potion'], [['G'], 'Quick meal'],
+  [['LMB'], 'Move / attack / talk'], [['RMB'], 'Use right-click skill'], [['1', '2', '3', '4'], 'Hotbar skills (hold to charge)'], [['Q', 'E'], 'Heart / Zoom potion'], [['G'], 'Quick meal'],
   [['F'], 'Interact'], [['X'], 'Swap weapons'], [['I'], 'Bag'], [['P'], 'Pantry'], [['C'], 'Character'], [['K'], 'Skills'], [['J'], 'Journal'],
   [['M'], 'Map'], [['Tab'], 'Switch hero'], [['B'], 'Build (village)'], [['Alt'], 'Show loot labels'], [['Esc'], 'Close / menu'],
 ];
@@ -35,6 +35,7 @@ export class MenuPanel extends Panel {
         <div class="set-row"><div class="set-n">${glyph('sound')}Sound FX</div><div class="sld"><input type="range" min="0" max="100" data-k="sfx"><b></b></div></div>
         <div class="set-row"><div class="set-n">${glyph('sparkle')}UI size</div><div class="sld"><input type="range" min="80" max="125" data-k="uiScale"><b></b></div></div>
         <div class="set-row"><div class="set-n">${glyph('bolt')}Screen shake</div><button class="tog" data-k="shake"><i></i></button></div>
+        <div class="set-row" title="Hold a skill's button to charge it. Toggle: press once to start charging, again to release. Off: holding repeats the skill."><div class="set-n">${glyph('zap')}Charge on hold</div><div class="seg" data-k="chargeMode">${['On', 'Off', 'Toggle'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
         <div class="set-row"><div class="set-n">${glyph('star')}Show FPS</div><button class="tog" data-k="showFps"><i></i></button></div>
         <div class="set-row"><div class="set-n">${glyph('sparkle')}Disney style</div><button class="tog" data-k="disneyChewy"><i></i></button></div>
         <div class="set-row"><div class="set-n">${glyph('star')}Toybox heroes</div><button class="tog" data-k="toyChewy"><i></i></button></div>
@@ -78,9 +79,11 @@ export class MenuPanel extends Panel {
     this.setView(this.opts.view || 'main'); this.panel.classList.toggle('from-title', this.opts.from === 'title'); }
   sync() {
     const s = this.ui.settings;
-    const seg = this.body.querySelector('.seg[data-k="quality"]');
-    for (const b of seg.querySelectorAll('button')) b.classList.toggle('on', +b.dataset.v === s.quality);
-    seg.style.setProperty('--sel', s.quality);
+    for (const seg of this.body.querySelectorAll('.seg')) { // (Graphics, Charge on hold)
+      const v = s[seg.dataset.k] ?? 0;
+      for (const b of seg.querySelectorAll('button')) b.classList.toggle('on', +b.dataset.v === v);
+      seg.style.setProperty('--sel', v);
+    }
     for (const r of this.body.querySelectorAll('input[type=range]')) {
       const k = r.dataset.k, v = Math.round((s[k] ?? 1) * 100);
       if (+r.value !== v) r.value = v;

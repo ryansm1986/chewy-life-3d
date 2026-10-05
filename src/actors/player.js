@@ -146,7 +146,7 @@ export class Player extends Actor {
     let moved = 0;
     // external speed modifiers (buffs, chill auras)
     this.slowT = Math.max(0, (this.slowT || 0) - dt);
-    this.speedMul = (G.combat?.moveMul?.() || 1) * (G.derived?.moveMul || 1) * (this.slowT > 0 ? 1 - (this.slowAmt || 0.3) : 1) * (G.combat?.buffs?.shrineZoom ? 1.35 : 1);
+    this.speedMul = (G.combat?.moveMul?.() || 1) * (G.derived?.moveMul || 1) * (this.slowT > 0 ? 1 - (this.slowAmt || 0.3) : 1) * (G.combat?.buffs?.shrineZoom ? 1.35 : 1) * (this.chargeSlow || 1); // (chargeSlow: winding up a charged skill, docs/CHARGE.md)
     if (this.navWorld !== this.world) { this.navWorld = this.world; const nav = navFor(this.world); if (nav && !nav.built) nav.build(); } // ~5-8 ms, once per world (behind the load / iris)
     if (G.playerDead) { super.update(dt); return; }
     if (this.knock && this.knock.lengthSq() > 0.01) { const b = this.pos.clone(); this.pos.addScaledVector(this.knock, dt); this.knock.multiplyScalar(Math.exp(-10 * dt)); this.world.collision?.resolve(this.pos, this.radius, b); }
@@ -178,6 +178,8 @@ export class Player extends Actor {
       }
       if (!this.moveTarget && this.route.pts) this.route.clear();
     }
+    // winding up a charge: face the cursor while walking (combat/charge.js points aimLock at its aim)
+    if (this.aimLock && !(this.rollT > 0)) this.faceTarget = Math.atan2(this.aimLock.x - this.pos.x, this.aimLock.z - this.pos.z);
     // footsteps
     this.stepAcc += this.anim.speed * dt;
     if (this.stepAcc > 0.62) { this.stepAcc = 0; Events.emit('footstep', this.pos); }
@@ -206,7 +208,7 @@ export class Player extends Actor {
     // skill and goes back a few seconds later. In the Burrow it stays in hand.
     if (this.anim.action && !this.toolOut) this._drawnT = 3;
     this._drawnT = Math.max(0, (this._drawnT || 0) - dt);
-    const sheathed = (this.G.mode === 'village' && this._drawnT <= 0) || !!this.toolOut; // (a homestead tool is in the paw: life/tools.js)
+    const sheathed = ((this.G.mode === 'village' || this.G.mode === 'interior') && this._drawnT <= 0) || !!this.toolOut; // (a homestead tool is in the paw: life/tools.js; indoors it stays on his back)
     if (sheathed !== this._sheathed) {
       this._sheathed = sheathed;
       this.sword.scale.setScalar(sheathed ? 0.0001 : 1); this.sword.castShadow = !sheathed;

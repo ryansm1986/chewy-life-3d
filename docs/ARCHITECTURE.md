@@ -23,8 +23,8 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
 - Isolated dev scenes: `src/tests/NAME.js` exporting `default function()`; open with `/?test=NAME`. Each module owner makes
   their own test page. Set `window.__ready = true` when the scene is ready to screenshot.
 - Post debug: `&off=ao,tilt,main,smaa` disables passes, `&raw` renders without post, `&q=0|1|2` quality, `&hour=13` time of day.
-- QA: `node tools/qa/run-all.mjs [s1 s5 ...]` (the browser scenarios s1-s16; s15 is the homestead, s16 the guided
-  tutorials, which every other scenario keeps off with `?nointro`).
+- QA: `node tools/qa/run-all.mjs [s1 s5 ...]` (the browser scenarios s1-s18; s15 is the homestead, s16 the guided
+  tutorials, which every other scenario keeps off with `?nointro`, s17 housing, s18 getting furniture).
   Perf: `village-perf.mjs [runs]` (the village at three camera spots), `homestead-perf.mjs [runs]` (a fully planted,
   ripe garden and a reel in progress, each against the same spot without). Profilers: `tools/qa/profile-boot.mjs` (boot → ready),
   `profile-burst.mjs` / `profile-stress.mjs` (long frames in big fights, `CASTS=a,b` env to bisect skills), `boot-time.mjs`.
@@ -288,6 +288,32 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
 - Guides start on their own only when enabled: off with `?notut`, and with the QA's `?nointro` unless `?tut`
   (remembered per tab), so s1-s15 never meet one; s16 drives them.
 
+## Housing (src/home/ — design and as-built notes: docs/HOUSING.md)
+- **Interiors**: `G.mode = 'interior'`. One persistent `InteriorWorld` (home/interiorWorld.js: its scene, the same light
+  rig as the village — 1 hemi, 1 shadow sun, the 8-light pool — its own materials and VFX) loads a house per visit and
+  frees only that visit's geometry; the village world is swapped out with `G.swapWorld`, never disposed. Rooms are
+  pure data (home/rooms.js: home1-3, cottage1-3; two back walls and two cut-down front walls for the 45° camera).
+- **Furniture**: home/furniture.js (the catalog, pure: 73 pieces, 13 surfaces, sets, `shop`, `owner`), the models in
+  furnitureModels.js / furnitureModels2.js (kit Builder; `KIT` shares the helpers), cached by furnitureMesh.js (never
+  disposed) and drawn as one InstancedMesh per piece and bucket. `state.furniture` is the household storage
+  (`G.actions.addFurniture/spendFurniture`, 'furniture:changed'); a house's room is `b.interior = { v, layout, wall,
+  floor, items }` on its building record. Placement rules are pure (home/placement.js `canPlace`).
+- **G.housing** (home/housing.js): enter / exit (the iris), the household jobs, hosting (the benched hero, a villager in
+  their own home), decorate mode (home/decorate.js, ui/decorate.js), saved owners (home/owners.js, `b.owner`), the
+  merged door prompt (visit / knock), the Home Rating (home/rating.js, pure; `b.homeStars` feeds `b.happy`), the
+  owners' reactions, the house card / upgrade / remodel, and `G.housing.ext` (home/exteriors.js: mailboxes, the
+  remodelled fences, the scaffold). Getting furniture: home/sources.js (Tanu's stall `G.openTrinkets`, the workbench
+  `G.openWorkbench`, finds in `dungeonMode` drops).
+- **Exteriors**: `b.style` (world/buildings/styles.js, pure) → `getTemplate(id, level, seed, style)`, a style hash in
+  the cache key, the same Builder seed (a remodel changes only the chosen parts); styled templates capped at
+  `STYLED_CAP` (24, LRU, only unused ones evicted; unstyled templates are never evicted). `levelUp` keeps the seed and
+  the style; interiors grow with the level (home/grow.js `migrateInterior`).
+- Story: decorate requests (`story.js decorateRequests`, step type `decorate`, appended after the other templates),
+  invitations at three hearts (`friend.invited`). Guides: "Make it home" (Shadow) and "Remodel" (Tanu) in guides.js.
+- QA: s17 (interiors, decorating, homes, ratings, requests, upgrades, remodels, the housing guides, leak cycles), s18
+  (Tanu, the workbench, finds); `housing-perf.mjs`; test pages `/?test=furniture`, `furnsheet`, `stall`, `upgrade`,
+  `buildings&style=`.
+
 ## Persistent state `G.state` (JSON-serialisable, saved to localStorage)
 ```js
 state = {
@@ -313,6 +339,8 @@ state = {
   fishing: { rod: 0|1|2, milestones: [5, ...], gotRod?, pendingMilestone?, lastRecord? },
   fishLog: { id: { n, best, day, spot, time } },
   // flags.tutorials = { active, [guideId]: { step, started, offered, done, skipped } } (docs/TUTORIALS.md)
+  // housing (docs/HOUSING.md): furniture: { id: n }, furnitureFound: { id: day }, trinkets: { day, rank, list, sold },
+  //   workbench: { known, crafted }; per building record: interior, owner, style, homeStars
   cookbook: { known: { recipe: day }, cooked: { recipe: n }, quick },
   // per hero: heroes[id].player.meal = { dish, buff, tier, left (s of play), dur } (Well Fed)
 }

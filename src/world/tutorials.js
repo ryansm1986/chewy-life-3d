@@ -46,7 +46,7 @@ export class Tutorials {
     const S = this.S;
     // guides whose start already happened before this session: offered once, never auto-started
     this.pastAtLoad = {};
-    for (const id of GUIDE_IDS) this.pastAtLoad[id] = !S[id] && this.safe(() => GUIDES[id].trigger(G));
+    for (const id of GUIDE_IDS) this.pastAtLoad[id] = !S[id] && this.safe(() => (GUIDES[id].past || GUIDES[id].trigger)(G)); // (past: an old save that is already beyond the guide's start)
     // every event any step listens for
     const names = new Set(['mode:changed']);
     for (const g of Object.values(GUIDES)) for (const st of g.steps) { const w = st.waitFor; if (w) names.add(typeof w === 'string' ? w : w.event); for (const k in st.on || {}) names.add(k); }
@@ -147,7 +147,7 @@ export class Tutorials {
     const G = this.G, ui = G.ui, a = st?.allow || {};
     if (G.titleActive || G.playerDead) return 'busy';
     if (ui?.iris?.active || G.leavingDungeon) return 'transition';
-    if (G.mode !== 'village') return 'away';
+    if (G.mode !== 'village' && !(G.mode === 'interior' && a.interior)) return 'away'; // (a step may run indoors: allow.interior)
     if (G.heroSwitching && !a.switching) return 'switching';
     if (G.build?.active || G.buildMode) return 'build';
     if (ui?.dlg?.active && !a.dialogue) return 'dialogue';
@@ -158,9 +158,14 @@ export class Tutorials {
     }
     return null;
   }
-  calm() {
+  /** is it a good moment to start a guide (or offer one)? A guide may start indoors (g.indoors) or over its own panels
+   *  (g.startPanels: the house card opens the Remodel guide) */
+  calm(g = null) {
     const G = this.G, ui = G.ui;
-    return !(G.titleActive || G.playerDead || G.mode !== 'village' || ui?.iris?.active || ui?.dlg?.active || ui?.anyModal?.() || ui?.banners?.busy || G.player?.controlLocked || G.heroSwitching || G.build?.active || G.introFocus || this.ui?.offering);
+    const place = G.mode === 'village' || (G.mode === 'interior' && g?.indoors);
+    const open = ui?.anyModal?.() ? Object.keys(ui.panels || {}).filter(n => ui.isOpen(n)) : [];
+    const panels = !open.length || (g?.startPanels && open.every(n => g.startPanels.includes(n)));
+    return !(G.titleActive || G.playerDead || !place || ui?.iris?.active || ui?.dlg?.active || !panels || ui?.banners?.busy || G.player?.controlLocked || G.heroSwitching || G.build?.active || G.introFocus || this.ui?.offering);
   }
   update(dt) {
     const G = this.G;
@@ -170,14 +175,14 @@ export class Tutorials {
       this.trigT = 0.5;
       if (this.enabled) for (const id of GUIDE_IDS) {
         const r = this.S[id]; if (r?.done || r?.offered || r?.started || this.pending.has(id) || this.cur?.id === id || this.offers.includes(id)) continue;
-        if (!this.safe(() => GUIDES[id].trigger(G))) continue;
+        if (!this.pastAtLoad[id] && !this.safe(() => GUIDES[id].trigger(G))) continue; // (an old save's guide is offered whatever the moment)
         if (this.pastAtLoad[id]) this.offers.push(id); else this.pending.add(id);
       }
     }
-    this.calmT = this.calm() ? this.calmT + dt : 0;
-    if (!this.cur && this.pending.size && this.calmT > 1.2) {
-      const id = [...this.pending].sort((a, b) => GUIDES[a].priority - GUIDES[b].priority)[0];
-      this.start(id);
+    const first = this.pending.size ? [...this.pending].sort((a, b) => GUIDES[a].priority - GUIDES[b].priority)[0] : null;
+    this.calmT = this.calm(first && !this.cur ? GUIDES[first] : null) ? this.calmT + dt : 0;
+    if (!this.cur && first && this.calmT > (GUIDES[first].startPanels ? 0.4 : 1.2)) {
+      this.start(first);
     } else if (!this.cur && !this.pending.size && this.offers.length && this.calmT > 2.5 && this.ui && !this.ui.offering) this.offerNext();
     // the running step
     const c = this.cur;
@@ -226,7 +231,7 @@ export class Tutorials {
   }
   updateArrow(dt) {
     const G = this.G, t = this.target(), A = arrowMarker();
-    if (!t || G.mode !== 'village') { this.hideArrow(); return; }
+    if (!t || (G.mode !== 'village' && G.mode !== 'interior')) { this.hideArrow(); return; }
     const scene = G.world?.scene; if (!scene) return;
     if (A.parent !== scene) scene.add(A);
     A.visible = true;

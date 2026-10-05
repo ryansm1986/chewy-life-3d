@@ -1,7 +1,7 @@
 // SimCity-style village simulation: placement, zoning (R/C/W), road access, service coverage, RCI demand,
 // organic growth & level-ups, residents, daily income. Renders buildings via the buildings kit.
 import * as THREE from 'three';
-import { BUILDINGS, buildModel, setNight, sizeOf, bridgeDeckHeight, getTemplate, hasTemplate, VARIANTS } from './buildings/index.js';
+import { BUILDINGS, buildModel, releaseModel, setNight, sizeOf, bridgeDeckHeight, getTemplate, hasTemplate, VARIANTS } from './buildings/index.js';
 import { T, WORLD } from './terrain.js';
 import { LANDMARKS, PLAZA, PATHS, JUNCTIONS, distToPaths, paintStreet } from './layout.js';
 import { PLOTS, PLOT_BY_ID, PLOT_TYPES, ZONE_TYPES, DISTRICTS, DOOR_ROT, DOOR_DIR, plotZones, plotSpot, plotReserve, plotCentre, plotFrame, rectsOverlap } from './plots.js';
@@ -59,6 +59,10 @@ function propTwin(m, xray = false) {
   PROP_TWINS[+xray].set(m, t);
   return t;
 }
+// a decorated home is a happier one (docs/HOUSING.md §4): its Home Rating (home/rating.js, kept on b.homeStars) adds to
+// b.happy past the three stars a villager's own furnishing gets: +0.06 at four stars, +0.12 at five
+const homeJoy = b => (b.homeStars > 3 ? (Math.min(5, b.homeStars) - 3) * 0.06 : 0);
+
 export class VillageSim {
   constructor(G, world) {
     this.G = G; this.world = world; this.terrain = world.terrain;
@@ -83,6 +87,7 @@ export class VillageSim {
     this.plotUse = new Map(); // plot id -> building data
   }
   get S() { return this.G.state.village; }
+  get vfx() { return this.G.village?.vfx || this.G.vfx; } // (the village's own effects: growth goes on while you're indoors)
   // ------------------------------------------------------------------ setup / persistence
   // Zoned buildings grow with a random variant/level; building a template the first time costs 5-20 ms, a hitch right
   // when a home pops up. Templates are pre-built only while nobody can see a hitch: the level-1 variants that grow
@@ -101,7 +106,7 @@ export class VillageSim {
     q.sort((a, b) => a[1] - b[1]); // level 1 first
     const one = () => { const [id, lv, v] = q.shift(); try { getTemplate(id, lv, v); } catch (e) { /* unknown combo */ } };
     for (let t = performance.now(); q.length && q[0][1] === 1 && performance.now() - t < 400;) one(); // boot, behind the splash
-    const hidden = () => { const G = this.G; return G.titleActive || G.ui?.dlg?.active || G.ui?.anyModal?.() || G.mode !== 'village'; };
+    const hidden = () => { const G = this.G; return G.titleActive || G.ui?.dlg?.active || G.ui?.anyModal?.() || (G.mode !== 'village' && G.mode !== 'interior'); };
     const iv = setInterval(() => {
       if (!q.length) return clearInterval(iv);
       if (hidden()) for (let t = performance.now(); q.length && performance.now() - t < 14;) one();
@@ -431,7 +436,7 @@ export class VillageSim {
   }
   spawnModel(b, animate) {
     if (b.idx === undefined) b.idx = this.nextIdx();
-    const model = buildModel(b.type, { level: b.level, seed: b.seed });
+    const model = buildModel(b.type, { level: b.level, seed: b.seed, style: b.style || null }); // (b.style: a remodelled look, docs/HOUSING.md §6)
     const g = new THREE.Group(); g.add(model.group);
     const p = this.worldPos(b);
     g.position.copy(p); g.rotation.y = -b.rot * Math.PI / 2;
@@ -480,12 +485,13 @@ export class VillageSim {
     if (inter) this.world.interactables.push(inter);
     const rec = { data: b, model, group: g, col, lights, smokes, inter, door, deck };
     this.list.push(rec);
-    if (animate) { g.scale.set(1, 0.01, 1); this.rising.push({ rec, t: 0 }); this.G.vfx?.dustRing?.(p, Math.max(w, d) * 0.6); }
+    if (animate) { g.scale.set(1, 0.01, 1); this.rising.push({ rec, t: 0 }); this.vfx?.dustRing?.(p, Math.max(w, d) * 0.6); }
     this.nightVal = -1;
     return rec;
   }
   despawn(rec) {
     this.group.remove(rec.group);
+    releaseModel(rec.model); // (its template may be evicted again: buildings/index.js)
     if (rec.col) this.world.collision.remove(rec.col);
     for (const l of rec.lights) this.world.lightPool.removeSource(l);
     for (const s of rec.smokes) { const a = this.G.village?.ambient; if (a && s) a.smokeEmitters.splice(a.smokeEmitters.indexOf(s), 1); }
@@ -513,7 +519,8 @@ export class VillageSim {
       case 'bulletinBoard': return mk('Read the Notice Board', () => G.openBoard?.(), 1.1);
       case 'dungeonGate': return mk('Enter the Burrow', () => G.openBurrowMenu?.(), 1.8);
       case 'fishingHut': return mk("Kero's Fishing Hut", () => G.openFishHut?.()); // (rods, and fish sell best here: docs/HOMESTEAD.md)
-      default: return null;
+      case 'lumber': return mk('Use the workbench 🔨', () => G.openWorkbench?.('lumber')); // (furniture crafting: docs/HOUSING.md §3)
+      default: return G.housing?.doorInter?.(b, door) || null; // (a named villager's home: visit / knock — home/housing.js)
     }
   }
   refreshTiles() {
@@ -560,10 +567,10 @@ export class VillageSim {
     for (const b of this.S.buildings) {
       const def = BUILDINGS[b.type];
       const q = this.quality(b); b.q = q;
-      if (def.cat === 'home') { S.homes++; S.population += b.residents || 0; const h = (q.road ? 0.3 : 0) + q.water * 0.25 + q.joy * 0.25 + q.light * 0.1 + q.health * 0.05 + q.learn * 0.05; b.happy = h; hap += h; nh++; }
+      if (def.cat === 'home') { S.homes++; S.population += b.residents || 0; const h = (q.road ? 0.3 : 0) + q.water * 0.25 + q.joy * 0.25 + q.light * 0.1 + q.health * 0.05 + q.learn * 0.05 + homeJoy(b); b.happy = h; hap += h; nh++; }
       if (def.jobs) { const j = def.jobs[Math.min(def.jobs.length - 1, b.level - 1)] || 0; S.jobs += j; if (def.cat === 'shop') { S.shops++; cJobs += j; } if (def.cat === 'craft') { S.workshops++; wJobs += j; } }
     }
-    S.happiness = nh ? hap / nh : 0.5;
+    S.happiness = (nh ? hap / nh : 0.5) + (this.S.buildings.some(b => b.type === 'chewyHouse' && b.homeStars >= 5) ? 0.03 : 0); // (a five-star cottage: a little joy for everyone)
     const pop = S.population;
     this.demand.R = clamp((S.jobs + 6 + S.happiness * 8 - pop) / 12, -1, 1);
     this.demand.C = clamp((pop * 0.45 - cJobs + 2) / 8, -1, 1);
@@ -726,8 +733,8 @@ export class VillageSim {
   // visible world ping where something new appeared (sparkle pillar + heart)
   ping(b, color = '#ffb0d0') {
     const p = this.worldPos(b);
-    this.G.vfx?.pillar?.(p, { color, life: 2.2, r: 0.9, h: 6, opacity: 0.6 });
-    this.G.vfx?.sparkle?.(p.clone().setY(p.y + 1.5), { n: 18, color, r: 1.5 });
+    this.vfx?.pillar?.(p, { color, life: 2.2, r: 0.9, h: 6, opacity: 0.6 });
+    this.vfx?.sparkle?.(p.clone().setY(p.y + 1.5), { n: 18, color, r: 1.5 });
   }
   // Where the next-level footprint fits: any anchor that still covers the current lot and keeps path access,
   // preferring the one that grows over the most zoned tiles. → { x, z } or { why } (reason for the same-corner try)
@@ -760,10 +767,11 @@ export class VillageSim {
     if (spot.why) return false;
     this.despawn(this.list.find(r => r.data === b));
     b.x = spot.x; b.z = spot.z;
-    b.level = nl; b.seed = this.seedFor(b.type, nl);
+    b.level = nl; // (the seed and the style stay: a house keeps its look as it grows — docs/HOUSING.md §5)
     const rec = this.spawnModel(b, true);
+    Events.emit('building:levelup', { b, level: nl });
     this.refreshTiles();
-    this.G.vfx?.levelUp?.(this.worldPos(b));
+    this.vfx?.levelUp?.(this.worldPos(b));
     this.news('upgrades'); this.ping(b, '#ffd84a');
     Events.emit('sfx', 'build_complete');
     return true;
@@ -829,14 +837,14 @@ export class VillageSim {
     for (let i = this.rising.length - 1; i >= 0; i--) {
       const r = this.rising[i]; r.t += dt; const k = Math.min(1, r.t / 0.7);
       r.rec.group.scale.set(1 + Math.sin(k * Math.PI) * 0.08, ease.outBack(k), 1 + Math.sin(k * Math.PI) * 0.08);
-      if (Math.random() < 0.4) this.G.vfx?.dust?.(r.rec.group.position.clone().add(new THREE.Vector3(rand(-1, 1), 0, rand(-1, 1))), { n: 1, size: 0.4 });
-      if (k >= 1) { this.rising.splice(i, 1); this.G.vfx?.petals?.(r.rec.group.position.clone().setY(r.rec.group.position.y + 1.5), 16, 1.2); Events.emit('sfx', 'build_complete'); }
+      if (Math.random() < 0.4) this.vfx?.dust?.(r.rec.group.position.clone().add(new THREE.Vector3(rand(-1, 1), 0, rand(-1, 1))), { n: 1, size: 0.4 });
+      if (k >= 1) { this.rising.splice(i, 1); this.vfx?.petals?.(r.rec.group.position.clone().setY(r.rec.group.position.y + 1.5), 16, 1.2); Events.emit('sfx', 'build_complete'); }
     }
     for (const r of this.list) r.model.update?.(dt, t);
     const n = this.G.day?.out?.night ?? 0;
     if (Math.abs(n - this.nightVal) > 0.02) { this.nightVal = n; for (const r of this.list) setNight(r.model, n); }
     // growth pauses on the title screen, during conversations and while in the Burrow
-    const G = this.G, busy = G.titleActive || G.mode !== 'village' || G.ui?.dlg?.active || G.player?.controlLocked;
+    const G = this.G, busy = G.titleActive || (G.mode !== 'village' && G.mode !== 'interior') || G.ui?.dlg?.active || G.player?.controlLocked; // (indoors the village keeps growing)
     if (!busy) {
       this.tickT += dt;
       if (this.tickT > 6) { this.tickT = 0; this.simulate(); this.grow(); this.simulate(); }

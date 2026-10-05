@@ -18,7 +18,7 @@ const server = await preview({ logLevel: 'error', build: { outDir }, preview: { 
 const url = server.resolvedUrls.local[0].replace(/\/$/, '');
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true, args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] });
 let failed = 0;
-for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`])]) {
+for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['home', '/?fresh&nointro'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`])]) {
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
   const errs = [];
   page.on('pageerror', e => errs.push('pageerror: ' + e.message));
@@ -38,14 +38,27 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
       return r;
     });
   }
+  if (label === 'home') { // the cottage in the bundle (docs/HOUSING.md): in through the door, the furniture drawn, the decorate palette with thumbnails
+    s.home = await page.evaluate(async () => {
+      const G = window.G, wait = ms => new Promise(q => setTimeout(q, ms));
+      G.openHome(); await wait(2600);
+      const r = { mode: G.mode, items: G.world.items?.length || 0, batches: G.world.batches?.map.size || 0, jobs: G.world.interactables.filter(i => i.use).length };
+      G.housing.decor.enter(); await wait(1500);
+      r.palette = G.ui.isOpen('decorate'); r.thumbs = [...document.querySelectorAll('.p-decor .card img')].filter(i => /^data:image\/png/.test(i.src) && !i.classList.contains('dc-wait')).length;
+      G.housing.decor.exit(); G.housing.exit(); await wait(2400);
+      r.back = G.mode;
+      return r;
+    });
+  }
   const regionId = label.startsWith('region:') ? label.slice(7) : null;
   if (regionId) { // every outdoor region in the bundle (docs/REGIONS.md): built, populated, with its own boss
     await page.waitForFunction(() => window.G?.dungeon?.isRegion && !window.G.ui?.iris?.active, null, { timeout: 30000 }).catch(() => errs.push('region never loaded'));
     s.region = await page.evaluate(() => ({ id: window.G.dungeon?.regionId, monsters: window.G.dungeon?.monsters?.length || 0, boss: !!window.G.dungeon?.boss }));
   }
   const regionOk = !s.region || (s.region.id === regionId && s.region.monsters >= 10 && s.region.boss);
+  const h = s.home, homeOk = !h || (h.mode === 'interior' && h.items >= 12 && h.batches >= 10 && h.jobs === 4 && h.palette && h.thumbs >= 3 && h.back === 'village');
   const m = s.moka, mokaOk = !m || ((!TOY_MOKA || s.model === 'moka_toy') && m.baked && m.staff && m.wt === 'staff' && m.cast && m.switch && m.after === 'chewy' && m.chewyBaked && m.mokaVillager);
-  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && mokaOk && regionOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!TOY_CHEWY || s.model === 'chewy_b') && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
+  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && mokaOk && regionOk && homeOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!TOY_CHEWY || s.model === 'chewy_b') && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
   console.log(`${ok ? 'PASS' : 'FAIL'}  production ${label}: ${JSON.stringify(s)}${errs.length ? '\n   ' + [...new Set(errs)].slice(0, 8).join('\n   ') : ''}`);
   if (!ok) failed++;
   await page.close();

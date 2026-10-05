@@ -1,7 +1,8 @@
 // RPG data/logic self-test: node tools/test-rpg.mjs [--quiet]
 // Validates schemas & invariants, simulates leveling 1→60, prints sample items/tooltips and drop-rate tables, and
 // tests the homestead's pure math (docs/HOMESTEAD.md): the pantry, recipes and mixes, Well Fed in computeStats, the
-// garden's growth rules, the fish tables and the reel sim.
+// garden's growth rules, the fish tables and the reel sim; and housing's (docs/HOUSING.md): the furniture catalog, the
+// room shells, the placement rules and the default furnishings.
 import { RNG } from '../src/core/util.js';
 import { Events } from '../src/core/events.js';
 import { SKILLS, SKILL_IDS, TREES, ATTACK, synergyMult, effectiveLevel, canLearn, skillRuntime, usable, ROW_REQ } from '../src/rpg/skills.js';
@@ -22,6 +23,10 @@ import { BUFFS, mealFor, mealActive } from '../src/life/meals.js';
 import { growNight, harvestCrop, isRipe, SPRINKLE } from '../src/life/gardenRules.js';
 import { FISH, FISH_IDS, SPOTS, biters, rollFish, rollSize, recordCatch, timeOf, MILESTONES } from '../src/life/fishData.js';
 import { ReelSim } from '../src/life/reelSim.js';
+import { FURNITURE, FURNITURE_IDS, SURFACES, SURFACE_IDS, SETS as FSETS, CATS as FCATS, TABS as FTABS, CELL as FCELL, footprint, storable, itemDef, storageList, tabOf, STARTER_STORAGE } from '../src/home/furniture.js';
+import { LAYOUTS, shellOf, layoutFor, isBack, WALL_H } from '../src/home/rooms.js';
+import { canPlace, poseOf, boxOf, cellsOf, wallSpan, frontCell, nextK } from '../src/home/placement.js';
+import { defaultInterior } from '../src/home/defaults.js';
 
 const quiet = process.argv.includes('--quiet');
 let fails = 0, checks = 0;
@@ -679,11 +684,307 @@ hr('HOMESTEAD');
   { const s = new ReelSim({ rng: seq(3) }); s.step(10, false); ok(Math.abs(s.t - 0.05) < 1e-9, 'reel: a long frame is clamped'); }
 }
 
+// ------------------------------------------------------------------ housing (docs/HOUSING.md)
+hr('HOUSING');
+{
+  // ---- the furniture catalog
+  const TAGS = ['cozy', 'warm', 'nature', 'water', 'lantern', 'bookish', 'sweet', 'music', 'retro', 'festive', 'elegant', 'cute'];
+  const MOUNTS = ['floor', 'rug', 'table', 'wall', 'ceiling'];
+  ok(FURNITURE_IDS.length >= 40, `furniture: at least 40 items (${FURNITURE_IDS.length})`);
+  ok(new Set(FURNITURE_IDS.map(id => FURNITURE[id].cat)).size === Object.keys(FCATS).length, 'furniture: every category has items');
+  ok(Object.keys(FSETS).every(s => FURNITURE_IDS.some(id => FURNITURE[id].set === s)), 'furniture: every set has items');
+  for (const id of FURNITURE_IDS) {
+    const d = FURNITURE[id];
+    ok(d.id === id && d.name && d.jp && d.desc && FCATS[d.cat] && FSETS[d.set] && MOUNTS.includes(d.mount), `furniture ${id}: complete`);
+    ok(Array.isArray(d.size) && d.size.length === 2 && d.size.every(n => Number.isInteger(n) && n >= 1 && n <= 4) && fin(d.h) && d.h > 0 && d.h <= 2, `furniture ${id}: size in cells, height`);
+    ok(d.tags.length >= 1 && d.tags.every(t => TAGS.includes(t)), `furniture ${id}: tags`);
+    ok(fin(d.price) && d.price > 0, `furniture ${id}: price`);
+    if (d.surface != null) ok(d.mount === 'floor' && d.surface > 0 && d.surface <= d.h + 0.05 && (Math.abs(d.surface - d.h) < 0.05 || d.use === 'craft'), `furniture ${id}: a surface is a floor piece's top (the workbench's pegboard stands above its top)`);
+    if (d.cat === 'tabletop') ok(d.mount === 'table' && d.size[0] === 1 && d.size[1] === 1, `furniture ${id}: tabletop items are 1x1 on a table`);
+    if (d.cat === 'rug') ok(d.mount === 'rug' && d.h <= 0.05, `furniture ${id}: rugs lie flat`);
+    if (d.cat === 'wall') ok(d.mount === 'wall' && d.size[1] * FCELL <= 1, `furniture ${id}: wall items hang`);
+    if (d.light) ok(fin(d.light.y) && /^#[0-9a-f]{6}$/i.test(d.light.color) && d.light.intensity > 0 && d.light.radius > 0, `furniture ${id}: light`);
+    if (d.use) ok(['sleep', 'stash', 'cook', 'craft'].includes(d.use) && d.mount === 'floor', `furniture ${id}: a household job on a floor piece`);
+    ok(storable(id) && itemDef(id) === d && FTABS.some(t => t.id === tabOf(d)), `furniture ${id}: storable, on a palette tab`);
+  }
+  ok(['sleep', 'stash', 'cook'].every(u => FURNITURE_IDS.some(id => FURNITURE[id].use === u)), 'furniture: a bed, a chest and a stove do the household jobs');
+  ok(SURFACE_IDS.filter(id => SURFACES[id].kind === 'wall').length >= 6 && SURFACE_IDS.filter(id => SURFACES[id].kind === 'floor').length >= 4, 'surfaces: wallpapers and floors');
+  ok(SURFACE_IDS.filter(id => SURFACES[id].free).length === 2 && !storable('wp_plaster') && storable('wp_sakura') && !storable('nope') && tabOf(SURFACES.fl_tatami) === 'surface', 'surfaces: the free plaster and planks are never stored; the rest are');
+  ok(footprint(FURNITURE.futonBed, 0).join() === '4,3' && footprint(FURNITURE.futonBed, 1).join() === '3,4' && footprint(FURNITURE.futonBed, 2).join() === '4,3', 'footprint: a quarter turn swaps the sides');
+  ok(Object.keys(STARTER_STORAGE).every(storable), 'starter storage: real, storable items');
+  { const st = { furniture: { chabudai: 2, wp_sakura: 1, teaSet: 3 } }; const all = storageList(st), tt = storageList(st, 'tabletop');
+    ok(all.length === 3 && all[all.length - 1].id === 'wp_sakura' && tt.length === 1 && tt[0].n === 3, 'storageList: catalog order, surfaces last, by tab'); }
+  // ---- the room shells
+  for (const [id, L] of Object.entries(LAYOUTS)) {
+    const S = shellOf(L);
+    ok(S.W > 0 && S.D > 0 && S.walls.length >= 4 && S.walls.some(isBack) && S.walls.some(r => !isBack(r)), `room ${id}: walls, back and front`);
+    ok(S.door && S.doorCells.length === L.door.w && S.doorCells.every(([x, z]) => S.isFloor(x, z)) && [...S.doorKeep].every(k => S.isFloor(...k.split(',').map(Number))), `room ${id}: the door and its kept-clear cells are on the floor`);
+    ok(S.windows.length && S.windows.every(w => w.side === 'n' || w.side === 'w') && S.winCells.size === S.windows.reduce((a, w) => a + w.w, 0), `room ${id}: windows on back walls`);
+    ok(S.slots.n.size > 0 && S.slots.w.size > 0, `room ${id}: wall slots on both back walls`);
+    // every floor cell edge that faces outside has a wall, except the door gap
+    let open = 0; for (let z = 0; z < S.D; z++) for (let x = 0; x < S.W; x++) if (S.isFloor(x, z)) for (const [dx, dz, side] of [[0, -1, 'n'], [0, 1, 's'], [-1, 0, 'w'], [1, 0, 'e']]) {
+      if (S.isFloor(x + dx, z + dz)) continue;
+      const hx = side === 'e' ? x + 1 : x, hz = side === 's' ? z + 1 : z;
+      if (!S.walls.some(r => r.side === side && (side === 'n' || side === 's' ? r.z0 === hz && hx >= r.x0 && hx < r.x1 : r.x0 === hx && hz >= r.z0 && hz < r.z1))) open++;
+    }
+    ok(open === L.door.w, `room ${id}: closed but for the door (${open} open edges)`);
+  }
+  ok(layoutFor('chewyHouse', 1).id === 'cottage1' && layoutFor('home', 2).id === 'home2' && layoutFor('home', 9).id === 'home3', 'layoutFor: the cottage has its own, homes by level (capped at 3)');
+  { const S = shellOf(LAYOUTS.home1); ok(S.W * FCELL === 6 && S.D * FCELL === 5, 'room home1: 6 x 5 m'); }
+  { const S = shellOf(LAYOUTS.home3); ok(S.partitions.length === 2 && S.partitions.every(p => p.x0 === 10), 'room home3: a partition with a doorway between the two rooms'); }
+  // ---- placement rules (cottage1: 12 x 10 cells, the door at x 7-8 on the south wall)
+  const L = LAYOUTS.cottage1, bed = { k: 1, id: 'futonBed', mount: 'floor', x: 0, z: 0, rot: 0 }, tbl = { k: 2, id: 'chabudai', mount: 'floor', x: 5, z: 5, rot: 0 };
+  const P = (it, items = [bed, tbl], o) => canPlace(L, items, it, o);
+  ok(P({ id: 'sideTable', mount: 'floor', x: 9, z: 6, rot: 0 }).ok, 'place: an open floor cell');
+  ok(/door/i.test(P({ id: 'sideTable', mount: 'floor', x: 7, z: 9, rot: 0 }).why) && /door/i.test(P({ id: 'sideTable', mount: 'floor', x: 8, z: 8, rot: 0 }).why), "place: the door mat and the row inside it stay clear");
+  ok(/already/i.test(P({ id: 'sideTable', mount: 'floor', x: 5, z: 6, rot: 0 }).why), 'place: no overlapping');
+  ok(/outside/i.test(P({ id: 'woodTable', mount: 'floor', x: 10, z: 3, rot: 0 }).why) && P({ id: 'woodTable', mount: 'floor', x: 10, z: 3, rot: 1 }).ok, 'place: inside the room (a quarter turn can make it fit)');
+  ok(P({ id: 'zabutonBlue', mount: 'floor', x: 4, z: 5, rot: 0 }, [bed, tbl, { k: 3, id: 'ragRug', mount: 'rug', x: 4, z: 4, rot: 0 }]).ok && P({ id: 'tileMat', mount: 'rug', x: 4, z: 4, rot: 0 }).ok, 'place: furniture stands on rugs, rugs go under furniture');
+  ok(!P({ id: 'tatamiMat', mount: 'rug', x: 5, z: 5, rot: 0 }, [bed, tbl, { k: 3, id: 'ragRug', mount: 'rug', x: 4, z: 4, rot: 0 }]).ok && !P({ id: 'tatamiMat', mount: 'rug', x: 6, z: 8, rot: 0 }).ok, "place: rugs don't overlap rugs or cover the door mat");
+  ok(P({ id: 'teaSet', mount: 'table', on: 2, x: 6, z: 6, rot: 0 }).ok && /fall/i.test(P({ id: 'teaSet', mount: 'table', on: 2, x: 7, z: 6, rot: 0 }).why) && /table/i.test(P({ id: 'teaSet', mount: 'table', on: 1, x: 1, z: 1, rot: 0 }).why), 'place: tabletop items sit inside a surface, never on a bed');
+  ok(/room/i.test(P({ id: 'daruma', mount: 'table', on: 2, x: 6, z: 6, rot: 0 }, [bed, tbl, { k: 3, id: 'teaSet', mount: 'table', on: 2, x: 6, z: 6, rot: 0 }]).why), 'place: one tabletop item per cell');
+  ok(P({ id: 'packPhoto', mount: 'wall', side: 'n', x: 7, z: 0, y: 1 }).ok && P({ id: 'packPhoto', mount: 'wall', side: 'w', x: 0, z: 7, y: 1 }).ok, 'place: wall items on both back walls');
+  ok(/window/i.test(P({ id: 'packPhoto', mount: 'wall', side: 'n', x: 4, z: 0, y: 1 }).why) && P({ id: 'packPhoto', mount: 'wall', side: 'n', x: 4, z: 0, y: 1.85 }).ok === false, 'place: wall items keep off windows');
+  { const shelf = [bed, tbl, { k: 3, id: 'bookshelf', mount: 'floor', x: 7, z: 0, rot: 0 }];
+    ok(/bookshelf/i.test(P({ id: 'packPhoto', mount: 'wall', side: 'n', x: 7, z: 0, y: 1 }, shelf).why) && P({ id: 'packPhoto', mount: 'wall', side: 'n', x: 1, z: 0, y: 1 }).ok, 'place: a wall item clears the furniture in front of it'); }
+  ok(/high|low/i.test(P({ id: 'cuckooClock', mount: 'wall', side: 'n', x: 7, z: 0, y: 1.75 }).why) && /high|low/i.test(P({ id: 'packPhoto', mount: 'wall', side: 'n', x: 7, z: 0, y: 0.5 }).why) && !P({ id: 'packPhoto', mount: 'wall', side: 'n', x: 7, z: 2, y: 1 }).ok, 'place: wall items stay on the wall, between the wainscot rail and the head rail');
+  ok(/window/i.test(P({ id: 'bookshelf', mount: 'floor', x: 4, z: 0, rot: 0 }).why) && P({ id: 'pupBasket', mount: 'floor', x: 4, z: 0, rot: 0 }).ok, 'place: tall furniture never covers a window (low things may)');
+  ok(P({ id: 'paperPendant', mount: 'ceiling', x: 5, z: 5, rot: 0 }).ok && /bump/i.test(P({ id: 'paperPendant', mount: 'ceiling', x: 10, z: 5, rot: 0 }, [bed, tbl, { k: 3, id: 'wardrobe', mount: 'floor', x: 10, z: 5, rot: 0 }]).why), 'place: ceiling lamps over the floor, clear of tall furniture');
+  { // sealing the bed off with screens fails; leaving a gap is fine
+    const wall = [bed, { k: 3, id: 'byobu', mount: 'floor', x: 0, z: 3, rot: 0 }, { k: 4, id: 'byobu', mount: 'floor', x: 3, z: 3, rot: 0 }, { k: 5, id: 'tansu', mount: 'floor', x: 4, z: 0, rot: 1 }];
+    ok(/reach/i.test(P({ id: 'sideTable', mount: 'floor', x: 4, z: 2, rot: 0 }, wall).why), "place: the bed can't be walled in");
+    ok(P({ id: 'sideTable', mount: 'floor', x: 9, z: 6, rot: 0 }, wall).ok, 'place: ...one free cell beside it is enough');
+  }
+  ok(/standing/i.test(P({ id: 'sideTable', mount: 'floor', x: 9, z: 6, rot: 0 }, [bed, tbl], { player: { x: 9, z: 6 } }).why) && /someone/i.test(P({ id: 'sideTable', mount: 'floor', x: 9, z: 6, rot: 0 }, [bed, tbl], { guests: [{ x: 9, z: 6 }] }).why), "place: never on the player or a guest");
+  ok(P({ id: 'zabutonBlue', mount: 'floor', x: 9, z: 6, rot: 0 }, [bed, tbl], { player: { x: 9, z: 6 } }).ok, 'place: cushions you can stand on are fine');
+  ok(P({ id: 'chabudai', mount: 'floor', x: 6, z: 5, rot: 0 }, [bed, tbl], { skip: tbl }).ok, 'place: a piece being moved ignores where it was');
+  { const p = poseOf(bed, [bed]), b = boxOf(bed, [bed]); ok(p.x === 1 && p.z === 0.75 && p.y === 0 && p.yaw === 0 && b[0] === 0 && b[3] === 2 && b[5] === 1.5 && b[4] === FURNITURE.futonBed.h, 'poseOf / boxOf: a 4 x 3 bed in the corner'); }
+  { const t = { k: 9, id: 'teaSet', mount: 'table', on: 2, x: 5, z: 5 }; ok(poseOf(t, [bed, tbl, t]).y === FURNITURE.chabudai.surface, 'poseOf: a tabletop item stands on its host'); }
+  { const w = { k: 9, id: 'cuckooClock', mount: 'wall', side: 'w', x: 0, z: 2, y: 1 }, s = wallSpan(w), p = poseOf(w); ok(s.side === 'w' && s.u0 === 2 && s.u1 === 3 && s.y1 === 2 && p.x === 0 && p.z === 1.25 && Math.abs(p.yaw - Math.PI / 2) < 1e-9, 'wallSpan / poseOf: a west-wall clock faces into the room'); }
+  ok(cellsOf({ id: 'futonBed', x: 2, z: 3, rot: 1 }).length === 12 && cellsOf({ id: 'futonBed', x: 2, z: 3, rot: 1 }).every(([x, z]) => x >= 2 && x < 5 && z >= 3 && z < 7), 'cellsOf: a turned bed');
+  ok(frontCell({ id: 'treasureChest', x: 1, z: 3, rot: 0 }).join() === '1,4' && frontCell({ id: 'treasureChest', x: 0, z: 4, rot: 3 }).join() === '1,4', 'frontCell: where you stand to use a piece');
+  ok(nextK([bed, tbl]) === 3 && nextK([]) === 1, 'nextK');
+  // ---- the default furnishings fit their rooms (every piece placeable in order)
+  for (const [type, lv] of [['chewyHouse', 1], ['home', 1]]) {
+    const I = defaultInterior(type, lv), Ly = LAYOUTS[I.layout], placed = [];
+    let bad = null; for (const it of I.items) { const c = canPlace(Ly, placed, it); if (!c.ok && !bad) bad = `${it.id}: ${c.why}`; placed.push(it); }
+    ok(!bad && new Set(I.items.map(i => i.k)).size === I.items.length && I.items.every(i => FURNITURE[i.id]), `defaults ${type}: every piece fits (${bad || 'ok'})`);
+  }
+  { const I = defaultInterior('chewyHouse', 1); ok(['futonBed', 'treasureChest', 'kitchenStove', 'chabudai', 'zabutonPink', 'ragRug', 'andonLamp'].every(id => I.items.some(i => i.id === id)) && I.items.some(i => i.mount === 'table' && I.items.find(h => h.k === i.on)?.id === 'chabudai'), 'defaults: the cottage has its bed, chest, stove, table, cushions, rug, lantern, and a tea set on the table'); }
+  // ---- furniture storage through the actions
+  { const G = { state: newGameState() }, A = createActions(G), ev = [];
+    const off = Events.on('furniture:changed', e => ev.push(e));
+    ok(A.addFurniture('chabudai', 2) === 2 && A.addFurniture('wp_sakura') === 1 && A.addFurniture('wp_plaster') === 0 && A.addFurniture('nope') === 0, 'addFurniture: furniture and stored surfaces, never the free ones');
+    ok(ev[0].first && ev[0].delta === 2 && ev[1].first && G.state.furnitureFound.chabudai === 1, 'addFurniture: furniture:changed with a first-discovery flag');
+    ok(A.hasFurniture({ chabudai: 2 }) && !A.hasFurniture({ chabudai: 3 }) && !A.spendFurniture({ chabudai: 1, teaSet: 1 }) && A.furnitureCount('chabudai') === 2, 'spendFurniture: all or nothing');
+    ok(A.spendFurniture({ chabudai: 2 }) && !('chabudai' in G.state.furniture) && ev[ev.length - 1].spend, 'spendFurniture: spends, emits, drops empty counters');
+    off(); }
+}
+
 // icons module must import without a DOM
 {
   const icons = await import('../src/rpg/icons.js');
   ok(typeof icons.itemIcon === 'function' && icons.itemIcon(makeGem('ruby', 0)) === '', 'icons.js imports & no-ops without DOM');
 }
+hr('HOMES & RATING');
+// docs/HOUSING.md §1, §4 (phase 2): saved owners (home/owners.js), the villagers' default homes (home/defaults.js),
+// the Home Rating and request needs (home/rating.js)
+{
+  const O = await import('../src/home/owners.js'), Rt = await import('../src/home/rating.js'), D = await import('../src/home/defaults.js');
+  const { VILLAGERS } = await import('../src/actors/roster.js');
+  // ---- owners: a toy village (homes in a row, Kuma's bakery on the street), anchors next to some of them
+  const mkB = () => [
+    { id: 'h1', type: 'home', x: 10, z: 10 }, { id: 'h2', type: 'home', x: 20, z: 10 }, { id: 'h3', type: 'home', x: 30, z: 10 }, { id: 'h4', type: 'home', x: 40, z: 10 },
+    { id: 'h5', type: 'home', x: 50, z: 10 }, { id: 'h6', type: 'home', x: 60, z: 10 }, { id: 'h7', type: 'home', x: 70, z: 10 }, { id: 's1', type: 'shop', x: 24, z: 30 },
+    { id: 'p1', type: 'park', x: 5, z: 5 },
+  ];
+  const anchors = { mochi: { x: 11, z: 11 }, usagi: { x: 21, z: 11 }, kuma: { x: 25, z: 28 }, kitsune: { x: 41, z: 12 }, pan: { x: 51, z: 11 }, tanu: { x: 61, z: 11 }, kero: { x: 31, z: 11 } };
+  const B1 = mkB(), got = O.assignOwners(B1, anchors);
+  const own = Object.fromEntries(B1.filter(b => b.owner).map(b => [b.owner, b.id]));
+  ok(got.length === 7 && O.CAST.every(id => B1.filter(b => b.owner === id).length === 1), 'owners: each of the seven gets exactly one building');
+  ok(own.kuma === 's1' && own.mochi === 'h1' && own.usagi === 'h2' && own.kero === 'h3' && own.kitsune === 'h4', `owners: Kuma's bakery, everyone else the nearest home to their anchor (${JSON.stringify(own)})`);
+  ok(!B1.find(b => b.type === 'park').owner && O.homeOf(B1, 'pan')?.id === 'h5', 'owners: only homes and shops; homeOf finds a villager\'s home');
+  ok(O.assignOwners(B1, anchors).length === 0 && JSON.stringify(Object.fromEntries(B1.filter(b => b.owner).map(b => [b.owner, b.id]))) === JSON.stringify(own), 'owners: idempotent (a second pass changes nothing)');
+  { const B2 = mkB(); O.assignOwners(B2, anchors); ok(JSON.stringify(Object.fromEntries(B2.filter(b => b.owner).map(b => [b.owner, b.id]))) === JSON.stringify(own), 'owners: deterministic — an old save without owners gets the same ones'); }
+  { const B3 = mkB(); B3[0].owner = 'kuma'; B3[1].owner = 'kuma'; B3[2].owner = 'nobody'; O.assignOwners(B3, anchors); ok(B3.filter(b => b.owner === 'kuma').length === 1 && !B3.some(b => b.owner === 'nobody'), 'owners: one home each; stray owners are dropped'); }
+  { const B4 = mkB().filter(b => b.id !== 'h1'); O.assignOwners(B4, anchors); ok(B4.filter(b => b.owner).length === 7 && B4.find(b => b.owner === 'mochi'), 'owners: a demolished home: its owner moves into a free one'); }
+  { const B5 = [{ id: 'a', type: 'home', x: 0, z: 0 }, { id: 'b', type: 'home', x: 100, z: 0 }]; O.assignOwners(B5, anchors); ok(B5.filter(b => b.owner).length === 2, 'owners: fewer homes than villagers: as many as fit, the rest wait'); }
+  // ---- the villagers' default homes: personality layouts that fit every level
+  const TASTE = Object.fromEntries(VILLAGERS.map(v => [v.id, v.home]));
+  ok(O.CAST.every(id => TASTE[id]?.style?.length && TASTE[id].likesFurniture.every(x => FURNITURE[x])), 'roster: every owner has a style and favourite pieces (real catalog ids)');
+  const starsAt = [];
+  for (const lv of [1, 2, 3]) for (const id of O.CAST) {
+    const I = D.defaultInterior('home', lv, id), Ly = LAYOUTS[I.layout], placed = [], bad = [];
+    for (const it of I.items) { const c = canPlace(Ly, placed, it); if (!c.ok) bad.push(`${it.id}: ${c.why}`); placed.push(it); }
+    const tops = I.items.filter(i => i.mount === 'table'), cellsTaken = new Set(tops.map(i => `${i.on}:${i.x},${i.z}`));
+    ok(!bad.length, `default home ${id} L${lv}: every piece fits${bad.length ? ' — ' + bad.join(' | ') : ''}`);
+    ok(tops.every(t => I.items.some(h => h.k === t.on && FURNITURE[h.id].surface)) && cellsTaken.size === tops.length, `default home ${id} L${lv}: tabletop pieces stand on a table, one per cell`);
+    ok(I.items.every(i => i.own === 1) && I.wall && I.floor && SURFACES[I.wall] && SURFACES[I.floor], `default home ${id} L${lv}: their own pieces (own), their wallpaper and floor`);
+    ok(TASTE[id].likesFurniture.some(x => I.items.some(i => i.id === x)), `default home ${id} L${lv}: at least one piece they love`);
+    starsAt.push(Rt.homeRating(I, TASTE[id]).stars);
+  }
+  ok(starsAt.every(s => s >= 2 && s <= 4) && starsAt.filter(s => s === 3).length >= starsAt.length / 2, `default homes rate 2-4 stars, mostly 3 (${starsAt.join('')}): there's always something to do`);
+  ok(D.defaultInterior('home', 1, null).items.every(i => !i.own) && D.defaultInterior('chewyHouse', 1).items.every(i => !i.own), 'defaults: the cottage and an ownerless home have no "own" pieces');
+  // ---- the Home Rating
+  const empty = Rt.homeRating({ layout: 'home1', items: [] }, TASTE.kuma);
+  ok(empty.stars === 1 && empty.score < 25 && empty.tips.includes('a lamp') && empty.tips.includes('a rug'), `rating: an empty room is one star, with tips (${empty.score})`);
+  const cot = Rt.homeRating(D.defaultInterior('chewyHouse', 1), Rt.COTTAGE_TASTE);
+  ok(cot.stars === 3 && Object.values(cot.parts).every(v => Number.isFinite(v) && v >= 0), `rating: Chewy's cottage starts at three stars (${cot.score})`);
+  const base = { layout: 'home1', wall: 'wp_plaster', floor: 'fl_planks', items: [{ k: 1, id: 'chabudai', mount: 'floor', x: 4, z: 4, rot: 0 }, { k: 2, id: 'zabutonPink', mount: 'floor', x: 3, z: 4, rot: 0 }] };
+  const plus = (I, ...its) => ({ ...I, items: [...I.items, ...its.map((it, i) => ({ k: 100 + i, mount: 'floor', rot: 0, ...it }))] });
+  const r0 = Rt.homeRating(base, TASTE.kuma), r1 = Rt.homeRating(plus(base, { id: 'andonLamp', x: 0, z: 8 }), TASTE.kuma), r2 = Rt.homeRating(plus(base, { id: 'andonLamp', x: 0, z: 8 }, { id: 'mushroomLamp', mount: 'table', on: 1, x: 4, z: 4 }), TASTE.kuma);
+  ok(r1.parts.lighting === 6 && r2.parts.lighting === 10 && r1.score > r0.score, 'rating: a lamp lights it up (a second one for full points)');
+  const rugd = Rt.homeRating(plus(base, { id: 'ragRug', mount: 'rug', x: 4, z: 4 }), TASTE.kuma);
+  ok(rugd.has.rug && rugd.parts.finish === 4 && !rugd.tips.includes('a rug'), 'rating: a rug counts for variety and finish');
+  const papered = Rt.homeRating({ ...base, wall: 'wp_stripes' }, TASTE.kuma);
+  ok(papered.parts.finish === r0.parts.finish + 2, 'rating: your own wallpaper or floor finishes it');
+  const liked = Rt.homeRating(plus(base, { id: 'breadShelf', x: 4, z: 0 }, { id: 'flourSacks', x: 6, z: 0 }), TASTE.kuma), plain = Rt.homeRating(plus(base, { id: 'bookshelf', x: 4, z: 0 }, { id: 'tansu', x: 6, z: 0 }), TASTE.kuma);
+  ok(liked.parts.taste > plain.parts.taste && liked.has.loved === 2, 'rating: the owner\'s favourite pieces and style raise taste');
+  ok(Rt.homeRating(plus(base, { id: 'byobu', x: 0, z: 0 }, { id: 'ikebana', x: 3, z: 0 }, { id: 'bonsaiStand', x: 4, z: 0 }), TASTE.kitsune).parts.sets >= 8, 'rating: three pieces from one themed set give a set bonus');
+  { const crowd = { layout: 'home1', items: [] }; let k = 1; for (let z = 0; z < 8; z += 2) for (let x = 0; x < 12; x += 2) if (!(x >= 4 && x <= 7 && z >= 6)) crowd.items.push({ k: k++, id: 'chabudai', mount: 'floor', x, z, rot: 0 });
+    const rc = Rt.homeRating(crowd, TASTE.kuma); ok(rc.has.cover > 0.55 && rc.parts.filled < Rt.RATING_PARTS.filled && rc.tips.some(t => /cluttered/.test(t)), `rating: past 55% floor cover it feels cluttered (cover ${rc.has.cover})`); }
+  ok(Rt.starsOf(0) === 1 && Rt.starsOf(24.9) === 1 && Rt.starsOf(25) === 2 && Rt.starsOf(50) === 3 && Rt.starsOf(70) === 4 && Rt.starsOf(88) === 5 && Rt.starText(3) === '★★★☆☆', 'rating: star thresholds and the star text');
+  ok(Object.values(Rt.RATING_PARTS).reduce((a, v) => a + v, 0) === 100, 'rating: the parts add up to 100');
+  // ---- request needs (story.js 'decorate' steps)
+  const warm2 = plus(base, { id: 'kitchenStove', x: 0, z: 0 }, { id: 'ragRug', mount: 'rug', x: 4, z: 4 });
+  ok(!Rt.meetsNeed(base, { tag: 'warm', n: 3, rug: true }).ok && Rt.meetsNeed(warm2, { tag: 'warm', n: 2, rug: true }).ok, 'needs: "2 warm things and a rug"');
+  ok(Rt.meetsNeed(base, { tag: 'warm', n: 3, rug: true }).missing.length === 2 && Rt.meetsNeed(base, { ids: ['breadShelf'] }).missing[0] === 'a bread shelf', 'needs: what is still missing, in words');
+  ok(Rt.meetsNeed(base, { light: true }).ok === false && Rt.meetsNeed(r1 && plus(base, { id: 'andonLamp', x: 0, z: 8 }), { light: true }).ok, 'needs: a lamp');
+  ok(!Rt.meetsNeed(base, { stars: 4 }, TASTE.kuma).ok && Rt.meetsNeed(base, { stars: 1 }, TASTE.kuma).ok, 'needs: a star rating');
+}
+hr('EXTERIORS & GROWTH');
+// docs/HOUSING.md §5-6 (phase 3): the exterior styles (world/buildings/styles.js) and interiors growing with the house
+// (home/grow.js)
+{
+  const S = await import('../src/world/buildings/styles.js'), Gr = await import('../src/home/grow.js'), D = await import('../src/home/defaults.js');
+  const { canPlace: cp } = await import('../src/home/placement.js');
+  // ---- styles
+  ok(S.STYLE_SET_IDS.join() === 'machiya,cottage,teaHouse,seaside', 'styles: the four style sets');
+  for (const id of S.STYLE_SET_IDS) {
+    const set = S.STYLE_SETS[id], st = S.setStyle(id);
+    ok(set.name && set.jp && set.desc && set.cost?.coins > 0 && set.rank >= 1, `style set ${id}: complete`);
+    ok(Object.entries(set.style).every(([k, v]) => S.FIELDS[k]?.opts[v]) && st.set === id && Object.keys(set.style).every(k => st[k] === set.style[k]), `style set ${id}: every field a real option`);
+    ok(['roof', 'roofType', 'wall', 'trim', 'door', 'window', 'fence'].every(k => set.style[k]), `style set ${id}: sets the main parts`);
+  }
+  ok(new Set(S.STYLE_SET_IDS.map(id => S.styleKey(S.setStyle(id)))).size === 4, 'styles: each set has its own template key');
+  ok(Object.keys(S.ROOF_COLORS).length >= 10 && Object.keys(S.WALLS).length >= 8 && Object.keys(S.TRIMS).length >= 5 && Object.keys(S.DOORS).join() === 'shoji,round,wood,lattice' && Object.keys(S.WINDOWS).join() === 'shoji,round,lattice', 'styles: ~10 roofs, ~8 walls, ~5 trims, the doors and windows');
+  ok(Object.keys(S.FENCES).join() === 'picket,bamboo,rail,rope,hedge' && S.NOREN.none.c === null, 'styles: the fences; a noren can be none');
+  ok(S.cleanStyle(null) === null && S.cleanStyle({}) === null && S.cleanStyle({ roof: 'nope', wall: 'mint' }).wall === 'mint' && !('roof' in S.cleanStyle({ roof: 'nope', wall: 'mint' })), 'styles: cleanStyle drops unknown ids');
+  ok(S.styleKey(null) === '' && S.styleKey({ wall: 'mint', roof: 'plum' }) === S.styleKey({ roof: 'plum', wall: 'mint' }) && S.styleKey({ roof: 'plum' }) !== S.styleKey({ roof: 'teal' }), 'styles: the key is stable, order-free and distinct');
+  { const m = S.setStyle('machiya'), w = S.withField(m, 'roof', 'plum'); ok(w.roof === 'plum' && !w.set && w.trim === 'dark' && S.withField(m, 'roof', 'charcoal').set === 'machiya' && !('door' in S.withField(m, 'door', null)), 'styles: a changed part takes the house off its set (the same value keeps it)'); }
+  { const c0 = S.remodelCost(null, S.setStyle('cottage')), c1 = S.remodelCost(null, { roof: 'plum' }), c2 = S.remodelCost({ roof: 'plum' }, { roof: 'plum', door: 'round' }), c3 = S.remodelCost(S.setStyle('cottage'), S.setStyle('cottage'));
+    ok(c0.coins === S.STYLE_SETS.cottage.cost.coins && c1.coins === S.FIELDS.roof.cost.coins && c2.coins === S.FIELDS.door.cost.coins && !Object.keys(c3).length, 'styles: a set costs its price; a part its own; nothing changed is free'); }
+  ok(S.lockOf('roofType', 'irimoya') === 2 && S.lockOf('roof', 'plum') === 1, 'styles: some options unlock with the village rank');
+  { const s = S.styleOf({ style: S.setStyle('seaside') }), n = S.styleOf({ style: null }); ok(s.roof('#000') === S.ROOF_COLORS.sea.c && s.door('x') === 'wood' && s.noren('#123') === null && n.roof('#abc') === '#abc' && !n.any && s.any, 'styles: styleOf resolves a style with the variant\'s fallbacks'); }
+  // ---- interiors grow with the house
+  ok(Gr.pathOf('home1', 'home3').join() === 'home1,home2,home3' && Gr.pathOf('cottage2', 'cottage3').join() === 'cottage2,cottage3' && Gr.pathOf('home3', 'home1') === null, 'grow: the layouts grow home1 → home2 → home3, cottage1 → 2 → 3');
+  const check = (I, to, label) => {
+    const r = Gr.migrateInterior(I, to), L = LAYOUTS[to], placed = [];
+    let bad = 0; for (const it of r.interior.items) { if (!cp(L, placed, it).ok) bad++; placed.push(it); }
+    ok(r.interior.layout === to && !bad && r.moved + r.stored.length === I.items.length, `grow ${label}: every piece fits its new room or is handed back (${r.moved} kept, ${r.stored.length} back)`);
+    return r;
+  };
+  { const I = D.defaultInterior('chewyHouse', 1), r2 = check(I, 'cottage2', 'cottage L1 → L2'), r3 = check(r2.interior, 'cottage3', 'cottage L2 → L3');
+    ok(!r2.stored.length && !r3.stored.length && ['futonBed', 'treasureChest', 'kitchenStove', 'workbench'].every(id => r3.interior.items.some(i => i.id === id)), 'grow: the cottage keeps everything as it grows, the bed, chest, stove and workbench too');
+    const k = r3.interior.items.find(i => i.id === 'teaSet'), h = r3.interior.items.find(i => i.k === k.on); ok(h?.id === 'chabudai', 'grow: the tea set stays on its chabudai'); }
+  for (const id of ['kuma', 'mochi', 'usagi', 'kitsune', 'pan', 'tanu', 'kero']) { const r = check(D.defaultInterior('home', 1, id), 'home3', `${id}'s home L1 → L3`); ok(!r.stored.length, `grow: ${id}'s own things all come along`); }
+  { const I = { layout: 'home1', items: [] }; let k = 1; for (let z = 0; z < 8; z++) for (let x = 0; x < 12; x++) if (!(x >= 4 && x <= 7 && z >= 6)) I.items.push({ k: k++, id: 'zabutonBlue', mount: 'floor', x, z, rot: 0 }); const r = check(I, 'home2', 'a room packed with cushions'); ok(r.moved > 50, 'grow: a packed room mostly comes along'); }
+}
+hr('FURNITURE SOURCES');
+// docs/HOUSING.md §3: Tanu's Trinkets (home/trinkets.js), the workbench (home/recipes.js), the finds (home/finds.js)
+{
+  const T = await import('../src/home/trinkets.js'), Rc = await import('../src/home/recipes.js'), Fd = await import('../src/home/finds.js');
+  const { shopRank } = await import('../src/home/furniture.js');
+  // ---- Tanu's daily stock
+  const st = newGameState();
+  const a = T.trinketStock(st, 5, 2), b = T.trinketStock(st, 5, 2), c = T.trinketStock(st, 6, 2);
+  ok(JSON.stringify(a) === JSON.stringify(b), 'trinketStock: the same day and rank give the same stock');
+  ok(JSON.stringify(a.map(e => e.id)) !== JSON.stringify(c.map(e => e.id)), 'trinketStock: the next day restocks');
+  ok(T.ALWAYS.length >= 6 && T.ALWAYS.every(id => storable(id) && a.some(e => e.id === id && e.always && e.stock == null)), 'trinketStock: the basics are always there, with no limit');
+  ok(['zabutonPink', 'zabutonBlue', 'sideTable', 'packPhoto'].every(id => T.ALWAYS.includes(id)) && T.ALWAYS.some(id => SURFACES[id]?.kind === 'wall') && T.ALWAYS.some(id => SURFACES[id]?.kind === 'floor'), 'trinketStock: basics = both cushions, the side table, the pack photo, wallpapers and floors');
+  const rot = a.filter(e => e.kind === 'furniture' && !e.always);
+  ok(rot.length === T.DAILY && new Set(rot.map(e => e.id)).size === rot.length && rot.every(e => !T.ALWAYS.includes(e.id)), 'trinketStock: ~8 different rotating pieces a day, none of them basics');
+  ok(rot.every(e => e.stock >= 1 && e.stock <= 2 && e.price === itemDef(e.id).price), 'trinketStock: 1-2 of each, at the catalog price');
+  for (const rank of [1, 2, 3, 5]) {
+    let bad = 0, n = 0;
+    for (let d = 1; d <= 80; d++) for (const e of T.trinketStock(st, d, rank)) if (e.kind === 'furniture') { n++; const r = shopRank(itemDef(e.id)); if (!(r > 0 && r <= rank) && !e.always) bad++; if (itemDef(e.id).shop === false) bad++; }
+    ok(!bad && n > 0, `trinketStock: rank ${rank} stocks only pieces with 0 < shopRank <= ${rank}, never a craft- or find-only piece`);
+  }
+  ok(T.trinketPool(1).every(id => (itemDef(id).set === 'basics' || itemDef(id).shop === 1)) && T.trinketPool(3).length > T.trinketPool(2).length && T.trinketPool(2).length > T.trinketPool(1).length, 'trinketPool: higher ranks open more sets');
+  { // cheaper pieces turn up more often
+    const pool = T.trinketPool(3), avgPool = pool.reduce((s, id) => s + itemDef(id).price, 0) / pool.length;
+    let sum = 0, n = 0; for (let d = 1; d <= 300; d++) for (const e of T.trinketStock(st, d, 3)) if (e.kind === 'furniture' && !e.always) { sum += e.price; n++; }
+    ok(sum / n < avgPool * 0.92, `trinketStock: weighted toward cheaper pieces (avg ${Math.round(sum / n)} vs pool ${Math.round(avgPool)})`);
+  }
+  const scrolls = a.filter(e => e.kind === 'scroll');
+  ok(scrolls.length === T.DAILY_SCROLLS && scrolls.every(e => Rc.RECIPES[e.recipe]?.learn === 'shop' && (Rc.RECIPES[e.recipe].rank || 1) <= 2 && e.id === 'recipe:' + e.recipe && e.price > 0), 'trinketStock: a couple of recipe scrolls a day (shop recipes up to the rank)');
+  { const s2 = newGameState(); for (const id of Rc.RECIPE_IDS) Rc.learnRecipe(s2, id, 1); ok(T.trinketStock(s2, 5, 5).every(e => e.kind !== 'scroll'), 'trinketStock: no scrolls for recipes you already know'); }
+  { // state.trinkets: what's sold today stays sold (and survives a save); a new day restocks
+    const s3 = newGameState(), T1 = T.trinketsOf(s3, 3, 1), e = T1.list.find(x => x.kind === 'furniture' && !x.always), basic = T1.list.find(x => x.always);
+    const left0 = T.stockLeft(T1, e);
+    ok(T.sellOne(T1, e.id) && T.stockLeft(T1, e) === left0 - 1 && T.sellOne(T1, basic.id) && T.stockLeft(T1, basic) === Infinity, 'trinkets: selling one takes it from today\'s stock (the basics never run out)');
+    while (T.stockLeft(T1, e) > 0) T.sellOne(T1, e.id);
+    ok(!T.sellOne(T1, e.id), 'trinkets: a sold-out piece can\'t be bought');
+    const s4 = JSON.parse(JSON.stringify(s3)), T2 = T.trinketsOf(s4, 3, 1);
+    ok(T2.sold[e.id] === e.stock && T.stockLeft(T2, T2.list.find(x => x.id === e.id)) === 0 && JSON.stringify(T2.list) === JSON.stringify(T1.list), 'trinkets: the stock and what was sold survive a save and reload');
+    const T3 = T.trinketsOf(s4, 4, 1);
+    ok(T3.day === 4 && !Object.keys(T3.sold).length && s4.trinkets === T3, 'trinkets: a new day restocks (nothing sold yet)');
+    const T4 = T.trinketsOf(s4, 4, 2); ok(T4.rank === 2 && T4.day === 4, 'trinkets: a new village rank restocks the same day');
+  }
+  ok(T.buyBackPrice('chabudai') === Math.floor(FURNITURE.chabudai.price / 2) && T.buyBackPrice('wp_sakura') === 120 && T.buyBackPrice('wp_plaster') === 0 && T.buyBackPrice('nope') === 0, 'trinkets: Tanu buys back at half price (never the free surfaces)');
+  ok(['greet', 'thanks', 'sold', 'poor'].every(k => Array.isArray(T.TANU[k]) && T.TANU[k].length >= 2) && typeof T.TANU.soldOut === 'string', "trinkets: Tanu's lines");
+  // ---- the workbench recipes
+  const learns = new Set(['start', 'shop', 'reward']);
+  ok(Rc.RECIPE_IDS.length >= 12 && Rc.RECIPE_IDS.length <= 15, `recipes: ${Rc.RECIPE_IDS.length} workbench recipes`);
+  for (const id of Rc.RECIPE_IDS) {
+    const r = Rc.RECIPES[id], ing = Rc.ingredientsOf(id);
+    ok(!!FURNITURE[r.out] && r.n >= 1 && learns.has(r.learn), `recipe ${id}: makes a catalog piece, learn valid`);
+    ok(ing.length >= 1 && ing.every(e => e.n > 0 && Number.isInteger(e.n) && (e.kind === 'mat' ? MATERIAL_KEYS.includes(e.k) : !!PANTRY[e.k])), `recipe ${id}: ingredients are real materials / pantry goods`);
+    if (r.learn === 'shop') ok(r.price > 0 && (r.rank || 1) >= 1, `recipe ${id}: a scroll price and rank`);
+    if (r.learn === 'reward') ok(!!r.from, `recipe ${id}: who gives it`);
+  }
+  ok(new Set(Rc.RECIPE_IDS.map(id => Rc.RECIPES[id].out)).size === Rc.RECIPE_IDS.length, 'recipes: one recipe per piece');
+  ok(['melonStool', 'catTower', 'pumpkinLamp'].every(id => FURNITURE[id].shop === false && Rc.recipeFor(id)), 'recipes: every craft-only piece has a recipe');
+  ok(Rc.RECIPES.melonStool.pantry.melon && Rc.RECIPES.melonStool.mats.wood && Rc.RECIPES.catTower.mats.wood && Rc.RECIPES.catTower.mats.silk && Rc.RECIPES.pumpkinLamp.pantry.pumpkin && Rc.RECIPES.pumpkinLamp.mats.lantern, 'recipes: melon + wood, wood + silk, pumpkin + lantern');
+  ok(Rc.START_RECIPES.length >= 4 && Rc.SCROLLS.length >= 4 && Rc.RECIPE_IDS.some(id => Rc.RECIPES[id].learn === 'reward'), 'recipes: some known from the start, some sold as scrolls, some given as thanks');
+  ok(FURNITURE_IDS.filter(id => FURNITURE[id].shop === false).every(id => Rc.recipeFor(id) || Fd.FIND_WHERE.some(w => Fd.FIND_TABLES[w].includes(id))), 'every never-sold piece can be crafted or found');
+  { // the workbench state and the craft math
+    const s = newGameState(); delete s.workbench;
+    ok(!Rc.knowsRecipe(s, 'andonLamp') && Rc.knowsRecipe(s, 'woodChair') && Rc.knownRecipes(s).length === Rc.START_RECIPES.length, 'workbench: the start recipes are known from the beginning');
+    const w = Rc.workbenchOf(s); ok(w.known && w.crafted && Rc.START_RECIPES.every(id => id in w.known), 'workbench: state.workbench is lazy { known, crafted }');
+    ok(Rc.learnRecipe(s, 'andonLamp', 4) && !Rc.learnRecipe(s, 'andonLamp', 5) && s.workbench.known.andonLamp === 4 && !Rc.learnRecipe(s, 'nope'), 'workbench: learnRecipe → true once');
+    s.materials = { wood: 13, stone: 2, petal: 0, silk: 0, lantern: 0 }; s.pantry = { melon: 3 };
+    ok(Rc.maxCraft(s, 'sideTable') === 2 && Rc.maxCraft(s, 'woodChair') === 2 && Rc.maxCraft(s, 'flowerVase') === 0 && Rc.maxCraft(s, 'melonStool') === 3, 'workbench: maxCraft = the scarcest ingredient');
+    ok(Rc.canCraft(s, 'sideTable', 2) && !Rc.canCraft(s, 'sideTable', 3) && !Rc.canCraft(s, 'melonStool') && Rc.maxCraft(s, 'melonStool') === 3, 'workbench: canCraft needs the recipe and the ingredients');
+    const cc = Rc.craftCost('melonStool', 3); ok(cc.mats.wood === 9 && cc.pantry.melon === 3, 'workbench: craftCost scales with the count');
+    let toasts = 0; const G = { state: s, ui: { toast: () => toasts++ }, day: { day: 7 } };
+    ok(Rc.teachRecipe(G, 'melonStool', { from: 'tanu' }) && !Rc.teachRecipe(G, 'melonStool') && toasts === 1 && s.workbench.known.melonStool === 7 && Rc.canCraft(s, 'melonStool', 3), 'workbench: teachRecipe learns once, with a toast');
+    ok(Rc.recipeHint('ragRug').how === 'Tanu sells this recipe' && /thank-you/.test(Rc.recipeHint('catTower', { mochi: 'Mochi' }).how) && Rc.recipeHint('catTower', { mochi: 'Mochi' }).who === 'mochi', 'workbench: hints for unknown recipes');
+  }
+  // ---- finds
+  const tbl = Fd.FIND_TABLES, all = Fd.FIND_WHERE.flatMap(w => tbl[w]);
+  ok(['bamboo', 'maple', 'tidepool', 'onsen', 'burrow'].every(w => tbl[w]?.length) && all.every(id => storable(id)), 'finds: a table for every region and the Burrow, every piece real');
+  ok(['pandaPlush', 'hangingPlanter'].every(id => tbl.bamboo.includes(id)) && tbl.maple.includes('wp_maple') && ['frogFountain', 'lilyTub', 'wp_waves'].every(id => tbl.tidepool.includes(id)) && ['wp_wood', 'fl_stone'].every(id => tbl.onsen.includes(id)), 'finds: each region\'s set plus its extras');
+  ok(['luckyCat', 'yokaiLantern'].every(id => tbl.burrow.includes(id) && Fd.FIND_WHERE.filter(w => tbl[w].includes(id)).length === 1 && !Rc.recipeFor(id) && FURNITURE[id].shop === false), 'finds: the lucky cat and the yokai lantern come only from the Burrow');
+  ok(!all.some(id => FURNITURE[id] && FURNITURE[id].shop === false && Rc.recipeFor(id)), 'finds: craft-only pieces never drop');
+  { // odds: low per monster, better per chest, good per boss; never two from one roll
+    let x = 12345; const rng = () => (x = (x * 16807) % 2147483647) / 2147483647;
+    const rate = (kind, n = 40000) => { let k = 0, two = 0; for (let i = 0; i < n; i++) { const d = Fd.rollFind('maple', kind, { rng }); k += d.length; if (d.length > 1) two++; } return { r: k / n, two }; };
+    const mn = rate('normal'), ch0 = rate('chest0'), ch2 = rate('chest2'), bs = rate('boss', 8000);
+    ok(mn.r > 0.006 && mn.r < 0.022 && !mn.two, `finds: ~1-2% per monster (${(mn.r * 100).toFixed(2)}%)`);
+    ok(ch0.r > 0.07 && ch2.r < 0.2 && (ch0.r + ch2.r) / 2 > 0.1 && (ch0.r + ch2.r) / 2 < 0.15, `finds: ~12% per chest (${(ch0.r * 100).toFixed(1)}% / ${(ch2.r * 100).toFixed(1)}%)`);
+    ok(bs.r > 0.3 && bs.r < 0.4 && !bs.two, `finds: ~35% per boss (${(bs.r * 100).toFixed(1)}%)`);
+    ok(Fd.findChance('champion') > Fd.findChance('normal') && Fd.findChance('boss') > Fd.findChance('chest2'), 'finds: tougher foes, better odds');
+    const got = {}; for (let i = 0; i < 3000; i++) for (const d of Fd.rollFind('bamboo', 'normal', { rng, force: true })) { ok(d.type === 'furniture' && d.n === 1, 'finds: a furniture loot entry'); got[d.key] = (got[d.key] || 0) + 1; }
+    ok(Object.keys(got).every(id => tbl.bamboo.includes(id)) && tbl.bamboo.every(id => got[id] > 0) && got.pandaPlush > got.bambooBench, 'finds: a region drops its own pieces (the find-only ones more often)');
+    const bur = {}; for (let i = 0; i < 4000; i++) { const id = Fd.pickFind('burrow', 2, rng); bur[id] = (bur[id] || 0) + 1; }
+    const odd = (bur.luckyCat || 0) + (bur.yokaiLantern || 0), other = Object.keys(bur).filter(id => !tbl.burrow.includes(id));
+    ok(odd > 2400 && odd < 3200 && other.length > 5 && other.every(id => { const r = shopRank(itemDef(id)); return FURNITURE[id] && r > 0 && r <= 2; }), `finds: the Burrow's oddities, now and then any piece up to the rank (${odd}/4000 oddities)`);
+    const G = { finds: { force: 2 }, sim: { stats: { rank: 1 } } };
+    ok(Fd.findDrops(G, { isRegion: true, regionId: 'onsen' }).length === 1 && Fd.findDrops(G, {}).length === 1 && G.finds.force === 0 && tbl.onsen.length, 'finds: G.finds.force makes the next rolls sure finds');
+  }
+}
+
 hr('RESULT');
 if (fails) {
   log(`FAILED ${fails}/${checks} checks:`);

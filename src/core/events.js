@@ -5,4 +5,6 @@ export const Events = {
   once(name, fn) { const off = Events.on(name, (...a) => { off(); fn(...a); }); return off; },
   off(name, fn) { map.get(name)?.delete(fn); },
   emit(name, ...args) { const s = map.get(name); if (s) for (const fn of [...s]) fn(...args); },
+  /** how many listeners are subscribed in all (QA leak checks) */
+  listenerCount() { let n = 0; for (const s of map.values()) n += s.size; return n; },
 };

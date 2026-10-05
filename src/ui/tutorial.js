@@ -15,7 +15,7 @@ import { glyph } from './glyphs.js';
 import { portraitHTML } from './portraits.js';
 
 const md = s => esc(s).replace(/\*([^*]+)\*/g, '<b>$1</b>');
-const NAMES = { shadow: 'Shadow', kero: 'Kero', moka: 'Moka', rosie: 'Rosie', usagi: 'Usagi' };
+const NAMES = { shadow: 'Shadow', kero: 'Kero', moka: 'Moka', rosie: 'Rosie', usagi: 'Usagi', tanu: 'Tanu' };
 
 export class TutorialUI {
   constructor(ui, layer) {

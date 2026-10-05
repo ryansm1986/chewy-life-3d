@@ -1,0 +1,68 @@
+/* The house card and the Remodel panel (ui/remodel.js, docs/HOUSING.md §5-6) */
+.p-house .pb { padding: 10px 14px 12px; }
+.hc { display: grid; grid-template-columns: 170px 1fr; grid-template-areas: 'pic info' 'up up' 'btns btns'; gap: 10px 14px; align-items: center; }
+.hc-pic { grid-area: pic; position: relative; width: 170px; height: 128px; border-radius: 16px; background: radial-gradient(ellipse at 50% 70%, #eaf6dc, #cfe8ff); border: 2.5px solid var(--ink); box-shadow: inset 0 -6px 0 rgba(74, 44, 42, .08), 0 3px 0 rgba(74, 44, 42, .25); overflow: hidden; }
+.hc-pic img { width: 100%; height: 100%; object-fit: contain; }
+.hc-lv { position: absolute; left: 6px; top: 6px; font: 700 12px/1 var(--font); background: #fff; border: 2px solid var(--ink); border-radius: 9px; padding: 3px 7px; }
+.hc-info { grid-area: info; display: flex; flex-direction: column; gap: 4px; }
+.hc-name { font: 700 19px/1.1 var(--font); color: var(--ink); }
+.hc-sub { font: 600 12.5px/1.2 var(--font); color: #8a6a5a; }
+.hc-stars { display: flex; align-items: baseline; gap: 6px; }
+.hc-st { font: 700 18px/1 var(--font); color: #ffb92e; letter-spacing: 1px; text-shadow: 0 1px 0 #b8742a; }
+.hc-stars small { font: 600 11px var(--font); color: #a08070; }
+.hc-stats { display: flex; gap: 10px; font: 700 12.5px var(--font); color: var(--ink); }
+.hc-stats span { display: inline-flex; align-items: center; gap: 3px; }
+.hc-stats .gl { width: 17px; height: 17px; }
+.hc-up { grid-area: up; background: #fff8ec; border: 2px solid #f0d8b8; border-radius: 14px; padding: 7px 10px 8px; display: flex; flex-direction: column; gap: 5px; }
+.hc-up.max { opacity: .75; }
+.hc-up-h { display: flex; align-items: center; gap: 6px; font: 700 14px var(--font); color: var(--ink); }
+.hc-up-h .gl { width: 19px; height: 19px; }
+.hc-up-to { margin-left: auto; font: 700 12.5px var(--font); color: #c07a3a; }
+.hc-cost, .rm-cost { display: flex; flex-wrap: wrap; gap: 5px; }
+.rm-c { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px 2px 4px; border-radius: 999px; background: #fff; border: 2px solid #c8e8c0; font: 700 12.5px var(--font); color: var(--ink); }
+.rm-c.bad { border-color: #ffb0bc; background: #fff2f4; color: #c0405a; }
+.rm-c .gl { width: 17px; height: 17px; }
+.rm-free { display: inline-flex; align-items: center; gap: 3px; font: 700 12.5px var(--font); color: #4a9a5a; }
+.hc-why, .rm-why { font: 600 12px/1.25 var(--font); color: #6a9a6a; }
+.hc-why.bad, .rm-why.bad { color: #c0506a; }
+.hc-btns { grid-area: btns; display: flex; gap: 8px; justify-content: center; }
+.hc-btns .btn.big { font-size: 15px; padding: 7px 14px 9px; }
+.hc-btns .btn:disabled, .rm-apply:disabled { opacity: .5; filter: grayscale(.4); cursor: default; transform: none; }
+.btn.gold { background: linear-gradient(#fff2c8, #ffcf4a); }
+
+.p-remodel .pb { padding: 10px 14px 12px; }
+.rm { display: grid; grid-template-columns: 470px 1fr; gap: 14px; }
+.rm-left { display: flex; flex-direction: column; gap: 9px; }
+.rm-pv { position: relative; width: 470px; height: 300px; border-radius: 18px; background: radial-gradient(ellipse at 50% 75%, #eef8e2, #cfe6ff 70%); border: 2.5px solid var(--ink); overflow: hidden; box-shadow: inset 0 -8px 0 rgba(74, 44, 42, .07), 0 3px 0 rgba(74, 44, 42, .25); }
+.rm-pv img { width: 100%; height: 100%; object-fit: contain; }
+.rm-pv img.swap { animation: popIn .3s var(--pop); }
+.rm-rot { position: absolute; right: 8px; bottom: 8px; }
+.rm-badge { position: absolute; left: 10px; top: 10px; font: 700 13px/1 var(--font); color: var(--ink); background: #fff; border: 2px solid var(--ink); border-radius: 10px; padding: 4px 9px; box-shadow: 0 2px 0 rgba(74, 44, 42, .3); }
+.rm-sets { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.rm-set { cursor: pointer; border: 2px solid #ead6c0; border-radius: 12px; background: #fffaf2; padding: 5px 6px 6px; display: flex; flex-direction: column; gap: 2px; min-height: 58px; transition: transform .12s var(--pop), border-color .12s; }
+.rm-set:hover { transform: translateY(-2px); border-color: #ffb07a; }
+.rm-set.on { border-color: #ff8fb0; background: #fff0f5; box-shadow: 0 0 0 3px rgba(255, 143, 176, .25); }
+.rm-set.locked { opacity: .55; cursor: default; }
+.rm-set b { font: 700 12.5px/1.1 var(--font); color: var(--ink); }
+.rm-set b .jp { font-size: 10px; color: #a08070; }
+.rm-set small { font: 600 10px/1.2 var(--font); color: #8a6a5a; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.rm-set small .gl { width: 12px; height: 12px; vertical-align: -2px; }
+.rm-foot { display: flex; flex-direction: column; gap: 5px; background: #fff8ec; border: 2px solid #f0d8b8; border-radius: 14px; padding: 7px 10px 8px; }
+.rm-btns { display: flex; justify-content: flex-end; gap: 8px; }
+.rm-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; align-content: start; max-height: 492px; overflow-y: auto; padding-right: 4px; }
+.rm-f { background: #fffaf2; border: 2px solid #f0e0cc; border-radius: 12px; padding: 4px 8px 6px; }
+.rm-fh { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.rm-fh b { font: 700 12.5px var(--font); color: var(--ink); }
+.rm-opts { display: flex; flex-wrap: wrap; gap: 5px; }
+.rm-o { position: relative; cursor: pointer; border: 2px solid #e2cdb6; background: #fff; border-radius: 10px; font: 700 11.5px/1 var(--font); color: var(--ink); transition: transform .1s var(--pop); }
+.rm-o:hover { transform: translateY(-1px); }
+.rm-o.on { border-color: #ff8fb0; box-shadow: 0 0 0 3px rgba(255, 143, 176, .28); }
+.rm-o.locked { opacity: .45; cursor: default; }
+.rm-o.sw { width: 28px; height: 28px; padding: 3px; border-radius: 50%; }
+.rm-o.sw i { display: block; width: 100%; height: 100%; border-radius: 50%; border: 1.5px solid rgba(74, 44, 42, .35); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .08); }
+.rm-o.sw i.none { display: flex; align-items: center; justify-content: center; background: #f4ece4; }
+.rm-o.sw i.none .gl { width: 14px; height: 14px; }
+.rm-o.chip { padding: 5px 9px 6px; }
+.rm-o em { position: absolute; right: -5px; top: -5px; }
+.rm-o em .gl { width: 13px; height: 13px; }
+.rm-auto { font-size: 10.5px; padding: 3px 7px 4px; }

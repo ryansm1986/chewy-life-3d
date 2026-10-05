@@ -1037,17 +1037,21 @@ export class SpellFX {
     const core = this.take('beamC', () => { const o = new THREE.Mesh(G_CYL(), this.mBeam(true)); o.renderOrder = 13; return o; });
     const pool = this.take('moonPool', () => { const o = new THREE.Mesh(G_PLANE(), this.mGlyph(moonTex())); o.renderOrder = 9; return o; });
     pool.material.color.set('#d8d0ff');
-    const H = { alive: true, pos: new THREE.Vector3(), endT: -1 };
+    const H = { alive: true, pos: new THREE.Vector3(), endT: -1, r }; // (H.r: a charged Moonbeam grows as it revs up)
     const light = this.vfx.lightPool?.addSource({ pos: new THREE.Vector3(), color: new THREE.Color('#c8c8ff'), intensity: 6, radius: 6, priority: 5 });
     const HT = 16;
+    let rr0 = r; const rBase = r;
     this.run((dt, t) => {
+      // (a revving charged beam spreads on the ground; the column itself only thickens a little, or it walls off the screen)
+      rr0 += (H.r - rr0) * Math.min(1, dt * 6); const r = rr0, rc = rBase + (r - rBase) * 0.3;
       let k = Math.min(1, t / 0.16);
       if (H.endT >= 0) { H.endT += dt; k *= Math.max(0, 1 - H.endT / 0.22); if (H.endT > 0.22) return false; }
       const p = H.pos, wob = 1 + Math.sin(t * 9) * 0.04;
-      outer.position.set(p.x, p.y, p.z); outer.scale.set(r * 1.05 * k * wob, HT, r * 1.05 * k * wob);
-      core.position.set(p.x, p.y, p.z); core.scale.set(r * 0.42 * k, HT, r * 0.42 * k);
-      outer.material.uniforms.uA.value = 0.75 * k; core.material.uniforms.uA.value = 1.0 * k;
-      pool.position.set(p.x, p.y + 0.05, p.z); pool.scale.setScalar(r * 1.35 * (0.9 + 0.1 * Math.sin(t * 6))); pool.rotation.y += dt * 0.9; pool.material.opacity = 0.85 * k;
+      outer.position.set(p.x, p.y, p.z); outer.scale.set(rc * 1.05 * k * wob, HT, rc * 1.05 * k * wob);
+      core.position.set(p.x, p.y, p.z); core.scale.set(rc * 0.42 * k, HT, rc * 0.42 * k);
+      const thin = rBase / rc, thinP = Math.sqrt(rBase / r); // (a grown beam keeps the same total light: no bloom wash)
+      outer.material.uniforms.uA.value = 0.75 * k * thin * thin; core.material.uniforms.uA.value = 1.0 * k * thin;
+      pool.position.set(p.x, p.y + 0.05, p.z); pool.scale.setScalar(r * 1.35 * (0.9 + 0.1 * Math.sin(t * 6))); pool.rotation.y += dt * 0.9; pool.material.opacity = 0.85 * k * thinP;
       if (light) { light.pos.set(p.x, p.y + 1.5, p.z); light.intensity = 6 * k; }
       // dust motes drifting in the shaft, sparkles where it lands
       for (let i = this.emit('motes', 45 * k, dt); i > 0; i--) { const a = rand(0, TAU), rr = Math.sqrt(Math.random()) * r * 0.9; this.pa.spawn({ frame: i % 4 ? F.DOT : F.SPARK, x: p.x + Math.cos(a) * rr, y: p.y + rand(0.1, 5), z: p.z + Math.sin(a) * rr, vy: rand(-0.6, 0.6), vx: rand(-0.1, 0.1), vz: rand(-0.1, 0.1), life: rand(0.7, 1.3), size: rand(0.05, 0.12), size1: 0.03, color: i % 3 ? PAL.moon : PAL.lilac, alpha: 0.9, alpha1: 0, fadeIn: 0.2, flicker: 12 }); }

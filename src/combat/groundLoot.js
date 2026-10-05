@@ -1,9 +1,12 @@
 // Ground loot: spills from monsters/chests with a bouncy arc; coins/potions/materials auto-collect,
 // items show rarity beams + labels and are picked up by walking over them or clicking their label.
+// A furniture find (docs/HOUSING.md §3, home/finds.js) is the piece itself (its cached model, scaled down to ~0.5 m;
+// a wallpaper is a roll and a floor a little stack of tiles), floating and bobbing in a soft beam with sparkles and its
+// name; it comes to Chewy like the other loot and goes into the furniture storage.
 import * as THREE from 'three';
 import { makeToon, makeOutline } from '../gfx/materials.js';
 import { paint, merge } from '../gfx/geom.js';
-import { tennisBallTexture } from '../gfx/textures.js';
+import { tennisBallTexture, glowTexture } from '../gfx/textures.js';
 import { boneSwordGeo } from '../actors/charKit.js';
 import { RARITY } from '../rpg/items.js';
 import { Events } from '../core/events.js';
@@ -11,6 +14,9 @@ import { POTION_CAP } from '../rpg/actions.js';
 import { rand, TAU, dist, uid } from '../core/util.js';
 import { glyph } from '../ui/glyphs.js';
 import { PANTRY, CROPS } from '../life/pantry.js';
+import { FURNITURE, SURFACES, SETS as FSETS, itemDef } from '../home/furniture.js';
+import { furnitureGroup, furnitureTemplate } from '../home/furnitureMesh.js';
+import { surfaceTexture } from '../home/surfaces.js';
 
 const RCOL = { normal: '#f4efe6', magic: '#6ea8ff', rare: '#ffd84a', unique: '#ff9a3c', set: '#5ee07a' };
 const MAT_COL = { wood: '#b07a4a', stone: '#b8b0c0', petal: '#ffb0d0', crystal: '#9ae8ff', bone: '#fff4e0', mochi: '#ffe0ec', silk: '#e8e0ff', lantern: '#ff8a4a' };
@@ -63,6 +69,64 @@ function bundleGeo() {
   });
 }
 
+// a furniture find on the ground: shared, cached geometry and materials only (never disposed with the floor)
+const surfMats = new Map();
+function surfaceMat(id) {
+  let m = surfMats.get(id);
+  if (!m) { m = makeToon({ map: surfaceTexture(id).tex, rim: 0.45 }); surfMats.set(id, m); }
+  return m;
+}
+function wallRollGeos() {
+  return geo('wpRoll', () => {
+    const roll = new THREE.CylinderGeometry(0.075, 0.075, 0.42, 18, 1); roll.rotateZ(Math.PI / 2); roll.translate(0, 0.075, -0.05);
+    const flap = new THREE.PlaneGeometry(0.4, 0.2); flap.rotateX(-Math.PI / 2 + 0.08); flap.translate(0, 0.012, 0.075);
+    for (const [g, su, sv] of [[roll, 0.47, 0.42], [flap, 0.4, 0.2]]) { const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * su, uv.getY(i) * sv); }
+    const band = new THREE.TorusGeometry(0.079, 0.014, 6, 20); band.rotateY(Math.PI / 2); band.translate(0.1, 0.075, -0.05); paint(band, (p, n, o) => o.set('#ff8fb0'));
+    const bow = new THREE.SphereGeometry(0.03, 8, 6); bow.scale(1, 0.7, 1.4); bow.translate(0.1, 0.155, -0.05); paint(bow, (p, n, o) => o.set('#ff6f96'));
+    return { paper: merge([roll, flap]), ribbon: merge([band, bow]) };
+  });
+}
+function floorStackGeo() {
+  return geo('flStack', () => {
+    const parts = [[0, 0.0175, 0, 0.1], [0.02, 0.0525, -0.015, -0.25], [-0.015, 0.0875, 0.01, 0.4]].map(([x, y, z, r]) => {
+      const t = new THREE.BoxGeometry(0.3, 0.035, 0.3); const uv = t.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 0.3, uv.getY(i) * 0.3);
+      t.rotateY(r); t.translate(x, y, z); return t;
+    });
+    return merge(parts);
+  });
+}
+function ribbonMat() { return geo('ribbonMat', () => makeToon({ vertexColors: true, rim: 0.5 })); }
+// the soft glow disc a find floats over (one shared plane and material, white-gold for every set: the beam and the
+// light carry the set's colour)
+function glowDisc() {
+  const { g, m } = geo('findGlow', () => { const g = new THREE.CircleGeometry(0.55, 28); g.rotateX(-Math.PI / 2); return { g, m: new THREE.MeshBasicMaterial({ map: glowTexture(), color: new THREE.Color('#ffe8a8'), transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }) }; });
+  const d = new THREE.Mesh(g, m); d.renderOrder = 1; return d;
+}
+/** the ground model of a furniture find (a Group of shared meshes): the piece about half a metre big (flat rugs tilted
+ *  up to face the camera), lifted over a glow disc */
+function furnitureLoot(id) {
+  const holder = new THREE.Group(), piece = new THREE.Group();
+  holder.add(piece);
+  if (FURNITURE[id]) {
+    const d = FURNITURE[id], t = furnitureTemplate(id), g = furnitureGroup(id), size = t.box.getSize(new THREE.Vector3()), c = t.box.getCenter(new THREE.Vector3());
+    const k = Math.min(1.8, 0.52 / Math.max(size.x, size.y * 1.1, size.z, 0.1));
+    g.scale.setScalar(k); g.position.set(-c.x * k, -c.y * k, -c.z * k); // (centred: it turns about its middle)
+    piece.add(g);
+    if (d.mount === 'rug') piece.rotation.x = 1.05; // (a rug shows its pattern)
+    else if (d.mount === 'wall') piece.rotation.x = -0.25;
+    piece.position.y = Math.max(size.y * k / 2, d.mount === 'rug' ? 0.24 : 0.05);
+  } else if (SURFACES[id]?.kind === 'wall') {
+    const G2 = wallRollGeos();
+    piece.add(new THREE.Mesh(G2.paper, surfaceMat(id)), new THREE.Mesh(G2.ribbon, ribbonMat()));
+    piece.scale.setScalar(1.25); piece.rotation.x = 0.35; piece.position.y = 0.06;
+  } else { piece.add(new THREE.Mesh(floorStackGeo(), surfaceMat(id))); piece.scale.setScalar(1.4); piece.rotation.x = 0.55; piece.position.y = 0.12; }
+  piece.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  const glow = glowDisc(); holder.add(glow);
+  holder.userData.piece = piece; holder.userData.glow = glow;
+  holder.name = 'loot:furniture:' + id;
+  return holder;
+}
+
 export class GroundLoot {
   constructor(G, world) { this.G = G; this.world = world; this.list = []; this.mats = {}; }
   mat(color) { return this.mats[color] || (this.mats[color] = makeToon({ vertexColors: true, color, rim: 0.6, emissive: color, emissiveIntensity: 0.12 })); }
@@ -82,6 +146,7 @@ export class GroundLoot {
     else if (d.type === 'potion') { mesh = new THREE.Mesh(potionGeo(d.key), makeToon({ vertexColors: true, rim: 0.6, emissive: POT_COL[d.key], emissiveIntensity: 0.3 })); }
     else if (d.type === 'material') { mesh = new THREE.Mesh(matGeo(d.key), makeToon({ vertexColors: true, rim: 0.6 })); }
     else if (d.type === 'pantry') { mesh = new THREE.Mesh(pantryGeo(d.key), makeToon({ vertexColors: true, rim: 0.6, emissive: '#fff0c0', emissiveIntensity: 0.15 })); color = '#8fe0a0'; }
+    else if (d.type === 'furniture') { const fd = itemDef(d.key); if (!fd) return; mesh = furnitureLoot(d.key); color = FSETS[fd.set]?.color || '#ffcf4a'; label = fd.name; beam = this.G.vfx.pillar(to, { color, persistent: true, r: 0.3, h: 4, opacity: 0.4 }); Events.emit('sfx', 'pickup_rare'); }
     else if (d.type === 'gem') { const gc = d.item?.color || d.item?.icon?.colors?.[0] || '#ff6a8a'; mesh = new THREE.Mesh(gemGeo(), makeToon({ vertexColors: true, color: gc, rim: 0.8, emissive: gc, emissiveIntensity: 0.6 })); color = gc; label = d.item?.name; }
     else if (d.type === 'item') {
       const it = d.item; color = RCOL[it.rarity] || '#ffffff';
@@ -94,11 +159,11 @@ export class GroundLoot {
     }
     if (!mesh) return;
     mesh.castShadow = true;
-    const ol = new THREE.Mesh(mesh.geometry, makeOutline('#3a2230', 0.012)); mesh.add(ol);
+    if (mesh.geometry) { const ol = new THREE.Mesh(mesh.geometry, makeOutline('#3a2230', 0.012)); mesh.add(ol); }
     this.world.scene.add(mesh);
     const e = { id: uid(), d, mesh, from, to, t: 0, fly: 0.55, beam, color, label, spin: rand(-3, 3) };
     // the label stands on the item itself (not at Chewy's height), so a pile of drops doesn't bury him
-    if (label) this.G.ui?.lootLabel?.add?.({ id: e.id, name: label, color, worldPos: to, lift: 0.16, onClick: () => this.tryPickup(e, true) });
+    if (label) this.G.ui?.lootLabel?.add?.({ id: e.id, name: label, color, worldPos: to, lift: d.type === 'furniture' ? -0.55 : 0.16, onClick: () => this.tryPickup(e, true) }); // (a find's name sits under it: the piece floats above)
     if (e.beam) e.light = this.world.lightPool.addSource({ pos: to.clone().setY(1), color: new THREE.Color(color), intensity: 3, radius: 3.5 });
     this.list.push(e);
     Events.emit('sfx', 'drop_item', { pos: to });
@@ -107,8 +172,8 @@ export class GroundLoot {
     const G = this.G, P = G.player;
     if (!clicked && e.d.type === 'item' && e.d.item.rarity === 'normal' && !G.state.flags?.autoPickNormal) return false;
     if (clicked && dist(P.pos.x, P.pos.z, e.to.x, e.to.z) > 1.8) { P.moveTarget = e.to.clone(); P.pendingLoot = e; return false; }
-    const first = e.d.type === 'pantry' && !(G.state.pantryFound || {})[e.d.key];
-    const ok = G.actions.pickup(e.d);
+    const first = e.d.type === 'pantry' ? !(G.state.pantryFound || {})[e.d.key] : e.d.type === 'furniture' ? !(G.state.furnitureFound || {})[e.d.key] && !(G.state.furniture?.[e.d.key] > 0) : false;
+    const ok = e.d.type === 'furniture' ? G.actions.addFurniture?.(e.d.key, e.d.n || 1, { src: 'find' }) > 0 : G.actions.pickup(e.d);
     if (!ok) return false;
     this.remove(e);
     const p = e.to.clone().setY(e.to.y + 0.4);
@@ -116,6 +181,7 @@ export class GroundLoot {
     else if (e.d.type === 'potion') { G.vfx.sparkle(p, { n: 5, color: POT_COL[e.d.key] }); Events.emit('sfx', 'pickup_item'); }
     else if (e.d.type === 'material') { G.vfx.sparkle(p, { n: 4, color: MAT_COL[e.d.key] }); Events.emit('sfx', 'pickup_item'); this.tally(e.d.key, e.d.n); }
     else if (e.d.type === 'pantry') { G.vfx.sparkle(p, { n: 8, color: '#bff0a0' }); Events.emit('sfx', 'pickup_magic'); G.ui?.pantryGain?.(e.d.key, e.d.n || 1, { first, worldPos: p }); }
+    else if (e.d.type === 'furniture') { G.vfx.sparkle(p, { n: 16, color: e.color, r: 0.5, rise: 1.1 }); Events.emit('sfx', first ? 'pickup_unique' : 'pickup_magic'); G.furnitureGain?.(e.d.key, e.d.n || 1, { first, worldPos: p }); Events.emit('furniture:found', { id: e.d.key, first }); }
     else { G.vfx.sparkle(p, { n: 10, color: e.color }); Events.emit('sfx', ['unique', 'set', 'rare'].includes(e.d.item?.rarity) ? 'pickup_rare' : 'pickup_item'); G.ui?.pickupFly?.(e.d.item, p); }
     return true;
   }
@@ -159,6 +225,12 @@ export class GroundLoot {
         e.mesh.position.set(e.to.x, e.to.y + Math.abs(Math.sin((e.t - e.fly) * 9)) * 0.15 * b + 0.02, e.to.z);
         e.mesh.rotation.y += dt * e.spin * 0.3;
         if (Math.random() < dt * 1.5 && e.d.type === 'coins') G.vfx.sparkle(e.mesh.position, { n: 1, color: '#ffe070', r: 0.2 });
+        if (e.d.type === 'furniture') { // a find floats over its glow, turning slowly, with sparkles
+          const h = Math.min(1, (e.t - e.fly) * 2), U = e.mesh.userData, lift = h * (0.32 + Math.sin(e.t * 2.4) * 0.07);
+          U.piece.position.y = (U.py ??= U.piece.position.y) + lift; U.glow.position.y = 0.03 - (e.mesh.position.y - e.to.y);
+          U.glow.scale.setScalar(0.85 + 0.15 * Math.sin(e.t * 2.4 + 1)); e.mesh.rotation.y += dt * 0.8;
+          if (Math.random() < dt * 3) G.vfx.sparkle(e.mesh.position.clone().setY(e.mesh.position.y + lift + 0.3), { n: 1, color: Math.random() < 0.5 ? e.color : '#fff6c0', r: 0.35, size: 0.22 });
+        }
         if (!P || G.playerDead) continue;
         const d = dist(P.pos.x, P.pos.z, e.to.x, e.to.z);
         const auto = e.d.type !== 'item' && e.d.type !== 'gem';

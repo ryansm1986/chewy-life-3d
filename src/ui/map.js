@@ -9,6 +9,7 @@ import { pantryIcon } from '../life/pantryIcons.js';
 
 const LEGEND_VILLAGE = [['you', 'Chewy'], ['shop', 'Shops'], ['home', 'Homes'], ['craft', 'Workshops'], ['quest', 'Quest'], ['gate', 'Burrow gate']];
 const LEGEND_DUNGEON = [['you', 'Chewy'], ['mon', 'Monsters'], ['elite', 'Elites'], ['boss', 'Boss'], ['stairs', 'Stairs down'], ['portal', 'Portal home'], ['wp', 'Waypoint'], ['quest', 'Quest']];
+const LEGEND_HOME = [['you', 'You'], ['furn', 'Furniture'], ['rugs', 'Rugs'], ['door', 'The door'], ['pup', 'Shadow']]; // (indoors: docs/HOUSING.md)
 export class MapPanel extends Panel {
   constructor(ui) { super(ui, { name: 'map', title: 'Map', jp: '地図', side: 'center', cls: 'p-map', icon: 'map' }); }
   init() {
@@ -23,15 +24,15 @@ export class MapPanel extends Panel {
   }
   onOpen() { this.acc = 0; this.draw(); }
   render() {
-    const dun = this.ui.mode === 'dungeon';
+    const dun = this.ui.mode === 'dungeon', home = this.ui.mode === 'interior';
     if (this._lgMode !== this.ui.mode) {
       this._lgMode = this.ui.mode;
-      this.body.querySelector('.mp-legend').innerHTML = (dun ? LEGEND_DUNGEON : LEGEND_VILLAGE).map(([c, t]) => `<div><i class="lg ${c}"></i>${t}</div>`).join('');
+      this.body.querySelector('.mp-legend').innerHTML = (dun ? LEGEND_DUNGEON : home ? LEGEND_HOME : LEGEND_VILLAGE).map(([c, t]) => `<div><i class="lg ${c}"></i>${t}</div>`).join('');
     }
     const loc = this.ui.hud?.cache.loc;
-    const name = this.ui.mode === 'dungeon' ? (loc?.name || 'The Burrow') : 'Blossom Hollow';
+    const name = dun ? (loc?.name || 'The Burrow') : home ? (loc?.name || 'Home') : 'Blossom Hollow';
     this.body.querySelector('.mp-name').textContent = name;
-    this.body.querySelector('.mp-jp').textContent = this.ui.mode === 'dungeon' ? (loc?.sub || '地下') : 'さくら村';
+    this.body.querySelector('.mp-jp').textContent = dun ? (loc?.sub || '地下') : home ? 'おうち' : 'さくら村';
   }
   update(dt) { if (!this.isOpen) return; this.acc = (this.acc || 0) + dt; if (this.acc > 0.1) { this.acc = 0; this.draw(); } }
   draw() {

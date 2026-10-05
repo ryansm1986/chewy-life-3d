@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { clamp, lerp, ease, TAU, damp } from '../core/util.js';
 import { LIFE_ACTIONS } from './lifePoses.js';
+import { CHARGE_ACTIONS } from './chargePoses.js';
 
 // action library: dur (s), events {name: t01}, pose(t01, P, A) applies additive offsets
 const ACTIONS = {
@@ -158,6 +159,8 @@ const ACTIONS = {
 };
 // villager daily-life poses (bench sitting, chores, chat gestures, idle fidgets) live in lifePoses.js
 for (const k in LIFE_ACTIONS) if (!ACTIONS[k]) ACTIONS[k] = LIFE_ACTIONS[k];
+// charged abilities' wind-up poses (combat/charge.js writes a.style / a.k / a.pulse / a.full onto the action)
+for (const k in CHARGE_ACTIONS) if (!ACTIONS[k]) ACTIONS[k] = CHARGE_ACTIONS[k];
 export { ACTIONS };
 
 const zero = () => ({ x: 0, y: 0, z: 0 });
@@ -208,7 +211,7 @@ export class Animator {
       const a = this.action; a.t += dt;
       const u = a.def.hold ? a.t : clamp(a.t / a.dur);
       if (a.def.ev) for (const [ev, at] of Object.entries(a.def.ev)) if (!a.fired.has(ev) && a.t / a.dur >= at) { a.fired.add(ev); a.onEvent?.(ev); }
-      a.def.pose(a.def.hold ? a.t : u, this.P, A);
+      a.def.pose(a.def.hold ? a.t : u, this.P, A, a);
       if (!a.def.hold && a.t >= a.dur) { this.action = null; a.onEvent?.('end'); }
     }
     if (this.quad) this.poseQuad(dt, A); else this.poseBiped(dt, A);

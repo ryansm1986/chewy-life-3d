@@ -46,6 +46,7 @@ function band(top, bot, colr, out) {
  *  over (eave overhang), gOver (gable-end overhang), H (rise), curve (concavity), lift (corner upturn), thick
  *  color, edge (tile-end band), under (soffit), cap (ridge tiles), ribW (0 = smooth), ribAmp, course, courseAmp
  *  tg (irimoya split 0..1), oni (onigawara), finial, moss (0..1), gable ('plaster'|'wood'|'ornate'), vent (round window in gable)
+ *  gableColor (plaster gable fill), gableWood (wood gable fill), timber (the gable's beam / post / vent frame)
  * returns { ridgeY, yb, H, A, Bz, yAt(x,z) } in the caller's frame
  */
 export function roof(B, o) {
@@ -419,14 +420,14 @@ function gableTri(B, R, o, X, sx, t0, Bz, yBase) {
     const z = lerp(-zMax, zMax, i / N), t = 1 - Math.abs(z) / Bz;
     top.push(V(X - sx * 0.02, Math.max(yBase, yUnder(t)), z)); bot.push(V(X - sx * 0.02, yBase, z));
   }
-  const fill = o.gable || 'plaster';
-  const cFill = fill === 'wood' ? C.woodMid : fill === 'ornate' ? '#8a4a3a' : (o.gableColor || C.plaster);
+  const fill = o.gable || 'plaster', tim = o.timber || C.woodDark; // timber: the gable's beam, post and vent frame
+  const cFill = fill === 'wood' ? (o.gableWood || C.woodMid) : fill === 'ornate' ? '#8a4a3a' : (o.gableColor || C.plaster);
   B.add(band(top, bot, cFill, V(sx, 0, 0)), null);
   const hTri = yUnder(1) - yBase;
   if (hTri < 0.25) return;
   // timber details
   const wx = X + sx * 0.02;
-  const beam = G.box(0.08, 0.09, zMax * 1.9, 0.02); beam.translate(wx, yBase + 0.05, 0); B.add(beam, C.woodDark);
+  const beam = G.box(0.08, 0.09, zMax * 1.9, 0.02); beam.translate(wx, yBase + 0.05, 0); B.add(beam, tim);
   const post = G.box(0.08, hTri * 0.9, 0.09, 0.02); post.translate(wx, yBase + hTri * 0.45, 0);
   if (fill === 'ornate') {
     // gold gegyo crest
@@ -435,11 +436,11 @@ function gableTri(B, R, o, X, sx, t0, Bz, yBase) {
     for (const s of [-1, 1]) { const w = G.torus(0.1, 0.03, 4, 8, PI); w.rotateY(PI / 2); w.translate(wx + sx * 0.03, yBase + hTri * 0.62, s * 0.2); B.add(w, C.gold); }
   } else if (o.vent !== false && hTri > 0.5) {
     const vr = Math.min(0.2, hTri * 0.28);
-    const ring = G.torus(vr, 0.045, 5, 14); ring.rotateY(PI / 2); ring.translate(wx + sx * 0.01, yBase + hTri * 0.42, 0); B.add(ring, C.woodDark);
+    const ring = G.torus(vr, 0.045, 5, 14); ring.rotateY(PI / 2); ring.translate(wx + sx * 0.01, yBase + hTri * 0.42, 0); B.add(ring, tim);
     const pane = G.disc(vr * 0.95, 14); pane.rotateY(sx * PI / 2); pane.translate(wx, yBase + hTri * 0.42, 0);
     B.glow(pane, C.paper);
-    const cross = G.box(0.03, vr * 1.8, 0.03, 0); cross.translate(wx + sx * 0.02, yBase + hTri * 0.42, 0); B.add(cross, C.woodDark);
-  } else B.add(post, C.woodDark);
+    const cross = G.box(0.03, vr * 1.8, 0.03, 0); cross.translate(wx + sx * 0.02, yBase + hTri * 0.42, 0); B.add(cross, tim);
+  } else B.add(post, tim);
 }
 
 /**

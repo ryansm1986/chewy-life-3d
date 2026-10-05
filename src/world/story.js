@@ -9,10 +9,14 @@ import { PANTRY, CROPS, CROP_IDS, pantryList } from '../life/pantry.js';
 import { RECIPES } from '../life/cooking.js';
 import { MATERIALS } from '../ui/glyphs.js';
 import { pantryIcon } from '../life/pantryIcons.js';
+import { meetsNeed, homeRating, starText } from '../home/rating.js';
+import { FURNITURE } from '../home/furniture.js';
 
 // step types: talk(npc) | collect(material,n) | kill(monster?,n) | boss(id) | floor(n) | build(type,n) | pop(n) | zone(n)
 //   | fish(n) (catch n fish: life/fishing.js 'fish:caught') | plant(n) / harvest(n) (life/garden.js) | cook(n) dishes
 //   | deliver(npc, mat, n, pantry?) (a material, or with pantry: true a pantry good — crops, fish, dishes)
+//   | decorate(npc, need) (decorate their home: need = { tag?, n?, rug?, light?, stars?, ids? } — home/rating.js
+//     meetsNeed, checked when you leave their home: docs/HOUSING.md §4)
 export const QUESTS = {
   welcome: { title: 'Welcome Home, Chewy', giver: 'rosie', desc: 'Rosie wants to show you around Blossom Hollow.', steps: [{ type: 'talk', npc: 'rosie', text: 'Say hi to Rosie' }], reward: { coins: 50, xp: 20 }, next: 'burrow1' },
   burrow1: { title: 'Something Squishy', giver: 'rosie', desc: 'Strange squeaks echo from the Burrow on the shrine hill. Go take a peek!', steps: [{ type: 'kill', n: 8, text: 'Defeat yokai in the Burrow' }, { type: 'collect', mat: 'mochi', n: 3, text: 'Bring back Mochi Jelly' }], reward: { coins: 120, xp: 80, potions: { heart: 3 } }, next: 'homes' },
@@ -64,6 +68,8 @@ export const NIGHT_CHAT = {
   kero: { hi: ["Ribb… *yawn* …it. Chewy? The koi are asleep. So was I.", "Croak… mmh. The pond is so quiet at night, isn't it?"], bye: ["Goodnight, Chewy. Dream of lily pads.", "Sleep well. Ribbit means goodnight too."] },
   folk: { hi: ["Mmh… Chewy? It's so late… *yawn*", "Oh! You startled me… I was already in my pyjamas. *yawn*", "*yawn* …Is everything okay? It's the middle of the night!"], bye: ["Get some sleep, okay? Goodnight~", "See you in the morning, Chewy. Sweet dreams!", "Shh… the whole village is asleep. Goodnight!"] },
 };
+// a decorate request's extra thank-you: a workbench recipe (home/recipes.js, learn: 'reward')
+const CRAFT_REWARD = { mochi: 'catTower', kero: 'fishTank' };
 const HEART_REWARDS = { 3: { coins: 100, text: 'Here, a little something for being such a good friend!' }, 6: { item: 'magic', text: 'I found this and thought of you!' }, 9: { item: 'rare', text: 'You\'re my best friend in the whole village. Take this, please!' } };
 
 export class Story {
@@ -99,6 +105,7 @@ export class Story {
     switch (s.type) {
       case 'collect': return (st.materials[s.mat] || 0) >= s.n;
       case 'deliver': return !!q.delivered;
+      case 'decorate': return !!q.decorated;
       case 'build': return st.village.buildings.filter(b => b.type === s.btype).length >= s.n + (q.base || 0);
       case 'buildAny': return st.village.buildings.filter(b => s.btypes.includes(b.type)).length >= s.n + (q.base || 0);
       case 'pop': return (G.sim?.stats.population || 0) >= s.n;
@@ -137,6 +144,8 @@ export class Story {
     if (r.unique) this.giveItem(makeUnique(pick(UNIQUE_IDS), Math.max(5, G.state.player.lvl)));
     if (r.pantry) for (const k in r.pantry) { A.addPantry(k, r.pantry[k], { src: 'quest' }); G.ui?.pantryGain?.(k, r.pantry[k], {}); }
     if (r.recipe) setTimeout(() => G.life?.teach?.(r.recipe, { from: d.giver, src: 'quest' }), 1800);
+    if (r.furniture) setTimeout(() => { A.addFurniture?.(r.furniture, 1, { src: 'quest' }); G.ui?.toast?.(`${this.nameOf(d.giver)} gave you a ${FURNITURE[r.furniture]?.name || r.furniture}! (in your furniture storage)`, { icon: 'home', color: '#ffb07a' }); }, 1800);
+    if (r.craft) setTimeout(() => G.teachRecipe?.(r.craft, { from: d.giver }), 2400); // (a workbench recipe: home/sources.js)
     if (d.request && d.steps.some(s => s.pantry)) setTimeout(() => G.life?.onRequestDone?.(d.giver), 2200);
     if (r.hearts && d.giver) this.addHearts(d.giver, r.hearts);
     G.ui?.banner?.('Quest Complete!', d.title, { style: 'quest' });
@@ -199,6 +208,11 @@ export class Story {
     for (const q of order) {
       const d = this.def(q.id), s = d.steps[q.step]; if (!s) continue;
       if (s.type === 'talk') { const t = npcPos(s.npc); if (t) return t; continue; }
+      if (s.type === 'decorate') { // their home's door (inside it: nothing to point at)
+        const rec = G.mode === 'village' && G.sim?.list.find(r => r.data.owner === s.npc);
+        if (rec) return { pos: rec.door, label: `${this.nameOf(s.npc)}'s home`, kind: 'place' };
+        continue;
+      }
       if (s.type === 'deliver') { if (this.haveFor(s) >= s.n) { const t = npcPos(s.npc); if (t) return t; } continue; }
       const burrowStep = ['kill', 'floor', 'boss'].includes(s.type) || (s.type === 'collect' && s.mat === 'mochi');
       if (burrowStep) {
@@ -258,6 +272,13 @@ export class Story {
     // story talk steps
     this.markTalk(id);
     if (!npc.folk && this.G.life?.onTalk) await this.G.life.onTalk(npc, say); // (the homestead: Kero's rod, gifts, records)
+    // an invitation (3 hearts and a home of their own): visit and redecorate any time (docs/HOUSING.md §4)
+    if (!npc.folk && f.hearts >= 3 && !f.invited && G.sim?.list.some(r => r.data.owner === id)) {
+      f.invited = day;
+      await say(['You know what? Make yourself at home! Pop in any time you like — and if you want to move things around, go right ahead~']);
+      G.ui?.toast?.(`${this.nameOf(id)} invited you over! You can visit and decorate their home any time`, { icon: 'home', color: '#ff8fb0' });
+      Events.emit('sfx', 'ui_quest'); Events.emit('friend:invited', { id });
+    }
     // pending heart reward
     if (f.pendingReward && HEART_REWARDS[f.pendingReward]?.item && G.actions.firstFree('inv') < 0) {
       await say(["I have a present for you… but your bag looks stuffed! I'll keep it safe until you have room."]);
@@ -283,6 +304,7 @@ export class Story {
     if (id === 'rosie' && G.life?.kitchen) choices.push({ text: 'Bake with Rosie 🧁' }); // her oven (docs/HOMESTEAD.md §4)
     if (id === 'usagi' && G.openSeedStall) choices.push({ text: 'Seeds, please! 🌱' }); // her Seed Stall (docs/HOMESTEAD.md)
     if (id === 'kero' && G.openFishHut) choices.push({ text: 'Fishing gear & fish trades 🎣' }); // his Fishing Hut
+    if (id === 'tanu' && G.openTrinkets) choices.push({ text: 'Furniture, please! 🪑' }); // Tanu's Trinkets (docs/HOUSING.md §3)
     choices.push({ text: 'Bye!' });
     const c = await say(lines, choices);
     const pickText = choices[c]?.text || '';
@@ -293,6 +315,7 @@ export class Story {
     else if (pickText.startsWith('Open')) G.openShop?.();
     else if (pickText.startsWith('Seeds')) await G.openSeedStall?.();
     else if (pickText.startsWith('Fishing')) G.openFishHut?.();
+    else if (pickText.startsWith('Furniture')) G.openTrinkets?.();
   }
   /** Everything giftable for this villager: pantry dishes, then fish, crops and forage (no seeds), then materials.
    *  → [{ key, name, n, pantry, love: 'loved' | 'liked' | null }] */
@@ -350,6 +373,34 @@ export class Story {
     if (cooked.length) { const r = pick(cooked); out.push(deliver(r, 1, `Cook ${PANTRY[r].name} for ${npc.name}`, `Would you cook me some ${PANTRY[r].name.toLowerCase()}? I heard yours is the best!`)); }
     return out;
   }
+  /** Decorate requests (docs/HOUSING.md §4), for a villager with a home of their own: something in their style plus a
+   *  rug, one more star, or one of the pieces they love. The reward: hearts, coins and a piece for your storage. */
+  decorateRequests(npc) {
+    const G = this.G, id = npc.id, rec = G.sim?.list.find(r => r.data.owner === id), taste = VILLAGERS.find(v => v.id === id)?.home;
+    if (!rec || !taste || !G.housing) return [];
+    const I = G.housing.interiorOf(rec.data), r = homeRating(I, taste), tag = taste.style.find(t => t !== 'cozy') || taste.style[0];
+    const have = new Set(I.items.map(it => it.id)), gift = taste.likesFurniture.find(x => !have.has(x) && !(G.state.furniture?.[x] > 0)) || pick(taste.likesFurniture);
+    const out = [];
+    const craft = CRAFT_REWARD[id] && !G.state.workbench?.known?.[CRAFT_REWARD[id]] ? CRAFT_REWARD[id] : null; // (Mochi and Kero teach you a recipe the first time)
+    const dec = (need, text, ask) => ({ steps: [{ type: 'decorate', npc: id, need, text }], text: ask, reward: { furniture: gift, ...(craft ? { craft } : {}) } });
+    out.push(dec({ tag, n: 2, rug: true }, `Decorate ${npc.name}'s home: 2 ${tag} things and a rug`, `Could you help me make my home a bit more ${tag}? Two ${tag} things and a rug would be perfect! You can come in and move things around~`));
+    if (r.stars < 5) out.push(dec({ stars: r.stars + 1 }, `Make ${npc.name}'s home ${starText(r.stars + 1)}`, `My home feels a little plain… Could you make it a ${r.stars + 1}-star home? I'll leave the door open for you!`));
+    const want = taste.likesFurniture.find(x => !have.has(x));
+    if (want) out.push(dec({ ids: [want] }, `Put a ${FURNITURE[want].name.toLowerCase()} in ${npc.name}'s home`, `I've always dreamed of a ${FURNITURE[want].name.toLowerCase()} in my home… Tanu might sell one, or maybe you could make one?`));
+    return out;
+  }
+  /** On the way out of a villager's home (home/housing.js react): does their decorate request's need hold now? Completes
+   *  it if so (unless dry: just asking). → { done, missing } or null when there's no such request */
+  checkDecorate(id, interior, taste = null, dry = false) {
+    for (const q of this.Q.active) {
+      const d = this.def(q.id), s = d?.steps[q.step];
+      if (s?.type !== 'decorate' || s.npc !== id) continue;
+      const m = meetsNeed(interior, s.need || {}, taste);
+      if (m.ok) { if (!dry) { q.decorated = true; this.progress('decorate'); } return { done: true, missing: [] }; }
+      return { done: false, missing: m.missing };
+    }
+    return null;
+  }
   canRequest(id) { const f = this.friend(id); return (f.reqDay || 0) !== (this.G.day?.day || 1); }
   async requestFlow(npc, say) {
     const G = this.G, id = npc.id, f = this.friend(id);
@@ -360,13 +411,14 @@ export class Story {
       { steps: [{ type: 'kill', n: randInt(10, 20), text: 'Defeat yokai in the Burrow' }], text: 'The yokai keep knocking over my flower pots… could you shoo some away?' },
       { steps: [{ type: 'buildAny', btypes: ['bench', 'flowerBed', 'sakuraPlanter'], n: 1, text: 'Build a bench, flower bed or planter' }], text: 'The village could use somewhere cute to sit. Would you build something?' },
       ...this.homesteadRequests(npc), // (appended: the first three keep their places)
+      ...this.decorateRequests(npc), // (appended: docs/HOUSING.md §4)
     ];
     const t = pick(templates);
     const c = await say([t.text], [{ text: 'Leave it to me!' }, { text: 'Maybe later' }]);
     if (c !== 0) return;
     f.reqDay = G.day?.day || 1;
     const qid = `req_${id}`;
-    this.Q.requests[qid] = { def: { title: `${npc.name}'s Request`, giver: id, desc: t.text, steps: t.steps, reward: { coins: 40 + lvl * 12, xp: 30 + lvl * 20, hearts: 12 }, request: true, next: null } };
+    this.Q.requests[qid] = { def: { title: `${npc.name}'s Request`, giver: id, desc: t.text, steps: t.steps, reward: { coins: 40 + lvl * 12, xp: 30 + lvl * 20, hearts: 12, ...(t.reward || {}) }, request: true, next: null } };
     this.start(qid);
   }
 }

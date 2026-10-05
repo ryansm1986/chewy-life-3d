@@ -7,6 +7,9 @@ import { rand, TAU, clamp, dist, angleDiff } from '../core/util.js';
 import { SpiritPup, Decoy } from './allies.js';
 import { ringTexture } from '../gfx/textures.js';
 import { installMokaSpells, setSpellGame } from './mokaSpells.js';
+import { chargeRuntime } from '../rpg/charge.js';
+import { ChargeController } from './charge.js';
+import { installChargedSkills } from './chargedSkills.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const ELEM_COL = { phys: '#fffaf0', fire: '#ffae5a', frost: '#9fe0ff', zap: '#fff27a', stink: '#b8e880', holy: '#fff0b0' };
@@ -19,6 +22,7 @@ export class SkillRunner {
   constructor(G) {
     this.G = G; this.cds = {}; this.channel = null; this.combo = 0; this.orbits = [];
     this.queued = null;
+    this.charge = new ChargeController(this); // hold-to-charge (docs/CHARGE.md)
     setSpellGame(G);
   }
   get combat() { return this.G.combat; }
@@ -26,11 +30,11 @@ export class SkillRunner {
   cooldown(id) { return this.cds[id] || 0; }
   cooldownFrac(id) { const r = this.rt(id); if (!r || !r.cd) return 0; return clamp((this.cds[id] || 0) / r.cd); }
   attacksPerSec() { const D = this.G.derived; return (D.aspd || 1.4) * this.combat.atkMul() * (this.combat.buffs.shrineZoom ? 1.35 : 1); }
-  // aim: world point; returns true if cast started
-  tryCast(id, aim, target = null) {
+  // aim: world point; returns true if cast started. charge = { stage, t, free } casts the charged version (docs/CHARGE.md)
+  tryCast(id, aim, target = null, charge = null) {
     const G = this.G, P = G.player;
     if (!id || !P || G.playerDead) return false;
-    if (P.anim.busy() && id !== 'whirl') { this.queued = { id, aim: aim.clone(), target, t: 0.25 }; return false; }
+    if (P.anim.busy() && id !== 'whirl') { this.queued = { id, aim: aim.clone(), target, t: 0.25, charge }; return false; }
     const def = getSkill(id); if (!def) return false;
     // auto-swap to the right weapon for weapon skills
     if (def.wep && G.derived.weaponType !== def.wep) {
@@ -45,15 +49,15 @@ export class SkillRunner {
     if (!u.ok) { if (!this._warnT || G.engine.time - this._warnT > 1) { this._warnT = G.engine.time; G.ui?.float?.(P.pos.clone().setY(1.6), u.why, { kind: 'status', color: '#9fd0ff' }); Events.emit('sfx', 'ui_error'); } return false; }
     if ((this.cds[id] || 0) > 0) return false;
     if (this.channel && this.channel.id === id) return true; // already channelling (Tail Spin, Moonbeam)
-    const R = this.rt(id); if (!R) return false;
+    const R = charge ? chargeRuntime(id, G.state, G.derived, charge.stage, charge) : this.rt(id); if (!R) return false;
     // melee: never swing at thin air when a monster was clicked — walk up (too far) or lunge (just out of reach)
     let melee = null;
     if (this.isMelee(id, R)) {
       if (!target || !target.alive || target.team !== 'enemy') target = this.softTarget(R, aim);
       if (target) {
         const reach = this.reach(R, target), d = dist(target.pos.x, target.pos.z, P.pos.x, P.pos.z);
-        if (d > reach + LUNGE && !target.breakable) { this.approachTo(id, target); return false; }
-        melee = { target, reach, budget: LUNGE, cost: def.kind !== 'channel' ? R.cost : 0 };
+        if (d > reach + LUNGE && !target.breakable && !R.charge) { this.approachTo(id, target); return false; }
+        if (d <= reach + LUNGE || target.breakable) melee = { target, reach, budget: LUNGE, cost: def.kind !== 'channel' ? R.cost : 0, charged: !!R.charge }; // (a charged swing that's far off just swings: its shockwave reaches)
         aim = target.pos;
       }
     }
@@ -62,7 +66,7 @@ export class SkillRunner {
     P.moveTarget = null; this.approach = null;
     P.faceTarget = Math.atan2(aim.x - P.pos.x, aim.z - P.pos.z); P.facing = P.faceTarget;
     this.melee = melee;
-    const fn = this[`cast_${id}`] || this.castGeneric;
+    const fn = (R.charge && this[`charged_${id}`]) || this[`cast_${id}`] || this.castGeneric;
     fn.call(this, R, aim.clone(), target);
     G.state.player.lastCast = id;
     return true;
@@ -125,7 +129,7 @@ export class SkillRunner {
     if (d < 1e-3) return;
     P.faceTarget = Math.atan2(dx, dz); P.facing = P.faceTarget;
     // the target blinked / was flung out of reach mid-wind-up: pull the swing instead of slashing thin air (zoom refunded)
-    if (d > m.reach + m.budget + 0.35) { P.anim.stop(act); this.melee = null; if (m.cost) G.actions.restoreZoom?.(m.cost); return; }
+    if (d > m.reach + m.budget + 0.35) { if (m.charged) { this.melee = null; return; } P.anim.stop(act); this.melee = null; if (m.cost) G.actions.restoreZoom?.(m.cost); return; } // (a charged swing still lands: its shockwave rolls on)
     const want = d - (m.reach - 0.3);
     if (want <= 0 || m.budget <= 0) return;
     const step = Math.min(want, m.budget, LUNGE_SPEED * dt);
@@ -434,23 +438,34 @@ export class SkillRunner {
   update(dt, input) {
     const G = this.G, P = G.player;
     for (const k in this.cds) if (this.cds[k] > 0) this.cds[k] = Math.max(0, this.cds[k] - dt);
-    if (this.queued) { this.queued.t -= dt; if (this.queued.t <= 0) this.queued = null; else if (!P.anim.busy()) { const q = this.queued; this.queued = null; this.tryCast(q.id, q.target?.alive ? q.target.pos.clone() : q.aim, q.target); } }
+    if (this.queued) { this.queued.t -= dt; if (this.queued.t <= 0) this.queued = null; else if (!P.anim.busy()) { const q = this.queued; this.queued = null; this.tryCast(q.id, q.target?.alive ? q.target.pos.clone() : q.aim, q.target, q.charge); } }
+    this.charge.update(dt);
     this.updateApproach(dt);
     this.updateMelee(dt);
     // channels (Tail Spin; Moka's Moonbeam) — each needs its weapon
     if (this.channel) { const cw = getSkill(this.channel.id)?.wep; if (cw && G.derived.weaponType !== cw) this.endChannel(); }
     if (this.channel && this.channel.id !== 'whirl') this.updateMoonbeam(dt, input);
     else if (this.channel) {
-      const c = this.channel, p = c.R.params;
+      const c = this.channel, p = c.R.params, ch = c.R.charge;
       c.t += dt; c.acc += dt;
-      if (!input.holding('whirl') || G.playerDead) { this.endChannel(); }
-      else if (c.acc >= 1 / p.hitsPerSec) {
-        c.acc = 0;
-        if (!G.actions.spendZoom(c.R.cost)) { this.endChannel(); G.ui?.float?.(P.pos.clone().setY(1.6), 'Not enough zoom!', { kind: 'status', color: '#9fd0ff' }); }
-        else {
-          G.vfx.slash(P.pos, rand(0, TAU), { arc: 3.4, r: p.radius, width: 0.6, color: '#fff4d8', life: 0.22 });
-          Events.emit('sfx', 'swing', { vol: 0.5 });
-          this.nova(P.pos, p.radius, e => this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: p.knockback, from: P.pos }));
+      // held (or Toggle-held); a charged spin let go keeps spinning on its own for p.spinOut s (docs/CHARGE.md)
+      const held = input.holding('whirl') || c.toggleHeld, out = !held && c.spinOut > 0 && P.anim.action?.name === 'spin'; // (another skill ends a spin-out)
+      if (out) c.spinOut -= dt;
+      if ((!held && !out) || G.playerDead) { if (ch && c.spinOut !== undefined && !G.playerDead) this.spinFinish(c); this.endChannel(); }
+      else {
+        if (p.pull) { // a charged spin draws foes in
+          for (const e of this.foesNear(P.pos.x, P.pos.z, p.radius + 2.5)) this.pullFoe(e, P.pos.x, P.pos.z, p.pull * dt, p.radius * 0.45);
+          if (Math.random() < dt * 30) { const a = rand(0, TAU), r = p.radius + rand(0.5, 2.2); G.vfx.smoke.spawn({ x: P.pos.x + Math.cos(a) * r, y: 0.15, z: P.pos.z + Math.sin(a) * r, vx: -Math.cos(a) * r * 1.6 + Math.sin(a) * 3, vy: rand(0.2, 0.6), vz: -Math.sin(a) * r * 1.6 - Math.cos(a) * 3, life: 0.5, size: 0.3, size1: 0.6, color: '#efe2c8', alpha: 0.5, alpha1: 0, drag: 2 }); }
+        }
+        if (c.acc >= 1 / p.hitsPerSec) {
+          c.acc = 0;
+          if (!out && !G.actions.spendZoom(c.R.cost)) { this.endChannel(); G.ui?.float?.(P.pos.clone().setY(1.6), 'Not enough zoom!', { kind: 'status', color: '#9fd0ff' }); }
+          else {
+            G.vfx.slash(P.pos, rand(0, TAU), { arc: 3.4, r: p.radius, width: ch ? 0.8 : 0.6, color: ch ? '#ffe8a8' : '#fff4d8', life: 0.22 });
+            if (ch) G.vfx.slash(P.pos, rand(0, TAU), { arc: 2.6, r: p.radius * 0.7, width: 0.45, color: ch.color, life: 0.2, reverse: true });
+            Events.emit('sfx', 'swing', { vol: 0.5 });
+            this.nova(P.pos, p.radius, e => this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: p.knockback, from: P.pos }));
+          }
         }
       }
     }
@@ -490,6 +505,14 @@ export class SkillRunner {
     this.updateMoka(dt);
     this.keepOutOfBigBodies();
   }
+  /** a charged Tail Spin winds down: one last dizzy burst around Chewy */
+  spinFinish(c) {
+    const G = this.G, P = G.player, p = c.R.params;
+    G.vfx.slash(P.pos, rand(0, TAU), { arc: 6.2, r: p.radius * 1.1, width: 0.9, color: '#ffe8a8', life: 0.3 });
+    G.vfx.charge?.burst?.(P.pos, { r: p.radius * 1.15, life: 0.36, color: c.R.charge.colorC || (c.R.charge.colorC = new THREE.Color(c.R.charge.color)), w: 0.12 });
+    Events.emit('sfx', 'swing_heavy'); G.engine.rig.shake(0.25);
+    this.nova(P.pos, p.radius, e => { this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: 1.2, stun: p.dizzy || 0.4, from: P.pos }); if (!e.def?.boss && !e.breakable) this.fx().dizzy(e, p.dizzy || 0.4); });
+  }
   endChannel() {
     const P = this.G.player, c = this.channel; this.channel = null;
     if (!c || c.id === 'whirl') P?.anim.stop('spin'); else { c.end?.(); P?.anim.stop('beam'); }
@@ -497,6 +520,7 @@ export class SkillRunner {
   }
   clearAll() {
     this.melee = null; this.approach = null;
+    this.charge?.cancel('clear', true);
     if (this.channel) this.endChannel();
     const P = this.G.player; if (P) { P.leap = null; P.dash = null; P.invuln = false; P.canMoveWhileActing = false; if (P.anim.action?.name === 'spin') P.anim.stop('spin'); }
     for (const o of this.orbits) for (const b of o.bones) b.m.parent?.remove(b.m);
@@ -507,3 +531,4 @@ export class SkillRunner {
   }
 }
 installMokaSpells(SkillRunner.prototype);
+installChargedSkills(SkillRunner.prototype);

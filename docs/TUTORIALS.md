@@ -24,17 +24,22 @@ Status: **built** (2026-10-03). There are three guides, run by a small reusable 
   - `on: { event: (p, T) => … }`: reactions such as gentle tips, or looping back with `T.goto(step, { say })`.
   - `ack`: a wrap-up step that ends on "Got it!".
   - `skippable`: shows a "Skip step" button.
-  - `allow: { dialogue, switching, panels: [...] }`: what doesn't pause this step.
+  - `allow: { dialogue, switching, interior, panels: [...] }`: what doesn't pause this step (`interior`: it runs inside
+    a house, docs/HOUSING.md).
   - `resumeAt`: where a reload picks up (a cast in progress restarts at the cast).
 - **Pausing**: the speech, spotlight and arrow hide, and the objective card fades, during dialogue, panels, screen
-  transitions, hero switches, build mode, and anywhere but the village, unless the step allows it.
+  transitions, hero switches, build mode, and anywhere but the village, unless the step allows it (a step with
+  `allow.interior` runs inside a house too, with its arrow in the room).
 - **Wandering off**: a step never fails. Its target just keeps pointing (the arrow re-points from wherever you are).
 - **Progress** lives in `state.flags.tutorials = { active, [id]: { step, started, offered, done, skipped } }`. A reload
   resumes the active guide at its step.
 - **Starting**: a guide starts on its own when its `trigger` first becomes true and the game is calm (no dialogue,
-  panel, banner, transition or switch). If several are pending, the lowest `priority` goes first.
-- **Old saves**: a save that is already past a guide's trigger when it loads, with no record of that guide, gets a
-  one-time offer card instead: "New guide available: … Show me! / No thanks".
+  panel, banner, transition or switch). If several are pending, the lowest `priority` goes first. A guide with
+  `indoors: true` may also start inside a house, and one with `startPanels: [...]` over those panels (the Remodel
+  guide starts over the house card it was triggered by).
+- **Old saves**: a save that is already past a guide's trigger when it loads (or its `past(G)`, when the guide has
+  one), with no record of that guide, gets a one-time offer card instead: "New guide available: … Show me! / No
+  thanks". An offered guide doesn't wait for its trigger moment.
 - **Replay**: the Journal has a **Guides** tab (status ✓ / skipped, Play / Replay). Esc closes panels as usual and
   never skips a guide; *Skip* on the card does.
 - **Shadow's tips**: his one-off toast tips wait while a guide is talking. The old `tabSwitch` tip is retired once the
@@ -69,9 +74,10 @@ Status: **built** (2026-10-03). There are three guides, run by a small reusable 
 - **Home, sweet home (Shadow)** starts after Rosie's welcome, and after Moka's arrival scene when that follows it
   (`G.introJoinPending`).
   1. An arrow to the cottage door.
-  2. F at the door, with the prompt spotlit.
-  3. The cottage menu: Shadow spotlights and explains the stash (shared), Sleep (crops, income, save) and Cook in
-     turn, then Leave.
+  2. F at the door, with the prompt spotlit (the step waits for `home:enter`).
+  3. Inside the cottage (since docs/HOUSING.md: the menu became furniture): the arrow hops from the treasure chest
+     (the stash is shared) to the bed (sleep: crops, income, save) to the kitchen stove (cook), then to the door mat
+     ("press F, or just walk out"). The step waits for `home:exit`; a reload resumes at step 2.
   4. An arrow to the garden bed. If the player has no seeds at all, Shadow gives 3 turnip seeds as a housewarming gift
      (`flags.shadowSeeds`, once). Usagi's starter pack and "First Sprouts" are untouched, so nothing is double-gifted
      when the player already has seeds.
@@ -96,13 +102,33 @@ Status: **built** (2026-10-03). There are three guides, run by a small reusable 
   6. The catch, then the Journal button is spotlit, then the Fish Log tab is spotlit.
   7. Wrap-up: other spots and times, selling at the Hut, cooking. Kero's "catch 3 fish" quest carries on as normal.
 
+- **Make it home (Shadow)** starts the next time you're in the cottage after the house tour (docs/HOUSING.md §7):
+  1. Go in (if it was offered outside).
+  2. The household jobs: the arrow hops from the bed to the chest, the stove and the workbench.
+  3. B: the Decorate button is spotlit.
+  4. Place the cushion: its card in the palette is spotlit (one is given if there's none).
+  5. Pick it up, R, put it down (`decor:move`).
+  6. A wallpaper: the Wallpaper & Floors tab, then a wallpaper's card, are spotlit (one is given if there's none).
+  7. The Home Rating chip is spotlit (Got it).
+  8. Wrap-up: Tanu's Trinkets, the workbench, villagers love help decorating.
+- **Remodel (Tanu)** starts the first time a mailbox is opened, over the house card:
+  1. (Open a mailbox, when replayed.)
+  2. The house card: Upgrade / Remodel / Enter spotlit, a callout on the upgrade cost; click Remodel.
+  3. The style sets are spotlit: pick one (`remodel:draft { kind: 'set' }`).
+  4. The parts are spotlit: change one (`remodel:draft { kind: 'field' }`).
+  5. The cost and Remodel / As it was (Got it, or Remodel ends it: `house:remodel`).
+- QA: `tools/qa/s17-housing.mjs` sections o and p run both, end to end.
+
 ## Hooks added for the guides
 - `fishing.js`:
   - `scanAt` and `bankSpotNear`;
   - `this.tut` overrides;
   - the events `fishing:start`, `fishing:cast`, `fishing:nibble`, `fishing:early`, `fishing:bite`, `fishing:reel`, and
     `fishing:end { result: catch | escape | late | early | cancel }`.
-- `services.js`: `home:menu` and `home:menuClosed { choice }`.
+- `services.js`: `home:menu` and `home:menuClosed { choice }` (retired with the cottage menu: docs/HOUSING.md).
+- `home/housing.js`: `home:enter { type, id, household }`, `home:exit { type }`, `home:use { use }`;
+  `flags.homeVisits`, `flags.mailboxOpened`. `home/decorate.js`: `decor:place`, `decor:move`, `decor:surface`.
+  `ui/remodel.js`: `remodel:draft { kind: 'set' | 'field' }`.
 - `garden.js`: `facingDoor()`. Walking up to the cottage door now means the door, not the bed's corner tile beside it.
 - `hud.js`: a Pantry button in the menu bar.
 - `game.js`: `G.tutorials`, `G.introJoinPending`; `questTarget` asks the director first. Moka's join toast is skipped

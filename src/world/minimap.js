@@ -94,6 +94,7 @@ export class VillageMinimap {
     const L = G.village.world.landmarks;
     dot(L.dungeon.x, L.dungeon.z, 5, '#b89aff');
     if (G.seedStall) dot(G.seedStall.pos.x, G.seedStall.pos.z, 4, '#8fe0a0'); // Usagi's Seed Stall (docs/HOMESTEAD.md)
+    if (G.trinketStall) dot(G.trinketStall.at.x, G.trinketStall.at.z, 4, '#ffb06a'); // Tanu's Trinkets (docs/HOUSING.md §3)
     // the big map: the expansion rings' stub streets (dashed until their rank opens them) and the district names
     const ring = G.sim?.ringRank?.() || 1;
     if (o.big) {

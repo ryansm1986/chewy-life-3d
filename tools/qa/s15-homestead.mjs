@@ -295,10 +295,13 @@ try {
   const fs2 = await G(() => { const G = window.G, Q = G.story.Q; return { done: Q.done.includes('firstSprouts'), carrotSoup: !!G.state.cookbook?.known && 'carrotSoup' in G.state.cookbook.known, taste: Q.active.find(q => q.id === 'tasteTest')?.step ?? null, toast: window.QA.toasts.some(t => /New recipe: Carrot Soup/.test(t)) }; });
   R.check('Usagi\'s "First Sprouts" came with the starter seeds; planting and harvesting finish it: the Carrot Soup recipe, then Rosie\'s "Taste Test"', sprouts === 3 && !!(fs1.active || fs1.done) && fs2.done && fs2.carrotSoup && fs2.taste === 0 && fs2.toast, JSON.stringify({ sprouts, fs1, fs2 }));
   await G(() => { const G = window.G, A = G.actions; for (const [id, n] of Object.entries({ crucian: 3, loach: 2, salmon: 1, rice: 3, carrot: 3, turnip: 2, daikon: 1, strawberry: 2, honey: 1 })) A.addPantry(id, n, { silent: true }); A.addMaterial('mochi', 1); G.player.setPos(95.5, 126.2); });
-  await G(() => { window.G.openHome(); }); await sleep(page, 400); // (never hand back its pending promise)
-  const homeCh = await drainDialogue(page, [1]); await sleep(page, 700);
+  // the cottage's kitchen is the stove inside the house now (docs/HOUSING.md §1): in through the door, F at the stove
+  await G(() => { window.G.openHome(); });
+  await page.waitForFunction(() => window.G.mode === 'interior' && !window.G.ui.iris.active, null, { timeout: 15000 }); await sleep(page, 300);
+  const homeCh = [await G(() => { const G = window.G, it = G.world.interactables.find(i => i.use === 'cook'); G.player.setPos(it.pos.x, it.pos.z); G.player.moveTarget = null; G.interactCooldown = 0; return it?.label; })];
+  await sleep(page, 250); await tap(page, 'f', 70); await sleep(page, 700);
   const k0 = await G(() => { const G = window.G, p = G.ui.panels.cook; return { open: G.ui.isOpen('cook'), station: p.station, rows: [...document.querySelectorAll('.ck-row.known')].map(r => r.dataset.id), first: p.sel }; });
-  R.check('the cottage menu\'s "Cook something" opens the kitchen; the starters (and learned recipes) are in the cookbook', homeCh[0] === 'Cook something 🍳' && k0.open && k0.station === 'kitchen' && ['grilledFish', 'roastedVeggies', 'onigiri', 'carrotSoup'].every(r => k0.rows.includes(r)), JSON.stringify({ homeCh, k0 }));
+  R.check('inside the cottage, F at the stove ("Cook something") opens the kitchen; the starters (and learned recipes) are in the cookbook', homeCh[0] === 'Cook something 🍳' && k0.open && k0.station === 'kitchen' && ['grilledFish', 'roastedVeggies', 'onigiri', 'carrotSoup'].every(r => k0.rows.includes(r)), JSON.stringify({ homeCh, k0 }));
   const ck0 = await cookState();
   await G(() => { const p = window.G.ui.panels.cook; p.select('grilledFish'); });
   await G(() => document.querySelector('.ck-det [data-q="1"]').click());
@@ -318,6 +321,7 @@ try {
   });
   R.check('Try a mix: rice + salmon discovers Salmon Onigiri; a lone turnip is refused (nothing spent); fish + turnip makes a fallback Grilled Fish', mix.disc.known && mix.disc.n === 1 && mix.refused.turnip && mix.toast && mix.fallback === 1, JSON.stringify(mix));
   await G(() => window.G.ui.closeAll()); await sleep(page, 300);
+  await G(() => { window.G.housing.exit(); }); await waitMode(page, 'village'); // (back out to the village for Rosie)
   const taste = await G(() => window.G.story.Q.active.find(q => q.id === 'tasteTest'));
   await G(() => { const G = window.G, n = G.npcs.find(x => x.id === 'rosie'); G.player.setPos(n.pos.x + 1.2, n.pos.z); G.story.talk(n); });
   await sleep(page, 500);
@@ -398,16 +402,17 @@ try {
     const clear = () => { delete S.Q.requests['req_' + id]; S.Q.active = S.Q.active.filter(q => q.id !== 'req_' + id); S.friend(id).reqDay = 0; };
     clear(); Math.random = () => 0.01; await S.requestFlow(n, () => Promise.resolve(0)); Math.random = rnd;
     const first = S.Q.requests['req_' + id]?.def.steps[0];
-    const L = 3 + S.homesteadRequests(n).length;
+    const L = 3 + S.homesteadRequests(n).length + (S.decorateRequests?.(n).length || 0); // (housing's decorate requests come after the homestead ones)
     clear(); Math.random = () => 3.5 / L; await S.requestFlow(n, () => Promise.resolve(0)); Math.random = rnd;
     const st = S.Q.requests['req_' + id]?.def.steps[0];
     return { first: first && { mat: first.mat, pantry: !!first.pantry }, L, step: st && { mat: st.mat, n: st.n, pantry: !!st.pantry, type: st.type } };
   });
+  const had = await G(s => (s ? window.G.state.pantry[s.mat] || 0 : 0), rq.step); // (the crop may already be in the pantry: the gifts above)
   await G(s => { if (s) window.G.actions.addPantry(s.mat, s.n + 1, { silent: true }); }, rq.step);
   const cab0 = await G(() => 'cabbageRolls' in (window.G.state.cookbook.known || {}));
   await G(() => { const G = window.G, n = G.npcs.find(x => x.id === 'usagi'); G.story.talk(n); }); await sleep(page, 500); await drainDialogue(page); await sleep(page, 3000);
   const rq2 = await G(s => ({ left: window.G.state.pantry[s.mat] || 0, active: !!window.G.story.Q.requests.req_usagi, cab: 'cabbageRolls' in window.G.state.cookbook.known }), rq.step);
-  R.check('requests: crops, fish and dishes are appended (Math.random 0.01 still asks for wood); a crop request is delivered from the pantry and teaches Usagi\'s Cabbage Rolls', rq.first?.mat === 'wood' && !rq.first.pantry && rq.L >= 5 && rq.step?.pantry && rq.step.type === 'deliver' && rq2.left === 1 && !rq2.active && !cab0 && rq2.cab, JSON.stringify({ rq, rq2 }));
+  R.check('requests: crops, fish and dishes are appended (Math.random 0.01 still asks for wood); a crop request is delivered from the pantry and teaches Usagi\'s Cabbage Rolls', rq.first?.mat === 'wood' && !rq.first.pantry && rq.L >= 5 && rq.step?.pantry && rq.step.type === 'deliver' && rq2.left === had + 1 && !rq2.active && !cab0 && rq2.cab, JSON.stringify({ rq, rq2, had }));
   const teach = await G(async () => {
     const G = window.G, S = G.story, f = S.friend('kuma'); f.pts = Math.max(f.pts, 30); f.hearts = 3;
     const marker = S.markerFor('kuma'), k0 = 'honeyCake' in G.state.cookbook.known;

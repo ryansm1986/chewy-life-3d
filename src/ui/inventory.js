@@ -6,6 +6,7 @@ import { Panel } from './panel.js';
 import { itemIconURL, itemName, meetsReq, equipSlotsFor, sellPrice } from './rpg.js';
 import { itemTipHTML } from './tooltip.js';
 import { PantryView } from './pantry.js';
+import { FurnitureView } from './furniture.js';
 
 export const EQUIP_SLOTS = ['weapon', 'weaponAlt', 'hat', 'outfit', 'collar', 'charm1', 'charm2', 'boots', 'paws'];
 const SLOT_LABEL = { weapon: 'Weapon', weaponAlt: 'Swap', hat: 'Hat', outfit: 'Outfit', collar: 'Collar', charm1: 'Charm', charm2: 'Charm', boots: 'Boots', paws: 'Paws' };
@@ -234,12 +235,13 @@ export class ItemDrag {
 }
 
 // ------------------------------------------------------------------ inventory panel
-// Two views: the Bag (gear, 40 slots + the paper doll) and the Pantry (docs/HOMESTEAD.md §1, ui/pantry.js).
+// Three views: the Bag (gear, 40 slots + the paper doll), the Pantry (docs/HOMESTEAD.md §1, ui/pantry.js) and the
+// Furniture storage (docs/HOUSING.md §2, ui/furniture.js).
 export class InventoryPanel extends Panel {
   constructor(ui) { super(ui, { name: 'inventory', title: 'Bag', jp: 'かばん', side: 'right', cls: 'p-inv', icon: 'bag' }); this.view = 'bag'; }
   init() {
     const b = this.body;
-    this.extra.innerHTML = `<div class="tabs inv-tabs"><button class="tab on" data-v="bag">${glyph('bag')}Bag</button><button class="tab" data-v="pantry" style="--tc:#8fcf6a">${glyph('leaf')}Pantry<span class="kc sm">P</span></button></div>`;
+    this.extra.innerHTML = `<div class="tabs inv-tabs"><button class="tab on" data-v="bag">${glyph('bag')}Bag</button><button class="tab" data-v="pantry" style="--tc:#8fcf6a">${glyph('leaf')}Pantry<span class="kc sm">P</span></button><button class="tab" data-v="furniture" style="--tc:#ffb07a">${glyph('home')}Furniture</button></div>`;
     this.extra.querySelector('.inv-tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (t && t.dataset.v !== this.view) { this.setView(t.dataset.v); this.ui.sfx?.('tab'); } });
     b.innerHTML = `
       <div class="doll">
@@ -276,22 +278,26 @@ export class InventoryPanel extends Panel {
     b.querySelector('.wswap').addEventListener('click', () => { this.G.actions?.swapWeapons?.(); replay(b.querySelector('.wswap'), 'spin', 500); this.render(); });
     this.pv = new PantryView(this);
     b.insertBefore(this.pv.root, b.querySelector('.inv-foot'));
+    this.fv = new FurnitureView(this);
+    b.insertBefore(this.fv.root, b.querySelector('.inv-foot'));
     this.setView(this.view, true);
   }
   onOpen() { if (this.opts?.view && this.opts.view !== this.view) this.setView(this.opts.view, true); }
   setView(v, quiet) {
-    this.view = v === 'pantry' ? 'pantry' : 'bag';
+    this.view = v === 'pantry' || v === 'furniture' ? v : 'bag';
     if (!this.built) return;
-    const P = this.view === 'pantry';
+    const P = this.view === 'pantry', F = this.view === 'furniture';
     this.panel.classList.toggle('v-pantry', P);
+    this.panel.classList.toggle('v-furn', F);
     for (const t of this.extra.querySelectorAll('.inv-tabs .tab')) t.classList.toggle('on', t.dataset.v === this.view);
-    this.setTitle(P ? 'Pantry' : 'Bag', P ? '食料庫' : 'かばん');
+    this.setTitle(P ? 'Pantry' : F ? 'Furniture' : 'Bag', P ? '食料庫' : F ? '家具' : 'かばん');
     this.ui.tip.hide();
     if (!quiet) { this.pv._sig = null; replay(this.panel, 'vswap', 400); }
     this.render();
   }
   render() {
     if (this.view === 'pantry') { this.pv.render(); setText(this.coins, fmt(this.st.coins || 0)); setText(this.body.querySelector('.inv-hint'), 'Right-click a dish to eat · F at a garden bed to plant'); return; }
+    if (this.view === 'furniture') { this.fv.render(); setText(this.coins, fmt(this.st.coins || 0)); setText(this.body.querySelector('.inv-hint'), 'Your furniture storage · press B at home to decorate'); return; }
     const st = this.st, d = this.d, eq = st.equipment || {}, inv = st.inventory || [];
     const hero = st.activeHero || 'chewy';
     if (hero !== this._hero) { // the paper doll shows whoever is being played (the bag itself is shared)

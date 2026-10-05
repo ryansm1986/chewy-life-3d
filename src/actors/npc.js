@@ -128,7 +128,7 @@ export class Villager extends Actor {
     const life = this.life || (this.life = VillageLife.get(G));
     if (this.frozen) {
       const p = G.player, pd = p ? dist(p.pos.x, p.pos.z, this.pos.x, this.pos.z) : 99;
-      if (this.talking && p) this.faceTo(p.pos.x, p.pos.z); else this.frozenTick(dt, p, pd);
+      if (this.talking && p) this.faceTo(p.pos.x, p.pos.z); else if (this.hostTick) this.hostTick(dt, p, pd); else this.frozenTick(dt, p, pd); // (a guest indoors: home/housing.js)
       this.interact.pos = this.pos; this.anim.talk = this.talking ? 0.8 : 0;
       super.update(dt);
       return;

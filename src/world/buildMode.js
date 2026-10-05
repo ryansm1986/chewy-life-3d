@@ -156,6 +156,8 @@ export class BuildMode {
     if (!this.tool) {
       const hb = ins?.kind === 'building' ? sim.buildingAt(cur.x, cur.z) : null;
       if (hb) { const [w, d] = sim.dims(hb.type, hb.rot, hb.level); U.uCursor.value.set(hb.x + w / 2, hb.z + d / 2, w, d); this.cursorCol(ins.ok ? '#bff5da' : '#ffb0bc', 0.16); }
+      // a click on a house (no tool): its card — Upgrade / Remodel / Enter (docs/HOUSING.md §5)
+      if (hb && !overUI && Input.mouseHit(0) && G.housing?.isHouse?.(hb)) { const rec = sim.list.find(r => r.data === hb); if (rec) G.housing.openHouseCard(rec); }
       else { U.uCursor.value.set(cur.x + 0.5, cur.z + 0.5, 1, 1); this.cursorCol('#fff8d8', 0.1); }
       return;
     }

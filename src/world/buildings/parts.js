@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { puff, tube } from '../../gfx/geom.js';
 import { G, V, C, PI, bar, shade, mixc } from './kit.js';
-import { shapeGeo } from './symbols.js';
+import { shapeGeo, flatSymbol } from './symbols.js';
 import { wallSpan, streak, plasterPatch, sudare, grille, shutterBox } from './trim.js';
 
 export const STONES = ['#d9d0c8', '#c9bfc6', '#b8adb8', '#e4dcd2', '#cfc4b8', '#bdb4c4'];
@@ -141,9 +141,33 @@ export function shoji(B, o = {}) {
   for (let i = 1; i <= nx; i++) { const g = G.box(0.02, h - 0.1, 0.02, 0); g.translate(-w / 2 + i * w / (nx + 1), 0, 0.05); B.add(g, frame); }
   for (let j = 1; j <= ny; j++) { const g = G.box(w - 0.1, 0.02, 0.02, 0); g.translate(0, -h / 2 + j * h / (ny + 1), 0.05); B.add(g, frame); }
   if (o.sill !== false) { const s = G.box(w + 0.16, 0.06, 0.13, 0.02); s.translate(0, -h / 2 - 0.02, 0.07); B.add(s, frame); }
-  if (o.box) B.at([0, -h / 2 - 0.16, 0.14], 0, () => flowerBox(B, { w: w + 0.08, colors: o.flowers }));
+  if (o.box) B.at([0, -h / 2 - 0.16, 0.14], 0, () => flowerBox(B, { w: w + 0.08, colors: o.flowers, wood: o.boxWood }));
   if (o.hood) hood(B, w + 0.3, h / 2 + 0.12, o.hood);
   if (o.trim !== false) openingTrim(B, w, h, { frame, box: o.box, hood: o.hood, dress: o.dress, kind: 'window' });
+}
+
+// Koshi lattice window (the Kyoto machiya look): a chunky timber frame round a glowing paper pane behind close
+// vertical slats, a kumiko band of little squares under the head rail and a deep sill. bay: the lattice stands out
+// from the wall on side boards under a little tiled cap (degoshi). Local face frame, centred on the opening.
+// opts: w, h, frame, slat (slat colour, default frame), bay, roof (cap tile colour), wood (cap brackets), box, flowers,
+// boxWood, paper
+export function latticeWindow(B, o = {}) {
+  const w = o.w ?? 0.7, h = o.h ?? 0.6, frame = o.frame || C.timber, slat = o.slat || frame, bay = o.bay ? 0.11 : 0;
+  const pane = G.box(w - 0.08, h - 0.08, 0.04, 0); pane.translate(0, 0, 0.02); B.glow(pane, o.paper || C.paper);
+  if (bay) for (const s of [-1, 1]) { const sd = G.box(0.07, h - 0.02, bay + 0.02, 0.015); sd.translate(s * (w / 2 - 0.035), 0, (bay + 0.02) / 2); B.add(sd, shade(frame, 0.9)); }
+  B.at([0, 0, bay], 0, () => frameRect(B, w, h, 0.072, 0.072, frame));
+  const iw = w - 0.13, n = Math.max(4, Math.round(iw / 0.058)), z = bay + 0.05;
+  for (let i = 1; i < n; i++) { const s = G.box(0.032, h - 0.12, 0.03, 0); s.translate(-iw / 2 + i * iw / n, -0.01, z); B.add(s, i % 2 ? slat : shade(slat, 0.88)); }
+  // kumiko band: a second head rail with a mid bar crossing the slats (a row of little squares)
+  const yb = h / 2 - 0.072 - 0.1;
+  const r1 = G.box(iw + 0.02, 0.034, 0.036, 0); r1.translate(0, yb, z + 0.006); B.add(r1, shade(frame, 0.94));
+  const r2 = G.box(iw, 0.02, 0.026, 0); r2.translate(0, yb + 0.05, z + 0.008); B.add(r2, shade(slat, 0.94));
+  const r3 = G.box(iw, 0.03, 0.034, 0); r3.translate(0, -h / 2 + 0.11, z + 0.006); B.add(r3, shade(frame, 0.94));
+  const s = G.box(w + 0.16, 0.07, 0.14 + bay, 0.025); s.translate(0, -h / 2 - 0.025, (0.14 + bay) / 2); B.add(s, frame);
+  const lip = G.box(w + 0.18, 0.025, 0.03, 0); lip.translate(0, -h / 2 - 0.065, 0.13 + bay); B.add(lip, shade(frame, 0.8));
+  if (o.box) B.at([0, -h / 2 - 0.17, 0.15 + bay], 0, () => flowerBox(B, { w: w + 0.06, colors: o.flowers, wood: o.boxWood }));
+  if (bay) hood(B, w + 0.18, h / 2 + 0.1, o.roof || shade(frame, 1.15), 0.17 + bay, o.wood);
+  if (o.trim !== false) openingTrim(B, w, h, { frame, box: o.box, hood: !!bay, dress: 'none', kind: 'window' });
 }
 
 // Framing + dressing around an opening in the current face frame (opening centred at local 0, size w x h):
@@ -180,15 +204,15 @@ function pickDress(B) {
   return r === 0 ? B.dpick(['shutter', 'sudare', 'none']) : r === 1 ? B.dpick(['sudare', 'sudare', 'shutter', 'grille']) : B.dpick(['grille', 'grille', 'sudare']);
 }
 
-// small tiled hood (hisashi) above a window / door, local face frame
-export function hood(B, w, y, color, depth = 0.34) {
+// small tiled hood (hisashi) above a window / door, local face frame (wood: the bracket colour)
+export function hood(B, w, y, color, depth = 0.34, wood = C.woodDark) {
   B.at([0, y, 0], 0, () => {
     const slab = G.box(w, 0.07, depth, 0.03); slab.rotateX(0.42); slab.translate(0, 0.02, depth / 2 - 0.02);
     B.add(slab, color);
     const edge = G.box(w + 0.04, 0.06, 0.07, 0.025); edge.translate(0, -0.05, depth - 0.02); B.add(edge, mixc(color, '#fff6ea', 0.42));
     const n = Math.max(2, Math.round(w / 0.16));
     for (let i = 0; i <= n; i++) { const r = G.cyl(0.03, 0.03, depth * 0.95, 5); r.rotateX(PI / 2 + 0.42); r.translate(-w / 2 + 0.04 + i * (w - 0.08) / n, 0.07, depth / 2 - 0.02); B.add(r, shade(color, 1.12)); }
-    for (const s of [-1, 1]) { const b = G.box(0.05, 0.05, depth * 0.7, 0.015); b.rotateX(-0.6); b.translate(s * (w / 2 - 0.1), -0.12, 0.12); B.add(b, C.woodDark); }
+    for (const s of [-1, 1]) { const b = G.box(0.05, 0.05, depth * 0.7, 0.015); b.rotateX(-0.6); b.translate(s * (w / 2 - 0.1), -0.12, 0.12); B.add(b, wood); }
   });
 }
 
@@ -205,7 +229,7 @@ export function roundWindow(B, o = {}) {
       const h2 = G.box(r * 1.6, 0.022, 0.02, 0); h2.translate(0, s * r * 0.48, 0.055); B.add(h2, frame);
     }
   }
-  if (o.box) B.at([0, -r - 0.12, 0.14], 0, () => flowerBox(B, { w: r * 2 + 0.1, colors: o.flowers }));
+  if (o.box) B.at([0, -r - 0.12, 0.14], 0, () => flowerBox(B, { w: r * 2 + 0.1, colors: o.flowers, wood: o.boxWood }));
   if (o.trim !== false) openingTrim(B, r * 2, r * 2, { frame, box: o.box, round: true });
 }
 
@@ -213,21 +237,25 @@ export function roundWindow(B, o = {}) {
 export function door(B, o = {}) {
   const w = o.w ?? 0.9, h = o.h ?? 1.42, frame = o.frame || C.timber, wood = o.wood || C.woodLight;
   const style = o.style || 'shoji';
-  // recess + panels
-  const back = G.box(w, h, 0.04, 0); back.translate(0, h / 2, 0.01); B.add(back, shade(frame, 0.7));
+  // (the parts below keep their count and order: each coloured part draws on the Builder's random stream, which also
+  // places everything built after the door)
   if (style === 'round') {
-    // arched cottage door
-    const shp = new THREE.Shape();
-    shp.moveTo(-w / 2 + 0.06, 0); shp.lineTo(-w / 2 + 0.06, h - w / 2); shp.absarc(0, h - w / 2, w / 2 - 0.06, PI, 0, true); shp.lineTo(w / 2 - 0.06, 0);
-    const g = shapeGeo([shp], 0.06, 0.02); g.translate(0, 0, 0.02); B.add(g, wood);
-    for (const x of [-0.14, 0.14]) { const pl = G.box(0.02, h - w / 2, 0.02, 0); pl.translate(x, (h - w / 2) / 2, 0.1); B.add(pl, shade(wood, 0.78)); }
-    const win = G.disc(0.13, 12); win.translate(0, h - w / 2, 0.095); B.glow(win, C.paper);
-    const wr = G.torus(0.13, 0.03, 5, 12); wr.translate(0, h - w / 2, 0.1); B.add(wr, frame);
-    const knob = G.sph(0.045, 8, 6); knob.translate(w / 2 - 0.2, h * 0.45, 0.12); B.add(knob, C.gold);
-    const arch = G.torus(w / 2 - 0.02, 0.06, 5, 14, PI); arch.translate(0, h - w / 2, 0.06); B.add(arch, frame);
-    for (const s of [-1, 1]) { const p = G.box(0.1, h - w / 2, 0.1, 0.02); p.translate(s * (w / 2 - 0.02), (h - w / 2) / 2, 0.06); B.add(p, frame); }
+    // arched cottage door: a dark arched recess, the door slab (front face at z = 0.12), plank seams running up into
+    // the arch and a porthole standing proud of it, a brass knob, and the timber arch + posts framing it in front
+    const yc = h - w / 2, R = w / 2 - 0.06, arc = r => { const s = new THREE.Shape(); s.moveTo(-r, 0); s.lineTo(-r, yc); s.absarc(0, yc, r, PI, 0, true); s.lineTo(r, 0); return s; };
+    const back = shapeGeo([arc(w / 2 - 0.03)], 0.02, 0); B.add(back, shade(frame, 0.7));
+    const g = shapeGeo([arc(R)], 0.06, 0.02); g.translate(0, 0, 0.02); B.add(g, wood);
+    for (const x of [-1, 1].map(s => s * Math.min(0.14, R * 0.56))) { const top = yc + Math.sqrt(R * R - x * x) - 0.05; const pl = G.box(0.022, top - 0.05, 0.012, 0); pl.translate(x, 0.05 + (top - 0.05) / 2, 0.122); B.add(pl, shade(wood, 0.72)); }
+    const pr = Math.min(0.13, R * 0.5);
+    const win = G.disc(pr, 14); win.translate(0, yc, 0.124); B.glow(win, C.paper);
+    const wr = G.torus(pr, 0.03, 5, 14); wr.translate(0, yc, 0.128); B.add(wr, frame);
+    const knob = G.sph(0.045, 8, 6); knob.translate(w / 2 - 0.2, h * 0.45, 0.155); B.add(knob, C.gold);
+    const arch = G.torus(w / 2 - 0.02, 0.06, 5, 14, PI); arch.translate(0, yc, 0.09); B.add(arch, frame);
+    for (const s of [-1, 1]) { const p = G.box(0.1, yc, 0.12, 0.02); p.translate(s * (w / 2 - 0.02), yc / 2, 0.09); B.add(p, frame); }
     return;
   }
+  // recess + panels
+  const back = G.box(w, h, 0.04, 0); back.translate(0, h / 2, 0.01); B.add(back, shade(frame, 0.7));
   const pw = w / 2 + 0.02;
   for (const s of [-1, 1]) {
     B.at([s * (w / 4 - 0.005), 0, 0.03 + (s > 0 ? 0.025 : 0)], 0, () => {
@@ -242,7 +270,7 @@ export function door(B, o = {}) {
         for (let i = 1; i < cells; i++) { const g = G.box(0.022, h - 0.56, 0.02, 0); g.translate(-pw / 2 + i * pw / cells, 0.46 + (h - 0.56) / 2, 0.02); B.add(g, frame); }
         for (let j = 1; j < 4; j++) { const g = G.box(pw - 0.06, 0.022, 0.02, 0); g.translate(0, 0.46 + j * (h - 0.56) / 4, 0.02); B.add(g, frame); }
       }
-      frameRect(B, pw, h - 0.04, 0.06, 0.05, frame); // panel frame
+      B.at([0, 0.02 + (h - 0.04) / 2, 0], 0, () => frameRect(B, pw, h - 0.04, 0.06, 0.05, frame)); // panel frame (frameRect is centred)
     }, 1);
   }
   // lintel + posts
@@ -250,6 +278,85 @@ export function door(B, o = {}) {
   for (const s of [-1, 1]) { const p = G.box(0.11, h, 0.1, 0.025); p.translate(s * (w / 2 + 0.03), h / 2, 0.05); B.add(p, frame); }
   const th = G.box(w + 0.2, 0.05, 0.14, 0.02); th.translate(0, 0.02, 0.06); B.add(th, shade(frame, 0.9));
   if (o.trim !== false) doorTrim(B, w, h, frame, style);
+}
+
+// The remodel doors (exterior styles, styles.js): door() stays the village's own look; doorway() builds a chosen
+// door. style: 'shoji' (paper panes over a kick board) | 'lattice' (koshi-do: close slats over paper) | 'wood'
+// (painted board panels with a little paper window) | 'round' (arched storybook door: planks, iron straps, porthole).
+// frame: the opening's timber (lintel, posts, threshold); wood: the door colour; panel: the sliding panels' stiles
+// and muntins (default frame). Local face frame, bottom at y = 0.
+export function doorway(B, o = {}) {
+  const w = o.w ?? 0.9, h = o.h ?? 1.42, frame = o.frame || C.timber, wood = o.wood || C.woodLight, panel = o.panel || frame;
+  const style = o.style || 'shoji';
+  if (style === 'round') return archDoor(B, w, h, frame, wood);
+  const back = G.box(w, h, 0.04, 0); back.translate(0, h / 2, 0.01); B.add(back, shade(frame, 0.62));
+  const pw = w / 2 + 0.02, ph = h - 0.04, iw = pw - 0.1;
+  for (const s of [-1, 1]) {
+    B.at([s * (w / 4 - 0.005), 0, 0.03 + (s > 0 ? 0.026 : 0)], 0, () => {
+      const kick = G.box(iw + 0.02, 0.34, 0.03, 0.01); kick.translate(0, 0.22, 0); B.add(kick, shade(wood, 0.94));
+      const kr = G.box(iw + 0.04, 0.045, 0.045, 0); kr.translate(0, 0.4, 0.005); B.add(kr, panel);
+      if (style === 'wood') {
+        // horizontal painted boards (each its own tone) under a small paper window
+        const yTop = h - 0.42, nb = 4, bh = (yTop - 0.42) / nb;
+        for (let i = 0; i < nb; i++) { const b = G.box(iw, bh - 0.016, 0.03, 0.008); b.translate(0, 0.42 + bh * (i + 0.5), 0); B.add(b, shade(wood, [1, 0.93, 1.04, 0.96][i])); }
+        const mr = G.box(iw + 0.04, 0.045, 0.045, 0); mr.translate(0, yTop + 0.01, 0.005); B.add(mr, panel);
+        const win = G.box(iw - 0.02, h - yTop - 0.14, 0.02, 0); win.translate(0, (yTop + h - 0.1) / 2, -0.004); B.glow(win, C.paper);
+        const mv = G.box(0.024, h - yTop - 0.14, 0.024, 0); mv.translate(0, (yTop + h - 0.1) / 2, 0.012); B.add(mv, panel);
+        const mh = G.box(iw - 0.02, 0.024, 0.024, 0); mh.translate(0, (yTop + h - 0.1) / 2, 0.012); B.add(mh, panel);
+      } else {
+        const y0 = 0.42, y1 = h - 0.08, hh = y1 - y0;
+        const pane = G.box(iw, hh, 0.02, 0); pane.translate(0, y0 + hh / 2, -0.004); B.glow(pane, C.paper);
+        if (style === 'lattice') {
+          const n = Math.max(5, Math.round(iw / 0.045));
+          for (let i = 1; i < n; i++) { const g = G.box(0.026, hh, 0.028, 0); g.translate(-iw / 2 + i * iw / n, y0 + hh / 2, 0.012); B.add(g, i % 2 ? wood : shade(wood, 0.88)); }
+          for (const yy of [y0 + hh * 0.7, y1 - 0.06]) { const g = G.box(iw, 0.03, 0.034, 0); g.translate(0, yy, 0.016); B.add(g, panel); }
+        } else {
+          for (let i = 1; i < 3; i++) { const g = G.box(0.024, hh, 0.022, 0); g.translate(-iw / 2 + i * iw / 3, y0 + hh / 2, 0.01); B.add(g, panel); }
+          for (let j = 1; j < 4; j++) { const g = G.box(iw, 0.024, 0.022, 0); g.translate(0, y0 + j * hh / 4, 0.01); B.add(g, panel); }
+        }
+      }
+      B.at([0, 0.02 + ph / 2, 0], 0, () => frameRect(B, pw, ph, 0.062, 0.05, panel));
+    }, 1);
+  }
+  const lin = G.box(w + 0.24, 0.13, 0.12, 0.03); lin.translate(0, h + 0.06, 0.05); B.add(lin, frame);
+  for (const s of [-1, 1]) { const p = G.beam(0.11, h, 0.1, 0.02); p.translate(s * (w / 2 + 0.03), h / 2, 0.05); B.add(p, frame); }
+  const th = G.box(w + 0.2, 0.05, 0.14, 0.02); th.translate(0, 0.02, 0.06); B.add(th, shade(frame, 0.88));
+  if (o.trim !== false) doorTrim(B, w, h, frame, style);
+}
+
+// arched storybook door: three planks (each its own tone) cut to the arch, iron strap hinges, a porthole window,
+// a brass knob, all inside a chunky timber arch on posts
+function archDoor(B, w, h, frame, wood) {
+  const r = w / 2 - 0.05, yc = h - w / 2, gap = 0.014;
+  const arch = (x0, x1, R, inset = 0) => {
+    const sh = new THREE.Shape(), top = x => yc + Math.sqrt(Math.max(0, R * R - x * x));
+    sh.moveTo(x0, inset); sh.lineTo(x1, inset);
+    for (let k = 0; k <= 6; k++) { const x = x1 + (x0 - x1) * k / 6; sh.lineTo(x, top(x)); }
+    sh.closePath(); return sh;
+  };
+  const back = shapeGeo([arch(-r - 0.02, r + 0.02, r + 0.02)], 0.02, 0); back.translate(0, 0, 0.005); B.add(back, shade(frame, 0.55));
+  const pl = (2 * r - 2 * gap) / 3;
+  for (let i = 0; i < 3; i++) {
+    const x0 = -r + i * (pl + gap), g = shapeGeo([arch(x0, x0 + pl, r, 0.03)], 0.04, 0.012);
+    g.translate(0, 0, 0.03); B.add(g, shade(wood, [0.97, 1.04, 0.92][i]));
+  }
+  const zf = 0.03 + 0.04 + 0.024; // plank front face
+  for (const yy of [h * 0.24, yc - 0.02]) { // strap hinges from the hinge side
+    const st = G.box(w * 0.56, 0.05, 0.016, 0); st.translate(-r + w * 0.28 - 0.01, yy, zf + 0.008); B.add(st, C.iron);
+    const end = G.cyl(0.035, 0.035, 0.016, 8); end.rotateX(PI / 2); end.translate(-r + w * 0.56, yy, zf + 0.008); B.add(end, C.iron);
+    for (const x of [-r + 0.06, -r + w * 0.3]) { const n = G.sph(0.014, 5, 3); n.translate(x, yy, zf + 0.018); B.add(n, '#6a6670'); }
+  }
+  const py = yc + r * 0.32, pr = Math.min(0.11, r * 0.34);
+  const pane = G.disc(pr, 14); pane.translate(0, py, zf + 0.004); B.glow(pane, C.paper);
+  const ring = G.torus(pr, 0.03, 5, 14); ring.translate(0, py, zf + 0.012); B.add(ring, frame);
+  const cv = G.box(0.02, pr * 1.9, 0.02, 0); cv.translate(0, py, zf + 0.012); B.add(cv, frame);
+  const ch = G.box(pr * 1.9, 0.02, 0.02, 0); ch.translate(0, py, zf + 0.012); B.add(ch, frame);
+  const plate = G.cyl(0.05, 0.05, 0.012, 8); plate.rotateX(PI / 2); plate.translate(r - 0.13, h * 0.44, zf + 0.006); B.add(plate, C.bronze);
+  const knob = G.sph(0.042, 8, 6); knob.translate(r - 0.13, h * 0.44, zf + 0.045); B.add(knob, C.gold);
+  const at = G.torus(w / 2 - 0.01, 0.066, 6, 16, PI); at.translate(0, yc, 0.07); B.add(at, frame);
+  const key = G.box(0.1, 0.13, 0.1, 0.025); key.translate(0, yc + w / 2 + 0.02, 0.085); B.add(key, shade(frame, 1.12));
+  for (const s of [-1, 1]) { const p = G.beam(0.12, yc, 0.11, 0.02); p.translate(s * (w / 2 - 0.01), yc / 2, 0.07); B.add(p, frame); }
+  const th = G.box(w + 0.14, 0.05, 0.16, 0.02); th.translate(0, 0.02, 0.07); B.add(th, shade(frame, 0.88));
 }
 
 // Pull handles on the sliding panels and, on richer buildings, a ranma transom (lattice + glowing paper)
@@ -275,10 +382,10 @@ function doorTrim(B, w, h, frame, style) {
 
 // Noren curtain hanging from y (top) in local face frame. strips of cloth with a white hem & optional symbol
 export function noren(B, o = {}) {
-  const w = o.w ?? 0.9, h = o.h ?? 0.55, y = o.y ?? 1.5, z = o.z ?? 0.2, color = o.color || C.indigo;
+  const w = o.w ?? 0.9, h = o.h ?? 0.55, y = o.y ?? 1.5, z = o.z ?? 0.2, color = o.color || C.indigo, rodC = o.rod || C.woodDark;
   const n = o.strips ?? 3, gap = 0.035, sw = (w - gap * (n - 1)) / n;
-  const rod = G.cyl(0.025, 0.025, w + 0.16, 6); rod.rotateZ(PI / 2); rod.translate(0, y + 0.02, z); B.add(rod, C.woodDark);
-  for (const s of [-1, 1]) { const b = G.box(0.04, 0.05, z + 0.02, 0.01); b.translate(s * (w / 2 + 0.05), y + 0.02, z / 2); B.add(b, C.woodDark); }
+  const rod = G.cyl(0.025, 0.025, w + 0.16, 6); rod.rotateZ(PI / 2); rod.translate(0, y + 0.02, z); B.add(rod, rodC);
+  for (const s of [-1, 1]) { const b = G.box(0.04, 0.05, z + 0.02, 0.01); b.translate(s * (w / 2 + 0.05), y + 0.02, z / 2); B.add(b, rodC); }
   const hem = o.hem ?? 0.07, cl = { x0: -w / 2, x1: w / 2, yTop: y, yBot: y - h };
   for (let i = 0; i < n; i++) {
     const x = -w / 2 + sw / 2 + i * (sw + gap);
@@ -294,17 +401,60 @@ export function noren(B, o = {}) {
   }
 }
 
+// Noren crest (flat, unit size, facing +z, for noren({ symbol })): a symbols.js print, or 'wave' (three rolling
+// wave bands, the indigo-noren classic)
+export function norenMark(name) {
+  if (name !== 'wave') return flatSymbol(name);
+  const shapes = [];
+  for (let k = 0; k < 3; k++) {
+    const yc = 0.25 - k * 0.25, t = 0.085 - k * 0.008, sh = new THREE.Shape(), N = 14;
+    const f = x => yc + 0.065 * Math.sin((x + 0.4) / 0.8 * PI * 3 + k * 0.9);
+    for (let i = 0; i <= N; i++) { const x = -0.42 + 0.84 * i / N; if (i) sh.lineTo(x, f(x) + t / 2); else sh.moveTo(x, f(x) + t / 2); }
+    for (let i = N; i >= 0; i--) { const x = -0.42 + 0.84 * i / N; sh.lineTo(x, f(x) - t / 2); }
+    sh.closePath(); shapes.push(sh);
+  }
+  const g = new THREE.ShapeGeometry(shapes, 4);
+  return g.index ? g.toNonIndexed() : g;
+}
+
+// Festival bunting: strings of little triangle flags sagging between consecutive points (local [x,y,z] list). The
+// flags are cloth (they flutter); colours cycle through `colors` from `phase`.
+export const BUNTING = ['#e8503a', '#ffd24a', '#fff6ea', '#5a9ad8', '#ff8fb0', '#6ac08a'];
+export function bunting(B, pts, { sag = 0.1, size = 0.11, gap = 0.13, colors = BUNTING, cord = '#5a4038', phase = 0 } = {}) {
+  let k = phase;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = V(...pts[i]), b = V(...pts[i + 1]), L = a.distanceTo(b), sg = sag * Math.min(1, L / 1.2);
+    const P = t => V(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t - sg * 4 * t * (1 - t), a.z + (b.z - a.z) * t);
+    const cp = []; for (let j = 0; j <= 10; j++) cp.push({ p: P(j / 10), r: 0.01 });
+    B.add(tube(cp, 4, false), cord);
+    for (const e of [a, b]) { const kn = G.sph(0.022, 6, 4); kn.translate(e.x, e.y, e.z); B.add(kn, cord); }
+    const n = Math.max(2, Math.round(L / gap));
+    for (let j = 0; j < n; j++) {
+      const t = (j + 0.5) / n, p = P(t), tan = P(Math.min(1, t + 0.03)).sub(P(Math.max(0, t - 0.03))).normalize();
+      const l = p.clone().addScaledVector(tan, -size * 0.48), r = p.clone().addScaledVector(tan, size * 0.48);
+      const tip = p.clone(); tip.y -= size * 1.12;
+      const ml = l.clone().lerp(tip, 0.55), mr = r.clone().lerp(tip, 0.55);
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute([l, ml, r, ml, mr, r, ml, tip, mr].flatMap(q => [q.x, q.y, q.z]), 3));
+      g.computeVertexNormals();
+      const c = colors[k++ % colors.length];
+      B.cloth(g, { grad: [shade(c, 0.84), c] }, { x0: -2, x1: 2, yTop: p.y, yBot: tip.y });
+    }
+  }
+}
+
 // Engawa porch deck along the front of a block. x0..x1 along x at z front edge; depth; deck height y
-export function engawa(B, { x0, x1, z, depth = 0.7, y = 0.32, posts = true, step = true, wood = C.woodLight }) {
+// (wood: the deck planks; beam: the front beam and legs)
+export function engawa(B, { x0, x1, z, depth = 0.7, y = 0.32, posts = true, step = true, wood = C.woodLight, beam: beamC = C.woodDark }) {
   const w = x1 - x0, cx = (x0 + x1) / 2;
   const n = Math.max(3, Math.round(depth / 0.14));
   for (let i = 0; i < n; i++) {
     const g = G.box(w, 0.07, depth / n - 0.012, 0.012); g.translate(cx, y - 0.035, z + (i + 0.5) * depth / n);
     B.add(g, B.pick([wood, shade(wood, 0.94), shade(wood, 1.05)]));
   }
-  const beam = G.box(w, 0.1, 0.08, 0.02); beam.translate(cx, y - 0.1, z + depth - 0.04); B.add(beam, C.woodDark);
+  const beam = G.box(w, 0.1, 0.08, 0.02); beam.translate(cx, y - 0.1, z + depth - 0.04); B.add(beam, beamC);
   const legs = Math.max(2, Math.round(w / 1.2) + 1);
-  for (let i = 0; i < legs; i++) { const l = G.box(0.1, y - 0.06, 0.1, 0.02); l.translate(x0 + 0.08 + i * (w - 0.16) / (legs - 1), (y - 0.06) / 2, z + depth - 0.08); B.add(l, C.woodDark); }
+  for (let i = 0; i < legs; i++) { const l = G.box(0.1, y - 0.06, 0.1, 0.02); l.translate(x0 + 0.08 + i * (w - 0.16) / (legs - 1), (y - 0.06) / 2, z + depth - 0.08); B.add(l, beamC); }
   if (step) { const s = puff(V(0, 0, 0), 0.3, { detail: 1, noise: 0.2, squash: 0.35, seed: B.seed + 3 }); s.scale(1.5, 1, 0.9); s.translate(cx + B.wob(0.2), 0.08, z + depth + 0.22); B.add(s, STONES[0]); }
   return { top: y, front: z + depth };
 }

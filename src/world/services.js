@@ -1,4 +1,4 @@
-// Building services: Chewy's cottage (sleep, stash), Rosie's shop, Blossom Hall (village ledger),
+// Building services: Chewy's cottage (the door; sleep), Rosie's shop, Blossom Hall (village ledger),
 // notice board (quests), Bonesmith forge (reforge / socket / upgrade).
 import { BUILDINGS } from './buildings/index.js';
 import { generateItem, shopStock, itemValue, ITEM_BASES } from '../rpg/items.js';
@@ -31,18 +31,9 @@ export function installServices(G) {
     setTimeout(back, 800);
   };
   // ---------------------------------------------------------------- Chewy's cottage
-  G.openHome = () => lock(async () => {
-    // the hero you're not playing lives here too: say what they're up to if they're home
-    const H = G.heroes, other = H?.villagers?.[H.next?.() || ''], home = other && (!other.visible || other.state === 'inside' || other.state === 'hidden');
-    const OTHER = { moka: 'Moka is snoozing on a pile of library books, one ear flopped over her nose.', chewy: 'Chewy is snoring in his basket, still hugging his tennis ball.' };
-    const cook = !!G.life?.kitchen; // (the homestead kitchen: docs/HOMESTEAD.md §4)
-    Events.emit('home:menu', {}); // (the house tour spotlights its choices: world/guides.js)
-    const c = await say("Chewy's Cottage", ['Home sweet home. Shadow is already curled up on the cushion.', ...(home && OTHER[other.id] ? [OTHER[other.id]] : [])], [{ text: 'Open my treasure chest (stash)' }, ...(cook ? [{ text: 'Cook something 🍳' }] : []), { text: 'Sleep until morning 💤' }, { text: 'Leave' }], G.portrait?.(G.state.activeHero || 'chewy'));
-    Events.emit('home:menuClosed', { choice: c });
-    if (c === 0) ui()?.open?.('stash');
-    else if (cook && c === 1) G.life.kitchen.open('kitchen');
-    else if (c === (cook ? 2 : 1)) G.sleep();
-  });
+  // The door goes inside now (docs/HOUSING.md §1): the bed, the treasure chest and the stove are things in the room
+  // (home/housing.js), and the benched hero is often home too.
+  G.openHome = () => G.housing?.enter();
   G.sleep = () => {
     const go = () => {
       const d = G.day; const h = d.hour;

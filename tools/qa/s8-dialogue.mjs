@@ -1,5 +1,6 @@
 // Scenario 8: dialogue / story. Talk to every villager through the real UI (answering with keys 1-9 / Enter),
-// chat + gift + request flows, Rosie's shop hand-off, building services (home, hall, board, smith),
+// chat + gift + request flows, Rosie's shop hand-off, building services (the cottage door goes inside: docs/HOUSING.md;
+// hall, board, smith),
 // heart rewards, repeat requests, and "F to advance" on the last line. controlLocked must always be released.
 import { launch, boot, sleep, makeReport, drainDialogue, tap } from './lib.mjs';
 
@@ -108,16 +109,26 @@ try {
   R.check('"bring wood" request is fulfilled by handing wood over (not instantly on accept, nothing consumed)', !(req.first.done && req.first.woodLeft >= 20), JSON.stringify(req.first));
   R.check('a villager can give a new request after a completed one', req.second.active, JSON.stringify(req));
 
-  // services: home, town hall, board, smith — each must release controls
+  // Chewy's cottage: the door goes inside (docs/HOUSING.md §1), the door mat back out; controls released both ways
+  await page.evaluate(() => { window.G.openHome(); });
+  await page.waitForFunction(() => window.G.mode === 'interior' && !window.G.ui.iris.active, null, { timeout: 15000 });
+  await sleep(page, 400);
+  const inHome = { ...(await state()), mode: await page.evaluate(() => window.G.mode), jobs: await page.evaluate(() => window.G.world.interactables.map(i => i.use || (i.door ? 'door' : '')).filter(Boolean)) };
+  await page.evaluate(() => { window.G.world.interactables.find(i => i.door).onInteract(); });
+  await page.waitForFunction(() => window.G.mode === 'village' && !window.G.ui.iris.active, null, { timeout: 15000 });
+  await sleep(page, 400);
+  const outHome = { ...(await state()), mode: await page.evaluate(() => window.G.mode) };
+  R.check("Chewy's cottage: the door goes inside (the bed, chest and stove are there) and the door mat back out, controls released", inHome.mode === 'interior' && !inHome.locked && !inHome.modal && ['door', 'sleep', 'stash', 'cook'].every(j => inHome.jobs.includes(j)) && outHome.mode === 'village' && !outHome.locked && !outHome.modal, JSON.stringify({ inHome, outHome }));
+  // services: town hall, board, smith — each must release controls
   const svcProblems = [];
-  for (const [fn, picks] of [['openHome', [3]], ['openTownHall', [1]], ['openBoard', []], ['openSmith', [3]]]) {
+  for (const [fn, picks] of [['openTownHall', [1]], ['openBoard', []], ['openSmith', [3]]]) {
     await page.evaluate(fn => { window.G[fn](); }, fn); // (never return the pending promise: CDP awaitPromise on it crashed the renderer)
     await sleep(page, 300); await drainDialogue(page, [...picks]); await sleep(page, 300);
     if (await page.evaluate(() => window.G.ui.anyModal())) { await page.keyboard.press('Escape'); await sleep(page, 300); }
     await settle();
     const st = await state(); if (st.locked || st.dlg || st.modal) svcProblems.push(`${fn}: ${JSON.stringify(st)}`);
   }
-  R.check('building services (home/hall/board/smith) release controls', !svcProblems.length, svcProblems.join(' | '));
+  R.check('building services (hall/board/smith) release controls', !svcProblems.length, svcProblems.join(' | '));
   // town hall -> build mode hand-off
   await page.evaluate(() => { window.G.openTownHall(); }); await sleep(page, 300); await drainDialogue(page, [0]); await sleep(page, 600);
   const hall = await page.evaluate(() => ({ build: window.G.build.active, panel: window.G.ui.isOpen('build'), locked: window.G.player.controlLocked }));

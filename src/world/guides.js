@@ -1,13 +1,19 @@
 // The guided tutorials (docs/TUTORIALS.md): their steps, run by world/tutorials.js.
 //  - switch: Moka, right after she joins: Tab to play her, her spells, find Chewy, switch back, what's shared.
-//  - house:  Shadow, after Rosie's welcome (once Moka's arrival scene is over): the cottage, its menu, the garden bed
-//            (till, plant, water), the Pantry, and where seeds come from.
+//  - house:  Shadow, after Rosie's welcome (once Moka's arrival scene is over): the cottage (inside: the chest, the bed,
+//            the stove), the garden bed (till, plant, water), the Pantry, and where seeds come from.
 //  - fishing: Kero, as soon as you have a rod: the bank, the cast, the wait, the bite, the reel, the Fish Log.
+//  - makeHome: Shadow, the next time you're in the cottage after the house tour (docs/HOUSING.md §7): the household
+//            jobs, B to decorate, a cushion from storage, moving and turning it, a wallpaper, the Home Rating, and where
+//            more furniture comes from.
+//  - remodel: Tanu, the first time a mailbox is opened: the house card (Upgrade / Remodel / Enter), the style sets, a
+//            swatch, the cost.
 import * as THREE from 'three';
 import { POND } from './layout.js';
 import { SKILLS } from '../rpg/skills.js';
 import { pantryIcon } from '../life/pantryIcons.js';
 import { PANTRY } from '../life/pantry.js';
+import { FURNITURE, SURFACES } from '../home/furniture.js';
 
 const V = (x, z) => new THREE.Vector3(x, 0, z);
 const dist = (G, p) => Math.hypot(G.player.pos.x - p.x, G.player.pos.z - p.z);
@@ -96,14 +102,18 @@ const fishing = {
 const homeTiles = G => G.life?.garden?.beds?.[0]?.tiles || [];
 const anyTile = (G, f) => homeTiles(G).some(i => f(G.life.garden.rec(i) || {}, i));
 const hasSeeds = G => Object.keys(G.state.pantry || {}).some(k => PANTRY[k]?.kind === 'seed' && G.state.pantry[k] > 0);
-const MENU = [
-  [/stash/i, 'Your treasure chest! The stash is shared — Moka can use it too.'],
-  [/sleep/i, 'Sleep skips to morning: your crops grow, the village pays its daily income, and the game saves.'],
-  [/cook/i, 'And the kitchen! Cook your crops and fish into yummy dishes.'],
+// the cottage tour (indoors since docs/HOUSING.md §1): the household jobs are furniture now
+const TOUR = [
+  ['stash', 'Your treasure chest! The stash is shared — Moka can use it too.'],
+  ['sleep', 'Your bed! Sleep skips to morning: your crops grow, the village pays its daily income, and the game saves.'],
+  ['cook', 'And the kitchen stove! Cook your crops and fish into yummy dishes.'],
 ];
+const USE_NAME = { stash: 'Treasure chest', sleep: 'Bed', cook: 'Kitchen stove' };
+const useSpot = (G, use) => { const it = G.mode === 'interior' ? G.world.interactables.find(i => i.use === use) : null; return it ? { pos: it.pos, label: USE_NAME[use] } : null; };
+const matSpot = G => { const it = G.mode === 'interior' ? G.world.interactables.find(i => i.door) : null; return it ? { pos: it.pos, label: 'Door mat' } : null; };
 const house = {
   title: 'Home, sweet home', narrator: 'shadow', color: '#ffb07a', priority: 1,
-  blurb: 'Chewy\'s Cottage: the stash, sleep and the kitchen, the garden bed and the Pantry.',
+  blurb: 'Chewy\'s Cottage: the treasure chest, the bed and the stove inside, the garden bed and the Pantry.',
   offer: 'Shadow can show you around the cottage and the garden.',
   icon: () => pantryIcon('turnip'),
   trigger: G => G.state.quests?.done?.includes('welcome') && !G.introJoinPending,
@@ -111,21 +121,18 @@ const house = {
     { id: 'door', say: G => `Yip yip! Follow me, ${me(G)} — this is home!`, objective: "Go to Chewy's Cottage",
       target: G => ({ pos: G.heroes.homeDoor(), label: "Chewy's Cottage" }), done: G => dist(G, G.heroes.homeDoor()) < 2.6 },
     { id: 'enter', say: 'Press *F* at the door to go inside.', objective: 'Press *F* at the cottage door',
-      target: G => ({ pos: G.heroes.homeDoor(), label: "Chewy's Cottage" }), highlight: () => prompt, waitFor: 'home:menu' },
-    { id: 'menu', resumeAt: 'enter', say: 'This is the cottage menu. Let me show you…', objective: 'Look around the cottage menu', allow: { dialogue: true, panels: ['stash'] },
-      onEnter: (G, T) => { T.data.mi = -1; T.data.mt = 0; },
-      tick: (G, T, dt) => {
-        const ch = [...document.querySelectorAll('.dlg-ch .dch')];
-        if (!ch.length) return;
-        T.data.mt -= dt;
-        if (T.data.mt > 0 || T.data.mi >= MENU.length) return;
-        T.data.mi++; T.data.mt = 2.8;
-        if (T.data.mi < MENU.length) {
-          const [re, line] = MENU[T.data.mi], b = ch.find(x => re.test(x.textContent));
-          T.data.hl = b || null; if (b) T.say(line); else T.data.mt = 0;
-        } else { T.data.hl = ch.find(x => /leave/i.test(x.textContent)) || null; T.say('Pick anything you like — or *Leave*, and I\'ll show you the garden!'); }
+      target: G => ({ pos: G.heroes.homeDoor(), label: "Chewy's Cottage" }), highlight: () => prompt, waitFor: 'home:enter' },
+    { id: 'inside', resumeAt: 'enter', say: 'Home sweet home! Let me show you around…', objective: 'Look around the cottage', allow: { interior: true, dialogue: true, panels: ['stash', 'cook'] },
+      onEnter: (G, T) => { T.data.ti = -1; T.data.tt = 0.8; T.data.tgt = null; },
+      tick: (G, T, dt) => { // the arrow hops from the chest to the bed to the stove, then the door mat
+        if (G.mode !== 'interior') return;
+        T.data.tt -= dt;
+        if (T.data.tt > 0 || T.data.ti >= TOUR.length) return;
+        T.data.ti++; T.data.tt = 3.2;
+        if (T.data.ti < TOUR.length) { const [use, line] = TOUR[T.data.ti]; T.data.tgt = useSpot(G, use); if (T.data.tgt) T.say(line); else T.data.tt = 0; }
+        else { T.data.tgt = matSpot(G); T.say("Use them any time with *F*. Now step on the door mat and press *F* — or just walk out — and I'll show you the garden!"); }
       },
-      highlight: (G, T) => T.data.hl, waitFor: 'home:menuClosed' },
+      target: (G, T) => T.data.tgt, waitFor: 'home:exit' },
     { id: 'garden', objective: 'Go to your garden bed', allow: { panels: ['stash'] },
       onEnter: (G, T) => {
         const F = G.state.flags;
@@ -177,5 +184,75 @@ const sw = {
   ],
 };
 
-export const GUIDES = { switch: sw, house, fishing };
+// ------------------------------------------------------------------ making the cottage home (Shadow, docs/HOUSING.md §7)
+const inCottage = G => G.mode === 'interior' && !!G.housing?.home?.household;
+const houseDone = G => !!G.state.flags.tutorials?.house?.done;
+const JOBS = [['sleep', 'Bed'], ['stash', 'Treasure chest'], ['cook', 'Kitchen stove'], ['craft', 'Workbench']];
+const decoOpen = G => !!G.housing?.decor?.active;
+const store = G => G.state.furniture || {};
+const cushionId = G => ['zabutonBlue', 'zabutonPink'].find(id => store(G)[id] > 0) || 'zabutonBlue';
+const wallpaperId = G => Object.keys(store(G)).find(id => SURFACES[id]?.kind === 'wall' && store(G)[id] > 0 && id !== G.world?.wallId) || null;
+const makeHome = {
+  title: 'Make it home', narrator: 'shadow', color: '#ff8fb0', priority: 3, indoors: true,
+  blurb: 'Decorate the cottage: place, turn and move furniture, change the wallpaper, and the Home Rating.',
+  offer: 'Shadow has ideas for making the cottage extra cosy.',
+  icon: () => pantryIcon('strawberry'),
+  trigger: G => houseDone(G) && inCottage(G),
+  past: G => houseDone(G) && !!(G.state.flags.homeVisits || G.housing?.cottage?.()?.data.interior), // (an old save: you've been inside before)
+  locked: G => (houseDone(G) ? null : 'Finish "Home, sweet home" first'),
+  steps: [
+    { id: 'home', say: G => `Let's make the cottage really feel like home, ${me(G)}! Pop inside — *F* at the door.`, objective: "Go into Chewy's Cottage", allow: { interior: true },
+      target: G => (G.mode === 'village' ? { pos: G.heroes.homeDoor(), label: "Chewy's Cottage" } : null), highlight: G => (dist(G, G.heroes.homeDoor()) < 2.6 ? prompt : null),
+      done: G => inCottage(G) },
+    { id: 'jobs', say: 'The bed, the chest, the stove and the workbench all work with *F*. But it could be cosier in here…', objective: 'Look around the cottage', allow: { interior: true },
+      onEnter: (G, T) => { T.data.ji = -1; T.data.jt = 0; },
+      tick: (G, T, dt) => { if ((T.data.jt -= dt) > 0) return; T.data.ji = (T.data.ji + 1) % JOBS.length; T.data.jt = 1.6; },
+      target: (G, T) => { const [use, label] = JOBS[Math.max(0, T.data.ji)]; const it = G.mode === 'interior' ? G.world.interactables.find(i => i.use === use) : null; return it ? { pos: it.pos, label } : null; },
+      done: (G, T) => T.cur.t > 6.6 },
+    { id: 'decorate', say: 'Press *B* — or the *Decorate* button — to decorate!', objective: 'Press *B* to decorate', allow: { interior: true, panels: ['decorate'] },
+      highlight: G => (decoOpen(G) ? null : '.home-tools .deco-btn'), done: G => decoOpen(G) },
+    { id: 'place', resumeAt: 'decorate', say: 'This is your storage. Pick the cushion, then click the floor to put it down.', objective: 'Place the cushion on the floor', allow: { interior: true, panels: ['decorate'] },
+      onEnter: G => { if (!(store(G).zabutonBlue > 0) && !(store(G).zabutonPink > 0)) G.actions.addFurniture('zabutonBlue', 1, { src: 'gift' }); },
+      highlight: G => (!decoOpen(G) ? '.home-tools .deco-btn' : G.housing.decor.sel ? null : `.p-decor .card[data-id="${cushionId(G)}"]`),
+      waitFor: { event: 'decor:place', test: p => FURNITURE[p.id]?.mount !== 'wall' } },
+    { id: 'move', resumeAt: 'decorate', say: 'Woof! Now click it to pick it up, press *R* to turn it, and click again to put it down somewhere new.', objective: 'Pick it up, turn it (*R*), put it down', allow: { interior: true, panels: ['decorate'] },
+      highlight: G => (!decoOpen(G) ? '.home-tools .deco-btn' : null), waitFor: 'decor:move' },
+    { id: 'wallpaper', resumeAt: 'decorate', say: 'Ooh, and new wallpaper! Open *Wallpaper & Floors* and pick one.', objective: 'Change the wallpaper', allow: { interior: true, panels: ['decorate'] },
+      onEnter: G => { if (!wallpaperId(G)) G.actions.addFurniture('wp_dots', 1, { src: 'gift' }); },
+      highlight: G => { if (!decoOpen(G)) return '.home-tools .deco-btn'; const P = G.ui.panels.decorate; if (P.tab !== 'surface') return '.p-decor .tab[data-t="surface"]'; const w = wallpaperId(G); return w ? `.p-decor .card[data-id="${w}"]` : null; },
+      waitFor: { event: 'decor:surface', test: p => p.kind === 'wall' } },
+    { id: 'rating', resumeAt: 'decorate', say: 'See the stars? That\'s your *Home Rating*. The tip under it says what would make it even cosier.', objective: 'The Home Rating', allow: { interior: true, panels: ['decorate'] },
+      highlight: G => (decoOpen(G) ? '.p-decor .dc-rate' : '.home-tools .deco-btn'), ack: true },
+    { id: 'wrap', say: "Tanu sells furniture at his stall on Market Street, the workbench makes it, and the villagers love help decorating their homes — ask them \"Need any help?\". Press *B* when you're done!", objective: 'More furniture: Tanu, the workbench, finds', allow: { interior: true, panels: ['decorate'] }, ack: true },
+  ],
+};
+
+// ------------------------------------------------------------------ remodelling a house (Tanu, docs/HOUSING.md §7)
+const cardOpen = G => G.ui?.isOpen?.('houseCard'), remOpen = G => G.ui?.isOpen?.('remodel');
+const nearestMailbox = G => { let best = null, bd = 1e9; for (const m of G.housing?.ext?.mail?.values?.() || []) { const d = dist(G, m.inter.pos); if (d < bd) { bd = d; best = m; } } return best; };
+const remodel = {
+  title: 'Remodel', narrator: 'tanu', color: '#8fe0c0', priority: 4, startPanels: ['houseCard', 'remodel'],
+  blurb: 'A house\'s mailbox: Upgrade, Remodel and Enter, the style sets, the swatches and what it costs.',
+  offer: 'Tanu can show you how to give a house a whole new look.',
+  icon: null,
+  trigger: G => !!G.state.flags.mailboxOpened,
+  locked: () => null,
+  steps: [
+    { id: 'mailbox', say: 'Psst! Every house has a mailbox. Press *F* at one to open its house card.', objective: 'Open a mailbox (*F*)', allow: { panels: ['houseCard', 'remodel'] },
+      target: G => { const m = nearestMailbox(G); return m ? { pos: m.inter.pos, label: 'Mailbox' } : null; }, highlight: () => prompt,
+      done: G => cardOpen(G) || remOpen(G) },
+    { id: 'card', resumeAt: 'mailbox', say: "Here's the house card! *Upgrade* grows the house — it keeps its look and everything inside. *Enter* goes in. And *Remodel*… that's my favourite. Click it!", objective: 'Click *Remodel*', allow: { panels: ['houseCard', 'remodel'] },
+      highlight: G => (cardOpen(G) ? '.p-house .hc-btns' : null),
+      callouts: G => (cardOpen(G) ? [{ el: '.p-house .hc-up', text: 'What the next level costs', side: 'left' }] : []),
+      done: G => remOpen(G) },
+    { id: 'sets', resumeAt: 'mailbox', say: 'These are the style sets: a whole new look in one click. Try one — the picture shows it at once!', objective: 'Pick a style set', allow: { panels: ['houseCard', 'remodel'] },
+      highlight: G => (remOpen(G) ? '.p-remodel .rm-sets' : '.p-house .hc-rem'), waitFor: { event: 'remodel:draft', test: p => p.kind === 'set' } },
+    { id: 'swatch', resumeAt: 'mailbox', say: 'And every part has its own swatches. Tap one to change just that bit — a roof colour, say.', objective: 'Change one part', allow: { panels: ['houseCard', 'remodel'] },
+      highlight: G => (remOpen(G) ? '.p-remodel .rm-fields' : '.p-house .hc-rem'), waitFor: { event: 'remodel:draft', test: p => p.kind === 'field' } },
+    { id: 'cost', resumeAt: 'mailbox', say: "Here's what it costs. *Remodel* builds it, *As it was* puts it back. Your house, your rules — hee hee!", objective: 'Remodel it — or keep the old look', allow: { panels: ['houseCard', 'remodel'] },
+      highlight: G => (remOpen(G) ? '.p-remodel .rm-foot' : null), ack: true, waitFor: 'house:remodel' },
+  ],
+};
+
+export const GUIDES = { switch: sw, house, fishing, makeHome, remodel };
 export const GUIDE_IDS = Object.keys(GUIDES);

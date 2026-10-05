@@ -15,8 +15,9 @@ export const BUILDINGS = {
     desc: 'The heart of the village — the bell rings every morning and the mayor naps upstairs.',
   },
   chewyHouse: {
-    name: "Chewy's Cottage", cat: 'special', size: [3, 3], levels: 1, unique: true, prebuilt: true,
-    cost: { coins: 0 }, desc: "Home sweet home! There's a bone-shaped sign and a very important mailbox.",
+    name: "Chewy's Cottage", cat: 'special', size: [3, 3], levels: 3, unique: true, prebuilt: true,
+    cost: { coins: 0 }, levelCost: [null, { coins: 450, wood: 20, stone: 8 }, { coins: 1000, wood: 36, stone: 16, lantern: 2 }],
+    variants: ["Chewy's Cottage", "Chewy's Porch Cottage", "Chewy's Two-Storey Cottage"], desc: "Home sweet home! There's a bone-shaped sign and a very important mailbox.",
   },
   rosieShop: {
     name: "Rosie's Treats", cat: 'special', size: [4, 3], levels: 1, unique: true, prebuilt: true,
@@ -39,13 +40,13 @@ export const BUILDINGS = {
   // ------------------------------------------------------------------ zoned growth
   home: {
     name: 'Cozy Home', cat: 'home', zone: 'R', size: [2, 2], sizes: [[2, 2], [3, 3], [3, 3]], levels: 3,
-    cost: { coins: 50, wood: 6 }, levelCost: [null, { coins: 120, wood: 12, stone: 4 }, { coins: 260, wood: 18, stone: 10, petal: 2 }],
+    cost: { coins: 50, wood: 6 }, levelCost: [null, { coins: 320, wood: 14, stone: 6 }, { coins: 750, wood: 24, stone: 14, petal: 3 }], // (the player's Upgrade: ~3 days of early income for L2, ~a week for L3 — docs/HOUSING.md; the village's own growth is free)
     capacity: [2, 4, 6], variants: ['Tiny Cottage', 'Porch House', 'Blossom Villa'],
     desc: 'Villagers move in all by themselves when a home feels just right.',
   },
   shop: {
     name: 'Market Shop', cat: 'shop', zone: 'C', size: [2, 2], sizes: [[2, 2], [3, 3], [3, 3]], levels: 3,
-    cost: { coins: 70, wood: 8 }, levelCost: [null, { coins: 160, wood: 14, stone: 4, silk: 1 }, { coins: 340, wood: 24, stone: 12, lantern: 2 }],
+    cost: { coins: 70, wood: 8 }, levelCost: [null, { coins: 360, wood: 16, stone: 6, silk: 1 }, { coins: 800, wood: 26, stone: 14, lantern: 2 }],
     jobs: [2, 3, 5],
     variants: { 1: ['Tea Stand', 'Onigiri Cart', 'Taiyaki Stall'], 2: ['Bakery', 'Café', 'Flower Shop', 'Toy Shop'], 3: ['Teahouse', 'Department Store'] },
     desc: 'From humble snack carts to a grand teahouse — shops grow with the village.',

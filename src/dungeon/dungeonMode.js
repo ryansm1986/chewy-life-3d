@@ -8,6 +8,7 @@ import { MONSTERS } from './monsters.js';
 import { GroundLoot } from '../combat/groundLoot.js';
 import { rollDrops, chestDrops, floorClearDrops } from '../rpg/loot.js';
 import { seedDrops, forageDrops } from '../life/pantry.js';
+import { findDrops } from '../home/finds.js';
 import { xpForKill } from '../rpg/stats.js';
 import { makeToon, makeOutline } from '../gfx/materials.js';
 import { paint, merge, RoundedBox } from '../gfx/geom.js';
@@ -339,6 +340,7 @@ export class DungeonMode {
       const drops = chestDrops(this.layout.mlvl, gold ? 'golden' : 'plain', undefined, G.derived.mf || 0);
       drops.push(...seedDrops(this.layout.mlvl, gold ? 'chest2' : 'chest0')); // (homestead seeds, docs/HOMESTEAD.md)
       if (this.isRegion) drops.push(...forageDrops(this.regionId, gold ? 'chest2' : 'chest0')); // (and the region's forage)
+      drops.push(...findDrops(G, this, gold ? 'chest2' : 'chest0')); // (now and then a piece of furniture: docs/HOUSING.md §3)
       setTimeout(() => this.loot.drop(p.clone().setY(0.5), drops), 250);
     } };
     return chest;
@@ -439,6 +441,7 @@ export class DungeonMode {
     const drops = rollDrops({ mlvl: m.level, rank: m.rank, mf, gf: D.gf || 0, kind: m.stats.kind });
     drops.push(...seedDrops(m.level, m.rank)); // (homestead seeds, docs/HOMESTEAD.md)
     if (this.isRegion) drops.push(...forageDrops(this.regionId, m.rank));
+    if (!m.bossAdd) drops.push(...findDrops(G, this, isBoss ? 'boss' : m.rank)); // (a rare furniture find: docs/HOUSING.md §3)
     const at = m.pos.clone().setY(0.3);
     if (drops.length && isBoss) setTimeout(() => { if (G.dungeon !== this) return; G.vfx.ring(at, { color: '#ffe070', r0: 0.3, r1: 3.2, life: 0.6 }); G.vfx.sparkle(at.clone().setY(0.8), { n: 30, color: '#fff2a0', r: 1.2, rise: 1.6 }); Events.emit('sfx', 'chest_open'); this.loot.drop(at, drops); }, 1050);
     else if (drops.length) this.loot.drop(at, drops);

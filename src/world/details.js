@@ -380,6 +380,9 @@ function kit(seed, fn, warp = 0.025) {
   const t = B.finish();
   return { ...t.geos, lights: t.lights };
 }
+// yard fence pieces (Details.fenceKit): the piece's slot in an n-piece run, and each style's height and kit seed
+const fenceSlot = (i, n) => (n === 1 ? 'one' : i === 0 ? 'first' : i === n - 1 ? 'last' : 'mid');
+const FENCE_H = { picket: 0.55, bamboo: 0.75, rail: 0.6, rope: 0.6 }, FENCE_SEED = { picket: 150, bamboo: 151, rail: 152, rope: 154 };
 const ringCap = (r0, bark) => (p, n, o) => {
   const d = Math.hypot(p.y, p.z) / r0;
   if (d > 0.86) o.set(bark); else o.set('#ecc890').lerp(col('#c89a68'), (Math.sin(d * 26) * 0.5 + 0.5) * 0.6 + d * 0.2);
@@ -1302,7 +1305,7 @@ export class Details {
   // vegetation records, so building placement never clears them; their colliders come and go with the yard.
   plotYards() {
     const K = this.yardKits = {
-      picket: kit(150, B => fenceSection(B, 'picket', 0.55)), bamboo: kit(151, B => fenceSection(B, 'bamboo', 0.75)), rail: kit(152, B => fenceSection(B, 'rail', 0.6)),
+      // (fence runs take their pieces from fenceKit by slot: the run's first piece, the middle ones, the last, or a lone one)
       hedge: kit(153, B => { for (const [x, r] of [[-0.3, 0.26], [0.02, 0.29], [0.33, 0.25]]) B.at([x, 0, 0], 0, () => bush(B, { r, n: 2, color: '#4f8a44', sway: false })); }, 0.015),
       beds: [0, 1, 2].map(v => kit(160 + v, B => flowerPatch(B, { w: 1.05, d: 0.62, n: 12, colors: [['#ff9ec8', '#ffffff', '#ffd24a'], ['#b8a8ff', '#8fd0ff', '#ffffff'], ['#ff6f7f', '#ffd27a', '#fff0f6']][v] }))),
       trees: ['sakura', 'round', 'maple'].map((kind, v) => kit(170 + v, B => tree(B, { kind, s: 1 }))),
@@ -1325,9 +1328,10 @@ export class Details {
     return g;
   }
   // a kit piece stretched along its local x (fence and hedge runs)
-  yardPiece(g, pc, x, z, rot, sx = 1, s = 1) {
+  yardPiece(g, pc, x, z, rot, sx = 1, s = 1, rec = g.rec) {
     _q.setFromAxisAngle(UP, rot); _m4.compose(_p.set(x, this.H(x, z) - 0.02, z), _q, _s.set(sx * s, s, s));
-    for (const k of ['body', 'glow', 'leaf', 'cloth']) if (pc[k]) this.b[k].add(pc[k], _m4, null, g.rec);
+    for (const k of ['body', 'glow', 'leaf', 'cloth']) if (pc[k]) this.b[k].add(pc[k], _m4, null, rec);
+    return _m4.clone();
   }
   plotYard(p, K) {
     const rnd = mulberry32([...p.id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7));
@@ -1352,10 +1356,17 @@ export class Details {
     const inBed = (u, v, m = 0.7) => { if (!GB) return false; const [x, z] = W(u, v); return x > GB.x - m && x < GB.x + GB.w + m && z > GB.z - m && z < GB.z + GB.d + m; };
     // ---- fences / hedges: the back always, the sides by chance (a side shared with a neighbour is drawn once)
     const style = kind === 'farm' || kind === 'works' ? 'rail' : kind === 'shop' || kind === 'deco' ? 'hedge' : ['picket', 'picket', 'hedge', 'bamboo', 'hedge'][Math.floor(rnd() * 5)];
+    // (the plot's own fence runs get their own record, so a remodelled house can swap its fence: setPlotFence)
+    g.fence = { rec: { kind: 'yard', x: 0, z: 0, parts: [], alive: true, keep: true }, pieces: [], style, over: null };
     const run = (grp, ua, va, ub, vb, st) => {
       const [ax, az] = W(ua, va), [bx, bz] = W(ub, vb), len = Math.hypot(bx - ax, bz - az); if (len < 0.6) return;
       const n = Math.max(1, Math.round(len / (st === 'hedge' ? 0.95 : 1))), L = len / n, rot = Math.atan2(-(bz - az), bx - ax);
-      for (let i = 0; i < n; i++) { const t = (i + 0.5) / n; this.yardPiece(grp, K[st], ax + (bx - ax) * t, az + (bz - az) * t, rot, L * (st === 'hedge' ? 1.05 : 1), st === 'hedge' ? 0.92 : 1); }
+      for (let i = 0; i < n; i++) {
+        const t = (i + 0.5) / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t, part = fenceSlot(i, n);
+        const pc = st === 'hedge' ? K.hedge : this.fenceKit(st, null, part);
+        if (grp === g) { this.yardPiece(grp, pc, x, z, rot, L * (st === 'hedge' ? 1.05 : 1), st === 'hedge' ? 0.92 : 1, g.fence.rec); g.fence.pieces.push({ x, z, rot, L, part }); }
+        else this.yardPiece(grp, pc, x, z, rot, L * (st === 'hedge' ? 1.05 : 1), st === 'hedge' ? 0.92 : 1);
+      }
       const th = st === 'hedge' ? 0.5 : 0.16;
       grp.cols.push({ x0: Math.min(ax, bx) - (az === bz ? 0 : th / 2), z0: Math.min(az, bz) - (az === bz ? th / 2 : 0), x1: Math.max(ax, bx) + (az === bz ? 0 : th / 2), z1: Math.max(az, bz) + (az === bz ? th / 2 : 0) });
     };
@@ -1395,7 +1406,10 @@ export class Details {
       const bed = fronts[Math.floor(rnd() * fronts.length)];
       if (bed) { const [x, z] = W(bed.u, 0.62); this.yardPiece(g, K.beds[Math.floor(rnd() * 3)], x, z, face); used.push(bed); }
       if (kind === 'deco') { const other = fronts.find(c => !used.includes(c)); if (other) { const [x, z] = W(other.u, 0.62); this.yardPiece(g, K.beds[Math.floor(rnd() * 3)], x, z, face); } }
-      if (kind === 'home' && rnd() < 0.55 && !inBed(sm + 0.8, 0.3)) { const [x, z] = W(sm + 0.8, 0.3); this.yardPiece(g, K.mailbox[Math.floor(rnd() * 2)], x, z, face); g.cols.push({ c: true, x, z, r: 0.14 }); }
+      // every home has its own mailbox now (an interactable: home/mailboxes.js) at the spot the yard's mailbox used; the
+      // random draws stay, so the rest of the yard is as it was
+      if (kind === 'home' && rnd() < 0.55 && !inBed(sm + 0.8, 0.3)) rnd();
+      if (kind === 'home' && !inBed(sm + 0.8, 0.3)) { const [x, z] = W(sm + 0.8, 0.3); (this.mailSpots ||= new Map()).set(p.id, { x, z, face }); }
       const spare = fronts.find(c => !used.includes(c));
       if (spare && s >= 1.8 && rnd() < (kind === 'deco' ? 0.6 : 0.3) && !inBed(spare.u, 1.05)) { const [x, z] = W(spare.u, 1.05); this.yardPiece(g, K.bench, x, z, face); g.cols.push({ c: true, x, z, r: 0.45 }); }
     }
@@ -1438,11 +1452,49 @@ export class Details {
     if (!this.yards) return;
     if (on) this.builtPlots.add(id); else this.builtPlots.delete(id);
     for (const g of this.yards.get(id) || []) this.showYard(g, g.plots.some(q => this.builtPlots.has(q)));
+  }  /** A remodelled house's fence (docs/HOUSING.md §6): the plot's own fence runs (the back, and the sides it doesn't share
+   *  with a neighbour) in another style / colour, or back to the yard's own (style null). Built as a few meshes over the
+   *  same spots (the batched pieces hide); the pieces are cached per style + colour. */
+  setPlotFence(id, style = null, color = null) {
+    const g = (this.yards?.get(id) || []).find(q => q.fence && q.plots.length === 1 && q.plots[0] === id), F = g?.fence; if (!F) return false;
+    const key = style ? style + ':' + (color || '') : null;
+    if ((F.overKey || null) === key) return true;
+    if (F.over) { this.group.remove(F.over); F.over = null; }
+    F.overKey = key;
+    if (key) {
+      const grp = new THREE.Group(); grp.name = 'yardFence:' + id;
+      for (const pz of F.pieces) {
+        const pc = this.fenceKit(style, color, pz.part);
+        _q.setFromAxisAngle(UP, pz.rot); const m4 = new THREE.Matrix4().compose(new THREE.Vector3(pz.x, this.H(pz.x, pz.z) - 0.02, pz.z), _q, new THREE.Vector3(pz.L * (style === 'hedge' ? 1.05 : 1) * (style === 'hedge' ? 0.92 : 1), style === 'hedge' ? 0.92 : 1, style === 'hedge' ? 0.92 : 1));
+        for (const k of ['body', 'glow', 'leaf', 'cloth']) if (pc[k]) { const m = new THREE.Mesh(pc[k], this.mats[k]); m.matrixAutoUpdate = false; m.matrix.copy(m4); m.castShadow = k !== 'glow'; m.receiveShadow = true; grp.add(m); }
+      }
+      grp.visible = !!g.vis;
+      this.group.add(grp); F.over = grp;
+    }
+    for (const { bm, id: pid } of F.rec.parts) bm.setVisibleAt(pid, !!g.vis && !F.over);
+    return true;
   }
+  /** a fence piece (1 m along x) in a style and colour for a slot of its run (fenceSlot: 'one' | 'first' | 'mid' |
+   *  'last'), cached for the session (shared: never disposed). A run's pieces share their joint posts (each piece has the
+   *  post at its far end, the first one also the post at the start) and only the run's ends let the rails overhang, so
+   *  no joint has two posts or overlapping rails. Hedges are leafy bushes, the colour their flowers (fenceSection). */
+  fenceKit(style, color, part = 'one') {
+    if (style === 'hedge') part = 'one';
+    const key = 'fence:' + style + ':' + (color || '') + ':' + part;
+    let pc = this.fenceKits?.get(key); if (pc) return pc;
+    const ends = { one: [true, true], first: [true, false], mid: [false, false], last: [false, true] }[part] || [true, true];
+    pc = style === 'hedge'
+      ? kit(153, B => fenceSection(B, 'hedge', 0.55, color), 0.015)
+      : kit(FENCE_SEED[style] || 150, B => fenceSection(B, style, FENCE_H[style] || 0.6, color, { left: ends[0], right: ends[1] }));
+    (this.fenceKits ||= new Map()).set(key, pc);
+    return pc;
+  }
+
   showYard(g, v) {
     if (g.vis === v) return;
     g.vis = v;
     for (const { bm, id } of g.rec.parts) bm.setVisibleAt(id, v);
+    if (g.fence) { for (const { bm, id } of g.fence.rec.parts) bm.setVisibleAt(id, v && !g.fence.over); if (g.fence.over) g.fence.over.visible = v; }
     const col = this.world.collision;
     if (v && !g.live) g.live = g.cols.map(c => c.c ? col.addCircle(c.x, c.z, c.r, 'yard') : col.addRect(c.x0, c.z0, c.x1, c.z1, 'yard'));
     else if (!v && g.live) { for (const o of g.live) col.remove(o); g.live = null; }

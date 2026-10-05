@@ -278,7 +278,10 @@ const M = {
   /** the channel tick for Moonbeam (skillRunner.update → here while it's held) */
   updateMoonbeam(dt, input) {
     const G = this.G, P = G.player, c = this.channel, p = c.R.params;
-    if (!input.holding('moonbeam') || G.playerDead || P.anim.action?.name !== 'beam') return this.endChannel();
+    // held (or Toggle-held); a charged beam let go lingers on its own for p.linger s, then bursts (docs/CHARGE.md)
+    const held = input.holding('moonbeam') || c.toggleHeld, out = !held && c.spinOut > 0;
+    if (out) c.spinOut -= dt;
+    if ((!held && !out) || G.playerDead || P.anim.action?.name !== 'beam') { if (c.R.charge && c.spinOut !== undefined && !G.playerDead) this.beamFinish(c); return this.endChannel(); }
     c.t += dt; c.acc += dt; c.hum -= dt;
     const aim = this.aimOverride || G.engine.mouseGround(Input.mouse.nx, Input.mouse.ny, (x, z) => G.world.heightAt(x, z));
     const tgt = this.clampAim(aim, p.range), b = c.beam.pos;
@@ -290,11 +293,19 @@ const M = {
     const iv = 1 / p.ticksPerSec;
     if (c.acc >= iv) {
       c.acc -= iv;
-      if (!G.actions.spendZoom(c.R.cost * iv)) { this.endChannel(); G.ui?.float?.(P.pos.clone().setY(1.6), 'Not enough zoom!', { kind: 'status', color: '#9fd0ff' }); return; }
+      if (!out && !G.actions.spendZoom(c.R.cost * iv)) { this.endChannel(); G.ui?.float?.(P.pos.clone().setY(1.6), 'Not enough zoom!', { kind: 'status', color: '#9fd0ff' }); return; }
       let n = 0;
       this.nova2(b.x, b.z, p.radius, e => { n++; this.mokaHit(e, { dmgPct: p.dmgPct, element: 'zap', from: b, slow: p.slow, slowDur: 0.6, silent: false }); });
       if (n) { this.fx().starBurst(_u.set(b.x, b.y + 0.4, b.z), { r: 0.5, n: 4, color: PAL.moon, color2: PAL.violet, ink: false }); sfx('moonbeam_tick', { vol: 0.5 }); }
     }
+  },
+  /** a charged Moonbeam fades out in a burst of moonlight where it stood */
+  beamFinish(c) {
+    const G = this.G, p = c.R.params, b = c.beam.pos;
+    this.fx().starBurst(_u.set(b.x, b.y + 0.4, b.z), { r: 1.2, n: 16, color: PAL.moon, color2: PAL.violet });
+    G.vfx.charge?.burst?.(b, { r: 2.2, life: 0.4, color: PAL.moon, w: 0.12 });
+    sfx('rune_chime', { pos: b }); G.engine.rig.shake(0.2);
+    this.nova2(b.x, b.z, 2, e => this.mokaHit(e, { dmgPct: p.dmgPct * (p.burstPct || 150) / 100, element: 'zap', from: b, knock: 0.6 }));
   },
   cast_constellation(R, aim, target) {
     const G = this.G, P = G.player, p = R.params;

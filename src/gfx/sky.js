@@ -51,13 +51,16 @@ export class DayNight {
     return o;
   }
   update(dt) {
-    if (!this.paused) {
-      this.hour += dt * this.speed;
-      if (this.hour >= 24) { this.hour -= 24; }
-      if (this._lastHour !== undefined && this._lastHour < 6 && this.hour >= 6) { this.day++; this.world.onNewDay?.(this.day); }
-      this._lastHour = this.hour;
-    }
+    this.tick(dt);
     this.apply();
+  }
+  // time passes (and the 6:00 new day) without lighting the outdoors: an interior lights itself (home/housing.js)
+  tick(dt) {
+    if (this.paused) return;
+    this.hour += dt * this.speed;
+    if (this.hour >= 24) { this.hour -= 24; }
+    if (this._lastHour !== undefined && this._lastHour < 6 && this.hour >= 6) { this.day++; this.world.onNewDay?.(this.day); }
+    this._lastHour = this.hour;
   }
   apply() {
     const o = this.sample(this.hour);
