@@ -18,24 +18,16 @@ export class Collision {
     this._cells(x - rad, z - rad, x + rad, z + rad, k => { const a = this.map.get(k); if (a) for (const o of a) { if (o._s === s) continue; o._s = s; fn(o); } });
   }
   // push point (p.x, p.z) with radius r out of all colliders; prev = last valid position for terrain blocking
+  // (the cell walk is query()'s, inlined: no closures per call — monsters resolve twice a frame each, ROADMAP Z-B5)
   resolve(p, r, prev) {
+    const c = this.cell, rad = r + 1;
     for (let it = 0; it < 2; it++) {
-      this.query(p.x, p.z, r + 1, o => {
-        if (o.t === 'c') {
-          const dx = p.x - o.x, dz = p.z - o.z, d = Math.hypot(dx, dz), m = r + o.r;
-          if (d < m && d > 1e-5) { p.x = o.x + dx / d * m; p.z = o.z + dz / d * m; }
-        } else {
-          const cx = Math.max(o.x0, Math.min(p.x, o.x1)), cz = Math.max(o.z0, Math.min(p.z, o.z1));
-          const dx = p.x - cx, dz = p.z - cz, d = Math.hypot(dx, dz);
-          if (d < r) {
-            if (d > 1e-5) { p.x = cx + dx / d * r; p.z = cz + dz / d * r; }
-            else { // inside: push out along the smallest axis
-              const l = p.x - o.x0, rr = o.x1 - p.x, t = p.z - o.z0, b = o.z1 - p.z, mn = Math.min(l, rr, t, b);
-              if (mn === l) p.x = o.x0 - r; else if (mn === rr) p.x = o.x1 + r; else if (mn === t) p.z = o.z0 - r; else p.z = o.z1 + r;
-            }
-          }
-        }
-      });
+      const s = ++this._stamp, x = p.x, z = p.z;
+      const i0 = Math.floor((x - rad) / c), i1 = Math.floor((x + rad) / c), j0 = Math.floor((z - rad) / c), j1 = Math.floor((z + rad) / c);
+      for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+        const a = this.map.get(this._key(i, j)); if (!a) continue;
+        for (let n = 0; n < a.length; n++) { const o = a[n]; if (o._s === s) continue; o._s = s; this._push(p, r, o); }
+      }
     }
     if (this.blockFn && prev && this.blockFn(p.x, p.z)) {
       // slide along axes
@@ -45,15 +37,35 @@ export class Collision {
     }
     return p;
   }
+  _push(p, r, o) {
+    if (o.t === 'c') {
+      const dx = p.x - o.x, dz = p.z - o.z, d = Math.hypot(dx, dz), m = r + o.r;
+      if (d < m && d > 1e-5) { p.x = o.x + dx / d * m; p.z = o.z + dz / d * m; }
+    } else {
+      const cx = Math.max(o.x0, Math.min(p.x, o.x1)), cz = Math.max(o.z0, Math.min(p.z, o.z1));
+      const dx = p.x - cx, dz = p.z - cz, d = Math.hypot(dx, dz);
+      if (d < r) {
+        if (d > 1e-5) { p.x = cx + dx / d * r; p.z = cz + dz / d * r; }
+        else { // inside: push out along the smallest axis
+          const l = p.x - o.x0, rr = o.x1 - p.x, t = p.z - o.z0, b = o.z1 - p.z, mn = Math.min(l, rr, t, b);
+          if (mn === l) p.x = o.x0 - r; else if (mn === rr) p.x = o.x1 + r; else if (mn === t) p.z = o.z0 - r; else p.z = o.z1 + r;
+        }
+      }
+    }
+  }
   // true if a point is inside any collider or blocked terrain (for projectiles / placement)
   solidAt(x, z, pad = 0) {
-    let hit = false;
     if (this.blockFn && this.blockFn(x, z)) return true;
-    this.query(x, z, pad + 0.5, o => {
-      if (hit) return;
-      if (o.t === 'c') { if (Math.hypot(x - o.x, z - o.z) < o.r + pad) hit = true; }
-      else if (x > o.x0 - pad && x < o.x1 + pad && z > o.z0 - pad && z < o.z1 + pad) hit = true;
-    });
-    return hit;
+    const s = ++this._stamp, c = this.cell, rad = pad + 0.5;
+    const i0 = Math.floor((x - rad) / c), i1 = Math.floor((x + rad) / c), j0 = Math.floor((z - rad) / c), j1 = Math.floor((z + rad) / c);
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+      const a = this.map.get(this._key(i, j)); if (!a) continue;
+      for (let n = 0; n < a.length; n++) {
+        const o = a[n]; if (o._s === s) continue; o._s = s;
+        if (o.t === 'c') { if (Math.hypot(x - o.x, z - o.z) < o.r + pad) return true; }
+        else if (x > o.x0 - pad && x < o.x1 + pad && z > o.z0 - pad && z < o.z1 + pad) return true;
+      }
+    }
+    return false;
   }
 }

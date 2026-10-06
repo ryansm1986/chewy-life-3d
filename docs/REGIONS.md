@@ -21,7 +21,9 @@ toon look as the village and the Burrow (see ARCHITECTURE.md "Visual style guide
 - **Revisits**: terrain, vegetation and landmarks are fixed per region (seeded by the region id). Monster camps,
   chests and shrines reroll per visit. Monster level = the region's range, scaled by the hero's level within it
   (`clamp(heroLvl, min, max)`), camps nearer the boss +1…+3.
-- **Save**: `state.regions = { unlocked: { bamboo: true, … }, cleared: { bamboo: 2 }, visits: { bamboo: 3 } }`.
+- **Save**: since the zones rework, `state.zones[id]` (`src/rpg/zones.js`, docs/ZONES.md §8.1). `state.regions = { unlocked: { bamboo: true, … },
+  cleared: { bamboo: 2 }, visits: { bamboo: 3 } }` is a live, unsaved view of it (cleared = `zones[id].regionBoss`), and
+  older saves migrate.
 - Death in a region: the usual "Shadow drags you home" (to the village).
 
 ## 2. The four regions

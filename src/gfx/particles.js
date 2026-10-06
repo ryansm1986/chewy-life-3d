@@ -46,7 +46,7 @@ const FREE_MAX = 1024;
 
 export class ParticleLayer {
   constructor(scene, map, { additive = true, max = 3000, depthTest = true, order = 10, grid = 0 } = {}) {
-    this.max = max; this.n = 0;
+    this.max = max; this.n = 0; this.killed = 0;
     this.p = []; // particle objects
     this.free = []; // recycled particle objects
     const g = new THREE.InstancedBufferGeometry();
@@ -73,7 +73,9 @@ export class ParticleLayer {
   // spawn one particle; o: {x,y,z, vx,vy,vz, life, size, size1, color(THREE.Color|hex), color1, alpha, alpha1, rot, spin, drag, grav,
   // stretch, fn(q, dt, k), fadeIn, flicker, frame (atlas layers)} → the particle record (fn may keep extra fields on it)
   spawn(o) {
-    if (this.p.length >= this.max) { const old = this.p.shift(); if (this.free.length < FREE_MAX) this.free.push(old); }
+    // a full layer drops its oldest particle: it is marked spent (this frame's update compacts it out before the draw,
+    // as shift() did) instead of shifting the whole array — a saturated layer made every spawn O(max) (ROADMAP Z-B5)
+    if (this.p.length - this.killed >= this.max) { const old = this.p[this.killed++]; if (old) { old.t = old.life; old.fn = null; } }
     const c = o.color instanceof THREE.Color ? o.color : _col.set(o.color ?? '#ffffff');
     const q = this.free.pop() || { _c1: null };
     q.x = o.x; q.y = o.y; q.z = o.z; q.vx = o.vx || 0; q.vy = o.vy || 0; q.vz = o.vz || 0; q.t = 0; q.life = o.life || 1;
@@ -87,6 +89,7 @@ export class ParticleLayer {
   update(dt, camera) {
     camera.matrixWorld.extractBasis(this.uniforms.uCamRight.value, this.uniforms.uCamUp.value, _fwd);
     const P = this.p; let w = 0;
+    this.killed = 0;
     const pos = this.aPos.array, col = this.aCol.array, misc = this.aMisc.array, fr = this.aFrame ? this.aFrame.array : null;
     for (let i = 0; i < P.length; i++) {
       const q = P[i];
@@ -112,11 +115,11 @@ export class ParticleLayer {
       if (fr) fr[j] = q.frame;
     }
     P.length = w;
-    this.geo.instanceCount = Math.min(w, this.max);
+    const n = this.geo.instanceCount = Math.min(w, this.max);
     this.mesh.visible = w > 0;
-    this.aPos.needsUpdate = true; this.aCol.needsUpdate = true; this.aMisc.needsUpdate = true;
-    if (this.aFrame) this.aFrame.needsUpdate = true;
+    // upload only the live records (the buffers hold `max`: a full upload every frame was ~120 KB per layer)
+    if (n) for (const a of [this.aPos, this.aCol, this.aMisc, this.aFrame]) if (a) { a.clearUpdateRanges(); a.addUpdateRange(0, n * a.itemSize); a.needsUpdate = true; }
   }
-  clear() { for (const q of this.p) if (this.free.length < FREE_MAX) { q.fn = null; this.free.push(q); } this.p.length = 0; this.geo.instanceCount = 0; this.mesh.visible = false; }
+  clear() { for (const q of this.p) if (this.free.length < FREE_MAX) { q.fn = null; this.free.push(q); } this.p.length = 0; this.killed = 0; this.geo.instanceCount = 0; this.mesh.visible = false; }
   dispose() { this.mesh.parent?.remove(this.mesh); this.geo.dispose(); this.mat.dispose(); }
 }

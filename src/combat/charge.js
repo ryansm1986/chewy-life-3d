@@ -9,7 +9,7 @@
 // While charging: the hero plays the 'charge' wind-up pose (actors/chargePoses.js), walks at SLOW speed facing the
 // cursor, hits don't interrupt; cooldowns tick; zoom is only spent on release (+25% per stage). The ring caps at the
 // highest stage the hero can afford. Toggle mode: one press starts charging, the next press releases.
-// Channels (Tail Spin, Moonbeam): the charge is a wind-up; at Stage Ⅰ the charged channel starts and runs while held
+// Channels (Whirlwind Stance, Moonbeam): the charge is a wind-up; at Stage Ⅰ the charged channel starts and runs while held
 // (launch / tickChannel / letGo).
 // Events: 'charge:start' {id, slot}, 'charge:stage' {id, stage}, 'charge:release' {id, stage, ok}, 'charge:cancel' {id, reason}.
 import * as THREE from 'three';
@@ -69,7 +69,7 @@ export class ChargeController {
       this.tap(); // a different key: the older press is a tap
     }
     if (!edge) return false; // still holding a key whose press already ended (a roll cancelled it): press again
-    // Second Helping (Chomp): the next press inside the window is a free Stage Ⅰ, no hold
+    // Second Draw (Crescent Chomp): the next press inside the window is a free Stage Ⅰ, no hold
     if (this.free && this.free.id === id && this.clock < this.free.until) { this.free = null; return this.cast(id, { stage: 1, free: true }); }
     this.press = { slot, id, t: 0, toggle: mode === CHARGE_MODE.TOGGLE, warned: false };
     return true;
@@ -179,7 +179,7 @@ export class ChargeController {
     }
     Events.emit('charge:stage', { id: a.id, stage: s });
   }
-  // ------------------------------------------------------------------ channels (Tail Spin, Moonbeam)
+  // ------------------------------------------------------------------ channels (Whirlwind Stance, Moonbeam)
   // The charge is a wind-up: at Stage Ⅰ the charged spin / beam starts by itself and keeps going while the key is held,
   // the later stages rev it up as it runs (bigger, stronger, +25% zoom per second per stage), and letting go leaves a
   // charged channel spinning / lingering on its own for a moment (params.spinOut / linger) before it ends.

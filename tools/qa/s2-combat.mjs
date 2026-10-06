@@ -1,7 +1,7 @@
 // Scenario 2: dungeon combat stress. Level 30, every skill at 10, cast everything at monsters for 30 s
 // (including the whirl channel via a held hotbar key, dash, leap, bonestorm, packcall, decoy, treat, moonhowl, fetchstorm).
 // Asserts: no exceptions, player never NaN / inside rock / off-map, kills + xp + loot happen, no stuck skill state.
-// Then targeted repros: Dig Slam interrupted by a potion / by Tail Spin (P.leap never cleared), Dig Slam through walls.
+// Then targeted repros: Helmet Splitter interrupted by a potion / by Whirlwind Stance (P.leap never cleared), Helmet Splitter through walls.
 import { launch, boot, waitMode, sleep, makeReport, tap } from './lib.mjs';
 
 const R = makeReport('S2 dungeon combat stress');
@@ -88,7 +88,7 @@ try {
   const moved = await page.evaluate(p0 => { const P = window.G.player.pos; return Math.hypot(P.x - p0.x, P.z - p0.z); }, p0);
   R.check('player can still move with WASD after the stress run', moved > 0.3, `moved ${moved.toFixed(2)}`);
 
-  // ---------------------------------------------------------------- targeted: Dig Slam interrupted
+  // ---------------------------------------------------------------- targeted: Helmet Splitter interrupted
   async function leapInterrupted(label, interrupt) {
     await page.evaluate(() => { const G = window.G; G.skills.clearAll(); G.skills.cds = {}; G.player.leap = null; G.player.dash = null; G.player.anim.stop(); G.player.invuln = false; for (const m of G.dungeon.monsters) m.status.stun = 99; const s = G.dungeon.startPos; G.player.setPos(s.x, s.z); });
     await sleep(page, 200);
@@ -107,13 +107,13 @@ try {
     const st = await page.evaluate(() => ({ leap: !!window.G.player.leap, anim: window.G.player.anim.action?.name || null, pos: window.G.player.pos.clone() }));
     await tap(page, 'd', 500);
     const moved = await page.evaluate(p0 => { const P = window.G.player.pos; return Math.hypot(P.x - p0.x, P.z - p0.z); }, st.pos);
-    R.check(`Dig Slam interrupted by ${label}: player not frozen`, !st.leap && moved > 0.2, `cast=${r.ok} leapAfter1.5s=${st.leap} anim=${st.anim} movedWithD=${moved.toFixed(2)}`);
+    R.check(`Helmet Splitter interrupted by ${label}: player not frozen`, !st.leap && moved > 0.2, `cast=${r.ok} leapAfter1.5s=${st.leap} anim=${st.anim} movedWithD=${moved.toFixed(2)}`);
     await page.evaluate(() => { window.G.player.leap = null; window.G.player.anim.stop(); });
   }
   await leapInterrupted('a Heart Treat (Q)', 'potion');
-  await leapInterrupted('Tail Spin (hotbar key held)', 'whirl');
+  await leapInterrupted('Whirlwind Stance (hotbar key held)', 'whirl');
 
-  // ---------------------------------------------------------------- targeted: Dig Slam through a wall
+  // ---------------------------------------------------------------- targeted: Helmet Splitter through a wall
   const tunnel = await page.evaluate(async () => {
     const G = window.G, L = G.dungeon.layout, P = G.player, V = G.THREE.Vector3;
     for (const m of G.dungeon.monsters) m.status.stun = 99;
@@ -144,9 +144,9 @@ try {
     return { ok, from: [best.x, best.y], dir: [best.dx, best.dy], walkDistToOtherSide: best.far, endCell: [cx, cy], endWalkDist: D[cy * L.W + cx], leapDist: Math.hypot(P.pos.x - sx, P.pos.z - sz).toFixed(2) };
   });
   if (tunnel.skipped) R.note('dig-through-wall: ' + tunnel.skipped);
-  else R.check('Dig Slam cannot leap through a thin rock wall', !(tunnel.endWalkDist > 4), JSON.stringify(tunnel));
+  else R.check('Helmet Splitter cannot leap through a thin rock wall', !(tunnel.endWalkDist > 4), JSON.stringify(tunnel));
 
-  // ---------------------------------------------------------------- targeted: Tail Spin held on its hotbar key deals damage
+  // ---------------------------------------------------------------- targeted: Whirlwind Stance held on its hotbar key deals damage
   const whirl = await page.evaluate(async () => {
     const G = window.G, P = G.player;
     G.skills.clearAll(); G.skills.cds = {}; P.leap = null; P.anim.stop(); G.actions.restoreAll();
@@ -167,7 +167,7 @@ try {
     G.combat.hitMonster = rawHit; G.skills.tryCast = rawCast;
     return { monstersInRange: ring.length, hits, whirlCastsStarted: casts, zoomSpent: +(z0 - G.actions.zoom()).toFixed(1), channel: !!G.skills.channel, dbg: { modal: G.ui?.anyModal?.(), locked: P.controlLocked, dead: G.playerDead, wt: G.derived.weaponType, alt: G.state.equipment.weaponAlt?.wtype, busy: P.anim.busy(), act: P.anim.action?.name, leap: !!P.leap, dash: !!P.dash, hb: G.state.player.hotbar } };
   });
-  R.check('Tail Spin held on its hotbar key actually hits (≈4 hits/s per monster)', whirl.hits >= 8, JSON.stringify(whirl));
+  R.check('Whirlwind Stance held on its hotbar key actually hits (≈4 hits/s per monster)', whirl.hits >= 8, JSON.stringify(whirl));
 } catch (e) { errors.push('[harness] ' + e.stack); }
 const failed = R.finish(errors, warns);
 await browser.close();

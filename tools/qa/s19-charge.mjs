@@ -2,15 +2,15 @@
 //  a) the hold: a tap casts normal; holding reaches Ⅰ and fires charged; Ⅱ and Ⅲ with Deeper Charge; the stage cost, paid
 //     once on release; the cap when zoom is short; a roll and a panel cancel, a hit doesn't; the slow walk; Toggle and Off;
 //     the number keys; perks per hero through save/load, a hero switch and a respec
-//  b) unique perks at work: Second Helping, Split Shot + Boomerang Fetch, Rain Shower
-//  c) the channels: Tail Spin and Moonbeam wind up, then channel while held, spin out / linger when let go
+//  b) unique perks at work: Second Draw, Split Shot + Boomerang Fetch, Rain Shower
+//  c) the channels: Whirlwind Stance and Moonbeam wind up, then channel while held, spin out / linger when let go
 //  d) every active skill of both heroes charge-casts at Ⅰ and Ⅲ with every perk, in a Burrow fight, without errors
 //  e) the K panel: the Charge drawer, buying a perk (one point), level gates, the ⚡ chip picks a skill, the tooltip
-//  f) a charged dash (Zoomies, Ping-Pong, Afterimage) never leaves the walkable floor: walls, cliffs, closed doors,
+//  f) a charged dash (Flash Draw, Return Stroke, Afterimage) never leaves the walkable floor: walls, cliffs, closed doors,
 //     region bounds, even on a long frame
 //  g) the "Hold to power up!" guide (Shadow)
 //  h) perf: frame times through a burst of fully charged releases vs the same burst tapped
-import { launch, boot, waitMode, sleep, makeReport } from './lib.mjs';
+import { launch, boot, waitMode, sleep, makeReport, BASE } from './lib.mjs';
 
 const R = makeReport('S19 charged abilities: hold, perks, channels, every skill, K panel, dash bounds, guide, perf');
 const { browser, page, errors, warns } = await launch({ w: 1280, h: 720 });
@@ -18,7 +18,7 @@ const ev = (f, a) => page.evaluate(f, a);
 const HOUR = 11;
 
 async function fight(hero = 'chewy', floor = 2) {
-  await boot(page, `fresh&nointro${hero === 'moka' ? '&hero=moka' : ''}`);
+  await boot(page, `fresh&nointro${hero === 'moka' || hero === 'poe' ? `&hero=${hero}` : ''}`);
   await ev(f => { window.G.state.flags.burrowTut = true; window.G.enterDungeon(f); }, floor);
   await waitMode(page, 'dungeon');
 }
@@ -60,14 +60,14 @@ try {
   await page.mouse.move(800, 300);
   await reset(); await page.mouse.down({ button: 'right' }); await sleep(page, 70); await page.mouse.up({ button: 'right' }); await sleep(page, 500);
   let c = await ev(() => ({ casts: window.__casts, ev: window.__ev }));
-  R.check('a tap casts one normal Chomp (no charge)', c.casts.length === 1 && c.casts[0].stage === 0 && !c.ev.some(e => e[0] === 'charge:start'), JSON.stringify(c));
+  R.check('a tap casts one normal Crescent Chomp (no charge)', c.casts.length === 1 && c.casts[0].stage === 0 && !c.ev.some(e => e[0] === 'charge:start'), JSON.stringify(c));
   await reset(); await page.mouse.down({ button: 'right' });
   await page.waitForFunction(() => (window.G.skills.charge.active?.stage || 0) >= 1, null, { timeout: 8000 }); await sleep(page, 150);
   let st = await ev(() => { const a = window.G.skills.charge.active; return a && { stage: a.stage, max: a.max, slow: window.G.player.chargeSlow, pose: window.G.player.anim.action?.name, ring: window.G.skills.charge.view.on }; });
   await page.mouse.up({ button: 'right' }); await sleep(page, 600);
   c = await ev(() => ({ casts: window.__casts }));
   R.check('holding charges to Stage Ⅰ (one stage without perks): slow walk, the wind-up pose, the ring', st && st.stage === 1 && st.max === 1 && st.slow === 0.45 && st.pose === 'charge' && st.ring, JSON.stringify(st));
-  R.check('…and letting go fires a Stage Ⅰ Heavy Cleave', c.casts.length === 1 && c.casts[0].stage === 1, JSON.stringify(c.casts));
+  R.check('…and letting go fires a Stage Ⅰ Grand Crescent', c.casts.length === 1 && c.casts[0].stage === 1, JSON.stringify(c.casts));
   const perk = await ev(() => { const A = window.G.actions; return [A.learnPerk('chomp', 'stages'), A.learnPerk('chomp', 'stages'), A.learnPerk('chomp', 'stages'), window.G.state.player.skillPts]; });
   R.check('Deeper Charge: Ⅱ, Ⅲ, then mastered; two points spent', perk[0] === 1 && perk[1] === 2 && perk[2] === false && perk[3] === 8, JSON.stringify(perk));
   await reset(); await ev(() => { const A = window.G.actions; window.__spent = []; if (!A.__sz) { A.__sz = A.spendZoom; A.spendZoom = n => { window.__spent.push(n); return A.__sz(n); }; } });
@@ -121,7 +121,7 @@ try {
   R.check('a number key charges and releases like the mouse', st === 2 && c.casts[0]?.stage >= 1, JSON.stringify({ st, c }));
   const saved = await ev(() => { window.G.save(); const s = JSON.parse(localStorage.getItem('chewy3d.save')); return { chewy: s.heroes.chewy.player.chargePerks, moka: s.heroes.moka.player.chargePerks || null }; });
   R.check('perks are saved on the hero (Chewy has his, Moka none)', saved.chewy?.chomp?.stages === 2 && !saved.moka?.chomp, JSON.stringify(saved));
-  await page.goto('http://localhost:5173/?nointro&notitle', { waitUntil: 'load' });
+  await page.goto(`${BASE}/?nointro&notitle`, { waitUntil: 'load' }); // (the same origin as boot(): BASE=... runs keep their save)
   await page.waitForFunction(() => window.__ready === true && window.G?.player, null, { timeout: 60000 }); await sleep(page, 600);
   const back = await ev(() => ({ perks: window.G.state.player.chargePerks, ms: (() => { window.G.state.flags.mokaJoined = true; window.G.actions.setActiveHero('moka'); const p = window.G.state.player.chargePerks; window.G.actions.setActiveHero('chewy'); return p || null; })(), again: window.G.state.player.chargePerks }));
   R.check('after a reload Chewy keeps his perks, Moka has her own, switching back keeps them', back.perks?.chomp?.stages === 2 && !back.ms?.chomp && back.again?.chomp?.stages === 2, JSON.stringify(back));
@@ -133,11 +133,11 @@ try {
   let xy = await dummies(); await page.mouse.move(xy[0], xy[1]); await sleep(page, 300);
   await holdRMB();
   // (on the game's clock, not the wall's: wait for the charged swing to finish, then tap; the window is 2 s of game time)
-  await page.waitForFunction(() => window.__casts.length >= 1 && window.G.player.anim.action?.name !== 'swing', null, { timeout: 5000 }).catch(() => {});
+  await page.waitForFunction(() => window.__casts.length >= 1 && !['swing', 'iaiCut'].includes(window.G.player.anim.action?.name), null, { timeout: 5000 }).catch(() => {});
   await page.mouse.down({ button: 'right' }); await sleep(page, 60); await page.mouse.up({ button: 'right' });
   await page.waitForFunction(() => window.__casts.length >= 2, null, { timeout: 5000 }).catch(() => {});
   c = await ev(() => window.__casts);
-  R.check('Second Helping: a tap inside 2s after a charged Chomp is a free Stage Ⅰ', c.length === 2 && c[0].stage === 1 && c[1].stage === 1 && c[1].free, JSON.stringify(c));
+  R.check('Second Draw: a tap inside 2s after a charged Crescent Chomp is a free Stage Ⅰ', c.length === 2 && c[0].stage === 1 && c[1].stage === 1 && c[1].free, JSON.stringify(c));
   await fight('chewy', 2); await learn({ skills: { throw: 10 }, hotbar: [null, 'throw'], perks: { throw: { split: 2, boomerang: 1 } }, wep: 'throw' });
   xy = await dummies(true); await page.mouse.move(xy[0], xy[1]); await sleep(page, 300);
   await ev(() => { window.__pr = []; const C = window.G.combat, raw = C.spawn.bind(C); C.spawn = o => { const p = raw(o); window.__pr.push(p); return p; }; for (const m of window.__dummies) m.knock = { add() {}, set() {}, lengthSq: () => 0, multiplyScalar() { return this; } }; });
@@ -155,13 +155,14 @@ try {
   // ================================================================ c) the channels
   await fight('chewy', 2); await learn({ skills: { whirl: 10 }, hotbar: [null, null, 'whirl'] });
   await ev(() => { const G = window.G, P = G.player; for (const m of G.dungeon.monsters) { m.status.stun = 999; m.pos.set(-999, 0, -999); } const n0 = G.dungeon.monsters.length; G.dungeon.summonAround({ pos: P.pos }, 'mochi', 4); window.__ring = G.dungeon.monsters.slice(n0); window.__ring.forEach((m, i) => { const a = i / 4 * Math.PI * 2; m.pos.set(P.pos.x + Math.cos(a) * 3.2, 0, P.pos.z + Math.sin(a) * 3.2); m.lifeMax = m.life = 1e7; m.status.stun = 999; m.speed = 0; }); window.__ev = []; for (const n of ['charge:spinout']) G.events.on(n, p => window.__ev.push([n, p.stage])); window.__h = 0; const raw = G.combat.hitMonster.bind(G.combat); G.combat.hitMonster = (m, o) => { window.__h++; return raw(m, o); }; });
-  await page.keyboard.down('1'); await sleep(page, 300);
+  await page.keyboard.down('1');
+  await page.waitForFunction(() => window.G.skills.charge.active?.id === 'whirl' || window.G.skills.channel, null, { timeout: 4000 }).catch(() => {}); // (game time, not wall time: a busy machine runs the game slow)
   const w = await ev(() => ({ anim: window.G.player.anim.action?.name, channel: !!window.G.skills.channel }));
   await page.waitForFunction(() => window.G.skills.channel?.id === 'whirl', null, { timeout: 6000 });
   const d0 = await ev(() => window.__ring.map(m => Math.hypot(m.pos.x - window.G.player.pos.x, m.pos.z - window.G.player.pos.z)));
   await sleep(page, 1200);
   const s1 = await ev(() => ({ anim: window.G.player.anim.action?.name, stage: window.G.skills.channel?.R?.charge?.stage, hits: window.__h, d: window.__ring.map(m => Math.hypot(m.pos.x - window.G.player.pos.x, m.pos.z - window.G.player.pos.z)) }));
-  R.check('Tail Spin: holding winds up first, then the charged spin starts by itself, hits and pulls foes in', w.anim === 'charge' && !w.channel && s1.anim === 'spin' && s1.stage >= 1 && s1.hits >= 6 && s1.d.every((d, i) => d < d0[i] - 0.2), JSON.stringify({ w, s1, d0 }));
+  R.check('Whirlwind Stance: holding winds up first, then the charged spin starts by itself, hits and pulls foes in', w.anim === 'charge' && !w.channel && s1.anim === 'spin' && s1.stage >= 1 && s1.hits >= 6 && s1.d.every((d, i) => d < d0[i] - 0.2), JSON.stringify({ w, s1, d0 }));
   await page.keyboard.up('1'); await sleep(page, 400);
   const o1 = await ev(() => ({ channel: !!window.G.skills.channel, ev: window.__ev.map(e => e.join(':')) }));
   await sleep(page, 2600);
@@ -177,8 +178,8 @@ try {
   const mb2 = await ev(() => window.G.skills.channel?.id || null);
   R.check('Moonbeam: a wind-up, then the charged beam; let go and it lingers, then ends', mb.r >= mb.r0 - 1e-6 && mb1 === 'moonbeam' && !mb2, JSON.stringify({ mb, mb1, mb2 }));
 
-  // ================================================================ d) every active skill, both heroes, Ⅰ and Ⅲ, every perk
-  for (const hero of ['chewy', 'moka']) {
+  // ================================================================ d) every active skill, all three heroes, Ⅰ and Ⅲ, every perk
+  for (const hero of ['chewy', 'moka', 'poe']) {
     await fight(hero, 3);
     const ids = await ev(async hero => {
       const G = window.G, pl = G.state.player;
@@ -196,7 +197,7 @@ try {
       const r = await ev(async ({ id, stage }) => {
         const G = window.G, P = G.player;
         const { SKILLS } = await import('/src/rpg/skills.js');
-        G.skills.cds = {}; P.anim.stop(); P.leap = null; P.dash = null; G.actions.restoreAll();
+        G.skills.cds = {}; P.anim.stop(); P.leap = null; P.dash = null; if (P.hero === 'poe') G.skills.clearPoe(); G.actions.restoreAll();
         if (SKILLS[id].wep && G.derived.weaponType !== SKILLS[id].wep) { G.actions.swapWeapons(); P.setWeapon(G.derived.weaponType); }
         if (G.dungeon.monsters.filter(m => m.alive).length < 5) G.dungeon.summonAround({ pos: P.pos }, 'mochi', 5);
         const { r: rr } = G.engine.rig.groundAxes();
@@ -216,7 +217,7 @@ try {
   await ev(() => { const G = window.G, pl = G.state.player; pl.lvl = 14; pl.skillPts = 4; Object.assign(pl.skills, { chomp: 6, dig: 3 }); pl.chargePerks = {}; G.actions.recompute(); G.ui.open('skills'); });
   await sleep(page, 700);
   const k0 = await ev(() => ({ drawer: !!document.querySelector('.p-skills .chg-drawer:not([hidden])'), id: window.G.ui.panels.skills.chg.id, perks: document.querySelectorAll('.chg-pk').length, chips: document.querySelectorAll('.node .nd-chg.on').length, title: document.querySelector('.chg-name')?.textContent }));
-  R.check('K panel: the Charge drawer shows the tree\'s first skill (its 4 perks); the active skills carry a ⚡ chip', k0.drawer && k0.id === 'chomp' && k0.perks === 4 && k0.chips >= 2 && k0.title === 'Heavy Cleave', JSON.stringify(k0));
+  R.check('K panel: the Charge drawer shows the tree\'s first skill (its 4 perks); the active skills carry a ⚡ chip', k0.drawer && k0.id === 'chomp' && k0.perks === 4 && k0.chips >= 2 && k0.title === 'Grand Crescent', JSON.stringify(k0));
   const pk = sel => ev(sel => { const n = document.querySelector(sel); if (!n) return null; const b = n.getBoundingClientRect(); return [n.dataset.p, b.x + b.width / 2, b.y + b.height / 2]; }, sel);
   const click = async xy => { await page.mouse.move(xy[1], xy[2]); await sleep(page, 150); await page.mouse.down(); await page.mouse.up(); await sleep(page, 300); };
   const can = await pk('.chg-pk.can'); if (can) await click(can);
@@ -228,7 +229,7 @@ try {
   const chip = await ev(() => { const c = document.querySelector('.node[data-id="dig"] .nd-chg'); const b = c?.getBoundingClientRect(); return b && [0, b.x + b.width / 2, b.y + b.height / 2]; });
   if (chip) await click(chip);
   const k3 = await ev(() => ({ id: window.G.ui.panels.skills.chg.id, pts: window.G.state.player.skillPts, dig: window.G.state.player.skills.dig, sel: !!document.querySelector('.node[data-id="dig"] .nd-chg.sel') }));
-  R.check('the ⚡ chip on Dig Slam shows its charge in the drawer (without learning the skill)', k3.id === 'dig' && k3.pts === 3 && k3.dig === 3 && k3.sel, JSON.stringify(k3));
+  R.check('the ⚡ chip on Helmet Splitter shows its charge in the drawer (without learning the skill)', k3.id === 'dig' && k3.pts === 3 && k3.dig === 3 && k3.sel, JSON.stringify(k3));
   const nb = await ev(() => { const n = document.querySelector('.node[data-id="chomp"]'); const b = n.getBoundingClientRect(); return [0, b.x + b.width / 2, b.y + 8]; });
   await page.mouse.move(nb[1], nb[2]); await sleep(page, 500);
   const tip = await ev(() => document.querySelector('.tt-sect.chg')?.textContent || '');
@@ -273,7 +274,7 @@ try {
       return { bad, ok: W.walkable(P.pos.x, P.pos.z) };
     }, at);
     const res = await ev(async () => { window.__stopWatch = true; const G = window.G, P = G.player, W = G.world; const { navFor } = await import('/src/core/nav.js'); const nav = navFor(W); return { bad: window.__bad, walk: W.walkable(P.pos.x, P.pos.z), solid: W.collision.solidAt(P.pos.x, P.pos.z, 0.05), nav: nav ? nav.walkAt(P.pos.x, P.pos.z) : true, casts: window.__casts?.length }; });
-    R.check(`${label}: a fully charged Zoomies (Ping-Pong, Afterimage) at an edge ${at.open.toFixed(1)} m away never leaves the walkable floor, even on a 0.3 s frame`, !res.bad.length && res.walk && !res.solid && res.nav && !slow.bad.length && slow.ok, JSON.stringify({ at, res, slow }));
+    R.check(`${label}: a fully charged Flash Draw (Return Stroke, Afterimage) at an edge ${at.open.toFixed(1)} m away never leaves the walkable floor, even on a 0.3 s frame`, !res.bad.length && res.walk && !res.solid && res.nav && !slow.bad.length && slow.ok, JSON.stringify({ at, res, slow }));
   };
   await dashCase('the Burrow', 'fresh&nointro');
   await dashCase('a region (Bamboo)', 'fresh&nointro&region=bamboo');

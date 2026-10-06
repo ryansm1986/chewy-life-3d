@@ -34,7 +34,7 @@ export const SFX = {
     s.noise({ f: 2200, f2: 600, glide: 0.2, q: 1.4, a: 0.01, d: 0.2, v: 0.14, color: 'pink' });
     s.tone({ pts: [[0, 600], [0.18, 300]], type: 'triangle', a: 0.005, d: 0.18, v: 0.07 });
   } },
-  // Heavy Cleave: a deep earthy thoom under the swing
+  // Grand Crescent: a deep earthy thoom under the draw-cut
   charge_slam: { vary: 0.06, max: 2, gap: 0.08, trim: 1.6, fn(s) {
     s.tone({ f: 120, f2: 55, glide: 0.16, a: 0.003, d: 0.3, v: 0.42 });
     s.noise({ ft: 'lowpass', f: 900, a: 0.003, d: 0.22, v: 0.4, color: 'brown' });

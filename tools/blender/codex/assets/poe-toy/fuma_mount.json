@@ -1,0 +1,33 @@
+{
+  "units": "metres, Blender Z-up, front -Y; game: (x, z, -y)",
+  "object": "fuma_back",
+  "centre": [
+    0.0,
+    0.35,
+    0.628
+  ],
+  "facing": [
+    0.0,
+    0.9950371902099893,
+    -0.09950371902099893
+  ],
+  "up": [
+    -0.0,
+    0.09950371902099893,
+    0.9950371902099893
+  ],
+  "right": [
+    1.0,
+    0.0,
+    0.0
+  ],
+  "tip_radius": 0.4,
+  "across_m": 0.8,
+  "arm_angles_deg_from_right_in_plane": [
+    20,
+    160,
+    220,
+    320
+  ],
+  "note": "facing = the hub axis (points back, away from her); the pivot of fuma_back is the hub centre"
+}

@@ -72,23 +72,33 @@ function addBase(id, o) {
 const sword = (id, name, tier, lvl, dmg, aspd, req, sockets, variant, colors) => addBase(id, { name, slot: 'weapon', wtype: 'sword', tier, lvl, dmg, aspd, req, sockets, icon: { shape: 'sword', variant, colors } });
 const ball = (id, name, tier, lvl, dmg, aspd, req, sockets, variant, colors) => addBase(id, { name, slot: 'weapon', wtype: 'ball', tier, lvl, dmg, aspd, req, sockets, icon: { shape: 'ball', variant, colors } });
 const staff = (id, name, tier, lvl, dmg, aspd, req, sockets, variant, colors) => addBase(id, { name, slot: 'weapon', wtype: 'staff', tier, lvl, dmg, aspd, req, sockets, icon: { shape: 'staff', variant, colors } });
+const fuma = (id, name, tier, lvl, dmg, aspd, req, sockets, variant, colors) => addBase(id, { name, slot: 'weapon', wtype: 'fuma', tier, lvl, dmg, aspd, req, sockets, icon: { shape: 'fuma', variant, colors } });
 const armor = (slot, id, name, tier, lvl, def, req, sockets, variant, colors) => addBase(id, { name, slot, tier, lvl, def, req, sockets, icon: { shape: slot, variant, colors } });
 const jewel = (slot, id, name, tier, lvl, variant, colors) => addBase(id, { name, slot, tier, lvl, sockets: 0, icon: { shape: slot, variant, colors } });
 
-// ---- Bone swords (str scaling) — [blade, grip, accent]
+// ---- Bone swords (str scaling) — [blade, grip, accent]: Chewy carries every one of them as a Bone Katana (the samurai:
+// charKit.js katanaGeo, tinted by these colours); the ids stay, the names that clashed with the theme were re-flavoured
 sword('chewStick', 'Chew Stick', 0, 1, [2, 5], 1.35, {}, 2, 'stick', ['#c98f5e', '#8a5a3a', '#7cc45a']);
-sword('boneSword', 'Bone Sword', 0, 1, [3, 7], 1.15, {}, 2, 'bone', ['#f4e8cf', '#c23b3b', '#f2e4c6']);
-sword('ribSabre', 'Rib Sabre', 0, 5, [4, 11], 1.25, { str: 14 }, 2, 'sabre', ['#f7ecd6', '#3f6fb0', '#f4c04a']);
+sword('boneSword', 'Bone Katana', 0, 1, [3, 7], 1.15, {}, 2, 'bone', ['#f4e8cf', '#c23b3b', '#f2e4c6']);
+sword('ribSabre', 'Rib Wakizashi', 0, 5, [4, 11], 1.25, { str: 14 }, 2, 'sabre', ['#f7ecd6', '#3f6fb0', '#f4c04a']);
 sword('crunchyFemur', 'Crunchy Femur', 0, 9, [7, 15], 1.0, { str: 20 }, 3, 'club', ['#efdcb8', '#8a5a3a', '#d9c09a']);
 sword('rawhideCleaver', 'Rawhide Cleaver', 0, 13, [8, 19], 1.1, { str: 25 }, 3, 'cleaver', ['#e8c89a', '#6b4a3a', '#c98f5e']);
 sword('dinoBoneBlade', 'Dino Bone Blade', 1, 20, [14, 30], 1.1, { str: 40 }, 3, 'dino', ['#f1e2c2', '#3f8f8a', '#e8503a']);
-sword('sharkToothSaber', 'Shark Tooth Saber', 1, 24, [13, 31], 1.3, { str: 38, dex: 30 }, 2, 'shark', ['#fbf6ee', '#2f4a7a', '#8fd0ff']);
+sword('sharkToothSaber', 'Shark Tooth Tachi', 1, 24, [13, 31], 1.3, { str: 38, dex: 30 }, 2, 'shark', ['#fbf6ee', '#2f4a7a', '#8fd0ff']);
 sword('mammothTusk', 'Mammoth Tusk', 1, 28, [20, 40], 0.95, { str: 55 }, 3, 'tusk', ['#fff3e0', '#8a5a3a', '#c98f5e']);
 sword('tRexCleaver', 'T-Rex Cleaver', 1, 33, [22, 46], 1.05, { str: 62 }, 3, 'trex', ['#eadbb8', '#5a3a5a', '#e8503a']);
 sword('moonboneKatana', 'Moonbone Katana', 2, 40, [28, 54], 1.3, { str: 70, dex: 60 }, 3, 'katana', ['#e6f0ff', '#2c3a6a', '#8fd0ff']);
 sword('dragonboneEdge', 'Dragonbone Edge', 2, 45, [34, 66], 1.1, { str: 85 }, 3, 'dragon', ['#fff0d0', '#8a2a3a', '#f4c04a']);
 sword('kaijuFemur', 'Kaiju Femur', 2, 50, [42, 84], 0.95, { str: 110 }, 3, 'kaiju', ['#e2f0d8', '#3a5a3a', '#8fe0c0']);
 sword('starboneOdachi', 'Starbone Odachi', 2, 55, [40, 78], 1.2, { str: 95, dex: 75 }, 3, 'odachi', ['#fff8e8', '#5a3a8a', '#ffcf4a']);
+// saves made before the re-flavour keep the old base names on their items: normalizeHeroes (actions.js) renames them
+const RENAMED = { boneSword: ['Bone Sword', 'Bone Katana'], ribSabre: ['Rib Sabre', 'Rib Wakizashi'], sharkToothSaber: ['Shark Tooth Saber', 'Shark Tooth Tachi'] };
+/** an item from an older save: its base's new name (normal and magic items carry the base name in theirs) */
+export function renameLegacyItem(it) {
+  const r = it && RENAMED[it.base];
+  if (r && typeof it.name === 'string' && it.name.includes(r[0])) it.name = it.name.replace(r[0], r[1]);
+  return it;
+}
 // ---- Balls (dex scaling) — [main, seam, accent]
 ball('redTennisBall', 'Red Tennis Ball', 0, 1, [2, 6], 1.2, {}, 2, 'tennis', ['#e8362a', '#fff3e0', '#ff8a70']);
 ball('squeakyBall', 'Squeaky Ball', 0, 4, [3, 9], 1.25, { dex: 12 }, 2, 'squeaky', ['#ff8fb0', '#fff3e0', '#ffcf4a']);
@@ -113,6 +123,20 @@ staff('mallardScepter', 'Mallard Scepter', 2, 40, [25, 50], 1.15, { ene: 72 }, 3
 staff('siriusStaff', 'Sirius Staff', 2, 45, [31, 62], 1.1, { ene: 82 }, 3, 'star', ['#2c2a5a', '#ffffff', '#ffd36a']);
 staff('abyssalCrook', 'Abyssal Crook', 2, 50, [38, 76], 1.0, { ene: 95 }, 3, 'moon', ['#1f2a4a', '#7ae8ff', '#b89aff']);
 staff('sunriseStaff', 'Sunrise Staff', 2, 55, [36, 72], 1.2, { ene: 104 }, 3, 'sun', ['#fff3e0', '#ff9a3a', '#ffcf4a']);
+// ---- Fūma: giant folding shuriken (Poe; dexterity scaling, docs/POE.md) — [blades, hub, accent]. Quick: they slash a
+// little faster than swords (her basic attack is a one-paw slash combo; Fūma Throw sends the whole thing out and back)
+fuma('boneFuma', 'Bone Fūma', 0, 1, [3, 7], 1.25, {}, 2, 'bone', ['#f4ead2', '#d8b040', '#3d6038']);
+fuma('squeakyFuma', 'Squeaky Fūma', 0, 5, [4, 10], 1.3, {}, 2, 'rubber', ['#ff8fb0', '#ffd84a', '#8fd0ff']);
+fuma('bambooFuma', 'Bamboo Fūma', 0, 9, [6, 14], 1.2, { dex: 20 }, 3, 'bamboo', ['#a8d46a', '#d8b040', '#4f8a3a']);
+fuma('rawhidePinwheel', 'Rawhide Pinwheel', 0, 13, [7, 17], 1.3, { dex: 26 }, 3, 'rawhide', ['#e8c89a', '#8a5a3a', '#c98f5e']);
+fuma('kageFuma', 'Kage Fūma', 1, 20, [12, 27], 1.25, { dex: 38 }, 3, 'shadow', ['#5a5260', '#c88a3a', '#2e2a30']);
+fuma('kitsunePinwheel', 'Kitsune Pinwheel', 1, 24, [13, 29], 1.3, { dex: 44 }, 2, 'kitsune', ['#fffaf2', '#e8503a', '#f4c04a']);
+fuma('crescentFuma', 'Crescent Fūma', 1, 28, [17, 35], 1.2, { dex: 52 }, 3, 'crescent', ['#e6ecff', '#8fb8ff', '#3a3a6a']);
+fuma('raijinFuma', 'Raijin Fūma', 1, 33, [19, 41], 1.25, { dex: 60 }, 3, 'thunder', ['#fff2b0', '#5a48b8', '#ffd84a']);
+fuma('dragonboneFuma', 'Dragonbone Fūma', 2, 40, [25, 50], 1.25, { dex: 72 }, 3, 'dragon', ['#fff0d0', '#8a2a3a', '#f4c04a']);
+fuma('smokeVeilFuma', 'Smoke-Veil Fūma', 2, 45, [31, 62], 1.3, { dex: 82 }, 3, 'smoke', ['#d8d0e0', '#6a5a8a', '#b89aff']);
+fuma('thousandStarFuma', 'Thousand-Star Fūma', 2, 50, [38, 76], 1.2, { dex: 95 }, 3, 'star', ['#fff8e8', '#ffcf4a', '#ff8fb0']);
+fuma('greatPugFuma', "Great Pug's Fūma", 2, 55, [36, 72], 1.35, { dex: 104 }, 3, 'royal', ['#f4ead2', '#d8b040', '#5a8a4a']);
 ball('planetBall', 'Ringed Planet Ball', 2, 50, [34, 70], 1.2, { dex: 95 }, 3, 'planet', ['#8fd0ff', '#ffbcd6', '#ffffff']);
 ball('supernovaBall', 'Supernova Ball', 2, 55, [36, 76], 1.3, { dex: 105 }, 3, 'nova', ['#c86aff', '#ffe0ff', '#ffcf4a']);
 // ---- Hats — [main, band, accent]
@@ -187,7 +211,7 @@ export const SOCKETABLE_SLOTS = ['weapon', 'hat', 'outfit'];
 
 // ================================================================== stat text
 const sgn = v => (v >= 0 ? '+' + v : '' + v);
-const TREE_NAMES = { bone: 'Bone Arts', fetch: 'Fetch Mastery', spirit: 'Pack Spirit' };
+const TREE_NAMES = { bone: 'Bone Blade', fetch: 'Fetch Mastery', spirit: 'Pack Spirit' };
 export const STAT_TEXT = {
   str: v => `${sgn(v)} to Strength`, dex: v => `${sgn(v)} to Dexterity`, vit: v => `${sgn(v)} to Vitality`, ene: v => `${sgn(v)} to Energy`,
   lifeMax: v => `${sgn(v)} to Life`, zoomMax: v => `${sgn(v)} to Zoom`,
@@ -375,13 +399,13 @@ const SLOT_WEIGHT = { weapon: 1.5, hat: 1, outfit: 1, boots: 0.9, paws: 0.9, col
 // Weapon drops favour the hero being played (docs/HEROES.md §2): set by HeroManager on every switch.
 let LOOT_CLASS = 'chewy';
 export function setLootClass(cls) { LOOT_CLASS = cls || 'chewy'; }
-const CLASS_WTYPES = { chewy: ['sword', 'ball'], moka: ['staff'] };
+const CLASS_WTYPES = { chewy: ['sword', 'ball'], moka: ['staff'], poe: ['fuma'] };
 export function pickBase(ilvl, slot, wtype, rng) {
   rng = toRng(rng);
   let slots = slot ? [slot] : SLOTS;
   const byslot = s => GEAR_BASE_IDS.map(id => ITEM_BASES[id]).filter(b => b.slot === s && b.lvl <= Math.max(1, ilvl) && (!wtype || b.wtype === wtype));
   slots = slots.filter(s => byslot(s).length);
-  if (!slots.length) return ITEM_BASES[wtype === 'ball' ? 'redTennisBall' : wtype === 'staff' ? 'driftwoodStaff' : 'boneSword'];
+  if (!slots.length) return ITEM_BASES[wtype === 'ball' ? 'redTennisBall' : wtype === 'staff' ? 'driftwoodStaff' : wtype === 'fuma' ? 'boneFuma' : 'boneSword'];
   const s = rng.weighted(slots.map(x => ({ x, w: SLOT_WEIGHT[x] || 1 }))).x;
   let pool = byslot(s);
   if (s === 'weapon' && !wtype) {
@@ -458,6 +482,7 @@ const RARE_B = {
   sword: ['Chomper', 'Fang', 'Gnaw', 'Bonker', 'Cleaver', 'Tooth', 'Crunch', 'Snapper'],
   ball: ['Fetch', 'Bounce', 'Orb', 'Comet', 'Squeak', 'Sphere', 'Boing', 'Zoomer'],
   staff: ['Crook', 'Wand', 'Tide', 'Beacon', 'Branch', 'Rod', 'Splash', 'Quack'],
+  fuma: ['Pinwheel', 'Whirl', 'Shuriken', 'Snort', 'Sneeze', 'Star', 'Shadow', 'Twirl'],
   hat: ['Crown', 'Topper', 'Brow', 'Visage', 'Hood', 'Cap'], outfit: ['Coat', 'Shell', 'Wrap', 'Cozy', 'Robe', 'Hide'],
   collar: ['Chime', 'Loop', 'Promise', 'Tag', 'Choker', 'Ring'], charm: ['Trinket', 'Token', 'Wish', 'Spark', 'Knot', 'Omen'],
   boots: ['Stride', 'Tread', 'Pounce', 'Scamper', 'Trot', 'Hop'], paws: ['Grip', 'Swipe', 'Mitt', 'Clutch', 'Paw', 'Knuckle'],
@@ -632,6 +657,13 @@ export function socketGem(item, gem) {
   return { ok: true, why: '' };
 }
 
+/** Poe's starter: a plain Bone Fūma. */
+export function starterFuma() {
+  const it = blankItem(ITEM_BASES.boneFuma, 'normal', 1, toRng(new RNG(13)));
+  finalize(it);
+  return it;
+}
+
 /** Moka's starter: a plain Driftwood Staff. */
 export function starterStaff() {
   const it = blankItem(ITEM_BASES.driftwoodStaff, 'normal', 1, toRng(new RNG(11)));
@@ -639,7 +671,7 @@ export function starterStaff() {
   return it;
 }
 
-/** Starter kit: a plain Bone Sword and Red Tennis Ball. → { sword, ball } */
+/** Starter kit: a plain Bone Katana and Red Tennis Ball. → { sword, ball } */
 export function starterItems() {
   const rng = toRng(new RNG(7));
   const sword = blankItem(ITEM_BASES.boneSword, 'normal', 1, rng);
@@ -669,8 +701,8 @@ export function shopStock(lvl, seed = 1) {
   const out = [];
   const ilvl = () => clamp(lvl + rng.int(-2, 3), 1, 60);
   const add = it => { it.price = buyPrice(it); out.push(it); };
-  // two weapons for whoever is shopping (Chewy: a sword and a ball; Moka: two staffs)
-  for (const wtype of LOOT_CLASS === 'moka' ? ['staff', 'staff'] : ['sword', 'ball']) add(generateItem({ ilvl: ilvl(), slot: 'weapon', wtype, rarity: rng.chance(0.5) ? 'magic' : 'normal', rng }));
+  // two weapons for whoever is shopping (Chewy: a sword and a ball; Moka: two staffs; Poe: two fūma)
+  for (const wtype of LOOT_CLASS === 'moka' ? ['staff', 'staff'] : LOOT_CLASS === 'poe' ? ['fuma', 'fuma'] : ['sword', 'ball']) add(generateItem({ ilvl: ilvl(), slot: 'weapon', wtype, rarity: rng.chance(0.5) ? 'magic' : 'normal', rng }));
   for (const slot of ['hat', 'outfit', 'boots', 'paws']) add(generateItem({ ilvl: ilvl(), slot, rarity: rng.chance(0.45) ? 'magic' : 'normal', rng }));
   add(generateItem({ ilvl: ilvl(), slot: rng.chance(0.5) ? 'collar' : 'charm', rarity: 'magic', rng }));
   add(generateItem({ ilvl: ilvl(), slot: 'charm', rarity: 'magic', rng }));
@@ -693,9 +725,10 @@ export function itemDamage(it) {
 }
 export function itemKindName(it) {
   if (it.kind === 'gem') return 'Treat Gem';
-  if (it.wtype === 'sword') return 'Bone Sword';
+  if (it.wtype === 'sword') return 'Bone Katana';
   if (it.wtype === 'ball') return 'Ball';
   if (it.wtype === 'staff') return 'Staff';
+  if (it.wtype === 'fuma') return 'Fūma';
   return SLOT_NAMES[it.slot] || 'Item';
 }
 /** Does the player meet the item's requirements? */
@@ -783,9 +816,9 @@ export function itemTooltip(it, state, derived) {
   const subtitle = (it.rarity === 'rare' || it.rarity === 'unique' || it.rarity === 'set' ? b.name + ' · ' : '') + tierName + kind + (it.rarity !== 'normal' ? ` · ${RARITY[it.rarity].name}` : '');
   if (it.dmg) {
     const d = itemDamage(it);
-    L(`${it.wtype === 'ball' ? 'Throw' : it.wtype === 'staff' ? 'Spell' : 'Swing'} Damage: ${d[0]} to ${d[1]}`, d[2] ? C.blue : C.white);
+    L(`${it.wtype === 'ball' ? 'Throw' : it.wtype === 'staff' ? 'Spell' : it.wtype === 'fuma' ? 'Slash' : 'Swing'} Damage: ${d[0]} to ${d[1]}`, d[2] ? C.blue : C.white);
     L(`Attack Speed: ${speedLabel(it.aspd)} (${it.aspd.toFixed(2)}/s)`, C.white);
-    L(it.wtype === 'ball' ? 'Thrown · bounces back to you · scales with Dexterity' : it.wtype === 'staff' ? 'Sparkle bolt · powers every spell · scales with Energy' : 'Melee · wide swing · scales with Strength', C.grey);
+    L(it.wtype === 'ball' ? 'Thrown · bounces back to you · scales with Dexterity' : it.wtype === 'staff' ? 'Sparkle bolt · powers every spell · scales with Energy' : it.wtype === 'fuma' ? 'Quick slashes · Fūma Throw sends it out and back · scales with Dexterity' : 'Melee · wide swing · scales with Strength', C.grey);
   }
   if (it.def) {
     let ed = 0; for (const a of it.affixes) if (a.stat === 'def') ed += a.value;
@@ -830,6 +863,6 @@ function reqLines(it, state, derived) {
   if (r.ene) { const ene = derived ? derived.ene : state ? state.player.stats.ene : 999; out.push({ text: `Required Energy: ${r.ene}`, met: ene >= r.ene }); }
   const who = it.wtype && WEAPON_CLASS[it.wtype];
   const cls = state?.player?.cls || 'chewy';
-  if (who && (cls !== who || state?.flags?.mokaJoined)) out.push({ text: `${CLASSES[who].name}'s weapon`, met: cls === who });
+  if (who && (cls !== who || state?.flags?.mokaJoined || state?.flags?.poeJoined)) out.push({ text: `${CLASSES[who].name}'s weapon`, met: cls === who });
   return out;
 }

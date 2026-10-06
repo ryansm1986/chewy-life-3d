@@ -16,7 +16,7 @@ import {
 } from '../src/rpg/stats.js';
 import { rollDrops, chestDrops, MATERIAL_KEYS } from '../src/rpg/loot.js';
 import { createActions, newGameState, normalizeHeroes, saveableState } from '../src/rpg/actions.js';
-import { CLASSES, HERO_IDS } from '../src/rpg/classes.js';
+import { CLASSES, HERO_IDS, WEAPON_CLASS, canWield, heroText } from '../src/rpg/classes.js';
 import { PANTRY, PANTRY_IDS, KINDS as PKINDS, CROPS, CROP_IDS, LOVED, sellPrice, seedDrops, forageDrops, pantryHas, pantryList } from '../src/life/pantry.js';
 import { RECIPES, RECIPE_IDS, STATIONS, STARTERS, COOKBOOK, cookbookOf, knows, learn, spendFor, maxCook, haveOf, matchMix, fallbackMix, cookableAt, hintFor, teachesOf } from '../src/life/cooking.js';
 import { BUFFS, mealFor, mealActive } from '../src/life/meals.js';
@@ -44,8 +44,9 @@ const lpad = (s, n) => String(s).padStart(n);
 
 // ------------------------------------------------------------------ skills
 hr('SKILLS');
-// two heroes (docs/HEROES.md): Chewy's three trees (bone / fetch / spirit) and Moka's (tide / star / duck), 21 skills each
-ok(SKILL_IDS.length === 42 && TREES.length === 6, 'exactly 42 skills in 6 trees');
+// three heroes (docs/HEROES.md, docs/POE.md): Chewy's three trees (bone / fetch / spirit), Moka's (tide / star / duck) and
+// Poe's (shuriken / jutsu / shadow), 21 skills each
+ok(SKILL_IDS.length === 63 && TREES.length === 9, 'exactly 63 skills in 9 trees');
 for (const h of HERO_IDS) ok(SKILL_IDS.filter(id => SKILLS[id].cls === h).length === 21, `${h} has 21 skills`);
 for (const t of TREES) {
   const ids = SKILL_IDS.filter(id => SKILLS[id].tree === t.id);
@@ -62,7 +63,7 @@ for (const id of [...SKILL_IDS, 'attack']) {
   ok(id === 'attack' || s.req === ROW_REQ[s.row], `${id} req matches row`);
   ok(KINDS.includes(s.kind), `${id} kind valid`);
   ok(ELS.includes(s.element), `${id} element valid`);
-  ok([null, 'sword', 'ball', 'staff'].includes(s.wep) && (id === 'attack' || !s.wep || (s.wep === 'staff') === (s.cls === 'moka')), `${id} wep valid`);
+  ok([null, 'sword', 'ball', 'staff', 'fuma'].includes(s.wep) && (id === 'attack' || !s.wep || WEAPON_CLASS[s.wep] === s.cls), `${id} wep valid`);
   for (const p of s.pre) ok(SKILLS[p] && SKILLS[p].tree === s.tree && SKILLS[p].row < s.row, `${id} prereq ${p} valid`);
   for (const y of s.syn) ok(!!SKILLS[y.id] && fin(y.p), `${id} synergy ${y.id} valid`);
   for (let l = 1; l <= 30; l++) {
@@ -91,13 +92,13 @@ for (const id of GEAR_BASE_IDS) {
   tierCount[b.tier]++;
   ok(['weapon', 'hat', 'outfit', 'collar', 'charm', 'boots', 'paws'].includes(b.slot), `base ${id} slot`);
   ok(b.icon && b.icon.shape && b.icon.variant && b.icon.colors.length === 3, `base ${id} icon`);
-  if (b.slot === 'weapon') ok(['sword', 'ball', 'staff'].includes(b.wtype) && fin(b.dmg[0]) && b.dmg[1] > b.dmg[0] && fin(b.aspd), `weapon ${id} stats`);
+  if (b.slot === 'weapon') ok(['sword', 'ball', 'staff', 'fuma'].includes(b.wtype) && fin(b.dmg[0]) && b.dmg[1] > b.dmg[0] && fin(b.aspd), `weapon ${id} stats`);
   if (['hat', 'outfit', 'boots', 'paws'].includes(b.slot)) ok(b.def && b.def[1] >= b.def[0], `armor ${id} def`);
   ok(b.tier === 0 ? b.lvl < 20 : b.tier === 1 ? b.lvl >= 20 && b.lvl < 40 : b.lvl >= 40, `base ${id} tier/lvl consistent`);
 }
 for (const slot of ['weapon', 'hat', 'outfit', 'collar', 'charm', 'boots', 'paws'])
   for (const t of [0, 1, 2]) ok(GEAR_BASE_IDS.some(id => ITEM_BASES[id].slot === slot && ITEM_BASES[id].tier === t), `slot ${slot} has tier ${t}`);
-for (const wt of ['sword', 'ball', 'staff']) for (const t of [0, 1, 2]) ok(GEAR_BASE_IDS.some(id => ITEM_BASES[id].wtype === wt && ITEM_BASES[id].tier === t), `${wt} has tier ${t}`);
+for (const wt of ['sword', 'ball', 'staff', 'fuma']) for (const t of [0, 1, 2]) ok(GEAR_BASE_IDS.some(id => ITEM_BASES[id].wtype === wt && ITEM_BASES[id].tier === t), `${wt} has tier ${t}`);
 const prefixes = AFFIXES.filter(a => a.type === 'prefix').length, suffixes = AFFIXES.filter(a => a.type === 'suffix').length;
 ok(AFFIXES.length >= 45, '>=45 named affixes');
 ok(new Set(AFFIXES.map(a => a.id)).size === AFFIXES.length, 'affix ids unique');
@@ -335,7 +336,12 @@ hr('ACTIONS');
   { const v1 = JSON.parse(JSON.stringify(saveableState(S))); delete v1.heroes; v1.player = JSON.parse(JSON.stringify(S.player)); v1.equipment = JSON.parse(JSON.stringify(S.equipment)); v1.version = 1;
     const n = normalizeHeroes(v1); ok(n.version === 2 && n.player === n.heroes.chewy.player && !!n.heroes.moka, 'a v1 save normalises to v2'); }
   ok(S.equipment.weapon.base === 'boneSword' && S.equipment.weaponAlt.base === 'redTennisBall', 'starter equipped');
-  ok(JSON.parse(JSON.stringify(S)).equipment.weapon.name === 'Bone Sword', 'state JSON-serialisable');
+  ok(JSON.parse(JSON.stringify(S)).equipment.weapon.name === 'Bone Katana', 'state JSON-serialisable');
+  { // a save from before the samurai re-flavour: its sword items take the bases' new names (items.js renameLegacyItem)
+    const old = JSON.parse(JSON.stringify(S)); old.equipment.weapon.name = 'Crunchy Bone Sword of Zoomies'; old.inventory[0] = { ...old.equipment.weapon, base: 'ribSabre', name: 'Rib Sabre' };
+    const N = normalizeHeroes(old);
+    ok(N.equipment.weapon.name === 'Crunchy Bone Katana of Zoomies' && N.inventory[0].name === 'Rib Wakizashi', 'old saves: renamed sword bases follow (Bone Sword → Bone Katana, Rib Sabre → Rib Wakizashi)');
+  }
   // pickup & stacking
   const hat = generateItem({ ilvl: 1, slot: 'hat', rarity: 'magic', rng });
   ok(A.pickup(hat) && S.inventory[0] === hat, 'pickup gear');
@@ -985,6 +991,60 @@ hr('FURNITURE SOURCES');
   }
 }
 
+hr('POE (the third hero, docs/POE.md)');
+{
+  // the class, the trees, the starter kit
+  const C = CLASSES.poe;
+  ok(HERO_IDS.join() === 'chewy,moka,poe' && C.weapons.join() === 'fuma' && C.dmgStat.fuma === 'dex' && C.starter.skills.fumaThrow === 1, 'poe: the third class (fūma, Dex, starts with Fūma Throw)');
+  ok(['shuriken', 'jutsu', 'shadow'].every(t => TREES.some(x => x.id === t && x.cls === 'poe')) && C.trees.join() === 'shuriken,jutsu,shadow', 'poe: three trees');
+  for (const t of C.trees) {
+    const ids = SKILL_IDS.filter(id => SKILLS[id].tree === t), rows = ids.map(id => SKILLS[id].row).sort().join('');
+    ok(ids.length === 7 && rows === '0112345'.slice(0, 7) && ids.filter(id => SKILLS[id].kind === 'passive').length === 1, `poe ${t}: 7 skills on rows 0-5 with one passive (${rows})`);
+    for (const id of ids) for (const y of SKILLS[id].syn) ok(SKILLS[y.id].tree === t, `poe ${id}: synergy ${y.id} in its own tree`);
+  }
+  ok(canWield('poe', 'fuma') && !canWield('poe', 'sword') && !canWield('chewy', 'fuma') && !canWield('moka', 'fuma'), 'poe: the fūma is hers alone');
+  ok(heroText("Chewy's bone and Chewy", { player: { cls: 'poe' } }) === "Poe's bone and Poe" && heroText('Chewy', { player: { cls: 'chewy' } }) === 'Chewy', 'heroText addresses the active hero');
+  const st = newGameState(), h = st.heroes.poe;
+  ok(h && h.player.cls === 'poe' && h.equipment.weapon?.base === 'boneFuma' && h.equipment.weapon.wtype === 'fuma' && !h.equipment.weaponAlt && h.player.mouseSets.every(m => m.join() === 'attack,fumaThrow') && !st.flags.poeJoined, 'poe: a fresh game has her (Bone Fūma, attack + Fūma Throw on both sets), not yet joined');
+  // old saves (v1 single hero, v2 with two heroes) gain her through normalizeHeroes
+  { const v2 = JSON.parse(JSON.stringify(saveableState(st))); delete v2.heroes.poe; v2.flags.mokaJoined = true; const n = normalizeHeroes(v2);
+    ok(n.heroes.poe?.player?.cls === 'poe' && n.heroes.poe.player.lvl === 1 && n.heroes.moka && n.player === n.heroes.chewy.player && !n.flags.poeJoined, 'poe: a two-hero save migrates (Poe is new, not joined)'); }
+  { const v1 = JSON.parse(JSON.stringify(saveableState(st))); delete v1.heroes; v1.player = newGameState().player; v1.player.lvl = 9; v1.equipment = newGameState().equipment; v1.version = 1;
+    const n = normalizeHeroes(v1); ok(n.heroes.chewy.player.lvl === 9 && n.heroes.poe?.equipment.weapon?.wtype === 'fuma', 'poe: a v1 save migrates to three heroes'); }
+  // her derived stats
+  const S = { player: h.player, equipment: h.equipment, flags: {} }, d = computeStats(S);
+  ok(d.weaponType === 'fuma' && d.dodge === C.dodge && d.statDmgPct === h.player.stats.dex && Math.abs(d.jutsuMul - (100 + h.player.stats.ene) / (100 + h.player.stats.dex)) < 0.01, `poe: fūma + Dex, class dodge ${C.dodge}%, jutsu ×${d.jutsuMul}`);
+  ok(computeStats(newGameState()).dodge === 0, 'poe: the other heroes have no dodge');
+  const chewyLife = computeStats(newGameState()).lifeMax, mokaS = newGameState().heroes.moka, mokaLife = computeStats({ player: mokaS.player, equipment: mokaS.equipment }).lifeMax;
+  ok(d.lifeMax < chewyLife && d.lifeMax > mokaLife, `poe: fragile — life between Moka and Chewy (${mokaLife} < ${d.lifeMax} < ${chewyLife})`);
+  // masteries and Swift as Wind
+  S.player.lvl = 30; S.player.skills = { fumaThrow: 10, shurikenMastery: 5, smokeBomb: 5, ninjutsuMastery: 8, puffBall: 5, swiftWind: 10, shadowStep: 5 };
+  const d2 = computeStats(S), sk = SKILLS;
+  ok(d2.treeDmgPct.shuriken === sk.shurikenMastery.params(5).dmgPct && d2.treeDmgPct.jutsu === sk.ninjutsuMastery.params(8).dmgPct && d2.treeCostCut.jutsu === sk.ninjutsuMastery.params(8).costCut, 'poe: masteries fill her tree bonuses');
+  ok(Math.abs(d2.dodge - (C.dodge + sk.swiftWind.params(10).dodge)) < 0.11 && d2.moveMul > d.moveMul, `poe: Swift as Wind adds dodge (${d2.dodge}%) and speed (×${d2.moveMul})`);
+  const rP = skillRuntime('puffBall', S, d2);
+  ok(rP.cost < sk.puffBall.cost(5) && rP.params.dmgPct > sk.puffBall.params(5).dmgPct, 'poe: Ninjutsu Mastery: cheaper, stronger jutsu');
+  ok(usable('fumaThrow', S, d2).ok && !usable('chomp', S, d2).ok && !usable('splash', S, d2).ok, 'poe: her skills, not the others\'');
+  const A = skillRuntime('attack', S, d2);
+  ok(A.params.fuma && !A.params.projectile && A.params.dmgPct > 80, 'poe: the basic attack is a fūma slash (Shuriken Mastery helps)');
+  for (const id of SKILL_IDS.filter(i => SKILLS[i].cls === 'poe')) { S.player.skills[id] = S.player.skills[id] || 3; const r = skillRuntime(id, S, computeStats(S)); ok(r && Object.values(r.params).every(v => typeof v === 'boolean' || fin(v)) && fin(r.cost), `poe ${id}: runtime finite`); }
+  // crit options (Shadow Step's backstab, Vanish's double crit)
+  { let c = 0; for (let i = 0; i < 400; i++) if (rollHit({ derived: d2, skillDmgPct: 100, target: { def: 0, res: {} }, critAdd: 100, rng }).crit) c++;
+    const a = rollHit({ derived: { ...d2, dmgMin: 10, dmgMax: 10 }, skillDmgPct: 100, target: { def: 0, res: {} }, forceCrit: true, rng: () => 0.5 }), b = rollHit({ derived: { ...d2, dmgMin: 10, dmgMax: 10 }, skillDmgPct: 100, target: { def: 0, res: {} }, forceCrit: true, critX: 2, rng: () => 0.5 });
+    ok(c === 400 && a.crit && b.dmg === Math.round(10 * (1 + 2 * (d2.critMul - 1))) && b.dmg > a.dmg, 'poe: critAdd / forceCrit / critX (double crit)'); }
+  // her bases and her loot
+  const fb = GEAR_BASE_IDS.filter(id => ITEM_BASES[id].wtype === 'fuma');
+  ok(fb.length >= 12 && fb.every(id => ITEM_BASES[id].icon.shape === 'fuma') && [0, 1, 2].every(t => fb.some(id => ITEM_BASES[id].tier === t)), `poe: ${fb.length} fūma bases over three tiers`);
+  for (let i = 0; i < 30; i++) { const it = generateItem({ ilvl: 1 + i * 2, slot: 'weapon', wtype: 'fuma', rng }); validateItem(it, 'fuma'); ok(it.wtype === 'fuma' && /Slash Damage/.test(itemTooltip(it, S, d2).lines[0].text), 'poe: fūma items generate with a slash line'); }
+  const G = { state: newGameState() }, Ac = createActions(G), fm = generateItem({ ilvl: 3, slot: 'weapon', wtype: 'fuma', rarity: 'normal', rng });
+  G.state.inventory[0] = fm; ok(!Ac.equip(0) && /Poe/.test(Ac.equipProblem(fm, 'weapon')), "poe: Chewy can't equip her fūma");
+  // ---- hero balance (tools/hero-balance.mjs): her Fūma Throw build vs Chewy's Chomp and Moka's Splash, same level and gear
+  const HB = await import('./hero-balance.mjs'), band = HB.poeBand([6, 15, 30, 45]);
+  for (const b of band) ok(b.dps >= 0.85 && b.dps <= 1.2 && b.ehp >= 0.9 && b.ehp <= 1.15 && b.life < 1.02, `poe: level ${b.lvl} clear speed ×${b.dps.toFixed(2)} and eHP ×${b.ehp.toFixed(2)} of the Chewy–Moka mean (life ×${b.life.toFixed(2)}: fragile, but she dodges)`); for (const b of band) ok(b.step.clear >= 0.6 && b.step.single >= 1.15 && b.step.single <= 1.6, `poe: level ${b.lvl} Shadow Step build: clear ×${b.step.clear.toFixed(2)}, single target ×${b.step.single.toFixed(2)} of the mean (a single-target opener)`);
+  { const { POE_TRAINING } = await import('../src/rpg/skillsPoe.js'), { canLearn } = await import('../src/rpg/skills.js'); const S2 = { player: { ...S.player, skillPts: 5, skills: { ...S.player.skills } } }; const before = canLearn('vanish', S2).ok; POE_TRAINING.add('vanish'); const lk = canLearn('vanish', S2), us = usable('vanish', { player: { ...S2.player, skills: { ...S2.player.skills, vanish: 3 } } }, d2); POE_TRAINING.delete('vanish'); ok(before && !lk.ok && /training/.test(lk.why) && !us.ok && POE_TRAINING.size === 0, `poe: a skill still in training can't be learned or cast ("${lk.why}"); none are in training now`); }
+  ok(HB.fumaFlight(sk.fumaThrow.params(1, d2)) < 1.05 && Math.abs(HB.fumaFlight(sk.fumaThrow.params(20, d2)) - HB.fumaFlight(sk.fumaThrow.params(1, d2))) < 0.08, 'poe: a Fūma Throw round trip stays under ~1 s at every level');
+}
+
 hr('CHARGED ABILITIES');
 // docs/CHARGE.md: the tables, the rules (stage times, costs, gating), the balance layer and the DPS-band sim
 {
@@ -994,7 +1054,9 @@ hr('CHARGED ABILITIES');
   const ids = Object.keys(CHARGE);
   // ---- every active skill of both heroes charges, with a full table
   const actives = SKILL_IDS.filter(id => !['passive', 'aura'].includes(SKILLS[id].kind));
+  // (all three heroes: Poe's 18 tables are rpg/chargePoe.js, merged into the table by charge.js)
   ok(actives.every(id => CHARGE[id]) && ids.every(id => actives.includes(id)), `charge: a table for every active skill (${ids.length})`);
+  ok(ids.filter(id => SKILLS[id].cls === 'poe').length === 18 && ids.filter(id => SKILLS[id].cls === 'poe').every(id => CHARGE[id].pose.startsWith('poe')), 'charge: Poe has 18 tables, each with one of her wind-up poses');
   for (const id of ids) {
     const c = CHARGE[id];
     ok(c.ready === true && SKILLS[id].charge === c, `charge ${id}: ready and attached to its skill`);
@@ -1023,9 +1085,9 @@ hr('CHARGED ABILITIES');
   const R0 = skillRuntime('chomp', st, d), R1 = Ch.chargeRuntime('chomp', st, d, 1), R3 = Ch.chargeRuntime('chomp', st, d, 3), R9 = Ch.chargeRuntime('chomp', st, d, 9);
   ok(R1.charge.stage === 1 && R3.charge.stage === 3 && R9.charge.stage === 3 && R3.cost === Ch.chargeCost(R0.cost, 3, Ch.perksOf(st, 'chomp')), 'charge: chargeRuntime (stage clamp, cost)');
   ok(R3.params.dmgPct > R1.params.dmgPct && R1.params.dmgPct >= R0.params.dmgPct * 0.999 && R3.params.radius >= R1.params.radius, 'charge: a charged Chomp hits harder and wider than a tap, more at Ⅲ');
-  const sx = Sim.simHero('chewy'), sm = Sim.simHero('moka');
+  const sx = Sim.simHero('chewy'), sm = Sim.simHero('moka'), sp = Sim.simHero('poe');
   for (const id of ids) {
-    const H = SKILLS[id].cls === 'moka' ? sm : sx, S = H.st;
+    const H = SKILLS[id].cls === 'moka' ? sm : SKILLS[id].cls === 'poe' ? sp : sx, S = H.st;
     S.player.chargePerks = {}; const T0 = skillRuntime(id, S, H.d);
     S.player.chargePerks = { [id]: Object.fromEntries(Object.entries(CHARGE[id].perks).map(([k, p]) => [k, p.ranks])) };
     const Rs = [1, 2, 3].map(s => Ch.chargeRuntime(id, S, H.d, s));
@@ -1054,6 +1116,174 @@ hr('CHARGED ABILITIES');
     log(`  ${pad('skill', 16)} ${pad('kind', 8)} ${pad('Ⅰ / Ⅱ / Ⅲ (blend)', 22)} ${pad('Ⅲ pack', 8)} ${pad('single', 8)} burst`);
     for (const r of rows) log(`  ${pad(r.id, 16)} ${pad(r.kind, 8)} ${pad(r.b.map(v => '×' + v).join(' / '), 22)} ${pad('×' + r.pack, 8)} ${pad('×' + r.single, 8)} ×${r.burst}`);
   }
+}
+
+// ------------------------------------------------------------------ zones phase A (docs/ZONES.md §8; ROADMAP Z-A2 to Z-A5)
+hr('ZONES: DUNGEON DEFS, SEEDS, STATE, QUEST STEPS');
+{
+  const D = await import('../src/dungeon/defs.js'), Gn = await import('../src/dungeon/gen.js'), Z = await import('../src/rpg/zones.js'), Q = await import('../src/world/questSteps.js');
+  const { REGION_IDS, REGIONS } = await import('../src/regions/index.js');
+  // ---- DungeonDef: the Burrow is unchanged
+  const B = D.DUNGEONS.burrow;
+  ok(B.kind === 'burrow' && B.floors === Infinity && B.waypoints, 'defs: DUNGEONS.burrow is endless with waypoints');
+  let same = true;
+  for (let f = 1; f <= 40; f++) {
+    const p = D.floorPlan(B, f);
+    if (p.theme !== Gn.themeFor(f) || p.boss !== Gn.bossFor(f) || p.mlvl !== f + 1 || p.waypoint !== (f % 5 === 1 && f > 1)) same = false;
+    for (const seed of [1 + f * 17, 4242 + f]) { const a = Gn.generate({ floor: f, seed }), b = Gn.generate({ floor: f, seed, plan: p }); if (JSON.stringify([a.rooms, a.spawns, a.chests, a.waypoint, a.stairs, a.theme, a.mlvl, a.boss]) !== JSON.stringify([b.rooms, b.spawns, b.chests, b.waypoint, b.stairs, b.theme, b.mlvl, b.boss])) same = false; }
+  }
+  ok(same, 'defs: the Burrow plan reproduces the old generator floor for floor (theme every 20, bosses every 5, mlvl floor + 1, waypoints)');
+  // the four zone dungeons: stubs, 2 floors, the zone's own monsters and boss
+  ok(Object.keys(D.ZONE_DUNGEON).join() === REGION_IDS.join() && Object.values(D.ZONE_DUNGEON).join() === 'bambooDepths,mapleRoots,tideCaves,onsenCaverns', 'defs: one zone dungeon per zone (bambooDepths, mapleRoots, tideCaves, onsenCaverns)');
+  for (const id of Object.values(D.ZONE_DUNGEON)) {
+    const d = D.DUNGEONS[id], R = REGIONS[d.zone];
+    ok(d.kind === 'zone' && d.floors === 2 && d.stub && !d.waypoints && Gn.THEMES[d.theme] && d.monsters.join() === R.monsters.join() && d.boss === R.boss && d.levels.join() === R.levels.join(), `defs: ${id} is a 2-floor stub with ${d.zone}'s monsters, boss and level band`);
+    const p1 = D.floorPlan(d, 1, { heroLvl: 1 }), p2 = D.floorPlan(d, 2, { heroLvl: 99 }), pt = D.floorPlan(d, 2, { heroLvl: 99, tier: 5 });
+    ok(!p1.boss && p2.boss === d.boss && !p1.waypoint && p1.mlvl === d.levels[0] && p2.mlvl === d.levels[1] + 1 && pt.mlvl === Math.min(60, d.levels[1] + 1 + 20), `defs: ${id} floor 1 has no boss, floor 2 has it; levels from its band, +1 a floor, +4 a tier (cap 60)`);
+    let bad = 0;
+    for (let s = 1; s <= 60; s++) for (const f of [1, 2]) {
+      const L = Gn.generate({ floor: f, seed: s * 13 + f, plan: D.floorPlan(d, f, { heroLvl: 10 }) });
+      if (L.rooms.length < 2 || !!L.waypoint || (f === 1 ? (!L.stairs || L.boss) : (L.stairs || L.boss !== d.boss || !L.bossRoom)) || L.theme !== d.theme) bad++;
+    }
+    ok(!bad, `defs: ${id} generates (60 seeds × 2 floors): stairs on floor 1, the boss room on floor 2, never a waypoint (${bad} bad)`);
+  }
+  // normRun: the old numeric API, clamping
+  const n1 = D.normRun(7), n2 = D.normRun({ id: 'mapleRoots', floor: 9, tier: 2, mods: ['swarming'] }), n3 = D.normRun({ id: 'nope', floor: 0 });
+  ok(n1.id === 'burrow' && n1.floor === 7 && n1.tier === 0 && n2.id === 'mapleRoots' && n2.floor === 2 && n2.tier === 2 && n2.mods[0] === 'swarming' && n3.id === 'burrow' && n3.floor === 1, 'defs: normRun takes a Burrow floor number or { id, floor, tier, mods } (floors clamped, unknown ids → the Burrow)');
+  // ---- seeds: pinned = the old formula; unpinned rerolls per entry
+  const st0 = { dungeon: { deepest: 0, waypoints: [1] } };
+  const pinned = [1, 5, 12].map(f => D.beginRun(st0, f, { fixedSeed: 1 }));
+  ok(pinned.every(r => r.seed === 1 + r.floor * 17 && r.packSeed === r.floor * 999) && !st0.dungeon.runs, 'seeds: ?dseed=1 is exactly the old (seed || 1) + floor * 17, packs floor * 999, and leaves runs alone');
+  const rr = new RNG(9), rolls = [0, 1, 2, 3].map(() => D.beginRun(st0, 1, { rand: () => rr.next() }));
+  ok(st0.dungeon.runs === 4 && st0.dungeon.seed > 0 && new Set(rolls.map(r => r.seed)).size === 4 && new Set(rolls.map(r => r.packSeed)).size === 4, 'seeds: each unpinned entry bumps state.dungeon.runs and gets its own layout and pack seeds');
+  const lays = new Set(rolls.map(r => JSON.stringify(Gn.generate({ floor: 1, seed: r.seed }).rooms)));
+  ok(lays.size === 4, 'seeds: …so the same floor lays out differently each visit');
+  ok(D.beginRun(st0, { id: 'burrow', floor: 3, seed: 77 }).seed === 77 && D.beginRun({}, { id: 'tideCaves', floor: 1 }, { fixedSeed: 1 }).seed !== D.beginRun({}, 1, { fixedSeed: 1 }).seed, 'seeds: an explicit seed wins; each dungeon has its own layouts for the same pin');
+  // ---- state.zones and the migration from state.regions
+  const fresh = Z.normalizeZones({});
+  ok(Z.ZONE_IDS.join() === REGION_IDS.join() && Z.ZONE_IDS.every(id => { const z = fresh.zones[id]; return z.unlocked === false && z.visits === 0 && z.regionBoss === 0 && z.village === 'besieged' && Array.isArray(z.siegeCamps) && z.dungeon.cleared === 0 && z.dungeon.bestFloor === 0 && z.dungeon.tier.unlocked === 0 && z.dungeon.tier.cleared.length === 0 && z.dungeon.spirit.best === 0 && typeof z.quests === 'object'; }), 'zones: a fresh state gets the §8 record for all four zones');
+  const old = { regions: { unlocked: { bamboo: true, maple: true }, cleared: { bamboo: 3 }, visits: { bamboo: 7, maple: 2 } } };
+  Z.normalizeZones(old);
+  ok(old.zones.bamboo.unlocked && old.zones.bamboo.regionBoss === 3 && old.zones.bamboo.visits === 7 && old.zones.maple.unlocked && old.zones.maple.visits === 2 && !old.zones.onsen.unlocked && old.zones.bamboo.dungeon.cleared === 0, 'zones: an old save migrates (unlocked, the boss count → regionBoss, visits); the dungeon record starts fresh');
+  const Rv = old.regions;
+  ok(Rv.unlocked.bamboo === true && Rv.cleared.bamboo === 3 && Rv.visits.maple === 2 && (Rv.cleared.onsen || 0) === 0 && Object.keys(Rv.visits).length === 4, 'zones: state.regions reads as the old shape (a live view)');
+  Rv.cleared.maple = (Rv.cleared.maple || 0) + 1; Rv.visits.onsen = (Rv.visits.onsen || 0) + 1; Rv.unlocked.tidepool = true; Rv.visits.newZone = 2;
+  ok(old.zones.maple.regionBoss === 1 && old.zones.onsen.visits === 1 && old.zones.tidepool.unlocked && old.zones.newZone?.visits === 2, 'zones: …and writes through it land in state.zones (a new id makes a zone)');
+  const json = JSON.parse(JSON.stringify(old)), spread = { ...old };
+  ok(!('regions' in json) && json.zones.bamboo.regionBoss === 3 && !('regions' in spread), 'zones: the view is not saved (JSON and the save spread keep state.zones only)');
+  const again = Z.normalizeZones(Z.normalizeZones(json));
+  ok(again.zones.bamboo.regionBoss === 3 && again.regions.cleared.bamboo === 3 && again.zones.maple.regionBoss === 1, 'zones: normalizing a reloaded save is idempotent');
+  const both = Z.normalizeZones({ zones: { bamboo: { unlocked: false, visits: 9, regionBoss: 1 } }, regions: { unlocked: { bamboo: true }, cleared: { bamboo: 4 }, visits: { bamboo: 2 } } });
+  ok(both.zones.bamboo.unlocked && both.zones.bamboo.regionBoss === 4 && both.zones.bamboo.visits === 9, 'zones: a save with both shapes keeps the best of each (a max-merge never loses progress)');
+  const junk = Z.normalizeZones({ zones: { bamboo: { dungeon: 'x', village: 'ruined', siegeCamps: 3, visits: 'abc' } } });
+  ok(junk.zones.bamboo.dungeon.tier.unlocked === 0 && junk.zones.bamboo.village === 'besieged' && Array.isArray(junk.zones.bamboo.siegeCamps) && junk.zones.bamboo.visits === 0, 'zones: a damaged zone record is repaired');
+  // regionUnlocked still follows the old rules through the view
+  const { regionUnlocked } = await import('../src/regions/index.js');
+  const lu = Z.normalizeZones({ player: { lvl: 1 }, heroes: {} });
+  ok(!regionUnlocked(lu, 'maple').ok && (lu.regions.cleared.bamboo = 1) && regionUnlocked(lu, 'maple').ok && regionUnlocked(lu, 'bamboo').ok === false, 'zones: regionUnlocked (level, or the previous zone\'s boss) works through the view');
+  // dungeon clears and tiers
+  const ts = Z.normalizeZones({});
+  const c0 = Z.recordDungeonClear(ts, 'bamboo', 0), c0b = Z.recordDungeonClear(ts, 'bamboo', 0), c1 = Z.recordDungeonClear(ts, 'bamboo', 1);
+  ok(c0.first && c0.tierUnlocked === 1 && !c0b.first && c0b.tierUnlocked === null && c1.tierUnlocked === 2 && ts.zones.bamboo.dungeon.cleared === 3 && ts.zones.bamboo.dungeon.tier.cleared.join() === '0,1', 'zones: the first clear opens T1; clearing the highest open tier opens the next; repeats open nothing');
+  for (let t = 2; t <= 6; t++) Z.recordDungeonClear(ts, 'bamboo', Math.min(t, 5));
+  ok(ts.zones.bamboo.dungeon.tier.unlocked === Z.TIER_MAX && Z.tierCleared(ts, 'bamboo', 5) && !Z.tierCleared(ts, 'maple', 1), 'zones: tiers stop at T5; tierCleared reads per zone');
+  ok(Z.saveVillage(ts, 'maple') && !Z.saveVillage(ts, 'maple') && Z.villageSaved(ts, 'maple') && !Z.villageSaved(ts, 'bamboo'), 'zones: saveVillage marks it once');
+  ok(Z.noteFloor(ts, 'onsen', 2) === 2 && Z.noteFloor(ts, 'onsen', 1) === 2, 'zones: noteFloor keeps the best floor');
+  // ---- quest steps: filters and the new types
+  const kill = (s, e) => Q.stepGain(s, 'kill', e);
+  const eB = { id: 'mochi', floor: 3, zone: null, dungeon: 'burrow', tier: 0 }, eZ = { id: 'kodama', floor: 1, zone: 'bamboo', dungeon: 'bambooDepths', tier: 2 }, eR = { id: 'kodama', floor: 0, zone: 'bamboo', dungeon: null, tier: 0 };
+  ok(kill({ type: 'kill', n: 8 }, eB) === 1 && kill({ type: 'kill', n: 8 }, eZ) === 1 && kill({ type: 'kill', n: 8 }, eR) === 1 && kill({ type: 'kill', monster: 'mochi' }, eZ) === 0, 'steps: an unfiltered kill counts anywhere (as before); monster filters still work');
+  ok(kill({ type: 'kill', dungeon: 'bambooDepths' }, eZ) === 1 && kill({ type: 'kill', dungeon: 'bambooDepths' }, eR) === 0 && kill({ type: 'kill', dungeon: 'bambooDepths' }, eB) === 0 && kill({ type: 'kill', zone: 'bamboo' }, eR) === 1 && kill({ type: 'kill', zone: 'bamboo' }, eZ) === 1 && kill({ type: 'kill', zone: 'maple' }, eZ) === 0, 'steps: kill with a dungeon filter counts only there; a zone filter counts in the zone and its dungeon');
+  ok(kill({ type: 'kill', dungeon: 'bambooDepths', floor: 1 }, eZ) === 1 && kill({ type: 'kill', dungeon: 'bambooDepths', floor: 2 }, eZ) === 0 && kill({ type: 'kill', tier: 2 }, eZ) === 1 && kill({ type: 'kill', tier: 3 }, eZ) === 0, 'steps: floor (exact) and tier (at least) filters');
+  ok(Q.stepGain({ type: 'boss', id: 'mochiKing' }, 'boss', { id: 'mochiKing', dungeon: 'burrow' }) === 'set' && Q.stepGain({ type: 'boss', id: 'mochiKing' }, 'boss', { id: 'kasaLord' }) === 0 && Q.stepGain({ type: 'boss', dungeon: 'bambooDepths' }, 'boss', { id: 'tenguMaster', dungeon: 'bambooDepths' }) === 'set' && Q.stepGain({ type: 'boss', dungeon: 'bambooDepths' }, 'boss', { id: 'tenguMaster', dungeon: null, zone: 'bamboo' }) === 0 && Q.stepGain({ type: 'boss' }, 'boss', { id: 'x' }) === 0, 'steps: boss by id (as before) or by dungeon; an empty boss step matches nothing');
+  ok(Q.stepGain({ type: 'find', item: 'lostBell', dungeon: 'mapleRoots' }, 'find', { item: 'lostBell', n: 2, dungeon: 'mapleRoots' }) === 2 && Q.stepGain({ type: 'find', item: 'lostBell' }, 'find', { item: 'other' }) === 0 && Q.stepGain({ type: 'find', item: 'lostBell', dungeon: 'mapleRoots' }, 'find', { item: 'lostBell', dungeon: 'burrow' }) === 0, 'steps: find counts the right item (n at a time) where its filters say');
+  ok(Q.stepGain({ type: 'rescue', npc: 'hana' }, 'rescue', { npc: 'hana', dungeon: 'tideCaves' }) === 'set' && Q.stepGain({ type: 'rescue', npc: 'hana' }, 'rescue', { npc: 'ken' }) === 0 && Q.stepGain({ type: 'kill' }, 'rescue', { npc: 'hana' }) === 0, 'steps: rescue completes on that captive');
+  const qs = Z.normalizeZones({ dungeon: { deepest: 12 } });
+  ok(Q.zoneStepDone({ type: 'dungeonFloor', dungeon: 'burrow', n: 10 }, qs) && !Q.zoneStepDone({ type: 'dungeonFloor', dungeon: 'bambooDepths', n: 2 }, qs) && (Z.noteFloor(qs, 'bamboo', 2), Q.zoneStepDone({ type: 'dungeonFloor', dungeon: 'bambooDepths', n: 2 }, qs)) && Q.zoneStepHave({ type: 'dungeonFloor', dungeon: 'burrow', n: 20 }, qs) === 12, 'steps: dungeonFloor reads the Burrow\'s deepest or the zone dungeon\'s best floor');
+  ok(!Q.zoneStepDone({ type: 'tier', dungeon: 'tideCaves', n: 1 }, qs) && (Z.recordDungeonClear(qs, 'tidepool', 1), Q.zoneStepDone({ type: 'tier', dungeon: 'tideCaves', n: 1 }, qs)) && !Q.zoneStepDone({ type: 'tier', dungeon: 'tideCaves', n: 2 }, qs), 'steps: tier n is done by a clear at tier n or higher');
+  ok(!Q.zoneStepDone({ type: 'villageSaved', zone: 'onsen' }, qs) && (Z.saveVillage(qs, 'onsen'), Q.zoneStepDone({ type: 'villageSaved', zone: 'onsen' }, qs)) && Q.zoneStepDone({ type: 'kill' }, qs) === null, 'steps: villageSaved follows the zone; other types are not state steps');
+  const dst = s => JSON.stringify(Q.destOf(s));
+  ok(dst({ type: 'kill', n: 3 }) === JSON.stringify({ dungeon: 'burrow', zone: null }) && dst({ type: 'floor', n: 5 }) === JSON.stringify({ dungeon: 'burrow', zone: null, floor: 5 }) && Q.destOf({ type: 'collect', mat: 'wood' }) === null && Q.destOf({ type: 'collect', mat: 'mochi' }).dungeon === 'burrow', 'steps: destOf keeps the old Burrow targets (kills, floors, bosses, Mochi Jelly)');
+  const dF = Q.destOf({ type: 'dungeonFloor', dungeon: 'mapleRoots', n: 2 }), dT = Q.destOf({ type: 'tier', dungeon: 'onsenCaverns', n: 3 }), dV = Q.destOf({ type: 'villageSaved', zone: 'tidepool' }), dK = Q.destOf({ type: 'kill', zone: 'bamboo' });
+  ok(dF.dungeon === 'mapleRoots' && dF.zone === 'maple' && dF.floor === 2 && dT.floor === 2 && dT.boss && dV.zone === 'tidepool' && dV.village && dK.zone === 'bamboo' && !dK.dungeon, 'steps: destOf points zone steps at the zone, its gate, a floor or its boss');
+}
+
+hr('HORDES: THE CROWD GRID (ROADMAP Z-B3)');
+{
+  // A query must return every entity the caller's exact test could accept (within r of the point), after inserts, moves,
+  // removals and rebuilds; Combat / the monster pass then run the same tests the old scans did (src/combat/grid.js).
+  const { Grid } = await import('../src/combat/grid.js');
+  const { crowdOf } = await import('../src/dungeon/crowd.js');
+  const rng = new RNG(4242), R = () => rng.next();
+  const mk = n => Array.from({ length: n }, (_, i) => ({ id: i, pos: { x: R() * 120 - 20, y: R() * 3, z: R() * 120 - 20 }, radius: 0.2 + R() * 1.1, bodyR: 0.3 + R() * 0.5, height: 1 }));
+  const covers = (g, ents, x, z, r) => { const got = new Set(g.near(x, z, r)); g.release(); return ents.every(e => !(e._in ?? true) || (e.pos.x - x) ** 2 + (e.pos.z - z) ** 2 >= r * r || got.has(e)); };
+  for (const cell of [2, 4]) {
+    const g = new Grid(cell), ents = mk(400);
+    for (const e of ents) g.insert(e);
+    let good = 0, n = 0;
+    for (let q = 0; q < 300; q++) { n++; if (covers(g, ents, R() * 130 - 25, R() * 130 - 25, R() * 9)) good++; }
+    for (const e of ents) { e.pos.x += (R() - 0.5) * 12; e.pos.z += (R() - 0.5) * 12; g.move(e); } // (every mover re-bucketed)
+    for (let q = 0; q < 300; q++) { n++; if (covers(g, ents, R() * 130 - 25, R() * 130 - 25, R() * 9)) good++; }
+    for (const e of ents.slice(0, 100)) { g.remove(e); e._in = false; }
+    for (let q = 0; q < 200; q++) { n++; const x = R() * 130 - 25, z = R() * 130 - 25, got = g.near(x, z, 6); g.release(); if (covers(g, ents, x, z, 6) && !got.some(e => e._in === false)) good++; }
+    ok(good === n, `grid (${cell} m cells): queries cover every entity in range after inserts, moves and removals (${good}/${n})`);
+    const half = ents.slice(200); g.rebuild(half);
+    const all = g.near(50, 50, 500); g.release();
+    ok(all.length === half.length && half.every(e => all.includes(e)) && g.n === half.length, 'grid: a rebuild holds exactly the new list (the old entries are forgotten)');
+    ok(g.maxR >= Math.max(...half.map(e => e.radius)) - 1e-9 && g.maxY >= Math.max(...half.map(e => e.pos.y + 0.5)) - 1e-9, 'grid: tracks the largest radius and the mid-height range of what it holds');
+  }
+  { // nesting: a query inside a query keeps both buffers intact
+    const g = new Grid(4), ents = mk(200); for (const e of ents) g.insert(e);
+    const a = g.near(40, 40, 8), snap = [...a]; const b = g.near(10, 70, 5); const bs = [...b]; g.release();
+    ok(a.length === snap.length && a.every((e, i) => e === snap[i]) && bs.length >= 0, 'grid: nested queries use separate buffers');
+    g.release();
+    ok(g.depth === 0, 'grid: released buffers return the depth to zero');
+  }
+  { // the floor's crowd: big bodies (bosses) sit in a side list that every query adds
+    const mode = { monsters: [] }, C = crowdOf(mode);
+    const small = mk(120).map(e => ({ ...e, alive: true, def: {} })), boss = { pos: { x: 60, y: 0, z: 60 }, bodyR: 1.7, alive: true, def: { boss: true } };
+    mode.monsters.push(...small, boss); C.rebuild(mode.monsters);
+    const near = C.near(5, 5, 2), hasBoss = near.includes(boss); C.release();
+    ok(hasBoss && C.maxR <= 0.8 + 1e-9 && !C.grid.near(60, 60, 0.1).includes(boss), 'crowd: a boss is in every query (side list) and does not widen the grid radius');
+    C.grid.release();
+  }
+}
+
+hr('HORDES: SAFE RIG CLONE (Poe smoke copies; ARCHITECTURE "Hordes")');
+{
+  // three's SkeletonUtils.clone deep-copies userData through JSON: a three object in it (hero ear joints' `tip`, Moka's
+  // staff `orb`, Poe's fuma holders' `mat`) runs toJSON -> Matrix4.toArray() into plain arrays, which turns V8's
+  // keyed-store feedback in toArray generic for the session (Skeleton.update 10-20x slower). cloneSkinnedSafe must
+  // never call it with a plain array, restore the source, and give the copy its own nodes.
+  const THREE = await import('three');
+  const { clone: cloneSU } = await import('three/examples/jsm/utils/SkeletonUtils.js');
+  const { cloneSkinnedSafe } = await import('../src/actors/safeClone.js');
+  const rig = () => {
+    const root = new THREE.Group(); root.name = 'root';
+    const hip = new THREE.Bone(); hip.name = 'hip'; const ear = new THREE.Bone(); ear.name = 'ear_L'; const tip = new THREE.Bone(); tip.name = 'earTip_L';
+    hip.add(ear); ear.add(tip); ear.position.set(0.1, 0.5, 0); tip.position.set(0, 0.2, 0);
+    const g = new THREE.BoxGeometry(0.2, 0.2, 0.2), n = g.attributes.position.count;
+    g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(new Uint16Array(n * 4), 4));
+    g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(new Float32Array(n * 4).map((v, i) => (i % 4 ? 0 : 1)), 4));
+    const skin = new THREE.SkinnedMesh(g, new THREE.MeshBasicMaterial()); skin.name = 'body_skin'; skin.add(hip); skin.bind(new THREE.Skeleton([hip, ear, tip]));
+    const holder = new THREE.Group(); holder.name = 'fuma_hand'; const mat = new THREE.MeshBasicMaterial(); holder.userData.mat = mat; holder.userData.kind = 'proc';
+    ear.userData.tip = tip; ear.userData.gain = [1, 2]; root.add(skin, holder);
+    return { root, ear, tip, holder, mat };
+  };
+  const plainCalls = fn => { const P = THREE.Matrix4.prototype, raw = P.toArray; let n = 0; P.toArray = function (a, o) { if (!a || !ArrayBuffer.isView(a)) n++; return raw.call(this, a, o); }; try { fn(); } finally { P.toArray = raw; } return n; };
+  const A = rig(); const viaSU = plainCalls(() => cloneSU(A.root));
+  ok(viaSU > 0, 'safe clone: the test sees three\'s clone call Matrix4.toArray with plain arrays (the trap is real)');
+  const B = rig(); let C = null; const viaSafe = plainCalls(() => { C = cloneSkinnedSafe(B.root); });
+  ok(viaSafe === 0, 'safe clone: cloneSkinnedSafe never calls Matrix4.toArray with a plain array');
+  ok(B.ear.userData.tip === B.tip && B.holder.userData.mat === B.mat && Object.keys(B.ear.userData).join() === 'tip,gain', 'safe clone: the source rig keeps its userData (same objects, same keys)');
+  const find = (r, name) => r.getObjectByName(name);
+  const cEar = find(C, 'ear_L'), cTip = find(C, 'earTip_L'), cHolder = find(C, 'fuma_hand'), cSkin = find(C, 'body_skin');
+  ok(cEar && cTip && cEar.userData.tip === cTip && cTip !== B.tip, 'safe clone: the copy\'s ear points at its own tip node');
+  ok(cHolder.userData.mat === B.mat && cHolder.userData.kind === 'proc', 'safe clone: a material in userData is shared by reference; plain values copied');
+  ok(Array.isArray(cEar.userData.gain) && cEar.userData.gain !== B.ear.userData.gain && cEar.userData.gain.join() === '1,2', 'safe clone: plain userData is still deep-copied');
+  ok(cSkin.skeleton !== B.root.getObjectByName('body_skin').skeleton && cSkin.skeleton.bones.every(b => C.getObjectById(b.id) === b), 'safe clone: the copy\'s skeleton is its own, bound to its own bones');
+  const D = new THREE.Group(); D.add(new THREE.Mesh()); D.userData.n = 3; const E = cloneSkinnedSafe(D);
+  ok(E !== D && E.userData.n === 3 && E.children.length === 1, 'safe clone: a tree without three objects in userData clones as before');
 }
 
 hr('RESULT');

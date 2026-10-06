@@ -6,26 +6,27 @@ import { makeToon, makeOutline, STENCIL_OCCLUDER } from '../gfx/materials.js';
 import { merge, paint, tube, xf, mergeGeometries } from '../gfx/geom.js';
 import { tennisBallTexture } from '../gfx/textures.js';
 import { mulberry32, TAU, clamp } from '../core/util.js';
-import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { cloneSkinnedSafe as cloneSkinned } from './safeClone.js'; // (not SkeletonUtils.clone: ear joints keep userData.tip, see safeClone.js)
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { applyRefined, patchSkinMaterial } from './refinedRigs.js';
 import { chewyStyle } from './disneyChewy.js';
 import { furMaterial, buildDisneyHead, headKind, speciesColors, disneyHand, disneyFoot, handKindFor, footKindFor, tag, paintFn, mergeIndexed, tubeGeo, disneyWizardHat } from './disneyKit.js';
 import { toyMaterial, buildToyBody, TOY_KINDS } from './toyKit.js';
-import { chewyModel } from './heroModels.js';
+import { toyHeroes } from './heroModels.js';
+import { poeToyExtras, POE_PAL } from './poeKit.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const C = h => new THREE.Color(h);
 const INK = '#3a2230';
 // The procedural cast's style. 'toy' (default): the Toybox kit (toyKit.js), the same toy line as the baked Toybox
 // heroes; 'disney': the sculpted Storybook kit (disneyKit.js); 'classic': the Pokopia-style chibi kit with ink outlines.
-// ?kit=toy|disney|classic overrides. Otherwise it follows the Settings: "Disney style" off -> classic; "Toybox heroes"
-// off (the Storybook heroes) -> the Disney kit, so the villagers always match the heroes they stand next to.
+// ?kit=toy|disney|classic overrides. Otherwise it follows the Settings: "Disney style" off -> classic; "Hero models"
+// Storybook -> the Disney kit, so the villagers always match the heroes they stand next to.
 export const kitStyle = () => {
   const k = new URLSearchParams(location.search).get('kit');
   if (k) return k;
   if (chewyStyle() === 'classic') return 'classic';
-  return chewyModel() === 'toy' ? 'toy' : 'disney';
+  return toyHeroes() ? 'toy' : 'disney';
 };
 const sculpted = () => kitStyle() !== 'classic'; // toy and disney both bake one skinned mesh without ink hulls
 // tessellation multiplier: 1 in game; the Blender refine export (tools/blender) builds at 3 so painted colour edges are crisp
@@ -106,6 +107,103 @@ export function boneSwordGeo({ blade = '#fbf1e0', edge = '#ffffff', grip = '#c9a
   parts.push(ell(0.036, 0.034, 0.024, blade, [-0.02, 0.73, 0])); parts.push(ell(0.036, 0.034, 0.024, blade, [0.02, 0.73, 0]));
   return merge(parts);
 }
+// The Bone Katana (Chewy the samurai: tools/blender/work/codex/chewy-samurai/refs/sheet.png, "Bone Katana"): a long,
+// gently curved bone blade with a rounded tip, a gold collar, a round gold tsuba with a paw print cut through it, a red
+// wrapped grip and a bone-knob pommel. Origin = the sword paw's grip, just under the tsuba; the blade runs up +Y, its
+// edge toward −X and its curve (sori) toward +X (the back); the flat faces ±Z. KATANA.leftGrip is where the other paw
+// takes the hilt for a two-handed cut. Per-item tint: [blade, wrap, accent] from the item's icon colours (items.js);
+// the tsuba and rings stay gold. hilt: only the hilt (the sheathed look: the blade is hidden in the saya).
+export const KATANA = { blade0: 0.05, length: 0.62, leftGrip: -0.105, pommel: -0.17, gold: '#ebb84a' };
+let PAW_TSUBA = null;
+function tsubaGeo() {
+  if (PAW_TSUBA) return PAW_TSUBA.clone();
+  const R = 0.07, s = new THREE.Shape();
+  s.absarc(0, 0, R, 0, TAU, false);
+  // the paw print, cut through: a pad and four toes (the blade and grip pass through the middle of the pad)
+  const hole = (x, y, rx, ry) => { const h = new THREE.Path(); h.absellipse(x, y, rx, ry, 0, TAU, true); s.holes.push(h); };
+  for (const [x, y, rx, ry] of [[-0.044, 0.008, 0.011, 0.014], [-0.018, 0.04, 0.011, 0.014], [0.018, 0.04, 0.011, 0.014], [0.044, 0.008, 0.011, 0.014], [0, -0.041, 0.019, 0.013]]) hole(x, y, rx, ry);
+  const g = new THREE.ExtrudeGeometry(s, { depth: 0.012, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2, curveSegments: 28 * DETAIL });
+  g.translate(0, 0, -0.006); g.rotateX(-Math.PI / 2);
+  PAW_TSUBA = g;
+  return g.clone();
+}
+export function katanaGeo({ colors = null, hilt = false } = {}) {
+  const [bladeC = '#f4e8cf', wrapC = '#c23b3b', accentC = '#f2e4c6'] = colors || [];
+  const gold = C(KATANA.gold), goldDk = C(KATANA.gold).multiplyScalar(0.72), bone = C(bladeC).lerp(C('#fffaf2'), 0.35), wrap = C(wrapC); // (the blade a touch whiter than the icon: the warm light reads it pink)
+  const parts = [];
+  // tsuba (round, gold, the paw print cut out) on a pair of thin seppa
+  parts.push(paint(xf(tsubaGeo(), { p: [0, 0.044, 0] }), (p, n, o) => { o.copy(gold); if (Math.abs(n.y) < 0.5) o.copy(goldDk); }));
+  for (const y of [0.031, 0.057]) parts.push(cyl(0.03, 0.004, KATANA.gold, [0, y, 0]));
+  // fuchi collar, the wrapped grip (red ito over cream samegawa diamonds), the kashira ring
+  parts.push(cyl(0.031, 0.016, KATANA.gold, [0, 0.022, 0], 0.82));
+  const gl = 0.166, grip = new THREE.CylinderGeometry(1, 1, gl, 18 * DETAIL, 14 * DETAIL, true);
+  { const P = grip.attributes.position;
+    for (let i = 0; i < P.count; i++) { const y = P.getY(i) / gl + 0.5, b = 1 + 0.07 * Math.sin(y * Math.PI); P.setXYZ(i, P.getX(i) * 0.03 * b, P.getY(i), P.getZ(i) * 0.024 * b); } }
+  grip.translate(0, 0.014 - gl / 2, 0); grip.computeVertexNormals();
+  const samegawa = C('#f6eedc');
+  parts.push(paint(grip, (p, n, o) => {
+    const a = Math.atan2(p.z, p.x) / TAU, h = (p.y + 0.15) / gl;
+    const u = a * 6 + h * 5, v = a * 6 - h * 5, du = Math.abs((u - Math.floor(u)) - 0.5), dv = Math.abs((v - Math.floor(v)) - 0.5);
+    o.copy(wrap); if (du + dv < 0.24) o.copy(samegawa); else if (du + dv > 0.74) o.multiplyScalar(0.8);
+  }));
+  parts.push(cyl(0.029, 0.014, KATANA.gold, [0, -0.152, 0], 0.82));
+  // the bone-knob pommel: a dog-bone end, two lobes across the grip
+  parts.push(ell(0.017, 0.016, 0.017, bladeC, [0, -0.162, 0]));
+  for (const s of [-1, 1]) parts.push(ell(0.026, 0.024, 0.022, bladeC, [s * 0.02, -0.18, 0], [0, 0, 0], 16));
+  if (!hilt) {
+    // habaki: the blade collar, in the item's accent
+    parts.push(cyl(0.06, 0.036, '#' + C(accentC).lerp(gold, 0.35).getHexString(), [0, 0.072, 0], 0.52));
+    parts.push(bladeGeo(bone));
+  }
+  return merge(parts);
+}
+// the blade: a lens-shaped bone cross-section (a thick back, a thinner edge), gently curved, ending in a round tip
+function bladeGeo(bone) {
+  const y0 = 0.058, L = KATANA.length, N = 30 * DETAIL, sori = 0.05, M = 12;
+  const pos = [], idx = [], col = [];
+  const edge = C('#fffbf2'), back = bone.clone().multiplyScalar(0.93);
+  for (let i = 0; i <= N; i++) {
+    const t = i / N, y = y0 + t * L;
+    const tip = t > 0.86 ? Math.sqrt(Math.max(0, 1 - ((t - 0.86) / 0.14) ** 2)) : 1; // (a round tip, like the end of a bone)
+    const w = (0.05 - 0.011 * t) * Math.max(tip, 0.03), th = (0.021 - 0.005 * t) * Math.max(tip, 0.03), cx = sori * t * t; // (toy-chunky: as broad as the old bone sword)
+    for (let k = 0; k < M; k++) {
+      const f = (k / M) * TAU, e = Math.cos(f); // e: +1 the edge (−X), −1 the back (+X)
+      pos.push(cx - e * w, y, Math.sin(f) * th * (0.74 + 0.26 * (1 - e) / 2)); // (a soft lens: rounded, a little thinner toward the edge)
+      const c = e > 0.55 ? edge : e < -0.6 ? back : bone; col.push(c.r, c.g, c.b);
+    }
+  }
+  for (let i = 0; i < N; i++) for (let k = 0; k < M; k++) { const a = i * M + k, b = i * M + (k + 1) % M, c = a + M, d = b + M; idx.push(a, b, c, b, d, c); }
+  // caps: the base (inside the habaki) and the rounded point
+  const base = pos.length / 3; pos.push(0, y0, 0); col.push(bone.r, bone.g, bone.b);
+  for (let k = 0; k < M; k++) idx.push(base, (k + 1) % M, k);
+  const end = pos.length / 3; pos.push(sori, y0 + L + 0.004, 0); col.push(bone.r, bone.g, bone.b);
+  for (let k = 0; k < M; k++) idx.push(end, N * M + k, N * M + (k + 1) % M);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+// The katana's own material (shared by every rig): the toon look of the props, plus a lift that keeps the bone parts
+// bone-white: the warm key light and the warm grade read a cream blade pale salmon, so on bright, unsaturated albedo
+// the lit colour takes the albedo's own hue (its brightness kept), slightly cooled against the grade, and never falls
+// below uBoneLift of the albedo in the shade (it reads at the far camera in a dark Burrow too); no fog (a Burrow's tinted
+// haze turned it pink at the game camera's distance). The gold and the red wrap are saturated: untouched.
+const BONE_LIFT = /* glsl */`
+{
+  vec3 a = diffuseColor.rgb;
+  float mx = max(max(a.r, a.g), a.b), mn = min(min(a.r, a.g), a.b);
+  float bone = smoothstep(0.42, 0.66, mx) * (1.0 - smoothstep(0.32, 0.5, (mx - mn) / max(mx, 1e-3))); // (linear-space saturation: cream is ~0.2, the gold and the red wrap ~0.9)
+  float L = dot(outgoingLight, vec3(0.333)), La = dot(a, vec3(0.333)) + 1e-3;
+  vec3 neutral = a * (L / La) * vec3(0.96, 1.0, 1.06);
+  outgoingLight = mix(outgoingLight, neutral, bone * 0.75);
+  outgoingLight = max(outgoingLight, a * uBoneLift * bone);
+  outgoingLight = mix(outgoingLight, min(outgoingLight, a * 1.02), bone); // (never past its own bone colour: an overexposed cream blooms pink)
+}`;
+let KMAT = null;
+export function katanaMaterial() {
+  return KMAT || (KMAT = makeToon({ vertexColors: true, objectBrush: true, brush: 0.02, rim: 0.6, term: [-0.02, 0.28], shadowSat: 0.4, fog: false, fragPars: 'uniform float uBoneLift;', fragOut: BONE_LIFT, uniforms: { uBoneLift: { value: 0.78 } } }));
+}
+const cyl = (r, h, color, p, sz = 1) => { const g = new THREE.CylinderGeometry(r, r, h, 20 * DETAIL, 1); g.scale(1, 1, sz); g.translate(...p); const c = C(color); return paint(g, (pp, n, o) => o.copy(c)); };
 export function tennisBall(r = 0.1) {
   const g = new THREE.SphereGeometry(r, 20, 14);
   const m = makeToon({ map: tennisBallTexture(), rim: 0.5, brush: 0.05 });
@@ -1072,6 +1170,17 @@ export const CAST = {
     nose: '#4a2418', iris: '#e8a93a', eye: '#e8a93a', muzzleColor: '#906048', blush: '#ff9aa6', muzzleScale: 0.94,
     patterns: {}, brows: false,
     outfit: { top: 'kimono', topColor: '#b8a4e8', topColor2: '#f4c04a', bottomColor: '#7a68b0', sash: '#8a6ad8', scarf: '#4fc4b4', hat: 'wizard', hatColor: '#3fb0a0' },
+  },
+  // Poe, the black pug ninja (docs/POE.md): the procedural fallback until her baked Toybox model lands (heroModels.js
+  // poeToy). The Toybox kit builds the pug head, folded ears and curl tail (spec.toy) and her costume (poeKit.js); the
+  // fūma on her back is a separate prop (poeGear.js dressPoe). The classic and Storybook kits fall back to a black dog
+  // in the same bamboo-shinobi colours.
+  poe: {
+    name: 'Poe', species: 'dog', voice: 1.25, fur: POE_PAL.fur, fur2: POE_PAL.mask, fur3: POE_PAL.mask, earColor: POE_PAL.mask, earInner: '#2a2428', tail: 'stub',
+    nose: POE_PAL.mask, iris: POE_PAL.eye, eye: POE_PAL.eye, muzzleColor: POE_PAL.mask, blush: '#7a4a5a', muzzleScale: 0.88,
+    patterns: { chestBlaze: true }, brows: false,
+    outfit: { top: 'gi', topColor: POE_PAL.moss, topColor2: POE_PAL.cream, bottom: 'shorts', bottomColor: POE_PAL.darkMoss, sash: POE_PAL.mustard },
+    toy: { head: 'pug', ears: 'pug', tail: 'curl', feet: POE_PAL.moss, extras: poeToyExtras },
   },
 };
 

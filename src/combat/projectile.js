@@ -6,6 +6,9 @@ import { Events } from '../core/events.js';
 import { rand, TAU } from '../core/util.js';
 import { spellFx } from '../gfx/spellFx.js';
 import { chargeFx } from '../gfx/chargeFx.js';
+import { onigiriGeo, onigiriMaterial, spectralBladeGeo, stormBladeMaterial } from '../gfx/samuraiProps.js';
+import { bladeFx } from '../gfx/bladeFx.js';
+import { adoptSprites } from '../gfx/spriteBatch.js';
 
 let ballGeo, ballMat, acornGeo, acornMat, potGeo, potMat, acornCap;
 function ballMesh(r = 0.12) {
@@ -39,6 +42,9 @@ const VIS = {
   acorn: { mesh: acornMesh, trail: null },
   firepot: { mesh: potMesh, trail: '#ffb070', fire: true },
   bone: { mesh: () => glowSprite('#fff6e0', 0.8), trail: '#fff6e0' },
+  // Chewy the samurai (gfx/samuraiProps.js): the Onigiri Toss rice ball, and Sakura Storm's spectral blades flying off (Blade Volley)
+  onigiri: { mesh: () => { const g = new THREE.Group(); const m = new THREE.Mesh(onigiriGeo(), onigiriMaterial()); m.castShadow = true; g.add(m, glowSprite('#fff4d8', 0.75)); return g; }, trail: '#fff6e0', trailSize: 0.42 },
+  blade: { mesh: () => { const g = new THREE.Group(); const m = new THREE.Mesh(spectralBladeGeo(), stormBladeMaterial()); m.scale.setScalar(0.62); g.add(m, glowSprite('#ffd8e6', 0.55)); return g; }, trail: '#ffd8e6', trailSize: 0.32, trailFn: (p, dt) => bladeFx(p.G).petalTrail(p.pos, dt) },
   moonball: { mesh: () => { const g = new THREE.Group(); g.add(ballMesh(0.2), glowSprite('#ffe8a0', 1.8)); return g; }, trail: '#fff0b0', trailSize: 0.7 },
   // Moka's spells (looks + trails live in gfx/spellFx.js; the floor prewarm gets an empty group — SpellFX prewarms its own)
   waterorb: { mesh: p => (p ? spellFx(p.G).orbMesh() : new THREE.Group()), trailFn: (p, dt) => spellFx(p.G).trailOrb(p, dt) },
@@ -69,14 +75,20 @@ export class Projectile {
     this.vis = vis;
     this.mesh = vis.mesh(this); this.mesh.position.copy(this.pos);
     this.G.world.scene.add(this.mesh);
+    adoptSprites(this.mesh, this.G.world.scene); // (its glow sprite draws in the scene's instanced sprite batch: gfx/spriteBatch.js)
     this.t = 0;
     if (o.lob) { this.lob = { from: this.pos.clone(), to: o.lob.to.clone(), h: o.lob.h || 3, time: o.lob.time || 0.8 }; }
     if (vis.light) this.lightSrc = this.G.world.lightPool.addSource({ pos: this.pos, color: new THREE.Color(vis.light), intensity: 5, radius: 5, priority: 2 });
   }
+  // who this projectile can hit right now, in the combat registry's order: enemies near it (the crowd grid, combat.js;
+  // a pierce / ricochet ball may hit several in one step), or the hero and the allies
   targets() {
-    const out = [];
-    if (this.team === 'ally') { for (const e of this.c.entities) if (e.alive && e.team === 'enemy') out.push(e); }
-    else { const p = this.G.player; if (p && !this.G.playerDead) out.push(p); for (const e of this.c.entities) if (e.alive && e.team === 'ally') out.push(e); }
+    const out = this._tg ||= [];
+    out.length = 0;
+    if (this.team === 'ally') {
+      if (this.c.enemiesNear) { const near = this.c.enemiesNear(this.pos.x, this.pos.z, this.radius + 0.3); for (let i = 0; i < near.length; i++) if (near[i].team === 'enemy') out.push(near[i]); this.c.doneNear(); }
+      else for (const e of this.c.entities) if (e.alive && e.team === 'enemy') out.push(e);
+    } else { const p = this.G.player; if (p && !this.G.playerDead) out.push(p); for (const e of (this.c.allies || this.c.entities)) if (e.alive && e.team === 'ally') out.push(e); }
     return out;
   }
   update(dt) {

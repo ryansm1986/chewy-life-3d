@@ -24,8 +24,8 @@ import { Events } from '../core/events.js';
 import { computeStats, xpToNext, LEVEL_CAP } from './stats.js';
 import { SKILLS, canLearn } from './skills.js';
 import { learnPerk as learnPerkIn, perkPoints } from './charge.js';
-import { starterItems, starterStaff, generateItem, EQUIP_SLOT_ITEM, meetsReq, socketGem, POTIONS, targetSlot, SET_ITEMS } from './items.js';
-import { CLASSES, HERO_IDS, canWield } from './classes.js';
+import { starterItems, starterStaff, starterFuma, generateItem, EQUIP_SLOT_ITEM, meetsReq, socketGem, POTIONS, targetSlot, SET_ITEMS, renameLegacyItem } from './items.js';
+import { CLASSES, HERO_IDS, canWield, WEAPON_CLASS } from './classes.js';
 import { uid as rid } from '../core/util.js';
 import { PANTRY, pantryOf, pantryHas, sellPrice as pantrySellPrice } from '../life/pantry.js';
 import { RECIPES, cookbookOf, spendFor, learn as learnRecipeIn } from '../life/cooking.js';
@@ -45,6 +45,7 @@ export function newHeroState(id) {
   const C = CLASSES[id] || CLASSES.chewy, S0 = C.starter;
   const equipment = emptyEquipment();
   if (C.id === 'moka') equipment.weapon = starterStaff();
+  else if (C.id === 'poe') equipment.weapon = starterFuma(); // (one fūma: both weapon sets throw it)
   else { const { sword, ball } = starterItems(); equipment.weapon = sword; equipment.weaponAlt = ball; }
   return {
     player: {
@@ -100,6 +101,10 @@ export function normalizeHeroes(st) {
   st.player = st.heroes[st.activeHero].player;
   st.equipment = st.heroes[st.activeHero].equipment;
   st.version = Math.max(st.version || 1, 2);
+  // the sword bases renamed for the samurai Chewy (items.js renameLegacyItem): older saves' items follow
+  for (const id in st.heroes) for (const k in st.heroes[id].equipment) renameLegacyItem(st.heroes[id].equipment[k]);
+  for (const it of st.inventory || []) renameLegacyItem(it);
+  for (const it of st.stash || []) renameLegacyItem(it);
   return st;
 }
 /** What goes into localStorage: everything except the live player/equipment aliases (they live in heroes). */
@@ -151,7 +156,7 @@ export function createActions(G) {
     if ((r.str || 0) > D.str) return `Requires ${r.str} Strength`;
     if ((r.dex || 0) > D.dex) return `Requires ${r.dex} Dexterity`;
     if ((r.ene || 0) > D.ene) return `Requires ${r.ene} Energy`;
-    if (it.wtype && !canWield(P.cls || 'chewy', it.wtype)) return `That's ${CLASSES[it.wtype === 'staff' ? 'moka' : 'chewy'].name}'s — switch heroes to use it!`;
+    if (it.wtype && !canWield(P.cls || 'chewy', it.wtype)) return `That's ${CLASSES[WEAPON_CLASS[it.wtype] || 'chewy'].name}'s — switch heroes to use it!`;
     return '';
   }
   const canEquip = (it, slot) => !equipProblem(it, slot || targetSlot(it, S()));
@@ -190,7 +195,7 @@ export function createActions(G) {
   // player.mouseSets. The active set's pair is always live in hotbar[0..1] (so input / HUD keep reading the hotbar);
   // swapWeapons() files the live pair under the set being put away and brings the other set's pair in.
   // Keys 1–4 (hotbar[2..5]) are shared by both sets.
-  const setWeaponType = i => (S().equipment[i ? 'weaponAlt' : 'weapon']?.wtype) || (S().player.cls === 'moka' ? 'staff' : i ? 'ball' : 'sword');
+  const setWeaponType = i => (S().equipment[i ? 'weaponAlt' : 'weapon']?.wtype) || (S().player.cls === 'moka' ? 'staff' : S().player.cls === 'poe' ? 'fuma' : i ? 'ball' : 'sword');
   const fitsSet = (id, i) => !id || id === 'attack' || !SKILLS[id]?.wep || SKILLS[id].wep === setWeaponType(i);
   const knows = id => S().player.skills[id] > 0 && SKILLS[id] && SKILLS[id].kind !== 'passive' && SKILLS[id].kind !== 'aura';
   /** Best right-click skill for a weapon set: the weapon's most-trained spammable skill, else its other actives. */
@@ -198,6 +203,7 @@ export function createActions(G) {
     const P = S().player, wt = setWeaponType(i);
     const pref = wt === 'ball' ? ['throw', 'ricochet', 'multi', 'blaze', 'fetchstorm', 'decoy']
       : wt === 'staff' ? ['splash', 'kibble', 'feathers', 'moonbeam', 'constellation', 'whirlpool', 'shake', 'greatWave', 'meteor']
+      : wt === 'fuma' ? ['fumaThrow', 'kunaiFan', 'puffBall', 'shadowStep', 'thunderPaw', 'shadowStitch', 'shurikenRain', 'smokeDragon', 'thousandStars']
       : ['chomp', 'dig', 'whirl', 'bonestorm'];
     let best = null;
     pref.forEach((id, k) => { if (!knows(id)) return; const sc = (P.skills[id] || 0) * 10 - k * (k < 4 ? 1 : 25); if (!best || sc > best.sc) best = { id, sc }; });

@@ -1,0 +1,614 @@
+{
+  "bones": [
+    {
+      "name": "root",
+      "parent": null,
+      "head_blender_m": [
+        0,
+        0,
+        0
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "hips",
+      "parent": "root",
+      "head_blender_m": [
+        0,
+        0.015,
+        0.353
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "spine",
+      "parent": "hips",
+      "head_blender_m": [
+        0,
+        0.015,
+        0.469
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "chest",
+      "parent": "spine",
+      "head_blender_m": [
+        0,
+        0.013,
+        0.6
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "neck",
+      "parent": "chest",
+      "head_blender_m": [
+        0,
+        0.007,
+        0.672
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "head",
+      "parent": "neck",
+      "head_blender_m": [
+        0,
+        0.072,
+        0.692
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "jaw",
+      "parent": "head",
+      "head_blender_m": [
+        0,
+        -0.181,
+        0.778
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "eye_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.162,
+        -0.075,
+        0.903
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "lidU_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.162,
+        -0.075,
+        0.903
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "lidD_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.162,
+        0.17,
+        1.035
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "brow_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.151,
+        -0.179,
+        1.027
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "lip_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.118125,
+        -0.327,
+        0.7814000000108542
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "ear_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.22160648421437318,
+        0.00309908390045166,
+        1.119
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "earTip_L",
+      "parent": "ear_L",
+      "head_blender_m": [
+        0.2528022353780124,
+        0.22,
+        1.2229999999999999
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "upperarm_L",
+      "parent": "chest",
+      "head_blender_m": [
+        0.188,
+        0.013,
+        0.641
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "forearm_L",
+      "parent": "upperarm_L",
+      "head_blender_m": [
+        0.284,
+        -0.002,
+        0.51
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "hand_L",
+      "parent": "forearm_L",
+      "head_blender_m": [
+        0.363,
+        -0.022,
+        0.405
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "thigh_L",
+      "parent": "hips",
+      "head_blender_m": [
+        0.119,
+        0.014,
+        0.364
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "shin_L",
+      "parent": "thigh_L",
+      "head_blender_m": [
+        0.137,
+        0.007,
+        0.25
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "foot_L",
+      "parent": "shin_L",
+      "head_blender_m": [
+        0.146,
+        0.011,
+        0.121
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "eye_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.162,
+        -0.075,
+        0.903
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "lidU_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.162,
+        -0.075,
+        0.903
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "lidD_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.162,
+        0.17,
+        1.035
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "brow_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.151,
+        -0.179,
+        1.027
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "lip_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.118125,
+        -0.327,
+        0.7814000000108542
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "ear_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.22161097007391517,
+        0.003332376480102539,
+        1.119
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "earTip_R",
+      "parent": "ear_R",
+      "head_blender_m": [
+        -0.25214484500113193,
+        0.22,
+        1.22
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "upperarm_R",
+      "parent": "chest",
+      "head_blender_m": [
+        -0.188,
+        0.013,
+        0.641
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "forearm_R",
+      "parent": "upperarm_R",
+      "head_blender_m": [
+        -0.284,
+        -0.002,
+        0.51
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "hand_R",
+      "parent": "forearm_R",
+      "head_blender_m": [
+        -0.363,
+        -0.022,
+        0.405
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "thigh_R",
+      "parent": "hips",
+      "head_blender_m": [
+        -0.119,
+        0.014,
+        0.364
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "shin_R",
+      "parent": "thigh_R",
+      "head_blender_m": [
+        -0.137,
+        0.007,
+        0.25
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "foot_R",
+      "parent": "shin_R",
+      "head_blender_m": [
+        -0.146,
+        0.011,
+        0.121
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "tail1",
+      "parent": "hips",
+      "head_blender_m": [
+        0,
+        0.128,
+        0.348
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "tail2",
+      "parent": "tail1",
+      "head_blender_m": [
+        0,
+        0.206,
+        0.325
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "tail3",
+      "parent": "tail2",
+      "head_blender_m": [
+        0.015,
+        0.307,
+        0.402
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    },
+    {
+      "name": "tail4",
+      "parent": "tail3",
+      "head_blender_m": [
+        0.015,
+        0.304,
+        0.452
+      ],
+      "axes": "world +X,+Y,+Z; game XYZ = Blender X,Z,-Y"
+    }
+  ],
+  "triangles": 41106,
+  "mouth_seam_points": [
+    [
+      -0.1260024,
+      -0.3080431,
+      0.7888817
+    ],
+    [
+      -0.1243699,
+      -0.3103012,
+      0.7874115
+    ],
+    [
+      -0.1228195,
+      -0.3110901,
+      0.7860754
+    ],
+    [
+      -0.1150559,
+      -0.3153766,
+      0.7792349
+    ],
+    [
+      -0.1067399,
+      -0.3194307,
+      0.772225
+    ],
+    [
+      -0.1051774,
+      -0.3200161,
+      0.7712488
+    ],
+    [
+      -0.1020219,
+      -0.3210189,
+      0.7693487
+    ],
+    [
+      -0.0925787,
+      -0.3240295,
+      0.7635835
+    ],
+    [
+      -0.0875767,
+      -0.3255964,
+      0.7606658
+    ],
+    [
+      -0.0762038,
+      -0.3282801,
+      0.756171
+    ],
+    [
+      -0.0685621,
+      -0.3300654,
+      0.753255
+    ],
+    [
+      -0.0503982,
+      -0.3330161,
+      0.7494665
+    ],
+    [
+      -0.0491591,
+      -0.3332177,
+      0.7492029
+    ],
+    [
+      -0.0308663,
+      -0.3349871,
+      0.7498719
+    ],
+    [
+      -0.0283197,
+      -0.3352343,
+      0.7499357
+    ],
+    [
+      -0.015497,
+      -0.3356303,
+      0.752869
+    ],
+    [
+      -0.0010049,
+      -0.3360829,
+      0.756171
+    ],
+    [
+      -0.0004762,
+      -0.3360993,
+      0.7562917
+    ],
+    [
+      0.0,
+      -0.3361142,
+      0.7564
+    ],
+    [
+      0.0010049,
+      -0.3360829,
+      0.756171
+    ],
+    [
+      0.0283197,
+      -0.3352343,
+      0.7499357
+    ],
+    [
+      0.0485499,
+      -0.3332768,
+      0.7492186
+    ],
+    [
+      0.0491591,
+      -0.3332177,
+      0.7492029
+    ],
+    [
+      0.0612513,
+      -0.3312574,
+      0.7516586
+    ],
+    [
+      0.0685621,
+      -0.3300654,
+      0.753255
+    ],
+    [
+      0.0724206,
+      -0.3291681,
+      0.754678
+    ],
+    [
+      0.0762038,
+      -0.3282801,
+      0.756171
+    ],
+    [
+      0.0818738,
+      -0.3269489,
+      0.7583417
+    ],
+    [
+      0.0875767,
+      -0.3255964,
+      0.7606658
+    ],
+    [
+      0.0906028,
+      -0.3246541,
+      0.7623799
+    ],
+    [
+      0.0925787,
+      -0.3240295,
+      0.7635835
+    ],
+    [
+      0.0982601,
+      -0.3222351,
+      0.7669135
+    ],
+    [
+      0.1051774,
+      -0.3200161,
+      0.7712488
+    ],
+    [
+      0.1058125,
+      -0.3197852,
+      0.7716344
+    ],
+    [
+      0.1067399,
+      -0.3194307,
+      0.772225
+    ],
+    [
+      0.112309,
+      -0.3167739,
+      0.7768272
+    ],
+    [
+      0.1150559,
+      -0.3153766,
+      0.7792349
+    ],
+    [
+      0.1186379,
+      -0.3136968,
+      0.7822577
+    ],
+    [
+      0.1243699,
+      -0.3103012,
+      0.7874114
+    ],
+    [
+      0.1249062,
+      -0.3097944,
+      0.7878757
+    ],
+    [
+      0.1260024,
+      -0.3080431,
+      0.7888817
+    ]
+  ],
+  "lid_coverage": {
+    "lidU_L": {
+      "target_angle": 1.22,
+      "visible_globe_samples": 3193,
+      "posed_rim_samples": 20,
+      "uncovered_samples": 0
+    },
+    "lidD_L": {
+      "target_angle": -0.45,
+      "visible_globe_samples": 3193,
+      "posed_rim_samples": 177,
+      "uncovered_samples": 0
+    },
+    "lidU_R": {
+      "target_angle": 1.22,
+      "visible_globe_samples": 3193,
+      "posed_rim_samples": 24,
+      "uncovered_samples": 0
+    },
+    "lidD_R": {
+      "target_angle": -0.45,
+      "visible_globe_samples": 3193,
+      "posed_rim_samples": 179,
+      "uncovered_samples": 0
+    }
+  },
+  "notes": [
+    "Head pivot is at skull base, not volume centre.",
+    "Approved eye globes remain untouched; upper/lower lid hinges are fitted independently.",
+    "Lids are rigid swept shells with a single 2.5 mm lash edge; no shape keys or drivers.",
+    "Weights quantized to exact sum 255 for baked exporter."
+  ]
+}

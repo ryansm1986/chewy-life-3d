@@ -168,7 +168,7 @@ export default async function () {
     hitBoss: () => { demo._bh = (demo._bh ?? 7600) - 900; UI.setBoss({ name: 'King Mochimaru', title: 'The Squishy Tyrant', hp: demo._bh, hpMax: 10000 }); },
     interact: (t = 'Talk to Rosie') => UI.setInteract(t),
     loot() {
-      const names = [['Bone Sword', 'normal'], ['Sparkly Collar', 'magic'], ["Tanuki's Lucky Charm", 'unique'], ['Rain Boots of Zoom', 'rare'], ['Sakura Petal', 'normal'], ['Crystal Shard', 'magic'], ['Gi of the Pack', 'set'], ['Mittens', 'normal']];
+      const names = [['Bone Katana', 'normal'], ['Sparkly Collar', 'magic'], ["Tanuki's Lucky Charm", 'unique'], ['Rain Boots of Zoom', 'rare'], ['Sakura Petal', 'normal'], ['Crystal Shard', 'magic'], ['Gi of the Pack', 'set'], ['Mittens', 'normal']];
       names.forEach(([n, r], i) => UI.lootLabel.add({ id: 'l' + i, name: n, rarity: r, worldPos: { x: 2 + (i % 3) * .5, y: 0, z: 1 + Math.floor(i / 3) * .3 } }));
     },
     alt: on => UI.lootLabel.setVisible(on !== false),
@@ -216,7 +216,7 @@ function makeGen() {
     };
   }
   const BASES = {
-    weapon: [['boneSword', 'Bone Sword', 'sword'], ['bigBone', 'Big Ol\' Bone', 'sword'], ['tennisBall', 'Red Tennis Ball', 'ball']],
+    weapon: [['boneSword', 'Bone Katana', 'sword'], ['bigBone', 'Big Ol\' Bone', 'sword'], ['tennisBall', 'Red Tennis Ball', 'ball']],
     hat: [['strawHat', 'Straw Hat'], ['beanie', 'Pom Beanie']], outfit: [['dojoGi', 'Dojo Gi'], ['raincoat', 'Raincoat']], collar: [['bellCollar', 'Bell Collar']],
     charm: [['omamori', 'Omamori'], ['acorn', 'Lucky Acorn']], boots: [['rainBoots', 'Rain Boots']], paws: [['mittens', 'Mittens']],
   };

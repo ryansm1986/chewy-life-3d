@@ -7,10 +7,14 @@ import { chromium } from 'playwright-core';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
-const TOY_CHEWY = (await import('node:fs')).existsSync(new URL('../../public/rigs/chewy_b.json', import.meta.url)); // the Toybox Chewy ships: the player must be it
+const TOY_CHEWY = (await import('node:fs')).existsSync(new URL('../../public/rigs/chewy_b.json', import.meta.url)); // the Toybox Chewy ships (the samurai's fallback)
+const SAMURAI_CHEWY = (await import('node:fs')).existsSync(new URL('../../public/rigs/chewy_samurai.json', import.meta.url)); // the samurai Chewy ships: the player must be it (the default model)
+const CHEWY_MODEL = SAMURAI_CHEWY ? 'chewy_samurai' : TOY_CHEWY ? 'chewy_b' : null;
 const TOY_SHADOW = fs.existsSync(new URL('../../public/rigs/shadow_toy.json', import.meta.url)); // the Toybox Shadow ships: the companion must be it
 const TOY_MOKA = fs.existsSync(new URL('../../public/rigs/moka_toy.json', import.meta.url)); // the Toybox Moka ships: playing Moka must use it
 const TOY_ROSIE = fs.existsSync(new URL('../../public/rigs/rosie_toy.json', import.meta.url)); // the Toybox Rosie ships: the village's Rosie must be it
+const TOY_POE = fs.existsSync(new URL('../../public/rigs/poe_toy.json', import.meta.url)); // the Toybox Poe ships: playing Poe must use it
+const POE_FUMA = fs.existsSync(new URL('../../public/models/poe-fuma.glb', import.meta.url)); // her Blender fūma ships: every fūma must be it (actors/poeGear.js FUMA_MODEL)
 
 const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chewy-prod-'));
 await build({ logLevel: 'error', build: { outDir, emptyOutDir: true } });
@@ -18,15 +22,15 @@ const server = await preview({ logLevel: 'error', build: { outDir }, preview: { 
 const url = server.resolvedUrls.local[0].replace(/\/$/, '');
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true, args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] });
 let failed = 0;
-for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['home', '/?fresh&nointro'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`])]) {
+for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['poe', '/?fresh&nointro&hero=poe'], ['home', '/?fresh&nointro'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`])]) {
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
   const errs = [];
   page.on('pageerror', e => errs.push('pageerror: ' + e.message));
-  page.on('console', m => { if (m.type() === 'error' || /optional module missing|\[rigs\]|\[chewy\]|\[heroes\]|\[shadow\]|\[rosie\]|\[moka\]/.test(m.text())) errs.push(m.type() + ': ' + m.text()); }); // ([heroes]: a baked hero model missing from the bundle)
+  page.on('console', m => { if (m.type() === 'error' || /optional module missing|\[rigs\]|\[chewy\]|\[heroes\]|\[shadow\]|\[rosie\]|\[moka\]|\[poe\]/.test(m.text())) errs.push(m.type() + ': ' + m.text()); }); // ([heroes]: a baked hero model missing from the bundle)
   await page.goto(url + q);
   await page.waitForFunction(() => window.__ready === true, null, { timeout: 60000 }).catch(() => errs.push('never became ready'));
   await page.waitForTimeout(2500);
-  const s = await page.evaluate(() => ({ ui: document.querySelector('#ui')?.children.length || 0, hasUI: !!window.G?.ui, audio: !!window.G?.audio, title: !!window.G?.titleActive, mode: window.G?.mode, refinedRigs: !!((window.G?.player?.rig?.refined || window.G?.player?.rig?.disney) && (window.G?.companion?.rig?.refined || window.G?.companion?.rig?.disney)), disney: !!(window.G?.player?.rig?.bakedDisney && window.G?.companion?.rig?.disney && window.G?.npcs?.every(n => n.rig.disney)), model: window.G?.player?.rig?.model || null, pet: window.G?.companion?.rig?.model || null, rosie: window.G?.npcs?.find(n => n.id === 'rosie')?.rig?.model || null }));
+  const s = await page.evaluate(() => ({ ui: document.querySelector('#ui')?.children.length || 0, hasUI: !!window.G?.ui, audio: !!window.G?.audio, title: !!window.G?.titleActive, mode: window.G?.mode, refinedRigs: !!((window.G?.player?.rig?.refined || window.G?.player?.rig?.disney) && (window.G?.companion?.rig?.refined || window.G?.companion?.rig?.disney)), disney: !!(window.G?.player?.rig?.bakedDisney && window.G?.companion?.rig?.disney && window.G?.npcs?.every(n => n.rig.disney)), model: window.G?.player?.rig?.model || null, saya: !!window.G?.player?.rig?.parts?.saya, pet: window.G?.companion?.rig?.model || null, rosie: window.G?.npcs?.find(n => n.id === 'rosie')?.rig?.model || null }));
   if (label === 'moka') { // the second hero in the bundle: her baked model + staff, a spell, and a switch back to Chewy
     s.moka = await page.evaluate(async () => {
       const G = window.G, P = G.player, r = { baked: !!P.rig.bakedDisney && P.rig.hero === 'moka', staff: !!P.staff, wt: G.derived.weaponType };
@@ -35,6 +39,21 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
       G.heroes.cd = 0; r.switch = G.heroes.switchTo('chewy', { quiet: true });
       await new Promise(q => setTimeout(q, 3000));
       r.after = G.state.activeHero; r.chewyBaked = !!G.player.rig.bakedDisney && G.player.rig.hero === 'chewy'; r.mokaVillager = !!G.heroes.villagers.moka?.rig?.bakedDisney;
+      return r;
+    });
+  }
+  if (label === 'poe') { // the third hero in the bundle (docs/POE.md): her baked rig (or the kit) + the fūma on her back (the Blender prop when it ships), a Fūma Throw out and back, a switch
+    s.poe = await page.evaluate(async () => {
+      const G = window.G, P = G.player, kind = () => P.rig.parts.fumaBack?.children[0]?.userData.kind || null;
+      for (let i = 0; i < 30 && kind() !== 'glb'; i++) await new Promise(q => setTimeout(q, 100)); // (the prop loads after boot)
+      const r = { hero: P.hero, kit: !!P.rig.toy, baked: !!P.rig.bakedDisney && P.rig.hero === 'poe', fuma: kind(), back: !!P.rig.parts.fumaBack?.visible, wt: G.derived.weaponType };
+      r.cast = G.skills.tryCast('fumaThrow', P.pos.clone().add(new G.THREE.Vector3(3, 0, 0)), null);
+      await new Promise(q => setTimeout(q, 700)); r.flying = !!G.skills.poeFuma;
+      await new Promise(q => setTimeout(q, 1600)); r.caught = !G.skills.poeFuma && !P.fumaOut;
+      r.icons = [...document.querySelectorAll('.hotbar .hb-ic')].slice(0, 2).every(i => /^data:image\/png/.test(i.src));
+      G.heroes.cd = 0; r.switch = G.heroes.switchTo('chewy', { quiet: true });
+      await new Promise(q => setTimeout(q, 3000));
+      r.after = G.state.activeHero; r.poeVillager = !!G.heroes.villagers.poe?.rig?.parts?.fumaBack; r.villagerFuma = G.heroes.villagers.poe?.rig?.parts?.fumaBack?.children[0]?.userData.kind || null;
       return r;
     });
   }
@@ -57,8 +76,9 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
   }
   const regionOk = !s.region || (s.region.id === regionId && s.region.monsters >= 10 && s.region.boss);
   const h = s.home, homeOk = !h || (h.mode === 'interior' && h.items >= 12 && h.batches >= 10 && h.jobs === 4 && h.palette && h.thumbs >= 3 && h.back === 'village');
+  const pz = s.poe, poeOk = !pz || (pz.hero === 'poe' && (!TOY_POE || (s.model === 'poe_toy' && pz.baked)) && (!POE_FUMA || (pz.fuma === 'glb' && pz.villagerFuma === 'glb')) && pz.back && pz.wt === 'fuma' && pz.cast && pz.flying && pz.caught && pz.icons && pz.switch && pz.after === 'chewy' && pz.poeVillager);
   const m = s.moka, mokaOk = !m || ((!TOY_MOKA || s.model === 'moka_toy') && m.baked && m.staff && m.wt === 'staff' && m.cast && m.switch && m.after === 'chewy' && m.chewyBaked && m.mokaVillager);
-  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && mokaOk && regionOk && homeOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!TOY_CHEWY || s.model === 'chewy_b') && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
+  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && mokaOk && poeOk && regionOk && homeOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!CHEWY_MODEL || s.model === CHEWY_MODEL) && (!SAMURAI_CHEWY || s.saya) && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
   console.log(`${ok ? 'PASS' : 'FAIL'}  production ${label}: ${JSON.stringify(s)}${errs.length ? '\n   ' + [...new Set(errs)].slice(0, 8).join('\n   ') : ''}`);
   if (!ok) failed++;
   await page.close();

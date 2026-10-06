@@ -41,7 +41,7 @@ export default function () {
 
   if (sec.includes('items')) {
     const bySlot = s => GEAR_BASE_IDS.filter(id => ITEM_BASES[id].slot === s);
-    html += section('Bone Swords', bySlot('weapon').filter(id => ITEM_BASES[id].wtype === 'sword').map(id => cell(itemIcon(baseItem(id)), ITEM_BASES[id].name)));
+    html += section('Bone Katanas', bySlot('weapon').filter(id => ITEM_BASES[id].wtype === 'sword').map(id => cell(itemIcon(baseItem(id)), ITEM_BASES[id].name)));
     html += section('Balls', bySlot('weapon').filter(id => ITEM_BASES[id].wtype === 'ball').map(id => cell(itemIcon(baseItem(id)), ITEM_BASES[id].name)));
     html += section('Hats · Outfits', [...bySlot('hat'), ...bySlot('outfit')].map(id => cell(itemIcon(baseItem(id)), ITEM_BASES[id].name)));
     html += section('Collars · Charms · Boots · Paws', [...bySlot('collar'), ...bySlot('charm'), ...bySlot('boots'), ...bySlot('paws')].map(id => cell(itemIcon(baseItem(id, ITEM_BASES[id].slot === 'collar' || ITEM_BASES[id].slot === 'charm' ? 'magic' : 'normal')), ITEM_BASES[id].name)));

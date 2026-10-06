@@ -2,7 +2,7 @@
 
 Score out of 10 against the approved sheet. Ship at 9.
 
-## Build the evidence (don't judge from Codex's own renders alone)
+## Build the evidence (don't judge from the builder's own renders alone)
 - [ ] `report.md` and `preview/stats.json`: triangles, size, warnings, one atlas.
 - [ ] Same-scale comparisons (`scripts/compare.py`): head front, head 3/4, side, back and eyes-only, with the sheet on the
       left and the render on the right, at equal head heights.

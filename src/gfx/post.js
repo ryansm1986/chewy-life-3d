@@ -5,6 +5,7 @@ import {
   SMAAEffect, SMAAPreset, TiltShiftEffect, Effect, BlendFunction, KernelSize, ChromaticAberrationEffect,
 } from 'postprocessing';
 import { N8AOPostPass } from 'n8ao';
+import { U } from './materials.js';
 
 const GRADE_FRAG = /* glsl */`
 uniform float uSat;
@@ -54,7 +55,7 @@ export class GradeEffect extends Effect {
       blendFunction: BlendFunction.NORMAL,
       uniforms: new Map([
         ['uSat', new THREE.Uniform(1.12)], ['uContrast', new THREE.Uniform(1.04)],
-        ['uLift', new THREE.Uniform(new THREE.Vector3(0.02, 0.0, 0.05))],
+        ['uLift', new THREE.Uniform(U.uGradeLift.value)], // (shared with the materials: heroModels.js darkNeutral counters it)
         ['uGain', new THREE.Uniform(new THREE.Vector3(1.03, 1.0, 0.95))],
         ['uVignette', new THREE.Uniform(1.0)], ['uVigColor', new THREE.Uniform(new THREE.Vector3(0.55, 0.45, 0.65))],
         ['uFlashColor', new THREE.Uniform(new THREE.Vector3(1, 1, 1))], ['uFlash', new THREE.Uniform(0)],
@@ -77,6 +78,10 @@ export class Post {
     this.ao = new N8AOPostPass(scene, camera, w, h);
     Object.assign(this.ao.configuration, { aoRadius: 1.6, distanceFalloff: 0.6, intensity: 2.2, color: new THREE.Color('#40285a'), halfRes: quality < 2, aoSamples: 12, denoiseSamples: 8, denoiseRadius: 10, gammaCorrection: false });
     this.composer.addPass(this.ao);
+    // (perf, ROADMAP Z-B5) N8AO's transparency-aware pass renders the scene twice more every frame, right after the
+    // RenderPass: every matrix is already current then, so those renders skip the scene-wide matrix update
+    const rt = this.ao.renderTransparency?.bind(this.ao);
+    if (rt) this.ao.renderTransparency = (renderer) => { const s = this.ao.scene, a = s.matrixWorldAutoUpdate; s.matrixWorldAutoUpdate = false; try { return rt(renderer); } finally { s.matrixWorldAutoUpdate = a; } };
     this.tilt = new TiltShiftEffect({ offset: 0.0, rotation: 0, focusArea: 0.78, feather: 0.22, kernelSize: KernelSize.VERY_SMALL });
     this.tiltPass = new EffectPass(camera, this.tilt);
     this.composer.addPass(this.tiltPass);

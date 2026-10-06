@@ -10,6 +10,7 @@ import { chargeFx } from '../gfx/chargeFx.js';
 import { perkAt } from '../rpg/charge.js';
 import { PAL } from '../gfx/spellFx.js';
 import { installChargedChewy } from './chargedChewy.js';
+import { bladeFx } from '../gfx/bladeFx.js';
 import { installChargedMoka } from './chargedMoka.js';
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3();
@@ -47,7 +48,7 @@ const M = {
     if (c0) { S.splash = (p, o = {}) => c0.call(S, p, { ...o, maxH: Math.min(o.maxH ?? 99, 1.6), alpha: Math.min(o.alpha ?? 0.95, 0.68) }); S._soft = true; } // (and Moka's water crowns: ≤ 1.6 m, see-through; flocks made now dive soft)
     try { return fn(); } finally { V.flash = f0; V.ring = g0; if (c0) { S.splash = c0; S._soft = false; } V._tamed = false; }
   },
-  /** Twister: a charged Tail Spin's spin-out drifts after the cursor */
+  /** Twister: a charged Whirlwind Stance's spin-out drifts after the cursor */
   spinDrift(dt) {
     const G = this.G, P = G.player, tw = this.channel?.R?.def?.charge?.perks?.twister, a = this.charge.cursorGround(_v);
     if (!tw || !a) return;
@@ -56,26 +57,26 @@ const M = {
     this.slideHero(_w.set(dx / d, 0, dz / d), Math.min(d, tw.speed * dt));
   },
 
-  // ================================================================== Chomp Slash → Heavy Cleave
+  // ================================================================== Crescent Chomp → Grand Crescent
   charged_chomp(R, aim, target) {
-    const G = this.G, P = G.player, p = R.params, s = R.charge.stage, col = R.charge.color;
-    this.playFrom('swing', { speed: this.animSpeed(0.5), onEvent: ev => {
+    const G = this.G, P = G.player, p = R.params, s = R.charge.stage;
+    this.playFrom('iaiCut', { speed: this.animSpeed(0.5), onEvent: ev => {
+      if (ev === 'draw') { this.drawFromHip(); return; }
+      if (ev === 'end') { this.queueFlourish(); return; }
       if (ev !== 'hit') return;
       this.snapIn(target, p.radius);
       const f = P.facing, arc = p.arc * Math.PI / 180, o = P.pos.clone();
-      // the cleave: a fat cream sweep, a gold counter-sweep, and at Ⅱ+ a bright outer edge
-      G.vfx.slash(o, f, { arc, r: p.radius * 1.08, width: 1.25 + 0.15 * s, color: '#fff4d8', life: 0.34 });
-      G.vfx.slash(o, f, { arc: arc * 0.92, r: p.radius * 0.78, width: 0.85, color: col, life: 0.3, reverse: true });
-      if (s >= 2) G.vfx.slash(o, f, { arc: arc * 0.84, r: p.radius * 1.24, width: 0.45, color: '#ffe8a8', life: 0.26, tilt: 0.1 });
-      G.vfx.decal(_v.copy(o).add(this.forward().multiplyScalar(p.radius * 0.45)), { r: p.radius * 0.8, color: '#ffc870', additive: true, opacity: 0.22, life: 0.45, grow: 0.3 });
+      // the draw-cut: a bigger bone-white crescent moon (and at Ⅱ+ a second, outer one), a scuff on the ground
+      this.crescentChomp(o, f, p, 1 + 0.25 * s);
+      if (s >= 2) bladeFx(G).arc(o, f, { arc: arc * 0.86, r: p.radius * 1.28, y: 0.5, width: 0.28, life: 0.32, sweep: 0.09, mode: 1, tilt: -0.15 });
       G.vfx.decal(_v.copy(o).add(this.forward().multiplyScalar(p.radius * 0.6)), { r: p.radius * 0.7, color: '#3a2418', opacity: 0.35, life: 2.2 });
       G.vfx.dustRing(o, p.radius * 0.7, 10 + 4 * s);
-      sfx('swing_heavy'); sfx('bark', { pitch: 0.72 }); sfx('charge_slam', { stage: s, pitch: 1.05 - 0.08 * s });
+      sfx('swing_heavy'); sfx('bark', { pitch: 0.72, vol: 0.6 }); sfx('charge_slam', { stage: s, pitch: 1.05 - 0.08 * s });
       const hit = new Set();
       this.arcHit(o, f, p.radius, p.arc, e => { hit.add(e); this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: p.knockback, stun: p.stun, from: o }); }, target);
-      // the shockwave crescent rolls on from the cleave's edge and hits whatever it passes
+      // the crescent flies on from the cut's edge as a rolling wave and hits whatever it passes
       const cArc = Math.min(arc, (120 + 12 * s) * Math.PI / 180), wavePct = p.wavePct / 100;
-      chargeFx(G).crescent(o, f, { arc: cArc, r0: p.radius * 0.85, r1: p.radius + p.wave, life: 0.36 + 0.05 * s, color: col, width: p.waveWidth, onStep: (r0, r1) => {
+      bladeFx(G).wave(o, f, { arc: cArc, r0: p.radius * 0.85, r1: p.radius + p.wave, life: 0.36 + 0.05 * s, width: p.waveWidth, onStep: (r0, r1) => {
         this.combat.inRadius(o.x, o.z, r1, 'ally', (e, d) => {
           if (hit.has(e) || d + (e.radius || 0.3) < r0) return;
           if (d > 0.6 && Math.abs(angleDiff(f, Math.atan2(e.pos.x - o.x, e.pos.z - o.z))) > cArc / 2 + 0.12) return;

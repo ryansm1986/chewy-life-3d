@@ -11,7 +11,7 @@ import { Villager } from './actors/npc.js';
 import { CAST, REFINED_CAST, prebuildHumanoid } from './actors/charKit.js';
 import { loadRefinedRigs } from './actors/refinedRigs.js';
 import { chewyStyle, setChewyStyle } from './actors/disneyChewy.js';
-import { loadHeroModels, chewyModel, setChewyModel, heroModelReady, buildHeroModel } from './actors/heroModels.js';
+import { loadHeroModels, chewyModel, setChewyModel, CHEWY_MODELS, heroModelReady, buildHeroModel } from './actors/heroModels.js';
 import { VILLAGERS, randomVillagerSpec } from './actors/roster.js';
 import { U } from './gfx/materials.js';
 import { glowTexture } from './gfx/textures.js';
@@ -23,6 +23,8 @@ import { pupPrewarmRig } from './combat/allies.js';
 import { DungeonMode } from './dungeon/dungeonMode.js';
 import { RegionMode } from './regions/regionMode.js';
 import { REGIONS, REGION_IDS, regionState, regionUnlocked } from './regions/index.js';
+import { normRun, dungeonDef } from './dungeon/defs.js';
+import { normalizeZones } from './rpg/zones.js';
 import { addTravelPost } from './world/travelPost.js';
 import { MONSTERS } from './dungeon/monsters.js';
 import { GroundLoot } from './combat/groundLoot.js';
@@ -57,18 +59,25 @@ export async function boot() {
 
   // ---- persistent state + actions
   const saved = !P.has('fresh') && loadSave();
-  G.state = normalizeHeroes(saved || newGameState()); // one progression per hero, state.player = the active hero (docs/HEROES.md)
+  G.state = normalizeZones(normalizeHeroes(saved || newGameState())); // one progression per hero, state.player = the active hero (docs/HEROES.md); state.zones, migrated from state.regions (rpg/zones.js)
   if (P.has('hero') && G.state.heroes[P.get('hero')]) { // debug / tests: start as another hero (?hero=moka)
     const id = P.get('hero'); G.state.activeHero = id; G.state.player = G.state.heroes[id].player; G.state.equipment = G.state.heroes[id].equipment;
     if (id !== 'chewy') G.state.flags[`${id}Joined`] = true;
   }
   if (G.state.player.life === 0) G.state.player.life = null;
+  // dungeon layouts reroll per entry (dungeon/defs.js beginRun); ?dseed=N pins them for the tab (the QA's fixed floors:
+  // dseed=1 is the old fixed Burrow), ?dseed=off lets them roll again
+  {
+    let ds = P.get('dseed');
+    try { if (ds === 'off') sessionStorage.removeItem('chewy3d.dseed'); else if (ds != null) sessionStorage.setItem('chewy3d.dseed', ds); else ds = sessionStorage.getItem('chewy3d.dseed'); } catch (e) { /* storage unavailable */ }
+    G.dseed = ds != null && ds !== 'off' && Number.isFinite(+ds) ? +ds : null;
+  }
   G.actions = createActions(G);
   G.actions.recompute();
   G.skillParams = (id) => skillRuntime(id, G.state, G.derived)?.params;
 
   // Blender-refined skins for Chewy and Shadow must be in memory before their rigs (and portraits) are built
-  const [uiMod, audioMod] = await Promise.all([P.has('noui') ? null : tryImport('ui', () => import('./ui/ui.js')), P.has('noaudio') ? null : tryImport('audio', () => import('./audio/audio.js')), loadRefinedRigs(REFINED_CAST), loadHeroModels(['chewy', 'moka', 'shadow', 'rosie'])]);
+  const [uiMod, audioMod] = await Promise.all([P.has('noui') ? null : tryImport('ui', () => import('./ui/ui.js')), P.has('noaudio') ? null : tryImport('audio', () => import('./audio/audio.js')), loadRefinedRigs(REFINED_CAST), loadHeroModels(['chewy', 'moka', 'poe', 'shadow', 'rosie'])]); // (poe: while her model is pending, heroModels.js fetches nothing)
   G.audio = audioMod?.Audio || null;
   try { G.audio?.init?.(); } catch (e) { console.warn('[audio] init failed', e); }
 
@@ -148,11 +157,12 @@ export async function boot() {
   const portraits = new Portraits(engine);
   for (const v of VILLAGERS) portraits.register(v.id, v.spec);
   portraits.register('moka', CAST.moka);
+  portraits.register('poe', CAST.poe);
   G.portrait = (id) => portraits.get(id);
   G.thumbs = new BuildingThumbs(engine);
   try {
     const pm = await import('./ui/portraits.js');
-    for (const id of ['chewy', 'shadow', 'rosie', 'moka']) { const url = portraits.get(id); if (url) pm.PORTRAITS[id] = () => `<img class="p3d" src="${url}" alt="" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block">`; }
+    for (const id of ['chewy', 'shadow', 'rosie', 'moka', 'poe']) { const url = portraits.get(id); if (url) pm.PORTRAITS[id] = () => `<img class="p3d" src="${url}" alt="" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block">`; }
     G.refreshChewyPortrait = () => { // after a model swap: re-render the bust and update the HUD face
       portraits.cache.delete('chewy'); const url = portraits.get('chewy'); if (!url) return;
       pm.PORTRAITS.chewy = () => `<img class="p3d" src="${url}" alt="" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block">`;
@@ -165,11 +175,11 @@ export async function boot() {
   if (G.ui) { // Settings > Disney style: the sculpted cast (Disney Chewy + disneyKit villagers) or the classic toon kit.
     // Every character is built at boot, so switching saves and reloads (the save keeps all progress).
     G.ui.settings.disneyChewy = chewyStyle() === 'disney';
-    G.ui.settings.toyChewy = chewyModel() === 'toy'; // Toybox (new) vs Storybook baked Chewy (both need the Disney style)
+    G.ui.settings.heroModel = Math.max(0, CHEWY_MODELS.indexOf(chewyModel())); // Hero models: the samurai Chewy, the Toybox one or the Storybook heroes (all need the Disney style)
     G.ui.onSetting((k, v) => {
-      if (k === 'toyChewy') {
-        setChewyModel(v ? 'toy' : 'disney');
-        G.ui.toast?.(v ? 'Switching to the Toybox heroes…' : 'Switching to the Storybook heroes…');
+      if (k === 'heroModel') {
+        const m = CHEWY_MODELS[v] || 'samurai'; setChewyModel(m);
+        G.ui.toast?.(m === 'samurai' ? 'Switching to the samurai Chewy…' : m === 'toy' ? 'Switching to the Toybox heroes…' : 'Switching to the Storybook heroes…');
         setTimeout(() => { try { G.save?.(); } catch (e) { console.warn('[style] save failed', e); } location.reload(); }, 450);
         return;
       }
@@ -209,7 +219,7 @@ export async function boot() {
     for (const [k, v] of Object.entries(G.ui.settings || {})) applySetting(k, v, G.ui.settings);
     G.ui.onMenu?.({ save: () => { save(); G.ui.toast?.('Game saved ♡', { color: '#8fe0c0' }); }, quit: () => { save(); location.reload(); } });
   }
-  const BUFF_INFO = { howl: ['Howl', 'music', '#ff9a6a'], frenzy: ['Zoomies Frenzy', 'bolt', '#ffd84a'], shrineZoom: ['Zoomies Shrine', 'bolt', '#8fe0c0'], shrineLuck: ['Lucky Cat', 'clover', '#ffd84a'], shrineXp: ['Sparkle Shrine', 'sparkle', '#b8a8ff'], cursed: ['Cursed', 'skull', '#b88aff'], shadowPower: ['Pack Call', 'shadowDog', '#8ab8ff'], moonlit: ['Moonlit Rally', 'moon', '#ffb080'] };
+  const BUFF_INFO = { howl: ['War Banner', 'music', '#ff9a6a'], frenzy: ['Flowing Water', 'bolt', '#ffd84a'], shrineZoom: ['Zoomies Shrine', 'bolt', '#8fe0c0'], shrineLuck: ['Lucky Cat', 'clover', '#ffd84a'], shrineXp: ['Sparkle Shrine', 'sparkle', '#b8a8ff'], cursed: ['Cursed', 'skull', '#b88aff'], shadowPower: ['Pack Call', 'shadowDog', '#8ab8ff'], moonlit: ['Moonlit Rally', 'moon', '#ffb080'] };
   function syncBuffs() {
     const B = G.combat?.buffs || {}; const list = [];
     for (const [k, b] of Object.entries(B)) { const inf = BUFF_INFO[k]; if (!inf || (k === 'frenzy' && !b.stacks)) continue; list.push({ id: k, name: k === 'frenzy' ? `${inf[0]} ×${b.stacks}` : inf[0], glyph: inf[1], color: inf[2], time: b.t > 0 ? b.t : 0 }); }
@@ -306,14 +316,19 @@ export async function boot() {
       G.ui?.setLocation?.(location(), sub);
       G.ui?.minimap?.setProvider?.(region ? new RegionMinimap(G, dungeon) : new DungeonMinimap(G, dungeon));
       G.audio?.music?.(dungeon.layout.boss && !region ? 'boss' : 'dungeon'); G.audio?.ambience?.('dungeon');
-      Events.emit('mode:changed', { mode: 'dungeon', floor, region });
+      Events.emit('mode:changed', { mode: 'dungeon', floor: floor == null ? null : dungeon.floor, region, ...dungeon.where() }); // (+ zone, dungeon, tier: docs/ZONES.md §8)
       save();
       // first visit: one short, non-blocking tip from Shadow; the rest arrive when they become useful (see hints())
-      if (tip && !G.state.flags.burrowTut) { G.state.flags.burrowTut = true; setTimeout(() => G.mode === 'dungeon' && hint('fight', player.hero === 'moka' ? '*Yip!* Click a monster to zap it — right-click for Splash Bolt!' : '*Yip!* Click a monster to bonk it — right-click for Chomp Slash!'), 1800); }
+      if (tip && !G.state.flags.burrowTut) { G.state.flags.burrowTut = true; setTimeout(() => G.mode === 'dungeon' && hint('fight', player.hero === 'moka' ? '*Yip!* Click a monster to zap it — right-click for Splash Bolt!' : player.hero === 'poe' ? '*Yip!* Click a monster to slash it — right-click to throw your fūma (it comes back)!' : '*Yip!* Click a monster to slice it — right-click for Crescent Chomp!'), 1800); }
     };
     if (G.ui?.transition) G.ui.transition(go); else go();
   }
-  G.enterDungeon = (floor = 1) => enterCombatWorld(() => new DungeonMode(G), floor, { location: () => dungeon.theme.name, sub: `B${floor}F`, floor });
+  // A dungeon floor: G.enterDungeon({ id, floor, tier, mods }) (dungeon/defs.js DUNGEONS: 'burrow', the zone dungeons), or
+  // G.enterDungeon(n), the Burrow's floor n as before
+  G.enterDungeon = (arg = 1) => {
+    const run = normRun(arg), def = dungeonDef(run.id);
+    enterCombatWorld(() => new DungeonMode(G), run, { location: () => (def.kind === 'zone' ? def.name : dungeon.theme.name), sub: `B${run.floor}F`, floor: run.floor });
+  };
   G.enterRegion = (id) => {
     const def = REGIONS[id]; if (!def) return;
     enterCombatWorld(() => new RegionMode(G, id), undefined, { location: () => def.name, sub: def.jp, region: id });
@@ -322,7 +337,7 @@ export async function boot() {
   G.travel = {
     list: () => {
       const R = regionState(G.state), here = G.mode === 'village' ? 'village' : G.dungeon?.regionId;
-      const home = { id: 'village', name: 'Blossom Hollow', short: 'Blossom Hollow', jp: 'さくら村', sub: "Home: the cottage, Rosie's treats and a nap by the fountain.", color: '#ff8fb0', unlocked: G.mode !== 'dungeon' || !!G.dungeon?.isRegion, here: here === 'village', why: 'Use a portal to leave the Burrow' };
+      const home = { id: 'village', name: 'Blossom Hollow', short: 'Blossom Hollow', jp: 'さくら村', sub: "Home: the cottage, Rosie's treats and a nap by the fountain.", color: '#ff8fb0', unlocked: G.mode !== 'dungeon' || G.dungeon?.kind === 'region', here: here === 'village', why: 'Use a portal to leave the Burrow' };
       return [home, ...REGION_IDS.map(id => {
         const d = REGIONS[id], u = regionUnlocked(G.state, id), mon = id => MONSTERS[id]?.name;
         return { id, name: d.name, short: d.name.split(' ').slice(-2).join(' '), jp: d.jp, sub: d.sub, color: d.color, levels: d.levels, unlocked: u.ok, why: u.why,
@@ -495,13 +510,16 @@ export async function boot() {
     if (G.buildFocus) { G.buildFocus = null; }
     const modal = G.ui?.anyModal?.();
     if (modal || player.controlLocked || G.playerDead) { G.ui?.setInteract?.(null); return; }
+    // Tab: a tap switches to the next hero, holding it opens the hero wheel (heroes.js); the wheel takes the input while open
+    if (heroes.tabInput(dt)) { G.ui?.setInteract?.(null); return; }
     const hb = G.state.player.hotbar;
     const aim = engine.mouseGround(Input.mouse.nx, Input.mouse.ny, (x, z) => G.world.heightAt(x, z));
     hoverEnemy = G.mode === 'dungeon' && !Input.mouse.overUI ? G.combat.pickAtScreen(Input.mouse.x, Input.mouse.y, engine.camera) : null;
-    // LMB: attack enemies under the cursor (or Shift+click), otherwise walk / interact
+    // LMB: attack enemies under the cursor (or Alt+click: attack in place, at the cursor), otherwise walk / interact.
+    // (Shift is the sprint now: actors/sprint.js, docs/ZONES.md §9)
     const lmbCharge = skills.charge.owns(0); // (a charge held on LMB stays a skill press even off the monster / over the HUD)
     if (Input.mouseDown(0) && (!Input.mouse.overUI || lmbCharge)) {
-      if (hoverEnemy || (Input.down('shift') && G.mode === 'dungeon') || lmbCharge) {
+      if (hoverEnemy || (Input.down('alt') && G.mode === 'dungeon') || lmbCharge) {
         const tgt = hoverEnemy ? hoverEnemy.pos : aim;
         const R = skillRuntime(hb[0] || 'attack', G.state, G.derived);
         const melee = R && !R.params?.projectile && !(R.params?.speed) && (R.params?.radius || 0) < 3;
@@ -528,7 +546,6 @@ export async function boot() {
     if (Input.hit('g')) G.life?.kitchen?.quickEat(); // the quick meal (docs/HOMESTEAD.md §4)
     if (Input.hit('x')) { G.actions.swapWeapons(); player.setWeapon(G.derived.weaponType || 'sword'); G.audio?.play?.('ui_equip'); G.vfx.sparkle(player.pos.clone().setY(0.8), { n: 6 }); }
     if (Input.hit('t') && G.mode === 'dungeon') G.returnToVillage();
-    if (Input.hit('tab')) { Input.consume?.('tab'); heroes.switchTo(); } // switch heroes (zoom out, hand-off, zoom in)
     const it = nearestInteract();
     G.ui?.setInteract?.(it ? it.label : null);
     if (it && Input.hit('f') && performance.now() > (G.interactCooldown || 0)) it.onInteract();
@@ -585,7 +602,7 @@ export async function boot() {
     G.audio?.play?.('bark_small', { vol: 0.5 });
   }
   G.hint = hint;
-  let hintT = 0;
+  let hintT = 0, sprintWalkT = 0;
   function hints(dt) {
     hintT -= dt; if (hintT > 0 || G.playerDead) return; hintT = 0.5;
     if (G.ui?.dlg?.active) return;
@@ -604,6 +621,9 @@ export async function boot() {
       if (player.hero === 'chewy' && G.dungeon.monsters.some(m => m.alive && m.aggro && m.def.attack?.type === 'ranged' && m.pos.distanceTo(player.pos) < 9)) tip('ball', 'They throw things! Press X to swap to your tennis ball — Space to roll away.');
       if (player.hero === 'moka' && G.dungeon.monsters.some(m => m.alive && m.aggro && m.pos.distanceTo(player.pos) < 2.5)) tip('mokaRange', 'Too close! Moka is squishy — Space to roll away and splash them from afar.');
       if ((G.dungeon.loot?.list || []).some(e => e.d.type === 'item' && e.to.distanceTo(player.pos) < 5)) tip('loot', 'Shiny! Walk over loot to grab it. Press I to see your bag.');
+      // a long walk outdoors without sprinting: Shadow mentions Shift (actors/sprint.js)
+      sprintWalkT = G.dungeon.isRegion && player.anim.speed > 3.5 && !player.sprint.on ? sprintWalkT + 0.5 : 0;
+      if (sprintWalkT >= 6) tip('sprint', 'Hold Shift to sprint! Don\'t worry, I can keep up.');
     } else if (G.mode === 'village' && !G.titleActive) {
       if (st.quests.done.includes('burrow1') && !G.buildMode) tip('build', 'Press B to plan the village — paint zones and friends will build there!');
       if (regionUnlocked(st, 'bamboo').ok) tip('travel', "The Wayfarer's Post by the bamboo points to new lands! Walk the west trail to find it.");
@@ -687,7 +707,7 @@ export async function boot() {
     const prevDist = rig.distTarget; G.introFocus = player.pos.clone().lerp(rosie.pos, 0.5); rig.distTarget = 20;
     const pr = G.portrait('rosie');
     await G.ui.dialogue({ speaker: 'Rosie', portrait: pr, lines: ["Good morning, Chewy! ♡ Did you sleep well? Shadow did. He snored like a tiny tractor.", "Welcome to *Blossom Hollow*! The sakura are blooming and everyone is so happy you're here."] });
-    await G.ui.dialogue({ speaker: 'Rosie', portrait: pr, lines: ['Walk with *WASD* or click the ground. Press *F* near friends to chat.', 'Press *B* to plan the village — paint zones for homes, shops and workshops, then watch it grow!', "And… there's something squeaky in *the Burrow* on the shrine hill. Take your Bone Sword — and your red tennis ball!"] });
+    await G.ui.dialogue({ speaker: 'Rosie', portrait: pr, lines: ['Walk with *WASD* or click the ground, and hold *Shift* to sprint. Press *F* near friends to chat.', 'Press *B* to plan the village — paint zones for homes, shops and workshops, then watch it grow!', "And… there's something squeaky in *the Burrow* on the shrine hill. Take your Bone Katana — and your red tennis ball!"] });
     G.introFocus = null; rig.distTarget = prevDist; shadow.hold = null;
     rosie.talking = false; rosie.faceBias = 0; rosie.greeted = 30; rosie.state = 'idle'; rosie.t = 4;
     player.controlLocked = false;

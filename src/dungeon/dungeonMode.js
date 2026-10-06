@@ -1,10 +1,16 @@
-// Runs one Burrow floor: world + monsters + combat + loot + interactables + flow-field pathing.
+// Runs one dungeon floor (a Burrow floor, or a zone dungeon's: dungeon/defs.js DungeonDef): world + monsters + combat +
+// loot + interactables + flow-field pathing. this.kind is 'burrow' | 'zone' here, 'region' for an outdoor RegionMode.
 import * as THREE from 'three';
 import { generate, CELL, THEMES } from './gen.js';
+import { beginRun, floorPlan } from './defs.js';
+import { packMods, monsterMods } from '../rpg/zoneMods.js';
+import { noteFloor, recordDungeonClear } from '../rpg/zones.js';
 import { DungeonWorld, propCutMat } from './dungeonWorld.js';
 import { chestGeometry, potGeometry, potColor } from './lootModels.js';
 import { Monster } from './monster.js';
 import { MONSTERS } from './monsters.js';
+import { updateMonsters } from './crowd.js';
+import { hordeOf } from './horde.js';
 import { GroundLoot } from '../combat/groundLoot.js';
 import { rollDrops, chestDrops, floorClearDrops } from '../rpg/loot.js';
 import { seedDrops, forageDrops } from '../life/pantry.js';
@@ -17,18 +23,25 @@ import { Events } from '../core/events.js';
 import { rand, randInt, TAU, dist, RNG, clamp, pick } from '../core/util.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
+const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]], N8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]; // (flow-field neighbours)
 
 export class DungeonMode {
   constructor(G) { this.G = G; this.monsters = []; }
-  build(floor) {
+  // arg: a Burrow floor number (the old API) or a run { id, floor, tier, mods, seed? } (G.enterDungeon). Every entry
+  // rerolls its seed unless pinned (?dseed: G.dseed, the QA's fixed layouts) — dungeon/defs.js beginRun
+  build(arg) {
     const G = this.G;
-    this.floor = floor;
-    const layout = this.layout = generate({ floor, seed: (G.state.dungeon.seed || 1) + floor * 17 + (G.state.dungeon.runs || 0) * 101 });
+    const run = this.run = beginRun(G.state, arg, { fixedSeed: G.dseed ?? null }), def = this.def = run.def;
+    this.kind = def.kind; this.zoneId = def.zone || null; this.tier = run.tier; this.mods = run.mods;
+    const floor = this.floor = run.floor;
+    const layout = this.layout = generate({ floor, seed: run.seed, plan: floorPlan(def, floor, { tier: run.tier, heroLvl: G.state.player?.lvl }) });
+    if (layout.boss && !MONSTERS[layout.boss]) for (const sp of layout.spawns) if (sp.boss) sp.boss = layout.boss = 'mochiKing'; // (a zone boss not registered yet)
     const world = this.world = new DungeonWorld(G.engine, layout);
-    this.theme = THEMES[layout.theme];
+    const TH = THEMES[layout.theme], own = def.monsters?.filter(id => MONSTERS[id]);
+    this.theme = own?.length ? { ...TH, monsters: own } : TH; // (a zone dungeon's own roster on its stand-in kit)
     this.monsters = [];
     this.loot = new GroundLoot(G, world);
-    this.rng = new RNG(floor * 999 + (G.state.dungeon.runs || 0));
+    this.rng = new RNG(run.packSeed);
     this.flow = new Int16Array(layout.W * layout.H); this.flowT = 0;
     this.buildInteractables();
     return world;
@@ -42,10 +55,11 @@ export class DungeonMode {
     for (const sp of L.spawns) this.spawnPack(sp);
     // player light (warm lantern glow that follows Chewy)
     this.playerLight = this.world.lightPool.addSource({ pos: new THREE.Vector3(), color: new THREE.Color('#ffd8a8'), intensity: 7, radius: 11, priority: 10 });
-    G.ui?.banner?.(`Floor ${this.floor}`, `The Burrow — ${this.theme.name}`, { style: 'area' });
+    G.ui?.banner?.(`Floor ${this.floor}`, `${this.def.name} — ${this.theme.name}`, { style: 'area' });
     // boss floors: a small heads-up toast (the big boss banner is saved for the actual encounter)
     if (L.boss) setTimeout(() => { if (G.dungeon === this && this.boss?.alive && !this.boss.introDone) G.ui?.toast?.(`${MONSTERS[L.boss].name} lurks in the deepest chamber…`, { icon: 'oni', color: '#ff8a9a' }); }, 2600);
-    G.state.dungeon.deepest = Math.max(G.state.dungeon.deepest || 0, this.floor);
+    if (this.kind === 'burrow') G.state.dungeon.deepest = Math.max(G.state.dungeon.deepest || 0, this.floor); // (the Burrow's record; a zone dungeon keeps its own)
+    else if (this.zoneId) noteFloor(G.state, this.zoneId, this.floor);
     // dungeon colour grade (the village day/night grade doesn't run down here)
     const post = G.engine.post, gr = post.grade.uniforms;
     const gd = this.theme.grade || {}; // per-biome grade (the Burrow is lifted & neutral so floor 1 isn't murky)
@@ -53,12 +67,19 @@ export class DungeonMode {
     gr.get('uVigColor').value.set(0.16, 0.1, 0.16); gr.get('uVignette').value = 1.05;
     post.bloom.intensity = 1.15; post.bloom.luminanceMaterial.threshold = 0.6;
   }
+  /** where a kill / boss / clear happened, for the events (monster:killed, boss:dead, dungeon:cleared, mode:changed) */
+  where() { return { zone: this.zoneId || null, dungeon: this.def?.id || null, tier: this.tier || 0 }; }
+  /** the stairs' next floor: the same dungeon, tier and modifiers one floor down */
+  nextRun() { return { id: this.def?.id || 'burrow', floor: this.floor + 1, tier: this.tier || 0, mods: this.mods || [] }; }
+  /** is there a floor below this one? (the Burrow never ends; a zone dungeon ends at its boss; a region has none) */
+  hasDeeper() { return this.kind !== 'region' && this.floor < (this.def?.floors ?? Infinity); }
   spawnPack(sp) {
+    sp = packMods(this, sp); // (zone modifiers: count / size / rank — phase E, rpg/zoneMods.js)
     const L = this.layout, G = this.G;
     const lvl = L.mlvl;
     const c = this.world.cellToWorld(sp.x, sp.y);
     if (sp.boss) {
-      const b = new Monster(this, sp.boss, { level: lvl + 2, x: c.x, z: c.z, rng: () => this.rng.next() });
+      const b = monsterMods(this, new Monster(this, sp.boss, { level: lvl + 2, x: c.x, z: c.z, rng: () => this.rng.next() }));
       this.monsters.push(b); this.combat.add(b); this.boss = b;
       return;
     }
@@ -66,7 +87,7 @@ export class DungeonMode {
     const kind = this.rng.pick(kinds);
     const variant = this.rng.int(0, 3);
     let leader = null;
-    if (sp.rank !== 'normal') { leader = new Monster(this, kind, { level: lvl, rank: sp.rank, variant, x: c.x, z: c.z, rng: () => this.rng.next() }); this.monsters.push(leader); this.combat.add(leader); }
+    if (sp.rank !== 'normal') { leader = monsterMods(this, new Monster(this, kind, { level: lvl, rank: sp.rank, variant, x: c.x, z: c.z, rng: () => this.rng.next() })); this.monsters.push(leader); this.combat.add(leader); }
     const n = Math.round(sp.count * (MONSTERS[kind].pack || 1));
     for (let i = 0; i < n; i++) {
       const a = i / n * TAU + rand(0, 0.5), r = rand(0.8, 2.2);
@@ -74,6 +95,7 @@ export class DungeonMode {
       if (!this.world.walkable(x, z)) { x = c.x; z = c.z; }
       const m = new Monster(this, kind, { level: lvl, rank: 'normal', variant: sp.rank === 'champion' ? variant : this.rng.int(0, 3), x, z, leader, rng: () => this.rng.next() });
       if (sp.rank === 'champion') { m.rank = 'champion'; m.lifeMax = m.life = Math.round(m.life * 2); m.name = leader.name; m.eliteColor = '#6aa8ff'; }
+      monsterMods(this, m);
       this.monsters.push(m); this.combat.add(m);
     }
   }
@@ -248,7 +270,7 @@ export class DungeonMode {
     for (let i = 0; i < n; i++) {
       const a = i / n * TAU; const x = boss.pos.x + Math.cos(a) * 2.5, z = boss.pos.z + Math.sin(a) * 2.5;
       if (!this.world.walkable(x, z)) continue;
-      const m = new Monster(this, id, { level: this.layout.mlvl, x, z, rng: () => this.rng.next() }); m.aggro = true; m.bossAdd = true; // (vanishes with its boss)
+      const m = monsterMods(this, new Monster(this, id, { level: this.layout.mlvl, x, z, rng: () => this.rng.next() })); m.aggro = true; m.bossAdd = true; // (vanishes with its boss)
       this.monsters.push(m); this.combat.add(m);
       this.G.vfx.poof(V(x, 0.4, z), { color: '#e0d0ff', n: 10 });
     }
@@ -259,14 +281,14 @@ export class DungeonMode {
     const inter = W.interactables;
     // exit portal near the start
     const s = W.cellToWorld(L.start.x, L.start.y);
-    const exitPos = s.clone().add(V(-1.6, 0, -1.6));
+    const exitPos = this.exitPos = s.clone().add(V(-1.6, 0, -1.6)); // (also the quest pointer's way out: world/story.js)
     this.makePortal(exitPos, '#b89aff');
     inter.push({ pos: exitPos, radius: 1.2, label: 'Return to Blossom Hollow', onInteract: () => G.returnToVillage() });
     // stairs down
     if (L.stairs) {
       const p = W.cellToWorld(L.stairs.x, L.stairs.y);
       this.makeStairs(p);
-      inter.push({ pos: p, radius: 1.3, label: `Burrow deeper (Floor ${this.floor + 1})`, onInteract: () => G.enterDungeon(this.floor + 1) });
+      inter.push({ pos: p, radius: 1.3, label: `${this.kind === 'burrow' ? 'Burrow' : 'Go'} deeper (Floor ${this.floor + 1})`, onInteract: () => G.enterDungeon(this.nextRun()) });
       this.stairsPos = p;
     }
     // waypoint
@@ -339,7 +361,7 @@ export class DungeonMode {
       G.vfx.sparkle(p.clone().setY(0.7), { n: 20, color: gold ? '#ffe070' : '#fff4d8', r: 0.5 }); G.vfx.light(p.clone().setY(1), '#ffe0a0', 10, 6, 0.8);
       const drops = chestDrops(this.layout.mlvl, gold ? 'golden' : 'plain', undefined, G.derived.mf || 0);
       drops.push(...seedDrops(this.layout.mlvl, gold ? 'chest2' : 'chest0')); // (homestead seeds, docs/HOMESTEAD.md)
-      if (this.isRegion) drops.push(...forageDrops(this.regionId, gold ? 'chest2' : 'chest0')); // (and the region's forage)
+      if (this.zoneId) drops.push(...forageDrops(this.zoneId, gold ? 'chest2' : 'chest0')); // (and the zone's forage: a region, or its dungeon)
       drops.push(...findDrops(G, this, gold ? 'chest2' : 'chest0')); // (now and then a piece of furniture: docs/HOUSING.md §3)
       setTimeout(() => this.loot.drop(p.clone().setY(0.5), drops), 250);
     } };
@@ -405,7 +427,7 @@ export class DungeonMode {
     if (big) G.engine.rig.shake(0.6);
     const P = G.player;
     if (!G.playerDead && dist(P.pos.x, P.pos.z, pos.x, pos.z) < r + P.radius) this.combat.hitPlayer(dmg, { element, level: src?.level || 1, from: pos, knock: 0.8, src });
-    for (const e of this.combat.entities) if (e.alive && e.team === 'ally' && dist(e.pos.x, e.pos.z, pos.x, pos.z) < r) this.combat.hitAlly(e, dmg, { element });
+    for (const e of this.combat.allies || this.combat.entities) if (e.alive && e.team === 'ally' && dist(e.pos.x, e.pos.z, pos.x, pos.z) < r) this.combat.hitAlly(e, dmg, { element });
   }
   sporeCloud(pos, r, dmg, src) {
     const G = this.G, P = G.player;
@@ -440,12 +462,12 @@ export class DungeonMode {
     const mf = (D.mf || 0) + (this.combat.buffs.shrineLuck ? 60 : 0);
     const drops = rollDrops({ mlvl: m.level, rank: m.rank, mf, gf: D.gf || 0, kind: m.stats.kind });
     drops.push(...seedDrops(m.level, m.rank)); // (homestead seeds, docs/HOMESTEAD.md)
-    if (this.isRegion) drops.push(...forageDrops(this.regionId, m.rank));
+    if (this.zoneId) drops.push(...forageDrops(this.zoneId, m.rank));
     if (!m.bossAdd) drops.push(...findDrops(G, this, isBoss ? 'boss' : m.rank)); // (a rare furniture find: docs/HOUSING.md §3)
     const at = m.pos.clone().setY(0.3);
     if (drops.length && isBoss) setTimeout(() => { if (G.dungeon !== this) return; G.vfx.ring(at, { color: '#ffe070', r0: 0.3, r1: 3.2, life: 0.6 }); G.vfx.sparkle(at.clone().setY(0.8), { n: 30, color: '#fff2a0', r: 1.2, rise: 1.6 }); Events.emit('sfx', 'chest_open'); this.loot.drop(at, drops); }, 1050);
     else if (drops.length) this.loot.drop(at, drops);
-    Events.emit('monster:killed', { id: m.id, rank: m.rank, floor: this.floor });
+    Events.emit('monster:killed', { id: m.id, rank: m.rank, floor: this.floor, ...this.where() }); // + { zone, dungeon, tier } (docs/ZONES.md §8)
     this.checkFloorClear();
   }
   // every monster on the floor gone: a supply cache (wood / stone / coins) pops out at Chewy's feet
@@ -459,7 +481,7 @@ export class DungeonMode {
       G.vfx.sparkle(p.clone().setY(1), { n: 24, color: '#ffe8a0', r: 0.9, rise: 1.4 });
       G.vfx.ring(p, { color: '#8fe0c0', r0: 0.3, r1: 2.4, life: 0.6 });
       Events.emit('sfx', 'chest_open');
-      G.ui?.toast?.(this.isRegion ? 'Every camp cleared! A cache of building supplies' : 'Floor cleared! A cache of building supplies', { icon: 'wood', color: '#8fe0c0' });
+      G.ui?.toast?.(this.kind === 'region' ? 'Every camp cleared! A cache of building supplies' : 'Floor cleared! A cache of building supplies', { icon: 'wood', color: '#8fe0c0' });
       this.loot.drop(p, floorClearDrops(this.layout.mlvl));
     }, this.boss === null && this.layout.boss ? 2600 : 700);
   }
@@ -477,7 +499,8 @@ export class DungeonMode {
     G.ui?.floats?.hush?.(2.8); // clear the damage numbers off the stage for the moment
     G.ui?.banner?.('Victory!', `${b.name} was defeated!`, { style: 'victory', xp });
     this.clearBossFight(b);
-    Events.emit('boss:dead', { id: b.id, floor: this.floor });
+    Events.emit('boss:dead', { id: b.id, floor: this.floor, ...this.where() });
+    this.clearDungeon(b);
     Events.emit('sfx', 'ui_levelup');
     // stairs appear where the boss fell + a return portal
     const p = b.pos.clone();
@@ -485,14 +508,24 @@ export class DungeonMode {
       if (G.dungeon !== this) return;
       // stairs and portal go to open floor near where the boss fell (never inside rock, even against a wall)
       const sp = this.openSpotNear(p, 2, 1.3), pp = this.openSpotNear(p, 2, 1.2, sp);
-      if (!this.isRegion) { // (an outdoor region has no stairs: just the way home)
+      if (this.hasDeeper()) { // (an outdoor region, or a zone dungeon's last floor: just the way home)
         this.makeStairs(sp);
-        this.world.interactables.push({ pos: sp, radius: 1.3, label: `Burrow deeper (Floor ${this.floor + 1})`, onInteract: () => G.enterDungeon(this.floor + 1) });
+        this.world.interactables.push({ pos: sp, radius: 1.3, label: `${this.kind === 'burrow' ? 'Burrow' : 'Go'} deeper (Floor ${this.floor + 1})`, onInteract: () => G.enterDungeon(this.nextRun()) });
       }
       this.makePortal(pp, '#ffe070');
       this.world.interactables.push({ pos: pp, radius: 1.2, label: 'Return to Blossom Hollow', onInteract: () => G.returnToVillage() });
     }, 1500);
     this.boss = null;
+  }
+  // a boss down: 'dungeon:cleared' { id, kind, tier, floor, zone, boss, first } for every Burrow boss (floors 5, 10, …) and
+  // a zone dungeon's last-floor boss (its clear count and tiers: rpg/zones.js; a newly opened tier also fires
+  // 'tier:unlocked' { id, zone, tier }). An outdoor region reports its own boss (regionMode.js).
+  clearDungeon(b) {
+    if (this.kind === 'burrow') { Events.emit('dungeon:cleared', { id: 'burrow', kind: 'burrow', tier: 0, floor: this.floor, zone: null, boss: b.id, first: false }); return; }
+    if (this.kind !== 'zone' || this.hasDeeper() || !this.zoneId) return;
+    const r = recordDungeonClear(this.G.state, this.zoneId, this.tier || 0), id = this.def.id;
+    Events.emit('dungeon:cleared', { id, kind: 'zone', tier: this.tier || 0, floor: this.floor, zone: this.zoneId, boss: b.id, first: r.first });
+    if (r.tierUnlocked != null) Events.emit('tier:unlocked', { id, zone: this.zoneId, tier: r.tierUnlocked });
   }
   // The fight ends with the boss: its summoned adds burst into sparkles (a quick chain, nearest first, no xp / loot),
   // hostile shots still in the air fizzle (with their landing circles), and boss toasts that haven't been read yet
@@ -528,7 +561,7 @@ export class DungeonMode {
   cellOf(p) { return [Math.floor(p.x / CELL), Math.floor(p.z / CELL)]; }
   los(a, b) {
     const L = this.layout;
-    let [x0, y0] = this.cellOf(a); const [x1, y1] = this.cellOf(b);
+    let x0 = Math.floor(a.x / CELL), y0 = Math.floor(a.z / CELL); const x1 = Math.floor(b.x / CELL), y1 = Math.floor(b.z / CELL); // (cellOf, without the arrays: called per monster per frame)
     const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
     let err = dx - dy, n = 0;
     while (n++ < 200) {
@@ -540,39 +573,39 @@ export class DungeonMode {
     }
     return true;
   }
+  // (ROADMAP Z-B4: the BFS queue is kept between runs and the neighbour offsets are constants — no garbage every 0.4 s)
   updateFlow() {
     const L = this.layout, W = L.W, H = L.H, F = this.flow;
     F.fill(32000);
-    const [px, py] = this.cellOf(this.G.player.pos);
+    const px = Math.floor(this.G.player.pos.x / CELL), py = Math.floor(this.G.player.pos.z / CELL);
     if (!L.at(px, py)) return;
-    const q = new Int32Array(W * H); let h = 0, t = 0;
+    const q = (this._flowQ && this._flowQ.length === W * H) ? this._flowQ : (this._flowQ = new Int32Array(W * H)); let h = 0, t = 0;
     F[py * W + px] = 0; q[t++] = py * W + px;
     while (h < t) {
       const i = q[h++], x = i % W, y = (i / W) | 0, d = F[i];
       if (d > 60) continue;
-      for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const nx = x + ox, ny = y + oy; if (!L.at(nx, ny)) continue;
+      for (let k = 0; k < 4; k++) {
+        const nx = x + N4[k][0], ny = y + N4[k][1]; if (!L.at(nx, ny)) continue;
         const j = ny * W + nx; if (F[j] > d + 1) { F[j] = d + 1; q[t++] = j; }
       }
     }
   }
-  flowDir(pos) {
+  flowDir(pos, out = null) { // → a unit direction (into `out` when given) or null
     const L = this.layout, W = L.W, F = this.flow;
-    const [cx, cy] = this.cellOf(pos);
+    const cx = Math.floor(pos.x / CELL), cy = Math.floor(pos.z / CELL);
     let best = F[cy * W + cx], bx = 0, by = 0;
-    for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
-      const nx = cx + ox, ny = cy + oy; if (!L.at(nx, ny)) continue;
+    for (let k = 0; k < 8; k++) {
+      const ox = N8[k][0], oy = N8[k][1], nx = cx + ox, ny = cy + oy; if (!L.at(nx, ny)) continue;
       if (ox && oy && (!L.at(cx + ox, cy) || !L.at(cx, cy + oy))) continue;
       const v = F[ny * W + nx]; if (v < best) { best = v; bx = ox; by = oy; }
     }
     if (!bx && !by) return null;
-    const target = V((cx + bx + 0.5) * CELL, 0, (cy + by + 0.5) * CELL);
-    return target.sub(pos).setY(0).normalize();
+    return (out || new THREE.Vector3()).set((cx + bx + 0.5) * CELL, 0, (cy + by + 0.5) * CELL).sub(pos).setY(0).normalize();
   }
   update(dt, t) {
     const G = this.G;
     this.flowT -= dt; if (this.flowT <= 0) { this.flowT = 0.4; this.updateFlow(); }
-    for (const m of [...this.monsters]) m.update(dt);
+    updateMonsters(this, dt); // (the crowd grid + AI LOD: crowd.js)
     this.dying = (this.dying || []).filter(m => !m.disposed);
     for (const m of this.dying) m.update(dt); // death squash / poof animation
     this.loot.update(dt);
@@ -589,5 +622,9 @@ export class DungeonMode {
     this.updateVictoryGrade(dt);
     this.world.update(dt, t, G.vfx, G.player.pos);
   }
-  dispose() { this.loot.clear(); this.monsters.length = 0; this.G.engine.rig.clearBias?.(); }
+  dispose() { this.loot.clear(); this.monsters.length = 0; this.G.engine.rig.clearBias?.(); this._horde?.dispose(); }
+  /** Spawn one monster into this world (registered with the floor and its combat) → the Monster. */
+  spawnMonster(id, opts) { const m = new Monster(this, id, opts); this.monsters.push(m); this.combat.add(m); return m; }
+  /** Build the cached models (and their instanced batches) of monster kinds this world may field later (summons, waves). */
+  warmMonsters(ids) { hordeOf(this).warm(ids); }
 }

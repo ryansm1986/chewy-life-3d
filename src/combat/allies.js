@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { Actor } from '../actors/actor.js';
 import { buildBoston, cloneRig } from '../actors/charKit.js';
+import { kabutoGeo, kabutoMaterial } from '../gfx/samuraiProps.js';
+const KABUTO = { y: 0.07, z: -0.01, s: 0.82 }; // (on the pup's head bone)
 
 // one baked spirit-pup rig; every summon clones it (shared geometry) instead of building a Boston from scratch
 let pupTemplate = null;
@@ -9,6 +11,9 @@ function pupRig() {
   if (!pupTemplate) {
     pupTemplate = buildBoston({ fur: '#6a8ad8', collar: '#ffffff', outline: '#bfe0ff' });
     pupTemplate.mat.emissive.set('#4a7aff'); pupTemplate.mat.emissiveIntensity = 0.6; pupTemplate.mat.transparent = true; pupTemplate.mat.opacity = 0.85;
+    // Chewy the samurai's pups wear tiny kabuto (gfx/samuraiProps.js; every clone shares the helmet's geometry and material)
+    const head = pupTemplate.parts.head;
+    if (head) { const k = new THREE.Mesh(kabutoGeo(), kabutoMaterial()); k.name = 'kabuto'; k.position.set(0, KABUTO.y, KABUTO.z); k.rotation.x = -0.15; k.scale.setScalar(KABUTO.s); head.add(k); }
   }
   return cloneRig(pupTemplate);
 }

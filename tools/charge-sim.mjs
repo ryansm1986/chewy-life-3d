@@ -12,13 +12,14 @@
 //   for the tapper; charging is time the hero isn't attacking;
 // - damage per cast = Σ dmgPct × the foes each part hits: a pack of PACK foes within 3 m of the aim point (area parts hit
 //   ~PACK·(r/3)², lines ~2.6, fans by the share of their spread the pack fills, bounces by their count), or one target;
-// - channels (Tail Spin, Moonbeam) channel in 3 s bursts (the charged one winds up first, then revs, then spins out free);
+// - channels (Whirlwind Stance, Moonbeam) channel in 3 s bursts (the charged one winds up first, then revs, then spins out free);
 // - summons and buffs report a value ratio (their damage × uptime, or what they protect / heal); the band is asserted on
 //   the damage skills.
 import { newHeroState } from '../src/rpg/actions.js';
 import { computeStats } from '../src/rpg/stats.js';
 import { skillRuntime, SKILLS } from '../src/rpg/skills.js';
 import { CHARGE, chargeRuntime, stageTimes, PERK_STAGE } from '../src/rpg/charge.js';
+import { poeSim } from './charge-sim-poe.mjs';
 
 export const PACK = 5, RP = 3, CAST = 0.5, FIGHT = 60, ATK = { pct: 100, every: 0.45 };
 export const BAND = [1.1, 1.3]; // sustained gain of a fully charged, fully perked cast over tapping (docs/CHARGE.md §3), on the blend below
@@ -75,6 +76,8 @@ const VALUE = {
   howl: (p, k, s) => p.dmgBuff * p.duration,
   bubble: (p, k, s, sc) => p.absorb + p.dmgPct * area(p.radius, sc) * 0.5,
 };
+// Poe's models (tools/charge-sim-poe.mjs: her 15 damage skills, her summon and her two buffs)
+{ const poe = poeSim({ area, line, fan, rk, pp, RP }); Object.assign(DMG, poe.DMG); Object.assign(VALUE, poe.VALUE); }
 export const KIND = id => (DMG[id] ? 'damage' : CHAN[id] ? 'channel' : 'utility');
 
 /** a skill-build hero at level 30 with skill level `lvl` in every charged skill of its class */
@@ -82,7 +85,7 @@ export function simHero(hero, lvl = 12) {
   const h = newHeroState(hero), st = { player: h.player, equipment: h.equipment };
   st.player.lvl = 30;
   const pts = 145; st.player.stats.ene += Math.round(pts * 0.5); st.player.stats.vit += Math.round(pts * 0.25);
-  const main = hero === 'moka' ? 'dex' : 'str'; st.player.stats[main] = (st.player.stats[main] || 0) + Math.round(pts * 0.25);
+  const main = hero === 'moka' || hero === 'poe' ? 'dex' : 'str'; st.player.stats[main] = (st.player.stats[main] || 0) + Math.round(pts * 0.25);
   for (const id of Object.keys(CHARGE)) if (SKILLS[id].cls === hero) st.player.skills[id] = lvl;
   return { st, d: computeStats(st) };
 }

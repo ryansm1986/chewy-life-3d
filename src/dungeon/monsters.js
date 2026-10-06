@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { makeToon, makeOutline } from '../gfx/materials.js';
 import { paint, merge, tube, xf, RoundedBox } from '../gfx/geom.js';
-import { buildHumanoid } from '../actors/charKit.js';
+import { buildHumanoid, cloneRig } from '../actors/charKit.js';
 import { clamp, TAU, rand, ease } from '../core/util.js';
 
 const C = h => new THREE.Color(h);
@@ -72,9 +72,21 @@ export function capLuminance(mat) {
   mat.needsUpdate = true;
   return mat;
 }
+// Model cache (ROADMAP Z-B1): buildMonster() builds a Burrow rigid model's merged geometry once per kind × variant (the
+// dust bunny's random fluff: a few layouts per variant) and records finish()'s inputs; every later spawn gets fresh
+// groups / meshes / materials on that shared geometry (userData.shared: Monster.dispose leaves it, the Horde's
+// instanced batches draw it). Rigs (Tamamo, the humanoids) build as before; the Horde pools the humanoids.
+const CACHED = new Set(['mochi', 'dustbunny', 'kinoko', 'lantern', 'kasa', 'wisp', 'oni', 'oniChef']);
+const LAYOUTS = { dustbunny: 3 }; // (random fluff layouts per variant: 9 different bunnies; each layout is its own instanced batch)
+const MASTERS = new Map();
+let RECORD = null;
 function finish(parts, opts = {}) {
-  const mat = makeToon({ vertexColors: true, objectBrush: true, brush: 0.1, rim: 0.7, term: [-0.02, 0.3], ...(opts.mat || {}), fragOut: EDGE_OUT + (opts.mat?.fragOut || '') });
   const geo = merge(parts);
+  if (RECORD && !RECORD.geo) { RECORD.geo = geo; RECORD.opts = opts; geo.userData.shared = true; }
+  return finishGeo(geo, opts);
+}
+function finishGeo(geo, opts) {
+  const mat = makeToon({ vertexColors: true, objectBrush: true, brush: 0.1, rim: 0.7, term: [-0.02, 0.3], ...(opts.mat || {}), fragOut: EDGE_OUT + (opts.mat?.fragOut || '') });
   const body = new THREE.Mesh(geo, mat); body.castShadow = true; body.receiveShadow = true;
   const ol = new THREE.Mesh(geo, makeOutline(INK, opts.outline ?? 0.021));
   const pivot = new THREE.Group(); pivot.add(body, ol);
@@ -423,9 +435,32 @@ export function registerMonsters(defs = {}, builders = {}) {
 // the shared model kit, for region monster files (docs/REGIONS.md §3.4)
 export { ell, cone, eyes, blush, shell, glowBillboard, finish, EDGE_OUT, INK };
 
+const FINISHED = new Set(['root', 'pivot', 'body', 'mat', 'outline']);
+// humanoid monsters: one baked rig per kind × variant (~20 ms), then every spawn is a cloneRig of it (under 1 ms: shared
+// geometry, its own bones / skeleton / materials). The template itself is never shown.
+const RIG_CLONE = new Set(['tanuki', 'fox']);
+const RIG_TPL = new Map();
 export function buildMonster(id, variantIdx = 0) {
   const def = MONSTERS[id];
-  const v = (def.variants || [{}])[variantIdx % (def.variants?.length || 1)];
+  const vi = variantIdx % (def.variants?.length || 1), v = (def.variants || [{}])[vi];
+  if (RIG_CLONE.has(def.build)) {
+    const key = id + ':' + vi;
+    let T = RIG_TPL.get(key);
+    if (!T) { T = BUILD[def.build](v); T.rig.root.traverse(o => { if (o.isMesh) o.geometry.userData.shared = true; }); RIG_TPL.set(key, T); }
+    const rig = cloneRig(T.rig);
+    rig.spec = { ...T.rig.spec }; // (its own: the Monster sets spec.scale per rank and the Animator reads it every frame)
+    return { root: rig.root, pivot: rig.parts.body, body: rig.meshes[0], mat: rig.mat, rig, variant: v };
+  }
+  if (CACHED.has(def.build)) {
+    const n = LAYOUTS[def.build] || 1, key = `${id}:${vi}:${n > 1 ? (Math.random() * n) | 0 : 0}`, M = MASTERS.get(key);
+    if (M) { const model = finishGeo(M.geo, M.opts); Object.assign(model, M.extra); model.variant = v; return model; }
+    RECORD = {};
+    let model, rec;
+    try { model = BUILD[def.build](v); } finally { rec = RECORD; RECORD = null; }
+    if (rec.geo) { const extra = {}; for (const k in model) if (!FINISHED.has(k)) extra[k] = model[k]; MASTERS.set(key, { geo: rec.geo, opts: rec.opts, extra }); }
+    model.variant = v;
+    return model;
+  }
   const model = BUILD[def.build](v);
   model.variant = v;
   return model;

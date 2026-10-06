@@ -1,6 +1,6 @@
 // Scenario 4: player death in the Burrow -> wakes up in the village. Verifies life restored, dead flag cleared,
 // controls unlocked, time scale 1, no lingering dungeon objects/labels/boss bar, 10% coin loss, Shadow ok, WASD works.
-// Variants: dying mid Dig Slam leap, mid Tail Spin channel, on a boss floor with the bar up, during a floor transition.
+// Variants: dying mid Helmet Splitter leap, mid Whirlwind Stance channel, on a boss floor with the bar up, during a floor transition.
 import { launch, boot, waitMode, sleep, makeReport, drainDialogue, tap } from './lib.mjs';
 
 const R = makeReport('S4 player death');
@@ -58,10 +58,10 @@ try {
   await dieAndCheck('plain death on floor 2');
 
   await page.evaluate(() => window.G.enterDungeon(3)); await waitMode(page, 'dungeon');
-  await dieAndCheck('death mid Dig Slam', async () => { const G = window.G; G.skills.cds = {}; const ok = G.skills.tryCast('dig', G.player.pos.clone().add(new G.THREE.Vector3(3, 0, 0))); await new Promise(r => setTimeout(r, 120)); return { cast: ok, leap: !!G.player.leap }; });
+  await dieAndCheck('death mid Helmet Splitter', async () => { const G = window.G; G.skills.cds = {}; const ok = G.skills.tryCast('dig', G.player.pos.clone().add(new G.THREE.Vector3(3, 0, 0))); await new Promise(r => setTimeout(r, 120)); return { cast: ok, leap: !!G.player.leap }; });
 
   await page.evaluate(() => window.G.enterDungeon(3)); await waitMode(page, 'dungeon');
-  await dieAndCheck('death mid Tail Spin channel', async () => { const G = window.G; G.input.keys.add('1'); await new Promise(r => setTimeout(r, 300)); const c = !!G.skills.channel; G.input.keys.delete('1'); G.skills.tryCast('bonestorm', G.player.pos.clone()); return { channel: c }; });
+  await dieAndCheck('death mid Whirlwind Stance channel', async () => { const G = window.G; G.input.keys.add('1'); await new Promise(r => setTimeout(r, 300)); const c = !!G.skills.channel; G.input.keys.delete('1'); G.skills.tryCast('bonestorm', G.player.pos.clone()); return { channel: c }; });
 
   await page.evaluate(() => window.G.enterDungeon(5)); await waitMode(page, 'dungeon');
   await dieAndCheck('death on a boss floor with the boss bar up', async () => { const G = window.G, b = G.dungeon.boss; for (const [dx, dz] of [[5, 0], [-5, 0], [0, 5], [0, -5]]) if (G.world.walkable(b.pos.x + dx, b.pos.z + dz)) { G.player.setPos(b.pos.x + dx, b.pos.z + dz); break; } await new Promise(r => setTimeout(r, 1500)); return { bar: !!G.ui.hud.boss, aggro: b.aggro }; });

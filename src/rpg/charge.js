@@ -15,6 +15,7 @@
 //   perk ranks k ({ perkId: rank }), and returns the charged params (extra fields are read by chargedSkills.js).
 //   lines() are the tooltip lines for a stage, with exact numbers. Perk info(rank, C) describes one rank.
 import { SKILLS, skillRuntime } from './skills.js';
+import { poeCharge } from './chargePoe.js';
 
 export const GRACE = 0.18;
 export const SLOW = 0.45;
@@ -72,10 +73,10 @@ const set = (...ps) => Object.fromEntries(ps.map(p => [p.id, p]));
 // unless the skill names its own curve; the signature payoff grows with the stage too.
 const C = {};
 
-// =================================================================== CHEWY · BONE ARTS
+// =================================================================== CHEWY · BONE BLADE (the samurai: docs/HEROES.md)
 C.chomp = {
-  ready: true, tune: { dmg: [0.67, 0.51, 0.47], shape: [0.15, 1, 1] }, base: 0.8, color: '#ffc24a', pose: 'sword', title: 'Heavy Cleave',
-  blurb: 'A wider, heavier cleave, and a shockwave crescent that rolls on ahead.',
+  ready: true, tune: { dmg: [0.67, 0.51, 0.47], shape: [0.15, 1, 1] }, base: 0.8, color: '#ffc24a', pose: 'iai', title: 'Grand Crescent',
+  blurb: 'Hold the iai stance for a wider, heavier draw-cut, and its crescent flies on ahead as a rolling wave.',
   arc: [40, 60, 90], radius: [1.1, 1.2, 1.3], wave: [3, 3.6, 4.2], wavePct: 60, stun: [0, 0.25, 0.5],
   apply(p, s, k) {
     const w = 1 + (k.wide || 0) * 0.15;
@@ -84,38 +85,38 @@ C.chomp = {
     p.wave = r1(by(this.wave, s) * (1 + (k.wide || 0) * 0.1)); p.wavePct = this.wavePct; p.waveWidth = r2(0.75 * w);
     return p;
   },
-  lines(p) { return [`Cleave: ${pct(p.dmgPct)} in a ${p.arc}° arc (${p.radius} m)`, `Shockwave crescent rolls ${r1(p.wave)} m: ${p.wavePct}% of the cleave`, ...(p.stun ? [`Staggers for ${p.stun}s`] : [])]; },
-  perks: set(STAGES(), QUICK(), WIDE({ what: 'cleave reach', pct: 15 }),
-    UNIQUE('seconds', 'Second Helping', 8, 'After a charged Chomp, your next Chomp within 2s is a Stage Ⅰ Heavy Cleave without holding (normal zoom cost).', { extra: { window: 2 } })),
+  lines(p) { return [`Draw-cut: ${pct(p.dmgPct)} in a ${p.arc}° arc (${p.radius} m)`, `The crescent flies on ${r1(p.wave)} m: ${p.wavePct}% of the cut`, ...(p.stun ? [`Staggers for ${p.stun}s`] : [])]; },
+  perks: set(STAGES(), QUICK(), WIDE({ what: 'cut reach', pct: 15 }),
+    UNIQUE('seconds', 'Second Draw', 8, 'After a charged Crescent Chomp, your next one within 2s is a Stage Ⅰ Grand Crescent without holding (normal zoom cost).', { extra: { window: 2 } })),
 };
 C.whirl = {
-  ready: true, tune: { dmg: [1, 1, 1.01], shape: [0, 0.15, 0.55] }, base: 0.9, color: '#ffd98a', pose: 'spin', title: 'Rev-up Spin', channel: true,
-  blurb: 'Hold to wind up: at Stage Ⅰ a bigger spin that pulls foes in starts by itself and revs up while held; let go and it spins on alone, then a dizzy burst.',
+  ready: true, tune: { dmg: [1, 1, 1.01], shape: [0, 0.15, 0.55] }, base: 0.9, color: '#ffd98a', pose: 'stance', title: 'Gale Stance', channel: true,
+  blurb: 'Hold to settle into the stance: at Stage Ⅰ a bigger whirlwind that pulls foes in starts by itself and quickens while held; let go and it spins on alone, then a dizzy burst.',
   radius: [1.2, 1.3, 1.45], pull: [1.5, 2, 2.6], spinOut: [0.5, 1, 1.6],
   apply(p, s) { p.radius = r2(p.radius * by(this.radius, s)); p.pull = by(this.pull, s); p.spinOut = by(this.spinOut, s); p.dizzy = 0.4; return p; },
-  lines(p) { return [`Spin radius ${p.radius} m, pulling foes in at ${p.pull} m/s`, `Keeps spinning ${p.spinOut}s after you let go, then a dizzy burst (${p.dizzy}s)`]; },
+  lines(p) { return [`Whirlwind radius ${p.radius} m, pulling foes in at ${p.pull} m/s`, `Keeps spinning ${p.spinOut}s after you let go, then a dizzy burst (${p.dizzy}s)`]; },
   perks: set(STAGES(), QUICK(),
     UNIQUE('twister', 'Twister', 4, 'The spin-out drifts after your cursor at 2.5 m/s: a tiny tornado.', { extra: { speed: 2.5 } }),
     UNIQUE('finale', 'Dizzy Finale', 10, 'The spin-out ends by flinging everything nearby away: 120% damage and 1.2s dizzy.', { extra: { pct: 120, dizzy: 1.2 } })),
 };
 C.dig = {
-  ready: true, tune: { dmg: [0.69, 0.53, 0.44], shape: [0, 1, 1] }, base: 0.9, color: '#e8b07a', pose: 'crouch', title: 'Crater Slam',
-  blurb: 'A longer leap and a bigger, stunning crater.',
+  ready: true, tune: { dmg: [0.69, 0.53, 0.44], shape: [0, 1, 1] }, base: 0.9, color: '#e8b07a', pose: 'splitter', title: 'Mountain Splitter',
+  blurb: 'A longer leap and a bigger, stunning crack in the ground.',
   radius: [1.3, 1.5, 1.75], leap: [2, 3, 4], stun: [0.3, 0.5, 0.8],
   apply(p, s, k) { p.dmgPct *= by(STAGE_MULT, s); p.radius = r2(p.radius * by(this.radius, s) * (1 + (k.wide || 0) * 0.2)); p.leap += by(this.leap, s); p.stun = r2(p.stun + by(this.stun, s)); p.knockback = r2(p.knockback * 1.5); return p; },
-  lines(p) { return [`Slam: ${pct(p.dmgPct)} in ${p.radius} m`, `Leap up to ${p.leap} m · stun ${p.stun}s`]; },
-  perks: set(STAGES(), QUICK(), WIDE({ what: 'crater' }),
-    UNIQUE('aftershock', 'Aftershock', 8, 'A second slam ring erupts 0.6s later: 60% damage in a 40% wider ring.', { extra: { delay: 0.6, pct: 60, r: 1.4 } })),
+  lines(p) { return [`Split: ${pct(p.dmgPct)} in ${p.radius} m`, `Leap up to ${p.leap} m · stun ${p.stun}s`]; },
+  perks: set(STAGES(), QUICK(), WIDE({ what: 'crack' }),
+    UNIQUE('aftershock', 'Aftershock', 8, 'The ground cracks open again 0.6s later: 60% damage in a 40% wider ring.', { extra: { delay: 0.6, pct: 60, r: 1.4 } })),
 };
 C.bonestorm = {
-  ready: true, tune: { dmg: [0.87, 0.77, 0.67], shape: [0.1, 0.2, 0.2] }, base: 1.0, color: '#fff0c8', pose: 'sky', title: 'Bone Cyclone',
-  blurb: 'More bones in a wider storm.',
+  ready: true, tune: { dmg: [0.87, 0.77, 0.67], shape: [0.1, 0.2, 0.2] }, base: 1.0, color: '#ffd0e0', pose: 'storm', title: 'Sakura Tempest',
+  blurb: 'More spectral blades and petals in a wider storm.',
   count: [2, 3, 5], radius: [1.15, 1.3, 1.45], dur: [1, 1.05, 1.1], dmg: [1.15, 1.3, 1.5], // (it already lasts about its cooldown: the charge buys bones and reach, not time)
   apply(p, s) { p.count += by(this.count, s); p.radius = r2(p.radius * by(this.radius, s)); p.duration = r1(p.duration * by(this.dur, s)); p.dmgPct *= by(this.dmg, s); return p; },
-  lines(p) { return [`Bones: ${p.count} · ${pct(p.dmgPct)} per touch`, `Orbit ${p.radius} m · lasts ${p.duration}s`]; },
+  lines(p) { return [`Blades: ${p.count} · ${pct(p.dmgPct)} per touch`, `Orbit ${p.radius} m · lasts ${p.duration}s`]; },
   perks: set(STAGES(), QUICK(),
-    UNIQUE('volley', 'Bone Volley', 6, 'When a charged storm ends, every bone shoots at the nearest foe within 8 m for 50%.', { extra: { pct: 50, range: 8 } }),
-    UNIQUE('wall', 'Bone Wall', 12, 'While a charged storm spins, each bone blocks one hit aimed at Chewy (the bone pops).')),
+    UNIQUE('volley', 'Blade Volley', 6, 'When a charged storm ends, every blade shoots at the nearest foe within 8 m for 50%.', { extra: { pct: 50, range: 8 } }),
+    UNIQUE('wall', 'Blade Wall', 12, 'While a charged storm spins, each blade blocks one hit aimed at Chewy (and shatters into petals).')),
 };
 
 // =================================================================== CHEWY · FETCH MASTERY
@@ -179,47 +180,47 @@ C.fetchstorm = {
 
 // =================================================================== CHEWY · PACK SPIRIT
 C.woof = {
-  ready: true, tune: { dmg: [0.67, 0.51, 0.42], shape: [0, 1, 1] }, base: 0.9, color: '#bfe6ff', pose: 'breath', title: 'Sonic Bark',
-  blurb: 'A forward bark cone that reaches twice as far, knocks back further and stuns longer.',
+  ready: true, tune: { dmg: [0.67, 0.51, 0.42], shape: [0, 1, 1] }, base: 0.9, color: '#bfe6ff', pose: 'kiai', title: 'Thunder Kiai',
+  blurb: 'Draw a deep breath for a forward cone of shout that reaches twice as far, knocks back further and stuns longer.',
   cone: [90, 100, 110], knock: [1.6, 2, 2.5],
   apply(p, s, k) { p.cone = by(this.cone, s); p.reach = r2(p.radius * 2); p.dmgPct *= by(STAGE_MULT, s); p.stun = r2(p.stun * by(STAGE_MULT, s)); p.knockback = r2(p.knockback * by(this.knock, s)); return p; },
-  lines(p) { return [`Bark cone: ${p.cone}° reaching ${p.reach} m`, `${pct(p.dmgPct)} · stun ${p.stun}s · knockback ${x(p.knockback / 2.5)}`]; },
-  perks: set(STAGES(), QUICK(), ECHO({ name: 'Echo Bark' }),
-    UNIQUE('bigBad', 'Big Bad Woof', 10, 'Foes hit by a charged bark are scared stiff for 2.5s: they flee and take +25% damage.', { extra: { fear: 2.5, vuln: 25 } })),
+  lines(p) { return [`Shout cone: ${p.cone}° reaching ${p.reach} m`, `${pct(p.dmgPct)} · stun ${p.stun}s · knockback ${x(p.knockback / 2.5)}`]; },
+  perks: set(STAGES(), QUICK(), ECHO({ name: 'Echoing Kiai' }),
+    UNIQUE('bigBad', 'Big Bad Kiai', 10, 'Foes hit by a charged kiai are scared stiff for 2.5s: they flee and take +25% damage.', { extra: { fear: 2.5, vuln: 25 } })),
 };
 C.zoom = {
-  ready: true, tune: { dmg: [0.8, 0.71, 0.58], shape: [0, 1, 1] }, base: 0.85, color: '#ffd8a0', pose: 'crouch', title: 'Turbo Zoomies',
-  blurb: 'A much longer dash that leaves a damaging zoom trail behind.',
+  ready: true, tune: { dmg: [0.8, 0.71, 0.58], shape: [0, 1, 1] }, base: 0.85, color: '#ffd8a0', pose: 'iaiDash', title: 'Lightning Draw',
+  blurb: 'Coil low in the draw stance for a much longer draw-dash; its cut lingers along the path, still cutting.',
   dmg: [1.25, 1.5, 2], trailPct: [6, 10, 15], trail: [1, 1.5, 2],
   apply(p, s) { p.distance = r2(p.distance * by(STAGE_MULT, s)); p.dmgPct *= by(this.dmg, s); p.trailPct = by(this.trailPct, s); p.trail = by(this.trail, s); return p; },
-  lines(p) { return [`Dash ${p.distance} m: ${pct(p.dmgPct)}`, `Zoom trail: ${p.trailPct}% every 0.5s for ${p.trail}s`]; },
+  lines(p) { return [`Draw-dash ${p.distance} m: ${pct(p.dmgPct)}`, `Lingering cut: ${p.trailPct}% every 0.5s for ${p.trail}s`]; },
   perks: set(STAGES(), QUICK(),
-    UNIQUE('pingpong', 'Ping-Pong', 4, 'At the end of a charged dash Chewy rebounds halfway back, hitting everything again.'),
+    UNIQUE('pingpong', 'Return Stroke', 4, 'At the end of a charged dash Chewy cuts his way halfway back, hitting everything again.'),
     UNIQUE('afterimage', 'Afterimage', 10, 'A charged dash leaves a ghostly Chewy at the start that taunts foes for 3s, then pops for 40%.', { extra: { taunt: 3, pct: 40 } })),
 };
 C.packcall = {
-  ready: true, base: 0.9, color: '#9fd8ff', pose: 'breath', title: 'Alpha Pup', summon: true,
-  blurb: 'Calls an empowered alpha pup: bigger and tougher, with more pups at higher stages.',
+  ready: true, base: 0.9, color: '#9fd8ff', pose: 'warCry', title: 'Shogun Pup', summon: true,
+  blurb: 'Calls an empowered shogun pup in a grand helmet: bigger and tougher, with more pups at higher stages.',
   alpha: [1.6, 2.2, 3], extra: [0, 1, 2],
   apply(p, s) { p.alpha = by(this.alpha, s); p.pups += by(this.extra, s); p.alphaHowl = s >= 3; return p; },
-  lines(p) { return [`Alpha pup: ${x(p.alpha)} life and bite`, `Spirit pups: ${p.pups}`, ...(p.alphaHowl ? ['The alpha howls on arrival: foes in 3 m are chilled (−40% speed, 2s)'] : [])]; },
+  lines(p) { return [`Shogun pup: ${x(p.alpha)} life and bite`, `Spirit pups: ${p.pups}`, ...(p.alphaHowl ? ['The shogun howls on arrival: foes in 3 m are chilled (−40% speed, 2s)'] : [])]; },
   perks: set(STAGES(), QUICK(),
     UNIQUE('packLeader', 'Pack Leader', 4, 'A charged call sends Shadow into a 6s frenzy: +30% attack speed.', { extra: { t: 6, aspd: 30 } }),
-    UNIQUE('spiritWolf', 'Spirit Wolf', 10, 'At Stage Ⅲ the alpha arrives as a Spirit Wolf: much bigger, with a pouncing leap.', { needs: { stages: 2 } })),
+    UNIQUE('spiritWolf', 'Spirit Wolf', 10, 'At Stage Ⅲ the shogun pup arrives as a Spirit Wolf: much bigger, with a pouncing leap.', { needs: { stages: 2 } })),
 };
 C.treat = {
-  ready: true, base: 0.9, color: '#fff0b0', pose: 'ball', title: 'Big Biscuit',
-  blurb: 'A huge glowing biscuit: much more healing in a wider burst.',
+  ready: true, base: 0.9, color: '#fff0b0', pose: 'ball', title: 'Giant Onigiri',
+  blurb: 'A huge glowing rice ball: much more healing in a wider burst.',
   radius: [1.25, 1.4, 1.6],
   apply(p, s) { const m = by(STAGE_MULT, s); p.healPct = r1(p.healPct * m); p.healFlat = Math.round(p.healFlat * m); p.radius = r2(p.radius * by(this.radius, s)); p.dmgPct *= m; return p; },
   lines(p) { return [`Heals ${p.healPct}% life + ${p.healFlat} in ${p.radius} m`, `Holy crumbs: ${pct(p.dmgPct)}`]; },
   perks: set(STAGES(), QUICK(),
-    UNIQUE('picnic', 'Picnic', 6, 'A charged toss lays a picnic blanket (3 m) for 4 / 5 / 6s by stage: allies heal 3% life per second, foes on it take 25% holy per second.', { extra: { r: 3, dur: [4, 5, 6], heal: 3, pct: 25 } }),
-    UNIQUE('shower', 'Treat Shower', 10, 'The big biscuit bursts into 6 mini treats that scatter 3 m; each heals or zaps where it lands (25%).', { extra: { n: 6, pct: 25 } })),
+    UNIQUE('picnic', 'Hanami Picnic', 6, 'A charged toss lays a blossom-viewing picnic blanket (3 m) for 4 / 5 / 6s by stage: allies heal 3% life per second, foes on it take 25% holy per second.', { extra: { r: 3, dur: [4, 5, 6], heal: 3, pct: 25 } }),
+    UNIQUE('shower', 'Rice Ball Shower', 10, 'The giant onigiri bursts into 6 mini rice balls that scatter 3 m; each heals or zaps where it lands (25%).', { extra: { n: 6, pct: 25 } })),
 };
 C.howl = {
-  ready: true, base: 1.0, color: '#ffb080', pose: 'breath', title: 'Rallying Howl',
-  blurb: 'A longer, stronger rally with a wider fear.',
+  ready: true, base: 1.0, color: '#e8b84a', pose: 'warCry', title: 'Rallying Banner',
+  blurb: 'A longer, stronger rally under a bigger banner, with a wider fear.',
   buff: [1.15, 1.3, 1.5], dur: [1.3, 1.6, 2], radius: [2, 3, 4], fear: [1.3, 1.6, 2],
   apply(p, s) { p.duration = r1(p.duration * by(this.dur, s)); p.dmgBuff = Math.round(p.dmgBuff * by(this.buff, s)); p.radius += by(this.radius, s); p.fear = r2(p.fear * by(this.fear, s)); return p; },
   lines(p) { return [`+${p.dmgBuff}% damage for ${p.duration}s`, `Fear: ${p.fear}s in ${p.radius} m`]; },
@@ -228,11 +229,11 @@ C.howl = {
     UNIQUE('moonlit', 'Moonlit Rally', 10, 'While a charged howl lasts, all your charges fill 25% faster.', { extra: { speed: 1.25 } })),
 };
 C.moonhowl = {
-  ready: true, tune: { dmg: [0.84, 0.72, 0.59], shape: [0.05, 0.05, 0.05] }, base: 1.1, color: '#dfe8ff', pose: 'breath', title: 'Moonfall',
-  blurb: 'More moonbeams with wider strikes.',
+  ready: true, tune: { dmg: [0.84, 0.72, 0.59], shape: [0.05, 0.05, 0.05] }, base: 1.1, color: '#dfe8ff', pose: 'warCry', title: 'Moonfall',
+  blurb: 'More moonlit blades with wider strikes.',
   strikes: [3, 5, 8], strikeR: [1.2, 1.35, 1.5], dmg: [1.2, 1.4, 1.7],
   apply(p, s) { p.strikes += by(this.strikes, s); p.strikeRadius = r2(p.strikeRadius * by(this.strikeR, s)); p.dmgPct *= by(this.dmg, s); return p; },
-  lines(p) { return [`Moonbeams: ${p.strikes}`, `Holy damage each: ${pct(p.dmgPct)} in ${p.strikeRadius} m`]; },
+  lines(p) { return [`Moon blades: ${p.strikes}`, `Holy damage each: ${pct(p.dmgPct)} in ${p.strikeRadius} m`]; },
   perks: set(STAGES(), QUICK(), FOCUS(),
     UNIQUE('eclipse', 'Lunar Eclipse', 12, 'At Stage Ⅲ the area turns to night for 4s: 8% holy every 0.5s, and foes are blinded (they can’t attack and stumble about, −40% speed).', { needs: { stages: 2 }, extra: { dur: 4, pct: 8 } })),
 };
@@ -415,6 +416,9 @@ C.mallards = {
   perks: set(STAGES(), QUICK(), FOCUS(),
     UNIQUE('loop', 'Loop-de-Loop', 12, 'After diving, the squadron loops round and dives again at 50%.', { needs: { stages: 2 }, extra: { pct: 50 } })),
 };
+
+// =================================================================== POE (her 18 tables: rpg/chargePoe.js, built with these same perk families)
+Object.assign(C, poeCharge({ STAGES, QUICK, FOCUS, SPLIT, WIDE, ECHO, UNIQUE, set, STAGE_MULT, by, r1, r2, pct, x }));
 
 for (const id in C) {
   const c = C[id]; c.id = id;

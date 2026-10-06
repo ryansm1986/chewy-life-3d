@@ -71,7 +71,7 @@ try {
     G.input.keys.delete('1'); await new Promise(r => setTimeout(r, 200));
     return res;
   });
-  R.check('swapping to the ball mid Tail Spin ends the (sword-only) channel', !(swap.channel && swap.weapon === 'ball'), JSON.stringify(swap));
+  R.check('swapping to the ball mid Whirlwind Stance ends the (sword-only) channel', !(swap.channel && swap.weapon === 'ball'), JSON.stringify(swap));
 
   // 5. ball skill with no ball equipped: auto-swap must not flip-flop every frame
   const flip = await page.evaluate(async () => {

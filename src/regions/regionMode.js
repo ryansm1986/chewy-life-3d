@@ -2,7 +2,8 @@
 // chasing, boss intro / framing / victory, loot, chests and shrines all run unchanged — with an open-air world
 // (RegionWorld), a region layout (layoutGen) and the region's own flow: arrival at the Wayfarer's Stone, camps whose
 // level rises toward the boss, the boss unlocking the next region.
-// Game code sees G.mode === 'dungeon' ("a combat world") and G.dungeon.isRegion === true.
+// Game code sees G.mode === 'dungeon' ("a combat world") and G.dungeon.isRegion === true (G.dungeon.kind === 'region';
+// zoneId = the region id: the regions are the zones, docs/ZONES.md).
 import * as THREE from 'three';
 import { DungeonMode } from '../dungeon/dungeonMode.js';
 import { Monster } from '../dungeon/monster.js';
@@ -14,11 +15,13 @@ import { generateRegion } from './layoutGen.js';
 import { RegionWorld } from './regionWorld.js';
 import { RNG, TAU, rand } from '../core/util.js';
 import { Events } from '../core/events.js';
+import { packMods, monsterMods } from '../rpg/zoneMods.js';
 
 export class RegionMode extends DungeonMode {
   constructor(G, id) {
     super(G);
     this.regionId = id; this.region = REGIONS[id]; this.isRegion = true;
+    this.kind = 'region'; this.zoneId = id; this.def = null; this.tier = 0; this.mods = []; // (DungeonMode's where() / hasDeeper())
   }
   /** the monsters this visit can field: the region's own where they exist, Burrow stand-ins otherwise */
   roster() {
@@ -57,9 +60,10 @@ export class RegionMode extends DungeonMode {
   }
   // camps carry their own level (rising toward the boss); packs mix the region's monsters
   spawnPack(sp) {
+    sp = packMods(this, sp); // (zone modifiers: phase E, rpg/zoneMods.js)
     const lvl = sp.lvl ?? this.layout.mlvl, c = this.world.cellToWorld(sp.x, sp.y);
     if (sp.boss) {
-      const b = new Monster(this, sp.boss, { level: lvl, x: c.x, z: c.z, rng: () => this.rng.next() });
+      const b = monsterMods(this, new Monster(this, sp.boss, { level: lvl, x: c.x, z: c.z, rng: () => this.rng.next() }));
       this.monsters.push(b); this.combat.add(b); this.boss = b;
       return;
     }
@@ -68,7 +72,7 @@ export class RegionMode extends DungeonMode {
     if (this._packN == null) this._packN = this.rng.int(0, kinds.length - 1);
     const kind = kinds[this._packN++ % kinds.length], variant = this.rng.int(0, 3);
     let leader = null;
-    if (sp.rank !== 'normal') { leader = new Monster(this, kind, { level: lvl, rank: sp.rank, variant, x: c.x, z: c.z, rng: () => this.rng.next() }); this.monsters.push(leader); this.combat.add(leader); }
+    if (sp.rank !== 'normal') { leader = monsterMods(this, new Monster(this, kind, { level: lvl, rank: sp.rank, variant, x: c.x, z: c.z, rng: () => this.rng.next() })); this.monsters.push(leader); this.combat.add(leader); }
     const n = Math.max(1, Math.round(sp.count * (MONSTERS[kind].pack || 1)));
     for (let i = 0; i < n; i++) {
       const a = i / n * TAU + rand(0, 0.5), r = rand(0.8, 2.2);
@@ -78,6 +82,7 @@ export class RegionMode extends DungeonMode {
       const k2 = kinds.length > 1 && this.rng.chance(0.25) ? this.rng.pick(kinds) : kind;
       const m = new Monster(this, k2, { level: lvl, rank: 'normal', variant: sp.rank === 'champion' ? variant : this.rng.int(0, 3), x, z, leader, rng: () => this.rng.next() });
       if (sp.rank === 'champion') { m.rank = 'champion'; m.lifeMax = m.life = Math.round(m.life * 2); m.name = leader.name; m.eliteColor = '#6aa8ff'; }
+      monsterMods(this, m);
       this.monsters.push(m); this.combat.add(m);
     }
   }
@@ -99,6 +104,8 @@ export class RegionMode extends DungeonMode {
       setTimeout(() => G.ui?.toast?.(`New region on the Travel Map: ${REGIONS[next].name}!`, { icon: 'map', color: REGIONS[next].color }), 4200);
     }
     Events.emit('region:cleared', { id, times: R.cleared[id] });
+    // the zone's climax today (until phase C moves this boss into the zone dungeon): its count is zones[id].regionBoss
+    Events.emit('dungeon:cleared', { id, kind: 'region', tier: 0, floor: 0, zone: id, boss: b.id, first: R.cleared[id] === 1 });
     G.save?.();
   }
   dispose() { super.dispose(); this.world.dispose?.(); }

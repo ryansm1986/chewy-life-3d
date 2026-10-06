@@ -3,8 +3,9 @@
 // and BUILD (model builders -> { root, pivot, body, mat, outline }). Sounds live in ./bamboo.sfx.js (pure data).
 //
 // This file also carries the REGION MONSTER KIT shared by maple.js / tidepool.js / onsen.js (exported below):
-//   assemble(key, spec)   model from named parts; each part's merged geometry is built once per key and cloned per
-//                         instance (Monster.dispose frees the clone, never the master). Model = { root, pivot, inner, mat,
+//   assemble(key, spec)   model from named parts; each part's merged geometry is built once per key and shared by every
+//                         instance (userData.shared: never disposed per monster; dungeon/horde.js draws the parts
+//                         instanced, ROADMAP Z-B2). Model = { root, pivot, inner, mat,
 //                         body, outline, subs, g: {part groups}, act, actT } — `inner` (and the parts) are ours to animate,
 //                         MonsterAnim keeps writing pivot (champion scale, hit flash, death squash).
 //   mdef(def)             wraps onSpawn: m.rs (AI state), model.mon, elite outline on every part.
@@ -77,6 +78,8 @@ export function blob(seg, rings, fn, color) {
 
 // ================================================================================================= KIT: models
 const MASTERS = new Map();
+/** mark a cached geometry as shared (Monster.dispose leaves it; the Horde batches it) */
+export const shared = g => { g.userData.shared = true; return g; };
 /**
  * spec() → { mat?: makeToon opts, outline?: width, parts: [{ name: 'body' | …, geo: [geometries], at?: [x,y,z],
  *   parent?: 'inner' | 'root' | 'pivot' | <part>, outline?, shadow? }] }  (the first part must be 'body'; parents first)
@@ -85,7 +88,7 @@ export function assemble(key, spec) {
   let M = MASTERS.get(key);
   if (!M) {
     const s = spec();
-    M = { mat: s.mat || {}, ol: s.outline ?? 0.021, parts: s.parts.map(p => ({ name: p.name, at: p.at || null, parent: p.parent || 'inner', ol: p.outline, shadow: p.shadow !== false, geo: merge(p.geo) })) };
+    M = { mat: s.mat || {}, ol: s.outline ?? 0.021, parts: s.parts.map(p => ({ name: p.name, at: p.at || null, parent: p.parent || 'inner', ol: p.outline, shadow: p.shadow !== false, geo: shared(merge(p.geo)) })) };
     MASTERS.set(key, M);
   }
   const mo = M.mat;
@@ -94,7 +97,7 @@ export function assemble(key, spec) {
   root.add(pivot); pivot.add(inner);
   const model = { root, pivot, inner, mat, body: null, outline: null, subs: [], g: { root, pivot, inner }, act: 'idle', actT: 0, key };
   for (const p of M.parts) {
-    const geo = p.geo.clone();
+    const geo = p.geo; // (shared by every instance: ROADMAP Z-B1; the Horde draws them instanced)
     const mesh = new THREE.Mesh(geo, mat); mesh.castShadow = p.shadow; mesh.receiveShadow = true;
     const ol = new THREE.Mesh(geo, makeOutline(INK, p.ol ?? M.ol));
     let grp;
@@ -134,7 +137,7 @@ export function hitArea(m, x, z, r, raw, el = m.stats.element, knockMul = 1, noI
   let res = 0;
   const from = V(x, P?.pos.y || 0, z);
   if (playerIn(G, x, z, r) && !(noInvuln && P.invuln)) res = Cb.hitPlayer(raw, { element: el, level: m.level, from, knock: (m.stats.knockback || 0.4) * knockMul, onHit: m.stats.onHit, src: m });
-  for (const e of Cb.entities) if (e.alive && e.team === 'ally' && e !== P && !e.untargetable && e.pos && dist(e.pos.x, e.pos.z, x, z) < r + (e.radius || 0.3)) Cb.hitAlly(e, raw, { element: el, from });
+  for (const e of Cb.allies || Cb.entities) if (e.alive && e.team === 'ally' && e !== P && !e.untargetable && e.pos && dist(e.pos.x, e.pos.z, x, z) < r + (e.radius || 0.3)) Cb.hitAlly(e, raw, { element: el, from }); // (allies: combat.js keeps them apart, same order)
   return res;
 }
 /** chill the player: slowed for `secs` (frost sparkles while it lasts) */
@@ -244,7 +247,7 @@ const ENTS = [];
 function targetsNear(G, Cb, x, z, r) { // player first, then allies; into a reused array
   ENTS.length = 0; const P = G.player;
   if (P && !G.playerDead && !P.invuln && (P.pos.x - x) ** 2 + (P.pos.z - z) ** 2 < (r + (P.radius || 0.3)) ** 2) ENTS.push(P);
-  for (const e of Cb.entities) if (e.alive && e.team === 'ally' && e !== P && !e.untargetable && e.pos && (e.pos.x - x) ** 2 + (e.pos.z - z) ** 2 < (r + (e.radius || 0.3)) ** 2) ENTS.push(e);
+  for (const e of Cb.allies || Cb.entities) if (e.alive && e.team === 'ally' && e !== P && !e.untargetable && e.pos && (e.pos.x - x) ** 2 + (e.pos.z - z) ** 2 < (r + (e.radius || 0.3)) ** 2) ENTS.push(e);
   return ENTS;
 }
 /** camera right / up for screen-aligned particles (refreshed at most once per frame) */

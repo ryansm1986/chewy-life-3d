@@ -1,9 +1,9 @@
-// Skill trees (the active hero's three: Bone Arts / Fetch Mastery / Pack Spirit, or Moka's Tidewater / Starlight Kibble /
+// Skill trees (the active hero's three: Bone Blade / Fetch Mastery / Pack Spirit, or Moka's Tidewater / Starlight Kibble /
 // Duck Hunt) + hotbar assignment (popover, drag, hover+1-4).
 import { el, esc, replay, setText } from './dom.js';
 import { glyph } from './glyphs.js';
 import { Panel } from './panel.js';
-import { TREES, treesFor, skillList, skillDef, skillIconURL, hotbarIconURL, skillInfoLines, canLearnSkill, effLevel, treeInfo } from './rpg.js';
+import { TREES, treesFor, skillList, skillDef, skillIconURL, hotbarIconURL, skillInfoLines, canLearnSkill, effLevel, treeInfo, skillTraining } from './rpg.js';
 import { ChargeDrawer, chipState, chargeTipHTML } from './chargePanel.js';
 
 const COLW = 118, ROWH = 80, NODE = 64, PADX = 64, PADY = 26;
@@ -55,6 +55,7 @@ export class SkillsPanel extends Panel {
   state(s) {
     const p = this.st.player || {}, lvl = this.lvl(s.id);
     if (lvl >= s.maxLvl) return 'maxed';
+    if (skillTraining(s.id)) return 'locked training'; // (greyed until its cast is built: a small "In training" note in the tooltip)
     const can = canLearnSkill(s.id, this.st).ok;
     const reqOk = (p.lvl || 1) >= s.reqLvl && s.prereq.every(q => this.lvl(q) > 0);
     if (can) return lvl > 0 ? 'learned can' : 'avail can';
@@ -182,7 +183,7 @@ export class SkillsPanel extends Panel {
     const syn = (s.synergies || []).map(x => { const d = skillDef(x.id); return `<div class="tt-syn">${glyph('sparkle')}<b>${esc(d?.name || x.id)}</b> <span>${esc(x.text || '')}</span> <i>(${this.lvl(x.id)} pt${this.lvl(x.id) === 1 ? '' : 's'})</i></div>`; }).join('');
     const hot = (p.hotbar || []).indexOf(id);
     const KIND = { active: 'Active', passive: 'Passive', aura: 'Aura', channel: 'Channel' };
-    const wep = s.wep === 'sword' ? ' · Bone Sword' : s.wep === 'ball' ? ' · Ball' : '';
+    const wep = s.wep === 'sword' ? ' · Bone Katana' : s.wep === 'ball' ? ' · Ball' : '';
     return `<div class="tt-skill" style="--tc:${T.color}">
       <div class="tt-name">${esc(s.name)}</div>
       <div class="tt-kind"><span>${esc(T.name)} · ${KIND[s.kind] || 'Active'}${wep}</span><span class="jp">${T.jp || ''}</span></div>
@@ -191,6 +192,7 @@ export class SkillsPanel extends Panel {
       ${cur.length ? `<div class="tt-sect"><div class="tt-sh">Current</div>${cur.map(l => `<div class="tt-l">${esc(l)}</div>`).join('')}</div>` : ''}
       ${next.length ? `<div class="tt-sect next"><div class="tt-sh">${lvl ? 'Next level' : 'Level 1'}</div>${next.map(l => `<div class="tt-l">${esc(l)}</div>`).join('')}</div>` : lvl >= s.maxLvl ? '<div class="tt-max">✦ Mastered! ✦</div>' : ''}
       ${reqs.length ? `<div class="tt-reqs">Requires: ${reqs.join(', ')}</div>` : ''}
+      ${skillTraining(id) ? '<div class="tt-train">In training: Poe is still practising this one. Coming soon!</div>' : ''}
       ${!s.passive && lvl ? chargeTipHTML(id, this.st, this.d) : ''}
       ${syn ? `<div class="tt-sect syn"><div class="tt-sh">Synergies</div>${syn}</div>` : ''}
       <div class="tt-hints"><span><b>Click</b> learn</span>${!s.passive && lvl ? '<span><b>Right-click</b> / <b>1–4</b> assign</span><span><b>⚡</b> charge perks</span>' : ''}</div>

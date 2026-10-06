@@ -35,7 +35,7 @@ import { itemName, itemIconURL, skillIconURL } from './rpg.js';
 import { Vector3 } from 'three';
 
 const SETTINGS_KEY = 'chewy3d.settings';
-const DEFAULT_SETTINGS = { quality: 2, music: 0.7, sfx: 0.8, uiScale: 1, shake: true, showFps: false, chargeMode: 0 }; // chargeMode: 0 hold to charge · 1 off · 2 toggle (docs/CHARGE.md)
+const DEFAULT_SETTINGS = { quality: 2, music: 0.7, sfx: 0.8, uiScale: 1, shake: true, showFps: false, chargeMode: 0, sprintMode: 0 }; // chargeMode: 0 hold to charge · 1 off · 2 toggle (docs/CHARGE.md); sprintMode: 0 hold Shift · 1 toggle (actors/sprint.js)
 const NON_BLOCKING = new Set(['build', 'decorate']); // panels that don't pause gameplay input
 // UI sound names → src/audio sfx ids (learn / equip / level-up / toast sounds are already bound to game events by the audio module)
 const SFX_MAP = { open: 'ui_open', close: 'ui_close', tab: 'ui_tab', deny: 'ui_error', coin: 'ui_coin', buy: 'ui_buy', hover: 'ui_hover', equip: 'ui_equip', learn: 'ui_learn',
@@ -94,7 +94,7 @@ export const UI = {
     this.applyScale();
     addEventListener('resize', () => this.applyScale());
     addEventListener('keydown', e => this.onKey(e));
-    addEventListener('keyup', e => { if (e.key === 'Alt') { this.labels.setVisible(false); e.preventDefault(); } });
+    addEventListener('keyup', e => { if (e.code === 'KeyZ') this.labels.setVisible(false); if (e.key === 'Alt') e.preventDefault(); }); // (hold Z: the loot labels)
     addEventListener('blur', () => this.labels.setVisible(false));
     // LMB/RMB press flashes on the world canvas
     addEventListener('mousedown', e => {
@@ -250,10 +250,12 @@ export const UI = {
 
   // ------------------------------------------------------------------ keyboard
   onKey(e) {
-    if (!this.ready || isTyping() || e.repeat && e.key !== 'Alt') { if (e.key === 'Alt') e.preventDefault(); return; }
+    if (e.key === 'Alt') e.preventDefault(); // (Alt+LMB attacks in place: a lone Alt must not focus the browser's menu)
+    if (!this.ready || isTyping() || e.repeat && e.code !== 'KeyZ') return;
     const code = e.code, k = e.key;
     if (this.iris.active) { e.preventDefault(); return; }
-    if (k === 'Alt') { e.preventDefault(); this.labels.setVisible(true); return; }
+    if (k === 'Alt') return;
+    if (code === 'KeyZ' && !e.ctrlKey && !e.metaKey && !e.altKey) { this.labels.setVisible(true); return; } // hold Z: every loot label (Ctrl+Z stays the decorate undo)
     if (this.mode === 'title') { if (k === 'Escape' && this.isOpen('menu')) this.close('menu'); return; }
     if (this.dlg.active) { if (this.dlg.key(k, e)) e.preventDefault(); return; }
     if (k === 'Escape') {

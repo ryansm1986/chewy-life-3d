@@ -126,6 +126,15 @@ Status: **built** (2026-10-03). There are three guides, run by a small reusable 
   3. The Charge card is spotlit, with callouts on the stages and the perks (Got it).
   4. Wrap-up: tap vs hold, a roll drops a charge, hits don't.
   - QA: `tools/qa/s19-charge.mjs` section g runs it end to end.
+- **Meet Poe (Poe)** starts in town once Poe has joined (docs/POE.md §5), while you play someone else; offered once
+  to older saves past her join (`past`), locked in the Journal until then — docs/POE.md §6:
+  1. Tap Tab (the switch button spotlit): the next hero (`done` once the active hero changed and the switch is over).
+  2. Hold Tab: the hero wheel (her card spotlit while it's open; the ring if you're her already); a pick through the
+     wheel by mouse or number key (`hero:wheel { open: false, id }`).
+  3. Poe's binds: left-click fūma slashes, right-click Fūma Throw (catch it), her three trees (Got it).
+  4. Wrap-up: the mini portraits; tap Tab next, hold Tab pick (Got it).
+  - Steps 1–3 allow switching (`allow.switching`), so the transitions don't pause it.
+  - QA: `tools/qa/s20-poe.mjs` section c runs it end to end.
 
 ## Hooks added for the guides
 - `fishing.js`:
@@ -140,5 +149,6 @@ Status: **built** (2026-10-03). There are three guides, run by a small reusable 
 - `garden.js`: `facingDoor()`. Walking up to the cottage door now means the door, not the bed's corner tile beside it.
 - `hud.js`: a Pantry button in the menu bar.
 - `combat/charge.js`: `charge:release { id, stage, ok }`, `charge:cancel { id, reason }` (the charge guide).
+- `actors/heroes.js`: `hero:wheel { open, id }` (the Meet Poe guide); `ui/heroWheel.js` cards carry `data-id`.
 - `game.js`: `G.tutorials`, `G.introJoinPending`; `questTarget` asks the director first. Moka's join toast is skipped
   when her guide will show it.

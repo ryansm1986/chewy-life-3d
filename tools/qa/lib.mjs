@@ -24,6 +24,9 @@ export async function launch({ w = 1280, h = 720 } = {}) {
 }
 
 export async function boot(page, qs = 'fresh&nointro') {
+  // dungeon floors reroll per entry now (dungeon/defs.js): the QA pins them to the old fixed layouts (?dseed=1, kept for
+  // the tab, so reloads stay pinned too) unless a scenario asks otherwise (dseed=N, or dseed=off to roll)
+  if (!/(^|&)dseed=/.test(qs)) qs += '&dseed=1';
   await page.goto(`${BASE}/?${qs}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__ready === true && window.G?.player, null, { timeout: 60000 });
   await page.waitForTimeout(600);

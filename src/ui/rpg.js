@@ -24,7 +24,7 @@ export function itemIconURL(item) {
   if (f) { try { const u = f(item); if (u) return typeof u === 'string' ? u : u.toDataURL?.() || ''; } catch (e) { /* fall through */ } }
   const kind = item.kind;
   let g = SLOT_GLYPH[item.slot] || 'gift';
-  if (item.slot === 'weapon') g = item.wtype === 'ball' ? 'ball' : item.wtype === 'staff' ? 'staff' : 'sword';
+  if (item.slot === 'weapon') g = item.wtype === 'ball' ? 'ball' : item.wtype === 'staff' ? 'staff' : item.wtype === 'fuma' ? 'fuma' : 'sword';
   if (kind === 'gem') g = 'gem'; else if (kind === 'key') g = 'key'; else if (kind === 'gift') g = 'gift';
   else if (kind === 'material') g = item.base in MATERIAL_G ? MATERIAL_G[item.base] : 'petal';
   return glyphURL(g);
@@ -45,9 +45,9 @@ export function materialIconURL(k) {
 }
 export function potionInfo(k) { const P = rpg.items.POTIONS?.[k]; return P ? { name: P.name, desc: P.desc, price: P.price, color: P.color } : null; }
 
-const SKILL_FALLBACK_G = { attack: 'swords', attack_ball: 'ball', attack_staff: 'staff', chomp: 'bone', fetch: 'ball' };
-// hotbar / popover icon: the basic 'attack' follows the equipped weapon (bone sword vs tennis ball)
-export function hotbarIconURL(id, derived) { return skillIconURL(id === 'attack' && derived?.weaponType === 'ball' ? 'attack_ball' : id === 'attack' && derived?.weaponType === 'staff' ? 'attack_staff' : id); }
+const SKILL_FALLBACK_G = { attack: 'swords', attack_ball: 'ball', attack_staff: 'staff', attack_fuma: 'fuma', chomp: 'bone', fetch: 'ball' };
+// hotbar / popover icon: the basic 'attack' follows the equipped weapon (bone katana vs tennis ball)
+export function hotbarIconURL(id, derived) { return skillIconURL(id === 'attack' && derived?.weaponType === 'ball' ? 'attack_ball' : id === 'attack' && derived?.weaponType === 'staff' ? 'attack_staff' : id === 'attack' && derived?.weaponType === 'fuma' ? 'attack_fuma' : id); }
 export const plural = (n, word, pl = word + 's') => `${n} ${n === 1 ? word : pl}`;
 export function skillIconURL(id) {
   if (!id) return '';
@@ -56,18 +56,22 @@ export function skillIconURL(id) {
   const def = skillDef(id);
   if (def?.glyph) return glyphURL(def.glyph);
   const tree = def?.tree;
-  return glyphURL(SKILL_FALLBACK_G[id] || ({ fetch: 'ball', spirit: 'paw', bone: 'bone', tide: 'drop', star: 'star', duck: 'duck' })[tree] || 'sparkle');
+  return glyphURL(SKILL_FALLBACK_G[id] || ({ fetch: 'ball', spirit: 'paw', bone: 'bone', tide: 'drop', star: 'star', duck: 'duck', shuriken: 'fuma', jutsu: 'smoke', shadow: 'kunai' })[tree] || 'sparkle');
 }
 
 // ------------------------------------------------------------------ skills
 export const TREES = [
-  { id: 'bone', cls: 'chewy', name: 'Bone Arts', jp: '骨の技', color: '#ffb36a', bg: ['#fff3e0', '#ffe0c2'], glyph: 'bone' },
+  { id: 'bone', cls: 'chewy', name: 'Bone Blade', jp: '骨の刀', color: '#ffb36a', bg: ['#fff3e0', '#ffe0c2'], glyph: 'bone' },
   { id: 'fetch', cls: 'chewy', name: 'Fetch Mastery', jp: '取ってこい', color: '#5ec79a', bg: ['#effff6', '#cdf3e0'], glyph: 'ball' },
   { id: 'spirit', cls: 'chewy', name: 'Pack Spirit', jp: '群れの魂', color: '#9a8cff', bg: ['#f3f0ff', '#dcd6ff'], glyph: 'paw' },
   // Moka (docs/HEROES.md §3)
   { id: 'tide', cls: 'moka', name: 'Tidewater', jp: '潮の術', color: '#3cc4b4', bg: ['#eafffb', '#c8f2ea'], glyph: 'drop' },
   { id: 'star', cls: 'moka', name: 'Starlight Kibble', jp: '星のおやつ', color: '#9a7ae8', bg: ['#f6f0ff', '#e2d8ff'], glyph: 'star' },
   { id: 'duck', cls: 'moka', name: 'Duck Hunt', jp: '鴨狩り', color: '#e8902a', bg: ['#fff6e8', '#ffe2bc'], glyph: 'duck' },
+  // Poe (docs/POE.md)
+  { id: 'shuriken', cls: 'poe', name: 'Shuriken Arts', jp: '手裏剣術', color: '#c99a2a', bg: ['#fffaec', '#f6ebc8'], glyph: 'fuma' },
+  { id: 'jutsu', cls: 'poe', name: 'Ninjutsu', jp: '忍術', color: '#7a6aa8', bg: ['#f6f2ff', '#e4dcf4'], glyph: 'smoke' },
+  { id: 'shadow', cls: 'poe', name: 'Shadow Step', jp: '影歩き', color: '#4f7a44', bg: ['#f2f8ee', '#dceccf'], glyph: 'kunai' },
 ];
 /** The skill trees of the hero being played. */
 export const treesFor = cls => TREES.filter(t => t.cls === (cls || 'chewy'));
@@ -90,6 +94,8 @@ export function skillList() {
   _skillCache = arr.filter(d => d && d.id !== 'attack').map(norm);
   return _skillCache;
 }
+/** a skill still in training (Poe's, before its cast is built: rpg/skillsPoe.js POE_TRAINING) — read live, not cached */
+export const skillTraining = id => !!(rpg.skills.SKILLS || {})[id]?.training;
 export function skillDef(id) {
   if (!id) return null;
   if (id === 'attack') {
@@ -218,7 +224,7 @@ export function meetsReq(item, state, derived) {
   if (r.dex && r.dex > (d.dex ?? st.dex ?? 0)) { res.ok = false; res.dex = false; }
   if (r.ene && r.ene > (d.ene ?? st.ene ?? 0)) { res.ok = false; res.ene = false; }
   // weapons are class-bound (sword / ball: Chewy, staff: Moka) — the bag is shared, so this shows up a lot
-  const WC = { sword: 'chewy', ball: 'chewy', staff: 'moka' };
+  const WC = M('classes').WEAPON_CLASS || { sword: 'chewy', ball: 'chewy', staff: 'moka', fuma: 'poe' };
   if (item.wtype && WC[item.wtype] !== (state?.player?.cls || 'chewy')) { res.ok = false; res.other = true; }
   return res;
 }

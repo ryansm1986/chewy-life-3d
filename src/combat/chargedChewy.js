@@ -1,4 +1,4 @@
-// Chewy's charged releases (docs/CHARGE.md §7) beyond the phase-1 showcase (chargedSkills.js has Chomp Slash and
+// Chewy's charged releases (docs/CHARGE.md §7) beyond the phase-1 showcase (chargedSkills.js has Crescent Chomp and
 // Power Throw). Each `charged_<id>(R, aim, target)` gets the charged runtime: R.params are already the charged numbers
 // (src/rpg/charge.js apply()), R.charge = { stage, perks, color, base }. Most reuse the skill's own cast_ through
 // fromFrame() (the action starts from the wind-up frame the charge pose held, and its events can be hooked), then add
@@ -10,8 +10,11 @@ import { rand, TAU, dist, angleDiff } from '../core/util.js';
 import { chargeFx } from '../gfx/chargeFx.js';
 import { perkAt } from '../rpg/charge.js';
 import { Decoy } from './allies.js';
+import { bladeFx } from '../gfx/bladeFx.js';
+import { SAMURAI, BONE_WHITE } from '../gfx/samuraiPalette.js';
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3();
+const WHITE = new THREE.Color('#ffffff'), INK = new THREE.Color('#3a2230');
 const UP = new THREE.Vector3(0, 1, 0);
 const C = h => new THREE.Color(h);
 const sfx = (n, o) => Events.emit('sfx', n, o);
@@ -20,26 +23,27 @@ const by = (arr, s) => (Array.isArray(arr) ? arr[Math.max(0, Math.min(arr.length
 const perkOf = perkAt; // (its pct scaled to the release's stage)
 
 const M = {
-  // ================================================================== Bone Arts
-  /** Dig Slam → Crater Slam: a longer leap into a bigger, stunning crater (+ Aftershock) */
+  // ================================================================== Bone Blade (the samurai: docs/HEROES.md §8)
+  /** Helmet Splitter → Mountain Splitter: a longer leap into a bigger split that stuns longer (+ Aftershock: it cracks again) */
   charged_dig(R, aim, target) {
     const G = this.G, P = G.player, p = R.params, s = R.charge.stage, col = C(R.charge.color), after = perkOf(R, 'aftershock');
     this.fromFrame(0.16, () => this.cast_dig(R, aim, target), ev => {
       if (ev !== 'impact') return;
       const at = P.pos.clone(), fx = chargeFx(G);
       fx.burst(at, { r: p.radius * 1.05, life: 0.42, color: col, w: 0.14, a: 0.85 });
-      G.vfx.decal(at, { r: p.radius * 0.95, color: '#2a1810', opacity: 0.42, life: 4.5 });
+      bladeFx(G).crack(at, P.facing + Math.PI, { len: p.radius * 0.9, r: p.radius * 0.8, life: 4.5, star: false }); // (the split runs back behind him too)
       for (let i = 0; i < 10 + 4 * s; i++) { const a = rand(0, TAU), v = rand(2, 5); G.vfx.dot.spawn({ x: at.x, y: 0.3, z: at.z, vx: Math.cos(a) * v, vy: rand(4, 8), vz: Math.sin(a) * v, life: rand(0.6, 0.9), size: rand(0.12, 0.22), size1: 0.1, color: i % 2 ? '#8a6a4a' : '#b08a64', alpha: 1, alpha1: 1, grav: 18 }); }
       G.engine.rig.shake(0.15 * s);
       if (after) this.after(after.delay, () => {
         const r = p.radius * after.r;
-        fx.burst(at, { r, life: 0.45, color: col, w: 0.12, a: 0.8 }); G.vfx.dustRing(at, r * 0.8, 20); G.vfx.shockwave(at, r, '#ffe0b0');
-        sfx('dig', { pitch: 0.8 }); sfx('charge_slam', { pitch: 0.9 }); G.engine.rig.shake(0.45);
+        fx.burst(at, { r, life: 0.45, color: col, w: 0.12, a: 0.8 }); G.vfx.dustRing(at, r * 0.8, 20); G.vfx.ring(at, { color: '#fff0d8', r0: 0.3, r1: Math.min(r, 5), life: 0.42, opacity: 0.5 });
+        bladeFx(G).crack(at, P.facing + Math.PI / 2, { len: r * 1.2, r: r * 0.8, life: 3, star: false }); bladeFx(G).crack(at, P.facing - Math.PI / 2, { len: r * 1.2, r: r * 0.8, life: 3, star: false });
+        sfx('explosion_small', { pitch: 0.8 }); sfx('charge_slam', { pitch: 0.9 }); G.engine.rig.shake(0.45);
         this.nova(at, r, e => this.combat.hitMonster(e, { dmgPct: p.dmgPct * after.pct / 100, knock: 0.9, stun: 0.5, from: at }));
       });
     });
   },
-  /** Bone Storm → Bone Cyclone: more bones in a wider, longer storm (+ Bone Volley, Bone Wall) */
+  /** Sakura Storm → Sakura Tempest: more spectral blades in a wider storm (+ Blade Volley, Blade Wall) */
   charged_bonestorm(R) {
     const G = this.G, P = G.player;
     this.fromFrame(0.38, () => this.cast_bonestorm(R));
@@ -47,9 +51,10 @@ const M = {
     if (!o) return;
     o.volley = perkOf(R, 'volley'); o.wall = !!perkOf(R, 'wall');
     chargeFx(G).burst(P.pos, { r: o.p.radius * 1.2, life: 0.45, color: C(R.charge.color), w: 0.12, a: 0.8 });
-    if (o.wall) for (const b of o.bones) b.m.scale.setScalar(1.05);
+    bladeFx(G).petalSwirl(P.pos, { n: 14 + 4 * R.charge.stage, r: o.p.radius, y: 0.7, spin: 1, speed: 5, rise: 1 });
+    if (o.wall) for (const b of o.bones) b.m.scale.setScalar(1.0);
   },
-  /** Bone Volley: the storm's bones fly at the nearest foes when it ends */
+  /** Blade Volley: the storm's spectral blades fly at the nearest foes when it ends */
   boneVolley(o) {
     const G = this.G, v = o.volley;
     for (const b of o.bones) {
@@ -57,19 +62,19 @@ const M = {
       const e = this.combat.nearest(from, 'ally', v.range, x => isFoe(x));
       if (!e) continue;
       const dir = e.pos.clone().sub(from).setY(0); if (dir.lengthSq() < 1e-4) continue; dir.normalize();
-      const pr = this.combat.spawn({ team: 'ally', kind: 'bone', pos: from, dir, speed: 15, range: v.range + 2, radius: 0.32, homing: 6,
-        onHit: x => { this.combat.hitMonster(x, { dmgPct: o.p.dmgPct * v.pct / 100, knock: 0.5, from }); G.vfx.sparks(x.pos.clone().setY(0.6), { n: 6, color: '#fff0c8', speed: 4 }); } });
+      const pr = this.combat.spawn({ team: 'ally', kind: 'blade', pos: from, dir, speed: 15, range: v.range + 2, radius: 0.32, homing: 6,
+        onHit: x => { this.combat.hitMonster(x, { dmgPct: o.p.dmgPct * v.pct / 100, knock: 0.5, from }); G.vfx.sparks(x.pos.clone().setY(0.6), { n: 6, color: '#ffe8f0', speed: 4 }); bladeFx(G).petalSwirl(x.pos, { n: 4, r: 0.3, y: 0.6, speed: 1.5 }); } });
       pr.homeTarget = e;
     }
-    sfx('throw', { pitch: 1.3 });
+    sfx('throw', { pitch: 1.3 }); sfx('katana_draw', { pitch: 1.4, vol: 0.6 });
   },
-  /** Bone Wall: a charged storm's bone takes a hit for Chewy (combat.hitPlayer asks first) */
+  /** Blade Wall: a charged storm's blade takes a hit for Chewy (combat.hitPlayer asks first) and shatters into petals */
   boneBlock() {
     for (const o of this.orbits) {
       if (!o.wall || !o.bones.length) continue;
       const b = o.bones.pop();
-      this.G.vfx.poof(b.m.position, { n: 6, size: 0.35, color: '#fff6e0' }); this.G.vfx.sparks(b.m.position, { n: 10, color: '#fff0c8', speed: 5 });
-      b.m.parent?.remove(b.m); sfx('block');
+      bladeFx(this.G).petalSwirl(b.m.position, { n: 10, r: 0.2, y: 0, speed: 2.5, rise: 1 }); this.G.vfx.sparks(b.m.position, { n: 10, color: '#ffe8f0', speed: 5 });
+      b.m.parent?.remove(b.m); sfx('block'); sfx('katana_clang', { pitch: 1.2, vol: 0.6 });
       return true;
     }
     return false;
@@ -199,14 +204,16 @@ const M = {
   },
 
   // ================================================================== Pack Spirit
-  /** Woof! → Sonic Bark: a forward cone of sound that reaches twice as far (+ Echo Bark, Big Bad Woof) */
+  /** Kiai! → Thunder Kiai: a forward cone of shout that reaches twice as far (+ Echoing Kiai, Big Bad Kiai) */
   charged_woof(R, aim) {
     const G = this.G, P = G.player, p = R.params, echo = perkOf(R, 'echo'), bad = perkOf(R, 'bigBad');
-    const f = Math.atan2(aim.x - P.pos.x, aim.z - P.pos.z), cone = p.cone * Math.PI / 180;
+    const f = Math.atan2(aim.x - P.pos.x, aim.z - P.pos.z), cone = p.cone * Math.PI / 180, col = C(R.charge.color);
     const wave = (k) => {
       const o = P.pos.clone(), hit = new Set();
       sfx('bark', { pitch: 0.78 }); sfx('charge_whoosh', { pitch: 0.7 }); G.engine.rig.shake(0.3 * k + 0.15);
-      for (let i = 0; i < 3; i++) this.after(i * 0.07, () => chargeFx(G).crescent(o, f, { arc: cone, r0: 0.7, r1: p.reach * (1 - i * 0.12), life: 0.42, color: i ? '#dff2ff' : R.charge.color, width: 0.55 - i * 0.12,
+      bladeFx(G).shout(o, { r: Math.min(p.radius, 3.2) * (0.6 + 0.4 * k), life: 0.36, burst: k >= 1 });
+      // three shout fronts rolling out in the cone: zigzag ink edges on white, the first tinted with the charge colour
+      for (let i = 0; i < 3; i++) this.after(i * 0.07, () => bladeFx(G).wave(o, f, { arc: cone, r0: 0.7, r1: p.reach * (1 - i * 0.12), life: 0.42, mode: 2, core: i ? WHITE : col, edge: INK, width: 0.55 - i * 0.12, y: 0.5, a: 0.92 - i * 0.12,
         onStep: i ? null : (r0, r1) => this.combat.inRadius(o.x, o.z, r1, 'ally', (e, d) => {
           if (hit.has(e) || d + (e.radius || 0.3) < r0) return;
           if (d > 0.6 && Math.abs(angleDiff(f, Math.atan2(e.pos.x - o.x, e.pos.z - o.z))) > cone / 2 + 0.1) return;
@@ -214,14 +221,15 @@ const M = {
           if (bad && isFoe(e)) { e.applyStatus?.('fear', bad.fear); this.vuln(e, bad.vuln, bad.fear); G.vfx.emote(e, 'sweat', 1.2); }
         }) }));
     };
-    this.playFrom('bark', { onEvent: ev => { if (ev !== 'bark') return; wave(1); if (echo) this.after(echo.delay, () => wave(echo.pct / 100)); } }, 0.22);
+    this.playFrom('kiai', { onEvent: ev => { if (ev !== 'bark') return; wave(1); if (echo) this.after(echo.delay, () => wave(echo.pct / 100)); } }, 0.22);
   },
   /** foes take +pct% damage for dur s (Big Bad Woof) */
   vuln(e, pct, dur) {
     const m = 1 + pct / 100; e.cursedMul = Math.max(e.cursedMul || 1, m);
     this.after(dur, () => { if (e.cursedMul === m) e.cursedMul = 1; });
   },
-  /** Zoomies Dash → Turbo Zoomies: a much longer dash that leaves a damaging zoom trail (+ Ping-Pong, Afterimage) */
+  /** Flash Draw → Lightning Draw: a much longer draw-dash whose cut lingers along the path, still cutting (+ Return
+   *  Stroke, Afterimage); the cut line flashes along the whole path when he sheathes at the end */
   charged_zoom(R, aim) {
     const G = this.G, P = G.player, p = R.params, pong = perkOf(R, 'pingpong'), img = perkOf(R, 'afterimage');
     const start = P.pos.clone();
@@ -229,15 +237,20 @@ const M = {
     this.cast_zoom(R, aim);
     const dir = P.dash?.dir.clone(); if (!dir) return;
     const pts = [P.pos.clone()], fx = chargeFx(G);
-    let rebound = !pong, endT = -1;
+    let rebound = !pong, endT = -1, far = null;
+    if (pong) P.dash.onEnd = () => { far = P.pos.clone(); }; // (Return Stroke: the flourish waits for the way back)
     const z = this.combat.addZone({ pos: start, life: 30, tick: 0.5,
       update: (dt, zz) => {
         if (P.dash) { const last = pts[pts.length - 1]; if (dist(last.x, last.z, P.pos.x, P.pos.z) > 0.4 && pts.length < 80) pts.push(P.pos.clone()); }
-        else if (!rebound) { rebound = true; P.dash = { dir: dir.clone().negate(), left: p.distance / 2, speed: p.speed, hit: new Set(), p }; P.anim.play('roll', { speed: 1.4 }); P.invuln = true; sfx('dash', { pitch: 1.2 }); }
+        else if (!rebound) {
+          rebound = true; const a = far || P.pos.clone();
+          P.dash = { dir: dir.clone().negate(), left: p.distance / 2, speed: p.speed, hit: new Set(), p, onEnd: () => this.flashEnd(a, () => bladeFx(G).cutLine(start, a)) };
+          P.anim.play('flashDraw', { speed: 0.3 / Math.max(0.12, p.distance / 2 / p.speed) }); P.invuln = true; sfx('dash', { pitch: 1.2 }); sfx('swing', { pitch: 1.35, vol: 0.6 });
+        }
         else if (endT < 0) { endT = zz.t; zz.life = zz.t + p.trail; }
-        // the zoom trail: a golden streak of sparkle along the path, fading out
+        // the lingering cut: bone-white glints and a red edge along the path, fading out
         const fade = endT < 0 ? 1 : Math.max(0, 1 - (zz.t - endT) / p.trail);
-        for (let i = fx.emit('zt', 40 * fade, dt); i > 0; i--) { const q = pts[(Math.random() * pts.length) | 0]; G.vfx.glow.spawn({ x: q.x + rand(-0.15, 0.15), y: 0.25, z: q.z + rand(-0.15, 0.15), vy: 0.4, life: 0.4, size: 0.5, size1: 0.1, color: R.charge.color, alpha: 0.55, alpha1: 0 }); if (Math.random() < 0.3) fx.pa.spawn({ frame: 2, x: q.x, y: 0.35, z: q.z, vy: 0.9, life: 0.4, size: 0.2, size1: 0.03, color: '#fff6d0', alpha: 1, alpha1: 0 }); }
+        for (let i = fx.emit('zt', 40 * fade, dt); i > 0; i--) { const q = pts[(Math.random() * pts.length) | 0], red = Math.random() < 0.35; G.vfx.glow.spawn({ x: q.x + rand(-0.15, 0.15), y: 0.3, z: q.z + rand(-0.15, 0.15), vy: 0.4, life: 0.4, size: 0.45, size1: 0.1, color: red ? SAMURAI.trailEdge : BONE_WHITE, alpha: red ? 0.4 : 0.5, alpha1: 0 }); if (Math.random() < 0.3) fx.pa.spawn({ frame: 2, x: q.x, y: 0.4, z: q.z, vy: 0.9, life: 0.4, size: 0.2, size1: 0.03, color: '#fff6e6', alpha: 1, alpha1: 0 }); }
       },
       onTick: () => {
         for (const e of this.combat.entities) {
@@ -261,7 +274,7 @@ const M = {
       this.nova(at, 2, e => this.combat.hitMonster(e, { dmgPct: p.dmgPct * img.pct / 100, knock: 1, from: at }));
     });
   },
-  /** Pack Call → Alpha Pup: one of the pups is a big, tough alpha (+ Pack Leader, Spirit Wolf) */
+  /** Pack Call → Shogun Pup: one of the pups is a big, tough shogun in a grand kabuto (+ Pack Leader, Spirit Wolf) */
   charged_packcall(R) {
     const G = this.G, P = G.player, p = R.params, s = R.charge.stage, lead = perkOf(R, 'packLeader'), wolf = perkOf(R, 'spiritWolf') && s >= 3;
     this.fromFrame(0.22, () => this.cast_packcall(R), ev => {
@@ -276,7 +289,7 @@ const M = {
       if (lead && G.companion) { G.companion.frenzyT = lead.t; G.vfx.emote(G.companion, 'anger', 1.2); G.vfx.sparkle(G.companion.pos.clone().setY(0.5), { n: 10, color: '#9fd8ff' }); }
     });
   },
-  /** Treat Toss → Big Biscuit: much more healing in a wider burst (+ Picnic, Treat Shower) */
+  /** Onigiri Toss → Giant Onigiri: much more healing in a wider burst (+ Hanami Picnic, Rice Ball Shower) */
   charged_treat(R, aim) {
     const G = this.G, P = G.player, p = R.params, s = R.charge.stage, pic = perkOf(R, 'picnic'), shower = perkOf(R, 'shower'), fx = chargeFx(G);
     const d = Math.min(p.range, dist(aim.x, aim.z, P.pos.x, P.pos.z));
@@ -289,9 +302,9 @@ const M = {
     };
     this.playFrom('throw', { speed: 1, onEvent: ev => {
       if (ev !== 'release') return;
-      const pr = this.combat.spawn({ team: 'ally', kind: 'bone', pos: this.handPos(), lob: { to, h: 2.6, time: 0.55 }, onEnd: () => {
-        G.vfx.heal(to); G.vfx.petals(to, 18); fx.burst(to, { r: p.radius, life: 0.5, color: C(R.charge.color), w: 0.12, a: 0.8 }); sfx('heal'); sfx('charge_release', { pitch: 1.3, vol: 0.6 });
-        for (let i = 0; i < 14; i++) { const a = rand(0, TAU), v = rand(1.5, 3.5); this.fx().pn.spawn({ frame: 6, x: to.x, y: to.y + 0.4, z: to.z, vx: Math.cos(a) * v, vy: rand(2, 4), vz: Math.sin(a) * v, life: 0.7, size: rand(0.14, 0.22), size1: 0.12, color: '#e8b070', alpha: 1, alpha1: 1, grav: 10, spin: rand(-8, 8) }); }
+      const pr = this.combat.spawn({ team: 'ally', kind: 'onigiri', pos: this.handPos(), lob: { to, h: 2.6, time: 0.55 }, onEnd: () => {
+        G.vfx.heal(to); G.vfx.petals(to, 8); fx.burst(to, { r: p.radius, life: 0.5, color: C(R.charge.color), w: 0.12, a: 0.8 }); sfx('heal'); sfx('charge_release', { pitch: 1.3, vol: 0.6 });
+        this.riceCrumbs(to, 22, 1.25);
         healAt(to, p.radius, 1);
         if (pic) { const dur = by(pic.dur, s), H = fx.picnic(to, pic.r, dur); const z = this.combat.addZone({ pos: to.clone(), radius: pic.r, life: dur, tick: 0.5, onTick: zz => {
           if (dist(P.pos.x, P.pos.z, zz.pos.x, zz.pos.z) < zz.radius) { const h = G.actions.heal(G.derived.lifeMax * pic.heal / 100 * 0.5); if (h > 0.5) G.ui?.float?.(P.pos.clone().setY(1.5), `+${Math.round(h)}`, { kind: 'heal' }); }
@@ -300,20 +313,20 @@ const M = {
         }, dispose: () => H.end() }); (this.chargeZones ||= []).push(z); }
         if (shower) for (let i = 0; i < shower.n; i++) {
           const a = i / shower.n * TAU + rand(-0.3, 0.3), r = rand(1.4, 3), at = this.ground(to.clone().add(_w.set(Math.cos(a) * r, 0, Math.sin(a) * r)));
-          const m = this.combat.spawn({ team: 'ally', kind: 'bone', pos: to.clone().setY(to.y + 0.5), lob: { to: at, h: 1.6, time: 0.45 + i * 0.03 }, onEnd: () => { G.vfx.sparkle(at.clone().setY(0.4), { n: 6, color: '#fff0b0' }); healAt(at, 1.2, shower.pct / 100); sfx('pickup_item', { vol: 0.35, pitch: 1.4 }); } });
+          const m = this.combat.spawn({ team: 'ally', kind: 'onigiri', pos: to.clone().setY(to.y + 0.5), lob: { to: at, h: 1.6, time: 0.45 + i * 0.03 }, onEnd: () => { G.vfx.sparkle(at.clone().setY(0.4), { n: 6, color: '#fff0b0' }); healAt(at, 1.2, shower.pct / 100); sfx('pickup_item', { vol: 0.35, pitch: 1.4 }); } });
           m.mesh.scale.setScalar(0.6);
         }
       } });
       pr.mesh.scale.setScalar(1.7 + 0.2 * s);
     } }, 0.36);
   },
-  /** Howl of the Pack → Rallying Howl: a longer, stronger rally with a wider fear (+ Second Wind, Moonlit Rally) */
+  /** War Banner Howl → Rallying Banner: a longer, stronger rally under a bigger banner, with a wider fear (+ Second Wind, Moonlit Rally) */
   charged_howl(R) {
     const G = this.G, P = G.player, p = R.params, s = R.charge.stage, wind = perkOf(R, 'secondWind'), moon = perkOf(R, 'moonlit');
     this.fromFrame(0.22, () => this.cast_howl(R), ev => {
       if (ev !== 'bark') return;
       chargeFx(G).burst(P.pos, { r: Math.min(p.radius, 5), life: 0.6, color: C(R.charge.color), w: 0.1, a: 0.8 }); // (the buff reaches further than the ring: a huge ring would band the whole screen)
-      for (let i = 0; i < 12 + 4 * s; i++) { const a = rand(0, TAU), r = rand(0.4, 1.2); this.fx().pn.spawn({ frame: 14, x: P.pos.x + Math.cos(a) * r, y: P.pos.y + rand(0.8, 1.6), z: P.pos.z + Math.sin(a) * r, vx: Math.cos(a) * 0.8, vy: rand(1, 2), vz: Math.sin(a) * 0.8, life: rand(0.9, 1.4), size: rand(0.24, 0.34), size1: 0.12, color: i % 2 ? '#ffb080' : '#fff0c0', alpha: 1, alpha1: 0, spin: rand(-2, 2) }); }
+      for (let i = 0; i < 12 + 4 * s; i++) { const a = rand(0, TAU), r = rand(0.4, 1.2); this.fx().pn.spawn({ frame: 1, x: P.pos.x + Math.cos(a) * r, y: P.pos.y + rand(0.8, 1.6), z: P.pos.z + Math.sin(a) * r, vx: Math.cos(a) * 0.8, vy: rand(1, 2), vz: Math.sin(a) * 0.8, life: rand(0.9, 1.4), size: rand(0.24, 0.34), size1: 0.12, color: i % 2 ? '#e8b84a' : '#fff6e0', alpha: 1, alpha1: 0, spin: rand(-2, 2) }); }
       if (wind) {
         const k = by(wind.heal, s) / 100, h = G.actions.heal(G.derived.lifeMax * k);
         if (h > 0) G.ui?.float?.(P.pos.clone().setY(1.6), `+${Math.round(h)}`, { kind: 'heal' }); G.vfx.heal(P.pos.clone());
@@ -322,7 +335,7 @@ const M = {
       if (moon) { this.combat.buffs.moonlit = { t: p.duration, speed: moon.speed }; G.ui?.toast?.(`Moonlit Rally! Charges fill ${Math.round((moon.speed - 1) * 100)}% faster`, { color: '#ffb080' }); }
     });
   },
-  /** Moon Howl → Moonfall: more moonbeams with wider strikes (+ Lunar Eclipse at Stage Ⅲ) */
+  /** Moonlit Blades → Moonfall: more moon blades with wider strikes (+ Lunar Eclipse at Stage Ⅲ) */
   charged_moonhowl(R, aim) {
     const G = this.G, P = G.player, p = R.params, s = R.charge.stage, ecl = perkOf(R, 'eclipse');
     this.fromFrame(0.22, () => this.cast_moonhowl(R, aim), ev => {

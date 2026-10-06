@@ -1,6 +1,8 @@
 // Monster entity: stats (rpg/stats), model + animation, and a small state-machine AI with telegraphed attacks.
 import * as THREE from 'three';
-import { MONSTERS, buildMonster, MonsterAnim } from './monsters.js';
+import { MONSTERS, MonsterAnim } from './monsters.js';
+import { hordeOf } from './horde.js';
+import { crowdOf, NOGRID, PAD } from './crowd.js';
 import { monsterStats, applyRandomMods, MONSTER_MODS } from '../rpg/stats.js';
 import { Animator } from '../actors/animator.js';
 import { makeOutline } from '../gfx/materials.js';
@@ -10,8 +12,10 @@ import { rand, randInt, clamp, TAU, dist, dampAngle, pick, chance } from '../cor
 export const KIND_MAP = { mochi: 'mochi', dustbunny: 'dust', kinoko: 'kinoko', lantern: 'lantern', kasa: 'kasa', wisp: 'kitsune', oni: 'oni', tanuki: 'tanuki', mochiKing: 'mochi', kasaLord: 'kasa', oniChef: 'oni', nineTails: 'kitsune' };
 const UNIQUE_A = ['Squishy', 'Grumpy', 'Sneaky', 'Wobbly', 'Fluffmaw', 'Bitter', 'Sticky', 'Gloomy', 'Crunchy', 'Soggy', 'Rascal', 'Snoot'];
 const UNIQUE_B = ['the Sticky', 'Nibblebane', 'the Crumb-Snatcher', 'Toebiter', 'the Loud', 'Crumbclaw', 'the Sleepy', 'Sockthief', 'the Unpettable', 'Pillowhog', 'the Snack Bandit', 'Grumblepaw'];
-const _p = new THREE.Vector3();
+const _p = new THREE.Vector3(), _p0 = new THREE.Vector3(), _dir = new THREE.Vector3(), _dir2 = new THREE.Vector3(); // (temps: the AI's per-frame directions allocate nothing)
 const PLAYER_VR = 0.36; // Chewy's visual body radius (his collision radius is 0.3)
+/** collision sub-steps for a move of `len` m by a body of radius r (1 unless the step is longer than the radius) */
+const subSteps = (len, r) => (len > r && r > 0 ? Math.min(8, Math.ceil(len / r)) : 1);
 // big-body hit tints: warm and saturated so they add little luminance (≈ 0.08 at amp 0.2) — pale bosses sit near the bloom threshold
 const SOFT_TINT = new THREE.Color('#ff8a7a'), SOFT_CRIT = new THREE.Color('#ffc070');
 // Boss telegraph colours, picked against each arena's sigil (burrow pink, shrine gold, kitchen orange, sanctum blue):
@@ -41,11 +45,8 @@ function ringMat(color, ringA) {
   RING_MATS.set(key, m);
   return m;
 }
-function contactRing(r, color = '#2a1830', ringA = 0.32) {
-  const g = new THREE.PlaneGeometry(r * 2, r * 2); g.rotateX(-Math.PI / 2);
-  const m = new THREE.Mesh(g, ringMat(color, ringA)); m.position.y = 0.025; m.renderOrder = 1;
-  return m;
-}
+// (one instanced batch for every ring of the floor: dungeon/horde.js; ?noinst gives each its own plane mesh again)
+function contactRing(H, r, color = '#2a1830', ringA = 0.32) { return H.ring(r, ringMat(color, ringA)); }
 
 export class Monster {
   constructor(mode, id, { level = 1, rank = 'normal', variant = 0, x, z, leader = null, rng = Math.random } = {}) {
@@ -63,7 +64,8 @@ export class Monster {
     this.name = def.boss ? def.name : rank === 'unique' ? `${pick(UNIQUE_A)} ${pick(UNIQUE_B)}` : rank === 'champion' ? `Champion ${v.name || def.name}` : (v.name || def.name);
     const scale = (def.scale || 1) * (rank === 'champion' ? 1.15 : rank === 'unique' ? 1.3 : 1);
     this.scale = scale;
-    this.model = buildMonster(id, variant);
+    const H = hordeOf(mode); // (the model cache, the instanced batches and the rig pool: dungeon/horde.js)
+    this.model = H.build(id, variant);
     if (!this.model.rig) this.def = { ...def, scale }; else this.model.root.scale.setScalar(scale);
     this.anim = new MonsterAnim(this.model, { ...def, scale });
     this.kit = this.model.rig ? new Animator(this.model.rig) : null;
@@ -82,8 +84,9 @@ export class Monster {
     // elite visuals
     const elite = rank === 'champion' || rank === 'unique' || def.boss;
     const eCol = def.boss ? (def.light || '#ff4a6a') : rank === 'unique' ? '#ffb030' : '#6aa8ff';
-    this.shadow = contactRing(this.bodyR * 1.3, elite ? eCol : '#2a1830', elite ? 0.7 : 0.32);
-    this.world.scene.add(this.model.root, this.shadow);
+    this.shadow = contactRing(H, this.bodyR * 1.3, elite ? eCol : '#2a1830', elite ? 0.7 : 0.32);
+    this.model._sc = scale; // (its culling sphere's scale)
+    H.place(this.model);
     if (elite) {
       // champions / uniques get the D2-style coloured contour; bosses keep a crisp ink one (at 2-3x scale a coloured hull turns their brows & eyes pink)
       if (this.model.outline) { this.model.outline.material = def.boss ? makeOutline('#2a1622', 0.014) : makeOutline(eCol, 0.02); }
@@ -107,6 +110,7 @@ export class Monster {
     r.rotation.y = this.facing;
     this.shadow.position.set(this.pos.x, gy + 0.025, this.pos.z);
     if (this.light) this.light.pos.set(this.pos.x + Math.sin(this.facing) * 1.5, gy + 3.6, this.pos.z + Math.cos(this.facing) * 1.5);
+    if (!NOGRID && this.alive) { crowdOf(this.mode).move(this); this.mode.combat?.moved?.(this); } // (the crowd grids: crowd.js, combat.js)
   }
   /** A point `k` m above the ground under this monster (VFX / projectile origins). */
   lift(k) { return new THREE.Vector3(this.pos.x, this.pos.y + k, this.pos.z); }
@@ -116,7 +120,7 @@ export class Monster {
     this.life -= dmg;
     if (this.big) {
       // bosses / elites: a gentle warm tint (0.2, ~70 ms) that stays under the bloom threshold; at most ~4 blinks a second
-      // so a stream of hits (Tail Spin, Bone Storm, pups) flickers instead of holding the body lit
+      // so a stream of hits (Whirlwind Stance, Sakura Storm, pups) flickers instead of holding the body lit
       const tint = crit ? SOFT_CRIT : SOFT_TINT;
       if (this.anim.hit(tint, { amp: 0.2, dur: 0.07, gap: 0.22 }) && this.kit) {
         this.kit.hit(); this.kit.flash = 0.5; this.kit.flashColor.copy(tint).multiplyScalar(1.45); // Animator: emissive = c * flash² * 0.55 → 0.2
@@ -144,7 +148,10 @@ export class Monster {
     if (this.def.boss && !this.introDone) { this.introDone = true; this.mode.bossIntro?.(this); }
     this.aggro = true;
     if (this.state === 'idle') { this.emote('!', 0.9); }
-    for (const m of this.mode.monsters) if (m !== this && m.alive && !m.aggro && dist(m.pos.x, m.pos.z, this.pos.x, this.pos.z) < 7) { m.aggro = true; }
+    if (NOGRID) { for (const m of this.mode.monsters) if (m !== this && m.alive && !m.aggro && dist(m.pos.x, m.pos.z, this.pos.x, this.pos.z) < 7) { m.aggro = true; } return; }
+    const g = crowdOf(this.mode), near = g.near(this.pos.x, this.pos.z, 7 + PAD); // (the floor's monster grid: crowd.js)
+    for (let i = 0; i < near.length; i++) { const m = near[i]; if (m !== this && m.alive && !m.aggro && dist(m.pos.x, m.pos.z, this.pos.x, this.pos.z) < 7) { m.aggro = true; } }
+    g.release();
   }
   cancelAttack() { this.state = 'chase'; this.anim.wind = 0; this.anim.spin = 0; if (this.telegraph) { this.telegraph.t = 999; this.telegraph = null; } }
   die() {
@@ -184,15 +191,22 @@ export class Monster {
     if (delay > 0) setTimeout(go, delay * 1000); else go();
   }
   dispose() {
-    this.world.scene.remove(this.model.root, this.shadow);
-    this.model.root.traverse(o => { if (o.isMesh) { o.geometry?.dispose(); } });
-    this.model.rig?.skeleton?.dispose();
-    this.shadow.geometry?.dispose();
+    const H = this.mode._horde;
+    if (H && !H.disposed) H.dropRing(this.shadow); else this.world.scene.remove(this.shadow);
+    // a pooled rig goes back to the Horde for the next spawn of its kind; cached geometry is shared, never freed here
+    if (!(H && !H.disposed && H.recycle(this.model))) {
+      this.world.scene.remove(this.model.root);
+      this.model.root.traverse(o => { if (o.isMesh && !o.geometry?.userData?.shared) { o.geometry?.dispose(); } });
+      this.model.rig?.skeleton?.dispose();
+    }
+    if (!this.shadow.geometry?.userData?.shared) this.shadow.geometry?.dispose();
     if (this.light) { this.world.lightPool.removeSource(this.light); this.light = null; }
+    crowdOf(this.mode).remove(this);
     this.disposed = true;
   }
   // ------------------------------------------------------------------ AI
   update(dt) {
+    this.model._uf = (this.model._uf || 0) + 1; // (its pose may change: the Horde recomputes its matrices)
     if (!this.alive) { this.anim.update(dt, false, 0); this.shadow.scale.setScalar(Math.max(0.01, 1 - clamp(this.anim.deathT / 0.45))); return; }
     this.separate(dt);
     const G = this.G, P = G.player, st = this.status;
@@ -200,8 +214,10 @@ export class Monster {
     let moving = false;
     // knockback slide
     if (this.knock.lengthSq() > 0.001) {
-      _p.copy(this.pos); this.pos.addScaledVector(this.knock, dt); this.knock.multiplyScalar(Math.exp(-9 * dt));
-      this.world.collision.resolve(this.pos, this.radius, _p);
+      // (sub-stepped like move(): a hard shove on a long frame can't carry the body through a pillar)
+      const n = subSteps(this.knock.length() * dt, this.radius);
+      for (let i = 0; i < n; i++) { _p.copy(this.pos); this.pos.addScaledVector(this.knock, dt / n); this.world.collision.resolve(this.pos, this.radius, _p); }
+      this.knock.multiplyScalar(Math.exp(-9 * dt));
     }
     const stunned = st.stun > 0 || st.freeze > 0;
     const target = this.pickTarget();
@@ -211,7 +227,7 @@ export class Monster {
       const d = dist(tx, tz, this.pos.x, this.pos.z);
       if (!this.aggro && d < 9 && this.mode.los(this.pos, target.pos)) this.alert();
       if (st.fear > 0) { // run away
-        const away = this.pos.clone().sub(target.pos).setY(0).normalize();
+        const away = _dir.copy(this.pos).sub(target.pos).setY(0).normalize();
         this.move(away, dt, 1.1 * slowMul); moving = true;
       } else if (this.aggro) {
         const A = this.def.attack;
@@ -226,7 +242,7 @@ export class Monster {
           const inRange = d < (A.type === 'ranged' || A.type === 'barrage' ? A.range : A.range + target.radius);
           if (inRange && this.cd <= 0 && this.mode.los(this.pos, target.pos)) this.startAttack(target, d);
           else if (d > want || !this.mode.los(this.pos, target.pos)) { this.chase(target, dt, slowMul); moving = true; }
-          else if ((A.type === 'ranged' || A.type === 'barrage') && d < A.range * 0.4 && !this.def.noKite) { this.move(this.pos.clone().sub(target.pos).setY(0).normalize(), dt, 0.7 * slowMul); moving = true; }
+          else if ((A.type === 'ranged' || A.type === 'barrage') && d < A.range * 0.4 && !this.def.noKite) { this.move(_dir.copy(this.pos).sub(target.pos).setY(0).normalize(), dt, 0.7 * slowMul); moving = true; }
           else this.faceTo(tx, tz, dt);
           // teleporting elites
           if (this.stats.teleport && this.stateT > this.stats.teleport && d > 3) { this.blink(target); }
@@ -238,9 +254,9 @@ export class Monster {
         }
       } else if (!this.leader) { // idle wander
         if (!this.wander || this.stateT > 4) { this.wander = this.pos.clone().add(new THREE.Vector3(rand(-3, 3), 0, rand(-3, 3))); this.stateT = 0; }
-        if (dist(this.wander.x, this.wander.z, this.pos.x, this.pos.z) > 0.3 && this.stateT < 2.5) { this.move(this.wander.clone().sub(this.pos).setY(0).normalize(), dt, 0.35); moving = true; }
+        if (dist(this.wander.x, this.wander.z, this.pos.x, this.pos.z) > 0.3 && this.stateT < 2.5) { this.move(_dir.copy(this.wander).sub(this.pos).setY(0).normalize(), dt, 0.35); moving = true; }
       } else if (this.leader.alive && dist(this.leader.pos.x, this.leader.pos.z, this.pos.x, this.pos.z) > 2.5) {
-        this.move(this.leader.pos.clone().sub(this.pos).setY(0).normalize(), dt, 0.5); moving = true;
+        this.move(_dir.copy(this.leader.pos).sub(this.pos).setY(0).normalize(), dt, 0.5); moving = true;
       }
     }
     // frost aura
@@ -264,8 +280,10 @@ export class Monster {
     if (this.def.boss) return; // bosses are never shoved (move() stops them walking into Chewy instead)
     if (!this.aggro && P && (this.pos.x - P.pos.x) ** 2 + (this.pos.z - P.pos.z) ** 2 > 900) return; // idle & off-screen: nothing to untangle
     let px = 0, pz = 0;
-    const R = this.bodyR;
-    for (const m of this.mode.monsters) {
+    const R = this.bodyR, g = NOGRID ? null : crowdOf(this.mode);
+    const list = g ? g.near(this.pos.x, this.pos.z, (R + g.maxR) * 1.02 + PAD) : this.mode.monsters; // (neighbours only: crowd.js)
+    for (let i = 0; i < list.length; i++) {
+      const m = list[i];
       if (m === this || !m.alive) continue;
       const dx = this.pos.x - m.pos.x, dz = this.pos.z - m.pos.z, mn = (R + m.bodyR) * 1.02;
       if (dx > mn || dx < -mn || dz > mn || dz < -mn) continue;
@@ -275,6 +293,7 @@ export class Monster {
       const share = m.def.boss ? 1 : 0.5;
       px += nx * (mn - d) * share; pz += nz * (mn - d) * share;
     }
+    g?.release();
     const keepOff = (e, er) => {
       const dx = this.pos.x - e.pos.x, dz = this.pos.z - e.pos.z, mn = R + er, d2 = dx * dx + dz * dz;
       if (d2 >= mn * mn) return;
@@ -282,7 +301,7 @@ export class Monster {
       px += dx / d * (mn - d); pz += dz / d * (mn - d);
     };
     if (P && !G.playerDead) keepOff(P, PLAYER_VR);
-    for (const e of this.mode.combat?.entities || []) if (e.team === 'ally' && e.alive && e !== P && e.pos && !e.untargetable) keepOff(e, Math.max(0.3, e.radius || 0.3));
+    for (const e of this.mode.combat?.allies || this.mode.combat?.entities || []) if (e.team === 'ally' && e.alive && e !== P && e.pos && !e.untargetable) keepOff(e, Math.max(0.3, e.radius || 0.3));
     const L = Math.hypot(px, pz);
     if (L < 1e-5) return;
     const k = Math.min(1, Math.max(0.05, dt * 10) / L);
@@ -290,8 +309,8 @@ export class Monster {
     this.world.collision.resolve(this.pos, this.radius * 0.8, _p);
   }
   pickTarget() {
-    const G = this.G; let best = G.playerDead ? null : G.player, bd = best ? dist(best.pos.x, best.pos.z, this.pos.x, this.pos.z) : 1e9;
-    for (const e of this.mode.combat.entities) {
+    const G = this.G; let best = G.playerDead || G.player?.hidden ? null : G.player, bd = best ? dist(best.pos.x, best.pos.z, this.pos.x, this.pos.z) : 1e9; // (hidden: Poe in her smoke / Vanish — they lose her)
+    for (const e of this.mode.combat.allies || this.mode.combat.entities) { // (the allies set holds the entities' allies in the same order)
       if (!e.alive || e.team !== 'ally' || e.untargetable) continue;
       const d = dist(e.pos.x, e.pos.z, this.pos.x, this.pos.z) - (e.tauntFor ? e.tauntFor(this) : e.taunt ? 6 : 0); // (Moka's Decoy Duck: tauntFor = must-bite within its lure)
       if (d < bd - 1) { bd = d; best = e; }
@@ -300,35 +319,45 @@ export class Monster {
   }
   faceTo(x, z, dt) { this.facing = dampAngle(this.facing, Math.atan2(x - this.pos.x, z - this.pos.z), 10, dt); }
   move(dir, dt, mul = 1) {
-    _p.copy(this.pos);
-    this.pos.x += dir.x * this.speed * mul * dt; this.pos.z += dir.z * this.speed * mul * dt;
-    this.world.collision.resolve(this.pos, this.radius * 0.8, _p); // bodies are kept apart in separate()
+    _p0.copy(this.pos);
+    // fast movers (dashes, charges, long frames) take sub-steps no longer than their collision radius, each resolved,
+    // so they can't tunnel through a pillar or a thin wall; at normal frame rates every move is one step, as before
+    const r = this.radius * 0.8, sx = dir.x * this.speed * mul * dt, sz = dir.z * this.speed * mul * dt, n = subSteps(Math.hypot(sx, sz), r);
+    for (let i = 0; i < n; i++) {
+      _p.copy(this.pos);
+      this.pos.x += sx / n; this.pos.z += sz / n;
+      this.world.collision.resolve(this.pos, r, _p); // bodies are kept apart in separate()
+    }
     const P = this.G.player;
     if (this.def.boss && P && !this.G.playerDead) { // a boss never steps into Chewy (it isn't pushed either)
       const mn = this.bodyR + PLAYER_VR, d1 = (this.pos.x - P.pos.x) ** 2 + (this.pos.z - P.pos.z) ** 2;
-      if (d1 < mn * mn && d1 < (_p.x - P.pos.x) ** 2 + (_p.z - P.pos.z) ** 2) { this.pos.x = _p.x; this.pos.z = _p.z; }
+      if (d1 < mn * mn && d1 < (_p0.x - P.pos.x) ** 2 + (_p0.z - P.pos.z) ** 2) { this.pos.x = _p0.x; this.pos.z = _p0.z; }
     }
     this.facing = dampAngle(this.facing, Math.atan2(dir.x, dir.z), 10, dt);
   }
   chase(target, dt, mul) {
     let dir;
-    if (this.mode.los(this.pos, target.pos)) dir = target.pos.clone().sub(this.pos).setY(0).normalize();
-    else dir = this.mode.flowDir(this.pos) || target.pos.clone().sub(this.pos).setY(0).normalize();
+    if (this.mode.los(this.pos, target.pos)) dir = _dir.copy(target.pos).sub(this.pos).setY(0).normalize();
+    else dir = this.mode.flowDir(this.pos, _dir) || _dir.copy(target.pos).sub(this.pos).setY(0).normalize();
     // surround instead of stacking: when a pack-mate already blocks the way in, slide around it (each monster keeps
     // its own side) so the pack fans out into a ring of readable bodies rather than a pile behind the front row
     if (!this.def.boss) {
       const dT = dist(target.pos.x, target.pos.z, this.pos.x, this.pos.z);
       if (dT < 4) {
-        for (const m of this.mode.monsters) {
+        const g = NOGRID ? null : crowdOf(this.mode);
+        const list = g ? g.near(this.pos.x, this.pos.z, (this.bodyR + g.maxR) * 1.2 + PAD) : this.mode.monsters;
+        for (let i = 0; i < list.length; i++) { // (whichever blocker comes first, the turn is the same)
+          const m = list[i];
           if (m === this || !m.alive) continue;
           const dx = m.pos.x - this.pos.x, dz = m.pos.z - this.pos.z, mn = (this.bodyR + m.bodyR) * 1.2;
           if (dx * dx + dz * dz > mn * mn || dx * dir.x + dz * dir.z <= 0) continue;
           const side = this.side ??= (Math.random() < 0.5 ? -1 : 1), a = side * 1.1;
           const c = Math.cos(a), s = Math.sin(a);
-          dir = new THREE.Vector3(dir.x * c - dir.z * s, 0, dir.x * s + dir.z * c);
+          dir = _dir2.set(dir.x * c - dir.z * s, 0, dir.x * s + dir.z * c);
           mul *= 0.7;
           break;
         }
+        g?.release();
       }
     }
     this.move(dir, dt, mul);
@@ -509,7 +538,7 @@ export class Monster {
     }
     if (A.type === 'spin' && this.spinT > 0) {
       this.spinT -= dt;
-      this.move(target.pos.clone().sub(this.pos).setY(0).normalize(), dt, 0.6);
+      this.move(_dir.copy(target.pos).sub(this.pos).setY(0).normalize(), dt, 0.6);
       this.spinAcc = (this.spinAcc || 0) + dt;
       if (this.spinAcc > 0.3) { this.spinAcc = 0; G.vfx.slash(this.pos, this.facing + rand(0, TAU), { color: '#ffd0e0', arc: 3, r: A.radius * 0.8, life: 0.25 }); if (dist(target.pos.x, target.pos.z, this.pos.x, this.pos.z) < A.radius) this.dealTo(target, Math.round(roll() * 0.5), this.stats.element); }
       if (this.spinT <= 0) this.anim.spin = 0;
@@ -526,6 +555,8 @@ export class Monster {
     return false;
   }
   dealTo(target, raw, element, knockMul = 1) {
+    // blinded (Poe's smoke): a share of its blows go wide
+    if (this.status.blind > 0 && Math.random() < (this.status.blindMiss || 0.4)) { this.G.ui?.float?.(target.pos.clone().setY(target.pos.y + 1.4), 'Miss!', { kind: 'status', color: '#ddd4ee' }); return; }
     const C = this.mode.combat;
     if (target === this.G.player) C.hitPlayer(raw, { element, level: this.level, from: this.pos, knock: (this.stats.knockback || 0.4) * knockMul, onHit: this.stats.onHit, src: this });
     else C.hitAlly(target, raw, { element, from: this.pos });

@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import { clamp, lerp, ease, TAU, damp } from '../core/util.js';
 import { LIFE_ACTIONS } from './lifePoses.js';
 import { CHARGE_ACTIONS } from './chargePoses.js';
+import { SAMURAI_ACTIONS, SAMURAI_OVERRIDES, SAMURAI_FLOURISH } from './samuraiPoses.js';
+import { POE_ACTIONS } from './poePoses.js';
 
 // action library: dur (s), events {name: t01}, pose(t01, P, A) applies additive offsets
 const ACTIONS = {
@@ -40,7 +42,8 @@ const ACTIONS = {
     A.head.x += (-0.35 * a + 0.45 * clamp((t - 0.22) / 0.1)) * (1 - b); A.body.x += 0.15 * a * (1 - b);
     A.mouth = Math.max(A.mouth, clamp((t - 0.2) / 0.08) * (1 - b));
     A.sq += (0.08 * a - 0.14 * clamp((t - 0.25) / 0.08)) * (1 - b);
-    A.armR.x += -0.6 * a * (1 - b); A.armL.x += -0.6 * a * (1 - b); A.armR.z += 0.5 * a * (1 - b); A.armL.z += -0.5 * a * (1 - b);
+    const tk = 0.5 * (P.anim?.barkTuck ?? 1); // (the inward tuck: the samurai halves it, keeping the paws out of his saya and haori fronts)
+    A.armR.x += -0.6 * a * (1 - b); A.armL.x += -0.6 * a * (1 - b); A.armR.z += tk * a * (1 - b); A.armL.z += -tk * a * (1 - b);
     A.earKick += 3 * clamp((t - 0.25) / 0.05) * (1 - b);
   } },
   slam: { dur: 0.8, ev: { impact: 0.62 }, pose: (t, P, A) => {
@@ -60,7 +63,7 @@ const ACTIONS = {
   pickup: { dur: 0.45, ev: { grab: 0.4 }, pose: (t, P, A) => { const k = Math.sin(clamp(t) * Math.PI); A.body.x += 0.6 * k; A.armR.x += -1.2 * k; A.armL.x += -1.2 * k; A.sq += 0.1 * k; A.y += -0.06 * k; } },
   drink: { dur: 0.7, pose: (t, P, A) => { const k = Math.sin(clamp(t) * Math.PI); A.armR.x += -2.2 * k; A.armR.z += 0.6 * k; A.head.x += -0.35 * k; A.eyesHappy = k > 0.5 ? 1 : 0; } },
   dig: { dur: 0.9, pose: (t, P, A) => { const s = Math.sin(t * 26); A.body.x += 0.55; A.armR.x += -1.2 + s * 0.7; A.armL.x += -1.2 - s * 0.7; A.sq += 0.06; A.tailWag = 2.5; } },
-  sit: { dur: 99, hold: true, pose: (t, P, A) => { if (P.legs) return; /* quadrupeds sit in poseQuad */ const k = ease.outQuad(clamp(t / 0.3)); A.y += -0.12 * k; A.legL.x += -1.4 * k; A.legR.x += -1.4 * k; A.sq += 0.04 * k; } },
+  sit: { dur: 99, hold: true, pose: (t, P, A) => { if (P.legs) return; /* quadrupeds sit in poseQuad */ const k = ease.outQuad(clamp(t / 0.3)), th = P.anim?.sitThigh ?? -1.4; A.y += -0.12 * k; A.legL.x += th * k; A.legR.x += th * k; A.sq += 0.04 * k; } }, // (sitThigh: the samurai's hakama hems flare at −1.4)
   spin: { dur: 99, hold: true, pose: (t, P, A) => { A.spin = t * 16; A.armR.z += 1.4; A.armL.z += -1.4; A.armR.x += -0.2; } },
 
   // ---- Moka's staff casts (staff in handR; mokaSpells points the staff through each one, see STAFF there)
@@ -161,9 +164,26 @@ const ACTIONS = {
 for (const k in LIFE_ACTIONS) if (!ACTIONS[k]) ACTIONS[k] = LIFE_ACTIONS[k];
 // charged abilities' wind-up poses (combat/charge.js writes a.style / a.k / a.pulse / a.full onto the action)
 for (const k in CHARGE_ACTIONS) if (!ACTIONS[k]) ACTIONS[k] = CHARGE_ACTIONS[k];
+// Chewy's samurai cuts, draws, stances and battle cries (samuraiPoses.js)
+for (const k in SAMURAI_ACTIONS) if (!ACTIONS[k]) ACTIONS[k] = SAMURAI_ACTIONS[k];
+Object.assign(ACTIONS, SAMURAI_OVERRIDES); // ('spin', 'slam': only Chewy's Whirlwind Stance / Helmet Splitter play them)
+// Poe's fūma slashes, throw and catch, hand seal, Shadow Step and sneeze (poePoses.js, docs/POE.md)
+for (const k in POE_ACTIONS) if (!ACTIONS[k]) ACTIONS[k] = POE_ACTIONS[k];
 export { ACTIONS };
 
 const zero = () => ({ x: 0, y: 0, z: 0 });
+// The pose accumulator every action writes into: one per Animator, cleared each frame (no per-frame garbage).
+// foreL/R, wristL/R: forearm and wrist bends (rigs that have those bones: the baked heroes); blade: the held prop's
+// turn in the paw (Player.carrySword); bladeDir / bladeEdge (x forward, y up, z his left, in the hero's frame) with weight
+// bladeW: point the katana that way instead (samuraiPoses.js); twoHand 0..1: the free paw joins the sword hilt
+// (actors/armIK.js); armLock 0..1 holds the arms out of the walk swing (a two-handed guard while walking)
+const LIMBS = ['body', 'head', 'armR', 'armL', 'legL', 'legR', 'foreR', 'foreL', 'wristR', 'wristL', 'blade', 'bladeDir', 'bladeEdge'];
+const SCALARS = ['y', 'sq', 'lean', 'mouth', 'earKick', 'roll', 'spin', 'eyesClosed', 'eyesHappy', 'happy', 'tailWag', 'flinch', 'twoHand', 'armLock', 'bladeW'];
+function newPose() { const A = {}; for (const k of LIMBS) A[k] = zero(); for (const k of SCALARS) A[k] = 0; return A; }
+// (every field, so a pose that writes a new one of its own is cleared too: numbers to 0, {x, y, z} limbs to zero)
+function clearPose(A) {
+  for (const k in A) { const v = A[k]; if (v !== null && typeof v === 'object') { v.x = 0; v.y = 0; v.z = 0; if (v.zWave) v.zWave = 0; } else A[k] = 0; }
+}
 
 export class Animator {
   constructor(rig) {
@@ -191,7 +211,7 @@ export class Animator {
     this.action = { name, def, t: 0, dur: def.dur / speed, fired: new Set(), onEvent };
   }
   stop(name) { if (!name || this.action?.name === name) this.action = null; }
-  busy() { return !!this.action && !this.action.def.hold && !['hurt', 'drink', 'wave', 'happy', 'pickup'].includes(this.action.name); }
+  busy() { return !!this.action && !this.action.def.hold && !['hurt', 'drink', 'wave', 'happy', 'pickup'].includes(this.action.name) && !SAMURAI_FLOURISH.has(this.action.name); }
   hit(color = '#ffffff') { if (this.t - (this.lastHit ?? -9) < 0.35) return; this.lastHit = this.t; this.flash = 1; this.flashColor.set(color); }
   update(dt, worldPos) {
     this.t += dt;
@@ -203,10 +223,15 @@ export class Animator {
     this.speed = damp(this.speed, spd, 12, dt);
     this.move = clamp(this.speed / 2.2);
     this.runAmt = clamp((this.speed - 3.2) / 2.5);
-    const stride = this.quad ? 0.36 : 0.62 + this.runAmt * 0.25;
+    // the sprint (the owner sets this.sprint 0..1: Player, sprint.js): past the run blend's 5.7 m/s ceiling the stride keeps
+    // lengthening with the speed, so the feet keep the run's cadence instead of spinning faster. Quadrupeds stretch into
+    // a gallop the same way above 4.5 m/s (Shadow pacing a sprinting hero).
+    this.sprintAmt = damp(this.sprintAmt || 0, (this.sprint || 0) * clamp((this.speed - 3) / 2.5), 10, dt);
+    this.gallop = this.quad ? clamp((this.speed - 4.5) / 4) : 0;
+    const stride = this.quad ? 0.36 + this.gallop * 0.3 : 0.62 + this.runAmt * 0.25 + this.sprintAmt * 0.22;
     this.phase += (this.speed / stride) * dt * Math.PI;
     // action timing
-    const A = { body: zero(), head: zero(), armR: zero(), armL: zero(), legL: zero(), legR: zero(), y: 0, sq: 0, lean: 0, mouth: 0, earKick: 0, roll: 0, spin: 0, eyesClosed: 0, eyesHappy: 0, happy: 0, tailWag: 0, flinch: 0 };
+    const A = this.A || (this.A = newPose()); clearPose(A);
     if (this.action) {
       const a = this.action; a.t += dt;
       const u = a.def.hold ? a.t : clamp(a.t / a.dur);
@@ -252,28 +277,36 @@ export class Animator {
   _set(o, rx, ry, rz) { const r = this.rest.get(o); o.rotation.set(r.r.x + rx, r.r.y + ry, r.r.z + rz); }
   poseBiped(dt, A) {
     const P = this.P, mv = this.move, run = this.runAmt, ph = this.phase, t = this.t;
+    const sp = this.sprintAmt || 0; // the sprint run: a deeper lean, a longer stride, pumping arms (see update)
     const swing = Math.sin(ph), bob = Math.abs(Math.sin(ph));
-    const legAmp = (0.62 + run * 0.35) * mv;
-    this._set(P.legL, swing * legAmp + A.legL.x, 0, 0);
-    this._set(P.legR, -swing * legAmp + A.legR.x, 0, 0);
+    const legAmp = (0.62 + run * 0.35 + sp * 0.24) * mv;
+    this._set(P.legL, swing * legAmp + A.legL.x, A.legL.y, A.legL.z); // (z: a wide stance, + spreads the left leg out)
+    this._set(P.legR, -swing * legAmp + A.legR.x, A.legR.y, A.legR.z);
     // arms
-    const armAmp = (0.55 + run * 0.4) * mv;
+    const lock = 1 - A.armLock, armAmp = (0.55 + run * 0.4 + sp * 0.3) * mv * lock;
     const idleArm = Math.sin(t * 1.8) * 0.04 * (1 - mv);
-    this._set(P.armL, -swing * armAmp + A.armL.x + idleArm, 0, 0.12 + 0.12 * run + A.armL.z);
-    this._set(P.armR, swing * armAmp + A.armR.x - idleArm, 0, -0.12 - 0.12 * run + A.armR.z + (A.armR.zWave || 0));
+    this._set(P.armL, -swing * armAmp + A.armL.x + idleArm, A.armL.y, 0.12 + 0.12 * run + A.armL.z);
+    this._set(P.armR, swing * armAmp + A.armR.x - idleArm, A.armR.y, -0.12 - 0.12 * run + A.armR.z + (A.armR.zWave || 0));
+    // elbows and wrists (baked heroes have the bones; at rest they sit at their bind pose). Sprinting bends the elbows.
+    const elbow = -0.75 * sp * mv * lock;
+    if (P.foreL) this._set(P.foreL, A.foreL.x + elbow, A.foreL.y, A.foreL.z);
+    if (P.foreR) this._set(P.foreR, A.foreR.x + elbow, A.foreR.y, A.foreR.z);
+    if (P.wristL) this._set(P.wristL, A.wristL.x, A.wristL.y, A.wristL.z);
+    if (P.wristR) this._set(P.wristR, A.wristR.x, A.wristR.y, A.wristR.z);
+    this.twoHand = A.twoHand;
     // body
     const rb = this.rest.get(P.body);
     const breathe = Math.sin(t * 2.3) * 0.014 * (1 - mv);
-    P.body.position.y = rb.p.y + bob * (0.04 + run * 0.05) * mv + A.y * 0 ;
-    P.body.rotation.set(rb.r.x + (0.1 + run * 0.16) * mv + A.body.x + A.lean + (A.roll || 0), rb.r.y + A.body.y + (A.spin || 0), rb.r.z + Math.sin(ph) * 0.05 * mv + A.body.z);
+    P.body.position.y = rb.p.y + bob * (0.04 + run * 0.05 + sp * 0.025) * mv + A.y * 0 ;
+    P.body.rotation.set(rb.r.x + (0.1 + run * 0.16 + sp * 0.22) * mv + A.body.x + A.lean + (A.roll || 0), rb.r.y + A.body.y + (A.spin || 0), rb.r.z + Math.sin(ph) * 0.05 * mv + A.body.z);
     // squash & stretch on root
-    const sq = A.sq + breathe - bob * 0.03 * mv * (1 + run);
+    const sq = A.sq + breathe - bob * 0.03 * mv * (1 + run + sp);
     const root = this.rig.root, sc = this.rig.spec.scale || 1;
     root.scale.set(sc * (1 + sq * 0.5), sc * (1 - sq), sc * (1 + sq * 0.5));
     this.rig.offsetY = A.y + (A.roll ? 0 : 0);
     // head
     const lookY = Math.sin(t * 0.37) * 0.18 * (1 - mv) * (1 - this.talk * 0.5);
-    this._set(P.head, -0.05 * mv + Math.sin(ph * 2) * 0.03 * mv + A.head.x + (this.talk ? Math.sin(t * 9) * 0.04 : 0), lookY + A.head.y, Math.sin(t * 0.71) * 0.05 * (1 - mv) + A.head.z);
+    this._set(P.head, (-0.05 - sp * 0.08) * mv + Math.sin(ph * 2) * 0.03 * mv + A.head.x + (this.talk ? Math.sin(t * 9) * 0.04 : 0), lookY + A.head.y, Math.sin(t * 0.71) * 0.05 * (1 - mv) + A.head.z); // (sprinting: the head lifts against the lean, eyes ahead)
     // ears: springs driven by bob velocity and forward speed
     this.secondary(dt, A, bob, mv);
     // tail wag
@@ -284,8 +317,8 @@ export class Animator {
     }
   }
   poseQuad(dt, A) {
-    const P = this.P, mv = this.move, ph = this.phase, t = this.t;
-    const amp = 0.75 * mv;
+    const P = this.P, mv = this.move, ph = this.phase, t = this.t, gal = this.gallop || 0;
+    const amp = (0.75 + gal * 0.2) * mv; // (a gallop reaches further: see update's stride)
     const [FL, FR, BL, BR] = P.legs;
     const s = Math.sin(ph);
     const sitting = this.action?.name === 'sit';
@@ -300,7 +333,7 @@ export class Animator {
     const bob = Math.abs(Math.sin(ph));
     // A.y already lifts/lowers the whole rig through rig.offsetY (as for bipeds), so it is not added to the body again
     P.body.position.y = rb.p.y + bob * 0.03 * mv + Math.sin(t * 2.4) * 0.006 - 0.045 * sk;
-    P.body.rotation.set(rb.r.x + A.body.x + Math.sin(ph * 2) * 0.03 * mv, A.body.y, Math.sin(ph) * 0.04 * mv);
+    P.body.rotation.set(rb.r.x + A.body.x + Math.sin(ph * 2) * (0.03 + gal * 0.04) * mv, A.body.y, Math.sin(ph) * 0.04 * mv);
     this._set(P.head, Math.sin(ph * 2) * 0.05 * mv + A.head.x + Math.sin(t * 0.8) * 0.03, Math.sin(t * 0.43) * 0.25 * (1 - mv) + A.head.y, Math.sin(t * 0.61) * 0.08 * (1 - mv) + A.head.z);
     const sc = this.rig.spec.scale || 1, sq = A.sq;
     this.rig.root.scale.set(sc * (1 + sq * 0.5), sc * (1 - sq), sc * (1 + sq * 0.5));
@@ -310,12 +343,12 @@ export class Animator {
   }
   secondary(dt, A, bob, mv) {
     const P = this.P;
-    const drive = -this.vel.y * 0.08 - mv * 0.25 + Math.cos(this.phase) * 0.12 * mv + A.earKick * 0.3 + A.flinch * 0.6;
+    const drive = -this.vel.y * 0.08 - mv * 0.25 - ((this.sprintAmt || 0) + (this.gallop || 0)) * 0.2 + Math.cos(this.phase) * 0.12 * mv + A.earKick * 0.3 + A.flinch * 0.6; // (a sprint / gallop streams the ears back)
     ['earL', 'earR'].forEach((k, i) => {
       const e = P[k]; if (!e) return;
       const S = this.ear[i];
       const target = drive + Math.sin(this.t * 1.3 + i) * 0.03;
-      const g = this.rig.earGain || 1; // big sculpted ears (Disney Chewy) swing further and flick now and then
+      const eg = this.rig.earGain, g = (Array.isArray(eg) ? eg[i] : eg) || 1; // big sculpted ears (Disney Chewy) swing further and flick now and then; [left, right]: a gain per ear (heroModels.js)
       if (this.rig.earGain) {
         S.tw = (S.tw ?? 1 + Math.random() * 3) - dt;
         if (S.tw < 0) { S.tw = 2.5 + Math.random() * 4; S.v += (Math.random() < 0.5 ? -1 : 1) * (4 + Math.random() * 4); }

@@ -9,7 +9,7 @@ import { registerVfxExtension } from './vfx.js';
 import { spellFx, F, PAL } from './spellFx.js';
 import { glowTexture, ringTexture } from './textures.js';
 import { rand, TAU, clamp, ease } from '../core/util.js';
-import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { cloneSkinnedSafe as cloneSkinned } from '../actors/safeClone.js'; // (not SkeletonUtils.clone: see safeClone.js)
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Color();
 const UP = new THREE.Vector3(0, 1, 0);
@@ -39,13 +39,15 @@ function picnicTex() {
   if (PICNIC) return PICNIC;
   const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
   g.clearRect(0, 0, 256, 256);
+  // (Hanami Picnic: a red blossom-viewing mat scattered with cherry blossoms, Chewy the samurai's Onigiri Toss)
   g.save(); g.beginPath(); g.roundRect(18, 18, 220, 220, 26); g.clip();
-  g.fillStyle = '#fff6ec'; g.fillRect(0, 0, 256, 256);
-  for (let i = 0; i < 8; i++) { g.fillStyle = 'rgba(232, 84, 104, 0.55)'; g.fillRect(18 + i * 27.5, 0, 14, 256); g.fillRect(0, 18 + i * 27.5, 256, 14); }
-  for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { g.fillStyle = 'rgba(214, 52, 80, 0.55)'; g.fillRect(18 + i * 27.5, 18 + j * 27.5, 14, 14); }
+  g.fillStyle = '#d8463e'; g.fillRect(0, 0, 256, 256);
+  g.fillStyle = 'rgba(255, 210, 200, 0.12)'; for (let i = 0; i < 26; i++) g.fillRect(18 + i * 9, 0, 3, 256); // (the felt's weave)
+  const blossom = (x, y, r, rot) => { g.save(); g.translate(x, y); g.rotate(rot); g.fillStyle = '#ffe6ee'; for (let k = 0; k < 5; k++) { g.rotate(Math.PI * 2 / 5); g.beginPath(); g.ellipse(0, -r * 0.62, r * 0.42, r * 0.58, 0, 0, Math.PI * 2); g.fill(); } g.fillStyle = '#e8b84a'; g.beginPath(); g.arc(0, 0, r * 0.22, 0, Math.PI * 2); g.fill(); g.restore(); };
+  for (const [x, y, r] of [[64, 70, 18], [176, 58, 14], [122, 128, 22], [58, 186, 15], [190, 176, 19], [128, 210, 11], [204, 112, 10], [96, 34, 9]]) blossom(x, y, r, x * 0.07);
   g.restore();
   g.lineWidth = 7; g.strokeStyle = '#4a2c2a'; g.beginPath(); g.roundRect(18, 18, 220, 220, 26); g.stroke();
-  g.setLineDash([10, 8]); g.lineWidth = 3; g.strokeStyle = '#fff6ec'; g.beginPath(); g.roundRect(32, 32, 192, 192, 18); g.stroke();
+  g.setLineDash([10, 8]); g.lineWidth = 3; g.strokeStyle = '#ffe2d8'; g.beginPath(); g.roundRect(32, 32, 192, 192, 18); g.stroke();
   PICNIC = new THREE.CanvasTexture(c); PICNIC.colorSpace = THREE.SRGBColorSpace; PICNIC.anisotropy = 4;
   return PICNIC;
 }
@@ -388,7 +390,7 @@ export class ChargeFX {
     this.vfx.light(_a.copy(b), '#fff27a', 3, 3, 0.14);
   }
 
-  // ------------------------------------------------------------------ Treat Toss: the picnic blanket
+  // ------------------------------------------------------------------ Onigiri Toss: the Hanami Picnic mat
   picnic(pos, r = 3, life = 5) {
     const m = this.take('picnic', () => { const o = new THREE.Mesh(planeGeo(), new THREE.MeshBasicMaterial({ map: picnicTex(), transparent: true, opacity: 0, depthWrite: false, toneMapped: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2 })); o.renderOrder = 8; return o; });
     const x = pos.x, y = pos.y || 0, z = pos.z, rot = rand(-0.4, 0.4);
@@ -397,13 +399,13 @@ export class ChargeFX {
     this.run((dt, t) => {
       const tin = ease.outBack(Math.min(1, t / 0.3)), tout = Math.max(0, Math.min(1, (life - t) / 0.4));
       m.scale.setScalar(r * 0.78 * (0.4 + 0.6 * tin) * (0.8 + 0.2 * tout)); m.material.opacity = 0.92 * Math.min(1, t / 0.15) * tout;
-      if (Math.random() < dt * 5) this.spell.pn.spawn({ frame: F.HEART, x: x + rand(-r, r) * 0.55, y: y + 0.2, z: z + rand(-r, r) * 0.55, vy: 1.1, life: 0.9, size: rand(0.18, 0.26), size1: 0.1, color: Math.random() < 0.5 ? PAL.pink : PINK2, alpha: 1, alpha1: 0 });
+      if (Math.random() < dt * 5) this.vfx.petal.spawn({ x: x + rand(-r, r) * 0.55, y: y + 0.25, z: z + rand(-r, r) * 0.55, vx: rand(-0.4, 0.4), vy: 0.9, vz: rand(-0.4, 0.4), life: 1.1, size: rand(0.14, 0.2), color: '#ffffff', alpha: 1, alpha1: 0, drag: 1, grav: 0.3, spin: rand(-5, 5), stretch: 0.8 }); // (cherry petals off the mat)
       return H.alive && t < life;
     }, () => { H.alive = false; this.give('picnic', m); });
     H.end = () => { H.alive = false; };
     return H;
   }
-  // ------------------------------------------------------------------ Moon Howl: Lunar Eclipse's night dome
+  // ------------------------------------------------------------------ Moonlit Blades: Lunar Eclipse's night dome
   eclipse(pos, r = 7, life = 4) {
     const m = this.take('eclipse', () => { const o = new THREE.Mesh(planeGeo(), new THREE.MeshBasicMaterial({ map: glowTexture(), color: new THREE.Color('#1a1638'), transparent: true, opacity: 0, depthWrite: false, toneMapped: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2 })); o.renderOrder = 8; return o; });
     const rim = this.take('eclipseRim', () => { const o = new THREE.Mesh(planeGeo(), new THREE.MeshBasicMaterial({ map: ringTexture(), color: new THREE.Color('#c8d0ff'), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false })); o.renderOrder = 9; return o; });
@@ -417,7 +419,7 @@ export class ChargeFX {
       return t < life;
     }, () => { this.give('eclipse', m); this.give('eclipseRim', rim); });
   }
-  // ------------------------------------------------------------------ Zoomies Dash: Afterimage, a frozen golden ghost of the hero
+  // ------------------------------------------------------------------ Flash Draw: Afterimage, a frozen golden ghost of the hero
   ghost(rig, life = 3, color = '#ffe08a') {
     let g = null;
     try { g = cloneSkinned(rig.root); } catch (e) { return null; }
@@ -430,7 +432,7 @@ export class ChargeFX {
       mat.opacity = 0.5 * k * (0.85 + 0.15 * Math.sin(t * 9));
       if (Math.random() < dt * 14) this.pa.spawn({ frame: F.SPARK, x: g.position.x + rand(-0.3, 0.3), y: g.position.y + rand(0.2, 1.1), z: g.position.z + rand(-0.3, 0.3), vy: 0.8, life: 0.5, size: 0.18, size1: 0.03, color: GOLD, alpha: 1, alpha1: 0 });
       return H.alive && t < life;
-    }, () => { H.alive = false; g.parent?.remove(g); });
+    }, () => { H.alive = false; g.parent?.remove(g); g.traverse(o => o.isSkinnedMesh && o.skeleton?.dispose()); }); // (the clone's skeletons are its own: each holds a bone texture)
     H.end = () => { H.alive = false; };
     return H;
   }

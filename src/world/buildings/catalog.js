@@ -26,7 +26,7 @@ export const BUILDINGS = {
   boneSmith: {
     name: 'Bonesmith Forge', cat: 'special', size: [3, 3], levels: 1, unique: true,
     cost: { coins: 260, wood: 12, stone: 18, bone: 4 }, jobs: [1],
-    desc: 'Clang, clang! The forge glows day and night, sharpening Bone Swords to a shine.',
+    desc: 'Clang, clang! The forge glows day and night, polishing Bone Katanas to a shine.',
   },
   dungeonGate: {
     name: 'The Burrow', cat: 'special', size: [4, 4], levels: 1, unique: true, prebuilt: true,

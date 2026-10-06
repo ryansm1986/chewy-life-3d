@@ -18,7 +18,7 @@ export const VILLAGER_SPECS = [
 ];
 
 export default async function () {
-  await Promise.all([loadRefinedRigs(REFINED_CAST), loadDisneyChewy(), loadHeroModel('shadow'), loadHeroModel('rosie'), loadHeroModel('moka')]); // &procrigs: procedural skins, &chewy=classic: toon Chewy
+  await Promise.all([loadRefinedRigs(REFINED_CAST), loadDisneyChewy(), loadHeroModel('shadow'), loadHeroModel('rosie'), loadHeroModel('moka'), loadHeroModel('poe')]); // &procrigs: procedural skins, &chewy=classic: toon Chewy
   const P = new URLSearchParams(location.search);
   const S = makeStage({ ground: 30, hour: +(P.get('hour') ?? 10), dist: +(P.get('dist') ?? 11), center: [0, 0] });
   const only = P.get('only');
@@ -39,12 +39,12 @@ export default async function () {
   const FURC = { cat: '#ffd8a8', fox: '#ff9a4a', bunny: '#ffffff', dog: '#e8c89a', bear: '#a86a44', panda: '#fbf8f4', tanuki: '#a08070', frog: '#8ad86a', duck: '#fff8ec' };
   const specs = hats ? HAT_KINDS.flatMap(h => SPC.map(sp => [`${sp}-${h}`, { name: sp, species: sp, fur: FURC[sp], fur2: '#fff8f0', ...(sp === 'tanuki' ? { fur3: '#4a3a34', earColor: '#4a3a34' } : {}), outfit: { top: 'shirt', topColor: '#8fd0ff', bottomColor: '#4a4a6a', hat: h, hatColor: '#ff8fb0' } }]))
     : folk ? Array.from({ length: folk }, (_, i) => { const s = randomVillagerSpec(rand); return [`folk${i}`, s]; })
-    : [['chewy', CAST.chewy], ['moka', CAST.moka], ['rosie', CAST.rosie], ...VILLAGER_SPECS.map(s => [s.name.toLowerCase(), s])];
+    : [['chewy', CAST.chewy], ['moka', CAST.moka], ['rosie', CAST.rosie], ...VILLAGER_SPECS.map(s => [s.name.toLowerCase(), s]), ...(only === 'poe' ? [['poe', CAST.poe]] : [])]; // (Poe: &only=poe, the face check)
   if (folk) window.folkSpecs = specs.map(([, s]) => `${s.name} ${s.species} ${s.outfit.top}${s.outfit.hat ? ' +' + s.outfit.hat : ''}${s.outfit.scarf ? ' +scarf' : ''}${s.outfit.bag ? ' +bag' : ''}${s.outfit.bottom ? ' ' + s.outfit.bottom : ''}`);
   let i = 0;
   const lineup = only ? specs.filter(([k]) => k === only) : specs;
   for (const [k, spec] of lineup) {
-    const rig = (k === 'rosie' || k === 'moka') && heroModelReady(k) ? buildHeroModel(k) : k === 'chewy' && disneyReady() ? buildDisneyChewy() : buildHumanoid(spec);
+    const rig = (k === 'rosie' || k === 'moka' || k === 'poe') && heroModelReady(k) ? buildHeroModel(k) : k === 'chewy' && disneyReady() ? buildDisneyChewy() : buildHumanoid(spec);
     const cols = hats ? 9 : folk ? 4 : 5, col = i % cols, row = Math.floor(i / cols);
     const x = only ? 0 : hats ? (col - 4) * 0.95 : folk ? (col - 1.5) * 1.1 : (col - 2) * 1.3 + row * 0.6, z = only ? 0 : hats ? row * 1.1 - 2.75 : folk ? row * 1.3 - 1.3 : row * 1.5 - 0.6;
     if (k === 'chewy') {

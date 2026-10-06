@@ -1,0 +1,228 @@
+{
+  "units": "metres",
+  "coordinate_system": "Blender Z-up, front -Y; character left is +X",
+  "hips": [
+    0,
+    0.004,
+    0.36
+  ],
+  "spine": [
+    0,
+    0.002,
+    0.46
+  ],
+  "chest": [
+    0,
+    0.0,
+    0.58
+  ],
+  "neck": [
+    0,
+    -0.004,
+    0.66
+  ],
+  "head": [
+    0.0,
+    -0.01546,
+    0.93618
+  ],
+  "jaw_pivot": [
+    0,
+    -0.2481,
+    0.7980499999999999
+  ],
+  "eyes": {
+    "R": [
+      -0.1744298421099099,
+      -0.24198809962924778,
+      0.9134020315878434
+    ],
+    "L": [
+      0.1744298421099099,
+      -0.24198809962924778,
+      0.9134020315878434
+    ]
+  },
+  "ears": {
+    "R": {
+      "base": [
+        -0.21640637241777474,
+        -0.06889640097031202,
+        1.1243479771097786
+      ],
+      "fold": [
+        -0.25349062609689865,
+        -0.07943433160180866,
+        1.1287923605703647
+      ],
+      "tip": [
+        -0.35654711545913265,
+        -0.21053293408661905,
+        0.9846816202038396
+      ]
+    },
+    "L": {
+      "base": [
+        0.21640637241777474,
+        -0.06889640097031202,
+        1.1243479771097786
+      ],
+      "fold": [
+        0.25349062609689865,
+        -0.07943433160180866,
+        1.1287923605703647
+      ],
+      "tip": [
+        0.35654711545913265,
+        -0.21053293408661905,
+        0.9846816202038396
+      ]
+    }
+  },
+  "arms": {
+    "L": {
+      "shoulder": [
+        0.272,
+        -0.005,
+        0.6
+      ],
+      "elbow": [
+        0.3694652186895716,
+        -0.015614027410386908,
+        0.48384547547372275
+      ],
+      "wrist": [
+        0.4464114439708123,
+        -0.023993522734376573,
+        0.39214453505824065
+      ]
+    },
+    "R": {
+      "shoulder": [
+        -0.272,
+        -0.005,
+        0.6
+      ],
+      "elbow": [
+        -0.3694652186895716,
+        -0.015614027410386908,
+        0.48384547547372275
+      ],
+      "wrist": [
+        -0.4464114439708123,
+        -0.023993522734376573,
+        0.39214453505824065
+      ]
+    }
+  },
+  "legs": {
+    "L": {
+      "hip": [
+        0.11,
+        0.004,
+        0.36
+      ],
+      "knee": [
+        0.19,
+        -0.004,
+        0.21
+      ],
+      "ankle": [
+        0.208,
+        -0.004,
+        0.1
+      ],
+      "toe": [
+        0.238,
+        -0.18,
+        0.04
+      ]
+    },
+    "R": {
+      "hip": [
+        -0.11,
+        0.004,
+        0.36
+      ],
+      "knee": [
+        -0.19,
+        -0.004,
+        0.21
+      ],
+      "ankle": [
+        -0.208,
+        -0.004,
+        0.1
+      ],
+      "toe": [
+        -0.238,
+        -0.18,
+        0.04
+      ]
+    }
+  },
+  "tail": [
+    [
+      0.0,
+      0.2,
+      0.452
+    ],
+    [
+      0.039975198765150335,
+      0.2975930433310785,
+      0.42330200032253124
+    ],
+    [
+      0.01542919724803406,
+      0.3124709265904032,
+      0.31975501020509134
+    ],
+    [
+      -0.032059137502291474,
+      0.3117366251715247,
+      0.379174232837661
+    ],
+    [
+      0.014443680020421425,
+      0.3003775043672097,
+      0.3777519585064214
+    ],
+    [
+      0.015803013449522202,
+      0.298,
+      0.37050295144064366
+    ]
+  ],
+  "palm_R": [
+    -0.4692798378539015,
+    -0.02748497911937227,
+    0.3462223585688847
+  ],
+  "palm_L": [
+    0.4692798378539015,
+    -0.02748497911937227,
+    0.3462223585688847
+  ],
+  "fuma_back": {
+    "centre": [
+      0.0,
+      0.35,
+      0.628
+    ],
+    "facing": [
+      0.0,
+      0.9950371902099893,
+      -0.09950371902099893
+    ]
+  },
+  "notes": [
+    "Phase 1: no rig, weights or animations. Same keys as chewy-b joints-round13.json, plus palm_R / palm_L and fuma_back.",
+    "head = the head centre (the radial origin), not the nod pivot: the rig should put the head bone at the base of the skull.",
+    "Head skin = zero surface of one smooth implicit ball (squircle skull + bun muzzle + chin + forehead roll + bridge roll + nose), analytic normals, adaptive toon-band refinement.",
+    "Eyelid holes ringed by 6 loops each with the rim rolled 4.5 mm in behind separate lens eyeballs; 3 loops round the mouth, 4 round the nose.",
+    "Ears: separate pieces (Poe_ear_L / _R), 26 bend stations from the buried root over the fold to the tip; pivot = ears.base.",
+    "Tail: Poe_tail, a 34-ring spiral tube (bend loops), pivot = tail[0]. Scarf and sash tails are separate swept islands in Poe_body.",
+    "Shorts are split per leg (two closed islands); limbs carry joint loops at the elbow (sleeve cuff) and the wrist (guard end).",
+    "fuma_back: separate object, pivot = the hub centre; mount in fuma_mount.json. The mask (Poe_mask) is one rigid piece for the head bone."
+  ]
+}

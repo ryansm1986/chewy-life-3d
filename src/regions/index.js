@@ -3,15 +3,16 @@ import bamboo from './biomes/bamboo.js';
 import maple from './biomes/maple.js';
 import tidepool from './biomes/tidepool.js';
 import onsen from './biomes/onsen.js';
+import { normalizeZones } from '../rpg/zones.js';
 
 export const REGIONS = { bamboo, maple, tidepool, onsen };
 export const REGION_IDS = ['bamboo', 'maple', 'tidepool', 'onsen'];
 
-/** state.regions, created on demand */
+/** state.regions = { unlocked, cleared, visits }: since the zones rework a live view of state.zones (rpg/zones.js:
+ *  unlocked → zones[id].unlocked, cleared → zones[id].regionBoss, visits → zones[id].visits), migrated from older saves */
 export function regionState(state) {
-  const R = state.regions ||= {};
-  R.unlocked ||= {}; R.cleared ||= {}; R.visits ||= {};
-  return R;
+  normalizeZones(state);
+  return state.regions;
 }
 /** Is region `id` open for the active hero? (its level, or the previous region's boss beaten) → { ok, why } */
 export function regionUnlocked(state, id) {

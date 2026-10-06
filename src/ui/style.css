@@ -245,6 +245,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1c1424; }
 .tt-sect .tt-l { font-size: 13px; }
 .tt-reqs { margin-top: 7px; font-size: 12.5px; color: #d8cfe0; }
 .tt-reqs .ok { color: #7cf0a0; } .tt-reqs .bad { color: #ff6f7f; font-weight: 600; }
+.tt-train { margin-top: 7px; padding: 5px 8px; border-radius: 8px; font-size: 12.5px; color: #e8dcff; background: rgba(122, 106, 168, .28); border: 1px dashed rgba(200, 184, 255, .5); }
 .tt-syn { font-size: 12.5px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .tt-syn .gl { width: 12px; height: 12px; color: #ffe07a; }
 .tt-syn b { color: #fff; } .tt-syn span { color: #7cf0a0; } .tt-syn i { color: #b8a8bc; font-style: normal; }

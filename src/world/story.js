@@ -11,12 +11,16 @@ import { MATERIALS } from '../ui/glyphs.js';
 import { pantryIcon } from '../life/pantryIcons.js';
 import { meetsNeed, homeRating, starText } from '../home/rating.js';
 import { FURNITURE } from '../home/furniture.js';
+import { stepGain, zoneStepDone, zoneStepHave, destOf } from './questSteps.js';
+import { DUNGEONS } from '../dungeon/defs.js';
 
 // step types: talk(npc) | collect(material,n) | kill(monster?,n) | boss(id) | floor(n) | build(type,n) | pop(n) | zone(n)
 //   | fish(n) (catch n fish: life/fishing.js 'fish:caught') | plant(n) / harvest(n) (life/garden.js) | cook(n) dishes
 //   | deliver(npc, mat, n, pantry?) (a material, or with pantry: true a pantry good — crops, fish, dishes)
 //   | decorate(npc, need) (decorate their home: need = { tag?, n?, rug?, light?, stars?, ids? } — home/rating.js
 //     meetsNeed, checked when you leave their home: docs/HOUSING.md §4)
+//   the zones (docs/ZONES.md §3, rules in world/questSteps.js): kill / boss take optional zone, dungeon, floor and tier
+//   filters | find(item, n) | rescue(npc) | dungeonFloor(dungeon, n) | tier(dungeon, n) | villageSaved(zone)
 export const QUESTS = {
   welcome: { title: 'Welcome Home, Chewy', giver: 'rosie', desc: 'Rosie wants to show you around Blossom Hollow.', steps: [{ type: 'talk', npc: 'rosie', text: 'Say hi to Rosie' }], reward: { coins: 50, xp: 20 }, next: 'burrow1' },
   burrow1: { title: 'Something Squishy', giver: 'rosie', desc: 'Strange squeaks echo from the Burrow on the shrine hill. Go take a peek!', steps: [{ type: 'kill', n: 8, text: 'Defeat yokai in the Burrow' }, { type: 'collect', mat: 'mochi', n: 3, text: 'Bring back Mochi Jelly' }], reward: { coins: 120, xp: 80, potions: { heart: 3 } }, next: 'homes' },
@@ -88,6 +92,11 @@ export class Story {
     Events.on('garden:plant', e => this.progress('plant', e));
     Events.on('garden:harvest', e => this.progress('harvest', e));
     Events.on('dish:cooked', e => this.progress('cook', e));
+    // the zones (docs/ZONES.md §8): quest items, rescues, dungeon clears / tiers, saved villages (phase D emits the first two)
+    Events.on('quest:find', e => this.progress('find', e));
+    Events.on('villager:rescued', e => this.progress('rescue', e));
+    Events.on('dungeon:cleared', e => this.progress('tier', e));
+    Events.on('village:saved', e => this.progress('villageSaved', e));
     setInterval(() => this.progress('pop'), 5000);
   }
   get Q() { return this.G.state.quests; }
@@ -110,6 +119,7 @@ export class Story {
       case 'buildAny': return st.village.buildings.filter(b => s.btypes.includes(b.type)).length >= s.n + (q.base || 0);
       case 'pop': return (G.sim?.stats.population || 0) >= s.n;
       case 'floor': return (st.dungeon.deepest || 0) >= s.n;
+      case 'dungeonFloor': case 'tier': case 'villageSaved': return zoneStepDone(s, st);
       default: return q.prog >= (s.n || 1);
     }
   }
@@ -119,8 +129,8 @@ export class Story {
       const d = this.def(q.id); if (!d) continue;
       const s = d.steps[q.step]; if (!s) continue;
       if (s.type === 'buildAny' && q.base === undefined) q.base = this.G.state.village.buildings.filter(b => s.btypes.includes(b.type)).length;
-      if (kind === 'kill' && s.type === 'kill' && (!s.monster || s.monster === e.id)) { q.prog++; changed = true; }
-      if (kind === 'boss' && s.type === 'boss' && s.id === e.id) { q.prog = 1; changed = true; }
+      const gain = stepGain(s, kind, e); // kill / boss (with their zone filters), find, rescue: world/questSteps.js
+      if (gain === 'set') { q.prog = Math.max(q.prog, s.n || 1); changed = true; } else if (gain) { q.prog += gain; changed = true; }
       if (kind === 'fish' && s.type === 'fish') { q.prog++; changed = true; }
       if ((kind === 'plant' || kind === 'harvest' || kind === 'cook') && s.type === kind) { q.prog += kind === 'cook' ? e?.n || 1 : 1; changed = true; }
       if (this.stepDone(q, s)) {
@@ -214,18 +224,41 @@ export class Story {
         continue;
       }
       if (s.type === 'deliver') { if (this.haveFor(s) >= s.n) { const t = npcPos(s.npc); if (t) return t; } continue; }
-      const burrowStep = ['kill', 'floor', 'boss'].includes(s.type) || (s.type === 'collect' && s.mat === 'mochi');
-      if (burrowStep) {
-        if (G.mode === 'village') {
-          const gate = G.sim?.list.find(r => r.data.type === 'dungeonGate');
-          if (gate) return { pos: gate.door, label: 'The Burrow', kind: 'place' };
-        } else if (G.mode === 'dungeon' && (s.type === 'floor' || s.type === 'boss') && G.dungeon && !G.dungeon.isRegion) { // (Burrow quests point nowhere in an outdoor region)
-          if (s.type === 'boss' && G.dungeon.boss?.alive) return { pos: G.dungeon.boss.pos, label: G.dungeon.boss.name, kind: 'place' };
-          if (G.dungeon.stairsPos) return { pos: G.dungeon.stairsPos, label: 'Stairs down', kind: 'place' };
-        }
-        continue;
-      }
+      const t = this.placeFor(s, destOf(s)); if (t) return t;
     }
+    return null;
+  }
+  /** The pointer for a step that's somewhere you travel to (world/questSteps.js destOf): from the village, the Burrow's
+   *  gate or the Wayfarer's Post for a zone; in a zone's region, its dungeon gate (phase C: mode.gatePos) or its village
+   *  (phase D: mode.villagePos); in the right dungeon, the stairs until the floor, then the boss or the objective's mark
+   *  (phase D: mode.questMark(step)); anywhere else, the way out. Burrow quests point nowhere in an outdoor region. */
+  placeFor(s, dest) {
+    const G = this.G, D = G.mode === 'dungeon' ? G.dungeon : null;
+    if (!dest || (G.mode !== 'village' && !D)) return null;
+    const at = (pos, label) => (pos ? { pos, label, kind: 'place' } : null);
+    const zone = dest.zone || null, burrow = dest.dungeon === 'burrow';
+    if (G.mode === 'village') {
+      if (burrow) { const gate = G.sim?.list.find(r => r.data.type === 'dungeonGate'); return gate ? at(gate.door, 'The Burrow') : null; }
+      const tp = zone && G.world.landmarks?.travel; if (!tp) return null;
+      const p = this._postPos ||= { x: tp.x, y: G.world.heightAt?.(tp.x, tp.z) || 0, z: tp.z };
+      return at(p, "The Wayfarer's Post");
+    }
+    const here = D.kind === 'region' ? null : D.def?.id;
+    if (dest.dungeon && here === dest.dungeon) { // in the right dungeon
+      if (dest.floor && D.floor < dest.floor) return at(D.stairsPos, 'Stairs down');
+      if (dest.floor && D.floor > dest.floor) return at(D.exitPos, 'The way out');
+      if (dest.boss) return D.boss?.alive ? at(D.boss.pos, D.boss.name) : at(D.stairsPos, 'Stairs down');
+      if (dest.mark) return at(D.questMark?.(s), s.text);
+      return null;
+    }
+    if (burrow) return null; // (a Burrow step: nothing to point at in a region / a zone dungeon, as before)
+    if (D.kind === 'region' && D.zoneId === zone) { // the step's zone, outdoors
+      if (dest.village) return at(D.villagePos, 'The village');
+      if (dest.dungeon) return at(D.gatePos, DUNGEONS[dest.dungeon]?.name || 'The dungeon');
+      return dest.boss && D.boss?.alive ? at(D.boss.pos, D.boss.name) : null;
+    }
+    if (dest.dungeon && D.kind === 'zone' && here !== dest.dungeon) return at(D.exitPos, 'The way out'); // (another zone's dungeon)
+    if (zone && D.zoneId !== zone) return at(D.exitPos, D.kind === 'region' ? "The Wayfarer's Stone" : 'The way out'); // (somewhere else: travel on)
     return null;
   }
   // quest objects for the UI tracker / journal
@@ -240,7 +273,7 @@ export class Story {
         else if (s.type === 'buildAny') have = st.village.buildings.filter(b => s.btypes.includes(b.type)).length - (q.base || 0);
         else if (s.type === 'pop') have = G.sim?.stats.population || 0;
         else if (s.type === 'floor') have = Math.min(s.n, st.dungeon.deepest || 0);
-        else have = q.prog || 0;
+        else have = zoneStepHave(s, st) ?? (q.prog || 0);
       }
       return { text: s.text, have: done ? need : Math.min(need, have), need, done };
     };

@@ -1,0 +1,48 @@
+{
+  "units": "metres, model space",
+  "blender_axes": "Z up, front -Y, character left +X",
+  "game_axes": "glTF/three.js: Y up, front +Z; game = (bx, bz, -by)",
+  "mouth_blender": [
+    0.222,
+    -0.214,
+    0.44
+  ],
+  "mouth_game": [
+    0.222,
+    0.44,
+    0.214
+  ],
+  "blade_entry_dir_blender": [
+    0.26762,
+    0.83901,
+    -0.47375
+  ],
+  "blade_entry_dir_game": [
+    0.26762,
+    -0.47375,
+    -0.83901
+  ],
+  "edge_up_blender": [
+    0.14396,
+    0.45135,
+    0.88066
+  ],
+  "edge_up_game": [
+    0.14396,
+    0.88066,
+    -0.45135
+  ],
+  "scabbard_length_m": 0.553,
+  "inner_slot_depth_m": 0.012,
+  "angle_below_horizontal_deg": 28.28,
+  "tip_blender": [
+    0.37,
+    0.25,
+    0.178
+  ],
+  "notes": [
+    "The hilt goes at the mouth, pointing along -blade_entry_dir (forward, up and slightly inward); the blade runs along +blade_entry_dir.",
+    "edge_up is the oval section's long axis (the blade's spine-to-edge plane), for orienting the katana in the scabbard.",
+    "The saya is rigid; in phase 2 weight it 100% to hips."
+  ]
+}

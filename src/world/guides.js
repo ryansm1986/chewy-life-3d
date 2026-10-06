@@ -10,6 +10,8 @@
 //            swatch, the cost.
 //  - charge: Shadow, back in town after the first Burrow trip (docs/CHARGE.md §4): hold right-click to charge a skill to
 //            Stage Ⅰ and let go, the charge perks in the K panel's Charge card, tap vs hold.
+//  - meetPoe: Poe, in town after she joins (docs/POE.md §6): tap Tab for the next hero, hold Tab for the hero wheel and
+//            pick her, her fūma and her trees, and the mini portraits.
 import * as THREE from 'three';
 import { POND } from './layout.js';
 import { SKILLS } from '../rpg/skills.js';
@@ -287,5 +289,31 @@ const charge = {
   ],
 };
 
-export const GUIDES = { switch: sw, house, fishing, makeHome, remodel, charge };
+// ------------------------------------------------------------------ three heroes: tap Tab, hold Tab (Poe, docs/POE.md §6)
+const wheelOpen = G => !!G.heroes?.wheelOpen;
+const meetPoe = {
+  title: 'Meet Poe', narrator: 'poe', color: '#5a8a4a', priority: 1,
+  blurb: 'Tap Tab for the next hero, hold Tab for the hero wheel, and Poe’s fūma.',
+  offer: 'Poe can show you how to pick a hero with the hero wheel.',
+  icon: null,
+  trigger: G => !!G.heroes?.joined('poe') && G.state.activeHero !== 'poe',
+  past: G => !!G.heroes?.joined('poe'),
+  locked: G => (G.heroes?.joined('poe') ? null : 'Meet Poe in the Bamboo Grove first'),
+  steps: [
+    { id: 'tap', say: G => `A ninja reports for duty! *Tap Tab* — a quick press — and you play the next hero in the pack, ${me(G)}.`, objective: 'Tap *Tab* to switch to the next hero', allow: { switching: true },
+      onEnter: (G, T) => { T.data.from = G.state.activeHero; },
+      highlight: G => (G.heroSwitching ? null : '.hud .hsw'), done: (G, T) => G.state.activeHero !== T.data.from && !G.heroSwitching },
+    { id: 'hold', say: G => (G.state.activeHero === 'poe' ? "Hi! Now *hold Tab*: the hero wheel! Point at whoever you like — or press their number — and let go." : "Now *hold Tab*: the hero wheel! Point at me — or press my number — and let go. Very stealthy. Very fast."),
+      objective: 'Hold *Tab*, pick a hero, let go', allow: { switching: true },
+      highlight: G => (G.heroSwitching ? null : wheelOpen(G) ? (G.state.activeHero === 'poe' ? '.hero-wheel .hw-ring' : '.hero-wheel .hw-card[data-id="poe"]') : '.hud .hsw'),
+      waitFor: { event: 'hero:wheel', test: p => !!p?.id } },
+    { id: 'fuma', say: G => (G.state.activeHero === 'poe'
+        ? 'Ta-da! Left-click: my *fūma slashes*. Right-click: *Fūma Throw* — it flies out and comes back, so stay put and catch it! My trees are Shuriken Arts, Ninjutsu and Shadow Step (*K*).'
+        : 'When you play me: left-click is my *fūma slashes*, right-click is *Fūma Throw* — it comes back, so stay put and catch it! My trees are Shuriken Arts, Ninjutsu and Shadow Step.'),
+      objective: 'Poe: the fūma, three trees', allow: { switching: true }, highlight: G => (G.heroSwitching ? null : '.hud .hb.mouse'), ack: true },
+    { id: 'wrap', say: 'The little portraits by yours are the heroes in town: click one to play them. Tap *Tab* for the next, hold *Tab* to pick. Now — to the Burrow! *Snrrk.* …That was not a snort.', objective: 'Tap Tab: next · hold Tab: pick', ack: true, highlight: () => '.hud .hsw' },
+  ],
+};
+
+export const GUIDES = { switch: sw, house, fishing, makeHome, remodel, charge, meetPoe };
 export const GUIDE_IDS = Object.keys(GUIDES);

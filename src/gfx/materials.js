@@ -22,6 +22,9 @@ export const U = {
   // painted light pools: the nearest lamps as (x, y, z, radius) + premultiplied colour; radius 0 ends the list
   uPoolPos: { value: Array.from({ length: 32 }, () => new THREE.Vector4()) },
   uPoolCol: { value: Array.from({ length: 32 }, () => new THREE.Vector3()) },
+  // the grade pass's lift of the darks (post.js uLift is this same vector; sky.js / dungeonMode.js set it): a material
+  // that must stay neutral black under it can counter it (heroModels.js darkNeutral)
+  uGradeLift: { value: new THREE.Vector3(0.02, 0.0, 0.05) },
 };
 export function initSharedUniforms() { U.uBrush.value = brushTexture(); }
 

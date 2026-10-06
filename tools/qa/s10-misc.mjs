@@ -94,7 +94,7 @@ try {
   });
   R.check("Pack Call's shadowPower buff has a duration (not permanent for the rest of the floor)", pack.hasTimer, JSON.stringify(pack));
 
-  // g) Tail Spin held while taking the stairs: spin anim / slow-walk flag must not survive the floor change
+  // g) Whirlwind Stance held while taking the stairs: spin anim / slow-walk flag must not survive the floor change
   const spin = await page.evaluate(async () => {
     const G = window.G; G.state.player.skills.whirl = 3; G.state.player.skills.chomp = 1; G.state.player.hotbar[2] = 'whirl'; G.actions.recompute(); G.actions.restoreAll();
     if (G.derived.weaponType !== 'sword') G.actions.swapWeapons();
@@ -106,7 +106,7 @@ try {
   });
   await page.waitForFunction(() => !window.G.ui.iris.active && window.G.mode === 'dungeon', null, { timeout: 20000 }); await sleep(page, 500);
   const spinAfter = await page.evaluate(() => ({ anim: window.G.player.anim.action?.name || null, canMoveWhileActing: !!window.G.player.canMoveWhileActing, channel: !!window.G.skills.channel }));
-  R.check('Tail Spin + stairs: no endless spin / permanent 75% walk speed on the next floor', spinAfter.anim !== 'spin' && !spinAfter.canMoveWhileActing, JSON.stringify(spinAfter));
+  R.check('Whirlwind Stance + stairs: no endless spin / permanent 75% walk speed on the next floor', spinAfter.anim !== 'spin' && !spinAfter.canMoveWhileActing, JSON.stringify(spinAfter));
   await page.evaluate(() => { window.G.player.anim.stop(); window.G.player.canMoveWhileActing = false; });
 
   // h) Shadow faints, Chewy goes home, comes back: Shadow should not start the next floor on 1 HP

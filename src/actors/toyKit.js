@@ -215,6 +215,16 @@ const HEADS = {
     mouth: { x: [0, 0.03, 0.06, 0.085, 0.1, 0.13], y: [-0.006, -0.0065, -0.004, 0.002, 0.01, 0.03] },
     brow: { dy: 0.07, len: 0.046, color: '#467c38' }, ears: 'none', blush: [0.168, 0.15],
   },
+  // Poe the pug (docs/POE.md): a broad, squarer skull; a short bun muzzle (a centre pad under the wide flat nose with two
+  // puffy lobes either side) and a soft forehead roll over the nose bridge; big honey eyes set wide; folded button ears
+  pug: {
+    W: 0.252, H: 0.196, D: 0.198, n: 2.5, taper: 0.06, cy: 0.198,
+    muzzle: [{ c: [0, 0.108, -0.03], r: [0.062, 0.042, 0.04], k: 0.03 }, { c: [0.03, 0.104, -0.028], r: [0.04, 0.034, 0.034], k: 0.026, mir: true },
+      { c: [0, 0.166, -0.017], r: [0.05, 0.013, 0.022], k: 0.016 }],
+    eye: { x: 0.122, y: 0.196, hw: 0.054, hh: 0.058, iris: '#c88a3a' },
+    nose: { y: 0.142, w: 0.038, h: 0.024, d: 0.022, color: '#1e1b20' }, my: 0.094, mouth: W_MOUTH, philtrum: true,
+    brow: { dy: 0.06, len: 0.05, color: '#4a4450' }, ears: 'pug', muzzlePatch: true, blush: [0.162, 0.122],
+  },
   duck: {
     W: 0.226, H: 0.196, D: 0.198, n: 2.2, taper: 0.08, cy: 0.198,
     bill: { y: 0.118, w: 0.074, h: 0.026, l: 0.06 },
@@ -500,6 +510,7 @@ const EARS = {
   fox: { f: () => flatCone([0, 0.0, 0], [0, 0.2, 0], 0.102, 0.02, 0.44), inner: (x, y, z) => (z < 0.012 ? 1 : triD(x, y - 0.014, 0.066, 0.155)), tip: (x, y, z) => 0.13 - y + 0.12 * Math.abs(x), box: [[-0.125, -0.1, -0.055], [0.125, 0.245, 0.055]], embed: 0.035 },
   bunny: { f: () => flatCone([0, -0.02, 0], [0, 0.29, 0], 0.064, 0.066, 0.6), inner: (x, y, z) => (z < 0.012 ? 1 : hypot(x / 0.046, (y - 0.175) / 0.14) - 1), box: [[-0.085, -0.08, -0.05], [0.085, 0.38, 0.05]], embed: 0.03 },
   dog: { f: () => dogEar(), inner: (x, y, z) => (z < 0.012 || y > 0.08 ? 1 : triD(x, y - 0.004, 0.046, 0.095)), box: [[-0.095, -0.09, -0.07], [0.095, 0.14, 0.11]], embed: 0.035 },
+  pug: { f: () => pugEar(), inner: () => 1, box: [[-0.09, -0.06, -0.05], [0.09, 0.15, 0.06]], embed: 0.026 },
 };
 function triD(x, y, w, h) { // 2D isoceles triangle (base half-width w at y = 0, apex at y = h): negative inside
   const ax = Math.abs(x), k = w / h;
@@ -511,6 +522,12 @@ function dogEar() { // Chewy's folded ear: a thick rounded triangle whose top fo
     if (y > 0.07) { const a = 1.2 * smoothstep(0.07, 0.105, y), yy = y - 0.07, c = Math.cos(a), sn = Math.sin(a); return base(x, 0.07 + yy * c + z * sn, -yy * sn + z * c); }
     return base(x, y, z);
   };
+}
+function pugEar() { // Poe's folded button ear: the flap that hangs out and down over the top corner of the skull (the seat
+  // points the ear's +y outward-down, its broad face outward), with a soft rolled crease along the fold at its root
+  const flap = flatCone([0, -0.012, 0], [0, 0.1, 0.006], 0.06, 0.034, 0.46);
+  const roll = capsule([-0.048, 0.006, 0.006], [0.048, 0.006, 0.006], 0.026);
+  return (x, y, z) => smin(flap(x, y, z), roll(x, y, z), 0.018);
 }
 function earMesh(ek) {
   return cached(`toyear:${ek}`, () => {
@@ -527,6 +544,7 @@ const EAR_SEAT = {
   fox: { at: [0.14, -0.015], splay: 0.4, lean: 0.06, face: 0.2 },
   bunny: { at: [0.075, -0.02], splay: 0.12, lean: 0.08, face: 0.12 },
   dog: { at: [0.155, -0.005], splay: 0.6, lean: 0.06, face: 0.32 },
+  pug: { at: [0.172, 0.004], splay: 2.32, lean: 0.34, face: 1.4 },
 };
 // y of the skull's top surface at (x, z)
 function surfY(f, x, z, y0 = 0.7) { for (let y = y0; y > 0; y -= 0.005) if (f(x, y, z) < 0) { let lo = y, hi = y + 0.005; for (let i = 0; i < 12; i++) { const m = (lo + hi) / 2; if (f(x, m, z) < 0) lo = m; else hi = m; } return lo; } return 0.3; }
@@ -538,7 +556,7 @@ function earQuat(S, s) {
 }
 
 // ------------------------------------------------------------------ the head: geometry into `head` (the head bone)
-export function headKindToy(spec) { const s = spec.species; return HEADS[s] ? s : 'dog'; }
+export function headKindToy(spec) { const s = spec.toy?.head || spec.species; return HEADS[s] ? s : 'dog'; }
 export function headVariant(spec, kind) {
   if (kind === 'cat' && spec.fur3 && spec.fur3 !== spec.fur) return 'calico';
   if (kind === 'dog' && (spec.patterns?.chin || spec.patterns?.chestBlaze)) return 'chin';
@@ -683,7 +701,7 @@ export function buildToyHead(head, spec, kind) {
     add(head, solid(tubeGeo(bp, bp.map((_, i) => 0.0018 + 0.0032 * Math.sin((i / 8) * Math.PI)), 5), cols.brow.getStyle()), 'brow');
   }
   // ears
-  const ek = spec.earKind && EARS[spec.earKind] ? spec.earKind : D.ears;
+  const ek = spec.toy?.ears && EARS[spec.toy.ears] ? spec.toy.ears : spec.earKind && EARS[spec.earKind] ? spec.earKind : D.ears;
   if (ek && EARS[ek]) {
     const { g: eg, mask } = earMesh(ek), S = EAR_SEAT[ek];
     const tipC = ek === 'fox' ? C(spec.earTip || '#493044') : null;
@@ -730,6 +748,8 @@ const TAILS = {
   fox: { f: () => (x, y, z) => smin(ellipsoid([0, 0.13, -0.085], [0.112, 0.16, 0.104])(x, y, z), ellipsoid([0, 0.27, -0.035], [0.09, 0.115, 0.09])(x, y, z), 0.07), box: [[-0.14, -0.05, -0.21], [0.14, 0.41, 0.09]], tip: (x, y, z) => 0.265 - y - 0.15 * (z + 0.03) },
   tanuki: { f: () => (x, y, z) => smin(ellipsoid([0, 0.1, -0.066], [0.092, 0.13, 0.088])(x, y, z), ellipsoid([0.016, 0.235, -0.028], [0.078, 0.104, 0.078])(x, y, z), 0.06), box: [[-0.12, -0.05, -0.18], [0.13, 0.36, 0.08]], stripes: (x, y, z) => (y < 0.06 ? 1 : Math.abs((y % 0.085) - 0.0425) - 0.02), tip: (x, y, z) => 0.3 - y },
   duck: { f: () => roundCone([0, 0, 0], [0, 0.05, -0.04], 0.04, 0.012), box: [[-0.06, -0.05, -0.09], [0.06, 0.08, 0.05]] },
+  // Poe's tight pug curl: up off the rump, then one and a quarter turns of a coil lying against the back (drifting to one side)
+  curl: { f: () => { const pts = [], rad = []; for (let i = 0; i <= 16; i++) { const u = i / 16, th = -0.6 + u * 5.6, R = 0.052 - 0.022 * u; pts.push([0.006 + 0.03 * u, 0.06 + Math.sin(th) * R, -0.05 - Math.cos(th) * R * 0.92]); rad.push(0.03 - 0.013 * u); } pts.unshift([0, 0, 0], [0.002, 0.03, -0.02]); rad.unshift(0.032, 0.031); return (x, y, z) => smin(tube(pts, rad)(x, y, z), sphere(pts[pts.length - 1], rad[rad.length - 1] * 1.05)(x, y, z), 0.01); }, box: [[-0.05, -0.05, -0.13], [0.09, 0.14, 0.05]] },
 };
 function tailMesh(kind) {
   return cached(`toytail:${kind}`, () => {
@@ -1043,10 +1063,11 @@ export function buildToyBody(R, spec) {
   }
 
   // --- tail
-  const tk = spec.tail || B.tail;
+  const tk = spec.toy?.tail || spec.tail || B.tail;
   if (tk && tk !== 'none' && TAILS[tk]) {
-    const g = R.group(body, 'tail', [0, 0.035, -torsoR(0.035) * dz + 0.012]);
-    g.rotation.x = tk === 'fox' || tk === 'tanuki' ? -0.55 : tk === 'dog' ? -0.5 : 0;
+    const ty = tk === 'curl' ? 0.07 : 0.035; // (a pug's curl sits high on the rump)
+    const g = R.group(body, 'tail', [0, ty, -torsoR(ty) * dz + 0.012]);
+    g.rotation.x = tk === 'fox' || tk === 'tanuki' ? -0.55 : tk === 'dog' ? -0.5 : tk === 'curl' ? -0.25 : 0;
     const calico = kind === 'cat' && spec.fur3 && spec.fur3 !== spec.fur;
     const tipC = tk === 'fox' ? C('#fff4e8') : tk === 'cat' && calico ? dark : tk === 'tanuki' ? C(spec.fur3 || '#4a3a34') : null;
     const stripeC = tk === 'tanuki' ? C(spec.fur3 || '#4a3a34') : null;
@@ -1055,7 +1076,7 @@ export function buildToyBody(R, spec) {
   }
 
   // --- legs (fur, or pants gathered into a cuff) and broad rounded feet
-  const footC = kind === 'duck' ? C(spec.feet || '#ff9a3a') : limbDark || (spec.patterns?.socks ? C('#fffaf2') : fur);
+  const footC = kind === 'duck' ? C(spec.feet || '#ff9a3a') : spec.toy?.feet ? C(spec.toy.feet) : limbDark || (spec.patterns?.socks ? C('#fffaf2') : fur);
   for (const g of [legL, legR]) {
     const lr = 0.07 * lk + (pants ? 0.01 : 0), yTop = -0.01, yBot = -HIP + 0.075;
     const leg = new THREE.CapsuleGeometry(lr, yTop - yBot, 6, 18, 6); leg.deleteAttribute('uv');
@@ -1098,6 +1119,7 @@ export function buildToyBody(R, spec) {
   const hatAnchor = R.group(head, 'hatAnchor', [0, Hd.top - 0.035, -0.01]);
   hatAnchor.userData.hatScale = 1;
   if (of.hat) { const hg = toyHat(of.hat, of.hatColor || '#f4c04a', kind); if (hg) R.add(hatAnchor, kit(copy2(hg)), 'hat'); else R.classicHat?.(hatAnchor, of.hat, of.hatColor || '#f4c04a'); }
+  spec.toy?.extras?.(R, { body, head, legL, legR, armL: R.parts.armL, armR: R.parts.armR, kind, H: toyHead(kind), Hd, bw, dz, lk, fur, fur2, topC, botC, trimC, waist, ...TOY_KIT });
   R.parts.wave = 'out';            // short arms under a big head wave outward-up (as the Toybox Rosie)
   R.parts.toyArms = true;          // ... and stretch outward-up too (lifePoses stretch / sleepyYawn)
   R.squint = TOY_SQUINT;           // happy: the lower lid rises with its ^ arc, the upper lid tucks in behind it
@@ -1125,6 +1147,8 @@ function toyScale(R, K) {
   };
   walk(R.root);
 }
+/** the body-plan helpers a costume extra builds with (spec.toy.extras; sizes in the kit's sheet metres, before TOY_SCALE) */
+export const TOY_KIT = { HIP, NECK_Y, SHOULDER_Y, torsoR, onTorso, torsoZ, band, lathe, tinted, kit, surfZ, surfY, cutLayers, painted, shadeLow, squircle, rotEll, mirX };
 // a painted copy of a cached geometry (keeps colour and uv)
 function copy2(g) { const o = copy(g); for (const k of ['color', 'uv']) if (g.attributes[k]) o.setAttribute(k, g.attributes[k].clone()); return o; }
 

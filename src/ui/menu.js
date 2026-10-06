@@ -4,9 +4,10 @@ import { glyph } from './glyphs.js';
 import { Panel } from './panel.js';
 
 const CONTROLS = [
-  [['LMB'], 'Move / attack / talk'], [['RMB'], 'Use right-click skill'], [['1', '2', '3', '4'], 'Hotbar skills (hold to charge)'], [['Q', 'E'], 'Heart / Zoom potion'], [['G'], 'Quick meal'],
+  [['LMB'], 'Move / attack / talk'], [['Shift'], 'Sprint (hold)'], [['Alt', 'LMB'], 'Attack in place'], [['Space'], 'Dodge roll'],
+  [['RMB'], 'Use right-click skill'], [['1', '2', '3', '4'], 'Hotbar skills (hold to charge)'], [['Q', 'E'], 'Heart / Zoom potion'], [['G'], 'Quick meal'],
   [['F'], 'Interact'], [['X'], 'Swap weapons'], [['I'], 'Bag'], [['P'], 'Pantry'], [['C'], 'Character'], [['K'], 'Skills'], [['J'], 'Journal'],
-  [['M'], 'Map'], [['Tab'], 'Switch hero'], [['B'], 'Build (village)'], [['Alt'], 'Show loot labels'], [['Esc'], 'Close / menu'],
+  [['M'], 'Map'], [['Tab'], 'Switch hero'], [['B'], 'Build (village)'], [['Z'], 'Show loot labels (hold)'], [['Esc'], 'Close / menu'],
 ];
 
 export class MenuPanel extends Panel {
@@ -36,9 +37,10 @@ export class MenuPanel extends Panel {
         <div class="set-row"><div class="set-n">${glyph('sparkle')}UI size</div><div class="sld"><input type="range" min="80" max="125" data-k="uiScale"><b></b></div></div>
         <div class="set-row"><div class="set-n">${glyph('bolt')}Screen shake</div><button class="tog" data-k="shake"><i></i></button></div>
         <div class="set-row" title="Hold a skill's button to charge it. Toggle: press once to start charging, again to release. Off: holding repeats the skill."><div class="set-n">${glyph('zap')}Charge on hold</div><div class="seg" data-k="chargeMode">${['On', 'Off', 'Toggle'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+        <div class="set-row" title="Hold Shift while moving to sprint (+40% speed). Toggle: tap Shift to start sprinting; tap it again, or stop, to walk."><div class="set-n">${glyph('boots')}Sprint (Shift)</div><div class="seg" data-k="sprintMode">${['Hold', 'Toggle'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
         <div class="set-row"><div class="set-n">${glyph('star')}Show FPS</div><button class="tog" data-k="showFps"><i></i></button></div>
         <div class="set-row"><div class="set-n">${glyph('sparkle')}Disney style</div><button class="tog" data-k="disneyChewy"><i></i></button></div>
-        <div class="set-row"><div class="set-n">${glyph('star')}Toybox heroes</div><button class="tog" data-k="toyChewy"><i></i></button></div>
+        <div class="set-row" title="Which hero models to play with: the samurai Chewy, the Toybox Chewy, or the Storybook heroes. Switching saves and reloads."><div class="set-n">${glyph('star')}Hero models</div><div class="seg" data-k="heroModel">${['Samurai', 'Toybox', 'Storybook'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
         <div class="mn-foot"><button class="btn" data-a="back">${glyph('swap')}Back</button></div>
       </div>
       <div class="mn-v mn-controls">
@@ -79,7 +81,7 @@ export class MenuPanel extends Panel {
     this.setView(this.opts.view || 'main'); this.panel.classList.toggle('from-title', this.opts.from === 'title'); }
   sync() {
     const s = this.ui.settings;
-    for (const seg of this.body.querySelectorAll('.seg')) { // (Graphics, Charge on hold)
+    for (const seg of this.body.querySelectorAll('.seg')) { // (Graphics, Charge on hold, Hero models)
       const v = s[seg.dataset.k] ?? 0;
       for (const b of seg.querySelectorAll('button')) b.classList.toggle('on', +b.dataset.v === v);
       seg.style.setProperty('--sel', v);

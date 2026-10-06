@@ -17,18 +17,20 @@ itch-style iframe). Upload steps and page settings are in [docs/ITCH.md](docs/IT
 | Key / Mouse | Action |
 |---|---|
 | **WASD** or **click** | Walk (hold the mouse to keep walking) |
+| **Shift** (hold while moving) | Sprint: +40% speed, free; it pauses while you attack, cast, charge or roll · Settings › *Sprint*: Hold or Toggle |
 | **F** / click a villager | Talk · interact (shops, chests, shrines, portals, stairs) |
 | **F** at a door | Go inside: Chewy's Cottage, or a villager's home when you're friends (at night: knock) · **F** on the door mat (or walk out) to leave |
 | **F** at a mailbox | The house card: **Upgrade** · **Remodel** · **Enter** (also: click a house in Build mode) |
 | **F** at your garden bed | Till · plant (pick a seed: **1–9**) · water · harvest — whatever the tile needs |
 | **F** facing water | Fish: **F** when the float dips, then **hold F** (or the mouse) to keep the fish in the green |
-| **LMB on a monster** · **Shift+LMB** | Attack with your left-click skill |
+| **LMB on a monster** · **Alt+LMB** | Attack with your left-click skill (Alt: in place, at the cursor) |
 | **RMB**, **1–4** | Cast hotbar skills at the cursor · **tap** for a quick cast, **hold** to charge (Ⅰ → Ⅱ → Ⅲ, let go to release; channels spin / beam while held) · Settings › *Charge on hold*: On · Off · Toggle |
 | **Space** | Dodge roll |
 | **Q / E / R** | Heart Treat · Zoom Juice · Rejuvenation |
-| **X** | Swap **Bone Sword** ⇄ **Red Tennis Ball** |
+| **X** | Swap **Bone Katana** ⇄ **Red Tennis Ball** |
 | **G** | Eat your quick meal (the last dish you ate) |
-| **Tab** | Switch heroes (Chewy ⇄ Moka) |
+| **Tab** | Switch heroes: tap for the next (Chewy → Moka → Poe), hold for the hero wheel (point or 1–3, let go) |
+| **Z** (hold) | Show every loot label |
 | **I · P · C · K · J · M** | Bag · Pantry · Character · Skills · Journal (quests, Fish Log) · Map |
 | **B** | Build mode (village): place buildings, paint R/C/W zones, lay paths, bulldoze · **R** rotate |
 | **B** indoors | Decorate: pick from storage, click to place / pick up · **R** rotate · **Delete** store · **Ctrl+Z** undo · WASD pans |
@@ -52,7 +54,7 @@ itch-style iframe). Upload steps and page settings are in [docs/ITCH.md](docs/IT
 - **Upgrades and remodels**: every home has a mailbox. **Upgrade** a house (the builders' scaffold goes up and it grows, keeping its look and everything inside — the cottage too, to three levels); **Remodel** its outside with a live preview: four style sets (Machiya, Cottage, Tea House, Seaside) or any mix of roof, walls, trim, door, windows, noren, fence and festival bunting.
 
 **Guided tutorials**
-- Shadow shows you around Chewy's Cottage and the garden and then helps you make it home (decorating), Moka teaches you to switch heroes, Kero walks you through your first catch, Tanu shows you how to remodel a house, and back from the Burrow Shadow shows you how to hold a skill to power it up: a speech card, an objective card with *Skip*, bouncing arrows in the world and spotlights on the buttons that matter. Replay any guide from the Journal's **Guides** tab.
+- Shadow shows you around Chewy's Cottage and the garden and then helps you make it home (decorating), Moka teaches you to switch heroes (and Poe, once she joins, the hero wheel), Kero walks you through your first catch, Tanu shows you how to remodel a house, and back from the Burrow Shadow shows you how to hold a skill to power it up: a speech card, an objective card with *Skip*, bouncing arrows in the world and spotlights on the buttons that matter. Replay any guide from the Journal's **Guides** tab.
 
 **The homestead (farming, fishing, cooking)**
 - **Farming**: till, plant, water and harvest in Chewy's garden bed and the village's Veggie Patch fields. Eight crops grow a stage every watered night (a dry day only waits; nothing dies), strawberries keep fruiting, and sprinklers water their neighbours. Seeds come from **Usagi's Seed Stall** and as loot in the Burrow.
@@ -64,7 +66,9 @@ itch-style iframe). Upload steps and page settings are in [docs/ITCH.md](docs/IT
 - Procedurally generated floors across four biomes — Mossy Burrow, Crystal Grotto, Fox Shrine Tunnels, Oni's Kitchen — with torches, glowing mushrooms and crystals, light shafts, breakable pots, chests, shrines, waypoints and stairs down.
 - Cute yokai monsters (mochi slimes, dust bunnies, kinoko, lantern ghosts, kasa-obake, fox-fire wisps, oni imps, tanuki bandits) in packs led by **champions** and **uniques** with D2-style modifiers (fire enchanted, frosty aura, teleporting, vampiric…).
 - Bosses every 5 floors: **King Mochi**, **Lord Karakasa**, **Oni Chef Gorobei**, **Tamamo the Nine-Tailed**.
-- **Three skill trees × 7 skills** (Bone Arts, Fetch Mastery, Pack Spirit) with synergies, 60 levels, stat points.
+- **Three skill trees × 7 skills** (Bone Blade, Fetch Mastery, Pack Spirit) with synergies, 60 levels, stat points.
+- **Chewy the samurai**: a black-and-gold haori and hakama, and a Bone Katana drawn from the saya at his hip for quick-draw cuts, two-handed swings, stances and battle cries; a combo ends with the katana slid home into its saya (Settings › *Hero models*: Samurai, Toybox or Storybook).
+- **Poe the pug ninja**, the third hero: met in the Whispering Bamboo Grove, where she "stealthily" tails you (snorting) until a sneeze gives her away. A giant bone fūma shuriken thrown out and back, and three trees — Shuriken Arts (kunai fans, buzz-saws, shuriken rain), Ninjutsu (smoke bombs, shadow clones, a fire puff ball, thunder paw, a smoke dragon) and Shadow Step (backstabs, afterimage dashes, vanish, caltrops, bullseye marks) — all 18 actives chargeable (docs/POE.md).
 - **Charged abilities**: hold any active skill to charge it (a ring fills to Stage Ⅰ, Ⅱ, Ⅲ) and let go for a bigger version — a rolling shockwave cleave, a piercing fastball, a giant squeaker, a meteor shower… Skill points buy **charge perks** per skill in the K panel's Charge card: more stages, a quicker wind-up, extra projectiles and a unique trick for every skill.
 - **Loot**: normal / magic / rare / unique / set items with affixes, sockets and treat gems; loot beams for rares+; potions, materials and coins.
 - **Shadow** fights by your side, faints and gets back up; call spirit pups, throw squeaky decoys and heal with treats.
@@ -79,6 +83,6 @@ Dev pages live under `/?test=…` (`sandbox`, `chars`, `monsters`, `dungeon`, `b
 - `node tools/qa/prod-smoke.mjs` — builds the game, serves the bundle and checks the UI/audio load with no errors (run before shipping launcher changes)
 - `node tools/qa/run-all.mjs` — browser scenario suite (needs `npm run dev`): village↔Burrow round trips and leak checks,
   combat stress with every skill, all four bosses, death, village sim + save/load, inventory edge cases, dialogue/story,
-  input edge cases, the regions, the village plan, the homestead (s15: farming, fishing, cooking), the guided tutorials (s16), housing (s17: interiors, decorating, villagers' homes, ratings, requests, upgrades, remodels, the housing guides), getting furniture (s18) and charged abilities (s19: the hold, the perks, the channels, every skill, the K panel, dash bounds, the guide, perf). Each scenario (`tools/qa/s*.mjs`) can also run on its own.
+  input edge cases, the regions, the village plan, the homestead (s15: farming, fishing, cooking), the guided tutorials (s16), housing (s17: interiors, decorating, villagers' homes, ratings, requests, upgrades, remodels, the housing guides), getting furniture (s18) and charged abilities (s19: the hold, the perks, the channels, every skill, the K panel, dash bounds, the guide, perf) and Poe (s20: her joining scene, an old save and the rumour, the Meet Poe guide, every skill, a real charge, perf) and the zones' foundations (s21: the sprint, Alt+LMB, the Z loot labels, dungeon definitions, rerolling floors, the zone save state and its migration, the new quest steps). Each scenario (`tools/qa/s*.mjs`) can also run on its own.
 - `node tools/qa/village-perf.mjs 2` / `node tools/qa/homestead-perf.mjs 2` / `node tools/qa/housing-perf.mjs 2` — frame-time snapshots (the village; a full garden and a reel in progress; entering homes, a 60-piece room, remodels).
 - `node tools/shot.mjs --url "/?..." --out name` — headless screenshot harness used for visual iteration.

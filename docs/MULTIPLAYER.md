@@ -89,7 +89,7 @@ WebRTC.
 - **Downed, not dead**: at 0 life a hero is downed for 20 s. A teammate holding F nearby for 2 s revives them at 35%
   life. If the whole party is down, or the timer runs out, Shadow drags that hero home (today's death flow, per hero).
 - **Class synergies** (the reason to play together): Moka's Bubble Barrier can shield an ally, Duck Call and
-  Whirlpool gather monsters for Chewy's Bone Storm, and Good Boy Aura covers the party. These are balanced in the
+  Whirlpool gather monsters for Chewy's Sakura Storm, and Code of the Good Boy covers the party. These are balanced in the
   single-player pass so they work at all.
 - **The village**: every player can walk, chat, shop and fish. **Build mode is host-only** (it's the host's town).
   Villager hearts and quests belong to the host's world. Guests get the XP and coin rewards, and the story flags are
@@ -99,7 +99,8 @@ WebRTC.
 
 ## 6. Party-wide transitions
 - **Entering the Burrow**: the player at the gate starts a 5 s "Ready?" prompt (everyone sees paw icons fill as
-  players arrive or accept). The host then runs `enterDungeon(floor)` and sends `mode {floor, seed, runs}`, and every
+  players arrive or accept). The host then runs `enterDungeon(floor)` (or `{ id, floor, tier, mods }`) and sends
+  `mode {id, floor, tier, mods, seed}` (the host's `beginRun` seed: clients pass it as the run's explicit `seed`), and every
   client runs the same iris transition while it builds the floor locally.
 - **Stairs / waypoints**: same prompt. Stragglers are carried along (a D3-style party teleport).
 - **Going home** (T or waypoint): only the party leader (host) can end the run for everyone. Anyone else going home

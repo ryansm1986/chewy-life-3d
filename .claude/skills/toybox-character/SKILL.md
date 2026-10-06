@@ -1,22 +1,23 @@
 ---
 name: toybox-character
-description: Make a character (hero, villager, NPC or companion) in the game's "Toybox Chibi" style, end to end. Codex (GPT-6.1-Sol) draws Toybox-style model sheets, the USER approves one, then an Opus agent (the default; Codex on request) models it in Blender by script under Claude's measured feedback until 9/10, rigs it to the game's 37-bone contract (or the quad contract), and Claude exports and integrates it and runs QA. Use when the user wants a new, redesigned or "toybox" version of a character (e.g. "do a new Rosie", "make Kuma in the toybox style").
+description: Make a character (hero, villager, NPC or companion) in the game's "Toybox Chibi" style, end to end. Codex (GPT-6.1-Sol) draws Toybox-style model sheets, the USER approves one, then an Opus agent (always: it does all Blender work) models it in Blender by script under Claude's measured feedback until 9/10, rigs it to the game's 37-bone contract (or the quad contract), and Claude exports and integrates it and runs QA. Use when the user wants a new, redesigned or "toybox" version of a character (e.g. "do a new Rosie", "make Kuma in the toybox style").
 ---
 
 # Toybox character pipeline (concept → user approval → Blender model → rig → game)
 
 This is the flow that produced the **Toybox Chewy** (`public/rigs/chewy_b.*`; archive in `tools/blender/codex/assets/chewy-b/`).
-Claude directs and reviews every round. **Codex draws the concept sheets**, on the **codex-blender** skill's runner
-(read `.claude/skills/codex-blender/SKILL.md` once for the runner, sandbox and guardrails). **An Opus agent does the Blender
-work by default.** The user chose that on 2026-10-01 after Rosie and Shadow: Opus fixed Rosie's head in 3 rounds where Codex
-had plateaued after 12.
+Claude directs and reviews every round. **Codex only draws the concept sheets** (image generation), on the
+**codex-blender** skill's runner (read `.claude/skills/codex-blender/SKILL.md` once for the runner and the shared tools).
+**An Opus agent does all the Blender work**: modelling, re-dresses, rigging and export. That's the user's rule since
+2026-10-05, after Opus became the default on 2026-10-01: Opus fixed Rosie's head in 3 rounds where Codex had plateaued
+after 12. Don't use Codex for Blender, even when it seems quicker.
 
 **The style anchor is the Toybox Chewy.** Every new character must look like it belongs next to him:
 - the concept sheet `tools/blender/codex/assets/chewy-b/sheet-B.png`;
 - in-game shots of the model (`/?test=chars&only=chewy`).
 Attach both to every concept and model brief.
 
-Runner: `node .claude/skills/codex-blender/scripts/codex-blender.mjs start|resume|status …`.
+Concept-sheet runner (stage 2 only): `node .claude/skills/codex-blender/scripts/codex-blender.mjs start|resume|status …`.
 - Always run it with the Bash tool with `run_in_background: true`, and wait for the notification. Don't poll or sleep.
 - One run per task at a time: a `run.lock` in the task folder refuses a second start/resume while one is alive.
   Never queue a delayed resume with `sleep` in a background shell (it can outlive your view of it and overlap a manual
@@ -54,22 +55,31 @@ Runner: `node .claude/skills/codex-blender/scripts/codex-blender.mjs start|resum
 - Show the sheets (SendUserFile when available, otherwise their paths) with one or two lines per option: the idea and
   any risks (for example, "views disagree on the hair length").
 - Ask with AskUserQuestion (A / B / C, "mix", or "none: try again"). **Never start modelling without the user's pick.**
+- **A mix** (for example "the black pug from B in C's outfit", as with Poe): `resume` the concept task to draw **one
+  combined sheet** (`option-D.png`). Say exactly which parts come from which option, with their hex colours, and show it
+  to the user before modelling. The builder needs one consistent blueprint to measure, not two half-sheets.
+- **A recolour** (for example "try it in black", as with the samurai Chewy): resume with the picked design's shapes locked
+  and two or three palette variants, then let the user pick again.
 - Copy the chosen sheet to `tools/blender/work/codex/<id>-toy/refs/sheet.png`.
 
-### Builder choice for stages 4–6: Opus (default) or Codex
-The concept sheets always come from Codex (stage 2, image generation). The **Blender stages** can run on either builder:
-- **Opus** (the default): fill in `templates/opus-builder.md` and launch it with the **Agent** tool:
-  `subagent_type: "general-purpose"`, `model: "opus"`, `run_in_background: true`,
-  `description: "<id>-toy Blender build"`. Put the brief in `tools/blender/work/codex/<id>-toy/brief.md` (the model
-  brief).
-- **Codex**, only when the user asks for it: the runner with `--kind model --effort xhigh`, as in stage 4's notes.
-- If the agent stops on an API session limit, tell the user the reset time, then resume it **with SendMessage to the same
-  agent** after the reset. That keeps its context; a new agent would start over.
-  - Each feedback round goes to **the same agent** with SendMessage (it keeps context): send the `feedback-<n>.md` content
-    plus the image paths to look at.
-  - Review the same way for either builder. The work folder, previews, comparisons and archive are the same, so the rest of the
-    pipeline doesn't change.
-  - Note the builder in the archive README.
+### The builder for stages 4–6: an Opus agent
+The concept sheets come from Codex (stage 2, image generation). **Every Blender stage runs on an Opus agent**:
+- **Launching**: fill in `templates/opus-builder.md` and launch it with the **Agent** tool: `subagent_type: "general-purpose"`,
+  `model: "opus"`, `run_in_background: true`, `description: "<id>-toy Blender build"`. Put the brief in
+  `tools/blender/work/codex/<id>-toy/brief.md` (the model brief).
+- **One agent per character, for the whole job.** Each feedback round, the user's notes and the rig round go to **the same
+  agent** with SendMessage, which keeps its context: send the `feedback-<n>.md` path plus the image paths to look at. A new
+  agent would start over.
+- **Usage limits**: if the agent stops on an API session limit, tell the user the reset time, then resume it with
+  SendMessage after the reset.
+- **Reports**: subagents can't write `report.md` (the harness blocks report files), so the agent puts its report in its
+  reply. Save the important parts into the task folder yourself when you archive.
+- **Parallel builders**: two or more characters can build at the same time, in separate task folders. The template's
+  process rules matter here: each agent kills only the PIDs it started, never `taskkill /IM blender.exe`, with timeouts
+  and capped loops. If one breaks them, tell the user.
+- **Pausing**: to pause a builder (for example while the user reconsiders a design), SendMessage it to finish its current
+  step, report and wait. Keep its colours or other open choices as named constants so the next round only swaps them.
+- Note "built by an Opus agent" in the archive README.
 
 ### 4. Model (the builder models in Blender; about 45–60 minutes per round, 3–4 rounds with Opus)
 - Fill in `templates/model-brief.md`, **measuring the sheet**:
@@ -77,7 +87,12 @@ The concept sheets always come from Codex (stage 2, image generation). The **Ble
   - eye centres and opening sizes, nose, mouth, ear or hair masses, all as fractions of W and H;
   - total height (villagers and heroes are about 1.2 m to the crown).
 - Launch the builder with the brief, the sheet, the style anchor and the old model marked "not this" if the user dislikes
-  it (Codex: `start --kind model --effort xhigh` with `--image` for each).
+  it. List every reference image path in the agent's prompt so it reads them.
+- **Re-dressing an existing character** (new clothes, the same body: the samurai Chewy): have the builder run the
+  archived build script **unchanged**, checked by MD5, up to its join step, delete only the old costume pieces by name,
+  and build the new clothes in the freed atlas regions. It proves the lock in every report: head, eyes, ears, tail,
+  paws and feet vertex deltas of 0.0 against the shipping GLB, and locked atlas regions identical. The rig round then reuses
+  the old face rig and body weights as they are, and only weights the new clothes.
 - **Every review round:**
   1. Read `report.md` and the previews (`turnaround.png`, `head.png`, `portrait.png`, `game.png`).
   2. Make **same-scale comparisons** with `scripts/compare.py`: head front and 3/4, side and back, and eyes-only.
@@ -87,7 +102,7 @@ The concept sheets always come from Codex (stage 2, image generation). The **Ble
      - what's approved and **locked**;
      - numbered fixes with measured targets;
      - say explicitly what stays fixed when something moves (see lessons).
-  5. Send the round to the builder (Opus: SendMessage with the feedback path; Codex: `resume` with the comparison images).
+  5. Send the round to the builder: SendMessage with the feedback path and the comparison image paths.
 - Ship at **9/10** against the sheet. Use `templates/review-checklist.md`.
 
 ### 5. GATE 2: the user signs off on the model
@@ -96,7 +111,7 @@ The concept sheets always come from Codex (stage 2, image generation). The **Ble
 - Apply their notes in more model rounds, measured the same way.
 
 ### 6. Rig (the same builder, 1–2 rounds)
-- Send `templates/rig-brief.md`, filled in, to the builder (SendMessage, or `resume` for Codex). It covers:
+- Send `templates/rig-brief.md`, filled in, to the same builder with SendMessage. It covers:
   - the 37-bone contract and axis mapping;
   - the face controls and their exact game values;
   - the lid shells, mouth cavity, weights and pose tests.
@@ -144,7 +159,7 @@ and `sitDrop` on the entry sets how far the hind legs drop in a sit. Shadow's ri
 - **Prose gets over-corrected.** "A real muzzle" became a fox snout; "bigger ears" became Mickey paddles. Give numbers,
   normalised to the head width, measured from the sheet, plus same-scale crops.
 - **Measure on the comparison image.** A height misread by eye made the eyes 20% too small for a round.
-- **Say what stays fixed.** "Move the top edge down" shrank the chin patch, because Codex kept the other end fixed.
+- **Say what stays fixed.** "Move the top edge down" shrank the chin patch, because the builder kept the other end fixed.
 - **Check thin parts from both 45° game yaws.** Thin flaps read as spikes edge-on, so give ears and hair locks volume.
 - **Toon light and grade shift colour.** Judge colour in the game, and fix it with a runtime `tint` (or `darkGrade`
   for dark coats) rather than endless repaints. Check the portraits too: they render without the grade pass.
@@ -167,3 +182,16 @@ and `sitDrop` on the entry sets how far the hind legs drop in a sit. Shadow's ri
 - **Check the game's action poses on the new proportions.** The wave and happy-hop raise the arms inward-up, which hid
   Rosie's short arms in her curls. Per-model Animator overrides on the HERO_MODELS entry (`wave`: 'out' or 'front', `squint`) fix that
   without touching other characters.
+- **Head accessories from 45° above.** Poe's festival mask, placed as on the sheet's front view, read from the game camera
+  as a big badge lying on top of her head. Turn side accessories outward (about 40°) onto the side corner, and judge them
+  in `game.png`, not only from the front.
+- **Folded ears must stay under the crown outline.** When Poe's ear fold rose above the crown, it read as a thin dark hook
+  arching over the head from 45°. Brief folded ears as compact rounded triangles whose outer edge continues the head's
+  corner.
+- **Black coats need painted sheen to read in the game.** Poe's black face went flat in the game light: the eyes read, but
+  the nose and mouth vanished. Paint soft cool highlights on the forehead, the muzzle top, the cheek tops and the crown, and
+  give the nose a crisp highlight. The runtime `darkGrade` then fixes the hue.
+- **When the sheet disagrees with itself** (Poe's head close-up was 1.58 wide, her full-body view 1.42), pick one view,
+  tell the builder which, and say so in the review.
+- **Black cloth shifts toward navy** in the grade, as on the samurai Chewy. Paint the true colours, and fix the cast with
+  the entry's `darkGrade` after install.

@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { makeToon, makeOutline } from '../gfx/materials.js';
 import { paint, merge } from '../gfx/geom.js';
 import { tennisBallTexture, glowTexture } from '../gfx/textures.js';
-import { boneSwordGeo } from '../actors/charKit.js';
+import { katanaGeo } from '../actors/charKit.js';
 import { RARITY } from '../rpg/items.js';
 import { Events } from '../core/events.js';
 import { POTION_CAP } from '../rpg/actions.js';
@@ -150,7 +150,7 @@ export class GroundLoot {
     else if (d.type === 'gem') { const gc = d.item?.color || d.item?.icon?.colors?.[0] || '#ff6a8a'; mesh = new THREE.Mesh(gemGeo(), makeToon({ vertexColors: true, color: gc, rim: 0.8, emissive: gc, emissiveIntensity: 0.6 })); color = gc; label = d.item?.name; }
     else if (d.type === 'item') {
       const it = d.item; color = RCOL[it.rarity] || '#ffffff';
-      if (it.slot === 'weapon' && it.wtype === 'sword') { mesh = new THREE.Mesh(geo('lootSword', boneSwordGeo), makeToon({ vertexColors: true, rim: 0.6, emissive: color, emissiveIntensity: it.rarity === 'normal' ? 0 : 0.25 })); mesh.scale.setScalar(0.7); mesh.rotation.z = Math.PI / 2; }
+      if (it.slot === 'weapon' && it.wtype === 'sword') { const kc = it.icon?.colors?.length ? it.icon.colors : null; mesh = new THREE.Mesh(geo(`lootKatana:${kc || ''}`, () => katanaGeo({ colors: kc })), makeToon({ vertexColors: true, rim: 0.6, emissive: color, emissiveIntensity: it.rarity === 'normal' ? 0 : 0.25 })); mesh.scale.setScalar(0.7); mesh.rotation.z = Math.PI / 2; }
       else if (it.slot === 'weapon') { mesh = new THREE.Mesh(geo('lootBall', () => { const g = new THREE.SphereGeometry(0.13, 14, 10); g.translate(0, 0.13, 0); return g; }), makeToon({ map: tennisBallTexture(), rim: 0.6, emissive: color, emissiveIntensity: 0.15 })); }
       else { mesh = new THREE.Mesh(bundleGeo(), makeToon({ color, rim: 0.7, emissive: color, emissiveIntensity: 0.2 })); }
       label = it.name;

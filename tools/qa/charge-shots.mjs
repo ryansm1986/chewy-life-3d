@@ -22,7 +22,7 @@ const freeze = on => page.evaluate(on => { window.G.engine.timeScale = on ? 0 : 
 try {
   for (const id of IDS) {
     const hero = await (async () => { const m = await import('../../src/rpg/skills.js'); return m.SKILLS[id]?.cls || 'chewy'; })();
-    await boot(page, `fresh&nointro${hero === 'moka' ? '&hero=moka' : ''}`);
+    await boot(page, `fresh&nointro${hero === 'moka' || hero === 'poe' ? `&hero=${hero}` : ''}`); // (Poe: her wind-ups and releases too — SHOT_DIR=tools/qa/tmp/... for them)
     await page.evaluate(f => { window.G.state.flags.burrowTut = true; window.G.enterDungeon(f); }, FLOOR);
     await waitMode(page, 'dungeon');
     await sleep(page, 600);

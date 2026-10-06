@@ -19,19 +19,22 @@ export function themeFor(floor) {
 export const BOSSES = { 5: 'mochiKing', 10: 'kasaLord', 15: 'oniChef', 20: 'nineTails' };
 export function bossFor(floor) { return floor % 5 === 0 ? BOSSES[((floor - 1) % 20) + 1] || 'mochiKing' : null; }
 
-export function generate({ floor = 1, seed = 1 } = {}) {
+// plan: one floor of a dungeon (dungeon/defs.js floorPlan: { theme, boss, mlvl, waypoint, depth }); without one, the
+// Burrow's floor (the old behaviour: the theme and boss by floor, monsters floor + 1, waypoints every 5th floor)
+export function generate({ floor = 1, seed = 1, plan = null } = {}) {
   const rng = new RNG(seed * 7919 + floor * 104729);
   const noise = new Noise(seed + floor * 13);
-  const boss = bossFor(floor);
-  const theme = themeFor(floor), TH = THEMES[theme];
+  const P = plan || { theme: themeFor(floor), boss: bossFor(floor), mlvl: floor + 1, waypoint: floor % 5 === 1 && floor > 1, depth: floor };
+  const boss = P.boss || null, depth = P.depth ?? floor;
+  const theme = THEMES[P.theme] ? P.theme : themeFor(floor), TH = THEMES[theme];
   // built biomes (shrine / kitchen) get cleaner rooms and straight corridors so fences & brick walls read as architecture
   const wob = TH.wobble ?? 0.9, built = !!TH.built, cr = built ? 1.4 : 2.2;
-  const W = boss ? 56 : 64 + Math.min(16, floor * 2), H = W;
+  const W = boss ? 56 : 64 + Math.min(16, depth * 2), H = W;
   const grid = new Uint8Array(W * H); // 0 wall, 1 floor
   const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? 0 : grid[y * W + x];
   const set = (x, y, v = 1) => { if (x > 1 && y > 1 && x < W - 2 && y < H - 2) grid[y * W + x] = v; };
   const rooms = [];
-  const want = boss ? 6 : 9 + Math.min(6, Math.floor(floor / 2));
+  const want = boss ? 6 : 9 + Math.min(6, Math.floor(depth / 2));
   let tries = 0;
   while (rooms.length < want && tries++ < 600) {
     const big = rooms.length === 1 && boss;
@@ -113,7 +116,7 @@ export function generate({ floor = 1, seed = 1 } = {}) {
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) occupied.add((r.cy + dy) * W + r.cx + dx);
   }
   const spawns = [], chests = [], pots = [], shrines = [], props = [];
-  const mlvl = floor + 1;
+  const mlvl = P.mlvl ?? floor + 1;
   for (const r of rooms) {
     if (r.kind === 'start') continue;
     if (r.kind === 'boss') { spawns.push({ x: r.cx, y: r.cy, boss, rank: 'boss', count: 1 }); continue; }
@@ -121,7 +124,7 @@ export function generate({ floor = 1, seed = 1 } = {}) {
     for (let p = 0; p < packs; p++) {
       const c = freeCell(r, 2); if (!c) continue;
       const roll = rng.next();
-      const rank = roll < 0.06 + floor * 0.004 ? 'unique' : roll < 0.2 ? 'champion' : 'normal';
+      const rank = roll < 0.06 + depth * 0.004 ? 'unique' : roll < 0.2 ? 'champion' : 'normal';
       spawns.push({ x: c.x, y: c.y, rank, count: rank === 'unique' ? rng.int(3, 5) : rank === 'champion' ? rng.int(2, 4) : rng.int(3, 6) });
     }
     if (r.kind === 'treasure') { const c = freeCell(r, 2); if (c) chests.push({ ...c, quality: 'gold' }); }
@@ -133,7 +136,7 @@ export function generate({ floor = 1, seed = 1 } = {}) {
   const stairsCell = far.kind === 'stairs' ? freeCell(far, 2) || { x: far.cx, y: far.cy } : null;
   // waypoint: nearest cell to the start whose whole 3x3 neighbourhood is open floor (never inside rock)
   let waypoint = null;
-  if (floor % 5 === 1 && floor > 1) {
+  if (P.waypoint) {
     const open3 = (x, y) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!at(x + dx, y + dy)) return false; return true; };
     let best = null, bd = 1e9;
     for (let y = start.y - 1; y <= start.y + start.h; y++) for (let x = start.x - 1; x <= start.x + start.w; x++) {

@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 import { makeToon, makeOutline } from '../../gfx/materials.js';
 import { rand, clamp, TAU, dist, angleDiff, ease } from '../../core/util.js';
-import { V, col, ell, paint, xf, INK, lathe, cyl, tubeC, eyesCute, cheeks, smile, blob, assemble, act, mdef, every, tele, roll, sfx, playerIn, hitArea, push, puff, screenAngle } from './bamboo.js';
+import { V, col, ell, paint, xf, INK, lathe, cyl, tubeC, eyesCute, cheeks, smile, blob, assemble, act, mdef, every, tele, roll, sfx, playerIn, hitArea, push, puff, screenAngle, shared } from './bamboo.js';
 
 const _v = new THREE.Vector3(), _dir = new THREE.Vector3(), _q = new THREE.Vector3();
 const HINT = { crab: false };
@@ -58,7 +58,7 @@ function tuft(base, dir, len, rad, color, seg = 8) {
  */
 function vhook(mat, key, U, pars, body, ol = '', nrm = '') {
   if (!mat || mat.userData.vh) return mat;
-  mat.userData.vh = key;
+  mat.userData.vh = key; mat.userData.vhU = U; // (vhU: per-instance values the Horde's instanced batches read, dungeon/horde.js)
   const hull = mat.side === THREE.BackSide && !mat.isMeshToonMaterial;
   const prev = mat.onBeforeCompile, pk = mat.customProgramCacheKey;
   mat.onBeforeCompile = (sh, r) => {
@@ -81,7 +81,7 @@ function hookModel(M, H) {
 /** champions / uniques get a fresh coloured hull from Monster: hook it too (shared with the sub parts by mdef) */
 function rehook(m) { const M = m.model, H = M.hook; if (H) vhook(M.outline.material, H.key, H.U, H.pars, H.body, H.ol); }
 /** a per-instance uniform on a toon material built from a shared spec (assemble shares the spec's uniform objects) */
-function ownU(mat, name, value) { const u = { value }; mat.userData.u[name] = u; return u; }
+function ownU(mat, name, value) { const u = { value }; mat.userData.u[name] = u; (mat.userData.instU ||= []).push(name); return u; }
 
 /** is entity e inside the cone (apex at m, facing, range r, half-angle arc)? */
 function inCone(m, e, r, arc) {
@@ -322,7 +322,7 @@ function kappaAI(m, dt, target, d, slow) {
         go('splash'); m.state = 'attack'; m.telegraph = null; M.dip = 0.35;
         const fx = Math.sin(m.facing), fz = Math.cos(m.facing), raw = Math.round(roll(m) * 0.9);
         if (P && !G.playerDead && inCone(m, P, KP.SPL_R, KP.SPL_ARC) && !P.invuln) { m.mode.combat.hitPlayer(raw, { element: 'frost', level: m.level, from: m.pos, knock: 0.6, src: m }); soak(m, 2.2, 0.32); }
-        for (const e of m.mode.combat.entities) if (e.alive && e.team === 'ally' && e !== P && !e.untargetable && e.pos && inCone(m, e, KP.SPL_R, KP.SPL_ARC)) m.mode.combat.hitAlly(e, raw, { element: 'frost', from: m.pos });
+        for (const e of m.mode.combat.allies || m.mode.combat.entities) if (e.alive && e.team === 'ally' && e !== P && !e.untargetable && e.pos && inCone(m, e, KP.SPL_R, KP.SPL_ARC)) m.mode.combat.hitAlly(e, raw, { element: 'frost', from: m.pos });
         const hx = m.pos.x + fx * 0.25, hy = m.pos.y + 0.95, hz = m.pos.z + fz * 0.25;
         droplets(G, hx, hy, hz, fx, fz, 30, KP.SPL_ARC, 7, '#7ee2ff', 0.45);
         for (let i = 0; i < 7; i++) { const a = m.facing + rand(-KP.SPL_ARC, KP.SPL_ARC), r = rand(0.8, KP.SPL_R); puff(G.vfx.smoke, m.pos.x + Math.sin(a) * r, m.pos.y + 0.3, m.pos.z + Math.cos(a) * r, { vx: Math.sin(a) * 1.2, vy: rand(0.3, 0.9), vz: Math.cos(a) * 1.2, life: rand(0.5, 0.8), size: 0.45, size1: 1.0, color: '#d8f6ff', alpha: 0.55, alpha1: 0, drag: 2.5 }); }
@@ -711,9 +711,9 @@ function bellGeo(v) {
       const band = Math.abs(((p.y * 14) % 1 + 1) % 1 - 0.5); if (band > 0.42 && p.y > 0.06) o.copy(rib); // paper-lantern ribs
       if (Math.abs(Math.sin(Math.atan2(p.x, p.z) * 4)) < 0.08 && p.y > 0.08) o.copy(seam);
     });
-    BELLS.set(v.key, g);
+    BELLS.set(v.key, shared(g));
   }
-  return g.clone();
+  return g; // (shared: ROADMAP Z-B1)
 }
 function buildKurage(v) {
   const M = assemble('kurage:' + v.key, () => kurageSpec(v));
@@ -729,6 +729,7 @@ function buildKurage(v) {
     fragOut: `{ float fr = 1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
       outgoingLight += diffuseColor.rgb * (uBellK + fr * fr * 0.45);
       diffuseColor.a = clamp(0.34 + fr * fr * 0.62 + uBellK * 0.12, 0.0, 0.95); }` });
+  bellMat.userData.instU = ['uBellK']; // (a per-jelly uniform: instanced as an attribute, dungeon/horde.js)
   const geo = bellGeo(v);
   const bell = new THREE.Mesh(geo, bellMat); bell.renderOrder = 10; bell.castShadow = true;
   const hullMat = makeOutline(INK, 0.021); hullMat.transparent = true;
@@ -790,7 +791,7 @@ function zapRing(m, x, z, R, color) {
         }
       }
     }
-    for (const e of Cb.entities) {
+    for (const e of Cb.allies || Cb.entities) { // (the allies set: same entities, same order, without walking the crowd)
       if (!e.alive || e.team !== 'ally' || e === P || e.untargetable || !e.pos || hitA.includes(e)) continue;
       if (dist(e.pos.x, e.pos.z, x, z) < r + (e.radius || 0.3)) { hitA.push(e); Cb.hitAlly(e, raw, { element: 'zap', from: m.pos }); }
     }

@@ -23,7 +23,9 @@
 //   weaponType               'sword' | 'ball' (unarmed counts as 'sword')
 // Extras (safe to ignore): lvl, resAll, skillBonus{id:n}, statDmgPct, critMul, atkMul, castMul, moveMul, ballSpeed (mult),
 //   unarmed, weaponSlot, skillLevels{id:effLvl}, synergy{id:mult}, frenzy{perStack,maxStacks,duration}|null,
-//   auras[{id,lvl,radius,...}], setCounts{setId:n}, dmgAvg, meal{buff,tier,dish} (Well Fed, life/meals.js).
+//   auras[{id,lvl,radius,...}], setCounts{setId:n}, dmgAvg, meal{buff,tier,dish} (Well Fed, life/meals.js),
+//   dodge (% chance a monster's hit misses the hero: Poe's class + Swift as Wind; 0 for the others), treeDmgPct{tree:%},
+//   treeCostCut{tree:%} and jutsuMul (Poe: skillsPoe.js poePassives).
 //
 // Affix value semantics (item affixes add into these; only computeStats interprets them):
 //   dmgMin/dmgMax = flat added to weapon base damage; def = flat defense (enhanced-defense affixes are pre-converted
@@ -33,6 +35,7 @@ import { SKILLS, SKILL_IDS, effectiveLevel, synergyMult } from './skills.js';
 import { SETS, EQUIP_SLOTS } from './items.js';
 import { CLASSES } from './classes.js';
 import { mokaPassives } from './skillsMoka.js';
+import { poePassives } from './skillsPoe.js';
 import { mealAcc, mealPost } from '../life/meals.js';
 
 export const LEVEL_CAP = 60;
@@ -130,7 +133,7 @@ export function computeStats(state) {
   d.allSkills = acc.allSkills;
   d.cls = CL.id;
   d.treeSkills = {};
-  for (const t of ['bone', 'fetch', 'spirit', 'tide', 'star', 'duck']) d.treeSkills[t] = acc.treeSkills[t] || 0;
+  for (const t of ['bone', 'fetch', 'spirit', 'tide', 'star', 'duck', 'shuriken', 'jutsu', 'shadow']) d.treeSkills[t] = acc.treeSkills[t] || 0;
   d.skillBonus = { ...acc.skillBonus };
 
   // skill levels & synergies
@@ -147,7 +150,7 @@ export function computeStats(state) {
   const w = eq[weaponSlot];
   d.weaponSlot = weaponSlot;
   d.unarmed = !w;
-  d.weaponType = w ? w.wtype : (CL.weapons[0] === 'staff' ? 'staff' : 'sword'); // bare paws: the class's own style
+  d.weaponType = w ? w.wtype : (CL.weapons[0] === 'staff' || CL.weapons[0] === 'fuma' ? CL.weapons[0] : 'sword'); // bare paws: the class's own style
   let masteryPct = 0, masteryCrit = 0;
   d.ballSpeed = 1;
   let extraPierce = 0;
@@ -177,13 +180,13 @@ export function computeStats(state) {
   d.critDmg = 50 + acc.critDmg;
   d.critMul = r2(1 + d.critDmg / 100);
 
-  // defense & block (Stubborn Guard)
+  // defense & block (Unbending Stance)
   let defPct = 0, block = acc.block;
   if (L('guard') > 0) { const g = SP('guard'); defPct += g.defPct; block += g.block; }
   d.def = Math.round((itemDef + acc.def + d.dex / 4) * (1 + defPct / 100));
   d.block = r1(clamp(block, 0, 60));
 
-  // resistances (+ Good Boy Aura)
+  // resistances (+ Code of the Good Boy)
   d.auras = [];
   let auraRes = 0, auraRegen = 0;
   if (L('goodboy') > 0) {
@@ -220,6 +223,8 @@ export function computeStats(state) {
   d.setCounts = setCounts;
   d.treeDmgPct = { tide: 0, star: 0, duck: 0 };
   if (CL.id === 'moka') mokaPassives(d, L, state);
+  d.dodge = 0;
+  if (CL.id === 'poe') poePassives(d, L, CL); // (her per-tree masteries, Energy for jutsu, Swift as Wind, dodge)
   mealPost(P.meal, d); // (Hearty's max life / regen, and d.meal for the UI)
   return d;
 }
@@ -349,11 +354,12 @@ export const playerPhysDR = (def, attackerLevel) => Math.min(0.6, def / (def + 5
 
 /**
  * Roll one hit from the player.
- * @param {object} o { derived, skillDmgPct=100, element='phys', target:{def,res,level}, rng, bonusPct=0 (buffs like Howl), noCrit }
+ * @param {object} o { derived, skillDmgPct=100, element='phys', target:{def,res,level}, rng, bonusPct=0 (buffs like Howl), noCrit,
+ *   critAdd=0 (+% crit chance for this hit: Poe's strikes from behind), critX=1 (× the crit bonus: Vanish's double crit), forceCrit }
  * @returns {{dmg:number, crit:boolean, element:string, parts:object, heal:number, zoom:number}}
  *   heal/zoom = life/zoom stolen from this hit (lifeSteal/zoomSteal applied).
  */
-export function rollHit({ derived, skillDmgPct = 100, element = 'phys', target = {}, rng, bonusPct = 0, noCrit = false }) {
+export function rollHit({ derived, skillDmgPct = 100, element = 'phys', target = {}, rng, bonusPct = 0, noCrit = false, critAdd = 0, critX = 1, forceCrit = false }) {
   const r = toRand(rng);
   const d = derived;
   const k = skillDmgPct / 100;
@@ -364,8 +370,8 @@ export function rollHit({ derived, skillDmgPct = 100, element = 'phys', target =
     const a = d[ELEM_DMG_KEY[e]];
     if (a && a[1] > 0) parts[e] += (a[0] + (a[1] - a[0]) * r()) * k;
   }
-  const crit = !noCrit && r() * 100 < d.crit;
-  const mul = (crit ? d.critMul || 1.5 : 1) * (1 + bonusPct / 100);
+  const crit = !noCrit && (forceCrit || r() * 100 < d.crit + critAdd);
+  const cm = d.critMul || 1.5, mul = (crit ? (critX === 1 ? cm : 1 + (cm - 1) * critX) : 1) * (1 + bonusPct / 100);
   const res = target.res || {};
   const tdef = target.def || 0;
   let total = 0, best = 'phys', bestV = -1;

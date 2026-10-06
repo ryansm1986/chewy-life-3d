@@ -4,6 +4,8 @@
 // API: itemIcon(item), skillIcon(id), potionIcon(key), materialIcon(key), gemIcon(type, tier), clearIconCache(), setIconResolution(n)
 // No DOM access happens at import time (safe to import from node for tests).
 import { mixHex } from '../core/util.js';
+import { drawFuma, drawPoeSkill, POE_SKILL_TREE, POE_SKILL_BG, POE_PASSIVE } from './iconsPoe.js'; // Poe's fūma + skill art (docs/POE.md)
+import { drawSamuraiSkill, drawKatanaItem } from './samuraiIcons.js'; // (Chewy the samurai: the Bone Katana, the Bone Blade / Pack Spirit art)
 
 const INK = '#4a2c2a';
 const TAU = Math.PI * 2;
@@ -207,6 +209,7 @@ const SWORD = {
   odachi: { len: 56, grip: 12, hw: t => 2.4 - t * 0.8, curve: -3, tip: 'point', guard: 'star', glow: true, stars: true },
 };
 function drawSword(g, v, cols, noShadow) {
+  if (v === 'bone') return drawKatanaItem(g, cols, noShadow, ICON_KIT); // (the Bone Katana: samuraiIcons.js)
   const [blade, gripC, acc] = cols;
   const S = SWORD[v] || SWORD.bone;
   if (!noShadow) shadow(g, 25, 15, 3.2);
@@ -1277,12 +1280,13 @@ function drawMokaSkill(g, id) {
 const SKILL_BG = {
   bone: ['#fff0d2', '#e0a870', '#b8703e'], fetch: ['#ffd4c4', '#f07a5e', '#c23a2e'], spirit: ['#e2eaff', '#8fa4f0', '#4a58c0'], attack: ['#fffaf0', '#d8c8b0', '#a08870'],
   tide: ['#dcfff8', '#6fd8cc', '#2a8f9a'], star: ['#fff4d0', '#b8a0f0', '#5a48b8'], duck: ['#fff0d8', '#f0b060', '#b8702a'],
+  ...POE_SKILL_BG,
 };
 const SKILL_TREE = { chomp: 'bone', boneMastery: 'bone', whirl: 'bone', dig: 'bone', guard: 'bone', frenzy: 'bone', bonestorm: 'bone', throw: 'fetch', fetchMastery: 'fetch', ricochet: 'fetch', multi: 'fetch', decoy: 'fetch', blaze: 'fetch', fetchstorm: 'fetch', woof: 'spirit', goodboy: 'spirit', zoom: 'spirit', packcall: 'spirit', treat: 'spirit', howl: 'spirit', moonhowl: 'spirit',
   splash: 'tide', tideMastery: 'tide', bubble: 'tide', shake: 'tide', puddleHop: 'tide', whirlpool: 'tide', greatWave: 'tide',
   kibble: 'star', starMastery: 'star', squeak: 'star', pawRune: 'star', moonbeam: 'star', constellation: 'star', meteor: 'star',
-  duckDecoy: 'duck', retriever: 'duck', fetchLeash: 'duck', feathers: 'duck', duckCall: 'duck', spiritRetriever: 'duck', mallards: 'duck' };
-const PASSIVE = new Set(['boneMastery', 'guard', 'frenzy', 'fetchMastery', 'goodboy', 'tideMastery', 'starMastery', 'retriever']);
+  duckDecoy: 'duck', retriever: 'duck', fetchLeash: 'duck', feathers: 'duck', duckCall: 'duck', spiritRetriever: 'duck', mallards: 'duck', ...POE_SKILL_TREE };
+const PASSIVE = new Set(['boneMastery', 'guard', 'frenzy', 'fetchMastery', 'goodboy', 'tideMastery', 'starMastery', 'retriever', ...POE_PASSIVE]);
 const CREAM = '#fffaf0';
 function tennis(g, x, y, r, col = '#e8362a') {
   circ(g, x, y, r); paint(g, volR(g, col, x, y, r, 0.5, 0.35), Math.max(1.2, r * 0.14));
@@ -1315,6 +1319,8 @@ function ghostPup(g, x, y, s, a = 0.9) {
 }
 function drawSkill(g, id) {
   if (drawMokaSkill(g, id)) return;
+  if (drawPoeSkill(g, id, ICON_KIT)) return;
+  if (drawSamuraiSkill(g, id, ICON_KIT)) return;
   switch (id) {
     case 'attack': {
       g.save(); g.translate(-3, 3); g.scale(0.78, 0.78); drawSword(g, 'bone', ['#f4e8cf', '#c23b3b', '#f2e4c6'], true); g.restore();
@@ -1516,7 +1522,7 @@ function skillTile(g, tree, passive) {
 }
 
 // ================================================================== public API
-const SHAPES = { sword: drawSword, ball: drawBall, staff: drawStaff, hat: drawHat, outfit: drawOutfit, collar: drawCollar, charm: drawCharm, boots: drawBoots, paws: drawPaws };
+const SHAPES = { sword: drawSword, ball: drawBall, staff: drawStaff, fuma: (g, v, c, ns) => drawFuma(g, v, c, ns, ICON_KIT), hat: drawHat, outfit: drawOutfit, collar: drawCollar, charm: drawCharm, boots: drawBoots, paws: drawPaws };
 /** Icon for an Item (gear, gem, material item, potion item). Cached by shape+variant+colors+rarity. */
 export function itemIcon(item) {
   if (!item) return '';

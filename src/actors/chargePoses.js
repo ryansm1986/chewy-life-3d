@@ -5,9 +5,51 @@
 // u≈0.3, throw at u≈0.36, staffCast at u≈0.45 …) so the release snaps straight into the strike, and adds a coil that
 // deepens with the charge, a tremble when it's full, and a little hop at each stage.
 import { clamp, ease } from '../core/util.js';
+import { SAMURAI_KEYS as SK } from './samuraiPoses.js';
 
 const POSES = {
-  // Bone Sword drawn back over the shoulder (swing's wind-up)
+  // ---- Chewy the samurai (samuraiPoses.js keys): each holds the frame its release starts from
+  // iai: the paw on the hilt at the left hip, sinking lower and leaning in as it fills (Crescent Chomp → iaiCut at 0.3)
+  iai(t, k, A, e) {
+    SK.add(A, SK.IAI, e);
+    A.sq += 0.06 * k * e; A.y += -0.04 * k * e; A.body.x += 0.08 * k * e; A.legL.x += -0.12 * k * e; A.legR.x += 0.12 * k * e;
+    A.head.x += -0.05 * k * e; A.earKick += -0.5 * k * e;
+  },
+  // the same draw stance, but coiled lower and further forward for a dash (Flash Draw)
+  iaiDash(t, k, A, e) {
+    SK.add(A, SK.IAI, e);
+    A.sq += (0.06 + 0.08 * k) * e; A.y += (-0.03 - 0.05 * k) * e; A.body.x += (0.12 + 0.1 * k) * e; A.legL.x += (-0.2 - 0.15 * k) * e; A.legR.x += (0.2 + 0.15 * k) * e;
+    A.earKick += -0.8 * k * e;
+  },
+  // Whirlwind Stance's wind-up: settling into the planted two-handed stance, coiling back against the coming turn
+  stance(t, k, A, e) {
+    SK.add(A, SK.WHIRL, e);
+    const [f0, u0, l0] = SK.WHIRL_DIR, s = -0.5 * k; // (coiled: the blade drawn back the other way)
+    A.bladeDir.x += (f0 * Math.cos(s) - l0 * Math.sin(s)) * e; A.bladeDir.y += u0 * e; A.bladeDir.z += (f0 * Math.sin(s) + l0 * Math.cos(s)) * e; A.bladeW += e;
+    A.body.y += s * e; A.head.y += -s * 0.8 * e; A.sq += 0.05 * k * e; A.y += -0.03 * k * e; A.legL.z += 0.06 * k * e; A.legR.z += -0.06 * k * e;
+  },
+  // Helmet Splitter's wind-up: crouched over the katana held low behind, ready to spring
+  splitter(t, k, A, e) {
+    SK.add(A, SK.SPLIT_CROUCH, e);
+    A.sq += 0.06 * k * e; A.y += -0.04 * k * e; A.body.x += 0.1 * k * e; A.legL.x += -0.12 * k * e; A.legR.x += 0.1 * k * e; A.earKick += -0.6 * k * e;
+  },
+  // Sakura Storm's wind-up: the katana up in salute, standing tall as the petals gather
+  storm(t, k, A, e) {
+    SK.add(A, SK.STORM_IN, e);
+    A.body.x += -0.08 * k * e; A.head.x += -0.12 * k * e; A.sq += -0.05 * k * e; A.y += (0.03 + 0.02 * Math.sin(t * 3)) * k * e;
+  },
+  // Pack Call / War Banner Howl / Moonlit Blades: the deep breath before the call, the katana up
+  warCry(t, k, A, e) {
+    SK.add(A, SK.WAR_IN, e);
+    A.body.x += -0.1 * k * e; A.head.x += -0.2 * k * e; A.sq += -0.06 * k * e; A.y += 0.03 * k * e; A.earKick += 1.4 * k * e;
+  },
+  // Kiai!'s breath: the katana up in hassō, chest swelling, head back (→ kiai at 0.22)
+  kiai(t, k, A, e) {
+    SK.add(A, SK.KIAI_IN, e);
+    A.body.x += -0.1 * k * e; A.head.x += -0.15 * k * e; A.sq += -0.06 * k * e; A.y += 0.03 * k * e; A.earKick += 1.2 * k * e;
+    A.legL.z += 0.08 * k * e; A.legR.z += -0.08 * k * e;
+  },
+  // a sword drawn back over the shoulder (swing's wind-up)
   sword(t, k, A, e) {
     // (a held twist reads as 'turned away' from the iso camera: a smaller coil than swing's, the head kept on the target)
     const tw = 0.34 + 0.12 * k;
@@ -74,9 +116,9 @@ const POSES = {
     A.head.x += (-0.3 - 0.1 * k) * e; A.body.x += -0.08 * e; A.sq += (-0.05 - 0.06 * k) * e; A.y += 0.04 * k * e;
     A.mouth = Math.max(A.mouth, 0.5 * e); A.earKick += 0.8 * k * e;
   },
-  // the Moonbeam / Tail Spin channels keep their own action; these only exist for completeness
+  // the Moonbeam / Whirlwind Stance channels keep their own action; these only exist for completeness
   beam(t, k, A, e) { POSES.sky(t, k, A, e); },
-  spin(t, k, A, e) { POSES.sword(t, k, A, e); },
+  spin(t, k, A, e) { POSES.stance(t, k, A, e); },
 };
 
 export const CHARGE_ACTIONS = {
@@ -89,3 +131,5 @@ export const CHARGE_ACTIONS = {
   } },
 };
 export const POSE_STYLES = Object.keys(POSES);
+/** more wind-up families from another module (Poe's: actors/poePoses.js POE_CHARGE_POSES), merged in by name */
+export function addChargePoses(more) { for (const k in more) { if (!POSES[k]) POSES[k] = more[k]; if (!POSE_STYLES.includes(k)) POSE_STYLES.push(k); } }

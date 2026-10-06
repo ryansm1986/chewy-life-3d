@@ -14,16 +14,18 @@
 // D2 level gate: putting the Nth point into a skill needs character level >= req + (N-1).
 
 import { MOKA_TREES, MOKA_SKILLS } from './skillsMoka.js';
+import { POE_TREES, POE_SKILLS } from './skillsPoe.js';
 
 export const MAX_SKILL_LVL = 20;
 export const ROW_REQ = [1, 6, 12, 18, 24, 30];
 
 // every hero's trees (cls = the hero who learns them; see classes.js). The UI shows the active hero's three.
 export const TREES = [
-  { id: 'bone', cls: 'chewy', name: 'Bone Arts', sub: 'Bone Sword', color: '#f0d9b0', accent: '#e8475c', desc: 'Up-close chomps, spins and slams. Strength makes it hit harder.' },
+  { id: 'bone', cls: 'chewy', name: 'Bone Blade', sub: 'Bone Katana', color: '#f0d9b0', accent: '#e8475c', desc: 'Draw-cuts, stances and a ground-cracking overhead. Strength makes it hit harder.' },
   { id: 'fetch', cls: 'chewy', name: 'Fetch Mastery', sub: 'Red Tennis Ball', color: '#ffb3a0', accent: '#e8362a', desc: 'Throws, trick shots and ball storms. Dexterity makes it hit harder.' },
-  { id: 'spirit', cls: 'chewy', name: 'Pack Spirit', sub: 'Any weapon', color: '#b8d0ff', accent: '#5a7ae0', desc: 'Barks, auras, Shadow and the ghostly spirit pups.' },
+  { id: 'spirit', cls: 'chewy', name: 'Pack Spirit', sub: 'Any weapon', color: '#b8d0ff', accent: '#5a7ae0', desc: 'Battle cries, auras, Shadow and the ghostly spirit pups.' },
   ...MOKA_TREES,
+  ...POE_TREES,
 ];
 export const treesFor = cls => TREES.filter(t => (t.cls || 'chewy') === (cls || 'chewy'));
 
@@ -47,11 +49,11 @@ function synLine(id, d) {
 }
 
 const DEFS = {
-  // =================================================================== BONE ARTS
+  // =================================================================== BONE BLADE (Chewy the samurai: docs/HEROES.md)
   chomp: {
-    tree: 'bone', name: 'Chomp Slash', row: 0, col: 1, pre: [], wep: 'sword', kind: 'active', element: 'phys',
+    tree: 'bone', name: 'Crescent Chomp', row: 0, col: 1, pre: [], wep: 'sword', kind: 'active', element: 'phys',
     cost: l => r1(3 + 0.15 * (l - 1)), cd: () => 0,
-    desc: 'A mighty chomp-powered swing that cleaves everything in a wide arc in front of you.',
+    desc: 'Draw from the hip in one two-pawed swoop! The cut leaves a bone-white crescent and cleaves everything in a wide arc in front of you.',
     syn: [{ id: 'boneMastery', p: 6 }, { id: 'dig', p: 5 }],
     params(l, d) {
       return { dmgPct: lin(150, 18)(l) * syn('chomp', d), arc: Math.min(240, 140 + 5 * l), radius: 2.0, knockback: 0.6, hits: 1 };
@@ -62,17 +64,17 @@ const DEFS = {
     },
   },
   boneMastery: {
-    tree: 'bone', name: 'Bone Mastery', row: 1, col: 0, pre: [], wep: 'sword', kind: 'passive', element: 'phys',
+    tree: 'bone', name: 'Way of the Bone', row: 1, col: 0, pre: [], wep: 'sword', kind: 'passive', element: 'phys',
     cost: () => 0, cd: () => 0,
-    desc: 'Years of dedicated chewing have made you one with the bone. Passive — Bone Sword only.',
+    desc: 'A thousand practice cuts at the dojo (and only a few sneaky chews when sensei wasn’t looking) have made you one with the blade. Passive — Bone Katana only.',
     syn: [],
     params(l) { return { dmgPct: 25 + 9 * (l - 1), crit: r1(2 + 0.5 * (l - 1)) }; },
-    info(l) { const p = this.params(l); return [`+${p.dmgPct}% Bone Sword damage`, `+${p.crit}% critical chomp chance`]; },
+    info(l) { const p = this.params(l); return [`+${p.dmgPct}% Bone Katana damage`, `+${p.crit}% critical chomp chance`]; },
   },
   whirl: {
-    tree: 'bone', name: 'Tail Spin', row: 1, col: 2, pre: ['chomp'], wep: 'sword', kind: 'channel', element: 'phys',
+    tree: 'bone', name: 'Whirlwind Stance', row: 1, col: 2, pre: ['chomp'], wep: 'sword', kind: 'channel', element: 'phys',
     cost: l => r1(8 + 0.4 * (l - 1)), cd: () => 0,
-    desc: 'Hold to spin like a happy tornado, carving through crowds. You can move (slowly) while spinning.',
+    desc: 'Hold to plant your paws and turn into a whirlwind of two-pawed cuts, cherry petals swirling round you. You can move (slowly) while it spins.',
     syn: [{ id: 'chomp', p: 5 }, { id: 'frenzy', p: 6 }],
     params(l, d) {
       return { dmgPct: lin(70, 9)(l) * syn('whirl', d), hitsPerSec: 4, radius: r2(1.8 + 0.02 * l), moveMul: 0.75, knockback: 0.3 };
@@ -83,9 +85,9 @@ const DEFS = {
     },
   },
   dig: {
-    tree: 'bone', name: 'Dig Slam', row: 2, col: 1, pre: ['chomp'], wep: 'sword', kind: 'active', element: 'phys',
+    tree: 'bone', name: 'Helmet Splitter', row: 2, col: 1, pre: ['chomp'], wep: 'sword', kind: 'active', element: 'phys',
     cost: l => r1(10 + 0.5 * (l - 1)), cd: l => r1(Math.max(1.2, 3 - 0.08 * l)),
-    desc: 'Leap toward the cursor and slam the ground, erupting dirt that stuns everything nearby.',
+    desc: 'Leap toward the cursor into a mighty overhead cut that cracks the ground and stuns everything nearby.',
     syn: [{ id: 'chomp', p: 6 }, { id: 'bonestorm', p: 5 }],
     params(l, d) {
       return { dmgPct: lin(220, 24)(l) * syn('dig', d), radius: r2(2.2 + 0.05 * l), leap: 6, stun: r2(0.8 + 0.05 * l), knockback: 1.2 };
@@ -96,32 +98,32 @@ const DEFS = {
     },
   },
   guard: {
-    tree: 'bone', name: 'Stubborn Guard', row: 3, col: 0, pre: ['boneMastery'], wep: null, kind: 'passive', element: 'phys',
+    tree: 'bone', name: 'Unbending Stance', row: 3, col: 0, pre: ['boneMastery'], wep: null, kind: 'passive', element: 'phys',
     cost: () => 0, cd: () => 0,
-    desc: 'Plant your paws and refuse to budge. Nobody takes your chew toy. Passive — any weapon.',
+    desc: 'Root your paws like an old pine on a cliff. You don’t budge, and nobody takes your chew toy. Passive — any weapon.',
     syn: [],
     params(l) { return { defPct: 20 + 10 * (l - 1), block: r1(4 + dim(l, 30, 10)) }; },
     info(l) { const p = this.params(l); return [`+${p.defPct}% defense`, `+${p.block}% chance to block`]; },
   },
   frenzy: {
-    tree: 'bone', name: 'Zoomies Frenzy', row: 4, col: 2, pre: ['whirl'], wep: null, kind: 'passive', element: 'phys',
+    tree: 'bone', name: 'Flowing Water', row: 4, col: 2, pre: ['whirl'], wep: null, kind: 'passive', element: 'phys',
     cost: () => 0, cd: () => 0,
-    desc: 'Every hit whips you into a frenzy, stacking attack speed and move speed. Passive.',
+    desc: 'Be like water: every hit carries you on, stacking attack speed and move speed until your cuts and your feet run like a mountain stream. Passive.',
     syn: [],
     params(l) { return { perStack: 6 + l, maxStacks: 3 + Math.floor(l / 4), duration: 3 }; },
     info(l) { const p = this.params(l); return [`+${p.perStack}% attack & move speed per stack`, `Max stacks: ${p.maxStacks}`, `Stacks last ${p.duration}s`]; },
   },
   bonestorm: {
-    tree: 'bone', name: 'Bone Storm', row: 5, col: 1, pre: ['dig', 'frenzy'], wep: null, kind: 'active', element: 'phys',
+    tree: 'bone', name: 'Sakura Storm', row: 5, col: 1, pre: ['dig', 'frenzy'], wep: null, kind: 'active', element: 'phys',
     cost: l => r1(25 + 1 * (l - 1)), cd: () => 10,
-    desc: 'Summon a vortex of enchanted chew-bones that orbit you, shredding anything nearby.',
+    desc: 'Spectral bone blades and a flurry of cherry petals whirl round you, shredding anything that comes close.',
     syn: [{ id: 'boneMastery', p: 4 }, { id: 'whirl', p: 4 }],
     params(l, d) {
       return { count: 4 + Math.floor(l / 3), dmgPct: lin(60, 8)(l) * syn('bonestorm', d), radius: 2.2, duration: r1(6 + 0.3 * l), orbitSpeed: 3.5, hitInterval: 0.35 };
     },
     info(l, d) {
       const p = this.params(l, d);
-      return [`Bones: ${p.count}`, `Damage per touch: ${pct(p.dmgPct)}${dmgRange(p.dmgPct, d)}`, `Duration: ${p.duration}s`, `Zoom cost: ${this.cost(l)} · Cooldown: ${this.cd(l)}s`, ...synLine('bonestorm', d)];
+      return [`Blades: ${p.count}`, `Damage per touch: ${pct(p.dmgPct)}${dmgRange(p.dmgPct, d)}`, `Duration: ${p.duration}s`, `Zoom cost: ${this.cost(l)} · Cooldown: ${this.cd(l)}s`, ...synLine('bonestorm', d)];
     },
   },
 
@@ -220,9 +222,9 @@ const DEFS = {
 
   // =================================================================== PACK SPIRIT
   woof: {
-    tree: 'spirit', name: 'Woof!', row: 0, col: 1, pre: [], wep: null, kind: 'active', element: 'phys',
+    tree: 'spirit', name: 'Kiai!', row: 0, col: 1, pre: [], wep: null, kind: 'active', element: 'phys',
     cost: l => r1(6 + 0.3 * (l - 1)), cd: () => 1.5,
-    desc: 'A thunderous bark that knocks foes back and leaves them stunned and a little embarrassed.',
+    desc: 'A battle shout straight from the belly! It knocks foes back and leaves them stunned and a little embarrassed.',
     syn: [{ id: 'howl', p: 6 }, { id: 'moonhowl', p: 4 }],
     params(l, d) {
       return { dmgPct: lin(60, 10)(l) * syn('woof', d), radius: r2(3.5 + 0.08 * l), stun: r2(0.6 + 0.04 * l), knockback: 2.5 };
@@ -233,17 +235,17 @@ const DEFS = {
     },
   },
   goodboy: {
-    tree: 'spirit', name: 'Good Boy Aura', row: 1, col: 0, pre: [], wep: null, kind: 'aura', element: 'holy',
+    tree: 'spirit', name: 'Code of the Good Boy', row: 1, col: 0, pre: [], wep: null, kind: 'aura', element: 'holy',
     cost: () => 0, cd: () => 0,
-    desc: 'You are a very good boy, and everyone nearby can feel it. Always-on aura: regeneration and resistances for you, Shadow and your pups.',
+    desc: 'Honour, loyalty, and sitting nicely when asked. You are a very good boy, and everyone nearby can feel it. Always-on aura: regeneration and resistances for you, Shadow and your pups.',
     syn: [],
     params(l) { return { radius: 8, lifeRegen: r1(1 + 0.8 * l), resAll: Math.round(dim(l, 45, 12)) }; },
     info(l) { const p = this.params(l); return [`+${p.lifeRegen} life per second`, `+${p.resAll}% all resistances`, `Radius: ${p.radius} m (affects Shadow & pups)`]; },
   },
   zoom: {
-    tree: 'spirit', name: 'Zoomies Dash', row: 1, col: 2, pre: ['woof'], wep: null, kind: 'active', element: 'phys',
+    tree: 'spirit', name: 'Flash Draw', row: 1, col: 2, pre: ['woof'], wep: null, kind: 'active', element: 'phys',
     cost: l => r1(6 + 0.2 * (l - 1)), cd: l => r1(Math.max(0.8, 2.5 - 0.08 * l)),
-    desc: 'Dash through enemies in a blur of fur, damaging everything you pass. Untouchable while dashing.',
+    desc: 'Draw and dash through enemies in a single stroke, cutting everything you pass. Untouchable while dashing — the cut only shows once you sheathe.',
     syn: [{ id: 'frenzy', p: 4 }, { id: 'goodboy', p: 2 }],
     params(l, d) {
       return { dmgPct: lin(80, 12)(l) * syn('zoom', d), distance: r2(5 + 0.15 * l), speed: 22, width: 1.2, invuln: true };
@@ -256,7 +258,7 @@ const DEFS = {
   packcall: {
     tree: 'spirit', name: 'Pack Call', row: 2, col: 1, pre: ['woof'], wep: null, kind: 'summon', element: 'frost',
     cost: l => r1(15 + 0.5 * (l - 1)), cd: () => 2,
-    desc: 'Empowers Shadow (passively) and calls ghostly spirit pups whose chilly bites slow foes.',
+    desc: 'Empowers Shadow (passively) and calls ghostly spirit pups in tiny samurai helmets, whose chilly bites slow foes.',
     syn: [{ id: 'goodboy', p: 4 }, { id: 'howl', p: 4 }],
     params(l, d) {
       return { pups: 1 + Math.floor(l / 4), pupLifePct: 30 + 5 * l, pupDmgPct: lin(40, 6)(l) * syn('packcall', d), pupSpeed: 6, chill: 0.3, duration: 60, shadowDmg: 10 + 8 * l, shadowLife: 10 + 8 * l };
@@ -267,9 +269,9 @@ const DEFS = {
     },
   },
   treat: {
-    tree: 'spirit', name: 'Treat Toss', row: 3, col: 0, pre: ['goodboy'], wep: null, kind: 'active', element: 'holy',
+    tree: 'spirit', name: 'Onigiri Toss', row: 3, col: 0, pre: ['goodboy'], wep: null, kind: 'active', element: 'holy',
     cost: l => r1(12 + 0.5 * (l - 1)), cd: l => r1(Math.max(3, 8 - 0.2 * l)),
-    desc: 'Toss a glowing biscuit that bursts into healing crumbs for you and your pack. Yokai hate the smell.',
+    desc: 'Toss a glowing rice ball that bursts into healing crumbs for you and your pack. Yokai hate the smell of good cooking.',
     syn: [{ id: 'goodboy', p: 5 }],
     params(l, d) {
       const s = syn('treat', d);
@@ -282,30 +284,32 @@ const DEFS = {
     },
   },
   howl: {
-    tree: 'spirit', name: 'Howl of the Pack', row: 4, col: 2, pre: ['packcall'], wep: null, kind: 'active', element: 'phys',
+    tree: 'spirit', name: 'War Banner Howl', row: 4, col: 2, pre: ['packcall'], wep: null, kind: 'active', element: 'phys',
     cost: l => r1(20 + 0.5 * (l - 1)), cd: () => 14,
-    desc: 'A rallying howl: you and your pack hit harder and run faster. Nearby yokai flee in terror.',
+    desc: 'Plant your paw-crest war banner and howl: you and your pack hit harder and run faster while it flies. Nearby yokai flee in terror.',
     syn: [],
     params(l) { return { duration: 10, dmgBuff: 30 + 6 * l, moveBuff: 20, fear: r2(1.5 + 0.05 * l), radius: 6 }; },
     info(l) { const p = this.params(l); return [`+${p.dmgBuff}% damage for ${p.duration}s`, `+${p.moveBuff}% move speed`, `Fear: ${p.fear}s in ${p.radius} m`, `Zoom cost: ${this.cost(l)} · Cooldown: ${this.cd(l)}s`]; },
   },
   moonhowl: {
-    tree: 'spirit', name: 'Moon Howl', row: 5, col: 1, pre: ['howl'], wep: null, kind: 'active', element: 'holy',
+    tree: 'spirit', name: 'Moonlit Blades', row: 5, col: 1, pre: ['howl'], wep: null, kind: 'active', element: 'holy',
     cost: l => r1(35 + 1 * (l - 1)), cd: () => 6,
-    desc: 'Howl at the moon and it answers — pillars of moonlight smite nearby enemies.',
+    desc: 'Howl at the moon and it answers — blades of moonlight fall on nearby enemies.',
     syn: [{ id: 'woof', p: 6 }, { id: 'howl', p: 5 }],
     params(l, d) {
       return { strikes: 5 + Math.floor(l / 3), dmgPct: lin(280, 32)(l) * syn('moonhowl', d), radius: 7, strikeRadius: 1.4, interval: 0.15 };
     },
     info(l, d) {
       const p = this.params(l, d);
-      return [`Moonbeams: ${p.strikes}`, `Holy damage each: ${pct(p.dmgPct)}${dmgRange(p.dmgPct, d)}`, `Zoom cost: ${this.cost(l)} · Cooldown: ${this.cd(l)}s`, ...synLine('moonhowl', d)];
+      return [`Moon blades: ${p.strikes}`, `Holy damage each: ${pct(p.dmgPct)}${dmgRange(p.dmgPct, d)}`, `Zoom cost: ${this.cost(l)} · Cooldown: ${this.cd(l)}s`, ...synLine('moonhowl', d)];
     },
   },
 };
 
 // Moka's skills live in skillsMoka.js (same format)
 for (const id in MOKA_SKILLS) { if (DEFS[id]) throw new Error(`skill id clash: ${id}`); DEFS[id] = MOKA_SKILLS[id]; }
+// Poe's skills live in skillsPoe.js (same format; docs/POE.md)
+for (const id in POE_SKILLS) { if (DEFS[id]) throw new Error(`skill id clash: ${id}`); DEFS[id] = POE_SKILLS[id]; }
 
 /** Bind info/params so they also work when destructured (no reliance on `this`). */
 function bindDef(d) {
@@ -330,15 +334,17 @@ export const SKILL_IDS = Object.keys(DEFS);
 export const ATTACK = bindDef({
   id: 'attack', tree: null, name: 'Attack', row: -1, col: -1, req: 1, pre: [], wep: null, kind: 'active', element: 'phys', syn: [],
   cost: () => 0, cd: () => 0,
-  desc: 'Swing your bone sword or throw your ball. Free, forever, and very satisfying.',
+  desc: 'Cut with your bone katana or throw your ball. Free, forever, and very satisfying.',
   params(l, d) {
     if (d && d.weaponType === 'ball') return { dmgPct: 100, speed: 15 * (d.ballSpeed || 1), range: 11, pierce: d.pierce || 0, returns: true, projectile: true };
     if (d && d.weaponType === 'staff') return { dmgPct: 100, speed: 15, range: 11, pierce: 0, returns: false, projectile: true, bolt: true }; // Moka: a free little sparkle bolt
+    if (d && d.weaponType === 'fuma') return { dmgPct: 80 * (1 + ((d.treeDmgPct && d.treeDmgPct.shuriken) || 0) / 100), radius: 1.9, arc: 130, knockback: 0.25, projectile: false, fuma: true }; // Poe: quick one-paw fūma slashes (a three-hit combo, combat/poeSkills.js)
     return { dmgPct: 100, radius: 1.8, arc: 110, knockback: 0.25, projectile: false };
   },
   info(l, d) {
     const p = this.params(l, d);
-    return [`Damage: 100% weapon damage${dmgRange(100, d)}`, p.bolt ? 'A sparkly magic bolt from your staff' : p.projectile ? 'Thrown — bounces back to you' : 'Melee swing'];
+    if (p.fuma) return [`Damage: ${pct(p.dmgPct)} weapon damage${dmgRange(p.dmgPct, d)}`, 'Quick fūma slashes: a three-hit combo'];
+    return [`Damage: 100% weapon damage${dmgRange(100, d)}`, p.bolt ? 'A sparkly magic bolt from your staff' : p.projectile ? 'Thrown — bounces back to you' : 'Katana cuts: a three-cut combo, then a flourish'];
   },
 });
 
@@ -372,6 +378,7 @@ export function canLearn(id, state) {
   if (!d) return { ok: false, why: 'Unknown skill' };
   const P = state.player;
   if (d.cls && d.cls !== (P.cls || 'chewy')) return { ok: false, why: "Another hero's skill" };
+  if (d.training) return { ok: false, why: `${d.name} is still in training: coming soon!` }; // (Poe's skills before their cast lands: skillsPoe.js POE_TRAINING)
   const base = P.skills[id] || 0;
   if (base >= MAX_SKILL_LVL) return { ok: false, why: 'Mastered!' };
   const need = d.req + base;
@@ -383,6 +390,12 @@ export function canLearn(id, state) {
 
 /** Level that the NEXT point would need (for UI). */
 export const nextPointLevel = (id, state) => DEFS[id].req + ((state.player.skills[id] || 0));
+
+/** A skill's zoom cost at a level after its tree's cost cut (Poe's Ninjutsu Mastery: derived.treeCostCut[tree] %). */
+export function skillCost(d, lvl, derived) {
+  const c = d.cost(lvl), k = derived && derived.treeCostCut && derived.treeCostCut[d.tree];
+  return k ? r1(c * (1 - k / 100)) : c;
+}
 
 /**
  * Everything the combat executor needs for a cast: effective level, zoom cost, cooldown (after cdr),
@@ -396,7 +409,7 @@ export function skillRuntime(id, state, derived) {
   const cdr = Math.min(50, (derived && derived.cdr) || 0);
   return {
     id, lvl, def: d, kind: d.kind, element: d.element, wep: d.wep,
-    cost: d.cost(lvl), cd: r2(d.cd(lvl) * (1 - cdr / 100)),
+    cost: skillCost(d, lvl, derived), cd: r2(d.cd(lvl) * (1 - cdr / 100)),
     params: d.params(lvl, derived),
   };
 }
@@ -408,9 +421,10 @@ export function usable(id, state, derived, curZoom) {
   if (d.kind === 'passive' || d.kind === 'aura') return { ok: false, why: 'Passive skill' };
   if (id !== 'attack' && effectiveLevel(id, state, derived) <= 0) return { ok: false, why: 'Not learned' };
   if (d.cls && state.player?.cls && d.cls !== state.player.cls) return { ok: false, why: 'Not your skill!' };
-  if (d.wep && derived && derived.weaponType !== d.wep) return { ok: false, why: d.wep === 'sword' ? 'Needs a Bone Sword (X to swap)' : d.wep === 'staff' ? 'Needs a staff' : 'Needs a Ball (X to swap)' };
+  if (d.training) return { ok: false, why: 'Still in training!' };
+  if (d.wep && derived && derived.weaponType !== d.wep) return { ok: false, why: d.wep === 'sword' ? 'Needs a Bone Katana (X to swap)' : d.wep === 'staff' ? 'Needs a staff' : d.wep === 'fuma' ? 'Needs a fūma' : 'Needs a Ball (X to swap)' };
   const lvl = effectiveLevel(id, state, derived);
   const zoom = curZoom != null ? curZoom : (state.player.zoom == null ? (derived ? derived.zoomMax : 1e9) : state.player.zoom);
-  if (d.kind !== 'channel' && zoom < d.cost(lvl)) return { ok: false, why: 'Not enough zoom!' };
+  if (d.kind !== 'channel' && zoom < skillCost(d, lvl, derived)) return { ok: false, why: 'Not enough zoom!' };
   return { ok: true, why: '' };
 }

@@ -8,6 +8,8 @@ import { babble, gibberish } from './babble.js';
 import { REGION_SFX } from '../regions/sfx/index.js'; // region monsters / bosses / environments (docs/REGIONS.md)
 import { SFX as LIFE_SFX } from '../life/life.sfx.js'; // the homestead: farming, fishing, cooking (docs/HOMESTEAD.md)
 import { SFX as CHARGE_SFX } from './charge.sfx.js'; // charged abilities: the hum, stage chimes, release (docs/CHARGE.md)
+import { SFX as POE_SFX } from './poe.sfx.js'; // Poe: fūma swishes and whirrs, smoke, shadow steps, her sneeze (docs/POE.md)
+import { SFX as SAMURAI_SFX } from './samurai.sfx.js'; // Chewy the samurai: the katana's draw, its sheath's click, a clang (docs/HEROES.md)
 
 const R = (a, b) => a + Math.random() * (b - a);
 const mf = m => 440 * Math.pow(2, (m - 69) / 12);
@@ -329,6 +331,12 @@ export const SFX = {
     s.noise({ f: 800, f2: 4000, glide: 0.12, q: 2, a: 0.01, d: 0.13, v: 0.7 });
     s.tone({ f: 500, f2: 1500, glide: 0.1, a: 0.004, d: 0.09, v: 0.06 });
   } },
+  // the push-off into a sprint (actors/sprint.js): a soft airy "fwoosh" and a paw scuff, quieter than the roll's dash
+  sprint_start: { vary: 0.1, max: 2, gap: 0.3, fn(s) {
+    s.noise({ ft: 'lowpass', f: 900, a: 0.002, d: 0.06, v: 0.3, color: 'pink' });
+    s.noise({ pts: [[0, 450], [0.09, 1900], [0.24, 900]], q: 1.1, a: 0.04, d: 0.2, v: 0.45 });
+    s.tone({ f: 170, f2: 120, a: 0.002, d: 0.06, v: 0.08 });
+  } },
 
   // ------------------------------------------------------------------------------------------ world / items
   potion_drink: { vary: 0.05, max: 1, fn(s) {
@@ -639,7 +647,7 @@ const TRIM = {
   pickup_magic: 1.65, pickup_gem: 1.2, pickup_unique: 1.3, ui_quest_done: 1.15, victory_sfx: 1.5,
   footstep_grass: 3.0, footstep_stone: 2.2, footstep_wood: 1.9, // (the game plays steps at vol 0.35)
   door_knock: 0.7, yawn: 0.25,
-  swing: 2.6, swing_heavy: 1.45, throw: 3.3, dash: 3.3, hit_crit: 1.15, player_hurt: 0.6, monster_die: 1.5, ghost_wail: 0.7, boss_roar: 0.55, player_die: 0.5,
+  swing: 2.6, swing_heavy: 1.45, throw: 3.3, dash: 3.3, sprint_start: 1.6, hit_crit: 1.15, player_hurt: 0.6, monster_die: 1.5, ghost_wail: 0.7, boss_roar: 0.55, player_die: 0.5,
   bark: 0.9, bark_small: 0.4, howl: 0.37, whine: 0.3, dig: 2,
   fire_whoosh: 1.15, stink: 0.75, heal: 1.4, potion_drink: 1.6, door_open: 1.5, portal: 1.2, build_place: 1.1, bulldoze: 0.95,
   chest_open: 1.7, waypoint: 1.2, splash: 1.8, bird_chirp: 1.6, cat_meow: 0.3,
@@ -653,6 +661,8 @@ for (const [k, v] of Object.entries(TRIM)) SFX[k].trim = v;
 for (const k in REGION_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = REGION_SFX[k]; } // (each carries its own trim)
 for (const k in LIFE_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = LIFE_SFX[k]; }
 for (const k in CHARGE_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = CHARGE_SFX[k]; }
+for (const k in POE_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = POE_SFX[k]; }
+for (const k in SAMURAI_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = SAMURAI_SFX[k]; }
 
 export const SFX_NAMES = Object.keys(SFX);
 
@@ -662,9 +672,11 @@ export const SFX_GROUPS = {
   Footsteps: ['footstep_grass', 'footstep_stone', 'footstep_wood'],
   Combat: ['swing', 'swing_heavy', 'throw', 'ball_bounce', 'hit_flesh', 'hit_crit', 'monster_hit', 'monster_die', 'slime_bounce', 'ghost_wail', 'boss_roar', 'player_hurt', 'player_die'],
   Dogs: ['bark', 'bark_small', 'howl', 'whine', 'dig'],
-  Skills: ['explosion_small', 'fire_whoosh', 'frost', 'zap', 'stink', 'heal', 'buff', 'dash'],
+  Skills: ['explosion_small', 'fire_whoosh', 'frost', 'zap', 'stink', 'heal', 'buff', 'dash', 'sprint_start'],
   World: ['potion_drink', 'door_open', 'door_knock', 'portal', 'build_place', 'build_complete', 'bulldoze', 'chest_open', 'waypoint', 'splash'],
   Critters: ['bird_chirp', 'cat_meow', 'yawn', 'villager_chatter'],
   Moka: ['moka_bolt', 'splash_cast', 'water_splash', 'bubble_up', 'bubble_hit', 'bubble_pop', 'shake_spray', 'puddle_dive', 'puddle_pop', 'whirlpool', 'wave_roar', 'kibble_toss', 'kibble_hit', 'squeak_big', 'rune_stamp', 'rune_chime', 'moonbeam_start', 'moonbeam_hum', 'moonbeam_tick', 'star_chain', 'constellation_twinkle', 'meteor_whistle', 'meteor_boom', 'quack', 'duck_windup', 'confetti_pop', 'leash_throw', 'leash_snap', 'feather_flutter', 'duck_call', 'retriever_bark', 'spirit_summon', 'mallard_wings'],
   Heroes: ['hero_swap', 'hero_arrive'],
+  Poe: Object.keys(POE_SFX),
+  Samurai: Object.keys(SAMURAI_SFX),
 };

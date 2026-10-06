@@ -30,6 +30,7 @@ export class Portraits {
     const rig = heroModelReady(id) ? buildHeroModel(id) : id === 'shadow' ? buildBoston() : spec ? buildHumanoid(spec) : null;
     if (!rig) return null;
     rig.mat.userData.u?.uDarkGrade?.value.set(0, 0, 0, 0); // a dark coat's counter-grade is for the graded main scene only
+    if (rig.mat.userData.u?.uDarkLift) rig.mat.userData.u.uDarkLift.value = 0; // (and so is the cloth neutraliser's lift counter: heroModels.js darkNeutral)
     // hide outlines slightly thinner for close-ups
     rig.outMat.userData.width.value = 0.008;
     const head = rig.parts.head;
@@ -42,6 +43,7 @@ export class Portraits {
     if (id === 'moka') { big *= rig.bakedDisney ? 1.1 : rig.disney ? 1.3 : 1.15; hp.y += rig.bakedDisney ? 0.05 : 0.07; } // her hat brim and long ears in frame
     if (rig.model === 'moka_toy') { big *= 1.12; hp.y += 0.1; } // the Toybox Moka: the tall hat and the moon charm in frame
     if (id === 'rosie' && rig.bakedDisney) { big *= 1.08; hp.y += 0.08; } // the Toybox Rosie: her curls and bow stand tall above the head bone
+    if (rig.model === 'poe_toy') { big *= 1.1; hp.y += 0.13; } // the Toybox Poe: her big round head (the head bone sits at the neck) and the fox mask in frame
     rig.root.rotation.y = -0.25;
     this.scene.add(rig.root);
     const quad = !!rig.quadruped;

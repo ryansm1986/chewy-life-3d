@@ -5,12 +5,13 @@ import { portrait } from './portraits.js';
 import { Panel } from './panel.js';
 import { xpProgress } from './rpg.js';
 import { simpleTip } from './tooltip.js';
+import { HERO_TEXT } from '../rpg/classes.js';
 
 const ATTR = [
-  { k: 'str', n: 'Strength', jp: '力', g: 'swords', c: '#ff8f7a', tip: 'Adds damage to Bone Sword attacks (Chewy) and lets you wear heavier gear.' },
-  { k: 'dex', n: 'Dexterity', jp: '速', g: 'ball', c: '#ffcf4a', tip: 'Adds damage to thrown balls, improves block chance and crit chance a little.' },
+  { k: 'str', n: 'Strength', jp: '力', g: 'swords', c: '#ff8f7a', tip: 'Adds damage to Bone Katana attacks (Chewy) and lets you wear heavier gear.' },
+  { k: 'dex', n: 'Dexterity', jp: '速', g: 'ball', c: '#ffcf4a', tip: 'Adds damage to thrown balls and Poe’s fūma, improves block chance and crit chance a little.' },
   { k: 'vit', n: 'Vitality', jp: '体', g: 'heart', c: '#ff8fb0', tip: 'Each point grants extra Life and a bit of Life regeneration.' },
-  { k: 'ene', n: 'Energy', jp: '気', g: 'bolt', c: '#8fd0ff', tip: 'Each point grants extra Zoom (skill energy) and Zoom regeneration. With a staff (Moka) it also adds +1% spell damage.' },
+  { k: 'ene', n: 'Energy', jp: '気', g: 'bolt', c: '#8fd0ff', tip: 'Each point grants extra Zoom (skill energy) and Zoom regeneration. With a staff (Moka) it also adds +1% spell damage; for Poe it powers her Ninjutsu (+1% jutsu damage).' },
 ];
 
 const n0 = v => Math.round(+v || 0);
@@ -116,8 +117,8 @@ export class CharacterPanel extends Panel {
       this._hero = hero;
       const b = this.body;
       b.querySelector('.ch-por').innerHTML = portrait(hero);
-      b.querySelector('.ch-name').innerHTML = `${esc(p.name || 'Chewy')} <span class="jp">${hero === 'moka' ? 'モカ' : 'チューイ'}</span>`;
-      b.querySelector('.ch-cls').innerHTML = `Level <b class="ch-lv">${p.lvl || 1}</b> · ${hero === 'moka' ? 'Tidewater Mage of the Hollow' : 'Pup of the Blossom Dojo'}`;
+      b.querySelector('.ch-name').innerHTML = `${esc(p.name || 'Chewy')} <span class="jp">${HERO_TEXT[hero]?.jp || (hero === 'moka' ? 'モカ' : 'チューイ')}</span>`;
+      b.querySelector('.ch-cls').innerHTML = `Level <b class="ch-lv">${p.lvl || 1}</b> · ${HERO_TEXT[hero]?.motto || (hero === 'moka' ? 'Tidewater Mage of the Hollow' : 'Pup of the Blossom Dojo')}`;
       this.$.lv = b.querySelector('.ch-lv');
       b.dataset.hero = hero;
     }

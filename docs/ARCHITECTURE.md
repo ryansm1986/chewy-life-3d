@@ -6,11 +6,14 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
 
 ## Cast
 - **Chewy** — main character. Humanoid chibi chocolate-brown dog (#8a4a2c), lighter muzzle, **white chest blaze**,
-  amber eyes, semi-floppy rose ears. Wears a navy gi (#2c3a6a) with red scarf + red sash. Weapons: **Bone Sword** (melee)
+  amber eyes, semi-floppy rose ears. Wears a navy gi (#2c3a6a) with red scarf + red sash. Weapons: **Bone Katana** (melee; Chewy is a samurai, docs/HEROES.md)
   or **Red Tennis Ball** (thrown, returns). `X` swaps weapons.
 - **Moka** — second playable hero (docs/HEROES.md): Boykin Spaniel mage, chocolate wavy coat, long pendant ears, amber
   eyes; seafoam capelet, lavender robe, floppy seafoam wizard hat; a **staff** (Energy scales its damage). Water /
   starlight / duck-hunt spells. `Tab` switches heroes; the hero you're not playing lives in town as a villager.
+- **Poe** — third playable hero (docs/POE.md): a black pug ninja (she/her), honey eyes, moss-green top, mustard sash, a
+  fox festival mask pushed up on her head; a **giant bone fūma shuriken** (Dexterity) she throws out and back. Shuriken
+  Arts / Ninjutsu / Shadow Step. Met in the Bamboo Grove (she tails you, sneezes, joins). Tap `Tab` = next hero, hold = the hero wheel.
 - **Shadow** — sidekick Boston terrier (quadruped, black #1e1c24 + white muzzle/blaze/chest, big bat ears, round eyes, blue collar). Follows and fights (D2 mercenary style).
 - **Rosie** — human little girl, curly brown hair, brown eyes, fair skin, rosy cheeks, pink dress + red bow. Runs "Rosie's Treats" shop & gives quests.
 - Villagers — humanoid cartoony animals (cat, bunny, bear, fox, panda, tanuki, frog, duck…).
@@ -23,8 +26,10 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
 - Isolated dev scenes: `src/tests/NAME.js` exporting `default function()`; open with `/?test=NAME`. Each module owner makes
   their own test page. Set `window.__ready = true` when the scene is ready to screenshot.
 - Post debug: `&off=ao,tilt,main,smaa` disables passes, `&raw` renders without post, `&q=0|1|2` quality, `&hour=13` time of day.
-- QA: `node tools/qa/run-all.mjs [s1 s5 ...]` (the browser scenarios s1-s18; s15 is the homestead, s16 the guided
-  tutorials, which every other scenario keeps off with `?nointro`, s17 housing, s18 getting furniture).
+- QA: `node tools/qa/run-all.mjs [s1 s5 ...]` (the browser scenarios s1-s21; s15 is the homestead, s16 the guided
+  tutorials, which every other scenario keeps off with `?nointro`, s17 housing, s18 getting furniture, s19 charge, s20
+  Poe, s21 the zones' phase A: sprint, DungeonDef, seeds, state.zones, quest steps). `lib.mjs boot()` pins dungeon
+  layouts with `?dseed=1` (the old fixed floors); `dseed=off` lets them reroll.
   Perf: `village-perf.mjs [runs]` (the village at three camera spots), `homestead-perf.mjs [runs]` (a fully planted,
   ripe garden and a reel in progress, each against the same spot without). Profilers: `tools/qa/profile-boot.mjs` (boot → ready),
   `profile-burst.mjs` / `profile-stress.mjs` (long frames in big fights, `CASTS=a,b` env to bisect skills), `boot-time.mjs`.
@@ -59,7 +64,9 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
 
 ## Core modules (owned by the lead — read, don't rewrite)
 - `src/core/util.js` math, RNG (`RNG`, `mulberry32`), `Noise`, easing, colors. `src/core/events.js` event bus `Events.on/emit`.
-- `src/core/input.js` `Input.down(k)/hit(k)/mouseDown(b)/mouseHit(b)`, `Input.mouse.{x,y,nx,ny,overUI,wheel}`. Keys are lowercase letters, digits, `space`, `shift`, `escape`, `tab`, `alt`…
+- `src/core/input.js` `Input.down(k)/hit(k)/mouseDown(b)/mouseHit(b)`, `Input.mouse.{x,y,nx,ny,overUI,wheel}`. Keys are lowercase letters, digits, `space`, `shift`, `ctrl`, `escape`, `tab`, `alt`…
+  Shift is the sprint (`src/actors/sprint.js`), Alt+LMB attacks in place, a held Z shows the loot labels. A lone Alt and
+  Alt + keys never reach the browser, and every key and mouse event resyncs Alt, Shift and Ctrl, so none can stick.
 - `src/core/engine.js` `Engine` (renderer, `rig` camera, `post`, `tick()`, `render()`, `mouseGround()`), `LightPool`.
 - `src/gfx/*` materials, post, sky (DayNight), water, textures, geom. `src/world/terrain.js`, `vegetation.js`, `layout.js`, `villageWorld.js`.
 
@@ -171,7 +178,8 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
   - **The hold** `src/combat/charge.js` (`G.skills.charge`): fed by game.js for LMB / RMB / 1–4; the 0.18 s grace, the slow
     walk, the stages, the cancels (roll, panel, hotbar or weapon change, death, hero switch, floor change), the zoom cap,
     Toggle / Off (`ui.settings.chargeMode`), the channel wind-up. Events `charge:start|stage|release|spinout|cancel`.
-  - **Releases** `src/combat/chargedSkills.js` + `chargedChewy.js` + `chargedMoka.js`: `charged_<id>` methods mixed into
+  - **Releases** `src/combat/chargedSkills.js` + `chargedChewy.js` + `chargedMoka.js` + `chargedPoe.js` (her tables:
+    `src/rpg/chargePoe.js`, merged into `CHARGE`; her wind-ups via `chargePoses.js addChargePoses`): `charged_<id>` methods mixed into
     SkillRunner; most replay the skill's own `cast_<id>` from the wound-back frame (`fromFrame`) and add their extras; `tame()`
     caps the base cast's flashes, rings and crowns so foes stay readable.
   - **Looks** `src/gfx/chargeFx.js` (`G.vfx.charge`, pooled; the charging path allocates nothing per frame), **poses**
@@ -204,10 +212,17 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   (`frozen`, story marker '!') until `join('moka')`; new games play `introJoin()` after Rosie's welcome.
 - Rigs: `Player.buildRig(style, hero)` → baked film model (`heroModels.js`, public/rigs/<hero>_disney.*) or the kit
   spec `CAST[hero]`; Moka's staff is `heroGear.makeStaff(item.icon)` (six designs by variant).
-- Chewy's default baked model is the **Toybox Chewy** (`public/rigs/chewy_b.*`, built and rigged in Blender by the codex-blender
-  skill from tools/blender/work/codex/chewy-b, exported with `tools/blender/codex/hero_export.py`). `chewyModel()` picks
-  toy | disney (`?chewymodel=`, Settings > Toybox Chewy), and a missing file falls back to the Storybook model. `HERO_MODELS.chewyToy`
-  holds its tint, ear gain and palm / back attach points. prod-smoke requires it whenever chewy_b.json ships.
+- Chewy's default baked model is the **samurai Chewy** (`public/rigs/chewy_samurai.*`, sheet E "Black and Gold",
+  tools/blender/work/codex/chewy-samurai; docs/HEROES.md §8). Same 37-bone skeleton and face rig as the Toybox Chewy.
+  - `chewyModel()` picks samurai | toy | disney (`?chewymodel=`, Settings > Hero models). Samurai and toy both use the
+    Toybox Moka and Poe; disney is the Storybook heroes. A saved 'toy' from before the samurai moves to 'samurai' once
+    (`chewy.modelV`); after that the choice is kept.
+  - `cfgFor` falls back silently: chewySamurai → chewyToy (the **Toybox Chewy**, `public/rigs/chewy_b.*`) → the Storybook
+    model, so a missing file never breaks Chewy.
+  - `HERO_MODELS.chewySamurai` holds its tint, palm / back attach points, the `sayaMount` (the sheathed katana's hilt in
+    the saya at his left hip), the cloth and fur grade (`darkGrade` with a chroma gate, `furGrade`, `darkNeutral`,
+    `darkFur`: see heroModels.js and docs/HEROES.md §8) and per-model Animator tuning (`anim`: `barkTuck`, `sitThigh`).
+  - prod-smoke requires `chewy_samurai` and its saya whenever chewy_samurai.json ships (else chewy_b).
 - The companion is the **Toybox Shadow** (`public/rigs/shadow_toy.*`, sources in tools/blender/codex/assets/shadow-toy):
   a quadruped exported with `hero_export.py --contract quad`. That's 21 bones: the legs hang off root, and there are lid,
   jaw and lip joints.
@@ -225,13 +240,23 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   - It also sets `darkGrade` for her hair and a `hat` anchor for the nightcap.
   - prod-smoke requires `rosie_toy` whenever it ships.
 - Moka's default baked model is the **Toybox Moka** (`public/rigs/moka_toy.*`, sources in tools/blender/codex/assets/moka-toy).
-  - `cfgFor` loads `mokaToy` first and falls back to the Storybook `moka_disney`, like Chewy. The Settings toggle is
-    "Toybox heroes".
+  - `cfgFor` loads `mokaToy` first and falls back to the Storybook `moka_disney`, like Chewy. The Settings choice is
+    "Hero models" (Samurai or Toybox: the Toybox Moka; Storybook: hers).
   - Her entry sets `wave: 'front'`, `darkGrade` and `palm`.
   - prod-smoke requires `moka_toy` when playing Moka whenever it ships.
+- **Poe** (docs/POE.md): `CLASSES.poe`, the fūma (`wtype: 'fuma'`); skills `src/rpg/skillsPoe.js`, casts installed on
+  SkillRunner by `src/combat/poeSkills.js` (+ `poeArts.js`, `poeJutsu.js`, `poeShadow.js`, `chargedPoe.js`), effects
+  `src/gfx/poeFx.js` + `poeFxArts.js`, props / smoke copies `src/actors/poeProps.js`, poses `poePoses.js`, sounds
+  `src/audio/poe.sfx.js`, icons `src/rpg/iconsPoe.js`. Her look is the baked Toybox Poe
+  (`public/rigs/poe_toy.*`, `HERO_MODELS.poeToy`: palm, `fumaMount`, earGain, squint, the samurai's gated coat grade)
+  with the Blender fūma (`public/models/poe-fuma.glb`, `poeGear.js FUMA_MODEL`); the kit (`CAST.poe` + `poeKit.js`) is
+  the fallback (POE.md §8). prod-smoke requires `poe_toy` and the GLB fūma whenever they ship.
+  - Three heroes: tap Tab = `switchTo()` the next joined hero; hold Tab ≥ 0.26 s = the hero wheel (`src/ui/heroWheel.js`,
+    `heroes.tabInput`, event `hero:wheel`). `flags.poeJoined` gates her; `G.heroes.poeJoin` (`src/actors/poeJoin.js`) runs
+    her Bamboo Grove scene (event `poe:joinScene`) and Shadow's rumour in town; `joinPoe()` joins her.
 - **The procedural NPCs (villagers, townsfolk, humanoid monsters) are Toybox-style** by default: `src/actors/toyKit.js`, through
   `makeToyHumanoid` in charKit.js. The targets are the 7 approved sheets in tools/blender/work/codex/npc-kit/sheets.
-  - **Style:** `kitStyle()` follows the "Toybox heroes" setting (off gives the Disney kit), and "Disney style" off gives the
+  - **Style:** `kitStyle()` follows the "Hero models" setting (Storybook gives the Disney kit), and "Disney style" off gives the
     classic kit. `?kit=toy|disney|classic` overrides both.
   - **Eyes:** oval holes cut into one smooth skull; eye pads creased the face and zigzagged the toon band.
   - **Lids and lashes:** the lid ribbons carry the blink ∪, and the lower lids carry the happy ^ (`rig.squint`). The lash line
@@ -246,13 +271,14 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   (`ui/travel.js`, data from `G.travel.list/go`). `G.enterRegion(id)` shares the Burrow's entry sequence
   (`enterCombatWorld` in game.js). A region is a `RegionMode` (extends DungeonMode: monsters, flow field, bosses, loot
   unchanged) with a `RegionWorld` (terrain, water, mood lighting, the biome's vegetation / effects / critters).
-- `G.mode === 'dungeon'` means "a combat world"; `G.dungeon.isRegion` tells an outdoor region from a Burrow floor
-  (no stairs / waypoints / floor quests there). `layout.theme` = the region id, so audio resolves biome music through
+- `G.mode === 'dungeon'` means "a combat world"; `G.dungeon.kind` is 'burrow' | 'zone' | 'region' (`isRegion` is still
+  set on a RegionMode). Regions have no stairs, waypoints or floor quests. `layout.theme` = the region id, so audio resolves biome music through
   BIOME_TRACKS / BOSS_TRACKS / BIOME_AMBIENCES.
 - Monsters stand on terrain: `Monster.pos.y` = ground height, `m.lift(k)` for effect origins. Region monsters and bosses
   register through `src/regions/monsters/index.js` (`registerMonsters`; per-def hooks `ai`, `update`, `onSpawn`,
   `onDeath`, `damageTaken`, `subtitle`); their sounds are pure-data `*.sfx.js` merged by `src/regions/sfx/index.js`.
-- `state.regions = { unlocked, cleared, visits }`; a region opens at its level or when the previous boss falls.
+- A region opens at its level or when the previous boss falls. Its save state is `state.zones[id]` (`src/rpg/zones.js`);
+  `state.regions = { unlocked, cleared, visits }` is a live, unsaved view of it in the old shape (see Zones below).
 - Biome recipes (`src/regions/biomes/<id>.js`): the terrain functions plus populate / effects / interactables (the API
   is in REGIONS.md §3.6). Shared placement rules live in `src/regions/biomeKit.js`: the camera-side / lens / landmark
   view guards, bridge decks and trail spots. Landmark POIs are fixed with `layout.poiAt`.
@@ -260,6 +286,73 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   Hot springs are `ctx.addPool` bodies with their own level.
 - RegionWorld.dispose frees what the scene teardown can't reach (the weather mask texture, batches, the light pool).
   s13 checks round trips for texture/geometry growth.
+
+## Zones, phase A (src/dungeon/defs.js, src/rpg/zones.js, src/rpg/zoneMods.js, src/world/questSteps.js — design: docs/ZONES.md §8.1)
+- **DungeonDef** `DUNGEONS` (defs.js, pure): `burrow` (endless, the old rotation) and the four 2-floor zone dungeon
+  stubs. `G.enterDungeon({ id, floor, tier, mods })` (or a Burrow floor number) → `DungeonMode.build(arg)` →
+  `beginRun` (the def, the clamped floor, the entry's seeds) → `generate({ floor, seed, plan: floorPlan(...) })`. The
+  mode has `def`, `kind`, `zoneId`, `tier`, `mods`, `where()`, `nextRun()`, `hasDeeper()`, `exitPos`, `stairsPos`.
+- **Seeds** reroll per entry (`state.dungeon.runs`, `state.dungeon.seed`); `?dseed=N` pins them for the tab (`G.dseed`).
+- **Hooks**: `zoneMods.packMods` / `monsterMods` in every `spawnPack` (no-ops until phase E).
+- **Save**: `state.zones[id] = { unlocked, visits, regionBoss, village, siegeCamps, dungeon: { cleared, bestFloor, tier:
+  { unlocked, cleared }, spirit }, quests }`; `normalizeZones` migrates `state.regions` (boot, `regionState`).
+- **Quest steps**: zone filters on `kill` / `boss`, `find`, `rescue`, `dungeonFloor`, `tier`, `villageSaved`
+  (questSteps.js); `Story.placeFor` points at the Post, the gate, the stairs, the boss or the way out.
+- **Sprint** (`src/actors/sprint.js`, docs/ZONES.md §9.1): Shift, +40%, `player.sprint` → `speedMul`, `anim.sprint`;
+  Shadow paces on `player.anim.speed`; Settings › Sprint (`ui.settings.sprintMode`).
+
+## Hordes: big fights (src/dungeon/horde.js, crowd.js, src/combat/grid.js, src/gfx/spriteBatch.js — ZONES.md §7, ROADMAP Z-B)
+- **Model cache** (monsters.js `buildMonster`): a Burrow rigid model's merged geometry is built once per kind × variant
+  (dust bunnies: 3 random fluff layouts per variant) and region `assemble()` parts are shared, never cloned
+  (`geometry.userData.shared`: `Monster.dispose` leaves it; the floor teardown frees the GPU copy, the next floor
+  re-uploads). Each spawn still gets its own groups, meshes, materials and animate closure, so everything that writes to
+  a model keeps working. Humanoids (tanuki, fox) are one baked template per variant, then `cloneRig` per spawn (own
+  bones, skeleton, materials and `spec`).
+- **The Horde** (`hordeOf(mode)`, one per combat world) owns:
+  - **instanced batches**: a rigid model whose meshes are all toon bodies / ink hulls on shared geometry is *adopted*:
+    its root stays out of the scene, and in `scene.onBeforeRender` (main pass only) every visible mesh's world matrix
+    goes into one `InstancedMesh` per (geometry, program, render state). Toon bodies carry the hit flash (the
+    material's `emissive`) and an exact per-instance normal matrix (squash × turn shears); hulls carry colour and
+    width (elite contours); transparent parts (the kurage bell) opacity, back-to-front order; tidepool's GPU-deform
+    uniforms (`userData.vhU`, `userData.instU`) become attributes. Batches with the same draw signature share one
+    material (no uniform re-upload between them); shadows use one shared depth material. Models outside both the view
+    and the sun's shadow frustum are skipped; models whose monster didn't update keep last frame's matrices.
+  - **contact rings**: `RingProxy` objects (position / scale / visible / material like the old plane) → one depth-
+    sorted instanced quad batch.
+  - **the rig pool**: a despawned humanoid's model is reset to its first-build pose and handed to the next spawn;
+    `warm(ids)` builds a roster's masters, batches (drawn once below the floor so the driver finishes their programs)
+    and a rig per variant at floor load (the theme's kinds + the boss's summons; `DungeonMode.warmMonsters(ids)`).
+  - `?noinst`: every model is a scene mesh again (still on the cached geometry), for A/B; `?hordecheck` audits batch
+    materials; `?nocull` draws every instance.
+- **Crowd grids**: `Combat` keeps allies in their own set (`combat.allies`, insertion order) and enemies in a 4 m grid
+  rebuilt on the first query of a frame; `inRadius`, `nearest`, `pickAtScreen` (a cone round the cursor's line, cut
+  to the enemies' height slab) and projectile hits read nearby cells and return exactly what the old scans did, in
+  the same order (`?gridcheck` compares every answer and fuzzes them; `?nogrid` restores the scans). The floor's
+  monster grid (`crowdOf(mode)`, 2 m cells, bosses in a side list) serves `separate`, the chase surround step and
+  `alert`; `Monster.sync` keeps both grids current; `pickTarget` reads `combat.allies`.
+- **AI LOD** (`updateMonsters`, the monster pass): a monster that isn't aggroed, a boss or within 22 m of the hero or
+  an ally, and is off screen, updates every 4th frame with the time it missed; a sleeping humanoid also leaves the
+  scene graph. `?nolod` turns it off.
+- **Budgets**: damage numbers — 8 plain + 6 crits per frame, the rest of the frame's hits fold into one "+N" total
+  (`Combat.dmgFloat` / `flushFloats`); hit sparks — past 32 hits in a frame, plain hits spawn a quarter and no element
+  extras (`vfx.hit`). Fast monsters move in sub-steps no longer than their radius (`Monster.move`, knockback).
+- **Elsewhere**: `spriteBatch.js` (three's sprite shader, instanced; `?nosprites`) draws projectiles' additive glow
+  sprites in one batch per texture, and emote bubbles (render order 20) in depth-sorted runs that keep three's exact
+  draw order; additive double-sided VFX render single-pass and share ring / plane geometry (vfx.js); particle layers
+  upload only live records and drop the oldest without shifting; N8AO's transparency re-renders skip the redundant
+  scene matrix update (post.js); `Collision.resolve` / `solidAt` walk cells without closures; Poe's shots query the
+  enemy grid (poeArts.js).
+- **Cloning a hero rig**: use `cloneSkinnedSafe` (actors/safeClone.js), not three's `SkeletonUtils.clone`. Hero rig
+  nodes keep three objects in `userData` (the ear joints' `tip`, Moka's staff `orb`, Poe's fūma holders' `mat`), and
+  `Object3D.copy` deep-copies userData through `JSON.stringify`, which runs their `toJSON` → `Matrix4.toArray()` into
+  plain arrays. That one call turns V8's keyed-store feedback in `Matrix4.toArray` generic for the rest of the
+  session, and every `Skeleton.update` and `InstancedMesh.setMatrixAt` runs 10–20× slower (25 → 600 ns per matrix,
+  ~0.7 ms a frame in a 150 fight). Poe's smoke copies use it (poeProps.js); free copies wait outside the scene graph.
+  Still on the old clone: `chargeFx.ghost` (Chewy's charged Afterimage) — the same one-line import swap fixes it.
+- **The gate**: `tools/qa/profile-horde.mjs` (in run-all): per world × hero, a floor-alone baseline, then 150 and
+  250-monster fights on the same page; a 150 fight passes at p95 ≤ max(8, baseline + 3) ms, with one retry, and a
+  machine-load verdict is printed (ZONES §7.1). `tools/qa/horde-shots.mjs` renders frozen lineups for before / after
+  pixel diffs and fails on a near-black shot.
 
 ## Homestead: farming, fishing, cooking (src/life/ — design and as-built notes: docs/HOMESTEAD.md)
 - `installLife(G, village)` (life/index.js, from game.js after the sim, story and services) builds
@@ -307,7 +400,7 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   step allows it.
 - Old saves past a guide's start get a one-time offer. The Journal's Guides tab replays any guide.
 - Guides start on their own only when enabled: off with `?notut`, and with the QA's `?nointro` unless `?tut`
-  (remembered per tab), so s1-s15 never meet one; s16 drives them (s17 the housing guides, s19 "Hold to power up!").
+  (remembered per tab), so s1-s15 never meet one; s16 drives them (s17 the housing guides, s19 "Hold to power up!", s20 "Meet Poe").
 
 ## Housing (src/home/ — design and as-built notes: docs/HOUSING.md)
 - **Interiors**: `G.mode = 'interior'`. One persistent `InteriorWorld` (home/interiorWorld.js: its scene, the same light
@@ -338,7 +431,7 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
 ## Persistent state `G.state` (JSON-serialisable, saved to localStorage)
 ```js
 state = {
-  version: 2, activeHero: 'chewy', heroes: { chewy: { player, equipment }, moka: { player, equipment } }, // (saved)
+  version: 2, activeHero: 'chewy', heroes: { chewy: { player, equipment }, moka: { … }, poe: { … } }, // (saved)
   // player / equipment below = heroes[activeHero].player / .equipment (live aliases, not saved)
   player: { cls:'chewy', name:'Chewy', lvl:1, xp:0, stats:{str:10,dex:10,vit:12,ene:8}, statPts:0, skillPts:1,
             skills:{ chomp:1 }, hotbar:['attack','chomp',null,null,null,null], // [LMB, RMB, 1, 2, 3, 4]
@@ -353,7 +446,9 @@ state = {
   quests: { active:[], done:[] }, friends: { /* villagerId: {hearts, talkedDay, gifts} */ },
   village: { layoutVersion:2, ringRank:1, seed, buildings:[{ id, idx, type, x, z, rot, level, seed, residents, built, plot? }],
              zones:[[x,z,t]], paths:[[x,z]], day, income, stats, migrationNote? },   // (owned by the village sim)
-  dungeon: { deepest:0, waypoints:[1] },
+  dungeon: { deepest:0, waypoints:[1], seed, runs },          // the Burrow (seed / runs: per-entry rerolls, dungeon/defs.js)
+  zones: { bamboo: { unlocked, visits, regionBoss, village, siegeCamps, dungeon: { cleared, bestFloor, tier, spirit }, quests }, … },
+  // regions: { unlocked, cleared, visits } = a live view of zones (not saved; rpg/zones.js)
   day: 1, hour: 8.5, flags: {},
   // the homestead (docs/HOMESTEAD.md; household, lazy-init: old saves load with empty ones)
   pantry: { turnip: 3, koi: 1, onigiri: 2 }, pantryFound: { id: day },
@@ -406,6 +501,9 @@ Guides: `fishing:start|cast|nibble|early|bite|reel`, `fishing:end {result}`, `ho
 `tutorial:start|step|done|skip|offer`.
 Charge: `charge:start {id,slot}`, `charge:stage {id,stage}`, `charge:release {id,stage,ok}`, `charge:spinout {id,stage,t}`,
 `charge:cancel {id,reason}`, `perk:learned {id,perk,rank}`.
+Zones: `monster:killed {id,rank,floor,zone,dungeon,tier}`, `boss:dead {id,floor,zone,dungeon,tier}`, `mode:changed` (+ zone,
+dungeon, tier), `dungeon:cleared {id,kind,tier,floor,zone,boss,first}`, `tier:unlocked {id,zone,tier}`, `region:cleared {id,times}`;
+listened for, emitted from phase D: `village:saved {zone}`, `quest:find {item,n,...}`, `villager:rescued {npc,...}`.
 
 ## UI (src/ui/) — HTML/CSS overlay above the canvas (`#ui`), lots of spring/bounce animations
 `UI.init(G)`, `UI.update(dt)`, `UI.toggle(name)` / `open` / `close` / `isOpen` / `anyModal()` for

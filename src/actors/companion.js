@@ -84,7 +84,10 @@ export class Companion extends Actor {
     if (d > 18) { // teleport-catch-up if lost
       const back = new THREE.Vector3(-Math.sin(p.facing), 0, -Math.cos(p.facing));
       this.setPos(p.pos.x + back.x * 1.2, p.pos.z + back.z * 1.2);
+      this.catchUps = (this.catchUps || 0) + 1; // (QA: a sprinting hero shouldn't need these)
     }
+    // he paces himself on the hero's measured speed (a sprint, zoomies, Vanish: docs/ZONES.md §9), so he keeps up on foot
+    const pace = Math.min(2.2, Math.max(1, (p.anim?.speed || 0) / (this.speed * 1.05))); // (×1 while the hero walks at his own trot)
     if (this.hold) { // scripted staging (intro): stay on the mark, face the given way, sit once there
       if (this.moveTo(this.hold.x, this.hold.z, dt, 0.8, 0.15)) { this.faceTarget = this.hold.face; if (!this.anim.action) this.anim.play('sit'); }
       super.update(dt); return;
@@ -95,7 +98,7 @@ export class Companion extends Actor {
       if ((this.slotT -= dt) <= 0) { this.slotT = 0.35; this.pickSlot(p); }
       const [bk, sd] = SLOTS[this.slotK], fx = Math.sin(p.facing), fz = Math.cos(p.facing);
       const tx = p.pos.x - fx * bk + fz * sd, tz = p.pos.z - fz * bk - fx * sd;
-      this.follow(tx, tz, dt, d > 5 ? 1.5 : 1.05, 0.3);
+      this.follow(tx, tz, dt, (d > 5 ? 1.5 : 1.05) * pace, 0.3);
       this.idleT = 0; this.wanderTarget = null; this.sidePicked = false; this.anim.mood = 0.5;
       if (this.anim.action?.name === 'sit') this.anim.stop('sit');
     } else {

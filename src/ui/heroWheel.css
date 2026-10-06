@@ -1,0 +1,34 @@
+/* The hero wheel (ui/heroWheel.js): hold Tab, pick a hero, let go. Cards round a soft hub in the middle of the screen. */
+.hero-wheel { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 60; opacity: 0; transition: opacity .14s; }
+.hero-wheel.show { opacity: 1; }
+.hero-wheel::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgba(40, 24, 46, .38) 0, rgba(40, 24, 46, .18) 30%, rgba(40, 24, 46, 0) 58%); }
+.hw-ring { position: relative; width: 0; height: 0; }
+.hw-hub { position: absolute; width: 190px; height: 190px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px;
+  background: radial-gradient(circle at 50% 35%, #fffaf2, #f3e6d6); border: 4px solid var(--ink); box-shadow: 0 6px 0 rgba(74, 44, 42, .3); transform: scale(.6); transition: transform .22s var(--spring, ease); }
+.hero-wheel.show .hw-hub { transform: scale(1); }
+.hw-hub b { font: 700 24px/1 var(--font); color: var(--ink); }
+.hw-hub span { font: 600 12px/1.25 var(--font); color: var(--ink2, #7a5a50); max-width: 150px; }
+.hw-card { position: absolute; left: 0; top: 0; width: 132px; padding: 0; border: 0; background: none; cursor: pointer; pointer-events: auto; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) scale(.4); opacity: 0; transition: transform .26s var(--pop, ease) calc(var(--i) * 30ms), opacity .16s calc(var(--i) * 30ms); }
+.hero-wheel.show .hw-card { transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) scale(1); opacity: 1; }
+.hero-wheel.show .hw-card.sel { transform: translate(calc(-50% + var(--x) * 1.08), calc(-50% + var(--y) * 1.08)) scale(1.16); }
+.hw-face { position: relative; width: 92px; height: 92px; border-radius: 50%; overflow: hidden; border: 5px solid var(--ink); background: radial-gradient(circle at 50% 30%, #fff, color-mix(in srgb, var(--hc) 38%, #fff));
+  box-shadow: 0 4px 0 rgba(74, 44, 42, .35); transition: box-shadow .2s, border-color .2s; }
+.hw-face .p3d, .hw-face .portrait { position: absolute; left: -8%; top: 4%; width: 116% !important; height: 116% !important; object-fit: cover; }
+.hw-card.sel .hw-face { border-color: var(--hc); box-shadow: 0 0 0 4px var(--ink), 0 0 22px 6px color-mix(in srgb, var(--hc) 70%, transparent), 0 5px 0 rgba(74, 44, 42, .4); }
+.hw-card.locked .hw-face .p3d, .hw-card.locked .hw-face svg { filter: brightness(0) opacity(.55); }
+.hw-q { position: absolute; inset: 0; display: grid; place-items: center; font: 700 44px/1 var(--font); font-style: normal; color: #fff; -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill; }
+.hw-card.blocked .hw-face, .hw-card.active .hw-face { filter: saturate(.55); }
+.hw-card.active .hw-face { filter: none; }
+.hw-t { display: flex; flex-direction: column; align-items: center; line-height: 1.05; padding: 4px 10px; border-radius: 14px; background: rgba(255, 250, 242, .94); border: 3px solid var(--ink); }
+.hw-t b { font: 700 18px/1 var(--font); color: var(--ink); display: flex; align-items: baseline; gap: 5px; }
+.hw-t b .jp { font-size: 11px; color: var(--hc); }
+.hw-t span { font: 600 11px/1.15 var(--font); color: var(--ink2, #7a5a50); }
+.hw-t em { font: 700 11px/1 var(--font); font-style: normal; color: var(--hc); margin-top: 2px; }
+.hw-k { position: absolute; left: 6px; top: 4px; }
+.hw-tag { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); white-space: nowrap; font: 700 11px/1 var(--font); color: #fff; background: var(--hc); border: 3px solid var(--ink); border-radius: 10px; padding: 3px 7px; }
+.hw-tag.dim { background: #b8a8b0; }
+.hw-card.locked .hw-t { opacity: .8; }
+/* the HUD's extra mini portrait for a second benched hero (hud.js), beside the first */
+.hsw.hsw-b { left: 34px; top: 70px; width: 38px; height: 38px; }
+.hsw.hsw-b .kc { display: none; }

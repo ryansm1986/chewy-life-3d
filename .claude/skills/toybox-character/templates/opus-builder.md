@@ -19,6 +19,7 @@ then send you feedback rounds. You build the asset **in Blender, by script**.
 
 ## Environment
 - Blender 4.3: `"C:\Program Files\Blender Foundation\Blender 4.3\blender.exe" --background --factory-startup --python <script> -- <args>`.
+- **Processes**: other agents, and the owner, may be running Blender at the same time. Record the PID of every Blender run you launch and stop only those PIDs. **Never kill by image name** (`taskkill /IM blender.exe` kills everyone's). Wrap each run in a timeout (about 900 s) and cap sample counts and loops, so nothing can balloon memory. If a process looks wrong and isn't yours, report it and leave it running.
 - Write only inside `{{TASK_PATH}}/`, plus the final model at `{{REPO}}/public/models/{{TASK_NAME}}.glb`. Don't edit game code
   (`src/`), don't run git, and don't install anything.
 - Preview after every export (the standard sheet, turnaround, head and stats):

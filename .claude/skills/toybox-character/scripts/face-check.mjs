@@ -1,6 +1,7 @@
 // In-game face check for a baked character (the toybox-character skill): loads /?test=chars&only=<id> on the dev server
 // and saves close-up frames of rest, talk, blink (mid), bark and happy-with-open-mouth, through the game's own Animator.
-//   node .claude/skills/toybox-character/scripts/face-check.mjs --id rosie [--out DIR] [--dist 2.6] [--pitch 0.35]
+//   node .claude/skills/toybox-character/scripts/face-check.mjs --id rosie [--out DIR] [--dist 2.6] [--pitch 0.35] [--cy 0.9]
+//   (--cy: the camera's focus height, m: a big-headed character like Poe wants ~0.9)
 // Then compose them: python .claude/skills/toybox-character/scripts/compare.py face.png --h 360 "rest::DIR/rest.png::450,0,1150,620" …
 import { chromium } from 'playwright-core';
 import fs from 'node:fs';
@@ -8,13 +9,13 @@ import path from 'node:path';
 
 const args = process.argv.slice(2), arg = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
 const id = arg('id', 'chewy'), out = path.resolve(arg('out', `tools/blender/work/codex/${id}-face`));
-const dist = arg('dist', '2.6'), pitch = arg('pitch', '0.35'), base = process.env.BASE || 'http://localhost:5173';
+const dist = arg('dist', '2.6'), pitch = arg('pitch', '0.35'), cy = arg('cy', null), base = process.env.BASE || 'http://localhost:5173';
 fs.mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true, args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 await page.routeWebSocket(/.*/, ws => { ws.onMessage(() => {}); });
 const logs = []; page.on('pageerror', e => logs.push(e.message)); page.on('console', m => { if (m.type() === 'error') logs.push(m.text()); });
-await page.goto(`${base}/?test=chars&only=${id}&dist=${dist}&pitch=${pitch}`, { waitUntil: 'load' });
+await page.goto(`${base}/?test=chars&only=${id}&dist=${dist}&pitch=${pitch}${cy ? `&cx=0&cy=${cy}&cz=0` : ''}`, { waitUntil: 'load' });
 await page.waitForFunction(() => window.__ready === true && window.actors?.length, null, { timeout: 60000 });
 await page.waitForTimeout(2500);
 const info = await page.evaluate(() => { const r = window.actors[0].rig; return { model: r.model || (r.bakedDisney ? 'baked' : 'kit'), parts: Object.keys(r.parts).filter(k => r.parts[k]) }; });

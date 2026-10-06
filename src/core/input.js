@@ -11,16 +11,23 @@ export const Input = {
     this.canvas = canvas;
     addEventListener('keydown', e => {
       if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+      this._mods(e);
       const k = normKey(e);
       if (!this.keys.has(k)) this.pressed.add(k);
       this.keys.add(k); this.upLatch.delete(k);
       if (['Tab', 'Space', 'AltLeft', 'AltRight', 'F1'].includes(e.code) || (e.code.startsWith('Digit') && !e.ctrlKey)) e.preventDefault();
+      // Alt is held for attack-in-place (Alt+LMB): the keys pressed with it stay in the game instead of opening the browser's
+      // menu (Alt+F / E), the address bar (Alt+D) or going back / forward (Alt+arrows). (Alt+F4 stays the OS's.)
+      else if (e.altKey && !e.ctrlKey && !e.metaKey && e.code !== 'F4') e.preventDefault();
     });
-    addEventListener('keyup', e => { const k = normKey(e); if (this.pressed.has(k)) this.upLatch.add(k); else this.keys.delete(k); this.released.add(k); });
+    addEventListener('keyup', e => {
+      if (e.code === 'AltLeft' || e.code === 'AltRight') e.preventDefault(); // (Windows: a lone Alt tap would focus the browser's menu button and take the keys)
+      const k = normKey(e); if (this.pressed.has(k)) this.upLatch.add(k); else this.keys.delete(k); this.released.add(k);
+    });
     addEventListener('blur', () => { this.keys.clear(); this.mDown.clear(); this.upLatch.clear(); this.mUpLatch.clear(); });
-    addEventListener('mousemove', e => this._move(e));
+    addEventListener('mousemove', e => { this._move(e); this._mods(e); });
     addEventListener('mousedown', e => {
-      this._move(e);
+      this._move(e); this._mods(e);
       this.mouse.overUI = e.target !== canvas;
       if (this.mouse.overUI) return;
       this.mDown.add(e.button); this.mPressed.add(e.button); this.mUpLatch.delete(e.button);
@@ -33,6 +40,9 @@ export const Input = {
     addEventListener('contextmenu', e => e.preventDefault());
     canvas.addEventListener('wheel', e => { this.mouse.wheel += Math.sign(e.deltaY); e.preventDefault(); }, { passive: false });
   },
+  // a modifier whose keyup never came (Alt+Tab, an OS hotkey, a release outside the window) doesn't stick: every key and
+  // mouse event carries the real modifier state
+  _mods(e) { if (!e.altKey) this.keys.delete('alt'); if (!e.shiftKey) this.keys.delete('shift'); if (!e.ctrlKey) this.keys.delete('ctrl'); },
   _move(e) {
     this.mouse.x = e.clientX; this.mouse.y = e.clientY;
     this.mouse.nx = (e.clientX / innerWidth) * 2 - 1;

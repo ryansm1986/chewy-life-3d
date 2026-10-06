@@ -3,26 +3,27 @@
 // For every active skill: the charged release, how its numbers grow per stage at the reference skill level (normal →
 // Ⅰ / Ⅱ / Ⅲ, no perks, no gear), the stage times, the release cost, and the perks with their ranks, gates and numbers.
 import { SKILLS, TREES, skillRuntime } from '../src/rpg/skills.js';
+import { CLASSES } from '../src/rpg/classes.js';
 import { CHARGE, STAGE_MULT, NUMERAL, stageTimes, chargeCost, chargeRuntime, GRACE, SLOW, SURCHARGE, FOCUS_PER_RANK, PERK_STAGE } from '../src/rpg/charge.js';
 
 const li = process.argv.indexOf('--lvl'), LVL = li >= 0 ? +process.argv[li + 1] : 10;
 const D = { dmgMin: 10, dmgMax: 20, lifeMax: 300, synergy: {}, treeDmgPct: {}, ballSpeed: 1 };
 const L = {
-  dmgPct: ['damage', '%'], arc: ['arc', '°'], radius: ['radius', ' m'], knockback: ['knockback', ''], knock: ['knockback', ''], stun: ['stun', ' s'], wave: ['crescent rolls', ' m'],
+  dmgPct: ['damage', '%'], arc: ['arc', '°'], radius: ['radius', ' m'], knockback: ['knockback', ''], knock: ['knockback', ''], stun: ['stun', ' s'], wave: ['crescent flies', ' m'],
   pull: ['pull', ' m/s'], spinOut: ['spin-out', ' s'], leap: ['leap', ' m'], count: ['count', ''], duration: ['lasts', ' s'], speed: ['speed', ' m/s'], range: ['range', ' m'],
   pierce: ['pierce', ''], size: ['size', '×'], bounces: ['bounces', ''], bounceRange: ['bounce range', ' m'], spread: ['fan', '°'], life: ['life', ''], lureRadius: ['lure', ' m'],
   cloudRadius: ['stink cloud', ' m'], burnDuration: ['burning ground', ' s'], burnPct: ['burn', '%/s'], cone: ['cone', '°'], reach: ['reach', ' m'], distance: ['dash', ' m'],
-  alpha: ['alpha pup', '×'], pups: ['pups', ''], healPct: ['heal', '% life'], healFlat: ['heal', ' flat'], dmgBuff: ['damage buff', '%'], fear: ['fear', ' s'], strikes: ['moonbeams', ''],
+  alpha: ['shogun pup', '×'], pups: ['pups', ''], healPct: ['heal', '% life'], healFlat: ['heal', ' flat'], dmgBuff: ['damage buff', '%'], fear: ['fear', ' s'], strikes: ['moon blades', ''],
   strikeRadius: ['strike radius', ' m'], splashRadius: ['splash radius', ' m'], splashPct: ['splash', '%'], chill: ['slow', ''], chillDur: ['chill', ' s'], absorb: ['absorb', ''],
   freeze: ['freeze', ' s'], width: ['width', ' m'], length: ['length', ' m'], surf: ['surf', ' s'], homing: ['homing', ''], links: ['links', ''], linkRange: ['link range', ' m'],
-  twinklePct: ['twinkle', '%'], popRadius: ['pop radius', ' m'], barkStun: ['bark daze', ' s'], area: ['area', ' m'], linger: ['lingers', ' s'], grabs: ['grabs', ''], trailPct: ['zoom trail', '% / 0.5 s'],
+  twinklePct: ['twinkle', '%'], popRadius: ['pop radius', ' m'], barkStun: ['bark daze', ' s'], area: ['area', ' m'], linger: ['lingers', ' s'], grabs: ['grabs', ''], trailPct: ['lingering cut', '% / 0.5 s'],
   lure: ['tug', ' m'], arm: ['arms in', ' s'], wavePct: ['crescent', '%'], waveWidth: ['crescent width', ' m'], arcPct: ['spark arc', '%'], burstPct: ['burst', '%'], slamPct: ['slam splash', '%'],
   dizzy: ['dizzy', ' s'], trail: ['trail', ' s'],
 };
 const SKIP = new Set(['returns', 'golden', 'carry', 'alphaHowl', 'invuln', 'hits']);
 const PCT = new Set(['dmgPct', 'burnPct', 'healPct', 'twinklePct', 'dmgBuff']);
 const fmt = (k, v) => (k === 'chill' ? `−${Math.round(v * 100)}%` : PCT.has(k) ? `${Math.round(v)}` : typeof v === 'number' ? `${Math.round(v * 100) / 100}` : String(v));
-const POSE = { sword: 'sword drawn back', ball: 'ball cocked', staff: 'staff raised', crouch: 'crouch', breath: 'a big breath', sky: 'paws to the sky', spin: 'the spin revs up', beam: 'the beam grows', twirl: 'staff twirl', call: 'call to the lips', shake: 'braced to shake', bubble: 'blowing a bubble' };
+const POSE = { poeFuma: 'the fūma coiled back in both paws', poeKunai: 'kunai fanned at the chest', poeSeal: 'a hand seal, eyes closed', poePuff: 'cheeks puffing up', poeThunder: 'a crackling paw held high', poeDragon: 'three seals, faster and faster', poeCrouch: 'a low ninja crouch', poeStars: 'arms crossed, winding up', poeBrush: 'the brush up, taking aim', iai: 'iai stance, paw on the hilt', iaiDash: 'coiled in the draw stance', kiai: 'a big breath, blade up', stance: 'settling into the stance', splitter: 'crouched, blade low behind', storm: 'the blade raised in salute', warCry: 'a deep breath before the call', sword: 'sword drawn back', ball: 'ball cocked', staff: 'staff raised', crouch: 'crouch', breath: 'a big breath', sky: 'paws to the sky', spin: 'the spin revs up', beam: 'the beam grows', twirl: 'staff twirl', call: 'call to the lips', shake: 'braced to shake', bubble: 'blowing a bubble' };
 
 const out = [];
 out.push(`All numbers at skill level ${LVL} with no gear, read from \`src/rpg/charge.js\` (regenerate with \`node tools/charge-table.mjs\`). Common rules: a press under ${GRACE} s is a tap; charging walks at ${Math.round(SLOW * 100)}% speed; each stage costs +${Math.round(SURCHARGE * 100)}% of the skill's zoom; each table's curves (the main number ×${STAGE_MULT.join(' / ×')} unless it names its own) then pass through its balance tune (§9), so the numbers below are the tuned ones; a perk's bonus damage is ${PERK_STAGE.map(v => Math.round(v * 100) + '%').join(' / ')} of its listed value at Ⅰ / Ⅱ / Ⅲ. Stage times are Ⅰ / Ⅱ / Ⅲ (cumulative; Quick Wind-up trims them by 15% per rank).`);
@@ -36,7 +37,7 @@ out.push('');
 for (const T of TREES) {
   const ids = Object.keys(CHARGE).filter(id => SKILLS[id].tree === T.id).sort((a, b) => SKILLS[a].row - SKILLS[b].row || SKILLS[a].col - SKILLS[b].col);
   if (!ids.length) continue;
-  out.push(`#### ${T.name} (${T.cls === 'moka' ? 'Moka' : 'Chewy'})`);
+  out.push(`#### ${T.name} (${CLASSES[T.cls || 'chewy']?.name || 'Chewy'})`);
   out.push('');
   out.push('| Skill → charged release | Stage payoff (normal → Ⅰ / Ⅱ / Ⅲ) | Charge, cost | Perks (ranks · skill level) |');
   out.push('|---|---|---|---|');

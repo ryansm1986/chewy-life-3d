@@ -4,33 +4,116 @@ import { rollHit, playerDamageTaken, rollBlock, ELEMENT_COLORS } from '../rpg/st
 import { Events } from '../core/events.js';
 import { rand, clamp, TAU } from '../core/util.js';
 import { Projectile, projectileLooks } from './projectile.js';
+import { Grid } from './grid.js';
+import { adoptSprites } from '../gfx/spriteBatch.js';
 
-const _v = new THREE.Vector3();
+const _v = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3();
 // damage-number weight: hits below this size (5% of a monster's life, 1.5% of a boss's much larger pool) float up
 // smaller and fainter, so the big hits in a dense fight stand out (ui/fx.js Floats)
 const minorHit = m => (m.lifeMax || 0) * (m.def?.boss ? 0.015 : 0.05);
+// Crowd queries (ROADMAP Z-B3): enemies live in a uniform grid rebuilt once a frame (on the first query) and kept fresh
+// by Monster.sync; allies (Shadow, pups, decoys, clones, logs) are a small set scanned directly. Every query returns
+// what the old linear scans over `entities` returned, in the same (insertion) order. `?nogrid` restores the scans;
+// `?gridcheck` runs both and counts mismatches in `combat.check` (tools/qa/profile-horde.mjs reads it).
+const QS = typeof location !== 'undefined' ? location.search : '';
+const NOGRID = /[?&]nogrid\b/.test(QS), GRIDCHECK = /[?&]gridcheck\b/.test(QS);
+const PAD = 1.0; // how far an enemy may have moved since the grid last saw it (pulls, knockbacks applied from outside)
+const bySeq = (a, b) => a._cseq - b._cseq;
+// Damage numbers in a crowd (ROADMAP Z-B4): each frame (Combat.update to Combat.update) the first FLOAT_FREE plain
+// numbers and FLOAT_CRITS crits float as before; past that the frame's hits fold into ONE "+N" total over their centre
+// (ui/fx.js merges consecutive totals there, so a long burst reads as one growing number). A Great Wave through 40 foes
+// shows a handful of numbers, the crits and a total instead of 40 overlapping ones. Below the budget nothing changes.
+const FLOAT_FREE = 8, FLOAT_CRITS = 6;
 
 export class Combat {
   constructor(G, world) {
     this.G = G; this.world = world;
     this.entities = new Set();
+    this.allies = new Set(); // the team-'ally' entities, in insertion order
+    this.grid = new Grid(4); // the team-'enemy' entities
+    this.seq = 0; this.iter = 0; this.added = []; // (an entity added while inRadius runs its callbacks is visited too, as the Set did)
+    this.hits = [];
+    this.check = GRIDCHECK ? { n: 0, bad: 0, kinds: {} } : null;
     this.projectiles = [];
     this.zones = [];
     this.buffs = {}; // player buffs: howl {t, dmg, move}, frenzy {stacks, t}, cursed {t, pct}
     this.shake = 0;
   }
-  add(e) { this.entities.add(e); return e; }
-  remove(e) { this.entities.delete(e); }
-  clear() { for (const p of this.projectiles) p.dispose(); this.projectiles.length = 0; for (const z of this.zones) z.dispose?.(); this.zones.length = 0; this.entities.clear(); }
+  add(e) {
+    if (this.entities.has(e)) return e;
+    e._cseq = ++this.seq; this.entities.add(e);
+    if (e.team === 'ally') this.allies.add(e);
+    else if (e.team === 'enemy' && e.pos) this.grid.insert(e);
+    if (this.iter) this.added.push(e);
+    return e;
+  }
+  remove(e) { if (this.entities.delete(e)) { this.allies.delete(e); this.grid.remove(e); } }
+  clear() { for (const p of this.projectiles) p.dispose(); this.projectiles.length = 0; for (const z of this.zones) z.dispose?.(); this.zones.length = 0; this.entities.clear(); this.allies.clear(); this.grid.rebuild([]); }
   *hostile(team) { for (const e of this.entities) if (e.alive && e.team !== team) yield e; }
+  /** the enemy grid, rebuilt on the first query of a frame */
+  enemyGrid() {
+    const g = this.grid, f = this.G.engine?.renderer?.info?.render?.frame;
+    if (f === undefined || f !== g.frame) { g.rebuild(this.entities, e => e.team === 'enemy'); g.frame = f ?? -1; }
+    return g;
+  }
+  /** an entity moved (Monster.sync): keep its grid bucket current */
+  moved(e) { if (e._cseq && e.team === 'enemy' && this.entities.has(e)) this.grid.move(e); }
+  /** alive enemies within r (+ their radius slack) of (x, z), in insertion order → a reused array: call doneNear() after */
+  enemiesNear(x, z, r) {
+    if (NOGRID) { const out = this._scan ||= []; out.length = 0; for (const e of this.entities) if (e.alive && e.team === 'enemy') out.push(e); return out; }
+    const g = this.enemyGrid(), c = g.near(x, z, r + g.maxR + PAD), out = this.hits[g.depth - 1] ||= [];
+    out.length = 0;
+    for (let i = 0; i < c.length; i++) if (c[i].alive) out.push(c[i]);
+    if (out.length > 1) out.sort(bySeq);
+    return out;
+  }
+  doneNear() { if (!NOGRID) this.grid.release(); }
   inRadius(x, z, r, team, fn) {
+    if (NOGRID || (team !== 'ally' && team !== 'enemy')) return this.inRadiusScan(x, z, r, team, fn);
+    if (this.check) { const want = []; this.inRadiusScan(x, z, r, team, e => want.push(e)); const got = []; this.inRadiusGrid(x, z, r, team, e => got.push(e)); this.compare('inRadius', want, got); }
+    return this.inRadiusGrid(x, z, r, team, fn);
+  }
+  inRadiusScan(x, z, r, team, fn) {
     for (const e of this.entities) {
       if (!e.alive || e.team === team) continue;
       const d = Math.hypot(e.pos.x - x, e.pos.z - z);
       if (d < r + e.radius) fn(e, d);
     }
   }
+  inRadiusGrid(x, z, r, team, fn) {
+    if (team === 'enemy') { // → the allies
+      for (const e of this.allies) {
+        if (!e.alive || e.team === team) continue;
+        const d = Math.hypot(e.pos.x - x, e.pos.z - z);
+        if (d < r + e.radius) fn(e, d);
+      }
+      return;
+    }
+    const list = this.enemiesNear(x, z, r), mark = this.added.length;
+    this.iter++;
+    try {
+      // (the exact test runs at visit time, as the Set loop did: a callback may kill or remove a later candidate)
+      for (let i = 0; i < list.length; i++) {
+        const e = list[i];
+        if (!e.alive || e.team === team || !this.entities.has(e)) continue;
+        const d = Math.hypot(e.pos.x - x, e.pos.z - z);
+        if (d < r + e.radius) fn(e, d);
+      }
+      for (let i = mark; i < this.added.length; i++) { // entities a callback added (the Set would have reached them last)
+        const e = this.added[i];
+        if (!e.alive || e.team === team || !this.entities.has(e)) continue;
+        const d = Math.hypot(e.pos.x - x, e.pos.z - z);
+        if (d < r + e.radius) fn(e, d);
+      }
+    } finally { this.doneNear(); if (--this.iter === 0) this.added.length = 0; }
+  }
   nearest(pos, team, maxR = 99, filter) {
+    if (NOGRID || (team !== 'ally' && team !== 'enemy')) return this.nearestScan(pos, team, maxR, filter);
+    const got = this.nearestGrid(pos, team, maxR, filter);
+    if (this.check) this.compare('nearest', [this.nearestScan(pos, team, maxR, filter)], [got]);
+    return got;
+  }
+  nearestScan(pos, team, maxR = 99, filter) {
     let best = null, bd = maxR;
     for (const e of this.entities) {
       if (!e.alive || e.team === team || (filter && !filter(e))) continue;
@@ -39,8 +122,35 @@ export class Combat {
     }
     return best;
   }
+  nearestGrid(pos, team, maxR, filter) {
+    let best = null, bd = maxR;
+    if (team === 'enemy') {
+      for (const e of this.allies) {
+        if (!e.alive || e.team === team || (filter && !filter(e))) continue;
+        const d = Math.hypot(e.pos.x - pos.x, e.pos.z - pos.z) - e.radius;
+        if (d < bd) { bd = d; best = e; }
+      }
+      return best;
+    }
+    const g = this.enemyGrid(), c = g.near(pos.x, pos.z, maxR + g.maxR + PAD);
+    try {
+      for (let i = 0; i < c.length; i++) {
+        const e = c[i];
+        if (!e.alive || e.team === team || (filter && !filter(e))) continue;
+        const d = Math.hypot(e.pos.x - pos.x, e.pos.z - pos.z) - e.radius;
+        if (d < bd || (d === bd && best && e._cseq < best._cseq)) { bd = d; best = e; } // (ties: the earlier one, as the Set scan)
+      }
+    } finally { g.release(); }
+    return best;
+  }
   // entities under the cursor (screen-space pick)
   pickAtScreen(mx, my, cam, maxPx = 46) {
+    if (NOGRID) return this.pickScan(mx, my, cam, maxPx);
+    const got = this.pickGrid(mx, my, cam, maxPx);
+    if (this.check) this.compare('pick', [this.pickScan(mx, my, cam, maxPx)], [got]);
+    return got;
+  }
+  pickScan(mx, my, cam, maxPx = 46) {
     let best = null, bd = maxPx;
     for (const e of this.entities) {
       if (!e.alive || e.team !== 'enemy') continue;
@@ -51,12 +161,56 @@ export class Combat {
     }
     return best;
   }
+  // The grid pick only projects enemies near the cursor's line of sight. An enemy can score under maxPx only if its
+  // projection lies within Dpx = maxPx + 30·radius of the cursor; with the focal length f (px), that needs its point to
+  // be within the double cone of half-angle asin(Dpx / f) round the cursor's line (|Δscreen| ≥ f·sin(angle to the line),
+  // for points in front of the camera or behind it). Points sit in the slab of the enemies' mid-heights, so the cone is
+  // cut to that slab and the grid is read over its footprint. Unusual views (a level line of sight, a huge cone) scan.
+  pickGrid(mx, my, cam, maxPx) {
+    const g = this.enemyGrid();
+    if (!g.n || !cam.isPerspectiveCamera) return g.n ? this.pickScan(mx, my, cam, maxPx) : null;
+    const P = cam.projectionMatrix.elements, f = Math.min(innerWidth * 0.5 * P[0], innerHeight * 0.5 * P[5]);
+    const k = (maxPx + 30 * g.maxR + 2) / f;
+    if (!(k < 0.3)) return this.pickScan(mx, my, cam, maxPx);
+    const kk = k / (1 - k) * 1.05;
+    _c.setFromMatrixPosition(cam.matrixWorld);
+    _d.set(mx / innerWidth * 2 - 1, -(my / innerHeight) * 2 + 1, 0.5).unproject(cam).sub(_c).normalize();
+    if (Math.abs(_d.y) < 0.08) return this.pickScan(mx, my, cam, maxPx);
+    let pad = PAD, tA = 0, tB = 0;
+    for (let it = 0; it < 3; it++) {
+      const t0 = (g.minY - pad - _c.y) / _d.y, t1 = (g.maxY + pad - _c.y) / _d.y;
+      tA = Math.min(t0, t1); tB = Math.max(t0, t1);
+      pad = Math.max(Math.abs(tA), Math.abs(tB)) * kk + PAD;
+    }
+    const ax = _c.x + _d.x * tA, az = _c.z + _d.z * tA, bx = _c.x + _d.x * tB, bz = _c.z + _d.z * tB;
+    const c = g.box(Math.min(ax, bx) - pad, Math.min(az, bz) - pad, Math.max(ax, bx) + pad, Math.max(az, bz) + pad);
+    let best = null, bd = maxPx;
+    try {
+      for (let i = 0; i < c.length; i++) {
+        const e = c[i];
+        if (!e.alive || e.team !== 'enemy') continue;
+        _v.copy(e.pos).setY(e.pos.y + (e.height || 0.6) * 0.5).project(cam);
+        const sx = (_v.x * 0.5 + 0.5) * innerWidth, sy = (-_v.y * 0.5 + 0.5) * innerHeight;
+        const d = Math.hypot(sx - mx, sy - my) - (e.radius * 30);
+        if (d < bd || (d === bd && best && e._cseq < best._cseq)) { bd = d; best = e; }
+      }
+    } finally { g.release(); }
+    return best;
+  }
+  /** ?gridcheck: the grid answer must equal the scan's (same entities, same order) */
+  compare(kind, want, got) {
+    const C = this.check; C.n++;
+    if (want.length === got.length && want.every((e, i) => e === got[i])) return;
+    C.bad++; C.kinds[kind] = (C.kinds[kind] || 0) + 1;
+    if (C.bad <= 5) console.warn(`[gridcheck] ${kind} mismatch: scan ${want.length} vs grid ${got.length}`);
+  }
   playerBonusPct() { let b = 0; if (this.buffs.howl?.t > 0) b += this.buffs.howl.dmg; return b; }
   // Player (or ally) hits a monster with a skill-scaled hit
-  hitMonster(m, { dmgPct = 100, element = 'phys', knock = 0, stun = 0, from = null, noCrit = false, flat = 0, source = 'player', mult = 1, silent = false } = {}) {
+  // critAdd / critX / forceCrit: Poe's strikes from behind and Vanish's double crit (stats.js rollHit)
+  hitMonster(m, { dmgPct = 100, element = 'phys', knock = 0, stun = 0, from = null, noCrit = false, flat = 0, source = 'player', mult = 1, silent = false, critAdd = 0, critX = 1, forceCrit = false } = {}) {
     if (!m.alive) return 0;
     const G = this.G, D = G.derived;
-    const r = rollHit({ derived: D, skillDmgPct: dmgPct, element, target: { def: m.stats.def, res: m.stats.res, level: m.stats.level }, bonusPct: this.playerBonusPct(), noCrit });
+    const r = rollHit({ derived: D, skillDmgPct: dmgPct, element, target: { def: m.stats.def, res: m.stats.res, level: m.stats.level }, bonusPct: this.playerBonusPct(), noCrit, critAdd, critX, forceCrit });
     let dmg = Math.max(1, Math.round((r.dmg + flat) * mult * (m.cursedMul || 1)));
     if (source === 'player') {
       if (r.heal > 0) G.actions.heal(r.heal);
@@ -75,7 +229,7 @@ export class Combat {
     if (m.def?.damageTaken) { dmg = m.def.damageTaken(m, dmg, { element, crit, from }); if (!(dmg > 0)) return; dmg = Math.max(1, Math.round(dmg)); }
     m.takeDamage(dmg, { element, crit, knock, stun, from });
     if (!silent) {
-      G.ui?.float?.(m.pos.clone().setY(m.pos.y + (m.height || 1) + 0.2), crit ? `${dmg}!` : `${dmg}`, { kind: crit ? 'crit' : 'dmg', color: element !== 'phys' ? ELEMENT_COLORS[element] : undefined, ref: minorHit(m) });
+      this.dmgFloat(m.pos.x, m.pos.y + (m.height || 1) + 0.2, m.pos.z, dmg, crit, crit ? `${dmg}!` : `${dmg}`, { kind: crit ? 'crit' : 'dmg', color: element !== 'phys' ? ELEMENT_COLORS[element] : undefined, ref: minorHit(m) });
       if (m.big) {
         // big bodies: burst on the side facing the attacker at chest height (not over the face), small flash, rate-limited
         const t = G.engine.time || 0;
@@ -88,7 +242,7 @@ export class Combat {
       } else {
         // rapid repeat hits on one foe (barrages, ricochets, ticks) get the soft burst, so the stacked flashes don't white it out
         const t = G.engine.time || 0, rapid = !crit && t - (m._hitFxT || -9) < 0.09; m._hitFxT = t;
-        G.vfx.hit(m.pos.clone().setY(m.pos.y + (m.height || 1) * 0.5), { crit, element, soft: rapid });
+        G.vfx.hit(m.pos.clone().setY(m.pos.y + (m.height || 1) * 0.5), { crit, element, soft: rapid, r: m.bodyR || m.radius || 0.45 }); // (r: the glow stays the foe's size)
       }
       Events.emit('sfx', crit ? 'hit_crit' : 'hit_flesh', { pos: m.pos });
       if (crit) { G.engine.rig.shake(0.35); G.engine.hitStop = Math.max(G.engine.hitStop, 0.05); }
@@ -100,10 +254,11 @@ export class Combat {
   hitPlayer(raw, { element = 'phys', level = 1, from = null, knock = 0, onHit = null, src = null } = {}) {
     const G = this.G, p = G.player;
     if (!p || p.invuln || G.playerDead) return 0;
-    if (rollBlock(G.derived)) { G.ui?.float?.(p.pos.clone().setY(p.pos.y + 1.4), 'Block!', { kind: 'status', color: '#9fd0ff' }); G.vfx.sparks(p.pos.clone().setY(1), { n: 6, color: '#bfe6ff' }); Events.emit('sfx', 'block'); return 0; }
+    if (G.skills?.poeDodge?.(src, from)) return 0; // (Poe: her dodge chance — combat/poeSkills.js)
+    if (rollBlock(G.derived)) { G.ui?.float?.(p.pos.clone().setY(p.pos.y + 1.4), 'Block!', { kind: 'status', color: '#9fd0ff' }); G.vfx.sparks(p.pos.clone().setY(1), { n: 6, color: '#bfe6ff' }); G.skills?.onBlock?.(); /* (Unbending Stance: the samurai parries on his blade) */ Events.emit('sfx', 'block'); return 0; }
     let dmg = playerDamageTaken(G.derived, raw, element, level);
     if (this.buffs.cursed?.t > 0) dmg *= 1 + this.buffs.cursed.pct / 100;
-    // a charged Bone Storm's Bone Wall: a bone pops instead (docs/CHARGE.md)
+    // a charged Sakura Storm's Blade Wall: a blade shatters instead (docs/CHARGE.md)
     if (G.skills?.boneBlock?.()) { G.ui?.float?.(p.pos.clone().setY(p.pos.y + 1.4), 'Bonk!', { kind: 'status', color: '#fff0c8' }); return 0; }
     // Moka's Bubble Barrier soaks the hit first (mokaSpells.absorb → what gets through)
     if (G.skills?.bubbleShield) {
@@ -138,18 +293,31 @@ export class Combat {
   }
   spawn(opts) { const p = new Projectile(this, opts); this.projectiles.push(p); return p; }
   /** a fresh mesh of every projectile look (for the floor prewarm in game.js) */
-  projectileLooks() { return projectileLooks(); }
+  projectileLooks() { const looks = projectileLooks(), sc = this.G.world?.scene; for (const m of looks) adoptSprites(m, sc); return looks; } // (their glows go through the sprite batch, which gets compiled and drawn with them)
   // ground zones: {pos, radius, t, life, tick, onTick(zone), team, visual}
   addZone(z) { z.t = 0; z.acc = 0; this.zones.push(z); return z; }
+  /** a damage number over a monster, within the frame's budget (see FLOAT_FREE) */
+  dmgFloat(x, y, z, dmg, crit, text, opts) {
+    const B = this.fb ||= { n: 0, c: 0, k: 0, sum: 0, x: 0, y: 0, z: 0 };
+    if (crit ? B.c++ < FLOAT_CRITS : B.n++ < FLOAT_FREE) { this.G.ui?.float?.(new THREE.Vector3(x, y, z), text, opts); return; }
+    B.k++; B.sum += dmg; B.x += x; B.y += y; B.z += z;
+  }
+  /** the frame's folded hits as one "+N" total (start of Combat.update), and a fresh budget */
+  flushFloats() {
+    const B = this.fb; if (!B) return;
+    if (B.k > 0) this.G.ui?.float?.(new THREE.Vector3(B.x / B.k, B.y / B.k + 0.25, B.z / B.k), `+${B.sum}`, { kind: 'dmg', scale: 1.15 });
+    B.n = B.c = B.k = B.sum = 0; B.x = B.y = B.z = 0;
+  }
   update(dt) {
     const G = this.G;
+    this.flushFloats();
     // statuses
     for (const e of this.entities) {
       if (!e.alive || !e.status) continue;
       const s = e.status;
-      for (const k of ['stun', 'fear', 'freeze']) if (s[k] > 0) s[k] -= dt;
+      for (const k of ['stun', 'fear', 'freeze', 'blind']) if (s[k] > 0) s[k] -= dt; // (blind: Poe's smoke — monsters miss, dungeon/monster.js)
       if (s.slow?.t > 0) s.slow.t -= dt;
-      if (s.burn?.t > 0) { s.burn.t -= dt; s.burn.acc = (s.burn.acc || 0) + dt; if (s.burn.acc > 0.5) { s.burn.acc = 0; this.applyDamageToMonster(e, Math.max(1, Math.round(s.burn.dps * 0.5)), { element: 'fire', silent: true }); G.vfx.fire(e.pos.clone().setY(e.pos.y + 0.5), 2); G.ui?.float?.(e.pos.clone().setY(e.pos.y + 1.2), `${Math.round(s.burn.dps * 0.5)}`, { kind: 'dmg', color: '#ff9a3c', ref: minorHit(e) }); } }
+      if (s.burn?.t > 0) { s.burn.t -= dt; s.burn.acc = (s.burn.acc || 0) + dt; if (s.burn.acc > 0.5) { s.burn.acc = 0; this.applyDamageToMonster(e, Math.max(1, Math.round(s.burn.dps * 0.5)), { element: 'fire', silent: true }); G.vfx.fire(e.pos.clone().setY(e.pos.y + 0.5), 2); this.dmgFloat(e.pos.x, e.pos.y + 1.2, e.pos.z, Math.round(s.burn.dps * 0.5), false, `${Math.round(s.burn.dps * 0.5)}`, { kind: 'dmg', color: '#ff9a3c', ref: minorHit(e) }); } }
       if (s.poison?.t > 0) { s.poison.t -= dt; s.poison.acc = (s.poison.acc || 0) + dt; if (s.poison.acc > 0.5) { s.poison.acc = 0; this.applyDamageToMonster(e, Math.max(1, Math.round(s.poison.dps * 0.5)), { element: 'stink', silent: true }); G.vfx.stink(e.pos.clone().setY(e.pos.y + 0.4), 1); } }
     }
     // player buffs

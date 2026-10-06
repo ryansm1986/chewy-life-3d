@@ -1,8 +1,10 @@
 // Node-only fuzz of the Burrow generator (src/dungeon/gen.js has no browser deps).
 // For many floors x seeds: no throw, >=2 rooms, every placed thing sits on floor, everything reachable from start,
 // exit portal / stairs / waypoint can actually be reached by the player (interaction radius).
+// Also the zone dungeons' two floors (dungeon/defs.js floorPlan: stairs on floor 1, the boss room on floor 2).
 // usage: node tools/qa/gen-fuzz.mjs [seeds=300] [floors=40]
 import { generate, CELL } from '../../src/dungeon/gen.js';
+import { DUNGEONS, floorPlan } from '../../src/dungeon/defs.js';
 
 const SEEDS = +(process.argv[2] || 300), FLOORS = +(process.argv[3] || 40);
 const fails = {}; let runs = 0;
@@ -30,13 +32,17 @@ function reachable(L, p, r, reach) {
   return false;
 }
 
-for (let floor = 1; floor <= FLOORS; floor++) for (let s = 1; s <= SEEDS; s++) {
-  // the game seeds with (state.dungeon.seed||1) + floor*17 + runs*101
+// the Burrow's floors, then every zone dungeon's two
+const JOBS = [];
+for (let floor = 1; floor <= FLOORS; floor++) JOBS.push({ floor, plan: null, name: '' });
+for (const d of Object.values(DUNGEONS)) if (d.kind === 'zone') for (let floor = 1; floor <= d.floors; floor++) JOBS.push({ floor, plan: floorPlan(d, floor, { heroLvl: 10 }), name: d.id + ' ' });
+for (const { floor, plan, name } of JOBS) for (let s = 1; s <= SEEDS; s++) {
+  // the game seeds each entry with state.dungeon.seed + floor*17 + runs*101 (+ a per-dungeon salt): dungeon/defs.js beginRun
   const seed = s + floor * 17;
   let L;
   runs++;
-  try { L = generate({ floor, seed }); } catch (e) { bump('generate() threw', `floor ${floor} seed ${seed}: ${e.message}`); continue; }
-  const tag = `floor ${floor} seed ${seed}`;
+  try { L = generate({ floor, seed, plan }); } catch (e) { bump('generate() threw', `${name}floor ${floor} seed ${seed}: ${e.message}`); continue; }
+  const tag = `${name}floor ${floor} seed ${seed}`;
   if (L.rooms.length < 2) bump('fewer than 2 rooms', tag);
   if (L.boss && !L.bossRoom) bump('boss floor without boss room', tag);
   // BFS reachability from start
@@ -62,7 +68,7 @@ for (let floor = 1; floor <= FLOORS; floor++) for (let s = 1; s <= SEEDS; s++) {
   if (L.waypoint) { const w = c2w(L.waypoint.x, L.waypoint.y); if (!walkable(L, w.x, w.z)) bump('waypoint centre not walkable (mesh embedded in rock)', tag); if (!reachable(L, w, 1.75, reach)) bump('waypoint cannot be reached at all', tag); }
   if (L.stairs) { const w = c2w(L.stairs.x, L.stairs.y); if (!reachable(L, w, 1.65, reach)) bump('stairs cannot be reached', tag); }
 }
-console.log(`gen-fuzz: ${runs} layouts (${FLOORS} floors x ${SEEDS} seeds)`);
+console.log(`gen-fuzz: ${runs} layouts (${FLOORS} Burrow floors + ${JOBS.length - FLOORS} zone dungeon floors, x ${SEEDS} seeds)`);
 const keys = Object.keys(fails);
 if (!keys.length) console.log('PASS: no generator problems found');
 for (const k of keys) console.log(`FAIL ${k}: ${fails[k].n}x  e.g. ${fails[k].ex.join(' | ')}`);

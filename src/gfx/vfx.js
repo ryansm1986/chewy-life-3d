@@ -1,5 +1,6 @@
 // High-level visual effects: particle presets, slash arcs, shockwaves, light pillars, lightning, telegraphs, emotes.
 import * as THREE from 'three';
+import { adoptSortedSprite } from './spriteBatch.js';
 import { ParticleLayer } from './particles.js';
 import { glowTexture, sparkleTexture, smokeTexture, softDotTexture, petalTexture, ringTexture, slashTexture, shaftTexture, leafParticleTexture } from './textures.js';
 import { rand, TAU, clamp, ease } from '../core/util.js';
@@ -11,6 +12,30 @@ const C = h => new THREE.Color(h);
 const EXTENSIONS = [];
 export function registerVfxExtension(make) { EXTENSIONS.push(make); }
 const DAMP_MIN = 0.25; // additive effects sitting right on a boss keep 25% of their brightness
+const HIT_BUDGET = 4; // hit flashes per frame (the rest are sparks only: a sweep through a crowd doesn't stack glows)
+const HIT_FX_BUDGET = 32; // (past this many hits in one frame, plain hits spawn a quarter of the sparks and no element extras: ROADMAP Z-B4)
+const singlePass = o => o.traverse(c => { const m = c.material; if (m && !Array.isArray(m) && m.side === THREE.DoubleSide && m.transparent && m.blending === THREE.AdditiveBlending && !m.depthWrite) m.forceSinglePass = true; });
+// (perf, ROADMAP Z-B4) a monster swing / hit ring / decal no longer builds and uploads its own geometry: rings and
+// decals share one plane (sized by the mesh scale), slashes one ring per shape (radius, width, arc, direction).
+// userData.shared keeps them out of the per-effect geometry disposal.
+let PLANE = null; const sharedPlane = () => { if (!PLANE) { PLANE = new THREE.PlaneGeometry(2, 2); PLANE.userData.shared = true; } return PLANE; };
+const SLASHES = new Map();
+function slashGeo(r, width, arc, reverse) {
+  const key = `${r.toFixed(4)}|${width.toFixed(4)}|${arc.toFixed(4)}|${reverse ? 1 : 0}`;
+  let g = SLASHES.get(key);
+  if (g) return g;
+  g = new THREE.RingGeometry(r - width, r, 32, 1, 0, arc);
+  // remap uv: u along arc, v across
+  const uv = g.attributes.uv, pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), yy = pos.getY(i); const a = Math.atan2(yy, x); const rr = Math.hypot(x, yy);
+    uv.setXY(i, reverse ? 1 - a / arc : a / arc, (r - rr) / width);
+  }
+  g.userData.shared = true;
+  if (SLASHES.size > 256) SLASHES.clear(); // (odd one-off shapes: never an unbounded cache)
+  SLASHES.set(key, g);
+  return g;
+}
 
 // speech-bubble textures are shared by every VFX instance (the village one and each dungeon floor's): one canvas per
 // kind for the whole session, so floors don't leave a fresh set of uploaded textures behind on every visit
@@ -60,6 +85,7 @@ export class VFX {
     // Readability near big bodies: live bosses registered here ({pos, bodyR|radius, height, alive}) tone down every
     // additive glow / spark / flash / flash-light that lands on them, so a storm of skill effects can't turn the boss
     // into a white blob — its silhouette and face stay readable (the dungeon keeps this list in sync each frame).
+    this._hitN = 0; this._critLight = 0;
     this.dampers = [];
     for (const L of [this.glow, this.spark]) {
       const raw = L.spawn.bind(L);
@@ -97,18 +123,21 @@ export class VFX {
   }
   update(dt) {
     const cam = this.engine.camera;
+    this._hitN = 0; this._critLight = 0; // (the per-frame hit-flash budget: hit())
     for (const l of this.layers) l.update(dt, cam);
     for (let i = this.fx.length - 1; i >= 0; i--) {
       const f = this.fx[i];
       f.t += dt;
-      if (f.update(dt, f.t) === false || (f.life && f.t >= f.life)) { if (f.obj) { f.obj.parent?.remove(f.obj); f.obj.traverse?.(o => { if (o.isMesh) o.geometry?.dispose?.(); }); } this.fx.splice(i, 1); }
+      if (f.update(dt, f.t) === false || (f.life && f.t >= f.life)) { if (f.obj) { f.obj.parent?.remove(f.obj); f.obj.traverse?.(o => { if (o.isMesh && !o.geometry?.userData?.shared) o.geometry?.dispose?.(); }); } this.fx.splice(i, 1); }
     }
     for (const e of this.ext) e.update(dt);
   }
   // (effect geometries are per effect: freed here too, or a floor left mid-effect would keep them uploaded — shared
   // sprite geometry is left alone)
-  clear() { for (const l of this.layers) l.clear(); for (const f of this.fx) { f.obj?.parent?.remove(f.obj); f.obj?.traverse?.(o => { if (o.isMesh) o.geometry?.dispose?.(); }); } this.fx.length = 0; for (const e of this.ext) e.clear?.(); }
-  add(obj, update, life = 0) { if (obj) this.scene.add(obj); const f = { obj, update, t: 0, life }; this.fx.push(f); return f; }
+  clear() { for (const l of this.layers) l.clear(); for (const f of this.fx) { f.obj?.parent?.remove(f.obj); f.obj?.traverse?.(o => { if (o.isMesh && !o.geometry?.userData?.shared) o.geometry?.dispose?.(); }); } this.fx.length = 0; for (const e of this.ext) e.clear?.(); }
+  // (additive, non-depth-writing double-sided effects blend commutatively: one pass draws them exactly as three's back-
+  // then-front double pass does, without re-evaluating their program twice a frame and twice the draws: ROADMAP Z-B5)
+  add(obj, update, life = 0) { if (obj) { this.scene.add(obj); singlePass(obj); } const f = { obj, update, t: 0, life }; this.fx.push(f); return f; }
 
   // Compile every effect's shader up front (call behind a loading transition) so first use doesn't hitch. compile()
   // only links programs: the effect meshes are also DRAWN for a few real frames (culling off, far below the floor,
@@ -127,7 +156,7 @@ export class VFX {
     const warm = this.fx.slice(n0); // (the particles simply live out their short lives down there)
     for (const f of warm) { f.obj?.traverse?.(o => { o.frustumCulled = false; }); f.update = () => true; f.life = 0; }
     let frames = 0;
-    const done = () => { if (++frames < 3) return requestAnimationFrame(done); for (const f of warm) { const i = this.fx.indexOf(f); if (i >= 0) this.fx.splice(i, 1); f.obj?.parent?.remove(f.obj); f.obj?.traverse?.(o => { if (o.isMesh) o.geometry?.dispose?.(); }); } };
+    const done = () => { if (++frames < 3) return requestAnimationFrame(done); for (const f of warm) { const i = this.fx.indexOf(f); if (i >= 0) this.fx.splice(i, 1); f.obj?.parent?.remove(f.obj); f.obj?.traverse?.(o => { if (o.isMesh && !o.geometry?.userData?.shared) o.geometry?.dispose?.(); }); } };
     requestAnimationFrame(done);
   }
   // ------------------------------------------------------------------ particle presets
@@ -137,21 +166,26 @@ export class VFX {
       this.spark.spawn({ x: p.x, y: p.y, z: p.z, vx: Math.cos(a) * s, vy: rand(0.2, 1) * up * s * 0.4, vz: Math.sin(a) * s, life: rand(0.6, 1) * life, size: size * rand(0.6, 1.2), size1: 0.02, color, alpha: 1, alpha1: 0.2, drag: 3, grav, spin: rand(-8, 8) });
     }
   }
-  flash(p, color = '#ffffff', size = 1.4, life = 0.18) { this.glow.spawn({ x: p.x, y: p.y, z: p.z, life, size, size1: size * 1.6, color, alpha: 0.9, alpha1: 0 }); }
+  flash(p, color = '#ffffff', size = 1.4, life = 0.18, alpha = 0.9) { this.glow.spawn({ x: p.x, y: p.y, z: p.z, life, size, size1: size * 1.6, color, alpha, alpha1: 0 }); }
   // soft: hits on a big body (boss) — sparks still read, but the flash sprite / crit light stay small so they don't wash it out
-  hit(p, { color = '#fff4c0', crit = false, element = 'phys', soft = false } = {}) {
+  // r: the foe's body radius (m). A hit's glow stays about the size of the foe (≤ ~1.5 m, half alpha) and only the first
+  // few hits in a frame flash at all (HIT_BUDGET; one crit light per frame): a burst of hits never washes the view out
+  hit(p, { color = '#fff4c0', crit = false, element = 'phys', soft = false, r = 0.45 } = {}) {
     const ec = { fire: '#ffa040', frost: '#9fe0ff', zap: '#fff27a', stink: '#a8e070', holy: '#fff6c0', phys: color }[element] || color;
-    const s = soft ? 0.55 : 1;
+    const s = soft ? 0.55 : 1, lit = this._hitN++ < HIT_BUDGET, crowd = !crit && this._hitN > HIT_FX_BUDGET; // (crowd: a frame of very many hits)
     if (soft) { // big bodies: a tiny flash + opaque confetti chips (normal blend, so they read without adding light)
-      this.flash(p, ec, crit ? 0.8 : 0.45, 0.1);
+      if (lit) this.flash(p, ec, crit ? 0.8 : 0.45, 0.1, 0.5);
       for (let i = 0, n = crit ? 9 : 5; i < n; i++) { const a = rand(0, TAU), v = rand(2, 4.5); this.dot.spawn({ x: p.x, y: p.y, z: p.z, vx: Math.cos(a) * v, vy: rand(1.5, 4), vz: Math.sin(a) * v, life: rand(0.35, 0.55), size: rand(0.1, 0.17), size1: 0.04, color: i % 2 ? ec : crit ? '#ffcf4a' : '#ffa870', alpha: 1, alpha1: 0.6, grav: 12, drag: 1.5 }); }
-    } else this.flash(p, ec, crit ? 2.2 : 1.1, crit ? 0.26 : 0.16);
-    this.sparks(p, { n: Math.round((crit ? 18 : 8) * s), color: ec, speed: crit ? 7 : 4.5, size: crit ? 0.5 : 0.32 });
-    if (crit) { this.ring(p, { color: '#ffd84a', r0: 0.2, r1: 1.6 * s, life: 0.3, flat: false, opacity: soft ? 0.5 : 0.9 }); this.light(p, '#ffd070', soft ? 3 : 10, soft ? 4 : 6, 0.2); }
-    if (element === 'fire') this.fire(p, soft ? 3 : 6);
-    if (element === 'frost') this.frost(p, soft ? 3 : 6);
-    if (element === 'zap') this.sparks(p, { n: soft ? 4 : 8, color: '#fff7a0', speed: 8, size: 0.25 });
-    if (element === 'stink') this.stink(p, soft ? 2 : 4);
+    } else if (lit) this.flash(p, ec, Math.min(crit ? 1.2 : 0.85, 0.5 + r * 1.5), crit ? 0.22 : 0.15, 0.5);
+    this.sparks(p, { n: Math.round((crit ? 14 : 8) * s * (lit ? 1 : 0.5) * (crowd ? 0.25 : 1)), color: ec, speed: crit ? 6.5 : 4.5, size: crit ? 0.42 : 0.32 });
+    if (crit && lit) {
+      this.ring(p, { color: '#ffd84a', r0: 0.2, r1: Math.min(1.25, 0.5 + r * 1.6) * s, life: 0.28, flat: false, opacity: soft ? 0.45 : 0.6 });
+      if (this._critLight++ < 1) this.light(p, '#ffd070', soft ? 2.5 : 4, soft ? 3 : 3.5, 0.18);
+    }
+    if (!crowd && element === 'fire') this.fire(p, soft ? 3 : 6);
+    if (!crowd && element === 'frost') this.frost(p, soft ? 3 : 6);
+    if (!crowd && element === 'zap') this.sparks(p, { n: soft ? 4 : 8, color: '#fff7a0', speed: 8, size: 0.25 });
+    if (!crowd && element === 'stink') this.stink(p, soft ? 2 : 4);
   }
   dk(p) { return this.dampers.length ? this.dampAt(p.x, p.y, p.z) : 1; }
   poof(p, { color = '#fff0f6', n = 14, size = 0.7, hearts = false } = {}) {
@@ -220,7 +254,7 @@ export class VFX {
   // ------------------------------------------------------------------ mesh effects
   ring(p, { color = '#ffffff', r0 = 0.2, r1 = 2, life = 0.4, flat = true, opacity = 0.9, y = 0.06 } = {}) {
     opacity *= flat ? 1 : this.dk(p); // camera-facing rings sit over whatever they're centred on
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: ringTexture(), color: C(color), transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
+    const m = new THREE.Mesh(sharedPlane(), new THREE.MeshBasicMaterial({ map: ringTexture(), color: C(color), transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
     if (flat) m.rotation.x = -Math.PI / 2; else m.lookAt(this.engine.camera.position);
     m.position.set(p.x, p.y + y, p.z); m.renderOrder = 12;
     return this.add(m, (dt, t) => { const k = clamp(t / life); const r = r0 + (r1 - r0) * ease.outCubic(k); m.scale.setScalar(r); m.material.opacity = opacity * (1 - k); if (!flat) m.lookAt(this.engine.camera.position); }, life);
@@ -228,7 +262,7 @@ export class VFX {
   // flat ground decal (scorch marks, magic circles, impact glows). additive=false → darkening multiply-ish decal
   decal(p, { r = 1.5, color = '#2a1a14', life = 3, opacity = 0.55, additive = false, tex = null, spin = 0, grow = 0 } = {}) {
     if (additive) opacity *= 0.5 + 0.5 * this.dk(p);
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: tex || glowTexture(), color: C(color), transparent: true, opacity, depthWrite: false, toneMapped: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, polygonOffset: true, polygonOffsetFactor: -2 }));
+    const m = new THREE.Mesh(sharedPlane(), new THREE.MeshBasicMaterial({ map: tex || glowTexture(), color: C(color), transparent: true, opacity, depthWrite: false, toneMapped: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, polygonOffset: true, polygonOffsetFactor: -2 }));
     m.rotation.x = -Math.PI / 2; m.position.set(p.x, (p.y || 0) + 0.04, p.z); m.renderOrder = 8; m.scale.setScalar(r);
     return this.add(m, (dt, t) => { const k = clamp(t / life); m.material.opacity = opacity * (1 - ease.inQuad(k)); m.rotation.z += spin * dt; if (grow) m.scale.setScalar(r * (1 + grow * ease.outCubic(k))); }, life);
   }
@@ -245,13 +279,7 @@ export class VFX {
   }
   // horizontal crescent slash around an actor. dir = facing angle (radians, atan2(x,z)), arc in radians
   slash(p, dir, { color = '#fffaf0', arc = 2.6, r = 1.4, life = 0.26, y = 0.55, reverse = false, width = 0.8, tilt = 0, glow = true } = {}) {
-    const g = new THREE.RingGeometry(r - width, r, 32, 1, 0, arc);
-    // remap uv: u along arc, v across
-    const uv = g.attributes.uv, pos = g.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i), yy = pos.getY(i); const a = Math.atan2(yy, x); const rr = Math.hypot(x, yy);
-      uv.setXY(i, reverse ? 1 - a / arc : a / arc, (r - rr) / width);
-    }
+    const g = slashGeo(r, width, arc, reverse); // (cached per shape: a crowd's swings reuse it)
     const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: slashTexture(), color: C(color), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
     const grp = new THREE.Group(); grp.add(m);
     m.rotation.x = -Math.PI / 2; // lie flat
@@ -331,7 +359,7 @@ export class VFX {
   // speech-bubble emote that follows an actor
   emote(actor, kind = 'heart', life = 1.8) {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: emoteTexture(kind), transparent: true, depthWrite: false, depthTest: false, toneMapped: false }));
-    s.renderOrder = 20;
+    s.renderOrder = 20; adoptSortedSprite(s, this.scene); // (drawn in the scene's depth-sorted bubble runs: gfx/spriteBatch.js)
     const h = (actor.rig?.height || 1.2) + 0.55;
     return this.add(s, (dt, t) => {
       const k = t / life;

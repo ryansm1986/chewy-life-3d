@@ -1,4 +1,4 @@
-// Scenario 12: the hero roster (docs/HEROES.md) — Chewy + Moka.
+// Scenario 12: the hero roster (docs/HEROES.md, docs/POE.md §6) — Chewy, Moka and Poe.
 //  a) a fresh game: Moka waits by the fountain ('!'), switching is refused until she joins; the join scene
 //  b) Tab switch in the village: transition locks input + invulnerable, state relinks, the old hero stays in town
 //  c) switch cooldown; per-hero skill cooldowns survive a round trip
@@ -7,6 +7,8 @@
 //  f) switching in the Burrow: the old hero is sent home to the village, the new one tags in on the same spot
 //  g) save / reload keeps the active hero; a v1 (single-hero) save migrates
 //  h) repeated switches don't leak GPU geometry / textures / villagers
+//  i) three heroes: Poe joins, a Tab tap cycles the joined heroes in order, holding Tab opens the hero wheel (pick by key),
+//     the HUD shows a mini portrait per benched hero
 import { launch, boot, waitMode, sleep, makeReport, drainDialogue, tap } from './lib.mjs';
 
 const R = makeReport('S12 heroes: join, switch (village + Burrow), gear, XP, save/migrate, leaks');
@@ -18,9 +20,9 @@ try {
   // a) waiting by the fountain
   const a = await page.evaluate(() => {
     const G = window.G, v = G.heroes.villagers.moka;
-    return { hasMoka: !!v, frozen: !!v?.frozen, marker: G.story.markerFor('moka'), inNpcs: G.npcs.includes(v), why: G.heroes.canSwitch(), active: G.state.activeHero, heroes: Object.keys(G.state.heroes) };
+    return { hasMoka: !!v, frozen: !!v?.frozen, marker: G.story.markerFor('moka'), inNpcs: G.npcs.includes(v), why: G.heroes.canSwitch(), active: G.state.activeHero, heroes: Object.keys(G.state.heroes), poeV: !!G.heroes.villagers.poe }; // (Poe isn't in town until she joins: she's in the bamboo)
   });
-  R.check('fresh game: Chewy active, Moka waits in town with a "!" marker', a.active === 'chewy' && a.hasMoka && a.frozen && a.marker === '!' && a.inNpcs && a.heroes.join() === 'chewy,moka', JSON.stringify(a));
+  R.check('fresh game: Chewy active, Moka waits in town with a "!" marker', a.active === 'chewy' && a.hasMoka && a.frozen && a.marker === '!' && a.inNpcs && a.heroes.join() === 'chewy,moka,poe' && !a.poeV, JSON.stringify(a));
   R.check('switching is refused before Moka joins', /waiting/i.test(a.why), a.why);
   await page.evaluate(() => { const G = window.G; G.heroes.talk(G.heroes.villagers.moka); });
   await sleep(page, 300);
@@ -83,11 +85,14 @@ try {
 
   // e) talk to the benched hero → "Let's switch!"
   await sleep(page, 2200);
-  await page.evaluate(() => { const G = window.G, c = G.heroes.villagers.chewy; G.player.setPos(c.pos.x + 1, c.pos.z); G.talkTo(c); });
+  await page.waitForFunction(() => !window.G.heroes.switching, null, { timeout: 12000 }).catch(() => {}); // (game time runs slow under load)
+  await page.evaluate(() => { const G = window.G, c = G.heroes.villagers.chewy; G.heroes.cd = 0; G.player.setPos(c.pos.x + 1, c.pos.z); G.talkTo(c); });
   await sleep(page, 300);
   const opts = await page.evaluate(() => { const d = window.G.ui.dlg; return d.active ? { speaker: d.opts.speaker, choices: (d.opts.choices || []).map(c => c.text) } : null; });
   await drainDialogue(page, [0]);
-  await sleep(page, SW + 400);
+  await page.waitForFunction(() => window.G.heroes.switching, null, { timeout: 4000 }).catch(() => {});
+  await page.waitForFunction(() => !window.G.heroes.switching && !window.G.player.controlLocked, null, { timeout: 12000 }).catch(() => {});
+  await sleep(page, 400);
   const e = await page.evaluate(() => ({ active: window.G.state.activeHero, locked: window.G.player.controlLocked }));
   R.check('talking to the other hero offers a switch, and picking it switches', opts && opts.speaker === 'Chewy' && /switch/i.test(opts.choices[0] || '') && e.active === 'chewy' && !e.locked, JSON.stringify({ opts, e }));
 
@@ -96,6 +101,7 @@ try {
   await waitMode(page, 'dungeon'); await sleep(page, 2200);
   const f0 = await page.evaluate(() => { const G = window.G; return { p: [G.player.pos.x, G.player.pos.z], mokaV: !!G.heroes.villagers.moka }; });
   await page.evaluate(() => { window.G.heroes.cd = 0; }); await tap(page, 'Tab'); await sleep(page, SW - 800);
+  await page.waitForFunction(() => !window.G.heroes.switching && !window.G.player.controlLocked, null, { timeout: 12000 }).catch(() => {});
   const f = await page.evaluate((fp) => {
     const G = window.G, c = G.heroes.villagers.chewy, h = G.heroes.homeSpot('chewy');
     return { mode: G.mode, active: G.state.activeHero, same: Math.hypot(G.player.pos.x - fp[0], G.player.pos.z - fp[1]), chewyHome: c ? Math.hypot(c.pos.x - h.x, c.pos.z - h.z) : 99, chewyInVillage: c?.world === G.village.world, inDungeonScene: !!c && G.world.scene.getObjectById(c.rig.root.id) != null, locked: G.player.controlLocked };
@@ -105,7 +111,7 @@ try {
 
   // g) save / reload
   const g0 = await page.evaluate(() => { const G = window.G; G.save(); const s = JSON.parse(localStorage.getItem('chewy3d.save')); return { v: s.version, act: s.activeHero, top: 'player' in s || 'equipment' in s, heroes: Object.keys(s.heroes), mokaLvl: s.heroes.moka.player.lvl }; });
-  R.check('save format v2: heroes hold the progressions, no duplicated top-level player/equipment', g0.v === 2 && g0.act === 'moka' && !g0.top && g0.heroes.join() === 'chewy,moka', JSON.stringify(g0));
+  R.check('save format v2: heroes hold the progressions, no duplicated top-level player/equipment', g0.v === 2 && g0.act === 'moka' && !g0.top && g0.heroes.join() === 'chewy,moka,poe', JSON.stringify(g0));
   await boot(page, 'notitle');
   const g1 = await page.evaluate(() => { const G = window.G, st = G.state; return { act: st.activeHero, hero: G.player.hero, linked: st.player === st.heroes.moka.player, lvl: st.player.lvl, chewyV: !!G.heroes.villagers.chewy, mokaV: !!G.heroes.villagers.moka, wt: G.derived.weaponType }; });
   R.check('reload: still Moka (her level), Chewy lives in town', g1.act === 'moka' && g1.hero === 'moka' && g1.linked && g1.lvl === g0.mokaLvl && g1.chewyV && !g1.mokaV && g1.wt === 'staff', JSON.stringify(g1));
@@ -136,6 +142,41 @@ try {
   R.note(`switch memory: ${mem.map(x => `${x.geo}g/${x.tex}t/${x.npcs}n`).join(' ')}`);
   R.check('repeated switches: no geometry / texture growth after warm-up (cycles 3→7)', m(6).geo - m(2).geo <= 4 && m(6).tex - m(2).tex <= 2, JSON.stringify({ geo: mem.map(x => x.geo), tex: mem.map(x => x.tex) }));
   R.check('repeated switches: exactly one benched hero, villager count stable', mem.every(x => x.heroes === 1 && x.npcs === mem[0].npcs), JSON.stringify(mem.map(x => [x.heroes, x.npcs])));
+
+  // i) three heroes
+  await page.evaluate(() => { const G = window.G; G.heroes.cd = 0; return G.heroes.joinPoe(); });
+  await sleep(page, 600);
+  const i0 = await page.evaluate(() => { const G = window.G; return { joined: !!G.state.flags.poeJoined, v: !!G.heroes.villagers.poe, bench: G.heroes.bench(), next: G.heroes.next(), minis: [...document.querySelectorAll('.hsw')].filter(b => !b.hidden).length, active: G.state.activeHero }; });
+  R.check('Poe joins: she moves into town (a villager), two benched heroes, two HUD mini portraits', i0.joined && i0.v && i0.bench.length === 2 && i0.minis === 2, JSON.stringify(i0));
+  const order = [i0.active];
+  for (let k = 0; k < 3; k++) {
+    await page.evaluate(() => { window.G.heroes.cd = 0; });
+    await tap(page, 'Tab');
+    await page.waitForFunction(() => window.G.heroes.switching, null, { timeout: 4000 }).catch(() => {});
+    await page.waitForFunction(() => !window.G.heroes.switching, null, { timeout: 12000 }).catch(() => {});
+    order.push(await page.evaluate(() => window.G.state.activeHero));
+  }
+  const ids = ['chewy', 'moka', 'poe'], want = [0, 1, 2, 3].map(k => ids[(ids.indexOf(order[0]) + k) % 3]);
+  R.check('a Tab tap cycles the joined heroes in roster order (and wraps round)', order.join() === want.join(), JSON.stringify({ order, want }));
+  // hold Tab: the wheel opens (no switch yet); a number key picks that hero
+  await page.evaluate(() => { window.G.heroes.cd = 0; });
+  await page.keyboard.down('Tab');
+  await page.waitForFunction(() => window.G.heroes.wheelOpen, null, { timeout: 4000 }).catch(() => {});
+  const w = await page.evaluate(() => ({ open: window.G.heroes.wheelOpen, cards: document.querySelectorAll('.hero-wheel .hw-card').length, switching: window.G.heroes.switching, sel: document.querySelector('.hw-card.sel .hw-t b')?.textContent || '' }));
+  const pickId = await page.evaluate(() => { const G = window.G, list = G.heroes.roster(); return list.find(h => h.ready)?.id; });
+  const pickKey = String(['chewy', 'moka', 'poe'].indexOf(pickId) + 1);
+  await page.keyboard.press(pickKey);
+  await page.keyboard.up('Tab');
+  await page.waitForFunction(() => !window.G.heroes.wheelOpen, null, { timeout: 3000 }).catch(() => {});
+  await page.waitForFunction(() => !window.G.heroes.switching && window.G.state.activeHero !== undefined, null, { timeout: 12000 }).catch(() => {});
+  await sleep(page, 300);
+  const w2 = await page.evaluate(() => ({ active: window.G.state.activeHero, open: window.G.heroes.wheelOpen, switching: window.G.heroes.switching }));
+  R.check('holding Tab opens the hero wheel (three cards) instead of switching; a number key picks the hero', w.open && w.cards === 3 && !w.switching && w2.active === pickId && !w2.open, JSON.stringify({ w, pickId, w2 }));
+  // Poe as played: her fūma on her back, her class
+  await page.evaluate(() => { const G = window.G; G.heroes.cd = 0; if (G.state.activeHero !== 'poe') G.heroes.switchTo('poe', { quiet: true }); });
+  await page.waitForFunction(() => window.G.state.activeHero === 'poe' && !window.G.heroes.switching, null, { timeout: 12000 }).catch(() => {});
+  const pz = await page.evaluate(() => { const G = window.G, P = G.player; return { hero: P.hero, wt: G.derived.weaponType, back: !!P.rig.parts.fumaBack, backVis: !!P.rig.parts.fumaBack?.visible, hand: !!P.fumaHand, linked: G.state.player === G.state.heroes.poe.player }; });
+  R.check('playing Poe: her state relinked, the fūma on her back', pz.hero === 'poe' && pz.wt === 'fuma' && pz.back && pz.backVis && pz.hand && pz.linked, JSON.stringify(pz));
 } catch (e) { errors.push('[harness] ' + e.stack); }
 const failed = R.finish(errors, warns);
 await browser.close();

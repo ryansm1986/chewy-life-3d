@@ -10,6 +10,10 @@ import { installMokaSpells, setSpellGame } from './mokaSpells.js';
 import { chargeRuntime, perkAt } from '../rpg/charge.js';
 import { ChargeController } from './charge.js';
 import { installChargedSkills } from './chargedSkills.js';
+import { installPoeSkills } from './poeSkills.js';
+import { bladeFx } from '../gfx/bladeFx.js';
+import { spectralBladeGeo, stormBladeMaterial } from '../gfx/samuraiProps.js';
+import { SAMURAI_CUTS } from '../actors/samuraiPoses.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const ELEM_COL = { phys: '#fffaf0', fire: '#ffae5a', frost: '#9fe0ff', zap: '#fff27a', stink: '#b8e880', holy: '#fff0b0' };
@@ -17,6 +21,14 @@ const ELEM_COL = { phys: '#fffaf0', fire: '#ffae5a', frost: '#9fe0ff', zap: '#ff
 // lunge that tracks the target through the wind-up; one that is further away walks up first and swings on arrival.
 const LUNGE = 1.2, LUNGE_SPEED = 10;
 const _d = new THREE.Vector3();
+const _o1 = new THREE.Vector3(), _o2 = new THREE.Vector3(), _o3 = new THREE.Vector3(), _om = new THREE.Matrix4(); // (the storm's blades: no garbage per frame)
+// Chewy's samurai combo: each cut's action and trail (tilt: how much higher the trail's right end is, m; rev: the cut
+// runs right to left) — a kesa down from high right, a rising backhand up to high right, a level two-handed sweep
+const CUTS = [
+  { act: 'cut1', arc: 2.3, tilt: 0.7, rev: true, y: 0.7, w: 0.48, pitch: 1 },
+  { act: 'cut2', arc: 2.1, tilt: 0.65, rev: false, y: 0.72, w: 0.42, pitch: 1.12 },
+  { act: 'cut3', arc: 2.8, tilt: 0, rev: true, y: 0.6, w: 0.56, pitch: 0.9 },
+];
 const _slide = new THREE.Vector3();
 
 export class SkillRunner {
@@ -42,14 +54,15 @@ export class SkillRunner {
       const E = G.state.equipment, alt = G.state.player.activeWeapon === 1 ? E.weapon : E.weaponAlt; // the weapon NOT in hand
       if (alt && alt.wtype === def.wep) { G.actions.swapWeapons(); this.syncWeapon(); Events.emit('sfx', 'ui_equip'); }
       else {
-        if (!this._noWepT || G.engine.time - this._noWepT > 1.5) { this._noWepT = G.engine.time; G.ui?.float?.(P.pos.clone().setY(1.6), def.wep === 'ball' ? 'No ball equipped!' : def.wep === 'staff' ? 'No staff equipped!' : 'No bone sword equipped!', { kind: 'status', color: '#9fd0ff' }); Events.emit('sfx', 'ui_error'); }
+        if (!this._noWepT || G.engine.time - this._noWepT > 1.5) { this._noWepT = G.engine.time; G.ui?.float?.(P.pos.clone().setY(1.6), def.wep === 'ball' ? 'No ball equipped!' : def.wep === 'staff' ? 'No staff equipped!' : 'No bone katana equipped!', { kind: 'status', color: '#9fd0ff' }); Events.emit('sfx', 'ui_error'); }
         return false;
       }
     }
     const u = usable(id, G.state, G.derived);
     if (!u.ok) { if (!this._warnT || G.engine.time - this._warnT > 1) { this._warnT = G.engine.time; G.ui?.float?.(P.pos.clone().setY(1.6), u.why, { kind: 'status', color: '#9fd0ff' }); Events.emit('sfx', 'ui_error'); } return false; }
     if ((this.cds[id] || 0) > 0) return false;
-    if (this.channel && this.channel.id === id) return true; // already channelling (Tail Spin, Moonbeam)
+    if (this.castBlocked?.(id, aim, target, charge)) return false; // (Poe: Fūma Throw waits for the fūma to come home — poeSkills.js)
+    if (this.channel && this.channel.id === id) return true; // already channelling (Whirlwind Stance, Moonbeam)
     const R = charge ? chargeRuntime(id, G.state, G.derived, charge.stage, charge) : this.rt(id); if (!R) return false;
     // melee: never swing at thin air when a monster was clicked — walk up (too far) or lunge (just out of reach)
     let melee = null;
@@ -67,6 +80,7 @@ export class SkillRunner {
     P.moveTarget = null; this.approach = null;
     P.faceTarget = Math.atan2(aim.x - P.pos.x, aim.z - P.pos.z); P.facing = P.faceTarget;
     this.melee = melee;
+    this.flourish = null; // (any cast cuts a pending sheathing flourish short)
     const fn = (R.charge && this[`charged_${id}`]) || this[`cast_${id}`] || this.castGeneric;
     fn.call(this, R, aim.clone(), target);
     G.state.player.lastCast = id;
@@ -125,7 +139,7 @@ export class SkillRunner {
     const m = this.melee, G = this.G, P = G.player;
     if (!m) return;
     const act = P.anim.action?.name;
-    if (!m.target.alive || G.playerDead || P.leap || P.dash || !(act === 'swing' || act === 'swing2')) { this.melee = null; return; }
+    if (!m.target.alive || G.playerDead || P.leap || P.dash || !(act === 'swing' || act === 'swing2' || SAMURAI_CUTS.has(act))) { this.melee = null; return; }
     const t = m.target, dx = t.pos.x - P.pos.x, dz = t.pos.z - P.pos.z, d = Math.hypot(dx, dz);
     if (d < 1e-3) return;
     P.faceTarget = Math.atan2(dx, dz); P.facing = P.faceTarget;
@@ -192,22 +206,53 @@ export class SkillRunner {
   cast_attack(R, aim, target) {
     const G = this.G, P = G.player, p = R.params;
     if (p.bolt) return this.cast_staffBolt(R, aim, target); // Moka's staff: a free sparkle bolt
+    if (p.fuma) return this.cast_fumaSlash(R, aim, target); // Poe's fūma: the one-paw slash combo (poeSkills.js)
     if (p.projectile) {
       P.anim.play('throw', { speed: this.animSpeed(0.5), onEvent: ev => { if (ev === 'release') this.throwBall({ dmgPct: p.dmgPct, speed: p.speed, range: p.range, pierce: p.pierce, returns: true }, aim); } });
       return;
     }
-    const alt = (this.combo++ % 2) === 1;
-    P.anim.play(alt ? 'swing2' : 'swing', { speed: this.animSpeed(0.46), onEvent: ev => {
+    // the samurai combo (actors/samuraiPoses.js): kesa, rising backhand, big two-handed sweep — one cut per attack, the
+    // same speed, hit frame and arc as ever; a pause of more than ~1.3 s starts it over, and its end gets a flourish
+    const now = G.engine.time;
+    if (now - (this._cutT ?? -9) > 1.3) this.combo = 0;
+    this._cutT = now;
+    const i = this.combo++ % 3, cut = CUTS[i];
+    if (P.sheathedNow) Events.emit('sfx', 'katana_draw', { vol: 0.7 });
+    P.draw?.();
+    P.anim.play(cut.act, { speed: this.animSpeed(0.46), onEvent: ev => {
+      if (ev === 'end') { this.queueFlourish(); return; }
       if (ev !== 'hit') return;
       this.snapIn(target, p.radius);
       const f = P.facing;
-      G.vfx.slash(P.pos, f, { arc: 2.1, r: p.radius * 0.95, reverse: alt, color: '#fffaf0', life: 0.2 });
-      Events.emit('sfx', 'swing');
+      bladeFx(G).arc(P.pos, f, { arc: cut.arc, r: 1.32, tilt: cut.tilt, rev: cut.rev, y: cut.y, width: cut.w, life: 0.28 });
+      Events.emit('sfx', 'swing', { pitch: cut.pitch });
       let hit = 0;
       this.arcHit(P.pos, f, p.radius, p.arc, (e) => { this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: p.knockback, from: P.pos }); hit++; }, target);
-      if (hit) G.engine.rig.shake(0.12);
+      if (hit) G.engine.rig.shake(i === 2 ? 0.16 : 0.12);
       this.melee = null;
     } });
+  }
+  /** Unbending Stance: a block catches the blow on the blade (combat.hitPlayer calls this when a block lands) */
+  onBlock() {
+    const G = this.G, P = G.player;
+    if (P?.hero !== 'chewy' || P.weaponType !== 'sword' || !(P.sword?.scale.x > 0.5) || P.anim.busy() || P.leap || P.dash || this.channel) return;
+    P.anim.play('parry');
+    P.sword.localToWorld(_d.set(0, 0.35, 0)); bladeFx(G).glint(_d, 0.55);
+    G.vfx.sparks(_d, { n: 8, color: '#fff2c8', speed: 4, size: 0.24 }); Events.emit('sfx', 'katana_clang', { vol: 0.7 });
+  }
+  /** a combo's end: once Chewy has been idle a moment with the katana out, he sheathes it (a model with a saya: the
+   *  katana goes into it) or flicks it clean (chiburi); then = what happens at the flourish's beat */
+  queueFlourish(delay = 0.32, then = null) { this.flourish = { t: delay, then }; }
+  updateFlourish(dt) {
+    const f = this.flourish, G = this.G, P = G.player; if (!f) return;
+    f.t -= dt; if (f.t > 0) return;
+    if (P.hero !== 'chewy' || G.playerDead || P.leap || P.dash || this.channel || this.charge.charging) { this.flourish = null; f.then?.(); return; }
+    if (P.anim.action) { if (f.t < -1.5) { this.flourish = null; f.then?.(); } return; } // (wait for the paw to be free)
+    this.flourish = null;
+    const sword = P.weaponType === 'sword' && P.sword?.scale.x > 0.5, fx = bladeFx(G);
+    if (!sword) { f.then?.(); return; }
+    if (P.saya) P.anim.play('noto', { onEvent: ev => { if (ev !== 'click') return; P.sheathe(); f.then?.(); P.rig.parts.saya?.getWorldPosition(_d); fx.glint(_d, 0.55); Events.emit('sfx', 'katana_sheath'); } });
+    else P.anim.play('chiburi', { onEvent: ev => { if (ev !== 'flick') return; f.then?.(); P.sword.localToWorld(_d.set(0, 0.55, 0)); fx.flick(_d, this.forward().applyAxisAngle(UP, -1.2)); Events.emit('sfx', 'swing', { vol: 0.35, pitch: 1.5 }); } });
   }
   /** move the hero along dir by dist through the walls, cliffs, doors and region bounds: in sub-steps of at most
    *  0.25 m through the same collision as walking (a fast dash on a slow frame can't step past a thin wall), and never
@@ -241,29 +286,54 @@ export class SkillRunner {
       onEnd: o.onEnd,
     });
   }
-  // ---------------------------------------------------------------- Bone Arts
+  // ---------------------------------------------------------------- Bone Blade (the samurai: actors/samuraiPoses.js, gfx/bladeFx.js)
+  // Crescent Chomp: an iai draw-cut out of the left hip, the free paw joining on the hilt as it sweeps across, leaving a
+  // bone-white crescent (same hit frame, arc and reach as ever)
   cast_chomp(R, aim, target) {
     const G = this.G, P = G.player, p = R.params;
-    P.anim.play('swing', { speed: this.animSpeed(0.5), onEvent: ev => {
+    P.anim.play('iaiCut', { speed: this.animSpeed(0.5), onEvent: ev => {
+      if (ev === 'draw') { this.drawFromHip(); return; }
+      if (ev === 'end') { this.queueFlourish(); return; }
       if (ev !== 'hit') return;
       this.snapIn(target, p.radius);
-      const f = P.facing, arc = p.arc * Math.PI / 180;
-      G.vfx.slash(P.pos, f, { arc, r: p.radius * 1.1, width: 1.1, color: '#fff4d8', life: 0.3 });
-      G.vfx.slash(P.pos, f, { arc: arc * 0.9, r: p.radius * 0.75, width: 0.7, color: '#ffd070', life: 0.24, reverse: true });
-      G.vfx.decal(P.pos.clone().add(this.forward().multiplyScalar(p.radius * 0.5)), { r: p.radius * 0.8, color: '#ffe0a0', additive: true, opacity: 0.35, life: 0.5, grow: 0.4 });
-      Events.emit('sfx', 'swing_heavy'); Events.emit('sfx', 'bark', { pitch: 0.8 });
-      this.arcHit(P.pos, f, p.radius, p.arc, e => this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: p.knockback, from: P.pos }), target);
+      this.crescentChomp(P.pos, P.facing, p, 1);
+      Events.emit('sfx', 'swing_heavy'); Events.emit('sfx', 'bark', { pitch: 0.8, vol: 0.6 });
+      this.arcHit(P.pos, P.facing, p.radius, p.arc, e => this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: p.knockback, from: P.pos }), target);
       G.engine.rig.shake(0.25);
       this.melee = null;
     } });
   }
+  /** the crescent a Crescent Chomp leaves: the moon-shaped cut and the blade's own trail inside it (k: a charged one's size) */
+  crescentChomp(at, f, p, k = 1) {
+    const fx = bladeFx(this.G), arc = p.arc * Math.PI / 180;
+    fx.arc(at, f, { arc, r: p.radius * 1.08, rev: false, y: 0.55, width: 0.5 + 0.12 * (k - 1), life: 0.4, sweep: 0.08, mode: 1, grow: 0.14 });
+    fx.arc(at, f, { arc: arc * 0.92, r: p.radius * 0.8, rev: false, y: 0.68, width: 0.24, life: 0.26, sweep: 0.07, tilt: 0.25 });
+    this.G.vfx.decal(_d.copy(at).addScaledVector(this.forward(), p.radius * 0.45), { r: p.radius * 0.7, color: '#3a2418', opacity: 0.22, life: 1.6, grow: 0.2 });
+  }
+  /** the iai's draw: if the katana is in the saya it comes out now, with a glint at the hip */
+  drawFromHip() {
+    const P = this.G.player, fx = bladeFx(this.G);
+    if (P.sheathedNow) { P.draw(); P.rig.parts.saya?.getWorldPosition(_d); if (P.rig.parts.saya) fx.glint(_d, 0.6); }
+    else { P.sword?.localToWorld(_d.set(0, 0.1, 0)); fx.glint(_d, 0.45); }
+    Events.emit('sfx', 'katana_draw');
+  }
+  // Whirlwind Stance: planted wide, both paws on the hilt, the blade sweeping round him (samuraiPoses.js 'spin'), cherry
+  // petals swirling with it; the hits, rate and reach as ever
   cast_whirl(R, aim) {
     const P = this.G.player;
     if (this.channel?.id === 'whirl') return;
     this.channel = { id: 'whirl', R, acc: 1 / Math.max(1, R.params.hitsPerSec), t: 0 }; // first hit lands immediately
-    P.anim.play('spin'); P.canMoveWhileActing = true;
-    Events.emit('sfx', 'swing_heavy');
+    P.draw?.(); P.anim.play('spin'); P.canMoveWhileActing = true;
+    Events.emit('sfx', 'swing_heavy'); Events.emit('sfx', 'katana_draw', { vol: 0.6 });
   }
+  /** one turn of the whirlwind: a near-full bone-white ring at blade height and petals swept round with it */
+  whirlFx(p, ch) {
+    const G = this.G, P = G.player, fx = bladeFx(G), r = Math.min(p.radius, 2.6);
+    fx.arc(P.pos, rand(0, TAU), { arc: 3.8, r: r * 0.78, rev: true, y: 0.6, width: ch ? 0.5 : 0.42, life: 0.24, sweep: 0.1, tilt: rand(-0.12, 0.12) });
+    if (ch) fx.arc(P.pos, rand(0, TAU), { arc: 3, r: r * 0.95, rev: true, y: 0.5, width: 0.26, life: 0.22, sweep: 0.1, mode: 1, edge: new THREE.Color(ch.color) });
+    fx.petalSwirl(P.pos, { n: ch ? 7 : 4, r: r * 0.85, y: 0.5, spin: -1, speed: 4.5, rise: 0.5 });
+  }
+  // Helmet Splitter: a leap into an overhead two-pawed cut (samuraiPoses.js 'slam') that splits the ground and stuns
   cast_dig(R, aim) {
     const G = this.G, P = G.player, p = R.params;
     const d = Math.min(p.leap, dist(aim.x, aim.z, P.pos.x, P.pos.z));
@@ -275,29 +345,38 @@ export class SkillRunner {
       end.set(x, start.y, z);
     }
     P.leap = { start, end, t: 0, dur: 0.5 / 0.8 * 0.62 };
+    P.draw?.();
     P.anim.play('slam', { speed: 0.8, onEvent: ev => {
       if (ev !== 'impact') return;
       P.leap = null;
-      G.vfx.shockwave(P.pos, p.radius * 1.2, '#ffe0b0'); G.vfx.dustRing(P.pos, p.radius);
-      G.vfx.decal(P.pos, { r: p.radius * 0.9, color: '#3a2418', opacity: 0.55, life: 3.5 });
-      G.vfx.flash(P.pos.clone().setY(0.6), '#ffe0a0', p.radius * 1.5, 0.22);
-      for (let i = 0; i < 10; i++) G.vfx.smoke.spawn({ x: P.pos.x, y: 0.2, z: P.pos.z, vx: rand(-3, 3), vy: rand(3, 6), vz: rand(-3, 3), life: 0.8, size: 0.25, size1: 0.1, color: '#8a6a4a', alpha: 1, alpha1: 0, grav: 12 });
-      Events.emit('sfx', 'dig'); Events.emit('sfx', 'explosion_small');
+      this.splitFx(P.pos, P.facing, p.radius, 1);
+      Events.emit('sfx', 'explosion_small'); Events.emit('sfx', 'swing_heavy', { pitch: 0.75 }); Events.emit('sfx', 'katana_clang', { pitch: 0.8 });
       G.engine.rig.shake(0.7); G.engine.hitStop = 0.06;
       this.nova(P.pos, p.radius, e => this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: p.knockback, stun: p.stun, from: P.pos }));
     } });
   }
+  /** the split: the overhead cut's vertical trail, the crack running ahead, a dust ring and flung earth (k: a charged one) */
+  splitFx(at, f, r, k = 1) {
+    const G = this.G, fx = bladeFx(G);
+    fx.arc(at, f, { arc: 2.3, r: 1.25, roll: Math.PI / 2, rev: true, y: 0.75, width: 0.5, life: 0.3, sweep: 0.05, grow: 0.05 });
+    fx.crack(at, f, { len: r * 1.5 * k, r: r * 0.9, life: 3.5 + k });
+    G.vfx.ring(at, { color: '#fff0d8', r0: 0.3, r1: Math.min(r * 1.1, 4.5), life: 0.4, opacity: 0.5 }); G.vfx.dustRing(at, r * 0.9);
+    G.vfx.flash(_d.copy(at).setY(at.y + 0.4), '#fff0d0', 1.5, 0.18, 0.55);
+    for (let i = 0; i < 12; i++) { const a = f + rand(-0.6, 0.6), v = rand(2, 4.5); G.vfx.dot.spawn({ x: at.x + Math.sin(a) * 0.6, y: at.y + 0.2, z: at.z + Math.cos(a) * 0.6, vx: Math.sin(a) * v, vy: rand(3, 6), vz: Math.cos(a) * v, life: rand(0.6, 0.9), size: rand(0.12, 0.22), size1: 0.1, color: i % 2 ? '#8a6a4a' : '#b08a64', alpha: 1, alpha1: 1, grav: 16 }); }
+  }
+  // Sakura Storm: spectral bone blades orbit him in a flurry of cherry petals (the blades, their reach and hits as ever)
   cast_bonestorm(R) {
     const G = this.G, P = G.player, p = R.params;
-    const bones = [];
+    const bones = [], geo = spectralBladeGeo(), mat = stormBladeMaterial();
     for (let i = 0; i < p.count; i++) {
-      const m = new THREE.Mesh(this.G.player.sword.geometry, this.G.player.rig.propMat || this.G.player.rig.mat); m.scale.setScalar(0.9); m.castShadow = true;
+      const m = new THREE.Mesh(geo, mat); m.scale.setScalar(0.85); m.renderOrder = 12;
       G.world.scene.add(m); bones.push({ m, a: i / p.count * TAU, hit: new Map() });
     }
-    const rune = G.vfx.decal(P.pos, { r: p.radius * 1.15, color: '#ffe6a8', additive: true, opacity: 0.5, life: p.duration, spin: 1.5, tex: ringTexture() });
+    const rune = G.vfx.decal(P.pos, { r: p.radius * 1.15, color: '#ffd6e4', additive: true, opacity: 0.4, life: p.duration, spin: 1.5, tex: ringTexture() });
     this.orbits.push({ bones, t: 0, p, rune });
-    P.anim.play('cast'); Events.emit('sfx', 'buff');
-    G.vfx.ring(P.pos, { color: '#fff4d8', r0: 0.3, r1: p.radius, life: 0.5 });
+    P.anim.play('stormCall'); Events.emit('sfx', 'buff'); Events.emit('sfx', 'katana_draw', { pitch: 1.2, vol: 0.7 });
+    G.vfx.ring(P.pos, { color: '#ffe0ea', r0: 0.3, r1: p.radius, life: 0.5 });
+    bladeFx(G).petalSwirl(P.pos, { n: 18, r: p.radius * 0.7, y: 0.6, spin: 1, speed: 3.5, rise: 0.9 });
   }
   // ---------------------------------------------------------------- Fetch Mastery
   cast_throw(R, aim) {
@@ -374,27 +453,38 @@ export class SkillRunner {
     } });
   }
   // ---------------------------------------------------------------- Pack Spirit
+  // Kiai!: the battle cry (samuraiPoses.js 'kiai'): a zigzag shout ring out to the knockback's reach and a comic burst
   cast_woof(R) {
     const G = this.G, P = G.player, p = R.params;
-    P.anim.play('bark', { onEvent: ev => {
+    P.anim.play('kiai', { onEvent: ev => {
       if (ev !== 'bark') return;
-      Events.emit('sfx', 'bark');
-      G.vfx.ring(P.pos, { color: '#ffffff', r0: 0.3, r1: p.radius * 1.1, life: 0.45, y: 0.6, opacity: 1 }); G.vfx.ring(P.pos, { color: '#9fd8ff', r0: 0.2, r1: p.radius * 0.8, life: 0.35 }); G.vfx.ring(P.pos, { color: '#cfe8ff', r0: 0.2, r1: p.radius, life: 0.5, flat: false });
-      G.vfx.decal(P.pos, { r: p.radius * 0.8, color: '#bfe6ff', additive: true, opacity: 0.35, life: 0.6, grow: 0.3 });
+      Events.emit('sfx', 'bark', { pitch: 0.86 }); Events.emit('sfx', 'swing_heavy', { vol: 0.5, pitch: 0.7 });
+      bladeFx(G).shout(P.pos, { r: p.radius, life: 0.42 });
+      G.vfx.ring(P.pos, { color: '#fff2dc', r0: 0.3, r1: p.radius * 0.75, life: 0.32, opacity: 0.55 });
       G.engine.rig.shake(0.3);
       this.nova(P.pos, p.radius, e => this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: p.knockback, stun: p.stun, from: P.pos }));
     } });
   }
+  // Flash Draw: a draw-dash through the foes (the hits land as he passes, as ever); at the end he sheathes (or flicks the
+  // blade clean) and, on that beat, the cut flashes along the path behind him
   cast_zoom(R, aim) {
     const G = this.G, P = G.player, p = R.params;
-    const dir = aim.clone().sub(P.pos).setY(0).normalize();
-    P.dash = { dir, left: p.distance, speed: p.speed, hit: new Set(), p };
-    P.anim.play('roll', { speed: 1.4 }); P.invuln = true;
-    Events.emit('sfx', 'dash'); G.vfx.dust(P.pos, { n: 4 });
+    const dir = aim.clone().sub(P.pos).setY(0).normalize(), start = P.pos.clone();
+    P.dash = { dir, left: p.distance, speed: p.speed, hit: new Set(), p, onEnd: () => this.flashEnd(start) };
+    P.anim.play('flashDraw', { speed: 0.3 / Math.max(0.12, p.distance / p.speed) }); P.invuln = true;
+    this.drawFromHip();
+    Events.emit('sfx', 'dash'); Events.emit('sfx', 'swing', { pitch: 1.3, vol: 0.7 }); G.vfx.dust(P.pos, { n: 4 });
   }
+  /** the end of a Flash Draw: the flourish, and the cut line from start to here on its beat */
+  flashEnd(start, then = null) {
+    const G = this.G, P = G.player, end = P.pos.clone();
+    if (P.anim.action?.name === 'flashDraw') P.anim.stop('flashDraw');
+    this.queueFlourish(0.06, () => { bladeFx(G).cutLine(start, end); Events.emit('sfx', 'swing_heavy', { pitch: 1.4, vol: 0.6 }); then?.(); });
+  }
+  // Pack Call: "Go!" — the katana thrust forward (samuraiPoses.js 'command'); the spirit pups come in tiny kabuto (allies.js)
   cast_packcall(R) {
     const G = this.G, P = G.player, p = R.params;
-    P.anim.play('bark', { onEvent: ev => {
+    P.anim.play('command', { onEvent: ev => {
       if (ev !== 'bark') return;
       Events.emit('sfx', 'howl');
       this.pups = (this.pups || []).filter(x => x.alive);
@@ -413,8 +503,8 @@ export class SkillRunner {
     const to = P.pos.clone().add(aim.clone().sub(P.pos).setY(0).normalize().multiplyScalar(d || 0.01));
     P.anim.play('throw', { speed: 1, onEvent: ev => {
       if (ev !== 'release') return;
-      this.combat.spawn({ team: 'ally', kind: 'bone', pos: this.handPos(), lob: { to, h: 2.2, time: 0.5 }, onEnd: () => {
-        G.vfx.heal(to); G.vfx.petals(to, 10); Events.emit('sfx', 'heal');
+      this.combat.spawn({ team: 'ally', kind: 'onigiri', pos: this.handPos(), lob: { to, h: 2.2, time: 0.5 }, onEnd: () => {
+        G.vfx.heal(to); this.riceCrumbs(to, 14); Events.emit('sfx', 'heal');
         const D = G.derived;
         if (dist(P.pos.x, P.pos.z, to.x, to.z) < p.radius + 0.5) { const h = G.actions.heal(D.lifeMax * p.healPct / 100 + p.healFlat); if (h > 0) G.ui?.float?.(P.pos.clone().setY(1.5), `+${Math.round(h)}`, { kind: 'heal' }); }
         for (const e of G.combat.entities) if (e.alive && e.team === 'ally' && dist(e.pos.x, e.pos.z, to.x, to.z) < p.radius + 0.5) e.heal?.(e.lifeMax * p.healPct / 100 + p.healFlat);
@@ -422,34 +512,45 @@ export class SkillRunner {
       } });
     } });
   }
+  /** Onigiri Toss's healing crumbs: rice grains bursting from where it lands, with a few petals */
+  riceCrumbs(at, n = 14, k = 1) {
+    const sp = bladeFx(this.G).spell;
+    for (let i = 0; i < n; i++) { const a = rand(0, TAU), v = rand(1.2, 3.2) * k; sp.pn.spawn({ frame: i % 4 ? 10 : 6, x: at.x, y: (at.y || 0) + 0.35, z: at.z, vx: Math.cos(a) * v, vy: rand(2, 4), vz: Math.sin(a) * v, life: rand(0.55, 0.8), size: rand(0.1, 0.16) * k, size1: 0.08, color: '#fffaf0', alpha: 1, alpha1: 0.9, grav: 10, spin: rand(-6, 6) }); }
+    this.G.vfx.petals(at, 4);
+  }
+  // War Banner Howl: he plants the paw-crest nobori (gfx/bladeFx.js banner) and howls; it flies while the rally lasts
   cast_howl(R) {
     const G = this.G, P = G.player, p = R.params;
-    P.anim.play('bark', { onEvent: ev => {
+    P.anim.play('warCry', { onEvent: ev => {
       if (ev !== 'bark') return;
       Events.emit('sfx', 'howl');
       this.combat.buffs.howl = { t: p.duration, dmg: p.dmgBuff, move: p.moveBuff };
-      G.vfx.ring(P.pos, { color: '#ff9a6a', r0: 0.5, r1: p.radius, life: 0.6, y: 0.4 });
-      G.vfx.pillar(P.pos, { color: '#ffb080', life: 0.8, r: 0.9, h: 4 });
+      // the banner goes in at his left side, a little behind (he plants it with his free paw)
+      const f = this.forward(), at = _d.copy(P.pos).addScaledVector(f, -0.22).add(new THREE.Vector3(f.z, 0, -f.x).multiplyScalar(0.5));
+      this.banner?.end(); this.banner = bladeFx(G).banner(at, { life: p.duration, scale: R.charge ? 1.1 + 0.08 * R.charge.stage : 1 });
+      G.vfx.ring(P.pos, { color: '#ffd780', r0: 0.5, r1: p.radius, life: 0.6, y: 0.4, opacity: 0.7 });
       this.nova(P.pos, p.radius, e => { e.applyStatus?.('fear', p.fear); G.vfx.emote(e, 'sweat', 1.2); });
-      G.ui?.toast?.(`Howl! +${p.dmgBuff}% damage`, { color: '#ffb080' });
+      G.ui?.toast?.(`War Banner! +${p.dmgBuff}% damage`, { color: '#e8b84a' });
     } });
   }
+  // Moonlit Blades: he howls to the moon and blades of moonlight fall on the foes (the strikes as ever)
   cast_moonhowl(R, aim) {
     const G = this.G, P = G.player, p = R.params;
-    P.anim.play('bark', { onEvent: ev => {
+    P.anim.play('moonCall', { onEvent: ev => {
       if (ev !== 'bark') return;
       Events.emit('sfx', 'howl');
-      G.engine.post.pulse('#c8d8ff', 0.25);
+      G.engine.post.pulse('#c8d8ff', 0.14);
       let n = 0;
       const center = P.pos.clone();
       this.combat.addZone({ pos: center, life: p.strikes * p.interval + 0.5, tick: p.interval, onTick: () => {
         if (n++ >= p.strikes) return;
         const tgt = [...this.combat.hostile('ally')].filter(e => dist(e.pos.x, e.pos.z, center.x, center.z) < p.radius);
         const spot = tgt.length ? tgt[Math.floor(Math.random() * tgt.length)].pos.clone() : center.clone().add(new THREE.Vector3(rand(-p.radius, p.radius) * 0.6, 0, rand(-p.radius, p.radius) * 0.6));
-        G.vfx.pillar(spot, { color: '#dfe8ff', life: 0.6, r: p.strikeRadius * 0.6, h: 12, opacity: 1 });
-        G.vfx.lightning(spot.clone().setY(12), spot.clone().setY(0.2), { color: '#e8f0ff', width: 0.15, life: 0.25, jag: 0.4 });
+        bladeFx(G).moonBlade(spot, { scale: 3 + 0.3 * Math.min(2, p.strikeRadius - 1.4) });
+        G.vfx.pillar(spot, { color: '#dfe8ff', life: 0.45, r: p.strikeRadius * 0.4, h: 9, opacity: 0.35 }); // (a faint shaft: where the blade fell from)
         G.vfx.ring(spot, { color: '#e8f0ff', r0: 0.2, r1: p.strikeRadius * 1.3, life: 0.35 });
-        G.engine.rig.shake(0.3); Events.emit('sfx', 'zap');
+        G.vfx.light(spot, '#c8d8ff', 4, 4, 0.25);
+        G.engine.rig.shake(0.3); Events.emit('sfx', 'katana_clang', { pitch: 1.3, vol: 0.6 }); Events.emit('sfx', 'zap', { vol: 0.5 });
         this.nova(spot, p.strikeRadius, e => this.combat.hitMonster(e, { dmgPct: p.dmgPct, element: 'holy', from: spot, stun: 0.3 }));
       } });
     } });
@@ -463,7 +564,7 @@ export class SkillRunner {
     this.charge.update(dt);
     this.updateApproach(dt);
     this.updateMelee(dt);
-    // channels (Tail Spin; Moka's Moonbeam) — each needs its weapon
+    // channels (Whirlwind Stance; Moka's Moonbeam) — each needs its weapon
     if (this.channel) { const cw = getSkill(this.channel.id)?.wep; if (cw && G.derived.weaponType !== cw) this.endChannel(); }
     if (this.channel && this.channel.id !== 'whirl') this.updateMoonbeam(dt, input);
     else if (this.channel) {
@@ -476,14 +577,13 @@ export class SkillRunner {
       else {
         if (p.pull) { // a charged spin draws foes in
           for (const e of this.foesNear(P.pos.x, P.pos.z, p.radius + 2.5)) this.pullFoe(e, P.pos.x, P.pos.z, p.pull * dt, p.radius * 0.45);
-          if (Math.random() < dt * 30) { const a = rand(0, TAU), r = p.radius + rand(0.5, 2.2); G.vfx.smoke.spawn({ x: P.pos.x + Math.cos(a) * r, y: 0.15, z: P.pos.z + Math.sin(a) * r, vx: -Math.cos(a) * r * 1.6 + Math.sin(a) * 3, vy: rand(0.2, 0.6), vz: -Math.sin(a) * r * 1.6 - Math.cos(a) * 3, life: 0.5, size: 0.3, size1: 0.6, color: '#efe2c8', alpha: 0.5, alpha1: 0, drag: 2 }); }
+          if (Math.random() < dt * 30) { const a = rand(0, TAU), r = p.radius + rand(0.5, 2.2); G.vfx.smoke.spawn({ x: P.pos.x + Math.cos(a) * r, y: 0.15, z: P.pos.z + Math.sin(a) * r, vx: -Math.cos(a) * r * 1.6 + Math.sin(a) * 3, vy: rand(0.2, 0.6), vz: -Math.sin(a) * r * 1.6 - Math.cos(a) * 3, life: 0.5, size: 0.3, size1: 0.6, color: '#efe2c8', alpha: 0.5, alpha1: 0, drag: 2 }); G.vfx.petal.spawn({ x: P.pos.x + Math.cos(a) * r, y: 0.5, z: P.pos.z + Math.sin(a) * r, vx: -Math.cos(a) * r * 1.4 + Math.sin(a) * 3, vy: rand(0.2, 0.6), vz: -Math.sin(a) * r * 1.4 - Math.cos(a) * 3, life: 0.55, size: rand(0.13, 0.18), color: '#ffffff', alpha: 1, alpha1: 0, drag: 1.5, spin: rand(-6, 6), stretch: 0.8 }); } // (and petals: the gale draws them in)
         }
         if (c.acc >= 1 / p.hitsPerSec) {
           c.acc = 0;
           if (!out && !G.actions.spendZoom(c.R.cost)) { this.endChannel(); G.ui?.float?.(P.pos.clone().setY(1.6), 'Not enough zoom!', { kind: 'status', color: '#9fd0ff' }); }
           else {
-            G.vfx.slash(P.pos, rand(0, TAU), { arc: 3.4, r: p.radius, width: ch ? 0.8 : 0.6, color: ch ? '#ffe8a8' : '#fff4d8', life: 0.22 });
-            if (ch) G.vfx.slash(P.pos, rand(0, TAU), { arc: 2.6, r: p.radius * 0.7, width: 0.45, color: ch.color, life: 0.2, reverse: true });
+            this.whirlFx(p, ch);
             Events.emit('sfx', 'swing', { vol: 0.5 });
             // (a charged spin also catches what it pulled in: big bodies park a little past its blades)
             this.nova(P.pos, p.radius + (p.pull ? 0.35 : 0), e => this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: p.knockback, from: P.pos }));
@@ -491,19 +591,26 @@ export class SkillRunner {
         }
       }
     }
-    // Dig Slam leap arc
+    // Helmet Splitter's leap arc
     if (P.leap && P.anim.action?.name !== 'slam') P.leap = null;
     if (P.leap) { P.leap.t += dt; const k = clamp(P.leap.t / P.leap.dur); P.pos.lerpVectors(P.leap.start, P.leap.end, k); G.world.collision?.resolve(P.pos, P.radius, P.leap.start); }
-    // Zoomies dash
+    // Flash Draw's dash (a bone-white blur behind him; d.onEnd: the flourish and the cut line)
     if (P.dash) {
       const d = P.dash, step = Math.min(d.left, d.speed * dt);
       const before = P.pos.clone();
       this.slideHero(d.dir, step); d.left -= step;
-      for (let i = 0; i < 2; i++) G.vfx.glow.spawn({ x: P.pos.x + rand(-0.2, 0.2), y: 0.5, z: P.pos.z + rand(-0.2, 0.2), life: 0.35, size: 0.6, size1: 0.1, color: '#ffd8a0', alpha: 0.6, alpha1: 0 });
+      G.vfx.glow.spawn({ x: P.pos.x + rand(-0.15, 0.15), y: 0.55, z: P.pos.z + rand(-0.15, 0.15), life: 0.22, size: 0.42, size1: 0.08, color: '#fff2e0', alpha: 0.28, alpha1: 0 }); // (a faint afterimage: the cut itself shows at the end)
+      if (Math.random() < 0.5) G.vfx.smoke.spawn({ x: P.pos.x, y: 0.12, z: P.pos.z, vx: -d.dir.x * 1.5, vy: rand(0.2, 0.6), vz: -d.dir.z * 1.5, life: 0.35, size: 0.22, size1: 0.6, color: '#efe2c8', alpha: 0.45, alpha1: 0, drag: 3 });
       this.combat.inRadius(P.pos.x, P.pos.z, d.p.width, 'ally', e => { if (!d.hit.has(e)) { d.hit.add(e); this.combat.hitMonster(e, { dmgPct: d.p.dmgPct, knock: 0.6, from: P.pos }); } });
-      if (d.left <= 0.001 || P.pos.distanceTo(before) < step * 0.3) { P.dash = null; P.invuln = false; }
+      if (d.left <= 0.001 || P.pos.distanceTo(before) < step * 0.3) { P.dash = null; P.invuln = false; d.onEnd?.(); }
     }
-    // Bone Storm orbits
+    this.updateFlourish(dt);
+    // Flowing Water: the stacks show as water running at his feet
+    const fr = this.combat.buffs.frenzy;
+    if (fr?.stacks > 0 && P.hero === 'chewy' && P.anim.speed > 0.4) bladeFx(G).flow(P, fr.stacks, dt);
+    // a whirlwind keeps petals swirling round him between its cuts
+    if (this.channel?.id === 'whirl' && P.anim.action?.name === 'spin') bladeFx(G).petalTrail(_d.copy(P.pos).setY(P.pos.y + 0.6), dt, 10);
+    // Sakura Storm orbits: spectral blades flying edge-out along the orbit, shedding petals
     for (let i = this.orbits.length - 1; i >= 0; i--) {
       const o = this.orbits[i]; o.t += dt;
       if (o.rune?.obj) o.rune.obj.position.set(P.pos.x, P.pos.y + 0.05, P.pos.z);
@@ -511,28 +618,33 @@ export class SkillRunner {
         b.a += o.p.orbitSpeed * dt;
         const r = o.p.radius * (0.85 + Math.sin(o.t * 3 + b.a) * 0.1);
         b.m.position.set(P.pos.x + Math.cos(b.a) * r, P.pos.y + 0.7 + Math.sin(o.t * 4 + b.a * 2) * 0.15, P.pos.z + Math.sin(b.a) * r);
-        b.m.rotation.set(Math.PI / 2, 0, -b.a + o.t * 10);
+        const ca = Math.cos(b.a), sa = Math.sin(b.a), tilt = Math.sin(o.t * 4 + b.a * 2) * 0.25;
+        _o1.set(-sa, tilt, ca).normalize(); _o2.set(-ca, 0, -sa); _o3.crossVectors(_o2, _o1); // (+Y along the motion, the edge (−X) outward)
+        _om.makeBasis(_o2, _o1, _o3); b.m.quaternion.setFromRotationMatrix(_om);
         this.combat.inRadius(b.m.position.x, b.m.position.z, 0.45, 'ally', e => {
           const last = b.hit.get(e) || -9;
           if (o.t - last >= o.p.hitInterval) { b.hit.set(e, o.t); this.combat.hitMonster(e, { dmgPct: o.p.dmgPct, knock: 0.2, from: P.pos }); }
         });
-        if (Math.random() < 0.5) G.vfx.glow.spawn({ x: b.m.position.x, y: b.m.position.y, z: b.m.position.z, life: 0.28, size: 0.55, size1: 0.1, color: '#ffd890', alpha: 0.45, alpha1: 0 });
+        if (Math.random() < 0.35) G.vfx.glow.spawn({ x: b.m.position.x, y: b.m.position.y, z: b.m.position.z, life: 0.24, size: 0.45, size1: 0.1, color: '#ffc8dc', alpha: 0.3, alpha1: 0 });
+        if (Math.random() < dt * 9) G.vfx.petal.spawn({ x: b.m.position.x, y: b.m.position.y, z: b.m.position.z, vx: -sa * 1.5, vy: rand(0.2, 0.8), vz: ca * 1.5, life: rand(0.6, 1), size: rand(0.13, 0.18), color: '#ffffff', alpha: 1, alpha1: 0, drag: 1.5, grav: 0.5, spin: rand(-6, 6), stretch: 0.8 });
       }
-      if (o.t >= o.p.duration) { if (o.volley) this.boneVolley(o); for (const b of o.bones) { G.vfx.poof(b.m.position, { n: 4, size: 0.3 }); b.m.parent?.remove(b.m); } this.orbits.splice(i, 1); }
+      if (o.t >= o.p.duration) { if (o.volley) this.boneVolley(o); for (const b of o.bones) { bladeFx(G).petalSwirl(b.m.position, { n: 5, r: 0.15, y: 0, speed: 1.5, rise: 0.8 }); G.vfx.sparkle(b.m.position, { n: 3, color: '#fff0f4', r: 0.2 }); b.m.parent?.remove(b.m); } this.orbits.splice(i, 1); }
     }
     for (const x of this.pups || []) x.update(dt);
     for (const x of this.decoys || []) x.update(dt);
     this.updateMoka(dt);
+    this.updatePoe(dt);
     this.keepOutOfBigBodies();
   }
-  /** a charged Tail Spin winds down: one last dizzy burst around Chewy */
+  /** a charged Whirlwind Stance winds down: one last full turn of the blade, a ring of petals, the dizzy burst */
   spinFinish(c) {
-    const G = this.G, P = G.player, p = c.R.params;
-    G.vfx.slash(P.pos, rand(0, TAU), { arc: 6.2, r: p.radius * 1.1, width: 0.9, color: '#ffe8a8', life: 0.3 });
+    const G = this.G, P = G.player, p = c.R.params, fx = bladeFx(G);
+    fx.arc(P.pos, P.facing, { arc: 6.1, r: Math.min(p.radius, 3) * 0.85, rev: true, y: 0.55, width: 0.55, life: 0.32, sweep: 0.12 });
+    fx.petalSwirl(P.pos, { n: 16, r: p.radius * 0.7, y: 0.5, spin: -1, speed: 6, rise: 0.8 });
     G.vfx.charge?.burst?.(P.pos, { r: p.radius * 1.15, life: 0.36, color: c.R.charge.colorC || (c.R.charge.colorC = new THREE.Color(c.R.charge.color)), w: 0.12 });
     Events.emit('sfx', 'swing_heavy'); G.engine.rig.shake(0.25);
     const fin = perkAt(c.R, 'finale'); // (Dizzy Finale: a big fling)
-    if (fin) { G.vfx.charge?.crescent?.(P.pos, P.facing, { arc: 6.2, r0: p.radius * 0.6, r1: p.radius + 2.2, life: 0.4, color: c.R.charge.color, width: 0.9 }); G.engine.rig.shake(0.45); }
+    if (fin) { fx.wave(P.pos, P.facing, { arc: 6.2, r0: p.radius * 0.6, r1: p.radius + 2.2, life: 0.4, width: 0.8, edge: new THREE.Color(c.R.charge.color) }); fx.petalSwirl(P.pos, { n: 20, r: p.radius, y: 0.5, spin: -1, speed: 8, rise: 1 }); G.engine.rig.shake(0.45); }
     const dz = fin ? fin.dizzy : p.dizzy || 0.4;
     this.nova(P.pos, p.radius + (fin ? 0.8 : 0), e => { this.combat.hitMonster(e, { dmgPct: fin ? p.dmgPct * fin.pct / 100 : p.dmgPct, knock: fin ? 2.6 : 1.2, stun: dz, from: P.pos }); if (!e.def?.boss && !e.breakable) this.fx().dizzy(e, dz); });
   }
@@ -542,7 +654,7 @@ export class SkillRunner {
     if (P) P.canMoveWhileActing = false;
   }
   clearAll() {
-    this.melee = null; this.approach = null;
+    this.melee = null; this.approach = null; this.flourish = null; this.banner?.end(); this.banner = null;
     this.charge?.cancel('clear', true);
     if (this.channel) this.endChannel();
     const P = this.G.player; if (P) { P.leap = null; P.dash = null; P.invuln = false; P.canMoveWhileActing = false; if (P.anim.action?.name === 'spin') P.anim.stop('spin'); }
@@ -551,7 +663,9 @@ export class SkillRunner {
     for (const x of this.pups || []) x.expire(true); this.pups = [];
     for (const x of this.decoys || []) x.expire(true); this.decoys = [];
     this.clearMoka();
+    this.clearPoe();
   }
 }
 installMokaSpells(SkillRunner.prototype);
 installChargedSkills(SkillRunner.prototype);
+installPoeSkills(SkillRunner.prototype);
