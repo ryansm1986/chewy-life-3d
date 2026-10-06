@@ -1,13 +1,14 @@
 # Publishing on itch.io
 
-The game ships as an itch.io **HTML** project: a zip of the production build that itch serves from its CDN inside an
+The game is **Pawhaven** on itch.io: <https://holiestdiver.itch.io/pawhaven> (renamed from "Chewy Life 3D" on 2026-10-06;
+the repo folder, the code's internal names and the save keys keep the old name, so existing saves still load). It ships as an itch.io **HTML** project: a zip of the production build that itch serves from its CDN inside an
 iframe on the game page.
 
 ## Build the zip
 
 | Command | What it does |
 |---|---|
-| `npm run build:itch` | Production build with relative URLs into `dist-itch/`, checked against itch's limits, zipped to `release/chewy-life-itch-v<version>.zip` |
+| `npm run build:itch` | Production build with relative URLs into `dist-itch/`, checked against itch's limits, zipped to `release/pawhaven-itch-v<version>.zip` |
 | `npm run test:itch` | The same, then boots the build the way itch serves it (an iframe pointing into `/html/<id>/`) in headless Chrome. It fails on console errors, 404s or any request that leaves the build, and saves `release/itch-test.png` |
 | `npm run fonts` | Re-subsets the UI fonts (see below). Not part of the build |
 
@@ -47,9 +48,24 @@ The version in the zip name comes from `package.json`, so bump it before each up
 6. Save as **Draft** (or **Restricted** with a password), open the page, and play through: title, New Game, the village,
    a Burrow, then Settings. Make it public once you're happy with it.
 
-**Later updates:** run `npm run build:itch` again and replace the file under Uploads. For repeated uploads, itch's
-`butler` CLI can push the zip instead: `butler push release/chewy-life-itch-v0.1.0.zip <user>/<game>:html5`. Then mark
-that channel as played in the browser on the edit page.
+## Push with butler (`npm run push:itch`)
+itch's command-line uploader, **butler**, uploads only what changed since the last push, and keeps a version history.
+- **Install**: butler is installed at `%LOCALAPPDATA%utlerutler.exe` (from itch's official
+  `broth.itch.zone/butler/windows-amd64`). `tools/push-itch.mjs` finds it there, on PATH, or in `$BUTLER`.
+- **Sign in once**: run `"%LOCALAPPDATA%utlerutler.exe" login` yourself. It opens the browser to approve, and saves
+  the credentials on this PC. (Or set `BUTLER_API_KEY` from itch.io → Settings → API keys.)
+- **Push**: `npm run push:itch` builds and tests (`build-itch.mjs --test`), then runs
+  `butler push dist-itch holiestdiver/pawhaven:html5 --userversion <package.json version>`.
+  - The target and channel are in `package.json` under `"itch"`.
+  - Options: `-- --skip-build` (push the existing `dist-itch/`), `-- --dry-run`.
+  - Bump `version` in package.json for each release you want labelled.
+- **First push only**: on the game's edit page, the new `html5` upload appears under Uploads. Tick **This file will be
+  played in the browser**, and set the embed options above.
+- **Push a committed version**, not a tree with agents' unfinished work in it. Make a clean copy first:
+  - run `git worktree add --detach <dir> HEAD`;
+  - link `node_modules` into it;
+  - run `node tools/push-itch.mjs` there.
+  That's how the first push (from 6d53a3b plus the rename) was made.
 
 ## Saves on itch
 

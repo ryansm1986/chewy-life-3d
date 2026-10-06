@@ -218,6 +218,8 @@ They are cute, chunky, toon-shaded with ink outlines, readable at 22 m, and have
   kinds.
 - `avoid: [[x, z, r]…]`: no camp or random POI within r plus the site's own radius.
 - `open: [[x, z, r]…]`: extra play discs, not flattened.
+- `village: { at: [x, z], r }`: the zone village's clearing (docs/ZONES.md §2.1): flattened, the trail crosses it at its
+  level, camps / POIs / the wild keep out (`plan.village`, `ctx.inVillage`; the village pieces pass `isFree(..., { village: true })`).
 - Everything in `layout` goes into the plan's cache key, so changing it re-rolls the camps.
 
 **Terrain** (`terrain`, RegionTerrain):

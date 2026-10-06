@@ -26,7 +26,8 @@ export default {
     bloom: { intensity: 0.8, threshold: 0.82 }, wind: { dir: [0.92, -0.38], strength: 1.15 },
   },
   terrain: TERRAIN,
-  layout: LAYOUT,
+  // Shiokaze Port (潮風港, src/regions/village): the fishing port on the wreck-beach bay; shore: the bay stays sea
+  layout: { ...LAYOUT, village: { at: [20, 66], r: 12, shore: -0.3 } },
   coastDist,
   populate: tidepoolPopulate,
   effects: tidepoolEffects,

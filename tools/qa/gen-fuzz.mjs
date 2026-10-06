@@ -67,6 +67,42 @@ for (const { floor, plan, name } of JOBS) for (let s = 1; s <= SEEDS; s++) {
   if (!reachable(L, portal, 1.55, reach)) bump('exit portal cannot be reached (inside rock)', tag);
   if (L.waypoint) { const w = c2w(L.waypoint.x, L.waypoint.y); if (!walkable(L, w.x, w.z)) bump('waypoint centre not walkable (mesh embedded in rock)', tag); if (!reachable(L, w, 1.75, reach)) bump('waypoint cannot be reached at all', tag); }
   if (L.stairs) { const w = c2w(L.stairs.x, L.stairs.y); if (!reachable(L, w, 1.65, reach)) bump('stairs cannot be reached', tag); }
+  if (L.zone) zoneChecks(L, plan, reach, tag);
+}
+// zone dungeon floors (dungeon/zoneGen.js; docs/ZONES.md §8.2): density, elites, objective slots, the boss arena
+function zoneChecks(L, plan, reach, tag) {
+  const packs = L.spawns.filter(s => !s.boss), n = L.packTotal;
+  const [lo, hi] = plan.density || [120, 160];
+  if (!(n >= lo && n <= hi)) bump('zone floor density outside the plan', `${tag}: ${n} (${lo}-${hi})`);
+  if (packs.some(s => s.count < 1 || s.count > 16)) bump('zone pack size outside 1-16', tag);
+  const champ = packs.filter(s => s.rank === 'champion').length, uniq = packs.filter(s => s.rank === 'unique').length;
+  if (champ > 3 || uniq > 1 || champ + uniq < 1) bump('zone elites not rare (<=3 champion, <=1 unique packs, at least one)', `${tag}: ${champ}c ${uniq}u`);
+  const startRoom = L.roomId[L.start.y * L.W + L.start.x];
+  if (packs.some(s => L.roomId[s.y * L.W + s.x] === startRoom && startRoom)) bump('zone pack in the arrival chamber', tag);
+  if ((L.slots?.length || 0) < (plan.slots ?? 2)) bump('zone floor short of objective slots', `${tag}: ${L.slots?.length}`);
+  for (const s of L.slots || []) {
+    if (!L.at(s.x, s.y) || !reach[s.y * L.W + s.x]) bump('objective slot off the floor / unreachable', `${tag} @${s.x},${s.y}`);
+    if (s.room === startRoom) bump('objective slot in the arrival chamber', tag);
+    if (!(s.guard >= 0) || !L.spawns[s.guard] || L.spawns[s.guard].guard !== L.slots.indexOf(s)) bump('objective slot without its guard pack', tag);
+  }
+  if (!L.chests.some(c => c.mark)) bump('zone floor without its marked (treasure) chest', tag);
+  if (plan.boss) {
+    const A = L.arena, M = L.arenaMouth;
+    if (!A || !M) { bump('boss floor without its arena / mouth', tag); return; }
+    if (L.stairs) bump('boss floor with stairs', tag);
+    if (Math.abs(A.r - plan.arenaR) > 0.01) bump('arena radius off the plan', `${tag}: ${A.r}`);
+    const ac = { x: Math.floor(A.x / CELL), y: Math.floor(A.z / CELL) };
+    if (!reach[ac.y * L.W + ac.x]) bump('arena centre unreachable', tag);
+    const b = L.spawns.find(s => s.boss); if (!b || Math.hypot((b.x + 0.5) * CELL - A.x, (b.y + 0.5) * CELL - A.z) > CELL * 1.5) bump('boss not at the arena centre', tag);
+    if (packs.some(s => Math.hypot((s.x + 0.5) * CELL - A.x, (s.y + 0.5) * CELL - A.z) < A.r + 1)) bump('a pack inside the arena', tag);
+    // one way in: every floor cell just outside the ring lies at the mouth (the approach corridor)
+    const R = A.r / CELL, cx = A.x / CELL, cy = A.z / CELL;
+    for (let y = Math.floor(cy - R - 2); y <= cy + R + 2; y++) for (let x = Math.floor(cx - R - 2); x <= cx + R + 2; x++) {
+      const dd = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+      if (dd < R + 0.8 || dd > R + 1.8 || !L.at(x, y)) continue;
+      if (Math.hypot(x - M.cx, y - M.cy) > 3.2) { bump('arena has a second way in', `${tag} @${x},${y}`); break; }
+    }
+  } else if (L.arena) bump('arena on a non-boss floor', tag);
 }
 console.log(`gen-fuzz: ${runs} layouts (${FLOORS} Burrow floors + ${JOBS.length - FLOORS} zone dungeon floors, x ${SEEDS} seeds)`);
 const keys = Object.keys(fails);

@@ -267,8 +267,13 @@ export default {
   },
   layout: {
     start: [16, 96], startR: 7, arena: [92, 20, 11],
-    via: [[24, 84], [26, 71], [33, 62], [46, 63], [58, 55], [60, 42], [70, 33], [81, 28]],
-    camps: 7, campR: 6.5, pois: 3, poiKinds: ['cache', 'shrine', 'feature'], lanes: 4.5, trailW: 1.45, // (narrow lanes: the grove closes in)
+    // (the trail crosses the stream, then runs straight through Takemori Village — left to right across the screen, just
+    // below its square — before turning north for the Tengu's clearing)
+    via: [[24, 84], [26, 71], [33, 63], [43, 67], [49.5, 64.5], [56.5, 59.5], [63.5, 52.5], [68, 44], [72, 35], [81, 28]],
+    // Takemori Village (竹守村, src/regions/village): the clearing mid-trail, between the footbridge and the Tengu's clearing
+    village: { at: [55, 58], r: 14 },
+    camps: 7, campR: 6.5, campGap: 12, pois: 3, poiKinds: ['cache', 'shrine', 'feature'], lanes: 4.5, trailW: 1.45, // (narrow lanes: the grove closes in)
+    poiAt: [[22, 49, 'feature'], [81, 49, 'shrine']], // (fixed: the village takes the middle of the trail, where random sites used to land)
     avoid: [[POND.x, POND.z, POND.r + 6], ...STREAM.slice(1, 8).map(([x, z]) => [x, z, 5])],
   },
   populate, effects, interactables,

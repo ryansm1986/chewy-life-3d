@@ -12,6 +12,7 @@ import { LightPool } from '../core/engine.js';
 import { Collision } from '../world/collision.js';
 import { Noise, mulberry32, clamp, rand, TAU } from '../core/util.js';
 import { dressRooms } from './roomDressing.js';
+import { zoneKit } from './zoneKits/index.js';
 
 const C = h => new THREE.Color(h);
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -30,6 +31,17 @@ export function tplOf(g, flat = false) {
 }
 const TPL = new Map();
 const tpl = (key, make, flat) => { let t = TPL.get(key); if (!t) TPL.set(key, t = tplOf(make(), flat)); return t; };
+// a template that keeps the geometry's own vertex colours (cached per geometry object: kit pieces are cached too)
+const TPL_VC = new WeakMap();
+function tplVC(g) {
+  let t = TPL_VC.get(g); if (t) return t;
+  const ng = g.index ? g.toNonIndexed() : g, c = ng.attributes.color; if (!c) return null;
+  if (!ng.attributes.normal) ng.computeVertexNormals();
+  const n = ng.attributes.position.count, C3 = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { C3[i * 3] = c.getX(i); C3[i * 3 + 1] = c.getY(i); C3[i * 3 + 2] = c.getZ(i); }
+  TPL_VC.set(g, t = { p: ng.attributes.position.array, n: ng.attributes.normal.array, c: C3, count: n });
+  return t;
+}
 export const SH = {
   sph: () => tpl('sph', () => new THREE.SphereGeometry(1, 12, 8)),
   sphLo: () => tpl('sphLo', () => new THREE.SphereGeometry(1, 8, 6)),
@@ -120,6 +132,13 @@ export class Batch {
     if (this.A) { const A = this.A, x0 = ax ?? e[12], z0 = az ?? e[14]; for (let k = this.n * 3; k < o; k += 3) { A[k] = x0; A[k + 1] = z0; A[k + 2] = top; } }
     this.n += cnt;
   }
+  // append geometry g with its OWN vertex colours (a kit piece: world/buildings Builder buckets) transformed by m
+  addVC(g, m, ax, az, mul = 1) {
+    const t = tplVC(g); if (!t) return;
+    const k0 = this.n; this.add(t, m, _c.setRGB(1, 1, 1), null, ax, az);
+    this.C.set(t.c, k0 * 3);
+    if (mul !== 1) for (let i = k0 * 3, e = this.n * 3; i < e; i++) this.C[i] *= mul;
+  }
   geometry() {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(this.P.slice(0, this.n * 3), 3));
@@ -136,6 +155,7 @@ class Chunks {
   at(x, z) { const k = Math.floor(x / this.size) * 4096 + Math.floor(z / this.size); let b = this.map.get(k); if (!b) this.map.set(k, b = new Batch(this.anchors)); return b; }
   add(t, m, color, fn) { this.at(m.elements[12], m.elements[14]).add(t, m, color, fn); }
   addGeo(g, x, z, color, fn) { this.at(x, z).add(tplOf(g), IDM, color, fn, x, z); }
+  addVC(g, m, mul = 1) { this.at(m.elements[12], m.elements[14]).addVC(g, m, undefined, undefined, mul); }
   build(scene, mat, cast = true, receive = true) {
     const out = [];
     for (const b of this.map.values()) { if (!b.n) continue; const m = new THREE.Mesh(b.geometry(), mat); m.castShadow = cast; m.receiveShadow = receive; scene.add(m); out.push(m); }
@@ -1058,9 +1078,12 @@ export class DungeonWorld {
     // set dressing has its own random stream so the older passes keep their exact placement
     this.drng = mulberry32(layout.floor * 7717 + (layout.rooms[0]?.x || 0) * 131 + (layout.rooms[0]?.y || 0) * 17 + 3);
     this.krng = mulberry32(layout.floor * 4513 + 29); // the model-detail pass (wall kit, prop parts) has its own stream too
+    // a zone dungeon's kit (dungeon/zoneKits: bamboo shrine caves, ...) takes over the per-biome builders below
+    this.kit = zoneKit(this.th); this.kit?.init?.(this);
     this.buildInfo(); this.buildDecoMap(); this.buildFloor(); this.buildWalls(); this.buildProps(); this.buildLights(); this.buildShafts(); this.buildCenterpieces(); this.buildArena(); this.buildLandmarks();
     if (!globalThis.__noRoomDress) dressRooms(this); // room purposes: interior set pieces + floor decals (before the clutter, which keeps off them); the flag is an A/B switch for profiling
     this.buildDressing();
+    const kitMeshes = this.kit?.finish?.(this) || [];
     this.shaftBatch.build(scene, C(T.accent).lerp(C('#ffffff'), 0.55)); this.floorGlows.build(scene);
     // Cut-away (materials.js occlusionFade): props and wall dressing — lanterns, torii, shelves, barrels, statues, posts
     // and their glowing bits — are removed part by part when a part stands in front of Chewy inside his circle
@@ -1073,7 +1096,7 @@ export class DungeonWorld {
     const matGlowOcc = propCutMat({ vertexColors: true, rim: 0.5, fragOut: glowOut, occluder: true });
     const built = [...this.solid.build(scene, matSolid), ...this.wallDeco.build(scene, matSolidOcc)];
     this.clutterMeshes = this.clutter.build(scene, matClutter, false, true);
-    built.push(...this.clutterMeshes, ...this.glow.build(scene, matGlow, false), ...this.wallGlow.build(scene, matGlowOcc, false));
+    built.push(...this.clutterMeshes, ...this.glow.build(scene, matGlow, false), ...this.wallGlow.build(scene, matGlowOcc, false), ...kitMeshes);
     this.halos.build(scene);
     // every chunk is drawn (culling off) for the first few frames, behind the entry transition, so its buffers are
     // uploaded then instead of the first time it scrolls into view mid-fight
@@ -1146,7 +1169,7 @@ export class DungeonWorld {
     const D = this.deco = new Float32Array(TW * TH * 4);
     this.decoK = K; this.decoW = TW; this.decoH = TH;
     const b = L.bossRoom;
-    if (b) { const c = this.cellToWorld(b.cx, b.cy); this.arena = { x: c.x, z: c.z, R: Math.min(b.w, b.h) * CELL * 0.5 - 2.4 }; }
+    if (b) { const c = this.cellToWorld(b.cx, b.cy); this.arena = { x: c.x, z: c.z, R: this.arenaR(b) }; }
     // soft blob in world units (1 in the middle, 0 at rad, noisy rim)
     const disc = (x, z, rad, ch, amt = 1, wob = 0.3) => {
       const tx0 = Math.max(0, Math.floor((x - rad) * K / CELL)), tx1 = Math.min(TW - 1, Math.ceil((x + rad) * K / CELL));
@@ -1164,7 +1187,7 @@ export class DungeonWorld {
       const n = Math.ceil(len / (w * 0.45));
       for (let i = 0; i <= n; i++) { const t = i / n, u = 1 - t; disc(u * u * ax + 2 * u * t * mx + t * t * bx, u * u * az + 2 * u * t * mz + t * t * bz, w * (1 - 0.25 * t), ch, amt, 0.12); }
     };
-    const P = { // per-biome recipe: [lush blobs, crack blobs, accent blobs] per ~50 m² of room, and whether rooms get trails
+    const P = this.kit?.deco || { // per-biome recipe: [lush blobs, crack blobs, accent blobs] per ~50 m² of room, and whether rooms get trails
       burrow: { lush: 1.3, crack: 0.5, acc: 0.9, path: 1 }, crystal: { lush: 0.7, crack: 0.8, acc: 1.0, path: 1 },
       shrine: { lush: 0, crack: 0, acc: 1.1, path: 1 }, kitchen: { lush: 0.5, crack: 0.8, acc: 0.8, path: 1 },
     }[th];
@@ -1194,6 +1217,7 @@ export class DungeonWorld {
     }
     // corridors read as trodden runs too
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (at(x, y) && !roomId[y * W + x] && r() < 0.5) disc((x + 0.5) * CELL, (y + 0.5) * CELL, 1.3, 1, 0.55, 0.2);
+    this.kit?.decoMap?.(this, { disc, curve, cellsOf });
     const data = new Uint8Array(TW * TH * 4);
     for (let i = 0; i < data.length; i++) data[i] = Math.round(clamp(D[i]) * 255);
     const tex = new THREE.DataTexture(data, TW, TH, THREE.RGBAFormat);
@@ -1213,9 +1237,9 @@ export class DungeonWorld {
     rooms.slice(0, 16).forEach((r, i) => { uRoom[i].set(r.x * CELL, r.y * CELL, (r.x + r.w) * CELL, (r.y + r.h) * CELL); uRoomK[i].set(KIND[r.kind] ?? 0, (i * 0.618) % 1 * 10, (r.x * 7 + r.y * 13) % 2, RUG_KINDS.has(r.kind) ? 1 : 0); });
     const b = this.L.bossRoom;
     const uBoss = new THREE.Vector4(0, 0, 0, 0);
-    if (b) { const c = this.cellToWorld(b.cx, b.cy); uBoss.set(c.x, c.z, Math.min(b.w, b.h) * CELL * 0.5 - 2.4, 1); this.arena = { x: c.x, z: c.z, R: uBoss.z }; }
-    const SIG = { burrow: '#ffc2dc', crystal: '#8af0ff', shrine: '#ffd24a', kitchen: '#ff8a3a', moon: '#7c9cff' };
-    const CAP = { burrow: '#66805a', crystal: '#6e62a0', shrine: '#56668a', kitchen: '#6e4a34', moon: '#4a5486' }; // wall-top tones, shaded
+    if (b) { const c = this.cellToWorld(b.cx, b.cy); uBoss.set(c.x, c.z, this.arenaR(b), 1); this.arena = { x: c.x, z: c.z, R: uBoss.z }; }
+    const SIG = { burrow: '#ffc2dc', crystal: '#8af0ff', shrine: '#ffd24a', kitchen: '#ff8a3a', moon: '#7c9cff', ...(this.kit ? { [this.th]: this.kit.sig } : {}) };
+    const CAP = { burrow: '#66805a', crystal: '#6e62a0', shrine: '#56668a', kitchen: '#6e4a34', moon: '#4a5486', ...(this.kit ? { [this.th]: this.kit.cap } : {}) }; // wall-top tones, shaded
     // floor decals: filled in by the room dressing (roomDressing.js) before the first frame uploads the map
     this.decals = { A: Array.from({ length: DECAL_MAX }, () => new THREE.Vector4()), B: Array.from({ length: DECAL_MAX }, () => new THREE.Vector4()), C: Array.from({ length: DECAL_MAX }, () => new THREE.Vector4()), n: 0 };
     this.decMap = new THREE.DataTexture(new Uint8Array(W * this.L.H * 4), W, this.L.H, THREE.RGBAFormat);
@@ -1223,8 +1247,8 @@ export class DungeonWorld {
     const mat = makeToon({
       brush: 0.2, brushScale: 0.25, rim: 0, shadowSat: 0.5,
       uniforms: { uInfo: { value: this.info }, uDeco: { value: this.decoTex }, uSigDim: { value: 1 }, uSize: { value: size }, uF0: { value: C(T.floor[0]) }, uF1: { value: C(T.floor[1]) }, uF2: { value: C(T.floor[2]) }, uVoid: { value: C(T.fog) }, uSig: { value: C(SIG[this.variant] || SIG[this.th]) }, uCap: { value: C(CAP[this.variant] || CAP[this.th]) }, uRoom: { value: uRoom }, uRoomK: { value: uRoomK }, uBoss: { value: uBoss },
-        uDecMap: { value: this.decMap }, uDecA: { value: this.decals.A }, uDecB: { value: this.decals.B }, uDecC: { value: this.decals.C } },
-      fragPars: (this.variant === 'moon' ? '#define MOON\n' : '') + FLOOR_PARS + DECAL_PARS,
+        uDecMap: { value: this.decMap }, uDecA: { value: this.decals.A }, uDecB: { value: this.decals.B }, uDecC: { value: this.decals.C }, ...(this.kit?.floorUniforms?.(this) || {}) },
+      fragPars: (this.variant === 'moon' ? '#define MOON\n' : '') + FLOOR_PARS + DECAL_PARS + (this.kit?.floorPars || ''),
       fragColor: /* glsl */`
         {
           vec2 p = vCWorld.xz;
@@ -1237,9 +1261,9 @@ export class DungeonWorld {
           vec3 c = mix(uF1, uF0, smoothstep(0.38, 0.62, nA));
           c = mix(c, uF2, smoothstep(0.55, 0.75, nB) * 0.5);
           fG = vec3(0.0);
-          ${FLOOR_THEME[this.th]}
+          ${this.kit ? this.kit.floorGLSL : FLOOR_THEME[this.th]}
           ${DECAL_MAIN}
-          ${FLOOR_BOSS}
+          ${this.kit?.bossGLSL ?? FLOOR_BOSS}
           c *= mix(0.58, 1.0, smoothstep(0.45, 1.3, wd));   // painted contact shade along the wall base
           c *= mix(0.88, 1.0, smoothstep(1.0, 3.6, wd));    // and a broad room vignette: rooms read as volumes, not flat plates
           // the void between wall tops: never a flat fill — a slow painterly mottle, deepest in the middle of big gaps
@@ -1313,9 +1337,9 @@ export class DungeonWorld {
     return { pts: out, len: L };
   }
   buildWalls() {
-    const th = this.th, T = this.theme, N = this.noise, r = this.rng;
-    const built = !!T.built, ds = built ? 0.55 : th === 'crystal' ? 0.7 : 0.5;
-    const prof = PROFILES[th], roles = WALL_ROLES[this.variant] || WALL_ROLES[th], [H0, HV, NEAR] = WALL_H[th];
+    const th = this.th, T = this.theme, N = this.noise, r = this.rng, KT = this.kit;
+    const built = !!T.built, ds = KT?.ds ?? (built ? 0.55 : th === 'crystal' ? 0.7 : 0.5);
+    const prof = KT?.profile || PROFILES[th], roles = KT?.roles || WALL_ROLES[this.variant] || WALL_ROLES[th], [H0, HV, NEAR] = KT?.wallH || WALL_H[th];
     const voidC = C(T.fog).multiplyScalar(0.55);
     const roleCols = {}; for (const k in roles) roleCols[k] = roles[k].map(C);
     const loops = this.traceLoops();
@@ -1359,6 +1383,7 @@ export class DungeonWorld {
         const s = S[i % n], u = i === n ? len : s.u;
         const j = built ? [0, 0, 0, 0] : [N.n2(s.x * 0.7, s.z * 0.7) * 0.1, N.n2(s.z * 0.8 + 3, s.x * 0.8) * 0.12, N.n2(s.x * 0.5 + 9, s.z * 0.5) * 0.14, N.n2(s.x * 0.4, s.z * 0.4 + 5) * 0.25];
         if (th === 'crystal') { const q = mulberry32(Math.floor(s.x * 13.1) * 7919 + Math.floor(s.z * 17.3)); j[0] += (q() - 0.5) * 0.3; j[1] += (q() - 0.5) * 0.34; j[2] += (q() - 0.5) * 0.3; j[3] += (q() - 0.5) * 0.4; }
+        KT?.jitter?.(s, j);
         const P = prof(s.h, s.D, j);
         if (i < n) s.P = P; // kept for the wall-top dressing (surface heights)
         let vRun = 0; // arc length since the current pattern kind began (roof rows start at the eave, eave caps at 0)
@@ -1395,15 +1420,15 @@ export class DungeonWorld {
     g.setIndex(vbase > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1));
     g.computeVertexNormals();
     const mat = makeToon({
-      vertexColors: true, brush: th === 'crystal' ? 0.18 : 0.26, brushScale: 0.5, rim: 0.28, occluder: true, term: [-0.05, 0.35],
+      vertexColors: true, brush: KT?.brush ?? (th === 'crystal' ? 0.18 : 0.26), brushScale: 0.5, rim: 0.28, occluder: true, term: [-0.05, 0.35],
       uniforms: { uSeed: { value: (this.L.floor * 3.7) % 11 } },
       vertexPars: 'attribute vec4 aWall; varying vec4 vWall;', vertexWorld: 'vWall = aWall;',
       fragPars: `${this.variant === 'moon' ? '#define MOON\n' : ''}varying vec4 vWall; uniform float uSeed; vec3 wG; ${NOISE_GLSL}${TOP_GLSL}`,
-      fragColor: `wG = vec3(0.0); ${WALL_GLSL[th]}`,
+      fragColor: `wG = vec3(0.0); ${KT ? KT.wallGLSL : WALL_GLSL[th]}`,
       fragOut: 'outgoingLight += wG;' + CUT_INK,
     });
     cutMode(mat, 2);
-    if (th === 'crystal') mat.flatShading = true;
+    if (th === 'crystal' || KT?.flat) mat.flatShading = true;
     const mesh = new THREE.Mesh(g, mat); mesh.castShadow = true; mesh.receiveShadow = true; this.scene.add(mesh);
     this.wallMesh = mesh;
     // collision stays per wall cell
@@ -1421,6 +1446,7 @@ export class DungeonWorld {
     const th = this.th, r = this.rng, WD = this.wallDeco, WG = this.wallGlow, HA = this.halos;
     const lightBudget = { n: 0 };
     const addLight = (x, y, z, c, i = 5, rad = 6, fl = 0.4) => { if (lightBudget.n++ > 40) return; this.lightPool.addSource({ pos: V(x, y, z), color: C(c), intensity: i, radius: rad, flicker: fl }); };
+    if (this.kit) { this.kit.dressWalls(this, addLight); return; } // (a zone kit dresses its walls and wall tops itself)
     for (const { S, len, seed } of this.wallSamples) {
       const n = S.length;
       if (th === 'shrine' || th === 'kitchen') {
@@ -1975,6 +2001,7 @@ export class DungeonWorld {
   }
   // ------------------------------------------------------------------ floor clutter
   buildProps() {
+    if (this.kit) return this.kit.buildProps(this);
     const th = this.th, r = this.rng, B = this.solid, GL = this.glow, HA = this.halos;
     for (const p of this.L.props) {
       const wp = this.cellToWorld(p.x, p.y);
@@ -2214,6 +2241,7 @@ export class DungeonWorld {
   }
   // ------------------------------------------------------------------ light fixtures
   buildLights() {
+    if (this.kit) return this.kit.buildLights(this);
     const T = this.theme, th = this.th, B = this.solid, GL = this.glow, HA = this.halos, at = this.L.at;
     for (const l of this.L.lights) {
       const wp = this.cellToWorld(l.x, l.y);
@@ -2252,6 +2280,7 @@ export class DungeonWorld {
     }
   }
   buildShafts() {
+    if (this.kit?.buildShafts) return this.kit.buildShafts(this); // (a zone kit: its own few shafts through the roof)
     const { rooms } = this.L, r = this.rng, SB = this.shaftBatch;
     const col2 = C(this.theme.accent).lerp(C('#ffffff'), 0.55).getHexString();
     const beam = (x, z, n, w0, w1, base0, base1, poolR, poolA) => {
@@ -2268,6 +2297,7 @@ export class DungeonWorld {
     if (this.variant === 'moon' && this.arena) beam(this.arena.x, this.arena.z, 5, 2.2, 1.6, 0.1, 0.06, 3.2, 0.16);
   }
   buildCenterpieces() {
+    if (this.kit) return this.kit.buildCenterpieces(this);
     const th = this.th, r = this.rng, T = this.theme, solid = this.solid, glow = this.glow;
     for (const c of this.L.centers || []) {
       const p = this.cellToWorld(c.x, c.y);
@@ -2343,6 +2373,7 @@ export class DungeonWorld {
   // flagstones, a pair of biome lamps, a signpost pointing down and a trapdoor / grate lying open; rune plates on the
   // waypoint's stones and a ring of paving. Everything stays outside the interaction circle; only the lamp posts collide.
   buildLandmarks() {
+    if (this.kit?.buildLandmarks) return this.kit.buildLandmarks(this);
     const L = this.L, th = this.th, moon = this.variant === 'moon', B = this.solid, CL = this.clutter, GL = this.glow, HA = this.halos, q = this.krng;
     const CAM = Math.PI / 4, fx = CAMX, fz = CAMZ, rx = CAMX, rz = -CAMZ; // toward the camera, screen right
     const stone = th === 'crystal' ? ['#54487e', '#9c9ad0'] : th === 'kitchen' ? ['#6e625c', '#a09288'] : moon ? ['#5e6080', '#9a9cb8'] : th === 'shrine' ? ['#6e6874', '#a8a0a6'] : ['#7a6c60', '#a8988a'];
@@ -2405,6 +2436,7 @@ export class DungeonWorld {
   // ------------------------------------------------------------------ boss arena dressing (floor sigil lives in the floor shader)
   buildArena() {
     const A = this.arena; if (!A) return;
+    if (this.kit) return this.kit.buildArena(this);
     const th = this.th, B = this.solid, GL = this.glow, HA = this.halos, r = this.rng;
     const spots = [], n = 12;
     for (let i = 0; i < n; i++) {
@@ -2461,6 +2493,7 @@ export class DungeonWorld {
   // Small ground clutter goes into the non-shadow-casting `clutter` chunks; the few bigger pieces (lanterns, tables,
   // bonsai, roots) into `solid` / `glow`. Only wall-hugging pieces get colliders, so the fighting space stays open.
   buildDressing() {
+    if (this.kit) return this.kit.buildDressing(this);
     const th = this.th, r = this.drng, L = this.L, K = this.decoK, TW = this.decoW, TH = this.decoH, D = this.deco, dist = this.wallDist;
     const CL = this.clutter, B = this.solid, GL = this.glow;
     const roomId = L.roomId || new Uint8Array(L.W * L.H);
@@ -2788,6 +2821,10 @@ export class DungeonWorld {
     this.collision.addCircle(x, z, 0.2);
   }
   onSky() {}
+  // the arena's sigil radius: a zone layout's authored ring (L.arena.r, docs/ZONES.md §8.2), else the Burrow's boss room
+  arenaR(b) { return this.L.arena?.r ? this.L.arena.r - 1.4 : Math.min(b.w, b.h) * CELL * 0.5 - 2.4; }
+  /** frees what the scene teardown can't (a zone kit's Placer batches, made with session-long materials) */
+  dispose() { this.kit?.dispose?.(this); }
   updateSun(focus) {
     const s = this.sun;
     s.target.position.copy(focus); s.position.copy(focus).addScaledVector(this.sunDir, 50); s.target.updateMatrixWorld();
@@ -2812,5 +2849,6 @@ export class DungeonWorld {
       this.moteAcc = (this.moteAcc || 0) + dt * 10;
       while (this.moteAcc > 1) { this.moteAcc--; const x = focus.x + rand(-12, 12), z = focus.z + rand(-10, 10); if (!this.walkable(x, z)) continue; vfx.glow.spawn({ x, y: rand(0.3, 3), z, vx: rand(-0.1, 0.1), vy: rand(0.02, 0.12), vz: rand(-0.1, 0.1), life: rand(3, 5), size: rand(0.06, 0.12), color: this.theme.accent, alpha: 0.7, alpha1: 0, fadeIn: 1, flicker: rand(2, 5) }); }
     }
+    this.kit?.update?.(this, dt, t, vfx, focus);
   }
 }

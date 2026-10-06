@@ -1,4 +1,4 @@
-# Chewy Life 3D 🐶🌸
+# Pawhaven 🐶🌸
 
 A cozy, hand-painted **3D isometric** village life-sim in the spirit of *Hello Kitty Island Adventure*, with
 **SimCity-style village planning** and a **Diablo 2-style dungeon crawler** — starring **Chewy** the chocolate pup,
@@ -10,8 +10,9 @@ his Boston terrier sidekick **Shadow**, and **Rosie**, a little girl with curly 
 
 Chrome / Edge recommended (WebGL2). Saves automatically to the browser's local storage.
 
-**itch.io:** `npm run build:itch` makes an upload-ready zip in `release/` (`npm run test:itch` also boots it in an
-itch-style iframe). Upload steps and page settings are in [docs/ITCH.md](docs/ITCH.md).
+**itch.io** (<https://holiestdiver.itch.io/pawhaven>): `npm run push:itch` builds, tests and pushes with butler;
+`npm run build:itch` makes an upload-ready zip in `release/` (`npm run test:itch` also boots it in an itch-style iframe).
+Sign-in, upload steps and page settings are in [docs/ITCH.md](docs/ITCH.md).
 
 ## Controls
 | Key / Mouse | Action |

@@ -140,6 +140,7 @@ function populate(ctx) {
     for (let i = 4; i < tr.length && k < 4; i++) {
       acc += Math.hypot(tr[i][0] - tr[i - 1][0], tr[i][1] - tr[i - 1][1]); if (acc < 7) continue; acc = 0;
       const [x, z] = tr[i], [px, pz] = tr[i - 2], [nx, nz] = tr[Math.min(tr.length - 1, i + 2)], yaw = Math.atan2(nx - px, nz - pz), w = plan.trailW * 2 + 1.2;
+      if (ctx.inVillage?.(x, z, 2)) continue; // (not inside Yukimi Spa Village: the trail runs through its square)
       PL.piece(Pr.snowTorii(k, { w, h: 3.0 }), x, z, yaw);
       for (const s of [-1, 1]) ctx.addCollider(x + Math.cos(yaw) * w / 2 * s, z - Math.sin(yaw) * w / 2 * s, 0.25);
       ctx.reserve(x, z, 1); k++;
@@ -272,7 +273,9 @@ export default {
   },
   layout: {
     start: [36, 100], startR: 7, arena: ARENA,
-    via: [[44, 92], [48, 84], [53, 76], [60, 70], [67, 62], [72, 55], [77, 48], [80, 41]],
+    via: [[44, 92], [48, 84], [54, 80], [61, 75], [66, 66], [72, 55], [77, 48], [80, 41]],
+    // Yukimi Spa Village (雪見の湯, src/regions/village): the spa village below the hot springs, the trail through its square
+    village: { at: [60, 76], r: 12 },
     camps: 7, campR: 6, campGap: 11, pois: 3, poiKinds: ['cache', 'shrine', 'feature'], poiAt: [[45, 67, 'feature'], [74, 28, 'shrine'], [82, 60, 'cache']], lanes: 5, trailW: 1.5,
     open: [[54, 64, 5.5]],
     avoid: [[INN.x, INN.z, 4], ...SPRINGS.map(s => [s.x, s.z, s.r]), [FALL.x, FALL.z, 4]], // (camps may sit out on the frozen pond)

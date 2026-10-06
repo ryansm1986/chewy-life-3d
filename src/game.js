@@ -25,7 +25,11 @@ import { RegionMode } from './regions/regionMode.js';
 import { REGIONS, REGION_IDS, regionState, regionUnlocked } from './regions/index.js';
 import { normRun, dungeonDef } from './dungeon/defs.js';
 import { normalizeZones } from './rpg/zones.js';
+import { villageReady, VILLAGES } from './regions/village/data.js';
+import { zoneNpcRig } from './actors/zoneVillagers.js';
+import { soakChip } from './rpg/zoneBuffs.js';
 import { addTravelPost } from './world/travelPost.js';
+import { installGateDebug, gateDef } from './regions/dungeonGate.js';
 import { MONSTERS } from './dungeon/monsters.js';
 import { GroundLoot } from './combat/groundLoot.js';
 import { newGameState, createActions, normalizeHeroes, saveableState } from './rpg/actions.js';
@@ -159,6 +163,8 @@ export async function boot() {
   portraits.register('moka', CAST.moka);
   portraits.register('poe', CAST.poe);
   G.portrait = (id) => portraits.get(id);
+  G.registerPortrait = (id, spec) => { if (!portraits.specs.has(id)) portraits.register(id, spec); }; // (zone villagers: src/regions/village)
+  G.zoneNpcBuilder = (id) => zoneNpcRig(id); // a fresh Toybox rig of a zone villager (phase C's dungeon cages; the caller disposes it)
   G.thumbs = new BuildingThumbs(engine);
   try {
     const pm = await import('./ui/portraits.js');
@@ -224,6 +230,7 @@ export async function boot() {
     const B = G.combat?.buffs || {}; const list = [];
     for (const [k, b] of Object.entries(B)) { const inf = BUFF_INFO[k]; if (!inf || (k === 'frenzy' && !b.stacks)) continue; list.push({ id: k, name: k === 'frenzy' ? `${inf[0]} ×${b.stacks}` : inf[0], glyph: inf[1], color: inf[2], time: b.t > 0 ? b.t : 0 }); }
     const meal = G.life?.kitchen?.mealBuff(); if (meal) list.unshift(meal); // Well Fed (life/meals.js)
+    const soak = soakChip(G); if (soak) list.unshift(soak); // Onsen Glow (rpg/zoneBuffs.js)
     G.ui?.setBuffs?.(list);
   }
 
@@ -294,6 +301,7 @@ export async function boot() {
       const vfx = new VFX(engine, world.scene); vfx.setLightPool(world.lightPool);
       swapWorld(world, vfx, combat);
       G.mode = 'dungeon';
+      if (G.playerDead) { player.anim.stop(); G.playerDead = false; G.actions.restoreAll(); shadow.fainted = 0; shadow.untargetable = false; shadow.anim.stop(); shadow.life = shadow.lifeMax; } // (a zone respawn: G.zoneRespawn)
       dungeon.start();
       vfx.prewarm(engine.renderer, engine.camera);
       // every projectile look (ball, blaze, fireball, foxfire, pots...) is compiled AND drawn below the floor for the same
@@ -334,6 +342,8 @@ export async function boot() {
     enterCombatWorld(() => new RegionMode(G, id), undefined, { location: () => def.name, sub: def.jp, region: id });
   };
   // The Travel Map (ui/travel.js) reads places from here: Blossom Hollow + the four regions (docs/REGIONS.md §1)
+  // a gated zone's Travel Map card: its dungeon (cleared stamp, the boss inside) instead of the outdoor boss (docs/ZONES.md §8.2)
+  const zoneCard = id => { const gd = gateDef(id); if (!gd) return {}; const n = G.state.zones?.[id]?.dungeon?.cleared || 0; return { cleared: n, dungeon: { name: gd.name, cleared: n, boss: MONSTERS[gd.boss]?.name || null } }; };
   G.travel = {
     list: () => {
       const R = regionState(G.state), here = G.mode === 'village' ? 'village' : G.dungeon?.regionId;
@@ -341,7 +351,8 @@ export async function boot() {
       return [home, ...REGION_IDS.map(id => {
         const d = REGIONS[id], u = regionUnlocked(G.state, id), mon = id => MONSTERS[id]?.name;
         return { id, name: d.name, short: d.name.split(' ').slice(-2).join(' '), jp: d.jp, sub: d.sub, color: d.color, levels: d.levels, unlocked: u.ok, why: u.why,
-          here: here === id, visits: R.visits[id] || 0, cleared: R.cleared[id] || 0, boss: mon(d.boss) || null, monsters: d.monsters.map(mon).filter(Boolean) };
+          here: here === id, visits: R.visits[id] || 0, cleared: R.cleared[id] || 0, boss: mon(d.boss) || null, monsters: d.monsters.map(mon).filter(Boolean),
+          ...zoneCard(id), village: villageReady(id) ? { name: VILLAGES[id].name, jp: VILLAGES[id].jp, saved: G.state.zones?.[id]?.village === 'saved' } : null };
       })];
     },
     go: (id) => {
@@ -398,11 +409,21 @@ export async function boot() {
     G.ui?.banner?.('Oof!', `${player.name} needs a nap… Shadow will drag ${CLASSES[player.hero]?.pron.obj || 'him'} home.`, { style: 'area' });
     G.audio?.play?.('player_die');
     const lost = Math.floor(G.state.coins * 0.1); if (lost > 0) { G.state.coins -= lost; Events.emit('coins:changed', { coins: G.state.coins }); }
-    setTimeout(() => { engine.timeScale = 1; G.returnToVillage(true); }, 2600);
+    setTimeout(() => { engine.timeScale = 1; if (!G.zoneRespawn()) G.returnToVillage(true); }, 2600);
   }
+  // A knock-out in a zone or its dungeon whose village is saved wakes at that village's inn, not at home
+  // (src/regions/village; docs/ZONES.md §2): the zone is rebuilt and RegionMode.start puts the hero at the inn door.
+  G.zoneRespawn = () => {
+    const zone = G.mode === 'dungeon' ? G.dungeon?.zoneId : null;
+    if (!zone || !REGIONS[zone] || !villageReady(zone) || G.state.zones?.[zone]?.village !== 'saved') return false;
+    G._zoneArrive = { zone, respawn: true };
+    G.enterRegion(zone);
+    return true;
+  };
 
   // ---- interaction helpers
   G.story = new Story(G);
+  installGateDebug(G, P); // (?villagesaved=1 | =bamboo,…; G.zoneDebug.saveVillage(zone): the zone dungeon gates, regions/dungeonGate.js)
   G.ui?.setQuestProvider?.(() => G.story.uiList());
   G.questTarget = () => (G.titleActive || G.playerDead ? null : G.tutorials?.target() || (G.mode === 'interior' ? null : G.story.target())); // (a guide's pointer first; indoors only a guide points)
   installServices(G);

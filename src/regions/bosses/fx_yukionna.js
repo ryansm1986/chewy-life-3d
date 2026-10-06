@@ -15,6 +15,8 @@ import { makeToon, makeOutline } from '../../gfx/materials.js';
 import { paint, merge, mergeVertices } from '../../gfx/geom.js';
 import { ell, EDGE_OUT, INK } from '../../dungeon/monsters.js';
 import { iceTexture } from './kitB.js';
+import { lookIn } from '../../dungeon/horde.js';
+import { teleBatchFor } from '../../gfx/teleBatch.js';
 import { TAU, clamp, rand, ease } from '../../core/util.js';
 
 export const C = h => new THREE.Color(h);
@@ -341,11 +343,12 @@ export class FrostFx {
     if (key === 'ice') return (M.ice = new THREE.MeshBasicMaterial({ map: iceTexture(), color: C('#dff6ff'), transparent: true, opacity: 0.92, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
     return null;
   }
-  geo(key, make) { return this.geos[key] || (this.geos[key] = make()); }
+  geo(key, make) { if (!this.geos[key]) { this.geos[key] = make(); this.geos[key].userData.shared = true; } return this.geos[key]; }
   take(kind, make) {
     let P = this.pools.get(kind); if (!P) this.pools.set(kind, P = { free: [], all: [] });
     let o = P.free.pop();
     if (!o) { o = make(this); o.frustumCulled = false; o.traverse?.(c => { c.frustumCulled = false; }); this.scene.add(o); P.all.push(o); }
+    lookIn(this.G?.dungeon, o, this.scene); // (drawn instanced with the monsters where it can be: dungeon/horde.js)
     o.visible = true; return o;
   }
   give(kind, o) { if (!o) return; o.visible = false; this.pools.get(kind)?.free.push(o); }
@@ -404,6 +407,7 @@ export class FrostFx {
    */
   tele(o) {
     const shape = o.shape || 'circle', kind = 'tele_' + shape;
+    if (this.G?.dungeon && !this.G.dungeon.isRegion) return this.teleFlat(o, shape);
     const m = this.take(kind, () => teleMesh(shape)), U = m.material.uniforms;
     U.uK.value = 0; U.uT.value = 0; U.uA.value = 1; U.uFire.value = 0;
     U.uR.value = o.r || 1; U.uLen.value = o.len || 4; U.uArc.value = o.arc || 0.5; U.uC.value.set(o.color || '#ff4a6a');
@@ -424,6 +428,28 @@ export class FrostFx {
       if (f > hold) { const g = (f - hold) / 0.16; U.uA.value = Math.max(0, 1 - g); return g < 1; }
       return true;
     }, () => { h.dead = true; this.give(kind, m); });
+    return h;
+  }
+  /** tele() on a flat floor (the zone dungeons): the same handle and timeline, drawn in one instanced batch with every
+   *  other frost telegraph of the floor (gfx/teleBatch.js) instead of a mesh each */
+  teleFlat(o, shape) {
+    const time = Math.max(0.05, o.time ?? 0.8), hold = o.hold ?? 0.12;
+    const q = teleBatchFor(this.vfx, 'frost', TELE_FS).add({ x: o.x, z: o.z, dir: o.dir || 0, shape: shape === 'circle' ? 0 : shape === 'lane' ? 1 : 2, r: o.r || 1, len: o.len || 4, arc: o.arc || 0.5, color: o.color || '#ff4a6a', time, driven: true });
+    const h = { k: 0, x: o.x, z: o.z, dir: o.dir || 0, firedAt: -1, killT: -1, dead: false,
+      place(x, z, dir = h.dir) { h.x = x; h.z = z; h.dir = dir; q.x = x; q.z = z; q.dir = dir; },
+      fire() { if (h.firedAt < 0 && h.killT < 0) h.firedAt = h.t ?? 0; },
+      kill() { if (h.killT < 0) h.killT = h.t ?? 0; } };
+    this.run((dt, t) => {
+      h.t = t; q.t = t;
+      if (h.killT >= 0) { const f = (t - h.killT) / 0.14; q.a = Math.max(0, 1 - f); return f < 1; }
+      h.k = Math.min(1, t / time); q.k = h.k;
+      if (h.firedAt < 0 && t >= time && !o.manual) h.firedAt = t;
+      if (h.firedAt < 0) { if (t > time + 4) h.killT = t; return true; }
+      const f = t - h.firedAt;
+      q.fire = Math.max(0, 1 - f / 0.24);
+      if (f > hold) { const g = (f - hold) / 0.16; q.a = Math.max(0, 1 - g); return g < 1; }
+      return true;
+    }, () => { h.dead = true; q.done = true; });
     return h;
   }
   /** lay a telegraph grid on the terrain (world-space vertices; uv = local metres) */
@@ -469,6 +495,7 @@ export function frostFx(G) {
   const v = G.vfx; let f = HOSTS.get(v);
   if (!f) { f = new FrostFx(v); HOSTS.set(v, f); v.ext?.push(f); }
   if (f.W !== G.world) f.W = G.world;
+  f.G = G;
   return f;
 }
 export { ease };

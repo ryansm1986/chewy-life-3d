@@ -11,6 +11,9 @@
 //                   telegraph, then spews scalding steam (phase 2+: two or three blasts, sweeping).
 //   BELLY BUMP      up close he winds back and bumps you away with his belly (cone).
 //   Tanuki gang     at 70% and 40% he whistles on his leaf and his gang (tanuki bandits, kuri) pop out of leaf swirls.
+//   IN HIS HALL     (the Maple Roots' round arena, r ≥ 15 m: docs/ZONES.md §8.2) the fight is retuned for the bigger ring
+//                   (ARENA_TUNE): three gang waves (70 / 45 / 20%, the later ones with kakashi, momiji wisps and a tesso),
+//                   drum rings and the flop's ring rolling further, a longer boulder run, the flop kept inside the ring.
 //   PHASE 3 (< 33%) he chugs his sake, goes red in the cheeks and DORON! grows into a giant: slower, bigger rolls, faster
 //                   drums and a telegraphed belly-FLOP that lands with its own shock ring.
 // After every big move he takes a breather (dizzy stars or a sweat drop, fanning himself with his hat): hit him then.
@@ -239,6 +242,16 @@ const TUNE = {
   phaseAt: [0.66, 0.33],
   rest: [1.4, 1.25, 1.1],
 };
+// the arena retune: Danzaburō's hall under the great root crown in the Maple Roots (an authored round hall, r ≥ 15 m,
+// instead of the 11 m outdoor clearing; docs/ZONES.md §8.2). His drum rings roll on across the bigger hall, the boulder
+// runs further, the belly-flop's ring goes wider (and the flop never lands him off the ring), and his gang comes in three
+// waves (70 / 45 / 20%), the later ones bringing the hollow's yokai and the root halls' tesso.
+const ARENA_TUNE = {
+  summonAt: [0.7, 0.45, 0.2],
+  waves: [['tanuki', 'kuri', 'kuri', 'kuri'], ['tanuki', 'tanuki', 'kakashi', 'momijiWisp', 'tesso'], ['tanuki', 'tanuki', 'kuri', 'kuri', 'kakashi', 'momijiWisp']],
+  drumR1: 14, rockMax: 19, flopR1: 12.5, rim: 2.4,
+};
+const inHollow = S => (S.arena?.r || 0) >= 15;
 const set = (S, st) => { S.st = st; S.t = 0; S.flag = 0; };
 // timelines that keep running while he is stunned (the default AI skips def.ai during stuns)
 const TIMED = new Set(['intro', 'drum', 'leafUp', 'rockRoll', 'rockCrash', 'kettleHop', 'steam', 'bump', 'summon', 'giant', 'flopUp', 'flopTrack', 'flopLock', 'flopLand', 'rest', 'poofBack']);
@@ -305,7 +318,8 @@ function idleTick(m, dt, tgt, d, slowMul) {
   const S = m.tk, frac = m.life / m.lifeMax, C = S.cds, P = ph(S);
   if (P < 2 && frac < TUNE.phaseAt[1]) { startGiant(m); return false; }
   if (P < 1 && frac < TUNE.phaseAt[0]) { S.ph = 1; m.emote('anger', 1.4); sfx('danza_laugh', m.pos, { pitch: 0.9 }); m.G.ui?.toast?.(`${m.name} stops holding back!`, { color: '#ffb070', icon: 'oni' }); }
-  if (S.summoned < TUNE.summonAt.length && frac < TUNE.summonAt[S.summoned]) { startSummon(m); return false; }
+  const sAt = inHollow(S) ? ARENA_TUNE.summonAt : TUNE.summonAt;
+  if (S.summoned < sAt.length && frac < sAt[S.summoned]) { startSummon(m); return false; }
   S.gcd -= dt;
   if (S.gcd <= 0) {
     // the big moves are aimed at Chewy even while the pup is the one nipping at his ankles (the nearest target)
@@ -376,7 +390,7 @@ function drumTick(m, dt, tgt) {
     m.model.drum();
     worldOf(m.model.parts.bellyTip, _v); S.fx.pon(_v.x, _v.y, _v.z, sc(m) * 1.2);
     S.fx.word(alt ? 'POKO!' : 'PON!', m.lift(3.3 * sc(m) + 0.3 * alt), { a: '#fff4c8', b: alt ? '#ff8a5a' : '#ffae5a', size: 1.7 + 0.3 * sc(m) });
-    const ring = S.fx.shock({ x: m.pos.x, z: m.pos.z, r0: 0.9 * sc(m), r1: T.r1, speed: T.speed[P], w: T.w[P], h: 0.5 + 0.15 * P, gapA: S.gapA, gapW: T.gapW[P], color: '#ffa54a', hot: '#fffbe8' });
+    const ring = S.fx.shock({ x: m.pos.x, z: m.pos.z, r0: 0.9 * sc(m), r1: inHollow(S) ? ARENA_TUNE.drumR1 : T.r1, speed: T.speed[P], w: T.w[P], h: 0.5 + 0.15 * P, gapA: S.gapA, gapW: T.gapW[P], color: '#ffa54a', hot: '#fffbe8' });
     ring.hits = []; S.rings.push(ring);
     S.gapA += (Math.random() < 0.5 ? 1 : -1) * rand(0.9, 1.5);
     S.beat++;
@@ -446,7 +460,7 @@ function startRockAim(m, tgt, wind) {
 }
 function rockLen(m, aim) {
   const S = m.tk, A = S.arena, dx = Math.sin(aim), dz = Math.cos(aim);
-  let len = clearRun(m.world, m.pos.x, m.pos.z, dx, dz, 15, S.half * 0.7);
+  let len = clearRun(m.world, m.pos.x, m.pos.z, dx, dz, inHollow(S) ? ARENA_TUNE.rockMax : 15, S.half * 0.7);
   // stay inside the clearing (the bales ring it)
   const ox = m.pos.x - A.x, oz = m.pos.z - A.z, b = ox * dx + oz * dz, c = ox * ox + oz * oz - (A.r - 1.2) ** 2, disc = b * b - c;
   if (disc > 0) len = Math.min(len, Math.max(0, -b + Math.sqrt(disc)));
@@ -601,15 +615,18 @@ function startSummon(m) {
   const S = m.tk, p = m.model.pose; set(S, 'summon');
   S.summoned++; m.summoned = S.summoned;
   Object.assign(p, { armRx: -2.4, armRz: 0.2, head: -0.3, tilt: -0.1, armLx: -0.6, armLz: -0.5, rate: 10 }); // leaf to his lips: a leaf whistle
-  const ids = S.summoned === 1 ? [pickId(['tanuki'], 'kuri'), pickId(['kuri'], 'tanuki'), pickId(['kuri'], 'tanuki')] : [pickId(['tanuki'], 'kuri'), pickId(['tanuki'], 'kuri'), pickId(['kuri'], 'tanuki'), pickId(['kakashi', 'kuri'], 'tanuki')];
+  const hollow = inHollow(S);
+  const ids = hollow ? (ARENA_TUNE.waves[S.summoned - 1] || ARENA_TUNE.waves[0]).map(id => pickId([id], 'kuri'))
+    : S.summoned === 1 ? [pickId(['tanuki'], 'kuri'), pickId(['kuri'], 'tanuki'), pickId(['kuri'], 'tanuki')] : [pickId(['tanuki'], 'kuri'), pickId(['tanuki'], 'kuri'), pickId(['kuri'], 'tanuki'), pickId(['kakashi', 'kuri'], 'tanuki')];
   S.pending = ids.filter(Boolean); S.spots = [];
-  const A = S.arena, W = m.world;
+  const A = S.arena, W = m.world, rimIn = hollow ? ARENA_TUNE.rim : 1.2;
   for (let i = 0; i < S.pending.length; i++) {
-    let x = m.pos.x, z = m.pos.z;
-    for (let k = 0; k < 12; k++) { const a = i / S.pending.length * TAU + rand(-0.4, 0.4), r = rand(3, 5); x = m.pos.x + Math.sin(a) * r; z = m.pos.z + Math.cos(a) * r; if (W.walkable(x, z) && Math.hypot(x - A.x, z - A.z) < A.r - 1.2) break; }
+    let x = m.pos.x, z = m.pos.z, ok = false;
+    for (let k = 0; k < 14 && !ok; k++) { const a = i / S.pending.length * TAU + rand(-0.4, 0.4), r = hollow ? rand(3.2, 6) : rand(3, 5); x = m.pos.x + Math.sin(a) * r; z = m.pos.z + Math.cos(a) * r; ok = W.walkable(x, z) && Math.hypot(x - A.x, z - A.z) < A.r - rimIn; }
+    if (!ok) { const a = rand(0, TAU), r = rand(2, 5); x = A.x + Math.sin(a) * r; z = A.z + Math.cos(a) * r; } // (never out past the ring: pop up in the middle)
     S.spots.push({ x, z }); S.fx.swirl(x, z, 0.85);
   }
-  m.G.ui?.toast?.(S.summoned === 1 ? `${m.name} whistles up his tanuki gang!` : `${m.name} calls the whole hollow!`, { color: '#ffb070', icon: 'oni' });
+  m.G.ui?.toast?.(S.summoned === 1 ? `${m.name} whistles up his tanuki gang!` : S.summoned === 2 && hollow ? `${m.name} calls the root halls' yokai!` : `${m.name} calls the whole hollow!`, { color: '#ffb070', icon: 'oni' });
   m.mode.bossEngaged?.(m);
   sfx('danza_whistleleaf', m.pos);
 }
@@ -675,7 +692,9 @@ function flopTick(m, dt, tgtIn) {
     case 'flopTrack': case 'flopLock': {
       const tot = T.track + T.lock, k = clamp(S.t / tot);
       if (S.st === 'flopTrack') {
-        const f = 1 - Math.exp(-4 * dt); S.shx += (tgt.pos.x - S.shx) * f; S.shz += (tgt.pos.z - S.shz) * f; S.tele.place(S.shx, S.shz);
+        const f = 1 - Math.exp(-4 * dt); S.shx += (tgt.pos.x - S.shx) * f; S.shz += (tgt.pos.z - S.shz) * f;
+        if (inHollow(S)) { const A = S.arena, ox = S.shx - A.x, oz = S.shz - A.z, od = Math.hypot(ox, oz), lim = A.r - ARENA_TUNE.rim; if (od > lim) { S.shx = A.x + ox / od * lim; S.shz = A.z + oz / od * lim; } } // (never lands him off the ring)
+        S.tele.place(S.shx, S.shz);
         if (S.t >= T.track) { S.st = 'flopLock'; sfx('danza_fall', m.pos); }
       }
       S.tele.m.material.uniforms.uBlob.value = 0.2 + 0.7 * k;
@@ -703,7 +722,7 @@ function flopLand(m) {
   const x = m.pos.x, z = m.pos.z, P0 = G.player;
   if (hitWhere(m, (px, pz, r) => Math.hypot(px - x, pz - z) < T.r + r, roll(m, T.dmg), { knock: 0, from: m.pos }) && P0) { const dx = P0.pos.x - x, dz = P0.pos.z - z, L = Math.hypot(dx, dz); S.push = { x: L > 0.05 ? dx / L : 1, z: L > 0.05 ? dz / L : 0, v: 11, t: 0.3, T: 0.3 }; }
   S.fx.crash(x, z, T.r);
-  const ring = S.fx.shock({ x, z, r0: T.r * 0.8, r1: 9, speed: 7.5, w: 1.0, h: 0.7, gapA: Math.atan2(P0 ? P0.pos.x - x : 0, P0 ? P0.pos.z - z : 1) + rand(-2.4, 2.4), gapW: 0.5, color: '#ff9a44', hot: '#fffbe8' });
+  const ring = S.fx.shock({ x, z, r0: T.r * 0.8, r1: inHollow(S) ? ARENA_TUNE.flopR1 : 9, speed: 7.5, w: 1.0, h: 0.7, gapA: Math.atan2(P0 ? P0.pos.x - x : 0, P0 ? P0.pos.z - z : 1) + rand(-2.4, 2.4), gapW: 0.5, color: '#ff9a44', hot: '#fffbe8' });
   ring.hits = []; S.rings.push(ring);
   S.fx.word('DOSUN!', m.lift(4), { a: '#fff4c8', b: '#ff8a4a', size: 2.4 });
   G.engine.rig.shake(1.0); G.engine.hitStop = Math.max(G.engine.hitStop || 0, 0.07);
@@ -763,6 +782,7 @@ export const BUILD = { danzaburo: buildDanzaburo };
 export const MONSTERS = {
   danzaburo: {
     name: 'Danzaburō the Leaf-Shifter', build: 'danzaburo', boss: true, subtitle: 'A thousand tricks, one very round belly!',
+    adds: ['tanuki', 'kuri', 'kakashi', 'momijiWisp', 'tesso'], // (his gang in the Maple Roots' hall: dungeon/zoneRun.js warms them with the floor)
     scale: SCALE, radius: 1.05, vr: 1.2, speed: 2.3, life: 1, dmg: 1, move: 'none', attack: { type: 'melee', range: 1.6, cd: 3, windup: 0.6 },
     variants: [{}], material: 'stone',
     stats: { name: 'Danzaburō', life: 1.05, dmg: 1.0, def: 1.0, speed: 1.0, xp: 1.4, element: 'phys', res: { stink: 20, frost: -10, zap: 10 } },

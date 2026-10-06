@@ -167,7 +167,7 @@ function brook(A, { gain = 0.05, pan = 0, rate = [0.08, 0.3], bub = 0.016 }) {
 }
 
 // Output trims so the beds sit at similar perceived loudness (calibrated with the render check).
-const AMB_GAIN = { village: 1.2, night: 1.8, water: 1, dungeon: 1.4, dungeon_shrine: 1.4, dungeon_kitchen: 1.3, dungeon_crystal: 1.5, dungeon_moon: 1.7,
+const AMB_GAIN = { village: 1.2, night: 1.8, water: 1, dungeon: 1.4, dungeon_shrine: 1.4, dungeon_kitchen: 1.3, dungeon_crystal: 1.5, dungeon_moon: 1.7, dungeon_bamboo: 1.5, dungeon_maple: 1.5, dungeon_tidepool: 1.4, dungeon_onsen: 1.8,
   region_bamboo: 1.3, region_maple: 1.3, region_tidepool: 1.1, region_onsen: 2.4 };
 
 export const AMBIENCES = {
@@ -297,6 +297,66 @@ export const AMBIENCES = {
     }, 1);
     A.every(16, 30, t => amb(A, 'shishiOdoshi', t, { v: 0.7, pan: A.r(0.1, 0.6), rev: 0.6 }), 7);
   },
+  // Bamboo Depths (the shrine caves under the grove): a hollow cave bed, the grove's breeze far above through the cracks,
+  // culms creaking and knocking, drips into still pools, a brook, a far-off shishi-odoshi and furin (docs/ZONES.md §8.2)
+  dungeon_bamboo(A) {
+    A.bed({ color: 'brown', filters: [['lowpass', 130, 0]], gain: 0.22 });
+    wind(A, { gain: 0.06, lp: 620, gust: [3, 7], rustle: 0.03, chimes: false });
+    brook(A, { gain: 0.025, pan: -0.3 });
+    A.every(5, 12, t => culmCreak(A, t), 2);
+    A.every(8, 18, t => culmKnock(A, t), 5);
+    A.every(1.6, 4.5, t => drip(A, t, 0.07), 0.8);
+    A.every(9, 20, t => furin(A, t), 6);
+    A.every(18, 34, t => amb(A, 'shishiOdoshi', t, { v: 0.45, pan: A.r(-0.6, 0.6), rev: 0.8 }), 9);
+    A.every(16, 30, t => swell(A, t, { f0: 300, f1: 520, q: 6, len: 3.5, v: 0.12 }), 11);
+  },
+  // Maple Roots (the halls under the great maple): a deep earthy cave bed, the wind in the maples far above through the
+  // root cracks, dry leaves skittering down, the roots creaking with the tree's sway, drips, a far temple bell, a cricket
+  dungeon_maple(A) {
+    A.bed({ color: 'brown', filters: [['lowpass', 120, 0]], gain: 0.24 });
+    wind(A, { gain: 0.05, lp: 560, gust: [3, 8], rustle: 0.025, chimes: false });
+    A.every(2.5, 7, t => leafSkitter(A, t), 2);
+    A.every(5, 13, t => culmCreak(A, t), 3);
+    A.every(1.8, 5, t => drip(A, t, 0.06), 0.8);
+    A.every(50, 90, t => amb(A, 'templeBell', t, { v: 0.32, pan: A.r(-0.6, 0.6), rev: 0.9 }), 25);
+    const c = { f: A.r(3800, 4400), pan: A.r(-0.7, 0.7), pulses: 3, rate: A.r(22, 28), v: 0.006 }, gap = A.r(0.8, 1.3);
+    A.every(gap * 0.9, gap * 1.1, t => cricketChirp(A, t, c), A.r(0, 0.5));
+    A.every(16, 30, t => swell(A, t, { f0: 260, f1: 460, q: 6, len: 3.5, v: 0.12 }), 11);
+  },
+  // Tide Caves: the sea booming in the cave mouth, the wash sucking back through the rocks, drips everywhere into the
+  // pools, little bubbles and crab clicks, a far gull through a blowhole, the cave's long echo
+  dungeon_tidepool(A) {
+    A.bed({ color: 'brown', filters: [['lowpass', 160, 0]], gain: 0.24 });
+    A.bed({ color: 'brown', filters: [['lowpass', 320, 0]], gain: 0.06, rev: 0.6 });
+    A.every(6, 11, t => amb(A, 'wave', t, { v: A.r(0.3, 0.55), pan: A.r(-0.6, 0.6), rev: 0.85 }), 1);
+    A.every(1, 3, t => drip(A, t, 0.08), 0.4);
+    A.every(0.6, 2, t => {
+      const s = A.voice(t), n = 1 + ((A.rng() * 3) | 0), pan = A.r(-0.6, 0.6); let at = 0;
+      for (let i = 0; i < n; i++) { const f = A.r(450, 1000); s.tone({ at, pts: [[0, f], [0.03, f * A.r(1.4, 2)]], a: 0.002, d: 0.04, v: A.r(0.008, 0.02), pan, rev: 0.5 }); at += A.r(0.03, 0.12); }
+    }, 0.3);
+    A.every(7, 16, t => {
+      const s = A.voice(t), n = 3 + ((A.rng() * 4) | 0), pan = A.r(-0.8, 0.8); let at = 0;
+      for (let i = 0; i < n; i++) { s.noise({ at, f: A.r(3000, 5000), q: 5, a: 0.001, d: 0.008, v: A.r(0.025, 0.05), pan, rev: 0.4 }); at += A.r(0.04, 0.1); }
+    }, 3);
+    A.every(20, 45, t => amb(A, 'gull', t, { v: A.r(0.15, 0.3), pan: A.r(-0.8, 0.8), rev: 0.9 }), 10);
+    A.every(14, 26, t => swell(A, t, { f0: 180, f1: 340, q: 5, len: 4, v: 0.14 }), 8);
+  },
+  // Onsen Caverns: a cold hollow hum with a thin whistle of wind through the ice, ice ticking and creaking, the hot
+  // pockets hissing and bubbling, the odd crystalline chime of an icicle letting go
+  dungeon_onsen(A) {
+    A.bed({ color: 'brown', filters: [['lowpass', 110, 0]], gain: 0.2 });
+    A.bed({ color: 'white', filters: [['bandpass', 1400, 6]], gain: 0.008, rev: 0.7 });
+    A.every(10, 20, t => swell(A, t, { f0: A.r(900, 1200), f1: A.r(1500, 2000), q: 14, len: 4, v: 0.05, color: 'white', rev: 0.8 }), 5);
+    A.every(0.4, 1.6, t => {
+      const s = A.voice(t), n = 1 + ((A.rng() * 2) | 0), pan = A.r(-0.5, 0.5), r = (a, b) => A.r(a, b); let at = 0;
+      for (let i = 0; i < n; i++) { AMB.blup(s, r, { v: A.r(0.2, 0.5), pan, at }); at += A.r(0.05, 0.2); }
+    }, 0.4);
+    A.every(2.5, 7, t => { const s = A.voice(t); s.noise({ f: A.r(2500, 4500), q: 4, a: 0.001, d: A.r(0.004, 0.01), v: A.r(0.02, 0.04), pan: A.r(-0.7, 0.7), rev: 0.6 }); }, 1);
+    A.every(6, 14, t => { const s = A.voice(t); s.noise({ ft: 'lowpass', f: A.r(260, 420), a: 0.3, h: 0.2, d: 0.5, lin: true, v: 0.04, color: 'brown', pan: A.r(-0.3, 0.3) }); }, 3);
+    const E = [1568, 1760, 2093, 2349, 2637];
+    A.every(9, 20, t => { const s = A.voice(t); s.bell({ f: E[(A.rng() * E.length) | 0], d: A.r(1.2, 2.2), v: 0.016, pan: A.r(-0.7, 0.7), rev: 0.85, partials: [[1, 1, 1], [2.32, 0.3, 0.5], [4.25, 0.1, 0.3]] }); }, 4);
+    A.every(1.4, 4, t => drip(A, t, 0.05), 1);
+  },
   // Momiji Hollow: wind in the maples, dry leaves skittering, the river nearby and the waterfall's low roar far off,
   // crows, warblers, a sika deer calling, an evening temple bell, a couple of autumn crickets as the sun goes down.
   region_maple(A) {
@@ -351,6 +411,7 @@ export const AMBIENCES = {
 
 // Biome ambience per Burrow theme (gen.js THEMES keys) and per outdoor region (layout.theme = region id).
 export const BIOME_AMBIENCES = { burrow: 'dungeon', shrine: 'dungeon_shrine', kitchen: 'dungeon_kitchen', crystal: 'dungeon_crystal', moon: 'dungeon_moon',
+  bambooCave: 'dungeon_bamboo', mapleHalls: 'dungeon_maple', seaCave: 'dungeon_tidepool', iceCavern: 'dungeon_onsen', // (the zone dungeons' kits: gen.js THEMES keys)
   bamboo: 'region_bamboo', maple: 'region_maple', tidepool: 'region_tidepool', onsen: 'region_onsen' };
 
 export const AMBIENCE_NAMES = Object.keys(AMBIENCES);

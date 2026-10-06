@@ -20,7 +20,7 @@
 // only. The machine-load verdict (idle / busy from the baselines, plus Windows' CPU load and the other programs'
 // 3D-engine use, sampled before Chrome starts and after it closes) is printed with the table.
 //
-// usage: node tools/qa/profile-horde.mjs [--quick] [WORLDS=burrow,region] [HEROES=chewy,moka,poe] [SECS=6] [FLOOR=12]
+// usage: node tools/qa/profile-horde.mjs [--quick] [WORLDS=burrow,region(,zone)] [HEROES=chewy,moka,poe] [SECS=6] [FLOOR=12]
 //        [REGION=bamboo] [KINDS=all|a,b,…] [QS=noinst] [LIFE=8] [BASE=http://localhost:5173] [PRIO=0]
 //   --quick: Chewy only (both worlds), 4 s windows.  QS: extra query (noinst / nogrid / nolod / nocull for A/B; gridcheck
 //   compares every grid query with the old scans and fuzzes them, reported as gridcheck / crowdcheck counts).
@@ -96,7 +96,7 @@ async function run(world, hero) {
     for (const id of tree) P.skills[id] = 10;
     G.actions.recompute(); P.life = null; P.zoom = null;
     G.actions.addXp = () => {}; // (no level-up banners in the middle of a measurement)
-    if (world === 'region') G.enterRegion(region); else G.enterDungeon(floor);
+    if (world === 'region') G.enterRegion(region); else if (world === 'zone') G.enterDungeon({ id: 'bambooDepths', floor: 1 }); else G.enterDungeon(floor); // (zone: a real Bamboo Depths floor, ~140 of its own on top)
   }, { world, floor: FLOOR, region: REGION });
   await page.waitForFunction(() => window.G?.mode === 'dungeon' && window.G.dungeon?.monsters?.length && !window.G.ui?.iris?.active, null, { timeout: 40000 });
   await page.waitForTimeout(2500);
@@ -109,7 +109,7 @@ async function run(world, hero) {
     const MON = D.monsters[0].constructor;
     // the fight's roster: 4 Burrow + 4 region kinds (a skinned tanuki, the transparent kurage, GPU-deformed kappa),
     // more mixed than any real floor (3-5 kinds); KINDS=all spawns every kind
-    let KINDS = kinds === 'all' ? [] : kinds ? kinds.split(',') : world === 'region' ? ['takenoko', 'mochi', 'kodama', 'kinoko', 'kamaitachi', 'lantern', 'kurage', 'tanuki'] : ['mochi', 'takenoko', 'dustbunny', 'kodama', 'kasa', 'kappa', 'tanuki', 'kurage'];
+    let KINDS = kinds === 'all' ? [] : kinds ? kinds.split(',') : world === 'region' ? ['takenoko', 'mochi', 'kodama', 'kinoko', 'kamaitachi', 'lantern', 'kurage', 'tanuki'] : world === 'zone' ? ['takenoko', 'kodama', 'kamaitachi', 'iwabozu', 'karasuKozo', 'kurage', 'tanuki', 'kappa'] : ['mochi', 'takenoko', 'dustbunny', 'kodama', 'kasa', 'kappa', 'tanuki', 'kurage'];
     if (kinds === 'all') for (let i = 0; i < Math.max(BURROW.length, REGIONK.length); i++) { if (REGIONK[i]) KINDS.push(REGIONK[i]); if (BURROW[i]) KINDS.push(BURROW[i]); }
     D.warmMonsters?.(KINDS); // (as a floor load warms its roster)
     const H = window.__horde = { set: new Set(), want: 0, queue: 0, packN: 0, spawnLog: [], lastSpawnFrame: false, kinds: KINDS };

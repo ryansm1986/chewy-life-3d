@@ -32,6 +32,28 @@ const HIDE = new THREE.Matrix4().makeTranslation(0, -80, 0);
 
 /** the Horde of a combat world (created on first use) */
 export function hordeOf(mode) { return mode._horde ||= new Horde(mode); }
+/**
+ * A pooled effect look (a monster's projectile, a swooping crow, a snowball, an icicle: meshes on cached geometry with
+ * toon / ink materials) drawn instanced with the monsters instead of one draw call per mesh: its root leaves the scene
+ * and the Horde copies its matrices every frame (visibility is honoured: a pooled look hides itself when given back).
+ * Call it whenever the look is taken from its pool: it re-binds a look that outlived its world's Horde, and puts it
+ * back in `scene` when there is no Horde (or it can't be adopted: sprites, textured or additive materials).
+ * The look's geometry must be cached (it is flagged shared here: never freed per object).
+ */
+export function lookIn(mode, root, scene) {
+  const ud = root.userData, H = INSTANCED && mode?._horde && !mode._horde.disposed ? mode._horde : null;
+  if (ud.lookH && ud.lookH === H) return true;
+  if (ud.lookH && !ud.lookH.disposed && ud.lookModel?.slots) ud.lookH.release(ud.lookModel);
+  ud.lookH = null;
+  if (H && ud.lookOk !== false) {
+    root.traverse(o => { if (o.isMesh && o.geometry) o.geometry.userData.shared = true; });
+    const M = ud.lookModel ||= { root };
+    if (H.adopt(M)) { ud.lookH = H; return true; }
+    ud.lookOk = false; // (not adoptable: stays a scene object)
+  }
+  if (scene && root.parent !== scene) scene.add(root);
+  return false;
+}
 
 // ------------------------------------------------------------------ contact rings
 // soft painted shadow + a thin footprint ring; one instanced batch, colour / ring strength per instance (from the proxy's

@@ -114,20 +114,21 @@ class RoomDresser {
     const L = this.L, W = this.W, th = this.th;
     const K = 4, GW = L.W * K, GH = L.H * K; this.nc = new Uint8Array(GW * GH); this.ncW = GW; this.ncH = GH;
     W.noClutterAt = (x, z) => { const i = Math.floor(x * K / CELL), j = Math.floor(z * K / CELL); return i >= 0 && j >= 0 && i < GW && j < GH && this.nc[j * GW + i] === 1; };
-    const list = PURPOSES[th]; if (!list) return;
+    const ZK = W.kit; // (a zone dungeon's kit brings its own purposes: dungeon/zoneKits)
+    const list = ZK?.purposes || PURPOSES[th]; if (!list) return;
     const order = list.slice(); for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(this.r() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
     let k = 0;
     for (const rm of L.rooms) {
       if (rm.kind === 'boss') continue;
       const A = this.A = this.analyze(rm);
       if (A.cells.length < 12) continue;
-      if (rm.kind === 'start') this.arrival(A);
-      const next = () => { let p = order[k++ % order.length]; if (A.center && DUPES[th]?.includes(p)) p = order[k++ % order.length]; return p; };
+      if (rm.kind === 'start') { if (ZK?.arrival) ZK.arrival(this, A); else this.arrival(A); }
+      const next = () => { let p = order[k++ % order.length]; if (A.center && (ZK?.dupes || DUPES[th])?.includes(p)) p = order[k++ % order.length]; return p; };
       const purpose = next(), second = A.cells.length > 85 ? next() : null;
       this.plan.push(`${rm.id}:${purpose}${second ? '+' + second : ''}`);
-      for (const p of second ? [purpose, second] : [purpose]) { const n0 = this.nPieces; this[`${th}_${p}`]?.(A); if (this.nPieces === n0) (this.failed ||= []).push(`${rm.id}:${p}`); }
-      this[`${th}_extras`]?.(A);
-      if (rm.kind === 'treasure') this.hoard(A);
+      for (const p of second ? [purpose, second] : [purpose]) { const n0 = this.nPieces; if (ZK) ZK.rooms[p]?.(this, A); else this[`${th}_${p}`]?.(A); if (this.nPieces === n0) (this.failed ||= []).push(`${rm.id}:${p}`); }
+      if (ZK) ZK.extras?.(this, A); else this[`${th}_extras`]?.(A);
+      if (rm.kind === 'treasure') { if (ZK?.hoard) ZK.hoard(this, A); else this.hoard(A); }
     }
     this.dressCorridors();
     this.flushDecals();
@@ -366,7 +367,8 @@ class RoomDresser {
       const l = Math.hypot(dx, dz), px = (x + 0.5 + dx / l * 0.24 + (r() - 0.5) * 0.3) * CELL, pz = (y + 0.5 + dz / l * 0.24 + (r() - 0.5) * 0.3) * CELL;
       if (!W.walkable(px, pz) || W.keepClear(px, pz) || this.puddle(px, pz) || W.noClutterAt(px, pz) || W.collision.solidAt(px, pz, 0.25)) continue;
       const face = Math.atan2(-dx, -dz), q = r(); n++;
-      if (th === 'burrow') {
+      if (W.kit) W.kit.corridor?.(this, px, pz, face, q);
+      else if (th === 'burrow') {
         if (q < 0.3) this.fern(this.CL, px, pz, 0.7 + r() * 0.3);
         else if (q < 0.5) W.ddMushrooms(this.CL, px, pz, 0.8 + r() * 0.5, this.pick(['#d8563e', '#c89a64', '#e8604a']));
         else if (q < 0.65) this.leafPile(this.CL, px, pz, 0.7);

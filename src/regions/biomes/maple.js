@@ -299,6 +299,8 @@ export default {
   layout: {
     start: [96, 100], startR: 7, arena: [22, 22, 11],
     via: [[88, 88], [79, 79], [70, 66], [62, 56], [52, 49], [42, 43], [33, 35]],
+    // Akane Hamlet (茜の里, src/regions/village): the harvest hamlet mid-trail, between the orchard and the rice terraces
+    village: { at: [78, 79], r: 12.5, clear: 4 }, // (clear: the hamlet keeps its land free of the wild's trees for 4 m round)
     camps: 7, campR: 6.5, campGap: 12, pois: 3, poiKinds: ['cache', 'shrine', 'feature'], poiAt: [[58, 42, 'feature'], [52, 62, 'cache'], [98, 84, 'shrine']], lanes: 4.5, trailW: 1.45,
     avoid: [...FIELDS.map(([x, z, r]) => [x, z, r - 1]), [ORCHARD.x, ORCHARD.z, 1], [FALL.x, FALL.z, 5], ...RIVER.slice(0, 9).map(([x, z]) => [x, z, 3.4])], // (+ the site's own radius)
   },

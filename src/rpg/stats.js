@@ -37,6 +37,7 @@ import { CLASSES } from './classes.js';
 import { mokaPassives } from './skillsMoka.js';
 import { poePassives } from './skillsPoe.js';
 import { mealAcc, mealPost } from '../life/meals.js';
+import { soakAcc, soakPost } from './zoneBuffs.js';
 
 export const LEVEL_CAP = 60;
 export const RES_CAP = 75;
@@ -123,6 +124,7 @@ export function computeStats(state) {
   }
   // Well Fed: the hero's last meal (life/meals.js; P.meal = { buff, tier, left }) counts like gear while it lasts
   mealAcc(P.meal, (k, v) => addStat(acc, k, v));
+  soakAcc(P.soak, (k, v) => addStat(acc, k, v)); // (the Yukimi Bathhouse's Onsen Glow: rpg/zoneBuffs.js)
 
   const d = {};
   d.lvl = lvl;
@@ -226,6 +228,7 @@ export function computeStats(state) {
   d.dodge = 0;
   if (CL.id === 'poe') poePassives(d, L, CL); // (her per-tree masteries, Energy for jutsu, Swift as Wind, dodge)
   mealPost(P.meal, d); // (Hearty's max life / regen, and d.meal for the UI)
+  soakPost(P.soak, d);
   return d;
 }
 

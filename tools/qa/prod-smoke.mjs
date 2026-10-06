@@ -2,6 +2,7 @@
 // title screen and the village, and fail if the UI/audio did not load or the page logged errors.
 // (The dev server resolves things the bundle can't — e.g. a variable import() path — so this catches "works in dev,
 // no UI in the real game" bugs.)  usage: node tools/qa/prod-smoke.mjs
+import { DUNGEONS } from '../../src/dungeon/defs.js';
 import { build, preview } from 'vite';
 import { chromium } from 'playwright-core';
 import os from 'node:os';
@@ -22,7 +23,7 @@ const server = await preview({ logLevel: 'error', build: { outDir }, preview: { 
 const url = server.resolvedUrls.local[0].replace(/\/$/, '');
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true, args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] });
 let failed = 0;
-for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['poe', '/?fresh&nointro&hero=poe'], ['home', '/?fresh&nointro'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`])]) {
+for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['poe', '/?fresh&nointro&hero=poe'], ['home', '/?fresh&nointro'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`]), ...Object.values(DUNGEONS).filter(dd => dd.gate).map(dd => ['zone:' + dd.id, '/?fresh&nointro'])]) { // (every zone dungeon that has its gate: its kit, a dense floor, the arena)
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
   const errs = [];
   page.on('pageerror', e => errs.push('pageerror: ' + e.message));
@@ -70,15 +71,26 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
     });
   }
   const regionId = label.startsWith('region:') ? label.slice(7) : null;
-  if (regionId) { // every outdoor region in the bundle (docs/REGIONS.md): built, populated, with its own boss
+  if (regionId) { // every outdoor region in the bundle (docs/REGIONS.md): built, populated, with its own boss (or its dungeon gate)
     await page.waitForFunction(() => window.G?.dungeon?.isRegion && !window.G.ui?.iris?.active, null, { timeout: 30000 }).catch(() => errs.push('region never loaded'));
-    s.region = await page.evaluate(() => ({ id: window.G.dungeon?.regionId, monsters: window.G.dungeon?.monsters?.length || 0, boss: !!window.G.dungeon?.boss }));
+    s.region = await page.evaluate(() => ({ id: window.G.dungeon?.regionId, monsters: window.G.dungeon?.monsters?.length || 0, boss: !!window.G.dungeon?.boss, gate: !!window.G.dungeon?.gate }));
   }
-  const regionOk = !s.region || (s.region.id === regionId && s.region.monsters >= 10 && s.region.boss);
+  // (a zone whose boss moved into its dungeon has the dungeon gate at the trail's end instead: docs/ZONES.md §8.2)
+  const regionOk = !s.region || (s.region.id === regionId && s.region.monsters >= 10 && (s.region.boss || s.region.gate));
+  const zoneId = label.startsWith('zone:') ? label.slice(5) : null;
+  if (zoneId) { // a zone dungeon in the bundle (docs/ZONES.md §8.2): its cave kit, a dense floor, the arena with its boss
+    s.zone = await page.evaluate(async id => {
+      const G = window.G; G.state.flags.burrowTut = true; G.enterDungeon({ id, floor: 2 });
+      for (let i = 0; i < 250 && !(G.dungeon?.kind === 'zone' && G.dungeon.boss && !G.ui?.iris?.active); i++) await new Promise(q => setTimeout(q, 120));
+      await new Promise(q => setTimeout(q, 1500));
+      const D = G.dungeon; return { kind: D?.kind, kit: !!G.world.kit, n: D?.monsters?.length || 0, boss: D?.boss?.id || null, arena: D?.layout?.arena?.r || 0, tank: !!D?.monsters?.some(m => m.id === D.def.tank) };
+    }, zoneId);
+  }
+  const zoneOk = !s.zone || (s.zone.kind === 'zone' && s.zone.kit && s.zone.n >= 120 && !!s.zone.boss && s.zone.arena >= 15);
   const h = s.home, homeOk = !h || (h.mode === 'interior' && h.items >= 12 && h.batches >= 10 && h.jobs === 4 && h.palette && h.thumbs >= 3 && h.back === 'village');
   const pz = s.poe, poeOk = !pz || (pz.hero === 'poe' && (!TOY_POE || (s.model === 'poe_toy' && pz.baked)) && (!POE_FUMA || (pz.fuma === 'glb' && pz.villagerFuma === 'glb')) && pz.back && pz.wt === 'fuma' && pz.cast && pz.flying && pz.caught && pz.icons && pz.switch && pz.after === 'chewy' && pz.poeVillager);
   const m = s.moka, mokaOk = !m || ((!TOY_MOKA || s.model === 'moka_toy') && m.baked && m.staff && m.wt === 'staff' && m.cast && m.switch && m.after === 'chewy' && m.chewyBaked && m.mokaVillager);
-  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && mokaOk && poeOk && regionOk && homeOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!CHEWY_MODEL || s.model === CHEWY_MODEL) && (!SAMURAI_CHEWY || s.saya) && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
+  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && mokaOk && poeOk && regionOk && zoneOk && homeOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!CHEWY_MODEL || s.model === CHEWY_MODEL) && (!SAMURAI_CHEWY || s.saya) && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
   console.log(`${ok ? 'PASS' : 'FAIL'}  production ${label}: ${JSON.stringify(s)}${errs.length ? '\n   ' + [...new Set(errs)].slice(0, 8).join('\n   ') : ''}`);
   if (!ok) failed++;
   await page.close();

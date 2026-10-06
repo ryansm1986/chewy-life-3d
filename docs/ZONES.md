@@ -1,6 +1,6 @@
 # Zones: rescue the village, clear its dungeon, then push tiers (design)
 
-Status: **phase A built** (designed 2026-10-05; sprint and the foundations: §8.1, §9.1). The work is tracked in [ROADMAP.md](ROADMAP.md); this file is the design.
+Status: **phase A built** (designed 2026-10-05; sprint and the foundations: §8.1, §9.1); **phase D: Takemori Village (bamboo) built** (§2.1). The work is tracked in [ROADMAP.md](ROADMAP.md); this file is the design.
 
 The owner's direction (2026-10-05):
 - Every zone has **a village to save** from monsters.
@@ -63,6 +63,204 @@ Travel Map → Zone (outdoor, with elevation) → the besieged village
   - It's made of authored buildings (the `world/buildings` kits), its own NPC set (3–5 named villagers plus a few
     townsfolk) and a lightweight VillageLife.
   - It has no SimCity sim. The main town stays the only planned town.
+
+### 2.1 As built: Takemori Village (bamboo), 2026-10-06 (ROADMAP Z-D1 to Z-D5; code map: ARCHITECTURE.md "Zone villages")
+- **Names** (data: `src/regions/village/data.js`, the owner may rename them there):
+
+  | Zone | Village | Specials | Captain |
+  |---|---|---|---|
+  | Bamboo | **Takemori Village** (竹守村) | Kaze Ninja Dojo, Bamboo Craftshop | Captain Galeclaw (a storm Kamaitachi) |
+  | Maple | **Akane Hamlet** (茜の里) | Momiji Tea House | Captain Strawgrin (an oni Kakashi) |
+  | Tidepool | **Shiokaze Port** (潮風港) | Saba's Fish Market, Funaki Boatyard | Captain Brineclaw (a Shogun-gani) |
+  | Onsen | **Yukimi Spa Village** (雪見の湯) | Yukimi Bathhouse, Tetsu's Snow Forge | Captain Frostbelly (a Grand Daruma) |
+
+  The other three villages are written up in §2.2.
+
+- **The site** is data: the recipe's `layout.village = { at: [x, z], r }` (bamboo: (55, 58), r 14). layoutGen puts it in
+  the plan (`plan.village`, a `village` disc), the terrain flattens it and the trail runs through it at its level,
+  camps and POIs keep out of it, and RegionWorld's placement keeps the wild out (`isFree`). Everything else is placed
+  relative to the square in **screen-polar slots** (`a` degrees from screen-up, `d` metres) or **screen offsets** (`u`
+  right, `v` up), so moving the site (phase F's terraces) moves the village. Tall buildings stand on the far side
+  (|a| ≤ 85°); the camera side gets the low camps, the shrine, gardens and fences.
+- **The layout**: six buildings round a paved square (r 5.2) — Grandma Sasa's minka (top), the Sasanoha Inn, Chiku's
+  General Store, the Kaze Ninja Dojo, the Bamboo Craftshop and the Waypoint Shrine (low, below the road). The road
+  crosses the village just below the square, through a gate at each end of the clearing; a shishi-odoshi basin (it
+  clacks), benches, stone lanterns, a notice board, lantern posts along the road, bamboo fences round the camera
+  side, the village's own bamboo and understorey.
+- **The art** (`artBamboo.js`, the buildings kit's Builder): a custom **kayabuki thatch** (rounded sections stacked
+  from a thick cut lip, overlapping straw courses, moss, a cedar-bark ridge with umanori saddles; hip or irimoya with a
+  lattice gable), dark cedar frames, plaster and paper screens; the dojo has a charcoal-tile irimoya and a training yard;
+  the inn a tiled skirt between its floors. The static buildings go into the region's merged prop chunks.
+- **Besieged**: the siege overlay (`art.js`) boards every door and window, smears soot, hangs torn dark lanterns, plants
+  yokai war banners, and builds three **camps** (a campfire with a red light, a tent, a banner, spiked barricades across
+  the road, bones and debris; `data.js camps[].pieces`) whose monsters (5–6 of the zone's kinds, a champion leader) are
+  recorded in `zones[zone].siegeCamps` as they fall. Each camp **cages a villager** (Chiku, Takumi, Okami Fuku): once
+  its monsters are down, F frees them (`villager:rescued { npc, zone }`, recorded in `zones[zone].quests.freed`); the
+  elder and the sensei stay barricaded inside. A **siege gloom** desaturates and darkens the grade inside the village.
+- **The captain** (`captains.js`): Captain Galeclaw, a ×2 storm Kamaitachi with Bouncy and Zappy, boss stats ×9 life,
+  and two signatures — **Gale Rush** (three telegraphed dashes that leave nicking wind trails, then a breather) and,
+  under 60% life, **Sickle Storm** (a spin that hits round it and throws a ring of twelve crescent blades). It waits in
+  the square under a **banner ward** (no aggro, blows glance off with a "Warded!" float) until every camp falls; then
+  the ward shatters, it wakes with the boss intro (title card, roar, music), borrows the region's boss slot for the bar
+  and the framing, and fights inside a ring on the square.
+- **Saved**: its fall calls `saveVillage(zone)` and emits `village:saved { zone }` once; the celebration (~9 s): the
+  Victory banner, "Takemori Village is saved!", the siege overlay crumples, the saved overlay grows in (lit lanterns
+  and their lights, noren, bunting across the square, futons on the inn's rail, the shop's awning and goods, the
+  dojo's banner, flower tubs, a vegetable cart, a woodyard, the kitchen garden where the south camp stood), the hidden
+  villagers step out, three townsfolk come out, everyone cheers, sparkles and petals. Then two toasts: the Waypoint
+  Shrine is lit; the villagers have quests.
+- **Persistence**: `zones[zone].village` (saved), `siegeCamps` (cleared camps stay cleared between visits while
+  besieged), `quests.freed` / `quests.rescued`. A saved village rebuilds clean on every visit.
+- **Villagers** (`src/actors/zoneVillagers.js`): five named (Grandma Sasa, panda, the elder; Okami Fuku, tanuki, the
+  inn; Chiku, bunny, the shop; Takumi, bear, the craftshop; Master Kazemaru, silver fox, the dojo — Poe's old teacher)
+  plus Kome (cat, the inn's cook: rescued from the Depths, a quest) and three seeded townsfolk, all Toybox kit rigs.
+  A light routine: their place (counter / dojo floor / workbench), the square's edge (chat, admire), the basin, the
+  notice board, the benches and the elder's engawa (seated), routed door → square → door; they greet the hero.
+  Markers: "!" (a quest to offer or turn in), "?" (one in progress).
+- **Quests** (`src/world/zoneQuests.js`): six, all with objectives in the Bamboo Depths — Roots of the Grove (reach
+  floor 2), The Missing Ledger (a champion's drop on floor 1), The Wind Scroll (12 Kamaitachi, then a unique's drop on
+  floor 2; after Roots), The Missing Cook (rescue Kome on floor 2), Heartwood (3 chest drops on floor 2), Wings Over
+  the Grove (the dungeon's boss; after Roots). Each ends with a talk step back in the village (the turn-in "!") and
+  pays coins, xp, friendship and a furniture find / forage / a unique. Offered only once the village is saved.
+- **The phase C interface**: `G.story.dungeonObjectives({ dungeon, floor, zone, tier })` →
+  `[{ kind: 'cage', npc, label, quest }, { kind: 'drop', item, n, label, from: 'champion' | 'unique' | 'chest', quest }]`
+  for the active quests' current steps on that floor (a step with no floor counts as floor 1); C places them and emits
+  `villager:rescued { npc, zone, dungeon, floor }` / `quest:find { item, n, zone, dungeon, floor }`.
+  `G.zoneNpcBuilder(npc)` gives C a fresh Toybox rig of the caged villager (the caller disposes it).
+- **The buildings** (`talk.js`): the **Shop** (daily zone-band stock, potions, the grove's forage), the **Inn** (rest =
+  full heal; meals; the zone's **respawn point** — a knock-out in the zone or its dungeon wakes there once the village is
+  saved: `G.zoneRespawn` in game.js), the **Waypoint Shrine** (the Travel Map; travel into a saved zone arrives there),
+  the **Kaze Ninja Dojo** (respec for coins, a daily spar for xp, ninja gear — fūma for Poe), the **Bamboo Craftshop**
+  (bamboo shoots, wood and coins → bamboo furniture or woven gear). A boarded building says so.
+- **Perf** (s23, 1600×900, per frame): the saved square with 9 villagers out is about 206 draw calls and 3.8 M
+  triangles including the shadow passes, against 144 at the arrival stone; the CPU frame stays within the arrival
+  stone's p95 + 4 ms. (Checkpoint 1 reported 416: that tool counted two frames; corrected 2026-10-06.) The buildings
+  and a saved village's dressing are baked into the region's prop chunks; only a village saved during the visit adds
+  the saved overlay group (about 9 calls) until the next visit. The village adds ~200 ms to the region build.
+
+### 2.2 As built: Akane Hamlet, Shiokaze Port, Yukimi Spa Village, 2026-10-06 (ROADMAP Z-D1 to Z-D5)
+The same runtime as Takemori (§2.1): data in `village/data.js`, one theme module each (`artMaple.js`,
+`artTidepool.js`, `artOnsen.js`, built by three helper agents), the captains in `captains.js`, the talk and the
+services in `talk.js`, the quests in `world/zoneQuests.js`.
+- **Sites** (the recipes' `layout.village`):
+  - **Akane Hamlet** (maple): (78, 79), r 12.5, between the persimmon orchard and the rice terraces. The trail climbs the
+    screen through the square: in at the camera side, out between the Elder's house and the tea house.
+  - **Shiokaze Port** (tidepool): (20, 66), r 12, on the wreck-beach bay, with `shore: −0.3` (the clearing's flattening
+    fades at the waterline, so the bay stays sea). The trail crosses the square diagonally. The biome's wreck and net
+    rack sit inside the port.
+  - **Yukimi Spa Village** (onsen): (60, 76), r 12, just below the hot springs (the trail's via points moved to run
+    through the square). The springs read as the bathhouse's outdoor baths.
+- **Buildings**:
+
+  | Village | Elder | Inn | Shop | Specials | Waypoint |
+  |---|---|---|---|---|---|
+  | Akane Hamlet | Elder Kaede's House | Kurikaze Inn | Benji's Sundries | Momiji Tea House | the shared shrine, maple tint |
+  | Shiokaze Port | Captain Kaizo's Lookout | Shinju Inn | Nami's Port Store | Saba's Fish Market, Funaki Boatyard | sea tint |
+  | Yukimi Spa Village | Granny Shirayuki's Cottage | Ryokan Tsubaki | Mikan's Warm Goods | Yukimi Bathhouse, Tetsu's Snow Forge | snow tint |
+
+- **The Waypoint Shrine** is now one design for all four villages (`art.js waystone()`: the hokora, the standing stone
+  with the paw rune, the torii, the lanterns), tinted per zone (roof colour and a moss / leaf / salt / snow crown).
+  `data.js WAYSTONE.glb` is the slot for the Blender model (ROADMAP Z-D6).
+- **Captains** (each a ×1.75–1.9 named variant of a zone monster, 2 fixed elite mods, warded until the camps fall, then
+  a boss with its own bar):
+  - **Captain Strawgrin** (oni Kakashi; Multishot, Cursed): *Murder of Crows* (it rattles, then six crows dive one after
+    another onto marked circles on and round the hero) and *Harvest Scythe* (in close, a wide marked cone in front,
+    heavy knockback).
+  - **Captain Brineclaw** (Shogun-gani; Stone Skin, Bouncy): *Sidelong Rampage* (three side-on charges, each on a marked
+    lane) and *Tidal Slam* (both claws up, a slam at its feet, then a ring wave that rolls out across the square: roll
+    through it).
+  - **Captain Frostbelly** (Grand Daruma; Frosty Aura, Extra Strong): *Avalanche Roll* (it curls into a huge snowball
+    and bowls down a marked lane, chilling what it hits, then sits dizzy) and *Icicle Rain* (seven icicles crash onto
+    marked spots round the hero, one after another).
+  - Their gear (`captainGearTpl({ banner, mark, place })`) is placed per body: sode and a sashimono on the scarecrow and
+    the snowman, a crested kabuto and a small sashimono on the crab. `CAPTAINS[id].glb` is the Blender model slot.
+- **Villagers** (5 named each + 1 rescued from the zone's dungeon + 3 townsfolk; the caged ones are freed camp by camp):
+  - Akane: Elder Kaede (fox, the elder), Ochiyo (cat, the tea master; caged), Benji (tanuki, the shop; caged), Okami
+    Yae (bear, the inn; caged), Inaho (bunny, Kaede's grandson, a rice farmer); Tobi (dog, Ochiyo's apprentice) is
+    rescued in the Maple Roots.
+  - Shiokaze: Old Captain Kaizo (dog, the elder), Saba (cat, the fishmonger; caged), Funaki (bear, the boatwright;
+    caged), Nami (bunny, the store; caged), Okami Shinju (duck, the inn); Kaito (fox, the deckhand) is rescued in the
+    Tide Caves.
+  - Yukimi: Granny Shirayuki (bunny, the elder), Yuzu (tanuki, the bath-keeper; caged), Tetsu (bear, the smith; caged),
+    Mikan (fox, the shop; caged), Okami Tsubaki (cat, the ryokan); Hokuto (panda, Tetsu's apprentice) is rescued in the
+    Onsen Caverns.
+  - Each elder tells the zone's story (the fallen maple's roots and Danzaburō; the sea caves and Umibōzu; the ice
+    caverns and Yuki-onna). The townsfolk have lines of their own village.
+- **Quests** (6 each, all with objectives in the zone's dungeon: `mapleRoots`, `tideCaves`, `onsenCaverns`; each ends
+  with a talk back to its giver; rewards scale with the zone's level band):
+  - Akane: Under the Red Hills (reach floor 2), The Lost Apprentice (rescue Tobi), Benji's Lucky Charms (3 from floor 1
+    champions), Straw Soldiers (15 Kakashi), Golden Chestnuts (5 from floor 2 chests), The Tanuki Lord (the boss).
+  - Shiokaze: Where the Tide Breathes (floor 2), Man Overboard (rescue Kaito), The Shining Catch (3 Pearl Scales from
+    champions), Sea Glass (5 from floor 2 chests), Crabs Under the Stilts (15 Heike-gani), The Sea Monk (the boss).
+  - Yukimi: The Cold Below (floor 2), The Hiccuping Apprentice (rescue Hokuto), Snow Ore (4 from floor 1 chests), The
+    Mitten Thieves (3 pairs from champions), Too Many Snowmen (12 Yuki-daruma), The Snow Woman (the boss).
+  - Rewards include the zones' furniture (maple wreath, tea set, acorn stool, pumpkin lamp; glass floats, shell lamp,
+    wave rug; cypress bucket, noren, lily tub), pantry goods, materials and, for the boss quests, a unique.
+  - Phase C's dungeons for these zones are still stubs, so these quests' objectives wait on their gates (the provider
+    already answers for them: test-rpg).
+- **The specials** (`talk.js SERVICES`):
+  - **Momiji Tea House**: a tea set eaten on the spot (matcha and strawberry daifuku, sencha and trout, hōjicha and
+    honey castella, genmaicha and pumpkin, gyokuro and melon pan); its Well Fed lasts half as long again. Tea things
+    to take home (the tea set and maple furniture).
+  - **Saba's Fish Market**: fish, seaweed and seafood dishes to buy; the whole catch sold at ×1.3.
+  - **Funaki Boatyard**: commissions (glass floats, shell lamp, wave rug; a sailor's cap, deck boots, an anchor charm),
+    and a row round the headland to the sea cave once phase C's gate exists (`mode.gatePos`).
+  - **Yukimi Bathhouse**: a soak (40 coins) heals fully and leaves **Onsen Glow** for 20 minutes (+12% max life,
+    +2 life/s, +25% frost resist; `rpg/zoneBuffs.js`, on the hero beside the Well Fed meal, with a HUD chip). Bath goods.
+  - **Tetsu's Snow Forge**: forge a rare piece (weapon, hat, outfit, boots or paws; stone, a crystal and coins) or
+    re-fold the weapon in hand (a magic or rare one keeps its base and gets new magic).
+- **The art** (the theme modules; each building has its own siege and saved overlays):
+  - **Akane Hamlet** (`artMaple.js`): red-brown sekishu tiles and smoked-silver ibushi tiles, bengara (red-ochre)
+    lattices, dark cedar and cream plaster.
+    - Elder Kaede's farmhouse has a persimmon curtain on its porch and Inaho's rice rack beside it.
+    - The two-storey Kurikaze Inn has chestnut boards, a chestnut-roasting brazier and sake casks.
+    - Benji's open shopfront has daruma, a charm rack and the tanuki statue.
+    - The Momiji Tea House sits under a cypress-bark roof, with red parasols and a tea garden (stone basin, spout,
+      stepping stones).
+    - Round the square: red-lacquered gates, tile-capped white walls, a roofed well, and rim maples, persimmons and a
+      ginkgo.
+    - Saved: a persimmon drying frame, a full rice rack, a chestnut cart and a harvest offering on the square.
+  - **Shiokaze Port** (`artTidepool.js`): salt-silvered board walls, tarred timber, blue-teal tiles and
+    stone-weighted plank roofs (ishioki-yane).
+    - Captain Kaizo's house has a braced watchtower: telescope, bell and pennant.
+    - The Shinju Inn stands on barnacled stilts over the shallows.
+    - Saba's open fish hall has a carved mackerel on its roof; the catch goes out on ice when saved.
+    - The Funaki Boatyard has a hull on keel blocks under shear legs and a slipway, and its walkway runs on as a
+      walkable pier (`ctx.addDeck`) to Funaki's moored boat.
+    - Round the square: port gates hung with glass floats, rope fences, wind-bent coast pines; the biome's wreck and
+      net rack are kept clear.
+    - Saved: net racks, a catch handcart, crates, buoy planters.
+  - **Yukimi Spa Village** (`artOnsen.js`): snow-blanket roofs with cornices and icicles.
+    - Granny Shirayuki's cottage is gasshō (steep thatch).
+    - Ryokan Tsubaki and Mikan's Warm Goods.
+    - The Yukimi Bathhouse has a karahafu gable, a ゆ noren and a chimney; the springs behind it read as its outdoor
+      baths.
+    - Tetsu's Snow Forge.
+    - Also: an ashiyu foot bath on the square, the snowy gates, steam (the region's `weather.steam()`) and warm pools
+      of lantern light on the snow.
+    - Saved: a festival — a kamakura, snowmen and candle lanterns.
+- **Runtime details added with them**:
+  - A building's siege / saved overlay is built in the building's own frame with its own seed and warp
+    (`village.overlayTpl` / `withOverlays`; a saved village's overlays ride the building's own prop), so a glow or a
+    board a centimetre off a wall stays on it in game exactly as on the test page.
+  - `info.seat[3]` is an optional seat height (a veranda bench).
+  - The captain's dais banners keep off the trail.
+  - Each siege camp is one monster kind and one look, so a camp draws as one batch.
+  - Townsfolk cast no shadow-map shadow.
+  - A recipe's `village.clear` keeps the wild's trees that many metres off the clearing (maple: 4 m).
+  - `village-shots` stubs `combat.hitPlayer` so a tour can't be knocked home.
+- **Perf** (per frame, 1600×900, shadow passes included; REGIONS §4's unit). s23 measures the square just after a fight
+  (camp monsters awake; saved: 8 villagers out); village-shots measures a quiet square.
+
+  | Village | s23 besieged | s23 saved | village-shots besieged | village-shots saved | Triangles |
+  |---|---|---|---|---|---|
+  | Takemori | — | 209 | 197–210 | 178–186 | 3.2–3.8 M |
+  | Akane | 255 | 299 | 204–207 | 177–183 | 2.5–2.8 M |
+  | Shiokaze | 203 | 262 | 187–189 | 157–167 | 1.8–1.9 M |
+  | Yukimi | 305 | 327 | 219–235 | 179–183 | 1.8–2.1 M |
+
+  Every square stays well inside the 450-call budget. The CPU frame stays within the arrival stone's p95 + 4 ms.
+  A round trip leaves no village GPU memory behind; the base trip's own ~0.7 textures a trip is a ROADMAP follow-up.
 
 ## 3. The villagers' quests
 - **4–6 quests per zone village**, from 3–5 named villagers. Each has a short dialogue and a reward: coins, a zone item,
@@ -350,6 +548,216 @@ Travel Map → Zone (outdoor, with elevation) → the besieged village
     - outdoors in the step's zone, `mode.gatePos` (phase C) or `mode.villagePos` (phase D);
     - in the right dungeon, the stairs until the floor, then the boss or `mode.questMark(step)` (phase D);
     - elsewhere, the way out (`mode.exitPos`).
+
+### 8.2 As built: phase C, the zone dungeons, Bamboo first (2026-10-06; ROADMAP Z-C1 to Z-C4; code map: ARCHITECTURE.md "Zone dungeons")
+Built end to end for all four zones: the **Bamboo Depths** first (checkpoint 1), then the **Maple Roots**, the **Tide
+Caves** and the **Onsen Caverns** (checkpoint 2). Every region boss now fights in its dungeon's arena; the outdoor
+clearings hold the gates.
+- **The floors** (`src/dungeon/zoneGen.js`, pure; `gen.js generate` hands over when `plan.layout === 'zone'`, and
+  `floorPlan` adds `{ layout, rooms, size, arenaR: 17, slots: 2, density: [120, 160] }` for `kind: 'zone'`):
+  - **Floor 1** has about 9 organic cave chambers: the arrival; a treasure room (in a dead end, with a gold chest and
+    its champion guards); a buff shrine; **two objective slots**; camps; and the stairs in the chamber farthest away
+    by walking distance.
+  - **Floor 2** has about 8 chambers, then the **arena**. The arena is a clean round room of radius 17 m (34 m across)
+    in a corner, reached by one straight approach corridor. Its mouth is `L.arenaMouth`. Corridors route round the
+    ring, and a wall band seals it, so the approach is the only way in (gen-fuzz checks this). Half the time, floor 2
+    also has a second treasure room. It has no stairs.
+  - **Density**: 120–160 monsters a floor (the generator aims for 130–150). Room packs hold 8–16 monsters, corridor
+    packs 6–10, and no pack is larger than 16. Each pack forms a cluster 4–8 m wide (`spawn.r` 2–4 m).
+  - **Elites stay rare**: each floor has at most 2 champion packs (the treasure guards first) and exactly 1 unique pack
+    (on floor 2, the one at the approach).
+  - **Marks for phase D**: a pack that can carry a quest drop has `spawn.mark = 'champion' | 'unique'`, and the
+    treasure chest has `chest.mark`. A slot is `{ room, x, y, guard }`, where `guard` is its guard pack's index and
+    that pack has `spawn.guard`.
+  - The layout also returns `zone: true`, `slots`, `arena { x, z, r }` (world metres), `arenaMouth` and `packTotal`.
+- **The kit** (`src/dungeon/zoneKits/`; registered by `zoneKit(theme)`). DungeonWorld and RoomDresser call the kit
+  through small hooks, and the Burrow path is unchanged when no kit is set.
+  - A kit supplies:
+    - the floor, arena and wall shaders, and the wall profile;
+    - `dressWalls`, `buildProps`, `buildLights`, `buildCenterpieces`, `buildArena`, `buildLandmarks` and
+      `buildDressing`;
+    - `decoMap`, the room purposes, `arrival`, `hoard` and `corridor`;
+    - `update`, `finish` and `dispose`.
+  - **Shared passes** every kit uses (`zoneKits/common.js`): `addPiece` (bakes a Builder piece into the floor's
+    chunks), `roofShafts` (a few capped shafts through the roof), `wallSpots` (mid-scale dressing spots along the walls
+    and in the corners, off the corridor mouths), `kitDecal`, `inStream`. Each zone's theme is pure data in its own file
+    (`zoneKits/theme<Zone>.js`, merged by `themes.js`).
+  - **The cave feel** (the owner's 2026-10-06 pass, applied to every kit): the wall face swells into an overhanging
+    brow and the rock heaves up behind it into the dark (the walls imply the roof); a dark, cool band along every wall
+    foot (the floor shader's `encl`); a dim, cool base light with warm lantern pools and a few bright shafts from cracks
+    above; 4–6 mid-scale clusters along the walls and in the corners of every chamber, the middle kept clear.
+  - **`bambooCave`** (`zoneKits/bamboo.js`, theme in `zoneKits/themes.js`), the bamboo shrine caves:
+    - **floors and walls**: cool jade cave stone; flagstone runs with moss joints; moss cushions; bamboo-leaf litter;
+      a stream that crosses camp rooms wall to wall, with stepping stones, banks and soft caustics; round stone plazas
+      in the treasure and shrine rooms; bedrock shelves, grit and pebble patches, leaf drifts and small pools along the
+      wall foot. The rock walls show strata, seepage streaks, ledge moss and pale bamboo rhizomes, then swell into a
+      brow with moss tongues and hanging roots under it; above it, dark wet boulders with moss beds only along the brow.
+    - **wall pieces**: culms through the rock (they arc out past the brow), shide ropes, lantern niches, seeps, moss
+      curtains and hanging roots.
+    - **set pieces and props**: young culms leaning out of the brows, rock pillars, a shishi-odoshi spring, a
+      sacred-bamboo island, a hokora with a torii, stone lanterns and goza mats; along the walls and in the corners,
+      root tangles, fallen bamboo, moss boulders, lantern groups and leaf drifts.
+    - **light**: up to 5 shafts a floor (two narrow planes each, a cool pool and a light under them, dust motes),
+      lantern pools on the floor, a dim cool base.
+    - **effects**: bamboo blades drifting down from the cracks, fireflies over the moss, drips, faint stream mist.
+    - **the arena**: a flagstone ring, a moss lawn with a small mitsudomoe stone inlay, 8 stone lanterns round the
+      rim, a torii at the mouth, gohei, an iwakura on the far side, and wind chimes.
+    - **audio**: the `dungeon_bamboo` ambience; music `region_bamboo`, and `boss_bamboo` for the boss.
+    - The kit reuses the bamboo region's builders (`regions/biomes/bambooProps.js`, `bambooFlora.js`) through a
+      Placer.
+  - **The dungeon-only monster: the Iwa-bōzu** (`src/dungeon/zoneMonsters/bamboo.js`, with `bamboo.sfx.js`;
+    registered with the region monsters; `DungeonDef.tank`).
+    - **Look**: a mossy rock monk with a shimenawa belt and shide, in three variants: plain, the Lantern monk and the
+      Elder.
+    - **Behaviour**: it sleeps like a boulder until woken. Close up it slams the ground, with a ring telegraph and a
+      knock-back. From mid range it tucks into a ball and rolls along a lane telegraph, and it is dizzy afterwards (it
+      also stops if it hits a wall).
+    - **Stats**: life ×1.9, def ×1.6, slow (speed ×0.75); fire and frost resist 20, zap −15.
+    - **Model**: 4 parts (body with the eyes and the paper shide, sleeping lids, two arms), so each variant draws 8
+      instanced batches.
+    - About 10% of normal pack members are Iwa-bōzu (about 15 a floor), mixed into the inner part of the fast packs as
+      tanks.
+  - **`mapleHalls`** (`zoneKits/maple.js`, theme in `zoneKits/themeMaple.js`), the **Maple Root Halls** under the
+    great maple of Momiji Hollow:
+    - **floors**: packed umber earth with ochre and rust drifts; root-heaved flagstones; olive moss with glowing fungus
+      pinheads; fallen momiji in patches and drifts; a cool root-water channel; round plazas with a maple-leaf mon in
+      the shrine and treasure rooms.
+    - **walls**: layered clay and earth with roots threading down, a heavy brow with a fringe of hair roots, great roots
+      heaped above it.
+    - **dressing**: great root buttresses (some girdled in shimenawa), root niches with chochin, shelf fungus, jizō
+      alcoves, hanging roots; along the walls, root tangles, fallen branches, leaf drifts, sake-barrel stacks, lantern
+      groups and mushroom clusters.
+    - **rooms**: the hollow-root shrine, the sake cellar, the tanuki den, the root cellar, a lantern walk, the fungus
+      grotto, fallen branches.
+    - **the arena**, Danzaburō's hall: great roots pour over the far rim, root knees and stone lanterns on the near rim,
+      a torii at the mouth, the sake-barrel shrine, a capped amber shaft.
+    - **audio**: the `dungeon_maple` ambience; music `region_maple` / `boss_maple`.
+    - **the dungeon-only monster: the Tesso**, the iron-rat yokai (`zoneMonsters/maple.js`). It burrows and travels as
+      a dirt mound (it can't be hit underground), stops under the hero, a ring telegraph shows, it bursts out with a
+      knock-back and sits dazed; close up it gnaws (a cone telegraph). 4 parts, 3 variants (Tesso, Sutra Tesso, Elder
+      Raigō).
+    - **the boss**: Danzaburō (`regions/bosses/tanuki.js` `ARENA_TUNE`): his gang in three waves (70 / 45 / 20%), drum
+      rings to 14 m, a longer boulder run, the flop clamped inside the ring.
+    - **the gate** (`regions/gates/maple.js`): crossed great roots arching over a dark hollow in an earthen bank, a
+      torii, chochin, jizō; set 1.2 m in from the standard spot (the region's far-rim dressing stands there).
+  - **`seaCave`** (`zoneKits/tidepool.js`, theme in `zoneKits/themeTidepool.js`), the **Tide Sea Caves** under the
+    Shiokaze Tidepools:
+    - **floors**: wet sand with tide ripples and shell grit; basalt shelves with pools in their hollows; hexagonal
+      basalt flags on the trails; wrack banked along the wall foot; glowing tide pools and tide channels (decor b) with
+      barnacled rims, caustics, plankton sparks and little fish; a basalt dais in the shrine rooms.
+    - **walls**: basalt banded by the tide (a black wet foot, barnacles, mussels, pink crust, weed, a pale high-water
+      line), a sea-cut brow hung with kelp, wet boulder tops with glowing algae.
+    - **dressing**: kelp curtains, glass-float niches, nets on the rock, anemone ledges; float lanterns on driftwood
+      posts; along the walls, rock piles, driftwood heaps, net-and-float piles, kelp drifts with a crab, crab burrows.
+    - **rooms**: the Ebisu shrine, the wreck, the net loft, the wedded rocks, the coral garden with a giant clam, the
+      driftwood beach, the crab colony; the treasure chest sunk in a glowing pool.
+    - **the arena**, Umibōzu's cove: **a sea edge** on the far side from the camera (the kit sets `L.arenaSea`,
+      `W.waterAt`, `W.waterLevel`, `W.inSea`, and blocks the sea in `W.walkable`), a sand beach inside a basalt ring, a
+      seigaiha shell mosaic, float lanterns round the beach (`W.arenaLanterns`), a red sea torii and a sea stack in the
+      water, a moonlight shaft.
+    - **audio**: the `dungeon_tidepool` ambience; music `region_tidepool` / `boss_tidepool`.
+    - **the dungeon-only monster: the Sazae-oni**, the turban-shell oni (`zoneMonsters/tidepool.js`). Mid range: it
+      shuts in, bristles, flashes 8 lane telegraphs and fires a star of spines; close up it spins after you (a ring
+      telegraph, a knock-back) and is dizzy afterwards; shut in, it takes half damage. 4 parts, 3 variants (red, Hotaru
+      with glowing spots, Elder).
+    - **the boss**: Umibōzu (`regions/bosses/umibozu.js` `ARENA_TUNE`) rises from the cove's sea and slides ±5.5 m
+      along its shore; adds in three waves from the surf; the phase-2 flood and the wave crests are clipped to the ring
+      (`fx_umibozu.js`).
+    - **the gate** (`regions/gates/tidepool.js`): a sea-cave mouth in the cliff (the region's grotto arch), a rope
+      torii, floats, a tide pool at its foot.
+  - **`iceCavern`** (`zoneKits/onsen.js`, theme in `zoneKits/themeOnsen.js`), the **Onsen Ice Caverns** under Yukimi
+    Onsen:
+    - **floors**: packed snow with wind ripples, frozen slate flags, snow cushions with rime stars, glare-ice patches,
+      snow banked at the wall foot, a melt-water rill; **hot-spring pockets** (steaming teal pools with a warm glow, a
+      ring of thawed wet stone round each); frosted slate plazas.
+    - **walls**: dark slate sheathed in translucent blue ice (cracks, frozen bubbles, frost at the rim), ice flows from
+      the brow, an icicle fringe, snow on the rock above.
+    - **dressing**: ice crystals bursting from the rock, frozen falls, icicle curtains, lantern niches, steaming vents,
+      shide ropes; yukimi lanterns as the room lights; along the walls, ice-crystal clusters, drift heaps, frozen
+      barrels, lantern groups, steaming vents.
+    - **rooms**: a hot-spring pocket (a snow monkey soaking), the old bath corner, a frozen fall, an ice-crystal grove, a
+      lantern walk, a snowed-in shrine, a frozen storeroom.
+    - **the arena**, Yuki-onna's frozen hall: yukimi lanterns round the ring (`W.arenaLanterns`: her whiteout's safe
+      warmth), a snow torii at the mouth, a frozen fall and a shrine on the far side, a frozen-lake floor inlaid with a
+      snowflake. The boss intro's screen pulse is icy (`theme.introPulse`).
+    - **audio**: the `dungeon_onsen` ambience; music `region_onsen` / `boss_onsen`.
+    - **the dungeon-only monster: the Akaname**, the bath-licking imp (`zoneMonsters/onsen.js`). Mid range: it sucks its
+      tongue in (a lane telegraph) and lashes it out up to 6.5 m, slowing you and yanking you into the pack, then pants
+      (the moment to hit it); close up it puffs scalding steam (a ring telegraph, fire, a shove). Warm-blooded among the
+      snow folk; a grabber, not a wall. 4 parts, 3 variants (Akaname, Yuzu Akaname, Elder).
+    - **the boss**: Yuki-onna (`regions/bosses/yukionna.js` `ARENA_TUNE` / `inHall`): her children in two waves, more
+      icicles and glare patches, the mirrors in a wider ring, kept 4.6 m inside the rim, the whiteout round the hall's
+      lanterns.
+    - **the gate** (`regions/gates/onsen.js`): an ice-cave mouth in a snowy bank, icicles, a snow torii, yukimi
+      lanterns, a steaming spring at its foot (softer lantern lights on the snow: `look.lanternI`).
+- **The packs, the pacing and the arena** (`src/dungeon/zoneRun.js`, `DungeonMode.zr`):
+  - **Pack make-up**: each pack has a main kind that rotates through the roster, with 25% of its members from another
+    kind. A floor shows two of each kind's three variants (every variant × part is its own instanced batch), so a zone
+    fight draws about 180 calls (the Burrow's about 140). Champion and unique packs get a leader, and a champion pack has 3 champion members.
+  - **Pacing for fodder** (`DENSITY`):
+    - life ×0.7, damage ×0.85, xp ×0.42;
+    - only 40% of their drops are kept, and coins come in fewer piles worth ×1.5 each;
+    - gems and furniture always drop.
+  - **The arena trigger**: when the hero steps into the ring (within r − 2.2), the lanterns flare, a seal (a curtain
+    and a rope) closes the mouth, and the boss wakes with his intro. The seal opens when he falls.
+  - **After the boss**: a portal labelled "Return to the Whispering Bamboo Grove" takes the hero out to the gate
+    (`G._zoneArrive = { zone, gate: true }`). Floor 2 has no stairs.
+  - **First clear** (`dungeon:cleared` with `first: true`):
+    - a gold chest rises by the boss; it holds the zone boss unique (`ZONE_UNIQUE`; the bamboo one is `tenguGaleFeather`,
+      Master Tengu's Gale Feather, an omamori; tagged `zone`, so it never rolls at random) and a guaranteed rare;
+    - the next zone opens (`zoneUnlockOnClear`);
+    - a "<dungeon> cleared!" banner appears.
+- **The boss, retuned for the arena**: Master Tengu fights in the 17 m arena (`regions/bosses/tengu.js` `ARENA_TUNE`,
+  which applies when `layout.arena.r >= 15`).
+  - **Adds** come in 3 summon waves, at 70%, 42% and 18% life:
+    - 4 karasu-kozo;
+    - 3 karasu-kozo and 2 kamaitachi;
+    - 2 karasu-kozo, 2 kodama and 2 takenoko.
+  - **Open-ground attacks**: one extra tornado, and a wider dive.
+  - His identity, intro, music and victory are unchanged.
+  - The region no longer spawns him: `installGate` filters out the boss spawns and sets `L.boss = null`.
+- **The objectives API (with phase D), as agreed**:
+  - At each floor build, DungeonMode calls `G.story?.dungeonObjectives?.({ dungeon, floor, zone, tier })`. A missing
+    provider counts as `[]`.
+  - `{ kind: 'cage', npc, label }`:
+    - places a locked bamboo cage with the captured villager in an objective slot (a spare spot if the floor has no
+      free slot). The villager is built by `G.zoneNpcBuilder?.(npc)`, or is a kit villager.
+    - F refuses while the slot's guard pack stands. Once the guards are down, F frees the villager and emits
+      `villager:rescued { npc, zone, dungeon, floor, tier }`.
+  - `{ kind: 'drop', item, label, n?, from: 'champion' | 'unique' | 'chest' }`:
+    - the marked pack's leader (or its last member) drops a quest scroll, or the marked chest gives it;
+    - picking it up emits `quest:find { item, n, zone, dungeon, floor, tier }`. Nothing enters the bag.
+  - `mode.questMark(step)` points to:
+    - the cage, for a `rescue` step;
+    - for a `find` step, the dropped item if it is on the ground, else its carrier, else the chest.
+- **The gate** (`src/regions/dungeonGate.js`; `RegionMode` calls `installGate` after the village attaches):
+  - **Looks** live in `src/regions/gates/<zone>.js` (`{ build(ctx) → { lanterns, colliders, mouth }, seal, glb }`);
+    `glb.url` names a Blender gate (ROADMAP Z-D6) that replaces the kit gate's own mass when it loads.
+  - **Where and what**: the old boss clearing at the end of the trail becomes the dungeon's gate: a mossy cave mouth in
+    a rock outcrop, with a torii and lanterns. `mode.gatePos` is the quest pointer's target.
+  - **Sealed** until `villageSaved(zone)`: a curtain hung with ofuda, a "!" mark, and the label "Bamboo Depths: sealed.
+    Save Takemori Village first".
+  - **Unsealing**: the `village:saved { zone }` event unseals the gate live, with a burst and a banner.
+  - **Entering**: "Enter Bamboo Depths" calls `G.enterDungeon({ id: ZONE_DUNGEON[zone], floor: 1 })`.
+  - **Debug**: `?villagesaved=1` (every zone) or `?villagesaved=bamboo,maple` saves villages at boot, and
+    `G.zoneDebug.saveVillage(zone)` saves one and emits the event.
+- **The unlock rule** (`src/rpg/zoneProgress.js`, pure; `regions/index.js regionUnlocked`): a zone opens when either:
+  - the hero reaches its level (as before);
+  - the previous zone's dungeon has been cleared once;
+  - (old saves) the previous zone's region boss was beaten outdoors before the move (`zones[prev].regionBoss > 0`).
+  - Otherwise the reason reads "Reach level N or clear the <dungeon>".
+- **The Travel Map**: a dungeon zone's card shows a 踏破 stamp once its dungeon is cleared, a Dungeon row ("cleared
+  ×N"), and "deep in the dungeon" on the Boss row.
+- **QA**:
+  - **s22-zone-dungeons**: the gate sealed, then unsealed live; both floors; the cage and drop objectives with a fake
+    provider; kill pacing; the arena trigger and seal; the boss kill; the first-clear rewards; the next zone
+    unlocked; the second clear; the unlock rule; and perf on a dense floor.
+  - **gen-fuzz**: zone invariants (density, elites, slots with guards, arena reachable with one way in, the boss at
+    the centre, no pack in the ring).
+  - **test-rpg**: "ZONE DUNGEONS".
+  - **prod-smoke**: the `zone:bambooDepths` case.
+  - **profile-horde**: `WORLDS=zone`.
+  - **s13 and s21**: updated for the boss in the dungeon.
 
 ## 9. Sprint
 - **Hold Shift while moving** (WASD or click-to-move): **+40% speed**, free.

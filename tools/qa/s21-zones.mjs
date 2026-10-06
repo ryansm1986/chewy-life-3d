@@ -4,8 +4,8 @@
 //     Shadow keeps up without teleporting
 //  b) Alt+LMB attacks in place in the Burrow; Shift+LMB and Ctrl+LMB walk; Alt never reaches the browser or sticks;
 //     the loot labels on a held Z
-//  c) DungeonDef: G.enterDungeon(n) and G.enterDungeon({ id, floor }) give the same Burrow; a stub zone dungeon runs
-//     floor 1 → stairs → floor 2 (its boss), no Burrow waypoints / deepest
+//  c) DungeonDef: G.enterDungeon(n) and G.enterDungeon({ id, floor }) give the same Burrow; a zone dungeon (the Bamboo
+//     Depths) runs floor 1 → stairs → floor 2 (its boss), no Burrow waypoints / deepest
 //  d) seeds: a pinned ?dseed gives the old layouts; without it each entry rerolls (state.dungeon.runs)
 //  e) state.zones: an old save's state.regions migrates; the regions view still reads and writes; events carry
 //     { zone, dungeon, floor, tier }; dungeon:cleared on a Burrow boss
@@ -61,7 +61,7 @@ try {
     await openRun(); await ev(() => { window.G.companion.catchUps = 0; window.__maxD = 0; });
     await page.keyboard.down('Shift'); await page.keyboard.down('w');
     const t0 = await ev(() => window.G.engine.time);
-    await page.waitForFunction(t => { const G = window.G, P = G.player, S = G.companion; window.__maxD = Math.max(window.__maxD, Math.hypot(P.pos.x - S.pos.x, P.pos.z - S.pos.z)); return G.engine.time - t > 3.2 || P.anim.speed < 1; }, t0, { timeout: 8000, polling: 'raf' }).catch(() => {});
+    await page.waitForFunction(t => { const G = window.G, P = G.player, S = G.companion; window.__maxD = Math.max(window.__maxD, Math.hypot(P.pos.x - S.pos.x, P.pos.z - S.pos.z)); return G.engine.time - t > 3.2 || (G.engine.time - t > 0.6 && P.anim.speed < 1); }, t0, { timeout: 8000, polling: 'raf' }).catch(() => {});
     await page.keyboard.up('w'); await page.keyboard.up('Shift');
     return ev(t => ({ catchUps: window.G.companion.catchUps, maxD: +window.__maxD.toFixed(2), secs: +(window.G.engine.time - t).toFixed(2) }), t0);
   })();
@@ -223,12 +223,12 @@ try {
   await page.waitForFunction(() => window.G.world.interactables.some(i => /deeper/.test(i.label)), null, { timeout: 5000 }).catch(() => {});
   const bstairs = await ev(() => window.G.world.interactables.some(i => /Burrow deeper \(Floor 6\)/.test(i.label)));
   R.check('…and its stairs down still appear (the Burrow never ends)', bstairs, String(bstairs));
-  // a stub zone dungeon: floor 1 (its own roster on a stand-in kit) → stairs → floor 2 (its boss), no Burrow records
+  // a zone dungeon: floor 1 (its own roster, the bamboo cave kit) → stairs → floor 2 (its boss), no Burrow records
   await ev(() => { const G = window.G; G.state.quests.active = []; G.state.quests.requests.req_s21 = { def: { title: 'S21', giver: 'rosie', desc: '', steps: [{ type: 'kill', n: 2, dungeon: 'bambooDepths', text: 'Defeat 2 yokai in the Bamboo Depths' }, { type: 'dungeonFloor', dungeon: 'bambooDepths', n: 2, text: 'Reach floor 2 of the Bamboo Depths' }, { type: 'boss', dungeon: 'bambooDepths', text: 'Defeat its boss' }], reward: { coins: 1 }, request: true, next: null } }; G.story.start('req_s21', true); });
   await ev(() => { window.__ev.length = 0; window.__deep = window.G.state.dungeon.deepest; window.__wps = window.G.state.dungeon.waypoints.length; });
   await enter({ id: 'bambooDepths', floor: 1 });
-  const z1 = await ev(() => { const G = window.G, D = G.dungeon, q = G.state.quests.active.find(q => q.id === 'req_s21'); return { kind: D.kind, zone: D.zoneId, floor: D.floor, roster: D.theme.monsters, ids: [...new Set(D.monsters.map(m => m.id))], stairs: !!D.stairsPos, wp: !!D.layout.waypoint, deepest: G.state.dungeon.deepest === window.__deep, wps: G.state.dungeon.waypoints.length === window.__wps, best: G.state.zones.bamboo.dungeon.bestFloor, mode: window.__ev.find(e => e[0] === 'mode:changed')?.[1] || null, step: q?.step, prog: q?.prog }; });
-  R.check('a zone dungeon (stub): floor 1 with the zone\'s monsters and stairs, no waypoint, the Burrow\'s deepest untouched, zones.bamboo.dungeon.bestFloor = 1', z1.kind === 'zone' && z1.zone === 'bamboo' && z1.floor === 1 && z1.ids.every(i => z1.roster.includes(i)) && z1.stairs && !z1.wp && z1.deepest && z1.wps && z1.best === 1 && z1.mode?.dungeon === 'bambooDepths' && z1.mode?.zone === 'bamboo', JSON.stringify(z1));
+  const z1 = await ev(() => { const G = window.G, D = G.dungeon, q = G.state.quests.active.find(q => q.id === 'req_s21'); return { kind: D.kind, zone: D.zoneId, floor: D.floor, roster: [...D.theme.monsters, D.def.tank].filter(Boolean), ids: [...new Set(D.monsters.map(m => m.id))], stairs: !!D.stairsPos, wp: !!D.layout.waypoint, deepest: G.state.dungeon.deepest === window.__deep, wps: G.state.dungeon.waypoints.length === window.__wps, best: G.state.zones.bamboo.dungeon.bestFloor, mode: window.__ev.find(e => e[0] === 'mode:changed')?.[1] || null, step: q?.step, prog: q?.prog }; });
+  R.check('a zone dungeon: floor 1 with the zone\'s monsters (and its own dungeon-only one) and stairs, no waypoint, the Burrow\'s deepest untouched, zones.bamboo.dungeon.bestFloor = 1', z1.kind === 'zone' && z1.zone === 'bamboo' && z1.floor === 1 && z1.ids.every(i => z1.roster.includes(i)) && z1.stairs && !z1.wp && z1.deepest && z1.wps && z1.best === 1 && z1.mode?.dungeon === 'bambooDepths' && z1.mode?.zone === 'bamboo', JSON.stringify(z1));
   await killOne(); await killOne(); await sleep(page, 200);
   const zk = await ev(() => { const k = window.__ev.filter(e => e[0] === 'monster:killed').map(e => e[1]); const q = window.G.state.quests.active.find(q => q.id === 'req_s21'); return { k: k.slice(0, 2), step: q?.step, ptr: window.G.questTarget()?.label || null }; });
   R.check('zone kills carry { zone: bamboo, dungeon: bambooDepths, floor: 1 }; the dungeon-filtered kill step completes; the pointer heads for the stairs', zk.k.length === 2 && zk.k.every(e => e.zone === 'bamboo' && e.dungeon === 'bambooDepths' && e.floor === 1) && zk.step === 1 && zk.ptr === 'Stairs down', JSON.stringify(zk));
@@ -239,8 +239,8 @@ try {
   await ev(() => { window.__ev.length = 0; });
   await killOne(true); await page.waitForFunction(() => window.__ev.some(e => e[0] === 'dungeon:cleared'), null, { timeout: 5000 }).catch(() => {});
   await sleep(page, 1800);
-  const zc = await ev(() => { const G = window.G, Z = G.state.zones.bamboo.dungeon; return { clear: window.__ev.find(e => e[0] === 'dungeon:cleared')?.[1] || null, tier: window.__ev.find(e => e[0] === 'tier:unlocked')?.[1] || null, Z: JSON.parse(JSON.stringify(Z)), quest: G.state.quests.active.some(q => q.id === 'req_s21'), stairs: G.world.interactables.some(i => /deeper/.test(i.label)), portal: G.world.interactables.some(i => /Return to Blossom Hollow/.test(i.label)) }; });
-  R.check('its boss: dungeon:cleared { id: bambooDepths, first: true }, tier:unlocked { tier: 1 }, zones.bamboo.dungeon cleared 1 / T1 open; the boss step completes; a portal home and no stairs', zc.clear?.id === 'bambooDepths' && zc.clear.first === true && zc.clear.zone === 'bamboo' && zc.tier?.tier === 1 && zc.Z.cleared === 1 && zc.Z.tier.unlocked === 1 && zc.Z.tier.cleared.includes(0) && !zc.quest && !zc.stairs && zc.portal, JSON.stringify(zc));
+  const zc = await ev(() => { const G = window.G, Z = G.state.zones.bamboo.dungeon; return { clear: window.__ev.find(e => e[0] === 'dungeon:cleared')?.[1] || null, tier: window.__ev.find(e => e[0] === 'tier:unlocked')?.[1] || null, Z: JSON.parse(JSON.stringify(Z)), quest: G.state.quests.active.some(q => q.id === 'req_s21'), stairs: G.world.interactables.some(i => /deeper/.test(i.label)), portal: G.world.interactables.some(i => /Return to the Whispering Bamboo Grove/.test(i.label)) }; });
+  R.check('its boss: dungeon:cleared { id: bambooDepths, first: true }, tier:unlocked { tier: 1 }, zones.bamboo.dungeon cleared 1 / T1 open; the boss step completes; a portal back out to the grove and no stairs', zc.clear?.id === 'bambooDepths' && zc.clear.first === true && zc.clear.zone === 'bamboo' && zc.tier?.tier === 1 && zc.Z.cleared === 1 && zc.Z.tier.unlocked === 1 && zc.Z.tier.cleared.includes(0) && !zc.quest && !zc.stairs && zc.portal, JSON.stringify(zc));
   await ev(() => window.G.returnToVillage()); await waitMode(page, 'village');
   // the pointer from the village: a zone step → the Wayfarer's Post; a Burrow step → the Burrow
   const ptrs = await ev(() => { const G = window.G, S = G.story; return { zone: S.placeFor({ type: 'dungeonFloor', dungeon: 'mapleRoots', n: 2 }, { dungeon: 'mapleRoots', zone: 'maple', floor: 2 })?.label || null, burrow: S.placeFor({ type: 'floor', n: 9 }, { dungeon: 'burrow', floor: 9 })?.label || null }; });
@@ -284,13 +284,23 @@ try {
   await page.waitForFunction(() => window.__ready === true && window.G?.player, null, { timeout: 60000 }); await sleep(page, 400);
   const mig2 = await ev(() => ({ boss: window.G.state.zones.bamboo.regionBoss, onsen: window.G.state.regions.visits.onsen, tide: window.G.state.regions.unlocked.tidepool }));
   R.check('…and it survives a reload', mig2.boss === 2 && mig2.onsen === 3 && mig2.tide === true, JSON.stringify(mig2));
-  // a region boss (today's zone climax): zones[id].regionBoss counts it, dungeon:cleared { id: bamboo, kind: region }
-  await ev(() => { const G = window.G; G.state.flags.burrowTut = true; window.__ev = []; for (const n of ['monster:killed', 'dungeon:cleared']) G.events.on(n, e => window.__ev.push([n, { ...e }])); G.enterRegion('bamboo'); });
-  await waitMode(page, 'dungeon'); await page.waitForFunction(() => !!window.G.dungeon?.boss, null, { timeout: 30000 }); await sleep(page, 400);
-  await killOne(); await killOne(true);
-  await page.waitForFunction(() => window.__ev.some(e => e[0] === 'dungeon:cleared'), null, { timeout: 6000 }).catch(() => {});
-  const rb = await ev(() => ({ kill: window.__ev.find(e => e[0] === 'monster:killed')?.[1] || null, clear: window.__ev.find(e => e[0] === 'dungeon:cleared')?.[1] || null, boss: window.G.state.zones.bamboo.regionBoss, view: window.G.state.regions.cleared.bamboo, dclear: window.G.state.zones.bamboo.dungeon.cleared }));
-  R.check('a region: kills carry { zone: bamboo, dungeon: null, floor: 0 }; its boss bumps zones.bamboo.regionBoss (3) and fires dungeon:cleared { id: bamboo, kind: region }; the zone dungeon record is untouched', rb.kill?.zone === 'bamboo' && rb.kill.dungeon === null && rb.kill.floor === 0 && rb.clear?.id === 'bamboo' && rb.clear.kind === 'region' && rb.boss === 3 && rb.view === 3 && rb.dclear === 0, JSON.stringify(rb));
+  // a region boss still outdoors (a zone whose dungeon has no gate yet: ZONES §8.2 moves them one by one):
+  // zones[id].regionBoss counts it, dungeon:cleared { id, kind: region }. The Bamboo Grove's boss lives in its dungeon now.
+  const rz = await ev(async () => { const { DUNGEONS, ZONE_DUNGEON } = await import('/src/dungeon/defs.js'); return ['bamboo', 'maple', 'tidepool', 'onsen'].find(z => !DUNGEONS[ZONE_DUNGEON[z]]?.gate) || null; });
+  if (rz) {
+    await ev(z => { const G = window.G; G.state.flags.burrowTut = true; G.state.zones[z].unlocked = true; window.__rb0 = G.state.zones[z].regionBoss; window.__ev = []; for (const n of ['monster:killed', 'dungeon:cleared']) G.events.on(n, e => window.__ev.push([n, { ...e }])); G.enterRegion(z); }, rz);
+    await waitMode(page, 'dungeon'); await page.waitForFunction(() => !!window.G.dungeon?.boss, null, { timeout: 30000 }); await sleep(page, 400);
+    await killOne(); await killOne(true);
+    await page.waitForFunction(() => window.__ev.some(e => e[0] === 'dungeon:cleared'), null, { timeout: 6000 }).catch(() => {});
+    const rb = await ev(z => ({ z, kill: window.__ev.find(e => e[0] === 'monster:killed')?.[1] || null, clear: window.__ev.find(e => e[0] === 'dungeon:cleared')?.[1] || null, b0: window.__rb0, boss: window.G.state.zones[z].regionBoss, view: window.G.state.regions.cleared[z], dclear: window.G.state.zones[z].dungeon.cleared }), rz);
+    R.check(`a region with its boss still outdoors (${rz}): kills carry { zone, dungeon: null, floor: 0 }; its boss bumps zones.${rz}.regionBoss and fires dungeon:cleared { id: ${rz}, kind: region }; the zone dungeon record is untouched`, rb.kill?.zone === rz && rb.kill.dungeon === null && rb.kill.floor === 0 && rb.clear?.id === rz && rb.clear.kind === 'region' && rb.boss === rb.b0 + 1 && rb.view === rb.boss && rb.dclear === 0, JSON.stringify(rb));
+    await ev(() => window.G.returnToVillage()); await waitMode(page, 'village');
+  }
+  await ev(() => { const G = window.G; G.state.flags.burrowTut = true; window.__ev = []; for (const n of ['monster:killed']) G.events.on(n, e => window.__ev.push([n, { ...e }])); G.enterRegion('bamboo'); });
+  await waitMode(page, 'dungeon'); await page.waitForFunction(() => window.G.dungeon?.regionId === 'bamboo' && !window.G.ui?.iris?.active, null, { timeout: 30000 }); await sleep(page, 400);
+  await killOne();
+  const rbb = await ev(() => ({ kill: window.__ev.find(e => e[0] === 'monster:killed')?.[1] || null, boss: window.G.dungeon.boss?.id || null, gate: !!window.G.dungeon.gate, regionBoss: window.G.state.zones.bamboo.regionBoss }));
+  R.check('the Bamboo Grove: kills carry { zone: bamboo, dungeon: null, floor: 0 }; no outdoor boss (the trail ends at the dungeon gate); the migrated regionBoss count kept', rbb.kill?.zone === 'bamboo' && rbb.kill.dungeon === null && rbb.kill.floor === 0 && !rbb.boss && rbb.gate && rbb.regionBoss === 2, JSON.stringify(rbb));
   await ev(() => window.G.returnToVillage()); await waitMode(page, 'village');
 
   // all three heroes sprint (Moka, Poe), and Poe's Vanish speed stacks with it

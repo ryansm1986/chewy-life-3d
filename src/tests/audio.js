@@ -8,7 +8,7 @@ const LONG_OK = { player_die: 3.2, ghost_wail: 2.6, howl: 2.6, portal: 2.8, buil
   tengu_storm: 3.4, umi_rise: 2.7, umi_wave: 3.1, umi_tide: 4.1, umi_defeat: 3.7 };
 
 export default function () {
-  document.title = 'Chewy Life 3D — Audio';
+  document.title = 'Pawhaven — Audio';
   const css = document.createElement('style');
   css.textContent = `
     :root { --cream:#fff6e8; --ink:#4a2c2a; --pink:#ff8fb0; --gold:#ffcf4a; --mint:#8fe0c0; --sky:#8fd0ff; }
@@ -38,7 +38,7 @@ export default function () {
 
   Audio.init();
   const status = el('span', { className: 'status', textContent: 'click anywhere to start audio' });
-  main.append(el('h1', { textContent: 'Chewy Life 3D — procedural audio' }, status));
+  main.append(el('h1', { textContent: 'Pawhaven — procedural audio' }, status));
   setInterval(() => { status.textContent = Audio.ready ? 'audio running' : 'click anywhere to start audio'; status.className = 'status' + (Audio.ready ? ' on' : ''); }, 300);
 
   // ---- mixer

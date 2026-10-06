@@ -59,6 +59,16 @@ function pantryGeo(key) {
     const g = merge([pk, win]); g.rotateX(-0.25); return g;
   });
 }
+// a quest item (docs/ZONES.md §8.2 'drop' objectives): a rolled letter tied with a red cord and a gold seal
+function questGeo() {
+  return geo('quest', () => {
+    const roll = new THREE.CylinderGeometry(0.075, 0.075, 0.34, 14); roll.rotateZ(Math.PI / 2); roll.translate(0, 0.12, 0); paint(roll, (p, n, o) => o.set('#fff6e0').multiplyScalar(0.88 + 0.12 * Math.abs(n.y)));
+    const ends = [-1, 1].map(s => { const e = new THREE.CylinderGeometry(0.09, 0.09, 0.03, 14); e.rotateZ(Math.PI / 2); e.translate(s * 0.18, 0.12, 0); return paint(e, (p, n, o) => o.set('#8a5a3a')); });
+    const cord = new THREE.TorusGeometry(0.08, 0.016, 5, 14); cord.rotateY(Math.PI / 2); cord.translate(0, 0.12, 0); paint(cord, (p, n, o) => o.set('#e8403a'));
+    const seal = new THREE.CylinderGeometry(0.04, 0.04, 0.02, 10); seal.rotateX(Math.PI / 2); seal.translate(0, 0.12, 0.085); paint(seal, (p, n, o) => o.set('#ffcf4a'));
+    return merge([roll, ...ends, cord, seal]);
+  });
+}
 function gemGeo() { return geo('gem', () => { const g = new THREE.OctahedronGeometry(0.11, 0); g.scale(1, 1.2, 1); g.translate(0, 0.14, 0); return paint(g, (p, n, o) => o.set('#ffffff').lerp(new THREE.Color('#dddddd'), 0.2)); }); }
 function bundleGeo() {
   return geo('bundle', () => {
@@ -157,6 +167,7 @@ export class GroundLoot {
       if (['rare', 'unique', 'set'].includes(it.rarity)) beam = this.G.vfx.pillar(to, { color, persistent: true, r: 0.28, h: 5, opacity: it.rarity === 'rare' ? 0.35 : 0.6 });
       if (it.rarity === 'unique' || it.rarity === 'set') Events.emit('sfx', 'pickup_rare');
     }
+    else if (d.type === 'quest') { mesh = new THREE.Mesh(questGeo(), makeToon({ vertexColors: true, rim: 0.7, emissive: '#ffe08a', emissiveIntensity: 0.3 })); color = '#ffe070'; label = d.label || 'Quest item'; beam = this.G.vfx.pillar(to, { color, persistent: true, r: 0.32, h: 5, opacity: 0.55 }); Events.emit('sfx', 'pickup_rare'); }
     if (!mesh) return;
     mesh.castShadow = true;
     if (mesh.geometry) { const ol = new THREE.Mesh(mesh.geometry, makeOutline('#3a2230', 0.012)); mesh.add(ol); }
@@ -166,6 +177,7 @@ export class GroundLoot {
     if (label) this.G.ui?.lootLabel?.add?.({ id: e.id, name: label, color, worldPos: to, lift: d.type === 'furniture' ? -0.55 : 0.16, onClick: () => this.tryPickup(e, true) }); // (a find's name sits under it: the piece floats above)
     if (e.beam) e.light = this.world.lightPool.addSource({ pos: to.clone().setY(1), color: new THREE.Color(color), intensity: 3, radius: 3.5 });
     this.list.push(e);
+    if (d.type === 'quest') this.G.dungeon?.zr?.onQuestLoot?.(d, e, false); // (the quest pointer finds it on the ground)
     Events.emit('sfx', 'drop_item', { pos: to });
   }
   tryPickup(e, clicked = false) {
@@ -173,7 +185,7 @@ export class GroundLoot {
     if (!clicked && e.d.type === 'item' && e.d.item.rarity === 'normal' && !G.state.flags?.autoPickNormal) return false;
     if (clicked && dist(P.pos.x, P.pos.z, e.to.x, e.to.z) > 1.8) { P.moveTarget = e.to.clone(); P.pendingLoot = e; return false; }
     const first = e.d.type === 'pantry' ? !(G.state.pantryFound || {})[e.d.key] : e.d.type === 'furniture' ? !(G.state.furnitureFound || {})[e.d.key] && !(G.state.furniture?.[e.d.key] > 0) : false;
-    const ok = e.d.type === 'furniture' ? G.actions.addFurniture?.(e.d.key, e.d.n || 1, { src: 'find' }) > 0 : G.actions.pickup(e.d);
+    const ok = e.d.type === 'furniture' ? G.actions.addFurniture?.(e.d.key, e.d.n || 1, { src: 'find' }) > 0 : e.d.type === 'quest' ? true : G.actions.pickup(e.d); // (a quest item never enters the bag)
     if (!ok) return false;
     this.remove(e);
     const p = e.to.clone().setY(e.to.y + 0.4);
@@ -181,6 +193,12 @@ export class GroundLoot {
     else if (e.d.type === 'potion') { G.vfx.sparkle(p, { n: 5, color: POT_COL[e.d.key] }); Events.emit('sfx', 'pickup_item'); }
     else if (e.d.type === 'material') { G.vfx.sparkle(p, { n: 4, color: MAT_COL[e.d.key] }); Events.emit('sfx', 'pickup_item'); this.tally(e.d.key, e.d.n); }
     else if (e.d.type === 'pantry') { G.vfx.sparkle(p, { n: 8, color: '#bff0a0' }); Events.emit('sfx', 'pickup_magic'); G.ui?.pantryGain?.(e.d.key, e.d.n || 1, { first, worldPos: p }); }
+    else if (e.d.type === 'quest') { // 'quest:find' { item, n, zone, dungeon, floor, tier }: phase D's find steps count it (world/questSteps.js)
+      G.vfx.sparkle(p, { n: 18, color: '#ffe070', r: 0.5, rise: 1.2 }); Events.emit('sfx', 'pickup_unique');
+      G.ui?.toast?.(`Found: ${e.d.label || e.d.item}`, { icon: 'quest', color: '#ffe070' });
+      Events.emit('quest:find', { item: e.d.item, n: e.d.n || 1, ...(e.d.where || {}) });
+      G.dungeon?.zr?.onQuestLoot?.(e.d, e, true);
+    }
     else if (e.d.type === 'furniture') { G.vfx.sparkle(p, { n: 16, color: e.color, r: 0.5, rise: 1.1 }); Events.emit('sfx', first ? 'pickup_unique' : 'pickup_magic'); G.furnitureGain?.(e.d.key, e.d.n || 1, { first, worldPos: p }); Events.emit('furniture:found', { id: e.d.key, first }); }
     else { G.vfx.sparkle(p, { n: 10, color: e.color }); Events.emit('sfx', ['unique', 'set', 'rare'].includes(e.d.item?.rarity) ? 'pickup_rare' : 'pickup_item'); G.ui?.pickupFly?.(e.d.item, p); }
     return true;

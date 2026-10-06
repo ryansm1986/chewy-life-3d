@@ -345,6 +345,12 @@ export const UNIQUES = Object.fromEntries([
   UQ('bellyRubMittens', 'Belly-Rub Mittens', 'mittens', 3, [['lifeRegen', 1, 2], ['lifeMax', 10, 15], ['shadowLife', 15, 20]], 'Irresistible. Scientifically.', { colors: ['#ffbcd6', '#ffffff', '#ff8fb0'] }),
   UQ('ovenMittsOfLegend', 'Oven Mitts of Legend', 'ovenMitts', 14, [['fireDmg', [4, 6], [10, 14]], ['resFire', 25, 35], ['atkSpeed', 10, 10], ['lifeMax', 15, 20]], 'Can hold anything hot. Including grudges.'),
   UQ('kitsunesGrasp', "Kitsune's Grasp", 'kitsuneGauntlets', 53, [['crit', 8, 10], ['critDmg', 30, 50], ['dex', 15, 20], ['treeSkills.fetch', 2, 2]], 'Sly fingers, sly fox.', { w: 0.5 }),
+  // the zone dungeons' boss uniques (docs/ZONES.md §8.2): only from a zone dungeon's first-clear chest (rpg/zoneProgress.js
+  // ZONE_UNIQUE); `zone` keeps them out of the random unique rolls (generateItem)
+  UQ('tenguGaleFeather', "Master Tengu's Gale Feather", 'omamori', 10, [['moveSpeed', 12, 15], ['atkSpeed', 10, 12], ['dex', 6, 8], ['resZap', 15, 20], ['cdr', 5, 6]], 'One feather from the great fan. It still remembers the mountain wind.', { zone: 'bamboo', colors: ['#2a2a46', '#ffcf3a', '#f7efde'] }),
+  UQ('danzaburoLeaf', "Danzaburō's Trick Leaf", 'pawCharm', 18, [['mf', 20, 30], ['gf', 25, 40], ['vit', 10, 14], ['resFire', 15, 20], ['lifeMax', 20, 30]], 'Put it on your head and think very hard about being a teakettle.', { zone: 'maple', colors: ['#5a9a3a', '#c8402e', '#ffe8b0'] }),
+  UQ('umibozuPearl', "Umibōzu's Black Pearl", 'jeweledCollar', 26, [['ene', 14, 18], ['resFrost', 15, 20], ['resZap', 15, 20], ['cdr', 6, 8], ['lifeMax', 30, 45]], 'From his prayer beads. Hold it to your ear: the tide, very far away, snoring.', { zone: 'tidepool', colors: ['#1e2a3a', '#a8f0ff', '#f2f6ff'] }),
+  UQ('yukiOnnaCord', "Yuki-onna's Frost Cord", 'ropeCollar', 34, [['str', 14, 18], ['dex', 14, 18], ['resFrost', 25, 30], ['atkSpeed', 8, 10], ['moveSpeed', 8, 10]], 'Cold to the touch, warm around the neck. She would not say how.', { zone: 'onsen', colors: ['#cfeeff', '#ffffff', '#6a7ac8'] }),
 ].map(u => [u.id, u]));
 export const UNIQUE_IDS = Object.keys(UNIQUES);
 
@@ -533,7 +539,7 @@ export function generateItem(o = {}) {
   let rarity = o.rarity || rollRarity(ilvl, o.mf || 0, rank, rng);
   if (rarity === 'unique' || rarity === 'set') {
     const pool = rarity === 'unique'
-      ? UNIQUE_IDS.map(id => UNIQUES[id]).filter(u => u.lvl <= ilvl + 2)
+      ? UNIQUE_IDS.map(id => UNIQUES[id]).filter(u => u.lvl <= ilvl + 2 && !u.zone) // (a zone boss's unique only drops from its first clear)
       : SET_ITEM_IDS.map(id => SET_ITEMS[id]).filter(s => s.lvl <= ilvl + 2);
     const fit = pool.filter(u => { const b = ITEM_BASES[u.base]; return (!o.base || u.base === o.base) && (!o.slot || b.slot === o.slot) && (!o.wtype || b.wtype === o.wtype); });
     if (fit.length) {

@@ -17,12 +17,11 @@ export class Title {
     const paws = Array.from({ length: 9 }, (_, i) => `<i style="--i:${i};left:${6 + i * 11}%;top:${i % 2 ? 8 : 0}px;transform:rotate(${80 + (i % 2 ? 12 : -12)}deg)">${glyph('paw')}</i>`).join('');
     r.innerHTML = `<div class="ti-vig"></div><div class="ti-petals">${petals}</div>
       <div class="ti-center">
-        <div class="ti-kana"><span>チューイ・ライフ</span></div>
+        <div class="ti-kana"><span>ポーヘイブン</span></div>
         <div class="ti-logo">
           <div class="ti-chewy">${portrait('chewy')}</div>
           <div class="ti-shadow">${portrait('shadow')}</div>
-          <div class="ti-word w1">${word('Chewy', 0)}</div>
-          <div class="ti-word w2">${word('Life', 5)}</div>
+          <div class="ti-word w1">${word('Pawhaven', 0)}</div>
           <div class="ti-spark s1">${glyph('sparkle')}</div><div class="ti-spark s2">${glyph('sparkle')}</div><div class="ti-spark s3">${glyph('sakura')}</div>
         </div>
         <div class="ti-paws">${paws}</div>

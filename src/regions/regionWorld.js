@@ -78,6 +78,9 @@ export class RegionWorld {
     this.flags = { veg: P.get('veg') !== '0', fx: P.get('fx') !== '0', grass: P.get('grass') !== '0' };
     if (this.flags.veg) { try { (def.populate || defaultPopulate)(this.ctx); } catch (e) { console.error('[region] populate failed', e); } }
     tt = mark('populate', tt);
+    // the zone village (src/regions/village, docs/ZONES.md §2): its ground, colliders, nav blockers and greenery, before
+    // the batches and the grass (RegionMode sets layout.hooks; gameplay pieces, so it runs even with ?veg=0)
+    if (layout.hooks?.populate) { try { layout.hooks.populate(this.ctx); } catch (e) { console.error('[region] village populate failed', e); } tt = mark('village', tt); }
     for (const c of this.veg.colliders) c.ref = this.collision.addCircle(c.x, c.z, c.r);
     for (const b of this.veg.batches) b.build(this.veg.group);
     scene.add(this.veg.group);
@@ -229,6 +232,7 @@ export class RegionWorld {
       inStart: (x, z, pad = 0) => Math.hypot(x - P.start.x, z - P.start.z) < P.start.r + pad,
       inCamp: (x, z, pad = 0) => P.camps.some(c => Math.hypot(x - c.x, z - c.z) < c.r + pad),
       inPoi: (x, z, pad = 0) => P.pois.some(c => Math.hypot(x - c.x, z - c.z) < c.r + pad),
+      inVillage: (x, z, pad = 0) => !!P.village && Math.hypot(x - P.village.x, z - P.village.z) < P.village.r + pad,
       onMap: (x, z, pad = 0) => x > pad && z > pad && x < SIZE - pad && z < SIZE - pad,
       isFree: (x, z, r = 0.5, o = {}) => W.isFree(x, z, r, o),
       canPlace: (x, z, r = 0.5, o = {}) => { if (!W.isFree(x, z, r, o)) return false; if (o.reserve !== false) W.reserve(x, z, o.space ?? r); return true; },
@@ -283,6 +287,8 @@ export class RegionWorld {
       if (!o.clearings && (Math.hypot(x - P.arena.x, z - P.arena.z) < P.arena.r + (o.arena ?? 0.5) + r || Math.hypot(x - P.start.x, z - P.start.z) < P.start.r + r ||
         P.camps.some(c => Math.hypot(x - c.x, z - c.z) < c.r + r) || P.pois.some(c => Math.hypot(x - c.x, z - c.z) < c.r + r))) return false;
       if (o.lanes && T.openDist(x, z) < r + (o.lanes === true ? 0 : o.lanes)) return false;
+      // the zone village's clearing (src/regions/village) keeps the wild out, clearings or not; the village's own pieces pass o.village
+      if (!o.village && P.village && Math.hypot(x - P.village.x, z - P.village.z) < P.village.r + r + (r >= 0.6 ? P.village.clear || 0 : 0)) return false; // (clear: a ring the village's land keeps free of the wild's trees)
       if (o.walkable && !this.walkable(x, z)) return false;
     } else if (o.inside) return false;
     if (!o.water && this.waterAt(x, z) > 0.04) return false;
@@ -405,6 +411,7 @@ export class RegionWorld {
   cellToWorld(cx, cy) { const x = (cx + 0.5) * RCELL, z = (cy + 0.5) * RCELL; return V(x, this.heightAt(x, z), z); }
   /** the minimap colour at (x, z) */
   mapColor(x, z) {
+    const hc = this.L.hooks?.mapColor?.(x, z); if (hc) return hc; // (the zone village's roofs and square)
     const T = this.terrain, P = T.palette, W = T.water, d = this.waterAt(x, z);
     if (d > 0.04) return d > 0.6 ? (W?.deep || '#3a8ac8') : (W?.shallow || '#6ad0d8');
     if (T.iceAt?.(x, z)) return '#dcefff';

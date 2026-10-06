@@ -18,6 +18,8 @@ import { ell, cone, shell, EDGE_OUT, INK } from '../../dungeon/monsters.js';
 import { paint, merge, tube, xf, mergeVertices } from '../../gfx/geom.js';
 import { makeToon, makeOutline } from '../../gfx/materials.js';
 import { Events } from '../../core/events.js';
+import { lookIn } from '../../dungeon/horde.js';
+import { teleBatchFor } from '../../gfx/teleBatch.js';
 import { rand, randInt, clamp, TAU, dist, angleDiff, ease } from '../../core/util.js';
 
 // ================================================================================================= KIT: geometry
@@ -215,6 +217,9 @@ export function tele(G, { shape = 'circle', x, z, r = 1, dir = 0, len = 4, arc =
   if (shape === 'circle') { x0 = -r; x1 = r; y0 = -r; y1 = r; nx = ny = Math.max(4, Math.min(14, Math.ceil(r * 2.4))); }
   else if (shape === 'lane') { x0 = -r; x1 = r; y0 = 0; y1 = len; nx = 2; ny = Math.max(2, Math.ceil(len / 0.7)); }
   else { const s = arc < Math.PI / 2 ? Math.sin(arc) * r : r; x0 = -s; x1 = s; y0 = arc < Math.PI / 2 ? 0 : -r; y1 = r; nx = 8; ny = Math.max(4, Math.ceil(r * 1.6)); }
+  // a flat floor (the Burrow, the zone dungeons): every telegraph of the floor in one instanced draw (a dense fight has
+  // dozens in flight); outdoors each one still drapes over the hills as its own mesh
+  if (G.dungeon && !G.dungeon.isRegion) return teleBatchFor(G.vfx, 'kit', TELE_FS).add({ x, z, dir, shape: shape === 'circle' ? 0 : shape === 'lane' ? 1 : 2, r, len, arc, time, color }); // (gfx/teleBatch.js)
   const n = (nx + 1) * (ny + 1), pos = new Float32Array(n * 3), uv = new Float32Array(n * 2), idx = [];
   for (let j = 0, k = 0; j <= ny; j++) for (let i = 0; i <= nx; i++, k++) {
     const lx = x0 + (x1 - x0) * i / nx, ly = y0 + (y1 - y0) * j / ny;
@@ -239,10 +244,11 @@ export function take(G, key, make) {
   const sc = G.world.scene; let P = POOLS.get(sc); if (!P) POOLS.set(sc, P = new Map());
   let arr = P.get(key); if (!arr) P.set(key, arr = []);
   let o = arr.pop();
-  if (!o) { o = make(); o.userData.poolKey = key; o.traverse(c => { c.frustumCulled = false; }); sc.add(o); }
+  if (!o) { o = make(); o.userData.poolKey = key; o.userData.poolScene = sc; o.traverse(c => { c.frustumCulled = false; }); sc.add(o); }
+  lookIn(G.dungeon, o, sc); // (drawn instanced with the monsters when it can be: dungeon/horde.js)
   o.visible = true; return o;
 }
-export function give(o) { if (!o) return; o.visible = false; const P = o.parent && POOLS.get(o.parent); P?.get(o.userData.poolKey)?.push(o); }
+export function give(o) { if (!o) return; o.visible = false; const sc = o.userData.poolScene || o.parent, P = sc && POOLS.get(sc); P?.get(o.userData.poolKey)?.push(o); }
 const ENTS = [];
 function targetsNear(G, Cb, x, z, r) { // player first, then allies; into a reused array
   ENTS.length = 0; const P = G.player;

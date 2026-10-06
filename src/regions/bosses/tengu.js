@@ -6,6 +6,9 @@
 //   TORNADOES       2 (phase 2: 3) leaf-blade whirlwinds wander the arena for a few seconds; contact hurts.
 //   DIVE            he rockets out of frame, a shadow circle tracks you, locks, and he slams down into it.
 //   Crow disciples  at 70% and 30% (plus the grove's kamaitachi / kodama once they exist).
+//   IN HIS HOLLOW   (the Bamboo Depths' round arena, r ≥ 15 m: docs/ZONES.md §8.2) the fight is retuned for the bigger
+//                   ring and a hero fresh from two dense floors: three waves of disciples (70 / 42 / 18%, the later ones
+//                   mixing in the grove's yokai), one more tornado, the dive's shadow a touch wider.
 //   PHASE 2 (< 50%) a bamboo-leaf wind storm: the arena swirls and slowly drifts you; gusts and dives come faster.
 // After every big move he takes a breather (fanning himself, sweat drop): that's the moment to hit him.
 // Exports MONSTERS / BUILD. Sounds in ./tengu.sfx.js (pure data); effects in ./fx_tengu.js.
@@ -227,6 +230,9 @@ const TUNE = {
   drift: 0.95,
   summonAt: [0.7, 0.3],
 };
+// the arena retune (an authored round hollow of r ≥ 15 m instead of the 11 m outdoor clearing)
+const ARENA_TUNE = { summonAt: [0.7, 0.42, 0.18], waves: [['karasuKozo', 'karasuKozo', 'karasuKozo', 'karasuKozo'], ['karasuKozo', 'karasuKozo', 'karasuKozo', 'kamaitachi', 'kamaitachi'], ['karasuKozo', 'karasuKozo', 'kodama', 'kodama', 'takenoko', 'takenoko']], tornExtra: 1, diveR: 0.3 };
+const inHollow = S => (S.arena?.r || 0) >= 15;
 const TELE = TENGU_COL.tele;
 const _dir = new THREE.Vector3(), _v = new THREE.Vector3();
 const P2 = S => (S.p2 ? 1 : 0);
@@ -275,7 +281,8 @@ function introTick(m, dt) {
 function idleTick(m, dt, tgt, d, slowMul) {
   const S = m.tg, frac = m.life / m.lifeMax, C = S.cds;
   if (!S.p2 && frac < 0.5) { startStorm(m); return false; }
-  if (S.summoned < TUNE.summonAt.length && frac < TUNE.summonAt[S.summoned]) { startSummon(m); return false; }
+  const sAt = inHollow(S) ? ARENA_TUNE.summonAt : TUNE.summonAt;
+  if (S.summoned < sAt.length && frac < sAt[S.summoned]) { startSummon(m); return false; }
   S.gcd -= dt;
   if (S.gcd <= 0) {
     const los = m.mode.los(m.pos, tgt.pos);
@@ -355,10 +362,10 @@ function gustRelTick(m, dt) {
 function startTornado(m, tgt) {
   const S = m.tg, T = TUNE.torn, ph = P2(S), p = m.model.pose; set(S, 'tornCast');
   S.cds.torn = T.cd[ph] * rand(0.9, 1.1); S.gcd = rand(0.5, 0.9);
-  const n = T.n[ph], base = Math.atan2(tgt.pos.x - m.pos.x, tgt.pos.z - m.pos.z), A = S.arena, W = m.world;
+  const n = T.n[ph] + (inHollow(S) ? ARENA_TUNE.tornExtra : 0), base = Math.atan2(tgt.pos.x - m.pos.x, tgt.pos.z - m.pos.z), A = S.arena, W = m.world;
   S.spots = [];
   for (let i = 0; i < n; i++) {
-    const off = n === 2 ? (i ? 1 : -1) * 1.0 : (i - 1) * 1.15;
+    const off = n === 2 ? (i ? 1 : -1) * 1.0 : (i - (n - 1) / 2) * 1.15;
     let x = m.pos.x, z = m.pos.z;
     for (let k = 0; k < 6; k++) {
       const a = base + off + (k ? rand(-0.5, 0.5) : 0), r = 2.8 + k * 0.3;
@@ -444,7 +451,7 @@ function diveTick(m, dt, tgtIn) {
       if (S.t >= T.up) {
         set(S, 'diveTrack'); m.model.root.visible = false; m.shadow.visible = false;
         S.shx = tgt.pos.x; S.shz = tgt.pos.z; S.trackDur = S.dives > 1 || S.second ? 1.0 : T.track[ph];
-        S.tele = S.fx.tele({ shape: 'disc', x: S.shx, z: S.shz, r: T.r[ph], time: S.trackDur + T.lock[ph], color: TELE, blob: 0.15, hold: 0.3 });
+        S.tele = S.fx.tele({ shape: 'disc', x: S.shx, z: S.shz, r: T.r[ph] + (inHollow(S) ? ARENA_TUNE.diveR : 0), time: S.trackDur + T.lock[ph], color: TELE, blob: 0.15, hold: 0.3 });
         M.bossTelegraph?.(S.trackDur + T.lock[ph]);
         sfx('tengu_caw', tgt.pos, { vol: 0.6 });
       }
@@ -467,7 +474,7 @@ function diveTick(m, dt, tgtIn) {
         m.shadow.scale.setScalar(0.2 + 0.8 * k);
         S.fx.climbTrail(m.pos.x, m.pos.y + p.direct + 1, m.pos.z);
       }
-      if (S.t >= L) diveImpact(m, T.r[ph]);
+      if (S.t >= L) diveImpact(m, T.r[ph] + (inHollow(S) ? ARENA_TUNE.diveR : 0));
       return false;
     }
     case 'diveLand':
@@ -502,7 +509,7 @@ function startSummon(m) {
   S.summoned++; m.summoned = S.summoned;
   Object.assign(p, { hover: 1.3, hoverRate: 4, wingY: 0.1, wingZ: 0.6, flap: 3.5, flapAmp: 0.4, fanX: -1.0, fanZ: -0.8, head: -0.3, jaw: 0.5 });
   sfx('tengu_caw', m.pos);
-  m.G.ui?.toast?.(S.summoned === 1 ? `${m.name} calls his crow disciples!` : `${m.name} summons the whole grove!`, { color: '#b8a8ff', icon: 'oni' });
+  m.G.ui?.toast?.(S.summoned === 1 ? `${m.name} calls his crow disciples!` : S.summoned === 2 && inHollow(S) ? `${m.name} whistles up the hollow's yokai!` : `${m.name} summons the whole grove!`, { color: '#b8a8ff', icon: 'oni' });
   m.G.engine.rig.shake(0.35);
 }
 function summonTick(m, dt) {
@@ -510,7 +517,8 @@ function summonTick(m, dt) {
   if (S.t > 0.3 && !(S.flag & 1)) { S.flag |= 1; m.model.pose.jaw = 0; }
   if (S.t > 0.6 && !(S.flag & 2)) {
     S.flag |= 2;
-    const ids = S.summoned === 1 ? ['karasuKozo', 'karasuKozo', 'karasuKozo'] : ['karasuKozo', 'karasuKozo', pickId(['kamaitachi', 'kodama'], 'karasuKozo'), pickId(['kodama', 'kamaitachi'], 'karasuKozo')];
+    const ids = inHollow(S) ? (ARENA_TUNE.waves[S.summoned - 1] || ARENA_TUNE.waves[0]).map(id => pickId([id], 'karasuKozo')).filter(Boolean)
+      : S.summoned === 1 ? ['karasuKozo', 'karasuKozo', 'karasuKozo'] : ['karasuKozo', 'karasuKozo', pickId(['kamaitachi', 'kodama'], 'karasuKozo'), pickId(['kodama', 'kamaitachi'], 'karasuKozo')];
     summonAdds(m, ids, m.pos.x, m.pos.z, { r0: 2.8, r1: 4.6, onEach: (a, x, z) => { const y = m.world.heightAt(x, z); S.fx.feathers(x, y + 0.7, z, { n: 12, speed: 3, up: 2.5 }); S.fx.puffs(x, y + 0.2, z, { n: 7, size: 0.5 }); } });
     sfx('tengu_caw', m.pos, { pitch: 1.3 });
   }
@@ -608,6 +616,7 @@ function onDeath(m) {
 
 export const MONSTERS = {
   tenguMaster: {
+    adds: ['karasuKozo', 'kamaitachi', 'kodama', 'takenoko'], // (his waves: dungeon/zoneRun.js warms them with the floor)
     name: 'Master Tengu', build: 'tenguMaster', boss: true, subtitle: 'The mountain wind answers to him!',
     scale: 2.3, radius: 1.0, vr: 1.15, speed: 2.5, life: 1, dmg: 1, move: 'none', attack: { type: 'melee', range: 1.5, cd: 3, windup: 0.6 },
     variants: [{}], material: 'silk',

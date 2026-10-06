@@ -11,6 +11,7 @@ import { Monster } from './monster.js';
 import { MONSTERS } from './monsters.js';
 import { updateMonsters } from './crowd.js';
 import { hordeOf } from './horde.js';
+import { ZoneRun } from './zoneRun.js';
 import { GroundLoot } from '../combat/groundLoot.js';
 import { rollDrops, chestDrops, floorClearDrops } from '../rpg/loot.js';
 import { seedDrops, forageDrops } from '../life/pantry.js';
@@ -43,7 +44,9 @@ export class DungeonMode {
     this.loot = new GroundLoot(G, world);
     this.rng = new RNG(run.packSeed);
     this.flow = new Int16Array(layout.W * layout.H); this.flowT = 0;
+    this.zr = this.kind === 'zone' ? new ZoneRun(this) : null; // (a zone dungeon's packs, objectives, arena and rewards: zoneRun.js)
     this.buildInteractables();
+    this.zr?.build();
     return world;
   }
   get combat() { return this.G.combat; }
@@ -65,7 +68,7 @@ export class DungeonMode {
     const gd = this.theme.grade || {}; // per-biome grade (the Burrow is lifted & neutral so floor 1 isn't murky)
     gr.get('uLift').value.set(...(gd.lift || [0.012, 0.004, 0.02])); gr.get('uGain').value.set(...(gd.gain || [1.05, 1.0, 0.95])); gr.get('uSat').value = gd.sat ?? 1.1;
     gr.get('uVigColor').value.set(0.16, 0.1, 0.16); gr.get('uVignette').value = 1.05;
-    post.bloom.intensity = 1.15; post.bloom.luminanceMaterial.threshold = 0.6;
+    post.bloom.intensity = this.theme.bloom?.intensity ?? 1.15; post.bloom.luminanceMaterial.threshold = this.theme.bloom?.threshold ?? 0.6; // (a zone kit's theme may set its own)
   }
   /** where a kill / boss / clear happened, for the events (monster:killed, boss:dead, dungeon:cleared, mode:changed) */
   where() { return { zone: this.zoneId || null, dungeon: this.def?.id || null, tier: this.tier || 0 }; }
@@ -75,6 +78,7 @@ export class DungeonMode {
   hasDeeper() { return this.kind !== 'region' && this.floor < (this.def?.floors ?? Infinity); }
   spawnPack(sp) {
     sp = packMods(this, sp); // (zone modifiers: count / size / rank — phase E, rpg/zoneMods.js)
+    if (this.zr && !sp.boss) { this.zr.spawnPack(sp); return; } // (a zone dungeon's cluster formations)
     const L = this.layout, G = this.G;
     const lvl = L.mlvl;
     const c = this.world.cellToWorld(sp.x, sp.y);
@@ -108,7 +112,7 @@ export class DungeonMode {
     b.anim.wind = 1; b.anim.lunge = 1;
     G.vfx.ring(b.pos, { color: '#ff6a8a', r0: 0.5, r1: 7, life: 0.9 });
     G.vfx.dustRing(b.pos, 5, 26);
-    rig.shake(0.9); E.post.pulse('#ff9ab0', 0.25); E.post.hitAberration(1);
+    rig.shake(0.9); E.post.pulse(this.theme?.introPulse || '#ff9ab0', this.theme?.introPulseK ?? 0.25); E.post.hitAberration(1); // (a theme may tint it: themes' introPulse)
     Events.emit('sfx', 'boss_roar'); G.audio?.music?.('boss', { fade: 0.5 });
     // short title card kept off Chewy and the boss's face: solve the reveal's two-shot now (where both will stand on
     // screen once the camera has swung over) and slide the card into the emptiest strip of the band between them.
@@ -283,7 +287,8 @@ export class DungeonMode {
     const s = W.cellToWorld(L.start.x, L.start.y);
     const exitPos = this.exitPos = s.clone().add(V(-1.6, 0, -1.6)); // (also the quest pointer's way out: world/story.js)
     this.makePortal(exitPos, '#b89aff');
-    inter.push({ pos: exitPos, radius: 1.2, label: 'Return to Blossom Hollow', onInteract: () => G.returnToVillage() });
+    const ex = this.zr?.exit(); // (a zone dungeon leads back out to its zone, at the gate)
+    inter.push({ pos: exitPos, radius: 1.2, label: ex?.label || 'Return to Blossom Hollow', onInteract: () => (ex ? ex.go() : G.returnToVillage()) });
     // stairs down
     if (L.stairs) {
       const p = W.cellToWorld(L.stairs.x, L.stairs.y);
@@ -298,7 +303,7 @@ export class DungeonMode {
     }
     // chests
     for (const c of L.chests) {
-      const p = W.cellToWorld(c.x, c.y); const chest = this.makeChest(p, c.quality);
+      const p = W.cellToWorld(c.x, c.y); const chest = this.makeChest(p, c.quality); chest.rec = c;
       const it = { pos: p, radius: 1.2, label: c.quality === 'gold' ? 'Open golden chest' : 'Open chest', onInteract: () => { if (chest.opened) return; chest.open(); inter.splice(inter.indexOf(it), 1); } };
       inter.push(it);
       W.collision.addCircle(p.x, p.z, 0.5);
@@ -363,6 +368,7 @@ export class DungeonMode {
       drops.push(...seedDrops(this.layout.mlvl, gold ? 'chest2' : 'chest0')); // (homestead seeds, docs/HOMESTEAD.md)
       if (this.zoneId) drops.push(...forageDrops(this.zoneId, gold ? 'chest2' : 'chest0')); // (and the zone's forage: a region, or its dungeon)
       drops.push(...findDrops(G, this, gold ? 'chest2' : 'chest0')); // (now and then a piece of furniture: docs/HOUSING.md §3)
+      if (this.zr) drops.push(...this.zr.chestDrops(chest), ...this.zr.firstClearDrops(chest)); // (a zone's quest item, the first-clear unique + rare)
       setTimeout(() => this.loot.drop(p.clone().setY(0.5), drops), 250);
     } };
     return chest;
@@ -448,6 +454,7 @@ export class DungeonMode {
     let xp = xpForKill(m.stats.xp, m.level, G.state.player.lvl);
     if (this.combat.buffs.shrineXp) xp = Math.round(xp * 1.5);
     xp = Math.round(xp * (1 + (D.xpBonus || 0) / 100));
+    if (this.zr) xp = Math.max(1, Math.round(xp * this.zr.xpMul(m))); // (a dense zone floor pays less per kill: zoneRun.js DENSITY)
     const isBoss = m === this.boss;
     // the Victory banner goes up before the xp lands, so a level-up from the kill folds into it (no second banner)
     if (isBoss) this.onBossDefeated(m, xp);
@@ -464,6 +471,7 @@ export class DungeonMode {
     drops.push(...seedDrops(m.level, m.rank)); // (homestead seeds, docs/HOMESTEAD.md)
     if (this.zoneId) drops.push(...forageDrops(this.zoneId, m.rank));
     if (!m.bossAdd) drops.push(...findDrops(G, this, isBoss ? 'boss' : m.rank)); // (a rare furniture find: docs/HOUSING.md §3)
+    this.zr?.filterDrops(m, drops); // (thinned for a zone pack's fodder; a marked pack's leader carries a quest item)
     const at = m.pos.clone().setY(0.3);
     if (drops.length && isBoss) setTimeout(() => { if (G.dungeon !== this) return; G.vfx.ring(at, { color: '#ffe070', r0: 0.3, r1: 3.2, life: 0.6 }); G.vfx.sparkle(at.clone().setY(0.8), { n: 30, color: '#fff2a0', r: 1.2, rise: 1.6 }); Events.emit('sfx', 'chest_open'); this.loot.drop(at, drops); }, 1050);
     else if (drops.length) this.loot.drop(at, drops);
@@ -501,6 +509,7 @@ export class DungeonMode {
     this.clearBossFight(b);
     Events.emit('boss:dead', { id: b.id, floor: this.floor, ...this.where() });
     this.clearDungeon(b);
+    this.zr?.onBossDefeated(b, this.lastClear); // (the seal opens; the first clear's chest, banner and the next zone)
     Events.emit('sfx', 'ui_levelup');
     // stairs appear where the boss fell + a return portal
     const p = b.pos.clone();
@@ -513,7 +522,8 @@ export class DungeonMode {
         this.world.interactables.push({ pos: sp, radius: 1.3, label: `${this.kind === 'burrow' ? 'Burrow' : 'Go'} deeper (Floor ${this.floor + 1})`, onInteract: () => G.enterDungeon(this.nextRun()) });
       }
       this.makePortal(pp, '#ffe070');
-      this.world.interactables.push({ pos: pp, radius: 1.2, label: 'Return to Blossom Hollow', onInteract: () => G.returnToVillage() });
+      const ex = this.zr?.exit();
+      this.world.interactables.push({ pos: pp, radius: 1.2, label: ex?.label || 'Return to Blossom Hollow', onInteract: () => (ex ? ex.go() : G.returnToVillage()) });
     }, 1500);
     this.boss = null;
   }
@@ -523,7 +533,7 @@ export class DungeonMode {
   clearDungeon(b) {
     if (this.kind === 'burrow') { Events.emit('dungeon:cleared', { id: 'burrow', kind: 'burrow', tier: 0, floor: this.floor, zone: null, boss: b.id, first: false }); return; }
     if (this.kind !== 'zone' || this.hasDeeper() || !this.zoneId) return;
-    const r = recordDungeonClear(this.G.state, this.zoneId, this.tier || 0), id = this.def.id;
+    const r = this.lastClear = recordDungeonClear(this.G.state, this.zoneId, this.tier || 0), id = this.def.id;
     Events.emit('dungeon:cleared', { id, kind: 'zone', tier: this.tier || 0, floor: this.floor, zone: this.zoneId, boss: b.id, first: r.first });
     if (r.tierUnlocked != null) Events.emit('tier:unlocked', { id, zone: this.zoneId, tier: r.tierUnlocked });
   }
@@ -620,9 +630,12 @@ export class DungeonMode {
     const sd = this.world.floorMesh?.material?.userData?.u?.uSigDim;
     if (sd) { this.sigDimT = Math.max(0, (this.sigDimT || 0) - dt); const want = this.sigDimT > 0 && this.boss?.alive ? 0.3 : this.sigilCalm ? 0.45 : 1; sd.value += (want - sd.value) * Math.min(1, dt * (want < sd.value ? (this.sigilCalm ? 4 : 14) : 3)); }
     this.updateVictoryGrade(dt);
+    this.zr?.update(dt, t);
     this.world.update(dt, t, G.vfx, G.player.pos);
   }
-  dispose() { this.loot.clear(); this.monsters.length = 0; this.G.engine.rig.clearBias?.(); this._horde?.dispose(); }
+  dispose() { this.loot.clear(); this.monsters.length = 0; this.G.engine.rig.clearBias?.(); this._horde?.dispose(); this.zr?.dispose(); if (this.kind !== 'region') this.world.dispose?.(); }
+  /** the quest pointer's mark for a find / rescue step on this floor (world/story.js placeFor; zoneRun.js) */
+  questMark(step) { return this.zr?.questMark(step) ?? null; }
   /** Spawn one monster into this world (registered with the floor and its combat) → the Monster. */
   spawnMonster(id, opts) { const m = new Monster(this, id, opts); this.monsters.push(m); this.combat.add(m); return m; }
   /** Build the cached models (and their instanced batches) of monster kinds this world may field later (summons, waves). */

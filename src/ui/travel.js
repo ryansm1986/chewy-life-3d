@@ -61,7 +61,7 @@ export class TravelPanel extends Panel {
       const cls = ['tv-pin', p.unlocked ? 'open' : 'locked', p.here ? 'here' : '', p.id === this.sel ? 'sel' : '', p.cleared ? 'cleared' : ''].join(' ');
       return `<button class="${cls}" data-id="${p.id}" style="left:${s.x * 100}%;top:${s.y * 100}%;--pc:${p.color}">
         <span class="tv-pin-ic">${glyph(p.unlocked ? s.g : 'lock')}</span><span class="tv-pin-n"><b>${i + 1}</b>${esc(p.short || p.name)}</span>
-        ${p.cleared ? `<span class="tv-stamp">討伐</span>` : ''}${p.here ? `<span class="tv-here">${glyph('paw')}</span>` : ''}</button>`;
+        ${p.cleared ? `<span class="tv-stamp">${p.dungeon ? '踏破' : '討伐'}</span>` : ''}${p.here ? `<span class="tv-here">${glyph('paw')}</span>` : ''}</button>`;
     }).join('');
     const p = L.find(x => x.id === this.sel) || L[0]; if (!p) { this.card.innerHTML = ''; return; }
     const lv = p.levels ? `Lv ${p.levels[0]}–${p.levels[1]}` : 'Home';
@@ -76,7 +76,9 @@ export class TravelPanel extends Panel {
       <div class="tv-rows">
         <div><span>Level</span><b>${lv}</b></div>
         ${p.levels ? `<div class="fit ${fit}"><span>For you (Lv ${hero})</span><b>${fitText}</b></div>` : ''}
-        ${p.boss ? `<div><span>Boss</span><b>${esc(p.boss)}${p.cleared ? ` <em class="tv-beat">defeated ×${p.cleared}</em>` : ''}</b></div>` : ''}
+        ${p.village ? `<div><span>Village</span><b>${esc(p.village.name)} <em class="tv-beat">${p.village.saved ? 'saved ♡' : 'under siege!'}</em></b></div>` : ''}
+        ${p.dungeon ? `<div><span>Dungeon</span><b>${esc(p.dungeon.name)}${p.dungeon.cleared ? ` <em class="tv-beat">cleared ×${p.dungeon.cleared}</em>` : ''}</b></div>` : ''}
+        ${p.boss ? `<div><span>Boss</span><b>${esc(p.dungeon?.boss || p.boss)}${p.dungeon ? ' <em class="tv-beat">deep in the dungeon</em>' : p.cleared ? ` <em class="tv-beat">defeated ×${p.cleared}</em>` : ''}</b></div>` : ''}
         ${p.monsters?.length ? `<div><span>Yokai</span><b>${p.monsters.map(esc).join(', ')}</b></div>` : ''}
         ${p.levels ? `<div><span>Visits</span><b>${p.visits || 0}</b></div>` : ''}
       </div>

@@ -14,7 +14,7 @@
 //                reform a few metres away. Ginkgo and Ember variants.
 // Nothing here allocates per frame in steady state beyond particle spawn records.
 import * as THREE from 'three';
-import { V, col, ell, cone, shell, paint, merge, xf, INK, lathe, cyl, tubeC, eyesCute, cheeks, smile, assemble, act, mdef, every, roll, sfx, playerIn, hitArea, kite, push, tele, take, give, bolt, patch, puff } from './bamboo.js';
+import { V, col, ell, cone, shell, paint, merge, xf, INK, lathe, cyl, tubeC, eyesCute, cheeks, smile, assemble, act, mdef, every, roll, sfx, playerIn, hitArea, kite, push, tele, take, give, bolt, patch, puff, shared } from './bamboo.js';
 import { EDGE_OUT } from '../../dungeon/monsters.js';
 import { mergeVertices, RoundedBox } from '../../gfx/geom.js';
 import { makeToon, makeOutline } from '../../gfx/materials.js';
@@ -356,7 +356,7 @@ function crowFly() {
   if (!CROW) {
     const c = '#2a2c44', hi = '#454a78';
     const wing = s => merge([ell(0.13, 0.018, 0.07, c, [s * 0.12, 0, -0.01], [0, 0, 0], 10), ell(0.07, 0.014, 0.05, hi, [s * 0.2, 0.004, -0.03], [0, s * 0.3, 0], 8)]);
-    CROW = { body: merge(crowParts(c, hi, true)), wl: wing(-1), wr: wing(1),
+    CROW = { body: shared(merge(crowParts(c, hi, true))), wl: shared(wing(-1)), wr: shared(wing(1)),
       mat: makeToon({ vertexColors: true, objectBrush: true, brush: 0.1, rim: 0.7, term: [-0.02, 0.3], fragOut: EDGE_OUT }), ol: makeOutline(INK, 0.018) };
   }
   const g = new THREE.Group(); g.rotation.order = 'YXZ';

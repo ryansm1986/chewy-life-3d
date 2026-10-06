@@ -46,8 +46,11 @@ function makePlan(def) {
   const trail = spline(ctrl, 1.5);
   // camp sites: clearings beside the trail, spaced out, the first stretch left calm; a couple of spares
   const want = (L.camps ?? 7) + 2, camps = [];
+  // the zone village (docs/ZONES.md §2, src/regions/village): a clearing on the trail, { at: [x, z], r } in the recipe
+  // (data, so phase F's terrain rework can move it); camps and POIs keep out of it
+  const village = L.village?.at ? { x: L.village.at[0], z: L.village.at[1], r: L.village.r ?? 14, ...(L.village.shore != null ? { shore: L.village.shore } : {}), ...(L.village.clear ? { clear: L.village.clear } : {}) } : null; // (shore: a raw height below which the flattening fades out: a sea / lake edge stays wet)
   // keep-out discs [[x, z, r]...] where no camp / POI site may land (the biome's landmarks: pools, grottos, gardens)
-  const avoided = c => (L.avoid || []).some(([x, z, r]) => Math.hypot(c.x - x, c.z - z) < r + (c.r || 0));
+  const avoided = c => (L.avoid || []).some(([x, z, r]) => Math.hypot(c.x - x, c.z - z) < r + (c.r || 0)) || (!!village && Math.hypot(c.x - village.x, c.z - village.z) < village.r + (c.r || 0) + 3);
   const campR = L.campR ?? 6.5;
   for (let tries = 0; camps.length < want && tries < 400; tries++) {
     const k = 0.2 + rng.next() * 0.66;
@@ -77,11 +80,11 @@ function makePlan(def) {
     i++;
   }
   const open = (L.open || []).map(([x, z, r]) => ({ x, z, r }));
-  const P = { trail, spurs, camps, pois, start, arena, open, trailW: L.trailW ?? 1.5, lanes: L.lanes ?? 6.5 };
+  const P = { trail, spurs, camps, pois, start, arena, open, village, trailW: L.trailW ?? 1.5, lanes: L.lanes ?? 6.5 };
   // playable skeleton as capsules / discs (the terrain's play mask and the placement keep-outs read this)
   P.segs = [];
   for (const path of [trail, ...spurs]) for (let i = 0; i < path.length - 1; i++) P.segs.push([path[i][0], path[i][1], path[i + 1][0], path[i + 1][1], path === trail ? P.lanes : 3.2]);
-  P.discs = [{ ...start, r: start.r + 2, kind: 'start' }, ...camps.map(c => ({ ...c, r: c.r + 1.5, kind: 'camp' })), ...pois.map(p => ({ ...p, r: p.r + 1.5, kind: 'poi' })), { ...arena, r: arena.r + 3.5, kind: 'arena' }, ...open.map(o => ({ ...o, kind: 'open' }))];
+  P.discs = [{ ...start, r: start.r + 2, kind: 'start' }, ...camps.map(c => ({ ...c, r: c.r + 1.5, kind: 'camp' })), ...pois.map(p => ({ ...p, r: p.r + 1.5, kind: 'poi' })), { ...arena, r: arena.r + 3.5, kind: 'arena' }, ...open.map(o => ({ ...o, kind: 'open' })), ...(village ? [{ ...village, kind: 'village' }] : [])];
   return P;
 }
 
@@ -153,6 +156,7 @@ export function generateRegion(def, { visit = 0, mlvl = def.levels[0] } = {}) {
     floor: 0, theme: def.id, region: def.id, waypoint: null, stairs: null,
     paths: [plan.trail, ...plan.spurs], arena: { x: plan.arena.x, z: plan.arena.z, r: plan.arena.r }, pois,
     camps: sites.map(s => ({ x: s.x, z: s.z, r: s.r })), plan, visit,
+    village: plan.village, // (the zone village's clearing { x, z, r } or null: src/regions/village)
   };
   Object.defineProperty(L, 'terrain', { value: T, enumerable: false }); // (not serialised; RegionWorld reuses it)
   return L;

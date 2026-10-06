@@ -1229,9 +1229,10 @@ export const TRACK_NAMES = Object.keys(TRACKS);
 
 // Which theme plays where. The Burrow's floor theme comes from gen.js THEMES keys (layout.theme).
 export const BIOME_TRACKS = { burrow: 'dungeon', shrine: 'dungeon_shrine', kitchen: 'dungeon_kitchen', crystal: 'dungeon_crystal', moon: 'dungeon_moon',
-  bamboo: 'region_bamboo', maple: 'region_maple', tidepool: 'region_tidepool', onsen: 'region_onsen' }; // + the outdoor regions (layout.theme = region id)
+  bamboo: 'region_bamboo', maple: 'region_maple', tidepool: 'region_tidepool', onsen: 'region_onsen', // + the outdoor regions (layout.theme = region id)
+  bambooCave: 'region_bamboo', mapleHalls: 'region_maple', seaCave: 'region_tidepool', iceCavern: 'region_onsen' }; // + the zone dungeons (their kit's theme key): the zone's own theme underground
 export const BOSS_TRACKS = { burrow: 'boss_burrow', shrine: 'boss', kitchen: 'boss_kitchen', crystal: 'boss', moon: 'boss_moon',
-  bamboo: 'boss_bamboo', maple: 'boss_maple', tidepool: 'boss_tidepool', onsen: 'boss_onsen' };
+  bamboo: 'boss_bamboo', maple: 'boss_maple', tidepool: 'boss_tidepool', onsen: 'boss_onsen', bambooCave: 'boss_bamboo', mapleHalls: 'boss_maple', seaCave: 'boss_tidepool', iceCavern: 'boss_onsen' };
 
 // ------------------------------------------------------------------------------------------ stings
 // One-shot cues on the music bus (so they follow the music volume and sit in the music reverb).

@@ -108,13 +108,15 @@ export function waveRingMesh(B) {
   const m = new THREE.Mesh(g, mat); m.renderOrder = 10; m.visible = false;
   return m;
 }
-/** lay the ring out: centre (cx, cz), radius R, crest height H (m), arc centred on angle a0 (±half), gap at angle ga (half-width gw) */
-export function layoutWave(m, W, cx, cz, R, H, a0, half, ga, gw, kOut) {
+/** lay the ring out: centre (cx, cz), radius R, crest height H (m), arc centred on angle a0 (±half), gap at angle ga (half-width gw);
+ *  clip { x, z, r }: a round room (the Tide Caves' cove) the crest dies against: outside it the crest has no strength */
+export function layoutWave(m, W, cx, cz, R, H, a0, half, ga, gw, kOut, clip = null) {
   const P = m.geometry.attributes.position.array, K = m.geometry.attributes.aK.array;
   for (let i = 0; i <= SEG; i++) {
     const a = a0 - half + (i / SEG) * half * 2, ca = Math.cos(a), sa = Math.sin(a);
     let d = Math.abs(a - ga); d = Math.min(d, TAU - d);
-    const k = gw > 0 ? smooth(gw, gw + 0.12, d) : 1;
+    let k = gw > 0 ? smooth(gw, gw + 0.12, d) : 1;
+    if (clip) k *= 1 - smooth(clip.r - 1.6, clip.r - 0.4, Math.hypot(cx + ca * R - clip.x, cz + sa * R - clip.z));
     if (kOut) kOut[i] = k;
     const gh = W.heightAt(cx + ca * R, cz + sa * R);
     for (let j = 0; j < NP; j++) {
@@ -157,9 +159,11 @@ export function inkPuddleMesh() {
 
 // ================================================================== flood (phase 2) + stand-in sea
 // A plane along the shore: local x across (W m), local z from 4 m seaward (uv.y 0) to D m inland (uv.y = 1).
-const FS_FLOOD = /* glsl */`uniform float uT, uA, uEdge, uSurge, uWarn, uLen; varying vec2 vUv; varying vec3 vW;
+const FS_FLOOD = /* glsl */`uniform float uT, uA, uEdge, uSurge, uWarn, uLen; uniform vec4 uClip; uniform vec2 uTone; varying vec2 vUv; varying vec3 vW;
   void main() {
     float y = vUv.y; if (y > uEdge) discard;
+    float clipK = 1.0; // (a round room: the flood laps against its rock, uClip = centre xz, radius, on)
+    if (uClip.w > 0.5) { float cd = length(vW.xz - uClip.xy); if (cd > uClip.z) discard; clipK = smoothstep(uClip.z, uClip.z - 0.8, cd); }
     float toEdge = (uEdge - y) * uLen;
     vec3 deep = vec3(0.14, 0.58, 0.68), shallow = vec3(0.46, 0.87, 0.85);
     vec3 c = mix(deep, shallow, smoothstep(0.0, 0.9, y));
@@ -175,12 +179,13 @@ const FS_FLOOD = /* glsl */`uniform float uT, uA, uEdge, uSurge, uWarn, uLen; va
     float urg = 0.7 + 0.3 * sin(uT * 18.0);
     c = mix(c, vec3(1.0, 0.95, 0.9), uWarn * hatch * 0.35 * smoothstep(0.15, 0.4, y));
     c = mix(c, vec3(1.0, 0.42, 0.5), uWarn * (1.0 - smoothstep(0.0, 0.5, toEdge)) * urg);
+    c *= mix(uTone.x, 1.0, max(foam * 0.6, uWarn * 0.7)); // (a dim sea cave: the water darker, its foam and the warning as bright)
     float side = smoothstep(0.0, 0.06, min(vUv.x, 1.0 - vUv.x));
-    gl_FragColor = vec4(c, uA * (0.6 + 0.35 * foam + uWarn * 0.1) * side * smoothstep(0.0, 0.12, y));
+    gl_FragColor = vec4(c, uA * (0.6 + 0.35 * foam + uWarn * 0.1) * side * smoothstep(0.0, 0.12, y) * clipK * mix(uTone.y, 1.0, foam));
   }`;
 export function floodMesh(W, D) {
   const mat = new THREE.ShaderMaterial({ vertexShader: VS_UVW, fragmentShader: FS_FLOOD, ...OPT, polygonOffset: true, polygonOffsetFactor: -1,
-    uniforms: { uT: { value: 0 }, uA: { value: 0 }, uEdge: { value: 0 }, uSurge: { value: 0 }, uWarn: { value: 0 }, uLen: { value: D + 4 } } });
+    uniforms: { uT: { value: 0 }, uA: { value: 0 }, uEdge: { value: 0 }, uSurge: { value: 0 }, uWarn: { value: 0 }, uLen: { value: D + 4 }, uClip: { value: new THREE.Vector4(0, 0, 0, 0) }, uTone: { value: new THREE.Vector2(1, 1) } } });
   const m = new THREE.Mesh(stripGeo(W, -4, D), mat); m.renderOrder = 7; m.visible = false;
   return m;
 }

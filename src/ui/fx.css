@@ -198,7 +198,7 @@
 @keyframes tlBob { 0%, 58%, 100% { transform: translateY(0) rotate(0) scale(1); } 68% { transform: translateY(-20px) rotate(-5deg) scale(1.04, .97); } 80% { transform: translateY(3px) rotate(2deg) scale(1.06, .92); } 90% { transform: translateY(-4px) scale(1); } }
 .ti-chewy, .ti-shadow { position: absolute; border-radius: 50%; overflow: hidden; border: 5px solid var(--ink); z-index: 2; }
 .ti-chewy { left: -128px; top: -34px; width: 150px; height: 150px; background: radial-gradient(circle at 50% 30%, #fff, #ffe0ea 60%, #ffc4d6); box-shadow: 0 8px 0 var(--ink); animation: peekIn .8s 1.1s var(--pop) both, float 3.2s ease-in-out 2s infinite; --rot: -12deg; }
-.ti-shadow { right: -104px; bottom: 6px; width: 118px; height: 118px; background: radial-gradient(circle at 50% 30%, #fff, #d6e6ff 60%, #b9d4ff); box-shadow: 0 7px 0 var(--ink); animation: peekIn .8s 1.35s var(--pop) both, float 3.6s ease-in-out 2.4s infinite; --rot: 10deg; }
+.ti-shadow { right: -130px; bottom: 6px; width: 118px; height: 118px; background: radial-gradient(circle at 50% 30%, #fff, #d6e6ff 60%, #b9d4ff); box-shadow: 0 7px 0 var(--ink); animation: peekIn .8s 1.35s var(--pop) both, float 3.6s ease-in-out 2.4s infinite; --rot: 10deg; }
 .ti-chewy .portrait, .ti-shadow .portrait { position: absolute; left: -4%; top: 6%; width: 108%; height: 108%; }
 @keyframes peekIn { from { opacity: 0; transform: scale(.2) rotate(calc(var(--rot) - 40deg)); } to { transform: rotate(var(--rot)); } }
 @keyframes float { 0%, 100% { transform: rotate(var(--rot)) translateY(0); } 50% { transform: rotate(calc(var(--rot) * -.5)) translateY(-10px); } }

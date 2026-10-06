@@ -8,6 +8,12 @@
 //   summons     kurage / kappa from the surf at 72% and 36%
 //   PHASE 2     below 50% the tide rises: the arena rim floods (wading slows you) and surges crash over it; every
 //               attack speeds up, slams come in pairs, rings in twos, more ink.
+//   IN HIS COVE (the Tide Caves' round sea-cave arena, r ≥ 15 m: docs/ZONES.md §8.2) the kit gives the ring a sea on
+//               the far side (layout.arenaSea + world.waterAt: the shore 6.5 m out from the centre); he rises from it,
+//               slides a shorter way along the shore, his wave crests and the flood die against the rock round the
+//               ring, he wakes when the hero steps into the ring (the seal), and the surf brings three waves of friends
+//               (72 / 46 / 20%) for a hero fresh from two dense floors. His identity, intro, music and victory are as
+//               outdoors.
 // Model: a unit-size body (def.scale = S) built from the monster kit; hands + arms are world-space objects owned by
 // the fight (fx_umibozu.js). Sounds: ./umibozu.sfx.js.
 import * as THREE from 'three';
@@ -25,6 +31,10 @@ const BACK = 3.1;           // his centre sits this far out from the shoreline
 const LAT = 7;              // how far he slides along the shore either way
 const FW = 34, FD = 6.5, FX = 3; // flood band: width along the shore, depth inland, extra reach of a surge
 const COL = { slam: '#ff2a48', ink: '#c86aff' };
+// the arena retune (a round sea-cave cove of r ≥ 15 m instead of the 11 m outdoor beach): the slide along the shore, the
+// summon thresholds and the waves of friends (each row: [id, fallback, count] …)
+const ARENA_TUNE = { lat: 5.5, summonAt: [0.72, 0.46, 0.2], waves: [[['kurage', 'wisp', 3]], [['kappa', 'mochi', 2], ['heikegani', 'kappa', 1]], [['kurage', 'wisp', 2], ['kappa', 'mochi', 1], ['sazaeOni', 'heikegani', 1]]] };
+const inHollow = B => (B.arena?.r || 0) >= 15;
 const _v = V(), _w = V(), _x = V(), _y = V();
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
 
@@ -153,8 +163,10 @@ function fakeSea(m) {
   sea.position.set(B.E.x + B.s.x * 0.2, B.E.y + 0.05, B.E.z + B.s.z * 0.2); sea.rotation.y = Math.atan2(B.s.x, B.s.z);
   B.scene.add(sea);
   const cell = L.CELL || 2;
+  const ring = inHollow(B) ? B.arena : null; // (in a dungeon cove only the ring's own cells: never the corridors behind it)
   if (L.grid && L.W) for (let cy = 0; cy < L.H; cy++) for (let cx = 0; cx < L.W; cx++) {
     const x = (cx + 0.5) * cell, z = (cy + 0.5) * cell, dx = x - B.E.x, dz = z - B.E.z;
+    if (ring && Math.hypot(x - ring.x, z - ring.z) > ring.r + 1) continue;
     if (dx * B.s.x + dz * B.s.z > -0.4 && Math.abs(dx * B.tan.x + dz * B.tan.z) < 34) L.grid[cy * L.W + cx] = 0;
   }
   // worlds whose walkable() ignores the grid: a fence of colliders along the waterline
@@ -231,12 +243,14 @@ function update(m, dt) {
   B.lastLife = m.life;
   const act = B.canAct; B.canAct = false;
   // wake up when Chewy steps onto his beach (the Burrow's line-of-sight aggro can't see out of the sea)
-  if (!m.aggro && P && !G.playerDead && Math.hypot(P.pos.x - B.arena.x, P.pos.z - B.arena.z) < B.arena.r + 1.5) m.alert();
+  // (in the cove the arena trigger wakes him as the seal closes: dungeon/zoneRun.js; here the same line, as a backstop)
+  if (!m.aggro && P && !G.playerDead && Math.hypot(P.pos.x - B.arena.x, P.pos.z - B.arena.z) < B.arena.r + (inHollow(B) ? -2.2 : 1.5)) m.alert();
   if (m.aggro && B.state === 'sub') startRise(m);
   // slide along the shore after Chewy, turn to face him (never away from the beach)
   if (m.aggro && P) {
     _v.set(P.pos.x - B.E.x, 0, P.pos.z - B.E.z);
-    B.uGoal = clamp(_v.x * B.tan.x + _v.z * B.tan.z, -LAT, LAT);
+    const lat = inHollow(B) ? ARENA_TUNE.lat : LAT;
+    B.uGoal = clamp(_v.x * B.tan.x + _v.z * B.tan.z, -lat, lat);
     const sp = (B.phase > 1 ? 1.9 : 1.4) * (B.busy ? 0.45 : 1) * (m.status.slow?.t > 0 ? 1 - m.status.slow.amt * 0.5 : 1);
     const du = B.uGoal - B.u; B.u += Math.sign(du) * Math.min(Math.abs(du), sp * dt);
     const want = Math.atan2(P.pos.x - m.pos.x, P.pos.z - m.pos.z), rel = clamp(angleDiff(B.land, want), -0.85, 0.85);
@@ -277,11 +291,12 @@ function update(m, dt) {
   if (m.aggro && B.state !== 'sub' && B.state !== 'rise') {
     const frac = m.life / m.lifeMax;
     if (B.phase === 1 && frac < 0.5 && !B.busy) startTide(m);
-    else if (!B.busy && B.state !== 'tide' && ((frac < 0.72 && B.summoned === 0) || (frac < 0.36 && B.summoned === 1))) callFriends(m);
+    else if (!B.busy && B.state !== 'tide' && B.summoned < sumAt(B).length && frac < sumAt(B)[B.summoned]) callFriends(m);
     else if (act) think(m, dt);
     B.voiceT -= dt; if (B.voiceT < 0 && !B.busy) { B.voiceT = rand(7, 11); sfx('umi_voice', m.pos, { vol: 0.7 }); }
   }
 }
+const sumAt = B => (inHollow(B) ? ARENA_TUNE.summonAt : [0.72, 0.36]);
 function ai(m) { m.B.canAct = true; return false; } // (stunned / feared: the brain waits, running attacks still resolve)
 
 function startRise(m) {
@@ -461,7 +476,7 @@ function ring(m, gapA, n) {
   B.run((dt, t) => {
     R += speed * dt;
     const H = H0 * Math.pow(clamp(1 - (R - R0) / (Rmax - R0 - 5)), 0.55) * Math.min(1, t / 0.2) + 0.06;
-    layoutWave(mesh, W, cx, cz, R, H, a0, half, gapA, gw, kbuf);
+    layoutWave(mesh, W, cx, cz, R, H, a0, half, gapA, gw, kbuf, inHollow(B) ? B.arena : null);
     mesh.material.uniforms.uA.value = clamp((Rmax - R) / 3);
     // crest contact: only while it still stands tall (past ~13 m it's a harmless wash). A roll's i-frames carry you
     // through; a block still counts as the wave passing.
@@ -556,10 +571,14 @@ function callFriends(m) {
   B.summoned++;
   const cx = B.E.x - B.s.x * 3.5 + B.tan.x * B.u, cz = B.E.z - B.s.z * 3.5 + B.tan.z * B.u;
   const jelly = pickId(['kurage'], 'wisp'), kappa = pickId(['kappa'], 'mochi');
-  const adds = B.summoned === 1 ? summonAt(m, jelly, 3, cx, cz, 1.5, 5.5) : [...summonAt(m, kappa, 2, cx, cz, 1.5, 5), ...summonAt(m, jelly, 1, cx, cz, 2, 5)];
+  let adds;
+  if (inHollow(B)) { // the cove: three waves out of the surf, the last one bringing a turban-shell oni
+    adds = [];
+    for (const [id, fb, n] of ARENA_TUNE.waves[B.summoned - 1] || ARENA_TUNE.waves[0]) adds.push(...summonAt(m, pickId([id], fb), n, cx, cz, 1.5, 5.5));
+  } else adds = B.summoned === 1 ? summonAt(m, jelly, 3, cx, cz, 1.5, 5.5) : [...summonAt(m, kappa, 2, cx, cz, 1.5, 5), ...summonAt(m, jelly, 1, cx, cz, 2, 5)];
   for (const a of adds) G.vfx.undamped(() => sp.splash(a.pos, { r: 1.2 }));
   sfx('umi_call', m.pos);
-  G.ui?.toast?.(B.summoned === 1 ? 'Umibōzu calls his jelly friends from the surf!' : 'The kappa come surfing in!', { color: '#7fe6ff', icon: 'oni' });
+  G.ui?.toast?.(B.summoned === 1 ? 'Umibōzu calls his jelly friends from the surf!' : B.summoned === 2 ? 'The kappa come surfing in!' : 'The whole tide pool wakes up!', { color: '#7fe6ff', icon: 'oni' });
   m.emote('!', 1.4);
   B.busy = 1; B.state = 'call'; B.mouthO = 0;
   B.run((dt, t) => { B.mouthO = Math.sin(clamp(t / 0.8) * Math.PI) * 0.8; if (t < 0.9) return true; rest(m, 0.8); return false; });
@@ -570,6 +589,7 @@ function startTide(m) {
   const B = m.B, G = m.G, sp = spellFx(G), fl = B.flood, U = fl.material.uniforms;
   B.phase = 2; m.enraged = true; B.busy = 1; B.state = 'tide';
   fl.visible = true; fl.position.set(B.E.x, B.E.y - 0.2, B.E.z); fl.rotation.y = Math.atan2(-B.s.x, -B.s.z);
+  if (inHollow(B)) { U.uClip.value.set(B.arena.x, B.arena.z, B.arena.r - 0.3, 1); U.uTone.value.set(0.42, 0.78); } // (the flood laps at the cove's rock, dark as the cave)
   fl.renderOrder = 7;
   B.floodK = 0; B.surgeT = 5; B.surgeK = 0; B.warnK = 0;
   sfx('umi_tide', m.pos); G.engine.rig.shake(0.6); G.engine.post.pulse('#bff4ff', 0.18);
@@ -663,6 +683,7 @@ function onDeath(m) {
 // ================================================================== definition
 export const MONSTERS = {
   umibozu: {
+    adds: ['kurage', 'kappa', 'heikegani', 'sazaeOni'], // (his waves from the surf: dungeon/zoneRun.js warms them with the floor)
     name: 'Umibōzu', build: 'umibozu', boss: true, scale: S, radius: 3.2, vr: 3.3, speed: 1.5, life: 0.8, dmg: 1, move: 'none', element: 'frost',
     subtitle: 'The sea itself has come to say hello.',
     stats: { name: 'Umibōzu', life: 1.0, dmg: 1.0, def: 1.1, speed: 1, xp: 1.5, element: 'frost', res: { frost: 50, fire: 20, zap: -20 } },
@@ -670,6 +691,15 @@ export const MONSTERS = {
     attack: { type: 'slam', range: 14, radius: 3, cd: 3, windup: 1.15 }, // (read by generic code paths only; the fight is scripted above)
     variants: [{}],
     ai, update, onSpawn, onDeath,
+    // test hooks (tools/qa/zone-boss-shots.mjs, src/tests/regionBosses.js): force a move right now
+    debug: {
+      slam: m => { const B = m.B; if (!B || B.busy || B.state === 'sub') return; doSlam(m, m.G.player); },
+      wave: m => { const B = m.B; if (!B || B.busy || B.state === 'sub') return; doWaves(m); },
+      ink: m => { const B = m.B; if (!B || B.busy || B.state === 'sub') return; doInk(m, m.G.player); },
+      summon: m => { const B = m.B; if (!B || B.busy || B.state === 'sub') return; callFriends(m); },
+      phase2: m => { const B = m.B; if (!B || B.phase > 1 || B.state === 'sub') return; m.life = Math.min(m.life, m.lifeMax * 0.49); B.busy = 0; startTide(m); },
+      state: m => ({ st: m.B?.state, phase: m.B?.phase, summoned: m.B?.summoned, u: +(m.B?.u || 0).toFixed(2), hasSea: m.B?.hasSea, shoreK: m.B?.shoreK, life: Math.round(m.life), lifeMax: m.lifeMax }),
+    },
   },
 };
 export const _test = { buildUmibozu, arms, S, SUB, placeHands, pose };

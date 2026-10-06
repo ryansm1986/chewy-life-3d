@@ -301,7 +301,144 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
 - **Sprint** (`src/actors/sprint.js`, docs/ZONES.md §9.1): Shift, +40%, `player.sprint` → `speedMul`, `anim.sprint`;
   Shadow paces on `player.anim.speed`; Settings › Sprint (`ui.settings.sprintMode`).
 
+## Zone villages (src/regions/village/, src/actors/zoneVillagers.js, src/world/zoneQuests.js, src/rpg/zoneBuffs.js — design and as-built: docs/ZONES.md §2, §2.1, §2.2)
+- **Data** `village/data.js` (pure): `VILLAGES[zone]` (names, buildings in screen-polar slots `{ a, d }` round the square,
+  camps and their pieces in screen offsets `[u, v, yaw]`, the captain, villagers with Toybox specs, townsfolk seed),
+  `ZONE_NPCS`, `slotAt` / `slotOf` / `screenAt` / `screenYaw`; `WAYSTONE` / `WAYSTONE_TINTS` (the shrine's model slot,
+  ROADMAP Z-D6). The site is the recipe's `layout.village = { at, r, shore? }` → layoutGen `plan.village` (a flattened
+  disc the trail crosses at its level; `shore`: a raw height below which the flattening fades, so a shore village keeps
+  its sea; camps / POIs / the wild keep out). Sites: bamboo (55, 58), maple (78, 79), tidepool (20, 66, shore −0.3),
+  onsen (60, 76).
+- **Runtime** `village/village.js` `ZoneVillage` (one per RegionMode visit): `ZoneVillage.for(mode)` sets
+  `layout.hooks.populate` / `mapColor` before the RegionWorld builds; `populate(ctx)` puts the static buildings into the
+  region's prop chunks (`ctx.prop`, occluders), colliders (circle grids: buildings turn every way) and nav blocks,
+  paints the square and paths, the theme's `decor` (Placer pieces, gates, fences, greenery) and, for a village already
+  saved, its saved dressing (`savedDressing(B)`, baked into the chunks: no extra draw calls); `attach(world)` builds,
+  while besieged only, the siege overlay and the saved overlay (hidden until the celebration) as region-owned
+  meshes (`art.js villageMats / tplGroup`), the cages, lights, villagers, door interactables and `mode.villagePos`;
+  a building's siege / saved overlay is built in the building's own frame, seed and warp (`overlayTpl` /
+  `withOverlays`; a saved village's overlays ride the building's own prop), so a piece a centimetre off a wall stays on
+  it; `start(arrive)` spawns the siege camps (one monster kind and look per camp: one horde batch) and the captain; `update` drives villagers, markers, camp clears, cages,
+  the ward, the boss-slot loan, the gloom and the celebration; `captainDefeated` → `saveVillage` + `village:saved`.
+- **Art**: `village/art.js` (shared: boards, soot, torn / lit lanterns, war banners, spikes, tents, campfires, debris,
+  soft scorch decals, noren, bunting, flower pots, cages, the arena ring, `waystone()` — the one Waypoint Shrine design,
+  tinted per zone — and `captainGearTpl({ banner, mark, place })`, the captains' kabuto / sode / sashimono placed per
+  base body) and one theme module per village, registered in village.js `THEMES`: `artBamboo.js` (the tiered
+  kayabuki `thatch()`; `elder` / `inn` / `shop` / `dojo` / `craft` / `waypoint`), `artMaple.js` (… `teaHouse`),
+  `artTidepool.js` (… `fishmonger` / `boatwright`), `artOnsen.js` (… `bathhouse` / `smith`). Each building builder
+  returns `{ fp, door, keeper, seat, lamps, siege(B), saved(B) }`; a theme also exports `decor`, `savedDecor`, `MAP`
+  (and optionally `gate`, `lanternPost`). Test page `/?test=village&theme=<zone>&state=besieged|saved|plain&focus=i&extras=1`;
+  look review `tools/qa/village-shots.mjs --zone <zone> [--both]`.
+- **Model slots** (ROADMAP Z-D6): `data.js WAYSTONE.glb` puts a Blender shrine at every village's shrine slot
+  (`village.placeShrineGlb`: the kit's footprint, door and rune are kept, its 'tint…' materials take the zone colour);
+  `CAPTAINS[id].glb` puts a Blender body under a captain's model (`dressCaptain`: the kit body hidden, the gear, AI and
+  hitbox kept). Both are null: the kit versions run.
+- **Captains** `village/captains.js`: boss-flagged named variants of a zone monster (`def.captain`, `baseId`), fixed mods,
+  their own AI with two signature moves each — Galeclaw (Kamaitachi: Gale Rush, Sickle Storm), Strawgrin (Kakashi:
+  Murder of Crows, Harvest Scythe), Brineclaw (Heike-gani: Sidelong Rampage, Tidal Slam's ring wave), Frostbelly
+  (Yuki-daruma: Avalanche Roll, Icicle Rain via onsen.js `icicleDrop`); the village wards them (`m.warded`: no aggro, `takeDamage` glances off) until the
+  camps fall, then lends them `mode.boss`; RegionMode.onBossDefeated hands a captain to `village.captainDefeated`.
+- **Villagers** `actors/zoneVillagers.js` `ZoneVillager` (Actor + a Toybox rig): states caged / hidden / scared / life /
+  script, a weighted spot routine routed through the square, seats, greetings; `zoneSpec(id)`, `zoneNpcRig(id)`
+  (`G.zoneNpcBuilder`). Their talk and the buildings' services: `village/talk.js` (`villageTalk`, `buildingAction`,
+  `wakeLines`; `SERVICES` by building kind: shop, inn, dojo, craft (`craftRun`, also the boatyard's commissions),
+  teaHouse (a tea set eaten on the spot: its Well Fed lasts ×1.5), fishmonger (buy; sell the catch ×1.3), boatwright
+  (commissions; a row to the sea cave once phase C's gate exists: `mode.gatePos`), bathhouse (heal + Onsen Glow),
+  smith (forge a rare piece; re-fold the weapon in hand)).
+- **Zone buffs** `rpg/zoneBuffs.js` (pure but for the tick): the bathhouse's Onsen Glow on the hero (`P.soak { left, dur }`,
+  saved with the hero; beside, not instead of, the Well Fed meal): `soakAcc` / `soakPost` in `computeStats`, `tickSoak`
+  in kitchen.update, `soakChip` in game.js syncBuffs.
+- **Quests** `world/zoneQuests.js` (pure): `ZONE_QUESTS`, `QUEST_ITEMS`, `offersFor`, `dungeonObjectives`. story.js reads
+  them through `def()`, names zone villagers (`nameOf`), points at them (`zoneTalkTarget`) and exposes phase C's provider
+  `G.story.dungeonObjectives({ dungeon, floor, zone, tier })` and `zoneOffers(id, zone)`.
+- **Hooks elsewhere**: RegionMode (build / start / update / onBossDefeated / dispose; `campAnchor` keeps the cooking
+  campfire at the Wayfarer's Stone), RegionWorld (`isFree` keep-out, `ctx.inVillage`, the populate and mapColor hooks),
+  regionTerrain (the trail profile through the clearing), game.js (`G.zoneRespawn`: a knock-out wakes at a saved
+  village's inn; `G.registerPortrait`; the Travel Map card's Village row), ui/travel.js.
+- Save: `zones[zone].village`, `siegeCamps [{ id, cleared }]`, `quests.{ freed, rescued, met, shop, ninja, trained, innRest }`,
+  the hero's `player.soak`.
+
+## Zone dungeons (src/dungeon/zoneGen.js, zoneRun.js, zoneKits/, zoneMonsters/, src/regions/dungeonGate.js, src/rpg/zoneProgress.js — design and as-built: docs/ZONES.md §4, §8.2)
+- **Floors** `zoneGen.js` `generateZone({ floor, seed, plan, TH })` (pure; `gen.js generate` delegates for
+  `plan.layout === 'zone'`, from `defs.js floorPlan` on `kind: 'zone'`):
+  - It returns the Burrow layout shape plus `zone: true`, `slots [{ room, x, y, guard }]`, `arena { x, z, r }`
+    (world metres), `arenaMouth { x, z, ux, uz, cx, cy }` and `packTotal`.
+  - Spawns can carry `mark` ('champion' | 'unique': quest-drop carriers) and `guard` (the index of the slot they
+    guard). Chests can carry `mark`.
+  - The arena is the last room (`kind: 'boss'`, `arena: true`). Corridors route round it, so the approach corridor is
+    its only way in.
+- **Kits** `zoneKits/index.js` `zoneKit(theme)` → a kit object (API documented in that file); DungeonWorld sets
+  `this.kit` and asks it at every build step:
+  - shaders: `floorGLSL` / `bossGLSL` / `wallGLSL`;
+  - walls: `profile` / `roles` / `wallH`;
+  - building: `dressWalls`, `buildProps`, `buildLights`, `buildCenterpieces`, `buildArena`, `buildLandmarks`,
+    `buildDressing`, `decoMap`;
+  - every frame: `update`;
+  - lifetime: `init` / `finish` / `dispose`.
+  - RoomDresser asks it for the purposes, `arrival`, `hoard`, `extras` and `corridor`.
+  - `common.js`: `addPiece` (bakes a region Builder piece into the floor's batches, lights and halos), the Placer
+    helpers (`placer` / `finishPlacer` / `disposePlacer`), and the passes every kit shares: `roofShafts` (a few capped
+    light shafts through the roof, `kit.buildShafts`; DungeonWorld.buildShafts defers to it), `wallSpots` (mid-scale
+    dressing spots along the walls and corners), `kitDecal`, `inStream`, `decoAt`.
+  - Themes live in `themes.js` (`ZONE_THEMES`, merged into `gen.js THEMES`), one pure-data file per zone
+    (`themeMaple.js`, `themeTidepool.js`, `themeOnsen.js`; bamboo's inline). Kits: `bamboo.js` (`bambooCave`),
+    `maple.js` (`mapleHalls`), `tidepool.js` (`seaCave`), `onsen.js` (`iceCavern`).
+  - `DungeonWorld.arenaR(b)` gives the arena radius for the floor shader; `DungeonWorld.dispose()` calls the kit's
+    dispose.
+- **The run** `zoneRun.js` `ZoneRun` (`DungeonMode.zr` on zone dungeons; DungeonMode reaches it through small hooks):
+  - **Floor setup** `build()`:
+    - asks `G.story.dungeonObjectives`;
+    - places the cages, and binds the drop objectives to `sp.quest` or `chest.quest`;
+    - warms the boss's adds;
+    - builds the arena seal.
+  - **Packs and loot**:
+    - `spawnPack(sp)`: the formations, champion / unique leaders, fodder pacing (`DENSITY`) and the `def.tank` mix;
+    - `xpMul`, `filterDrops` (thinned fodder drops, the carried quest item), `chestDrops`, `onQuestLoot`.
+  - **Every frame** `update()`: the cages, the seal, and the arena trigger (`enterArena` → seal, lantern flare,
+    `boss.alert()`).
+  - **Objectives** `questMark(step)` (exposed as `DungeonMode.questMark`).
+  - **The boss and the exit**:
+    - `onBossDefeated(b, clear)`: the seal opens; on a first clear, the first-clear chest, the next zone's unlock and
+      the banner;
+    - `firstClearDrops(chest)`: the zone unique + a rare;
+    - `exit()`: the portal's label and destination.
+  - **Quest items** fall as ground loot of type `quest` (`combat/groundLoot.js`): a rolled letter with a seal. Picking
+    one up emits `quest:find` and adds nothing to the bag.
+- **Dungeon-only monsters** `zoneMonsters/<zone>.js` (+ `.sfx.js`): region-monster format (the kit in
+  `regions/monsters/bamboo.js`), registered in `regions/monsters/index.js` and `regions/sfx/index.js`. A DungeonDef
+  names its monster in `tank`.
+- **The gate** `regions/dungeonGate.js`, its looks in `regions/gates/<zone>.js` (`gateLook(zone)`; the format is
+  documented in `gates/bamboo.js`; `look.glb` is the Blender gate's slot):
+  - `installGate(mode)` (RegionMode.build, after the village attaches; `null` for zones without `def.gate`):
+    - drops the region boss spawns;
+    - builds the gate at the old arena's far rim from the zone's look (two Placer groups, the gate's own mass apart so
+      a loaded `look.glb` model can replace it; colliders and nav blocks; all in `world.disposers`);
+    - adds the seal, the interactable and `mode.gatePos`;
+    - listens for `village:saved`.
+  - `G._zoneArrive.gate` puts the hero in front of the gate (RegionMode.start).
+  - `installGateDebug(G, params)`: `G.zoneDebug.saveVillage(zone)` and `?villagesaved=`.
+- **Progression** `rpg/zoneProgress.js` (pure): `ZONE_ORDER`, `nextZone` / `prevZone`, `ZONE_UNIQUE`, `openedByPrev`
+  (used by `regions/index.js regionUnlocked`), `zoneUnlockOnClear`.
+  - Zone boss uniques in `rpg/items.js` carry `zone` and are kept out of the random unique pool.
+  - The Travel Map card gets `{ cleared, dungeon: { name, cleared, boss } }` (game.js `zoneCard`).
+- **Bosses in arenas**: a region boss reads `mode.layout.arena = { x, z, r }`. A kit-built arena sets r = 17, and the
+  boss's own `ARENA_TUNE` applies at r ≥ 15 (tengu.js).
+- **The four kits**: `bambooCave`, `mapleHalls`, `seaCave` (its arena's sea edge: `L.arenaSea`, `W.waterAt` /
+  `waterLevel` / `inSea`, the sea blocked in `W.walkable`, set by the kit's buildArena), `iceCavern`. A boss lists its
+  adds and copies in `def.adds` (zoneRun warms them with floor 2); a theme may tint the boss intro's screen pulse
+  (`introPulse`, `introPulseK`); a gate look may set `sealLight`, `sealLightI`, `lanternI`.
+- **Audio**: `audio/ambience.js` `BIOME_AMBIENCES[theme]`, `audio/music.js` `BIOME_TRACKS` / `BOSS_TRACKS[theme]`. The cave ambiences: `dungeon_bamboo`, `dungeon_maple`, `dungeon_tidepool`, `dungeon_onsen`.
+- **QA**: s22 (the whole loop), gen-fuzz (the zone invariants), test-rpg "ZONE DUNGEONS", prod-smoke
+  `zone:bambooDepths`, `profile-horde WORLDS=zone`.
+  - Look tools: `tools/qa/zone-shots.mjs` (a game-camera tour of a zone floor: rooms, arena, stairs, treasure, slots,
+    streams), and `/?test=regionMonsters&id=iwabozu` (the monster sheet).
+
 ## Hordes: big fights (src/dungeon/horde.js, crowd.js, src/combat/grid.js, src/gfx/spriteBatch.js — ZONES.md §7, ROADMAP Z-B)
+- **Pooled effect looks and telegraphs** (2026-10-06): `lookIn(mode, root, scene)` (horde.js) draws a pooled effect
+  look (a projectile, a crow, a snowball, an icicle: cached geometry, toon / ink materials) instanced with the monsters;
+  the region kit's `take()` and the frost effects' pool call it. On flat floors every ground telegraph of a look (the
+  region kit's `tele()`, the frost effects' `tele()`) draws in one instanced call (`gfx/teleBatch.js`); outdoors they
+  still drape over the hills as meshes.
 - **Model cache** (monsters.js `buildMonster`): a Burrow rigid model's merged geometry is built once per kind × variant
   (dust bunnies: 3 random fluff layouts per variant) and region `assemble()` parts are shared, never cloned
   (`geometry.userData.shared`: `Monster.dispose` leaves it; the floor teardown frees the GPU copy, the next floor
@@ -503,7 +640,8 @@ Charge: `charge:start {id,slot}`, `charge:stage {id,stage}`, `charge:release {id
 `charge:cancel {id,reason}`, `perk:learned {id,perk,rank}`.
 Zones: `monster:killed {id,rank,floor,zone,dungeon,tier}`, `boss:dead {id,floor,zone,dungeon,tier}`, `mode:changed` (+ zone,
 dungeon, tier), `dungeon:cleared {id,kind,tier,floor,zone,boss,first}`, `tier:unlocked {id,zone,tier}`, `region:cleared {id,times}`;
-listened for, emitted from phase D: `village:saved {zone}`, `quest:find {item,n,...}`, `villager:rescued {npc,...}`.
+phase D emits `village:saved {zone, village}` (with the "…is saved!" banner), `villager:rescued {npc, zone, dungeon: null}` (a siege cage) and
+`village:campCleared {zone, camp, left}`; phase C emits `quest:find {item,n,...}` and `villager:rescued {npc, zone, dungeon, floor}` (a dungeon cage).
 
 ## UI (src/ui/) — HTML/CSS overlay above the canvas (`#ui`), lots of spring/bounce animations
 `UI.init(G)`, `UI.update(dt)`, `UI.toggle(name)` / `open` / `close` / `isOpen` / `anyModal()` for

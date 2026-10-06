@@ -1,8 +1,11 @@
 // Scenario 13: outdoor regions (docs/REGIONS.md).
 //  a) the Wayfarer's Post + Travel Map in the village; unlock rules
-//  b) travelling to a region: world contract, camps, boss, hero on walkable ground
+//  b) travelling to a region: world contract, camps, hero on walkable ground; the Bamboo trail ends at its dungeon gate
+//     (the region boss moved into the zone dungeon: docs/ZONES.md §8.2; the other three keep theirs outdoors until
+//     their dungeons are built)
 //  c) fighting there: kills, loot, terrain-aware monsters (pos.y = ground)
-//  d) the boss: victory, region cleared, the next region unlocked, a portal home
+//  d) the boss, in the Bamboo Depths' arena now: victory, the dungeon's first clear opens the next region, a portal back
+//     out to the grove (s22 covers the gate / floors / rewards in depth)
 //  e) the Wayfarer's Stone: region → region travel
 //  f) every region builds and runs a few seconds with no errors
 //  g) home again: arrival by the post, the village mood restored; save / reload keeps state.regions
@@ -35,9 +38,9 @@ try {
   const b = await page.evaluate(() => {
     const G = window.G, W = G.world, D = G.dungeon, P = G.player;
     const contract = ['scene', 'lightPool', 'collision', 'interactables', 'L', 'terrain'].every(k => W[k]) && ['heightAt', 'walkable', 'cellToWorld', 'updateSun', 'update', 'applyMood', 'dispose'].every(k => typeof W[k] === 'function');
-    return { contract, region: D.isRegion, monsters: D.monsters.length, boss: D.boss?.id, bossAlive: !!D.boss?.alive, walk: W.walkable(P.pos.x, P.pos.z), stone: W.interactables.some(i => /Wayfarer/.test(i.label)), visits: G.state.regions.visits.bamboo };
+    return { contract, region: D.isRegion, monsters: D.monsters.length, boss: D.boss?.id || null, gate: !!D.gate, sealed: !!D.gate?.sealed, walk: W.walkable(P.pos.x, P.pos.z), stone: W.interactables.some(i => /Wayfarer/.test(i.label)), visits: G.state.regions.visits.bamboo };
   });
-  R.check('travel lands in the region: world contract, camps, a boss, the hero on walkable ground, the Wayfarer\'s Stone', b.contract && b.region && b.monsters >= 12 && b.bossAlive && b.walk && b.stone && b.visits === 1, JSON.stringify(b));
+  R.check('travel lands in the region: world contract, camps, the hero on walkable ground, the Wayfarer\'s Stone; no outdoor boss: the trail ends at the sealed Bamboo Depths gate', b.contract && b.region && b.monsters >= 12 && !b.boss && b.gate && b.sealed && b.walk && b.stone && b.visits === 1, JSON.stringify(b));
 
   // c) a fight: terrain-aware monsters, kills and loot
   const c = await page.evaluate(async () => {
@@ -51,15 +54,21 @@ try {
   });
   R.check('region monsters stand on the terrain; kills work and drop loot', c.ground && c.killed === c.want && c.loot > 0, JSON.stringify(c));
 
-  // d) the boss
+  // d) the boss, in the dungeon now: unseal the gate (the debug path stands in for phase D's village rescue), floor 2's
+  // arena, Master Tengu down → the first clear opens Momiji Hollow; the portal leads back out to the grove
+  await page.evaluate(() => { const G = window.G; G.zoneDebug.saveVillage('bamboo'); G.enterDungeon({ id: 'bambooDepths', floor: 2 }); });
+  await page.waitForFunction(() => window.G?.dungeon?.kind === 'zone' && window.G.dungeon.floor === 2 && window.G.dungeon.boss && !window.G.ui?.iris?.active, null, { timeout: 40000 });
   const d = await page.evaluate(async () => {
     const G = window.G, D = G.dungeon, b = D.boss, A = D.layout.arena;
+    const mapleBefore = G.travel.list().find(p => p.id === 'maple').unlocked;
     G.player.setPos(A.x, A.z + Math.min(8, A.r)); await new Promise(r => setTimeout(r, 1500)); // intro
     G.combat.hitMonster(b, { dmgPct: 1e7 }); await new Promise(r => setTimeout(r, 2600));
-    const R = G.state.regions;
-    return { dead: !b.alive, cleared: R.cleared.bamboo, mapleOpen: G.travel.list().find(p => p.id === 'maple').unlocked, portal: G.world.interactables.filter(i => /Wayfarer|Blossom/.test(i.label)).length, stairs: G.world.interactables.some(i => /Burrow deeper/.test(i.label)) };
+    const Z = G.state.zones.bamboo;
+    return { dead: !b.alive, cleared: Z.dungeon.cleared, mapleBefore, mapleOpen: G.travel.list().find(p => p.id === 'maple').unlocked, portal: G.world.interactables.find(i => /Return to/.test(i.label))?.label || null, stairs: G.world.interactables.some(i => /deeper/.test(i.label)) };
   });
-  R.check('beating the boss clears the region, opens Momiji Hollow, leaves a portal (no Burrow stairs)', d.dead && d.cleared === 1 && d.mapleOpen && d.portal >= 2 && !d.stairs, JSON.stringify(d));
+  R.check('Master Tengu, in the Bamboo Depths\' arena: his fall clears the dungeon, opens Momiji Hollow, leaves a portal back to the grove (no stairs)', d.dead && d.cleared === 1 && !d.mapleBefore && d.mapleOpen && /Bamboo Grove/.test(d.portal || '') && !d.stairs, JSON.stringify(d));
+  await page.evaluate(() => window.G.world.interactables.find(i => /Return to/.test(i.label)).onInteract());
+  await inRegion('bamboo');
 
   // e) region → region via the Wayfarer's Stone
   await page.evaluate(() => { const G = window.G, it = G.world.interactables.find(i => /Wayfarer/.test(i.label)); it.onInteract(); });
@@ -89,8 +98,8 @@ try {
   });
   await page.evaluate(() => window.G.save());
   await boot(page, 'notitle');
-  const g2 = await page.evaluate(() => ({ R: window.G.state.regions, maple: window.G.travel.list().find(p => p.id === 'maple').unlocked }));
-  R.check('home again: you arrive by the Wayfarer\'s Post; state.regions survives a reload', g.nearPost && !g.dungeon && g2.R?.cleared?.bamboo === 1 && g2.maple, JSON.stringify({ g, R: g2.R }));
+  const g2 = await page.evaluate(() => ({ R: window.G.state.regions, Z: window.G.state.zones?.bamboo?.dungeon, maple: window.G.travel.list().find(p => p.id === 'maple').unlocked }));
+  R.check('home again: you arrive by the Wayfarer\'s Post; state.regions and the dungeon clear survive a reload (Momiji Hollow stays open)', g.nearPost && !g.dungeon && g2.R?.visits?.bamboo >= 1 && g2.Z?.cleared === 1 && g2.maple, JSON.stringify({ g, R: g2.R, Z: g2.Z }));
 
   // h) round trips don't leak
   await page.evaluate(() => { const G = window.G; G.state.player.lvl = 6; Object.defineProperty(G.sim.stats, 'population', { get: () => 0, set() {}, configurable: true }); });

@@ -1137,7 +1137,7 @@ hr('ZONES: DUNGEON DEFS, SEEDS, STATE, QUEST STEPS');
   ok(Object.keys(D.ZONE_DUNGEON).join() === REGION_IDS.join() && Object.values(D.ZONE_DUNGEON).join() === 'bambooDepths,mapleRoots,tideCaves,onsenCaverns', 'defs: one zone dungeon per zone (bambooDepths, mapleRoots, tideCaves, onsenCaverns)');
   for (const id of Object.values(D.ZONE_DUNGEON)) {
     const d = D.DUNGEONS[id], R = REGIONS[d.zone];
-    ok(d.kind === 'zone' && d.floors === 2 && d.stub && !d.waypoints && Gn.THEMES[d.theme] && d.monsters.join() === R.monsters.join() && d.boss === R.boss && d.levels.join() === R.levels.join(), `defs: ${id} is a 2-floor stub with ${d.zone}'s monsters, boss and level band`);
+    ok(d.kind === 'zone' && d.floors === 2 && (d.stub || d.gate) && !d.waypoints && Gn.THEMES[d.theme] && d.monsters.join() === R.monsters.join() && d.boss === R.boss && d.levels.join() === R.levels.join(), `defs: ${id} is a 2-floor zone dungeon (${d.gate ? 'built, gated' : 'stub'}) with ${d.zone}'s monsters, boss and level band`);
     const p1 = D.floorPlan(d, 1, { heroLvl: 1 }), p2 = D.floorPlan(d, 2, { heroLvl: 99 }), pt = D.floorPlan(d, 2, { heroLvl: 99, tier: 5 });
     ok(!p1.boss && p2.boss === d.boss && !p1.waypoint && p1.mlvl === d.levels[0] && p2.mlvl === d.levels[1] + 1 && pt.mlvl === Math.min(60, d.levels[1] + 1 + 20), `defs: ${id} floor 1 has no boss, floor 2 has it; levels from its band, +1 a floor, +4 a tier (cap 60)`);
     let bad = 0;
@@ -1284,6 +1284,134 @@ hr('HORDES: SAFE RIG CLONE (Poe smoke copies; ARCHITECTURE "Hordes")');
   ok(cSkin.skeleton !== B.root.getObjectByName('body_skin').skeleton && cSkin.skeleton.bones.every(b => C.getObjectById(b.id) === b), 'safe clone: the copy\'s skeleton is its own, bound to its own bones');
   const D = new THREE.Group(); D.add(new THREE.Mesh()); D.userData.n = 3; const E = cloneSkinnedSafe(D);
   ok(E !== D && E.userData.n === 3 && E.children.length === 1, 'safe clone: a tree without three objects in userData clones as before');
+}
+
+// ------------------------------------------------------------------ zone villages (docs/ZONES.md §2–§3; ROADMAP Z-D1 to Z-D5)
+hr('ZONE VILLAGES: DATA, QUESTS, THE DUNGEON PROVIDER');
+{
+  const VD = await import('../src/regions/village/data.js'), ZQ = await import('../src/world/zoneQuests.js'), Q = await import('../src/world/questSteps.js'), Z = await import('../src/rpg/zones.js');
+  const { FURNITURE } = await import('../src/home/furniture.js'), { PANTRY } = await import('../src/life/pantry.js'), { DUNGEONS, ZONE_DUNGEON } = await import('../src/dungeon/defs.js');
+  // ---- the villages' data
+  ok(['bamboo', 'maple', 'tidepool', 'onsen'].every(z => VD.VILLAGES[z]?.name && VD.VILLAGES[z].jp && VD.VILLAGES[z].zone === z), 'villages: every zone has a named village (names in data)');
+  ok(VD.VILLAGES.bamboo.name === 'Takemori Village' && VD.VILLAGES.maple.name === 'Akane Hamlet' && VD.VILLAGES.tidepool.name === 'Shiokaze Port' && VD.VILLAGES.onsen.name === 'Yukimi Spa Village', 'villages: the director\'s default names');
+  const TK = VD.VILLAGES.bamboo, kinds = TK.buildings.map(b => b.kind);
+  ok(TK.ready && TK.buildings.length >= 5 && TK.buildings.length <= 7 && VD.STANDARD.every(k => kinds.includes(k)) && kinds.includes('dojo') && kinds.includes('craft'), 'villages: Takemori has 5–7 buildings — the 4 standard ones, the Ninja Dojo and the Bamboo Craftshop');
+  ok(TK.buildings.filter(b => b.kind !== 'waypoint').every(b => Math.abs(b.a) <= 85), 'villages: the tall buildings stand on the far side of the square (|a| ≤ 85°: the camera side stays low)');
+  const named = TK.villagers.filter(v => !v.rescue);
+  ok(named.length >= 3 && named.length <= 5 && TK.villagers.every(v => v.id && v.name && v.spec?.species && v.role), 'villages: 3–5 named villagers (each with an id, a name, a species and a role), plus one rescued from the dungeon');
+  ok(TK.camps.length >= 2 && TK.camps.length <= 3 && TK.camps.every(c => TK.villagers.some(v => v.id === c.cage && v.camp === c.id)), 'villages: 2–3 siege camps, each caging one villager');
+  ok(VD.ZONE_NPCS.tk_sasa?.zone === 'bamboo' && VD.zoneNpc('tk_kome')?.rescue && VD.zoneNpc('nobody') === null, 'villages: ZONE_NPCS indexes every zone villager with its zone');
+  const site = { x: 55, z: 58 };
+  let rt = true; for (let a = -170; a <= 170; a += 17) { const s = VD.slotAt(site, a, 9), b = VD.slotOf(site, s.x, s.z); if (Math.abs(b.a - a) > 1e-6 || Math.abs(b.d - 9) > 1e-6) rt = false; }
+  const up = VD.slotAt(site, 0, 10), right = VD.slotAt(site, 90, 10);
+  ok(rt && up.x < site.x && up.z < site.z && right.x > site.x && right.z < site.z, 'villages: screen-polar slots round-trip (slotAt ↔ slotOf); a = 0 is screen-up (−x, −z), 90 screen-right (+x, −z)');
+  const fr = VD.slotAt(site, 30, 8); ok(Math.abs(Math.sin(fr.rot) * 8 + (fr.x - site.x)) < 1e-6 && Math.abs(Math.cos(fr.rot) * 8 + (fr.z - site.z)) < 1e-6, 'villages: a slot\'s yaw turns a +z front toward the square');
+  // ---- the quests
+  const ids = ZQ.zoneQuestsIn('bamboo');
+  ok(ids.length >= 4 && ids.length <= 6, `quests: Takemori has 4–6 quests (${ids.length})`);
+  const dungeon = ZONE_DUNGEON?.bamboo || 'bambooDepths';
+  ok(ids.every(id => ZQ.ZONE_QUESTS[id].steps.some(s => s.dungeon === dungeon) && DUNGEONS[dungeon]), 'quests: every one has an objective in the zone\'s dungeon');
+  ok(ids.every(id => { const q = ZQ.ZONE_QUESTS[id], last = q.steps[q.steps.length - 1]; return TK.villagers.some(v => v.id === q.giver) && last.type === 'talk' && last.npc === q.giver && q.offer && q.thanks; }), 'quests: each has a Takemori giver, an offer and thanks, and ends by talking to them');
+  const types = new Set(ids.flatMap(id => ZQ.ZONE_QUESTS[id].steps.map(s => s.type)));
+  ok(['kill', 'find', 'rescue', 'dungeonFloor', 'boss'].every(t => types.has(t)), 'quests: kill, find, rescue, reach-the-floor and boss objectives are all used');
+  ok(ids.every(id => { const r = ZQ.ZONE_QUESTS[id].reward; return r.coins > 0 && r.xp > 0 && r.hearts > 0 && (!r.furniture || FURNITURE[r.furniture]) && Object.keys(r.pantry || {}).every(k => PANTRY[k]); }), 'quests: rewards are coins, xp, friendship, and real furniture / pantry goods');
+  ok(ids.every(id => (ZQ.ZONE_QUESTS[id].prereq || []).every(p => ZQ.ZONE_QUESTS[p])) && ids.every(id => ZQ.ZONE_QUESTS[id].steps.every(s => s.type !== 'find' || ZQ.QUEST_ITEMS[s.item]) && ZQ.ZONE_QUESTS[id].steps.every(s => s.type !== 'rescue' || VD.ZONE_NPCS[s.npc])), 'quests: prereqs, quest items and rescued villagers all exist');
+  ok(ids.every(id => ZQ.ZONE_QUESTS[id].steps.every(s => Q.destOf(s) !== undefined)), 'quests: every step has a pointer destination rule (questSteps.destOf)');
+  // ---- offers (only once the village is saved; prereqs gate the later ones)
+  const st = Z.normalizeZones({ quests: { active: [], done: [] } });
+  ok(ZQ.offersFor(st, 'tk_sasa', false).length === 0, 'quests: nothing is offered while the village is besieged');
+  ok(ZQ.offersFor(st, 'tk_sasa', true).join() === 'tk_roots' && ZQ.offersFor(st, 'tk_kazemaru', true).length === 0, 'quests: once saved, Grandma Sasa offers Roots of the Grove; the sensei waits for it');
+  st.quests.done.push('tk_roots');
+  ok(ZQ.offersFor(st, 'tk_sasa', true).join() === 'tk_tengu' && ZQ.offersFor(st, 'tk_kazemaru', true).join() === 'tk_windScroll', 'quests: finishing it opens the Tengu quest and the Wind Scroll');
+  st.quests.active.push({ id: 'tk_tengu', step: 0, prog: 0 });
+  ok(ZQ.offersFor(st, 'tk_sasa', true).length === 0, 'quests: a quest already taken is not offered again');
+  // ---- phase C's provider: dungeonObjectives
+  const ps = { quests: { active: [{ id: 'tk_ledger', step: 0, prog: 0 }, { id: 'tk_kome', step: 0, prog: 0 }, { id: 'tk_heartwood', step: 0, prog: 1 }, { id: 'tk_windScroll', step: 0, prog: 0 }], done: [] } };
+  const f1 = ZQ.dungeonObjectives(ps, { dungeon, floor: 1, zone: 'bamboo' }), f2 = ZQ.dungeonObjectives(ps, { dungeon, floor: 2, zone: 'bamboo' });
+  ok(f1.length === 1 && f1[0].kind === 'drop' && f1[0].item === 'tk_ledger' && f1[0].from === 'champion' && f1[0].n === 1 && f1[0].label === "Chiku's Ledger", 'provider: floor 1 asks for the ledger drop (from a champion)');
+  ok(f2.length === 2 && f2.some(o => o.kind === 'cage' && o.npc === 'tk_kome' && o.label === 'Free Kome') && f2.some(o => o.kind === 'drop' && o.item === 'tk_heartwood' && o.n === 2 && o.from === 'chest'), 'provider: floor 2 asks for Kome\'s cage and the 2 heartwood still missing (the Wind Scroll waits behind its kill step)');
+  ok(ZQ.dungeonObjectives(ps, { dungeon: 'mapleRoots', floor: 1, zone: 'maple' }).length === 0 && ZQ.dungeonObjectives({ quests: { active: [] } }, { dungeon, floor: 1 }).length === 0, 'provider: another dungeon, or no quests, asks for nothing');
+  ps.quests.active[3].step = 1;
+  ok(ZQ.dungeonObjectives(ps, { dungeon, floor: 2, zone: 'bamboo' }).some(o => o.item === 'tk_windScroll' && o.from === 'unique'), 'provider: the Wind Scroll appears once its kill step is done');
+  // ---- the steps count the events phase C emits (questSteps)
+  const led = ZQ.ZONE_QUESTS.tk_ledger.steps[0], kom = ZQ.ZONE_QUESTS.tk_kome.steps[0];
+  ok(Q.stepGain(led, 'find', { item: 'tk_ledger', n: 1, dungeon, floor: 1, zone: 'bamboo' }) === 1 && Q.stepGain(led, 'find', { item: 'tk_ledger', dungeon, floor: 2 }) === 0, 'steps: quest:find counts on the right floor only');
+  ok(Q.stepGain(kom, 'rescue', { npc: 'tk_kome', dungeon, floor: 2, zone: 'bamboo' }) === 'set' && Q.stepGain(kom, 'rescue', { npc: 'tk_kome', dungeon: null, floor: 0, zone: 'bamboo' }) === 0, 'steps: a dungeon rescue counts; a siege-cage rescue (no dungeon) does not');
+  // ---- the other three villages: the same rules, their own specials, quests into their own dungeons (phase D, part 2)
+  const SPECIALS = { maple: ['teaHouse'], tidepool: ['fishmonger', 'boatwright'], onsen: ['bathhouse', 'smith'] };
+  for (const [zone, sp] of Object.entries(SPECIALS)) {
+    const Vz = VD.VILLAGES[zone], kz = Vz.buildings.map(b => b.kind), dz = ZONE_DUNGEON?.[zone];
+    ok(Vz.ready && Vz.buildings.length >= 5 && Vz.buildings.length <= 7 && VD.STANDARD.every(k => kz.includes(k)) && sp.every(k => kz.includes(k)), `villages: ${Vz.name} has 5–7 buildings — the 4 standard ones and ${sp.join(' + ')}`);
+    ok(Vz.buildings.filter(b => b.kind !== 'waypoint').every(b => Math.abs(b.a) <= 100) && Vz.buildings.every(b => b.name && b.jp), `villages: ${Vz.name}'s buildings are named and stand round the far side`);
+    const nz = Vz.villagers.filter(v => !v.rescue);
+    ok(nz.length >= 3 && nz.length <= 5 && Vz.villagers.filter(v => v.rescue).length === 1 && Vz.villagers.every(v => v.id && v.name && v.spec?.species && v.role && v.bio), `villages: ${Vz.name} has ${nz.length} named villagers and one to rescue from its dungeon`);
+    ok(Vz.camps.length >= 2 && Vz.camps.length <= 3 && Vz.camps.every(c => Vz.villagers.some(v => v.id === c.cage && v.camp === c.id) && c.saved), `villages: ${Vz.name} has 2–3 siege camps, each caging a villager, each with its saved dressing`);
+    ok(Vz.captain?.id && Vz.folk.n > 0 && Vz.villagers.every(v => Vz.buildings.some(b => b.id === v.home)), `villages: ${Vz.name} has a siege captain, townsfolk, and every villager a home building`);
+    const qz = ZQ.zoneQuestsIn(zone);
+    ok(qz.length >= 4 && qz.length <= 6 && dz && DUNGEONS[dz] && qz.every(id => ZQ.ZONE_QUESTS[id].steps.some(s => s.dungeon === dz)), `quests: ${Vz.name} has ${qz.length} quests, every one with an objective in ${DUNGEONS[dz]?.name}`);
+    ok(qz.every(id => { const q = ZQ.ZONE_QUESTS[id], last = q.steps[q.steps.length - 1]; return Vz.villagers.some(v => v.id === q.giver) && last.type === 'talk' && last.npc === q.giver && q.offer && q.thanks; }), `quests: ${Vz.name}'s quests come from its villagers and end with a talk back to the giver`);
+    const tz = new Set(qz.flatMap(id => ZQ.ZONE_QUESTS[id].steps.map(s => s.type)));
+    ok(['kill', 'find', 'rescue', 'dungeonFloor', 'boss'].every(t => tz.has(t)), `quests: ${Vz.name} uses kill, find, rescue, reach-the-floor and boss objectives`);
+    ok(qz.every(id => { const r = ZQ.ZONE_QUESTS[id].reward; return r.coins > 0 && r.xp > 0 && r.hearts > 0 && (!r.furniture || FURNITURE[r.furniture]) && Object.keys(r.pantry || {}).every(k => PANTRY[k]); }) && qz.every(id => ZQ.ZONE_QUESTS[id].steps.every(s => s.type !== 'find' || ZQ.QUEST_ITEMS[s.item]?.zone === zone) && (ZQ.ZONE_QUESTS[id].prereq || []).every(p => ZQ.ZONE_QUESTS[p]?.zone === zone)), `quests: ${Vz.name}'s rewards and quest items are real`);
+    const rescueQ = qz.find(id => ZQ.ZONE_QUESTS[id].steps[0].type === 'rescue'), rq = ZQ.ZONE_QUESTS[rescueQ];
+    const pz = { quests: { active: [{ id: rescueQ, step: 0, prog: 0 }], done: [] } };
+    const o2 = ZQ.dungeonObjectives(pz, { dungeon: dz, floor: rq.steps[0].floor || 1, zone });
+    ok(o2.length === 1 && o2[0].kind === 'cage' && o2[0].npc === rq.steps[0].npc && Vz.villagers.find(v => v.id === o2[0].npc)?.rescue && ZQ.dungeonObjectives(pz, { dungeon: 'bambooDepths', floor: 2, zone: 'bamboo' }).length === 0, `provider: ${Vz.name}'s rescue quest asks ${DUNGEONS[dz]?.name} for ${o2[0]?.label} (and no other dungeon)`);
+    const so = Z.normalizeZones({ quests: { active: [], done: [] } }), first = qz.find(id => !(ZQ.ZONE_QUESTS[id].prereq || []).length);
+    ok(ZQ.offersFor(so, ZQ.ZONE_QUESTS[first].giver, false).length === 0 && ZQ.offersFor(so, ZQ.ZONE_QUESTS[first].giver, true).length >= 1, `quests: ${Vz.name} offers nothing while besieged, then its first quests`);
+  }
+  // ---- the bathhouse's soak (rpg/zoneBuffs.js): on the hero beside the meal, folded into the stats, ticks out
+  {
+    const ZB = await import('../src/rpg/zoneBuffs.js'), P = {};
+    const rec = ZB.startSoak(P, 20), acc = {}; ZB.soakAcc(P.soak, (k, v) => { acc[k] = (acc[k] || 0) + v; });
+    const d = { lifeMax: 100 }; ZB.soakPost(P.soak, d);
+    ok(rec.left === 1200 && acc.lifeRegen === ZB.SOAK.regen && acc.resFrost === ZB.SOAK.frost && d.lifeMax === 100 + ZB.SOAK.lifePct && d.soak, 'soak: Onsen Glow adds regen and frost resist, and raises max life');
+    const G0 = { state: { player: P }, actions: { recompute() { this.n = (this.n || 0) + 1; } } };
+    const e1 = ZB.tickSoak(G0, 600), e2 = ZB.tickSoak(G0, 700), d2 = { lifeMax: 100 }; ZB.soakPost(P.soak, d2);
+    ok(!e1 && e2 && P.soak === null && G0.actions.n === 1 && d2.lifeMax === 100 && !ZB.soakChip(G0), 'soak: it ticks down with play and runs out (one recompute), leaving the stats as they were');
+  }
+}
+
+// ------------------------------------------------------------------ zone dungeons (docs/ZONES.md §8.2; ROADMAP Z-C1 to Z-C4)
+hr('ZONE DUNGEONS: GENERATOR, PROGRESSION, FIRST-CLEAR UNIQUE');
+{
+  const D = await import('../src/dungeon/defs.js'), Gn = await import('../src/dungeon/gen.js'), ZP = await import('../src/rpg/zoneProgress.js'), Z = await import('../src/rpg/zones.js');
+  const { regionUnlocked } = await import('../src/regions/index.js');
+  // ---- the zone floors (dungeon/zoneGen.js through gen.js): density, elites, slots, the arena
+  const def = D.DUNGEONS.bambooDepths;
+  ok(def.kind === 'zone' && def.gate && def.floors === 2 && def.theme === 'bambooCave' && def.tank === 'iwabozu' && !def.stub, 'defs: the Bamboo Depths is a gated two-floor zone dungeon on its own cave kit, with its dungeon-only monster');
+  let dens = true, arenaOk = true, slotOk = true, eliteOk = true, stairsOk = true, n = 0, lo = 1e9, hi = 0;
+  for (const floor of [1, 2]) for (let seed = 1; seed <= 40; seed++) {
+    const plan = D.floorPlan(def, floor, { heroLvl: 8 }), L = Gn.generate({ floor, seed: seed * 7 + floor, plan });
+    n++; lo = Math.min(lo, L.packTotal); hi = Math.max(hi, L.packTotal);
+    if (!L.zone || L.packTotal < plan.density[0] || L.packTotal > plan.density[1] || L.spawns.some(s => !s.boss && (s.count < 1 || s.count > 16))) dens = false;
+    const packs = L.spawns.filter(s => !s.boss);
+    if (packs.filter(s => s.rank === 'champion').length > 2 || packs.filter(s => s.rank === 'unique').length !== 1) eliteOk = false;
+    if ((L.slots || []).length !== 2 || L.slots.some(s => !(s.guard >= 0) || L.spawns[s.guard]?.guard !== L.slots.indexOf(s))) slotOk = false;
+    if (floor === 1 ? (!L.stairs || L.arena || L.boss) : (L.stairs || !L.arena || L.arena.r !== 17 || L.boss !== 'tenguMaster' || !L.arenaMouth)) stairsOk = false;
+    if (floor === 2) { const b = L.spawns.find(s => s.boss); if (!b || Math.hypot((b.x + 0.5) * Gn.CELL - L.arena.x, (b.y + 0.5) * Gn.CELL - L.arena.z) > 3 || packs.some(s => Math.hypot((s.x + 0.5) * Gn.CELL - L.arena.x, (s.y + 0.5) * Gn.CELL - L.arena.z) < L.arena.r + 1)) arenaOk = false; }
+  }
+  ok(dens, `zone floors: ${n} layouts, ${lo}–${hi} monsters a floor (the plan's 120–160), packs of at most 16`);
+  ok(eliteOk, 'zone floors: elites stay rare (at most 2 champion packs, exactly 1 unique pack a floor)');
+  ok(slotOk, 'zone floors: two objective slots a floor, each with its guard pack');
+  ok(stairsOk, 'zone floors: floor 1 has the stairs and no arena; floor 2 the 17 m arena with Master Tengu, its mouth, and no stairs');
+  ok(arenaOk, 'zone floors: the boss stands at the arena centre and no pack waits inside the ring');
+  // ---- progression: the order, the unlock on first clear, migrated saves
+  ok(ZP.nextZone('bamboo') === 'maple' && ZP.nextZone('onsen') === null && ZP.prevZone('maple') === 'bamboo' && ZP.prevZone('bamboo') === null, 'progression: Bamboo → Maple → Tidepool → Onsen');
+  const st = Z.normalizeZones({ player: { lvl: 5 } });
+  ok(!ZP.openedByPrev(st, 'maple') && !regionUnlocked(st, 'maple').ok && /clear the Bamboo Depths/.test(regionUnlocked(st, 'maple').why || ''), 'progression: Momiji Hollow starts locked ("Reach level N or clear the Bamboo Depths")');
+  Z.zoneOf(st, 'bamboo').dungeon.cleared = 1;
+  ok(ZP.openedByPrev(st, 'maple') && regionUnlocked(st, 'maple').ok && !ZP.openedByPrev(st, 'tidepool'), 'progression: the Bamboo Depths cleared once opens Momiji Hollow (and only it)');
+  ok(ZP.zoneUnlockOnClear(st, 'bamboo') === 'maple' && st.zones.maple.unlocked && ZP.zoneUnlockOnClear(st, 'bamboo') === null && ZP.zoneUnlockOnClear(st, 'onsen') === null, 'progression: the first clear marks the next zone unlocked once (none after Onsen)');
+  const mig = Z.normalizeZones({ player: { lvl: 5 }, regions: { unlocked: { bamboo: true }, cleared: { bamboo: 1 }, visits: { bamboo: 2 } } });
+  ok(ZP.openedByPrev(mig, 'maple') && regionUnlocked(mig, 'maple').ok, 'progression: a save that beat the region boss outdoors (zones.bamboo.regionBoss 1) keeps Momiji Hollow open');
+  // ---- the zone boss uniques: real, tagged with their zone, never in the random pool
+  const ZU = Object.entries(ZP.ZONE_UNIQUE);
+  ok(ZU.length >= 1 && ZU.every(([z, id]) => UNIQUES[id] && UNIQUES[id].zone === z && ITEM_BASES[UNIQUES[id].base]), `uniques: each zone boss unique exists and is tagged with its zone (${ZU.map(([, id]) => id).join(', ')})`);
+  let leak = 0; const rng = new RNG(5);
+  for (let i = 0; i < 3000; i++) { const it = generateItem({ ilvl: 60, rarity: 'unique', rng }); if (ZU.some(([, id]) => it.uniqueId === id)) leak++; }
+  const fu = makeUnique('tenguGaleFeather', 12);
+  ok(leak === 0 && fu.rarity === 'unique' && fu.uniqueId === 'tenguGaleFeather', `uniques: 3000 random unique rolls never give a zone boss unique (${leak}); the first-clear chest's makeUnique does`);
 }
 
 hr('RESULT');

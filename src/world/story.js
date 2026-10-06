@@ -13,6 +13,8 @@ import { meetsNeed, homeRating, starText } from '../home/rating.js';
 import { FURNITURE } from '../home/furniture.js';
 import { stepGain, zoneStepDone, zoneStepHave, destOf } from './questSteps.js';
 import { DUNGEONS } from '../dungeon/defs.js';
+import { ZONE_QUESTS, dungeonObjectives as zoneObjectives, offersFor } from './zoneQuests.js'; // (zone villagers' quests: docs/ZONES.md §3)
+import { ZONE_NPCS } from '../regions/village/data.js';
 
 // step types: talk(npc) | collect(material,n) | kill(monster?,n) | boss(id) | floor(n) | build(type,n) | pop(n) | zone(n)
 //   | fish(n) (catch n fish: life/fishing.js 'fish:caught') | plant(n) / harvest(n) (life/garden.js) | cook(n) dishes
@@ -100,7 +102,7 @@ export class Story {
     setInterval(() => this.progress('pop'), 5000);
   }
   get Q() { return this.G.state.quests; }
-  def(id) { return QUESTS[id] || this.Q.requests?.[id]?.def; }
+  def(id) { return QUESTS[id] || ZONE_QUESTS[id] || this.Q.requests?.[id]?.def; }
   start(id, silent = false) {
     if (this.Q.active.some(q => q.id === id) || this.Q.done.includes(id)) return;
     this.Q.active.push({ id, step: 0, prog: 0 });
@@ -217,7 +219,7 @@ export class Story {
     const npcPos = id => { const n = G.npcs?.find(x => x.id === id && x.visible); return n ? { pos: n.pos, label: n.name, kind: 'npc' } : null; };
     for (const q of order) {
       const d = this.def(q.id), s = d.steps[q.step]; if (!s) continue;
-      if (s.type === 'talk') { const t = npcPos(s.npc); if (t) return t; continue; }
+      if (s.type === 'talk') { const t = npcPos(s.npc) || this.zoneTalkTarget(s); if (t) return t; continue; }
       if (s.type === 'decorate') { // their home's door (inside it: nothing to point at)
         const rec = G.mode === 'village' && G.sim?.list.find(r => r.data.owner === s.npc);
         if (rec) return { pos: rec.door, label: `${this.nameOf(s.npc)}'s home`, kind: 'place' };
@@ -281,6 +283,20 @@ export class Story {
     const done = this.Q.done.filter(id => QUESTS[id]).map(id => ({ id, title: QUESTS[id].title, desc: QUESTS[id].desc, giver: this.nameOf(QUESTS[id].giver), main: true, steps: QUESTS[id].steps.map(s => ({ text: s.text, have: 1, need: 1, done: true })), reward: QUESTS[id].reward, done: true }));
     return act; // (completed quests live in state.quests.done)
   }
+  /** A zone villager's talk step (a zone quest's turn-in, world/zoneQuests.js): the villager, out in their village; the
+   *  village in their zone's region; the way out of a dungeon; the way to the zone from anywhere else (placeFor). */
+  zoneTalkTarget(s) {
+    const n = ZONE_NPCS[s.npc]; if (!n) return null;
+    const G = this.G, D = G.mode === 'dungeon' ? G.dungeon : null;
+    if (D?.kind === 'region' && D.zoneId === n.zone) { const p = D.village?.npcPos?.(s.npc); return p ? { pos: p, label: n.name, kind: 'npc' } : D.villagePos ? { pos: D.villagePos, label: 'The village', kind: 'place' } : null; }
+    if (D && D.kind !== 'region') return D.exitPos ? { pos: D.exitPos, label: 'The way out', kind: 'place' } : null;
+    return this.placeFor(s, { zone: n.zone, village: true });
+  }
+  /** Phase C's provider (docs/ZONES.md §3): what the active quests need placed on a dungeon floor →
+   *  [{ kind: 'cage', npc, label, quest }, { kind: 'drop', item, n, label, from, quest }] (world/zoneQuests.js) */
+  dungeonObjectives(o = {}) { return zoneObjectives(this.G.state, o, id => this.def(id)); }
+  /** the zone quests a villager can offer now (their village saved, prereqs done) */
+  zoneOffers(id, zone) { return offersFor(this.G.state, id, this.G.state.zones?.[zone]?.village === 'saved'); }
   // ------------------------------------------------------------------ friendship
   friend(id) { return (this.G.state.friends[id] ||= { hearts: 0, pts: 0, talkedDay: 0, giftDay: 0, rewards: [] }); }
   addHearts(id, pts) {
@@ -293,7 +309,7 @@ export class Story {
     }
     Events.emit('friend:changed', { id });
   }
-  nameOf(id) { return id === 'rosie' ? 'Rosie' : VILLAGERS.find(v => v.id === id)?.spec.name || id; }
+  nameOf(id) { return id === 'rosie' ? 'Rosie' : VILLAGERS.find(v => v.id === id)?.spec.name || ZONE_NPCS[id]?.name || id; }
   likesOf(id) { return id === 'rosie' ? ['petal', 'mochi', 'crystal'] : VILLAGERS.find(v => v.id === id)?.likes || []; }
   // full conversation flow for a villager
   async talk(npc) {

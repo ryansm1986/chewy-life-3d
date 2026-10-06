@@ -1,4 +1,4 @@
-// Chewy Life 3D — procedural audio system (no asset files; everything is synthesized with Web Audio).
+// Pawhaven — procedural audio system (no asset files; everything is synthesized with Web Audio).
 //
 //   import { Audio } from './audio/audio.js';
 //   Audio.init();                                   // once at boot; the AudioContext is created on the first pointer/key gesture

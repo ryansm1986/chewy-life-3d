@@ -1,4 +1,4 @@
-// Chewy Life UI — HTML/CSS overlay above the canvas. See docs/ARCHITECTURE.md (UI section) for the contract.
+// Pawhaven UI — HTML/CSS overlay above the canvas. See docs/ARCHITECTURE.md (UI section) for the contract.
 import './style.css';
 import './hud.css';
 import './panels.css';

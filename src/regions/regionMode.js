@@ -16,6 +16,8 @@ import { RegionWorld } from './regionWorld.js';
 import { RNG, TAU, rand } from '../core/util.js';
 import { Events } from '../core/events.js';
 import { packMods, monsterMods } from '../rpg/zoneMods.js';
+import { ZoneVillage } from './village/village.js'; // the zone's village: hub, siege, villagers, quests (docs/ZONES.md §2)
+import { installGate } from './dungeonGate.js'; // the zone dungeon's gate at the trail's end (its boss moved inside: docs/ZONES.md §8.2)
 
 export class RegionMode extends DungeonMode {
   constructor(G, id) {
@@ -37,6 +39,7 @@ export class RegionMode extends DungeonMode {
     const layout = this.layout = generateRegion(def, { visit, mlvl: regionLevel(def, heroLvl) });
     layout.boss = this.bossId();
     for (const sp of layout.spawns) if (sp.boss) sp.boss = layout.boss;
+    this.village = ZoneVillage.for(this); // (sets layout.hooks: the village's static pieces go in while the world builds)
     const world = this.world = new RegionWorld(G.engine, layout, def);
     // the bits of a Burrow theme that DungeonMode / the game read
     this.theme = { name: def.name, monsters: this.roster(), grade: def.mood?.grade, wall: ['#6a5a4a'], light: '#ffd8a8', accent: def.color };
@@ -45,12 +48,19 @@ export class RegionMode extends DungeonMode {
     this.rng = new RNG(visit * 977 + REGION_IDS.indexOf(def.id) * 131 + 7);
     this.flow = new Int16Array(layout.W * layout.H); this.flowT = 0;
     this.buildInteractables();
+    this.village?.attach(world); // (overlays, cages, villagers, the buildings' doors, mode.villagePos)
+    this.gate = installGate(this); // (no outdoor boss in a gated zone; mode.gatePos)
     return world;
   }
   start() {
     const G = this.G, L = this.layout, def = this.region;
     this.startPos = this.world.cellToWorld(L.start.x, L.start.y);
+    // a saved village: travel arrives at its Waypoint Shrine, a knock-out wakes at its inn (G.zoneRespawn in game.js)
+    const arrive = G._zoneArrive?.zone === this.regionId ? G._zoneArrive : {}; G._zoneArrive = null;
+    const vp = this.village?.arrival(arrive); if (vp) { this.campAnchor = this.startPos; this.startPos = vp; } // (the cooking campfire stays by the Wayfarer's Stone)
+    if (arrive.gate && this.gate) this.startPos = this.gate.arrival.clone(); // (back out of the zone dungeon: in front of its gate)
     for (const sp of L.spawns) this.spawnPack(sp);
+    this.village?.start(arrive); // (the siege camps and the captain)
     // dusk / night regions: a warm lantern glow follows the hero (daylight regions don't need it)
     if ((def.mood?.night || 0) > 0.3) this.playerLight = this.world.lightPool.addSource({ pos: new THREE.Vector3(), color: new THREE.Color('#ffd8a8'), intensity: 5, radius: 9, priority: 10 });
     G.ui?.banner?.(def.name, `${def.jp} · Lv ${def.levels[0]}–${def.levels[1]}`, { style: 'area' });
@@ -94,7 +104,9 @@ export class RegionMode extends DungeonMode {
     if (exit) { exit.label = "Touch the Wayfarer's Stone"; exit.onInteract = () => (G.openTravel ? G.openTravel({ from: this.regionId }) : G.returnToVillage()); }
     this.region.interactables?.({ G, mode: this, world: W, layout: this.layout, add: it => inter.push(it) });
   }
+  update(dt, t) { super.update(dt, t); this.village?.update(dt, t); }
   onBossDefeated(b, xp = 0) {
+    if (b.siegeCaptain && this.village) return this.village.captainDefeated(b, xp); // (the village's captain: it saves the village)
     super.onBossDefeated(b, xp); // victory beat + a return portal where it fell (DungeonMode skips the stairs in regions)
     const G = this.G, R = regionState(G.state), id = this.regionId;
     R.cleared[id] = (R.cleared[id] || 0) + 1;
@@ -108,5 +120,5 @@ export class RegionMode extends DungeonMode {
     Events.emit('dungeon:cleared', { id, kind: 'region', tier: 0, floor: 0, zone: id, boss: b.id, first: R.cleared[id] === 1 });
     G.save?.();
   }
-  dispose() { super.dispose(); this.world.dispose?.(); }
+  dispose() { this.village?.dispose(); super.dispose(); this.world.dispose?.(); }
 }

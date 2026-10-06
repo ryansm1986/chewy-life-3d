@@ -16,13 +16,15 @@ import { themeFor, bossFor } from './gen.js';
 
 export const DUNGEONS = {
   burrow: { id: 'burrow', kind: 'burrow', name: 'The Burrow', zone: null, theme: null, monsters: null, boss: null, levels: null, floors: Infinity, waypoints: true },
-  // The four zone dungeons: 2 floors and a boss each (docs/ZONES.md §4). STUBS until phase C (ROADMAP Z-C1, Z-C2):
-  // their kits stand in with Burrow themes and the boss fights in the Burrow's boss room. The rosters and bosses are
-  // the zones' own (registered by src/regions/monsters/index.js); DungeonMode falls back to the theme's table if not.
-  bambooDepths: { id: 'bambooDepths', kind: 'zone', name: 'Bamboo Depths', zone: 'bamboo', theme: 'burrow' /* TODO(Z-C1): bamboo shrine caves */, monsters: ['takenoko', 'kodama', 'kamaitachi'], boss: 'tenguMaster', levels: [4, 12], floors: 2, waypoints: false, stub: true },
-  mapleRoots: { id: 'mapleRoots', kind: 'zone', name: 'Maple Roots', zone: 'maple', theme: 'shrine' /* TODO(Z-C1): maple root halls */, monsters: ['kuri', 'kakashi', 'momijiWisp'], boss: 'danzaburo', levels: [11, 19], floors: 2, waypoints: false, stub: true },
-  tideCaves: { id: 'tideCaves', kind: 'zone', name: 'Tide Caves', zone: 'tidepool', theme: 'crystal' /* TODO(Z-C1): tidepool sea caves */, monsters: ['kappa', 'heikegani', 'kurage'], boss: 'umibozu', levels: [18, 27], floors: 2, waypoints: false, stub: true },
-  onsenCaverns: { id: 'onsenCaverns', kind: 'zone', name: 'Onsen Caverns', zone: 'onsen', theme: 'crystal' /* TODO(Z-C1): onsen ice caverns */, monsters: ['yukiwarashi', 'yukidaruma', 'tsurara'], boss: 'yukiOnna', levels: [26, 35], floors: 2, waypoints: false, stub: true },
+  // The four zone dungeons: 2 floors and a boss each (docs/ZONES.md §4, §8.2): zone floors (zoneGen.js: ~8 chambers, the
+  // dense packs, the round boss arena on floor 2), the zone's roster and its region boss. `gate`: the dungeon is entered
+  // from its gate at the end of the zone's trail (regions/dungeonGate.js), and its boss no longer spawns outdoors.
+  // `stub`: its kit is still a Burrow stand-in theme (ROADMAP Z-C1). The rosters and bosses are the zones' own
+  // (registered by src/regions/monsters/index.js); DungeonMode falls back to the theme's table if not.
+  bambooDepths: { id: 'bambooDepths', kind: 'zone', name: 'Bamboo Depths', zone: 'bamboo', theme: 'bambooCave', monsters: ['takenoko', 'kodama', 'kamaitachi'], tank: 'iwabozu', boss: 'tenguMaster', levels: [4, 12], floors: 2, waypoints: false, gate: true },
+  mapleRoots: { id: 'mapleRoots', kind: 'zone', name: 'Maple Roots', zone: 'maple', theme: 'mapleHalls', monsters: ['kuri', 'kakashi', 'momijiWisp'], tank: 'tesso', boss: 'danzaburo', levels: [11, 19], floors: 2, waypoints: false, gate: true },
+  tideCaves: { id: 'tideCaves', kind: 'zone', name: 'Tide Caves', zone: 'tidepool', theme: 'seaCave', monsters: ['kappa', 'heikegani', 'kurage'], tank: 'sazaeOni', boss: 'umibozu', levels: [18, 27], floors: 2, waypoints: false, gate: true },
+  onsenCaverns: { id: 'onsenCaverns', kind: 'zone', name: 'Onsen Caverns', zone: 'onsen', theme: 'iceCavern', monsters: ['yukiwarashi', 'yukidaruma', 'tsurara'], tank: 'akaname', boss: 'yukiOnna', levels: [26, 35], floors: 2, waypoints: false, gate: true },
 };
 export const DUNGEON_IDS = Object.keys(DUNGEONS);
 /** zone id → its dungeon id ('bamboo' → 'bambooDepths') */
@@ -51,6 +53,9 @@ export function floorPlan(def, floor, { tier = 0, heroLvl = 1 } = {}) {
     mlvl: levelAt(def, floor, tier, heroLvl),
     waypoint: !!def.waypoints && floor % 5 === 1 && floor > 1,
     depth: floor, // (room count, size and the unique-pack chance grow with it: gen.js)
+    // a zone dungeon's floors (zoneGen.js): ~9 chambers on floor 1, ~8 then the round arena (r ~17 m) on the last,
+    // two objective slots a floor and 120–160 monsters at tier 0 (ZONES §4)
+    ...(def.kind === 'zone' ? { layout: 'zone', rooms: last ? 8 : 9, size: last ? 84 : 76, arenaR: 17, slots: 2, density: [120, 160] } : {}),
   };
 }
 // each dungeon its own layouts for the same seed

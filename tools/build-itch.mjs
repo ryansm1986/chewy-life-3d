@@ -1,5 +1,5 @@
 // itch.io build: a relative-path production build, checked against itch's HTML5 limits, zipped for upload.
-//   npm run build:itch            build + check + zip  ->  release/chewy-life-itch-v<version>.zip
+//   npm run build:itch            build + check + zip  ->  release/pawhaven-itch-v<version>.zip
 //   npm run build:itch -- --test  ...then boot the zip's contents inside an itch-style iframe (a sub-folder on another
 //                                 origin path) with headless Chrome and fail on errors / 404s; saves a screenshot
 // itch serves HTML5 games from a CDN sub-folder inside an iframe, so every URL must be relative (base './'): an
@@ -15,7 +15,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'dist-itch');
 const REL = path.join(ROOT, 'release');
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
-const ZIP = path.join(REL, `chewy-life-itch-v${pkg.version}.zip`);
+const ZIP = path.join(REL, `pawhaven-itch-v${pkg.version}.zip`);
 const TEST = process.argv.includes('--test');
 // itch.io HTML5 upload limits (https://itch.io/docs/creators/html5): index.html at the zip root, at most 1000 files,
 // 500 MB extracted in total, 200 MB per file, 240 characters per path (UTF-8, case-sensitive on their CDN).
@@ -44,7 +44,7 @@ for (const dep of Object.keys(pkg.dependencies || {})) {
   fs.copyFileSync(path.join(dir, lic), path.join(LIC, `${dep}-LICENSE.txt`));
   shipped.push(`${dep}-LICENSE.txt  (${dep} ${meta.version}, ${meta.license})`);
 }
-fs.writeFileSync(path.join(LIC, 'README.txt'), `Chewy Life ${pkg.version}: third-party software included in this build\n\n${shipped.join('\n')}\n`);
+fs.writeFileSync(path.join(LIC, 'README.txt'), `Pawhaven ${pkg.version}: third-party software included in this build\n\n${shipped.join('\n')}\n`);
 
 // ---- 2. check against itch's rules
 const files = walk(OUT);
@@ -148,10 +148,11 @@ if (TEST) {
   const frame = await (await page.waitForSelector('iframe')).contentFrame();
   let state = null;
   try {
-    await frame.waitForFunction(() => window.G && (window.G.titleActive || window.G.mode), null, { timeout: 90000 });
+    // wait for the real title screen (the UI built and the boot overlay gone), not just G existing: G.mode is set early
+    await frame.waitForFunction(() => window.__ready === true && window.G?.ui && window.G.titleActive && !document.querySelector('#boot:not(.gone)'), null, { timeout: 150000 });
     await page.waitForTimeout(3000);
     state = await frame.evaluate(() => ({ title: !!window.G.titleActive, mode: window.G.mode, ui: !!window.G.ui, audio: !!window.G.audio, fonts: [...document.fonts].filter(f => f.status === 'loaded').map(f => f.family + ' ' + f.weight) }));
-  } catch (e) { errs.push('did not reach the title screen in 90 s'); }
+  } catch (e) { errs.push('did not reach the title screen in 150 s'); }
   const shot = path.join(REL, 'itch-test.png');
   await page.screenshot({ path: shot });
   await browser.close(); server.close();

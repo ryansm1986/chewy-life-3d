@@ -15,14 +15,24 @@ const ev = (f, a) => page.evaluate(f, a);
 const quiet = () => ev(() => { const G = window.G; G.sim.tickT = -1e9; clearInterval(window.__freeze); window.__freeze = setInterval(() => { G.sim.tickT = -1e9; }, 200); G.state.flags.hints = { ...(G.state.flags.hints || {}), garden: 1, build: 1, travel: 1, skills: 1, stats: 1, loot: 1, potion: 1, fight: 1 }; });
 const mokaIn = () => ev(() => { const G = window.G; G.state.flags.mokaJoined = true; const v = G.heroes.villagers.moka; if (v) { v.frozen = false; v.waitingToJoin = false; } });
 const toBamboo = async () => {
-  await ev(() => { const G = window.G; G.state.player.lvl = 6; G.actions.recompute(); G.state.flags.burrowTut = true; G.enterRegion('bamboo'); });
+  await ev(() => { const G = window.G; G.state.player.lvl = 6; G.actions.recompute(); G.state.flags.burrowTut = true; window.__walkI = 0; G.enterRegion('bamboo'); });
   await waitMode(page, 'dungeon'); await sleep(page, 600);
   await ev(() => { for (const m of window.G.dungeon.monsters) { m.pos.set(-500, 0, -500); m.aggro = false; } }); // (a quiet grove)
 };
-/** walk n small steps along the camera-up ground axis (open floor only) */
+/** walk n small steps: in a region along its trail from the arrival (it climbs up-screen after the first bend; the open
+ *  path whatever the bamboo does round the glade), elsewhere along the camera-up ground axis (open floor only) */
 const walk = async (n) => {
   for (let i = 0; i < n; i++) {
-    await ev(() => { const G = window.G, P = G.player, { f, r } = G.engine.rig.groundAxes(); for (const d of [f, r, { x: -r.x, z: -r.z }, { x: -f.x, z: -f.z }]) { const x = P.pos.x + d.x * 0.35, z = P.pos.z + d.z * 0.35; if (G.world.walkable(x, z) && !G.world.collision?.solidAt?.(x, z, 0.3)) { P.setPos(x, z); P.facing = P.faceTarget = Math.atan2(d.x, d.z); return; } } });
+    await ev(() => {
+      const G = window.G, P = G.player, ok = (x, z) => G.world.walkable(x, z) && !G.world.collision?.solidAt?.(x, z, 0.3), tr = G.dungeon?.isRegion && G.dungeon.layout?.plan?.trail;
+      if (tr) {
+        let bi = window.__walkI || 0, bd = 1e9; for (let j = Math.max(0, bi - 2); j < Math.min(tr.length, bi + 12); j++) { const q = Math.hypot(tr[j][0] - P.pos.x, tr[j][1] - P.pos.z); if (q < bd) { bd = q; bi = j; } } window.__walkI = bi;
+        const nx = tr[Math.min(tr.length - 1, bi + 2)], L = Math.hypot(nx[0] - P.pos.x, nx[1] - P.pos.z) || 1, d = { x: (nx[0] - P.pos.x) / L, z: (nx[1] - P.pos.z) / L };
+        const x = P.pos.x + d.x * 0.35, z = P.pos.z + d.z * 0.35; if (ok(x, z)) { P.setPos(x, z); P.facing = P.faceTarget = Math.atan2(d.x, d.z); }
+        return;
+      }
+      const { f, r } = G.engine.rig.groundAxes(); for (const d of [f, r, { x: -r.x, z: -r.z }, { x: -f.x, z: -f.z }]) { const x = P.pos.x + d.x * 0.35, z = P.pos.z + d.z * 0.35; if (ok(x, z)) { P.setPos(x, z); P.facing = P.faceTarget = Math.atan2(d.x, d.z); return; } }
+    });
     await sleep(page, 55);
   }
 };

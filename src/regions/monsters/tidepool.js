@@ -427,12 +427,15 @@ const CRAB_HOOK = {
 function heikeganiSpec(v) {
   const CY = HG.CY, sh = col(v.shell), shD = col(v.shell).multiplyScalar(0.6), shL = col(v.shell).lerp(col('#fff0d8'), 0.3), belly = col(v.belly);
   const B = [], C = [];
-  const W = z => 0.5 * (1 + 0.1 * z / 0.38), top = (x, z) => CY + 0.2 * Math.sqrt(Math.max(0, 1 - (x / W(z)) ** 2 - (z / 0.38) ** 2));
+  // shape knobs (a variant may set them; the village captain Brineclaw does: wide round shell, a lip, 3 stubby legs a side, big claws)
+  const SW = v.shellW ?? 0.5, SD = v.shellD ?? 0.38, DOME = v.dome ?? 0.2, NL = v.legs ?? 4, LK = v.legK ?? 1, LL = v.legL ?? 1, CK = v.clawK ?? 1, ST = v.stalk ?? 1;
+  const W = z => SW * (1 + 0.1 * z / SD), top = (x, z) => CY + DOME * Math.sqrt(Math.max(0, 1 - (x / W(z)) ** 2 - (z / SD) ** 2));
   // carapace: a broad low shield, wider at the front, with a lumpy rim
-  B.push(blob(28, 16, q => { const b = 1 + 0.035 * Math.sin(q.x * 11) * Math.sin(q.z * 9); return q.set(q.x * 0.5 * (1 + 0.1 * q.z) * b, q.y * (q.y > 0 ? 0.2 : 0.12) + CY, q.z * 0.38 * b); },
+  B.push(blob(28, 16, q => { const b = 1 + 0.035 * Math.sin(q.x * 11) * Math.sin(q.z * 9); return q.set(q.x * SW * (1 + 0.1 * q.z) * b, q.y * (q.y > 0 ? DOME : 0.12) + CY, q.z * SD * b); },
     (p, n, o) => { o.copy(sh); if (n.y < 0.25) o.lerp(shD, clamp((0.25 - n.y) * 1.6)); else o.lerp(shL, clamp((n.y - 0.8) * 3) * 0.45); if (n.y < -0.5) o.copy(belly); }));
-  // rim spikes along the sides
-  for (const k of [-1, 1]) for (let i = 0; i < 4; i++) { const z = 0.2 - i * 0.13, x = W(z) * Math.sqrt(1 - (z / 0.4) ** 2) * k; B.push(tuft([x * 0.97, CY + 0.02, z], [k, 0.25, 0.3], 0.09, 0.03, v.shell, 6)); }
+  // rim spikes along the sides (or, with v.lip, a rolled rim all round the shell)
+  if (v.lip) { const pts = []; for (let i = 0; i <= 40; i++) { const a = i / 40 * TAU, z = Math.sin(a) * SD * 0.99; pts.push([Math.cos(a) * W(z) * 0.99, CY + 0.005, z, 0.034]); } B.push(tubeC(pts, (p, n, o) => o.copy(shD).lerp(sh, clamp(n.y + 0.4) * 0.6), 6)); }
+  else for (const k of [-1, 1]) for (let i = 0; i < 4; i++) { const z = 0.2 - i * 0.13, x = W(z) * Math.sqrt(1 - (z / 0.4) ** 2) * k; B.push(tuft([x * 0.97, CY + 0.02, z], [k, 0.25, 0.3], 0.09, 0.03, v.shell, 6)); }
   // ---- the samurai face on the shell (forehead toward the back, chin toward the claws)
   const F = v.face, eyeW = v.eyeW;
   const on = (x, z, lift = 0) => [x, top(x, z) + lift, z];
@@ -459,20 +462,22 @@ function heikeganiSpec(v) {
   B.push(cyl(0.075, 0.08, 0.035, v.crest, on(0, -0.27, 0.0), [-0.5, 0, 0], 14), ell(0.035, 0.012, 0.035, v.mon, on(0, -0.262, 0.03), [-0.5, 0, 0], 10));
   // ---- stalk eyes at the front (the crab's own, cute and cross)
   for (const k of [-1, 1]) {
-    B.push(tubeC([[k * 0.08, CY + 0.06, 0.3, 0.022], [k * 0.1, CY + 0.15, 0.33, 0.018]], v.leg, 5));
-    B.push(ell(0.048, 0.05, 0.046, '#fffaf2', [k * 0.1, CY + 0.19, 0.335], [0, 0, 0], 10));
-    B.push(ell(0.026, 0.03, 0.02, '#1e1418', [k * 0.1 - k * 0.006, CY + 0.188, 0.372], [0, 0, 0], 8), ell(0.009, 0.009, 0.006, '#ffffff', [k * 0.1 - k * 0.018, CY + 0.2, 0.39], [0, 0, 0], 6));
-    B.push(tubeC([[k * 0.155, CY + 0.25, 0.33, 0.012], [k * 0.05, CY + 0.228, 0.36, 0.012]], INK, 4)); // cross little brows
+    const sz0 = SD * 0.79, sy = (ST - 1) * 0.12; // (longer stalks lift the eyes clear of a bigger dome)
+    B.push(tubeC([[k * 0.08, CY + 0.06, sz0, 0.022], [k * 0.1, CY + 0.15 + sy, sz0 + 0.03, 0.018]], v.leg, 5));
+    B.push(ell(0.048, 0.05, 0.046, '#fffaf2', [k * 0.1, CY + 0.19 + sy, sz0 + 0.035], [0, 0, 0], 10));
+    B.push(ell(0.026, 0.03, 0.02, '#1e1418', [k * 0.1 - k * 0.006, CY + 0.188 + sy, sz0 + 0.072], [0, 0, 0], 8), ell(0.009, 0.009, 0.006, '#ffffff', [k * 0.1 - k * 0.018, CY + 0.2 + sy, sz0 + 0.09], [0, 0, 0], 6));
+    B.push(tubeC([[k * 0.155, CY + 0.25 + sy, sz0 + 0.03, 0.012], [k * 0.05, CY + 0.228 + sy, sz0 + 0.06, 0.012]], INK, 4)); // cross little brows
   }
   // ---- 8 legs, short and chunky, fanned fore and aft (GPU stepping: uv.x = phase alternating by leg + side, uv.y =
   // weight toward the tip)
   const legC = col(v.leg), legJ = col(v.leg).lerp(col('#fff2dc'), 0.35), tipC = col(v.leg).multiplyScalar(0.42);
-  for (const k of [-1, 1]) for (let i = 0; i < 4; i++) {
-    const fan = 0.62 - i * 0.44, z = 0.13 - i * 0.1, ph = ((i + (k > 0 ? 1 : 0)) % 2) * Math.PI + i * 0.35;
-    const out = (r, y) => [k * (0.34 + r * Math.cos(fan)), y, z + r * Math.sin(fan)];
-    const pts = smooth([[...out(0, CY - 0.05), 0.058], [...out(0.17, CY + 0.07), 0.05], [...out(0.28, CY + 0.03), 0.042], [...out(0.37, 0.03), 0.014]], 6);
-    const g = tubeC(pts, (p, n, o) => { const r = Math.hypot(Math.abs(p.x) - 0.34, p.z - z); o.copy(legC); if (Math.abs(r - 0.17) < 0.022 || Math.abs(r - 0.28) < 0.018) o.copy(legJ); if (r > 0.31) o.lerp(tipC, clamp((r - 0.31) / 0.06)); }, 5);
-    B.push(uvf(g, p => [ph, clamp((Math.hypot(Math.abs(p.x) - 0.34, p.z - z) - 0.03) / 0.34) ** 1.2]));
+  const LX = 0.34 * SW / 0.5;
+  for (const k of [-1, 1]) for (let i = 0; i < NL; i++) {
+    const u = NL > 1 ? i / (NL - 1) : 0.5, fan = 0.62 - u * 1.32, z = 0.13 - u * 0.3, ph = ((i + (k > 0 ? 1 : 0)) % 2) * Math.PI + i * 0.35;
+    const out = (r, y) => [k * (LX + r * LL * Math.cos(fan)), y, z + r * LL * Math.sin(fan)];
+    const pts = smooth([[...out(0, CY - 0.05), 0.058 * LK], [...out(0.17, CY + 0.07), 0.05 * LK], [...out(0.28, CY + 0.03), 0.042 * LK], [...out(0.37, 0.03), 0.014 * LK + 0.016 * (LK - 1)]], 6);
+    const g = tubeC(pts, (p, n, o) => { const r = Math.hypot(Math.abs(p.x) - LX, p.z - z) / LL; o.copy(legC); if (Math.abs(r - 0.17) < 0.022 * LK || Math.abs(r - 0.28) < 0.018 * LK) o.copy(legJ); if (r > 0.31) o.lerp(tipC, clamp((r - 0.31) / 0.06)); }, 5);
+    B.push(uvf(g, p => [ph, clamp((Math.hypot(Math.abs(p.x) - LX, p.z - z) / LL - 0.03) / 0.34) ** 1.2]));
   }
   // ---- claws (one part: raised in front as a shield, up for the slam), lacquered like samurai gauntlets
   const cl = col(v.claw), clD = col(v.claw).multiplyScalar(0.62), trim = col(v.trim), tip = col(v.tip);
@@ -489,6 +494,7 @@ function heikeganiSpec(v) {
     C.push(finger([k * 0.19, 0.1, 0.4], [-k * 0.6, -0.08, 0.8], 0.27, 0.062));   // fixed finger
     C.push(finger([k * 0.27, 0.21, 0.39], [-k * 0.52, 0.16, 0.84], 0.25, 0.055));  // dactyl (a gap between: a proper pincer)
   }
+  if (CK !== 1) for (const g of C) { g.translate(0, 0.05, 0.1); g.scale(CK, CK, CK); g.translate(0, -0.05, -0.1 + (SD - 0.38) * 0.6); } // (bigger claws, grown out from the shoulders)
   for (const g of C) { g.translate(...HG_CLAW); uvs(g, 0, 5); }
   return { parts: [{ name: 'body', geo: stamp([...B, ...C]) }] };
 }

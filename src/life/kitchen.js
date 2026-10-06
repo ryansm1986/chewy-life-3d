@@ -12,6 +12,7 @@ import { makeToon } from '../gfx/materials.js';
 import { PANTRY } from './pantry.js';
 import { RECIPES, STATIONS, cookbookOf, matchMix, fallbackMix, cookableAt, knows } from './cooking.js';
 import { BUFFS, TIER_NAMES, mealActive, mealLabel } from './meals.js';
+import { tickSoak } from '../rpg/zoneBuffs.js';
 import { campfireGeo, flameGeos, stovePotGeo, brothGeo } from './kitchenModels.js';
 import { pantryIcon } from './pantryIcons.js';
 
@@ -124,7 +125,7 @@ export class Kitchen {
     if (W === this.campWorld) return;
     this.campWorld = W; this.camp = null;
     if (G.mode !== 'dungeon' || !G.dungeon?.startPos || !W?.scene) return;
-    const spot = this.campSpot(W, G.dungeon.startPos);
+    const spot = this.campSpot(W, G.dungeon.campAnchor || G.dungeon.startPos); // (a zone village's arrival moves startPos: the camp stays by the Stone)
     if (!spot) return;
     const M = mats(), F = flameGeos(), grp = new THREE.Group(); grp.name = 'kitchen:campfire';
     const y = W.heightAt?.(spot.x, spot.z) ?? 0;
@@ -216,7 +217,7 @@ export class Kitchen {
   update(dt) {
     const G = this.G;
     this.ensureCamp();
-    if (!G.titleActive && !G.playerDead && dt > 0) G.actions.tickMeal?.(dt);
+    if (!G.titleActive && !G.playerDead && dt > 0) { G.actions.tickMeal?.(dt); tickSoak(G, dt); } // (the bathhouse's soak: rpg/zoneBuffs.js)
     // the campfire: flickering tongues, embers, steam off the pot
     const c = this.camp;
     if (c && c.world === G.world) {

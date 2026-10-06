@@ -12,6 +12,12 @@
 //                of them aim ice darts at you (lane telegraphs). The copies shatter when hit (a puff of chill) or burst
 //                after a few seconds (small lilac circles). She rests meanwhile: find her and hit her.
 //   children     at 70% she calls two yuki-warashi.
+//   IN HER HALL  (the Onsen Caverns' round arena, r ≥ 15 m: docs/ZONES.md §8.2) the fight is retuned for the bigger ring
+//                and a hero fresh from two dense floors: two waves of snow children (70%: three yuki-warashi; 40%: two
+//                more and two tsurara), spawned toward the middle of the hall; more icicles and glare-ice patches to cover
+//                the ring; the mirrors stand a little wider; her whiteout's lantern refuges are the hall's own yukimi
+//                lanterns (world.arenaLanterns), and its haze is a touch thinner down here, so the dark cave never goes
+//                flat white.
 //   PHASE 2      below 50% a WHITEOUT blows in, in waves (13 s on, 8 s off): a snow-haze overlay with clear ellipses round
 //                Chewy and each lantern (world.arenaLanterns, or four spirit lanterns she lights if the map has none), the
 //                fog pulled in behind him, the lanterns flaring warm. Away from a lantern's warmth, frostbite nips and
@@ -41,6 +47,9 @@ const TUNE = {
   keep: [6, 5.5],
   whiteout: { on: 13, off: 8 },
 };
+// the arena retune (an authored round hall of r ≥ 15 m instead of the 11 m outdoor lake)
+const ARENA_TUNE = { summonAt: [0.7, 0.4], waves: [['yukiwarashi', 'yukiwarashi', 'yukiwarashi'], ['yukiwarashi', 'yukiwarashi', 'tsurara', 'tsurara']], icicleN: [7, 10], floorN: [4, 5], mirrorR: 6.0, rim: 4.6, woA: 0.6, woFog: 0.72 };
+const inHall = Y => (Y.arena?.r || 0) >= 15;
 const _v = V(), _w = V(), _p = V(), _q = V(), _cr = V(), _cu = V(), _cf = V();
 const ph = Y => (Y.phase > 1 ? 1 : 0);
 
@@ -381,7 +390,8 @@ function update(m, dt) {
   const frac = m.life / m.lifeMax;
   if (!Y.busy && act) {
     if (Y.phase === 1 && frac < 0.5) { startStorm(m); return; }
-    if (Y.summoned === 0 && frac < 0.7) { callChildren(m); return; }
+    const sAt = inHall(Y) ? ARENA_TUNE.summonAt : [0.7];
+    if (Y.summoned < sAt.length && frac < sAt[Y.summoned]) { callChildren(m); return; }
     Y.gcd -= dt;
     if (Y.restT <= 0 && Y.gcd <= 0 && think(m, tgt, d)) return;
   }
@@ -429,7 +439,8 @@ function reposition(m, dt, tgt, d) {
   const radial = clamp((d - want) / 2, -1, 1);
   let mx = dx * radial - dz * Y.strafe * 0.7, mz = dz * radial + dx * Y.strafe * 0.7;
   const A = Y.arena, ox = m.pos.x - A.x, oz = m.pos.z - A.z, od = Math.hypot(ox, oz) || 1;
-  if (od > A.r - 2.2) { const k = clamp((od - (A.r - 2.2)) / 1.5) * 1.6; mx -= ox / od * k; mz -= oz / od * k; }
+  const rim = A.r - (inHall(Y) ? ARENA_TUNE.rim : 2.2); // (in the hall she keeps off the lantern ring and the rock: the fight stays in the open)
+  if (od > rim) { const k = clamp((od - rim) / 1.5) * 1.6; mx -= ox / od * k; mz -= oz / od * k; }
   const ml = Math.hypot(mx, mz);
   if (ml < 0.15) { m.faceTo(tgt.pos.x, tgt.pos.z, dt); return; }
   _v.set(mx / ml, 0, mz / ml);
@@ -520,7 +531,7 @@ function doBlizzard(m, tgt, second = false) {
 
 // ------------------------------------------------------------------ ICICLE RAIN
 function doIcicles(m, tgt) {
-  const Y = m.Y, B = m.B, G = m.G, fx = Y.fx, T = TUNE.icicles, W = m.world, n = T.n[ph(Y)];
+  const Y = m.Y, B = m.B, G = m.G, fx = Y.fx, T = TUNE.icicles, W = m.world, n = (inHall(Y) ? ARENA_TUNE.icicleN : T.n)[ph(Y)];
   Y.busy = true;
   poseTo(m, { rX: -2.7, rZ: 0.25, hX: -0.22, lX: -0.35, lZ: -0.35, hover: 0.45, rate: 6 });
   sfx('yuki_cast', m.pos);
@@ -553,7 +564,7 @@ function doIcicles(m, tgt) {
 
 // ------------------------------------------------------------------ FROZEN FLOOR (glare-ice patches you slide on)
 function doFloor(m, tgt) {
-  const Y = m.Y, B = m.B, G = m.G, fx = Y.fx, T = TUNE.floor, n = T.n[ph(Y)], A = Y.arena, wind = 0.95;
+  const Y = m.Y, B = m.B, G = m.G, fx = Y.fx, T = TUNE.floor, n = (inHall(Y) ? ARENA_TUNE.floorN : T.n)[ph(Y)], A = Y.arena, wind = 0.95;
   Y.busy = true;
   poseTo(m, { spin: 9, rX: -0.4, rZ: 1.35, lX: -0.4, lZ: -1.35, hover: 0.2, hX: 0.1, rate: 6 });
   sfx('yuki_twirl', m.pos);
@@ -639,7 +650,7 @@ function doMirror(m, tgt) {
   const Y = m.Y, B = m.B, G = m.G, fx = Y.fx, T = TUNE.mirror, n = T.n[ph(Y)], W = m.world, mode = m.mode, Cb = mode.combat;
   const P = tgt, spots = [], base = rand(0, TAU);
   for (let i = 0; i < n; i++) for (let k = 0; k < 12; k++) {
-    const a = base + i / n * TAU + (k ? rand(-0.45, 0.45) : 0), r = T.R + (k ? rand(-1, 0.8) : 0), x = P.pos.x + Math.cos(a) * r, z = P.pos.z + Math.sin(a) * r;
+    const a = base + i / n * TAU + (k ? rand(-0.45, 0.45) : 0), r = (inHall(Y) ? ARENA_TUNE.mirrorR : T.R) + (k ? rand(-1, 0.8) : 0), x = P.pos.x + Math.cos(a) * r, z = P.pos.z + Math.sin(a) * r;
     if (openSpot(m, x, z, 0.8) && inArena(Y, x, z, 0.8) && !spots.some(q => Math.hypot(q.x - x, q.z - z) < 2.4)) { spots.push({ x, z, y: W.heightAt(x, z) }); break; }
   }
   if (spots.length < 2) { doIcicles(m, tgt); return; }
@@ -755,12 +766,17 @@ function mirrorUpdate(c, dt) {
 
 // ------------------------------------------------------------------ her snow children (70%)
 function callChildren(m) {
-  const Y = m.Y, G = m.G, fx = Y.fx;
-  Y.summoned = 1;
-  const id = pickId(['yukiwarashi'], 'mochi');
-  const adds = summonAt(m, id, 2, m.pos.x, m.pos.z, 2.2, 4.2);
+  const Y = m.Y, G = m.G, fx = Y.fx, A = Y.arena;
+  Y.summoned++;
+  let adds;
+  if (inHall(Y)) { // a wave from ARENA_TUNE, spawned between her and the hall's middle (never out by the rim or in the mouth)
+    const cx = A.x + (m.pos.x - A.x) * 0.55, cz = A.z + (m.pos.z - A.z) * 0.55, wave = ARENA_TUNE.waves[Y.summoned - 1] || ARENA_TUNE.waves[0], cnt = {};
+    for (const id of wave) cnt[id] = (cnt[id] || 0) + 1;
+    adds = [];
+    for (const [id, k] of Object.entries(cnt)) adds.push(...summonAt(m, pickId([id], 'mochi'), k, cx, cz, 2.0, 4.5)); // (≤ 0.55 (r − 2.2) + 4.5 m from the middle: inside the ring)
+  } else adds = summonAt(m, pickId(['yukiwarashi'], 'mochi'), 2, m.pos.x, m.pos.z, 2.2, 4.2);
   for (const a of adds) { fx.puffs(a.pos.x, a.pos.y + 0.3, a.pos.z, { n: 10, size: 0.6, speed: 2, up: 1.4 }); fx.burst(a.pos.x, a.pos.y + 0.6, a.pos.z, { frame: FR.FLAKE, n: 10, colors: PAL_SNOW, speed: 3, up: 3, size: 0.26, grav: 2, life: 1 }); }
-  G.ui?.toast?.('Yuki-onna calls her snow children!', { color: '#bfe6ff', icon: 'oni' });
+  G.ui?.toast?.(Y.summoned > 1 ? 'Yuki-onna calls the whole hall to her side!' : 'Yuki-onna calls her snow children!', { color: '#bfe6ff', icon: 'oni' });
   sfx('yuki_call', m.pos); m.emote('!', 1.2);
   Y.busy = true; poseTo(m, { rX: -1.6, rZ: 0.9, lX: -1.6, lZ: -0.9, hX: -0.15 });
   m.B.after(0.9, () => { poseTo(m, {}); rest(m, 0.6); });
@@ -821,10 +837,11 @@ function updateWhiteout(m, dt) {
   const k = ease.inOutQuad(wo.k), W = m.world, sc = W.scene, cam = G.engine.camera, P = G.player;
   // fog pulled in just behind Chewy (the haze overlay does the close-up whiteout), background to snow
   const camD = cam.position.distanceTo(G.engine.rig.target || P.pos);
-  if (sc.fog) { sc.fog.near = lerp(wo.save.near, camD + 3, k); sc.fog.far = lerp(wo.save.far, camD + 24, k); sc.fog.color.copy(wo.save.color).lerp(WO_FOG, k); }
-  if (sc.background?.isColor) sc.background.copy(wo.save.bg).lerp(WO_FOG, k);
+  const fk = inHall(Y) ? ARENA_TUNE.woFog : 1; // (down in the hall the fog reaches only part way to snow-white: the cave stays a cave)
+  if (sc.fog) { sc.fog.near = lerp(wo.save.near, camD + 3, k); sc.fog.far = lerp(wo.save.far, camD + 24, k); sc.fog.color.copy(wo.save.color).lerp(WO_FOG, k * fk); }
+  if (sc.background?.isColor) sc.background.copy(wo.save.bg).lerp(WO_FOG, k * fk);
   // overlay: Chewy's small clear circle, the lanterns' big warm ones (screen-space ellipses of ground circles)
-  const U = wo.mesh.material.uniforms; U.uA.value = 0.82 * k; U.uT.value = m.B.t; U.uAsp.value = cam.aspect;
+  const U = wo.mesh.material.uniforms; U.uA.value = (inHall(Y) ? ARENA_TUNE.woA : 0.82) * k; U.uT.value = m.B.t; U.uAsp.value = cam.aspect;
   cam.matrixWorld.extractBasis(_cr, _cu, _cf);
   const rx = _cr.x, rz = _cr.z, rl = Math.hypot(rx, rz) || 1, fx = -_cf.x, fz = -_cf.z, fl = Math.hypot(fx, fz) || 1;
   WB.rx = rx / rl; WB.rz = rz / rl; WB.fx = fx / fl; WB.fz = fz / fl;
@@ -898,6 +915,7 @@ function onDeath(m) {
 const hurtT = { t: -9 };
 export const MONSTERS = {
   yukiOnna: {
+    adds: ['yukiMirror', 'yukiwarashi', 'tsurara'], // (her glass copies and her children: dungeon/zoneRun.js warms them with the floor)
     name: 'Yuki-onna', build: 'yukiOnna', boss: true, subtitle: 'The Frost Princess breathes, and the world turns to snow.',
     scale: S, radius: 0.72, vr: 0.82, speed: 2.4, life: 1, dmg: 1, move: 'none', element: 'frost',
     stats: { name: 'Yuki-onna', life: 1.0, dmg: 1.0, def: 1.0, speed: 1.05, xp: 1.5, element: 'frost', res: { frost: 60, fire: -20, holy: 10 } },

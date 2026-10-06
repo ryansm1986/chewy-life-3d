@@ -13,8 +13,12 @@ import * as tengu from '../bosses/tengu.js';
 import * as tanuki from '../bosses/tanuki.js';
 import * as umibozu from '../bosses/umibozu.js';
 import * as yukionna from '../bosses/yukionna.js';
+import * as zoneBamboo from '../../dungeon/zoneMonsters/bamboo.js'; // (dungeon-only monsters: docs/ZONES.md §8.2)
+import * as zoneMaple from '../../dungeon/zoneMonsters/maple.js';
+import * as zoneTide from '../../dungeon/zoneMonsters/tidepool.js';
+import * as zoneOnsen from '../../dungeon/zoneMonsters/onsen.js';
 
-export const REGION_MONSTER_MODULES = { bamboo, maple, tidepool, onsen, tengu, tanuki, umibozu, yukionna };
+export const REGION_MONSTER_MODULES = { bamboo, maple, tidepool, onsen, tengu, tanuki, umibozu, yukionna, zoneBamboo, zoneMaple, zoneTide, zoneOnsen };
 for (const mod of Object.values(REGION_MONSTER_MODULES)) {
   registerMonsters(mod.MONSTERS, mod.BUILD);
   for (const [id, def] of Object.entries(mod.MONSTERS || {})) {

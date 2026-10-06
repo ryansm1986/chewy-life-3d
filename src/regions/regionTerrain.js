@@ -161,9 +161,13 @@ export class RegionTerrain {
     for (let j = 0; j < NA; j++) for (let i = 0; i < NA; i++) h[j * NA + i] = this.rawHeight(AX[i], AX[j]);
     const [lo, hi] = this.band, mid = (lo + hi) / 2;
     const rawAt = (x, z) => this.gridHeight(x, z);
+    // the zone village's clearing (layoutGen plan.village): the trail runs through it at the clearing's own level, so the
+    // square stays one flat floor instead of a groove along the trail
+    const vd = P.village ? { ...P.village, lvl: clamp(rawAt(P.village.x, P.village.z), lo + 0.1, hi - 0.15) } : null;
+    const atVillage = (x, z, v) => (vd ? lerp(v, vd.lvl, 1 - smoothstep(vd.r - 2, vd.r + 3.5, Math.hypot(x - vd.x, z - vd.z))) : v);
     // trail profile: raw height along the trail, clamped into the band and smoothed, then carved in (a little sunken)
     const carve = (path, w, sink) => {
-      const prof = path.map(([x, z]) => clamp(rawAt(x, z), lo + 0.08, hi - 0.12));
+      const prof = path.map(([x, z]) => atVillage(x, z, clamp(rawAt(x, z), lo + 0.08, hi - 0.12)));
       const sm = prof.map((_, i) => { let s = 0, n = 0; for (let k = -6; k <= 6; k++) { const q = prof[clamp(i + k, 0, prof.length - 1)]; s += q; n++; } return s / n; });
       return { path, prof: sm, w, sink };
     };
@@ -184,7 +188,8 @@ export class RegionTerrain {
         const dd = Math.hypot(x - d.x, z - d.z);
         const inner = d.kind === 'arena' ? d.r - 2.5 : d.r - 2, outer = d.r + (d.kind === 'arena' ? 2.5 : 3.5);
         if (dd > outer) continue;
-        const wt = 1 - smoothstep(inner, outer, dd);
+        let wt = 1 - smoothstep(inner, outer, dd);
+        if (d.shore != null) wt *= smoothstep(d.shore, d.shore + 0.6, h[k]); // (a shore village: the water's edge keeps its slope)
         if (wt > wsum) { wsum = wt; tsum = d.lvl; }
       }
       if (wsum > 0) hv = lerp(hv, tsum, wsum);

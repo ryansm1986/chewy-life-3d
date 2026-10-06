@@ -10,8 +10,12 @@ import { SFX as bTengu } from '../bosses/tengu.sfx.js';
 import { SFX as bTanuki } from '../bosses/tanuki.sfx.js';
 import { SFX as bUmi } from '../bosses/umibozu.sfx.js';
 import { SFX as bYuki } from '../bosses/yukionna.sfx.js';
+import { SFX as zBamboo } from '../../dungeon/zoneMonsters/bamboo.sfx.js';
+import { SFX as zMaple } from '../../dungeon/zoneMonsters/maple.sfx.js';
+import { SFX as zTide } from '../../dungeon/zoneMonsters/tidepool.sfx.js';
+import { SFX as zOnsen } from '../../dungeon/zoneMonsters/onsen.sfx.js';
 
 export const REGION_SFX = {};
-for (const S of [env, ambient, mBamboo, mMaple, mTide, mOnsen, bTengu, bTanuki, bUmi, bYuki]) {
+for (const S of [env, ambient, mBamboo, mMaple, mTide, mOnsen, bTengu, bTanuki, bUmi, bYuki, zBamboo, zMaple, zTide, zOnsen]) {
   for (const k in S) { if (REGION_SFX[k]) throw new Error(`region sfx clash: ${k}`); REGION_SFX[k] = S[k]; }
 }

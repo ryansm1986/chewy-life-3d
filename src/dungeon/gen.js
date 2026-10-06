@@ -1,5 +1,7 @@
 // Procedural burrow layout: organic rooms joined by wobbly corridors (MST + loops), with spawns, loot and props.
 import { RNG, Noise } from '../core/util.js';
+import { generateZone } from './zoneGen.js';
+import { ZONE_THEMES } from './zoneKits/themes.js';
 
 export const CELL = 2; // world units per cell
 // kit: which geometry/shader kit renders the biome (defaults to the theme key); sun/sunI: key light colour & strength
@@ -10,6 +12,7 @@ export const THEMES = {
   crystal: { name: 'Crystal Grotto', floor: ['#9aa6c8', '#8894b8', '#b0bcd8'], wall: ['#5a4a8a', '#4a3c78', '#6a5a9c'], top: ['#a8e8ff', '#c8b8ff', '#ffc8f0'], fog: '#161430', ambient: ['#8a98e0', '#2a2040'], accent: '#ff8ae0', light: '#7ae8ff', monsters: ['wisp', 'kinoko', 'lantern', 'mochi', 'wisp', 'dustbunny'], music: 'dungeon', wobble: 0.8 },
   // Tamamo's lair: the fox-shrine kit re-lit by moonlight (cool silver key light, warm lanterns, blue foxfire)
   moon: { name: 'Moonlit Fox Sanctum', kit: 'shrine', floor: ['#b89878', '#a88a6c', '#c8a888'], wall: ['#5a5a8a', '#4a4a78', '#6a6a9a'], top: ['#6a8a9a', '#5a7a8a', '#bcd8ff'], fog: '#10122a', ambient: ['#98a8f0', '#262440'], ambientI: 1.4, sun: '#c4d4ff', sunI: 1.6, accent: '#bcd8ff', light: '#ffc890', lightI: 9, grade: { gain: [0.97, 1.0, 1.05], sat: 1.05, lift: [0.01, 0.01, 0.03] }, monsters: ['wisp', 'kasa', 'lantern', 'tanuki', 'wisp'], music: 'dungeon', wobble: 0.25, built: true },
+  ...ZONE_THEMES, // the zone dungeons' kits (dungeon/zoneKits/themes.js: bamboo shrine caves, ...)
 };
 // 1-5 burrow (King Mochi) · 6-10 fox shrine (Lord Karakasa) · 11-15 kitchen (Oni Chef) · 16-19 crystal grotto · 20 moonlit sanctum (Tamamo)
 export function themeFor(floor) {
@@ -27,6 +30,7 @@ export function generate({ floor = 1, seed = 1, plan = null } = {}) {
   const P = plan || { theme: themeFor(floor), boss: bossFor(floor), mlvl: floor + 1, waypoint: floor % 5 === 1 && floor > 1, depth: floor };
   const boss = P.boss || null, depth = P.depth ?? floor;
   const theme = THEMES[P.theme] ? P.theme : themeFor(floor), TH = THEMES[theme];
+  if (P.layout === 'zone') return generateZone({ floor, seed, plan: { ...P, theme }, TH }); // a zone dungeon's floor (zoneGen.js)
   // built biomes (shrine / kitchen) get cleaner rooms and straight corridors so fences & brick walls read as architecture
   const wob = TH.wobble ?? 0.9, built = !!TH.built, cr = built ? 1.4 : 2.2;
   const W = boss ? 56 : 64 + Math.min(16, depth * 2), H = W;
