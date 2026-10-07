@@ -1,0 +1,102 @@
+/* Gamepad prompts and the pad-active state (ui/padGlyphs.js, core/actions.js; docs/CONTROLS.md §1) */
+
+/* the cursor hides while a gamepad plays (any mouse move brings it back) */
+body.pad-active, body.pad-active * { cursor: none !important; }
+
+/* a pad glyph replaces the keycap's paper key: the SVG is the whole cap */
+.kc.pad { background: none; border: 0; box-shadow: none; padding: 0; min-width: 0; height: 26px; border-radius: 0; flex: none; } /* (flex: none: a glyph never shrinks under the words beside it) */
+.kc.pad .pg { width: 26px; height: 26px; display: block; overflow: visible; }
+.kc.pad .pg.wide { width: 39px; }
+.kc.sm.pad { height: 24px; min-width: 0; padding: 0; box-shadow: none; vertical-align: -6px; }
+.kc.sm.pad .pg { width: 24px; height: 24px; }
+.kc.sm.pad .pg.wide { width: 36px; }
+.kc.pad.inline { display: inline-grid; vertical-align: -7px; margin: 0 1px; }
+.kc.unbound { display: none !important; }
+.pg text { font-family: var(--font, 'Fredoka', sans-serif); }
+
+/* markup with a keyboard and a pad version (footers, the reel bar's hint): the visible one keeps its own display */
+body:not(.pad-active) .pad-only { display: none !important; }
+body.pad-active .kbm-only { display: none !important; }
+.pad-only .kc.pad.inline, .kc.pad.inline { margin: 0 2px; }
+/* the gift and seed cards' number keys mean nothing on the pad (the D-pad picks, A gives) */
+body.pad-active :is(.gf-k, .sp-k) { display: none; }
+
+/* the HUD: the interact prompt's big bobbing cap, the hotbar and button badges */
+.hud .prompt .kc.pad { background: none; min-width: 0; height: 34px; }
+.hud .prompt .kc.pad .pg { width: 34px; height: 34px; }
+.hud .prompt .kc.pad .pg.wide { width: 51px; }
+.hb .hb-k.pad, .belt .hb-k.pad { left: -11px; bottom: -12px; transform: none; height: 30px; }
+.hb .hb-k.pad .pg, .belt .hb-k.pad .pg { width: 30px; height: 30px; }
+.hb .hb-k.pad .pg.wide, .belt .hb-k.pad .pg.wide { width: 45px; }
+.hud .mb .kc.pad { right: -10px; bottom: -11px; transform: none; }
+.hsw .kc.pad { bottom: -13px; padding: 0; height: 24px; }
+.hsw .kc.pad .pg { width: 24px; height: 24px; }
+
+/* the pad picks dialogue choices with the D-pad / stick and A (the keyboard's number keys hide) */
+.dch.pad-focus { transform: translateY(-3px) scale(1.04); background: linear-gradient(90deg, #fff, color-mix(in srgb, var(--sc) 30%, #fff)); box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--sc), 0 5px 0 3px var(--ink); }
+.dch.pad-focus .dch-paw { opacity: 1; transform: rotate(90deg); }
+body.pad-active .dch > .kc, body.pad-active .hw-k { display: none; }
+
+/* the title screen's buttons with the pad (CT-1 bridge; CT-2's focus navigation styles every panel) */
+.ti-btns .btn.pad-focus { transform: translateY(-3px) scale(1.05); box-shadow: 0 0 0 4px #fff, 0 0 0 8px #ff8fb0, 0 6px 0 4px var(--ink); }
+
+/* the pause menu's quick panels row (shown while the pad plays: the Menu button reaches the panels) */
+.mn-quick { display: none; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 2px 0 14px; }
+body.pad-active .mn-quick { display: flex; }
+.mn-quick .btn { font-size: 15px; padding: 7px 13px 8px; }
+.mn-quick .btn .gl { width: 19px; height: 19px; }
+
+/* Settings › Controls: per-device bindings, rebindable */
+.ctl-tabs { display: flex; justify-content: center; gap: 8px; margin: 0 0 10px; }
+.ctl-tabs button { font: 700 15px/1 var(--font); padding: 7px 14px 8px; border: 3px solid var(--ink); border-radius: 14px; background: #f3e3cf; cursor: pointer; }
+.ctl-tabs button.on { background: linear-gradient(#ffc6d8, #ff8fb0); color: #fff; -webkit-text-stroke: 3.5px var(--ink); paint-order: stroke fill; box-shadow: 0 2px 0 var(--ink); }
+.ctl-opts { display: none; margin: 0 0 6px; }
+.p-menu[data-dev="pad"] .ctl-opts { display: block; }
+.ctl-opts .set-row { padding: 7px 6px; }
+.ctl-list { max-height: min(52vh, 430px); overflow-y: auto; padding: 0 6px 6px 2px; scrollbar-width: thin; }
+.ctl-g { margin: 10px 2px 4px; font: 700 13px var(--font); letter-spacing: .04em; text-transform: uppercase; opacity: .6; }
+.ctl-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 4px; border-bottom: 2px dashed rgba(74, 44, 42, .1); font: 500 14px var(--font); }
+.ctl-row .ctl-b { display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 92px; min-height: 32px; padding: 2px 8px; border: 2px solid transparent; border-radius: 12px; background: none; cursor: pointer; font: 700 13px var(--font); }
+.ctl-row .ctl-b:hover:not(.locked) { border-color: var(--ink); background: #fff3e0; }
+.ctl-row .ctl-b.locked { cursor: default; opacity: .75; }
+.ctl-row .ctl-b.wait { border-color: var(--ink); background: linear-gradient(#fff4c0, #ffcf4a); animation: ctlWait 1s ease-in-out infinite; }
+.ctl-row .ctl-b .none { opacity: .45; font-weight: 500; }
+.ctl-row .kc { pointer-events: none; }
+.ctl-row.flash { animation: ctlFlash .7s ease-out; }
+.ctl-note { margin: 8px 4px 0; font: 500 12.5px var(--font); opacity: .7; text-align: center; }
+@keyframes ctlWait { 50% { transform: scale(1.05); } }
+@keyframes ctlFlash { 0% { background: #ffe6a8; } 100% { background: transparent; } }
+
+/* ---- CT-2: the focus ring (ui/padNav.js): a white and pink double ring that glides between elements, with a paw */
+.pad-ring { position: fixed; left: 0; top: 0; width: 40px; height: 40px; z-index: 60; pointer-events: none; opacity: 0; border-radius: 14px;
+  box-shadow: 0 0 0 3px #fff, 0 0 0 6.5px #ff8fb0, 0 0 0 8.5px var(--ink, #4a2c2a), 0 0 18px 8px rgba(255, 143, 176, .38);
+  transition: transform .13s cubic-bezier(.3, 1.4, .5, 1), width .13s, height .13s, opacity .15s; }
+.pad-ring.on { opacity: 1; animation: padRingPulse 1.6s ease-in-out infinite; }
+.pad-ring.bump { animation: padRingBump .25s ease-out; }
+.pad-ring .pr-paw { position: absolute; left: -15px; top: -15px; width: 22px; height: 22px; border-radius: 50%; background: #ff8fb0; border: 2.5px solid var(--ink, #4a2c2a);
+  box-shadow: 0 2px 0 var(--ink, #4a2c2a); animation: padPaw 1.1s ease-in-out infinite; }
+.pad-ring .pr-paw::before { content: ''; position: absolute; left: 50%; top: 56%; width: 9px; height: 7px; margin: -3.5px 0 0 -4.5px; border-radius: 50% 50% 45% 45%; background: #fff6e8; }
+.pad-ring .pr-paw::after { content: ''; position: absolute; left: 3px; top: 2px; width: 3.5px; height: 3.5px; border-radius: 50%; background: #fff6e8;
+  box-shadow: 4.6px -1.6px 0 #fff6e8, 9.2px 0 0 #fff6e8; }
+@keyframes padRingPulse { 50% { box-shadow: 0 0 0 3px #fff, 0 0 0 6.5px #ffb0c8, 0 0 0 8.5px var(--ink, #4a2c2a), 0 0 24px 10px rgba(255, 143, 176, .5); } }
+@keyframes padRingBump { 30% { box-shadow: 0 0 0 3px #fff, 0 0 0 6.5px #ff6f86, 0 0 0 8.5px var(--ink, #4a2c2a); margin-left: 3px; } 60% { margin-left: -3px; } }
+@keyframes padPaw { 50% { transform: translateY(-3px) rotate(-12deg); } }
+
+/* the footer of glyph hints under the focused panel (and above the build / decorate palette) */
+.pad-hints { position: fixed; left: 0; top: 0; z-index: 61; display: flex; gap: 6px 14px; flex-wrap: wrap; align-items: center; max-width: min(92vw, 760px);
+  padding: 6px 14px 7px; background: linear-gradient(#fffdf8, #fff1e0); border: 3px solid var(--ink, #4a2c2a); border-radius: 999px; box-shadow: 0 3px 0 var(--ink, #4a2c2a);
+  font: 700 14px/1 var(--font); color: var(--ink, #4a2c2a); pointer-events: none; opacity: 0; transition: opacity .15s; }
+.pad-hints.on { opacity: 1; }
+.pad-hints .ph-i { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.pad-hints .kc.pad { height: 24px; }
+.pad-hints .kc.pad .pg { width: 24px; height: 24px; }
+.pad-hints .kc.pad .pg.wide { width: 36px; }
+
+/* the virtual cursor in build and decorate mode (ui/padCursor.js): a paw pointer */
+.pad-cursor { position: fixed; left: 0; top: 0; z-index: 59; width: 0; height: 0; pointer-events: none; opacity: 0; transition: opacity .15s; }
+.pad-cursor.on { opacity: 1; }
+.pad-cursor .pc-dot { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2.5px solid var(--ink, #4a2c2a); box-shadow: 0 0 0 3px rgba(255, 143, 176, .6); }
+.pad-cursor .pc-paw { position: absolute; left: 6px; top: 6px; width: 26px; height: 26px; border-radius: 50%; background: #ff8fb0; border: 3px solid var(--ink, #4a2c2a); box-shadow: 0 3px 0 var(--ink, #4a2c2a); transform: rotate(-20deg); animation: padPaw 1.1s ease-in-out infinite; }
+.pad-cursor .pc-paw::before { content: ''; position: absolute; left: 50%; top: 58%; width: 11px; height: 9px; margin: -4.5px 0 0 -5.5px; border-radius: 50% 50% 45% 45%; background: #fff6e8; }
+.pad-cursor .pc-paw::after { content: ''; position: absolute; left: 4px; top: 3px; width: 4.5px; height: 4.5px; border-radius: 50%; background: #fff6e8; box-shadow: 5.6px -2px 0 #fff6e8, 11.2px 0 0 #fff6e8; }
+.pad-hints.pc-hints { max-width: min(94vw, 980px); }

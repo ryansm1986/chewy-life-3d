@@ -5,6 +5,8 @@
 //   new HeroWheel(G, heroes) → .show() .hide() .release() .input() .open
 import './heroWheel.css';
 import { Input } from '../core/input.js';
+import { Actions } from '../core/actions.js';
+import { keyCap } from './padGlyphs.js';
 import { HERO_TEXT } from '../rpg/classes.js';
 import { el, esc } from './dom.js';
 import { portrait } from './portraits.js';
@@ -14,7 +16,7 @@ export class HeroWheel {
   constructor(G, heroes) {
     this.G = G; this.H = heroes; this.open = false; this.sel = null; this.cards = [];
     this.root = el('div', 'hero-wheel');
-    this.root.innerHTML = `<div class="hw-ring"></div><div class="hw-hub"><b>Heroes</b><span>Let go of <span class="kc sm">Tab</span> to switch</span></div>`;
+    this.root.innerHTML = `<div class="hw-ring"></div><div class="hw-hub"><b>Heroes</b><span>Let go of ${keyCap('hero', { sm: true })} to switch</span></div>`;
     (document.getElementById('ui') || document.body).appendChild(this.root);
     this.ring = this.root.querySelector('.hw-ring');
     this.hub = this.root.querySelector('.hw-hub');
@@ -52,7 +54,7 @@ export class HeroWheel {
     this.sel = i;
     this.cards.forEach((c, k) => c.el.classList.toggle('sel', k === i));
     const h = this.cards[i].h;
-    this.hub.innerHTML = `<b>${esc(h.joined ? h.name : '???')}</b><span>${h.active ? 'Playing now' : h.ready ? `Let go of <span class="kc sm">Tab</span> to play as ${esc(h.name)}` : esc(h.why)}</span>`;
+    this.hub.innerHTML = `<b>${esc(h.joined ? h.name : '???')}</b><span>${h.active ? 'Playing now' : h.ready ? `Let go of ${keyCap('hero', { sm: true })} to play as ${esc(h.name)}` : esc(h.why)}</span>`;
     this.G.audio?.play?.('ui_hover', { vol: 0.5 });
   }
   confirm() { const c = this.cards[this.sel]; this.H.pickFromWheel(c && c.h.ready ? c.h.id : null); }
@@ -62,12 +64,18 @@ export class HeroWheel {
   input() {
     for (let k = 0; k < Math.min(KEYS.length, this.cards.length); k++) if (Input.hit(KEYS[k])) { Input.consume(KEYS[k]); this.select(k); this.confirm(); return; }
     if (Input.hit('escape')) { Input.consume('escape'); this.H.pickFromWheel(null); return; }
+    // the pad (docs/CONTROLS.md §2): the right stick points at a hero, B closes the wheel without switching
+    if (Actions.pressed('roll', 'pad')) { Actions.consume('roll', 'pad'); this.H.pickFromWheel(null); return; }
+    const rs = Actions.aim();
+    if (rs.mag > 0.5) { this.pickAngle(Math.atan2(-rs.y, rs.x)); return; } // (screen angles: y grows downward)
     // radial pick: the mouse pushed away from where it was when the wheel opened selects the card in that direction
     const dx = Input.mouse.x - this.mouse0.x, dy = Input.mouse.y - this.mouse0.y;
-    if (dx * dx + dy * dy > 40 * 40) {
-      const a = Math.atan2(dy, dx); let best = -1, bd = 9;
-      this.cards.forEach((c, k) => { let d = Math.abs(((a - c.a) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI); if (d < bd) { bd = d; best = k; } });
-      this.select(best);
-    }
+    if (dx * dx + dy * dy > 40 * 40) this.pickAngle(Math.atan2(dy, dx));
+  }
+  /** select the card nearest a screen angle (the mouse push, or the pad's right stick) */
+  pickAngle(a) {
+    let best = -1, bd = 9;
+    this.cards.forEach((c, k) => { let d = Math.abs(((a - c.a) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI); if (d < bd) { bd = d; best = k; } });
+    this.select(best);
   }
 }

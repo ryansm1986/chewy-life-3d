@@ -13,8 +13,10 @@ import './tutorial.css';
 import { el, esc, replay } from './dom.js';
 import { glyph } from './glyphs.js';
 import { portraitHTML } from './portraits.js';
+import { keyHint, keyCap } from './padGlyphs.js';
 
-const md = s => esc(s).replace(/\*([^*]+)\*/g, '<b>$1</b>');
+// *word* → bold; while the gamepad plays, an emphasised key (*F*, *Tab*, *Shift*) becomes its pad glyph (ui/padGlyphs.js)
+const md = s => esc(s).replace(/\*([^*]+)\*/g, (m, w) => keyHint(w) || `<b>${w}</b>`);
 const NAMES = { shadow: 'Shadow', kero: 'Kero', moka: 'Moka', rosie: 'Rosie', usagi: 'Usagi', tanu: 'Tanu', poe: 'Poe' };
 
 export class TutorialUI {
@@ -25,9 +27,9 @@ export class TutorialUI {
       <div class="tut-mid"><div class="tut-flash"><b></b><small></small></div></div>
       <div class="tut-top"><div class="tut-dock">
         <div class="tut-say"><div class="ts-por"></div><div class="ts-bub"><b class="ts-name"></b><div class="ts-tx"></div></div></div>
-        <div class="tut-obj"><span class="to-ic"></span><span class="to-n"></span><div class="to-t"><small class="to-h"></small><b class="to-tx"></b></div><button class="btn sm mint to-ok">${glyph('check')}Got it!</button><button class="btn sm to-step">Skip step</button><button class="to-skip" title="Skip this guide">Skip</button></div>
+        <div class="tut-obj"><span class="to-ic"></span><span class="to-n"></span><div class="to-t"><small class="to-h"></small><b class="to-tx"></b></div><button class="btn sm mint to-ok">${glyph('check')}Got it!<span class="pad-only">${keyCap('map', { sm: true })}</span></button><button class="btn sm to-step">Skip step</button><button class="to-skip" title="Skip this guide">Skip</button></div>
       </div></div>
-      <div class="tut-top"><div class="tut-offer"><div class="tf-por"></div><div class="tf-t"><small>New guide available</small><b></b><span></span></div><div class="tf-b"><button class="btn sm pink tf-yes">${glyph('play')}Show me!</button><button class="btn sm tf-no">No thanks</button></div></div></div>`;
+      <div class="tut-top"><div class="tut-offer"><div class="tf-por"></div><div class="tf-t"><small>New guide available</small><b></b><span></span></div><div class="tf-b"><button class="btn sm pink tf-yes">${glyph('play')}Show me!</button><button class="btn sm tf-no">No thanks<span class="pad-only">${keyCap('roll', { sm: true })}</span></button></div></div></div>`;
     layer.appendChild(r);
     const q = s => r.querySelector(s);
     this.$ = { spot: q('.tut-spot'), ring: q('.tut-ring'), calls: q('.tut-calls'), flash: q('.tut-flash'), flashB: q('.tut-flash b'), flashS: q('.tut-flash small'), dock: q('.tut-dock'), say: q('.tut-say'), por: q('.ts-por'), name: q('.ts-name'), tx: q('.ts-tx'),
@@ -47,19 +49,25 @@ export class TutorialUI {
     $.ic.innerHTML = o.icon ? `<img src="${o.icon}" alt="">` : glyph('paw');
     $.n.textContent = `${o.n}/${o.total}`;
     $.h.textContent = o.title || '';
-    $.otx.innerHTML = md(o.objective || '');
+    $.otx.innerHTML = md(o.objective || ''); this._step = o;
     $.obj.classList.toggle('ack', !!o.ack); $.obj.classList.toggle('skippable', !!o.skippable);
     replay($.obj, 'pop', 500);
   }
   say(who, text) {
     const $ = this.$;
     if (!text) { $.say.classList.remove('on'); this.sig.say = ''; return; }
-    const sig = who + '|' + text; if (sig === this.sig.say) return; this.sig.say = sig;
+    const sig = who + '|' + text; if (sig === this.sig.say) return; this.sig.say = sig; this._say = [who, text];
     $.por.innerHTML = portraitHTML(this.ui.G?.portrait?.(who) || who);
     $.name.textContent = NAMES[who] || who;
     $.tx.innerHTML = md(text);
     $.say.classList.add('on'); replay($.say, 'pop', 500);
     this.ui.sfx?.('tick');
+  }
+  /** the input device changed: re-render the key names in the current line and objective (no pop, no tick) */
+  redraw() {
+    if (this._step && this.root.classList.contains('on')) this.$.otx.innerHTML = md(this._step.objective || '');
+    if (this._say && this.sig.say) this.$.tx.innerHTML = md(this._say[1]);
+    if (this.sig.calls) { const list = this.callouts; this.sig.calls = null; this.setCallouts(list); }
   }
   setPaused(p) { this.root.classList.toggle('paused', !!p); if (p) { this.highlight([]); this.setCallouts([]); this.flash(null); } }
   hide() { this.root.classList.remove('on', 'paused'); this.say(null); this.highlight([]); this.setCallouts([]); this.flash(null); }

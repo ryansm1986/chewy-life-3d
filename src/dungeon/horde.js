@@ -5,7 +5,8 @@
 //    animate() hooks drive, meshes with per-monster materials), but on cached geometry, and its root is never added to
 //    the scene: adopt() lists its meshes as slots, and every frame (scene.onBeforeRender) each visible slot's world
 //    matrix and per-instance looks are copied into one InstancedMesh per (geometry, program, render state). Toon bodies
-//    carry the hit flash (the material's emissive) and an exact normal matrix; ink hulls carry their colour and width
+//    carry the hit flash (the material's emissive) and an exact normal matrix (gfx/geom.js normalMatrixInto: finite for
+//    a part squashed flat, a dying monster; a collapsed instance is hidden); ink hulls carry their colour and width
 //    (elite contours); transparent parts their opacity and are sorted back to front; per-instance GPU-deform uniforms
 //    (tidepool's vhook `vhU`, `userData.instU`) become attributes. Everything code writes to a model keeps working.
 //    Batches that would draw alike share one material (no uniform re-upload between them), shadows one depth material;
@@ -22,6 +23,7 @@
 // Proof of identical looks: tools/qa/horde-shots.mjs (frozen lineups, before / after pixel diffs).
 import * as THREE from 'three';
 import { buildMonster, MONSTERS } from './monsters.js';
+import { normalMatrixInto } from '../gfx/geom.js';
 
 const QS = typeof location !== 'undefined' ? location.search : '';
 export const INSTANCED = !/[?&]noinst\b/.test(QS);
@@ -208,7 +210,7 @@ class Batch {
     } else {
       const em = m.emissive, k = m.emissiveIntensity ?? 1, F = this.aFlash.array;
       F[i * 3] = em.r * k; F[i * 3 + 1] = em.g * k; F[i * 3 + 2] = em.b * k;
-      _n3.getNormalMatrix(mesh.matrixWorld); this.aNM.array.set(_n3.elements, i * 9);
+      if (!normalMatrixInto(e, this.aNM.array, i * 9)) HIDE.toArray(M, o); // (collapsed to a line or a point: drawn nowhere)
     }
     if (this.aOp) this.aOp.array[i] = m.opacity;
     for (let j = 0; j < this.names.length; j++) {

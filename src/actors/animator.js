@@ -7,6 +7,13 @@ import { CHARGE_ACTIONS } from './chargePoses.js';
 import { SAMURAI_ACTIONS, SAMURAI_OVERRIDES, SAMURAI_FLOURISH } from './samuraiPoses.js';
 import { POE_ACTIONS } from './poePoses.js';
 
+// a lid's rest orientation, then a turn of `a` about the hinge axis (x, 0, z) (rig.lidTilt; no allocation per frame)
+const _lidAxis = new THREE.Vector3(), _lidQ = new THREE.Quaternion();
+function lidTurn(l, rest, x, z, a) {
+  l.quaternion.setFromEuler(rest.r);
+  l.quaternion.multiply(_lidQ.setFromAxisAngle(_lidAxis.set(x, 0, z), a));
+}
+
 // action library: dur (s), events {name: t01}, pose(t01, P, A) applies additive offsets
 const ACTIONS = {
   swing: { dur: 0.46, ev: { hit: 0.42 }, pose: (t, P, A) => {
@@ -266,8 +273,18 @@ export class Animator {
       // happy squint: upper lids +0.488 (0.4 of a blink), lower lids −0.24 (held at −0.1 otherwise); rig.squint = [upper, lower]
       // overrides it per model (a tall wrapped eye like the Toybox Rosie's reads happier with less upper lid)
       const sq = this.rig.squint, up = A.eyesHappy ? (sq ? sq[0] : 0.488) : 0, low = A.eyesHappy ? (sq ? sq[1] : -0.24) : -0.1;
-      for (const l of P.lids) { const r = this.rest.get(l); l.rotation.x = r.r.x + Math.max(blink * 1.22, up); }
-      for (const l of P.lidsLow || []) { const r = this.rest.get(l); l.rotation.x = r.r.x + low; }
+      const tilt = this.rig.lidTilt;
+      if (!tilt) {
+        for (const l of P.lids) { const r = this.rest.get(l); l.rotation.x = r.r.x + Math.max(blink * 1.22, up); }
+        for (const l of P.lidsLow || []) { const r = this.rest.get(l); l.rotation.x = r.r.x + low; }
+      } else {
+        // rig.lidTilt (radians): eyes that face that far outward hinge their lids about the eye's own sideways axis, not
+        // world X (a rigid lid on a 31°-out eye can't sweep the opening about world X). [0] = the character's left (+X)
+        // eye, whose hinge is (cos t, 0, −sin t); the right eye mirrors it. Same angles as above, about the tilted axes.
+        const c = Math.cos(tilt), s = Math.sin(tilt), a = Math.max(blink * 1.22, up);
+        P.lids.forEach((l, i) => lidTurn(l, this.rest.get(l), c, i ? s : -s, a));
+        (P.lidsLow || []).forEach((l, i) => lidTurn(l, this.rest.get(l), c, i ? s : -s, low));
+      }
     }
     if (P.lips) {
       this.smile = damp(this.smile ?? 0.4, A.happy || this.mood ? 1 : 0.4, 6, dt);

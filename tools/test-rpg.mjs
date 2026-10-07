@@ -1414,6 +1414,110 @@ hr('ZONE DUNGEONS: GENERATOR, PROGRESSION, FIRST-CLEAR UNIQUE');
   ok(leak === 0 && fu.rarity === 'unique' && fu.uniqueId === 'tenguGaleFeather', `uniques: 3000 random unique rolls never give a zone boss unique (${leak}); the first-clear chest's makeUnique does`);
 }
 
+// ------------------------------------------------------------------ render health (ROADMAP R-7: the black flashes)
+hr('RENDER HEALTH: NaN-SAFE NORMALS (ARCHITECTURE "Render health")');
+{
+  // one NaN pixel in the HDR buffer is a black block after the bloom: the normals that fed it must never be NaN. The
+  // Horde's per-instance normal matrix (the cofactor form) must turn normals like three's getNormalMatrix, and stay
+  // finite for a part squashed flat (a dying monster); merged geometry must not keep a zero vertex normal.
+  const THREE = await import('three');
+  const { normalMatrixInto, repairNormals, merge } = await import('../src/gfx/geom.js');
+  const rng = new RNG(24), r = () => rng.next(), A = new Float32Array(9), N = new THREE.Matrix3(), M3 = new THREE.Matrix3(), m = new THREE.Matrix4();
+  let worst = 0;
+  for (let t = 0; t < 3000; t++) {
+    m.compose(new THREE.Vector3(r(), r(), r()), new THREE.Quaternion(r() - 0.5, r() - 0.5, r() - 0.5, r() - 0.5).normalize(), new THREE.Vector3((r() < 0.5 ? -1 : 1) * (0.05 + 3 * r()), 0.05 + 3 * r(), 0.05 + 3 * r()));
+    if (t % 3 === 0) m.multiply(new THREE.Matrix4().makeShear(r(), 0, r(), 0, 0, r()));
+    N.getNormalMatrix(m); normalMatrixInto(m.elements, A, 0); M3.fromArray(A);
+    for (let k = 0; k < 3; k++) { const v = new THREE.Vector3(r() - 0.5, r() - 0.5, r() - 0.5).normalize(); worst = Math.max(worst, v.clone().applyMatrix3(N).normalize().distanceTo(v.clone().applyMatrix3(M3).normalize())); }
+  }
+  ok(worst < 1e-5, `render health: the Horde's cofactor normal matrix turns normals like getNormalMatrix (3000 transforms incl. mirrored and sheared; worst ${worst.toExponential(1)})`);
+  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.3, 1.1, -0.2)), flat = new THREE.Matrix4().compose(new THREE.Vector3(1, 2, 3), q, new THREE.Vector3(1.6, 0, 1.6));
+  const okFlat = normalMatrixInto(flat.elements, A, 0), up = new THREE.Vector3(0, 1, 0).applyMatrix3(M3.fromArray(A)).normalize();
+  ok(okFlat && A.every(Number.isFinite) && up.dot(new THREE.Vector3(0, 1, 0).applyQuaternion(q)) > 0.9999 && new THREE.Matrix3().getNormalMatrix(flat).elements.every(v => v === 0), 'render health: a part squashed flat keeps a finite normal matrix (its normals along the squashed axis), where getNormalMatrix gives all zeros');
+  ok(!normalMatrixInto(new THREE.Matrix4().makeScale(1, 0, 0).elements, A, 0) && A.every(Number.isFinite), 'render health: a transform collapsed to a line reports nothing to draw (the Horde hides that instance)');
+  // a fin whose front and back share vertices (normals cancel to zero) and a zero-area sliver
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 0, 0, 2, 0, 0, 2, 0, 0], 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(27).fill(0), 3));
+  const fixed = repairNormals(g), Nn = g.attributes.normal;
+  const n = i => new THREE.Vector3(Nn.getX(i), Nn.getY(i), Nn.getZ(i));
+  ok(fixed === 9 && Math.abs(n(0).z - 1) < 1e-6 && Math.abs(n(3).z + 1) < 1e-6 && n(6).y === 1 && [...Nn.array].every(Number.isFinite), 'render health: repairNormals gives each zero normal its own face normal (front +z, back −z) and a degenerate sliver straight up');
+  const box = new THREE.BoxGeometry(1, 1, 1), card = new THREE.PlaneGeometry(1, 1); card.attributes.normal.array.fill(0);
+  const merged = merge([box, card]), MN = merged.attributes.normal; let zeros = 0;
+  for (let i = 0; i < MN.count; i++) if (MN.getX(i) ** 2 + MN.getY(i) ** 2 + MN.getZ(i) ** 2 < 1e-12) zeros++;
+  ok(zeros === 0, 'render health: geom.merge() never returns a zero vertex normal (the building / prop kit merges through it)');
+}
+
+hr('CONTROLS: THE ACTION LAYER (docs/CONTROLS.md §1, core/actions.js)');
+{
+  const { Actions, ACTIONS } = await import('../src/core/actions.js');
+  const { Input } = await import('../src/core/input.js');
+  const A = Actions;
+  // the defaults are the old raw keys
+  const want = { attack: 'LMB', skillAlt: 'RMB', skill1: '1', skill2: '2', skill3: '3', skill4: '4', roll: 'Space', sprint: 'Shift', attackInPlace: 'Alt', interact: 'F', potionHeart: 'Q', potionZoom: 'E', potionR: 'R', meal: 'G', swap: 'X', hero: 'Tab', lootLabels: 'Z', home: 'T', inventory: 'I', pantry: 'P', character: 'C', skills: 'K', quests: 'J', map: 'M', build: 'B', menu: 'Esc' };
+  ok(Object.entries(want).every(([a, k]) => A.label(a, 'kbm') === k), 'controls: every keyboard binding is the old key (LMB, RMB, 1-4, Space, Shift, Alt, F, Q, E, R, G, X, Tab, Z, T, I, P, C, K, J, M, B, Esc)');
+  const padWant = { attack: 'A', skillAlt: 'X', skill1: 'Y', skill2: 'RB', skill3: 'RT', skill4: 'LT', roll: 'B', sprint: 'L3', hero: 'LB', interact: 'DDown', potionHeart: 'DLeft', potionZoom: 'DRight', meal: 'DUp', map: 'View', menu: 'Menu', swap: 'L3+R3' };
+  ok(Object.entries(padWant).every(([a, t]) => A.binds(a, 'pad')[0] === t), 'controls: the console-ARPG pad mapping (A attack, X / Y / RB / RT / LT skills, B roll, L3 sprint, LB hero, the D-pad, View, Menu, L3+R3 swap)');
+  // keys → the move vector (unit, exactly the old WASD direction) and held / pressed through Input
+  Input.keys.add('w'); Input.keys.add('d'); const m = A.move();
+  ok(Math.abs(m.x - Math.SQRT1_2) < 1e-9 && Math.abs(m.y - Math.SQRT1_2) < 1e-9 && m.mag === 1 && !m.pad, 'controls: W+D move diagonally at full speed (a unit vector, as before)');
+  Input.keys.clear();
+  Input.keys.add('1'); Input.pressed.add('1');
+  ok(A.held('skill1') && A.pressed('skill1') && A.held('skill1', 'kbm') && !A.held('skill1', 'pad'), 'controls: a held key reads as its action (any device and the keyboard; not the pad)');
+  A.consume('skill1'); ok(!A.pressed('skill1') && A.held('skill1'), 'controls: consume() takes the press, the hold stays');
+  Input.keys.clear(); Input.pressed.clear();
+  // the pad, polled from a stub
+  const pad = { id: 'Xbox Wireless Controller', index: 0, connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) };
+  const gp0 = navigator.getGamepads; navigator.getGamepads = () => [pad];
+  const poll = () => { A._t = performance.now() - 16; A.poll(); };
+  poll(); ok(A.device === 'kbm', 'controls: an idle pad leaves the keyboard the active device');
+  pad.axes = [0.1, -0.12, 0, 0]; poll(); ok(A.move().mag === 0 && A.device === 'kbm', "controls: the left stick's dead zone (a small drift moves nothing, switches nothing)");
+  const mags = [0.3, 0.5, 0.7, 0.9, 1].map(v => { pad.axes = [0, -v, 0, 0]; poll(); return A.move().mag; });
+  ok(mags.every((v, i) => i === 0 || v > mags[i - 1]) && mags[0] > 0.1 && mags[0] < 0.3 && mags[4] === 1 && A.move().y === 1 && A.device === 'pad', `controls: the response curve rises with the tilt to full speed, up = forward, and a push makes the pad active (${mags.map(v => v.toFixed(2)).join(' ')})`);
+  pad.axes = [0, 0, 0, 0]; pad.buttons[0].pressed = true; pad.buttons[0].value = 1; poll();
+  ok(A.pressed('attack') && A.held('attack', 'pad') && !A.held('attack', 'kbm'), 'controls: A pressed and held reads as attack on the pad');
+  A.consume('interact'); ok(!A.pressed('attack', 'pad') && A.held('attack'), "controls: consuming interact takes the pad's A press too (A is the context interact)");
+  poll(); ok(!A.pressed('attack') && A.held('attack') && A.heldTime('attack') > 0, 'controls: a press is one frame; the hold time grows');
+  pad.buttons[0].pressed = false; pad.buttons[0].value = 0; poll(); ok(A.released('attack') && !A.held('attack'), 'controls: letting go reads as released');
+  pad.buttons[7].value = 0.3; poll(); const t1 = A.held('skill3'); pad.buttons[7].value = 0.4; poll(); const t2 = A.held('skill3'); pad.buttons[7].value = 0.25; poll(); const t3 = A.held('skill3'); pad.buttons[7].value = 0.1; poll(); const t4 = A.held('skill3');
+  ok(!t1 && t2 && t3 && !t4, 'controls: an analogue trigger presses past 0.35 and lets go under 0.22 (hysteresis)');
+  pad.buttons[10].pressed = true; pad.buttons[11].pressed = true; poll(); ok(A.pressed('swap') && A.held('sprint', 'pad'), 'controls: L3 + R3 together read as the swap chord');
+  pad.buttons[10].pressed = false; pad.buttons[11].pressed = false; poll();
+  // names, text, rebinding
+  A.setDevice('pad');
+  ok(A.text('interact') === 'A' && A.text('interactAlt') === 'D-pad ▼' && A.text('skills') === 'Menu' && A.resolve('Press {potionHeart} now') === 'Press D-pad ◀ now' && A.resolve('Face water and press F to fish.') === 'Face water and press A to fish.' && A.resolve('Press K to learn') === 'Press Menu to learn', "controls: text names the pad's buttons ({tokens}, \"press F\" → A, a panel → Menu)");
+  A.setDevice('kbm');
+  ok(A.resolve('Press {roll} to roll') === 'Press Space to roll' && A.resolve('Press F to fish.') === 'Press F to fish.', 'controls: on the keyboard old text is left alone and {tokens} name the keys');
+  const r0 = A.forKey('R'); A.isBuilding = () => true; const rB = A.forKey('R'); A.isBuilding = () => false;
+  ok(r0 === 'potionR' && rB === 'rotate' && A.forKey('Tab') === 'hero', 'controls: R in text is the Rejuv potion, or Rotate while building; Tab is the hero button');
+  const r1 = A.rebind('skill1', 'pad', 'RB');
+  ok(r1?.swapped === 'skill2' && A.binds('skill1', 'pad')[0] === 'RB' && A.binds('skill2', 'pad')[0] === 'Y', 'controls: rebinding Skill 1 to RB swaps Skill 2 onto Y');
+  ok(A.rebind('attack', 'kbm', 'h') === null && A.rebind('menu', 'pad', 'Y') === null && A.rebind('move', 'kbm', 'h') === null, 'controls: LMB attack, Esc / Menu and the sticks are fixed');
+  const r2 = A.rebind('interact', 'pad', 'DDown'); ok(!r2?.swapped && A.binds('lootLabels', 'pad')[0] === 'DDown', 'controls: interact and the loot labels may share D-pad ▼');
+  A.rebind('skill1', 'pad', 'Y'); ok(!Object.keys(A.over.pad).length, 'controls: binding back to the defaults leaves no overrides');
+  A.rebind('potionHeart', 'kbm', 'h'); ok(A.isKey('potionHeart', 'h') && !A.isKey('potionHeart', 'q'), "controls: a keyboard rebind moves the action's key");
+  A.resetBindings(); ok(A.label('potionHeart', 'kbm') === 'Q' && !Object.keys(A.over.kbm).length, 'controls: reset restores the defaults');
+  ok(Object.values(ACTIONS).every(x => x.label && x.group && Array.isArray(x.kbm) && Array.isArray(x.pad)), 'controls: every action has a label, a group and both bindings');
+  navigator.getGamepads = gp0; A.axes.fill(0); A.cur.clear(); A.prev.clear(); A.setDevice('kbm');
+}
+
+hr('CONTROLS: THE STEAM DECK PROFILE (docs/CONTROLS.md §10, core/deck.js)');
+{
+  const D = await import('../src/core/deck.js');
+  const Q = q => D.bootGraphics(new URLSearchParams(q));
+  const d3 = Q('q=3'), d0 = Q('q=0');
+  ok(d3.preset === 3 && d3.quality === 1 && d3.deck && d0.preset === 0 && d0.quality === 0 && !d0.deck && Q('q=9').preset === 3 && Q('q=x').preset === 2, 'deck: ?q= picks the preset (3: the Deck, built at Medium density; clamped; junk is High)');
+  const ls0 = Object.getOwnPropertyDescriptor(globalThis, 'localStorage'), store = { 'chewy3d.settings': JSON.stringify({ quality: 1 }) };
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, writable: true, value: { getItem: k => store[k] ?? null } });
+  const s1 = Q(''), sq = Q('q=2'); delete store['chewy3d.settings']; const s0 = Q('');
+  if (ls0) Object.defineProperty(globalThis, 'localStorage', ls0); else delete globalThis.localStorage;
+  ok(s1.preset === 1 && s1.quality === 1 && sq.preset === 2 && s0.preset === 2, 'deck: R-2, the saved Graphics preset applies at boot; ?q= wins; nothing saved off a Deck screen is High');
+  const dpr0 = globalThis.devicePixelRatio; globalThis.devicePixelRatio = 2;
+  ok(D.pixelRatioFor(2) === 1.5 && D.pixelRatioFor(1) === 1 && D.pixelRatioFor(0) === 1 && D.pixelRatioFor(3) === 0.85, 'deck: the pixel ratio (High up to 1.5, Medium and Low 1, the Deck 0.85)');
+  globalThis.devicePixelRatio = dpr0;
+  ok(!D.deckLike() && D.FPS_CAPS.join() === '0,60,40' && D.PRESET_NAMES.join() === 'Low,Medium,High,Deck' && D.DECK.uiScale === 1.15 && D.DECK.shadowMap <= 2048, 'deck: no screen is not a Deck; the frame caps, the preset names and the Deck numbers');
+}
+
 hr('RESULT');
 if (fails) {
   log(`FAILED ${fails}/${checks} checks:`);

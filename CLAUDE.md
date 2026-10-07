@@ -8,7 +8,8 @@ A cozy 3D browser action-RPG and village sim (Three.js + Vite), starring Chewy, 
   - Set their status as you work.
   - Add a dated log line when you finish or hand off.
 - Design docs:
-  - [ZONES](docs/ZONES.md): the zone, village, dungeon and tier loop, the current big plan;
+  - [ZONES](docs/ZONES.md): the zone, village, dungeon and tier loop;
+  - [CONTROLS](docs/CONTROLS.md): gamepad, Steam Deck desktop app, touch;
   - [ARCHITECTURE](docs/ARCHITECTURE.md): the code map;
   - [REGIONS](docs/REGIONS.md), [HEROES](docs/HEROES.md), [POE](docs/POE.md), [CHARGE](docs/CHARGE.md),
     [HOUSING](docs/HOUSING.md), [HOMESTEAD](docs/HOMESTEAD.md), [TUTORIALS](docs/TUTORIALS.md),

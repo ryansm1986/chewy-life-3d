@@ -106,7 +106,9 @@ export class VillageSim {
     q.sort((a, b) => a[1] - b[1]); // level 1 first
     const one = () => { const [id, lv, v] = q.shift(); try { getTemplate(id, lv, v); } catch (e) { /* unknown combo */ } };
     for (let t = performance.now(); q.length && q[0][1] === 1 && performance.now() - t < 400;) one(); // boot, behind the splash
-    const hidden = () => { const G = this.G; return G.titleActive || G.ui?.dlg?.active || G.ui?.anyModal?.() || (G.mode !== 'village' && G.mode !== 'interior'); };
+    // (a menu or dialogue hides a hitch only once it has finished opening: ui.js hidesHitches, ROADMAP R-8 — building
+    //  templates from the frame a menu opened made every first open stutter)
+    const hidden = () => { const G = this.G; return G.titleActive || (G.ui?.hidesHitches ? G.ui.hidesHitches() : G.ui?.dlg?.active || G.ui?.anyModal?.()) || (G.mode !== 'village' && G.mode !== 'interior'); };
     const iv = setInterval(() => {
       if (!q.length) return clearInterval(iv);
       if (hidden()) for (let t = performance.now(); q.length && performance.now() - t < 14;) one();

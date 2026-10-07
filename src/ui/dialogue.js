@@ -2,6 +2,7 @@
 import { el, esc, wait } from './dom.js';
 import { glyph } from './glyphs.js';
 import { portraitHTML, portraitBg, PORTRAITS } from './portraits.js';
+import { keyHint } from './padGlyphs.js';
 
 const SPEAKER_COLORS = { rosie: '#ff8fb0', chewy: '#c98f5e', shadow: '#6a7ab8' };
 
@@ -65,6 +66,8 @@ export class Dialogue {
       if (!part) continue;
       const em = part.startsWith('*') && part.endsWith('*') && part.length > 2;
       const s = em ? part.slice(1, -1) : part;
+      const hint = em && keyHint(s); // (the gamepad plays: *F* / *Tab* show its button: ui/padGlyphs.js)
+      if (hint) { html += `<span class="wd em"><span class="ch" style="animation-delay:${delay.toFixed(3)}s">${hint}</span></span>`; idx++; delay += speed * 2; continue; }
       const words = s.split(/(\s+)/);
       for (const w of words) {
         if (!w) continue;

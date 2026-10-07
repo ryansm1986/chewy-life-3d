@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { Events } from '../core/events.js';
 import { Input } from '../core/input.js';
+import { Actions } from '../core/actions.js';
 import { makeToon, makeOutline } from '../gfx/materials.js';
 import { POND, BASIN, RIVER_W } from '../world/layout.js';
 import { riverDist } from '../world/islandShape.js';
@@ -139,7 +140,7 @@ export class Fishing {
     P.anim.play('rodCast', { onEvent: ev => { if (ev === 'release' && this.s?.phase === 'cast') this.launch(); } });
     Events.emit('fishing:start', { spot: t.spot });
     Events.emit('sfx', 'swing', { pitch: 1.5, vol: 0.35 });
-    Input.consume?.('f');
+    Actions.consume('interact');
   }
   launch() {
     const s = this.s, scene = s.world.scene;
@@ -222,7 +223,7 @@ export class Fishing {
     if (s.phase === 'reel') G.ui?.reel?.end('escape', escaped ? 'It got away…' : 'Line in!');
     this.tools.release();
     if (P.anim.action && ['fish', 'rodCast', 'reel'].includes(P.anim.action.name)) P.anim.stop();
-    P.controlLocked = false; G.interactCooldown = performance.now() + 400; Input.consume?.('f');
+    P.controlLocked = false; G.interactCooldown = performance.now() + 400; Actions.consume('interact');
     if (msg && !quiet) G.ui?.toast?.(msg, { icon: 'wave', color: '#8fd0ff' });
     if (escaped && !quiet) Events.emit('sfx', 'fish_escape');
     // how it ended (the fishing guide loops on it): catch | escape (the reel) | late (the bite) | early | cancel
@@ -250,9 +251,9 @@ export class Fishing {
     // anything that pulls the player away ends the session
     if (G.world !== s.world || G.ui?.iris?.active || G.leavingDungeon || G.playerDead || G.mode === 'title') return this.end(null, { quiet: true });
     if (G.actions.life() < s.life0 - 0.5) return this.end('Ouch! The fish got away.', { escaped: true });
-    if (s.phase !== 'land' && MOVE.some(k => Input.hit(k))) return this.end('You reel in your line.');
+    if (s.phase !== 'land' && (MOVE.some(k => Input.hit(k)) || Actions.moveHit() || Actions.pressed('roll', 'pad') || Actions.pressed('menu', 'pad'))) return this.end('You reel in your line.'); // (the pad: a fresh push of the stick, B or Menu)
     s.t += dt;
-    const press = Input.hit('f') || Input.mouseHit(0);
+    const press = Actions.pressed('interact') || Actions.pressed('attack') || Actions.pressed('reel'); // (F or LMB; the pad: A, the D-pad or RT)
     if (s.phase === 'cast') { if (s.t > 1.2) this.launch(); }
     else if (s.phase === 'fly') {
       const k = Math.min(1, s.t / 0.5), b = this.bobber;
@@ -271,7 +272,7 @@ export class Fishing {
       if (press) this.reel();
       else if (s.t > s.window) return this.end('It got away!', { escaped: true });
     } else if (s.phase === 'reel') {
-      const hold = Input.down('f') || Input.mouseDown(0), r = s.sim.step(dt, hold);
+      const hold = Actions.held('interact') || Actions.held('attack') || Actions.held('reel'), r = s.sim.step(dt, hold);
       // the float tugs about with the fish; the reel clicks while it's wound
       const off = (s.sim.f - 0.5) * (s.ice ? 0.3 : 1.4), dx = Math.cos(P.facing), dz = -Math.sin(P.facing);
       this.bobber.position.set(s.x + dx * off, s.y - 0.02 + Math.sin(s.t * 13) * 0.02 - (s.sim.inZone ? 0 : 0.03), s.z + dz * off);

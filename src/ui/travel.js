@@ -3,6 +3,7 @@
 // Data comes from the game (G.travel.list / G.travel.go), so the UI never imports world code.
 import { el, esc } from './dom.js';
 import { glyph } from './glyphs.js';
+import { padGlyph } from './padGlyphs.js';
 import { Panel } from './panel.js';
 
 // where each place sits on the painted map (0..1) and its map glyph
@@ -21,7 +22,7 @@ export class TravelPanel extends Panel {
     this.body.innerHTML = `<div class="tv-wrap">
       <div class="tv-map"><canvas class="tv-cv"></canvas><div class="tv-pins"></div><div class="tv-compass">${glyph('sakura')}<b>N</b></div></div>
       <div class="tv-side"><div class="tv-card"></div>
-        <div class="tv-foot"><span class="kc sm">1</span>–<span class="kc sm">5</span> choose <span class="sep">·</span> <span class="kc sm">Enter</span> set off</div></div>
+        <div class="tv-foot kbm-only"><span class="kc sm">1</span>–<span class="kc sm">5</span> choose <span class="sep">·</span> <span class="kc sm">Enter</span> set off</div><div class="tv-foot pad-only"><span class="kc sm pad">${padGlyph('DRight')}</span> choose <span class="sep">·</span> <span class="kc sm pad">${padGlyph('A')}</span> on the card: set off</div></div>
     </div>`;
     this.cv = this.body.querySelector('.tv-cv');
     this.pins = this.body.querySelector('.tv-pins');

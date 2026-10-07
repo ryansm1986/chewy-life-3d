@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { BUILDINGS, CATEGORIES, buildModel, sizeOf } from './buildings/index.js';
 import { ZONES, RANK_POP } from './village.js';
 import { Input } from '../core/input.js';
+import { Actions } from '../core/actions.js';
 import { Events } from '../core/events.js';
 import { WORLD } from './terrain.js';
 import { ease, damp } from '../core/util.js';
@@ -27,7 +28,7 @@ export class BuildMode {
     this.G = G; this.sim = sim; this.active = false; this.tool = null;
     this.ghost = null; this.ghostKey = ''; this.rot = 0; this.drag = null;
     this.okMat = new THREE.MeshBasicMaterial({ color: '#8affb0', transparent: true, opacity: 0.55, depthWrite: false });
-    this.badMat = new THREE.MeshBasicMaterial({ color: '#ff7a8a', transparent: true, opacity: 0.55, depthWrite: false });
+    this.badMat = new THREE.MeshBasicMaterial({ color: '#ff7a8a', transparent: true, opacity: 0.55, depthWrite: false, depthTest: false }); // (drawn on top: a ghost pointed at a building stays visible, red)
     this.prevDist = 34;
     this.view = 0; // 0..1 build-view blend (grass shrink)
     this.lastCur = null;
@@ -59,15 +60,16 @@ export class BuildMode {
     const u = this.sim.terrain.material.userData.u; if (!u.uCursorCol) return;
     const c = new THREE.Color(hex); u.uCursorCol.value.set(c.r, c.g, c.b, fill);
   }
-  catalog() {
-    const rank = this.sim.stats.rank;
+  catalog(missing = null) {
+    const rank = this.sim.stats.rank, T = this.G.thumbs;
     const cats = [];
+    const icon = id => { if (!T) return null; if (!missing || T.has(id)) return T.get(id) || null; missing.push(id); return null; }; // (missing: rendered after the open, fillThumbs)
     for (const [cid, cname] of Object.entries(CATEGORIES)) {
       // prebuilt landmarks are listed too (always 'Already built') so the Landmarks tab shows the whole village set
       const items = Object.entries(BUILDINGS).filter(([id, b]) => b.cat === cid && !b.zone).map(([id, b]) => {
         const need = RANK_REQ[id] || 1;
         const unique = b.unique && this.sim.S.buildings.some(x => x.type === id);
-        return { id, name: b.name, cost: b.cost || {}, desc: b.desc, cover: b.cover || null, covers: b.covers || null, size: sizeOf(id, 1), icon: this.G.thumbs?.get(id) || null, locked: unique || b.prebuilt ? 'Already built' : rank < need ? `Village rank ${need}` : null };
+        return { id, name: b.name, cost: b.cost || {}, desc: b.desc, cover: b.cover || null, covers: b.covers || null, size: sizeOf(id, 1), icon: icon(id), locked: unique || b.prebuilt ? 'Already built' : rank < need ? `Village rank ${need}` : null };
       }).sort((a, b) => !!a.locked - !!b.locked);
       if (items.length) cats.push({ id: cid, name: cname, items });
     }
@@ -79,8 +81,9 @@ export class BuildMode {
     const rig = this.G.engine.rig; this.prevDist = rig.distTarget; rig.distTarget = Math.max(rig.distTarget, 44);
     this.overlay('build');
     this.sim.terrain.material.userData.u.uGrid.value = 1;
+    const missing = [];
     this.G.ui?.open?.('build', {
-      categories: this.catalog(),
+      categories: this.catalog(missing),
       onSelect: id => this.setTool({ kind: 'building', type: id }),
       onZone: z => this.setTool(z ? { kind: 'zone', zone: typeof z === 'string' ? ZONES[z] ?? 0 : z } : { kind: 'zone', zone: 0 }),
       onPath: (erase) => this.setTool({ kind: 'path', erase: !!erase }),
@@ -91,7 +94,22 @@ export class BuildMode {
     });
     this.sim.showNeedIcons?.(true);
     this.refreshStakes();
+    this.fillThumbs(missing);
     Events.emit('sfx', 'ui_open');
+  }
+  // Building thumbnails not rendered yet come in after the palette has opened, one every few frames, instead of all
+  // inside the open (each is a model build + a render: the first B used to freeze ~1 s, ROADMAP R-8). The idle prewarm
+  // (ui/prewarm.js) usually has them all before the first B.
+  fillThumbs(ids) {
+    const T = this.G.thumbs; if (!T || !ids.length) return;
+    let i = 0;
+    const step = () => {
+      if (!this.active || i >= ids.length) return;
+      const id = ids[i++]; this.G.ui?.panels?.build?.setIcon?.(id, T.get(id));
+      setTimeout(step, 45);
+    };
+    const go = () => (T.warmPrograms ? T.warmPrograms(ids[0]) : Promise.resolve()).then(() => setTimeout(step, 0)); // (the thumbnail shaders compile off the main thread first)
+    setTimeout(go, 700); // (after the palette's open animation)
   }
   exit() {
     if (!this.active) return;
@@ -130,13 +148,30 @@ export class BuildMode {
     const key = cur.x + ',' + cur.z;
     this.insT = (this.insT || 0) - dt;
     if (key !== this.insKey || this.insT <= 0) { this.insKey = key; this.insT = 0.4; this.insInfo = this.sim.inspect?.(cur.x, cur.z) || null; }
-    ui?.buildInspect?.(this.insInfo, Input.mouse.x, Input.mouse.y);
+    const m = Actions.pointer();
+    ui?.buildInspect?.(this.insInfo, m.x, m.y);
     return this.insInfo;
   }
   cursorTile() {
-    const G = this.G;
-    const p = G.engine.mouseGround(Input.mouse.nx, Input.mouse.ny, (x, z) => this.sim.world.heightAt(x, z));
+    const G = this.G, m = Actions.pointer(); // (the mouse, or the pad's virtual cursor: ui/padCursor.js)
+    const p = G.engine.mouseGround(m.nx, m.ny, (x, z) => this.sim.world.heightAt(x, z));
     return { x: Math.floor(p.x), z: Math.floor(p.z), p };
+  }
+  // the pad (docs/CONTROLS.md §2): A is the click, B cancels, Y / RB rotate, X removes (the virtual cursor is on)
+  get pad() { return Actions.vcursor.on; }
+  hitA() { if (Input.mouseHit(0)) return true; if (this.pad && Actions.padHit('A')) { Actions.padConsume('A'); return true; } return false; }
+  downA() { return Input.mouseDown(0) || (this.pad && Actions.padDown('A')); }
+  /** a hint for the prompt: the pad's wording (and its A glyph when A does it) */
+  say(mouse, pad, act = true) { if (this.pad) this.G.ui?.setInteract?.(pad, { key: act ? 'pad:interact' : null }); else this.G.ui?.setInteract?.(mouse); }
+  /** X on the pad: remove the building under the cursor (press twice; the landmarks stay) */
+  padRemove(cur) {
+    const sim = this.sim, b = sim.buildingAt(cur.x, cur.z), G = this.G;
+    if (!b) { Events.emit('sfx', 'ui_error'); return; }
+    if (BUILDINGS[b.type].prebuilt) { G.ui?.toast?.(`${BUILDINGS[b.type].name} can't be removed`, { color: '#ffb0bc' }); return; }
+    const now = performance.now();
+    if (this._rm?.b === b && now - this._rm.t < 1800) { this._rm = null; sim.remove(b); return; }
+    this._rm = { b, t: now };
+    G.ui?.toast?.(`Press ${Actions.tokenName('X', 'pad')} again to remove the ${BUILDINGS[b.type].name} (50% refund)`, { color: '#ffd8a8', duration: 1.8 });
   }
   update(dt) {
     // grass shrinks in build view so zones and overlays read clearly (eases in and out)
@@ -145,11 +180,13 @@ export class BuildMode {
     if (!this.active) return;
     const G = this.G, sim = this.sim, U = sim.terrain.material.userData.u;
     // over the palette: keep using the last world cursor (so drags can finish), but never start actions there
-    const overUI = Input.mouse.overUI;
+    const overUI = this.pad ? false : Input.mouse.overUI;
     const cur = overUI && this.lastCur ? this.lastCur : this.cursorTile();
     if (!overUI) this.lastCur = cur;
     if (Input.hit('escape')) { if (this.tool) { this.setTool(null); Input.consume('escape'); } }
     if (Input.mouseHit(2) && this.tool) this.setTool(null);
+    if (this.pad && Actions.padHit('B') && this.tool) { Actions.padConsume('B'); this.setTool(null); } // (B with nothing in hand leaves build mode: ui/padCursor.js)
+    if (this.pad && Actions.padHit('X')) { Actions.padConsume('X'); this.padRemove(cur); }
     // info card for the hovered lot / building (only while browsing or painting zones, never over the palette)
     const inspecting = !overUI && (!this.tool || (this.tool.kind === 'zone' && !this.drag));
     const ins = this.inspectAt(inspecting ? cur : null, dt);
@@ -157,12 +194,13 @@ export class BuildMode {
       const hb = ins?.kind === 'building' ? sim.buildingAt(cur.x, cur.z) : null;
       if (hb) { const [w, d] = sim.dims(hb.type, hb.rot, hb.level); U.uCursor.value.set(hb.x + w / 2, hb.z + d / 2, w, d); this.cursorCol(ins.ok ? '#bff5da' : '#ffb0bc', 0.16); }
       // a click on a house (no tool): its card — Upgrade / Remodel / Enter (docs/HOUSING.md §5)
-      if (hb && !overUI && Input.mouseHit(0) && G.housing?.isHouse?.(hb)) { const rec = sim.list.find(r => r.data === hb); if (rec) G.housing.openHouseCard(rec); }
+      if (this.pad) this.say('', hb ? (G.housing?.isHouse?.(hb) ? `Open the ${BUILDINGS[hb.type]?.name || 'house'}'s card` : BUILDINGS[hb.type]?.name || '') : 'Pick a building or a tool with the D-pad', !!(hb && G.housing?.isHouse?.(hb)));
+      if (hb && !overUI && G.housing?.isHouse?.(hb) && this.hitA()) { const rec = sim.list.find(r => r.data === hb); if (rec) G.housing.openHouseCard(rec); }
       else { U.uCursor.value.set(cur.x + 0.5, cur.z + 0.5, 1, 1); this.cursorCol('#fff8d8', 0.1); }
       return;
     }
     if (this.tool.kind === 'zone' || this.tool.kind === 'path') {
-      if (Input.mouseHit(0) && !overUI) this.drag = { x: cur.x, z: cur.z };
+      if (!overUI && this.hitA()) this.drag = { x: cur.x, z: cur.z };
       const a = this.drag || cur;
       const x0 = Math.min(a.x, cur.x), x1 = Math.max(a.x, cur.x), z0 = Math.min(a.z, cur.z), z1 = Math.max(a.z, cur.z);
       const zc = { 1: '#7adc7a', 2: '#6eaaff', 3: '#ffc45a', 0: '#ff8a8a' }[this.tool.zone ?? 0];
@@ -185,8 +223,9 @@ export class BuildMode {
           : this.tool.zone && !plotZones(pl).includes(this.tool.zone) ? `This plot is not for ${zname}`
           : `Click or drag to paint a ${zname} zone · villagers build there when there is demand`;
       }
-      G.ui?.setInteract?.(hint);
-      if (!Input.mouseDown(0) && this.drag) { // finish on mouse-up even if released over the palette
+      if (this.pad) this.say(hint, this.tool.kind === 'path' ? (this.tool.erase ? 'Hold A and move to remove paths' : 'Hold A and move to lay stone paths') : this.drag ? hint : hint.replace(/^Click or drag to paint/, 'Paint (hold A and move for more)'), !this.drag || this.tool.kind === 'zone');
+      else G.ui?.setInteract?.(hint);
+      if (!this.downA() && this.drag) { // finish on mouse-up even if released over the palette
         if (this.tool.kind === 'zone') {
           const k = sim.paintZone(x0, z0, x1, z1, this.tool.zone);
           if (!sim.lastZoneHits && this.tool.zone) G.ui?.toast?.('Zones only grow on plots: paint over the marked lots', { color: '#ffb0bc' });
@@ -204,7 +243,7 @@ export class BuildMode {
       const type = this.tool.type, pl = sim.plotOf(cur.p.x, cur.p.z);
       // on a plot that allows it: the building snaps to the plot, its door to the street (no free rotation)
       const snap = pl && !pl.fixed && pl.allows.includes(type) ? sim.spotFor(pl, type, 1) : null;
-      if (!snap && Input.hit('r')) { this.rot = (this.rot + 1) % 4; Events.emit('sfx', 'ui_click'); }
+      if (!snap && (Input.hit('r') || (this.pad && (Actions.padHit('Y') || Actions.padHit('RB'))))) { this.rot = (this.rot + 1) % 4; Events.emit('sfx', 'ui_click'); }
       const rot = snap ? snap.rot : this.rot;
       const [w, d] = sim.dims(type, rot);
       const x0 = snap ? snap.x : Math.round(cur.p.x - w / 2), z0 = snap ? snap.z : Math.round(cur.p.z - d / 2);
@@ -219,18 +258,20 @@ export class BuildMode {
       this.ghost.position.x = damp(this.ghost.position.x, target.x, 22, dt); this.ghost.position.z = damp(this.ghost.position.z, target.z, 22, dt);
       this.ghost.position.y = target.y + Math.abs(Math.sin(G.engine.time * 4)) * 0.08;
       this.ghost.rotation.y = damp(this.ghost.rotation.y, -rot * Math.PI / 2, 16, dt);
-      if (ok !== this.ghostOk) { this.ghostOk = ok; this.ghost.traverse(o => { if (o.isMesh) o.material = ok ? this.okMat : this.badMat; }); }
-      G.ui?.setInteract?.(ok ? (snap ? `Click to build on this ${DISTRICTS[pl.district]?.name || ''} plot` : 'Click to build · R to rotate') : (!chk.ok ? chk.why : 'Not enough materials'));
-      if (Input.mouseHit(0)) {
+      if (ok !== this.ghostOk) { this.ghostOk = ok; this.ghost.traverse(o => { if (o.isMesh) { o.material = ok ? this.okMat : this.badMat; o.renderOrder = ok ? 0 : 20; } }); }
+      if (this.pad) this.say('', ok ? (snap ? `Build on this ${DISTRICTS[pl.district]?.name || ''} plot` : `Build here · ${Actions.tokenName('Y', 'pad')} rotates`) : (!chk.ok ? chk.why : 'Not enough materials'), ok);
+      else G.ui?.setInteract?.(ok ? (snap ? `Click to build on this ${DISTRICTS[pl.district]?.name || ''} plot` : 'Click to build · R to rotate') : (!chk.ok ? chk.why : 'Not enough materials'));
+      if (this.hitA()) {
         const b = sim.place(type, x0, z0, rot, snap ? { plot: pl.id } : {});
         if (b) { G.vfx.sparkle(target.clone().setY(target.y + 1), { n: 20, r: 1.2 }); if (BUILDINGS[this.tool.type].unique) this.setTool(null); }
       }
     } else if (this.tool.kind === 'bulldoze') {
       const b = sim.buildingAt(cur.x, cur.z);
       U.uCursor.value.set(cur.x + 0.5, cur.z + 0.5, 1, 1); this.cursorCol('#ff7a8a', 0.25);
-      G.ui?.setInteract?.(b ? (BUILDINGS[b.type].prebuilt ? `${BUILDINGS[b.type].name} can't be removed` : `Click to remove ${BUILDINGS[b.type].name} (50% refund)`) : 'Click a building to remove it');
+      if (this.pad) this.say('', b ? (BUILDINGS[b.type].prebuilt ? `${BUILDINGS[b.type].name} can't be removed` : `Remove ${BUILDINGS[b.type].name} (50% refund)`) : 'Point at a building to remove it', !!b && !BUILDINGS[b.type].prebuilt);
+      else G.ui?.setInteract?.(b ? (BUILDINGS[b.type].prebuilt ? `${BUILDINGS[b.type].name} can't be removed` : `Click to remove ${BUILDINGS[b.type].name} (50% refund)`) : 'Click a building to remove it');
       if (b) { const [w, d] = sim.dims(b.type, b.rot, b.level); U.uCursor.value.set(b.x + w / 2, b.z + d / 2, w, d); }
-      if (Input.mouseHit(0) && b && !BUILDINGS[b.type].prebuilt) sim.remove(b);
+      if (b && !BUILDINGS[b.type].prebuilt && this.hitA()) sim.remove(b);
     }
   }
 }

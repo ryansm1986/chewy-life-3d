@@ -58,6 +58,7 @@ vec3 lightPools(vec3 wp) {
 
 // gradient kept linear filtered for a soft painted terminator
 const WIND_GLSL = /* glsl */`
+vec3 cSafeN(vec3 v) { return v * inversesqrt(max(dot(v, v), 1e-12)); } // (NaN-safe normals: see SAFE_NORMAL_VERTEX)
 uniform float uTime;
 uniform vec2 uWindDir;
 uniform float uWindStr;
@@ -113,6 +114,13 @@ vec3 windOffset(vec3 wp, vec3 local, vec3 origin, int mode, vec2 uvv) {
 `;
 
 const PAINT_GLSL = /* glsl */`
+vec3 cSafeN(vec3 v) { return v * inversesqrt(max(dot(v, v), 1e-12)); }
+// a zero interpolated normal (every vertex of the triangle degenerate) falls back to the face's own normal from the
+// derivatives of p (the FLAT_SHADED normal for p = vViewPosition)
+vec3 cSafeNormal(vec3 v, vec3 p) {
+  vec3 f = cross(dFdx(p), dFdy(p)); float l = dot(v, v);
+  return l > 1e-12 ? v * inversesqrt(max(l, 1e-12)) : f * inversesqrt(max(dot(f, f), 1e-30));
+}
 uniform float uTime;
 uniform sampler2D uBrush;
 uniform float uBrushAmt;
@@ -198,6 +206,20 @@ void RE_IndirectDiffuse_Toon( const in vec3 irradiance, const in vec3 geometryPo
 
 const WIND_MODES = { grass: 1, tree: 2, leaf: 3, cloth: 4, reed: 5 };
 
+// NaN-safe normals (ROADMAP R-7). normalize() of a zero vector is NaN on the GPU, and so is every fragment of a
+// triangle with such a vertex: a generated mesh with a zero vertex normal (a mailbox's, a villager's face seam), or a
+// world matrix squashed flat (a dying monster: its normal matrix is all zeros). One NaN pixel is enough: the bloom's
+// mip chain and the grade's clamp turn it into a black block for a frame. These are three's normal chunks with every
+// normalize of a normal made safe (cSafeN: zero stays zero), the fragment's starting normal falling back to the face's.
+function safeChunk(name, from, to) {
+  const src = THREE.ShaderChunk[name], out = src.split(from).join(to);
+  if (out === src) console.warn(`[materials] safe ${name}: pattern not found (three changed?)`);
+  return out;
+}
+const SAFE_NORMAL_VERTEX = safeChunk('normal_vertex', 'vNormal = normalize( transformedNormal );', 'vNormal = cSafeN( transformedNormal );');
+const SAFE_NORMAL_BEGIN = safeChunk('normal_fragment_begin', 'vec3 normal = normalize( vNormal );', 'vec3 normal = cSafeNormal( vNormal, vViewPosition );');
+const SAFE_NORMAL_MAPS = safeChunk('normal_fragment_maps', 'normalize(', 'cSafeN(');
+
 function injectVertex(shader, o) {
   const mode = o.wind ? WIND_MODES[o.wind] : 0;
   shader.vertexShader = shader.vertexShader
@@ -220,7 +242,7 @@ function injectVertex(shader, o) {
       gl_Position = projectionMatrix * mvPosition;
     `)
     .replace('#include <worldpos_vertex>', 'vec4 worldPosition = cWorld;')
-    .replace('#include <normal_vertex>', `#include <normal_vertex>\n vCWN = normalize( (modelMatrix * vec4(objectNormal, 0.0)).xyz );\n #ifdef USE_INSTANCING\n vCWN = normalize( (modelMatrix * instanceMatrix * vec4(objectNormal, 0.0)).xyz );\n #endif`);
+    .replace('#include <normal_vertex>', `${SAFE_NORMAL_VERTEX}\n vCWN = cSafeN( (modelMatrix * vec4(objectNormal, 0.0)).xyz );\n #ifdef USE_INSTANCING\n vCWN = cSafeN( (modelMatrix * instanceMatrix * vec4(objectNormal, 0.0)).xyz );\n #endif`);
 }
 
 function injectDepthVertex(shader, o) {
@@ -297,15 +319,15 @@ export function makeToon(o = {}) {
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${PAINT_GLSL}\n${o.fragPars || ''}`)
       .replace('#include <lights_toon_pars_fragment>', TOON_LIGHT)
-      .replace('#include <normal_fragment_begin>', o.noFlip ? '#include <normal_fragment_begin>\n normal = normalize(vNormal); nonPerturbedNormal = normal;' : '#include <normal_fragment_begin>')
+      .replace('#include <normal_fragment_begin>', o.noFlip ? `${SAFE_NORMAL_BEGIN}\n normal = cSafeNormal(vNormal, vViewPosition); nonPerturbedNormal = normal;` : SAFE_NORMAL_BEGIN)
       .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n occlusionFade(vViewPosition.z);')
-      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${o.fragNormal || ''}`)
+      .replace('#include <normal_fragment_maps>', `${SAFE_NORMAL_MAPS}\n${o.fragNormal || ''}`)
       .replace('#include <color_fragment>', /* glsl */`
         #include <color_fragment>
         ${o.fragColor || ''}
         {
           vec3 bp = ${o.objectBrush ? 'vCObj * 2.0' : 'vCWorld'};
-          vec3 bs = brushSample(bp, normalize(vCWN));
+          vec3 bs = brushSample(bp, cSafeNormal(vCWN, vCWorld));
           float v = (bs.r - 0.5) * 1.3 + (bs.b - 0.5) * 0.9;
           diffuseColor.rgb *= 1.0 + v * uBrushAmt;
           // low-frequency painted hue drift: warmer / cooler patches
@@ -377,7 +399,7 @@ export function makeOutline(color = '#3a2230', width = 0.02) {
     s.uniforms.uOutW = w;
     s.vertexShader = s.vertexShader
       .replace('#include <common>', '#include <common>\nuniform float uOutW;')
-      .replace('#include <begin_vertex>', 'vec3 transformed = position + normalize(normal) * uOutW;');
+      .replace('#include <begin_vertex>', 'vec3 transformed = position + normal * inversesqrt(max(dot(normal, normal), 1e-12)) * uOutW;'); // (a zero normal: no push, not NaN)
   };
   return m;
 }

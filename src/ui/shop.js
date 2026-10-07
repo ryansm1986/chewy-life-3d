@@ -11,6 +11,7 @@
 import { heroText } from '../rpg/classes.js';
 import { el, esc, fmt, replay, setText, rarityColor } from './dom.js';
 import { glyph, glyphURL } from './glyphs.js';
+import { padWording } from './padGlyphs.js';
 import { portraitHTML } from './portraits.js';
 import { Panel } from './panel.js';
 import { itemIconURL, buyPrice, sellPrice, itemName, potionIconURL, potionInfo } from './rpg.js';
@@ -65,7 +66,7 @@ export class ShopPanel extends Panel {
     for (const t of this.body.querySelectorAll('.sh-tabs .tab')) t.classList.toggle('on', t.dataset.t === this.tab);
     const sk = this.opts.sellKinds;
     const sf = this.opts.sellFurniture;
-    this.$.hint.textContent = this.tab === 'buy' ? (sf ? 'Click to buy · Furniture goes to your storage' : 'Click to buy · Items fly into your bag') : sf ? 'Click to sell one · Tanu pays half the price' : sk ? 'Click to sell one · Shift+Click sells them all' : 'Click to sell · or Shift+Right-click in your bag';
+    this.$.hint.innerHTML = padWording(esc(this.tab === 'buy' ? (sf ? 'Click to buy · Furniture goes to your storage' : 'Click to buy · Items fly into your bag') : sf ? 'Click to sell one · Tanu pays half the price' : sk ? 'Click to sell one · Shift+Click sells them all' : 'Click to sell · or Shift+Right-click in your bag')); // (the pad's wording while it plays: ui/padGlyphs.js)
     let html = '';
     if (this.tab === 'buy') {
       const sig = 'b' + (st.coins || 0) + '|' + (this.entries || []).map(e => (e.item?.uid || e.potion || e.pantry || e.goods?.id || e.furn) + ':' + (e.stock ?? '') + (e.pantry ? ':' + (st.pantry?.[e.pantry] || 0) : '')).join();

@@ -1,14 +1,18 @@
 // Pause menu: Resume / Settings / Controls / Save / Quit. Settings fire UI.onSetting callbacks and persist.
+// Controls (docs/CONTROLS.md §1): the bindings per device (Keyboard & mouse | Controller), click one to rebind it (the
+// next key, mouse button or pad button; Esc / Menu cancels; a binding taken from another action swaps with it), Reset,
+// and the controller's rumble, aim assist and button glyphs. While the pad plays, the main view also has a row of the
+// panels (the Menu button is how the pad reaches the bag, character, skills, journal and map) and Home.
 import { el, esc, replay } from './dom.js';
 import { glyph } from './glyphs.js';
 import { Panel } from './panel.js';
+import { Actions, ACTIONS, ACTION_GROUPS, PAD_BINDABLE } from '../core/actions.js';
+import { normKey } from '../core/input.js';
+import { padGlyph } from './padGlyphs.js';
+import { PRESET_NAMES } from '../core/deck.js';
 
-const CONTROLS = [
-  [['LMB'], 'Move / attack / talk'], [['Shift'], 'Sprint (hold)'], [['Alt', 'LMB'], 'Attack in place'], [['Space'], 'Dodge roll'],
-  [['RMB'], 'Use right-click skill'], [['1', '2', '3', '4'], 'Hotbar skills (hold to charge)'], [['Q', 'E'], 'Heart / Zoom potion'], [['G'], 'Quick meal'],
-  [['F'], 'Interact'], [['X'], 'Swap weapons'], [['I'], 'Bag'], [['P'], 'Pantry'], [['C'], 'Character'], [['K'], 'Skills'], [['J'], 'Journal'],
-  [['M'], 'Map'], [['Tab'], 'Switch hero'], [['B'], 'Build (village)'], [['Z'], 'Show loot labels (hold)'], [['Esc'], 'Close / menu'],
-];
+const MOUSE_CAP = { mouse0: () => glyph('mouseL'), mouse2: () => glyph('mouseR') };
+const QUICK = [['inventory', 'bag', 'Bag'], ['character', 'star', 'Character'], ['skills', 'sparkle', 'Skills'], ['quests', 'book', 'Journal'], ['map', 'map', 'Map']];
 
 export class MenuPanel extends Panel {
   constructor(ui) { super(ui, { name: 'menu', title: 'Paused', jp: '一時停止', side: 'center', cls: 'p-menu', icon: 'gear' }); this.view = 'main'; }
@@ -22,6 +26,7 @@ export class MenuPanel extends Panel {
     this.body.innerHTML = `<div class="mn-views">
       <div class="mn-v mn-main">
         <div class="mn-hero"><div class="mn-paws">${glyph('paw')}${glyph('paw')}${glyph('paw')}</div><div class="mn-zz"><b class="mn-who">Chewy</b> is taking a little break<span>z</span><span>z</span><span>z</span></div></div>
+        <div class="mn-quick">${QUICK.map(([n, g, l]) => `<button class="btn" data-a="open:${n}">${glyph(g)}${l}</button>`).join('')}<button class="btn" data-a="build">${glyph('hammer')}Build</button><button class="btn" data-a="decorate">${glyph('home')}Decorate</button><button class="btn" data-a="home">${glyph('home')}Home</button></div>
         <div class="mn-btns">
           <button class="btn big mint" data-a="resume">${glyph('play')}Resume</button>
           <button class="btn big" data-a="settings">${glyph('gear')}Settings</button>
@@ -31,7 +36,8 @@ export class MenuPanel extends Panel {
         </div>
       </div>
       <div class="mn-v mn-settings">
-        <div class="set-row"><div class="set-n">${glyph('eye')}Graphics</div><div class="seg" data-k="quality">${['Low', 'Medium', 'High'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+        <div class="set-row" title="Deck: tuned for the Steam Deck (a lighter picture, smaller shadows, fewer particles). Grass and scenery detail change at the next start."><div class="set-n">${glyph('eye')}Graphics</div><div class="seg" data-k="quality">${PRESET_NAMES.map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+        <div class="set-row" title="Caps the frame rate: 40 is a steady fallback on the Steam Deck"><div class="set-n">${glyph('play')}Frame cap</div><div class="seg" data-k="fpsCap">${['Off', '60', '40'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
         <div class="set-row"><div class="set-n">${glyph('music')}Music</div><div class="sld"><input type="range" min="0" max="100" data-k="music"><b></b></div></div>
         <div class="set-row"><div class="set-n">${glyph('sound')}Sound FX</div><div class="sld"><input type="range" min="0" max="100" data-k="sfx"><b></b></div></div>
         <div class="set-row"><div class="set-n">${glyph('sparkle')}UI size</div><div class="sld"><input type="range" min="80" max="125" data-k="uiScale"><b></b></div></div>
@@ -40,14 +46,25 @@ export class MenuPanel extends Panel {
         <div class="set-row" title="Hold Shift while moving to sprint (+40% speed). Toggle: tap Shift to start sprinting; tap it again, or stop, to walk."><div class="set-n">${glyph('boots')}Sprint (Shift)</div><div class="seg" data-k="sprintMode">${['Hold', 'Toggle'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
         <div class="set-row"><div class="set-n">${glyph('star')}Show FPS</div><button class="tog" data-k="showFps"><i></i></button></div>
         <div class="set-row"><div class="set-n">${glyph('sparkle')}Disney style</div><button class="tog" data-k="disneyChewy"><i></i></button></div>
+        <div class="set-row" title="Keys and controller buttons, rumble, aim assist"><div class="set-n">${glyph('question')}Controls</div><button class="btn sm" data-a="controls">Change…</button></div>
         <div class="set-row" title="Which hero models to play with: the samurai Chewy, the Toybox Chewy, or the Storybook heroes. Switching saves and reloads."><div class="set-n">${glyph('star')}Hero models</div><div class="seg" data-k="heroModel">${['Samurai', 'Toybox', 'Storybook'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
         <div class="mn-foot"><button class="btn" data-a="back">${glyph('swap')}Back</button></div>
       </div>
       <div class="mn-v mn-controls">
-        <div class="ctl-grid">${CONTROLS.map(([ks, t]) => `<div class="ctl"><span class="ctl-k">${ks.map(k => `<span class="kc">${k === 'LMB' ? glyph('mouseL') : k === 'RMB' ? glyph('mouseR') : k}</span>`).join('')}</span><span class="ctl-t">${t}</span></div>`).join('')}</div>
-        <div class="mn-foot"><button class="btn" data-a="back">${glyph('swap')}Back</button></div>
+        <div class="ctl-tabs"><button data-dev="kbm">Keyboard &amp; mouse</button><button data-dev="pad">Controller</button></div>
+        <div class="ctl-opts">
+          <div class="set-row" title="Light pulses on hits and charged releases"><div class="set-n">${glyph('bolt')}Rumble</div><button class="tog" data-k="rumble"><i></i></button></div>
+          <div class="set-row" title="The soft lock on the foe nearest your aim: how wide its cone is (0: off)"><div class="set-n">${glyph('eye')}Aim assist</div><div class="sld"><input type="range" min="0" max="100" data-k="aimAssist"><b></b></div></div>
+          <div class="set-row" title="Auto follows the controller (the Steam Deck shows Xbox letters)"><div class="set-n">${glyph('star')}Button glyphs</div><div class="seg" data-k="padGlyphs" style="--w:96px">${['Auto', 'Xbox', 'PlayStation'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+        </div>
+        <div class="ctl-list"></div>
+        <div class="ctl-note"></div>
+        <div class="mn-foot"><button class="btn" data-a="resetBinds">${glyph('sort')}Reset</button><button class="btn" data-a="back">${glyph('swap')}Back</button></div>
       </div></div>`;
+    this.dev = 'kbm';
     this.body.addEventListener('click', e => {
+      const tab = e.target.closest('.ctl-tabs button'); if (tab) { this.cancelWait(); this.dev = tab.dataset.dev; this.ui.sfx('tab'); this.renderControls(); return; }
+      const bb = e.target.closest('.ctl-b'); if (bb) { this.startWait(bb.dataset.bind); return; }
       const b = e.target.closest('[data-a]'); if (b) { this.act(b.dataset.a); replay(b, 'pressed', 300); return; }
       const s = e.target.closest('.seg button'); if (s) { this.ui.setSetting(s.parentElement.dataset.k, +s.dataset.v); this.sync(); return; }
       const t = e.target.closest('.tog'); if (t) { this.ui.setSetting(t.dataset.k, !this.ui.settings[t.dataset.k]); this.sync(); }
@@ -61,14 +78,21 @@ export class MenuPanel extends Panel {
   }
   act(a) {
     const h = this.ui._menuH || {};
+    if (a.startsWith('open:')) { this.ui.close('menu'); this.ui._user = true; try { this.ui.open(a.slice(5), a === 'open:inventory' ? { view: 'bag' } : undefined); } finally { this.ui._user = false; } return; } // (the pad's way to the panels)
+    if (a === 'home') { this.ui.close('menu'); if (this.ui.G?.mode === 'dungeon') this.ui.G.returnToVillage?.(); return; }
+    if (a === 'build') { this.ui.close('menu'); const B = this.ui.G?.build; if (B && !B.active && this.ui.G.mode === 'village') B.enter(); return; } // (the pad's way into build mode)
+    if (a === 'decorate') { this.ui.close('menu'); const D = this.ui.G?.housing?.decor; if (D && !D.active && this.ui.G.mode === 'interior') D.enter(); return; }
+    if (a === 'resetBinds') { this.cancelWait(); Actions.resetBindings(this.dev); this.ui.saveBinds(); this.note(this.dev === 'pad' ? 'Controller buttons reset.' : 'Keys reset.'); this.renderControls(); return; }
     if (a === 'resume') this.ui.close('menu');
     else if (a === 'settings' || a === 'controls') this.setView(a);
-    else if (a === 'back') this.setView(this.opts.from === 'title' ? 'close' : 'main');
+    else if (a === 'back') this.setView(this.view === 'controls' && this._backTo === 'settings' ? 'settings' : this.opts.from === 'title' ? 'close' : 'main');
     else if (a === 'save') { const r = h.save?.(); if (r !== false) this.ui.toast('Game saved!', { icon: 'save', color: '#8fd0ff' }); }
     else if (a === 'quit') { this.ui.close('menu'); h.quit ? h.quit() : this.ui.setMode('title'); }
   }
   setView(v) {
     if (v === 'close') { this.ui.close('menu'); return; }
+    if (v === 'controls' && this.view !== 'controls') { this._backTo = this.view; this.dev = Actions.device; this.renderControls(); }
+    if (v !== 'controls') this.cancelWait();
     this.view = v;
     this.panel.dataset.view = v;
     this.setTitle(v === 'settings' ? 'Settings' : v === 'controls' ? 'Controls' : 'Paused', v === 'settings' ? '設定' : v === 'controls' ? '操作' : '一時停止');
@@ -90,11 +114,84 @@ export class MenuPanel extends Panel {
       const k = r.dataset.k, v = Math.round((s[k] ?? 1) * 100);
       if (+r.value !== v) r.value = v;
       r.style.setProperty('--p', ((v - r.min) / (r.max - r.min) * 100).toFixed(1) + '%');
-      r.nextElementSibling.textContent = k === 'uiScale' ? v + '%' : v;
+      r.nextElementSibling.textContent = k === 'uiScale' || k === 'aimAssist' ? v + '%' : v;
     }
-    for (const t of this.body.querySelectorAll('.tog')) t.classList.toggle('on', !!s[t.dataset.k]);
+    for (const t of this.body.querySelectorAll('.tog')) t.classList.toggle('on', k0(s, t.dataset.k));
     const h = this.ui._menuH || {};
     this.body.querySelector('[data-a="save"]').style.display = h.save ? '' : 'none';
+    const mode = this.ui.G?.mode, show = (a, on) => { const b = this.body.querySelector(`[data-a="${a}"]`); if (b) b.style.display = on ? '' : 'none'; };
+    show('home', mode === 'dungeon'); show('build', mode === 'village' && !this.ui.G?.build?.active); show('decorate', mode === 'interior' && !!this.ui.G?.housing?.canDecorate?.());
   }
-  render() { this.sync(); }
+  render() { this.sync(); if (this.view === 'controls') this.renderControls(); }
+  onClose() { this.cancelWait(); }
+
+  // ---------------------------------------------------------------- Controls: bindings per device, rebinding
+  /** a binding's caps: keycaps / mouse glyphs, or pad glyphs */
+  caps(id, dev) {
+    const ts = Actions.binds(id, dev);
+    if (!ts.length) return '<span class="none">—</span>';
+    if (dev === 'pad') return ts.map(t => `<span class="kc pad">${padGlyph(t)}</span>`).join('');
+    if (id === 'camTurn') return '<span class="kc">Q</span><span class="kc">E</span>';
+    return ts.map(t => t.includes('+') ? t.split('+').map(k => `<span class="kc">${Actions.tokenName(k, 'kbm')}</span>`).join('') : `<span class="kc">${MOUSE_CAP[t]?.() || Actions.tokenName(t, 'kbm')}</span>`).join('');
+  }
+  renderControls() {
+    if (!this.panel) return;
+    const dev = this.dev || 'kbm', list = this.body.querySelector('.ctl-list'); if (!list) return;
+    this.panel.dataset.dev = dev;
+    for (const b of this.body.querySelectorAll('.ctl-tabs button')) b.classList.toggle('on', b.dataset.dev === dev);
+    let html = '';
+    for (const [g, title] of ACTION_GROUPS) {
+      const rows = Object.entries(ACTIONS).filter(([id, A]) => A.group === g && (Actions.binds(id, dev).length || Actions.rebindable(id, dev)));
+      if (!rows.length) continue;
+      html += `<div class="ctl-g">${esc(title)}</div>` + rows.map(([id, A]) => {
+        const lock = !Actions.rebindable(id, dev), wait = this.wait?.id === id && this.wait.dev === dev;
+        const label = dev === 'kbm' && A.kbmLabel ? A.kbmLabel : A.label;
+        return `<div class="ctl-row" data-row="${id}"><span class="ctl-t">${esc(label)}</span><button class="ctl-b${lock ? ' locked' : ''}${wait ? ' wait' : ''}" data-bind="${id}"${lock ? ' disabled' : ''} title="${lock ? 'Fixed' : 'Click to change'}">${wait ? (dev === 'pad' ? 'Press a button…' : 'Press a key…') : this.caps(id, dev)}</button></div>`;
+      }).join('');
+    }
+    list.innerHTML = html;
+    this.sync();
+  }
+  note(t) { const n = this.body.querySelector('.ctl-note'); if (n) n.textContent = t || ''; }
+  startWait(id) {
+    const dev = this.dev || 'kbm'; if (!Actions.rebindable(id, dev)) return;
+    this.cancelWait();
+    this.wait = { id, dev, t: performance.now() };
+    this.note(dev === 'pad' ? 'Press a button on the controller (Menu cancels).' : 'Press a key, or the middle or a side mouse button (Esc cancels).');
+    this.ui.sfx('select');
+    if (dev === 'kbm') {
+      this._kd = e => { e.preventDefault(); e.stopPropagation(); const k = normKey(e); if (k === 'escape') this.cancelWait(true); else this.finishWait(k); };
+      this._md = e => { if (performance.now() - this.wait.t < 120) return; if (e.button === 0 || e.button === 2) { if (!e.target.closest?.('.ctl-b')) this.cancelWait(true); return; } e.preventDefault(); e.stopPropagation(); this.finishWait('mouse' + e.button); };
+      addEventListener('keydown', this._kd, true); addEventListener('mousedown', this._md, true);
+    }
+    this.renderControls();
+  }
+  /** per frame from UI.padInput while a pad rebind waits: the first pad button pressed (Menu cancels) → true (handled) */
+  padCapture() {
+    const w = this.wait; if (!w) return false;
+    if (w.dev !== 'pad') return false;
+    const t = [...Actions.pPressed].find(x => PAD_BINDABLE.includes(x) || x === 'L3+R3');
+    for (const x of [...Actions.pPressed]) Actions.padConsume(x);
+    if (!t) return true;
+    if (t === 'Menu') this.cancelWait(true); else this.finishWait(t);
+    return true;
+  }
+  finishWait(token) {
+    const w = this.wait; if (!w) return;
+    const r = Actions.rebind(w.id, w.dev, token);
+    this.cancelWait();
+    if (r?.blocked) { this.note(`${Actions.tokenName(token, w.dev)} is fixed for ${ACTIONS[r.blocked].label}.`); this.ui.sfx('deny'); this.renderControls(); return; }
+    this.ui.saveBinds();
+    this.note(r?.swapped ? `${ACTIONS[w.id].label} → ${Actions.tokenName(token, w.dev)} (swapped with ${ACTIONS[r.swapped].label})` : `${ACTIONS[w.id].label} → ${Actions.tokenName(token, w.dev)}`);
+    this.ui.sfx('assign');
+    this.renderControls();
+    const row = this.body.querySelector(`[data-row="${w.id}"]`); if (row) replay(row, 'flash', 700);
+  }
+  cancelWait(say) {
+    if (this._kd) { removeEventListener('keydown', this._kd, true); removeEventListener('mousedown', this._md, true); this._kd = this._md = null; }
+    const was = this.wait; this.wait = null;
+    if (was && say) { this.note('Unchanged.'); this.renderControls(); }
+  }
 }
+// a toggle's setting (rumble defaults on: undefined counts as on)
+const k0 = (s, k) => (k === 'rumble' ? s[k] !== false : !!s[k]);

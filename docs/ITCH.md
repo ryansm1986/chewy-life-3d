@@ -50,9 +50,9 @@ The version in the zip name comes from `package.json`, so bump it before each up
 
 ## Push with butler (`npm run push:itch`)
 itch's command-line uploader, **butler**, uploads only what changed since the last push, and keeps a version history.
-- **Install**: butler is installed at `%LOCALAPPDATA%utlerutler.exe` (from itch's official
+- **Install**: butler is installed at `%LOCALAPPDATA%\butler\butler.exe` (from itch's official
   `broth.itch.zone/butler/windows-amd64`). `tools/push-itch.mjs` finds it there, on PATH, or in `$BUTLER`.
-- **Sign in once**: run `"%LOCALAPPDATA%utlerutler.exe" login` yourself. It opens the browser to approve, and saves
+- **Sign in once**: run `"%LOCALAPPDATA%\butler\butler.exe" login` yourself. It opens the browser to approve, and saves
   the credentials on this PC. (Or set `BUTLER_API_KEY` from itch.io → Settings → API keys.)
 - **Push**: `npm run push:itch` builds and tests (`build-itch.mjs --test`), then runs
   `butler push dist-itch holiestdiver/pawhaven:html5 --userversion <package.json version>`.
@@ -109,9 +109,8 @@ world, and the WebAudio-synthesised music, effects and voices. If you add a thir
 
 - **Low-end GPUs:**
   - Settings → Quality **Low** turns off AO and tilt-shift and drops the pixel ratio at runtime.
-  - Grass and detail density only follow the `?q=0|1|2` URL parameter at boot, which itch players can't set. Make the
-    saved setting apply at boot (in `core/engine.js`, read the saved settings when there's no `?q`) before the game
-    goes public.
+  - Done (ROADMAP R-2, CT-3): grass and detail density now follow the saved Graphics setting at boot, as well as
+    `?q=`. A Steam Deck-sized screen (1280×800) starts on the lighter **Deck** preset.
   - The village is about 2.6M triangles.
 - **First load:** about 30 MB over the CDN. It took about 10 s to reach the title locally, and will be longer on slow
   connections.

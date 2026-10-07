@@ -31,11 +31,21 @@ import { DecoratePanel, HomeHud } from './decorate.js';
 import { HouseCardPanel, RemodelPanel, Preview } from './remodel.js';
 import { ReelBar } from './reel.js';
 import { Title } from './title.js';
+import { Prewarm } from './prewarm.js';
 import { itemName, itemIconURL, skillIconURL } from './rpg.js';
+import { Actions } from '../core/actions.js';
+import { normKey } from '../core/input.js';
+import { installPadGlyphs } from './padGlyphs.js';
+import { PadNav } from './padNav.js';
+import { PadCursor } from './padCursor.js';
+import { deckLike, DECK } from '../core/deck.js';
+import './deck.css'; // (last: the Deck's text floor outranks the panels' own sizes)
 import { Vector3 } from 'three';
 
 const SETTINGS_KEY = 'chewy3d.settings';
-const DEFAULT_SETTINGS = { quality: 2, music: 0.7, sfx: 0.8, uiScale: 1, shake: true, showFps: false, chargeMode: 0, sprintMode: 0 }; // chargeMode: 0 hold to charge · 1 off · 2 toggle (docs/CHARGE.md); sprintMode: 0 hold Shift · 1 toggle (actors/sprint.js)
+const DEFAULT_SETTINGS = { quality: 2, music: 0.7, sfx: 0.8, uiScale: 1, shake: true, showFps: false, chargeMode: 0, sprintMode: 0, rumble: true, aimAssist: 0.7, padGlyphs: 0, binds: null, fpsCap: 0 }; // chargeMode: 0 hold to charge · 1 off · 2 toggle (docs/CHARGE.md); sprintMode: 0 hold Shift · 1 toggle (actors/sprint.js); rumble, aimAssist (0..1), padGlyphs (0 auto · 1 Xbox · 2 PlayStation), binds ({ kbm, pad } overrides): Settings › Controls (core/actions.js, docs/CONTROLS.md); quality 3 is the Steam Deck preset, fpsCap 0 off · 1 60 · 2 40 (core/deck.js)
+const CONTROL_SETTINGS = new Set(['rumble', 'padGlyphs', 'binds']);
+const PAD_SLOTS = ['attack', 'skillAlt', 'skill1', 'skill2', 'skill3', 'skill4'];
 const NON_BLOCKING = new Set(['build', 'decorate']); // panels that don't pause gameplay input
 // UI sound names → src/audio sfx ids (learn / equip / level-up / toast sounds are already bound to game events by the audio module)
 const SFX_MAP = { open: 'ui_open', close: 'ui_close', tab: 'ui_tab', deny: 'ui_error', coin: 'ui_coin', buy: 'ui_buy', hover: 'ui_hover', equip: 'ui_equip', learn: 'ui_learn',
@@ -51,12 +61,17 @@ export const UI = {
     if (this.ready) { this.G = G; return this; }
     this.G = G;
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch (e) { /* private mode */ }
-    if (G?.engine?.quality != null && localStorage.getItem(SETTINGS_KEY) == null) this.settings.quality = G.engine.quality;
+    // the graphics preset the engine booted with (core/deck.js: the saved one, ?q=, or the first start's pick: Deck on a
+    // Deck-like screen); a Deck-like screen's first start also sizes the UI up (1.15) and keeps it in a safe area
+    const fresh = (() => { try { return localStorage.getItem(SETTINGS_KEY) == null; } catch (e) { return true; } })(), deck = deckLike();
+    if (G?.engine?.preset != null && (fresh || G.engine.params?.has('q'))) this.settings.quality = G.engine.preset;
+    if (fresh && deck) this.settings.uiScale = DECK.uiScale;
     let root = document.getElementById('ui');
     if (!root) { root = el('div'); root.id = 'ui'; document.body.appendChild(root); }
     this.root = root;
     root.innerHTML = '';
     root.classList.add('ui-root');
+    root.classList.toggle('deck-ui', deck); // (deck.css: the safe area and the Deck's text floor)
     const L = n => { const d = el('div', 'layer l-' + n); root.appendChild(d); return d; };
     this.layers = { world: L('world'), hud: L('hud'), panels: L('panels'), dlg: L('dlg'), msg: L('msg'), title: L('title'), fx: L('fx'), over: L('over'), iris: L('iris') };
     this.tip = new Tooltip(this.layers.over);
@@ -94,7 +109,7 @@ export const UI = {
     this.applyScale();
     addEventListener('resize', () => this.applyScale());
     addEventListener('keydown', e => this.onKey(e));
-    addEventListener('keyup', e => { if (e.code === 'KeyZ') this.labels.setVisible(false); if (e.key === 'Alt') e.preventDefault(); }); // (hold Z: the loot labels)
+    addEventListener('keyup', e => { if (Actions.isKey('lootLabels', normKey(e))) this.labels.setVisible(false); if (e.key === 'Alt') e.preventDefault(); }); // (hold Z: the loot labels)
     addEventListener('blur', () => this.labels.setVisible(false));
     // LMB/RMB press flashes on the world canvas
     addEventListener('mousedown', e => {
@@ -107,8 +122,12 @@ export const UI = {
     root.addEventListener('mouseover', e => { const t = e.target.closest?.('button, .slot, .node, .card, .hb, .belt, .sh-item, .q-item, .ll'); if (t && t !== this._hovEl) { this._hovEl = t; this.sfx('hover'); } });
     this.bindEvents();
     this.applySettings(true);
+    this.applyControls();
+    this.refreshCaps = installPadGlyphs(this); // (keycaps ⇄ gamepad glyphs when the device changes: ui/padGlyphs.js)
+    this.padNav = new PadNav(this); this.padCursor = new PadCursor(this); // (the gamepad in panels; in build and decorate mode: docs/CONTROLS.md §3)
     this.setMode(G?.mode && G.mode !== 'title' ? G.mode : this.mode);
     this.ready = true;
+    (this.prewarm = new Prewarm(this)).start(); // the menus' lazy setup, done ahead in idle time after boot (ui/prewarm.js)
     return this;
   },
 
@@ -144,6 +163,7 @@ export const UI = {
   update(dt = 1 / 60) {
     if (!this.ready) return;
     const cam = this.G?.engine?.camera;
+    this.padInput(); // (the gamepad in menus and dialogue)
     this.floats.update(dt, cam, this.scale);
     this.labels.update(dt, cam, this.scale);
     if (this.mode !== 'title') this.hud.update(dt);
@@ -189,6 +209,7 @@ export const UI = {
     else if (p.side !== 'center' && name !== 'decorate' && this.isOpen('decorate')) this.close('decorate');
     // (a homestead stall, which trades only in pantry goods, shows the Pantry beside it rather than the Bag)
     if ((name === 'shop' || name === 'stash') && !this.isOpen('inventory')) { this.panels.inventory.open(name === 'shop' ? { view: opts?.noBagSell ? 'pantry' : 'bag' } : {}); this._autoInv = true; this._order.push('inventory'); }
+    if (!p.isOpen) p._openAt = performance.now(); // (hidesHitches: when it finished opening)
     p.open(opts || {});
     this._order = this._order.filter(n => n !== name); this._order.push(name);
     this._raise(p);
@@ -219,6 +240,20 @@ export const UI = {
     return false;
   },
   isPaused() { return this.ready && (this.mode === 'title' || this.isOpen('menu')); },
+  /** A moment a one-off hitch can't be seen, for heavy cache-filling work (building templates: world/village.js, the
+   *  townsfolk rig pool: game.js, the build palette's thumbnails: ui/prewarm.js): the title screen, or a menu / dialogue
+   *  that has been up past its open animation (`ms`). Not the open itself: that frame is the one the player watches
+   *  (ROADMAP R-8: work that started on every open made each first open stutter). */
+  hidesHitches(ms = 800) {
+    if (!this.ready) return false;
+    if (this.mode === 'title') return true;
+    if (this.iris.active) return false;
+    // (the newest of what's up counts: a panel opened alongside another, e.g. the bag beside a shop, has no stamp of its own)
+    let up = false, newest = 0;
+    if (this.dlg.active) { up = true; newest = this._dlgAt || 0; }
+    for (const [n, p] of Object.entries(this.panels)) if (p.isOpen && !NON_BLOCKING.has(n)) { up = true; newest = Math.max(newest, p._openAt || 0); }
+    return up && performance.now() - newest > ms;
+  },
   _raise(p) { this._z = (this._z || 10) + 1; if (p.wrap) p.wrap.style.zIndex = this._z; },
   openBuild(opts) {
     if (this.mode !== 'village') { this.toast('You can only build in the village!', { icon: 'hammer' }); return; }
@@ -251,37 +286,94 @@ export const UI = {
   // ------------------------------------------------------------------ keyboard
   onKey(e) {
     if (e.key === 'Alt') e.preventDefault(); // (Alt+LMB attacks in place: a lone Alt must not focus the browser's menu)
-    if (!this.ready || isTyping() || e.repeat && e.code !== 'KeyZ') return;
+    const nk = normKey(e), act = a => Actions.isKey(a, nk); // (the keys go through the action layer's bindings: Settings › Controls)
+    if (!this.ready || isTyping() || e.repeat && !act('lootLabels')) return;
     const code = e.code, k = e.key;
     if (this.iris.active) { e.preventDefault(); return; }
     if (k === 'Alt') return;
-    if (code === 'KeyZ' && !e.ctrlKey && !e.metaKey && !e.altKey) { this.labels.setVisible(true); return; } // hold Z: every loot label (Ctrl+Z stays the decorate undo)
+    if (act('lootLabels') && !e.ctrlKey && !e.metaKey && !e.altKey) { this.labels.setVisible(true); return; } // hold Z: every loot label (Ctrl+Z stays the decorate undo)
     if (this.mode === 'title') { if (k === 'Escape' && this.isOpen('menu')) this.close('menu'); return; }
     if (this.dlg.active) { if (this.dlg.key(k, e)) e.preventDefault(); return; }
-    if (k === 'Escape') {
-      e.preventDefault();
-      if (this.pop.classList.contains('show')) { this.hidePopover(); return; }
-      if (this.drag.held) { this.drag.cancel(); return; }
-      if (this.isOpen('build') && (this.panels.build.sel || this.panels.build.tool)) { this.panels.build.clearSelection(); this.panels.build.opts.onCancel?.(); return; }
-      if (this.isOpen('decorate') && this.G?.housing?.decor?.onEscape?.()) return; // (decorating: Esc drops what's in hand first)
-      const top = [...this._order].reverse().find(n => this.panels[n]?.isOpen);
-      this._user = true; try { if (top) this.close(top); else this.open('menu'); } finally { this._user = false; }
-      return;
-    }
+    if (k === 'Escape') { e.preventDefault(); this.back(); return; }
     if (this.isOpen('menu')) return;
-    const map = { KeyI: 'inventory', KeyC: 'character', KeyK: 'skills', KeyJ: 'quests', KeyM: 'map' }; // (Tab switches heroes: game.js)
-    if (code === 'KeyI' && this.isOpen('inventory') && this.panels.inventory.view === 'pantry') { e.preventDefault(); this.panels.inventory.setView('bag'); this.sfx('tab'); return; }
-    if (map[code]) { e.preventDefault(); this.toggle(map[code], code === 'KeyI' ? { view: 'bag' } : undefined); return; }
-    if (code === 'KeyP') { e.preventDefault(); this.togglePantry(); return; } // the Pantry (docs/HOMESTEAD.md)
-    if (code === 'KeyB') { if (this.mode === 'village' && !this.G?.build && this._buildProvider) this.openBuild(); return; } // the game toggles G.build itself
+    const panel = ['inventory', 'character', 'skills', 'quests', 'map'].find(act); // (Tab switches heroes: game.js)
+    if (panel === 'inventory' && this.isOpen('inventory') && this.panels.inventory.view === 'pantry') { e.preventDefault(); this.panels.inventory.setView('bag'); this.sfx('tab'); return; }
+    if (panel) { e.preventDefault(); this.toggle(panel, panel === 'inventory' ? { view: 'bag' } : undefined); return; }
+    if (act('pantry')) { e.preventDefault(); this.togglePantry(); return; } // the Pantry (docs/HOMESTEAD.md)
+    if (act('build')) { if (this.mode === 'village' && !this.G?.build && this._buildProvider) this.openBuild(); return; } // the game toggles G.build itself
     const dig = /^Digit([1-4])$/.exec(code);
     if (dig) {
       const slot = +dig[1] + 1;
       if (this.isOpen('skills') && this.skills.hoverId) { this.skills.assign(slot, this.skills.hoverId); e.preventDefault(); return; }
-      if (!this.anyModal()) this.hud.flashSlot(slot);
+      if (!this.anyModal() && act(PAD_SLOTS[slot])) this.hud.flashSlot(slot);
       return;
     }
-    if ((code === 'KeyQ' || code === 'KeyE') && !this.anyModal()) this.hud.flashBelt(code === 'KeyQ' ? 'heart' : 'zoom');
+    const sk = PAD_SLOTS.indexOf(PAD_SLOTS.slice(2).find(act)); // (a hotbar key rebound off the digits)
+    if (sk > 1 && !this.anyModal()) this.hud.flashSlot(sk);
+    if ((act('potionHeart') || act('potionZoom')) && !this.anyModal()) this.hud.flashBelt(act('potionHeart') ? 'heart' : 'zoom');
+  },
+  /** Esc (and the pad's B / Menu): a popover, a held item, a build pick, decorate's hand, the top panel — else the menu */
+  back() {
+    if (this.pop.classList.contains('show')) { this.hidePopover(); return; }
+    if (this.drag.held) { this.drag.cancel(); return; }
+    if (this.isOpen('build') && (this.panels.build.sel || this.panels.build.tool)) { this.panels.build.clearSelection(); this.panels.build.opts.onCancel?.(); return; }
+    if (this.isOpen('decorate') && this.G?.housing?.decor?.onEscape?.()) return; // (decorating: Esc drops what's in hand first)
+    const top = [...this._order].reverse().find(n => this.panels[n]?.isOpen);
+    this._user = true; try { if (top) this.close(top); else this.open('menu'); } finally { this._user = false; }
+  },
+
+  // ------------------------------------------------------------------ the gamepad in menus and dialogue (docs/CONTROLS.md §3)
+  // CT-1's bridge: Menu = Esc (the menu, or close the top panel), B = back out of a panel, View = the map, a held D-pad ▼
+  // shows the loot labels, A / B / the D-pad drive dialogue (advance, leave, pick a choice). Hotbar and belt flashes for
+  // pad presses. (CT-2 adds spatial focus navigation for every panel.)
+  padInput() {
+    const A = Actions;
+    const lh = A.device === 'pad' && A.heldTime('lootLabels') > 0.25 && !this.anyModal();
+    if (lh !== !!this._padLabels) { this._padLabels = lh; this.labels.setVisible(lh); }
+    if (A.device !== 'pad') { this.padNav?.update(); this.padCursor?.update(); return; } // (they hide their ring, hints and cursor)
+    if (this.dlg.active && this.mode !== 'title') return this.padDialogue(); // (every frame: the focused choice shows as soon as the choices do)
+    if (this.mode === 'title' && !this.isOpen('menu') && !this.iris.active) return this.padTitle();
+    if (this.panels.menu?.wait) { this.panels.menu.padCapture(); return; } // (Settings › Controls is waiting for a button)
+    if (this.iris.active) return;
+    if (this.padCursor?.update()) return; // build and decorate mode: the virtual cursor and the palette (ui/padCursor.js)
+    // View: the map (or, while a guide waits for "Got it!", that); Menu: Esc
+    const mapOk = !this._order.some(n => n !== 'map' && this.panels[n]?.isOpen && !NON_BLOCKING.has(n));
+    if (A.pressed('map', 'pad') && this.tutorial?.root.classList.contains('on') && this.tutorial.$.obj.classList.contains('ack') && !this.anyModal()) { A.consume('map', 'pad'); this.tutorial.onAck?.(); return; }
+    if (A.pressed('map', 'pad') && mapOk && !this.isOpen('menu')) { A.consume('map', 'pad'); this._user = true; try { this.toggle('map'); } finally { this._user = false; } return; }
+    if (A.pressed('menu', 'pad')) { A.consume('menu', 'pad'); if (this.tutorial?.offering) this.tutorial.answerOffer(false); else this.back(); return; }
+    if (this.tutorial?.offering && A.padHit('B')) { A.padConsume('B'); this.tutorial.answerOffer(false); return; }
+    if (this.padNav?.update()) return; // a panel, the popover or the guide's offer: spatial focus navigation (ui/padNav.js)
+    if (!this.anyModal()) {
+      PAD_SLOTS.forEach((a, i) => { if (A.pressed(a, 'pad')) this.hud.flashSlot(i); });
+      if (A.pressed('potionHeart', 'pad')) this.hud.flashBelt('heart');
+      if (A.pressed('potionZoom', 'pad')) this.hud.flashBelt('zoom');
+    }
+  },
+  nonBlocking(n) { return NON_BLOCKING.has(n); },
+  /** the title screen: the D-pad / stick moves a focus over New Game · Continue · Settings (Continue first), A presses it */
+  padTitle() {
+    const A = Actions, T = this.titleScreen;
+    const btns = [...T.root.querySelectorAll('.ti-btns .btn')].filter(b => !b.disabled);
+    if (!btns.length) return;
+    if (T._padSel == null || !btns[T._padSel]) T._padSel = Math.max(0, btns.findIndex(b => b.dataset.a === 'continue'));
+    if (A.nav === 'right' || A.nav === 'down') { T._padSel = (T._padSel + 1) % btns.length; this.sfx('hover'); }
+    if (A.nav === 'left' || A.nav === 'up') { T._padSel = (T._padSel + btns.length - 1) % btns.length; this.sfx('hover'); }
+    btns.forEach((b, i) => b.classList.toggle('pad-focus', i === T._padSel));
+    if (A.padHit('A')) { A.padConsume('A'); btns[T._padSel].click(); }
+  },
+  padDialogue() {
+    const A = Actions, D = this.dlg;
+    const picking = D.choices?.length && D.i >= D.lines.length - 1 && !D.typing;
+    const btns = picking ? [...D.$.ch.querySelectorAll('.dch')] : [];
+    if (btns.length) {
+      if (D._padSel == null || D._padSel >= btns.length || btns[D._padSel]?.dataset.i == null) D._padSel = 0;
+      if (A.nav === 'down' || A.nav === 'right') D._padSel = (D._padSel + 1) % btns.length;
+      if (A.nav === 'up' || A.nav === 'left') D._padSel = (D._padSel + btns.length - 1) % btns.length;
+      btns.forEach((b, i) => b.classList.toggle('pad-focus', i === D._padSel));
+      if (A.nav) this.sfx('hover');
+      if (A.padHit('A')) { A.padConsume('A'); D.choose(+btns[D._padSel].dataset.i); D._padSel = null; return; }
+    } else { D._padSel = null; if (A.padHit('A')) { A.padConsume('A'); D.key('Enter'); return; } }
+    if (A.padHit('B')) { A.padConsume('B'); D.key('Escape'); }
   },
 
   // ------------------------------------------------------------------ settings
@@ -291,9 +383,25 @@ export const UI = {
     this.settings[k] = v;
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings)); } catch (e) { /* ignore */ }
     this.applySettings();
+    if (CONTROL_SETTINGS.has(k)) this.applyControls();
     for (const f of this._settingFns) { try { f(k, v, this.settings); } catch (e) { console.error('[ui] onSetting handler', e); } }
     if (k === 'sfx') this.sfx('tick');
   },
+  /** Settings › Controls → the action layer: the rebinds, rumble, the glyph style (aim assist is read live: combat/padAim.js) */
+  applyControls() {
+    const s = this.settings;
+    Actions.setOptions({ rumble: s.rumble !== false, glyphs: s.padGlyphs || 0 });
+    const b = s.binds || {}, sig = JSON.stringify(b);
+    if (sig !== this._bindSig) { this._bindSig = sig; Actions.setOverrides(b); }
+  },
+  /** the device changed (ui/padGlyphs.js already redrew the tagged caps): redraw what prints key names in text */
+  onDevice(p) {
+    this.tutorial?.redraw?.(); if (this.hud?.cache) this.hud.cache.prompt = null; if (this.isOpen('menu')) this.panels.menu.render?.();
+    if (p?.device !== 'pad') { for (const b of this.root.querySelectorAll('.pad-focus')) b.classList.remove('pad-focus'); if (this.dlg) this.dlg._padSel = null; }
+    for (const n of ['inventory', 'shop', 'stash']) this.panels[n]?.refresh?.(); // (their footers' mouse / pad wording)
+  },
+  /** save the action layer's current overrides (after a rebind in the Controls panel) */
+  saveBinds() { this.setSetting('binds', JSON.parse(JSON.stringify(Actions.over))); },
   applySettings() {
     this.fpsEl.classList.toggle('show', !!this.settings.showFps);
     this.applyScale();
@@ -312,11 +420,11 @@ export const UI = {
   },
 
   // ------------------------------------------------------------------ messages
-  toast(text, opts = {}) { if (!this.ready) return null; return this.toasts.show(text, opts); },
+  toast(text, opts = {}) { if (!this.ready) return null; return this.toasts.show(typeof text === 'string' ? Actions.resolve(text) : text, opts); }, // ({action} tokens; on the pad, "press F" names its button)
   banner(title, sub = '', opts = {}) { if (!this.ready) return; this.banners.show(title, sub, opts); this.events.emit('ui:banner', { title, style: opts.style }); },
   heroCard(o) { if (this.ready) this.hud?.heroCard?.(o); },
   float(worldPos, text, opts = {}) { if (!this.ready || !worldPos) return; this.floats.spawn(worldPos, String(text), opts); },
-  dialogue(opts) { if (!this.ready) return Promise.resolve(-1); this.hidePopover(); this.tip.hide(); return this.dlg.open(opts); },
+  dialogue(opts) { if (!this.ready) return Promise.resolve(-1); this.hidePopover(); this.tip.hide(); if (!this.dlg.active) this._dlgAt = performance.now(); return this.dlg.open(opts); },
   setTarget(info) { if (this.ready) this.hud.setTarget(info); },
   setBoss(info) { if (this.ready) this.hud.setBoss(info); },
   setInteract(text, opts) { if (this.ready) this.hud.setInteract(this.mode === 'title' || this.dlg.active ? null : text, opts); },

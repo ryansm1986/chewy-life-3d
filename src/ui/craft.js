@@ -7,6 +7,7 @@
 import './craft.css';
 import { esc, replay } from './dom.js';
 import { glyph, glyphURL } from './glyphs.js';
+import { padGlyph } from './padGlyphs.js';
 import { Panel } from './panel.js';
 import { Events } from '../core/events.js';
 import { PANTRY } from '../life/pantry.js';
@@ -42,7 +43,7 @@ export class CraftPanel extends Panel {
         </div>
       </div>
     </div>
-    <div class="ck-foot"><span><span class="kc sm">↑</span><span class="kc sm">↓</span> choose</span><span><span class="kc sm">F</span> / <span class="kc sm">Enter</span> craft</span><span><span class="kc sm">Esc</span> close</span></div>`;
+    <div class="ck-foot kbm-only"><span><span class="kc sm">↑</span><span class="kc sm">↓</span> choose</span><span><span class="kc sm">F</span> / <span class="kc sm">Enter</span> craft</span><span><span class="kc sm">Esc</span> close</span></div><div class="ck-foot pad-only"><span><span class="kc sm pad">${padGlyph('DUp')}</span> choose</span><span><span class="kc sm pad">${padGlyph('A')}</span> select · on Craft: craft</span><span><span class="kc sm pad">${padGlyph('B')}</span> close</span></div>`;
     const q = s => this.body.querySelector(s);
     this.$ = { list: q('.cr-list'), main: q('.ck-main'), det: q('.cr-det'), work: q('.cr-work'), drops: q('.cw-drops'), ghost: q('.cw-piece .ghost'), fill: q('.cw-piece .fill'), out: q('.cw-out'), tabN: this.extra.querySelector('.tab-n') };
     this.$.list.addEventListener('click', e => { const r = e.target.closest('.ck-row'); if (!r || this.busy) return; this.select(r.dataset.id); this.ui.sfx?.('select'); });

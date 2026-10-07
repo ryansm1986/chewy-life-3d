@@ -5,7 +5,7 @@
 //   buildingAction(village, building): F at a door — the same services without the chat (or a barricade line).
 // The services reuse existing systems: ui/shop.js (stock, pantry goods, furniture), actions.restoreAll / respec /
 // addFurniture / addPantry, items.generateItem, the Travel Map (G.openTravel).
-import { Input } from '../../core/input.js';
+import { Actions } from '../../core/actions.js';
 import { Events } from '../../core/events.js';
 import { heroText } from '../../rpg/classes.js';
 import { generateItem, shopStock, buyPrice, SLOT_NAMES } from '../../rpg/items.js';
@@ -167,7 +167,7 @@ export async function villageTalk(V, v) {
   if (v.talking || !P) return;
   v.talking = true; P.controlLocked = true;
   try { await flow(V, v, sayer(V, v)); } catch (e) { console.error('[village] talk failed', e); }
-  finally { v.talking = false; P.controlLocked = false; G.interactCooldown = performance.now() + 350; Input.consume('f'); }
+  finally { v.talking = false; P.controlLocked = false; G.interactCooldown = performance.now() + 350; Actions.consume('interact'); }
 }
 async function flow(V, v, say) {
   const G = V.G, st = G.state, id = v.id;
@@ -237,7 +237,7 @@ export function buildingAction(V, b) {
   if (b.kind === 'elder') { const v = V.villager(b.keeper); if (v?.visible) return V.talk(v); G.ui?.toast?.(`Nobody answers at ${b.name}.`, { color: '#ffd8a8' }); return; }
   const S = SERVICES[b.kind]; if (!S) return;
   const keeper = V.villager(b.keeper) || { id: b.keeper, name: nameOf(b.keeper), spec: ZONE_NPCS[b.keeper]?.spec };
-  const lock = async () => { const P = G.player; P.controlLocked = true; try { await S.run(V, b, sayer(V, keeper), keeper); } finally { P.controlLocked = false; G.interactCooldown = performance.now() + 350; Input.consume('f'); } };
+  const lock = async () => { const P = G.player; P.controlLocked = true; try { await S.run(V, b, sayer(V, keeper), keeper); } finally { P.controlLocked = false; G.interactCooldown = performance.now() + 350; Actions.consume('interact'); } };
   lock();
 }
 function waypoint(V) {

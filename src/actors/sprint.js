@@ -4,7 +4,7 @@
 // One per Player (player.sprint). Player.update folds mul() into speedMul and hands k to the Animator (anim.sprint: the
 // lean, the longer stride and the arm pump); Shadow paces himself on the hero's measured speed (companion.js); the
 // start puff, the heel kicks and the whoosh live here.
-import { Input } from '../core/input.js';
+import { Actions } from '../core/actions.js';
 import { Events } from '../core/events.js';
 import { rand } from '../core/util.js';
 
@@ -23,12 +23,17 @@ export class Sprint {
     this.stillT = 0; this.puffCd = 0; this.starts = 0;
   }
   get mode() { return this.P.G?.ui?.settings?.sprintMode ?? SPRINT_MODE.HOLD; }
-  /** Is Shift asking for a sprint? Hold: Shift is down. Toggle: a tap latched it (taps inside menus don't count). */
+  /** Is Shift asking for a sprint? Hold: Shift is down. Toggle: a tap latched it (taps inside menus don't count).
+   *  The pad's L3 is always a click: on, and it stays on while the hero keeps moving (docs/CONTROLS.md §2); L3 + R3
+   *  together swap weapons instead, so a click that turns into that chord gives its toggle back. */
   wanted() {
     const P = this.P, G = P.G, free = !P.controlLocked && !G?.ui?.anyModal?.();
-    if (this.mode !== SPRINT_MODE.TOGGLE) { this.latched = false; return free && Input.down('shift'); }
-    if (free && Input.hit('shift')) this.latched = !this.latched;
-    return free && this.latched;
+    const chord = (Actions.binds('swap', 'pad')[0] || '').split('+'), inChord = chord.length > 1 && Actions.binds('sprint', 'pad').some(t => chord.includes(t));
+    if (free && Actions.pressed('sprint', 'pad') && !(inChord && Actions.held('swap', 'pad'))) { this.padLatched = !this.padLatched; this.padT = 0; }
+    if (inChord && Actions.pressed('swap', 'pad') && this.padT < 0.5) this.padLatched = !this.padLatched;
+    if (this.mode !== SPRINT_MODE.TOGGLE) { this.latched = false; return free && (Actions.held('sprint', 'kbm') || !!this.padLatched); }
+    if (free && Actions.pressed('sprint', 'kbm')) this.latched = !this.latched;
+    return free && (this.latched || !!this.padLatched);
   }
   /** why the hero can't sprint this frame (null: free to) */
   blocked() {
@@ -42,9 +47,11 @@ export class Sprint {
   }
   /** Once a frame from Player.update, before it walks. moving: WASD is held or a click-to-move route is live. */
   update(dt, moving) {
+    this.padT = (this.padT || 0) + dt;
     const want = this.wanted();
     this.stillT = moving ? 0 : this.stillT + dt;
     if (this.latched && this.stillT > STILL) this.latched = false;
+    if (this.padLatched && this.stillT > STILL) this.padLatched = false;
     this.why = want ? this.blocked() : null;
     const was = this.on;
     this.on = want && moving && !this.why;
@@ -72,5 +79,5 @@ export class Sprint {
     if (Math.random() < 0.7) G?.vfx?.dust?.({ x: P.pos.x - Math.sin(f) * 0.2, y: P.pos.y, z: P.pos.z - Math.cos(f) * 0.2 }, { n: 1, size: 0.2, color: '#eadcc6' });
   }
   /** a new world, a hero switch, a knock-out: start from a walk (Toggle's latch is kept across a stairs hop) */
-  reset(keepLatch = true) { this.k = 0; this.on = false; this.why = null; if (!keepLatch) this.latched = false; }
+  reset(keepLatch = true) { this.k = 0; this.on = false; this.why = null; if (!keepLatch) { this.latched = false; this.padLatched = false; } }
 }

@@ -15,6 +15,7 @@
 import * as THREE from 'three';
 import { Events } from '../core/events.js';
 import { Input } from '../core/input.js';
+import { Actions } from '../core/actions.js';
 import { CHARGE, GRACE, SLOW, stageTimes, stageAt, maxStage, chargeCost, perksOf, chargeable, chargeRuntime } from '../rpg/charge.js';
 import { getSkill, usable, skillRuntime } from '../rpg/skills.js';
 import { chargeFx } from '../gfx/chargeFx.js';
@@ -274,9 +275,11 @@ export class ChargeController {
     if (this.fed[this.active?.slot ?? -1]) return; // game.js fed this frame's aim already
     this.cursorGround(this.aim);
   }
-  /** the ground point under the mouse, written into out (no allocations) → out, or null without a camera */
+  /** the ground point under the mouse (the gamepad's aim point while it plays: combat/padAim.js), written into out (no
+   *  allocations) → out, or null without a camera */
   cursorGround(out) {
     if (this.aimOverride) return out.copy(this.aimOverride);
+    if (Actions.device === 'pad' && Actions.padAim) return out.copy(Actions.padAim);
     const E = this.G.engine, W = this.G.world;
     if (!E?.raycaster || !E.camera) return null;
     E.raycaster.setFromCamera(_nv.set(Input.mouse.nx, Input.mouse.ny), E.camera);

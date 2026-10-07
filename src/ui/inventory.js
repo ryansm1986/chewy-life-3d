@@ -1,12 +1,18 @@
 // Inventory (10x4 grid + paper doll), Stash (10x6) and the shared item pick-up / drag & drop controller.
 import { el, esc, fmt, replay, setText, rarityColor } from './dom.js';
 import { glyph, SLOT_GLYPH } from './glyphs.js';
+import { padGlyph } from './padGlyphs.js';
 import { portrait } from './portraits.js';
 import { Panel } from './panel.js';
 import { itemIconURL, itemName, meetsReq, equipSlotsFor, sellPrice } from './rpg.js';
 import { itemTipHTML } from './tooltip.js';
 import { PantryView } from './pantry.js';
 import { FurnitureView } from './furniture.js';
+import { padWording } from './padGlyphs.js';
+import { Actions } from '../core/actions.js';
+
+/** a footer hint: the mouse's wording, or the pad's buttons while it plays */
+function hintTo(e, t) { if (!e) return; const h = padWording(esc(t)); if (e._h !== h) { e._h = h; e.innerHTML = h; } }
 
 export const EQUIP_SLOTS = ['weapon', 'weaponAlt', 'hat', 'outfit', 'collar', 'charm1', 'charm2', 'boots', 'paws'];
 const SLOT_LABEL = { weapon: 'Weapon', weaponAlt: 'Swap', hat: 'Hat', outfit: 'Outfit', collar: 'Collar', charm1: 'Charm', charm2: 'Charm', boots: 'Boots', paws: 'Paws' };
@@ -296,8 +302,8 @@ export class InventoryPanel extends Panel {
     this.render();
   }
   render() {
-    if (this.view === 'pantry') { this.pv.render(); setText(this.coins, fmt(this.st.coins || 0)); setText(this.body.querySelector('.inv-hint'), 'Right-click a dish to eat · F at a garden bed to plant'); return; }
-    if (this.view === 'furniture') { this.fv.render(); setText(this.coins, fmt(this.st.coins || 0)); setText(this.body.querySelector('.inv-hint'), 'Your furniture storage · press B at home to decorate'); return; }
+    if (this.view === 'pantry') { this.pv.render(); setText(this.coins, fmt(this.st.coins || 0)); hintTo(this.body.querySelector('.inv-hint'), 'Right-click a dish to eat · F at a garden bed to plant'); return; }
+    if (this.view === 'furniture') { this.fv.render(); setText(this.coins, fmt(this.st.coins || 0)); hintTo(this.body.querySelector('.inv-hint'), Actions.device === 'pad' ? 'Your furniture storage · decorate from the game menu at home' : 'Your furniture storage · press B at home to decorate'); return; }
     const st = this.st, d = this.d, eq = st.equipment || {}, inv = st.inventory || [];
     const hero = st.activeHero || 'chewy';
     if (hero !== this._hero) { // the paper doll shows whoever is being played (the bag itself is shared)
@@ -318,7 +324,7 @@ export class InventoryPanel extends Panel {
       .map(([g, n, v]) => `<div class="ist">${glyph(g)}<span>${n}</span><b>${v}</b></div>`).join('');
     if (html !== this._stats) { this._stats = html; this.statsEl.innerHTML = html; }
     const shop = this.ui.isOpen('shop'), stash = this.ui.isOpen('stash');
-    setText(this.body.querySelector('.inv-hint'), shop ? 'Shift+Right-click to sell' : stash ? 'Ctrl+Click to stash' : 'Drag items · Right-click to equip');
+    hintTo(this.body.querySelector('.inv-hint'), shop ? 'Shift+Right-click to sell' : stash ? 'Ctrl+Click to stash' : 'Drag items · Right-click to equip'); // (the pad's wording while it plays)
   }
   sort() {
     const A = this.G.actions || {};
@@ -343,7 +349,7 @@ export class InventoryPanel extends Panel {
 export class StashPanel extends Panel {
   constructor(ui) { super(ui, { name: 'stash', title: 'Stash', jp: '倉庫', side: 'left', cls: 'p-stash', icon: 'chest' }); }
   init() {
-    this.body.innerHTML = `<div class="stash-top"><div class="stash-note">${glyph('sakura')}Items here are safe forever — shared across every adventure.</div></div><div class="grid g10 stash-grid"></div><div class="inv-foot"><div class="inv-hint">Ctrl+Click moves items between Bag and Stash</div></div>`;
+    this.body.innerHTML = `<div class="stash-top"><div class="stash-note">${glyph('sakura')}Items here are safe forever — shared across every adventure.</div></div><div class="grid g10 stash-grid"></div><div class="inv-foot"><div class="inv-hint kbm-only">Ctrl+Click moves items between Bag and Stash</div><div class="inv-hint pad-only"><span class="kc sm pad">${padGlyph('X')}</span> moves items between Bag and Stash</div></div>`;
     const g = this.body.querySelector('.grid');
     this.cells = [];
     const n = (this.st.stash || []).length || 60;

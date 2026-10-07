@@ -3,6 +3,7 @@
 // pick-up feedback (toast with the icon and a "New!" badge for a first discovery, the icon flying into the bag).
 import { el, esc, fmt, replay, setText } from './dom.js';
 import { glyph } from './glyphs.js';
+import { padGlyph, keyCap } from './padGlyphs.js';
 import { Panel } from './panel.js';
 import { PANTRY, KINDS, KIND_INFO, CROPS, RARE_NAMES, RARE_COLORS, LOVED, pantryList, sellPrice } from '../life/pantry.js';
 import { pantryIcon } from '../life/pantryIcons.js';
@@ -109,7 +110,7 @@ export class PantryView {
     const n = st.pantry?.[id] || 0;
     this.$.facts.innerHTML = [`${glyph('bag')}You have <b>×${n}</b> · worth ${glyph('coin')}<b>${d.value}</b>`, ...pantryFacts(id, st)].map(f => `<div>${f}</div>`).join('');
     if (d.food) this.$.act.innerHTML = `<button class="btn pink pt-eat" data-act="eat">${glyph('heart')}Eat</button><small>or right-click</small>`;
-    else if (d.kind === 'seed') this.$.act.innerHTML = `<div class="pt-hint">${glyph('leaf')}<span>Press <span class="kc sm">F</span> at your garden bed to plant</span></div>`;
+    else if (d.kind === 'seed') this.$.act.innerHTML = `<div class="pt-hint">${glyph('leaf')}<span>Press ${keyCap('interact', { sm: true })} at your garden bed to plant</span></div>`;
     else if (d.kind === 'crop') this.$.act.innerHTML = `<div class="pt-hint">${glyph('coin')}<span>Usagi pays <b>${sellPrice(id, 'usagi')}</b> at her stall</span></div>`;
     else if (d.kind === 'fish') this.$.act.innerHTML = `<div class="pt-hint">${glyph('coin')}<span>Kero pays <b>${sellPrice(id, 'kero')}</b> at the Fishing Hut</span></div>`;
     else this.$.act.innerHTML = '';
@@ -121,7 +122,7 @@ export class PantryView {
 export class SeedPickerPanel extends Panel {
   constructor(ui) { super(ui, { name: 'seeds', title: 'Plant Seeds', jp: 'たねまき', side: 'center', cls: 'p-seeds', icon: 'leaf' }); }
   init() {
-    this.body.innerHTML = `<div class="sp-row"></div><div class="sp-foot"><span><span class="kc sm">1</span>–<span class="kc sm">9</span> pick</span><span><span class="kc sm">F</span> / <span class="kc sm">Enter</span> plant</span><span><span class="kc sm">Esc</span> not now</span></div>`;
+    this.body.innerHTML = `<div class="sp-row"></div><div class="sp-foot kbm-only"><span><span class="kc sm">1</span>–<span class="kc sm">9</span> pick</span><span><span class="kc sm">F</span> / <span class="kc sm">Enter</span> plant</span><span><span class="kc sm">Esc</span> not now</span></div><div class="sp-foot pad-only"><span><span class="kc sm pad">${padGlyph('DRight')}</span> choose</span><span><span class="kc sm pad">${padGlyph('A')}</span> plant</span><span><span class="kc sm pad">${padGlyph('B')}</span> not now</span></div>`;
     this.row = this.body.querySelector('.sp-row');
     this.row.addEventListener('click', e => { const c = e.target.closest('.sp-card'); if (c) this.pick(c.dataset.id); });
     this.row.addEventListener('mouseover', e => { const c = e.target.closest('.sp-card'); if (c && c.dataset.id !== this.hl) this.highlight(c.dataset.id); });

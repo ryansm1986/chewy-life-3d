@@ -1,6 +1,7 @@
 // Cached 3D thumbnails of buildings for the build palette (rendered once with the game's renderer).
 import * as THREE from 'three';
 import { buildModel, sizeOf } from '../world/buildings/index.js';
+import { MATS } from '../world/buildings/kit.js';
 import { U } from './materials.js';
 
 export class BuildingThumbs {
@@ -13,6 +14,26 @@ export class BuildingThumbs {
     const rim = new THREE.DirectionalLight('#ffd8f0', 1.0); rim.position.set(-4, 3, -3); s.add(rim);
     this.cam = new THREE.PerspectiveCamera(22, 1, 0.1, 200);
     this.canvas = document.createElement('canvas'); this.canvas.width = this.canvas.height = size;
+  }
+  /** already rendered (the build palette shows those at once and fills in the rest after it opens: world/buildMode.js) */
+  has(id) { return this.cache.has(id); }
+  /** Compile the thumbnail scene's programs without blocking (KHR_parallel_shader_compile, renderer.compileAsync): its
+   *  lights make new variants of the building materials, and the first render otherwise waits ~190 ms on their link
+   *  (ROADMAP R-8). Called once, with a first building, before any thumbnail (ui/prewarm.js, buildMode.js). */
+  warmPrograms(id) {
+    const R = this.engine.renderer;
+    if (this._warm) return this._warm;
+    if (!R.compileAsync) return (this._warm = Promise.resolve());
+    let g = null;
+    try {
+      g = buildModel(id, { level: 1, seed: 1 }).group;
+      // every kit material, not only the first building's: a later building with a water, jet or hot part would
+      // otherwise link its program on the spot (~1 s on ANGLE)
+      const geo = g.getObjectsByProperty('isMesh', true)[0]?.geometry;
+      if (geo) for (const m of Object.values(MATS())) g.add(new THREE.Mesh(geo, m));
+      this.scene.add(g); g.updateMatrixWorld(true);
+    } catch (e) { return (this._warm = Promise.resolve()); }
+    return (this._warm = R.compileAsync(this.scene, this.cam).catch(() => {}).finally(() => this.scene.remove(g)));
   }
   get(id) {
     if (this.cache.has(id)) return this.cache.get(id);

@@ -3,6 +3,7 @@
 // home/decorate.js (opts: house(), state(), onSelect, onSurface, onStore, onUndo, onCancel, onClose).
 import { el, esc, replay } from './dom.js';
 import { glyph, glyphURL } from './glyphs.js';
+import { padGlyph } from './padGlyphs.js';
 import { Panel } from './panel.js';
 import { FURNITURE, SURFACES, SURFACE_IDS, TABS, SETS, CATS, CELL, storageList, tabOf } from '../home/furniture.js';
 import { furnitureGroup } from '../home/furnitureMesh.js';
@@ -41,7 +42,8 @@ export class DecoratePanel extends Panel {
         <div class="dc-rate" title="Home Rating"><span class="dc-stars"></span><small class="dc-tip"></small></div>
         <div class="bh-t dc-hint">Pick something to place</div>
         <div class="dc-btns"><button class="btn sm dc-store" title="Put it back in storage (Delete)">${glyph('chest')}Store</button><button class="btn sm dc-undo" title="Undo (Ctrl+Z)">${glyph('swap')}Undo</button><button class="btn sm pink dc-done" title="Done (B)">${glyph('check')}Done</button></div>
-        <div class="bh-k dc-keys"><span><span class="kc sm">${glyph('mouseL')}</span>place</span><span><span class="kc sm">R</span>rotate</span><span><span class="kc sm">Esc</span>cancel</span></div>
+        <div class="bh-k dc-keys kbm-only"><span><span class="kc sm">${glyph('mouseL')}</span>place</span><span><span class="kc sm">R</span>rotate</span><span><span class="kc sm">Esc</span>cancel</span></div>
+        <div class="bh-k dc-keys pad-only"><span><span class="kc sm pad">${padGlyph('A')}</span>place</span><span><span class="kc sm pad">${padGlyph('Y')}</span>rotate</span><span><span class="kc sm pad">${padGlyph('X')}</span>store</span><span><span class="kc sm pad">${padGlyph('B')}</span>cancel</span></div>
       </div></div>`;
     this.$ = { tabs: this.extra.querySelector('.dc-tabs'), cards: this.body.querySelector('.dc-cards'), name: this.body.querySelector('.dc-name'), surf: this.body.querySelector('.dc-surf'), rate: this.body.querySelector('.dc-rate'), stars: this.body.querySelector('.dc-stars'), tip: this.body.querySelector('.dc-tip'), hint: this.body.querySelector('.dc-hint'), store: this.body.querySelector('.dc-store'), undo: this.body.querySelector('.dc-undo'), done: this.body.querySelector('.dc-done') };
     this.$.tabs.addEventListener('click', e => { const t = e.target.closest('.tab'); if (t && t.dataset.t !== this.tab) { this.tab = t.dataset.t; this._sig = null; this.render(); replay(this.$.cards, 'swap', 400); this.ui.sfx?.('tab'); } });
@@ -86,7 +88,7 @@ export class DecoratePanel extends Panel {
       const stars = '★'.repeat(R.stars) + '☆'.repeat(5 - R.stars);
       if (this.$.stars.textContent !== stars) { this.$.stars.textContent = stars; if (this._stars != null && R.stars > this._stars) replay(this.$.rate, 'gain', 600); }
       this._stars = R.stars;
-      this.$.tip.textContent = R.stars >= 5 ? (h.owner ? "They'll love it!" : 'A five-star home!') : R.tips[0] ? `Try: ${h.owner ? R.tips[0] : R.tips[0].replace(/their/, 'your')}` : ''; // (your own home: your favourite pieces)
+      this.$.tip.textContent = R.stars >= 5 ? (h.owner ? "They'll love it!" : 'A five-star home!') : R.tips[0] ? `Try: ${h.owner ? R.tips[0] : R.tips[0].replace(/\btheir\b/, 'your')}` : ''; // (your own home: your favourite pieces)
     }
     this.$.rate.style.display = R ? '' : 'none';
     const holding = s.holding ? FURNITURE[s.holding] : null, sel = s.sel ? FURNITURE[s.sel] : null;

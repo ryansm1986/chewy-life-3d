@@ -43,6 +43,8 @@ void main() {
 const _col = new THREE.Color();
 const _fwd = new THREE.Vector3();
 const FREE_MAX = 1024;
+/** every layer's live cap is max × scale (the Deck preset lowers it: core/deck.js, set by game.js) */
+export const PARTICLE_BUDGET = { scale: 1 };
 
 export class ParticleLayer {
   constructor(scene, map, { additive = true, max = 3000, depthTest = true, order = 10, grid = 0 } = {}) {
@@ -75,7 +77,7 @@ export class ParticleLayer {
   spawn(o) {
     // a full layer drops its oldest particle: it is marked spent (this frame's update compacts it out before the draw,
     // as shift() did) instead of shifting the whole array — a saturated layer made every spawn O(max) (ROADMAP Z-B5)
-    if (this.p.length - this.killed >= this.max) { const old = this.p[this.killed++]; if (old) { old.t = old.life; old.fn = null; } }
+    if (this.p.length - this.killed >= this.max * PARTICLE_BUDGET.scale) { const old = this.p[this.killed++]; if (old) { old.t = old.life; old.fn = null; } }
     const c = o.color instanceof THREE.Color ? o.color : _col.set(o.color ?? '#ffffff');
     const q = this.free.pop() || { _c1: null };
     q.x = o.x; q.y = o.y; q.z = o.z; q.vx = o.vx || 0; q.vy = o.vy || 0; q.vz = o.vz || 0; q.t = 0; q.life = o.life || 1;

@@ -1,0 +1,25 @@
+/* The Steam Deck's UI (docs/CONTROLS.md §10, ROADMAP CT-3). On a Deck-like screen (core/deck.js deckLike() puts
+   .deck-ui on the UI root) the UI starts at 1.15 — 0.92 of the 1600×900 design at 1280×800 — inside a safe area, with a
+   text floor: what the design sets under 12 px is raised to 12 (11 px on the Deck's screen). tools/qa/deck-ui.mjs opens
+   every panel at 1280×800 and lists anything still under (s26-deck checks the HUD, bag, skills and build mode with
+   the keyboard's caps). The Japanese subtitles, the compass's 北, the portrait's tiny "Lv" and the glyph art keep
+   their sizes. */
+.ui-root.deck-ui { --safe-x: 18px; --safe-y: 12px; }
+.ui-root.deck-ui .l-hud, .ui-root.deck-ui .l-dlg, .ui-root.deck-ui .l-msg { inset: var(--safe-y) var(--safe-x); }
+.ui-root.deck-ui .l-panels { inset: var(--safe-y) var(--safe-x) 0; } /* (the build and decorate palettes stay on the bottom edge) */
+
+/* the text floor (the :is() takes its most specific selector's weight, so it outranks each panel's own rule) */
+.ui-root.deck-ui :is(
+  .hud .ws-n, .hud .hsw-lv, .hud .loc-s, .hud .rci-h, .hud .rci-foot, .hud .mb-dot,
+  .tab .tab-n, .p-decor .dc-tabs .tab .tab-n,
+  .chg-gate, .nd-hk, .chg-pn, .chg-dh span, .chg-foot, .sk-pts span, .rowl, .nd-lv, .chg-st span,
+  .ck-t small, .ck-btext, .ck-tag, .cr-set, .cr-tags span,
+  .tv-pin-n b, .gf-card small, .sp-card small, .hc-stars small, .rm-set small, .rm-o, .rm-auto, .to-h, .to-skip, .rl-hint,
+  .cd-size, .cd-built, .rk-next, .rk-badge b, .rk-n, .ovl, .bd-side .bh-k, .bd-side .bd-stats small,
+  .kc.sm:not(.pad)
+) { font-size: 12px; }
+
+/* the toasts stand above the hotbar row: at 1280 wide its health orb reaches in under them */
+.ui-root.deck-ui .toasts { bottom: 172px; }
+.ui-root.deck-ui.building .toasts { bottom: 212px; }
+.ui-root.deck-ui.dlg-open .toasts { bottom: 176px; }

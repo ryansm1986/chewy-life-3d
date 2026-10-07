@@ -65,6 +65,18 @@ House rules for every objective:
 
 ---
 
+## 1b. Controls: gamepad, Steam Deck, touch (design: [CONTROLS.md](CONTROLS.md))
+
+| ID | Objective | Status | Notes |
+|---|---|---|---|
+| CT-1 | **The action layer, gamepad gameplay** (the console ARPG mapping, aim assist, A context-interact, hold-to-charge), device-aware glyphs | done | CONTROLS §1–2, as built §8. `core/actions.js` (actions, the pad poll, dead zones, last device, rebinding, rumble), `combat/padAim.js` (soft lock + ring), `ui/padGlyphs.js` + `pad.css` (Xbox / PlayStation glyphs, caps that follow the device), Settings › Controls (menu.js). A CT-1 bridge for dialogue, the title, Menu / B / View. QA: s25 (28 checks, a virtual pad), test-rpg "CONTROLS", prod-smoke `pad` |
+| CT-2 | **UI focus navigation** for every menu, panel and dialogue; build and decorate with a virtual cursor | done | CONTROLS §3, as built §9. `ui/padNav.js` (spatial focus over every open panel, the popover and the guide offer: A / B / LB RB / X Y per element, tooltips on the focus, the ring and a glyph-hint footer), `ui/padCursor.js` (build and decorate: a stick-driven paw cursor through `Actions.pointer()`, the D-pad palette), the pause menu's pad row (panels, Build, Decorate, Home). QA: s25 45 checks (sections g, h), prod-smoke `pad` (the focus ring) |
+| CT-3 | **The Steam Deck**: the 1280×800 UI scale and safe area, the Deck quality preset, R-2 (quality at boot), the Deck perf test | built, in review | CONTROLS §4, as built §10. `core/deck.js` (the Deck-like screen, the preset at boot, the Deck's numbers, the frame cap), `Engine.applyPreset / tuneShadows` (the Deck's shadows, redrawn every other frame), `ui/deck.css` (the safe area, the 12 px text floor), Settings › Graphics Low / Medium / High / Deck and Frame cap Off / 60 / 40. QA: s26-deck 8/8, `deck-ui.mjs` (26 views at 1280×800), `deck-perf.mjs`, prod-smoke's `deck` case |
+| CT-4 | **The desktop app**: an Electron Linux (SteamOS) and Windows build, `npm run build:desktop`, `docs/DESKTOP.md` | todo | CONTROLS §5 |
+| CT-5 | **Touch controls** for phones and tablets | todo | CONTROLS §6; after the controller work |
+
+---
+
 ## 2. Heroes (in flight)
 
 | ID | Objective | Status | Notes |
@@ -84,7 +96,9 @@ House rules for every objective:
 | R-1 | itch.io build: `npm run build:itch` / `test:itch` | done | docs/ITCH.md |
 | R-6 | **A small texture leak** on region ⇄ home trips: about 0.7 GL textures a trip (small quads plus two skinned-mesh depth passes); it reproduces with every village off | todo | Found by the zones-D agent; s23 allows ≤ 4 over two trips meanwhile |
 | R-5 | **Rebrand to Pawhaven, plus butler pushes** to holiestdiver/pawhaven:html5 | in progress | The rename is done (logo, page, boot, zip, docs; save keys kept). butler is installed. Waiting on the owner's `butler login`, then the first push from 6d53a3b plus the rename |
-| R-2 | The saved quality setting applies at boot (grass and detail density follow Settings, not only `?q=`) | todo | Needed before a public itch release |
+| R-7 | **Black flashes** in game (around Chewy's house; dungeon fights), reported by the owner 2026-10-06 | done | Two NaN sources, each a black frame (one NaN texel → the whole frame after the bloom): zero vertex normals in generated meshes (the mailboxes round every house, Chewy's Cottage's too; the trinket stall; building trims; villager face seams) and the monster death squash reaching zero height (a singular matrix: all-zero normal matrices). Fixed at the source (NaN-safe toon normals, `geom.js repairNormals` / `normalMatrixInto`, the squash stops at 2 %) plus a bloom NaN guard. Probe `?nanprobe`, `tools/qa/flash-hunt.mjs`, s24; ARCHITECTURE "Render health" |
+| R-8 | **A stutter on the first open of each menu** | review | Causes: work started on the very frame a menu opened (the village's building-template prewarm and the townsfolk rig pool treat an open menu as "hidden"), icons drawn on GPU-backed canvases (each `toDataURL` waited on the GPU), the panels' first GPU raster, B rendering every building thumbnail at once (~1 s). Fixed: `ui.hidesHitches()` (a menu hides a hitch only once it has opened), CPU-backed icon canvases, `src/ui/prewarm.js` (builds, icons, ghost paints, thumbnails in hidden moments: the title screen), progressive build thumbnails. `tools/qa/menu-stutter.mjs`, s24 |
+| R-2 | The saved quality setting applies at boot (grass and detail density follow Settings, not only `?q=`) | done (CT-3) | `core/deck.js` `bootGraphics()`: `?q=` > the saved preset > the first start's pick; a density change says it follows at the next start. s26 c) |
 | R-3 | The X3595 ANGLE shader warning in the AO pass (Windows) | todo | Warning only |
 | R-4 | Bugs: the starting "welcome" quest's pointer targets Rosie even inside a region; the s5 village-save test flakes when the home sim grows a building in the 1.5 s after reload | todo | Found by the zones-D agent |
 
@@ -226,3 +240,122 @@ House rules for every objective:
     machine.
   - **Zones A–D are complete**, which makes the full loop playable: village → dungeon → next zone. Next: phase E (tiers and
     modifiers) and phase F (elevation).
+- 2026-10-06: **the shadow-whelp rig is installed** at `public/rigs/shadow_whelp.*` (quad contract, 0 warnings, identity with
+  shadow_toy proven; walk, run and fly have 0 poke-through). The wing prop is `public/models/shadow-whelp-wing.glb`, with
+  mounts in `tools/blender/work/codex/shadow-whelp/wing_mount.json` (flapRange −30 to 60, the right wing an x-mirror with a
+  negated flap).
+  - For the dragoon class agent: pitch the **root** bone for flying, since the legs are root children; ride the wings on
+    the body bone; damp the ear swing to ≤ 0.6.
+- 2026-10-06: the owner reported black flashes (house area, dungeon fights) and first-open menu stutter. An Opus bug-hunt
+  agent started (R-7, R-8), with a new `s24-render-health` QA scenario to follow.
+- 2026-10-06: the owner wants mobile and controller controls and to play on the Steam Deck. Picks: **controller first**,
+  the **console ARPG** style, a **desktop app (Electron)** for the Deck. Design in docs/CONTROLS.md, tracked as CT-1 to
+  CT-5; the CT-1 and CT-2 agent started.
+- 2026-10-06: the Golden dragoon model was **approved by the owner** (round 2: cast head size, sheet face, sculpted open
+  smile, fluffy ears and tail). The rig round started (`golden_toy`, 37-bone). The Shih Tzu is in round 4 (the owner
+  asked for a **sculpted mouth instead of the painted line**). The shadow_whelp rig is installed.
+- 2026-10-06: **CT-1 built, in review** (the controls Opus agent; CONTROLS §8 as built).
+  - The action layer `core/actions.js`: the keyboard defaults are the old keys, a polled Gamepad API pad, dead zones and
+    a curve, the last-device switch (glyphs, a hidden cursor), rebinding, rumble.
+  - Gamepad gameplay `combat/padAim.js`: analogue walking, L3 sprint, the soft lock and its ring, A attack / context
+    interact, X Y RB RT LT skills with hold-to-charge, B roll, the LB tap and wheel, the D-pad potions / meal / interact,
+    View, Menu, L3 + R3 swap. Covers all three heroes (Moka's channels, Poe's throws and blinks).
+  - Glyphs `ui/padGlyphs.js`: Xbox / PlayStation, in the HUD, the prompt, guides, dialogue and tooltips.
+  - Settings › Controls: per-device rebinding, rumble, aim assist, glyph style.
+  - A CT-1 bridge for dialogue, the title, Menu / B / View. Build and decorate (and the panels' focus) are CT-2.
+  - QA: s25 29/29 (new, a virtual pad); s2, s9, s12, s16, s19, s20, s21 green; test-rpg (a CONTROLS section) and
+    prod-smoke (a new `pad` case) pass.
+- 2026-10-06: CT-1 approved by the director (the action layer `src/core/actions.js`, gamepad aim and soft lock
+  `src/combat/padAim.js`, Xbox and PlayStation glyphs, Settings → Controls rebinding, s25 29/29). CT-2 (focus navigation,
+  the build and decorate cursor) started.
+- 2026-10-06: **R-7 (black flashes) and R-8 (first-open menu stutter) built, in review** (the render-health agent).
+  - **R-7**: a NaN probe (`?nanprobe`, `?rh`: `src/gfx/renderHealth.js`) and `tools/qa/flash-hunt.mjs` reproduced it on the
+    production bundle. One NaN texel blacks out the frame (the bloom's mip chain, then the grade's clamp). Sources:
+    zero vertex normals in generated meshes (every house's mailbox, Chewy's Cottage's too, the trinket stall, building
+    trims, villager face seams: 1-texel NaN on 9-11 frames per cottage lap) and the death squash reaching zero height
+    (a singular matrix: up to 901 NaN texels a frame in Burrow and Bamboo Depths fights). Fixed at the source:
+    NaN-safe toon normals (materials.js), `geom.js repairNormals` in merge and charKit's bake, the Horde's cofactor
+    normal matrix (`geom.js normalMatrixInto`), the squash stops at 2 %; plus a bloom NaN guard (post.js). On the
+    bundle, true image: flash frames 11 / 10 / 1 / 1 in 4 of 8 sessions → 0 in 8; NaN texels → 0 at every stage.
+    The hero darkGrade shader and the N8AO matrix skip were cleared.
+  - **R-8**: a menu's first open now builds nothing heavy on its frame. `ui.hidesHitches()` (the village's template
+    prewarm and the townsfolk pool waited for "a menu is open", so they started on the open), CPU-backed icon canvases
+    (`toDataURL` no longer waits on the GPU: 40 icons 282 → 107 ms), `src/ui/prewarm.js` (panels built, painted once,
+    icons, the wheel, thumbnails, build mode's shaders, in hidden moments: done on a 4 s title screen), B's thumbnails
+    fill in after it opens. In the owner's flow (title, Continue), first-open worst frame, before → after: B 923 → 82,
+    skills 127 → 45, inventory 103 → 43, shop 181 → 75; the rest 12-34 ms. Boot unchanged (ready 4.9 s either way).
+  - QA: s24-render-health 27/27 (new, in run-all), test-rpg (a render-health section), s2, s12, s17, s19, s20, s22 and
+    prod-smoke pass. Full run-all on a busy machine (CPU up to 97 %, another game on the GPU): 21 of 26 green first time;
+    s8, s19, s22 and s24 green on re-run; profile-horde failed on load (baselines 11-21 ms, verdict BUSY), and the new
+    per-instance normal matrix is 2-3x cheaper than the old one (41-70 vs 134 ns). ARCHITECTURE "Render health". Open: the shop's ~65 ms on every open (its grid and the bag
+    re-render), the townhall template (up to ~1 s) still builds while a menu or dialogue sits open, the audio unlock
+    (~150 ms) on the first gesture.
+- 2026-10-06: the Shih Tzu rig's rigid lids couldn't close cleanly on his 31°-outward eyes. Added a per-model **`lidTilt`**
+  (radians) in `animator.js` `face()` and `heroModels.js`: the lids hinge about (cos t, 0, ∓sin t) per eye. Other heroes
+  are unchanged (face-check chewy and poe OK). The builder's round 5b redoes the lids on that axis and rounds the open mouth
+  into a "D".
+- 2026-10-06 22:20: the 3rd session-limit stop (about 22:00, reset 22:20). Resumed: the R-7/R-8 bug fix, CT-2 controller
+  navigation, and the Shih Tzu rig round 5b. **Held**: the golden-toy rig (it was mid ear-swing check, the backward swing
+  sinking about 5 cm), to resume when a slot frees, keeping about 3 Opus agents at a time.
+- 2026-10-06: **R-7 (black flashes) fixed and accepted.**
+  - The causes: zero-length vertex normals in generated meshes (the house mailbox, the trinket stall, trims, villager
+    seams) giving NaN on D3D, and the monster death squash reaching zero height (a singular normal matrix).
+  - One NaN pixel was spread by bloom into a full-screen black flash.
+  - The fixes: NaN-safe normals, `repairNormals` in `merge()`, a finite `normalMatrixInto`, the squash floored at 2%, plus a
+    bloom NaN guard as a safety net.
+  - The proof: flash-hunt over 8 sessions went from 23 flash frames to 0. s24-render-health added.
+- **R-8 (first-open stutter) much improved, still open.** Build 923→82 ms, skills 127→45, inventory 103→43, the shop
+  181→75 (the shop costs about 65 ms on every open; its grid re-renders). The prewarm runs on the title screen. Follow-ups:
+  the shop re-render, build mode's camera and grid cost, the Town Hall template (about 1 s if the prewarm is skipped), the
+  audio unlock (about 150 ms).
+- 2026-10-06: **CT-2 built, in review** (the controls Opus agent; CONTROLS §9 as built).
+  - Spatial focus navigation `ui/padNav.js` for every panel, the popover and the guide offer. A selects, B goes back, LB /
+    RB switch tabs, X / Y act per element (the bag: pick up / put down / equip / drop / sell / stash; the skills: learn,
+    assign, charge perks; shops: buy / sell all; the Pantry: eat). The tooltip follows the focus (item compares included).
+    A pink ring and a glyph-hint footer show where the focus is.
+  - Build and decorate get a stick-driven paw cursor (`ui/padCursor.js`, `Actions.pointer()`) and a D-pad palette: A
+    places, B cancels, Y / RB rotate, X removes or stores, LB undoes, LT / RT turn or zoom. The pause menu has a pad row
+    (the panels, Build, Decorate, Home).
+  - Fishing and cooking are playable on the pad end to end.
+  - QA: s25 45/45 (with new sections for every panel, build, decorate and fishing). Full run-all: everything passes but
+    profile-horde (the machine was BUSY, other programs at up to 93% CPU; the controls code costs about 5 µs a frame
+    with the mouse). s19 and s24 failed once under that load and passed on re-run (34/34, 27/27). test-rpg and
+    prod-smoke (its `pad` case checks the focus ring) pass. Screenshots at 1600×900 and 1280×800.
+- 2026-10-06: **CT-2 approved and done** (`src/ui/padNav.js` focus navigation on every panel, `src/ui/padCursor.js` for the
+  build and decorate cursor, fishing on the pad; s25 45/45). Then: pad-aware tooltip wording, the build ghost visibility,
+  then **CT-3** (R-2 quality at boot, the Deck preset and UI scale, deck-perf), then CT-4 (the Electron desktop app).
+- 2026-10-06: **Polish after CT-2** (the controls Opus agent; CONTROLS §10.0).
+  - While the pad plays, tooltips and the bag / shop / stash hints swap mouse words for glyphs (`padWording`), and every
+    panel footer has a mouse and a pad twin.
+  - Build mode's red "can't place" ghost draws on top of the building it overlaps.
+- 2026-10-06: **CT-3 built, in review** (the controls Opus agent; CONTROLS §10 as built).
+  - **R-2 done.** The saved Settings › Graphics applies at boot (`core/deck.js` `bootGraphics`), so grass, flowers,
+    details and shadow maps follow it. `?q=` still wins.
+  - **The Deck preset**, the 4th Graphics choice, picked on a Deck-like screen's first start (1280×800, or the desktop
+    app reporting a Deck):
+    - Medium density;
+    - pixel ratio 0.85;
+    - no AO or tilt-shift;
+    - a 1536 sun shadow map over 0.82 of the area, redrawn every other frame;
+    - particles ×0.6.
+  - **Settings › Frame cap**: Off, 60 or 40.
+  - **The Deck's UI** (`ui/deck.css`):
+    - the UI at 1.15 inside a 12 / 18 px safe area;
+    - a 12 px text floor (11 px on the Deck), about 40 selectors;
+    - the toasts above the hotbar;
+    - the glyph footer beside a full-height panel;
+    - glyph caps that never shrink (build mode's side panel had them over the words).
+  - **QA**:
+    - s26-deck 8/8 (in run-all);
+    - `tools/qa/deck-ui.mjs`: 26 views at 1280×800 with the pad, no text under 11 px, no panel cut off, screenshots;
+    - prod-smoke's new `deck` case;
+    - test-rpg's Deck checks.
+  - **`tools/qa/deck-perf.mjs`** (the Deck preset at 1280×800, the CPU throttled ×3, CPU p95):
+    - the village 11.9 ms, the busy square 13.2 and the zone fight 16.5: PASS for 60 fps;
+    - the Burrow fight 17.2 ms (p50 11.2): WARN.
+    - The machine was 62 to 65% busy. The GPU can't be emulated here; at ×1 the Deck preset cuts the render's GPU span
+      by 17 to 45% against High.
+    - The real check is the CT-4 build on a Deck.
+  - **Full run-all**: everything passes, profile-horde included. The one exception was s12's hero-switch leak check,
+    which failed twice at +5 geometries against its limit of 4. It passed 22/22 on two re-runs: the extra geometries
+    were props the villagers hold, which come and go during the switches. test-rpg and prod-smoke (15 cases) pass.

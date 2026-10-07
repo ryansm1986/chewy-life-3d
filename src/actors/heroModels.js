@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import { makeToon, makeOutline } from '../gfx/materials.js';
 
 const BASE = import.meta.env?.BASE_URL ?? '/';
+const OFF_DARK = typeof location !== 'undefined' && /[?&]off=[^&]*\bdark\b/.test(location.search); // (?off=dark: no darkGrade / darkNeutral, for bisecting render bugs)
 
 // Runtime tuning per hero. palm/back: attachment points in model units (× meta.scale) under hand_* / chest.
 // earFlip: the ears hang (Moka's pendant ears): each ear bone sits under a mount turned half round, so the
@@ -276,7 +277,7 @@ export function buildHeroModel(id, spec = null) {
   const fumaMount = !quad && cfg.fumaMount ? propMount('fumaMount', cfg.fumaMount, B, abs, S) : null; // (Poe's fūma on her back: see HERO_MODELS)
   root.updateMatrixWorld(true);
 
-  const dg = cfg.darkGrade, gated = dg?.[4] != null, fg = gated && cfg.furGrade, neutral = gated && cfg.darkNeutral;
+  const dg = OFF_DARK ? null : cfg.darkGrade, gated = dg?.[4] != null, fg = gated && cfg.furGrade, neutral = gated && cfg.darkNeutral;
   const v4 = a => new THREE.Vector4(a[0], a[1] / 255, a[2] / 255, a[3] / 255);
   const mat = makeToon({
     map: tex, objectBrush: true, brush: 0, rim: 0.5, term: [-0.04, 0.34], shadowSat: 0.35,
@@ -316,7 +317,7 @@ export function buildHeroModel(id, spec = null) {
   };
   return {
     spec: spec || { name: cfg.name }, hero: id, root, parts, mat, outMat, propMat, meshes: [skin], skin, outline, skeleton, height: meta.height,
-    disney: true, bakedDisney: true, sharedGeo: true, earGain: cfg.earGain, model: cfg.file, quadruped: quad, sitDrop: cfg.sitDrop, squint: cfg.squint,
+    disney: true, bakedDisney: true, sharedGeo: true, earGain: cfg.earGain, model: cfg.file, quadruped: quad, sitDrop: cfg.sitDrop, squint: cfg.squint, lidTilt: cfg.lidTilt,
     dispose() { skeleton.dispose(); mat.dispose(); outMat.dispose(); propMat.dispose(); },
   };
 }

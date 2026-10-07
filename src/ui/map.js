@@ -1,6 +1,7 @@
 // Big map (uses the same provider as the minimap) and the quest journal.
 import { el, esc, fmt } from './dom.js';
 import { glyph } from './glyphs.js';
+import { padGlyph } from './padGlyphs.js';
 import { Panel } from './panel.js';
 import { drawPlaceholderMap } from './hud.js';
 import { FishLogView } from './fishlog.js';
@@ -16,7 +17,7 @@ export class MapPanel extends Panel {
     this.body.innerHTML = `<div class="mp-wrap"><div class="mp-frame"><canvas class="mp-cv"></canvas><div class="mp-compass">${glyph('sakura')}<b>N</b></div><div class="mp-vig"></div></div>
       <div class="mp-side"><div class="mp-loc"><b class="mp-name">Blossom Hollow</b><span class="jp mp-jp">さくら村</span></div>
         <div class="mp-legend"></div>
-        <div class="mp-tip">${glyph('paw')}Scroll the mouse wheel to zoom the map</div>
+        <div class="mp-tip kbm-only">${glyph('paw')}Scroll the mouse wheel to zoom the map</div><div class="mp-tip pad-only">${glyph('paw')}<span class="kc sm pad">${padGlyph('LT')}</span><span class="kc sm pad">${padGlyph('RT')}</span> zoom the map</div>
       </div></div>`;
     this.cv = this.body.querySelector('.mp-cv');
     this.zoom = 1;

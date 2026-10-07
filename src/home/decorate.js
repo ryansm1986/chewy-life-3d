@@ -4,8 +4,12 @@
 // onto anything with a `surface`, rugs under furniture, ceiling lamps over the floor. Click a placed item to pick it
 // up (move it, or Store it back), Ctrl+Z undoes. Wallpaper and floors apply from the palette's last tab.
 // WASD pans the camera, the wheel zooms; the player stays where they are.
+// The gamepad (docs/CONTROLS.md §2, ROADMAP CT-2): the virtual cursor (ui/padCursor.js: the left stick, the right stick
+// pans, the triggers zoom, the D-pad picks from the palette); A places / picks up, B cancels, Y / RB rotate, X stores
+// the piece in hand, LB undoes.
 import * as THREE from 'three';
 import { Input } from '../core/input.js';
+import { Actions } from '../core/actions.js';
 import { Events } from '../core/events.js';
 import { FURNITURE, SURFACES, CELL, footprint, itemDef } from './furniture.js';
 import { canPlace, poseOf, boxOf, cellsOf, wallSpan, nextK, WALL_STEP } from './placement.js';
@@ -147,36 +151,39 @@ export class Decorator {
     this.H.clampFocus(this.focus, -1.2);
     if (Input.mouse.wheel) rig.zoom(Input.mouse.wheel);
     if (G.ui?.anyModal?.()) { this.cursor && (this.cursor.count = 0); return; }
-    // keys
-    if (Input.down('ctrl') && Input.hit('z')) { Input.consume('z'); this.undo(); }
-    if ((Input.hit('delete') || Input.hit('backspace')) && this.hold) this.storeHeld();
-    if (Input.mouseHit(2) && (this.sel || this.hold)) { Input.consumeMouse(2); this.cancel(); }
-    const overUI = Input.mouse.overUI;
+    // keys (and the pad's buttons while its virtual cursor is on)
+    const pad = Actions.vcursor.on, ph = t => pad && Actions.padHit(t) && (Actions.padConsume(t), true);
+    if ((Input.down('ctrl') && Input.hit('z')) || ph('LB')) { Input.consume('z'); this.undo(); }
+    if ((Input.hit('delete') || Input.hit('backspace') || (this.hold && ph('X'))) && this.hold) this.storeHeld();
+    if ((Input.mouseHit(2) || ((this.sel || this.hold) && ph('B'))) && (this.sel || this.hold)) { Input.consumeMouse(2); this.cancel(); } // (B with nothing in hand leaves: ui/padCursor.js)
+    const overUI = pad ? false : Input.mouse.overUI;
     const id = this.hold?.it.id || this.sel;
     if (!id) { this.hover(overUI); return; }
-    if (Input.hit('r') && FURNITURE[id].mount !== 'wall') { this.rot = (this.rot + 1) % 4; Events.emit('sfx', 'ui_tab'); }
+    if ((Input.hit('r') || ph('Y') || ph('RB')) && FURNITURE[id].mount !== 'wall') { this.rot = (this.rot + 1) % 4; Events.emit('sfx', 'ui_tab'); }
     const cand = overUI ? this.lastCand : this.candidate(id);
     if (!overUI) this.lastCand = cand;
-    if (!cand) { this.ghost && (this.ghost.visible = false); this.cursor.count = 0; G.ui?.setInteract?.(FURNITURE[id].mount === 'wall' ? 'Point at a back wall' : FURNITURE[id].mount === 'table' ? 'Point at a table or a shelf' : 'Point at the floor'); return; }
+    if (!cand) { this.ghost && (this.ghost.visible = false); this.cursor.count = 0; G.ui?.setInteract?.(FURNITURE[id].mount === 'wall' ? 'Point at a back wall' : FURNITURE[id].mount === 'table' ? 'Point at a table or a shelf' : 'Point at the floor', pad ? { key: null } : undefined); return; }
     const P = G.player, [pcx, pcz] = W.cellAt(P.pos.x, P.pos.z);
     const guests = this.H.hosts.map(v => { const [x, z] = W.cellAt(v.pos.x, v.pos.z); return { x, z }; });
     const chk = canPlace(W.layout, this.items, cand, { skip: this.hold?.it || null, player: { x: pcx, z: pcz }, guests });
     this.showGhost(cand, chk.ok, dt);
     this.showCells(cand, chk.ok);
-    G.ui?.setInteract?.(chk.ok ? `Click to ${this.hold ? 'put down' : 'place'} the ${FURNITURE[id].name}${FURNITURE[id].mount === 'wall' ? '' : ' · R to rotate'}` : chk.why);
-    if (Input.mouseHit(0) && !overUI) {
+    if (pad) G.ui?.setInteract?.(chk.ok ? `${this.hold ? 'Put down' : 'Place'} the ${FURNITURE[id].name}${FURNITURE[id].mount === 'wall' ? '' : ` · ${Actions.tokenName('Y', 'pad')} rotates`}` : chk.why, { key: chk.ok ? 'pad:interact' : null });
+    else G.ui?.setInteract?.(chk.ok ? `Click to ${this.hold ? 'put down' : 'place'} the ${FURNITURE[id].name}${FURNITURE[id].mount === 'wall' ? '' : ' · R to rotate'}` : chk.why);
+    if ((Input.mouseHit(0) && !overUI) || ph('A')) {
       Input.consumeMouse(0);
       if (chk.ok) this.place(cand); else { Events.emit('sfx', 'ui_error'); this.G.ui?.float?.(this.ghost.position.clone().setY(this.ghost.position.y + 1), chk.why, { kind: 'status', color: '#ffb0bc' }); }
     }
   }
   /** what's under the mouse when nothing is in hand: highlight it, and a click picks it up */
   hover(overUI) {
-    const G = this.G, it = overUI ? null : this.itemAtMouse();
+    const G = this.G, it = overUI ? null : this.itemAtMouse(), pad = Actions.vcursor.on;
     this.showHover(it);
-    G.ui?.setInteract?.(it ? `Click to move the ${FURNITURE[it.id].name}` : 'Pick something from the palette · click furniture to move it');
-    if (it && Input.mouseHit(0)) { Input.consumeMouse(0); this.pickUp(it); }
+    if (pad) G.ui?.setInteract?.(it ? `Move the ${FURNITURE[it.id].name}` : 'Pick something with the D-pad · point at furniture to move it', { key: it ? 'pad:interact' : null });
+    else G.ui?.setInteract?.(it ? `Click to move the ${FURNITURE[it.id].name}` : 'Pick something from the palette · click furniture to move it');
+    if (it && (Input.mouseHit(0) || (pad && Actions.padHit('A')))) { Input.consumeMouse(0); Actions.padConsume('A'); this.pickUp(it); }
   }
-  ray() { const G = this.G; _rc.setFromCamera({ x: Input.mouse.nx, y: Input.mouse.ny }, G.engine.camera); return _rc.ray; }
+  ray() { const G = this.G, m = Actions.pointer(); _rc.setFromCamera({ x: m.nx, y: m.ny }, G.engine.camera); return _rc.ray; } // (the mouse, or the pad's virtual cursor)
   itemAtMouse() {
     const r = this.ray(), items = this.items;
     let best = null, bt = 1e9;

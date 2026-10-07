@@ -3,7 +3,7 @@
 // animation; each part is one merged vertex-coloured mesh + an inverted-hull outline.
 import * as THREE from 'three';
 import { makeToon, makeOutline, STENCIL_OCCLUDER } from '../gfx/materials.js';
-import { merge, paint, tube, xf, mergeGeometries } from '../gfx/geom.js';
+import { merge, paint, tube, xf, mergeGeometries, repairNormals } from '../gfx/geom.js';
 import { tennisBallTexture } from '../gfx/textures.js';
 import { mulberry32, TAU, clamp } from '../core/util.js';
 import { cloneSkinnedSafe as cloneSkinned } from './safeClone.js'; // (not SkeletonUtils.clone: ear joints keep userData.tip, see safeClone.js)
@@ -270,6 +270,7 @@ class Rig {
     const bakeList = list => {
       const geos = list.map(partGeo);
       const out = this.disney ? mergeIndexed(geos) : mergeGeometries(geos, false);
+      repairNormals(out); // (a zero normal at a face seam: NaN in the shader, a black block in the bloom — ROADMAP R-7)
       const n = out.attributes.position.count, si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
       let o = 0;
       list.forEach((m, j) => {

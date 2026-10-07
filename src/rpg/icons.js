@@ -21,7 +21,9 @@ const D = (c, t = 0.3) => mixHex(c, '#3a1c22', t);
 function newCanvas() {
   const c = document.createElement('canvas');
   c.width = c.height = ICON_SIZE * ICON_RES;
-  const g = c.getContext('2d');
+  // (a CPU-backed canvas: every icon ends in toDataURL, and on a GPU-backed one that read-back waits for the GPU, busy
+  //  with the game: 20-70 ms an icon instead of a few — ROADMAP R-8)
+  const g = c.getContext('2d', { willReadFrequently: true });
   g.scale(ICON_RES, ICON_RES);
   g.lineJoin = 'round'; g.lineCap = 'round';
   return { c, g };

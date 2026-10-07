@@ -2,6 +2,7 @@
 // Duck Hunt) + hotbar assignment (popover, drag, hover+1-4).
 import { el, esc, replay, setText } from './dom.js';
 import { glyph } from './glyphs.js';
+import { padGlyph } from './padGlyphs.js';
 import { Panel } from './panel.js';
 import { TREES, treesFor, skillList, skillDef, skillIconURL, hotbarIconURL, skillInfoLines, canLearnSkill, effLevel, treeInfo, skillTraining } from './rpg.js';
 import { ChargeDrawer, chipState, chargeTipHTML } from './chargePanel.js';
@@ -16,7 +17,7 @@ export class SkillsPanel extends Panel {
     this.extra.innerHTML = `<div class="sk-pts">${glyph('star')}<b>0</b><span>points</span></div>`;
     b.innerHTML = `<div class="tabs sk-tabs">${TREES.map(t => `<button class="tab" data-t="${t.id}" style="--tc:${t.color}">${glyph(t.glyph)}<span>${t.name}</span><b class="tab-n">0</b></button>`).join('')}</div>
       <div class="tree-wrap"><div class="tree"><div class="tree-title"><span class="tt-jp"></span></div><svg class="links"></svg><div class="rows"></div><div class="nodes"></div></div></div>
-      <div class="sk-foot">${glyph('mouseL')}Learn <span class="sep">·</span>${glyph('mouseR')}Assign <span class="sep">·</span><span class="kc sm">1</span>–<span class="kc sm">4</span> while hovering <span class="sep">·</span> Drag to hotbar</div>`;
+      <div class="sk-foot kbm-only">${glyph('mouseL')}Learn <span class="sep">·</span>${glyph('mouseR')}Assign <span class="sep">·</span><span class="kc sm">1</span>–<span class="kc sm">4</span> while hovering <span class="sep">·</span> Drag to hotbar</div><div class="sk-foot pad-only"><span class="kc sm pad">${padGlyph('A')}</span>Learn <span class="sep">·</span><span class="kc sm pad">${padGlyph('Y')}</span>Assign <span class="sep">·</span><span class="kc sm pad">${padGlyph('X')}</span>Charge perks <span class="sep">·</span><span class="kc sm pad">${padGlyph('LB')}</span><span class="kc sm pad">${padGlyph('RB')}</span>Trees</div>`;
     this.$ = { pts: this.extra.querySelector('.sk-pts b'), ptsW: this.extra.querySelector('.sk-pts span'), ptsBox: this.extra.querySelector('.sk-pts'), tree: b.querySelector('.tree'), links: b.querySelector('.links'), nodes: b.querySelector('.nodes'), rows: b.querySelector('.rows'), title: b.querySelector('.tree-title') };
     this.chg = new ChargeDrawer(this); // (the Charge drawer docked to the tree's right: docs/CHARGE.md §4)
     b.querySelector('.sk-tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (t) this.setTree(t.dataset.t); });

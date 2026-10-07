@@ -23,8 +23,8 @@ const server = await preview({ logLevel: 'error', build: { outDir }, preview: { 
 const url = server.resolvedUrls.local[0].replace(/\/$/, '');
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true, args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] });
 let failed = 0;
-for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['poe', '/?fresh&nointro&hero=poe'], ['home', '/?fresh&nointro'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`]), ...Object.values(DUNGEONS).filter(dd => dd.gate).map(dd => ['zone:' + dd.id, '/?fresh&nointro'])]) { // (every zone dungeon that has its gate: its kit, a dense floor, the arena)
-  const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['poe', '/?fresh&nointro&hero=poe'], ['home', '/?fresh&nointro'], ['pad', '/?fresh&nointro&notut'], ['deck', '/?fresh&nointro&notut'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`]), ...Object.values(DUNGEONS).filter(dd => dd.gate).map(dd => ['zone:' + dd.id, '/?fresh&nointro'])]) { // (every zone dungeon that has its gate: its kit, a dense floor, the arena)
+  const page = await browser.newPage({ viewport: label === 'deck' ? { width: 1280, height: 800 } : { width: 1600, height: 900 } }); // (deck: the Steam Deck's screen)
   const errs = [];
   page.on('pageerror', e => errs.push('pageerror: ' + e.message));
   page.on('console', m => { if (m.type() === 'error' || /optional module missing|\[rigs\]|\[chewy\]|\[heroes\]|\[shadow\]|\[rosie\]|\[moka\]|\[poe\]/.test(m.text())) errs.push(m.type() + ': ' + m.text()); }); // ([heroes]: a baked hero model missing from the bundle)
@@ -70,6 +70,26 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
       return r;
     });
   }
+  if (label === 'pad') { // the gamepad in the bundle (docs/CONTROLS.md): a virtual pad (as tools/qa/pad-lib.mjs) walks, casts Y, and the glyphs show
+    s.pad = await page.evaluate(async () => {
+      const G = window.G, P = G.player, wait = ms => new Promise(q => setTimeout(q, ms));
+      const btn = () => ({ pressed: false, value: 0 }), pad = { id: 'Xbox 360 Controller (XInput STANDARD GAMEPAD)', index: 0, connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, btn) };
+      navigator.getGamepads = () => [pad];
+      const p0 = P.pos.clone(); pad.axes[1] = -1; await wait(700); pad.axes[1] = 0; await wait(100);
+      const r = { dev: G.controls.device, moved: +P.pos.distanceTo(p0).toFixed(2), glyphs: document.querySelectorAll('.hud .hotbar .hb-k.pad svg').length, cursor: document.body.classList.contains('pad-active') };
+      G.state.player.hotbar[2] = 'chomp'; G.state.player.skills.chomp = 1; G.skills.cds = {};
+      let cast = 0; const raw = G.skills.tryCast.bind(G.skills); G.skills.tryCast = (...a) => { const x = raw(...a); if (x) cast++; return x; };
+      pad.buttons[3].pressed = true; await wait(80); pad.buttons[3].pressed = false; await wait(400);
+      r.cast = cast;
+      // CT-2: a panel takes the focus ring, the D-pad moves it (docs/CONTROLS.md §3)
+      G.ui.toggle('inventory', { view: 'bag' }); await wait(400);
+      const c0 = G.ui.padNav.cur; pad.buttons[15].pressed = true; await wait(80); pad.buttons[15].pressed = false; await wait(200);
+      r.focus = !!c0 && document.querySelector('.pad-ring')?.classList.contains('on') && G.ui.padNav.cur !== c0;
+      G.ui.close('inventory');
+      return r;
+    });
+  }
+  if (label === 'deck') s.deck = await page.evaluate(() => { const G = window.G, E = G.engine; return { preset: E.preset, quality: E.quality, pr: E.renderer.getPixelRatio(), ao: E.post.ao.enabled, shadow: G.world.sun.shadow.mapSize.x, ui: G.ui.settings.uiScale, safe: getComputedStyle(document.querySelector('.l-hud')).top, floor: getComputedStyle(document.querySelector('.hud .loc-s') || document.body).fontSize }; }); // (CT-3: the Deck profile and deck.css in the bundle)
   const regionId = label.startsWith('region:') ? label.slice(7) : null;
   if (regionId) { // every outdoor region in the bundle (docs/REGIONS.md): built, populated, with its own boss (or its dungeon gate)
     await page.waitForFunction(() => window.G?.dungeon?.isRegion && !window.G.ui?.iris?.active, null, { timeout: 30000 }).catch(() => errs.push('region never loaded'));
@@ -89,8 +109,10 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
   const zoneOk = !s.zone || (s.zone.kind === 'zone' && s.zone.kit && s.zone.n >= 120 && !!s.zone.boss && s.zone.arena >= 15);
   const h = s.home, homeOk = !h || (h.mode === 'interior' && h.items >= 12 && h.batches >= 10 && h.jobs === 4 && h.palette && h.thumbs >= 3 && h.back === 'village');
   const pz = s.poe, poeOk = !pz || (pz.hero === 'poe' && (!TOY_POE || (s.model === 'poe_toy' && pz.baked)) && (!POE_FUMA || (pz.fuma === 'glb' && pz.villagerFuma === 'glb')) && pz.back && pz.wt === 'fuma' && pz.cast && pz.flying && pz.caught && pz.icons && pz.switch && pz.after === 'chewy' && pz.poeVillager);
+  const pd = s.pad, padOk = !pd || (pd.dev === 'pad' && pd.moved > 1.5 && pd.glyphs >= 6 && pd.cursor && pd.cast >= 1 && pd.focus);
+  const dk = s.deck, deckOk = !dk || (dk.preset === 3 && dk.quality === 1 && dk.pr === 0.85 && !dk.ao && dk.shadow === 1536 && dk.ui === 1.15 && dk.safe === '12px' && dk.floor === '12px');
   const m = s.moka, mokaOk = !m || ((!TOY_MOKA || s.model === 'moka_toy') && m.baked && m.staff && m.wt === 'staff' && m.cast && m.switch && m.after === 'chewy' && m.chewyBaked && m.mokaVillager);
-  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && mokaOk && poeOk && regionOk && zoneOk && homeOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!CHEWY_MODEL || s.model === CHEWY_MODEL) && (!SAMURAI_CHEWY || s.saya) && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
+  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && mokaOk && padOk && deckOk && poeOk && regionOk && zoneOk && homeOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!CHEWY_MODEL || s.model === CHEWY_MODEL) && (!SAMURAI_CHEWY || s.saya) && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
   console.log(`${ok ? 'PASS' : 'FAIL'}  production ${label}: ${JSON.stringify(s)}${errs.length ? '\n   ' + [...new Set(errs)].slice(0, 8).join('\n   ') : ''}`);
   if (!ok) failed++;
   await page.close();

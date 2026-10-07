@@ -134,6 +134,50 @@ export function paint(g, fn) {
 }
 export function solid(g, hex) { const c = new THREE.Color(hex); return paint(g, (p, n, o) => o.copy(c)); }
 
+/**
+ * Zero or non-finite vertex normals (a fin whose front and back faces share a vertex, a zero-area sliver, a pole) →
+ * the vertex's own face normal (area-weighted over its triangles), else straight up. A zero normal shades wrong, and
+ * an unguarded normalize() in a shader makes it NaN, which the bloom turns into a black block (ROADMAP R-7).
+ * → the number of normals repaired.
+ */
+export function repairNormals(g) {
+  const N = g?.attributes?.normal, P = g?.attributes?.position; if (!N || !P) return 0;
+  let acc = null;
+  for (let i = 0; i < N.count; i++) { const x = N.getX(i), y = N.getY(i), z = N.getZ(i), l = x * x + y * y + z * z; if (!(l > 1e-12) || !Number.isFinite(l)) (acc ||= new Map()).set(i, new THREE.Vector3()); }
+  if (!acc) return 0;
+  const I = g.index, T = I ? I.count / 3 : P.count / 3, a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (let t = 0; t < T; t++) {
+    const i0 = I ? I.getX(t * 3) : t * 3, i1 = I ? I.getX(t * 3 + 1) : t * 3 + 1, i2 = I ? I.getX(t * 3 + 2) : t * 3 + 2;
+    const v0 = acc.get(i0), v1 = acc.get(i1), v2 = acc.get(i2); if (!v0 && !v1 && !v2) continue;
+    a.fromBufferAttribute(P, i0); b.fromBufferAttribute(P, i1).sub(a); c.fromBufferAttribute(P, i2).sub(a); b.cross(c);
+    if (!Number.isFinite(b.x + b.y + b.z)) continue;
+    v0?.add(b); v1?.add(b); v2?.add(b);
+  }
+  for (const [i, v] of acc) { if (v.lengthSq() > 1e-30) v.normalize(); else v.set(0, 1, 0); N.setXYZ(i, v.x, v.y, v.z); }
+  N.needsUpdate = true;
+  return acc.size;
+}
+
+// A normal matrix that never breaks (ROADMAP R-7; the Horde's per-instance normals, dungeon/horde.js): the cofactor
+// matrix of a world 3×3 (e: Matrix4 elements), signed by the determinant and scaled
+// to unit size. That is the inverse-transpose times |det|, and normals are normalised in the shader, so it turns them
+// exactly like three's normal matrix wherever that exists, and stays finite and right where it doesn't: a part squashed
+// flat (a dying monster: det 0, getNormalMatrix gives all zeros → NaN normals → black blocks in the bloom) keeps the
+// limit, its normals along the squashed axis. → false when the 3×3 has rank ≤ 1 or isn't finite (nothing to draw).
+export function normalMatrixInto(e, A, o) {
+  const a0 = e[0], a1 = e[1], a2 = e[2], b0 = e[4], b1 = e[5], b2 = e[6], c0 = e[8], c1 = e[9], c2 = e[10];
+  // columns: b × c, c × a, a × b (a, b, c: the 3×3's columns)
+  const x0 = b1 * c2 - b2 * c1, x1 = b2 * c0 - b0 * c2, x2 = b0 * c1 - b1 * c0;
+  const y0 = c1 * a2 - c2 * a1, y1 = c2 * a0 - c0 * a2, y2 = c0 * a1 - c1 * a0;
+  const z0 = a1 * b2 - a2 * b1, z1 = a2 * b0 - a0 * b2, z2 = a0 * b1 - a1 * b0;
+  const det = a0 * x0 + a1 * x1 + a2 * x2;
+  const m = Math.max(Math.abs(x0), Math.abs(x1), Math.abs(x2), Math.abs(y0), Math.abs(y1), Math.abs(y2), Math.abs(z0), Math.abs(z1), Math.abs(z2));
+  if (!(m > 1e-30) || !Number.isFinite(m + det)) { A[o] = 1; A[o + 1] = 0; A[o + 2] = 0; A[o + 3] = 0; A[o + 4] = 1; A[o + 5] = 0; A[o + 6] = 0; A[o + 7] = 0; A[o + 8] = 1; return false; }
+  const k = (det < 0 ? -1 : 1) / m;
+  A[o] = x0 * k; A[o + 1] = x1 * k; A[o + 2] = x2 * k; A[o + 3] = y0 * k; A[o + 4] = y1 * k; A[o + 5] = y2 * k; A[o + 6] = z0 * k; A[o + 7] = z1 * k; A[o + 8] = z2 * k;
+  return true;
+}
+
 // Merge geometries after normalising attribute sets (position, normal, uv, color)
 export function merge(list) {
   const norm = list.map(g => {
@@ -144,7 +188,9 @@ export function merge(list) {
     for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv', 'color'].includes(k)) g.deleteAttribute(k);
     return g;
   });
-  return mergeGeometries(norm, false);
+  const out = mergeGeometries(norm, false);
+  repairNormals(out);
+  return out;
 }
 
 export function rounded(w, h, d, r = 0.1, seg = 3) {

@@ -16,7 +16,7 @@ import { CAST } from './charKit.js';
 import { Villager } from './npc.js';
 import { Player } from './player.js';
 import { Events } from '../core/events.js';
-import { Input } from '../core/input.js';
+import { Actions } from '../core/actions.js';
 import { HeroWheel } from '../ui/heroWheel.js';
 import { PoeJoin } from './poeJoin.js';
 
@@ -162,13 +162,13 @@ export class HeroManager {
   // ------------------------------------------------------------------ Tab: tap for the next hero, hold for the wheel
   /** game.js calls this from handleInput (play input only). → true while the wheel is open (it takes the input) */
   tabInput(dt) {
-    if (Input.hit('tab')) { Input.consume?.('tab'); this.tab = { t: 0 }; }
+    if (Actions.pressed('hero')) { Actions.consume('hero'); this.tab = { t: 0 }; } // (Tab, or the pad's LB: core/actions.js)
     // the wheel's own keys first: a number key pressed in the same frame Tab is let go of still picks that hero
     const open = this.wheelOpen;
     if (open) this.wheel.input();
     const T = this.tab;
     if (T) {
-      if (Input.down('tab')) {
+      if (Actions.held('hero')) {
         T.t += dt;
         // (once per hold: after a key pick or Esc it stays shut until Tab is pressed again)
         if (!T.wheel && !this.wheelOpen && T.t >= WHEEL_HOLD && this.bench().length && !this.T) { T.wheel = true; this.openWheel(); }
@@ -303,7 +303,7 @@ export class HeroManager {
     G.state.flags.mokaJoined = true;
     if (npc) { npc.anim.play('happy'); G.vfx?.emote?.(npc, 'heart', 2.4); G.vfx?.sparkle?.(npc.pos.clone().setY(0.8), { n: 24, color: '#5ce0d0', r: 0.8 }); }
     Events.emit('sfx', 'ui_quest');
-    ui.banner?.('Moka joined the pack!', 'Press Tab to switch heroes', { style: 'levelup' });
+    ui.banner?.('Moka joined the pack!', Actions.resolve('Press {hero} to switch heroes'), { style: 'levelup' });
     Events.emit('hero:joined', { id });
     G.save?.();
   }

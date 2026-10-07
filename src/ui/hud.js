@@ -6,6 +6,8 @@ import { glyph, glyphURL, MATERIALS } from './glyphs.js';
 import { portrait } from './portraits.js';
 import { skillIconURL, hotbarIconURL, skillDef, skillCost, xpProgress, potionIconURL, potionInfo, materialIconURL, skillUsable } from './rpg.js';
 import { simpleTip } from './tooltip.js';
+import { Actions } from '../core/actions.js';
+import { keyCap, capInner } from './padGlyphs.js';
 import { pantryIcon } from '../life/pantryIcons.js';
 import { PANTRY } from '../life/pantry.js';
 import { BUFFS, TIER_NAMES } from '../life/meals.js';
@@ -13,6 +15,7 @@ import { BUFFS, TIER_NAMES } from '../life/meals.js';
 const TAU = Math.PI * 2;
 const HERO_JP = { chewy: 'チューイ', moka: 'モカ', poe: 'ポー' };
 const SLOT_KEYS = ['LMB', 'RMB', '1', '2', '3', '4'];
+const SLOT_ACTS = ['attack', 'skillAlt', 'skill1', 'skill2', 'skill3', 'skill4']; // (their caps follow the device and the bindings: ui/padGlyphs.js)
 
 // ------------------------------------------------------------------ Orb (canvas liquid)
 class Orb {
@@ -181,7 +184,7 @@ export class Hud {
     <div class="hud-tl">
       <div class="pcard">
         <div class="pc-bub" data-open="character"><div class="pc-face">${portrait(this.G?.state?.activeHero || 'chewy')}</div><div class="pc-lv"><small>Lv</small><span>1</span></div></div>
-        <button class="hsw" hidden><div class="hsw-face"></div><svg class="hsw-cd" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17.5"/></svg><span class="hsw-lv"></span><span class="kc sm">Tab</span></button>
+        <button class="hsw" hidden><div class="hsw-face"></div><svg class="hsw-cd" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17.5"/></svg><span class="hsw-lv"></span><span class="kc sm" data-act="hero">Tab</span></button>
         <div class="pc-info">
           <div class="pc-name">Chewy<span class="jp">チューイ</span></div>
           <div class="pc-xp"><i></i></div>
@@ -248,11 +251,11 @@ export class Hud {
           </div>
           <div class="rci-foot"></div>
         </div>
-        <button class="build-btn" data-open="build">${glyph('hammer')}<span class="bb-l">Build</span><span class="kc">B</span></button>
+        <button class="build-btn" data-open="build">${glyph('hammer')}<span class="bb-l">Build</span><span class="kc" data-act="build">B</span></button>
       </div>
       <div class="menubtns">
         ${[['inventory', 'bag', 'I', 'Bag'], ['pantry', 'leaf', 'P', 'Pantry'], ['character', 'star', 'C', 'Character'], ['skills', 'sparkle', 'K', 'Skills'], ['quests', 'book', 'J', 'Journal'], ['map', 'map', 'M', 'Map'], ['menu', 'gear', 'Esc', 'Menu']]
-    .map(([n, g, k, l]) => `<button class="mb" data-open="${n}" data-tip="${l}">${glyph(g)}<span class="kc">${k}</span><span class="mb-dot"></span></button>`).join('')}
+    .map(([n, g, k, l]) => `<button class="mb" data-open="${n}" data-tip="${l}">${glyph(g)}<span class="kc" data-act="${n}">${k}</span><span class="mb-dot"></span></button>`).join('')}
       </div>
     </div>`;
     const q = s => R.querySelector(s);
@@ -275,7 +278,7 @@ export class Hud {
     tip.bind(this.$.hsw, () => {
       const H = this.ui.G?.heroes, id = H?.next(); if (!id) return '';
       const hp = this.st.heroes?.[id]?.player || {}, C = H.cls(id);
-      return simpleTip(`${esc(C.name)} <span class="jp">${HERO_JP[id] || ''}</span>`, `Level ${hp.lvl || 1} ${esc(C.title)} · hanging out in town.<br><span class="tt-dim">Press <span class="kc sm">Tab</span> or click to play as ${esc(C.name)}.</span>`);
+      return simpleTip(`${esc(C.name)} <span class="jp">${HERO_JP[id] || ''}</span>`, `Level ${hp.lvl || 1} ${esc(C.title)} · hanging out in town.<br><span class="tt-dim">Press ${keyCap('hero', { sm: true })} or click to play as ${esc(C.name)}.</span>`);
     });
     // orbs
     this.life = new Orb('life'); this.zoom = new Orb('zoom');
@@ -287,7 +290,7 @@ export class Hud {
     this.slots = SLOT_KEYS.map((k, i) => {
       const s = el('div', 'hb' + (i < 2 ? ' mouse' : ''));
       s.dataset.i = i;
-      s.innerHTML = `<div class="hb-in"><img class="hb-ic" alt="" draggable="false"><div class="hb-cd"></div><span class="hb-cdt"></span><div class="hb-fl"></div></div><span class="kc hb-k">${i === 0 ? glyph('mouseL') : i === 1 ? glyph('mouseR') : k}</span>`;
+      s.innerHTML = `<div class="hb-in"><img class="hb-ic" alt="" draggable="false"><div class="hb-cd"></div><span class="hb-cdt"></span><div class="hb-fl"></div></div><span class="kc hb-k" data-act="${SLOT_ACTS[i]}">${i === 0 ? glyph('mouseL') : i === 1 ? glyph('mouseR') : k}</span>`;
       hb.appendChild(s);
       const o = { el: s, ic: s.querySelector('.hb-ic'), cd: s.querySelector('.hb-cd'), cdt: s.querySelector('.hb-cdt'), id: undefined, cdv: -1 };
       tip.bind(s, () => this.slotTip(i));
@@ -302,17 +305,17 @@ export class Hud {
     ws.addEventListener('click', e => { e.stopPropagation(); const G = this.ui.G; if (!G?.actions?.swapWeapons || G.mode === 'title') return; G.actions.swapWeapons(); G.audio?.play?.('ui_equip'); });
     tip.bind(ws, () => { const set = this.pl.activeWeapon === 1 ? 1 : 0, wt = this.d.weaponType || 'sword'; return simpleTip(`Weapon set ${set ? 'II' : 'I'} · ${wt === 'ball' ? 'Tennis Ball' : wt === 'staff' ? 'Staff' : wt === 'fuma' ? 'Fūma' : 'Bone Katana'}`, `Each weapon set remembers its own ${glyph('mouseL')} / ${glyph('mouseR')} skills.<br><span class="tt-dim">Press <span class="kc sm">X</span> or click to swap.</span>`); });
     hb.appendChild(el('div', 'hb-sep'));
-    this.belt = [['heart', 'Q', 'Heart Potion', 'Restores Life'], ['zoom', 'E', 'Zoom Potion', 'Restores Zoom'], ['rejuv', 'R', 'Rejuv Potion', 'Restores Life and Zoom']].map(([k, key, name, desc]) => {
+    this.belt = [['heart', 'Q', 'Heart Potion', 'Restores Life', 'potionHeart'], ['zoom', 'E', 'Zoom Potion', 'Restores Zoom', 'potionZoom'], ['rejuv', 'R', 'Rejuv Potion', 'Restores Life and Zoom', 'potionR']].map(([k, key, name, desc, act]) => {
       const s = el('div', 'belt b-' + k);
-      s.innerHTML = `<div class="hb-in"><img class="bt-ic" src="${potionIconURL(k)}" alt="" draggable="false"><b class="bt-n">0</b><div class="hb-fl"></div></div><span class="kc hb-k">${key}</span>`;
+      s.innerHTML = `<div class="hb-in"><img class="bt-ic" src="${potionIconURL(k)}" alt="" draggable="false"><b class="bt-n">0</b><div class="hb-fl"></div></div><span class="kc hb-k" data-act="${act}">${key}</span>`;
       hb.appendChild(s);
       s.addEventListener('click', () => { this.ui.G?.actions?.usePotion?.(k); this.flashBelt(k); });
-      tip.bind(s, () => { const I = potionInfo(k) || { name, desc }; return simpleTip(I.name, `${esc(I.desc)}<br>You have <b>${this.st.potions?.[k] || 0}</b>.<br><span class="tt-dim">Press ${key} or click to drink.</span>`); });
+      tip.bind(s, () => { const I = potionInfo(k) || { name, desc }; return simpleTip(I.name, `${esc(I.desc)}<br>You have <b>${this.st.potions?.[k] || 0}</b>.<br><span class="tt-dim">Press ${Actions.text(act) || key} or click to drink.</span>`); });
       return { k, el: s, n: s.querySelector('.bt-n'), v: -1 };
     });
     // the quick meal (G): the last dish eaten, else the most filling one in the pantry (life/kitchen.js quickEat)
     const ms = el('div', 'belt b-meal');
-    ms.innerHTML = `<div class="hb-in"><img class="bt-ic" alt="" draggable="false"><span class="bt-bowl">${glyph('heart')}</span><b class="bt-n">0</b><div class="hb-fl"></div></div><span class="kc hb-k">G</span>`;
+    ms.innerHTML = `<div class="hb-in"><img class="bt-ic" alt="" draggable="false"><span class="bt-bowl">${glyph('heart')}</span><b class="bt-n">0</b><div class="hb-fl"></div></div><span class="kc hb-k" data-act="meal">G</span>`;
     hb.appendChild(ms);
     ms.addEventListener('click', () => this.ui.G?.life?.kitchen?.quickEat?.());
     tip.bind(ms, () => { const id = this.mealSlot.id, d = id && PANTRY[id], B = d && BUFFS[d.food.buff]; return d ? simpleTip(`Quick meal · ${esc(d.name)}`, `Heals ${Math.round(d.food.heal * 100)}% life · Well Fed: <b>${B.name} ${TIER_NAMES[d.food.tier]}</b> (${d.food.mins} min)<br>You have <b>${this.st.pantry?.[id] || 0}</b>.<br><span class="tt-dim">Press G or click to eat. Eat any dish from the Pantry to make it your quick meal.</span>`) : simpleTip('Quick meal', 'No dishes yet.<br><span class="tt-dim">Cook at home or at a campfire, then press G to eat.</span>'); });
@@ -327,7 +330,7 @@ export class Hud {
       if (n === 'build') this.ui.openBuild(); else if (n === 'pantry') this.ui.togglePantry(); else this.ui.toggle(n); // (the Pantry is a view of the inventory panel)
       replay(b, 'pressed', 300);
     });
-    for (const b of R.querySelectorAll('.mb')) tip.bind(b, () => simpleTip(b.dataset.tip, `<span class="tt-dim">Hotkey: ${b.querySelector('.kc').textContent}</span>`));
+    for (const b of R.querySelectorAll('.mb')) tip.bind(b, () => simpleTip(b.dataset.tip, `<span class="tt-dim">Hotkey: ${Actions.text(b.dataset.open) || b.querySelector('.kc').textContent}</span>`));
     tip.bind(q('.pc-bub'), () => { const C = this.ui.G?.heroes?.cls(); return simpleTip(esc(this.pl.name || 'Chewy'), `Level ${this.pl.lvl || 1} ${esc(C?.title || 'adventurer pup')}.<br><span class="tt-dim">Click for character sheet (C)</span>`); });
     tip.bind(this.$.pal, () => { const s = this.shadowHP(); return simpleTip('Shadow', `Loyal Boston terrier sidekick.<br>Life ${Math.ceil(s.cur)} / ${Math.round(s.max)}`); });
     tip.bind(this.$.xp, () => { const x = xpProgress(this.pl); return simpleTip(`Level ${this.pl.lvl || 1}`, `Experience ${fmt(x.cur)} / ${fmt(x.need)} <span class="tt-dim">(${Math.floor(x.frac * 100)}%)</span>`); });
@@ -752,14 +755,15 @@ export class Hud {
   setInteract(text, opts = {}) {
     const p = this.$.prompt;
     let key = opts.key;
-    if (key === undefined) key = !text ? '' : /^(click|drag)/i.test(text) ? 'mouse' : this.ui.root.classList.contains('building') ? null : 'F';
-    const sig = text ? (key || '-') + '|' + text : '';
+    if (key === undefined) key = !text ? '' : /^(click|drag)/i.test(text) ? 'mouse' : this.ui.root.classList.contains('building') ? null : Actions.device === 'pad' ? 'pad:' + (opts.act || 'interact') : Actions.text('interact', 'kbm') || 'F'; // (the pad: its A or D-pad glyph, ui/padGlyphs.js)
+    const sig = text ? (key || '-') + '|' + Actions.style + '|' + text : '';
     if (sig === this.cache.prompt) return;
     this.cache.prompt = sig;
     if (!text) { setCls(p, 'show', false); return; }
     setText(this.$.prT, text);
     this.$.prK.style.display = key ? '' : 'none';
-    if (key === 'mouse') this.$.prK.innerHTML = glyph('mouseL'); else if (key) { this.$.prK._t = null; setText(this.$.prK, key); }
+    setCls(this.$.prK, 'pad', !!key && key.startsWith('pad:'));
+    if (key === 'mouse') this.$.prK.innerHTML = glyph('mouseL'); else if (key?.startsWith('pad:')) { this.$.prK._t = null; this.$.prK.innerHTML = capInner(key.slice(4), 'pad'); } else if (key) { this.$.prK._t = null; setText(this.$.prK, key); }
     setCls(p, 'hint', !key);
     setCls(p, 'show', false); void p.offsetWidth; setCls(p, 'show', true);
   }
@@ -799,14 +803,14 @@ export class Hud {
   flashBelt(k) { const b = this.belt.find(x => x.k === k); if (b) replay(b.el, b.v > 0 ? 'press' : 'deny', 360); }
   slotTip(i) {
     const id = this.pl.hotbar?.[i];
-    const key = SLOT_KEYS[i];
-    if (!id) return simpleTip(`Empty slot <span class="kc sm">${key}</span>`, `<span class="tt-dim">Click to assign a skill, or drag one here from the skill tree (K).</span>`);
+    const key = SLOT_KEYS[i], cap = Actions.device === 'pad' ? keyCap(SLOT_ACTS[i], { sm: true }) : `<span class="kc sm">${Actions.text(SLOT_ACTS[i], 'kbm') || key}</span>`;
+    if (!id) return simpleTip(`Empty slot ${cap}`, `<span class="tt-dim">Click to assign a skill, or drag one here from the skill tree (K).</span>`);
     const def = skillDef(id);
     const lvl = this.pl.skills?.[id] || (id === 'attack' ? 1 : 0);
     const cost = skillCost(id, this.st);
     const wep = id === 'attack' ? (this.d.weaponType === 'ball' ? 'Basic attack · Red Tennis Ball' : this.d.weaponType === 'staff' ? 'Basic attack · Sparkle Bolt' : this.d.weaponType === 'fuma' ? 'Basic attack · Fūma slashes' : 'Basic attack · Bone Katana') : '';
     const setNote = i < 2 ? `<br><span class="tt-dim">Weapon set ${this.pl.activeWeapon === 1 ? 'II' : 'I'} — <span class="kc sm">X</span> swaps to the other set's mouse skills</span>` : '';
-    return simpleTip(`${esc(def?.name || id)} <span class="kc sm">${key}</span>`, `${def?.desc ? esc(def.desc) + '<br>' : ''}<span class="tt-dim">${id === 'attack' ? wep : 'Level ' + lvl}${cost ? ` · ${Math.round(cost * 10) / 10} Zoom` : ''}</span>${setNote}`);
+    return simpleTip(`${esc(def?.name || id)} ${cap}`, `${def?.desc ? esc(def.desc) + '<br>' : ''}<span class="tt-dim">${id === 'attack' ? wep : 'Level ' + lvl}${cost ? ` · ${Math.round(cost * 10) / 10} Zoom` : ''}</span>${setNote}`);
   }
   // screen-space rect of the bag button (fly-to-bag target)
   bagRect() {

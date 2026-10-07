@@ -2,6 +2,10 @@
 import * as THREE from 'three';
 import { Engine } from './core/engine.js';
 import { Input } from './core/input.js';
+import { Actions } from './core/actions.js';
+import { DECK, FPS_CAPS, PRESET } from './core/deck.js';
+import { PARTICLE_BUDGET } from './gfx/particles.js';
+import { PadAim } from './combat/padAim.js';
 import { Events } from './core/events.js';
 import { VillageWorld } from './world/villageWorld.js';
 import { DayNight } from './gfx/sky.js';
@@ -58,8 +62,9 @@ async function tryImport(name, load) { try { return await load(); } catch (e) { 
 export async function boot() {
   const engine = new Engine();
   Input.init(engine.renderer.domElement);
+  Actions.init(); // the action layer over Input + the gamepad (core/actions.js, docs/CONTROLS.md)
   const P = engine.params;
-  const G = window.G = { engine, input: Input, events: Events, THREE, mode: 'village', ui: null, audio: null, playerDead: false };
+  const G = window.G = { engine, input: Input, controls: Actions, events: Events, THREE, mode: 'village', ui: null, audio: null, playerDead: false };
 
   // ---- persistent state + actions
   const saved = !P.has('fresh') && loadSave();
@@ -131,7 +136,7 @@ export async function boot() {
   // nobody can see a hitch (boot, title, dialogue, menus, the Burrow) and move in from this pool; newcomers arrive
   // one per check, and only wait when the pool is empty and the village is on screen.
   const folkPool = [];
-  const hitchHidden = () => G.titleActive || (G.mode !== 'village' && G.mode !== 'interior') || G.ui?.dlg?.active || G.ui?.anyModal?.(); // (an interior is on screen: no hitches there either)
+  const hitchHidden = () => G.titleActive || (G.mode !== 'village' && G.mode !== 'interior') || (G.ui?.hidesHitches ? G.ui.hidesHitches() : G.ui?.dlg?.active || G.ui?.anyModal?.()); // (an interior is on screen: no hitches there either; a menu only once it has finished opening: ui.js hidesHitches)
   const stockFolk = () => { if (folk.length + folkPool.length < FOLK_MAX) folkPool.push(prebuildHumanoid(randomVillagerSpec())); };
   for (let i = 0; i < 6; i++) stockFolk(); // behind the boot splash
   setInterval(() => { if (hitchHidden()) stockFolk(); }, 350);
@@ -207,22 +212,25 @@ export async function boot() {
   }
 
   // ---- UI hooks: cooldowns, settings, pause-menu save/quit, buffs
-  let fpsOn = P.has('fps');
+  let fpsOn = P.has('fps'), capMs = 0, capT = 0, settingsBooted = false; // capMs: Settings › Frame cap (frame() below)
   if (G.ui) {
     G.ui.setSkillProvider?.({ cooldown: id => skills.cooldownFrac(id), remaining: id => skills.cooldown(id) });
     const applySetting = (k, v, all) => {
       if (k === 'music') G.audio?.setVolume?.('music', v);
       if (k === 'sfx') { G.audio?.setVolume?.('sfx', v); G.audio?.setVolume?.('ambience', v * 0.8); }
       if (k === 'shake') engine.rig.shakeMul = v ? 1 : 0;
-      if (k === 'quality') {
-        engine.renderer.setPixelRatio(Math.min(devicePixelRatio, v >= 2 ? 1.5 : 1));
-        engine.post.ao.enabled = v >= 1; engine.post.ao.configuration.halfRes = v < 2; engine.post.tiltPass.enabled = v >= 1;
-        engine.resize();
+      if (k === 'quality') { // (core/deck.js: 3 is the Steam Deck preset)
+        engine.applyPreset(v);
+        PARTICLE_BUDGET.scale = v === PRESET.DECK ? DECK.particles : 1; G.particleBudget = PARTICLE_BUDGET; // (G: for the QA)
+        const tier = v === PRESET.DECK ? PRESET.MED : v; // (the density the worlds build with: R-2, at the next start)
+        if (settingsBooted && tier !== engine.quality) G.ui.toast?.('Grass and scenery detail change at the next start', { icon: 'eye', color: '#ffe0a8' });
       }
+      if (k === 'fpsCap') capMs = FPS_CAPS[v] ? 1000 / FPS_CAPS[v] : 0;
       if (k === 'showFps') fpsOn = !!v;
     };
     G.ui.onSetting?.(applySetting);
     for (const [k, v] of Object.entries(G.ui.settings || {})) applySetting(k, v, G.ui.settings);
+    settingsBooted = true;
     G.ui.onMenu?.({ save: () => { save(); G.ui.toast?.('Game saved ♡', { color: '#8fe0c0' }); }, quit: () => { save(); location.reload(); } });
   }
   const BUFF_INFO = { howl: ['War Banner', 'music', '#ff9a6a'], frenzy: ['Flowing Water', 'bolt', '#ffd84a'], shrineZoom: ['Zoomies Shrine', 'bolt', '#8fe0c0'], shrineLuck: ['Lucky Cat', 'clover', '#ffd84a'], shrineXp: ['Sparkle Shrine', 'sparkle', '#b8a8ff'], cursed: ['Cursed', 'skull', '#b88aff'], shadowPower: ['Pack Call', 'shadowDog', '#8ab8ff'], moonlit: ['Moonlit Rally', 'moon', '#ffb080'] };
@@ -443,7 +451,7 @@ export async function boot() {
   G.talkTo = (npc) => {
     if (npc.talking) return;
     npc.talking = true; player.controlLocked = true;
-    const done = () => { npc.talking = false; player.controlLocked = false; G.interactCooldown = performance.now() + 350; Input.consume('f'); };
+    const done = () => { npc.talking = false; player.controlLocked = false; G.interactCooldown = performance.now() + 350; Actions.consume('interact'); };
     (npc.hero ? heroes.talk(npc) : G.story.talk(npc)).then(done, (e) => { console.error(e); done(); }); // the other hero: chat / switch / join
   };
   function nearestInteract() {
@@ -468,10 +476,11 @@ export async function boot() {
     }
     return best;
   }
-  // which key/button holds a skill (for channeling)
-  const SLOT_KEYS = [() => Input.mouseDown(0), () => Input.mouseDown(2), () => Input.down('1'), () => Input.down('2'), () => Input.down('3'), () => Input.down('4')];
-  const skillInput = { holding(id) { const hb = G.state.player.hotbar; return hb.some((s, i) => s === id && SLOT_KEYS[i]()); } };
-  skills.charge.bindKeys(i => SLOT_KEYS[i]?.()); // hold-to-charge polls the hotbar keys (combat/charge.js, docs/CHARGE.md)
+  // which action holds each hotbar slot (for channeling and hold-to-charge, on every device: core/actions.js)
+  const SLOT_ACTS = ['attack', 'skillAlt', 'skill1', 'skill2', 'skill3', 'skill4'];
+  const slotHeld = i => !!SLOT_ACTS[i] && Actions.held(SLOT_ACTS[i]);
+  const skillInput = { holding(id) { const hb = G.state.player.hotbar; return hb.some((s, i) => s === id && slotHeld(i)); } };
+  skills.charge.bindKeys(slotHeld); // hold-to-charge polls the hotbar buttons (combat/charge.js, docs/CHARGE.md)
 
   // occlusion fade: tell shaders where Chewy is on screen
   const _o = new THREE.Vector3();
@@ -512,12 +521,17 @@ export async function boot() {
   }
 
   // ---- per-frame input
-  let hoverEnemy = null;
+  let hoverEnemy = null, padA = false; // padA: the pad's A press went to an interactable (no swing until A comes up)
+  // the gamepad's aim, soft lock and target ring (combat/padAim.js, docs/CONTROLS.md §2)
+  const padAim = G.padAim = new PadAim(G);
+  Events.on('input:device', p => { if (p?.device !== 'pad') padAim.clear(); });
+  Actions.isBuilding = () => !!(buildMode.active || G.housing?.decor?.active);
   function handleInput(dt) {
-    if (G.mode === 'village' && Input.hit('b') && !player.controlLocked && !G.ui?.isPaused?.() && !G.ui?.anyModal?.()) { buildMode.active ? buildMode.exit() : buildMode.enter(); }
-    else if (G.mode === 'interior' && Input.hit('b') && (!player.controlLocked || G.housing?.decor.active) && !G.ui?.isPaused?.() && !G.ui?.anyModal?.()) G.housing?.decor.toggle(); // (indoors B decorates: docs/HOUSING.md §2; the player is held still while decorating)
-    if (G.housing?.decor.active) return; // (decorate mode reads the mouse and WASD itself: home/decorate.js)
+    if (G.mode === 'village' && Actions.pressed('build') && !player.controlLocked && !G.ui?.isPaused?.() && !G.ui?.anyModal?.()) { buildMode.active ? buildMode.exit() : buildMode.enter(); }
+    else if (G.mode === 'interior' && Actions.pressed('build') && (!player.controlLocked || G.housing?.decor.active) && !G.ui?.isPaused?.() && !G.ui?.anyModal?.()) G.housing?.decor.toggle(); // (indoors B decorates: docs/HOUSING.md §2; the player is held still while decorating)
+    if (G.housing?.decor.active) { padAim.clear(); return; } // (decorate mode reads the mouse and WASD itself: home/decorate.js)
     if (buildMode.active) {
+      padAim.clear();
       if (Input.mouse.wheel) rig.zoom(Input.mouse.wheel);
       if (!G.buildFocus) G.buildFocus = player.pos.clone();
       const { f, r } = rig.groundAxes(); const d = new THREE.Vector3();
@@ -529,18 +543,41 @@ export async function boot() {
       return;
     }
     if (G.buildFocus) { G.buildFocus = null; }
-    const modal = G.ui?.anyModal?.();
-    if (modal || player.controlLocked || G.playerDead) { G.ui?.setInteract?.(null); return; }
-    // Tab: a tap switches to the next hero, holding it opens the hero wheel (heroes.js); the wheel takes the input while open
+    const modal = G.ui?.anyModal?.() || (Actions.device === 'pad' && G.ui?.tutorial?.offering); // (the pad answers a guide's offer card with A / B: ui/padNav.js)
+    if (modal || player.controlLocked || G.playerDead) { G.ui?.setInteract?.(null); padAim.clear(); padA = Actions.held('attack', 'pad'); return; }
+    // Tab / LB: a tap switches to the next hero, holding it opens the hero wheel (heroes.js); the wheel takes the input while open
     if (heroes.tabInput(dt)) { G.ui?.setInteract?.(null); return; }
-    const hb = G.state.player.hotbar;
-    const aim = engine.mouseGround(Input.mouse.nx, Input.mouse.ny, (x, z) => G.world.heightAt(x, z));
-    hoverEnemy = G.mode === 'dungeon' && !Input.mouse.overUI ? G.combat.pickAtScreen(Input.mouse.x, Input.mouse.y, engine.camera) : null;
+    const hb = G.state.player.hotbar, pad = Actions.device === 'pad';
+    // the gamepad aims with the sticks and a soft lock (combat/padAim.js); the mouse with the cursor, as before
+    if (pad) padAim.update(dt);
+    const aim = pad ? padAim.point.clone() : engine.mouseGround(Input.mouse.nx, Input.mouse.ny, (x, z) => G.world.heightAt(x, z));
+    hoverEnemy = pad ? padAim.lock : G.mode === 'dungeon' && !Input.mouse.overUI ? G.combat.pickAtScreen(Input.mouse.x, Input.mouse.y, engine.camera) : null;
     // LMB: attack enemies under the cursor (or Alt+click: attack in place, at the cursor), otherwise walk / interact.
     // (Shift is the sprint now: actors/sprint.js, docs/ZONES.md §9)
     const lmbCharge = skills.charge.owns(0); // (a charge held on LMB stays a skill press even off the monster / over the HUD)
-    if (Input.mouseDown(0) && (!Input.mouse.overUI || lmbCharge)) {
-      if (hoverEnemy || (Input.down('alt') && G.mode === 'dungeon') || lmbCharge) {
+    const indoors = G.mode === 'interior'; // (no skills indoors: nothing to fight, and the furniture is fragile)
+    // the pad's A (CONTROLS §2): interacts when an interactable is highlighted and no foe is near, else the basic attack
+    // at the soft-locked foe (or along the aim); a melee attack steps in to a lock only from close by (short magnetism)
+    const padIt = pad ? padAim.pickInteract(G.mode === 'village' ? [...npcs.filter(n => n.visible).map(n => n.interact), ...G.world.interactables] : G.world.interactables) : null;
+    const aCtx = !!padIt && !padAim.foeNear();
+    // where a pad cast goes: at the lock, but a melee skill (the attack, Chomp) only steps in from close by (reach + 1.8 m);
+    // a lock further off gets a swing in place toward it, never a walk across the room (CONTROLS §2: short magnetism)
+    const padCast = id => {
+      const L = hoverEnemy; if (!L) return [aim, null];
+      const R = skillRuntime(id, G.state, G.derived);
+      if (!R || !skills.isMelee?.(id, R) || L.breakable) return [L.pos, L];
+      const reach = skills.reach(R, L), dx = L.pos.x - player.pos.x, dz = L.pos.z - player.pos.z, d = Math.hypot(dx, dz);
+      if (d <= reach + 1.8) return [L.pos, L];
+      const k = Math.min(d, reach * 0.8) / d;
+      return [new THREE.Vector3(player.pos.x + dx * k, player.pos.y, player.pos.z + dz * k), null];
+    };
+    if (pad) {
+      if (Actions.pressed('attack', 'pad') && aCtx && performance.now() > (G.interactCooldown || 0)) { padA = true; Actions.consume('attack', 'pad'); padIt.onInteract(); }
+      else if (!Actions.held('attack', 'pad')) padA = false;
+      else if (!padA && !indoors && (G.mode === 'dungeon' || lmbCharge)) { const [t, tg] = padCast(hb[0] || 'attack'); skills.charge.feed(0, hb[0] || 'attack', t, tg); } // (tap, hold to charge, or repeat while held)
+    }
+    if (Actions.held('attack', 'kbm') && (!Input.mouse.overUI || lmbCharge)) {
+      if (hoverEnemy || (Actions.held('attackInPlace') && G.mode === 'dungeon') || lmbCharge) {
         const tgt = hoverEnemy ? hoverEnemy.pos : aim;
         const R = skillRuntime(hb[0] || 'attack', G.state, G.derived);
         const melee = R && !R.params?.projectile && !(R.params?.speed) && (R.params?.radius || 0) < 3;
@@ -557,19 +594,19 @@ export async function boot() {
         else if (!player.interactTarget && (hit || steer)) player.moveTarget = aim;
       }
     }
-    const indoors = G.mode === 'interior'; // (no skills indoors: nothing to fight, and the furniture is fragile)
-    // RMB / 1-4: a tap casts; holding a chargeable skill charges it (Settings > Charge on hold), others repeat as held
-    if (!indoors && Input.mouseDown(2) && (!Input.mouse.overUI || skills.charge.owns(1)) && hb[1]) skills.charge.feed(1, hb[1], hoverEnemy ? hoverEnemy.pos : aim, hoverEnemy);
-    if (!indoors) for (let k = 1; k <= 4; k++) if (Input.down(String(k)) && hb[k + 1]) skills.charge.feed(k + 1, hb[k + 1], hoverEnemy ? hoverEnemy.pos : aim, hoverEnemy);
-    if (Input.hit('q')) usePotion('heart');
-    if (Input.hit('e')) usePotion('zoom');
-    if (Input.hit('r')) usePotion('rejuv');
-    if (Input.hit('g')) G.life?.kitchen?.quickEat(); // the quick meal (docs/HOMESTEAD.md §4)
-    if (Input.hit('x')) { G.actions.swapWeapons(); player.setWeapon(G.derived.weaponType || 'sword'); G.audio?.play?.('ui_equip'); G.vfx.sparkle(player.pos.clone().setY(0.8), { n: 6 }); }
-    if (Input.hit('t') && G.mode === 'dungeon') G.returnToVillage();
-    const it = nearestInteract();
-    G.ui?.setInteract?.(it ? it.label : null);
-    if (it && Input.hit('f') && performance.now() > (G.interactCooldown || 0)) it.onInteract();
+    // RMB / 1-4 (pad: X, Y, RB, RT, LT): a tap casts; holding a chargeable skill charges it (Settings > Charge on hold), others repeat as held
+    const slotAim = id => (pad ? padCast(id) : [hoverEnemy ? hoverEnemy.pos : aim, hoverEnemy]);
+    if (!indoors && hb[1] && ((Actions.held('skillAlt', 'kbm') && (!Input.mouse.overUI || skills.charge.owns(1))) || Actions.held('skillAlt', 'pad'))) skills.charge.feed(1, hb[1], ...slotAim(hb[1]));
+    if (!indoors) for (let k = 1; k <= 4; k++) if (Actions.held(SLOT_ACTS[k + 1]) && hb[k + 1]) skills.charge.feed(k + 1, hb[k + 1], ...slotAim(hb[k + 1]));
+    if (Actions.pressed('potionHeart')) usePotion('heart');
+    if (Actions.pressed('potionZoom')) usePotion('zoom');
+    if (Actions.pressed('potionR')) usePotion('rejuv');
+    if (Actions.pressed('meal')) G.life?.kitchen?.quickEat(); // the quick meal (docs/HOMESTEAD.md §4)
+    if (Actions.pressed('swap')) { G.actions.swapWeapons(); player.setWeapon(G.derived.weaponType || 'sword'); G.audio?.play?.('ui_equip'); G.vfx.sparkle(player.pos.clone().setY(0.8), { n: 6 }); }
+    if (Actions.pressed('home') && G.mode === 'dungeon') G.returnToVillage();
+    const it = pad ? padIt : nearestInteract();
+    G.ui?.setInteract?.(it ? it.label : null, pad && it ? { act: aCtx ? 'interact' : 'interactAlt' } : undefined); // (the pad's prompt: A, or the D-pad when A would swing)
+    if (it && Actions.pressed('interact') && performance.now() > (G.interactCooldown || 0)) it.onInteract();
     if (Input.mouse.wheel) rig.zoom(Input.mouse.wheel);
     // target frame
     if (hoverEnemy && !hoverEnemy.breakable && hoverEnemy !== G.dungeon?.boss) G.ui?.setTarget?.( // the boss already has its big bar
@@ -619,6 +656,7 @@ export async function boot() {
     hintPending.delete(id);
     H()[id] = true; hintBusyUntil = now + 7500;
     const o = { color: '#9fd0ff', iconURL: G.portrait('shadow'), duration: 7, sub: 'Shadow', priority: id === 'potion' ? 'high' : 'low' };
+    text = Actions.resolve(text); // ({roll} → Space / B; on the pad "Press Q" names the D-pad: core/actions.js)
     if (G.ui.toasts?.show) G.ui.toasts.show(text.replace(/\*/g, ''), o); else G.ui.toast(text.replace(/\*/g, ''), o); // straight to the queue: a shown tip is never rate-dropped
     G.audio?.play?.('bark_small', { vol: 0.5 });
   }
@@ -639,14 +677,14 @@ export async function boot() {
       if (st.player.skillPts > 0 && st.player.lvl >= 2) tip('skills', 'You have a skill point! Press K to learn something new.');
       if (st.player.statPts > 0 && st.player.lvl >= 2 && H().skills) tip('stats', 'Stat points too! Press C to get stronger.');
       const sp = G.dungeon.stairsPos; if (sp && sp.distanceTo(player.pos) < 7) tip('stairs', 'Stairs! Press F to burrow deeper.');
-      if (player.hero === 'chewy' && G.dungeon.monsters.some(m => m.alive && m.aggro && m.def.attack?.type === 'ranged' && m.pos.distanceTo(player.pos) < 9)) tip('ball', 'They throw things! Press X to swap to your tennis ball — Space to roll away.');
-      if (player.hero === 'moka' && G.dungeon.monsters.some(m => m.alive && m.aggro && m.pos.distanceTo(player.pos) < 2.5)) tip('mokaRange', 'Too close! Moka is squishy — Space to roll away and splash them from afar.');
+      if (player.hero === 'chewy' && G.dungeon.monsters.some(m => m.alive && m.aggro && m.def.attack?.type === 'ranged' && m.pos.distanceTo(player.pos) < 9)) tip('ball', 'They throw things! Press {swap} to swap to your tennis ball — {roll} to roll away.');
+      if (player.hero === 'moka' && G.dungeon.monsters.some(m => m.alive && m.aggro && m.pos.distanceTo(player.pos) < 2.5)) tip('mokaRange', 'Too close! Moka is squishy — {roll} to roll away and splash them from afar.');
       if ((G.dungeon.loot?.list || []).some(e => e.d.type === 'item' && e.to.distanceTo(player.pos) < 5)) tip('loot', 'Shiny! Walk over loot to grab it. Press I to see your bag.');
       // a long walk outdoors without sprinting: Shadow mentions Shift (actors/sprint.js)
       sprintWalkT = G.dungeon.isRegion && player.anim.speed > 3.5 && !player.sprint.on ? sprintWalkT + 0.5 : 0;
-      if (sprintWalkT >= 6) tip('sprint', 'Hold Shift to sprint! Don\'t worry, I can keep up.');
+      if (sprintWalkT >= 6) tip('sprint', Actions.device === 'pad' ? 'Click {sprint} to sprint! It stays on while you move. Don\'t worry, I can keep up.' : 'Hold Shift to sprint! Don\'t worry, I can keep up.');
     } else if (G.mode === 'village' && !G.titleActive) {
-      if (st.quests.done.includes('burrow1') && !G.buildMode) tip('build', 'Press B to plan the village — paint zones and friends will build there!');
+      if (st.quests.done.includes('burrow1') && !G.buildMode && Actions.device !== 'pad') tip('build', 'Press B to plan the village — paint zones and friends will build there!'); // (the pad builds with CT-2's virtual cursor)
       if (regionUnlocked(st, 'bamboo').ok) tip('travel', "The Wayfarer's Post by the bamboo points to new lands! Walk the west trail to find it.");
       if (heroes.joined('moka') && !heroes.T && heroes.cd <= 0 && !G.tutorials?.covers('switch')) tip('tabSwitch', `Press Tab to play as ${heroes.name(heroes.next())} — ${heroes.name()} will hang out in town.`);
     }
@@ -733,7 +771,7 @@ export async function boot() {
     rosie.talking = false; rosie.faceBias = 0; rosie.greeted = 30; rosie.state = 'idle'; rosie.t = 4;
     player.controlLocked = false;
     G.story.markTalk('rosie');
-    G.ui?.toast?.('Tip: I bag · K skills · C character · J quests · X swap weapon', { color: '#8fd0ff' });
+    G.ui?.toast?.(Actions.device === 'pad' ? `Tip: ${Actions.text('menu')} opens the bag, skills and journal · ${Actions.text('swap')} swaps weapons` : 'Tip: I bag · K skills · C character · J quests · X swap weapon', { color: '#8fd0ff' });
     G.introJoinPending = true; // (the house tour waits for Moka's arrival scene)
     setTimeout(async () => { try { await heroes.introJoin(); } finally { G.introJoinPending = false; } }, 2600); // …and a bookish spaniel mage has been waiting to meet Chewy
   }
@@ -761,8 +799,15 @@ export async function boot() {
 
   // ---- main loop
   let fpsAcc = 0, fpsN = 0; const fpsEl = Object.assign(document.body.appendChild(document.createElement('div')), { style: 'position:fixed;left:8px;bottom:8px;color:#fff;font:12px monospace;z-index:99;text-shadow:0 1px 2px #000' });
-  function frame() {
+  function frame(now) {
+    // Settings › Frame cap (60 / 40): skip display frames until the next slot is due; the slots advance by the cap's
+    // interval (not to now), so 40 on a 60 Hz screen alternates one and two refreshes and averages 40
+    if (capMs) {
+      if (now - capT < capMs - 2) { requestAnimationFrame(frame); return; }
+      capT = now - capT > capMs * 2 ? now : capT + capMs;
+    }
     const rdt = engine.tick();
+    Actions.poll(); // the gamepad's buttons and sticks for this frame (core/actions.js)
     // pause gameplay for the pause menu, and in the Burrow while reading dialogue (nothing should hit Chewy mid-sentence)
     const paused = G.ui?.isPaused?.() || (G.mode === 'dungeon' && G.ui?.dlg?.active);
     const dt = paused ? 0 : rdt;

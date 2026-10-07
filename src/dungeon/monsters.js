@@ -415,7 +415,7 @@ export class MonsterAnim {
     if (this.wind > 0) { sy *= 1 - this.wind * 0.18; sx *= 1 + this.wind * 0.12; rz += Math.sin(t * 60) * 0.05 * this.wind; }
     if (this.lunge > 0) { this.lunge = Math.max(0, this.lunge - dt * 4); rx += 0.4 * this.lunge; sy *= 1 + 0.1 * this.lunge; }
     if (this.spin > 0) { p.rotation.y += dt * 18; }
-    if (this.deathT >= 0) { this.deathT += dt; const k = clamp(this.deathT / 0.45); sy *= 1 - k; sx *= 1 + k * 0.6; y += k * 0.2; }
+    if (this.deathT >= 0) { this.deathT += dt; const k = clamp(this.deathT / 0.45); sy *= Math.max(1 - k, 0.02); sx *= 1 + k * 0.6; y += k * 0.2; } // (never quite flat: a zero scale is a singular matrix, NaN normals: ROADMAP R-7)
     this.m.animate?.(dt, t, moving, this); // extra parts (Tamamo's tails & foxfire)
     if (this.rig) { // humanoid monsters use the kit animator externally
       this.m.root.scale.setScalar(s);

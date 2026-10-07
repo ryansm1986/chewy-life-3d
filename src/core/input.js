@@ -62,7 +62,7 @@ export const Input = {
     this.pressed.clear(); this.released.clear(); this.mPressed.clear(); this.mReleased.clear(); this.mouse.wheel = 0;
   },
 };
-function normKey(e) {
+export function normKey(e) { // (also the action layer's key names: core/actions.js, ui.js, the Controls rebinding)
   if (e.code.startsWith('Key')) return e.code.slice(3).toLowerCase();
   if (e.code.startsWith('Digit')) return e.code.slice(5);
   const m = { Space: 'space', ShiftLeft: 'shift', ShiftRight: 'shift', Escape: 'escape', Tab: 'tab', AltLeft: 'alt', AltRight: 'alt', ControlLeft: 'ctrl', ControlRight: 'ctrl', Enter: 'enter', ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Backquote: '`', Delete: 'delete', Backspace: 'backspace' };

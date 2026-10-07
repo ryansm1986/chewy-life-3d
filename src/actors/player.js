@@ -12,7 +12,7 @@ import { POE_ROOTED } from './poePoses.js';
 import { installPoeGear, dressPoe } from './poeGear.js';
 import { reach } from './armIK.js';
 import { Sprint } from './sprint.js';
-import { Input } from '../core/input.js';
+import { Actions } from '../core/actions.js';
 import { navFor, PathFollow } from '../core/nav.js';
 import { Events } from '../core/events.js';
 import { U } from '../gfx/materials.js';
@@ -160,16 +160,18 @@ export class Player extends Actor {
     this._sheathed = undefined; // re-evaluated by carrySword next frame
   }
 
-  // camera-relative WASD
+  // camera-relative WASD, or the left stick (core/actions.js: its dead zone and response curve); the direction is a unit
+  // vector, and moveMag (1 on the keys) is how far the stick is pushed: Player.update scales the walk speed by it
   readMoveInput() {
     const d = this.inputDir.set(0, 0, 0);
+    this.moveMag = 1;
     if (this.controlLocked || this.G.ui?.anyModal?.()) return d;
     const { f, r } = this.G.engine.rig.groundAxes();
-    if (Input.down('w') || Input.down('up')) d.add(f);
-    if (Input.down('s') || Input.down('down')) d.sub(f);
-    if (Input.down('d') || Input.down('right')) d.add(r);
-    if (Input.down('a') || Input.down('left')) d.sub(r);
+    const m = Actions.move();
+    if (!m.mag || (m.pad && Actions.vcursor.on)) return d; // (in build mode the pad's left stick drives the virtual cursor: ui/padCursor.js)
+    d.addScaledVector(f, m.y).addScaledVector(r, m.x);
     if (d.lengthSq() > 0) d.normalize();
+    this.moveMag = m.mag;
     return d;
   }
   roll(dir) {
@@ -202,9 +204,10 @@ export class Player extends Actor {
       this.invuln = !!G.heroSwitching; // (nothing lands during a hero hand-off)
       const dir = this.readMoveInput();
       if (dir.lengthSq() > 0) { this.moveTarget = null; this.interactTarget = null; }
-      this.speedMul *= this.sprint.update(dt, dir.lengthSq() > 0 || !!this.moveTarget); // Shift: the sprint (sprint.js)
-      if (Input.hit('space') && !this.controlLocked && !G.ui?.anyModal?.()) {
-        if (this.roll(dir.lengthSq() ? dir : new THREE.Vector3())) Input.consume('space');
+      this.speedMul *= this.sprint.update(dt, dir.lengthSq() > 0 || !!this.moveTarget); // Shift / L3: the sprint (sprint.js)
+      if (dir.lengthSq() > 0 && this.moveMag < 1) this.speedMul *= this.moveMag; // (the stick's tilt: analogue walking speed)
+      if (Actions.pressed('roll', Actions.vcursor.on ? 'kbm' : undefined) && !this.controlLocked && !G.ui?.anyModal?.()) { // (the pad's B cancels in build mode)
+        if (this.roll(dir.lengthSq() ? dir : new THREE.Vector3())) Actions.consume('roll');
       }
       const navWas = this.navOn; this.navOn = false;
       if (dir.lengthSq() > 0 && !this.busyAction()) moved = this.step(dir, dt, this.speedMul * (this.canMoveWhileActing ? 0.75 : 1));

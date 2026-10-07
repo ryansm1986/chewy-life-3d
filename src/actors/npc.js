@@ -13,7 +13,7 @@ import { Actor } from './actor.js';
 import { buildHumanoid } from './charKit.js';
 import { rand, chance, dist, pick, clamp, damp, angleDiff } from '../core/util.js';
 import { Events } from '../core/events.js';
-import { Input } from '../core/input.js';
+import { Actions } from '../core/actions.js';
 import { VillageLife, propGeo, nightcapGeo, ROD_TIP, CAN_SPOUT, BROOM_HEAD } from './villageLife.js';
 import { gibberish } from '../audio/babble.js';
 import { SEAT_LIFT } from './lifePoses.js';
@@ -633,7 +633,7 @@ export class Villager extends Actor {
     this.zzzT = 2.5;
     const done = () => {
       this.talking = false; if (P) P.controlLocked = false;
-      G.interactCooldown = performance.now() + 350; Input.consume('f');
+      G.interactCooldown = performance.now() + 350; Actions.consume('interact');
     };
     const say = G.ui?.dialogue ? G.ui.dialogue({ speaker: this.spec.name, portrait: G.portrait?.(this.id), lines: [pick(L.hi), pick(L.bye)].map(l => heroText(l, G.state)), choices: [{ text: 'Sorry! Sleep tight 🌙' }], voice: this.spec.voice }) : Promise.resolve(null);
     say.then(done, done);

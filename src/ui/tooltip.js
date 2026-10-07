@@ -2,6 +2,7 @@
 import { el, esc, rarityColor, RARITY_JP, cap } from './dom.js';
 import { glyph } from './glyphs.js';
 import { itemName, baseName, meetsReq, rpgItemTooltip, equipSlotsFor } from './rpg.js';
+import { padWording } from './padGlyphs.js';
 
 export class Tooltip {
   constructor(layer) {
@@ -14,6 +15,7 @@ export class Tooltip {
   }
   show(html, cls = '', owner = null) {
     if (!html) return this.hide();
+    html = padWording(html); // (while the pad plays: its buttons instead of the mouse's, ui/padGlyphs.js)
     this.owner = owner;
     this.box.className = 'tt ' + cls;
     this.box.innerHTML = html;

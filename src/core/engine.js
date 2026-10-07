@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Post } from '../gfx/post.js';
 import { U, initSharedUniforms } from '../gfx/materials.js';
 import { damp, clamp, TAU } from './util.js';
+import { bootGraphics, pixelRatioFor, DECK, PRESET } from './deck.js';
 
 export const QUALITY = { LOW: 0, MED: 1, HIGH: 2 };
 
@@ -111,9 +112,12 @@ export class Engine {
   constructor() {
     const params = new URLSearchParams(location.search);
     this.params = params;
-    this.quality = params.has('q') ? +params.get('q') : QUALITY.HIGH;
+    // Settings › Graphics at boot (core/deck.js, ROADMAP R-2): preset 0..3 (3: the Steam Deck), quality 0..2 the density
+    // tier the worlds build their grass, flowers, details and shadow maps with (?q= still wins)
+    const gq = bootGraphics(params);
+    this.preset = gq.preset; this.quality = gq.quality; this.deck = gq.deck;
     const r = this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false, depth: true, preserveDrawingBuffer: params.has('shot') });
-    r.setPixelRatio(Math.min(devicePixelRatio, this.quality >= 2 ? 1.5 : 1));
+    r.setPixelRatio(pixelRatioFor(this.preset));
     r.setSize(innerWidth, innerHeight);
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFShadowMap;
@@ -148,6 +152,29 @@ export class Engine {
     this.scene = world.scene;
     if (!this.post) this.post = new Post(this.renderer, this.scene, this.camera, this.quality);
     else this.post.setScene(this.scene, this.camera);
+    this.tuneShadows(world);
+    this._shadowDirty = true; // (a new world's lights have no maps yet: draw them on its first frame)
+  }
+  /** Settings › Graphics, live: the pixel ratio, AO, tilt-shift and the Deck's shadows. Grass and detail density stay as
+   *  the worlds were built (the next start follows: R-2). The particle cap is game.js's (gfx/particles.js). */
+  applyPreset(p) {
+    this.preset = p; this.deck = p === PRESET.DECK;
+    this.renderer.setPixelRatio(pixelRatioFor(p));
+    const P = this.post;
+    if (P) { P.ao.enabled = p >= 1 && !this.deck; P.ao.configuration.halfRes = p !== PRESET.HIGH; P.tiltPass.enabled = p >= 1 && !this.deck; }
+    this.tuneShadows();
+    this.resize();
+  }
+  /** the Deck preset's sun shadows: a smaller map over a tighter area (fewer casters drawn too); other presets keep the
+   *  world's own (each world sizes its map by quality and its area by its camera) */
+  tuneShadows(world = this.world) {
+    const sun = world?.sun; if (!sun?.castShadow) return;
+    const sh = sun.shadow, sc = sh.camera, base = sun.userData.shadowBase ||= { size: sh.mapSize.x, ext: sc.right };
+    const size = this.deck ? Math.min(base.size, DECK.shadowMap) : base.size, ext = this.deck ? +(base.ext * DECK.shadowExtent).toFixed(2) : base.ext;
+    if (sh.mapSize.x === size && sc.right === ext) return;
+    sh.mapSize.set(size, size); sc.left = sc.bottom = -ext; sc.right = sc.top = ext; sc.updateProjectionMatrix();
+    if (sh.map) { sh.map.dispose(); sh.map = null; } // (three re-allocates it at the new size on the next shadow render)
+    this._shadowDirty = true;
   }
   resize() {
     this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix();
@@ -175,6 +202,10 @@ export class Engine {
   }
   render() {
     if (!this.scene) return;
-    this.post.render(this.dt, this.time);
+    // the Deck preset redraws the shadow maps every DECK.shadowEvery frames (moving things' shadows trail by a frame);
+    // only for this render: portraits and thumbnails keep three's own per-render update
+    const sm = this.renderer.shadowMap, every = this.deck ? DECK.shadowEvery : 1;
+    if (every > 1) { sm.autoUpdate = false; this._shN = ((this._shN || 0) + 1) % every; sm.needsUpdate = this._shadowDirty || this._shN === 0; this._shadowDirty = false; }
+    try { this.post.render(this.dt, this.time); } finally { if (every > 1) { sm.autoUpdate = true; sm.needsUpdate = false; } }
   }
 }

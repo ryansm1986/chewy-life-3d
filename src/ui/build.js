@@ -1,6 +1,7 @@
 // Village build palette: bottom drawer with category tabs, building cards (cost + requirements), zone tools, bulldoze.
 import { el, esc, fmt, replay } from './dom.js';
 import { glyph, glyphURL, MATERIALS } from './glyphs.js';
+import { padGlyph } from './padGlyphs.js';
 import { Panel } from './panel.js';
 
 const CATS = {
@@ -17,6 +18,12 @@ const OVERLAYS = [['', 'Zones'], ['water', 'Water'], ['light', 'Light'], ['joy',
 
 export class BuildPanel extends Panel {
   constructor(ui) { super(ui, { name: 'build', title: 'Build', jp: '建てる', side: 'bottom', cls: 'p-build', icon: 'hammer' }); this.cat = null; this.sel = null; this.tool = null; }
+  /** a building thumbnail rendered after the palette opened (world/buildMode.js fillThumbs): into its item and its card */
+  setIcon(id, url) {
+    if (!url) return;
+    for (const c of this.opts?.categories || []) for (const it of c.items || []) if (it.id === id) it.icon = url;
+    const img = this.$?.cards.querySelector(`.card[data-id="${id}"] .cd-art img`); if (img) { img.src = url; img.classList.remove('gi'); }
+  }
   init() {
     this.extra.innerHTML = `<div class="tabs bd-tabs"></div><div class="bd-tools">
         <span class="bd-tl">Zones</span>${ZONES.map(([z, n, g, c]) => `<button class="zone" data-z="${z}" style="--zc:${c}" title="${n}"><b>${z}</b>${glyph(g)}</button>`).join('')}
@@ -33,7 +40,8 @@ export class BuildPanel extends Panel {
         <div class="bd-rank"></div>
         <div class="bd-ov">${OVERLAYS.map(([m, n]) => `<button class="ovl" data-m="${m}" style="--oc:${COVERS[m]?.[0] || '#ff8fb0'}">${n}</button>`).join('')}</div>
         <div class="bh-t">Pick a building or a tool</div>
-        <div class="bh-k"><span class="kc sm">${glyph('mouseL')}</span>place <span class="kc sm">R</span>rotate <span class="kc sm">Esc</span>cancel</div>
+        <div class="bh-k kbm-only"><span class="kc sm">${glyph('mouseL')}</span>place <span class="kc sm">R</span>rotate <span class="kc sm">Esc</span>cancel</div>
+        <div class="bh-k pad-only"><span class="kc sm pad">${padGlyph('A')}</span>place <span class="kc sm pad">${padGlyph('Y')}</span>rotate <span class="kc sm pad">${padGlyph('X')}</span>remove <span class="kc sm pad">${padGlyph('B')}</span>cancel</div>
       </div></div>`;
     this.$ = { tabs: this.extra.querySelector('.bd-tabs'), cards: this.body.querySelector('.bd-cards'), hint: this.body.querySelector('.bh-t'), tools: this.extra.querySelector('.bd-tools'), stats: this.body.querySelector('.bd-stats'), rank: this.body.querySelector('.bd-rank'), ov: this.body.querySelector('.bd-ov') };
     this.$.ov.addEventListener('click', e => { const b = e.target.closest('.ovl'); if (!b) return; this.overlay = this.overlay === b.dataset.m ? '' : b.dataset.m; this.opts.onOverlay?.(this.overlay || null); this.markOverlay(); this.ui.sfx?.('tab'); });

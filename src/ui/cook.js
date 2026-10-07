@@ -6,6 +6,7 @@
 // bubbles over the card (the ingredients drop in, the steam rises, the dish pops out and flies to the pantry).
 import { el, esc, replay } from './dom.js';
 import { glyph } from './glyphs.js';
+import { padGlyph } from './padGlyphs.js';
 import { Panel } from './panel.js';
 import { PANTRY, RARE_NAMES, RARE_COLORS, KIND_INFO } from '../life/pantry.js';
 import { pantryIcon } from '../life/pantryIcons.js';
@@ -41,7 +42,7 @@ export class CookPanel extends Panel {
         </div>
       </div>
     </div>
-    <div class="ck-foot"><span><span class="kc sm">↑</span><span class="kc sm">↓</span> choose</span><span><span class="kc sm">F</span> / <span class="kc sm">Enter</span> cook</span><span><span class="kc sm">Esc</span> close</span></div>`;
+    <div class="ck-foot kbm-only"><span><span class="kc sm">↑</span><span class="kc sm">↓</span> choose</span><span><span class="kc sm">F</span> / <span class="kc sm">Enter</span> cook</span><span><span class="kc sm">Esc</span> close</span></div><div class="ck-foot pad-only"><span><span class="kc sm pad">${padGlyph('DUp')}</span> choose</span><span><span class="kc sm pad">${padGlyph('A')}</span> select · on Cook: cook</span><span><span class="kc sm pad">${padGlyph('B')}</span> close</span></div>`;
     const q = s => this.body.querySelector(s);
     this.$ = { list: q('.ck-list'), main: q('.ck-main'), det: q('.ck-det'), mix: q('.ck-mix'), slots: q('.mx-slots'), grid: q('.mx-grid'), pot: q('.ck-pot'), drops: q('.kp-drops'), out: q('.kp-out'), ring: q('.kp-ring .fill'), tabN: this.extra.querySelector('.tab-n') };
     this.extra.querySelector('.ck-tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (t && t.dataset.t !== this.tab) { this.setTab(t.dataset.t); this.ui.sfx?.('tab'); } });

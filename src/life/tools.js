@@ -4,6 +4,7 @@
 // cancels it; the effect lands at `at` seconds (cancelled before that, nothing happens).
 import * as THREE from 'three';
 import { Input } from '../core/input.js';
+import { Actions } from '../core/actions.js';
 import { propGeo, CAN_SPOUT } from '../actors/villageLife.js';
 import { hoeGeo, seedBagGeo } from './gardenModels.js';
 import { rodGeo } from './fishModels.js';
@@ -67,7 +68,7 @@ export class Tools {
     const c = this.cur; if (!c) return;
     const P = this.P, G = this.G;
     // anything else the player does cancels the chore
-    const moved = MOVE_KEYS.some(k => Input.down(k)) || P.moveTarget || P.rollT > 0 || G.mode !== 'village' || G.playerDead;
+    const moved = MOVE_KEYS.some(k => Input.down(k)) || Actions.move().pad || Actions.held('roll', 'pad') || P.moveTarget || P.rollT > 0 || G.mode !== 'village' || G.playerDead;
     const other = P.anim.action && P.anim.action.name !== c.pose;
     if (moved || other) { this.end(false); return; }
     c.t += dt;

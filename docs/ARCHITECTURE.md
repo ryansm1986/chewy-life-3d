@@ -25,10 +25,13 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
   → PNGs saved to the scratchpad `shots/` folder (path printed). Console errors/warnings are printed. ALWAYS check them.
 - Isolated dev scenes: `src/tests/NAME.js` exporting `default function()`; open with `/?test=NAME`. Each module owner makes
   their own test page. Set `window.__ready = true` when the scene is ready to screenshot.
-- Post debug: `&off=ao,tilt,main,smaa` disables passes, `&raw` renders without post, `&q=0|1|2` quality, `&hour=13` time of day.
+- Post debug: `&off=ao,tilt,main,smaa` disables passes (also `bloom`, `grade`, `guard`: the bloom's NaN guard, and
+  `dark`: the hero darkGrade), `&raw` renders without post, `&q=0|1|2|3` the graphics preset (3: the Steam Deck; it wins over Settings), `&deck` /
+  `&deck=0` force the Deck-like screen on or off, `&hour=13` time of day. NaN / flash
+  probes: `&nanprobe`, `&nanprobe=spread`, `&rh` (see "Render health" below).
 - QA: `node tools/qa/run-all.mjs [s1 s5 ...]` (the browser scenarios s1-s21; s15 is the homestead, s16 the guided
   tutorials, which every other scenario keeps off with `?nointro`, s17 housing, s18 getting furniture, s19 charge, s20
-  Poe, s21 the zones' phase A: sprint, DungeonDef, seeds, state.zones, quest steps). `lib.mjs boot()` pins dungeon
+  Poe, s21 the zones' phase A: sprint, DungeonDef, seeds, state.zones, quest steps, s25 the gamepad with a virtual pad). `lib.mjs boot()` pins dungeon
   layouts with `?dseed=1` (the old fixed floors); `dseed=off` lets them reroll.
   Perf: `village-perf.mjs [runs]` (the village at three camera spots), `homestead-perf.mjs [runs]` (a fully planted,
   ripe garden and a reel in progress, each against the same spot without). Profilers: `tools/qa/profile-boot.mjs` (boot → ready),
@@ -62,12 +65,66 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
 - Additive glows must fade their **alpha** to 0 at the quad edge (texture or analytic falloff); a flat-alpha additive quad shows
   as a box through the post chain. Dungeon halos use an alpha-preserving additive blend.
 
+## Render health: NaN, black flashes, first-open hitches (ROADMAP R-7, R-8)
+- **Why one NaN is a black flash**: the scene renders into a half-float buffer; a NaN (or Inf) texel there enters the
+  bloom's luminance pass, its 7-level mip chain spreads it to the whole frame, and the grade's clamp turns NaN black. A
+  650-texel NaN source poisons all 921,600 texels after the bloom (measured with the guard off).
+- **The rules**:
+  - a normal must never be zero where a shader normalizes it. `makeToon` uses NaN-safe copies of three's normal chunks
+    (materials.js `SAFE_NORMAL_*`: `cSafeN`, and a fragment fallback to the face normal from derivatives), outlines
+    too. In a new shader, never `normalize()` a vector that can be zero, never `pow()` a negative base.
+  - generated geometry goes through `geom.js merge()` or charKit's bake, which call `repairNormals(g)` (a zero vertex
+    normal → its own face normal). The usual source is a fin whose two sides share vertices (it was on the mailboxes,
+    the trinket stall, building trims and the villagers' face seams).
+  - a transform must not reach zero scale on an axis: that is a singular matrix, and three's normal matrix is then all
+    zeros. The Horde's per-instance normal matrix is `geom.js normalMatrixInto()` (the signed, scaled cofactor matrix:
+    the inverse-transpose up to scale, finite for a squashed part; a rank ≤ 1 instance is hidden). The monster death
+    squash stops at 2 %.
+  - the last-resort guard: post.js patches the bloom's luminance shader (`NAN_GUARD`: NaN → 0, +Inf → 64), so a new
+    source stays one pixel instead of a black frame. `?off=guard` turns it off for A/B.
+- **Probes** (`src/gfx/renderHealth.js`, built only with a flag): `?nanprobe` counts NaN / Inf texels per stage
+  (`scene` after the RenderPass, `ao` after N8AO, `tone` after bloom + tone map: the grade then gets its own pass) and
+  paints them magenta where they first appear; `?nanprobe=spread` paints them only after the tone map (the poisoned
+  area); `?rh` keeps the true image and runs only the flash detector. `window.__rh`: `read` (QA: read every frame
+  back), `scanOn` (list the visible meshes, instances and bones with a singular world matrix), `stage`, `flashes`,
+  `frameLog`. Bisect with `?off=ao,bloom,grade,dark,guard`, `?noinst`, `?nocull`, `?nogrid`, `?nolod`.
+- **Tools**: `tools/qa/flash-hunt.mjs` (the production bundle: Chewy's Cottage at day and night with the interior, Burrow
+  and Bamboo Depths fights for each hero; NaN per stage, flash frames with PNGs, the scan; `PROD_ROOT=` builds another
+  checkout), `tools/qa/s24-render-health.mjs` (in run-all), `tools/qa/menu-stutter.mjs` (each menu's first and second
+  open in the owner's flow: `FLOW=title`, `AB=1` against `?noprewarm`, `B_ROOT=` another checkout interleaved,
+  `TRACE=` / `PROF=` breakdowns).
+- **Heavy one-off work waits for a moment that hides it**: `G.ui.hidesHitches()` (ui.js) is true on the title screen
+  and once a menu or dialogue has finished opening (0.8 s), never on the frame a menu opens. The village's template
+  prewarm (`village.js`), the townsfolk rig pool (`game.js`) and the menu prewarm use it.
+- **The menu prewarm** (`src/ui/prewarm.js`, started by `UI.init`; `?noprewarm` skips it): in priority order (the active
+  hero's icons and the HUD keys' panels first), each panel is built hidden, rendered where that needs no options, and
+  painted once for two frames at 0.4 % opacity, inert (its first raster: the GPU shaders of its filters, its images'
+  decodes); every skill and carried / stocked item icon is drawn; the hero wheel's cards are built; the build palette's
+  thumbnail shaders compile with `compileAsync` and its thumbnails render. Steps run in hidden moments (about 18 ms a
+  tick, 40 on the title); only tiny ones use idle slots. `G.ui.prewarm` reports `done`, `left`, `steps`, `longest`,
+  `log`. Icons draw on CPU-backed canvases (`willReadFrequently`): their `toDataURL` no longer waits on the GPU. The
+  build palette shows cached thumbnails and fills in the missing ones after it opens (`buildMode.fillThumbs`).
+
 ## Core modules (owned by the lead — read, don't rewrite)
 - `src/core/util.js` math, RNG (`RNG`, `mulberry32`), `Noise`, easing, colors. `src/core/events.js` event bus `Events.on/emit`.
 - `src/core/input.js` `Input.down(k)/hit(k)/mouseDown(b)/mouseHit(b)`, `Input.mouse.{x,y,nx,ny,overUI,wheel}`. Keys are lowercase letters, digits, `space`, `shift`, `ctrl`, `escape`, `tab`, `alt`…
   Shift is the sprint (`src/actors/sprint.js`), Alt+LMB attacks in place, a held Z shows the loot labels. A lone Alt and
   Alt + keys never reach the browser, and every key and mouse event resyncs Alt, Shift and Ctrl, so none can stick.
+- `src/core/actions.js` **the action layer** over Input and the gamepad (docs/CONTROLS.md §1, as built §8). Gameplay reads
+  actions, not raw keys: `Actions.held / pressed / released / consume(action, dev?)`, `move()` (WASD or the left stick:
+  dead zone, curve), `aim()` (the right stick), `padAim` (the pad's world aim point), `device` ('kbm' | 'pad', the last
+  used: event `input:device`, `body.pad-active`), `binds` / `rebind` / `resetBindings` (Settings › Controls, saved in the
+  UI settings' `binds`), `text` / `resolve` (key names for text), `rumble()`. `ACTIONS` holds the defaults (the keyboard
+  ones are the old keys). game.js calls `Actions.poll()` at the top of every frame; `G.controls` is it.
 - `src/core/engine.js` `Engine` (renderer, `rig` camera, `post`, `tick()`, `render()`, `mouseGround()`), `LightPool`.
+  `engine.preset` is Settings › Graphics (0 Low · 1 Medium · 2 High · 3 Deck), read at boot (ROADMAP R-2);
+  `engine.quality` (0..2) is the density tier the worlds build grass, flowers, details and shadow maps with (the Deck
+  builds at 1); `engine.deck`; `applyPreset(p)` applies a change live (pixel ratio, AO, tilt, the Deck's shadows), and
+  `tuneShadows(world)` (from `setWorld`) gives the Deck preset its smaller sun shadow map over a tighter area, redrawn
+  every other frame by `render()`.
+- `src/core/deck.js` the Steam Deck profile (docs/CONTROLS.md §10): `deckLike()` (a 1280×800 screen, the desktop app's
+  `window.pawhaven.deck`, `?deck`), `bootGraphics()` (the saved preset, `?q=`, or the first start's pick), `DECK` (the
+  preset's numbers), `pixelRatioFor()`, `FPS_CAPS`.
 - `src/gfx/*` materials, post, sky (DayNight), water, textures, geom. `src/world/terrain.js`, `vegetation.js`, `layout.js`, `villageWorld.js`.
 
 ## The town plan: Blossom Hollow 2.0 (src/world/layout.js, plots.js, islandShape.js; design: docs/VILLAGE_PLAN.md)
@@ -564,6 +621,51 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
 - QA: s17 (interiors, decorating, homes, ratings, requests, upgrades, remodels, the housing guides, leak cycles), s18
   (Tanu, the workbench, finds); `housing-perf.mjs`; test pages `/?test=furniture`, `furnsheet`, `stall`, `upgrade`,
   `buildings&style=`.
+
+## Controls: gamepad and glyphs (design and as-built: docs/CONTROLS.md; ROADMAP CT-1)
+- **The action layer** `src/core/actions.js` (see Core modules). Every gameplay read goes through it: game.js
+  `handleInput` (the hotbar slots, potions, meal, swap, home, interact, build), the charge machine's `bindKeys` and the
+  channels' `holding()` (the slot actions), player.js (the move vector, roll), sprint.js (Shift; the pad's L3 click),
+  heroes.js (Tab / LB), fishing.js, tools.js, ui.js `onKey` (the panel keys). Build and decorate modes still read raw
+  keys (CT-2).
+- **Gamepad aiming** `src/combat/padAim.js` (`G.padAim`): the aim direction (right stick, else left stick, else facing),
+  the sticky soft lock in a cone (the combat grid's `inRadius`; Settings › Aim assist scales the cone), the aim point
+  (`Actions.padAim`, also read by `charge.cursorGround` and Moonbeam), the target ring (one canvas-textured plane, in the
+  scene only while locked), `pickInteract` (in front preferred), `foeNear`, and the rumble hooks.
+- **A** is context-sensitive (game.js): an interactable highlighted and no foe within 5 m → interact; else the basic
+  attack at the lock (charge, short melee magnetism).
+- **Glyphs** `src/ui/padGlyphs.js` + `pad.css`: `padGlyph(token, style)` (Xbox / PlayStation SVG in the game's ink
+  style), `keyCap(action)` (a `data-act` cap that `refreshCaps()` redraws on a device or bindings change), `keyHint` (an
+  emphasised key in guide or dialogue text). The HUD tags its caps; the prompt takes `{ act }`.
+- **Menus with the pad**: ui.js `padInput` runs in this order:
+  1. the dialogue (`padDialogue`: A / D-pad / B) and the title (`padTitle`);
+  2. the Controls rebinding capture;
+  3. build and decorate mode (`padCursor`);
+  4. View (the map, or a guide's "Got it!") and Menu (Esc);
+  5. any open panel (`padNav`).
+- **Spatial focus** `src/ui/padNav.js` (CT-2, CONTROLS §9.1):
+  - the scope is the popover, the guide's offer, or every open blocking panel;
+  - it moves cone-first, then by edge gap with a row toll;
+  - A clicks, or the element's handler (`HANDLERS`: bag slots pick up / put down, Y equip, X drop / sell / stash; skill
+    nodes learn, Y assign, X charge perks; shop wares; Pantry eat);
+  - B goes back (`ui.back`), LB / RB switch tabs;
+  - tooltips anchor to the focus (synthetic hover events); `.pad-ring` and the `.pad-hints` footer show where it is;
+  - each panel remembers its last focus.
+- **The virtual cursor** `src/ui/padCursor.js` (CT-2, CONTROLS §9.3): in build and decorate mode the left stick moves a
+  paw cursor (`Actions.vcursor`). `Actions.pointer()` is what buildMode.js and decorate.js aim with (the mouse
+  otherwise). The D-pad walks and picks the palette; their A / B / X / Y / RB / LB reads are in those modules.
+- Settings › Controls lives in menu.js (tabs per device, rebinding, rumble, aim assist, glyph style). While the pad
+  plays, the pause menu gets a panel row (plus Build, Decorate and Home where they apply).
+- QA `tools/qa/s25-gamepad.mjs` with the virtual pad `tools/qa/pad-lib.mjs`; look review `tools/qa/pad-shots.mjs`;
+  test-rpg "CONTROLS".
+- **The Steam Deck** (CT-3, CONTROLS §10): `src/core/deck.js` (above). On a Deck-like screen's first start: the Deck
+  graphics preset and the UI at 1.15; `ui.root.deck-ui` turns on `src/ui/deck.css` (the safe area: the UI layers inset
+  12 / 18 px; the text floor: the design's sub-12 px text raised to 12; the toasts above the hotbar). The Deck preset:
+  Medium density, pixel ratio ×0.85, AO and tilt-shift off, `Engine.tuneShadows` (1536 over 0.82 of the area),
+  `Engine.render` redraws the shadow maps every other frame (only for its own render), the particle cap ×0.6 (`PARTICLE_BUDGET` in gfx/particles.js, set by game.js). Settings › Frame cap (Off / 60 / 40):
+  game.js `frame()` skips display frames to the cap. QA: `tools/qa/s26-deck.mjs` (the profile, R-2, the cap, the text
+  floor), `tools/qa/deck-ui.mjs` (every panel at 1280×800: text under 11 px, panels cut off, screenshots),
+  `tools/qa/deck-perf.mjs` (frame times in four scenes with the CPU throttled).
 
 ## Persistent state `G.state` (JSON-serialisable, saved to localStorage)
 ```js

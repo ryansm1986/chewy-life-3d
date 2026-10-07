@@ -4,6 +4,7 @@
 // keeps it. world/story.js giftFlow awaits ui.pickGift() and does the hearts and the reaction.
 import { esc, replay } from './dom.js';
 import { glyph } from './glyphs.js';
+import { padGlyph } from './padGlyphs.js';
 import { Panel } from './panel.js';
 import { PANTRY, KIND_INFO, RARE_COLORS } from '../life/pantry.js';
 import { pantryIcon } from '../life/pantryIcons.js';
@@ -19,7 +20,7 @@ export class GiftPickerPanel extends Panel {
     this.body.innerHTML = `<div class="gf-to"><div class="gf-por"></div><div class="gf-tt"><b></b><small></small></div></div>
       <div class="gf-pages"><button class="btn sm gf-prev">${glyph('play')}</button><div class="gf-grid"></div><button class="btn sm gf-next">${glyph('play')}</button></div>
       <div class="gf-dots"></div>
-      <div class="gf-foot"><span><span class="kc sm">1</span>–<span class="kc sm">9</span> give</span><span><span class="kc sm">◀</span><span class="kc sm">▶</span> page</span><span><span class="kc sm">Esc</span> never mind</span></div>`;
+      <div class="gf-foot kbm-only"><span><span class="kc sm">1</span>–<span class="kc sm">9</span> give</span><span><span class="kc sm">◀</span><span class="kc sm">▶</span> page</span><span><span class="kc sm">Esc</span> never mind</span></div><div class="gf-foot pad-only"><span><span class="kc sm pad">${padGlyph('A')}</span> give</span><span><span class="kc sm pad">${padGlyph('DRight')}</span> choose</span><span><span class="kc sm pad">${padGlyph('B')}</span> never mind</span></div>`;
     const q = s => this.body.querySelector(s);
     this.$ = { por: q('.gf-por'), who: q('.gf-tt b'), sub: q('.gf-tt small'), grid: q('.gf-grid'), dots: q('.gf-dots'), prev: q('.gf-prev'), next: q('.gf-next') };
     this.$.prev.addEventListener('click', () => this.turn(-1));

@@ -38,6 +38,30 @@ Sign-in, upload steps and page settings are in [docs/ITCH.md](docs/ITCH.md).
 | **T** | Return to the village from the Burrow |
 | **Mouse wheel** | Zoom · **Esc** menu / close |
 
+**Controller** (Xbox names; the Steam Deck matches, a PlayStation pad shows its own symbols). The game follows whichever
+device you used last: the prompts change and the cursor hides while the pad plays. Settings › *Controls* rebinds both
+devices and sets rumble, aim assist and the glyph style.
+
+| Button | Action |
+|---|---|
+| **Left stick** | Move (analogue speed) · click **L3** to sprint (it stays on while you keep moving) |
+| **Right stick** | Aim skills and attacks; with no input the aim follows your walk and the soft lock (a small ring under the foe) |
+| **A** | Attack the locked foe (melee steps in from close by) · talks / interacts when something is highlighted and no foe is near (the **A** prompt) |
+| **X** · **Y** · **RB** · **RT** · **LT** | The right-click skill · hotbar skills 1–4 (**tap** to cast, **hold** to charge) |
+| **B** | Dodge roll · closes a panel |
+| **LB** | Tap: the next hero · hold: the hero wheel (point with the right stick, let go) |
+| **D-pad** ◀ ▶ ▲ ▼ | Heart potion · Zoom potion · quick meal · interact (hold: every loot label) |
+| **L3 + R3** | Swap weapon sets |
+| **View** · **Menu** | The map · the game menu (the bag, character, skills, journal, map, home) |
+| In dialogue | **A** next line / choose · **D-pad** pick a choice · **B** leave |
+| In menus | **D-pad** / stick move the focus · **A** select · **B** back · **LB / RB** tabs · **X / Y** the action named in the hint bar (bag: drop / equip; skills: charge perks / assign; shops: sell all) · the tooltip follows the focus |
+| Build · decorate | From the game menu (**Menu**). **Left stick** moves the paw cursor (right stick pans) · **D-pad** ◀ ▶ pick from the palette, ▲ ▼ category · **A** place / paint / pick up · **Y** or **RB** rotate · **X** remove (build: press twice) / store (decorate) · **LB** undo · **LT / RT** turn (build) / zoom (decorate) · **B** cancel, then leave |
+| Fishing | **A** (or **RT**) cast, strike and hold to reel · push the stick or **B** to stop |
+
+**Steam Deck.** On the Deck's 1280×800 screen the first start picks the *Deck* graphics preset (lighter shadows and
+effects, Medium grass), a larger UI (115%) and a safe margin round the screen. Settings › *Graphics* switches between
+Low, Medium, High and Deck (grass and scenery detail change at the next start), and *Frame cap* holds 60 or 40 fps.
+
 ## What's inside
 **Blossom Hollow (the village)**
 - Painterly toon renderer: soft terminators, lavender shadows, sun-side rim light, brush-stroke texture, drifting cloud shadows, bloom, AO and tilt-shift.
