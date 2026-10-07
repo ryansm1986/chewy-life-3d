@@ -1,0 +1,92 @@
+{
+  "units": "metres. Blender Z-up / front -Y; game axes = (x, z, -y). Each prop lies along its local +Z (game +Y), the tip at +Z.",
+  "golden-lance.glb": {
+    "pivot": "the main (rear) grip, the origin",
+    "length_m": 1.6,
+    "axis_blender": [
+      0,
+      0,
+      1
+    ],
+    "axis_game": [
+      0,
+      1,
+      0
+    ],
+    "main_grip": [
+      0,
+      0,
+      0
+    ],
+    "off_hand_grip_blender": [
+      0,
+      0,
+      0.44
+    ],
+    "off_hand_grip_game": [
+      0.0,
+      0.44,
+      0.0
+    ],
+    "tip_blender": [
+      0,
+      0,
+      1.24
+    ],
+    "pommel_end_blender": [
+      0,
+      0,
+      -0.36
+    ],
+    "grip_radius_m": 0.022,
+    "note": "shaft = braided rope r 0.022 m; the main grip sits 0.36 m above the pommel end, the off-hand grip 0.44 m further up"
+  },
+  "golden-javelin.glb": {
+    "pivot": "the throwing grip, the origin",
+    "length_m": 0.72,
+    "axis_blender": [
+      0,
+      0,
+      1
+    ],
+    "axis_game": [
+      0,
+      1,
+      0
+    ],
+    "grip": [
+      0,
+      0,
+      0
+    ],
+    "tip_blender": [
+      0,
+      0,
+      0.39
+    ],
+    "tail_end_blender": [
+      0,
+      0,
+      -0.31
+    ],
+    "grip_radius_m": 0.018
+  },
+  "stats": {
+    "golden_lance": {
+      "triangles": 5996,
+      "z_range_m": [
+        -0.3593,
+        1.2308
+      ],
+      "max_radius_m": 0.1144
+    },
+    "golden_javelin": {
+      "triangles": 2472,
+      "z_range_m": [
+        -0.3298,
+        0.39
+      ],
+      "max_radius_m": 0.085
+    }
+  }
+}

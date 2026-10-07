@@ -134,6 +134,15 @@ Status: **built** (2026-10-03). There are three guides, run by a small reusable 
   3. Poe's binds: left-click fūma slashes, right-click Fūma Throw (catch it), her three trees (Got it).
   4. Wrap-up: the mini portraits; tap Tab next, hold Tab pick (Got it).
   - Steps 1–3 allow switching (`allow.switching`), so the transitions don't pause it.
+- **Meet <the Shih Tzu> (him)** (`meetShihtzu`; the title and lines read `CLASSES.shihtzu.name`, the owner's to pick)
+  starts in town once he has joined (docs/SHIHTZU.md §5), while you play someone else; offered once to older saves past his
+  join, locked in the Journal until then:
+  1. Hold Tab: the wheel with four (his card spotlit); pick him (`done` once he's the active hero and the switch is over).
+  2. His flail: left-click the three swings, right-click Woeful Wallop (the mouse slots spotlit; Got it).
+  3. Press 1: Dripping Paw, a hex that stacks (slot 1 spotlit; Got it).
+  4. The Gloom Blanket: hexed foes near him soften every blow (Got it).
+  5. Wrap-up: his trees (K spotlit), "Grandpaw sends his regards" (Got it).
+  - QA: `tools/qa/s28-shihtzu.mjs` section c runs it end to end.
   - QA: `tools/qa/s20-poe.mjs` section c runs it end to end.
 
 ## Hooks added for the guides

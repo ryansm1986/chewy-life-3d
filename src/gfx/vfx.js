@@ -171,7 +171,7 @@ export class VFX {
   // r: the foe's body radius (m). A hit's glow stays about the size of the foe (≤ ~1.5 m, half alpha) and only the first
   // few hits in a frame flash at all (HIT_BUDGET; one crit light per frame): a burst of hits never washes the view out
   hit(p, { color = '#fff4c0', crit = false, element = 'phys', soft = false, r = 0.45 } = {}) {
-    const ec = { fire: '#ffa040', frost: '#9fe0ff', zap: '#fff27a', stink: '#a8e070', holy: '#fff6c0', phys: color }[element] || color;
+    const ec = { fire: '#ffa040', frost: '#9fe0ff', zap: '#fff27a', stink: '#a8e070', holy: '#fff6c0', gloom: '#7ae8cc', phys: color }[element] || color;
     const s = soft ? 0.55 : 1, lit = this._hitN++ < HIT_BUDGET, crowd = !crit && this._hitN > HIT_FX_BUDGET; // (crowd: a frame of very many hits)
     if (soft) { // big bodies: a tiny flash + opaque confetti chips (normal blend, so they read without adding light)
       if (lit) this.flash(p, ec, crit ? 0.8 : 0.45, 0.1, 0.5);

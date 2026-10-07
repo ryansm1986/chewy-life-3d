@@ -12,6 +12,12 @@ Chrome / Edge recommended (WebGL2). Saves automatically to the browser's local s
 
 **itch.io** (<https://holiestdiver.itch.io/pawhaven>): `npm run push:itch` builds, tests and pushes with butler;
 `npm run build:itch` makes an upload-ready zip in `release/` (`npm run test:itch` also boots it in an itch-style iframe).
+
+**Desktop app** (Windows and Linux; the way onto a **Steam Deck**): `npm run build:desktop` makes
+`release/desktop/Pawhaven-<version>-win-x64.zip` / `-portable.exe` and `-linux-x64.AppImage` / `.tar.gz`. It opens
+full screen (F11 or Settings › *Full screen* for a window), plays with a controller and keeps its saves in its own folder.
+[docs/DESKTOP.md](docs/DESKTOP.md) has the Deck steps (Add a Non-Steam Game, the controller template, saves,
+troubleshooting).
 Sign-in, upload steps and page settings are in [docs/ITCH.md](docs/ITCH.md).
 
 ## Controls
@@ -62,6 +68,29 @@ devices and sets rumble, aim assist and the glyph style.
 effects, Medium grass), a larger UI (115%) and a safe margin round the screen. Settings › *Graphics* switches between
 Low, Medium, High and Deck (grass and scenery detail change at the next start), and *Frame cap* holds 60 or 40 fps.
 
+**Touch** (phones and tablets, in landscape; a phone held upright shows a "turn your phone" card and pauses). The
+controls appear on a touch screen and hide again when you use a key, the mouse or a pad.
+
+| Control | Action |
+|---|---|
+| **Left thumb**, anywhere on the left half | A floating stick: move (analogue); push it out to its ring to sprint (the ring turns gold) |
+| **Attack** (the big round button, bottom right) | Attack the locked foe · hold to charge or keep swinging · it shows a paw and talks / uses when something is close and no foe is near |
+| **The five skills** round it · **roll** | Tap to cast, hold to charge (a ring fills) · the mint button rolls · the small badge swaps weapon sets |
+| **The belt** between the orbs | Heart potion · Zoom potion · quick meal |
+| **Top right** | The hero button (tap: the next hero; hold: the hero wheel, then tap a card) · the bag · the menu · the minimap opens the map |
+| **A tap in the world** | On a monster: lock it · on a villager, door or anything usable: walk over and use it · elsewhere: walk there |
+| **Two fingers** | Pinch to zoom |
+| **Menus** | Tap to pick and click (tap an item, then the slot to put it in) · drag to move items · **double-tap** for the right-click (equip, use, assign) · **long-press** for the details · the ✕ closes (on a phone a panel's title, tabs and ✕ sit at its bottom, by the thumbs) |
+| **Build · decorate** | Pick from the palette, then touch or drag the piece into place and use the buttons: **Build** / **Set down** · **Turn** · **Cancel** · **Store** · **Undo** · **Done** · zones and paths: drag to paint · with nothing in hand one finger pans (a tap opens a house's card or picks a piece up) · two fingers pan and pinch |
+| **Fishing** | Tap attack to cast and strike · hold anywhere to reel |
+
+Settings › *Controls* › *Touch* sets the button size and opacity, a left-handed layout, the skill aim (**Auto**: at the
+nearest foe in front; **Drag**: drag off a skill to aim it, drag back onto it to cancel) and haptics. On a phone or tablet
+the first start picks the *Mobile* graphics preset (a 1:1 pixel ratio, no ambient occlusion, light shadows, Low grass,
+half the particles, 1024-px hero skins, a 60 fps cap). On Android Chrome the first tap goes full screen; iPhones play in
+the browser bar (Safari has no full screen for pages), or full screen from *Add to Home Screen* when the game is served on
+its own (on itch, use itch's full-screen view).
+
 ## What's inside
 **Blossom Hollow (the village)**
 - Painterly toon renderer: soft terminators, lavender shadows, sun-side rim light, brush-stroke texture, drifting cloud shadows, bloom, AO and tilt-shift.
@@ -111,3 +140,6 @@ Dev pages live under `/?test=…` (`sandbox`, `chars`, `monsters`, `dungeon`, `b
   input edge cases, the regions, the village plan, the homestead (s15: farming, fishing, cooking), the guided tutorials (s16), housing (s17: interiors, decorating, villagers' homes, ratings, requests, upgrades, remodels, the housing guides), getting furniture (s18) and charged abilities (s19: the hold, the perks, the channels, every skill, the K panel, dash bounds, the guide, perf) and Poe (s20: her joining scene, an old save and the rumour, the Meet Poe guide, every skill, a real charge, perf) and the zones' foundations (s21: the sprint, Alt+LMB, the Z loot labels, dungeon definitions, rerolling floors, the zone save state and its migration, the new quest steps). Each scenario (`tools/qa/s*.mjs`) can also run on its own.
 - `node tools/qa/village-perf.mjs 2` / `node tools/qa/homestead-perf.mjs 2` / `node tools/qa/housing-perf.mjs 2` — frame-time snapshots (the village; a full garden and a reel in progress; entering homes, a 60-piece room, remodels).
 - `node tools/shot.mjs --url "/?..." --out name` — headless screenshot harness used for visual iteration.
+- Touch and phones: `node tools/qa/s27-touch.mjs` (real multi-touch through CDP on an 844×390 phone), `tools/qa/touch-shots.mjs`
+  (phone and tablet screenshots), `tools/qa/mobile-ui.mjs` (every menu at phone size: no text under 12 px, no target
+  under 44 px, nothing cut off), `tools/qa/mobile-perf.mjs` (the Mobile preset with the CPU throttled).

@@ -24,7 +24,7 @@ import { Events } from '../core/events.js';
 import { computeStats, xpToNext, LEVEL_CAP } from './stats.js';
 import { SKILLS, canLearn } from './skills.js';
 import { learnPerk as learnPerkIn, perkPoints } from './charge.js';
-import { starterItems, starterStaff, starterFuma, generateItem, EQUIP_SLOT_ITEM, meetsReq, socketGem, POTIONS, targetSlot, SET_ITEMS, renameLegacyItem } from './items.js';
+import { starterItems, starterStaff, starterFuma, starterFlail, starterLance, generateItem, EQUIP_SLOT_ITEM, meetsReq, socketGem, POTIONS, targetSlot, SET_ITEMS, renameLegacyItem } from './items.js';
 import { CLASSES, HERO_IDS, canWield, WEAPON_CLASS } from './classes.js';
 import { uid as rid } from '../core/util.js';
 import { PANTRY, pantryOf, pantryHas, sellPrice as pantrySellPrice } from '../life/pantry.js';
@@ -46,6 +46,8 @@ export function newHeroState(id) {
   const equipment = emptyEquipment();
   if (C.id === 'moka') equipment.weapon = starterStaff();
   else if (C.id === 'poe') equipment.weapon = starterFuma(); // (one fūma: both weapon sets throw it)
+  else if (C.id === 'shihtzu') equipment.weapon = starterFlail(); // (one flail: the second set keeps the hexes on its right click)
+  else if (C.id === 'golden') equipment.weapon = starterLance(); // (one lance: the second set keeps the javelins on its right click)
   else { const { sword, ball } = starterItems(); equipment.weapon = sword; equipment.weaponAlt = ball; }
   return {
     player: {
@@ -195,7 +197,7 @@ export function createActions(G) {
   // player.mouseSets. The active set's pair is always live in hotbar[0..1] (so input / HUD keep reading the hotbar);
   // swapWeapons() files the live pair under the set being put away and brings the other set's pair in.
   // Keys 1–4 (hotbar[2..5]) are shared by both sets.
-  const setWeaponType = i => (S().equipment[i ? 'weaponAlt' : 'weapon']?.wtype) || (S().player.cls === 'moka' ? 'staff' : S().player.cls === 'poe' ? 'fuma' : i ? 'ball' : 'sword');
+  const setWeaponType = i => (S().equipment[i ? 'weaponAlt' : 'weapon']?.wtype) || (S().player.cls === 'moka' ? 'staff' : S().player.cls === 'poe' ? 'fuma' : S().player.cls === 'shihtzu' ? 'flail' : S().player.cls === 'golden' ? 'lance' : i ? 'ball' : 'sword');
   const fitsSet = (id, i) => !id || id === 'attack' || !SKILLS[id]?.wep || SKILLS[id].wep === setWeaponType(i);
   const knows = id => S().player.skills[id] > 0 && SKILLS[id] && SKILLS[id].kind !== 'passive' && SKILLS[id].kind !== 'aura';
   /** Best right-click skill for a weapon set: the weapon's most-trained spammable skill, else its other actives. */
@@ -204,6 +206,8 @@ export function createActions(G) {
     const pref = wt === 'ball' ? ['throw', 'ricochet', 'multi', 'blaze', 'fetchstorm', 'decoy']
       : wt === 'staff' ? ['splash', 'kibble', 'feathers', 'moonbeam', 'constellation', 'whirlpool', 'shake', 'greatWave', 'meteor']
       : wt === 'fuma' ? ['fumaThrow', 'kunaiFan', 'puffBall', 'shadowStep', 'thunderPaw', 'shadowStitch', 'shurikenRain', 'smokeDragon', 'thousandStars']
+      : wt === 'flail' ? ['woefulWallop', 'drippingPaw', 'tugOfWoe', 'maelstrom', 'grumbleCloud', 'borrowedWarmth', 'mournfulAwoo', 'heaviestSigh', 'everlastingGloom']
+      : wt === 'lance' ? ['sunbeamThrust', 'bonkDart', 'pinwheelSweep', 'tailwagVolley', 'trueFlight', 'emberBreath', 'sunfallJump', 'gallantCharge', 'emberleafJavelin']
       : ['chomp', 'dig', 'whirl', 'bonestorm'];
     let best = null;
     pref.forEach((id, k) => { if (!knows(id)) return; const sc = (P.skills[id] || 0) * 10 - k * (k < 4 ? 1 : 25); if (!best || sc > best.sc) best = { id, sc }; });
@@ -380,8 +384,9 @@ export function createActions(G) {
     const D = d();
     let lf = life(), zm = zoom();
     if (lf <= 0) return;
-    lf += D.lifeRegen * dt;
-    zm += D.zoomRegen * dt;
+    const rk = G.regenMul ?? 1; // (a Hard Ground run: 0.7, dungeon/tierRun.js)
+    lf += D.lifeRegen * dt * rk;
+    zm += D.zoomRegen * dt * rk;
     for (let i = hots.length - 1; i >= 0; i--) {
       const h = hots[i];
       const k = Math.min(dt, h.t);

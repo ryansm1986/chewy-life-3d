@@ -1,5 +1,5 @@
 // The hero wheel (docs/POE.md §6, docs/HEROES.md §4): hold Tab to open it, pick a hero, let go. Mouse: point toward a
-// hero (or hover / click a card); keys: 1–3 pick and confirm, Esc closes. A tap of Tab never opens it (heroes.js
+// hero (or hover / click a card); keys: 1–9 pick and confirm (the roster's order), Esc closes. A tap of Tab never opens it (heroes.js
 // tabInput: a tap switches straight to the next joined hero). It isn't a modal: the hero can keep walking while it's up;
 // game.js skips the skill keys while it's open.
 //   new HeroWheel(G, heroes) → .show() .hide() .release() .input() .open
@@ -11,7 +11,7 @@ import { HERO_TEXT } from '../rpg/classes.js';
 import { el, esc } from './dom.js';
 import { portrait } from './portraits.js';
 
-const KEYS = ['1', '2', '3', '4'];
+const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9']; // (one per hero, in roster order: any number of heroes)
 export class HeroWheel {
   constructor(G, heroes) {
     this.G = G; this.H = heroes; this.open = false; this.sel = null; this.cards = [];
@@ -25,7 +25,7 @@ export class HeroWheel {
     const list = this.H.roster(), n = list.length;
     this.ring.innerHTML = '';
     this.cards = list.map((h, i) => {
-      const a = -Math.PI / 2 + (i / n) * Math.PI * 2, R = n > 3 ? 190 : 178; // (the first hero at the top, the others round the ring)
+      const a = -Math.PI / 2 + (i / n) * Math.PI * 2, R = n > 5 ? 228 : n > 4 ? 206 : n > 3 ? 190 : 178; // (the first hero at the top, the others round the ring; a wider ring for more heroes)
       const c = el('button', 'hw-card'); c.dataset.id = h.id; // (the Meet Poe guide spotlights her card)
       c.style.setProperty('--hc', h.color); c.style.setProperty('--x', `${Math.cos(a) * R}px`); c.style.setProperty('--y', `${Math.sin(a) * R}px`); c.style.setProperty('--i', i);
       c.classList.toggle('active', h.active); c.classList.toggle('locked', !h.joined); c.classList.toggle('blocked', h.joined && !h.active && !h.ready);
@@ -54,7 +54,7 @@ export class HeroWheel {
     this.sel = i;
     this.cards.forEach((c, k) => c.el.classList.toggle('sel', k === i));
     const h = this.cards[i].h;
-    this.hub.innerHTML = `<b>${esc(h.joined ? h.name : '???')}</b><span>${h.active ? 'Playing now' : h.ready ? `Let go of ${keyCap('hero', { sm: true })} to play as ${esc(h.name)}` : esc(h.why)}</span>`;
+    this.hub.innerHTML = `<b>${esc(h.joined ? h.name : '???')}</b><span>${h.active ? 'Playing now' : h.ready ? `${Actions.device === 'touch' ? 'Tap a card' : `Let go of ${keyCap('hero', { sm: true })}`} to play as ${esc(h.name)}` : esc(h.why)}</span>`; // (touch: the wheel stays up for a tap, ui/touch.js)
     this.G.audio?.play?.('ui_hover', { vol: 0.5 });
   }
   confirm() { const c = this.cards[this.sel]; this.H.pickFromWheel(c && c.h.ready ? c.h.id : null); }

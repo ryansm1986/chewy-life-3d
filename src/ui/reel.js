@@ -19,7 +19,7 @@ export class ReelBar {
           <div class="rl-zone"><i class="rl-zg"></i></div><div class="rl-fish"><img alt=""></div></div>
         <div class="rl-meter"><i class="rl-fill"></i><b class="rl-star">${glyph('star')}</b></div>
       </div>
-      <div class="rl-hint"><span class="rl-keys kbm-only"><span class="kc sm">F</span><span class="rl-or">or</span>${glyph('mouseL')}</span><span class="rl-keys pad-only">${keyCap('interact', { sm: true })}<span class="rl-or">or</span>${keyCap('reel', { sm: true })}</span><span>hold to reel</span></div>
+      <div class="rl-hint"><span class="rl-keys kbm-only"><span class="kc sm">F</span><span class="rl-or">or</span>${glyph('mouseL')}</span><span class="rl-keys pad-only">${keyCap('interact', { sm: true })}<span class="rl-or">or</span>${keyCap('reel', { sm: true })}</span><span class="rl-keys touch-only"><i class="rl-tap">${glyph('paw')}</i></span><span>hold to reel</span></div>
       <div class="rl-msg"></div>
     </div>`;
     layer.appendChild(r);

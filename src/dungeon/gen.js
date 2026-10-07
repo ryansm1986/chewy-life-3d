@@ -2,6 +2,7 @@
 import { RNG, Noise } from '../core/util.js';
 import { generateZone } from './zoneGen.js';
 import { ZONE_THEMES } from './zoneKits/themes.js';
+import { layoutMods, resolveRun } from '../rpg/zoneMods.js';
 
 export const CELL = 2; // world units per cell
 // kit: which geometry/shader kit renders the biome (defaults to the theme key); sun/sunI: key light colour & strength
@@ -22,9 +23,17 @@ export function themeFor(floor) {
 export const BOSSES = { 5: 'mochiKing', 10: 'kasaLord', 15: 'oniChef', 20: 'nineTails' };
 export function bossFor(floor) { return floor % 5 === 0 ? BOSSES[((floor - 1) % 20) + 1] || 'mochiKing' : null; }
 
-// plan: one floor of a dungeon (dungeon/defs.js floorPlan: { theme, boss, mlvl, waypoint, depth }); without one, the
-// Burrow's floor (the old behaviour: the theme and boss by floor, monsters floor + 1, waypoints every 5th floor)
+// plan: one floor of a dungeon (dungeon/defs.js floorPlan: { theme, boss, mlvl, waypoint, depth, tier, spirit, mods });
+// without one, the Burrow's floor (the old behaviour: the theme and boss by floor, monsters floor + 1, waypoints every 5th
+// floor). A tier or modded run's layout effects (pack sizes, extra packs, promotions, chests, shrines: rpg/zoneMods.js
+// layoutMods) are applied to the finished floor from their own seeded RNG, so a run without them is the same floor exactly.
 export function generate({ floor = 1, seed = 1, plan = null } = {}) {
+  const L = generateFloor({ floor, seed, plan });
+  const R = plan && (plan.tier || plan.spirit || plan.mods?.length) ? resolveRun(plan) : null;
+  if (R?.active) layoutMods(L, { ...plan, runMods: R }, new RNG(seed * 6151 + floor * 2477 + 17));
+  return L;
+}
+function generateFloor({ floor = 1, seed = 1, plan = null } = {}) {
   const rng = new RNG(seed * 7919 + floor * 104729);
   const noise = new Noise(seed + floor * 13);
   const P = plan || { theme: themeFor(floor), boss: bossFor(floor), mlvl: floor + 1, waypoint: floor % 5 === 1 && floor > 1, depth: floor };

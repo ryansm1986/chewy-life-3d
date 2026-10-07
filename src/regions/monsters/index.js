@@ -17,8 +17,9 @@ import * as zoneBamboo from '../../dungeon/zoneMonsters/bamboo.js'; // (dungeon-
 import * as zoneMaple from '../../dungeon/zoneMonsters/maple.js';
 import * as zoneTide from '../../dungeon/zoneMonsters/tidepool.js';
 import * as zoneOnsen from '../../dungeon/zoneMonsters/onsen.js';
+import * as zoneSpirit from '../../dungeon/zoneMonsters/spirit.js'; // (the Haunted modifier's ghost: docs/ZONES.md §5.1)
 
-export const REGION_MONSTER_MODULES = { bamboo, maple, tidepool, onsen, tengu, tanuki, umibozu, yukionna, zoneBamboo, zoneMaple, zoneTide, zoneOnsen };
+export const REGION_MONSTER_MODULES = { bamboo, maple, tidepool, onsen, tengu, tanuki, umibozu, yukionna, zoneBamboo, zoneMaple, zoneTide, zoneOnsen, zoneSpirit };
 for (const mod of Object.values(REGION_MONSTER_MODULES)) {
   registerMonsters(mod.MONSTERS, mod.BUILD);
   for (const [id, def] of Object.entries(mod.MONSTERS || {})) {

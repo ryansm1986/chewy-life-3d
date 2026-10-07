@@ -20,6 +20,8 @@ import { computeStats } from '../src/rpg/stats.js';
 import { skillRuntime, SKILLS } from '../src/rpg/skills.js';
 import { CHARGE, chargeRuntime, stageTimes, PERK_STAGE } from '../src/rpg/charge.js';
 import { poeSim } from './charge-sim-poe.mjs';
+import { shihtzuSim } from './charge-sim-shihtzu.mjs';
+import { goldenSim } from './charge-sim-golden.mjs';
 
 export const PACK = 5, RP = 3, CAST = 0.5, FIGHT = 60, ATK = { pct: 100, every: 0.45 };
 export const BAND = [1.1, 1.3]; // sustained gain of a fully charged, fully perked cast over tapping (docs/CHARGE.md §3), on the blend below
@@ -78,6 +80,10 @@ const VALUE = {
 };
 // Poe's models (tools/charge-sim-poe.mjs: her 15 damage skills, her summon and her two buffs)
 { const poe = poeSim({ area, line, fan, rk, pp, RP }); Object.assign(DMG, poe.DMG); Object.assign(VALUE, poe.VALUE); }
+// the Shih Tzu's (tools/charge-sim-shihtzu.mjs: 9 damage skills, the Maelstrom channel, 2 summons and 3 buffs)
+{ const stz = shihtzuSim({ area, line, fan, rk, pp, RP }); Object.assign(DMG, stz.DMG); Object.assign(CHAN, stz.CHAN); Object.assign(VALUE, stz.VALUE); }
+// Foosy's (tools/charge-sim-golden.mjs: 12 damage skills, Dragon Heart and 2 buffs)
+{ const gld = goldenSim({ area, line, fan, rk, pp, RP }); Object.assign(DMG, gld.DMG); Object.assign(VALUE, gld.VALUE); }
 export const KIND = id => (DMG[id] ? 'damage' : CHAN[id] ? 'channel' : 'utility');
 
 /** a skill-build hero at level 30 with skill level `lvl` in every charged skill of its class */

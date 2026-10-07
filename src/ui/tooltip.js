@@ -14,6 +14,7 @@ export class Tooltip {
     addEventListener('mousemove', e => { this.x = e.clientX; this.y = e.clientY; if (this.on) this.place(); }, { passive: true });
   }
   show(html, cls = '', owner = null) {
+    if (this.muted) return; // (a background panel build or render: ui/prewarm.js)
     if (!html) return this.hide();
     html = padWording(html); // (while the pad plays: its buttons instead of the mouse's, ui/padGlyphs.js)
     this.owner = owner;
@@ -35,6 +36,9 @@ export class Tooltip {
     this.wrap.style.transform = `translate3d(${x | 0}px,${y | 0}px,0)`;
   }
   hide(owner) {
+    // muted: the menu prewarm builds and renders closed panels in the background while a menu is open, and their
+    // setup calls hide() — which used to close the tooltip the player was reading (ui/prewarm.js run)
+    if (this.muted) return;
     if (owner && this.owner && owner !== this.owner) return;
     if (!this.on) return;
     this.on = false; this.owner = null;

@@ -18,7 +18,7 @@ const ev = (f, a) => page.evaluate(f, a);
 const HOUR = 11;
 
 async function fight(hero = 'chewy', floor = 2) {
-  await boot(page, `fresh&nointro${hero === 'moka' || hero === 'poe' ? `&hero=${hero}` : ''}`);
+  await boot(page, `fresh&nointro${hero === 'moka' || hero === 'poe' || hero === 'shihtzu' || hero === 'golden' ? `&hero=${hero}` : ''}`);
   await ev(f => { window.G.state.flags.burrowTut = true; window.G.enterDungeon(f); }, floor);
   await waitMode(page, 'dungeon');
 }
@@ -141,7 +141,9 @@ try {
   await fight('chewy', 2); await learn({ skills: { throw: 10 }, hotbar: [null, 'throw'], perks: { throw: { split: 2, boomerang: 1 } }, wep: 'throw' });
   xy = await dummies(true); await page.mouse.move(xy[0], xy[1]); await sleep(page, 300);
   await ev(() => { window.__pr = []; const C = window.G.combat, raw = C.spawn.bind(C); C.spawn = o => { const p = raw(o); window.__pr.push(p); return p; }; for (const m of window.__dummies) m.knock = { add() {}, set() {}, lengthSq: () => 0, multiplyScalar() { return this; } }; });
-  await holdRMB(); await sleep(page, 2600);
+  await holdRMB();
+  // (on the game's state, not the wall's: the three balls thrown, then every one home, out of the combat's projectiles)
+  await page.waitForFunction(() => window.__pr.length >= 3 && window.__pr.every(p => !window.G.combat.projectiles.includes(p)), null, { timeout: 10000 }).catch(() => {});
   const tb = await ev(() => ({ casts: window.__casts, balls: window.__pr.map(p => ({ kind: p.kind, out: p.hitSet.size, back: p.backSet?.size || 0 })) }));
   R.check('Split Shot 2 + Boomerang Fetch: three fastballs; one pierces the whole line and hits again on the way back', tb.casts[0]?.stage === 1 && tb.balls.length === 3 && tb.balls.every(b => b.kind === 'fastball') && Math.max(...tb.balls.map(b => b.out)) === 4 && tb.balls.every(b => !b.out || b.back > 0), JSON.stringify(tb));
   await fight('moka', 2); await learn({ skills: { splash: 10 }, hotbar: [null, 'splash'], perks: { splash: { split: 1, rain: 1 } } });
@@ -178,8 +180,8 @@ try {
   const mb2 = await ev(() => window.G.skills.channel?.id || null);
   R.check('Moonbeam: a wind-up, then the charged beam; let go and it lingers, then ends', mb.r >= mb.r0 - 1e-6 && mb1 === 'moonbeam' && !mb2, JSON.stringify({ mb, mb1, mb2 }));
 
-  // ================================================================ d) every active skill, all three heroes, Ⅰ and Ⅲ, every perk
-  for (const hero of ['chewy', 'moka', 'poe']) {
+  // ================================================================ d) every active skill, all five heroes, Ⅰ and Ⅲ, every perk
+  for (const hero of ['chewy', 'moka', 'poe', 'shihtzu', 'golden']) {
     await fight(hero, 3);
     const ids = await ev(async hero => {
       const G = window.G, pl = G.state.player;
@@ -197,7 +199,7 @@ try {
       const r = await ev(async ({ id, stage }) => {
         const G = window.G, P = G.player;
         const { SKILLS } = await import('/src/rpg/skills.js');
-        G.skills.cds = {}; P.anim.stop(); P.leap = null; P.dash = null; if (P.hero === 'poe') G.skills.clearPoe(); G.actions.restoreAll();
+        G.skills.cds = {}; P.anim.stop(); P.leap = null; P.dash = null; if (P.hero === 'poe') G.skills.clearPoe(); if (P.hero === 'shihtzu') G.skills.clearShihtzu(); if (P.hero === 'golden') G.skills.clearGolden(); G.actions.restoreAll();
         if (SKILLS[id].wep && G.derived.weaponType !== SKILLS[id].wep) { G.actions.swapWeapons(); P.setWeapon(G.derived.weaponType); }
         if (G.dungeon.monsters.filter(m => m.alive).length < 5) G.dungeon.summonAround({ pos: P.pos }, 'mochi', 5);
         const { r: rr } = G.engine.rig.groundAxes();
@@ -208,7 +210,7 @@ try {
       if (r.threw) threw ||= `${id} Ⅲ${stage}: ${r.threw}`;
       await sleep(page, ['bubble', 'whirlpool', 'howl', 'bonestorm', 'decoy', 'duckDecoy'].includes(id) ? 1500 : 2300);
     }
-    R.check(`${hero}: every active skill (${ids.length}) charge-casts at Ⅰ and Ⅲ with every perk, no errors`, !threw && ids.length >= 16, threw || ids.join(','));
+    R.check(`${hero}: every active skill (${ids.length}) charge-casts at Ⅰ and Ⅲ with every perk, no errors`, !threw && ids.length >= (hero === 'shihtzu' || hero === 'golden' ? 15 : 16), threw || ids.join(','));
     await ev(() => window.G.returnToVillage()); await waitMode(page, 'village');
   }
 

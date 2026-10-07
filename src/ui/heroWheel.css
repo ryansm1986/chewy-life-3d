@@ -29,6 +29,12 @@
 .hw-tag { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); white-space: nowrap; font: 700 11px/1 var(--font); color: #fff; background: var(--hc); border: 3px solid var(--ink); border-radius: 10px; padding: 3px 7px; }
 .hw-tag.dim { background: #b8a8b0; }
 .hw-card.locked .hw-t { opacity: .8; }
-/* the HUD's extra mini portrait for a second benched hero (hud.js), beside the first */
-.hsw.hsw-b { left: 34px; top: 70px; width: 38px; height: 38px; }
+/* the HUD's extra mini portraits for the other benched heroes (hud.js benchTick): a row of small ones (--k: 0, 1, …)
+   under the name and companion, right of the level badge and above the quest tracker, so any number of heroes fit */
+.hsw.hsw-b { left: calc(132px + var(--k, 0) * 35px); top: 79px; width: 33px; height: 33px; }
+.hsw.hsw-b .hsw-lv { min-width: 15px; height: 15px; font-size: 9px; right: -5px; top: -5px; }
+.hero-wheel .hw-card { width: auto; min-width: 132px; }
+.hw-t b { white-space: nowrap; }
 .hsw.hsw-b .kc { display: none; }
+/* a closed wheel takes no taps or clicks: its faded cards stayed hit-testable over the bag and the panels (CT-5) */
+.hero-wheel:not(.show) { visibility: hidden; transition: opacity .14s, visibility 0s .14s; }

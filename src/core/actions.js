@@ -9,8 +9,12 @@
 //    emits 'input:device' { device, style } and toggles body.pad-active (the cursor hides; ui/padGlyphs.js swaps glyphs).
 //  - Bindings: ACTIONS' defaults plus the player's overrides (Settings › Controls, saved in the UI settings: setOverrides).
 //  - Rumble: Actions.rumble(strong, weak, ms) on the active pad (Settings › Controls › Rumble).
+//  - Touch (CT-5, docs/CONTROLS.md §12): the third device. The on-screen controls (ui/touch.js) hold actions down through
+//    core/touch.js, and dev 'touch' reads them; move() and aim() take its stick and drag-to-aim. A touch makes it the
+//    device (body.touch-active); the mouse events a browser sends after a tap don't count as the mouse.
 import { Input } from './input.js';
 import { Events } from './events.js';
+import { Touch } from './touch.js';
 
 // the standard mapping's buttons, by index
 export const PAD_BUTTONS = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'View', 'Menu', 'L3', 'R3', 'DUp', 'DDown', 'DLeft', 'DRight', 'Home'];
@@ -67,6 +71,8 @@ const PAD_NAMES = {
 };
 // panels (and Home) the pad reaches through the game menu: their text names the Menu button
 const VIA_MENU = new Set(['inventory', 'pantry', 'character', 'skills', 'quests', 'map', 'home']);
+// what text calls an action's on-screen control while touch plays (ui/touch.js); the panels are in the menu
+const TOUCH_NAMES = { move: 'the stick', aim: 'a drag off a skill', attack: 'the attack button', skillAlt: 'the skill button', skill1: 'skill button 1', skill2: 'skill button 2', skill3: 'skill button 3', skill4: 'skill button 4', roll: 'the roll button', sprint: 'the stick out to its edge', interact: 'the attack button', potionHeart: 'the heart potion', potionZoom: 'the zoom potion', potionR: 'the rejuv potion', meal: 'the meal button', swap: 'the swap badge', hero: 'the hero button', menu: 'the menu button', inventory: 'the bag button', build: 'Build in the menu', pantry: 'Pantry in the bag', character: 'Character in the menu', skills: 'Skills in the menu', quests: 'Journal in the menu', map: 'the minimap', home: 'Home in the menu' };
 // key names as old text writes them → actions (resolve(), ui/padGlyphs.js keyHint)
 const TEXT_KEYS = { wasd: 'move', 'w a s d': 'move', click: 'attack', lmb: 'attack', 'left-click': 'attack', 'right-click': 'skillAlt', rmb: 'skillAlt', esc: 'menu', escape: 'menu' };
 export const keyName = t => KEY_NAMES[t] || (t.includes('+') ? t.split('+').map(keyName).join('+') : t.length === 1 ? t.toUpperCase() : t.replace(/^key/, '').replace(/^digit/, '').replace(/^numpad/, 'Num ').toUpperCase());
@@ -81,6 +87,7 @@ export const Actions = {
   device: 'kbm', style: 'kbm', padStyle: 'xbox', padId: '', connected: false,
   padAim: null, // the gamepad's world aim point (combat/padAim.js), or null
   vcursor: { on: false, x: 0, y: 0, nx: 0, ny: 0, overUI: false }, // the pad's virtual cursor in build / decorate mode (ui/padCursor.js)
+  tcursor: { on: false, x: 0, y: 0, nx: 0, ny: 0, overUI: false }, // touch's cursor in build / decorate mode: the last tap or drag (ui/touch.js)
   opts: { rumble: true, glyphs: 0 }, // glyphs: 0 auto · 1 Xbox · 2 PlayStation
   over: { kbm: {}, pad: {} }, // the player's overrides
   cur: new Set(), prev: new Set(), pPressed: new Set(), pReleased: new Set(), holdT: new Map(),
@@ -90,11 +97,16 @@ export const Actions = {
     if (this._init) return; this._init = true;
     const kbm = () => this.setDevice('kbm');
     addEventListener('keydown', e => { if (!e.repeat) kbm(); }, true);
-    addEventListener('mousedown', kbm, true);
+    addEventListener('mousedown', e => { if (!Touch.fromTouch(e)) kbm(); }, true); // (not the mousedown a tap sends)
     addEventListener('wheel', kbm, { capture: true, passive: true });
+    // a touch anywhere makes touch the device (the on-screen controls show); pen and mouse pointers don't
+    const touch = e => { if (e.pointerType === 'touch' || e.touches) { Touch.lastT = performance.now(); this.setDevice('touch'); } };
+    addEventListener('pointerdown', touch, true);
+    addEventListener('touchstart', touch, { capture: true, passive: true });
+    addEventListener('touchend', () => { Touch.lastT = performance.now(); }, { capture: true, passive: true });
     // a real mouse move (not a one-pixel jitter, nor the synthetic move a layout change fires) takes the mouse back
     addEventListener('mousemove', e => {
-      if (this.device === 'kbm') return;
+      if (this.device === 'kbm' || Touch.fromTouch(e)) return;
       const now = performance.now(); if (now - this._mouseT > 300) this._mouseAcc = 0; this._mouseT = now;
       this._mouseAcc += Math.abs(e.movementX || 0) + Math.abs(e.movementY || 0);
       if (this._mouseAcc > 10) kbm();
@@ -105,9 +117,10 @@ export const Actions = {
   setDevice(dev) {
     if (dev === this.device) return;
     this.device = dev;
-    this.style = dev === 'pad' ? this.padStyle : 'kbm';
+    this.style = dev === 'pad' ? this.padStyle : dev === 'touch' ? 'touch' : 'kbm';
     if (dev === 'kbm') this.padAim = null;
-    try { document.body.classList.toggle('pad-active', dev === 'pad'); document.body.dataset.padStyle = this.padStyle; } catch (e) { /* no DOM */ }
+    if (dev !== 'touch') Touch.releaseAll(); // (a button or the stick held when the keyboard or pad took over)
+    try { document.body.classList.toggle('pad-active', dev === 'pad'); document.body.classList.toggle('touch-active', dev === 'touch'); document.body.dataset.padStyle = this.padStyle; } catch (e) { /* no DOM */ }
     Events.emit('input:device', { device: dev, style: this.style });
   },
   setOptions(o) {
@@ -183,36 +196,42 @@ export const Actions = {
     if (nd !== this._nav) { this._nav = nd; this._navT = 0.38; this.nav = nd; }
     else if (nd && (this._navT -= dt) <= 0) { this._navT = 0.11; this.nav = nd; }
     if (this.pPressed.size || lm > ACT_STICK || Math.hypot(rx, ry) > ACT_STICK) this.setDevice('pad');
+    Touch.poll(dt); // (the touch buttons' edges and hold times: core/touch.js)
+    const tm = Touch.stick.on ? Touch.stick.mag : 0; this.tsPush = tm > 0.6 && (this._tsM || 0) <= 0.6; this._tsM = tm;
     this._rumbleT = Math.max(0, this._rumbleT - dt);
   },
 
   // ------------------------------------------------------------------ buttons
   held(a, dev) {
     if (!Input.enabled) return false;
-    if (dev !== 'pad') for (const t of this.binds(a, 'kbm')) if (kbmHeld(t)) return true;
-    if (dev !== 'kbm') for (const t of this.binds(a, 'pad')) if (this.cur.has(t)) return true;
+    if (!dev || dev === 'kbm') for (const t of this.binds(a, 'kbm')) if (kbmHeld(t)) return true;
+    if (!dev || dev === 'pad') for (const t of this.binds(a, 'pad')) if (this.cur.has(t)) return true;
+    if ((!dev || dev === 'touch') && Touch.cur.has(a)) return true;
     return false;
   },
   pressed(a, dev) {
     if (!Input.enabled) return false;
-    if (dev !== 'pad') for (const t of this.binds(a, 'kbm')) if (kbmHit(t)) return true;
-    if (dev !== 'kbm') for (const t of this.binds(a, 'pad')) if (this.pPressed.has(t)) return true;
+    if (!dev || dev === 'kbm') for (const t of this.binds(a, 'kbm')) if (kbmHit(t)) return true;
+    if (!dev || dev === 'pad') for (const t of this.binds(a, 'pad')) if (this.pPressed.has(t)) return true;
+    if ((!dev || dev === 'touch') && Touch.pressed.has(a)) return true;
     return false;
   },
   released(a, dev) {
-    if (dev !== 'pad') for (const t of this.binds(a, 'kbm')) if (t.startsWith('mouse') ? Input.mReleased.has(+t.slice(5)) : Input.released.has(t)) return true;
-    if (dev !== 'kbm') for (const t of this.binds(a, 'pad')) if (this.pReleased.has(t)) return true;
+    if (!dev || dev === 'kbm') for (const t of this.binds(a, 'kbm')) if (t.startsWith('mouse') ? Input.mReleased.has(+t.slice(5)) : Input.released.has(t)) return true;
+    if (!dev || dev === 'pad') for (const t of this.binds(a, 'pad')) if (this.pReleased.has(t)) return true;
+    if ((!dev || dev === 'touch') && Touch.released.has(a)) return true;
     return false;
   },
-  /** how long the pad has held this action's button (s; 0 when up). The keyboard's hold times are the callers'. */
-  heldTime(a) { let m = 0; for (const t of this.binds(a, 'pad')) m = Math.max(m, this.holdT.get(t) || 0); return m; },
-  /** a press already handled: nobody else this frame sees it (keys, mouse buttons and pad buttons alike) */
+  /** how long the pad (or a touch button) has held this action (s; 0 when up). The keyboard's hold times are the callers'. */
+  heldTime(a) { let m = Touch.holdT.get(a) || 0; for (const t of this.binds(a, 'pad')) m = Math.max(m, this.holdT.get(t) || 0); return m; },
+  /** a press already handled: nobody else this frame sees it (keys, mouse buttons, pad and touch buttons alike) */
   consume(a, dev) {
-    if (dev !== 'pad') for (const t of this.binds(a, 'kbm')) { if (t.startsWith('mouse')) Input.consumeMouse(+t.slice(5)); else Input.consume(t.includes('+') ? t.split('+').pop() : t); }
-    if (dev !== 'kbm') {
+    if (!dev || dev === 'kbm') for (const t of this.binds(a, 'kbm')) { if (t.startsWith('mouse')) Input.consumeMouse(+t.slice(5)); else Input.consume(t.includes('+') ? t.split('+').pop() : t); }
+    if (!dev || dev === 'pad') {
       for (const t of this.binds(a, 'pad')) this.pPressed.delete(t);
       if (a === 'interact') for (const t of this.binds('attack', 'pad')) this.pPressed.delete(t); // (on the pad A is the context interact)
     }
+    if (!dev || dev === 'touch') { Touch.pressed.delete(a); if (a === 'interact') Touch.pressed.delete('attack'); } // (the attack button is the touch's context interact)
   },
   /** the pad buttons pressed this frame (raw tokens: the rebinding capture, the CT-2 focus navigation) */
   padHit(t) { return Input.enabled && this.pPressed.has(t); },
@@ -227,23 +246,27 @@ export const Actions = {
     const kx = (Input.down('d') || Input.down('right') ? 1 : 0) - (Input.down('a') || Input.down('left') ? 1 : 0);
     const ky = (Input.down('w') || Input.down('up') ? 1 : 0) - (Input.down('s') || Input.down('down') ? 1 : 0);
     if (kx || ky) { const l = Math.hypot(kx, ky); o.x = kx / l; o.y = ky / l; o.mag = 1; return o; }
+    const ts = Touch.stick; // the floating stick (ui/touch.js already applied its dead zone and response)
+    if (ts.on && ts.mag > 0) { o.x = ts.x; o.y = ts.y; o.mag = ts.mag; o.pad = true; return o; }
     const x = this.axes[0], y = -this.axes[1], m = Math.hypot(x, y);
     if (m < MOVE_DZ) return o;
     const s = Math.min(1, (m - MOVE_DZ) / (OUTER - MOVE_DZ)), k = MOVE_MIN + (1 - MOVE_MIN) * Math.pow(s, MOVE_POW);
     o.x = x / m; o.y = y / m; o.mag = k; o.pad = true;
     return o;
   },
-  /** the screen pointer build and decorate mode aim with: the mouse, or the pad's virtual cursor ({ x, y, nx, ny, overUI }) */
-  pointer() { return this.vcursor.on ? this.vcursor : Input.mouse; },
+  /** the screen pointer build and decorate mode aim with: the mouse, the pad's virtual cursor or touch's ({ x, y, nx, ny, overUI }) */
+  pointer() { return this.vcursor.on ? this.vcursor : this.tcursor.on ? this.tcursor : Input.mouse; },
   /** any movement input held: a move key, or the left stick past its dead zone */
   moving() { return this.move().mag > 0; },
   /** a move key pressed this frame, or the left stick just pushed past half tilt (ends a fishing session) */
   moveHit() {
     for (const k of ['w', 'a', 's', 'd', 'up', 'down', 'left', 'right']) if (Input.hit(k)) return true;
-    return Input.enabled && this.lsPush;
+    return Input.enabled && (this.lsPush || this.tsPush);
   },
   /** the right stick: x right, y up (forward on screen); mag 0..1 past its dead zone (linear) */
   aim() {
+    const ta = Touch.aim; // (a drag off a skill or the hero button: ui/touch.js)
+    if (ta.on && ta.mag > 0 && Input.enabled) { _aim.x = ta.x; _aim.y = ta.y; _aim.mag = ta.mag; return _aim; }
     const x = this.axes[2], y = -this.axes[3], m = Math.hypot(x, y);
     if (!Input.enabled || m < AIM_DZ) return _zero;
     const s = Math.min(1, (m - AIM_DZ) / (OUTER - AIM_DZ));
@@ -267,6 +290,7 @@ export const Actions = {
   },
   /** plain text for an action's button on a device; a panel with no pad button names the Menu button (it reaches them) */
   text(a, dev = this.device) {
+    if (dev === 'touch') return TOUCH_NAMES[a === 'interactAlt' ? 'interact' : a] || '';
     const t = this.promptToken(a, dev);
     if (t) return a === 'camTurn' && dev === 'kbm' ? 'Q / E' : this.tokenName(t, dev);
     if (dev === 'pad' && VIA_MENU.has(a)) return this.text('menu', 'pad');
@@ -290,6 +314,12 @@ export const Actions = {
   /** '{action}' tokens → key names for the active device; on the pad also "press F" / "hold Tab" phrases in old text */
   resolve(text) {
     const s = String(text ?? '').replace(/\{([a-zA-Z]+)\}/g, (m, a) => (ACTIONS[a] || a === 'interactAlt' ? this.text(a) || m : m));
+    if (this.device === 'touch') { // "Press Q to…" → "Tap the heart potion to…", "Hold Tab" → "Hold the hero button"
+      return s.replace(/\b([Pp]ress|[Hh]old|[Tt]ap|[Uu]se|[Cc]lick)( \*?)(WASD|Shift|Space|Tab|Esc|[A-Z0-9])(\*?)(?=[\s.,!—–)]|$)/g, (m, verb, pre, key, post) => {
+        const a = this.forKey(key), t = a && TOUCH_NAMES[a];
+        return t ? `${/^[Hh]/.test(verb) ? verb : verb[0] === verb[0].toUpperCase() ? 'Tap' : 'tap'}${pre}${t}${post}` : m;
+      });
+    }
     if (this.device !== 'pad') return s;
     return s.replace(/\b([Pp]ress|[Hh]old|[Tt]ap|[Uu]se)( \*?)(WASD|Shift|Space|Tab|Esc|[A-Z0-9])(\*?)(?=[\s.,!—–)]|$)/g, (m, verb, pre, key, post) => {
       const a = this.forKey(key), t = a && this.text(a, 'pad');
@@ -298,7 +328,7 @@ export const Actions = {
   },
   /** a light pulse on the active pad (strong / weak motor 0..1, ms); a stronger pulse overrides a weaker one */
   rumble(strong = 0.25, weak = 0.45, ms = 80) {
-    if (!this.opts.rumble || this.device !== 'pad') return false;
+    if (!this.opts.rumble || this.device !== 'pad') return false; // (touch buzzes on its own events: ui/touch.js)
     const k = Math.max(strong, weak);
     if (this._rumbleT > 0 && k <= this._rumbleK) return false;
     this._rumbleT = ms / 1000; this._rumbleK = k;

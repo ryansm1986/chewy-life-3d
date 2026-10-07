@@ -13,6 +13,7 @@ import { Collision } from '../world/collision.js';
 import { Noise, mulberry32, clamp, rand, TAU } from '../core/util.js';
 import { dressRooms } from './roomDressing.js';
 import { zoneKit } from './zoneKits/index.js';
+import { releaseAfterUpload } from '../core/deck.js';
 
 const C = h => new THREE.Color(h);
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -158,7 +159,13 @@ class Chunks {
   addVC(g, m, mul = 1) { this.at(m.elements[12], m.elements[14]).addVC(g, m, undefined, undefined, mul); }
   build(scene, mat, cast = true, receive = true) {
     const out = [];
-    for (const b of this.map.values()) { if (!b.n) continue; const m = new THREE.Mesh(b.geometry(), mat); m.castShadow = cast; m.receiveShadow = receive; scene.add(m); out.push(m); }
+    for (const b of this.map.values()) {
+      if (!b.n) continue;
+      // (a chunk's geometry is its own, built once and disposed with the floor: on the Mobile preset its arrays go once
+      //  the GPU has them, core/deck.js releaseAfterUpload)
+      const m = new THREE.Mesh(releaseAfterUpload(b.geometry()), mat); m.castShadow = cast; m.receiveShadow = receive; scene.add(m); out.push(m);
+      b.P = b.N = b.C = b.A = null; b.cap = 0; b.n = 0; // (the growable staging arrays are spent: up to twice the chunk's size each)
+    }
     return out;
   }
 }

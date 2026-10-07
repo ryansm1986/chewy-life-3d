@@ -1,0 +1,262 @@
+{
+  "units": "W = 0.528 m (the face width between the ear locks at the cheeks); z = above the chin in W; profile b = behind the nose tip in W",
+  "face_rule": "sheet",
+  "sheet": {
+    "scale": "front view crown y 100, ground 466: 366 px = 1.20 m (305 px/m); head close-up crown 554, chin 711",
+    "W_px_closeup": 154,
+    "H_px_closeup": 157,
+    "W_px_body": 159,
+    "H_px_body": 164,
+    "W_over_H": 0.98,
+    "head_H_over_total": 0.448,
+    "heads_tall": 2.23,
+    "topknot_above_crown_frac_total": 0.11,
+    "eye_centre_x_W": 0.271,
+    "eye_centre_z_above_chin_W": 0.461,
+    "eye_opening_W": [
+      0.282,
+      0.244
+    ],
+    "iris_width_frac_opening": 0.7,
+    "pupil_frac_iris": 0.68,
+    "iris_bottom_z_W": 0.354,
+    "nose_width_W": 0.144,
+    "nose_top_z_W": 0.448,
+    "nose_centre_z_W": 0.412,
+    "mouth_arch_top_z_W": 0.279,
+    "beard_width_W": 0.32,
+    "blush_centre_W": [
+      0.39,
+      0.27
+    ],
+    "ear_locks_span_W": 1.89,
+    "ear_lock_bottom_z_W": 0.01,
+    "nose_tip_ahead_of_eye_front_W": 0.21,
+    "moustache_ahead_of_nose_tip_W": 0.05,
+    "lock_back_behind_nose_tip_W": 1.36,
+    "nose_tip_ahead_of_iris_front_W": 0.235
+  },
+  "chin_z_m": 0.662,
+  "crown_m": 1.2,
+  "head_height_W": 1.019,
+  "head_H_over_total": 0.448,
+  "face_width_rows_W(z: skin width, locks excluded)": {
+    "0.000": 0.464,
+    "0.050": 0.464,
+    "0.100": 0.936,
+    "0.150": 1.028,
+    "0.200": 1.052,
+    "0.262": 1.012,
+    "0.320": 1.0,
+    "0.400": 1.04,
+    "0.500": 1.056,
+    "0.600": 1.048,
+    "0.700": 0.992,
+    "0.800": 0.872,
+    "0.900": 0.692
+  },
+  "nose_tip_y_m": -0.3627,
+  "profile_b(z)": {
+    "0.020": 0.086,
+    "0.060": 0.055,
+    "0.100": 0.042,
+    "0.150": 0.04,
+    "0.200": 0.048,
+    "0.250": 0.059,
+    "0.300": 0.066,
+    "0.352": 0.028,
+    "0.400": 0.003,
+    "0.450": 0.082,
+    "0.500": 0.181,
+    "0.550": 0.182,
+    "0.600": 0.186,
+    "0.660": 0.192,
+    "0.720": 0.191,
+    "0.780": 0.189,
+    "0.850": 0.194,
+    "0.910": 0.216,
+    "0.970": 0.265
+  },
+  "eye_white_front_edge_b": 0.23,
+  "eye_opening_W": [
+    0.282,
+    0.244
+  ],
+  "eye_centre_W": [
+    0.271,
+    0.461
+  ],
+  "iris_bottom_z_W": 0.357,
+  "nose_z_W": 0.412,
+  "nose_top_z_W": 0.448,
+  "nose_width_W": 0.144,
+  "mouth_arch_top_z_W": 0.272,
+  "beard_width_W": 0.33,
+  "ear_locks_L": {
+    "x_min_W": 0.174,
+    "x_max_W": 0.927,
+    "b_min": 0.331,
+    "b_max": 1.425,
+    "z_min_W": -0.036,
+    "z_max_W": 0.992
+  },
+  "ear_locks_R": {
+    "x_min_W": -0.927,
+    "x_max_W": -0.174,
+    "b_min": 0.331,
+    "b_max": 1.425,
+    "z_min_W": -0.036,
+    "z_max_W": 0.992
+  },
+  "ear_locks_span_W": 1.854,
+  "head_refine_before": {
+    "visible_tris": 2771,
+    "err_mean_deg": 2.892,
+    "err_p90_deg": 8.212,
+    "band_disp_p90_mm": 8.206,
+    "band_disp_p99_mm": 30.386,
+    "band_disp_max_mm": 126.179
+  },
+  "head_refine": {
+    "dropped": 5,
+    "added": 145,
+    "visible_tris": 2996,
+    "err_mean_deg": 2.277,
+    "err_p90_deg": 6.544,
+    "band_disp_p90_mm": 6.526,
+    "band_disp_p99_mm": 11.452,
+    "band_disp_max_mm": 22.868
+  },
+  "mouth_cut": {
+    "split_vertices": 23,
+    "parting_vertices": 25,
+    "faces_by_geometry_fallback": 0
+  },
+  "skin_vertices": 2981,
+  "skin_faces": 5404,
+  "eye_axis_R": {
+    "out_deg": 31.6,
+    "down_deg": 3.5
+  },
+  "eye_axis_L": {
+    "out_deg": 31.6,
+    "down_deg": 3.5
+  },
+  "topknot_top_m": 1.3329,
+  "topknot_above_crown_m": 0.1329,
+  "body_sheet_frac_of_crown": {
+    "pauldrons_z": [
+      0.459,
+      0.541
+    ],
+    "pauldrons_width": 0.634,
+    "belt_band_z": [
+      0.352,
+      0.393
+    ],
+    "buckle_diameter": 0.105,
+    "tabard_hem_centre_z": 0.139,
+    "tabard_side_hem_z": 0.153,
+    "tabard_width": 0.505,
+    "cloak_hem_side_z": 0.194,
+    "cloak_width": 0.71,
+    "tome_z": [
+      0.229,
+      0.421
+    ],
+    "tome_width_front": 0.164,
+    "shorts_hem_z": 0.12,
+    "leg_cuff_z": [
+      0.057,
+      0.139
+    ],
+    "boots_top_z": 0.071,
+    "boots_width": 0.574,
+    "tail_z": [
+      0.117,
+      0.552
+    ],
+    "tail_depth": 0.34,
+    "paws_width": 0.885,
+    "chest_V_z": 0.481
+  },
+  "body_model_frac_of_crown": {
+    "pauldrons_z": [
+      0.404,
+      0.587
+    ],
+    "pauldrons_width": 0.624,
+    "belt_band_z": [
+      0.351,
+      0.394
+    ],
+    "buckle_diameter": 0.117,
+    "tabard_hem_centre_z": 0.141,
+    "tabard_side_hem_z": 0.151,
+    "tabard_width": 0.523,
+    "cloak_hem_side_z": 0.174,
+    "cloak_width": 0.68,
+    "tome_z": [
+      0.212,
+      0.42
+    ],
+    "tome_width_front": 0.151,
+    "shorts_hem_z": 0.127,
+    "leg_cuff_z": [
+      0.022,
+      0.217
+    ],
+    "boots_top_z": 0.085,
+    "boots_width": 0.534,
+    "tail_z": [
+      0.085,
+      0.316
+    ],
+    "tail_depth": 0.308,
+    "paws_width": 0.852,
+    "chest_V_z": 0.477
+  },
+  "arm_angle_from_vertical_deg": 45.0,
+  "part_triangles": {
+    "Shihtzu_head": 5804,
+    "Shihtzu_eye_R": 748,
+    "Shihtzu_eye_L": 748,
+    "Shihtzu_ear_L": 4032,
+    "Shihtzu_ear_R": 4032,
+    "Shihtzu_topknot": 1580,
+    "Shihtzu_body": 7868,
+    "Shihtzu_arm_L": 864,
+    "Shihtzu_arm_R": 864,
+    "Shihtzu_tabard": 852,
+    "Shihtzu_cloak": 1020,
+    "Shihtzu_tail": 800,
+    "tome": 736
+  },
+  "triangles": 29948,
+  "head_face_eyes_locks_topknot_triangles": 16944,
+  "model_render": {
+    "face_width_between_locks_W(z above chin: width)": {
+      "0.150": 1.025,
+      "0.200": 1.052,
+      "0.262": 1.016,
+      "0.320": 0.995
+    },
+    "head_with_locks_max_width_W": 1.857,
+    "head_with_locks_widest_at_z_W": 0.28,
+    "front_silhouette_width_frac_total(at height frac)": {
+      "0.95": 0.476,
+      "0.74": 0.81,
+      "0.56": 0.733,
+      "0.50": 0.62,
+      "0.40": 0.758,
+      "0.32": 0.851,
+      "0.25": 0.656,
+      "0.15": 0.441,
+      "0.05": 0.529
+    },
+    "top_of_figure_m": 1.334,
+    "bottom_of_figure_m": -0.003,
+    "side_depth_at_nose_height_W": 1.416,
+    "nose_tip_ahead_of_iris_front_W": 0.189
+  }
+}

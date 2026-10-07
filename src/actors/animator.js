@@ -6,6 +6,8 @@ import { LIFE_ACTIONS } from './lifePoses.js';
 import { CHARGE_ACTIONS } from './chargePoses.js';
 import { SAMURAI_ACTIONS, SAMURAI_OVERRIDES, SAMURAI_FLOURISH } from './samuraiPoses.js';
 import { POE_ACTIONS } from './poePoses.js';
+import { SHIHTZU_ACTIONS } from './shihtzuPoses.js';
+import { GOLDEN_ACTIONS } from './goldenPoses.js';
 
 // a lid's rest orientation, then a turn of `a` about the hinge axis (x, 0, z) (rig.lidTilt; no allocation per frame)
 const _lidAxis = new THREE.Vector3(), _lidQ = new THREE.Quaternion();
@@ -176,6 +178,11 @@ for (const k in SAMURAI_ACTIONS) if (!ACTIONS[k]) ACTIONS[k] = SAMURAI_ACTIONS[k
 Object.assign(ACTIONS, SAMURAI_OVERRIDES); // ('spin', 'slam': only Chewy's Whirlwind Stance / Helmet Splitter play them)
 // Poe's fūma slashes, throw and catch, hand seal, Shadow Step and sneeze (poePoses.js, docs/POE.md)
 for (const k in POE_ACTIONS) if (!ACTIONS[k]) ACTIONS[k] = POE_ACTIONS[k];
+// the Shih Tzu's flail swings and hexes (shihtzuPoses.js, docs/SHIHTZU.md); A.flailDir / A.flailW guide his flail's chain
+for (const k in SHIHTZU_ACTIONS) if (!ACTIONS[k]) ACTIONS[k] = SHIHTZU_ACTIONS[k];
+// the Golden Retriever dragoon's lance thrusts, javelin throws and the Jump (goldenPoses.js, docs/GOLDEN.md); A.lanceDir /
+// A.lanceUp / A.lanceW aim his lance, A.lanceTwo puts the left paw on its shaft, A.javW / A.javDir show a javelin in his paw
+for (const k in GOLDEN_ACTIONS) if (!ACTIONS[k]) ACTIONS[k] = GOLDEN_ACTIONS[k];
 export { ACTIONS };
 
 const zero = () => ({ x: 0, y: 0, z: 0 });
@@ -239,6 +246,14 @@ export class Animator {
     this.phase += (this.speed / stride) * dt * Math.PI;
     // action timing
     const A = this.A || (this.A = newPose()); clearPose(A);
+    // a rig stance (a held weapon's guard, e.g. the dragoon's two-handed lance: goldenGear.js sets this.stance while it's
+    // drawn): stance(A, t, k, anim) adds its key pose at k, eased in while no action plays and out while one does (an
+    // action whose def has `stance: true` keeps it; one with `guard: true` starts and ends on the guard in its own keys,
+    // so the hand-over is a cut, not a blend)
+    const ca = this.action, own = !!ca?.def.guard;
+    const stk = this.stanceK = !this.stance ? 0 : own ? 0 : this._ownPrev && !ca ? 1 : damp(this.stanceK || 0, ca && !ca.def.stance ? 0 : 1, 12, dt);
+    this._ownPrev = own;
+    if (this.stance && stk > 0.001) this.stance(A, this.t, stk, this);
     if (this.action) {
       const a = this.action; a.t += dt;
       const u = a.def.hold ? a.t : clamp(a.t / a.dur);
@@ -335,12 +350,17 @@ export class Animator {
   }
   poseQuad(dt, A) {
     const P = this.P, mv = this.move, ph = this.phase, t = this.t, gal = this.gallop || 0;
-    const amp = (0.75 + gal * 0.2) * mv; // (a gallop reaches further: see update's stride)
+    // in the air (Shadow the dragon whelp: actors/whelp.js sets fly 0..1, flyLift m, flyPitch / flyBank rad on a rig whose
+    // root turns 'YXZ'): the legs tuck (the front ones folded under the chest, the hind ones trailing, paddling a little),
+    // the whole rig lifts and pitches nose-down with speed, the head counters it to look ahead, the tail streams back
+    const fly = this.fly || 0;
+    const amp = (0.75 + gal * 0.2) * mv * (1 - fly); // (a gallop reaches further: see update's stride)
     const [FL, FR, BL, BR] = P.legs;
     const s = Math.sin(ph);
     const sitting = this.action?.name === 'sit';
-    this._set(FL, s * amp, 0, 0); this._set(BR, s * amp, 0, 0);
-    this._set(FR, -s * amp, 0, 0); this._set(BL, -s * amp, 0, 0);
+    const pf = fly * (0.95 + Math.sin(t * 6.5) * 0.08), pb = fly * (1.2 + Math.sin(t * 6.5 + 1.4) * 0.12);
+    this._set(FL, s * amp + pf, 0, -0.08 * fly); this._set(BR, s * amp + pb, 0, 0.1 * fly);
+    this._set(FR, -s * amp + pf, 0, 0.08 * fly); this._set(BL, -s * amp + pb, 0, -0.1 * fly);
     // sit: the body pitches up at the front so the rump settles onto the ground (only the body drops, the front paws stay
     // planted), the haunches come down and the hind legs fold forward along the ground; the head counter-tilts to look ahead
     const sk = sitting ? ease.outQuad(Math.min(1, this.action.t / 0.3)) : 0;
@@ -351,12 +371,13 @@ export class Animator {
     // A.y already lifts/lowers the whole rig through rig.offsetY (as for bipeds), so it is not added to the body again
     P.body.position.y = rb.p.y + bob * 0.03 * mv + Math.sin(t * 2.4) * 0.006 - 0.045 * sk;
     P.body.rotation.set(rb.r.x + A.body.x + Math.sin(ph * 2) * (0.03 + gal * 0.04) * mv, A.body.y, Math.sin(ph) * 0.04 * mv);
-    this._set(P.head, Math.sin(ph * 2) * 0.05 * mv + A.head.x + Math.sin(t * 0.8) * 0.03, Math.sin(t * 0.43) * 0.25 * (1 - mv) + A.head.y, Math.sin(t * 0.61) * 0.08 * (1 - mv) + A.head.z);
-    const sc = this.rig.spec.scale || 1, sq = A.sq;
+    this._set(P.head, Math.sin(ph * 2) * 0.05 * mv + A.head.x + Math.sin(t * 0.8) * 0.03 - fly * (this.flyPitch || 0) * 0.75, Math.sin(t * 0.43) * 0.25 * (1 - mv) + A.head.y, Math.sin(t * 0.61) * 0.08 * (1 - mv) + A.head.z);
+    const sc = (this.rig.spec.scale || 1) * (this.grow || 1), sq = A.sq; // (grow: Dragon Heart's huge Shadow, combat/goldenWhelp.js)
     this.rig.root.scale.set(sc * (1 + sq * 0.5), sc * (1 - sq), sc * (1 + sq * 0.5));
-    this.rig.offsetY = A.y;
+    this.rig.offsetY = A.y + fly * (this.flyLift || 0);
+    if (this.flyRig) { this.rig.root.rotation.x = fly * (this.flyPitch || 0); this.rig.root.rotation.z = fly * (this.flyBank || 0); }
     this.secondary(dt, A, bob, mv);
-    if (P.tail) P.tail.rotation.set(-0.3, Math.sin(t * (14 + this.mood * 10)) * (0.5 + this.mood * 0.4), 0);
+    if (P.tail) P.tail.rotation.set(-0.3 + 0.4 * fly, Math.sin(t * (14 + this.mood * 10)) * (0.5 + this.mood * 0.4) * (1 - 0.6 * fly), 0);
   }
   secondary(dt, A, bob, mv) {
     const P = this.P;
@@ -380,7 +401,7 @@ export class Animator {
         const b = Math.tanh(S.a * 0.25 * g / 0.35) * 0.35;
         e.rotation.set(r.r.x + b, r.r.y, r.r.z + (i ? -1 : 1) * S.a * 0.12 * (g - 1));
       }
-      else e.rotation.set(r.r.x + S.a * (e.userData.soft ? 0.9 : 0.4), r.r.y, r.r.z + (i ? -1 : 1) * S.a * 0.2);
+      else { const ed = (this.rig.earDamp ?? 1) * (1 - 0.25 * (this.fly || 0)); e.rotation.set(r.r.x + S.a * (e.userData.soft ? 0.9 : 0.4) * ed, r.r.y, r.r.z + (i ? -1 : 1) * S.a * 0.2 * ed); } // (earDamp: the whelp's ears come up through hood slits; heroModels.js)
     });
     if (P.scarfTail) {
       const S = this.scarf; const target = mv * 0.9 + Math.sin(this.t * 3) * 0.1 * mv;

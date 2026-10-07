@@ -1,0 +1,205 @@
+/* Phones and tablets (ui/mobile.js, docs/CONTROLS.md §12, ROADMAP CT-5). .m-touch: a touch-first screen (or touch
+   playing); .m-phone: its short side is 500 px or less; .m-tablet: bigger. --sa-t/r/b/l: the safe area (notches, the
+   home bar) in CSS px. --m-pscale: the menus' zoom (0.86 on a phone: the design's 14 px is 12 on screen). --m-top /
+   --m-bot / --m-side: the panels' margins in their own (zoomed) px. */
+html, body { height: 100%; height: 100dvh; }
+.m-safe { position: fixed; left: 0; top: 0; width: 0; height: 0; visibility: hidden; pointer-events: none;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+/* a touch-only twin of the .kbm-only / .pad-only hints (pad.css) */
+body:not(.touch-active) .touch-only { display: none !important; }
+
+/* ---------------------------------------------------------------- every layer inside the safe area */
+.ui-root.m-touch { --sa-t: 0px; --sa-r: 0px; --sa-b: 0px; --sa-l: 0px; }
+.ui-root.m-touch .l-hud { inset: calc(var(--sa-t) / var(--ui-scale)) calc(var(--sa-r) / var(--ui-scale)) calc(var(--sa-b) / var(--ui-scale)) calc(var(--sa-l) / var(--ui-scale)); }
+.ui-root.m-touch .l-msg { zoom: var(--m-mscale); inset: calc(var(--sa-t) / var(--m-mscale)) calc(var(--sa-r) / var(--m-mscale)) calc(var(--sa-b) / var(--m-mscale)) calc(var(--sa-l) / var(--m-mscale)); }
+.ui-root.m-touch .l-dlg { zoom: var(--m-pscale); inset: calc(var(--sa-t) / var(--m-pscale)) calc(var(--sa-r) / var(--m-pscale)) calc(var(--sa-b) / var(--m-pscale)) calc(var(--sa-l) / var(--m-pscale)); }
+.ui-root.m-touch .l-panels { zoom: var(--m-pscale); }
+.ui-root.m-touch :is(.tt, .pop-box) { zoom: var(--m-pscale); }
+
+/* ---------------------------------------------------------------- the menus on a phone: one panel, fitted, scrolling inside */
+.ui-root.m-phone .pw:not(.side-bottom) { left: 50%; right: auto; top: var(--m-top); bottom: var(--m-bot); transform: translateX(-50%); translate: none !important;
+  display: flex; flex-direction: column; justify-content: center; align-items: center; max-width: calc(100% - 2 * var(--m-side)); }
+.ui-root.m-phone .pw:not(.side-bottom) > .panel { max-height: 100%; max-width: 100%; min-height: 0; display: flex; flex-direction: column; padding-bottom: 14px; }
+.ui-root.m-phone .pw:not(.side-bottom) .pb { order: 1; flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; touch-action: pan-y;
+  scrollbar-width: thin; scrollbar-color: rgba(74, 44, 42, .35) transparent; padding-right: 2px; }
+.ui-root.m-phone .pw.m-back { display: none !important; }
+/* the title, the tabs and the close button sit at the bottom, where the thumbs are */
+.ui-root.m-phone .pw:not(.side-bottom) .ph { order: 2; margin: 10px 0 -4px; cursor: default; flex: none; }
+.ui-root.m-phone .pw:not(.side-bottom) .ph-x { position: relative; right: auto; top: auto; width: 52px; height: 52px; flex: none; margin-left: 6px; }
+.ui-root.m-phone .pw:not(.side-bottom) .ph-x .gl { width: 24px; height: 24px; }
+.ui-root.m-phone .pw:not(.side-bottom) .ph-tag { font-size: 20px; padding: 6px 14px 8px 8px; }
+.ui-root.m-phone .pw .deco { display: none; }
+/* tabs at the top of a body (the shop's Buy / Sell, the skill trees, the journal, the pantry's kinds) follow the bar */
+.ui-root.m-phone .pw:not(.side-bottom) .pb:has(> .tabs) { display: flex; flex-direction: column; }
+.ui-root.m-phone .pw:not(.side-bottom) .pb > .tabs { order: 9; position: sticky; bottom: 0; z-index: 4; margin: 8px -4px 0; padding: 8px 4px 2px;
+  background: #fff3e2; border-top: 2px dashed rgba(74, 44, 42, .16); box-shadow: 0 -10px 12px -8px rgba(74, 44, 42, .18); }
+/* cooking and the workbench (a fixed 452 px two-column body): the panel takes the screen's height, the list and the
+   details scroll on their own, so Cook / Craft stays in sight at the details' foot */
+.ui-root.m-phone .pw:not(.side-bottom):has(.ck) > .panel { height: 100%; }
+.ui-root.m-phone .pw:not(.side-bottom) .pb:has(> .ck) { display: flex; flex-direction: column; overflow: hidden; }
+.ui-root.m-phone .pw:not(.side-bottom) .pb > .ck { flex: 1 1 auto; height: auto; min-height: 0; }
+.ui-root.m-phone .pw .ck :is(.ck-det, .ck-mix) { overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; touch-action: pan-y; scrollbar-width: thin; scrollbar-color: rgba(74, 44, 42, .35) transparent; }
+.ui-root.m-phone .pw .ck :is(.ck-det, .ck-mix) > * { flex-shrink: 0; } /* (scroll, never squash the recipe's card) */
+.ui-root.m-phone .pw .ck :is(.ck-go-row, .mx-go) { position: sticky; bottom: 0; z-index: 2; padding-bottom: 4px; background: linear-gradient(rgba(255, 243, 226, 0), #fff3e2 14px); }
+/* the character sheet's "Shift+click spends 5" has no touch equivalent */
+body.touch-active .ch-pts .tt-dim { display: none; }
+/* the seed picker: room above the cards for the picked one's lift (the body scrolls, so it would clip) */
+.ui-root.m-phone .p-seeds .pb { padding-top: 12px; }
+/* the Travel Map: the painted map at 0.76 so all of it shows, the details beside it scrolling, Travel always in sight */
+.ui-root.m-phone .p-travel .tv-map { zoom: .76; }
+.ui-root.m-phone .p-travel .tv-side { max-height: 334px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; touch-action: pan-y; scrollbar-width: thin; scrollbar-color: rgba(74, 44, 42, .35) transparent; }
+.ui-root.m-phone .p-travel .tv-go { position: sticky; bottom: 0; z-index: 3; flex: none; }
+/* a modal (the game menu) scrim covers the screen, whatever the panel's box */
+.ui-root.m-phone .pw .modal-bg { position: fixed; inset: -50vh -50vw; left: -50vw; top: -50vh; width: 200vw; height: 200vh; }
+
+/* 44 px touch targets (the design's 52 px at 0.86): tabs, small buttons, toggles, segments, dialogue choices */
+.ui-root.m-touch .pw :is(.tab, .btn, .seg button) { min-height: 52px; }
+.ui-root.m-touch .pw .btn.sm { padding-top: 9px; padding-bottom: 10px; }
+.ui-root.m-touch .pw .tog { position: relative; }
+.ui-root.m-touch .pw .tog::after { content: ''; position: absolute; inset: -12px -6px; }
+.ui-root.m-touch .dch { min-height: 52px; }
+.ui-root.m-touch .dch > .kc { display: none; }
+.ui-root.m-touch .dlg { max-width: calc(100vw / var(--m-pscale) - 24px); }
+
+/* ---------------------------------------------------------------- the pair flip (a shop or the stash beside the bag) */
+.m-flip { position: fixed; left: 50%; top: calc(var(--sa-t, 0px) + 6px); z-index: 30; display: none; gap: 6px; padding: 5px; transform: translateX(-50%);
+  background: linear-gradient(#fffdf8, #fff0de); border: 3px solid var(--ink); border-radius: 999px; box-shadow: 0 3px 0 var(--ink), 0 8px 16px rgba(50, 22, 34, .25); pointer-events: auto; }
+.ui-root.m-phone .m-flip.on { display: flex; }
+.m-flip button { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border: 2.5px solid transparent; border-radius: 999px; background: none; font: 700 14px var(--font); color: var(--ink2); cursor: pointer; }
+.m-flip button .gl { width: 20px; height: 20px; }
+.m-flip button.on { background: linear-gradient(#ffc6d8, #ff8fb0); color: #fff; border-color: var(--ink); -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; box-shadow: 0 2px 0 var(--ink); }
+.m-flip button::after { content: ''; position: absolute; }
+.ui-root.m-phone.paused .m-flip { display: none; }
+
+/* ---------------------------------------------------------------- portrait: turn the phone */
+.m-rotate { position: fixed; inset: 0; z-index: 200; display: none; place-items: center; padding: 24px; pointer-events: auto; touch-action: none;
+  background: radial-gradient(circle at 50% 38%, #fff6e8, #ffd8e6 70%, #f6c2d6); }
+.ui-root.m-portrait .m-rotate { display: grid; }
+.mr-card { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 320px; text-align: center; color: var(--ink); }
+.mr-card b { font: 700 26px/1.1 var(--font); -webkit-text-stroke: 0; }
+.mr-card span { font: 600 16px/1.35 var(--font); color: var(--ink2); }
+.mr-phone { position: relative; width: 74px; height: 128px; margin: 10px 0 18px; border: 5px solid var(--ink); border-radius: 18px; background: linear-gradient(#fffdf8, #ffeedd);
+  box-shadow: 0 6px 0 rgba(74, 44, 42, .3); animation: mrTurn 2.6s var(--soft, ease) infinite; }
+.mr-phone::before { content: ''; position: absolute; left: 50%; top: 7px; width: 20px; height: 5px; margin-left: -10px; border-radius: 3px; background: var(--ink); opacity: .35; }
+.mr-scr { position: absolute; inset: 18px 9px; border-radius: 9px; display: grid; place-items: center; background: linear-gradient(160deg, #bff0ff, #ffd6e6); color: #ff8fb0; }
+.mr-scr .gl { width: 34px; height: 34px; filter: drop-shadow(0 2px 0 rgba(74, 44, 42, .35)); }
+@keyframes mrTurn { 0%, 18% { transform: rotate(0); } 50%, 80% { transform: rotate(-90deg); } 100% { transform: rotate(0); } }
+
+/* ---------------------------------------------------------------- the build and decorate palettes on a phone */
+.ui-root.m-phone .pw.side-bottom { left: calc(var(--sa-l) / var(--m-pscale)); right: calc(var(--sa-r) / var(--m-pscale)); transform: none; }
+.ui-root.m-phone .pw.side-bottom .panel.p-build { width: auto; padding: 6px 10px 4px; }
+.ui-root.m-phone .p-build .ph { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; touch-action: pan-x; padding: 4px 64px 6px 2px; margin: 0 -4px; }
+.ui-root.m-phone .p-build .ph::-webkit-scrollbar { display: none; }
+.ui-root.m-phone .p-build .ph > * { flex: none; }
+.ui-root.m-phone .p-build .ph-x { position: absolute; top: 4px; right: 6px; width: 52px; height: 52px; }
+.ui-root.m-phone :is(.bd-side, .dc-side) { display: none !important; }
+.ui-root.m-phone .p-build :is(.bd-cards, .dc-cards) { touch-action: pan-x; padding-top: 8px; }
+.ui-root.m-phone .p-build .cd-art { height: 52px; }
+.ui-root.m-phone .p-build .cd-n { min-height: 0; }
+/* something in hand: the palette folds down to its tab bar (ui/touch.js .tc-placing) */
+.ui-root.m-phone.tc-placing .pw.side-bottom .pb { display: none; }
+/* decorating on touch: the orbs and the skill-point pill step down out of the way, as in build mode (they would peek
+   over the folded palette) */
+.ui-root.m-touch.decorating .hud-bc { transform: translate(-50%, 110%); opacity: 0; }
+
+/* ---------------------------------------------------------------- per panel, on a phone */
+/* toasts step aside while a menu fills the screen (build and decorate keep theirs) */
+.ui-root.m-phone.has-panel:not(.building):not(.decorating) .toasts { opacity: 0; }
+/* the flip between a pair's panels: a tab column on the left edge, by the thumb */
+.ui-root.m-phone .m-flip { left: calc(var(--sa-l, 0px) + 8px); top: auto; bottom: calc(var(--sa-b, 0px) + 12px); transform: none; flex-direction: column; border-radius: 26px; }
+.ui-root.m-phone .m-flip button { min-height: 46px; flex-direction: column; gap: 2px; padding: 4px 10px; font-size: 12px; border-radius: 20px; }
+.ui-root.m-phone .m-flip button .gl { width: 24px; height: 24px; }
+/* rows that run wider than a phone: settings wrap, tab rows scroll sideways */
+.ui-root.m-phone .pw .set-row { flex-wrap: wrap; row-gap: 6px; }
+.ui-root.m-phone .pw .tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; max-width: 100%; }
+.ui-root.m-phone .pw .tabs::-webkit-scrollbar { display: none; }
+.ui-root.m-phone .pw .tabs > * { flex: none; }
+/* the skill trees' three tabs share the row on a phone, whatever the hero ("Starlight Kibble", "Ghostlight Tome"): the
+   name wraps to two lines, the points badge sits on the tab's corner, and the row doesn't scroll */
+.ui-root.m-phone .pw .sk-tabs { overflow: visible; padding-top: 12px; }
+.ui-root.m-phone .pw .sk-tabs .tab { flex: 1 1 0; min-width: 0; position: relative; justify-content: flex-start; gap: 5px; padding: 5px 9px 6px 8px; }
+.ui-root.m-phone .pw .sk-tabs .tab .gl { flex: none; }
+.ui-root.m-phone .pw .sk-tabs .tab > span { min-width: 0; white-space: normal; text-align: left; line-height: 1.04; }
+.ui-root.m-phone .pw .sk-tabs .tab .tab-n { position: absolute; right: -7px; top: -10px; z-index: 1; }
+.ui-root.m-touch .pw .tab .kc, .ui-root.m-touch :is(.gf-k, .sp-k) { display: none; }
+/* sliders: a 44 px track to grab, the bar drawn in the middle of it */
+.ui-root.m-touch .sld input[type=range] { height: 52px; border: 0; border-radius: 0; background: none; touch-action: none; }
+.ui-root.m-touch .sld input[type=range]::-webkit-slider-runnable-track { height: 22px; border-radius: 12px; border: 3px solid var(--ink); background: linear-gradient(90deg, #ffb3c9 0, #ff8fb0 var(--p, 50%), #f3e3cf var(--p, 50%)); }
+.ui-root.m-touch .sld input[type=range]::-moz-range-track { height: 16px; border-radius: 12px; border: 3px solid var(--ink); background: linear-gradient(90deg, #ffb3c9 0, #ff8fb0 var(--p, 50%), #f3e3cf var(--p, 50%)); }
+.ui-root.m-touch .sld input[type=range]::-webkit-slider-thumb { width: 36px; height: 36px; margin-top: -10px; }
+/* the controls panel's device tabs, the cook's and workbench's quantity buttons, remodel's chips, a guide's Skip */
+.ui-root.m-touch .ctl-tabs button { min-height: 52px; padding: 0 16px; }
+.ui-root.m-touch .pw :is(.rm-o.chip, .rm-o.sw) { min-height: 52px; min-width: 52px; }
+.ui-root.m-touch .tut-dock .to-skip { padding: 10px 14px; margin: -10px -8px; }
+/* the K panel's charge drawer: folded to its tag at the panel's top right, a sheet over the tree when opened */
+.ui-root.m-phone .chg-drawer { left: auto; right: 10px; top: 10px; width: min(380px, 74%); z-index: 6; border-left-width: 4px; border-radius: 22px; padding: 30px 14px 12px;
+  max-height: calc(100% - 20px); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+.ui-root.m-phone .chg-drawer:not(.m-open) { width: auto; padding: 0; border: 0; background: none; box-shadow: none; overflow: visible; }
+.ui-root.m-phone .chg-drawer:not(.m-open) > :not(.chg-tag) { display: none !important; }
+.ui-root.m-phone .chg-drawer:not(.m-open) .chg-tag { position: relative; left: 0; top: 0; transform: rotate(-2deg); }
+.ui-root.m-phone .chg-drawer .chg-tag { min-height: 52px; cursor: pointer; pointer-events: auto; }
+.ui-root.m-phone .chg-drawer.m-open .chg-tag { top: -14px; }
+/* the reel bar (in the HUD's 0.62) and the title screen at a phone's size */
+.ui-root.m-phone .reel .rl-hint { font-size: 20px; }
+/* the reel's touch hint: a paw cap (touch's mark, as on the prompt) over "hold to reel" */
+.rl-tap { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; color: #fff; background: linear-gradient(#ffc6d8, #ff8fb0);
+  border: 2px solid var(--ink); box-shadow: 0 2px 0 var(--ink); }
+.rl-hint .rl-tap .gl { width: 12px; height: 12px; }
+.ui-root.m-phone .reel .rl-tap { width: 34px; height: 34px; border-width: 3px; }
+.ui-root.m-phone .reel .rl-tap .gl { width: 20px; height: 20px; }
+.ui-root.m-phone .reel .rl-name { font-size: 20px; }
+.ui-root.m-touch :is(.ti-center, .ti-foot) { zoom: var(--m-pscale); }
+.ui-root.m-touch .ti-btns .btn { min-height: 52px; }
+/* a phone's title: the logo a little smaller, the three buttons in a row under it */
+.ui-root.m-phone .ti-center { top: 47%; }
+.ui-root.m-phone .ti-logo { zoom: .78; }
+.ui-root.m-phone .ti-sub { margin: 2px 0 16px; font-size: 24px; }
+.ui-root.m-phone .ti-btns { flex-direction: row; width: auto; gap: 12px; }
+.ui-root.m-phone .ti-btns .btn { padding: 12px 22px; font-size: 21px; }
+.ui-root.m-phone .ti-foot { bottom: calc(var(--sa-b, 0px) / var(--m-pscale) + 6px); }
+/* small buttons are at least as wide as they are tall (the cook's − / +), the zone and path tools too; a guide's dock
+   is the menus' size, not the HUD's */
+.ui-root.m-touch .pw .btn.sm { min-width: 52px; justify-content: center; }
+.ui-root.m-touch .pw .zone { min-height: 52px; min-width: 52px; }
+.ui-root.m-touch :is(.tut-dock, .tut-flash) { zoom: var(--m-pscale); }
+/* a guide's dock and offer on a phone: in the free band along the top, between the top-left card and the hero / bag /
+   menu buttons (ui/touch.js layout: --tc-band-l / -w), so it never covers the buttons it talks about */
+.ui-root.m-phone.touch-ui .tut-top { left: var(--tc-band-l, 0px); right: auto; width: var(--tc-band-w, 100%); }
+.ui-root.m-phone.touch-ui .tut-dock { width: min(600px, calc(var(--tc-band-w, 516px) / var(--m-pscale))); }
+.ui-root.m-phone.touch-ui .tut-offer { max-width: calc(var(--tc-band-w, 516px) / var(--ui-scale)); }
+/* while a guide speaks (its bubble over the objective) the toasts would stack under the dock: they step aside */
+.ui-root.m-phone:has(.tut.on .tut-say.on) .toasts { opacity: 0; }
+.ui-root.m-touch .tut-dock .to-skip { min-height: 52px; display: inline-flex; align-items: center; }
+.ui-root.m-phone .reel .rl-ex { font-size: 22px; }
+.ui-root.m-phone .pw:not(.side-bottom) .pb:has(> .tabs) > * { flex-shrink: 0; } /* (a scrolling tab row would shrink to nothing in the column) */
+
+/* ---------------------------------------------------------------- the bag on a phone: a compact paperdoll, the grid in sight */
+/* the doll becomes a strip of two 52 px rows (44 on screen): the weapon | hat, collar | outfit, boots | the portrait |
+   charms | paws, the weapon swap | the second weapon. The slot names hide (an empty slot shows its silhouette and a long
+   press names it), the stats stay one row, and two to three rows of the bag show under them */
+.ui-root.m-phone .p-inv .doll { height: auto; margin-bottom: 6px; display: grid; grid-template-columns: 52px 52px 52px 1fr 52px 52px 52px; grid-template-rows: 52px 52px; gap: 6px 8px; padding: 6px 10px; }
+.ui-root.m-phone .p-inv .doll .eq-l { display: none; }
+.ui-root.m-phone .p-inv .doll .slot.eq { position: relative; left: auto !important; top: auto !important; width: 52px; height: 52px; }
+.ui-root.m-phone .p-inv .doll .slot.eq.tall { height: auto; }
+.ui-root.m-phone .p-inv .doll .slot[data-i="weapon"] { grid-area: 1 / 1 / 3 / 2; }
+.ui-root.m-phone .p-inv .doll .slot[data-i="hat"] { grid-area: 1 / 2; }
+.ui-root.m-phone .p-inv .doll .slot[data-i="collar"] { grid-area: 2 / 2; }
+.ui-root.m-phone .p-inv .doll .slot[data-i="outfit"] { grid-area: 1 / 3; }
+.ui-root.m-phone .p-inv .doll .slot[data-i="boots"] { grid-area: 2 / 3; }
+.ui-root.m-phone .p-inv .doll .slot[data-i="charm1"] { grid-area: 1 / 5; }
+.ui-root.m-phone .p-inv .doll .slot[data-i="charm2"] { grid-area: 2 / 5; }
+.ui-root.m-phone .p-inv .doll .slot[data-i="paws"] { grid-area: 1 / 6; }
+.ui-root.m-phone .p-inv .doll .slot[data-i="weaponAlt"] { grid-area: 1 / 7 / 3 / 8; }
+.ui-root.m-phone .p-inv .doll .wswap { position: relative; left: auto; bottom: auto; grid-area: 2 / 6; width: 52px; height: 52px; border-radius: 15px; }
+.ui-root.m-phone .p-inv .doll .wswap > .gl { width: 24px; height: 24px; }
+.ui-root.m-phone .p-inv .doll-por { top: 5px; width: 100px; height: 100px; margin-left: -50px; border-width: 3.5px; box-shadow: 0 0 0 5px rgba(255, 255, 255, .7); }
+.ui-root.m-phone .p-inv .doll-name { top: auto; bottom: 3px; padding: 2px 9px 3px; font-size: 14px; }
+.ui-root.m-phone .p-inv .inv-stats { gap: 6px; margin-bottom: 6px; }
+.ui-root.m-phone .p-inv .ist { padding: 2px 8px 2px 4px; }
+.ui-root.m-phone .p-inv .ist .gl { width: 18px; height: 18px; }
+.ui-root.m-phone .p-inv .ist b { font-size: 15px; }
+.ui-root.m-phone .p-inv .pb > .grid.g10 { padding: 6px; }
+/* touch: the weapon swap's key cap, and the character sheet's + buttons at 44 px */
+body.touch-active .wswap .kc { display: none; }
+.ui-root.m-touch .p-char .at-plus { width: 52px; height: 52px; border-radius: 14px; }
+.ui-root.m-touch .p-char .at-plus .gl { width: 22px; height: 22px; }

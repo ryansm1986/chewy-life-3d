@@ -1,6 +1,6 @@
 # Zones: rescue the village, clear its dungeon, then push tiers (design)
 
-Status: **phase A built** (designed 2026-10-05; sprint and the foundations: §8.1, §9.1); **phase D: Takemori Village (bamboo) built** (§2.1). The work is tracked in [ROADMAP.md](ROADMAP.md); this file is the design.
+Status: **phases A–D built** (designed 2026-10-05; sprint and the foundations §8.1, §9.1; the dungeons §8.2; the villages §2.1, §2.2); **phase E: tiers and modifiers built, in review** (§5.1; the Spirit Lantern and the endgame next). The work is tracked in [ROADMAP.md](ROADMAP.md); this file is the design.
 
 The owner's direction (2026-10-05):
 - Every zone has **a village to save** from monsters.
@@ -294,14 +294,27 @@ services in `talk.js`, the quests in `world/zoneQuests.js`.
 - **Rewards**: the first clear gives the zone unique and a guaranteed rare; repeats give normal loot.
 
 ## 5. Tiers, the endgame and modifiers (PoE maps, player-picked)
+**The owner's decisions (2026-10-07):**
+- **The Burrow gets tiers and modifiers too**, at its own Spirit Lantern by the Burrow door: the **Deep Burrow** tier run
+  (§5.1). The Spirit endgame opens when **all four zone dungeons are cleared at T5** (the Burrow is optional for the
+  unlock); then Spirit tiers run in all five dungeons.
+- **Runs are free**: no Spirit Wicks, no cost. Pick a tier and modifiers and go. (The wick idea is dropped.)
+- **5 tiers** (T1–T5), each +4 monster levels (cap 60), with rising base pack size, rare chance and reward multipliers.
+  Modifier slots: T1 1, T2 2, T3 2, T4 3, T5 3, Spirit 4–6.
+- **The pinnacle boss at Spirit Tier 10** is a **remixed "all four" fight**: Master Tengu, Danzaburō, Umibōzu and
+  Yuki-onna return in phases in one arena, their mechanics combined and retuned for the endgame. It reuses their code
+  and models: a remix, not new art.
+
+The design:
 - **Tiers**:
   - After the first clear, the gate's **Spirit Lantern** (the modifier device) offers **Tier 1**. Clearing a tier unlocks the next, up to **T5**.
-  - Monster level: T0 is the zone band; each tier adds about +4 (capped at 60).
+  - Monster level: T0 is the zone band; each tier adds +4 (capped at 60).
   - Each tier also raises the base pack size, the rare chance and the reward multipliers.
 - **Endgame: Spirit tiers.**
-  - Once **all four zone dungeons are cleared at T5**, every zone dungeon offers **Spirit Tier 1…∞**.
+  - Once **all four zone dungeons are cleared at T5**, every tier dungeon (the four and the Deep Burrow) offers
+    **Spirit Tier 1…∞**.
   - Monster level is pinned at 60. Difficulty grows with stacking multipliers (life, damage, pack size).
-  - **Spirit Tier 10** has a pinnacle boss variant.
+  - **Spirit Tier 10** (and every 10th) has the pinnacle "all four" fight.
   - Rewards scale with the tier: item quantity and rarity, and a chance at endgame uniques.
 - **Modifier slots**, filled by the player at the Lantern before entering. Each modifier adds difficulty and a reward
   bonus:
@@ -313,7 +326,7 @@ services in `talk.js`, the quests in `world/zoneQuests.js`.
   | T3 | 2 |
   | T4 | 3 |
   | T5 | 3 |
-  | Spirit | 4–6 |
+  | Spirit | 4 (S1–4), 5 (S5–9), 6 (S10+) |
 
 - **The modifier catalogue** (the first set):
 
@@ -326,20 +339,132 @@ services in `talk.js`, the quests in `world/zoneQuests.js`.
   | Fierce | monsters +30% damage | +10% XP |
   | Stout | monsters +40% life | +10% quantity |
   | Quick | monsters +25% move and attack speed | +10% XP |
-  | Elemental (fire, frost or zap) | monsters deal +X% as that element | +8% rarity |
+  | Elemental (fire, frost or zap) | monsters deal +35% as that element | +8% rarity |
   | Warded | monsters +20% resist | +8% quantity |
   | Haunted | spirit ghosts rise from fallen monsters | +12% quantity |
   | Night March | darker, monsters more aggressive | +10% XP |
   | Hard Ground | −30% life and zoom regen for the hero | +10% rarity |
   | Boss's Wrath | the boss has +50% life, +20% damage and a new phase | +20% boss loot |
-  | Treasure Trove | +2 chests per floor | — |
+  | Treasure Trove | +2 chests per floor | — (the chests are the reward) |
   | Cursed Shrines | shrines also curse you | +10% rarity |
 
   - The total reward shows on the Lantern before entering.
   - Modifiers are **data** (`src/rpg/zoneMods.js`) applied through hooks: the pack count and size in the generator,
     spawn-time stat changes, and run-wide flags.
-  - Costs: a tier run costs a **Spirit Wick**, a cheap token from tier clears and drops, so runs feel like PoE maps
-    without item juggling. Optional, and tunable.
+  - ~~Costs: a Spirit Wick per run.~~ Dropped (the owner, 2026-10-07): runs are free.
+
+### 5.1 The design note, as built (phase E checkpoint 1: Z-E1 tiers, Z-E2 modifiers; 2026-10-07)
+Code map: `src/rpg/tiers.js` (the numbers), `src/rpg/zoneMods.js` (the catalogue and the hooks), `src/dungeon/tierRun.js`
+(the run-wide effects and the rewards, `mode.tr`), `src/rpg/zones.js` (the records), `src/dungeon/zoneMonsters/spirit.js`
+(the Haunted ghost); ARCHITECTURE.md "Tier runs".
+- **A run** is `{ tier, spirit, mods }` on top of a `DungeonDef` (`G.enterDungeon({ id, floor, tier, spirit, mods })`).
+  A Spirit run carries tier 5 (so quest filters "tier ≥ n" and the events treat it as at least T5). `normRun` caps the
+  tier at 5 and cleans the mods (known ids, no repeats, one Elemental, at most the run's slots); the endless Burrow has
+  no tiers (its tier runs are the Deep Burrow's).
+- **The tier table** (`TIERS`; monster level = the band with the hero clamped to it, +1 a floor, +4 a tier, cap 60):
+
+  | Tier | Levels (Bamboo, hero 8) | Pack size | Champion chance | Quantity | Rarity | XP | Slots |
+  |---|---|---|---|---|---|---|---|
+  | T0 (story) | 8 / 9 | ×1.00 | — | — | — | — | 0 |
+  | T1 | 12 / 13 | ×1.06 | 4% | +10% | +6% | +8% | 1 |
+  | T2 | 16 / 17 | ×1.12 | 8% | +20% | +12% | +16% | 2 |
+  | T3 | 20 / 21 | ×1.18 | 12% | +30% | +18% | +24% | 2 |
+  | T4 | 24 / 25 | ×1.24 | 16% | +40% | +24% | +32% | 3 |
+  | T5 | 28 / 29 | ×1.30 | 20% | +50% | +30% | +40% | 3 |
+
+  The champion chance is the chance that a plain room pack (not a slot's guards, not a corridor pack, no quest mark) is
+  promoted to a champion pack. The T5 levels per dungeon at the band's top: Bamboo 32, Maple 39, Tide 47, Onsen 55 (+1 on
+  floor 2); the Deep Burrow 41.
+- **Spirit S** (`spiritInfo`): level 60 everywhere; on every monster life ×(1 + 0.1 S) and damage ×(1 + 0.05 S); pack
+  size ×min(1.5, 1.3 + 0.02 S); champion chance min(30%, 20% + 1% S); rewards +50% + 6% S quantity, +30% + 4% S
+  rarity, +40% + 3% S xp; an endgame unique in the clear chest at min(25%, 3% + 1% S), and from a unique pack's leader at
+  min(3%, 0.5% + 0.1% S); slots 4 / 5 (S5) / 6 (S10). Spirit progress is shared: a Spirit S clear in any dungeon opens
+  S + 1 in all five. The pinnacle replaces the last boss on S10, S20…
+- **Rewards, summed** (`rewardTotals`: the tier's or the Spirit tier's own bonus plus every modifier's) and applied by
+  `tierRun.js`:
+  - **XP**: every kill × (1 + xp). A Haunted ghost pays a third.
+  - **Rarity**: +N% rarity is +N magic find on every kill and chest (`rollDrops`, `chestDrops`).
+  - **Quantity**: each item that drops earns floor(q) extra items plus one more at the remainder's chance (`extraItems`),
+    rolled at the same level with the run's magic find; coin piles grow by half the bonus. Chests the same.
+  - **Boss loot**: the boss's hoard rolls its extra items at quantity + boss loot.
+  - **The clear chest** (the Lantern chest that rises by the last boss of a tier or Spirit run; `clearChest`), on top of
+    a golden chest's own contents:
+
+    | Run | Rares | Magic finds | Gem | Coins (× lvl·14 + 40) | Rejuv | First clear of that tier |
+    |---|---|---|---|---|---|---|
+    | T1 | 1 | 2 | — | ×1.5 | — | +1 rare, coins ×2 |
+    | T2 | 2 | 2 | — | ×2 | — | +1 rare, coins ×2 |
+    | T3 | 2 | 2 | a chipped gem | ×2.5 | 1 | +1 rare, coins ×2 |
+    | T4 | 3 | 2 | a gem | ×3 | 1 | +1 rare, coins ×2 |
+    | T5 | 3 | 2 | a gem | ×3.5 | 1 | +1 rare, coins ×2, **the zone's boss unique again** |
+    | Spirit S | min(6, 3 + S/5) | 2 | a perfect gem | ×(3.5 + 0.25 S) | 2 | +1 rare; the endgame-unique chance; the pinnacle's own unique |
+
+    (A tier run that is somehow the dungeon's very first clear — only the debug entry can do that — also gets the boss
+    unique, so it is never lost.)
+- **The Deep Burrow** (`DUNGEONS.burrowDeep`, kind `deep`): the Burrow's tier run, fitted to its many-floor structure.
+  Two floors on its deepest themes — floor 1 the **Crystal Grotto**, floor 2 the **Moonlit Fox Sanctum** with **Tamamo**
+  in the Burrow's boss room — in the Burrow's own rooms-and-corridors layouts (gen.js), at the band of its floors 16–20
+  (levels 17–21, the hero clamped to it) +4 a tier: T5 is 37–41, Spirit 60. Its T0 is the story Burrow: **Tamamo beaten
+  on floor 20** opens T1 (live: a toast; old saves: `state.dungeon.deepest` past 20). Tier runs only (no T0 entry from
+  its Lantern), no waypoints, no Burrow records; its portals lead home to Blossom Hollow, next to its Lantern by the
+  Burrow door. Its record is `state.dungeon.deep`, the same shape as a zone dungeon's.
+- **Each modifier's hook and numbers** (`ZONE_MODS`; `layout` = `gen.js generate → layoutMods`, deterministic from the
+  floor's seed; `monster` = `monsterMods` as each run monster is built, once; `run` = `tierRun.js`):
+
+  | Modifier | Hook | Exactly |
+  |---|---|---|
+  | Swarming | layout | every pack's count ×1.4 (with the tier's ×1.06–1.30); a zone pack's cap (16) grows with it; the cluster disc widens (r = 0.62 √(n + 1), 2–4.8 m) |
+  | Teeming | layout | one more pack in every room but the arrival and the arena (zone 9–12, Burrow 3–5, then sized), on open floor clear of the arrival (5.5 cells), the stairs, the arena ring, slots, centrepieces, chests and other packs |
+  | Rally | layout | champion packs ×2 (promoted from plain room packs; a zone champion pack is 3 champions and its fodder) |
+  | Unique Hunt | layout | two plain room packs become unique packs (a named leader and its pack) |
+  | Fierce | monster | damage ×1.3 (dmg, the fire-enchant extra, auras) |
+  | Stout | monster | life ×1.4 |
+  | Quick | monster | move speed ×1.25, attack rate ×1.25 (`stats.atkMul`: every AI's cooldown ticks faster) |
+  | Elemental: Fire / Frost / Zap | monster + run | the monster carries the element (`m._el`); this floor's `combat.hitPlayer` folds 35% of each hit in as that element, after the hero's resistance to it (frost also chills 0.9 s); the monsters' ink contour turns the element's deep shade and their footprint ring its colour (elites keep theirs); embers / frost / sparks rise off the awake ones |
+  | Warded | monster | +20 to every elemental resistance, +10 physical |
+  | Haunted | run | a fallen monster rises as a Yūrei 0.75 s later: 20% of plain ones, every champion and unique (no boss, no boss adds, no ghost from a ghost), at most 24 alive; a ghost pays a third of the xp and drops only coins and potions |
+  | Night March | monster + run | attack rate ×1.12, speed ×1.08; monsters notice you from 14 m (`mode.alertR`, was 9); the cave's sky light ×0.52 and key light ×0.42 (cooled), fog and background darker, the grade's gain ×0.92 and saturation ×0.9, a deeper indigo vignette (1.2); the lanterns and the hero's light (×1.2 intensity, ×1.25 radius) keep the floor readable |
+  | Hard Ground | run | natural life and zoom regen ×0.7 (`G.regenMul` in `actions.tickRegen`; potions untouched) |
+  | Boss's Wrath | monster (boss) + run | the boss's life ×1.5 and damage ×1.2; at 40% life its **wrath**: enraged (attack rate ×1.3, speed ×1.12), a wave of 4 of the dungeon's monsters, and every 8 s a telegraphed shockwave ring (1.1 s, radius 4–6.5 m) |
+  | Treasure Trove | layout | two more golden chests a floor |
+  | Cursed Shrines | layout + run | one more shrine a floor; touching any shrine also curses you: +25% damage taken for 20 s |
+
+- **The floor ceiling** (`FLOOR_CAP`): a zone floor holds at most 340 monsters, a Deep Burrow floor 210; past that every
+  pack shrinks in proportion. T5 + Swarming + Teeming + Rally on the Bamboo Depths lands at ~330 (from ~140 at T0); a
+  Spirit 10 kitchen sink at ~300–340.
+- **Save** (`zones.js`): every tier dungeon's record is `{ cleared, bestFloor, tier: { unlocked, cleared }, spirit: { best },
+  lantern: { tier, spirit, mods } }` (`tierRecord(state, zone | dungeon id | 'burrowDeep')`). **Migration** (`fillTiers`,
+  idempotent): a zone dungeon with a clear but no tier record, and a Burrow past floor 20, start with T0 cleared and T1
+  open. `recordDungeonClear(state, id, tier, spirit)` → `{ first, cleared, tierUnlocked, firstTier, spirit }`;
+  `tierCleared` (a Spirit clear counts as T5), `tierOpen`, `spiritOpen` (all four zone dungeons at T5), `spiritBest`,
+  `spiritMax`, `rememberSetup` / `lastSetup` (the Lantern's memory).
+- **Events**: `dungeon:cleared { id, kind: 'zone' | 'deep', tier, spirit, floor, zone, boss, first, firstTier }`,
+  `tier:unlocked { id, zone, tier }` (also the Deep Burrow's T1 when Tamamo falls on a Burrow floor), and
+  `spirit:unlocked { id, zone }` on the clear that opens the endgame. `monster:killed` and the others carry
+  `{ zone, dungeon, tier, spirit }`. The quest `tier` step (`{ dungeon, n }`) reads the Deep Burrow too.
+- **The debug entry**: `G.enterDungeon({ id, floor, tier, spirit, mods })`, `?run=bambooDepths:5:swarming,teeming,rally`
+  (`:spirit` after the mods), and `G.tierDebug` (`run`, `unlock(id, tier)`, `clearAll(tier)`).
+- **The Haunted ghost, the Yūrei** (`zoneMonsters/spirit.js`, region monster kit): a little white sheet ghost with a
+  scalloped hem, a paper hitaikakushi tied on its brow, drooping "urameshiya" sleeves, big eyes and a small "oh", a cyan
+  hitodama circling it; the Sleepy Yūrei wears a floppy blue nightcap. It rises out of the fallen (a swirl of motes, a
+  soft "ooo~"), drifts after you, and boos: rears back (a small ring telegraph, 0.55 s), lunges with a chilling "boo!"
+  (frost, a 1.1 s chill). Life ×0.5, fragile; 4 parts × 2 variants (8 batches).
+- **Perf** (the horde check, `RUN=5:swarming,teeming,rally WORLDS=zone node tools/qa/profile-horde.mjs`; the machine was
+  **busy**: WardogsClient held 38% of the GPU's 3D engine and the CPU sat at 60–77%):
+  - the floor alone (335 monsters asleep, the hero idle): p95 3.9–10.3 ms, ~115 draw calls;
+  - a 150 horde fought on that floor (it wakes the floor's packs round it: ~235 awake): p95 22.7 (Chewy), 19.8 (Moka),
+    16.6 ms (Poe); 250: 19.0–22.1 ms;
+  - the same check on a T0 floor (146 monsters) in the same session: p95 28.8–32.2 ms (Chewy). The T5 floor is no
+    slower than T0 under this load; both miss the 8 ms gate only because of it. To re-run on a quiet machine.
+  - Draw calls: a T5 Swarming fight at the game camera ~340 (42 awake), a Haunted fight ~400–430.
+- **Look review**: `tools/qa/tier-shots.mjs --run <dungeon>:<tier>:<mods>` (the biggest pack near the arrival, woken, at
+  the game camera; `--kill N` fells some for Haunted).
+- **QA**: test-rpg "ZONE TIERS" (the tables, the cleaning, the summed rewards, the monster hook, the generator hook on
+  every dungeon, the save, the migration, Spirit, the chest, the Lantern's picks); gen-fuzz runs three tier setups on
+  every tier dungeon; **s30-tiers** (the migration on a real reload, a T2 run end to end with Boss's Wrath and Treasure
+  Trove, the clear's events, chest and banner, a quest's tier step, Haunted / Night March / Hard Ground, Cursed Shrines,
+  Elemental: Frost, the Deep Burrow T1 end to end).
+- **Next**: Z-E3 (the Spirit Lantern objects and panel, the run chip), Z-E4 (Spirit's endgame uniques, the pinnacle).
 
 ## 6. Elevation and depth (outdoor zones)
 - **Goal**: zones with **real playable elevation**:
@@ -481,14 +606,15 @@ services in `talk.js`, the quests in `world/zoneQuests.js`.
     quests: {...}
   }
   ```
-  The `wick` count is shared across zones.
+  (The shared `wick` count is dropped: runs are free, §5.) The Deep Burrow keeps the same dungeon record in
+  `state.dungeon.deep` (§5.1).
 - **Events**: `monster:killed` gains `{ zone, dungeon, floor, tier }`. New events: `village:saved`, `dungeon:cleared`
   `{ id, tier }`, `tier:unlocked`.
 - **Quest steps**:
   - `kill` with `zone`/`dungeon` filters;
   - new steps: `find`, `rescue`, `dungeonFloor`, `tier` and `villageSaved`;
   - the quest pointer learns about zone, gate and floor targets.
-- **The Lantern UI**: tier select, modifier slots, a reward summary, and the wick cost.
+- **The Lantern UI**: tier select, modifier slots, a reward summary (no cost: runs are free, §5).
 - **Modifier hooks**:
   - `spawnPack` (count, size, rank rolls);
   - the `Monster` constructor (stat multipliers, applied mods);
@@ -530,7 +656,7 @@ services in `talk.js`, the quests in `world/zoneQuests.js`.
   - `normalizeZones` runs at boot. It is idempotent and a max-merge.
   - Helpers: `recordDungeonClear` (a T0 clear opens T1; clearing the highest open tier opens the next, up to T5),
     `tierCleared`, `saveVillage`, `villageSaved`, `noteFloor`.
-  - The shared Spirit Wick count is left for phase E.
+  - (The shared Spirit Wick count was dropped in phase E: runs are free, §5.)
 - **Events**:
   - `monster:killed`, `boss:dead` and `mode:changed` carry `{ zone, dungeon, floor, tier }`;
   - `dungeon:cleared { id, kind, tier, floor, zone, boss, first }` fires on every Burrow boss (`id: 'burrow'`), a zone
@@ -818,6 +944,8 @@ Every phase ends with screenshots reviewed against the 9/10 quality bar, the rel
 
 ## 11. Open questions for the owner
 - The village names, and each zone's special buildings (proposals in §2).
-- Whether the **Burrow** also gets tiers and modifiers, or stays the story and starter dungeon only.
-- The tier count (5 proposed) and whether Spirit Wicks gate runs, or tiers are free to run.
-- The endgame pinnacle boss: a new boss, or a remixed "all four" fight.
+- ~~Whether the **Burrow** also gets tiers and modifiers.~~ Answered 2026-10-07: yes, at its own Spirit Lantern (the Deep
+  Burrow, §5.1); the Spirit unlock needs only the four zone dungeons at T5.
+- ~~The tier count and whether Spirit Wicks gate runs.~~ Answered 2026-10-07: 5 tiers, runs are free (no wicks).
+- ~~The endgame pinnacle boss.~~ Answered 2026-10-07: a remixed "all four" fight at Spirit 10 (Tengu, Danzaburō, Umibōzu,
+  Yuki-onna in phases in one arena; their code and models reused).

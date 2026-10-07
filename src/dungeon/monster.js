@@ -225,7 +225,7 @@ export class Monster {
     if (!stunned && target) {
       const tx = target.pos.x, tz = target.pos.z;
       const d = dist(tx, tz, this.pos.x, this.pos.z);
-      if (!this.aggro && d < 9 && this.mode.los(this.pos, target.pos)) this.alert();
+      if (!this.aggro && d < (this.mode.alertR || 9) && this.mode.los(this.pos, target.pos)) this.alert(); // (alertR: a Night March run's monsters notice you from further off, dungeon/tierRun.js)
       if (st.fear > 0) { // run away
         const away = _dir.copy(this.pos).sub(target.pos).setY(0).normalize();
         this.move(away, dt, 1.1 * slowMul); moving = true;

@@ -1,6 +1,6 @@
 // Hero roster: which hero the player controls, switching between them (with a zoom-out / zoom-in transition), and the
 // heroes nobody is playing living in Blossom Hollow as villagers (docs/HEROES.md §4-6, docs/POE.md §6).
-// Any number of heroes (classes.js HERO_IDS: Chewy, Moka, Poe): tap Tab for the next joined hero in roster order, hold
+// Any number of heroes (classes.js HERO_IDS: Chewy, Moka, Poe, the Shih Tzu, the dragoon): tap Tab for the next joined hero in roster order, hold
 // Tab for the hero wheel (ui/heroWheel.js) to pick one; the HUD shows a mini portrait per benched hero.
 //
 // One controlled body: G.player (the Player actor) always embodies the ACTIVE hero — switching swaps its rig, class and
@@ -19,6 +19,7 @@ import { Events } from '../core/events.js';
 import { Actions } from '../core/actions.js';
 import { HeroWheel } from '../ui/heroWheel.js';
 import { PoeJoin } from './poeJoin.js';
+import { ShihtzuJoin } from './shihtzuJoin.js';
 
 const V = (x, z) => new THREE.Vector3(x, 0, z);
 const ease = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
@@ -26,11 +27,14 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 const SWITCH_CD = 2;
 const WHEEL_HOLD = 0.26; // s: Tab held this long opens the hero wheel (a shorter press is a tap: the next hero)
 // where a hero who hasn't joined yet waits: Moka by the fountain (she joins in town), Poe in the Bamboo region (she joins
-// there: docs/POE.md §5) — so she isn't in town until she has joined
-const JOIN_AT = { moka: 'fountain', poe: 'bamboo' };
-const ARRIVE_PITCH = { chewy: 1, moka: 1.12, poe: 1.22 };
+// there: docs/POE.md §5), the Shih Tzu in the Maple zone at dusk (docs/SHIHTZU.md §5) — so they aren't in town until they
+// have joined, and the Golden Retriever dragoon by the hot springs in the Onsen zone (docs/GOLDEN.md §5); JOIN_HINT: what
+// the hero wheel says about a hero not met yet
+const JOIN_AT = { moka: 'fountain', poe: 'bamboo', shihtzu: 'maple', golden: 'onsen' };
+const JOIN_HINT = { moka: 'Waiting by the fountain', poe: 'Somewhere in the bamboo…', shihtzu: 'Somewhere in the maples, at dusk…', golden: 'Standing guard by the hot springs…' };
+const ARRIVE_PITCH = { chewy: 1, moka: 1.12, poe: 1.22, shihtzu: 0.88, golden: 0.96 };
 // where a hero stands when whisked home from the Burrow (beside Chewy's house door; they share the house)
-const HOME_OFS = { chewy: [1.6, 1.0], moka: [-0.2, 1.7], poe: [-1.5, 1.2] };
+const HOME_OFS = { chewy: [1.6, 1.0], moka: [-0.2, 1.7], poe: [-1.5, 1.2], shihtzu: [0.7, 2.4], golden: [-1.1, 2.7] };
 
 // what the hero you are NOT playing says when you walk up to them ({me} = the active hero's name)
 const HERO_CHAT = {
@@ -52,6 +56,20 @@ const HERO_CHAT = {
     ["I practised Substitution on Kuma's melon-pan. Now there's a chew-toy log on his counter.", 'He has not noticed yet. A true shinobi leaves no trace!'],
     ['Ah… ah… *ACHOO!* …That was a decoy sneeze. To confuse my enemies.', '{me}, you have crumbs on your nose. A shinobi notices these things.'],
   ],
+  // the Shih Tzu dark knight (docs/SHIHTZU.md): solemn about the gloom, soft about everything else
+  shihtzu: [
+    ['{me}. The gloom gathers.', '…Over the bakery, mostly. Kuma burned the melon-pan again.'],
+    ['I have been reading the tome by ghostlight. Chapter seven: The Long Dark.', 'It is about a puppy who is afraid of the dark. It ends happily. I cried a little.'],
+    ['Shall I take a turn in the Burrow? My flail grows restless.', '*squeak* …That was the flail. It is a very serious squeak.'],
+    ["The ghost pups wish to know if you have any treats.", "…I also wish to know. For the ghost pups. Solemnly."],
+  ],
+  // the Golden Retriever dragoon (docs/GOLDEN.md): earnest, sunny, a little knightly, and very easily distracted by a ball
+  golden: [
+    ['{me}! Good morning! I have polished my lance, guarded the bakery and inspected every puddle in town.', 'All clear! …Except one puddle. It looked suspicious. I jumped in it to be sure.'],
+    ['A dragoon must always be ready. Ready to leap, ready to guard, ready to—', '*ears perk* …Is that a tennis ball? No. Focus. Ready to guard.'],
+    ['Shadow is a very good dragon. I told him so twelve times today.', 'Shall I take a turn in the Burrow? My lance and I would be honoured!'],
+    ["Kuma says I can't fetch the moon. I said I could jump very high.", "He's still thinking about it. So am I."],
+  ],
 };
 
 export class HeroManager {
@@ -64,6 +82,7 @@ export class HeroManager {
     this.tab = null;     // a Tab press being timed (tap = next hero, hold = the wheel)
     this.wheel = null;   // ui/heroWheel.js (made on first use)
     this.poeJoin = new PoeJoin(G, this); // Poe's joining scene in the Bamboo Grove + the rumour in town (actors/poeJoin.js)
+    this.stzJoin = new ShihtzuJoin(G, this); // the Shih Tzu's scene in Momiji Hollow + his rumour in town (actors/shihtzuJoin.js)
     // back in town: a hero who joined while you were out (Poe, in the bamboo) moves into the cottage
     Events.on('mode:changed', p => { if (p?.mode === 'village') this.spawnBench(); });
     setLootClass(this.active);
@@ -197,13 +216,14 @@ export class HeroManager {
   roster() {
     return HERO_IDS.map(id => {
       const C = this.cls(id), joined = this.joined(id), active = id === this.active;
-      const why = active ? 'Playing now' : joined ? this.canSwitch(id) : JOIN_AT[id] === 'fountain' ? 'Waiting by the fountain' : 'Somewhere in the bamboo…';
+      const why = active ? 'Playing now' : joined ? this.canSwitch(id) : JOIN_HINT[id] || 'Not met yet';
       return { id, name: joined || active ? C.name : '???', title: joined || active ? C.title : 'Not met yet', color: C.color, lvl: this.G.state.heroes?.[id]?.player?.lvl || 1, active, joined: joined || active, ready: !active && joined && !why, why: why === 'busy' ? 'Just a moment…' : why };
     });
   }
   update(dt) {
     this.cd = Math.max(0, this.cd - dt);
     this.poeJoin.update(dt);
+    this.stzJoin.update(dt);
     // a Tab press or the wheel can't outlive play input (a dialogue, a menu, a switch starting)
     const ui = this.G.ui;
     if ((this.tab || this.wheelOpen) && (this.G.player?.controlLocked || ui?.dlg?.active || ui?.anyModal?.() || this.G.titleActive || this.T)) { this.tab = null; if (this.wheelOpen) this.pickFromWheel(null); }
@@ -291,6 +311,8 @@ export class HeroManager {
    *  (actors/poeJoin.js, docs/POE.md §5), which ends in joinPoe. */
   async join(id, npc = this.villagers[id]) {
     if (id === 'poe') return this.joinPoe();
+    if (id === 'shihtzu') return this.joinShihtzu();
+    if (id === 'golden') return this.joinGolden();
     const G = this.G, ui = G.ui;
     if (id !== 'moka' || this.joined(id) || !ui?.dialogue) return;
     const P = G.player, portrait = G.portrait?.('moka'), me = this.name();
@@ -318,6 +340,34 @@ export class HeroManager {
     Events.emit('sfx', 'ui_quest');
     G.ui?.banner?.('Poe joined the pack!', 'Tap Tab for the next hero · hold Tab to pick', { style: 'levelup' });
     Events.emit('hero:joined', { id: 'poe' });
+    G.save?.();
+    return true;
+  }
+  /** The Shih Tzu joins the pack: the end of his Maple scene (docs/SHIHTZU.md §5), or at once for ?hero=shihtzu and
+   *  tests. He lives in Chewy's house with the others from now on (back in town: spawnBench on mode:changed). */
+  async joinShihtzu() {
+    const G = this.G, id = 'shihtzu';
+    if (this.joined(id)) return false;
+    G.actions.prepareJoin?.(id);
+    G.state.flags.shihtzuJoined = true;
+    if (G.mode === 'village' && !this.villagers[id] && this.active !== id) { const h = this.homeSpot(id); this.spawnVillager(id, h.x, h.z).warm = true; }
+    Events.emit('sfx', 'ui_quest');
+    G.ui?.banner?.(`${this.name(id)} joined the pack!`, 'Tap Tab for the next hero · hold Tab to pick', { style: 'levelup' });
+    Events.emit('hero:joined', { id });
+    G.save?.();
+    return true;
+  }
+  /** The Golden Retriever dragoon joins the pack: the end of his Onsen scene (docs/GOLDEN.md §5), or at once for
+   *  ?hero=golden and tests. He lives in Chewy's house with the others from now on (back in town: spawnBench). */
+  async joinGolden() {
+    const G = this.G, id = 'golden';
+    if (this.joined(id)) return false;
+    G.actions.prepareJoin?.(id);
+    G.state.flags.goldenJoined = true;
+    if (G.mode === 'village' && !this.villagers[id] && this.active !== id) { const h = this.homeSpot(id); this.spawnVillager(id, h.x, h.z).warm = true; }
+    Events.emit('sfx', 'ui_quest');
+    G.ui?.banner?.(`${this.name(id)} joined the pack!`, 'Tap Tab for the next hero · hold Tab to pick', { style: 'levelup' });
+    Events.emit('hero:joined', { id });
     G.save?.();
     return true;
   }

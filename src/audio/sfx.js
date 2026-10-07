@@ -10,6 +10,8 @@ import { SFX as LIFE_SFX } from '../life/life.sfx.js'; // the homestead: farming
 import { SFX as CHARGE_SFX } from './charge.sfx.js'; // charged abilities: the hum, stage chimes, release (docs/CHARGE.md)
 import { SFX as POE_SFX } from './poe.sfx.js'; // Poe: fūma swishes and whirrs, smoke, shadow steps, her sneeze (docs/POE.md)
 import { SFX as SAMURAI_SFX } from './samurai.sfx.js'; // Chewy the samurai: the katana's draw, its sheath's click, a clang (docs/HEROES.md)
+import { SFX as SHIHTZU_SFX } from './shihtzu.sfx.js'; // the Shih Tzu: the flail's whoosh and thud, squeaky bonks, hexes, his awoo (docs/SHIHTZU.md)
+import { SFX as GOLDEN_SFX } from './golden.sfx.js'; // the dragoon: the lance's whoosh and thok, javelin fwips and bonks, the whelp's poof and flaps (docs/GOLDEN.md)
 
 const R = (a, b) => a + Math.random() * (b - a);
 const mf = m => 440 * Math.pow(2, (m - 69) / 12);
@@ -663,6 +665,8 @@ for (const k in LIFE_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[
 for (const k in CHARGE_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = CHARGE_SFX[k]; }
 for (const k in POE_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = POE_SFX[k]; }
 for (const k in SAMURAI_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = SAMURAI_SFX[k]; }
+for (const k in SHIHTZU_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = SHIHTZU_SFX[k]; }
+for (const k in GOLDEN_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = GOLDEN_SFX[k]; }
 
 export const SFX_NAMES = Object.keys(SFX);
 
@@ -679,4 +683,6 @@ export const SFX_GROUPS = {
   Heroes: ['hero_swap', 'hero_arrive'],
   Poe: Object.keys(POE_SFX),
   Samurai: Object.keys(SAMURAI_SFX),
+  'Shih Tzu': Object.keys(SHIHTZU_SFX),
+  Dragoon: Object.keys(GOLDEN_SFX),
 };

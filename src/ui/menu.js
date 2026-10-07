@@ -10,8 +10,11 @@ import { Actions, ACTIONS, ACTION_GROUPS, PAD_BINDABLE } from '../core/actions.j
 import { normKey } from '../core/input.js';
 import { padGlyph } from './padGlyphs.js';
 import { PRESET_NAMES } from '../core/deck.js';
+import { DESKTOP, quitGame } from './desktop.js';
 
 const MOUSE_CAP = { mouse0: () => glyph('mouseL'), mouse2: () => glyph('mouseR') };
+// Settings › Controls › Touch: what each on-screen control does (ui/touch.js, docs/CONTROLS.md §12)
+const TOUCH_HELP = [['Move', 'The stick: put a thumb down on the left (the right, left-handed)'], ['Sprint', 'Push the stick out to its glowing ring'], ['Attack · talk · use', 'The big button (it shows a paw when it will talk or use)'], ['Skills', 'The buttons round it: tap to cast, hold to charge'], ['Aim', 'Auto: the nearest foe, else where you face. Drag: drag off a skill, back onto it to cancel'], ['Target', 'Tap a monster'], ['Walk · talk · open', 'Tap the ground, a friend or a door'], ['Roll', 'The mint button'], ['Potions · meal', 'The belt between the orbs'], ['Swap weapons', 'The small badge by the big button'], ['Hero', 'Tap the portrait: the next hero. Hold it: the hero wheel'], ['Zoom', 'Pinch with two fingers'], ['Map · bag · menu', 'Tap the minimap; the buttons beside it']];
 const QUICK = [['inventory', 'bag', 'Bag'], ['character', 'star', 'Character'], ['skills', 'sparkle', 'Skills'], ['quests', 'book', 'Journal'], ['map', 'map', 'Map']];
 
 export class MenuPanel extends Panel {
@@ -32,30 +35,39 @@ export class MenuPanel extends Panel {
           <button class="btn big" data-a="settings">${glyph('gear')}Settings</button>
           <button class="btn big" data-a="controls">${glyph('question')}Controls</button>
           <button class="btn big sky" data-a="save">${glyph('save')}Save game</button>
-          <button class="btn big pink" data-a="quit">${glyph('exit')}Quit to title</button>
+          <button class="btn big pink" data-a="quit">${glyph('exit')}Quit to title</button>${DESKTOP ? `
+          <button class="btn big" data-a="exitGame">${glyph('door')}Quit game</button>` : ''}
         </div>
       </div>
       <div class="mn-v mn-settings">
-        <div class="set-row" title="Deck: tuned for the Steam Deck (a lighter picture, smaller shadows, fewer particles). Grass and scenery detail change at the next start."><div class="set-n">${glyph('eye')}Graphics</div><div class="seg" data-k="quality">${PRESET_NAMES.map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
-        <div class="set-row" title="Caps the frame rate: 40 is a steady fallback on the Steam Deck"><div class="set-n">${glyph('play')}Frame cap</div><div class="seg" data-k="fpsCap">${['Off', '60', '40'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+        <div class="set-row" title="Deck: tuned for the Steam Deck. Mobile: for phones and tablets (a lighter picture, smaller shadows, fewer particles). Grass and scenery detail change at the next start."><div class="set-n">${glyph('eye')}Graphics</div><div class="seg" data-k="quality">${PRESET_NAMES.map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+        <div class="set-row" title="Caps the frame rate: 40 is a steady fallback on the Steam Deck, 30 saves a phone's battery"><div class="set-n">${glyph('play')}Frame cap</div><div class="seg" data-k="fpsCap">${['Off', '60', '40', '30'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
         <div class="set-row"><div class="set-n">${glyph('music')}Music</div><div class="sld"><input type="range" min="0" max="100" data-k="music"><b></b></div></div>
         <div class="set-row"><div class="set-n">${glyph('sound')}Sound FX</div><div class="sld"><input type="range" min="0" max="100" data-k="sfx"><b></b></div></div>
         <div class="set-row"><div class="set-n">${glyph('sparkle')}UI size</div><div class="sld"><input type="range" min="80" max="125" data-k="uiScale"><b></b></div></div>
         <div class="set-row"><div class="set-n">${glyph('bolt')}Screen shake</div><button class="tog" data-k="shake"><i></i></button></div>
         <div class="set-row" title="Hold a skill's button to charge it. Toggle: press once to start charging, again to release. Off: holding repeats the skill."><div class="set-n">${glyph('zap')}Charge on hold</div><div class="seg" data-k="chargeMode">${['On', 'Off', 'Toggle'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
         <div class="set-row" title="Hold Shift while moving to sprint (+40% speed). Toggle: tap Shift to start sprinting; tap it again, or stop, to walk."><div class="set-n">${glyph('boots')}Sprint (Shift)</div><div class="seg" data-k="sprintMode">${['Hold', 'Toggle'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
-        <div class="set-row"><div class="set-n">${glyph('star')}Show FPS</div><button class="tog" data-k="showFps"><i></i></button></div>
+        <div class="set-row"><div class="set-n">${glyph('star')}Show FPS</div><button class="tog" data-k="showFps"><i></i></button></div>${DESKTOP ? `
+        <div class="set-row" title="Off: a window (F11 or Alt+Enter switch too)"><div class="set-n">${glyph('eye')}Full screen</div><button class="tog" data-k="fullscreen"><i></i></button></div>` : ''}
         <div class="set-row"><div class="set-n">${glyph('sparkle')}Disney style</div><button class="tog" data-k="disneyChewy"><i></i></button></div>
         <div class="set-row" title="Keys and controller buttons, rumble, aim assist"><div class="set-n">${glyph('question')}Controls</div><button class="btn sm" data-a="controls">Change…</button></div>
         <div class="set-row" title="Which hero models to play with: the samurai Chewy, the Toybox Chewy, or the Storybook heroes. Switching saves and reloads."><div class="set-n">${glyph('star')}Hero models</div><div class="seg" data-k="heroModel">${['Samurai', 'Toybox', 'Storybook'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
         <div class="mn-foot"><button class="btn" data-a="back">${glyph('swap')}Back</button></div>
       </div>
       <div class="mn-v mn-controls">
-        <div class="ctl-tabs"><button data-dev="kbm">Keyboard &amp; mouse</button><button data-dev="pad">Controller</button></div>
+        <div class="ctl-tabs"><button data-dev="kbm">Keyboard &amp; mouse</button><button data-dev="pad">Controller</button><button data-dev="touch">Touch</button></div>
         <div class="ctl-opts">
           <div class="set-row" title="Light pulses on hits and charged releases"><div class="set-n">${glyph('bolt')}Rumble</div><button class="tog" data-k="rumble"><i></i></button></div>
           <div class="set-row" title="The soft lock on the foe nearest your aim: how wide its cone is (0: off)"><div class="set-n">${glyph('eye')}Aim assist</div><div class="sld"><input type="range" min="0" max="100" data-k="aimAssist"><b></b></div></div>
           <div class="set-row" title="Auto follows the controller (the Steam Deck shows Xbox letters)"><div class="set-n">${glyph('star')}Button glyphs</div><div class="seg" data-k="padGlyphs" style="--w:96px">${['Auto', 'Xbox', 'PlayStation'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+        </div>
+        <div class="ctl-touch">
+          <div class="set-row" title="How big the on-screen buttons and the stick are"><div class="set-n">${glyph('sparkle')}Button size</div><div class="sld"><input type="range" min="75" max="135" data-k="touchSize"><b></b></div></div>
+          <div class="set-row" title="How see-through the buttons are while you aren't pressing them"><div class="set-n">${glyph('eye')}Opacity</div><div class="sld"><input type="range" min="30" max="100" data-k="touchOpacity"><b></b></div></div>
+          <div class="set-row" title="The buttons on the left, the stick on the right"><div class="set-n">${glyph('paw')}Left-handed</div><button class="tog" data-k="touchLeft"><i></i></button></div>
+          <div class="set-row" title="Auto: skills go at the nearest foe, else where you face. Drag: drag off a skill to aim it, back onto it to cancel, let go to cast."><div class="set-n">${glyph('star')}Skill aim</div><div class="seg" data-k="touchAim" style="--w:96px">${['Auto', 'Drag'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+          <div class="set-row" title="A little buzz on presses, charges and hits (phones that can)"><div class="set-n">${glyph('bolt')}Haptics</div><button class="tog" data-k="haptics"><i></i></button></div>
         </div>
         <div class="ctl-list"></div>
         <div class="ctl-note"></div>
@@ -88,6 +100,7 @@ export class MenuPanel extends Panel {
     else if (a === 'back') this.setView(this.view === 'controls' && this._backTo === 'settings' ? 'settings' : this.opts.from === 'title' ? 'close' : 'main');
     else if (a === 'save') { const r = h.save?.(); if (r !== false) this.ui.toast('Game saved!', { icon: 'save', color: '#8fd0ff' }); }
     else if (a === 'quit') { this.ui.close('menu'); h.quit ? h.quit() : this.ui.setMode('title'); }
+    else if (a === 'exitGame') quitGame(this.ui); // (the desktop app: save, then close: ui/desktop.js)
   }
   setView(v) {
     if (v === 'close') { this.ui.close('menu'); return; }
@@ -114,7 +127,7 @@ export class MenuPanel extends Panel {
       const k = r.dataset.k, v = Math.round((s[k] ?? 1) * 100);
       if (+r.value !== v) r.value = v;
       r.style.setProperty('--p', ((v - r.min) / (r.max - r.min) * 100).toFixed(1) + '%');
-      r.nextElementSibling.textContent = k === 'uiScale' || k === 'aimAssist' ? v + '%' : v;
+      r.nextElementSibling.textContent = k === 'uiScale' || k === 'aimAssist' || k === 'touchSize' || k === 'touchOpacity' ? v + '%' : v;
     }
     for (const t of this.body.querySelectorAll('.tog')) t.classList.toggle('on', k0(s, t.dataset.k));
     const h = this.ui._menuH || {};
@@ -140,6 +153,7 @@ export class MenuPanel extends Panel {
     this.panel.dataset.dev = dev;
     for (const b of this.body.querySelectorAll('.ctl-tabs button')) b.classList.toggle('on', b.dataset.dev === dev);
     let html = '';
+    if (dev === 'touch') { list.innerHTML = TOUCH_HELP.map(([t, d]) => `<div class="ctl-row"><span class="ctl-t">${esc(t)}</span><span class="ctl-h">${esc(d)}</span></div>`).join(''); this.sync(); return; } // (touch has no bindings: what each control does, ui/touch.js)
     for (const [g, title] of ACTION_GROUPS) {
       const rows = Object.entries(ACTIONS).filter(([id, A]) => A.group === g && (Actions.binds(id, dev).length || Actions.rebindable(id, dev)));
       if (!rows.length) continue;

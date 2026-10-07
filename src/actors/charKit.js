@@ -14,6 +14,9 @@ import { furMaterial, buildDisneyHead, headKind, speciesColors, disneyHand, disn
 import { toyMaterial, buildToyBody, TOY_KINDS } from './toyKit.js';
 import { toyHeroes } from './heroModels.js';
 import { poeToyExtras, POE_PAL } from './poeKit.js';
+import { CLASSES } from '../rpg/classes.js';
+import { shihtzuToyExtras } from './shihtzuKit.js';
+import { goldenToyExtras, GOLDEN_PAL } from './goldenKit.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const C = h => new THREE.Color(h);
@@ -1182,6 +1185,27 @@ export const CAST = {
     patterns: { chestBlaze: true }, brows: false,
     outfit: { top: 'gi', topColor: POE_PAL.moss, topColor2: POE_PAL.cream, bottom: 'shorts', bottomColor: POE_PAL.darkMoss, sash: POE_PAL.mustard },
     toy: { head: 'pug', ears: 'pug', tail: 'curl', feet: POE_PAL.moss, extras: poeToyExtras },
+  },
+  // The Shih Tzu dark knight (docs/SHIHTZU.md): the procedural fallback for ?chewy=classic and while his baked Toybox
+  // model loads (heroModels.js shihtzuToy). A black-and-white dog in the sheet's plum tabard over charcoal; the flail is a
+  // separate prop (shihtzuGear.js dressShihtzu).
+  shihtzu: {
+    name: CLASSES.shihtzu.name, species: 'dog', earKind: 'spaniel', voice: 0.92, fur: '#36352f', fur2: '#f4f0ea', fur3: '#f4f0ea', earColor: '#36352f', earInner: '#22211d', tail: 'dog', // (a warm charcoal: the sheet's cool #2C2A30 reads violet through the kit's grade, as Poe's did)
+    nose: '#1e1d1a', iris: '#c88a3a', eye: '#c88a3a', muzzleColor: '#f4f0ea', blush: '#e9a4ac', muzzleScale: 0.9,
+    patterns: { chestBlaze: true, chin: '#f4f0ea', tailFluff: true }, brows: false,
+    outfit: { top: 'gi', topColor: '#4a2a4a', topColor2: '#c8ccd8', bottomColor: '#34303e', sash: '#34303e', scarf: '#4a2a4a' },
+    toy: { head: 'dog', ears: 'round', tail: 'dog', feet: '#34303e', darkGrade: [0.45, 13, 6, -9], extras: shihtzuToyExtras }, // (the topknot, the ear locks, the blaze, the tome: shihtzuKit.js)
+  },
+  // The Golden Retriever dragoon (docs/GOLDEN.md): the procedural fallback for ?chewy=classic and while his baked Toybox
+  // model loads (heroModels.js goldenToy). A red-gold dog in the sheet's emerald scale armour; the Toybox kit adds the
+  // feathered ear drapes, the crest helm with its little dragon, the ruff and the quiver (goldenKit.js); the lance is a
+  // separate prop (goldenGear.js dressGolden).
+  golden: {
+    name: CLASSES.golden.name, species: 'dog', earKind: 'spaniel', voice: 0.96, fur: GOLDEN_PAL.fur, fur2: GOLDEN_PAL.light, fur3: GOLDEN_PAL.light, earColor: GOLDEN_PAL.fur, earInner: '#9a5a2a', tail: 'dog',
+    nose: GOLDEN_PAL.eye, iris: GOLDEN_PAL.eye, eye: GOLDEN_PAL.eye, muzzleColor: GOLDEN_PAL.light, blush: GOLDEN_PAL.blush, muzzleScale: 0.98,
+    patterns: { chestBlaze: true, chin: GOLDEN_PAL.cream, tailFluff: true }, brows: false,
+    outfit: { top: 'gi', topColor: GOLDEN_PAL.emerald, topColor2: GOLDEN_PAL.brass, bottomColor: '#2f7a55', sash: GOLDEN_PAL.brass, wraps: GOLDEN_PAL.emerald },
+    toy: { head: 'dog', ears: 'round', tail: 'dog', feet: GOLDEN_PAL.light, extras: goldenToyExtras }, // (the ear drapes, the crest helm, the ruff, the quiver: goldenKit.js)
   },
 };
 

@@ -105,6 +105,7 @@ export function refreshCaps(root = document) {
 }
 /** HTML for an emphasised key in guide or dialogue text (*F*, *Tab*) while the pad plays; null: leave the text alone */
 export function keyHint(label) {
+  if (Actions.device === 'touch') return touchHint(label);
   if (Actions.device !== 'pad') return null;
   const v = /^(tap|hold|press|click|use) (.+)$/i.exec(String(label).trim()); // ("*Tap Tab*", "*hold Tab*")
   if (v) { const g = keyHint(v[2]); return g && `<b>${v[1]}</b> ${g}`; }
@@ -113,12 +114,21 @@ export function keyHint(label) {
   return `<span class="kc sm pad inline" data-act="${a}">${inner}</span>`;
 }
 
+/** touch (CT-5): an emphasised key names the on-screen control instead ("press *F*" → "press the attack button") */
+function touchHint(label) {
+  const v = /^(tap|hold|press|click|use) (.+)$/i.exec(String(label).trim());
+  if (v) { const g = touchHint(v[2]); return g && `<b>${v[1]}</b> ${g}`; }
+  const a = Actions.forKey(label), t = a && Actions.text(a, 'touch');
+  return t ? `<b class="touch-name">${t}</b>` : null;
+}
+
 // ---------------------------------------------------------------- mouse wording → the pad's buttons
 const CAP = t => `<span class="kc sm pad inline">${padGlyph(t)}</span>`;
 /** while the pad plays, a tooltip's or footer's mouse wording names the pad's buttons instead (CONTROLS §9: the focus
  *  handlers): Click → A, Right-click → Y, Shift+Click / Shift+Right-click / Ctrl+Click → X, Drag → A, ⚡ → X,
  *  the mouse wheel → the triggers. Anything else is left alone; with the mouse the text is returned as is. */
 export function padWording(html) {
+  if (Actions.device === 'touch' && html) return touchWording(html);
   if (Actions.device !== 'pad' || !html) return html;
   return String(html)
     .replace(/<b>(Shift\+Right-click|Shift\+Click|Ctrl\+Click)<\/b>/g, () => CAP('X'))
@@ -132,6 +142,25 @@ export function padWording(html) {
     .replace(/\bDrag items\b/g, () => `${CAP('A')} moves items`)
     .replace(/drag gear here/g, 'pick up gear and put it here')
     .replace(/Scroll the mouse wheel to zoom/g, () => `${CAP('LT')}${CAP('RT')} zoom`);
+}
+
+/** touch (CT-5): a tooltip's or footer's mouse wording in touch's words (ui/mobile.js: a tap is the click, a double-tap
+ *  the right-click, a long press shows the details; the shop's Sell tab sells) */
+export function touchWording(html) {
+  return String(html)
+    .replace(/<b>(Shift\+Right-click|Shift\+Click)<\/b>\s*(sell|to sell)/g, 'the <b>Sell</b> tab sells')
+    .replace(/<b>Ctrl\+Click<\/b>/g, '<b>Drag</b>')
+    .replace(/<b>Right-click<\/b>\s*\/\s*<b>1–4<\/b>/g, '<b>Double-tap</b>')
+    .replace(/<b>Right-click<\/b>/g, '<b>Double-tap</b>')
+    .replace(/<b>Click<\/b>/g, '<b>Tap</b>')
+    .replace(/\b(Shift\+Right-click|Shift\+Click)\b to sell/g, 'The Sell tab sells')
+    .replace(/\bCtrl\+Click\b/g, 'Drag')
+    .replace(/\bRight-click\b/g, 'Double-tap')
+    .replace(/\bright-click\b/g, 'double-tap')
+    .replace(/\bClick or drag to paint\b/g, 'Drag to paint')
+    .replace(/\bClick\b/g, 'Tap').replace(/\bclick\b/g, 'tap')
+    .replace(/Scroll the mouse wheel to zoom/g, 'Pinch to zoom')
+    .replace(/ · R to rotate/g, ' · Turn rotates it');
 }
 
 // ---------------------------------------------------------------- wiring

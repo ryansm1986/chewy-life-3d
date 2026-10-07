@@ -1,0 +1,145 @@
+{
+ "archive_md5": "215a35ee7932201235ed02e9838d8fdc",
+ "base_copy_md5": "215a35ee7932201235ed02e9838d8fdc",
+ "vs_fresh_unmodified_build": {
+  "Shadow_head": {
+   "vertices": 5416,
+   "max_vertex_delta_m": 0.0,
+   "max_uv_delta_px": 6.103515625e-05
+  },
+  "Shadow_ear_L": {
+   "vertices": 1046,
+   "max_vertex_delta_m": 0.0,
+   "max_uv_delta_px": 6.103515625e-05
+  },
+  "Shadow_ear_R": {
+   "vertices": 1046,
+   "max_vertex_delta_m": 0.0,
+   "max_uv_delta_px": 6.103515625e-05
+  },
+  "Shadow_body": {
+   "vertices": 4464,
+   "max_vertex_delta_m": 0.0,
+   "max_uv_delta_px": 6.103515625e-05
+  },
+  "Shadow_tail": {
+   "vertices": 200,
+   "max_vertex_delta_m": 0.0,
+   "max_uv_delta_px": 6.103515625e-05
+  },
+  "Shadow_eye_L": {
+   "vertices": 422,
+   "max_vertex_delta_m": 0.0,
+   "max_uv_delta_px": 6.103515625e-05
+  },
+  "Shadow_eye_R": {
+   "vertices": 422,
+   "max_vertex_delta_m": 0.0,
+   "max_uv_delta_px": 6.103515625e-05
+  }
+ },
+ "glb_shadow_toy_vs_whelp": {
+  "Shadow_body": {
+   "vertices": [
+    4977,
+    4977
+   ],
+   "max_vertex_delta_m": 0.0,
+   "max_uv_delta_px": 9.1552734375e-05
+  },
+  "Shadow_ear_L": {
+   "vertices": [
+    1145,
+    1145
+   ],
+   "max_vertex_delta_m": 0.0,
+   "max_uv_delta_px": 6.103515625e-05
+  },
+  "Shadow_ear_R": {
+   "vertices": [
+    1145,
+    1145
+   ],
+   "max_vertex_delta_m": 0.0,
+   "max_uv_delta_px": 6.103515625e-05
+  },
+  "Shadow_eye_L": {
+   "vertices": [
+    491,
+    491
+   ],
+   "max_vertex_delta_m": 0.0,
+   "max_uv_delta_px": 6.103515625e-05
+  },
+  "Shadow_eye_R": {
+   "vertices": [
+    491,
+    491
+   ],
+   "max_vertex_delta_m": 0.0,
+   "max_uv_delta_px": 6.103515625e-05
+  },
+  "Shadow_head": {
+   "vertices": [
+    5724,
+    5724
+   ],
+   "max_vertex_delta_m": 0.0,
+   "max_uv_delta_px": 0.000152587890625
+  },
+  "Shadow_tail": {
+   "vertices": [
+    245,
+    245
+   ],
+   "max_vertex_delta_m": 0.0,
+   "max_uv_delta_px": 6.103515625e-05
+  }
+ },
+ "glb_objects": {
+  "shadow-toy": [
+   "Shadow_body",
+   "Shadow_ear_L",
+   "Shadow_ear_R",
+   "Shadow_eye_L",
+   "Shadow_eye_R",
+   "Shadow_head",
+   "Shadow_tail"
+  ],
+  "shadow-whelp (Shadow_*)": [
+   "Shadow_body",
+   "Shadow_ear_L",
+   "Shadow_ear_R",
+   "Shadow_eye_L",
+   "Shadow_eye_R",
+   "Shadow_head",
+   "Shadow_tail"
+  ]
+ },
+ "atlas_charts_max_diff_8bit": {
+  "head": 0,
+  "body": 0,
+  "eye.L": 0,
+  "eye.R": 0,
+  "leg.FL": 0,
+  "leg.FR": 0,
+  "leg.BL": 0,
+  "leg.BR": 0,
+  "ear.L": 0,
+  "ear.R": 0,
+  "nose": 0,
+  "tail": 0,
+  "collar": 0,
+  "gold": 0,
+  "all 2048 x 2048 rows": 0
+ },
+ "summary": {
+  "head and face (head, nose, muzzle, smile)": 0.0,
+  "eyes": 0.0,
+  "ears": 0.0,
+  "body, legs, paws, collar, tag": 0.0,
+  "tail": 0.0,
+  "UVs in atlas pixels (fresh build and GLB)": 0.000152587890625,
+  "atlas, his charts (8-bit levels)": 0
+ }
+}

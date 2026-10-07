@@ -24,7 +24,7 @@ export function itemIconURL(item) {
   if (f) { try { const u = f(item); if (u) return typeof u === 'string' ? u : u.toDataURL?.() || ''; } catch (e) { /* fall through */ } }
   const kind = item.kind;
   let g = SLOT_GLYPH[item.slot] || 'gift';
-  if (item.slot === 'weapon') g = item.wtype === 'ball' ? 'ball' : item.wtype === 'staff' ? 'staff' : item.wtype === 'fuma' ? 'fuma' : 'sword';
+  if (item.slot === 'weapon') g = item.wtype === 'ball' ? 'ball' : item.wtype === 'staff' ? 'staff' : item.wtype === 'fuma' ? 'fuma' : item.wtype === 'flail' ? 'flail' : item.wtype === 'lance' ? 'lance' : 'sword';
   if (kind === 'gem') g = 'gem'; else if (kind === 'key') g = 'key'; else if (kind === 'gift') g = 'gift';
   else if (kind === 'material') g = item.base in MATERIAL_G ? MATERIAL_G[item.base] : 'petal';
   return glyphURL(g);
@@ -45,9 +45,9 @@ export function materialIconURL(k) {
 }
 export function potionInfo(k) { const P = rpg.items.POTIONS?.[k]; return P ? { name: P.name, desc: P.desc, price: P.price, color: P.color } : null; }
 
-const SKILL_FALLBACK_G = { attack: 'swords', attack_ball: 'ball', attack_staff: 'staff', attack_fuma: 'fuma', chomp: 'bone', fetch: 'ball' };
+const SKILL_FALLBACK_G = { attack: 'swords', attack_ball: 'ball', attack_staff: 'staff', attack_fuma: 'fuma', attack_flail: 'flail', chomp: 'bone', fetch: 'ball' };
 // hotbar / popover icon: the basic 'attack' follows the equipped weapon (bone katana vs tennis ball)
-export function hotbarIconURL(id, derived) { return skillIconURL(id === 'attack' && derived?.weaponType === 'ball' ? 'attack_ball' : id === 'attack' && derived?.weaponType === 'staff' ? 'attack_staff' : id === 'attack' && derived?.weaponType === 'fuma' ? 'attack_fuma' : id); }
+export function hotbarIconURL(id, derived) { return skillIconURL(id === 'attack' && derived?.weaponType === 'ball' ? 'attack_ball' : id === 'attack' && derived?.weaponType === 'staff' ? 'attack_staff' : id === 'attack' && derived?.weaponType === 'fuma' ? 'attack_fuma' : id === 'attack' && derived?.weaponType === 'flail' ? 'attack_flail' : id === 'attack' && derived?.weaponType === 'lance' ? 'attack_lance' : id); }
 export const plural = (n, word, pl = word + 's') => `${n} ${n === 1 ? word : pl}`;
 export function skillIconURL(id) {
   if (!id) return '';
@@ -56,7 +56,7 @@ export function skillIconURL(id) {
   const def = skillDef(id);
   if (def?.glyph) return glyphURL(def.glyph);
   const tree = def?.tree;
-  return glyphURL(SKILL_FALLBACK_G[id] || ({ fetch: 'ball', spirit: 'paw', bone: 'bone', tide: 'drop', star: 'star', duck: 'duck', shuriken: 'fuma', jutsu: 'smoke', shadow: 'kunai' })[tree] || 'sparkle');
+  return glyphURL(SKILL_FALLBACK_G[id] || ({ fetch: 'ball', spirit: 'paw', bone: 'bone', tide: 'drop', star: 'star', duck: 'duck', shuriken: 'fuma', jutsu: 'smoke', shadow: 'kunai', flail: 'flail', hex: 'hex', tome: 'tome' })[tree] || 'sparkle');
 }
 
 // ------------------------------------------------------------------ skills
@@ -72,6 +72,14 @@ export const TREES = [
   { id: 'shuriken', cls: 'poe', name: 'Shuriken Arts', jp: '手裏剣術', color: '#c99a2a', bg: ['#fffaec', '#f6ebc8'], glyph: 'fuma' },
   { id: 'jutsu', cls: 'poe', name: 'Ninjutsu', jp: '忍術', color: '#7a6aa8', bg: ['#f6f2ff', '#e4dcf4'], glyph: 'smoke' },
   { id: 'shadow', cls: 'poe', name: 'Shadow Step', jp: '影歩き', color: '#4f7a44', bg: ['#f2f8ee', '#dceccf'], glyph: 'kunai' },
+  // the Shih Tzu (docs/SHIHTZU.md)
+  { id: 'flail', cls: 'shihtzu', name: 'Flail Arts', jp: '鎖鉄球', color: '#8a4a8a', bg: ['#fbf4fb', '#ecdcec'], glyph: 'flail' },
+  { id: 'hex', cls: 'shihtzu', name: 'Gloom Hexes', jp: '憂いの呪い', color: '#2f9a86', bg: ['#effcf8', '#d2f2e8'], glyph: 'hex' },
+  { id: 'tome', cls: 'shihtzu', name: 'Ghostlight Tome', jp: '鬼火の書', color: '#5a7a9a', bg: ['#f2f6fb', '#dce6f2'], glyph: 'tome' },
+  // the Golden Retriever dragoon (docs/GOLDEN.md)
+  { id: 'lance', cls: 'golden', name: 'Lance Arts', jp: '槍術', color: '#2f8a5c', bg: ['#f0faf3', '#d6efde'], glyph: 'lance' },
+  { id: 'javelin', cls: 'golden', name: 'Javelins', jp: '投げ槍', color: '#b8862e', bg: ['#fffaee', '#f6e8c8'], glyph: 'javelin' },
+  { id: 'whelp', cls: 'golden', name: 'Whelp Bond', jp: '竜の絆', color: '#d8603a', bg: ['#fff4ee', '#fbdccc'], glyph: 'whelp' },
 ];
 /** The skill trees of the hero being played. */
 export const treesFor = cls => TREES.filter(t => t.cls === (cls || 'chewy'));
@@ -224,7 +232,7 @@ export function meetsReq(item, state, derived) {
   if (r.dex && r.dex > (d.dex ?? st.dex ?? 0)) { res.ok = false; res.dex = false; }
   if (r.ene && r.ene > (d.ene ?? st.ene ?? 0)) { res.ok = false; res.ene = false; }
   // weapons are class-bound (sword / ball: Chewy, staff: Moka) — the bag is shared, so this shows up a lot
-  const WC = M('classes').WEAPON_CLASS || { sword: 'chewy', ball: 'chewy', staff: 'moka', fuma: 'poe' };
+  const WC = M('classes').WEAPON_CLASS || { sword: 'chewy', ball: 'chewy', staff: 'moka', fuma: 'poe', flail: 'shihtzu', lance: 'golden' };
   if (item.wtype && WC[item.wtype] !== (state?.player?.cls || 'chewy')) { res.ok = false; res.other = true; }
   return res;
 }

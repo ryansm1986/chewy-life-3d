@@ -3,8 +3,9 @@
 import * as THREE from 'three';
 import { generate, CELL, THEMES } from './gen.js';
 import { beginRun, floorPlan } from './defs.js';
-import { packMods, monsterMods } from '../rpg/zoneMods.js';
-import { noteFloor, recordDungeonClear } from '../rpg/zones.js';
+import { packMods, monsterMods, resolveRun } from '../rpg/zoneMods.js';
+import { noteFloor, recordDungeonClear, tierRecord, spiritOpen } from '../rpg/zones.js';
+import { TierRun } from './tierRun.js';
 import { DungeonWorld, propCutMat } from './dungeonWorld.js';
 import { chestGeometry, potGeometry, potColor } from './lootModels.js';
 import { Monster } from './monster.js';
@@ -20,6 +21,7 @@ import { xpForKill } from '../rpg/stats.js';
 import { makeToon, makeOutline } from '../gfx/materials.js';
 import { paint, merge, RoundedBox } from '../gfx/geom.js';
 import { glowTexture } from '../gfx/textures.js';
+import { releaseAfterUpload } from '../core/deck.js';
 import { Events } from '../core/events.js';
 import { rand, randInt, TAU, dist, RNG, clamp, pick } from '../core/util.js';
 
@@ -33,9 +35,10 @@ export class DungeonMode {
   build(arg) {
     const G = this.G;
     const run = this.run = beginRun(G.state, arg, { fixedSeed: G.dseed ?? null }), def = this.def = run.def;
-    this.kind = def.kind; this.zoneId = def.zone || null; this.tier = run.tier; this.mods = run.mods;
+    this.kind = def.kind; this.zoneId = def.zone || null; this.tier = run.tier; this.spirit = run.spirit || 0; this.mods = run.mods;
+    this.runMods = resolveRun(run); // (a tier / Spirit / modded run's effects, merged once: rpg/zoneMods.js; monsterMods reads it)
     const floor = this.floor = run.floor;
-    const layout = this.layout = generate({ floor, seed: run.seed, plan: floorPlan(def, floor, { tier: run.tier, heroLvl: G.state.player?.lvl }) });
+    const layout = this.layout = generate({ floor, seed: run.seed, plan: floorPlan(def, floor, { tier: run.tier, spirit: this.spirit, mods: run.mods, heroLvl: G.state.player?.lvl }) });
     if (layout.boss && !MONSTERS[layout.boss]) for (const sp of layout.spawns) if (sp.boss) sp.boss = layout.boss = 'mochiKing'; // (a zone boss not registered yet)
     const world = this.world = new DungeonWorld(G.engine, layout);
     const TH = THEMES[layout.theme], own = def.monsters?.filter(id => MONSTERS[id]);
@@ -45,8 +48,10 @@ export class DungeonMode {
     this.rng = new RNG(run.packSeed);
     this.flow = new Int16Array(layout.W * layout.H); this.flowT = 0;
     this.zr = this.kind === 'zone' ? new ZoneRun(this) : null; // (a zone dungeon's packs, objectives, arena and rewards: zoneRun.js)
+    this.tr = this.runMods.active ? new TierRun(this) : null; // (a tier / Spirit / modded run's rewards and run-wide effects: tierRun.js)
     this.buildInteractables();
     this.zr?.build();
+    this.tr?.build();
     return world;
   }
   get combat() { return this.G.combat; }
@@ -56,9 +61,12 @@ export class DungeonMode {
     this.startPos = s;
     // monsters
     for (const sp of L.spawns) this.spawnPack(sp);
-    // player light (warm lantern glow that follows Chewy)
-    this.playerLight = this.world.lightPool.addSource({ pos: new THREE.Vector3(), color: new THREE.Color('#ffd8a8'), intensity: 7, radius: 11, priority: 10 });
-    G.ui?.banner?.(`Floor ${this.floor}`, `${this.def.name} — ${this.theme.name}`, { style: 'area' });
+    // player light (warm lantern glow that follows the hero). It hangs 4 m up (lift), stronger to match: at 1.8 m it sat
+    // 0.2-0.5 m over the toybox heroes' heads and helms, and its falloff (decay 1.6, core/engine.js LightPool) lit their
+    // heads, backs and shoulders 10-40x the floor's key light, so the tone map and the bloom blew their colours out to
+    // mint and peach on every floor (ROADMAP R-9). Up here it lights the floor round them about as before.
+    this.playerLight = this.world.lightPool.addSource({ pos: new THREE.Vector3(), color: new THREE.Color('#ffd8a8'), intensity: 16, radius: 11, priority: 10, lift: 4 });
+    G.ui?.banner?.(`Floor ${this.floor}`, `${this.def.name}${this.tr ? ' · ' + this.tr.label : ''} — ${this.theme.name}`, { style: 'area' });
     // boss floors: a small heads-up toast (the big boss banner is saved for the actual encounter)
     if (L.boss) setTimeout(() => { if (G.dungeon === this && this.boss?.alive && !this.boss.introDone) G.ui?.toast?.(`${MONSTERS[L.boss].name} lurks in the deepest chamber…`, { icon: 'oni', color: '#ff8a9a' }); }, 2600);
     if (this.kind === 'burrow') G.state.dungeon.deepest = Math.max(G.state.dungeon.deepest || 0, this.floor); // (the Burrow's record; a zone dungeon keeps its own)
@@ -69,11 +77,12 @@ export class DungeonMode {
     gr.get('uLift').value.set(...(gd.lift || [0.012, 0.004, 0.02])); gr.get('uGain').value.set(...(gd.gain || [1.05, 1.0, 0.95])); gr.get('uSat').value = gd.sat ?? 1.1;
     gr.get('uVigColor').value.set(0.16, 0.1, 0.16); gr.get('uVignette').value = 1.05;
     post.bloom.intensity = this.theme.bloom?.intensity ?? 1.15; post.bloom.luminanceMaterial.threshold = this.theme.bloom?.threshold ?? 0.6; // (a zone kit's theme may set its own)
+    this.tr?.start(); // (Night March's grade, Hard Ground, the run's toast)
   }
   /** where a kill / boss / clear happened, for the events (monster:killed, boss:dead, dungeon:cleared, mode:changed) */
-  where() { return { zone: this.zoneId || null, dungeon: this.def?.id || null, tier: this.tier || 0 }; }
+  where() { return { zone: this.zoneId || null, dungeon: this.def?.id || null, tier: this.tier || 0, spirit: this.spirit || 0 }; }
   /** the stairs' next floor: the same dungeon, tier and modifiers one floor down */
-  nextRun() { return { id: this.def?.id || 'burrow', floor: this.floor + 1, tier: this.tier || 0, mods: this.mods || [] }; }
+  nextRun() { return { id: this.def?.id || 'burrow', floor: this.floor + 1, tier: this.tier || 0, spirit: this.spirit || 0, mods: this.mods || [] }; }
   /** is there a floor below this one? (the Burrow never ends; a zone dungeon ends at its boss; a region has none) */
   hasDeeper() { return this.kind !== 'region' && this.floor < (this.def?.floors ?? Infinity); }
   spawnPack(sp) {
@@ -364,18 +373,19 @@ export class DungeonMode {
       chest.opened = true; Events.emit('sfx', 'chest_open');
       let t = 0; (this.spinners ||= []).push((dt) => { t += dt; lid.rotation.x = -Math.min(1.9, t * 7); });
       G.vfx.sparkle(p.clone().setY(0.7), { n: 20, color: gold ? '#ffe070' : '#fff4d8', r: 0.5 }); G.vfx.light(p.clone().setY(1), '#ffe0a0', 10, 6, 0.8);
-      const drops = chestDrops(this.layout.mlvl, gold ? 'golden' : 'plain', undefined, G.derived.mf || 0);
+      const drops = chestDrops(this.layout.mlvl, gold ? 'golden' : 'plain', undefined, (G.derived.mf || 0) + (this.tr?.mfBonus || 0)); // (a tier run's rarity bonus as magic find)
       drops.push(...seedDrops(this.layout.mlvl, gold ? 'chest2' : 'chest0')); // (homestead seeds, docs/HOMESTEAD.md)
       if (this.zoneId) drops.push(...forageDrops(this.zoneId, gold ? 'chest2' : 'chest0')); // (and the zone's forage: a region, or its dungeon)
       drops.push(...findDrops(G, this, gold ? 'chest2' : 'chest0')); // (now and then a piece of furniture: docs/HOUSING.md §3)
       if (this.zr) drops.push(...this.zr.chestDrops(chest), ...this.zr.firstClearDrops(chest)); // (a zone's quest item, the first-clear unique + rare)
+      this.tr?.onChest(chest, drops); // (a tier run: the quantity bonus, and the Lantern chest's hoard)
       setTimeout(() => this.loot.drop(p.clone().setY(0.5), drops), 250);
     } };
     return chest;
   }
   makePot(p) {
     const G = this.G, W = this.world;
-    const g = potGeometry(this.layout.theme), colA = potColor(this.layout.theme); // a biome pot with rim, lid and painted motifs (lootModels.js)
+    const g = releaseAfterUpload(potGeometry(this.layout.theme)), colA = potColor(this.layout.theme); // a biome pot with rim, lid and painted motifs (lootModels.js; its own clone, disposed when broken: on the Mobile preset its arrays go once uploaded)
     const mesh = new THREE.Mesh(g, makeToon({ vertexColors: true, rim: 0.4 })); mesh.position.copy(p); mesh.rotation.y = rand(-0.4, 0.4); mesh.castShadow = true;
     const ol = new THREE.Mesh(g, makeOutline('#3a2230', 0.012)); mesh.add(ol);
     W.scene.add(mesh);
@@ -413,6 +423,7 @@ export class DungeonMode {
       sh.used = true; orb.material.emissiveIntensity = 0.1; W.lightPool.removeSource(light);
       G.vfx.pillar(p, { color: INFO.color, life: 1.4, r: 0.8, h: 6 }); G.vfx.sparkle(p.clone().setY(1), { n: 30, color: INFO.color, r: 1 });
       Events.emit('sfx', 'buff'); G.ui?.banner?.(INFO.name, INFO.text, { style: 'quest' });
+      this.tr?.onShrine(type); // (Cursed Shrines: the blessing comes with a curse)
       const B = this.combat.buffs;
       if (type === 'zoomies') B.shrineZoom = { t: 45 };
       if (type === 'goodboy') { G.actions.restoreAll(); G.vfx.heal(G.player.pos); }
@@ -455,6 +466,7 @@ export class DungeonMode {
     if (this.combat.buffs.shrineXp) xp = Math.round(xp * 1.5);
     xp = Math.round(xp * (1 + (D.xpBonus || 0) / 100));
     if (this.zr) xp = Math.max(1, Math.round(xp * this.zr.xpMul(m))); // (a dense zone floor pays less per kill: zoneRun.js DENSITY)
+    if (this.tr) xp = Math.max(1, Math.round(xp * this.tr.xpMul(m))); // (a tier run's xp bonus; a Haunted ghost pays a third)
     const isBoss = m === this.boss;
     // the Victory banner goes up before the xp lands, so a level-up from the kill folds into it (no second banner)
     if (isBoss) this.onBossDefeated(m, xp);
@@ -466,12 +478,13 @@ export class DungeonMode {
     }
     if (D.lifeOnKill) G.actions.heal(D.lifeOnKill);
     // drops (a boss's hoard bursts out a beat later, once the Victory banner has had the stage)
-    const mf = (D.mf || 0) + (this.combat.buffs.shrineLuck ? 60 : 0);
+    const mf = (D.mf || 0) + (this.combat.buffs.shrineLuck ? 60 : 0) + (this.tr?.mfBonus || 0);
     const drops = rollDrops({ mlvl: m.level, rank: m.rank, mf, gf: D.gf || 0, kind: m.stats.kind });
     drops.push(...seedDrops(m.level, m.rank)); // (homestead seeds, docs/HOMESTEAD.md)
     if (this.zoneId) drops.push(...forageDrops(this.zoneId, m.rank));
     if (!m.bossAdd) drops.push(...findDrops(G, this, isBoss ? 'boss' : m.rank)); // (a rare furniture find: docs/HOUSING.md §3)
     this.zr?.filterDrops(m, drops); // (thinned for a zone pack's fodder; a marked pack's leader carries a quest item)
+    this.tr?.onDrops(m, drops, isBoss); this.tr?.onMonsterDeath(m); // (a tier run: the quantity and boss-loot bonus; Haunted's ghosts)
     const at = m.pos.clone().setY(0.3);
     if (drops.length && isBoss) setTimeout(() => { if (G.dungeon !== this) return; G.vfx.ring(at, { color: '#ffe070', r0: 0.3, r1: 3.2, life: 0.6 }); G.vfx.sparkle(at.clone().setY(0.8), { n: 30, color: '#fff2a0', r: 1.2, rise: 1.6 }); Events.emit('sfx', 'chest_open'); this.loot.drop(at, drops); }, 1050);
     else if (drops.length) this.loot.drop(at, drops);
@@ -510,6 +523,7 @@ export class DungeonMode {
     Events.emit('boss:dead', { id: b.id, floor: this.floor, ...this.where() });
     this.clearDungeon(b);
     this.zr?.onBossDefeated(b, this.lastClear); // (the seal opens; the first clear's chest, banner and the next zone)
+    this.tr?.onBossDefeated(b, this.lastClear); // (a tier / Spirit run's clear: the Lantern chest, the banner)
     Events.emit('sfx', 'ui_levelup');
     // stairs appear where the boss fell + a return portal
     const p = b.pos.clone();
@@ -530,12 +544,23 @@ export class DungeonMode {
   // a boss down: 'dungeon:cleared' { id, kind, tier, floor, zone, boss, first } for every Burrow boss (floors 5, 10, …) and
   // a zone dungeon's last-floor boss (its clear count and tiers: rpg/zones.js; a newly opened tier also fires
   // 'tier:unlocked' { id, zone, tier }). An outdoor region reports its own boss (regionMode.js).
+  // The Deep Burrow (kind 'deep', docs/ZONES.md §5.1) records the same way; Tamamo on a Burrow floor is its story clear
+  // (its T1 opens). A Spirit clear also fires 'spirit:unlocked' when it's the clear that opened the endgame.
   clearDungeon(b) {
-    if (this.kind === 'burrow') { Events.emit('dungeon:cleared', { id: 'burrow', kind: 'burrow', tier: 0, floor: this.floor, zone: null, boss: b.id, first: false }); return; }
-    if (this.kind !== 'zone' || this.hasDeeper() || !this.zoneId) return;
-    const r = this.lastClear = recordDungeonClear(this.G.state, this.zoneId, this.tier || 0), id = this.def.id;
-    Events.emit('dungeon:cleared', { id, kind: 'zone', tier: this.tier || 0, floor: this.floor, zone: this.zoneId, boss: b.id, first: r.first });
+    const G = this.G;
+    if (this.kind === 'burrow') {
+      Events.emit('dungeon:cleared', { id: 'burrow', kind: 'burrow', tier: 0, floor: this.floor, zone: null, boss: b.id, first: false });
+      const d = b.id === 'nineTails' ? tierRecord(G.state, 'burrowDeep') : null;
+      if (d && !d.tier.cleared.includes(0)) { d.tier.cleared.unshift(0); if (d.tier.unlocked < 1) { d.tier.unlocked = 1; Events.emit('tier:unlocked', { id: 'burrowDeep', zone: null, tier: 1 }); setTimeout(() => { if (G.dungeon === this) G.ui?.toast?.('The Spirit Lantern by the Burrow door glows: the Deep Burrow\'s Tier 1 is open', { icon: 'lantern', color: '#ffd88a' }); }, 5200); } }
+      return;
+    }
+    if ((this.kind !== 'zone' && this.kind !== 'deep') || this.hasDeeper()) return;
+    const was = spiritOpen(G.state);
+    const r = this.lastClear = recordDungeonClear(G.state, this.def.id, this.tier || 0, this.spirit || 0), id = this.def.id;
+    r.spiritOpened = !was && spiritOpen(G.state);
+    Events.emit('dungeon:cleared', { id, kind: this.kind, tier: this.tier || 0, spirit: this.spirit || 0, floor: this.floor, zone: this.zoneId, boss: b.id, first: r.first, firstTier: r.firstTier });
     if (r.tierUnlocked != null) Events.emit('tier:unlocked', { id, zone: this.zoneId, tier: r.tierUnlocked });
+    if (r.spiritOpened) Events.emit('spirit:unlocked', { id, zone: this.zoneId });
   }
   // The fight ends with the boss: its summoned adds burst into sparkles (a quick chain, nearest first, no xp / loot),
   // hostile shots still in the air fizzle (with their landing circles), and boss toasts that haven't been read yet
@@ -620,7 +645,7 @@ export class DungeonMode {
     for (const m of this.dying) m.update(dt); // death squash / poof animation
     this.loot.update(dt);
     for (const s of this.spinners || []) s(dt, t);
-    if (this.playerLight) this.playerLight.pos.copy(G.player.pos).setY(G.player.pos.y + 1.8);
+    if (this.playerLight) this.playerLight.pos.copy(G.player.pos).setY(G.player.pos.y + (this.playerLight.lift ?? 1.8)); // (a region's night lantern keeps 1.8)
     // boss bar
     if (this.boss?.alive && this.boss.aggro) G.ui?.setBoss?.({ name: this.boss.name, hp: this.boss.life, max: this.boss.lifeMax });
     this.updateBossFraming(dt);
@@ -631,13 +656,14 @@ export class DungeonMode {
     if (sd) { this.sigDimT = Math.max(0, (this.sigDimT || 0) - dt); const want = this.sigDimT > 0 && this.boss?.alive ? 0.3 : this.sigilCalm ? 0.45 : 1; sd.value += (want - sd.value) * Math.min(1, dt * (want < sd.value ? (this.sigilCalm ? 4 : 14) : 3)); }
     this.updateVictoryGrade(dt);
     this.zr?.update(dt, t);
+    this.tr?.update(dt, t);
     this.world.update(dt, t, G.vfx, G.player.pos);
   }
-  dispose() { this.loot.clear(); this.monsters.length = 0; this.G.engine.rig.clearBias?.(); this._horde?.dispose(); this.zr?.dispose(); if (this.kind !== 'region') this.world.dispose?.(); }
+  dispose() { this.loot.clear(); this.monsters.length = 0; this.G.engine.rig.clearBias?.(); this._horde?.dispose(); this.zr?.dispose(); this.tr?.dispose(); if (this.kind !== 'region') this.world.dispose?.(); }
   /** the quest pointer's mark for a find / rescue step on this floor (world/story.js placeFor; zoneRun.js) */
   questMark(step) { return this.zr?.questMark(step) ?? null; }
   /** Spawn one monster into this world (registered with the floor and its combat) → the Monster. */
-  spawnMonster(id, opts) { const m = new Monster(this, id, opts); this.monsters.push(m); this.combat.add(m); return m; }
+  spawnMonster(id, opts) { const m = monsterMods(this, new Monster(this, id, opts)); this.monsters.push(m); this.combat.add(m); return m; } // (a tier run's modifiers apply to every spawn: boss waves, ghosts)
   /** Build the cached models (and their instanced batches) of monster kinds this world may field later (summons, waves). */
   warmMonsters(ids) { hordeOf(this).warm(ids); }
 }

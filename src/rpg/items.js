@@ -73,6 +73,8 @@ const sword = (id, name, tier, lvl, dmg, aspd, req, sockets, variant, colors) =>
 const ball = (id, name, tier, lvl, dmg, aspd, req, sockets, variant, colors) => addBase(id, { name, slot: 'weapon', wtype: 'ball', tier, lvl, dmg, aspd, req, sockets, icon: { shape: 'ball', variant, colors } });
 const staff = (id, name, tier, lvl, dmg, aspd, req, sockets, variant, colors) => addBase(id, { name, slot: 'weapon', wtype: 'staff', tier, lvl, dmg, aspd, req, sockets, icon: { shape: 'staff', variant, colors } });
 const fuma = (id, name, tier, lvl, dmg, aspd, req, sockets, variant, colors) => addBase(id, { name, slot: 'weapon', wtype: 'fuma', tier, lvl, dmg, aspd, req, sockets, icon: { shape: 'fuma', variant, colors } });
+const flail = (id, name, tier, lvl, dmg, aspd, req, sockets, variant, colors) => addBase(id, { name, slot: 'weapon', wtype: 'flail', tier, lvl, dmg, aspd, req, sockets, icon: { shape: 'flail', variant, colors } });
+const lance = (id, name, tier, lvl, dmg, aspd, req, sockets, variant, colors) => addBase(id, { name, slot: 'weapon', wtype: 'lance', tier, lvl, dmg, aspd, req, sockets, icon: { shape: 'lance', variant, colors } });
 const armor = (slot, id, name, tier, lvl, def, req, sockets, variant, colors) => addBase(id, { name, slot, tier, lvl, def, req, sockets, icon: { shape: slot, variant, colors } });
 const jewel = (slot, id, name, tier, lvl, variant, colors) => addBase(id, { name, slot, tier, lvl, sockets: 0, icon: { shape: slot, variant, colors } });
 
@@ -137,6 +139,37 @@ fuma('dragonboneFuma', 'Dragonbone Fūma', 2, 40, [25, 50], 1.25, { dex: 72 }, 3
 fuma('smokeVeilFuma', 'Smoke-Veil Fūma', 2, 45, [31, 62], 1.3, { dex: 82 }, 3, 'smoke', ['#d8d0e0', '#6a5a8a', '#b89aff']);
 fuma('thousandStarFuma', 'Thousand-Star Fūma', 2, 50, [38, 76], 1.2, { dex: 95 }, 3, 'star', ['#fff8e8', '#ffcf4a', '#ff8fb0']);
 fuma('greatPugFuma', "Great Pug's Fūma", 2, 55, [36, 72], 1.35, { dex: 104 }, 3, 'royal', ['#f4ead2', '#d8b040', '#5a8a4a']);
+// ---- Flails: dog toys on a rope (the Shih Tzu; strength scaling, docs/SHIHTZU.md) — [ball, rope, handle]. Heavy: they
+// swing a little slower than swords and hit a little harder (his basic attack is a three-swing combo; Flail Arts whirl,
+// tug and slam with it). The variant picks the ball (actors/shihtzuGear.js tints the Blender prop; rpg/iconsShihtzu.js)
+flail('toyFlail', 'Toy Flail', 0, 1, [3, 8], 1.05, {}, 2, 'nub', ['#2c2a30', '#7a4a7a', '#f4f0ea']);
+flail('squeakyMorningstar', 'Squeaky Morningstar', 0, 5, [5, 11], 1.1, {}, 2, 'squeak', ['#ff8fb0', '#5ce0c0', '#f4f0ea']);
+flail('ropeKnotFlail', 'Rope-Knot Flail', 0, 9, [7, 16], 1.0, { str: 20 }, 3, 'knot', ['#c98f5e', '#8a5a3a', '#efdcb8']);
+flail('rawhideThumper', 'Rawhide Thumper', 0, 13, [8, 19], 1.05, { str: 26 }, 3, 'rawhide', ['#e8c89a', '#6b4a3a', '#c98f5e']);
+flail('gloomropeFlail', 'Gloomrope Flail', 1, 20, [13, 30], 1.05, { str: 38 }, 3, 'nub', ['#34303e', '#4a2a4a', '#c8ccd8']);
+flail('ghostlightFlail', 'Ghostlight Flail', 1, 24, [14, 32], 1.1, { str: 44 }, 2, 'lantern', ['#2a3a3a', '#5ce0c0', '#e8f4f0']);
+flail('moonknotFlail', 'Moonknot Flail', 1, 28, [18, 39], 1.0, { str: 52 }, 3, 'knot', ['#dfe8ff', '#3a3a6a', '#c8ccd8']);
+flail('brambleBallFlail', 'Bramble Ball Flail', 1, 33, [21, 45], 1.05, { str: 60 }, 3, 'bramble', ['#7cc45a', '#4f8f3a', '#efdcb8']);
+flail('rubberCometFlail', 'Rubber Comet Flail', 2, 40, [27, 55], 1.05, { str: 72 }, 3, 'comet', ['#ff8a3a', '#e8503a', '#fff3e0']);
+flail('lanternWickFlail', 'Lantern-Wick Flail', 2, 45, [33, 68], 1.1, { str: 82 }, 3, 'lantern', ['#ffb04a', '#7a4a7a', '#fff3a0']);
+flail('gloomhowlFlail', 'Gloomhowl Flail', 2, 50, [41, 83], 1.0, { str: 95 }, 3, 'nub', ['#1e1c24', '#5ce0c0', '#c8ccd8']);
+flail('grandSqueaker', 'Grand Squeaker', 2, 55, [39, 79], 1.15, { str: 104 }, 3, 'squeak', ['#ffd84a', '#8a4a8a', '#fffaf0']);
+// ---- Lances: long dog-toy lances (the Golden Retriever dragoon; strength scaling, docs/GOLDEN.md) — [head, shaft, pommel].
+// The longest reach of any weapon (his basic attack is two thrusts and a sweeping swat; Lance Arts thrust, sweep, charge and
+// jump with it), a touch slower than a sword. Every base is the same Blender prop, its rubber head and felt guard tinted
+// to [head], the rope's bands to [shaft], the tennis-ball pommel to [pommel] (actors/goldenGear.js setLanceLook)
+lance('toyLance', 'Toy Lance', 0, 1, [3, 8], 1.1, {}, 2, 'flame', ['#3a9a6a', '#f4e8d0', '#d6c85c']);
+lance('squeakyPike', 'Squeaky Pike', 0, 5, [4, 11], 1.15, {}, 2, 'squeak', ['#ff8fb0', '#f4e8d0', '#ffd84a']);
+lance('ropeToyLance', 'Rope-Toy Lance', 0, 9, [7, 15], 1.05, { str: 20 }, 3, 'rope', ['#c98f5e', '#e8c89a', '#d6c85c']);
+lance('rawhideSpear', 'Rawhide Spear', 0, 13, [8, 19], 1.1, { str: 26 }, 3, 'rawhide', ['#e8c89a', '#8a5a3a', '#c98f5e']);
+lance('leafbladeLance', 'Leafblade Lance', 1, 20, [13, 29], 1.1, { str: 38 }, 3, 'leaf', ['#7cc45a', '#f4e8d0', '#c8a050']);
+lance('emberGlaive', 'Ember Glaive', 1, 24, [14, 31], 1.15, { str: 44 }, 2, 'flame', ['#ff8a3a', '#f4e8d0', '#ffcf4a']);
+lance('wyvernLance', 'Wyvern Lance', 1, 28, [17, 38], 1.05, { str: 52 }, 3, 'wing', ['#5aa8e0', '#f6f7f2', '#c8d0dc']);
+lance('cometLance', 'Tennis Comet Lance', 1, 33, [20, 44], 1.1, { str: 60 }, 3, 'comet', ['#d4f05a', '#ffffff', '#d6c85c']);
+lance('sunspear', 'Sunspear', 2, 40, [26, 54], 1.1, { str: 72 }, 3, 'sun', ['#ffcf4a', '#fff3e0', '#ff8a3a']);
+lance('dragonGuardLance', 'Dragon Guard Lance', 2, 45, [32, 66], 1.1, { str: 82 }, 3, 'flame', ['#2f7a5a', '#f4e8d0', '#c8a050']);
+lance('starfallPike', 'Starfall Pike', 2, 50, [40, 80], 1.05, { str: 95 }, 3, 'star', ['#e6f0ff', '#3a3a6a', '#ffcf4a']);
+lance('emberleafLance', 'Emberleaf Lance', 2, 55, [38, 76], 1.2, { str: 104 }, 3, 'leaf', ['#3a9a6a', '#e0a868', '#d8603a']);
 ball('planetBall', 'Ringed Planet Ball', 2, 50, [34, 70], 1.2, { dex: 95 }, 3, 'planet', ['#8fd0ff', '#ffbcd6', '#ffffff']);
 ball('supernovaBall', 'Supernova Ball', 2, 55, [36, 76], 1.3, { dex: 105 }, 3, 'nova', ['#c86aff', '#ffe0ff', '#ffcf4a']);
 // ---- Hats — [main, band, accent]
@@ -405,13 +438,13 @@ const SLOT_WEIGHT = { weapon: 1.5, hat: 1, outfit: 1, boots: 0.9, paws: 0.9, col
 // Weapon drops favour the hero being played (docs/HEROES.md §2): set by HeroManager on every switch.
 let LOOT_CLASS = 'chewy';
 export function setLootClass(cls) { LOOT_CLASS = cls || 'chewy'; }
-const CLASS_WTYPES = { chewy: ['sword', 'ball'], moka: ['staff'], poe: ['fuma'] };
+const CLASS_WTYPES = { chewy: ['sword', 'ball'], moka: ['staff'], poe: ['fuma'], shihtzu: ['flail'], golden: ['lance'] };
 export function pickBase(ilvl, slot, wtype, rng) {
   rng = toRng(rng);
   let slots = slot ? [slot] : SLOTS;
   const byslot = s => GEAR_BASE_IDS.map(id => ITEM_BASES[id]).filter(b => b.slot === s && b.lvl <= Math.max(1, ilvl) && (!wtype || b.wtype === wtype));
   slots = slots.filter(s => byslot(s).length);
-  if (!slots.length) return ITEM_BASES[wtype === 'ball' ? 'redTennisBall' : wtype === 'staff' ? 'driftwoodStaff' : wtype === 'fuma' ? 'boneFuma' : 'boneSword'];
+  if (!slots.length) return ITEM_BASES[wtype === 'ball' ? 'redTennisBall' : wtype === 'staff' ? 'driftwoodStaff' : wtype === 'fuma' ? 'boneFuma' : wtype === 'flail' ? 'toyFlail' : wtype === 'lance' ? 'toyLance' : 'boneSword'];
   const s = rng.weighted(slots.map(x => ({ x, w: SLOT_WEIGHT[x] || 1 }))).x;
   let pool = byslot(s);
   if (s === 'weapon' && !wtype) {
@@ -489,6 +522,8 @@ const RARE_B = {
   ball: ['Fetch', 'Bounce', 'Orb', 'Comet', 'Squeak', 'Sphere', 'Boing', 'Zoomer'],
   staff: ['Crook', 'Wand', 'Tide', 'Beacon', 'Branch', 'Rod', 'Splash', 'Quack'],
   fuma: ['Pinwheel', 'Whirl', 'Shuriken', 'Snort', 'Sneeze', 'Star', 'Shadow', 'Twirl'],
+  flail: ['Thumper', 'Squeaker', 'Wallop', 'Knot', 'Sigh', 'Bonker', 'Gloom', 'Tug'],
+  lance: ['Lance', 'Pike', 'Poker', 'Glaive', 'Spear', 'Wingtip', 'Fetcher', 'Sunbeam'],
   hat: ['Crown', 'Topper', 'Brow', 'Visage', 'Hood', 'Cap'], outfit: ['Coat', 'Shell', 'Wrap', 'Cozy', 'Robe', 'Hide'],
   collar: ['Chime', 'Loop', 'Promise', 'Tag', 'Choker', 'Ring'], charm: ['Trinket', 'Token', 'Wish', 'Spark', 'Knot', 'Omen'],
   boots: ['Stride', 'Tread', 'Pounce', 'Scamper', 'Trot', 'Hop'], paws: ['Grip', 'Swipe', 'Mitt', 'Clutch', 'Paw', 'Knuckle'],
@@ -663,6 +698,20 @@ export function socketGem(item, gem) {
   return { ok: true, why: '' };
 }
 
+/** The Golden Retriever dragoon's starter: a plain Toy Lance. */
+export function starterLance() {
+  const it = blankItem(ITEM_BASES.toyLance, 'normal', 1, toRng(new RNG(19)));
+  finalize(it);
+  return it;
+}
+
+/** The Shih Tzu's starter: a plain Toy Flail. */
+export function starterFlail() {
+  const it = blankItem(ITEM_BASES.toyFlail, 'normal', 1, toRng(new RNG(17)));
+  finalize(it);
+  return it;
+}
+
 /** Poe's starter: a plain Bone Fūma. */
 export function starterFuma() {
   const it = blankItem(ITEM_BASES.boneFuma, 'normal', 1, toRng(new RNG(13)));
@@ -708,7 +757,7 @@ export function shopStock(lvl, seed = 1) {
   const ilvl = () => clamp(lvl + rng.int(-2, 3), 1, 60);
   const add = it => { it.price = buyPrice(it); out.push(it); };
   // two weapons for whoever is shopping (Chewy: a sword and a ball; Moka: two staffs; Poe: two fūma)
-  for (const wtype of LOOT_CLASS === 'moka' ? ['staff', 'staff'] : LOOT_CLASS === 'poe' ? ['fuma', 'fuma'] : ['sword', 'ball']) add(generateItem({ ilvl: ilvl(), slot: 'weapon', wtype, rarity: rng.chance(0.5) ? 'magic' : 'normal', rng }));
+  for (const wtype of LOOT_CLASS === 'moka' ? ['staff', 'staff'] : LOOT_CLASS === 'poe' ? ['fuma', 'fuma'] : LOOT_CLASS === 'shihtzu' ? ['flail', 'flail'] : LOOT_CLASS === 'golden' ? ['lance', 'lance'] : ['sword', 'ball']) add(generateItem({ ilvl: ilvl(), slot: 'weapon', wtype, rarity: rng.chance(0.5) ? 'magic' : 'normal', rng }));
   for (const slot of ['hat', 'outfit', 'boots', 'paws']) add(generateItem({ ilvl: ilvl(), slot, rarity: rng.chance(0.45) ? 'magic' : 'normal', rng }));
   add(generateItem({ ilvl: ilvl(), slot: rng.chance(0.5) ? 'collar' : 'charm', rarity: 'magic', rng }));
   add(generateItem({ ilvl: ilvl(), slot: 'charm', rarity: 'magic', rng }));
@@ -735,6 +784,8 @@ export function itemKindName(it) {
   if (it.wtype === 'ball') return 'Ball';
   if (it.wtype === 'staff') return 'Staff';
   if (it.wtype === 'fuma') return 'Fūma';
+  if (it.wtype === 'flail') return 'Flail';
+  if (it.wtype === 'lance') return 'Lance';
   return SLOT_NAMES[it.slot] || 'Item';
 }
 /** Does the player meet the item's requirements? */
@@ -822,9 +873,9 @@ export function itemTooltip(it, state, derived) {
   const subtitle = (it.rarity === 'rare' || it.rarity === 'unique' || it.rarity === 'set' ? b.name + ' · ' : '') + tierName + kind + (it.rarity !== 'normal' ? ` · ${RARITY[it.rarity].name}` : '');
   if (it.dmg) {
     const d = itemDamage(it);
-    L(`${it.wtype === 'ball' ? 'Throw' : it.wtype === 'staff' ? 'Spell' : it.wtype === 'fuma' ? 'Slash' : 'Swing'} Damage: ${d[0]} to ${d[1]}`, d[2] ? C.blue : C.white);
+    L(`${it.wtype === 'ball' ? 'Throw' : it.wtype === 'staff' ? 'Spell' : it.wtype === 'fuma' ? 'Slash' : it.wtype === 'flail' ? 'Wallop' : it.wtype === 'lance' ? 'Thrust' : 'Swing'} Damage: ${d[0]} to ${d[1]}`, d[2] ? C.blue : C.white);
     L(`Attack Speed: ${speedLabel(it.aspd)} (${it.aspd.toFixed(2)}/s)`, C.white);
-    L(it.wtype === 'ball' ? 'Thrown · bounces back to you · scales with Dexterity' : it.wtype === 'staff' ? 'Sparkle bolt · powers every spell · scales with Energy' : it.wtype === 'fuma' ? 'Quick slashes · Fūma Throw sends it out and back · scales with Dexterity' : 'Melee · wide swing · scales with Strength', C.grey);
+    L(it.wtype === 'ball' ? 'Thrown · bounces back to you · scales with Dexterity' : it.wtype === 'staff' ? 'Sparkle bolt · powers every spell · scales with Energy' : it.wtype === 'fuma' ? 'Quick slashes · Fūma Throw sends it out and back · scales with Dexterity' : it.wtype === 'flail' ? 'Heavy swings · long reach · scales with Strength' : it.wtype === 'lance' ? 'Long thrusts · the longest reach · scales with Strength' : 'Melee · wide swing · scales with Strength', C.grey);
   }
   if (it.def) {
     let ed = 0; for (const a of it.affixes) if (a.stat === 'def') ed += a.value;
@@ -869,6 +920,6 @@ function reqLines(it, state, derived) {
   if (r.ene) { const ene = derived ? derived.ene : state ? state.player.stats.ene : 999; out.push({ text: `Required Energy: ${r.ene}`, met: ene >= r.ene }); }
   const who = it.wtype && WEAPON_CLASS[it.wtype];
   const cls = state?.player?.cls || 'chewy';
-  if (who && (cls !== who || state?.flags?.mokaJoined || state?.flags?.poeJoined)) out.push({ text: `${CLASSES[who].name}'s weapon`, met: cls === who });
+  if (who && (cls !== who || state?.flags?.mokaJoined || state?.flags?.poeJoined || state?.flags?.shihtzuJoined || state?.flags?.goldenJoined)) out.push({ text: `${CLASSES[who].name}'s weapon`, met: cls === who });
   return out;
 }

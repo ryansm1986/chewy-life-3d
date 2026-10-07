@@ -1,0 +1,140 @@
+{
+  "units": "metres; game axes [x, y, z] = Blender [x, z, -y]; the game rebuilds bones without rotation, so a bone frame is the model frame translated to the bone head",
+  "lance": {
+    "prop": "/models/golden-lance.glb",
+    "prop_axis": "the shaft runs along the prop's +Y (game), the tip at +Y; origin = the main grip",
+    "main_grip": {
+      "bone": "hand_R",
+      "position_in_bone_frame": [
+        -0.04049,
+        -0.02883,
+        0.00291
+      ],
+      "shaft_axis_game": [
+        0.04008,
+        0.04451,
+        0.9982
+      ]
+    },
+    "off_hand_grip": {
+      "bone": "hand_L",
+      "position_in_bone_frame": [
+        0.04049,
+        -0.02883,
+        0.00291
+      ],
+      "distance_along_shaft_from_main_m": 0.44
+    },
+    "note": "two-handed: place the prop origin at the right palm and aim its +Y from the right palm toward the left palm; the left palm then sits at 0.44 m along the shaft when the paws are that far apart"
+  },
+  "javelin": {
+    "prop": "/models/golden-javelin.glb",
+    "throw_grip": {
+      "bone": "hand_R",
+      "position_in_bone_frame": [
+        -0.04049,
+        -0.02883,
+        0.00291
+      ],
+      "shaft_axis_game": [
+        0.04008,
+        0.04451,
+        0.9982
+      ]
+    }
+  },
+  "quiver_back_mount": {
+    "bone": "chest",
+    "mouth_position_in_bone_frame": [
+      0.0,
+      0.16538,
+      -0.31
+    ],
+    "mouth_position_model_game": [
+      0.0,
+      0.68168,
+      -0.3
+    ],
+    "axis_game": [
+      0.0,
+      0.98089,
+      -0.19454
+    ],
+    "javelin_tips_model_game": [
+      [
+        0.0,
+        0.79818,
+        -0.33111
+      ],
+      [
+        -0.034,
+        0.77548,
+        -0.33
+      ],
+      [
+        0.034,
+        0.77775,
+        -0.33045
+      ]
+    ],
+    "note": "the quiver is part of the hero mesh (rigid on chest); a drawn javelin starts at the mouth along the axis"
+  },
+  "palms": {
+    "R": {
+      "bone": "hand_R",
+      "hand_head_game": [
+        -0.39616,
+        0.36208,
+        0.02914
+      ],
+      "palm_centre_game": [
+        -0.43665,
+        0.33325,
+        0.03205
+      ],
+      "palm_offset_in_hand_frame_game": [
+        -0.04049,
+        -0.02883,
+        0.00291
+      ],
+      "grip_axis_game": [
+        0.04008,
+        0.04451,
+        0.9982
+      ],
+      "arm_axis_game": [
+        -0.66793,
+        -0.74181,
+        0.05989
+      ]
+    },
+    "L": {
+      "bone": "hand_L",
+      "hand_head_game": [
+        0.39616,
+        0.36208,
+        0.02914
+      ],
+      "palm_centre_game": [
+        0.43665,
+        0.33325,
+        0.03205
+      ],
+      "palm_offset_in_hand_frame_game": [
+        0.04049,
+        -0.02883,
+        0.00291
+      ],
+      "grip_axis_game": [
+        -0.04008,
+        0.04451,
+        0.9982
+      ],
+      "arm_axis_game": [
+        0.66793,
+        -0.74181,
+        0.05989
+      ]
+    }
+  }
+}

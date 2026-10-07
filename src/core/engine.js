@@ -1,9 +1,10 @@
 // Renderer, camera rig, lights and the per-frame render. Scenes (village / dungeon) plug in.
 import * as THREE from 'three';
+import { SMAAPreset } from 'postprocessing';
 import { Post } from '../gfx/post.js';
 import { U, initSharedUniforms } from '../gfx/materials.js';
 import { damp, clamp, TAU } from './util.js';
-import { bootGraphics, pixelRatioFor, DECK, PRESET } from './deck.js';
+import { bootGraphics, pixelRatioFor, DECK, PRESET, liteOf, releasedGeometries } from './deck.js';
 
 export const QUALITY = { LOW: 0, MED: 1, HIGH: 2 };
 
@@ -115,7 +116,7 @@ export class Engine {
     // Settings › Graphics at boot (core/deck.js, ROADMAP R-2): preset 0..3 (3: the Steam Deck), quality 0..2 the density
     // tier the worlds build their grass, flowers, details and shadow maps with (?q= still wins)
     const gq = bootGraphics(params);
-    this.preset = gq.preset; this.quality = gq.quality; this.deck = gq.deck;
+    this.preset = gq.preset; this.quality = gq.quality; this.deck = gq.deck; this.lite = liteOf(gq.preset); // (lite: the Deck's or Mobile's numbers, core/deck.js)
     const r = this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false, depth: true, preserveDrawingBuffer: params.has('shot') });
     r.setPixelRatio(pixelRatioFor(this.preset));
     r.setSize(innerWidth, innerHeight);
@@ -125,6 +126,10 @@ export class Engine {
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.domElement.id = 'game';
     document.body.appendChild(r.domElement);
+    // a lost WebGL context (a phone backgrounding the tab) after geometries let go of their arrays (the Mobile preset,
+    // core/deck.js releaseAfterUpload) can't be re-uploaded: save on the loss, and reload once the context is back
+    r.domElement.addEventListener('webglcontextlost', e => { if (!releasedGeometries()) return; e.preventDefault(); this.lostReleased = true; try { globalThis.G?.save?.(); } catch (er) { /* */ } });
+    r.domElement.addEventListener('webglcontextrestored', () => { if (this.lostReleased) location.reload(); });
     initSharedUniforms();
 
     this.camera = new THREE.PerspectiveCamera(20, innerWidth / innerHeight, 1, 500);
@@ -150,7 +155,7 @@ export class Engine {
   setWorld(world) {
     this.world = world;
     this.scene = world.scene;
-    if (!this.post) this.post = new Post(this.renderer, this.scene, this.camera, this.quality);
+    if (!this.post) { this.post = new Post(this.renderer, this.scene, this.camera, this.quality); this.postPreset(); }
     else this.post.setScene(this.scene, this.camera);
     this.tuneShadows(world);
     this._shadowDirty = true; // (a new world's lights have no maps yet: draw them on its first frame)
@@ -158,19 +163,27 @@ export class Engine {
   /** Settings › Graphics, live: the pixel ratio, AO, tilt-shift and the Deck's shadows. Grass and detail density stay as
    *  the worlds were built (the next start follows: R-2). The particle cap is game.js's (gfx/particles.js). */
   applyPreset(p) {
-    this.preset = p; this.deck = p === PRESET.DECK;
+    this.preset = p; this.deck = p === PRESET.DECK; this.lite = liteOf(p);
     this.renderer.setPixelRatio(pixelRatioFor(p));
-    const P = this.post;
-    if (P) { P.ao.enabled = p >= 1 && !this.deck; P.ao.configuration.halfRes = p !== PRESET.HIGH; P.tiltPass.enabled = p >= 1 && !this.deck; }
+    this.postPreset();
     this.tuneShadows();
     this.resize();
   }
-  /** the Deck preset's sun shadows: a smaller map over a tighter area (fewer casters drawn too); other presets keep the
-   *  world's own (each world sizes its map by quality and its area by its camera) */
+  /** the post passes a preset keeps: AO and tilt-shift from Medium up (not the Deck's or Mobile's); Mobile also takes
+   *  SMAA down to its low preset and leaves out the chromatic aberration pass (hit flashes keep their tint) */
+  postPreset(p = this.preset) {
+    const P = this.post; if (!P) return;
+    const mob = p === PRESET.MOBILE, lite = !!liteOf(p);
+    P.ao.enabled = p >= 1 && !lite; P.ao.configuration.halfRes = p !== PRESET.HIGH; P.tiltPass.enabled = p >= 1 && !lite;
+    if (P._smaaMob !== mob) { P._smaaMob = mob; try { P.smaa.applyPreset?.(mob ? SMAAPreset.LOW : SMAAPreset.HIGH); } catch (e) { /* */ } }
+    P.noChroma = mob; // (Post.render keeps the hit aberration's pass off while it is set)
+  }
+  /** the Deck's and Mobile's sun shadows: a smaller map over a tighter area (fewer casters drawn too); other presets keep
+   *  the world's own (each world sizes its map by quality and its area by its camera) */
   tuneShadows(world = this.world) {
     const sun = world?.sun; if (!sun?.castShadow) return;
-    const sh = sun.shadow, sc = sh.camera, base = sun.userData.shadowBase ||= { size: sh.mapSize.x, ext: sc.right };
-    const size = this.deck ? Math.min(base.size, DECK.shadowMap) : base.size, ext = this.deck ? +(base.ext * DECK.shadowExtent).toFixed(2) : base.ext;
+    const sh = sun.shadow, sc = sh.camera, base = sun.userData.shadowBase ||= { size: sh.mapSize.x, ext: sc.right }, L = this.lite;
+    const size = L ? Math.min(base.size, L.shadowMap) : base.size, ext = L ? +(base.ext * L.shadowExtent).toFixed(2) : base.ext;
     if (sh.mapSize.x === size && sc.right === ext) return;
     sh.mapSize.set(size, size); sc.left = sc.bottom = -ext; sc.right = sc.top = ext; sc.updateProjectionMatrix();
     if (sh.map) { sh.map.dispose(); sh.map = null; } // (three re-allocates it at the new size on the next shadow render)
@@ -204,7 +217,7 @@ export class Engine {
     if (!this.scene) return;
     // the Deck preset redraws the shadow maps every DECK.shadowEvery frames (moving things' shadows trail by a frame);
     // only for this render: portraits and thumbnails keep three's own per-render update
-    const sm = this.renderer.shadowMap, every = this.deck ? DECK.shadowEvery : 1;
+    const sm = this.renderer.shadowMap, every = this.lite?.shadowEvery || 1;
     if (every > 1) { sm.autoUpdate = false; this._shN = ((this._shN || 0) + 1) % every; sm.needsUpdate = this._shadowDirty || this._shN === 0; this._shadowDirty = false; }
     try { this.post.render(this.dt, this.time); } finally { if (every > 1) { sm.autoUpdate = true; sm.needsUpdate = false; } }
   }

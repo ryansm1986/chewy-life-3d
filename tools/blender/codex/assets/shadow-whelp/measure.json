@@ -1,0 +1,341 @@
+{
+ "base_md5": "215a35ee7932201235ed02e9838d8fdc",
+ "archive_md5": "215a35ee7932201235ed02e9838d8fdc",
+ "atlas": [
+  2048,
+  2304
+ ],
+ "costume_charts": {
+  "hood": [
+   0,
+   2048,
+   1024,
+   256
+  ],
+  "coat": [
+   1024,
+   2048,
+   512,
+   256
+  ],
+  "tail": [
+   1536,
+   2048,
+   256,
+   128
+  ],
+  "bib": [
+   1536,
+   2176,
+   256,
+   128
+  ],
+  "brass": [
+   1792,
+   2048,
+   128,
+   128
+  ],
+  "cuff": [
+   1792,
+   2176,
+   128,
+   128
+  ]
+ },
+ "triangles": {
+  "Shadow_head": 10824,
+  "Shadow_ear_L": 2088,
+  "Shadow_ear_R": 2088,
+  "Shadow_body": 8904,
+  "Shadow_tail": 396,
+  "Shadow_eye_L": 840,
+  "Shadow_eye_R": 840,
+  "Whelp_hood": 3360,
+  "Whelp_coat": 2356,
+  "Whelp_tail": 964
+ },
+ "triangles_shadow": 25980,
+ "triangles_costume": 6680,
+ "costume_ratio": 0.257,
+ "hood_min_clearance_m": 0.01149999996995284,
+ "coat_min_clearance_m": 0.008803439277192784,
+ "bib_min_clearance_m": 0.006799999973360504,
+ "tail_cover_min_clearance_to_nub_m": 0.010095544368411324,
+ "tag_to_bib_min_m": -0.00025947531908802803,
+ "ear_slits": {
+  "L": {
+   "loop_z": [
+    0.5288239489480681,
+    0.623644630458831
+   ],
+   "cuff_gap_m": 0.0025,
+   "cuff_tube_r_m": 0.0065,
+   "ear_spring_check": {
+    "a-1.0": {
+     "ear_to_piping_clearance_m": -0.0026,
+     "crossing_inside_opening_margin_m": -0.0031
+    },
+    "a-0.6": {
+     "ear_to_piping_clearance_m": 0.0013,
+     "crossing_inside_opening_margin_m": 0.0014
+    },
+    "a-0.3": {
+     "ear_to_piping_clearance_m": 0.0017,
+     "crossing_inside_opening_margin_m": 0.0015
+    },
+    "a+0.0": {
+     "ear_to_piping_clearance_m": 0.0017,
+     "crossing_inside_opening_margin_m": 0.0015
+    },
+    "a+0.3": {
+     "ear_to_piping_clearance_m": 0.0017,
+     "crossing_inside_opening_margin_m": 0.0015
+    },
+    "a+0.6": {
+     "ear_to_piping_clearance_m": 0.0012,
+     "crossing_inside_opening_margin_m": 0.001
+    },
+    "a+1.0": {
+     "ear_to_piping_clearance_m": -0.0056,
+     "crossing_inside_opening_margin_m": -0.0087
+    }
+   }
+  },
+  "R": {
+   "loop_z": [
+    0.5288239489480681,
+    0.623644630458831
+   ],
+   "cuff_gap_m": 0.0025,
+   "cuff_tube_r_m": 0.0065,
+   "ear_spring_check": {
+    "a-1.0": {
+     "ear_to_piping_clearance_m": -0.0026,
+     "crossing_inside_opening_margin_m": -0.0031
+    },
+    "a-0.6": {
+     "ear_to_piping_clearance_m": 0.0013,
+     "crossing_inside_opening_margin_m": 0.0014
+    },
+    "a-0.3": {
+     "ear_to_piping_clearance_m": 0.0017,
+     "crossing_inside_opening_margin_m": 0.0015
+    },
+    "a+0.0": {
+     "ear_to_piping_clearance_m": 0.0017,
+     "crossing_inside_opening_margin_m": 0.0015
+    },
+    "a+0.3": {
+     "ear_to_piping_clearance_m": 0.0017,
+     "crossing_inside_opening_margin_m": 0.0015
+    },
+    "a+0.6": {
+     "ear_to_piping_clearance_m": 0.0012,
+     "crossing_inside_opening_margin_m": 0.001
+    },
+    "a+1.0": {
+     "ear_to_piping_clearance_m": -0.0056,
+     "crossing_inside_opening_margin_m": -0.0087
+    }
+   }
+  }
+ },
+ "wing_mount": {
+  "units": "metres",
+  "game_axes": "three.js: Y up, front +Z; game = (bx, bz, -by)",
+  "body_bone_head_game": [
+   0.0,
+   0.21,
+   -0.07
+  ],
+  "body_bone_rest": "identity orientation (rig_shadow-toy.py), so the bone frame is the model frame moved to the bone head",
+  "wing_glb": "/models/shadow-whelp-wing.glb (the LEFT wing; mirror x for the right one)",
+  "L": {
+   "model_blender": [
+    0.1322,
+    0.1554,
+    0.2653
+   ],
+   "model_game": [
+    0.1322,
+    0.2653,
+    -0.1554
+   ],
+   "body_bone_frame_game": [
+    0.1322,
+    0.0553,
+    -0.0854
+   ],
+   "surface_normal_game": [
+    0.6025,
+    0.7973,
+    -0.0366
+   ]
+  },
+  "R": {
+   "model_blender": [
+    -0.1322,
+    0.1554,
+    0.2653
+   ],
+   "model_game": [
+    -0.1322,
+    0.2653,
+    -0.1554
+   ],
+   "body_bone_frame_game": [
+    -0.1322,
+    0.0553,
+    -0.0854
+   ],
+   "surface_normal_game": [
+    -0.6025,
+    0.7973,
+    -0.0366
+   ]
+  },
+  "flapRange": [
+   -30,
+   60
+  ],
+  "clearance_search": {
+   "note": "min signed distance of the wing (outside its root knob) to the coat and to the hood, per flap over flapRange; at the shoulders (y 0.155), the innermost x with >= 3 mm at every flap",
+   "candidates_x_y_blender": {
+    "0.094,0.155": {
+     "flap-30": {
+      "coat_m": -0.007,
+      "hood_m": 0.0729
+     },
+     "flap-15": {
+      "coat_m": 0.0043,
+      "hood_m": 0.0658
+     },
+     "flap+0": {
+      "coat_m": 0.0129,
+      "hood_m": 0.0573
+     },
+     "flap+15": {
+      "coat_m": 0.0182,
+      "hood_m": 0.0487
+     },
+     "flap+30": {
+      "coat_m": 0.0234,
+      "hood_m": 0.0407
+     },
+     "flap+45": {
+      "coat_m": 0.0275,
+      "hood_m": 0.0308
+     },
+     "flap+60": {
+      "coat_m": 0.03,
+      "hood_m": 0.0105
+     },
+     "worst_m": -0.007
+    },
+    "0.110,0.155": {
+     "flap-30": {
+      "coat_m": -0.0015,
+      "hood_m": 0.0865
+     },
+     "flap-15": {
+      "coat_m": 0.0089,
+      "hood_m": 0.0791
+     },
+     "flap+0": {
+      "coat_m": 0.0146,
+      "hood_m": 0.0703
+     },
+     "flap+15": {
+      "coat_m": 0.0199,
+      "hood_m": 0.0614
+     },
+     "flap+30": {
+      "coat_m": 0.0249,
+      "hood_m": 0.0528
+     },
+     "flap+45": {
+      "coat_m": 0.028,
+      "hood_m": 0.043
+     },
+     "flap+60": {
+      "coat_m": 0.0301,
+      "hood_m": 0.0221
+     },
+     "worst_m": -0.0015
+    },
+    "0.125,0.155": {
+     "flap-30": {
+      "coat_m": 0.0051,
+      "hood_m": 0.1019
+     },
+     "flap-15": {
+      "coat_m": 0.0115,
+      "hood_m": 0.0941
+     },
+     "flap+0": {
+      "coat_m": 0.0169,
+      "hood_m": 0.0851
+     },
+     "flap+15": {
+      "coat_m": 0.0221,
+      "hood_m": 0.0758
+     },
+     "flap+30": {
+      "coat_m": 0.0262,
+      "hood_m": 0.0668
+     },
+     "flap+45": {
+      "coat_m": 0.0287,
+      "hood_m": 0.0564
+     },
+     "flap+60": {
+      "coat_m": 0.0303,
+      "hood_m": 0.0343
+     },
+     "worst_m": 0.0051
+    },
+    "0.140,0.155": {
+     "flap-30": {
+      "coat_m": 0.0093,
+      "hood_m": 0.1212
+     },
+     "flap-15": {
+      "coat_m": 0.0147,
+      "hood_m": 0.1129
+     },
+     "flap+0": {
+      "coat_m": 0.0201,
+      "hood_m": 0.1036
+     },
+     "flap+15": {
+      "coat_m": 0.0248,
+      "hood_m": 0.0939
+     },
+     "flap+30": {
+      "coat_m": 0.0275,
+      "hood_m": 0.0844
+     },
+     "flap+45": {
+      "coat_m": 0.0295,
+      "hood_m": 0.0729
+     },
+     "flap+60": {
+      "coat_m": 0.0305,
+      "hood_m": 0.0482
+     },
+     "worst_m": 0.0093
+    }
+   },
+   "chosen_x_y_blender": [
+    0.125,
+    0.155
+   ]
+  },
+  "notes": [
+   "The wing root (the prop origin) goes at the mount, the prop axes parallel to the body bone: +X span outward (mirror for the right wing), +Z forward, +Y up; at flap 0 the membrane is level.",
+   "Flap = rotation about the prop's +Z (forward) axis at its root: + raises the tip. For the right wing (mirrored), the same visual flap is the negative angle.",
+   "flapRange: the game caps the flap at -30 (down stroke) .. +60 deg (up stroke); the clearances are checked over it."
+  ]
+ }
+}

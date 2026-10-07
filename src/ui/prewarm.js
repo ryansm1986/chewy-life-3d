@@ -40,8 +40,11 @@ export class Prewarm {
     wait();
   }
   run([name, fn]) {
-    const s = performance.now(); let p = null;
-    try { p = fn(); } catch (e) { console.warn('[prewarm]', name, e); }
+    const s = performance.now(); let p = null, tip = this.ui.tip;
+    // the tooltip is muted for the step: a background build or render of a closed panel mustn't hide (or show) the
+    // tooltip of the menu the player has open — the steps run exactly while a menu is open (hidesHitches)
+    if (tip) tip.muted = true;
+    try { p = fn(); } catch (e) { console.warn('[prewarm]', name, e); } finally { if (tip) tip.muted = false; }
     const ms = performance.now() - s;
     this.steps++; this.ms += ms; this.longest = Math.max(this.longest, ms); this.log.push([name, +ms.toFixed(1)]);
     if (this.log.length > 400) this.log.splice(0, 200);

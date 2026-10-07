@@ -279,7 +279,7 @@ export class ChargeController {
    *  allocations) → out, or null without a camera */
   cursorGround(out) {
     if (this.aimOverride) return out.copy(this.aimOverride);
-    if (Actions.device === 'pad' && Actions.padAim) return out.copy(Actions.padAim);
+    if (Actions.device !== 'kbm' && Actions.padAim) return out.copy(Actions.padAim); // (the pad's or touch's aim)
     const E = this.G.engine, W = this.G.world;
     if (!E?.raycaster || !E.camera) return null;
     E.raycaster.setFromCamera(_nv.set(Input.mouse.nx, Input.mouse.ny), E.camera);

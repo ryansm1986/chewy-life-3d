@@ -15,9 +15,14 @@ import { computeStats, playerPhysDR } from '../src/rpg/stats.js';
 import { skillRuntime, canLearn } from '../src/rpg/skills.js';
 import { ITEM_BASES, GEAR_BASE_IDS, generateItem } from '../src/rpg/items.js';
 import { RNG } from '../src/core/util.js';
+import { SHIHTZU_TRAINING } from '../src/rpg/skillsShihtzu.js';
+import { GOLDEN_TRAINING } from '../src/rpg/skillsGolden.js';
 
 export const FIGHT = 60, PACK = 5, RP = 3, BLEND = 0.7;
 const area = (r, n) => (n <= 1 ? 1 : Math.max(1, Math.min(n, n * (r / RP) ** 2)));
+/** the foes a straight line catches in a pack (the dragoon's thrusts: len m long, half-width w, a foe's body 0.3 either
+ *  side): its area over the pack's, with the same crowding near the hero as area()'s arcs (×1.8 over a uniform spread) */
+const lineArea = (len, w, n) => (n <= 1 ? 1 : Math.max(1, Math.min(n, n * (len * 2 * (w + 0.3)) / (Math.PI * RP * RP) * 1.8)));
 /** the fūma's round trip in seconds: combat/poeSkills.js updateFuma's flight integrated (the hero standing still) */
 export function fumaFlight(p, dt = 1 / 240) {
   let x = 0, z = 0, a = 0, t = 0, trav = 0, out = true, back = 0;
@@ -56,7 +61,75 @@ export const BUILDS = {
   'poe·step': { hero: 'poe', ref: true, skill: 'shadowStep', mastery: 'afterimageDash', extra: ['vanish', 'swiftWind'], stat: 'dex', wtype: 'fuma',
     cycle: (R, d) => Math.max(R.cd, 0.24 + 0.36 / 1.05), hits: (p, n, d) => p.dmgPct * area(p.radius, n) * Math.min(1, p.arc / 200) * (1 + Math.min(1, (d.crit + p.critBonus) / 100) * 0.5) / (1 + d.crit / 100 * 0.5) / 100,
     attack: (p, n, d) => BUILDS.poe.attack(p, n, d) },
+  // the Shih Tzu (docs/SHIHTZU.md §4): Woeful Wallop on repeat (the 'wallop' action, 0.66 s at animSpeed 0.6), Weight of the World,
+  // then its synergies; his basic attack is the three-swing combo (two swings at 1/aspd, the slam at 1/(0.85 aspd), ×1.35 on 110°)
+  shihtzu: { skill: 'woefulWallop', mastery: 'weightOfWorld', extra: ['maelstrom', 'heaviestSigh'], stat: 'str', wtype: 'flail',
+    cycle: (R, d) => 0.66 / (d.aspd * 0.6), hits: (p, n) => p.dmgPct * area(p.radius, n) * Math.min(1, p.arc / 200) / 100,
+    attack: (p, n, d) => ({ per: p.dmgPct * (2 * area(p.radius, n) * Math.min(1, p.arc / 200) + 1.35 * area(p.radius * 0.92, n) * 0.55) / 3 / 100, cycle: (2 + 1 / 0.85) / 3 / d.aspd }) },
+  // the hex build (docs/SHIHTZU.md §4), also in the band: an Energy build that keeps its gloom up rather than casting one skill on
+  // repeat. Points: one in each rotation skill first (and Case of the Mopes, the prerequisite), then Dripping Paw, Lingering Gloom,
+  // Grumble Cloud, Mournful Awoo, Everlasting Gloom, Grudge Ledger. The fight is a rotation (rotation() below).
+  'shihtzu·hex': { hero: 'shihtzu', skill: 'drippingPaw', mastery: 'lingeringGloom', stat: 'ene', wtype: 'flail',
+    plan: [['drippingPaw', 1], ['grumbleCloud', 1], ['caseOfMopes', 1], ['mournfulAwoo', 1], ['everlastingGloom', 1], ['drippingPaw', 8], ['lingeringGloom', 6], ['grumbleCloud', 6], ['mournfulAwoo', 4], ['everlastingGloom', 6],
+      ['drippingPaw', 20], ['lingeringGloom', 20], ['grumbleCloud', 20], ['everlastingGloom', 20], ['mournfulAwoo', 20], ['grudgeLedger', 20]],
+    rotation: (st, d, n) => hexRotation(st, d, n),
+    attack: (p, n, d) => BUILDS.shihtzu.attack(p, n, d) },
+  // Foosy the dragoon (docs/GOLDEN.md §4): the lance build, Sunbeam Thrust on repeat (the 'sunbeamThrust' action, 0.62 s at
+  // animSpeed 0.62: one attack's time) down a long line, A Knight's Vow, then its synergies; his basic attack is the reach
+  // combo (two thrusts down a line at 1/aspd, then a sweeping swat ×1.15 on its arc at 1/(0.9 aspd))
+  golden: { skill: 'sunbeamThrust', mastery: 'knightsVow', extra: ['pinwheelSweep', 'sunfallJump', 'gallantCharge'], stat: 'str', wtype: 'lance',
+    cycle: (R, d) => 0.62 / (d.aspd * 0.62), hits: (p, n) => p.dmgPct * lineArea(p.length, p.width, n) / 100,
+    attack: (p, n, d) => ({ per: p.dmgPct * (2 * lineArea(p.radius, p.width, n) + 1.15 * area(p.sweepRadius, n) * Math.min(1, p.arc / 200)) / 3 / 100, cycle: (2 + 1 / 0.9) / 3 / d.aspd }) },
+  // the javelin build (a Dexterity build: 50% of the points in Dexterity, so javMul > 1): Tailwag Volley on repeat (the
+  // 'javToss' action, 0.46 s at his cast speed; Bonk Dart while it fights better, at the low levels), Keen Nose, Bonk Dart,
+  // True Flight. Each javelin of the fan bonks the first
+  // foe it reaches: in a pack about three in four find one; a lone foe catches the middle one or two
+  'golden·jav': { hero: 'golden', skill: 'tailwagVolley', mastery: 'keenNose', stat: 'dex', wtype: 'lance',
+    plan: [['bonkDart', 1], ['tailwagVolley', 20], ['keenNose', 20], ['bonkDart', 20], ['trueFlight', 20], ['sunshower', 20]],
+    alt: [{ skill: 'bonkDart', cycle: (R, d) => 0.46 / (d.castMul || 1), hits: (p, n) => p.dmgPct * (1 + p.splash / 100 * (area(p.splashRadius, n) - 1)) / 100 }],
+    cycle: (R, d) => 0.46 / (d.castMul || 1), hits: (p, n) => p.dmgPct * (n <= 1 ? 1 + (p.count - 1) * 0.2 : p.count * 0.75) / 100,
+    attack: (p, n, d) => BUILDS.golden.attack(p, n, d) },
+  // the Whelp Bond build (an Energy build: whelpMul > 1): Ember Breath on repeat (Shadow breathes three puffs a call; a call
+  // while he's still breathing adds its puffs to his, so it's paced by the cooldown, the call and the puffs), Best Friends,
+  // then Divebomb Swoop, Warm Heart, Mighty Little Roar, Dragon Heart. The cone (50°, ~4 m) catches ~arc/120 of a pack (a
+  // lone foe is in it whole).
+  'golden·whelp': { hero: 'golden', skill: 'emberBreath', mastery: 'bestFriends', stat: 'ene', wtype: 'lance',
+    plan: [['emberBreath', 1], ['bestFriends', 1], ['divebombSwoop', 1], ['emberBreath', 20], ['bestFriends', 20], ['divebombSwoop', 20], ['wingShield', 1], ['warmHeart', 20], ['mightyRoar', 20], ['dragonHeart', 20]],
+    cycle: (R, d) => Math.max(R.cd, 0.45 / (d.castMul || 1), R.params.ticks * 0.17),
+    hits: (p, n, d) => (p.dmgPct * p.ticks + p.burnPct * Math.min(p.burnDur, Math.max(0.6, p.ticks * 0.17))) * (n <= 1 ? 1 : Math.max(1, area(Math.min(p.range, RP + 1), n) * Math.min(1, p.arc / 120))) / 100,
+    attack: (p, n, d) => BUILDS.golden.attack(p, n, d) },
 };
+/** the hex build's sustained damage (weapon-damage % per second) against n foes. Per second of fight, zoom and cast time are spent
+ *  by priority: Everlasting Gloom kept up, one Grumble Cloud kept up, Mournful Awoo on its cooldown (it spreads the hexes to the whole
+ *  pack), Dripping Paw with what's left; any time still free swings the flail. The hexes: every hexed foe carries min(cap, stacks
+ *  applied over a hex's run) stacks, each ticking the strongest hex's dps (one hex record per foe: combat/shihtzuSkills.js stzHex). */
+export function hexRotation(st, d, n, parts = null) {
+  const has = id => (st.player.skills[id] || 0) > 0, rt = id => (has(id) ? skillRuntime(id, st, d) : null);
+  const paw = rt('drippingPaw'), cloud = rt('grumbleCloud'), awoo = rt('mournfulAwoo'), ever = rt('everlastingGloom'), A = skillRuntime('attack', st, d);
+  const cm = d.castMul || 1;
+  let zoom = d.zoomRegen, time = 1, dps = 0;
+  const take = (R, rate, castT) => { if (!R) return 0; const r = Math.max(0, Math.min(rate, zoom / R.cost, time / castT)); zoom -= r * R.cost; time -= r * castT; return r; };
+  const rEver = take(ever, ever ? 1 / Math.max(ever.cd, ever.params.duration) : 0, 0.7 / cm);
+  const rCloud = take(cloud, cloud ? 1 / Math.max(cloud.cd, cloud.params.duration) : 0, 0.42 / cm);
+  const rAwoo = take(awoo, awoo ? 1 / awoo.cd : 0, 1.1);
+  const rPaw = take(paw, 1 / (0.42 / cm), 0.42 / cm);
+  const everUp = ever ? Math.min(1, rEver * ever.params.duration) : 0, cloudUp = cloud ? Math.min(1, rCloud * cloud.params.duration) : 0;
+  const pawArea = area(paw.params.radius, n), hexed = n <= 1 ? 1 : Math.max(pawArea, everUp > 0.5 ? area(ever.params.radius, n) : 0, rAwoo > 0 ? area(Math.min(awoo.params.radius, RP + 1), n) : 0);
+  const cap = d.hexStacks || 3, dur = paw.params.duration;
+  const stacks = Math.min(cap, everUp + rPaw * dur * Math.min(1, pawArea / hexed) + (rAwoo > 0 ? rAwoo * awoo.params.spread * dur : 0));
+  const dot = Math.max(paw.params.dotPct, everUp > 0.5 ? ever.params.dotPct : 0);
+  const atk = BUILDS.shihtzu.attack(A.params, n, d);
+  const P = {
+    hex: stacks * dot * hexed, paw: rPaw * paw.params.dmgPct * pawArea,
+    cloud: cloud ? cloudUp * cloud.params.dmgPct / cloud.params.tick * area(cloud.params.radius, n) : 0,
+    awoo: awoo ? rAwoo * awoo.params.dmgPct * area(Math.min(awoo.params.radius, RP + 1), n) : 0,
+    burst: ever ? rEver * ever.params.burstPct * 0.3 * (n <= 1 ? 0 : Math.min(n - 1, 1 + ever.params.jumps)) : 0, // (a few foes drop inside a fight: their bursts)
+    swing: Math.max(0, time) * atk.per * 100 / atk.cycle,
+  };
+  for (const k in P) dps += P[k];
+  if (parts) Object.assign(parts, P, { stacks, hexed, rPaw, rAwoo, rEver, rCloud, time });
+  return dps / 100;
+}
 
 /** a hero at `lvl` with the build above → { st, d } */
 export function buildHero(id, lvl) {
@@ -64,12 +137,16 @@ export function buildHero(id, lvl) {
   P.lvl = lvl; P.skillPts = lvl; P.skills = {};
   const pts = (lvl - 1) * 5; P.stats[B.stat] += Math.round(pts * 0.5); P.stats.vit += Math.round(pts * 0.3); P.stats.ene += pts - Math.round(pts * 0.5) - Math.round(pts * 0.3);
   // skill points: the main skill first, then its mastery, then the synergy picks (each as far as the level gates allow)
-  const order = [B.skill, B.mastery, ...B.extra];
-  for (let guard = 0; guard < 200 && P.skillPts > 0; guard++) {
-    const id2 = order.find(s => (P.skills[s] || 0) < 20 && canLearn(s, st).ok);
-    if (!id2) break;
-    P.skills[id2] = (P.skills[id2] || 0) + 1; P.skillPts--;
-  }
+  const plan = B.plan || [B.skill, B.mastery, ...B.extra].map(s => [s, 20]); // ([skill, up to level] in order: a plan puts points in steps)
+  // (the balance models the finished class: skills still "in training" — built at a later checkpoint — count as learnable)
+  const locked = [...SHIHTZU_TRAINING], lockedG = [...GOLDEN_TRAINING]; SHIHTZU_TRAINING.clear(); GOLDEN_TRAINING.clear();
+  try {
+    for (let guard = 0; guard < 400 && P.skillPts > 0; guard++) {
+      const step = plan.find(([s, max]) => (P.skills[s] || 0) < max && canLearn(s, st).ok);
+      if (!step) break;
+      P.skills[step[0]] = (P.skills[step[0]] || 0) + 1; P.skillPts--;
+    }
+  } finally { for (const id of locked) SHIHTZU_TRAINING.add(id); for (const id of lockedG) GOLDEN_TRAINING.add(id); }
   // the gear: the best normal base of the weapon type the level allows (same rule for every hero)
   const base = GEAR_BASE_IDS.map(k => ITEM_BASES[k]).filter(b => b.wtype === B.wtype && b.req.lvl <= lvl && b.lvl <= lvl).sort((a, b) => (b.dmg[0] + b.dmg[1]) - (a.dmg[0] + a.dmg[1]))[0];
   st.equipment.weapon = generateItem({ ilvl: lvl, base: base.id, rarity: 'normal', rng: new RNG(5) }); st.equipment.weaponAlt = null;
@@ -88,16 +165,21 @@ function fight({ cost, cd, cycle, per, atk, zoomMax, regen }) {
 }
 /** one hero at one level → { lvl, dmg: [min, max], life, zoom, pack, single, blend (weapon-damage % per second), dps (blend × avg damage), ehp, dodge } */
 export function heroAt(id, lvl) {
-  const B = BUILDS[id], { st, d } = buildHero(id, lvl), R = skillRuntime(B.skill, st, d), A = skillRuntime('attack', st, d);
-  const out = { id, lvl, skill: B.skill, skillLvl: R.lvl, dmg: [d.dmgMin, d.dmgMax], life: d.lifeMax, zoom: d.zoomMax, regen: d.zoomRegen, crit: d.crit, dodge: d.dodge || 0, block: d.block || 0 };
-  for (const [k, n] of [['pack', PACK], ['single', 1]]) {
-    const f = fight({ cost: R.cost, cd: R.cd, cycle: B.cycle(R, d), per: B.hits(R.params, n, d), atk: B.attack(A.params, n, d), zoomMax: d.zoomMax, regen: d.zoomRegen });
-    out[k] = Math.round(f.dps * 100) / 100;
-  }
+  const B = BUILDS[id], { st, d } = buildHero(id, lvl), A = skillRuntime('attack', st, d);
+  // (a build with `alt` [{ skill, cycle, hits }]: whichever of its skills fights better at this level is the one on repeat —
+  //  the javelin build spams Bonk Dart until Tailwag Volley has a few points)
+  const opts = [{ skill: B.skill, cycle: B.cycle, hits: B.hits }, ...(B.alt || [])].filter(o => skillRuntime(o.skill, st, d));
+  const run = o => { const R = skillRuntime(o.skill, st, d), r = { R, o };
+    for (const [k, n] of [['pack', PACK], ['single', 1]]) r[k] = Math.round(fight({ cost: R.cost, cd: R.cd, cycle: o.cycle(R, d), per: o.hits(R.params, n, d), atk: B.attack(A.params, n, d), zoomMax: d.zoomMax, regen: d.zoomRegen }).dps * 100) / 100;
+    r.blend = BLEND * r.pack + (1 - BLEND) * r.single; return r; };
+  const best = B.rotation ? null : opts.map(run).sort((a, b) => b.blend - a.blend)[0], R = best ? best.R : skillRuntime(B.skill, st, d);
+  const out = { id, lvl, skill: best ? best.o.skill : B.skill, skillLvl: R.lvl, dmg: [d.dmgMin, d.dmgMax], life: d.lifeMax, zoom: d.zoomMax, regen: d.zoomRegen, crit: d.crit, dodge: d.dodge || 0, block: d.block || 0 };
+  for (const [k, n] of [['pack', PACK], ['single', 1]]) out[k] = B.rotation ? Math.round(B.rotation(st, d, n) * 100) / 100 : best[k];
   const avg = (d.dmgMin + d.dmgMax) / 2 * (1 + d.crit / 100 * ((d.critMul || 1.5) - 1));
   out.blend = Math.round((BLEND * out.pack + (1 - BLEND) * out.single) * 100) / 100;
   out.dps = Math.round(out.blend * avg); out.singleDps = Math.round(out.single * avg);
-  out.ehp = Math.round(d.lifeMax / ((1 - out.dodge / 100) * (1 - out.block / 100) * (1 - playerPhysDR(d.def || 0, lvl))));
+  out.dr = d.dmgReduce || 0; // (the Shih Tzu's class damage reduction and Iron Topknot: stats.js shihtzuPassives)
+  out.ehp = Math.round(d.lifeMax / ((1 - out.dodge / 100) * (1 - out.block / 100) * (1 - playerPhysDR(d.def || 0, lvl)) * (1 - out.dr / 100)));
   return out;
 }
 export function compare(levels = [6, 15, 30]) {
@@ -109,6 +191,25 @@ export function poeBand(levels = [6, 15, 30, 45]) {
   return compare(levels).map(r => {
     const mean = k => (r.chewy[k] + r.moka[k]) / 2, S = r['poe·step'];
     return { lvl: r.lvl, dps: r.poe.dps / mean('dps'), ehp: r.poe.ehp / mean('ehp'), life: r.poe.life / mean('life'), step: { clear: S.dps / mean('dps'), single: S.singleDps / mean('singleDps') } };
+  });
+}
+
+/** the Shih Tzu's blend dps and eHP over the Chewy–Moka–Poe mean, per level (the band test-rpg asserts: docs/SHIHTZU.md §4; the
+ *  tank: a little under the mean in damage, well over it in survivability); hex: the hex build's clear (blend) and single target */
+export function stzBand(levels = [6, 15, 30, 45]) {
+  return compare(levels).map(r => {
+    const mean = k => (r.chewy[k] + r.moka[k] + r.poe[k]) / 3, X = r['shihtzu·hex'];
+    return { lvl: r.lvl, dps: r.shihtzu.dps / mean('dps'), ehp: r.shihtzu.ehp / mean('ehp'), life: r.shihtzu.life / mean('life'), hex: { clear: X.dps / mean('dps'), single: X.singleDps / mean('singleDps') } };
+  });
+}
+
+/** Foosy's blend dps and eHP over the Chewy–Moka–Poe–Shih Tzu mean, per level (the band test-rpg asserts: docs/GOLDEN.md
+ *  §4; mid-pack damage, solid life below the Shih Tzu's); jav: the javelin build's clear (blend) and single target */
+export function gldBand(levels = [6, 15, 30, 45]) {
+  return compare(levels).map(r => {
+    const ids = ['chewy', 'moka', 'poe', 'shihtzu'], mean = k => ids.reduce((a, id) => a + r[id][k], 0) / ids.length, X = r['golden·jav'];
+    const Y = r['golden·whelp'];
+    return { lvl: r.lvl, dps: r.golden.dps / mean('dps'), ehp: r.golden.ehp / mean('ehp'), life: r.golden.life / mean('life'), stzEhp: r.golden.ehp / r.shihtzu.ehp, jav: { clear: X.dps / mean('dps'), single: X.singleDps / mean('singleDps') }, whelp: { clear: Y.dps / mean('dps'), single: Y.singleDps / mean('singleDps') } };
   });
 }
 
@@ -126,4 +227,11 @@ if (process.argv[1]?.replace(/\\/g, '/').endsWith('tools/hero-balance.mjs')) {
   const band = poeBand(levels);
   console.log('\npoe vs the chewy–moka mean: ' + band.map(b => `L${b.lvl} dps ×${b.dps.toFixed(2)} eHP ×${b.ehp.toFixed(2)} life ×${b.life.toFixed(2)}`).join(' · '));
   console.log('shadow step build vs the mean: ' + band.map(b => `L${b.lvl} clear ×${b.step.clear.toFixed(2)} single ×${b.step.single.toFixed(2)}`).join(' · '));
+  const sb = stzBand(levels);
+  console.log('shih tzu vs the chewy–moka–poe mean: ' + sb.map(b => `L${b.lvl} dps ×${b.dps.toFixed(2)} eHP ×${b.ehp.toFixed(2)} life ×${b.life.toFixed(2)}`).join(' · '));
+  console.log('hex build vs the mean: ' + sb.map(b => `L${b.lvl} clear ×${b.hex.clear.toFixed(2)} single ×${b.hex.single.toFixed(2)}`).join(' · '));
+  const gb = gldBand(levels);
+  console.log('foosy (lance) vs the chewy–moka–poe–shih tzu mean: ' + gb.map(b => `L${b.lvl} dps ×${b.dps.toFixed(2)} eHP ×${b.ehp.toFixed(2)} (×${b.stzEhp.toFixed(2)} the shih tzu's) life ×${b.life.toFixed(2)}`).join(' · '));
+  console.log('javelin build vs the mean: ' + gb.map(b => `L${b.lvl} clear ×${b.jav.clear.toFixed(2)} single ×${b.jav.single.toFixed(2)}`).join(' · '));
+  console.log('whelp build vs the mean: ' + gb.map(b => `L${b.lvl} clear ×${b.whelp.clear.toFixed(2)} single ×${b.whelp.single.toFixed(2)}`).join(' · '));
 }

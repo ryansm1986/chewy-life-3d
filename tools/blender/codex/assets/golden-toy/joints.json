@@ -1,0 +1,234 @@
+{
+  "units": "metres",
+  "coordinate_system": "Blender Z-up, front -Y; character left is +X",
+  "hips": [
+    0,
+    0.01,
+    0.3308
+  ],
+  "spine": [
+    0,
+    0.0,
+    0.4195
+  ],
+  "chest": [
+    0,
+    -0.01,
+    0.5163
+  ],
+  "neck": [
+    0,
+    -0.012,
+    0.6454
+  ],
+  "head": [
+    0.0,
+    0.0,
+    0.912
+  ],
+  "jaw_pivot": [
+    0,
+    -0.12,
+    0.792
+  ],
+  "eyes": {
+    "R": [
+      -0.14470882791038955,
+      -0.1906470850346657,
+      0.9920084700242415
+    ],
+    "L": [
+      0.14470882791038955,
+      -0.1906470850346657,
+      0.9920084700242415
+    ]
+  },
+  "ears": {
+    "R": {
+      "base": [
+        -0.23148161136202933,
+        0.11337800452367496,
+        1.0537389265641153
+      ],
+      "fold": [
+        -0.3511938249128271,
+        0.16462482532780862,
+        0.9147096520850835
+      ],
+      "tip": [
+        -0.4397031814532247,
+        0.19878184699588933,
+        0.6266539762990733
+      ]
+    },
+    "L": {
+      "base": [
+        0.23148161136202933,
+        0.11337800452367496,
+        1.0537389265641153
+      ],
+      "fold": [
+        0.3511938249128271,
+        0.16462482532780862,
+        0.9147096520850835
+      ],
+      "tip": [
+        0.4397031814532247,
+        0.19878184699588933,
+        0.6266539762990733
+      ]
+    }
+  },
+  "arms": {
+    "L": {
+      "shoulder": [
+        0.205,
+        -0.012,
+        0.5743865546218488
+      ],
+      "elbow": [
+        0.31440683793406277,
+        -0.021810357221237676,
+        0.4528779512043894
+      ],
+      "wrist": [
+        0.3961613981485273,
+        -0.029141173606338354,
+        0.3620803134858483
+      ]
+    },
+    "R": {
+      "shoulder": [
+        -0.205,
+        -0.012,
+        0.5743865546218488
+      ],
+      "elbow": [
+        -0.31440683793406277,
+        -0.021810357221237676,
+        0.4528779512043894
+      ],
+      "wrist": [
+        -0.3961613981485273,
+        -0.029141173606338354,
+        0.3620803134858483
+      ]
+    }
+  },
+  "legs": {
+    "L": {
+      "hip": [
+        0.12,
+        0.0,
+        0.3226890756302522
+      ],
+      "knee": [
+        0.16,
+        -0.012,
+        0.16537815126050423
+      ],
+      "ankle": [
+        0.178,
+        -0.004,
+        0.06857142857142859
+      ],
+      "toe": [
+        0.23104722665003954,
+        -0.19772116295183118,
+        0.05
+      ]
+    },
+    "R": {
+      "hip": [
+        -0.12,
+        0.0,
+        0.3226890756302522
+      ],
+      "knee": [
+        -0.16,
+        -0.012,
+        0.16537815126050423
+      ],
+      "ankle": [
+        -0.178,
+        -0.004,
+        0.06857142857142859
+      ],
+      "toe": [
+        -0.23104722665003954,
+        -0.19772116295183118,
+        0.05
+      ]
+    }
+  },
+  "tail": [
+    [
+      0.0,
+      0.13,
+      0.345
+    ],
+    [
+      -0.021399475142149,
+      0.2510854351946348,
+      0.330817028721388
+    ],
+    [
+      -0.06442732176702143,
+      0.39649511590610875,
+      0.3973628808864266
+    ],
+    [
+      -0.0967579822131506,
+      0.4776804198862808,
+      0.488800408222773
+    ],
+    [
+      -0.11724566263303687,
+      0.5156152500364485,
+      0.5956094182825484
+    ],
+    [
+      -0.122,
+      0.5200000000000001,
+      0.6400000000000001
+    ]
+  ],
+  "palm_R": [
+    -0.4366487317606029,
+    -0.03205193893571656,
+    0.33325492082275027
+  ],
+  "palm_L": [
+    0.4366487317606029,
+    -0.03205193893571656,
+    0.33325492082275027
+  ],
+  "quiver_javelin_tips": [
+    [
+      0.0,
+      0.33110611078685087,
+      0.7981820711942064
+    ],
+    [
+      -0.034,
+      0.3300033815053107,
+      0.7754792344805583
+    ],
+    [
+      0.034,
+      0.33045365443346475,
+      0.7777495181519232
+    ]
+  ],
+  "notes": [
+    "Phase 1: no rig, weights or animations. Same keys as chewy-b joints-round13.json, plus palm_R / palm_L.",
+    "head = the head centre (the radial origin), not the nod pivot: the rig should put the head bone at the base of the skull.",
+    "Head skin = zero surface of one smooth implicit ball (skull + cheeks + bun muzzle + jaw + nose), analytic normals, adaptive toon-band refinement; the skin under the helmet is deleted.",
+    "The open smile: a hole ringed by 4 loops, the edge rolled 5.5 mm in as a lip, continuing into a closed 5-ring mouth sac; the tongue is a separate piece (Golden_tongue) for the jaw bone.",
+    "Eyelid holes ringed by 5 loops each with the rim rolled 4.5 mm in behind separate lens eyeballs; 5 loops round the nose.",
+    "Ears: separate pieces (Golden_ear_L / _R), 24 bend rows from the root (under the helmet) to the scalloped hem; pivot = ears.base.",
+    "Tail: Golden_tail, a 28-ring plume (bend loops), pivot = tail[0]. The ruff (Golden_ruff) and the tabard panels (Golden_tabard: front panel + two tassets) are separate pieces.",
+    "The helmet, horns, crest fins and little dragon (Golden_helm) are one rigid piece for the head bone.",
+    "Arms: fur ring stacks with joint loops at the elbow (bracer rim) and wrist (strap); legs: 15-ring stacks per leg, the hips a separate fur mass under the tassets."
+  ]
+}

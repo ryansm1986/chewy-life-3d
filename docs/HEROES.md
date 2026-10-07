@@ -5,7 +5,9 @@ Status: **shipped** (Moka update; QA: tools/qa/s12-heroes.mjs, spell perf: tools
 (dog-themed water, starlight and duck-hunt magic). The player controls one hero at a time and can switch on demand;
 the other hero lives in Blossom Hollow as a villager. The same seams are the base for co-op multiplayer
 (see docs/MULTIPLAYER.md). The third hero, **Poe** (a black pug ninja with a giant bone fūma), has her own doc:
-docs/POE.md (class, skills, charge, joining in the Bamboo Grove, the hero wheel; QA tools/qa/s20-poe.mjs).
+docs/POE.md (class, skills, charge, joining in the Bamboo Grove, the hero wheel; QA tools/qa/s20-poe.mjs). The fourth,
+**the Shih Tzu** (a black-and-white dark knight with a toy flail and dark dog magic; name TBD), has docs/SHIHTZU.md
+(class, skills, charge, joining in Momiji Hollow; QA tools/qa/s28-shihtzu.mjs).
 
 ## 1. Who is Moka
 - Boykin Spaniel (South Carolina's retriever): rich chocolate/liver wavy-curly coat, long pendant wavy ears, golden
@@ -88,8 +90,8 @@ free little sparkle bolt. Hotbar hints on first join. Staff bases span tiers lik
   cooldown ring. The character, skills and inventory panels always show the active hero.
 - **Three heroes** (once Poe joins, docs/POE.md §6): a **tap** of Tab switches to the next joined hero (Chewy → Moka →
   Poe); **holding** Tab (≥ 0.26 s) opens the **hero wheel** (`src/ui/heroWheel.js`: a card per hero; point the mouse
-  or press 1–3, let go to confirm, Esc closes). The HUD shows a mini portrait per benched hero (a click switches).
-  Poe's "Meet Poe" guide teaches both.
+  or press 1–9, let go to confirm, Esc closes; a wider ring past four). The HUD shows a mini portrait per benched hero
+  (a click switches). Poe's "Meet Poe" guide teaches both; the Shih Tzu's "Meet <name>" guide the wheel with four.
 
 ## 5. The inactive hero as a villager
 - A `Villager` built with the hero's rig (`opts.rig`) and `hero: true`: daily routines through VillageLife (benches,
@@ -103,11 +105,15 @@ free little sparkle bolt. Hotbar hints on first join. Staff bases span tiers lik
 - Existing saves: Moka waits by the fountain with a "!" marker; talking to her plays the same scene.
 - Poe joins later, in the Whispering Bamboo Grove: she tails you (badly), sneezes, gets caught and joins; once Moka has
   joined, Shadow passes on a rumour in town that points there (`src/actors/poeJoin.js`, docs/POE.md §5).
+- The Shih Tzu joins in Momiji Hollow (the Maple zone): kneeling by the trail, lighting ghostlight lanterns; he rises to
+  proclaim and a ghost pup licks his face mid-word; once Poe has joined, Shadow passes on the rumour in town
+  (`src/actors/shihtzuJoin.js`, docs/SHIHTZU.md §5).
 
 ## 7. Code map
 - `src/rpg/classes.js` — class table. `src/rpg/skillsMoka.js` — Moka's skill defs (merged into SKILLS).
 - `src/actors/heroes.js` — HeroManager: roster, state linking, switching + transition, NPC-mode heroes, Shadow;
-  tap / hold Tab (`tabInput`) and the hero wheel (`src/ui/heroWheel.js`); Poe's joining scene (`poeJoin.js`).
+  tap / hold Tab (`tabInput`) and the hero wheel (`src/ui/heroWheel.js`); Poe's joining scene (`poeJoin.js`) and the
+  Shih Tzu's (`shihtzuJoin.js`).
 - `src/actors/heroModels.js` — baked hero models (Chewy, Moka, and Shadow on the quad contract); `src/actors/heroGear.js` — staff geometry.
 - `src/combat/mokaSpells.js` — SkillRunner cast implementations for Moka; `src/gfx/spellFx.js` — spell VFX.
 - Blender: `tools/blender/disney/moka.py` (build.py `char=moka`), export `public/rigs/moka_disney.*` (63.9k tris, the

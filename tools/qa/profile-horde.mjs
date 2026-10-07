@@ -39,6 +39,8 @@ const WORLDS = (process.env.WORLDS || 'burrow,region').split(',');
 const HEROES = (process.env.HEROES || (quick ? 'chewy' : 'chewy,moka,poe')).split(',');
 const QS = process.env.QS ? '&' + process.env.QS : '';
 const LIFE = +(process.env.LIFE || 8), PROF = !!process.env.PROF;
+// RUN=<tier>[:<mods,…>[:<spirit>]]: the zone world as a tier run (docs/ZONES.md §5.1: the T5 Swarming + Teeming + Rally horde check)
+const TIER_RUN = process.env.RUN ? (([t, m, s]) => ({ tier: +t || 0, mods: m ? m.split(',') : [], spirit: +s || 0 }))(process.env.RUN.split(':')) : {};
 const GATE = 8, BASE_BUSY = 5, BASE_EXCESS = 3; // (p95 ≤ GATE, or ≤ baseline + BASE_EXCESS when the baseline p95 > BASE_BUSY)
 const limitOf = r => Math.max(GATE, (r.base?.p95 ?? 0) + BASE_EXCESS);
 const gatePass = r => !r.failed && r.p95 <= limitOf(r);
@@ -87,17 +89,19 @@ async function run(world, hero) {
     const proto = Object.getPrototypeOf(sk), raw = proto.update; const S = window.__skel = { n: 0, ms: 0, bones: 0 };
     S.by = {}; proto.update = function () { const t = performance.now(); raw.call(this); if (window.__perf?.on) { const dt = performance.now() - t; S.n++; S.ms += dt; S.bones += this.bones.length; const k = (this.bones[0]?.name || '?') + '/' + this.bones.length + (this.boneTexture ? '' : ':notex') + (G.world.scene.matrixWorldAutoUpdate === false ? ' [in N8AO re-render]' : ''); const e = S.by[k] ||= [0, 0]; e[0]++; e[1] += dt; } };
   });
-  await page.evaluate(({ world, floor, region }) => {
+  await page.evaluate(({ world, floor, region, tierRun }) => {
     const G = window.G; G.state.flags.burrowTut = true;
     const P = G.state.player; P.lvl = 30; P.stats = { str: 90, dex: 90, vit: 400, ene: 300 }; P.statPts = 0;
     const tree = { chewy: ['chomp', 'whirl', 'bonestorm', 'blaze', 'fetchstorm', 'woof', 'packcall', 'multi', 'ricochet', 'throw', 'fetchMastery', 'boneMastery', 'dig', 'frenzy', 'howl'],
       moka: ['splash', 'tideMastery', 'bubble', 'shake', 'puddleHop', 'whirlpool', 'greatWave', 'kibble', 'starMastery', 'squeak', 'pawRune', 'moonbeam', 'constellation', 'meteor', 'duckDecoy', 'retriever', 'fetchLeash', 'feathers', 'duckCall', 'spiritRetriever', 'mallards'],
-      poe: ['fumaThrow', 'shurikenMastery', 'kunaiFan', 'shadowStitch', 'whirlingFuma', 'shurikenRain', 'thousandStars', 'smokeBomb', 'ninjutsuMastery', 'puffBall', 'shadowClone', 'substitution', 'thunderPaw', 'smokeDragon', 'caltropFlip', 'phantomBarrage'] }[G.player.hero] || [];
+      poe: ['fumaThrow', 'shurikenMastery', 'kunaiFan', 'shadowStitch', 'whirlingFuma', 'shurikenRain', 'thousandStars', 'smokeBomb', 'ninjutsuMastery', 'puffBall', 'shadowClone', 'substitution', 'thunderPaw', 'smokeDragon', 'caltropFlip', 'phantomBarrage'],
+      shihtzu: ['woefulWallop', 'weightOfWorld', 'tugOfWoe', 'maelstrom', 'ironTopknot', 'steadfastSulk', 'heaviestSigh', 'drippingPaw', 'lingeringGloom', 'grumbleCloud', 'caseOfMopes', 'grudgeLedger', 'mournfulAwoo', 'everlastingGloom', 'ghostPups', 'veryGoodGhosts', 'borrowedWarmth', 'boneWard', 'midnightReading', 'wayhomeLantern', 'grandpawsGhost'],
+      golden: ['sunbeamThrust', 'knightsVow', 'sunfallJump', 'pinwheelSweep', 'steadyPaws', 'gallantCharge', 'starfallLance', 'bonkDart', 'keenNose', 'tailwagVolley', 'trueFlight', 'goodRetriever', 'emberleafJavelin', 'sunshower', 'emberBreath', 'bestFriends', 'divebombSwoop', 'wingShield', 'warmHeart', 'mightyRoar', 'dragonHeart'] }[G.player.hero] || [];
     for (const id of tree) P.skills[id] = 10;
     G.actions.recompute(); P.life = null; P.zoom = null;
     G.actions.addXp = () => {}; // (no level-up banners in the middle of a measurement)
-    if (world === 'region') G.enterRegion(region); else if (world === 'zone') G.enterDungeon({ id: 'bambooDepths', floor: 1 }); else G.enterDungeon(floor); // (zone: a real Bamboo Depths floor, ~140 of its own on top)
-  }, { world, floor: FLOOR, region: REGION });
+    if (world === 'region') G.enterRegion(region); else if (world === 'zone') G.enterDungeon({ id: 'bambooDepths', floor: 1, ...tierRun }); else G.enterDungeon(floor); // (zone: a real Bamboo Depths floor, ~140 of its own on top; RUN=5:swarming,teeming,rally makes it a tier run, ~330)
+  }, { world, floor: FLOOR, region: REGION, tierRun: TIER_RUN });
   await page.waitForFunction(() => window.G?.mode === 'dungeon' && window.G.dungeon?.monsters?.length && !window.G.ui?.iris?.active, null, { timeout: 40000 });
   await page.waitForTimeout(2500);
   if (!gpuName) gpuName = await page.evaluate(() => { try { const gl = window.G.engine.renderer.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); return e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : ''; } catch (e) { return ''; } });
@@ -152,19 +156,33 @@ async function run(world, hero) {
       chewy: ['attack', 'attack', 'attack', 'chomp', 'attack', 'whirl', 'attack', 'bonestorm', 'woof', 'attack', 'packcall', 'blaze', 'fetchstorm', 'multi', 'throw'],
       moka: ['attack', 'splash', 'kibble', 'shake', 'whirlpool', 'squeak', 'constellation', 'feathers', 'meteor', 'pawRune', 'greatWave', 'duckCall', 'mallards', 'duckDecoy', 'spiritRetriever', 'fetchLeash', 'bubble'],
       poe: ['attack', 'fumaThrow', 'kunaiFan', 'attack', 'shurikenRain', 'thunderPaw', 'whirlingFuma', 'attack', 'thousandStars', 'smokeBomb', 'puffBall', 'shadowClone', 'substitution', 'smokeDragon', 'caltropFlip', 'phantomBarrage'],
+      // the Shih Tzu's full kit (docs/SHIHTZU.md §3): the pups and Grandpaw out, the hexes, a cloud, the Maelstrom channel (held 1.5 s)
+      shihtzu: ['ghostPups', 'drippingPaw', 'everlastingGloom', 'attack', 'mournfulAwoo', 'grumbleCloud', 'maelstrom', 'drippingPaw', 'caseOfMopes', 'grandpawsGhost', 'attack', 'woefulWallop', 'borrowedWarmth', 'maelstrom', 'tugOfWoe', 'boneWard', 'heaviestSigh', 'wayhomeLantern'],
+      // Foosy's full kit (docs/GOLDEN.md §3): the big Shadow out, the whelp breathing and swooping between every few moves, the
+      // javelins (a volley, the rain, an Emberleaf), the lance moves (the Jump, the pinwheel, the charge, the star)
+      golden: ['dragonHeart', 'emberBreath', 'attack', 'divebombSwoop', 'sunbeamThrust', 'emberBreath', 'tailwagVolley', 'wingShield', 'sunshower', 'emberleafJavelin', 'attack', 'pinwheelSweep',
+        'emberBreath', 'divebombSwoop', 'starfallLance', 'mightyRoar', 'trueFlight', 'sunfallJump', 'emberBreath', 'gallantCharge', 'bonkDart', 'divebombSwoop'],
     }[P.hero] || ['attack'];
     const BALL = new Set(['blaze', 'fetchstorm', 'multi', 'throw']);
     let ri = 0, nextCast = 0;
     H.cast = () => {
       if (!H.fight || performance.now() < nextCast) return;
+      if (G.skills.channel?.id === 'maelstrom' && performance.now() < (H.chanUntil || 0)) return; // (the Shih Tzu: let the Maelstrom whirl)
+      if (performance.now() < (H.holdUntil || 0)) return; // (and let a tome read reach its last word: the summons land on it)
       nextCast = performance.now() + 160;
+      if (P.hero === 'shihtzu') H.hexAll?.();
       const id = ROT[ri++ % ROT.length];
       G.state.player.zoom = null; G.state.player.life = null; G.skills.cds = {};
       if (P.hero === 'chewy') { const ball = BALL.has(id); if (id !== 'attack' && (G.derived.weaponType === 'ball') !== ball) { G.actions.swapWeapons(); P.setWeapon(G.derived.weaponType); } }
       const t = G.combat.nearest(P.pos, 'ally', 9, e => !e.breakable) || [...H.set].find(m => m.alive);
       H.casts = (H.casts || 0) + 1; H.lastCast = id; H.castFrames = 0;
       if (t) { P.anim.busy?.() && id !== 'attack' && P.anim.stop(); try { G.skills.tryCast(id, t.pos.clone(), t); } catch (e) { H.castErr = String(e); } }
+      if (id === 'maelstrom' && G.skills.channel?.id === 'maelstrom') { G.skills.channel.toggleHeld = true; H.chanUntil = performance.now() + 1500; }
+      if (P.hero === 'shihtzu' && ['ghostPups', 'grandpawsGhost', 'boneWard', 'wayhomeLantern'].includes(id)) H.holdUntil = performance.now() + 800;
     };
+    // the Shih Tzu's hexes on the fight: three stacks on the 70 horde monsters nearest him,
+    // as his Awoo and Everlasting Gloom spread them in play; refreshed each cast tick
+    H.hexAll = () => { const S = G.skills; if (!S.stzHex) return; const near = [...H.set].filter(m => m.alive).sort((a, b) => Math.hypot(a.pos.x - P.pos.x, a.pos.z - P.pos.z) - Math.hypot(b.pos.x - P.pos.x, b.pos.z - P.pos.z)).slice(0, 70); for (const m of near) S.stzHex(m, 40, 5, 3, 3); H.hexN = Math.max(H.hexN || 0, S.stzHexes?.size || 0); }; // (the 70 nearest: 60+ hexed)
     // frame bookkeeping: CPU time from tick() to the end of render(), the rAF interval, draw calls / triangles
     const tick = E.tick.bind(E), render = E.render.bind(E), R = window.__perf = { t: [], w: [], calls: [], tris: [], spawnFrames: [], on: false, t0: 0 };
     E.renderer.info.autoReset = false;
@@ -210,6 +228,8 @@ async function run(world, hero) {
         calls: q(c, 0.5), calls95: q(c, 0.95), tris: q(tr, 0.5), geo: mem.geometries, tex: mem.textures,
         hitch: Math.max(0, ...R.spawnFrames), packs: H.spawnLog.length, packMax: Math.max(0, ...H.spawnLog.map(x => x.ms)), packAvg: H.spawnLog.length ? H.spawnLog.reduce((a, x) => a + x.ms / x.n, 0) / H.spawnLog.length : 0,
         alive: window.G.dungeon.monsters.filter(m => m.alive).length, horde: [...H.set].filter(m => m.alive).length, casts: H.casts || 0, err: H.err || H.castErr || null,
+        gld: window.G.player.hero === 'golden' ? { jav: (window.G.skills.gldJav || []).length, big: !!window.G.skills.gldBig, act: window.G.skills.gldW?.kind || null, lift: +(window.G.companion?.whelp?.lift || 0).toFixed(2) } : null,
+        stz: window.G.player.hero === 'shihtzu' ? { hexed: window.G.skills.stzHexes?.size || 0, hexMax: H.hexN || 0, allies: (window.G.skills.stzAllies || []).filter(a => a.alive).length, chan: window.G.skills.channel?.id || null } : null,
         skel: window.__skel ? { perFrame: +(window.__skel.n / Math.max(1, t.length)).toFixed(1), ms: +(window.__skel.ms / Math.max(1, t.length)).toFixed(3), bonesPerFrame: +(window.__skel.bones / Math.max(1, t.length)).toFixed(0), by: Object.fromEntries(Object.entries(window.__skel.by || {}).sort((x, y) => y[1][1] - x[1][1]).slice(0, 8).map(([k, [n, ms]]) => [k, `${(n / Math.max(1, t.length)).toFixed(1)}/f ${(ms / Math.max(1, t.length)).toFixed(3)} ms`])) } : null,
         census: window.__census ? Object.fromEntries(Object.entries(R.census || {}).map(([k, v]) => [k, k === 'frames' ? v : +(v / Math.max(1, R.census.frames)).toFixed(1)]).sort((x, y) => y[1] - x[1]).slice(0, 30)) : null,
         spikes: window.__spikeProbe ? Object.fromEntries(Object.entries(R.spikeKinds).map(([k, v]) => [k, k === 'frames' ? v : +(v / Math.max(1, R.spikeKinds.frames || 1)).toFixed(1)])) : null,
@@ -252,6 +272,30 @@ async function run(world, hero) {
   const burst = await page.evaluate(() => new Promise(res => { const H = window.__horde; requestAnimationFrame(() => { const t0 = performance.now(); for (let i = 0; i < 10; i++) H.pack(10, 6, 16); H.want = 250; const ms = performance.now() - t0; requestAnimationFrame(() => res({ ms })); }); }));
   await page.waitForTimeout(2000);
   const r250 = await measure();
+  // DRAWCAT=1: draw calls per frame (every pass) owed to each category at 250: each one hidden in turn, the difference
+  // from the whole frame's count (the fight keeps running; 20 frames a category)
+  if (process.env.DRAWCAT) console.log('draw calls per frame by category', JSON.stringify(await page.evaluate(async () => {
+    const G = window.G, S = G.world.scene, H = G.dungeon._horde, r = G.engine.renderer, info = r.info.render;
+    const frames = n => new Promise(res => { let k = 0, c0 = info.calls, sum = 0; const f = () => { sum += info.calls - c0; c0 = info.calls; if (++k < n) requestAnimationFrame(f); else res(sum / n); }; requestAnimationFrame(() => { c0 = info.calls; requestAnimationFrame(f); }); });
+    const own = new Set(), mark = o => o && own.add(o);
+    const P = G.player, sh = G.companion, gld = G.vfx.gld, stz = G.vfx.stz;
+    const lootObjs = () => { const L = G.dungeon.loot; const out = []; for (const x of L?.list || L?.items || []) for (const k of ['mesh', 'obj', 'group', 'root', 'beam', 'label', 'sprite']) if (x[k]?.isObject3D) out.push(x[k]); return out; };
+    const cats = {
+      horde: () => [H.root], rigs: () => G.dungeon.monsters.filter(m => m.model.rig && m.model.root.parent).map(m => m.model.root),
+      projectiles: () => G.combat.projectiles.map(p => p.mesh).filter(Boolean), vfxFx: () => G.vfx.fx.map(f => f.obj).filter(Boolean),
+      particles: () => (G.vfx.layers || []).map(l => l.mesh || l.points || l.obj).filter(Boolean),
+      heroAndShadow: () => [P.rig.root, sh?.rig?.root].filter(Boolean), loot: lootObjs,
+      goldenFx: () => gld ? [...gld.scene.children.filter(o => gld.pools && [...gld.pools.values()].some(q => q.includes(o))), gld._jav?.mesh, gld.flyLance?.holder].filter(Boolean) : [],
+      spellAndOtherExt: () => (G.vfx.ext || []).filter(e => e !== gld).flatMap(e => [...(e.pools?.values?.() || [])].flat()).filter(o => o?.isObject3D),
+    };
+    for (const f of Object.values(cats)) for (const o of f()) mark(o);
+    cats.otherSceneChildren = () => S.children.filter(o => !own.has(o) && !o.isLight);
+    const all = await frames(20), out = { all: +all.toFixed(1) };
+    for (const [k, f] of Object.entries(cats)) { const objs = f(); const vis = objs.map(o => o.visible); objs.forEach(o => { o.visible = false; }); const c = await frames(20); objs.forEach((o, i) => { o.visible = vis[i]; }); out[k] = `${+(all - c).toFixed(1)} (${objs.length} objs)`; }
+    const kinds = {}; for (const o of S.children) { if (own.has(o) || o.isLight) continue; const k = `${o.type}:${o.name || (o.material?.map ? 'map' : '')}:${o.geometry?.type || ''}`; kinds[k] = (kinds[k] || 0) + 1; }
+    out.otherKinds = Object.fromEntries(Object.entries(kinds).sort((a, b) => b[1] - a[1]).slice(0, 12));
+    return out;
+  })));
   if (process.env.DIAG) console.log('render calls per frame', JSON.stringify(await page.evaluate(() => new Promise(res => {
     const G = window.G, r = G.engine.renderer, raw = r.render.bind(r), acc = new Map(); let frames = 0, wi = 0;
     r.render = (scene, cam) => { const c0 = r.info.render.calls, t0 = performance.now(); raw(scene, cam); const k = (scene === G.world.scene ? 'world#' + (wi++ % 3) : scene.type + (scene.children?.length || 0)) + (r.getRenderTarget() ? ':rt' : ''); const a = acc.get(k) || { n: 0, calls: 0, ms: 0 }; a.n++; a.calls += r.info.render.calls - c0; a.ms += performance.now() - t0; acc.set(k, a); };
@@ -287,7 +331,7 @@ async function run(world, hero) {
 
 function printRow(r) {
   const f = x => x.toFixed(2);
-  console.log(`${(r.world + '/' + r.hero).padEnd(14)} N=${r.N} (alive ${r.alive}, horde ${r.horde})  cpu p50 ${f(r.p50)}  p95 ${f(r.p95)}  p99 ${f(r.p99)}  max ${r.max.toFixed(1)} ms | rAF p50 ${f(r.w50)} p95 ${f(r.w95)} | draws ${r.calls} (p95 ${r.calls95})  tris ${(r.tris / 1000).toFixed(0)}k | geo ${r.geo} tex ${r.tex} | spawn ${r.N === 150 ? '150' : '+100'} in ${r.spawnMs.toFixed(1)} ms, packs ${r.packs} (worst ${r.packMax.toFixed(1)} ms, ${r.packAvg.toFixed(2)} ms/monster), worst spawn frame ${r.hitch.toFixed(1)} ms | casts ${r.casts}${r.inst ? ` | batches ${r.inst.batches} (${r.inst.instances} inst, ${r.inst.models} models)` : ''}${r.slept != null ? `, asleep ${r.slept}` : ''}${r.gridcheck ? ` | gridcheck ${r.gridcheck.bad}/${r.gridcheck.n} bad ${JSON.stringify(r.gridcheck.kinds)}` : ''}${r.crowdcheck ? ` | crowdcheck ${r.crowdcheck.bad}/${r.crowdcheck.n} bad` : ''}${r.err ? ' | ERR ' + r.err.slice(0, 160) : ''}`);
+  console.log(`${(r.world + '/' + r.hero).padEnd(14)} N=${r.N} (alive ${r.alive}, horde ${r.horde})  cpu p50 ${f(r.p50)}  p95 ${f(r.p95)}  p99 ${f(r.p99)}  max ${r.max.toFixed(1)} ms | rAF p50 ${f(r.w50)} p95 ${f(r.w95)} | draws ${r.calls} (p95 ${r.calls95})  tris ${(r.tris / 1000).toFixed(0)}k | geo ${r.geo} tex ${r.tex} | spawn ${r.N === 150 ? '150' : '+100'} in ${r.spawnMs.toFixed(1)} ms, packs ${r.packs} (worst ${r.packMax.toFixed(1)} ms, ${r.packAvg.toFixed(2)} ms/monster), worst spawn frame ${r.hitch.toFixed(1)} ms | casts ${r.casts}${r.inst ? ` | batches ${r.inst.batches} (${r.inst.instances} inst, ${r.inst.models} models)` : ''}${r.slept != null ? `, asleep ${r.slept}` : ''}${r.gridcheck ? ` | gridcheck ${r.gridcheck.bad}/${r.gridcheck.n} bad ${JSON.stringify(r.gridcheck.kinds)}` : ''}${r.crowdcheck ? ` | crowdcheck ${r.crowdcheck.bad}/${r.crowdcheck.n} bad` : ''}${r.stz ? ` | shih tzu: hexed ${r.stz.hexed} (max ${r.stz.hexMax}), ghosts ${r.stz.allies}${r.stz.chan ? ', ' + r.stz.chan : ''}` : ''}${r.err ? ' | ERR ' + r.err.slice(0, 160) : ''}`);
 }
 
 function printProfile(profile, label) {

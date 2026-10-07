@@ -1,0 +1,450 @@
+{
+ "sheet_targets": {
+  "close_up_face_W_units": {
+   "eye_centre_x_W": 0.26233766233766226,
+   "eye_centre_z_W": 0.5435064935064938,
+   "eye_opening_W": [
+    0.22727272727272727,
+    0.2642857142857143
+   ],
+   "iris_frac_of_opening": [
+    0.7342857142857143,
+    0.85012285012285
+   ],
+   "pupil_frac_of_iris": 0.78,
+   "iris_bottom_z_W": 0.41103896103896076,
+   "nose_W": [
+    0.23181818181818184,
+    0.16233766233766234
+   ],
+   "nose_top_z_W": 0.49610389610389594,
+   "nose_bottom_z_W": 0.3337662337662336,
+   "mouth_width_W": 0.5324675324675324,
+   "mouth_corner_z_W": 0.3116883116883117,
+   "mouth_top_z_W": 0.2792207792207792,
+   "mouth_bottom_z_W": 0.06493506493506493,
+   "brow_z_W": 0.7922077922077922,
+   "band_V_z_W": 0.8331168831168828,
+   "band_beside_V_z_W": 0.8766233766233766,
+   "band_lower_edge_at_x0.30W_z_W": 0.7922077922077922,
+   "H_helm_over_W": 0.987012987012987,
+   "ear_outer_x_W(z)": {
+    "0.62": 0.5474025974025974,
+    "0.45": 0.7337662337662337,
+    "0.29": 0.8506493506493507,
+    "0.12": 0.935064935064935,
+    "-0.05": 0.8831168831168831
+   },
+   "blush_W": {
+    "x": 0.37,
+    "y": 0.39
+   }
+  },
+  "body_m": {
+   "chin_m": 0.8327414772727272,
+   "helmet_dome_top_m": 1.2251420454545454,
+   "horn_tip_m": 1.2588778409090908,
+   "crest_top_m": 1.3316761363636362,
+   "ear_bottom_m": 0.7528409090909091,
+   "ear_outer_halfspan_m": 0.37642045454545453,
+   "ruff_V_bottom_m": 0.6747159090909091,
+   "ruff_width_m": 0.36931818181818177,
+   "pauldrons_across_m": 0.5823863636363635,
+   "pauldron_top_m": 0.7883522727272727,
+   "chest_width_m": 0.3196022727272727,
+   "belt_z_m": [
+    0.49360795454545453,
+    0.5397727272727272
+   ],
+   "medallion_d_m": 0.09232954545454544,
+   "tabard_point_m": 0.23082386363636362,
+   "tabard_top_width_m": 0.2130681818181818,
+   "tassets_z_m": [
+    0.3267045454545454,
+    0.48650568181818177
+   ],
+   "tassets_across_m": 0.5823863636363635,
+   "feet_width_each_m": 0.3018465909090909,
+   "foot_centre_x_m": 0.22727272727272727,
+   "paw_centre_m": [
+    -0.4580965909090909,
+    0.43323863636363635
+   ],
+   "bracer_z_m": [
+    0.5042613636363636,
+    0.5930397727272727
+   ],
+   "side_nose_tip_y_m": -0.31605113636363635,
+   "side_head_back_y_m": 0.23082386363636362,
+   "side_tail_y_m": [
+    0.2130681818181818,
+    0.6747159090909091
+   ],
+   "side_tail_z_m": [
+    0.12073863636363635,
+    0.5646306818181818
+   ],
+   "side_quiver_y_m": [
+    0.18465909090909088,
+    0.3196022727272727
+   ],
+   "side_quiver_z_m": [
+    0.4758522727272727,
+    0.8416193181818181
+   ],
+   "side_javelin_tips_top_m": 1.0369318181818181,
+   "side_ear_y_m": [
+    -0.05326704545454545,
+    0.24857954545454544
+   ]
+  },
+  "colour_extents": {
+   "emerald_rows(front): y -> x range": {
+    "100": [
+     171,
+     270
+    ],
+    "210": [
+     139,
+     303
+    ],
+    "240": [
+     175,
+     265
+    ],
+    "270": [
+     86,
+     355
+    ],
+    "300": [
+     147,
+     293
+    ],
+    "330": [
+     163,
+     277
+    ],
+    "350": [
+     210,
+     231
+    ]
+   },
+   "emerald_lowest_row(front tabard point)": 359
+  },
+  "turnaround_face": {
+   "W_m": 0.4048295454545454,
+   "H_helm_over_W": 0.9692982456140351,
+   "head_H_helm_over_total": 0.32028985507246377,
+   "heads_tall(crown to ground / H)": 3.1221719457013575
+  }
+ },
+ "compare": [
+  {
+   "target": "head W (m) [cast: ~0.60]",
+   "sheet": 0.6,
+   "model": 0.595,
+   "dev_pct": -0.8,
+   "unit": "m"
+  },
+  {
+   "target": "crown (skull, m)",
+   "sheet": 1.2,
+   "model": 1.199,
+   "dev_pct": -0.0,
+   "unit": "m"
+  },
+  {
+   "target": "helmet dome top (m) [head-scaled]",
+   "sheet": 1.237,
+   "model": 1.27,
+   "dev_pct": 2.6,
+   "unit": "m"
+  },
+  {
+   "target": "H_helm / W",
+   "sheet": 0.987,
+   "model": 0.996,
+   "dev_pct": 0.9,
+   "unit": ""
+  },
+  {
+   "target": "eye centre x (W)",
+   "sheet": 0.262,
+   "model": 0.262,
+   "dev_pct": -0.1,
+   "unit": ""
+  },
+  {
+   "target": "eye centre z (W)",
+   "sheet": 0.544,
+   "model": 0.543,
+   "dev_pct": -0.1,
+   "unit": ""
+  },
+  {
+   "target": "eye opening w (W)",
+   "sheet": 0.227,
+   "model": 0.227,
+   "dev_pct": -0.1,
+   "unit": ""
+  },
+  {
+   "target": "eye opening h (W)",
+   "sheet": 0.264,
+   "model": 0.264,
+   "dev_pct": -0.1,
+   "unit": ""
+  },
+  {
+   "target": "eye facing (deg out)",
+   "sheet": 30.0,
+   "model": 32.4,
+   "dev_pct": 8.0,
+   "unit": ""
+  },
+  {
+   "target": "iris bottom z (W)",
+   "sheet": 0.411,
+   "model": 0.411,
+   "dev_pct": -0.0,
+   "unit": ""
+  },
+  {
+   "target": "nose top z (W)",
+   "sheet": 0.496,
+   "model": 0.496,
+   "dev_pct": -0.0,
+   "unit": ""
+  },
+  {
+   "target": "nose width (W)",
+   "sheet": 0.232,
+   "model": 0.232,
+   "dev_pct": 0.1,
+   "unit": ""
+  },
+  {
+   "target": "nose height (W)",
+   "sheet": 0.162,
+   "model": 0.162,
+   "dev_pct": -0.2,
+   "unit": ""
+  },
+  {
+   "target": "mouth width (W)",
+   "sheet": 0.532,
+   "model": 0.533,
+   "dev_pct": 0.1,
+   "unit": ""
+  },
+  {
+   "target": "mouth top z at the centre (W)",
+   "sheet": 0.279,
+   "model": 0.28,
+   "dev_pct": 0.3,
+   "unit": ""
+  },
+  {
+   "target": "mouth bottom z (W)",
+   "sheet": 0.065,
+   "model": 0.065,
+   "dev_pct": 0.1,
+   "unit": ""
+  },
+  {
+   "target": "band V z (W)",
+   "sheet": 0.833,
+   "model": 0.833,
+   "dev_pct": -0.0,
+   "unit": ""
+  },
+  {
+   "target": "ear outer x (W) at z 0.62",
+   "sheet": 0.547,
+   "model": 0.587,
+   "dev_pct": 7.2,
+   "unit": ""
+  },
+  {
+   "target": "ear outer x (W) at z 0.45",
+   "sheet": 0.734,
+   "model": 0.725,
+   "dev_pct": -1.2,
+   "unit": ""
+  },
+  {
+   "target": "ear outer x (W) at z 0.29",
+   "sheet": 0.851,
+   "model": 0.842,
+   "dev_pct": -1.0,
+   "unit": ""
+  },
+  {
+   "target": "ear outer x (W) at z 0.12",
+   "sheet": 0.935,
+   "model": 0.896,
+   "dev_pct": -4.2,
+   "unit": ""
+  },
+  {
+   "target": "ear outer x (W) at z -0.05",
+   "sheet": 0.883,
+   "model": 0.857,
+   "dev_pct": -3.0,
+   "unit": ""
+  },
+  {
+   "target": "ear bottom (W below the chin)",
+   "sheet": -0.197,
+   "model": -0.192,
+   "dev_pct": 2.7,
+   "unit": ""
+  },
+  {
+   "target": "side: nose tip y (m) [head-scaled]",
+   "sheet": -0.468,
+   "model": -0.454,
+   "dev_pct": 3.0,
+   "unit": "m"
+  },
+  {
+   "target": "ruff V bottom below the chin (W)",
+   "sheet": -0.39,
+   "model": -0.277,
+   "dev_pct": 29.1,
+   "unit": ""
+  },
+  {
+   "target": "pauldrons across (m)",
+   "sheet": 0.582,
+   "model": 0.596,
+   "dev_pct": 2.3,
+   "unit": "m"
+  },
+  {
+   "target": "pauldron top (m) [x BZS]",
+   "sheet": 0.636,
+   "model": 0.65,
+   "dev_pct": 2.2,
+   "unit": "m"
+  },
+  {
+   "target": "belt bottom (m) [x BZS]",
+   "sheet": 0.398,
+   "model": 0.399,
+   "dev_pct": 0.2,
+   "unit": "m"
+  },
+  {
+   "target": "belt top (m) [x BZS]",
+   "sheet": 0.435,
+   "model": 0.442,
+   "dev_pct": 1.5,
+   "unit": "m"
+  },
+  {
+   "target": "medallion diameter (m)",
+   "sheet": 0.092,
+   "model": 0.089,
+   "dev_pct": -3.6,
+   "unit": "m"
+  },
+  {
+   "target": "tabard point (m) [x BZS]",
+   "sheet": 0.186,
+   "model": 0.179,
+   "dev_pct": -3.9,
+   "unit": "m"
+  },
+  {
+   "target": "tabard top width (m)",
+   "sheet": 0.213,
+   "model": 0.227,
+   "dev_pct": 6.5,
+   "unit": "m"
+  },
+  {
+   "target": "tassets across (m)",
+   "sheet": 0.582,
+   "model": 0.581,
+   "dev_pct": -0.2,
+   "unit": "m"
+  },
+  {
+   "target": "tassets bottom (m) [x BZS]",
+   "sheet": 0.264,
+   "model": 0.255,
+   "dev_pct": -3.2,
+   "unit": "m"
+  },
+  {
+   "target": "paw centre x (m)",
+   "sheet": 0.458,
+   "model": 0.42,
+   "dev_pct": -8.3,
+   "unit": "m"
+  },
+  {
+   "target": "paw centre z (m) [x BZS]",
+   "sheet": 0.349,
+   "model": 0.339,
+   "dev_pct": -3.0,
+   "unit": "m"
+  },
+  {
+   "target": "feet: one foot width (m)",
+   "sheet": 0.302,
+   "model": 0.306,
+   "dev_pct": 1.4,
+   "unit": "m"
+  },
+  {
+   "target": "feet: lowest point (m)",
+   "sheet": 0.0,
+   "model": 0.002,
+   "dev_pct": 0,
+   "unit": "m"
+  },
+  {
+   "target": "tail back reach y (m)",
+   "sheet": 0.675,
+   "model": 0.626,
+   "dev_pct": -7.2,
+   "unit": "m"
+  },
+  {
+   "target": "tail top z (m) [x BZS; raised per round 2]",
+   "sheet": 0.455,
+   "model": 0.689,
+   "dev_pct": 51.3,
+   "unit": "m"
+  },
+  {
+   "target": "quiver top z (m) [x BZS]",
+   "sheet": 0.679,
+   "model": 0.73,
+   "dev_pct": 7.5,
+   "unit": "m"
+  },
+  {
+   "target": "javelin tips top (m) [x BZS]",
+   "sheet": 0.836,
+   "model": 0.831,
+   "dev_pct": -0.7,
+   "unit": "m"
+  },
+  {
+   "target": "dragon top (m) [head-scaled]",
+   "sheet": 1.395,
+   "model": 1.448,
+   "dev_pct": 3.8,
+   "unit": "m"
+  }
+ ],
+ "notes": [
+  "Round 2 (the director): the face follows the sheet exactly (EZW, NZW, NHH back; the iris bottom 0.085 W under the nose top).",
+  "Round 2: the cast proportions. W 0.600 m (the sheet 0.405 m: head scale HS 1.48) with the skull crown kept at 1.200 m; the body below the chin is the sheet body shortened by BZS = chin / 0.833 in z, widths kept, the arms scaled 0.9 about the shoulder.",
+  "Head-part targets are the sheet numbers mapped by HS about the crown; body heights by BZS. The tail is raised on purpose.",
+  "The face follows the head close-up (as the brief says); the turnaround draws the face shorter."
+ ]
+}

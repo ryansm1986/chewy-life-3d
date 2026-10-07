@@ -1,0 +1,61 @@
+{
+ "triangles": 2446,
+ "bounds_min": [
+  -0.0292,
+  -0.0654,
+  -0.0908
+ ],
+ "bounds_max": [
+  0.4238,
+  0.2483,
+  0.0311
+ ],
+ "span_m": 0.42382892966270447,
+ "chord_m": 0.31369397789239883,
+ "thickness_m": {
+  "membrane": 0.018,
+  "arm_d_root": 0.047,
+  "leading_finger_d_root": 0.037,
+  "strut_d_root": 0.025,
+  "sag": 0.014
+ },
+ "visibility": {
+  "reference_top_view_m2": 0.06848,
+  "fraction_of_top_view": {
+   "flap-30": {
+    "game+45": 0.761,
+    "game-45": 0.377,
+    "game+135": 0.995,
+    "game-135": 0.631,
+    "front": 0.373,
+    "side": 0.548
+   },
+   "flap+0": {
+    "game+45": 0.591,
+    "game-45": 0.665,
+    "game+135": 0.814,
+    "game-135": 0.908,
+    "front": 0.372,
+    "side": 0.242
+   },
+   "flap+30": {
+    "game+45": 0.319,
+    "game-45": 0.774,
+    "game+135": 0.477,
+    "game-135": 1.01,
+    "front": 0.383,
+    "side": 0.543
+   },
+   "flap+60": {
+    "game+45": 0.411,
+    "game-45": 0.67,
+    "game+135": 0.215,
+    "game-135": 0.899,
+    "front": 0.407,
+    "side": 0.879
+   }
+  },
+  "worst_game_fraction": 0.215,
+  "note": "left wing; the mirrored right wing sees the mirrored yaws"
+ }
+}

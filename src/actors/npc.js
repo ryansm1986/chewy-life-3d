@@ -63,14 +63,18 @@ const LIKES = {
   moka: { board: 3.5, browse: 2.5, rim: 2.5, fish: 1.8, garden: 1.6, chat: 2 },
   // Poe practises being unseen: lurking by lanterns and benches, "secretly" watching the board, then chatting anyway
   poe: { lantern: 3, admire: 2.5, bench: 2, board: 2, stroll: 2, chat: 2.2 },
+  // the Shih Tzu tends the town's lanterns (solemnly), reads on benches and gazes at the garden; chats, softly
+  shihtzu: { lantern: 3.5, bench: 2.5, admire: 2, garden: 1.6, board: 1.5, chat: 1.8 },
+  // the dragoon patrols (very seriously), fishes (retrievers love water), and stops for a chat with everyone he meets
+  golden: { stroll: 3, fish: 2.2, chat: 2.6, admire: 1.8, bench: 1.4, garden: 1.4 },
 };
 const FOLK_LIKES = ['bench', 'garden', 'farm', 'fish', 'counter', 'browse', 'admire', 'sweep', 'chat', 'onsen', 'board'];
 // bedtimes [in, out] in game hours. Rosie keeps her shop lit a little later; Kitsune (lantern gazing) and Kero (night
 // fishing, the hot spring) are the night owls, but the whole cast is tucked in by 23:30. Townsfolk head home at dusk
 // (19:15-20:00) and wake 5:30-6:30, staggered so doors open one by one.
-const BED = { chewy: [22.4, 7.0], moka: [22.0, 6.6], poe: [22.8, 6.8], rosie: [22.9, 6.6], mochi: [21.6, 7.0], usagi: [20.8, 6.0], kuma: [21.0, 5.8], kitsune: [23.3, 7.6], pan: [22.2, 8.0], tanu: [22.6, 7.2], kero: [23.0, 6.4] };
+const BED = { chewy: [22.4, 7.0], moka: [22.0, 6.6], poe: [22.8, 6.8], shihtzu: [21.8, 7.6], golden: [22.2, 6.4], rosie: [22.9, 6.6], mochi: [21.6, 7.0], usagi: [20.8, 6.0], kuma: [21.0, 5.8], kitsune: [23.3, 7.6], pan: [22.2, 8.0], tanu: [22.6, 7.2], kero: [23.0, 6.4] };
 // nightcap colours (townsfolk pick one from their id)
-const CAP_COLOR = { chewy: '#e0443a', moka: '#5cc8b8', poe: '#7aa86a', rosie: '#ff8fb0', mochi: '#ffb3cf', usagi: '#9fe0c0', kuma: '#8fb8ff', kitsune: '#c9a0ff', pan: '#ffd36e', tanu: '#8fd0ff', kero: '#ffb07a' };
+const CAP_COLOR = { chewy: '#e0443a', moka: '#5cc8b8', poe: '#7aa86a', shihtzu: '#9a6a9a', golden: '#e0a868', rosie: '#ff8fb0', mochi: '#ffb3cf', usagi: '#9fe0c0', kuma: '#8fb8ff', kitsune: '#c9a0ff', pan: '#ffd36e', tanu: '#8fd0ff', kero: '#ffb07a' };
 const CAP_FOLK = ['#8fb8ff', '#ffb3cf', '#9fe0c0', '#c9a0ff', '#ffd36e', '#ffb07a'];
 
 export class Villager extends Actor {

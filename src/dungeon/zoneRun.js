@@ -105,7 +105,7 @@ export class ZoneRun {
     const variant = pickVar(main);
     if (sp.rank !== 'normal') { pack.leader = add(main, { rank: sp.rank, variant, x: c.x, z: c.z }); }
     // the formation: a jittered sunflower disc of radius sp.r, or (40%) two clumps either side of the centre
-    const n = Math.max(1, Math.min(16 - (pack.leader ? 1 : 0), Math.round(sp.count * (1 + ((MONSTERS[main].pack || 1) - 1) * 0.5)))), /* (a kind's pack factor at half strength: big kinds come fewer, the floor keeps its density) */ R = sp.r || 2.6, rot = this.rng.next() * TAU; // (ZONES §4: packs of 8–16)
+    const n = Math.max(1, Math.min((sp.cap || 16) - (pack.leader ? 1 : 0), Math.round(sp.count * (1 + ((MONSTERS[main].pack || 1) - 1) * 0.5)))), /* (a kind's pack factor at half strength: big kinds come fewer, the floor keeps its density) */ R = sp.r || 2.6, rot = this.rng.next() * TAU; // (ZONES §4: packs of 8–16; a tier run's bigger packs carry their own cap: rpg/zoneMods.js layoutMods)
     const two = n >= 9 && this.rng.chance(0.4), ax = Math.cos(rot), az = Math.sin(rot);
     const pts = [];
     for (let i = 0; i < n; i++) {
@@ -307,8 +307,13 @@ export class ZoneRun {
     const G = this.G, M = this.mode, z = this.zone;
     this.setSeal(false);
     if (!clear?.first) return;
-    // the first clear: a treasure chest rises by the fallen boss, the zone opens on, a banner
-    const p = M.openSpotNear(b.pos.clone(), 3.2, 1.2);
+    // the first clear: a treasure chest rises by the fallen boss, the zone opens on, a banner. (A tier run that happens to
+    // be the dungeon's first clear — only from the debug entry — gets the boss unique in its Lantern chest instead:
+    // dungeon/tierRun.js clearDrops, and its own banner.)
+    const story = !(M.tier > 0 || M.spirit > 0);
+    const opened0 = !story ? zoneUnlockOnClear(G.state, z) : null;
+    if (!story) { if (opened0) setTimeout(() => { if (G.dungeon === M) G.ui?.toast?.(`New zone on the Travel Map: ${REGIONS[opened0]?.name}!`, { icon: 'map', color: REGIONS[opened0]?.color || '#8fd0ff' }); }, 7000); return; }
+    const p = this.firstChestAt = M.openSpotNear(b.pos.clone(), 3.2, 1.2);
     setTimeout(() => {
       if (G.dungeon !== M) return;
       const chest = M.makeChest(p, 'gold');

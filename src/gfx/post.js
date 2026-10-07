@@ -147,7 +147,7 @@ export class Post {
     this.grade.uniforms.get('uFlash').value = this.flash;
     this.grade.uniforms.get('uTime').value = time;
     this.chroma.offset.set(0.0022 * this.aberr, 0.0012 * this.aberr);
-    this.chromaPass.enabled = this.aberr > 0.01;
+    this.chromaPass.enabled = this.aberr > 0.01 && !this.noChroma; // (noChroma: the Mobile preset, core/engine.js postPreset)
     this.composer.render(dt);
     // (probes: a transition's iris or a deliberate screen pulse is legit darkening, not a flash)
     if (this.health) try { this.health.afterFrame({ skip: this.grade.uniforms.get('uWipe').value > 0.001 || this.flash > 0.02 }); } catch (e) { if (!this.healthErr) console.warn('[renderHealth]', (this.healthErr = e)); }

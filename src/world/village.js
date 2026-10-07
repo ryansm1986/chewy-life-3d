@@ -9,6 +9,7 @@ import { Events } from '../core/events.js';
 import { uid, rand, randInt, clamp, ease, mulberry32, pick } from '../core/util.js';
 import { NeedIcons } from './needIcons.js';
 import { markOccluder } from '../gfx/materials.js';
+import { memLite } from '../core/deck.js';
 
 export const ZONES = { R: 1, C: 2, W: 3 };
 export const ZONE_COLORS = { 1: [70, 205, 90], 2: [70, 140, 255], 3: [255, 165, 40] };
@@ -102,7 +103,10 @@ export class VillageSim {
   prewarmTemplates() {
     if (this._prewarm) return;
     const q = this._prewarm = [];
-    for (const [id, d] of Object.entries(BUILDINGS)) if (d.zone) for (let lv = 1; lv <= (d.levels || 1); lv++) for (let v = 0; v < VARIANTS; v++) q.push([id, lv, v]);
+    // (the Mobile preset prewarms level 1 in two variants only: every template is 0.2 to 1.5 MB of arrays, all 112 of them
+    //  over 120 MB; seedFor still prefers those two, and anything else is built when a building needs it)
+    const lite = memLite(), maxLv = lite ? 1 : 9, nv = lite ? 2 : VARIANTS;
+    for (const [id, d] of Object.entries(BUILDINGS)) if (d.zone) for (let lv = 1; lv <= Math.min(maxLv, d.levels || 1); lv++) for (let v = 0; v < nv; v++) q.push([id, lv, v]);
     q.sort((a, b) => a[1] - b[1]); // level 1 first
     const one = () => { const [id, lv, v] = q.shift(); try { getTemplate(id, lv, v); } catch (e) { /* unknown combo */ } };
     for (let t = performance.now(); q.length && q[0][1] === 1 && performance.now() - t < 400;) one(); // boot, behind the splash

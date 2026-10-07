@@ -1,0 +1,130 @@
+{
+  "units": "metres",
+  "coordinate_system": "Blender Z-up, front -Y, character left = +X",
+  "root": [
+    0,
+    0,
+    0
+  ],
+  "body": [
+    0,
+    0.055,
+    0.195
+  ],
+  "neck": [
+    0.0,
+    -0.03,
+    0.303
+  ],
+  "head": [
+    0,
+    -0.02,
+    0.335
+  ],
+  "jaw": [
+    0,
+    -0.15,
+    0.352
+  ],
+  "eye_L": [
+    0.0663,
+    -0.1109,
+    0.4384
+  ],
+  "eye_R": [
+    -0.0663,
+    -0.1109,
+    0.4384
+  ],
+  "ear_L": [
+    0.1214,
+    0.03,
+    0.5624
+  ],
+  "ear_R": [
+    -0.1214,
+    0.03,
+    0.5624
+  ],
+  "earTip_L": [
+    0.151,
+    0.006,
+    0.7
+  ],
+  "earTip_R": [
+    -0.151,
+    0.006,
+    0.7
+  ],
+  "legFL": [
+    0.094,
+    -0.06,
+    0.215
+  ],
+  "legFR": [
+    -0.094,
+    -0.06,
+    0.215
+  ],
+  "elbowFL": [
+    0.094,
+    -0.06,
+    0.125
+  ],
+  "elbowFR": [
+    -0.094,
+    -0.06,
+    0.125
+  ],
+  "pawFL": [
+    0.094,
+    -0.06999999999999999,
+    0.035
+  ],
+  "pawFR": [
+    -0.094,
+    -0.06999999999999999,
+    0.035
+  ],
+  "legBL": [
+    0.1,
+    0.192,
+    0.215
+  ],
+  "legBR": [
+    -0.1,
+    0.192,
+    0.215
+  ],
+  "kneeBL": [
+    0.1,
+    0.192,
+    0.12
+  ],
+  "kneeBR": [
+    -0.1,
+    0.192,
+    0.12
+  ],
+  "pawBL": [
+    0.1,
+    0.182,
+    0.035
+  ],
+  "pawBR": [
+    -0.1,
+    0.182,
+    0.035
+  ],
+  "tail": [
+    0.0,
+    0.235,
+    0.2208
+  ],
+  "notes": [
+    "Phase 1: no armature or weights.",
+    "Eyeballs are true spheres (radius 0.092 m) centred at eye_L/R; the iris is painted on the sphere's own pole, turned 21 deg toward the nose, so eye bones can aim.",
+    "Legs are separate closed shells (horizontal rings: elbow/knee loops); the body barrel has rings along the spine.",
+    "Ears are separate closed cupped shells with dense rings near the base (bend loop)."
+  ]
+}

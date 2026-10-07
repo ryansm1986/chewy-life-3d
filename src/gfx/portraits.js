@@ -17,6 +17,8 @@ export class Portraits {
     this.canvas = document.createElement('canvas'); this.canvas.width = this.canvas.height = this.size;
   }
   register(id, spec) { this.specs.set(id, spec); }
+  /** a dresser for one id's bust: fn(rig) puts its props on before the render (the whelp's wings) */
+  dresser(id, fn) { (this.dressers ||= new Map()).set(id, fn); this.cache.delete(id); }
   get(id) {
     if (this.cache.has(id)) return this.cache.get(id);
     let url = null;
@@ -30,6 +32,7 @@ export class Portraits {
     const rig = heroModelReady(id) ? buildHeroModel(id) : id === 'shadow' ? buildBoston() : spec ? buildHumanoid(spec) : null;
     if (!rig) return null;
     rig.mat.userData.u?.uDarkGrade?.value.set(0, 0, 0, 0); // a dark coat's counter-grade is for the graded main scene only
+    rig.mat.userData.u?.uWarmGrade?.value.set(0, 0, 0, 0); // (and so is a warm coat's: heroModels.js warmGrade)
     if (rig.mat.userData.u?.uDarkLift) rig.mat.userData.u.uDarkLift.value = 0; // (and so is the cloth neutraliser's lift counter: heroModels.js darkNeutral)
     // hide outlines slightly thinner for close-ups
     rig.outMat.userData.width.value = 0.008;
@@ -44,6 +47,10 @@ export class Portraits {
     if (rig.model === 'moka_toy') { big *= 1.12; hp.y += 0.1; } // the Toybox Moka: the tall hat and the moon charm in frame
     if (id === 'rosie' && rig.bakedDisney) { big *= 1.08; hp.y += 0.08; } // the Toybox Rosie: her curls and bow stand tall above the head bone
     if (rig.model === 'poe_toy') { big *= 1.1; hp.y += 0.13; } // the Toybox Poe: her big round head (the head bone sits at the neck) and the fox mask in frame
+    if (rig.model === 'shihtzu_toy') { big *= 1.2; hp.y += 0.2; } // the Shih Tzu: his big head with its draping ears and the topknot in frame
+    if (rig.model === 'golden_toy') { big *= 1.32; hp.y += 0.27; } // the dragoon: his big head, the feathered ears and the dragon crest in frame
+    if (rig.model === 'shadow_whelp') hp.y += 0.03; // (the whelp's hood horns)
+    this.dressers?.get(id)?.(rig);
     rig.root.rotation.y = -0.25;
     this.scene.add(rig.root);
     const quad = !!rig.quadruped;

@@ -1,6 +1,7 @@
 // Title screen over the live 3D scene: bouncing logo, paw-print trail, falling petals, New / Continue / Settings.
 import { el, esc } from './dom.js';
 import { glyph } from './glyphs.js';
+import { DESKTOP, quitGame } from './desktop.js';
 import { portrait } from './portraits.js';
 
 const LETTER_COLORS = ['#fff6e8', '#ffc4d6', '#ffe79a', '#c9f5e4', '#cfeaff', '#e4dcff'];
@@ -29,7 +30,8 @@ export class Title {
         <div class="ti-btns">
           <button class="btn big pink" data-a="newGame">${glyph('sakura')}New Game</button>
           <button class="btn big" data-a="continue">${glyph('paw')}Continue</button>
-          <button class="btn big" data-a="settings">${glyph('gear')}Settings</button>
+          <button class="btn big" data-a="settings">${glyph('gear')}Settings</button>${DESKTOP ? `
+          <button class="btn big" data-a="quit">${glyph('door')}Quit</button>` : ''}
         </div>
       </div>
       <div class="ti-foot">v0.1 · made with love for Chewy &amp; Shadow ♡</div>`;
@@ -47,6 +49,7 @@ export class Title {
       }
       else if (a === 'newGame') h.newGame?.();
       else if (a === 'continue') h.continue?.();
+      else if (a === 'quit') quitGame(ui); // (the desktop app only: ui/desktop.js)
     });
   }
   sync() {

@@ -1,6 +1,7 @@
 // Skill trees (the active hero's three: Bone Blade / Fetch Mastery / Pack Spirit, or Moka's Tidewater / Starlight Kibble /
 // Duck Hunt) + hotbar assignment (popover, drag, hover+1-4).
 import { el, esc, replay, setText } from './dom.js';
+import { CLASSES } from '../rpg/classes.js';
 import { glyph } from './glyphs.js';
 import { padGlyph } from './padGlyphs.js';
 import { Panel } from './panel.js';
@@ -193,7 +194,7 @@ export class SkillsPanel extends Panel {
       ${cur.length ? `<div class="tt-sect"><div class="tt-sh">Current</div>${cur.map(l => `<div class="tt-l">${esc(l)}</div>`).join('')}</div>` : ''}
       ${next.length ? `<div class="tt-sect next"><div class="tt-sh">${lvl ? 'Next level' : 'Level 1'}</div>${next.map(l => `<div class="tt-l">${esc(l)}</div>`).join('')}</div>` : lvl >= s.maxLvl ? '<div class="tt-max">✦ Mastered! ✦</div>' : ''}
       ${reqs.length ? `<div class="tt-reqs">Requires: ${reqs.join(', ')}</div>` : ''}
-      ${skillTraining(id) ? '<div class="tt-train">In training: Poe is still practising this one. Coming soon!</div>' : ''}
+      ${skillTraining(id) ? `<div class="tt-train">In training: ${esc(CLASSES[skillDef(id)?.raw?.cls || skillDef(id)?.cls]?.name || 'the hero')} is still practising this one. Coming soon!</div>` : ''}
       ${!s.passive && lvl ? chargeTipHTML(id, this.st, this.d) : ''}
       ${syn ? `<div class="tt-sect syn"><div class="tt-sh">Synergies</div>${syn}</div>` : ''}
       <div class="tt-hints"><span><b>Click</b> learn</span>${!s.passive && lvl ? '<span><b>Right-click</b> / <b>1–4</b> assign</span><span><b>⚡</b> charge perks</span>' : ''}</div>

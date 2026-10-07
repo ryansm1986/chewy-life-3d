@@ -1,0 +1,72 @@
+{
+ "shadow-whelp.glb": {
+  "Whelp_hood / hood": {
+   "triangles": 2072,
+   "inward": 0,
+   "flagged": []
+  },
+  "Whelp_hood / cuff": {
+   "triangles": 672,
+   "inward": 0,
+   "flagged": []
+  },
+  "Whelp_hood / brass": {
+   "triangles": 616,
+   "inward": 0,
+   "flagged": []
+  },
+  "Whelp_coat / coat": {
+   "triangles": 1488,
+   "inward": 0,
+   "flagged": []
+  },
+  "Whelp_coat / bib": {
+   "triangles": 532,
+   "inward": 0,
+   "flagged": []
+  },
+  "Whelp_coat / brass": {
+   "triangles": 336,
+   "inward": 0,
+   "flagged": []
+  },
+  "Whelp_tail / tail": {
+   "triangles": 420,
+   "inward": 0,
+   "flagged": []
+  },
+  "Whelp_tail / brass": {
+   "triangles": 544,
+   "inward": 0,
+   "flagged": []
+  }
+ },
+ "shadow-whelp-wing.glb": {
+  "memb": {
+   "triangles": 990,
+   "inward": 0,
+   "flagged": []
+  },
+  "tube": {
+   "triangles": 480,
+   "inward": 0,
+   "flagged": []
+  },
+  "rib": {
+   "triangles": 576,
+   "inward": 0,
+   "flagged": []
+  },
+  "knob": {
+   "triangles": 288,
+   "inward": 0,
+   "flagged": []
+  },
+  "brass": {
+   "triangles": 112,
+   "inward": 0,
+   "flagged": []
+  }
+ },
+ "total_inward": 0
+}

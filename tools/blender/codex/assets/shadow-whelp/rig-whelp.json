@@ -1,0 +1,353 @@
+{
+ "base_rig_md5": "98831422ee4500b02814853fbe4b6590",
+ "bones": [
+  {
+   "name": "root",
+   "parent": null,
+   "head_blender_m": [
+    0.0,
+    0.04,
+    0.0
+   ]
+  },
+  {
+   "name": "body",
+   "parent": "root",
+   "head_blender_m": [
+    0.0,
+    0.07,
+    0.21
+   ]
+  },
+  {
+   "name": "neck",
+   "parent": "body",
+   "head_blender_m": [
+    0.0,
+    -0.03,
+    0.285
+   ]
+  },
+  {
+   "name": "head",
+   "parent": "neck",
+   "head_blender_m": [
+    0.0,
+    -0.01,
+    0.335
+   ]
+  },
+  {
+   "name": "jaw",
+   "parent": "head",
+   "head_blender_m": [
+    0.0,
+    -0.12,
+    0.37132
+   ]
+  },
+  {
+   "name": "eye_L",
+   "parent": "head",
+   "head_blender_m": [
+    0.06627,
+    -0.11087,
+    0.43844
+   ]
+  },
+  {
+   "name": "lidU_L",
+   "parent": "head",
+   "head_blender_m": [
+    0.06627,
+    -0.11386,
+    0.4087
+   ]
+  },
+  {
+   "name": "lidD_L",
+   "parent": "head",
+   "head_blender_m": [
+    0.06627,
+    0.06548,
+    0.57187
+   ]
+  },
+  {
+   "name": "lip_L",
+   "parent": "head",
+   "head_blender_m": [
+    0.07392,
+    -0.21773,
+    0.37132
+   ]
+  },
+  {
+   "name": "ear_L",
+   "parent": "head",
+   "head_blender_m": [
+    0.1214,
+    0.03,
+    0.5624
+   ]
+  },
+  {
+   "name": "eye_R",
+   "parent": "head",
+   "head_blender_m": [
+    -0.06627,
+    -0.11087,
+    0.43844
+   ]
+  },
+  {
+   "name": "lidU_R",
+   "parent": "head",
+   "head_blender_m": [
+    -0.06627,
+    -0.11386,
+    0.4087
+   ]
+  },
+  {
+   "name": "lidD_R",
+   "parent": "head",
+   "head_blender_m": [
+    -0.06627,
+    0.06548,
+    0.57187
+   ]
+  },
+  {
+   "name": "lip_R",
+   "parent": "head",
+   "head_blender_m": [
+    -0.07392,
+    -0.21773,
+    0.37132
+   ]
+  },
+  {
+   "name": "ear_R",
+   "parent": "head",
+   "head_blender_m": [
+    -0.1214,
+    0.03,
+    0.5624
+   ]
+  },
+  {
+   "name": "legFL",
+   "parent": "root",
+   "head_blender_m": [
+    0.094,
+    -0.06,
+    0.215
+   ]
+  },
+  {
+   "name": "legFR",
+   "parent": "root",
+   "head_blender_m": [
+    -0.094,
+    -0.06,
+    0.215
+   ]
+  },
+  {
+   "name": "legBL",
+   "parent": "root",
+   "head_blender_m": [
+    0.1,
+    0.185,
+    0.215
+   ]
+  },
+  {
+   "name": "legBR",
+   "parent": "root",
+   "head_blender_m": [
+    -0.1,
+    0.185,
+    0.215
+   ]
+  },
+  {
+   "name": "tail1",
+   "parent": "body",
+   "head_blender_m": [
+    0.0,
+    0.25,
+    0.234
+   ]
+  },
+  {
+   "name": "tail2",
+   "parent": "tail1",
+   "head_blender_m": [
+    0.0,
+    0.25751,
+    0.24061
+   ]
+  }
+ ],
+ "axes": "identity rest orientations (as shadow_toy): pose rotations are world-axis rotations about each bone head; game XYZ = Blender X, Z, -Y",
+ "shadow_rig_stats": {
+  "smile_cut": {
+   "cut_triangles": 44,
+   "separated_rim_points": 37,
+   "x_sep": 0.07392,
+   "z_corner": 0.37132
+  },
+  "lidU_L": {
+   "happy_view_ray_misses": 293,
+   "view_ray_misses": 3,
+   "view_ray_samples": 25383,
+   "vertices_visible_at_hidden_poses": 0,
+   "pivot_yz": [
+    -0.1139,
+    0.4087
+   ],
+   "target": 1.22,
+   "happy_cover_at_0.488": 0.19930908936001543,
+   "needed_samples": 117,
+   "uncovered_samples": 0,
+   "pivot_depth_behind_eye_centre_m": [
+    -0.003,
+    -0.03
+   ]
+  },
+  "lidD_L": {
+   "happy_view_ray_misses": 0,
+   "view_ray_misses": 0,
+   "view_ray_samples": 1690,
+   "vertices_visible_at_hidden_poses": 0,
+   "pivot_yz": [
+    0.0655,
+    0.5719
+   ],
+   "target": -0.24,
+   "happy_cover_at_0.488": null,
+   "needed_samples": 49,
+   "uncovered_samples": 0,
+   "arm_m": 0.3,
+   "cover_fraction": 0.313
+  },
+  "lidF_L": {
+   "happy_view_ray_misses": 0,
+   "view_ray_misses": 1197,
+   "view_ray_samples": 3525,
+   "vertices_visible_at_hidden_poses": 0,
+   "pivot_yz": [
+    -0.1139,
+    0.4087
+   ],
+   "target": 1.22,
+   "happy_cover_at_0.488": null,
+   "needed_samples": 60,
+   "uncovered_samples": 0,
+   "filler_for": "lidU_L"
+  },
+  "lidU_R": {
+   "happy_view_ray_misses": 298,
+   "view_ray_misses": 3,
+   "view_ray_samples": 25383,
+   "vertices_visible_at_hidden_poses": 0,
+   "pivot_yz": [
+    -0.1139,
+    0.4087
+   ],
+   "target": 1.22,
+   "happy_cover_at_0.488": 0.19930509744625902,
+   "needed_samples": 117,
+   "uncovered_samples": 0,
+   "pivot_depth_behind_eye_centre_m": [
+    -0.003,
+    -0.03
+   ]
+  },
+  "lidD_R": {
+   "happy_view_ray_misses": 0,
+   "view_ray_misses": 0,
+   "view_ray_samples": 1690,
+   "vertices_visible_at_hidden_poses": 0,
+   "pivot_yz": [
+    0.0655,
+    0.5719
+   ],
+   "target": -0.24,
+   "happy_cover_at_0.488": null,
+   "needed_samples": 49,
+   "uncovered_samples": 0,
+   "arm_m": 0.3,
+   "cover_fraction": 0.313
+  },
+  "lidF_R": {
+   "happy_view_ray_misses": 0,
+   "view_ray_misses": 1193,
+   "view_ray_samples": 3528,
+   "vertices_visible_at_hidden_poses": 0,
+   "pivot_yz": [
+    -0.1139,
+    0.4087
+   ],
+   "target": 1.22,
+   "happy_cover_at_0.488": null,
+   "needed_samples": 60,
+   "uncovered_samples": 0,
+   "filler_for": "lidU_R"
+  },
+  "tongue_max_sdf": -0.0083,
+  "pocket_rim_points": 39,
+  "pocket_inner_max_sdf": 0.0001,
+  "triangles": 27919
+ },
+ "costume": {
+  "Whelp_hood": {
+   "vertices": 1719,
+   "dominant_bone_counts": {
+    "head": 1719
+   },
+   "charts": {
+    "cuff": 336,
+    "brass": 318,
+    "hood": 1065
+   }
+  },
+  "Whelp_coat": {
+   "vertices": 1224,
+   "dominant_bone_counts": {
+    "body": 1072,
+    "neck": 61,
+    "legFR": 46,
+    "legFL": 45
+   },
+   "charts": {
+    "bib": 281,
+    "brass": 174,
+    "coat": 769
+   }
+  },
+  "Whelp_tail": {
+   "vertices": 494,
+   "dominant_bone_counts": {
+    "body": 29,
+    "tail1": 28,
+    "tail2": 437
+   },
+   "charts": {
+    "tail": 212,
+    "brass": 282
+   }
+  },
+  "triangles_total": 34599,
+  "triangles_shadow": 27919,
+  "triangles_costume": 6680,
+  "rest_pose_max_delta_m": 0.0
+ },
+ "weights": {
+  "Whelp_hood": "head; the nape band (last 4 cm above the collar, behind the face edge) copies the nearer skin: head skin, or neck skin and collar (the collar neck band); piping, horns, spikes rigid head",
+  "Whelp_coat": "coat and bib: Shadow_body's own skin weights at the nearest barrel / leg triangle; spikes rigid at their base",
+  "Whelp_tail": "body / tail1 / tail2 on the stub tail falloff along the tail axis; spikes rigid at their base"
+ }
+}

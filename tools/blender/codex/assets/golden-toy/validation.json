@@ -1,0 +1,262 @@
+{
+ "bones": {
+  "count": 37,
+  "contract_ok": true
+ },
+ "meshes": {
+  "Golden_arm_L": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 897,
+   "tris": 1634,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 2
+  },
+  "Golden_arm_R": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 897,
+   "tris": 1634,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 2
+  },
+  "Golden_body": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 4047,
+   "tris": 7843,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 3
+  },
+  "Golden_ear_L": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 1026,
+   "tris": 1940,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 3
+  },
+  "Golden_ear_R": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 1026,
+   "tris": 1940,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 3
+  },
+  "Golden_eye_L": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 288,
+   "tris": 572,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Golden_eye_R": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 288,
+   "tris": 572,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Golden_head": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 3065,
+   "tris": 5497,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 3
+  },
+  "Golden_helm": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 2050,
+   "tris": 4020,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Golden_lidD_L": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 221,
+   "tris": 384,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Golden_lidD_R": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 221,
+   "tris": 384,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Golden_lidU_L": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 702,
+   "tris": 1300,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Golden_lidU_R": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 702,
+   "tris": 1300,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Golden_mouth_cavity": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 457,
+   "tris": 836,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 3
+  },
+  "Golden_ruff": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 452,
+   "tris": 900,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 2
+  },
+  "Golden_tabard": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 550,
+   "tris": 1088,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 3
+  },
+  "Golden_tail": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 602,
+   "tris": 1180,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 3
+  },
+  "Golden_tongue": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 146,
+   "tris": 288,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  }
+ },
+ "hero_triangles": 33312,
+ "export": {
+  "name": "golden_toy",
+  "height": 1.2,
+  "bones": 37,
+  "verts": 17403,
+  "tris": 33312,
+  "finite": true,
+  "weight_sum_offenders": 0,
+  "skin_index_in_range": true,
+  "index_in_range": true,
+  "degenerate_tris": 0,
+  "normal_unit_ok": true,
+  "winding_disagrees_with_normals_tris": 0,
+  "min_y": 0.002,
+  "max_y": 1.4825,
+  "tris_match_rig": true
+ },
+ "problems": [],
+ "ok": true
+}

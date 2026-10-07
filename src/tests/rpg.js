@@ -56,7 +56,8 @@ export default function () {
     html += section('Potions · Materials', [...['heart', 'zoom', 'rejuv'].map(k => cell(potionIcon(k), k)), ...MATERIAL_KEYS.map(k => cell(materialIcon(k), k))]);
   }
   if (sec.includes('skills')) {
-    html += section('Skills', [cell(skillIcon('attack'), ATTACK.name), ...TREES.flatMap(t => SKILL_IDS.filter(id => SKILLS[id].tree === t.id).sort((a, b) => SKILLS[a].row - SKILLS[b].row).map(id => cell(skillIcon(id), SKILLS[id].name)))]);
+    const only = new URLSearchParams(location.search).get('cls'); // (?cls=shihtzu: one hero's trees)
+    html += section('Skills', [cell(skillIcon('attack'), ATTACK.name), ...TREES.filter(t => !only || t.cls === only).flatMap(t => SKILL_IDS.filter(id => SKILLS[id].tree === t.id).sort((a, b) => SKILLS[a].row - SKILLS[b].row).map(id => cell(skillIcon(id), SKILLS[id].name)))]);
   }
   if (sec.includes('tips')) {
     const st = newGameState();

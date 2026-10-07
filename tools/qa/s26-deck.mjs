@@ -39,7 +39,7 @@ try {
   R.check('a) a first start on 1280×800 picks the Deck: the Deck preset (Medium density), pixel ratio 0.85, AO and tilt off, a 1536 shadow map, particles ×0.6, the UI at 1.15 in the safe area', pd.preset === 3 && pd.deck && pd.quality === 1 && pd.pr === 0.85 && !pd.ao && !pd.tilt && pd.shadow === 1536 && pd.ext < 34 && pd.particles === 0.6 && pd.uiScale === 1.15 && pd.settingsQ === 3 && pd.deckUi && pd.hudInset !== '0px', JSON.stringify(pd));
   await D.page.evaluate(() => { window.G.ui.open('menu'); window.G.ui.panels.menu.setView('settings'); }); await sleep(D.page, 400);
   const seg = await D.page.evaluate(() => ({ names: [...document.querySelectorAll('.p-menu .seg[data-k="quality"] button')].map(b => b.textContent), on: document.querySelector('.p-menu .seg[data-k="quality"] button.on')?.textContent, cap: [...document.querySelectorAll('.p-menu .seg[data-k="fpsCap"] button')].map(b => b.textContent) }));
-  R.check('a) Settings › Graphics offers Low / Medium / High / Deck with Deck on, and a Frame cap row (Off / 60 / 40)', seg.names.join() === 'Low,Medium,High,Deck' && seg.on === 'Deck' && seg.cap.join() === 'Off,60,40', JSON.stringify(seg));
+  R.check('a) Settings › Graphics offers Low / Medium / High / Deck / Mobile with Deck on, and a Frame cap row (Off / 60 / 40 / 30)', seg.names.join() === 'Low,Medium,High,Deck,Mobile' && seg.on === 'Deck' && seg.cap.join() === 'Off,60,40,30', JSON.stringify(seg)); // (Mobile and the 30 cap: CT-5, CONTROLS §12.7)
   await D.page.evaluate(() => window.G.ui.close('menu'));
 
   // ---------------------------------------------------------------- f) the text floor at 1280×800 (a few key views)

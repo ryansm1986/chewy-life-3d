@@ -1,0 +1,1191 @@
+{
+ "rule": "crossing = fur triangles newly crossing armour faces vs rest, minus the covered junctions (module docstring); visible = those whose poked-through vertices (outside the armour face) are seen by one of 8 cameras (front, back, both sides, four 45-degree game cameras)",
+ "fur_through_armour": {
+  "rest": {
+   "label": "REST (ALL BONES AT REST)",
+   "new_crossing_tris_not_covered": 0,
+   "visible_fur_through_armour_tris": 0,
+   "covered_junction_tris": 0,
+   "crossing_by_pair": {},
+   "visible_by_pair": {},
+   "visible_points": [],
+   "covered_by_pair": {}
+  },
+  "walk-game": {
+   "label": "WALK, GAME AMPLITUDE 0.62",
+   "new_crossing_tris_not_covered": 0,
+   "visible_fur_through_armour_tris": 0,
+   "covered_junction_tris": 23,
+   "crossing_by_pair": {},
+   "visible_by_pair": {},
+   "visible_points": [],
+   "covered_by_pair": {
+    "plumed_tail x emerald_tasset": 4,
+    "plumed_tail x emerald_chest_plate": 1,
+    "plumed_tail x brass_belt_edge": 1,
+    "fur_hips x emerald_tasset": 2,
+    "fur_arm x emerald_pauldron": 6,
+    "fur_arm x emerald_pauldron_lame": 2,
+    "cream_chest_ruff x emerald_pauldron": 2,
+    "ball_head_skin x emerald_pauldron": 4,
+    "fur_arm x emerald_chest_plate": 1
+   }
+  },
+  "walk-a": {
+   "label": "WALK EXTREME A (0.8)",
+   "new_crossing_tris_not_covered": 0,
+   "visible_fur_through_armour_tris": 0,
+   "covered_junction_tris": 30,
+   "crossing_by_pair": {},
+   "visible_by_pair": {},
+   "visible_points": [],
+   "covered_by_pair": {
+    "fur_leg x emerald_tasset": 4,
+    "plumed_tail x leather_belt": 1,
+    "plumed_tail x emerald_chest_plate": 1,
+    "plumed_tail x emerald_tasset": 4,
+    "fur_hips x emerald_tasset": 4,
+    "plumed_tail x brass_belt_edge": 1,
+    "fur_arm x emerald_pauldron": 6,
+    "cream_chest_ruff x emerald_pauldron": 2,
+    "fur_arm x emerald_pauldron_lame": 2,
+    "ball_head_skin x emerald_pauldron": 4,
+    "fur_arm x emerald_chest_plate": 1
+   }
+  },
+  "walk-b": {
+   "label": "WALK EXTREME B (0.8)",
+   "new_crossing_tris_not_covered": 0,
+   "visible_fur_through_armour_tris": 0,
+   "covered_junction_tris": 27,
+   "crossing_by_pair": {},
+   "visible_by_pair": {},
+   "visible_points": [],
+   "covered_by_pair": {
+    "plumed_tail x emerald_tasset": 4,
+    "fur_hips x emerald_tasset": 4,
+    "plumed_tail x emerald_chest_plate": 2,
+    "cream_chest_ruff x emerald_pauldron": 2,
+    "fur_arm x emerald_pauldron": 6,
+    "fur_arm x emerald_chest_plate": 1,
+    "ball_head_skin x emerald_pauldron": 6,
+    "fur_arm x emerald_pauldron_lame": 2
+   }
+  },
+  "run": {
+   "label": "RUN (LEGS +-0.97, LEAN 0.26)",
+   "new_crossing_tris_not_covered": 3,
+   "visible_fur_through_armour_tris": 2,
+   "covered_junction_tris": 46,
+   "crossing_by_pair": {
+    "plumed_tail x emerald_quiver": 3
+   },
+   "visible_by_pair": {
+    "plumed_tail x emerald_quiver": 2
+   },
+   "visible_points": [
+    [
+     0.008,
+     0.313,
+     0.454
+    ],
+    [
+     0.042,
+     0.281,
+     0.415
+    ]
+   ],
+   "covered_by_pair": {
+    "cream_chest_ruff x emerald_pauldron": 7,
+    "fur_arm x emerald_pauldron": 9,
+    "fur_arm x emerald_pauldron_lame": 3,
+    "fur_arm x emerald_chest_plate": 3,
+    "ball_head_skin x emerald_pauldron": 7,
+    "fur_leg x emerald_tasset": 4,
+    "plumed_tail x emerald_tasset": 6,
+    "plumed_tail x leather_belt": 2,
+    "fur_hips x emerald_tasset": 4,
+    "plumed_tail x emerald_chest_plate": 1
+   }
+  },
+  "run-b": {
+   "label": "RUN B",
+   "new_crossing_tris_not_covered": 3,
+   "visible_fur_through_armour_tris": 2,
+   "covered_junction_tris": 40,
+   "crossing_by_pair": {
+    "plumed_tail x emerald_quiver": 3
+   },
+   "visible_by_pair": {
+    "plumed_tail x emerald_quiver": 2
+   },
+   "visible_points": [
+    [
+     0.008,
+     0.313,
+     0.454
+    ],
+    [
+     0.042,
+     0.281,
+     0.415
+    ]
+   ],
+   "covered_by_pair": {
+    "fur_arm x emerald_pauldron": 8,
+    "fur_arm x emerald_pauldron_lame": 4,
+    "cream_chest_ruff x emerald_pauldron": 7,
+    "ball_head_skin x emerald_pauldron": 7,
+    "fur_arm x emerald_chest_plate": 3,
+    "fur_hips x emerald_tasset": 4,
+    "plumed_tail x emerald_tasset": 6,
+    "plumed_tail x leather_belt": 1
+   }
+  },
+  "thrust": {
+   "label": "TWO-HANDED LANCE THRUST (BOTH ARMS FORWARD)",
+   "new_crossing_tris_not_covered": 8,
+   "visible_fur_through_armour_tris": 7,
+   "covered_junction_tris": 35,
+   "crossing_by_pair": {
+    "plumed_tail x emerald_quiver": 4,
+    "plumed_tail x brass_quiver_band": 2,
+    "plumed_tail x emerald_tasset": 2
+   },
+   "visible_by_pair": {
+    "plumed_tail x emerald_quiver": 4,
+    "plumed_tail x brass_quiver_band": 2,
+    "plumed_tail x emerald_tasset": 1
+   },
+   "visible_points": [
+    [
+     0.012,
+     0.291,
+     0.439
+    ],
+    [
+     -0.012,
+     0.256,
+     0.435
+    ],
+    [
+     -0.015,
+     0.219,
+     0.434
+    ],
+    [
+     -0.03,
+     0.234,
+     0.433
+    ],
+    [
+     0.071,
+     0.272,
+     0.331
+    ],
+    [
+     0.075,
+     0.236,
+     0.33
+    ],
+    [
+     0.022,
+     0.221,
+     0.234
+    ]
+   ],
+   "covered_by_pair": {
+    "plumed_tail x emerald_tasset": 2,
+    "plumed_tail x emerald_chest_plate": 2,
+    "plumed_tail x brass_belt_edge": 2,
+    "plumed_tail x leather_belt": 1,
+    "ball_head_skin x emerald_pauldron": 4,
+    "fur_arm x emerald_pauldron": 12,
+    "fur_arm x emerald_pauldron_lame": 2,
+    "cream_chest_ruff x emerald_chest_plate": 2,
+    "fur_arm x emerald_chest_plate": 7,
+    "cream_chest_ruff x emerald_pauldron": 1
+   }
+  },
+  "dive": {
+   "label": "LEAPING DIVE (ARMS DOWN, LEGS TUCKED)",
+   "new_crossing_tris_not_covered": 24,
+   "visible_fur_through_armour_tris": 16,
+   "covered_junction_tris": 69,
+   "crossing_by_pair": {
+    "feathered_ear x brass_bracer_rim": 8,
+    "feathered_ear x emerald_bracer": 3,
+    "fur_ankle_cuff x emerald_tasset": 8,
+    "fur_leg x emerald_tasset": 2,
+    "plumed_tail x emerald_quiver": 3
+   },
+   "visible_by_pair": {
+    "feathered_ear x brass_bracer_rim": 7,
+    "fur_ankle_cuff x emerald_tasset": 4,
+    "fur_leg x emerald_tasset": 2,
+    "plumed_tail x emerald_quiver": 2,
+    "feathered_ear x emerald_bracer": 1
+   },
+   "visible_points": [
+    [
+     -0.393,
+     -0.06,
+     0.62
+    ],
+    [
+     -0.351,
+     -0.14,
+     0.647
+    ],
+    [
+     -0.413,
+     -0.101,
+     0.639
+    ],
+    [
+     -0.351,
+     -0.14,
+     0.647
+    ],
+    [
+     -0.288,
+     -0.069,
+     0.25
+    ],
+    [
+     -0.276,
+     -0.065,
+     0.223
+    ],
+    [
+     -0.228,
+     -0.114,
+     0.357
+    ],
+    [
+     -0.188,
+     -0.134,
+     0.377
+    ],
+    [
+     0.008,
+     0.313,
+     0.454
+    ],
+    [
+     0.042,
+     0.281,
+     0.416
+    ],
+    [
+     0.393,
+     -0.06,
+     0.62
+    ],
+    [
+     0.413,
+     -0.101,
+     0.639
+    ]
+   ],
+   "covered_by_pair": {
+    "fur_arm x emerald_pauldron": 11,
+    "fur_arm x emerald_pauldron_lame": 5,
+    "cream_chest_ruff x emerald_pauldron": 10,
+    "fur_leg x emerald_tasset": 2,
+    "plumed_tail x emerald_chest_plate": 2,
+    "plumed_tail x emerald_tasset": 8,
+    "fur_hips x emerald_tasset": 8,
+    "ball_head_skin x emerald_pauldron": 16,
+    "fur_arm x emerald_chest_plate": 6,
+    "plumed_tail x leather_belt": 1
+   }
+  },
+  "throw": {
+   "label": "JAVELIN THROW (RIGHT ARM BACK AND UP)",
+   "new_crossing_tris_not_covered": 51,
+   "visible_fur_through_armour_tris": 21,
+   "covered_junction_tris": 20,
+   "crossing_by_pair": {
+    "plumed_tail x emerald_quiver": 14,
+    "plumed_tail x brass_quiver_band": 1,
+    "plumed_tail x emerald_tasset": 2,
+    "fur_hips x brass_quiver_band": 1,
+    "feathered_ear x brass_bracer_rim": 12,
+    "feathered_ear x emerald_bracer": 18,
+    "feathered_ear x leather_wrist_strap": 2,
+    "feathered_ear x brass_bracer_rim2": 1
+   },
+   "visible_by_pair": {
+    "plumed_tail x emerald_quiver": 8,
+    "feathered_ear x emerald_bracer": 9,
+    "feathered_ear x brass_bracer_rim": 3,
+    "feathered_ear x leather_wrist_strap": 1
+   },
+   "visible_points": [
+    [
+     -0.08,
+     0.305,
+     0.467
+    ],
+    [
+     -0.08,
+     0.305,
+     0.467
+    ],
+    [
+     -0.138,
+     0.296,
+     0.399
+    ],
+    [
+     -0.138,
+     0.296,
+     0.399
+    ],
+    [
+     -0.139,
+     0.284,
+     0.349
+    ],
+    [
+     -0.125,
+     0.272,
+     0.287
+    ],
+    [
+     -0.139,
+     0.284,
+     0.349
+    ],
+    [
+     -0.111,
+     0.236,
+     0.285
+    ],
+    [
+     -0.294,
+     -0.202,
+     0.73
+    ],
+    [
+     -0.294,
+     -0.202,
+     0.73
+    ],
+    [
+     -0.222,
+     -0.167,
+     0.781
+    ],
+    [
+     -0.222,
+     -0.167,
+     0.781
+    ]
+   ],
+   "covered_by_pair": {
+    "fur_arm x emerald_pauldron": 7,
+    "fur_arm x emerald_pauldron_lame": 1,
+    "fur_arm x emerald_chest_plate": 4,
+    "cream_chest_ruff x emerald_pauldron": 3,
+    "ball_head_skin x emerald_pauldron": 4,
+    "cream_chest_ruff x emerald_chest_plate": 1
+   }
+  },
+  "raised": {
+   "label": "ARMS RAISED Z +-1.3",
+   "new_crossing_tris_not_covered": 67,
+   "visible_fur_through_armour_tris": 24,
+   "covered_junction_tris": 44,
+   "crossing_by_pair": {
+    "feathered_ear x leather_wrist_strap": 11,
+    "feathered_ear x brass_bracer_rim2": 1,
+    "feathered_ear x emerald_bracer": 39,
+    "feathered_ear x brass_bracer_rim": 16
+   },
+   "visible_by_pair": {
+    "feathered_ear x emerald_bracer": 18,
+    "feathered_ear x leather_wrist_strap": 5,
+    "feathered_ear x brass_bracer_rim": 1
+   },
+   "visible_points": [
+    [
+     0.371,
+     -0.086,
+     0.732
+    ],
+    [
+     0.366,
+     -0.08,
+     0.708
+    ],
+    [
+     0.366,
+     -0.08,
+     0.708
+    ],
+    [
+     0.366,
+     -0.08,
+     0.708
+    ],
+    [
+     0.282,
+     -0.078,
+     0.727
+    ],
+    [
+     -0.371,
+     -0.086,
+     0.732
+    ],
+    [
+     -0.371,
+     -0.086,
+     0.732
+    ],
+    [
+     -0.366,
+     -0.08,
+     0.708
+    ],
+    [
+     -0.366,
+     -0.08,
+     0.708
+    ],
+    [
+     0.478,
+     -0.002,
+     0.789
+    ],
+    [
+     0.478,
+     -0.002,
+     0.789
+    ],
+    [
+     0.373,
+     -0.089,
+     0.756
+    ]
+   ],
+   "covered_by_pair": {
+    "fur_arm x emerald_pauldron": 8,
+    "fur_arm x emerald_chest_plate": 6,
+    "fur_arm x emerald_pauldron_lame": 4,
+    "cream_chest_ruff x emerald_pauldron": 4,
+    "ball_head_skin x emerald_pauldron": 22
+   }
+  },
+  "attack": {
+   "label": "ATTACK (RIGHT UPPER ARM -2.4 X)",
+   "new_crossing_tris_not_covered": 23,
+   "visible_fur_through_armour_tris": 17,
+   "covered_junction_tris": 17,
+   "crossing_by_pair": {
+    "feathered_ear x brass_bracer_rim": 5,
+    "feathered_ear x emerald_bracer": 17,
+    "feathered_ear x brass_bracer_rim2": 1
+   },
+   "visible_by_pair": {
+    "feathered_ear x brass_bracer_rim": 4,
+    "feathered_ear x emerald_bracer": 13
+   },
+   "visible_points": [
+    [
+     -0.282,
+     -0.078,
+     0.727
+    ],
+    [
+     -0.282,
+     -0.078,
+     0.727
+    ],
+    [
+     -0.418,
+     -0.041,
+     0.695
+    ],
+    [
+     -0.418,
+     -0.041,
+     0.695
+    ],
+    [
+     -0.422,
+     -0.046,
+     0.715
+    ],
+    [
+     -0.284,
+     -0.082,
+     0.744
+    ],
+    [
+     -0.284,
+     -0.082,
+     0.744
+    ],
+    [
+     -0.431,
+     -0.047,
+     0.736
+    ],
+    [
+     -0.422,
+     -0.046,
+     0.715
+    ],
+    [
+     -0.293,
+     -0.088,
+     0.818
+    ],
+    [
+     -0.293,
+     -0.088,
+     0.818
+    ],
+    [
+     -0.292,
+     -0.089,
+     0.799
+    ]
+   ],
+   "covered_by_pair": {
+    "fur_arm x emerald_pauldron": 4,
+    "fur_arm x emerald_chest_plate": 3,
+    "ball_head_skin x emerald_pauldron": 6,
+    "cream_chest_ruff x emerald_pauldron": 2,
+    "cream_chest_ruff x emerald_chest_plate": 1,
+    "fur_arm x emerald_pauldron_lame": 1
+   }
+  },
+  "head": {
+   "label": "HEAD TURNED +0.45 Y, NODDED +0.3 X",
+   "new_crossing_tris_not_covered": 41,
+   "visible_fur_through_armour_tris": 4,
+   "covered_junction_tris": 17,
+   "crossing_by_pair": {
+    "ball_head_skin x emerald_chest_plate": 33,
+    "ball_head_skin x emerald_pauldron": 8
+   },
+   "visible_by_pair": {
+    "ball_head_skin x emerald_pauldron": 4
+   },
+   "visible_points": [
+    [
+     0.184,
+     -0.038,
+     0.659
+    ],
+    [
+     0.213,
+     -0.099,
+     0.64
+    ],
+    [
+     0.213,
+     -0.099,
+     0.64
+    ],
+    [
+     0.215,
+     -0.135,
+     0.625
+    ]
+   ],
+   "covered_by_pair": {
+    "fur_arm x emerald_pauldron": 4,
+    "fur_arm x emerald_chest_plate": 2,
+    "ball_head_skin x emerald_pauldron": 9,
+    "ball_head_skin x emerald_chest_plate": 2
+   }
+  },
+  "ears-up": {
+   "label": "EAR TIPS -1.05, EARS -0.35",
+   "new_crossing_tris_not_covered": 49,
+   "visible_fur_through_armour_tris": 19,
+   "covered_junction_tris": 10,
+   "crossing_by_pair": {
+    "feathered_ear x emerald_pauldron_lame": 9,
+    "feathered_ear x emerald_pauldron": 24,
+    "feathered_ear x emerald_chest_plate": 16
+   },
+   "visible_by_pair": {
+    "feathered_ear x emerald_pauldron_lame": 3,
+    "feathered_ear x emerald_pauldron": 14,
+    "feathered_ear x emerald_chest_plate": 2
+   },
+   "visible_points": [
+    [
+     0.138,
+     0.182,
+     0.714
+    ],
+    [
+     0.138,
+     0.097,
+     0.675
+    ],
+    [
+     0.196,
+     0.095,
+     0.637
+    ],
+    [
+     0.194,
+     0.208,
+     0.695
+    ],
+    [
+     0.326,
+     -0.047,
+     0.57
+    ],
+    [
+     0.196,
+     0.095,
+     0.637
+    ],
+    [
+     0.196,
+     0.095,
+     0.637
+    ],
+    [
+     0.323,
+     -0.164,
+     0.517
+    ],
+    [
+     0.13,
+     -0.186,
+     0.606
+    ],
+    [
+     0.136,
+     -0.224,
+     0.624
+    ],
+    [
+     -0.138,
+     0.182,
+     0.714
+    ],
+    [
+     -0.196,
+     0.095,
+     0.637
+    ]
+   ],
+   "covered_by_pair": {
+    "fur_arm x emerald_chest_plate": 2,
+    "fur_arm x emerald_pauldron": 4,
+    "ball_head_skin x emerald_pauldron": 4
+   }
+  },
+  "ears-down": {
+   "label": "EAR TIPS +0.6, EARS +0.35",
+   "new_crossing_tris_not_covered": 0,
+   "visible_fur_through_armour_tris": 0,
+   "covered_junction_tris": 10,
+   "crossing_by_pair": {},
+   "visible_by_pair": {},
+   "visible_points": [],
+   "covered_by_pair": {
+    "fur_arm x emerald_pauldron": 4,
+    "fur_arm x emerald_chest_plate": 2,
+    "ball_head_skin x emerald_pauldron": 4
+   }
+  },
+  "tail-l": {
+   "label": "TAIL WAG -0.7",
+   "new_crossing_tris_not_covered": 10,
+   "visible_fur_through_armour_tris": 9,
+   "covered_junction_tris": 12,
+   "crossing_by_pair": {
+    "plumed_tail x emerald_tasset": 4,
+    "plumed_tail x brass_quiver_band": 1,
+    "plumed_tail x emerald_quiver": 5
+   },
+   "visible_by_pair": {
+    "plumed_tail x emerald_tasset": 4,
+    "plumed_tail x brass_quiver_band": 1,
+    "plumed_tail x emerald_quiver": 4
+   },
+   "visible_points": [
+    [
+     0.098,
+     0.267,
+     0.24
+    ],
+    [
+     0.085,
+     0.204,
+     0.331
+    ],
+    [
+     0.066,
+     0.217,
+     0.364
+    ],
+    [
+     -0.091,
+     0.26,
+     0.366
+    ],
+    [
+     0.085,
+     0.204,
+     0.331
+    ],
+    [
+     0.073,
+     0.294,
+     0.468
+    ],
+    [
+     0.039,
+     0.326,
+     0.483
+    ],
+    [
+     -0.042,
+     0.334,
+     0.43
+    ],
+    [
+     -0.049,
+     0.312,
+     0.415
+    ]
+   ],
+   "covered_by_pair": {
+    "plumed_tail x emerald_tasset": 2,
+    "fur_arm x emerald_pauldron": 4,
+    "ball_head_skin x emerald_pauldron": 4,
+    "fur_arm x emerald_chest_plate": 2
+   }
+  },
+  "tail-r": {
+   "label": "TAIL WAG +0.7 (DROOP -0.3)",
+   "new_crossing_tris_not_covered": 10,
+   "visible_fur_through_armour_tris": 7,
+   "covered_junction_tris": 11,
+   "crossing_by_pair": {
+    "plumed_tail x brass_quiver_band": 1,
+    "plumed_tail x emerald_tasset": 6,
+    "plumed_tail x emerald_quiver": 3
+   },
+   "visible_by_pair": {
+    "plumed_tail x brass_quiver_band": 1,
+    "plumed_tail x emerald_tasset": 4,
+    "plumed_tail x emerald_quiver": 2
+   },
+   "visible_points": [
+    [
+     0.045,
+     0.283,
+     0.31
+    ],
+    [
+     -0.097,
+     0.199,
+     0.374
+    ],
+    [
+     -0.112,
+     0.201,
+     0.382
+    ],
+    [
+     -0.152,
+     0.196,
+     0.357
+    ],
+    [
+     -0.165,
+     0.196,
+     0.304
+    ],
+    [
+     -0.041,
+     0.32,
+     0.413
+    ],
+    [
+     -0.003,
+     0.315,
+     0.379
+    ]
+   ],
+   "covered_by_pair": {
+    "plumed_tail x emerald_tasset": 1,
+    "fur_arm x emerald_pauldron": 4,
+    "fur_arm x emerald_chest_plate": 2,
+    "ball_head_skin x emerald_pauldron": 4
+   }
+  },
+  "roll": {
+   "label": "ROLL CROUCH",
+   "new_crossing_tris_not_covered": 75,
+   "visible_fur_through_armour_tris": 9,
+   "covered_junction_tris": 58,
+   "crossing_by_pair": {
+    "cream_chest_ruff x emerald_tasset": 2,
+    "fur_leg x emerald_tasset": 12,
+    "fur_leg x leather_belt": 6,
+    "fur_leg x emerald_chest_plate": 15,
+    "fur_leg x emerald_tabard_front": 3,
+    "fur_ankle_cuff x emerald_chest_plate": 8,
+    "cream_chest_ruff x leather_belt": 7,
+    "cream_chest_ruff x emerald_tabard_front": 3,
+    "cream_chest_ruff x brass_belt_edge": 3,
+    "fur_arm x emerald_tasset": 11,
+    "plumed_tail x emerald_quiver": 4,
+    "plumed_tail x brass_quiver_band": 1
+   },
+   "visible_by_pair": {
+    "fur_leg x emerald_chest_plate": 3,
+    "fur_arm x emerald_tasset": 5,
+    "plumed_tail x brass_quiver_band": 1
+   },
+   "visible_points": [
+    [
+     0.043,
+     -0.185,
+     0.305
+    ],
+    [
+     -0.043,
+     -0.185,
+     0.305
+    ],
+    [
+     -0.043,
+     -0.185,
+     0.305
+    ],
+    [
+     0.259,
+     -0.099,
+     0.405
+    ],
+    [
+     0.24,
+     -0.092,
+     0.419
+    ],
+    [
+     0.18,
+     -0.135,
+     0.443
+    ],
+    [
+     -0.011,
+     0.146,
+     0.525
+    ],
+    [
+     -0.223,
+     -0.089,
+     0.436
+    ],
+    [
+     -0.24,
+     -0.092,
+     0.419
+    ]
+   ],
+   "covered_by_pair": {
+    "cream_chest_ruff x emerald_pauldron": 6,
+    "fur_arm x emerald_pauldron_lame": 6,
+    "fur_arm x emerald_pauldron": 8,
+    "fur_arm x emerald_chest_plate": 2,
+    "fur_leg x emerald_tasset": 6,
+    "fur_hips x emerald_tasset": 8,
+    "fur_leg x emerald_chest_plate": 4,
+    "plumed_tail x emerald_tasset": 7,
+    "plumed_tail x leather_belt": 2,
+    "plumed_tail x brass_belt_edge": 1,
+    "plumed_tail x emerald_chest_plate": 3,
+    "ball_head_skin x emerald_pauldron": 4,
+    "fur_leg x leather_belt": 1
+   }
+  },
+  "sit": {
+   "label": "SIT (LEGS -1.4, DROP 0.12)",
+   "new_crossing_tris_not_covered": 52,
+   "visible_fur_through_armour_tris": 28,
+   "covered_junction_tris": 41,
+   "crossing_by_pair": {
+    "fur_leg x leather_belt": 7,
+    "fur_leg x emerald_tasset": 15,
+    "fur_ankle_cuff x emerald_tasset": 8,
+    "fur_leg x emerald_tabard_front": 12,
+    "fur_ankle_cuff x emerald_tabard_front": 8,
+    "fur_leg x emerald_chest_plate": 2
+   },
+   "visible_by_pair": {
+    "fur_leg x leather_belt": 5,
+    "fur_leg x emerald_tasset": 10,
+    "fur_leg x emerald_tabard_front": 8,
+    "fur_ankle_cuff x emerald_tabard_front": 5
+   },
+   "visible_points": [
+    [
+     0.151,
+     -0.159,
+     0.314
+    ],
+    [
+     0.157,
+     -0.183,
+     0.312
+    ],
+    [
+     0.102,
+     -0.164,
+     0.301
+    ],
+    [
+     0.128,
+     -0.223,
+     0.267
+    ],
+    [
+     0.067,
+     -0.189,
+     0.266
+    ],
+    [
+     0.103,
+     -0.254,
+     0.247
+    ],
+    [
+     0.043,
+     -0.185,
+     0.222
+    ],
+    [
+     -0.102,
+     -0.164,
+     0.301
+    ],
+    [
+     -0.076,
+     -0.192,
+     0.24
+    ],
+    [
+     -0.067,
+     -0.189,
+     0.266
+    ],
+    [
+     -0.088,
+     -0.216,
+     0.228
+    ],
+    [
+     -0.103,
+     -0.254,
+     0.247
+    ]
+   ],
+   "covered_by_pair": {
+    "fur_leg x emerald_tasset": 8,
+    "ball_head_skin x emerald_pauldron": 4,
+    "fur_leg x emerald_chest_plate": 3,
+    "fur_leg x leather_belt": 2,
+    "fur_arm x emerald_pauldron": 4,
+    "fur_arm x emerald_chest_plate": 2,
+    "fur_hips x emerald_tasset": 8,
+    "plumed_tail x emerald_tasset": 10
+   }
+  }
+ },
+ "ear_vs_head_and_helmet_contract": {
+  "L tip +0.60 ear x +0.35 z +0.00": {
+   "outer_verts_inside_head_or_helmet": 7,
+   "deepest_outer_mm": -14.7
+  },
+  "L tip +0.60 ear x +0.00 z +0.00": {
+   "outer_verts_inside_head_or_helmet": 0,
+   "deepest_outer_mm": 9.7
+  },
+  "L tip -1.05 ear x -0.35 z +0.00": {
+   "outer_verts_inside_head_or_helmet": 2,
+   "deepest_outer_mm": -5.5
+  },
+  "L tip -1.05 ear x +0.00 z +0.00": {
+   "outer_verts_inside_head_or_helmet": 0,
+   "deepest_outer_mm": 10.9
+  },
+  "L tip +0.00 ear x +0.35 z +0.30": {
+   "outer_verts_inside_head_or_helmet": 0,
+   "deepest_outer_mm": 11.3
+  },
+  "L tip +0.00 ear x -0.35 z -0.30": {
+   "outer_verts_inside_head_or_helmet": 7,
+   "deepest_outer_mm": -15.0
+  },
+  "L tip +0.00 ear x +0.35 z -0.30": {
+   "outer_verts_inside_head_or_helmet": 0,
+   "deepest_outer_mm": 7.5
+  },
+  "L tip +0.00 ear x -0.35 z +0.30": {
+   "outer_verts_inside_head_or_helmet": 0,
+   "deepest_outer_mm": 14.8
+  },
+  "R tip +0.60 ear x +0.35 z +0.00": {
+   "outer_verts_inside_head_or_helmet": 6,
+   "deepest_outer_mm": -10.8
+  },
+  "R tip +0.60 ear x +0.00 z +0.00": {
+   "outer_verts_inside_head_or_helmet": 0,
+   "deepest_outer_mm": 10.0
+  },
+  "R tip -1.05 ear x -0.35 z +0.00": {
+   "outer_verts_inside_head_or_helmet": 3,
+   "deepest_outer_mm": -6.0
+  },
+  "R tip -1.05 ear x +0.00 z +0.00": {
+   "outer_verts_inside_head_or_helmet": 0,
+   "deepest_outer_mm": 11.0
+  },
+  "R tip +0.00 ear x +0.35 z +0.30": {
+   "outer_verts_inside_head_or_helmet": 0,
+   "deepest_outer_mm": 8.0
+  },
+  "R tip +0.00 ear x -0.35 z -0.30": {
+   "outer_verts_inside_head_or_helmet": 0,
+   "deepest_outer_mm": 14.8
+  },
+  "R tip +0.00 ear x +0.35 z -0.30": {
+   "outer_verts_inside_head_or_helmet": 0,
+   "deepest_outer_mm": 11.3
+  },
+  "R tip +0.00 ear x -0.35 z +0.30": {
+   "outer_verts_inside_head_or_helmet": 8,
+   "deepest_outer_mm": -19.7
+  }
+ },
+ "earGain_rule": "the game ear motion over S.a in [-1.2, 2.6]: safe = no ear outer-surface vertex more than 3 mm inside the head skin or the helmet",
+ "earGain_sweep": {
+  "1.00": {
+   "ear_outer_deepest_in_head_or_helmet_mm": -13.9,
+   "worst_at_ear_Sa_tip_ear": [
+    "L",
+    1.72,
+    0.6,
+    0.295
+   ]
+  },
+  "0.90": {
+   "ear_outer_deepest_in_head_or_helmet_mm": -14.2,
+   "worst_at_ear_Sa_tip_ear": [
+    "L",
+    2.02,
+    0.6,
+    0.301
+   ]
+  },
+  "0.80": {
+   "ear_outer_deepest_in_head_or_helmet_mm": -13.9,
+   "worst_at_ear_Sa_tip_ear": [
+    "L",
+    2.31,
+    0.6,
+    0.303
+   ]
+  },
+  "0.70": {
+   "ear_outer_deepest_in_head_or_helmet_mm": -13.3,
+   "worst_at_ear_Sa_tip_ear": [
+    "L",
+    2.6,
+    0.6,
+    0.302
+   ]
+  },
+  "0.60": {
+   "ear_outer_deepest_in_head_or_helmet_mm": -11.5,
+   "worst_at_ear_Sa_tip_ear": [
+    "L",
+    2.6,
+    0.599,
+    0.282
+   ]
+  },
+  "0.50": {
+   "ear_outer_deepest_in_head_or_helmet_mm": -9.2,
+   "worst_at_ear_Sa_tip_ear": [
+    "L",
+    2.6,
+    0.597,
+    0.255
+   ]
+  }
+ },
+ "largest_safe_earGain": 0.0,
+ "tail": {
+  "rest": {
+   "tail_x_quiver_tris_new": 0,
+   "tail_x_tabard_tris_new": 0
+  },
+  "tail-l": {
+   "tail_x_quiver_tris_new": 4,
+   "tail_x_tabard_tris_new": 2
+  },
+  "tail-r": {
+   "tail_x_quiver_tris_new": 2,
+   "tail_x_tabard_tris_new": 4
+  },
+  "walk-a": {
+   "tail_x_quiver_tris_new": 5,
+   "tail_x_tabard_tris_new": 0
+  },
+  "walk-b": {
+   "tail_x_quiver_tris_new": 5,
+   "tail_x_tabard_tris_new": 0
+  },
+  "run": {
+   "tail_x_quiver_tris_new": 17,
+   "tail_x_tabard_tris_new": 0
+  },
+  "run-b": {
+   "tail_x_quiver_tris_new": 17,
+   "tail_x_tabard_tris_new": 0
+  },
+  "sit": {
+   "tail_x_quiver_tris_new": 0,
+   "tail_x_tabard_tris_new": 0
+  },
+  "roll": {
+   "tail_x_quiver_tris_new": 0,
+   "tail_x_tabard_tris_new": 0
+  },
+  "dive": {
+   "tail_x_quiver_tris_new": 11,
+   "tail_x_tabard_tris_new": 0
+  }
+ },
+ "closed_eye_eyeball_rays_of_6400_per_view": {
+  "L front": 0,
+  "L 34in": 0,
+  "L 34out": 0,
+  "L game+45": 1,
+  "L game-45": 0,
+  "R front": 0,
+  "R 34in": 0,
+  "R 34out": 0,
+  "R game+45": 0,
+  "R game-45": 1
+ }
+}

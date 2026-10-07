@@ -35,15 +35,18 @@ import { Prewarm } from './prewarm.js';
 import { itemName, itemIconURL, skillIconURL } from './rpg.js';
 import { Actions } from '../core/actions.js';
 import { normKey } from '../core/input.js';
-import { installPadGlyphs } from './padGlyphs.js';
+import { installPadGlyphs, touchWording } from './padGlyphs.js';
 import { PadNav } from './padNav.js';
 import { PadCursor } from './padCursor.js';
-import { deckLike, DECK } from '../core/deck.js';
+import { deckLike, mobileLike, DECK } from '../core/deck.js';
+import { installDesktop } from './desktop.js';
+import { TouchControls } from './touch.js';
+import { Mobile } from './mobile.js';
 import './deck.css'; // (last: the Deck's text floor outranks the panels' own sizes)
 import { Vector3 } from 'three';
 
 const SETTINGS_KEY = 'chewy3d.settings';
-const DEFAULT_SETTINGS = { quality: 2, music: 0.7, sfx: 0.8, uiScale: 1, shake: true, showFps: false, chargeMode: 0, sprintMode: 0, rumble: true, aimAssist: 0.7, padGlyphs: 0, binds: null, fpsCap: 0 }; // chargeMode: 0 hold to charge · 1 off · 2 toggle (docs/CHARGE.md); sprintMode: 0 hold Shift · 1 toggle (actors/sprint.js); rumble, aimAssist (0..1), padGlyphs (0 auto · 1 Xbox · 2 PlayStation), binds ({ kbm, pad } overrides): Settings › Controls (core/actions.js, docs/CONTROLS.md); quality 3 is the Steam Deck preset, fpsCap 0 off · 1 60 · 2 40 (core/deck.js)
+const DEFAULT_SETTINGS = { quality: 2, music: 0.7, sfx: 0.8, uiScale: 1, shake: true, showFps: false, chargeMode: 0, sprintMode: 0, rumble: true, aimAssist: 0.7, padGlyphs: 0, binds: null, fpsCap: 0, touchSize: 1, touchOpacity: 0.85, touchLeft: false, touchAim: 0, haptics: true }; // touch*: Settings › Controls › Touch (ui/touch.js: button size, opacity, left-handed, aim 0 auto · 1 drag), haptics; chargeMode: 0 hold to charge · 1 off · 2 toggle (docs/CHARGE.md); sprintMode: 0 hold Shift · 1 toggle (actors/sprint.js); rumble, aimAssist (0..1), padGlyphs (0 auto · 1 Xbox · 2 PlayStation), binds ({ kbm, pad } overrides): Settings › Controls (core/actions.js, docs/CONTROLS.md); quality 3 is the Steam Deck preset, fpsCap 0 off · 1 60 · 2 40 (core/deck.js)
 const CONTROL_SETTINGS = new Set(['rumble', 'padGlyphs', 'binds']);
 const PAD_SLOTS = ['attack', 'skillAlt', 'skill1', 'skill2', 'skill3', 'skill4'];
 const NON_BLOCKING = new Set(['build', 'decorate']); // panels that don't pause gameplay input
@@ -66,6 +69,7 @@ export const UI = {
     const fresh = (() => { try { return localStorage.getItem(SETTINGS_KEY) == null; } catch (e) { return true; } })(), deck = deckLike();
     if (G?.engine?.preset != null && (fresh || G.engine.params?.has('q'))) this.settings.quality = G.engine.preset;
     if (fresh && deck) this.settings.uiScale = DECK.uiScale;
+    if (fresh && mobileLike()) this.settings.fpsCap = 1; // (a phone or tablet: capped at 60, kind to the battery on a 120 Hz screen)
     let root = document.getElementById('ui');
     if (!root) { root = el('div'); root.id = 'ui'; document.body.appendChild(root); }
     this.root = root;
@@ -123,8 +127,11 @@ export const UI = {
     this.bindEvents();
     this.applySettings(true);
     this.applyControls();
+    installDesktop(this); // (the desktop app: Settings › Full screen; nothing in a browser — ui/desktop.js)
     this.refreshCaps = installPadGlyphs(this); // (keycaps ⇄ gamepad glyphs when the device changes: ui/padGlyphs.js)
     this.padNav = new PadNav(this); this.padCursor = new PadCursor(this); // (the gamepad in panels; in build and decorate mode: docs/CONTROLS.md §3)
+    this.mobile = new Mobile(this); // (phones and tablets: the layout, the menus on touch, rotate, full screen: ui/mobile.js)
+    this.touch = new TouchControls(this); // (the on-screen controls while touch plays: ui/touch.js, docs/CONTROLS.md §12)
     this.setMode(G?.mode && G.mode !== 'title' ? G.mode : this.mode);
     this.ready = true;
     (this.prewarm = new Prewarm(this)).start(); // the menus' lazy setup, done ahead in idle time after boot (ui/prewarm.js)
@@ -170,6 +177,7 @@ export const UI = {
     this.qarrow.update(dt, cam);
     this.tutorial?.update(dt);
     if (this.mode !== 'title') this.chargeHud?.update(dt);
+    this.mobile?.update(dt); this.touch?.update(dt);
     this.panels.map.update?.(dt);
     if (this.settings.showFps) {
       this._fpsAcc += dt; this._fpsN++;
@@ -239,7 +247,7 @@ export const UI = {
     for (const [n, p] of Object.entries(this.panels)) if (p.isOpen && !NON_BLOCKING.has(n)) return true;
     return false;
   },
-  isPaused() { return this.ready && (this.mode === 'title' || this.isOpen('menu')); },
+  isPaused() { return this.ready && (this.mode === 'title' || this.isOpen('menu') || !!this.mobile?.portrait); }, // (a phone held upright: the rotate overlay, ui/mobile.js)
   /** A moment a one-off hitch can't be seen, for heavy cache-filling work (building templates: world/village.js, the
    *  townsfolk rig pool: game.js, the build palette's thumbnails: ui/prewarm.js): the title screen, or a menu / dialogue
    *  that has been up past its open animation (`ms`). Not the open itself: that frame is the one the player watches
@@ -421,13 +429,13 @@ export const UI = {
 
   // ------------------------------------------------------------------ messages
   toast(text, opts = {}) { if (!this.ready) return null; return this.toasts.show(typeof text === 'string' ? Actions.resolve(text) : text, opts); }, // ({action} tokens; on the pad, "press F" names its button)
-  banner(title, sub = '', opts = {}) { if (!this.ready) return; this.banners.show(title, sub, opts); this.events.emit('ui:banner', { title, style: opts.style }); },
+  banner(title, sub = '', opts = {}) { if (!this.ready) return; this.banners.show(title, typeof sub === 'string' ? Actions.resolve(sub) : sub, opts); this.events.emit('ui:banner', { title, style: opts.style }); }, // (the sub line's "Tap Tab…": the pad's or touch's own words)
   heroCard(o) { if (this.ready) this.hud?.heroCard?.(o); },
   float(worldPos, text, opts = {}) { if (!this.ready || !worldPos) return; this.floats.spawn(worldPos, String(text), opts); },
   dialogue(opts) { if (!this.ready) return Promise.resolve(-1); this.hidePopover(); this.tip.hide(); if (!this.dlg.active) this._dlgAt = performance.now(); return this.dlg.open(opts); },
   setTarget(info) { if (this.ready) this.hud.setTarget(info); },
   setBoss(info) { if (this.ready) this.hud.setBoss(info); },
-  setInteract(text, opts) { if (this.ready) this.hud.setInteract(this.mode === 'title' || this.dlg.active ? null : text, opts); },
+  setInteract(text, opts) { if (this.ready) this.hud.setInteract(this.mode === 'title' || this.dlg.active ? null : Actions.device === 'touch' && text ? touchWording(text) : text, opts); }, // (touch: "Click to build · R to rotate" in its words)
   onInteract(fn) { this._fire = n => { if (n === 'interact') fn(); }; },
   setRCI(v) { if (this.ready) this.hud.setRCI(v); },
   setLocation(name, sub) { if (this.ready) this.hud.setLocation(name, sub); },

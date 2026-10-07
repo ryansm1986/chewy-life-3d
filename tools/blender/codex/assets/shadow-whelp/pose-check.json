@@ -1,0 +1,274 @@
+{
+ "method": "(fur through costume): a fur vertex of Shadow_head, Shadow_body (barrel and legs, not the collar or tag) or\nShadow_tail that the costume covers at rest (a ray along its normal meets a hood / coat / bib / tail-cover shell within\n3.5 cm) and that, in the pose, is no longer covered while a ray inward meets the shell within 3 cm: the fur came out\nthrough it. The ears pass through their slits by design; ear-against-piping triangle overlaps are counted separately.",
+ "covered_fur_vertices_at_rest": {
+  "Shadow_head": 2650,
+  "Shadow_body": 1226,
+  "Shadow_tail": 145
+ },
+ "ear_piping_triangle_overlaps_at_rest": 0,
+ "poses": {
+  "rest": {
+   "label": "REST",
+   "flap_deg": 15,
+   "fur_through_costume": 0,
+   "by_mesh": {
+    "Shadow_head": 0,
+    "Shadow_body": 0,
+    "Shadow_tail": 0
+   },
+   "ear_piping_triangle_overlaps": 0,
+   "must_be_zero": false
+  },
+  "walk_a": {
+   "label": "WALK (legs 0.75, bob, roll)",
+   "flap_deg": 15,
+   "fur_through_costume": 0,
+   "by_mesh": {
+    "Shadow_head": 0,
+    "Shadow_body": 0,
+    "Shadow_tail": 0
+   },
+   "ear_piping_triangle_overlaps": 0,
+   "must_be_zero": true
+  },
+  "walk_b": {
+   "label": "WALK, other foot",
+   "flap_deg": 15,
+   "fur_through_costume": 0,
+   "by_mesh": {
+    "Shadow_head": 0,
+    "Shadow_body": 0,
+    "Shadow_tail": 0
+   },
+   "ear_piping_triangle_overlaps": 0,
+   "must_be_zero": true
+  },
+  "run": {
+   "label": "RUN (legs 0.75, pitch 0.03, bob, roll)",
+   "flap_deg": 15,
+   "fur_through_costume": 0,
+   "by_mesh": {
+    "Shadow_head": 0,
+    "Shadow_body": 0,
+    "Shadow_tail": 0
+   },
+   "ear_piping_triangle_overlaps": 0,
+   "must_be_zero": true
+  },
+  "run_b": {
+   "label": "RUN, other foot",
+   "flap_deg": 15,
+   "fur_through_costume": 0,
+   "by_mesh": {
+    "Shadow_head": 0,
+    "Shadow_body": 0,
+    "Shadow_tail": 0
+   },
+   "ear_piping_triangle_overlaps": 0,
+   "must_be_zero": true
+  },
+  "gallop": {
+   "label": "GALLOP / SPRINT (legs 0.95, pitch 0.07)",
+   "flap_deg": 15,
+   "fur_through_costume": 5,
+   "by_mesh": {
+    "Shadow_head": 0,
+    "Shadow_body": 5,
+    "Shadow_body_depth_max_mm": 1.11,
+    "Shadow_body_where": [
+     0.045,
+     0.045,
+     0.17
+    ],
+    "Shadow_body_idx": [
+     1135,
+     1195,
+     1255,
+     1374,
+     1434
+    ],
+    "Shadow_tail": 0
+   },
+   "ear_piping_triangle_overlaps": 0,
+   "must_be_zero": false
+  },
+  "gallop_b": {
+   "label": "GALLOP, other foot",
+   "flap_deg": 15,
+   "fur_through_costume": 4,
+   "by_mesh": {
+    "Shadow_head": 0,
+    "Shadow_body": 4,
+    "Shadow_body_depth_max_mm": 11.55,
+    "Shadow_body_where": [
+     0.0,
+     -0.029,
+     0.162
+    ],
+    "Shadow_body_idx": [
+     1328,
+     1509,
+     1552,
+     1612
+    ],
+    "Shadow_tail": 0
+   },
+   "ear_piping_triangle_overlaps": 0,
+   "must_be_zero": false
+  },
+  "sit": {
+   "label": "SIT",
+   "flap_deg": 15,
+   "fur_through_costume": 1,
+   "by_mesh": {
+    "Shadow_head": 0,
+    "Shadow_body": 1,
+    "Shadow_body_depth_max_mm": 0.74,
+    "Shadow_body_where": [
+     0.045,
+     0.018,
+     0.103
+    ],
+    "Shadow_body_idx": [
+     1135
+    ],
+    "Shadow_tail": 0
+   },
+   "ear_piping_triangle_overlaps": 0,
+   "must_be_zero": false
+  },
+  "bark": {
+   "label": "BARK (head up, jaw open, ear kick)",
+   "flap_deg": 15,
+   "fur_through_costume": 0,
+   "by_mesh": {
+    "Shadow_head": 0,
+    "Shadow_body": 0,
+    "Shadow_tail": 0
+   },
+   "ear_piping_triangle_overlaps": 76,
+   "must_be_zero": false
+  },
+  "head_turn": {
+   "label": "IDLE HEAD TURN 0.25",
+   "flap_deg": 15,
+   "fur_through_costume": 0,
+   "by_mesh": {
+    "Shadow_head": 0,
+    "Shadow_body": 0,
+    "Shadow_tail": 0
+   },
+   "ear_piping_triangle_overlaps": 0,
+   "must_be_zero": false
+  },
+  "tail_L": {
+   "label": "TAIL WAG +0.7",
+   "flap_deg": 15,
+   "fur_through_costume": 0,
+   "by_mesh": {
+    "Shadow_head": 0,
+    "Shadow_body": 0,
+    "Shadow_tail": 0
+   },
+   "ear_piping_triangle_overlaps": 0,
+   "must_be_zero": false
+  },
+  "tail_R": {
+   "label": "TAIL WAG -0.7",
+   "flap_deg": 15,
+   "fur_through_costume": 0,
+   "by_mesh": {
+    "Shadow_head": 0,
+    "Shadow_body": 0,
+    "Shadow_tail": 0
+   },
+   "ear_piping_triangle_overlaps": 0,
+   "must_be_zero": false
+  },
+  "ears_fwd": {
+   "label": "EAR SPRING +1 (fwd)",
+   "flap_deg": 15,
+   "fur_through_costume": 0,
+   "by_mesh": {
+    "Shadow_head": 0,
+    "Shadow_body": 0,
+    "Shadow_tail": 0
+   },
+   "ear_piping_triangle_overlaps": 76,
+   "must_be_zero": false
+  },
+  "ears_back": {
+   "label": "EAR SPRING -1 (back)",
+   "flap_deg": 15,
+   "fur_through_costume": 0,
+   "by_mesh": {
+    "Shadow_head": 0,
+    "Shadow_body": 0,
+    "Shadow_tail": 0
+   },
+   "ear_piping_triangle_overlaps": 56,
+   "must_be_zero": false
+  },
+  "ears_fwd06": {
+   "label": "EAR SPRING +0.6",
+   "flap_deg": 15,
+   "fur_through_costume": 0,
+   "by_mesh": {
+    "Shadow_head": 0,
+    "Shadow_body": 0,
+    "Shadow_tail": 0
+   },
+   "ear_piping_triangle_overlaps": 0,
+   "must_be_zero": false
+  },
+  "ears_back06": {
+   "label": "EAR SPRING -0.6",
+   "flap_deg": 15,
+   "fur_through_costume": 0,
+   "by_mesh": {
+    "Shadow_head": 0,
+    "Shadow_body": 0,
+    "Shadow_tail": 0
+   },
+   "ear_piping_triangle_overlaps": 0,
+   "must_be_zero": false
+  },
+  "fly_m30": {
+   "label": "FLYING, flap -30",
+   "flap_deg": -30,
+   "fur_through_costume": 0,
+   "by_mesh": {
+    "Shadow_head": 0,
+    "Shadow_body": 0,
+    "Shadow_tail": 0
+   },
+   "ear_piping_triangle_overlaps": 0,
+   "must_be_zero": true
+  },
+  "fly_p30": {
+   "label": "FLYING, flap +30",
+   "flap_deg": 30,
+   "fur_through_costume": 0,
+   "by_mesh": {
+    "Shadow_head": 0,
+    "Shadow_body": 0,
+    "Shadow_tail": 0
+   },
+   "ear_piping_triangle_overlaps": 0,
+   "must_be_zero": true
+  },
+  "fly_p60": {
+   "label": "FLYING, flap +60",
+   "flap_deg": 60,
+   "fur_through_costume": 0,
+   "by_mesh": {
+    "Shadow_head": 0,
+    "Shadow_body": 0,
+    "Shadow_tail": 0
+   },
+   "ear_piping_triangle_overlaps": 0,
+   "must_be_zero": true
+  }
+ },
+ "must_be_zero_ok": true
+}

@@ -22,7 +22,7 @@ try {
     const G = window.G, v = G.heroes.villagers.moka;
     return { hasMoka: !!v, frozen: !!v?.frozen, marker: G.story.markerFor('moka'), inNpcs: G.npcs.includes(v), why: G.heroes.canSwitch(), active: G.state.activeHero, heroes: Object.keys(G.state.heroes), poeV: !!G.heroes.villagers.poe }; // (Poe isn't in town until she joins: she's in the bamboo)
   });
-  R.check('fresh game: Chewy active, Moka waits in town with a "!" marker', a.active === 'chewy' && a.hasMoka && a.frozen && a.marker === '!' && a.inNpcs && a.heroes.join() === 'chewy,moka,poe' && !a.poeV, JSON.stringify(a));
+  R.check('fresh game: Chewy active, Moka waits in town with a "!" marker', a.active === 'chewy' && a.hasMoka && a.frozen && a.marker === '!' && a.inNpcs && a.heroes.join() === 'chewy,moka,poe,shihtzu,golden' && !a.poeV, JSON.stringify(a));
   R.check('switching is refused before Moka joins', /waiting/i.test(a.why), a.why);
   await page.evaluate(() => { const G = window.G; G.heroes.talk(G.heroes.villagers.moka); });
   await sleep(page, 300);
@@ -111,7 +111,7 @@ try {
 
   // g) save / reload
   const g0 = await page.evaluate(() => { const G = window.G; G.save(); const s = JSON.parse(localStorage.getItem('chewy3d.save')); return { v: s.version, act: s.activeHero, top: 'player' in s || 'equipment' in s, heroes: Object.keys(s.heroes), mokaLvl: s.heroes.moka.player.lvl }; });
-  R.check('save format v2: heroes hold the progressions, no duplicated top-level player/equipment', g0.v === 2 && g0.act === 'moka' && !g0.top && g0.heroes.join() === 'chewy,moka,poe', JSON.stringify(g0));
+  R.check('save format v2: heroes hold the progressions, no duplicated top-level player/equipment', g0.v === 2 && g0.act === 'moka' && !g0.top && g0.heroes.join() === 'chewy,moka,poe,shihtzu,golden', JSON.stringify(g0));
   await boot(page, 'notitle');
   const g1 = await page.evaluate(() => { const G = window.G, st = G.state; return { act: st.activeHero, hero: G.player.hero, linked: st.player === st.heroes.moka.player, lvl: st.player.lvl, chewyV: !!G.heroes.villagers.chewy, mokaV: !!G.heroes.villagers.moka, wt: G.derived.weaponType }; });
   R.check('reload: still Moka (her level), Chewy lives in town', g1.act === 'moka' && g1.hero === 'moka' && g1.linked && g1.lvl === g0.mokaLvl && g1.chewyV && !g1.mokaV && g1.wt === 'staff', JSON.stringify(g1));
@@ -162,7 +162,7 @@ try {
   await page.evaluate(() => { window.G.heroes.cd = 0; });
   await page.keyboard.down('Tab');
   await page.waitForFunction(() => window.G.heroes.wheelOpen, null, { timeout: 4000 }).catch(() => {});
-  const w = await page.evaluate(() => ({ open: window.G.heroes.wheelOpen, cards: document.querySelectorAll('.hero-wheel .hw-card').length, switching: window.G.heroes.switching, sel: document.querySelector('.hw-card.sel .hw-t b')?.textContent || '' }));
+  const w = await page.evaluate(() => ({ open: window.G.heroes.wheelOpen, cards: document.querySelectorAll('.hero-wheel .hw-card').length, roster: window.G.heroes.roster().length, switching: window.G.heroes.switching, sel: document.querySelector('.hw-card.sel .hw-t b')?.textContent || '' }));
   const pickId = await page.evaluate(() => { const G = window.G, list = G.heroes.roster(); return list.find(h => h.ready)?.id; });
   const pickKey = String(['chewy', 'moka', 'poe'].indexOf(pickId) + 1);
   await page.keyboard.press(pickKey);
@@ -171,7 +171,7 @@ try {
   await page.waitForFunction(() => !window.G.heroes.switching && window.G.state.activeHero !== undefined, null, { timeout: 12000 }).catch(() => {});
   await sleep(page, 300);
   const w2 = await page.evaluate(() => ({ active: window.G.state.activeHero, open: window.G.heroes.wheelOpen, switching: window.G.heroes.switching }));
-  R.check('holding Tab opens the hero wheel (three cards) instead of switching; a number key picks the hero', w.open && w.cards === 3 && !w.switching && w2.active === pickId && !w2.open, JSON.stringify({ w, pickId, w2 }));
+  R.check('holding Tab opens the hero wheel (a card per hero of the roster) instead of switching; a number key picks the hero', w.open && w.cards === w.roster && w.roster >= 4 && !w.switching && w2.active === pickId && !w2.open, JSON.stringify({ w, pickId, w2 }));
   // Poe as played: her fūma on her back, her class
   await page.evaluate(() => { const G = window.G; G.heroes.cd = 0; if (G.state.activeHero !== 'poe') G.heroes.switchTo('poe', { quiet: true }); });
   await page.waitForFunction(() => window.G.state.activeHero === 'poe' && !window.G.heroes.switching, null, { timeout: 12000 }).catch(() => {});

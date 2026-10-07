@@ -1,10 +1,12 @@
 // Node-only fuzz of the Burrow generator (src/dungeon/gen.js has no browser deps).
 // For many floors x seeds: no throw, >=2 rooms, every placed thing sits on floor, everything reachable from start,
 // exit portal / stairs / waypoint can actually be reached by the player (interaction radius).
-// Also the zone dungeons' two floors (dungeon/defs.js floorPlan: stairs on floor 1, the boss room on floor 2).
+// Also the zone dungeons' two floors (dungeon/defs.js floorPlan: stairs on floor 1, the boss room on floor 2), and tier runs'
+// floors with their modifiers' layout hooks (rpg/zoneMods.js layoutMods; the Deep Burrow's too).
 // usage: node tools/qa/gen-fuzz.mjs [seeds=300] [floors=40]
 import { generate, CELL } from '../../src/dungeon/gen.js';
 import { DUNGEONS, floorPlan } from '../../src/dungeon/defs.js';
+import { FLOOR_CAP } from '../../src/rpg/zoneMods.js';
 
 const SEEDS = +(process.argv[2] || 300), FLOORS = +(process.argv[3] || 40);
 const fails = {}; let runs = 0;
@@ -36,6 +38,10 @@ function reachable(L, p, r, reach) {
 const JOBS = [];
 for (let floor = 1; floor <= FLOORS; floor++) JOBS.push({ floor, plan: null, name: '' });
 for (const d of Object.values(DUNGEONS)) if (d.kind === 'zone') for (let floor = 1; floor <= d.floors; floor++) JOBS.push({ floor, plan: floorPlan(d, floor, { heroLvl: 10 }), name: d.id + ' ' });
+// tier runs (docs/ZONES.md §5.1): the modifiers' layout hooks (rpg/zoneMods.js layoutMods) on every tier dungeon, the
+// Deep Burrow too: bigger packs, extra packs, promotions, extra chests and shrines all on reachable floor
+const TIER_RUNS = [{ tier: 5, mods: ['swarming', 'teeming', 'rally'] }, { tier: 3, mods: ['uniqueHunt', 'treasureTrove'] }, { tier: 5, spirit: 10, mods: ['swarming', 'teeming', 'rally', 'uniqueHunt', 'treasureTrove', 'cursedShrines'] }];
+for (const d of Object.values(DUNGEONS)) if (d.kind === 'zone' || d.kind === 'deep') for (const run of TIER_RUNS) for (let floor = 1; floor <= d.floors; floor++) JOBS.push({ floor, plan: floorPlan(d, floor, { heroLvl: 10, ...run }), name: `${d.id} T${run.tier}${run.spirit ? 'S' + run.spirit : ''}+${run.mods.length} ` });
 for (const { floor, plan, name } of JOBS) for (let s = 1; s <= SEEDS; s++) {
   // the game seeds each entry with state.dungeon.seed + floor*17 + runs*101 (+ a per-dungeon salt): dungeon/defs.js beginRun
   const seed = s + floor * 17;
@@ -73,10 +79,16 @@ for (const { floor, plan, name } of JOBS) for (let s = 1; s <= SEEDS; s++) {
 function zoneChecks(L, plan, reach, tag) {
   const packs = L.spawns.filter(s => !s.boss), n = L.packTotal;
   const [lo, hi] = plan.density || [120, 160];
-  if (!(n >= lo && n <= hi)) bump('zone floor density outside the plan', `${tag}: ${n} (${lo}-${hi})`);
-  if (packs.some(s => s.count < 1 || s.count > 16)) bump('zone pack size outside 1-16', tag);
   const champ = packs.filter(s => s.rank === 'champion').length, uniq = packs.filter(s => s.rank === 'unique').length;
-  if (champ > 3 || uniq > 1 || champ + uniq < 1) bump('zone elites not rare (<=3 champion, <=1 unique packs, at least one)', `${tag}: ${champ}c ${uniq}u`);
+  if (L.modded) { // a tier run: within the floor ceiling, packs within their cap, the extras where they belong
+    if (!(n >= lo && n <= FLOOR_CAP.zone + 1)) bump('tier floor density outside the plan / the ceiling', `${tag}: ${n}`);
+    if (packs.some(s => s.count < 1 || s.count > (s.cap || 16))) bump('tier pack size over its cap', tag);
+    if (uniq > 1 + (L.modded.uniques || 0)) bump('tier floor has more unique packs than its modifiers allow', `${tag}: ${uniq}`);
+  } else {
+    if (!(n >= lo && n <= hi)) bump('zone floor density outside the plan', `${tag}: ${n} (${lo}-${hi})`);
+    if (packs.some(s => s.count < 1 || s.count > 16)) bump('zone pack size outside 1-16', tag);
+    if (champ > 3 || uniq > 1 || champ + uniq < 1) bump('zone elites not rare (<=3 champion, <=1 unique packs, at least one)', `${tag}: ${champ}c ${uniq}u`);
+  }
   const startRoom = L.roomId[L.start.y * L.W + L.start.x];
   if (packs.some(s => L.roomId[s.y * L.W + s.x] === startRoom && startRoom)) bump('zone pack in the arrival chamber', tag);
   if ((L.slots?.length || 0) < (plan.slots ?? 2)) bump('zone floor short of objective slots', `${tag}: ${L.slots?.length}`);
@@ -104,7 +116,7 @@ function zoneChecks(L, plan, reach, tag) {
     }
   } else if (L.arena) bump('arena on a non-boss floor', tag);
 }
-console.log(`gen-fuzz: ${runs} layouts (${FLOORS} Burrow floors + ${JOBS.length - FLOORS} zone dungeon floors, x ${SEEDS} seeds)`);
+console.log(`gen-fuzz: ${runs} layouts (${FLOORS} Burrow floors + ${JOBS.length - FLOORS} zone dungeon and tier run floors, x ${SEEDS} seeds)`);
 const keys = Object.keys(fails);
 if (!keys.length) console.log('PASS: no generator problems found');
 for (const k of keys) console.log(`FAIL ${k}: ${fails[k].n}x  e.g. ${fails[k].ex.join(' | ')}`);

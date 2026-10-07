@@ -44,9 +44,10 @@ const lpad = (s, n) => String(s).padStart(n);
 
 // ------------------------------------------------------------------ skills
 hr('SKILLS');
-// three heroes (docs/HEROES.md, docs/POE.md): Chewy's three trees (bone / fetch / spirit), Moka's (tide / star / duck) and
-// Poe's (shuriken / jutsu / shadow), 21 skills each
-ok(SKILL_IDS.length === 63 && TREES.length === 9, 'exactly 63 skills in 9 trees');
+// five heroes (docs/HEROES.md, docs/POE.md, docs/SHIHTZU.md, docs/GOLDEN.md): Chewy's three trees (bone / fetch / spirit),
+// Moka's (tide / star / duck), Poe's (shuriken / jutsu / shadow), the Shih Tzu's (flail / hex / tome) and Foosy's (lance /
+// javelin / whelp), 21 skills each
+ok(SKILL_IDS.length === 105 && TREES.length === 15, 'exactly 105 skills in 15 trees');
 for (const h of HERO_IDS) ok(SKILL_IDS.filter(id => SKILLS[id].cls === h).length === 21, `${h} has 21 skills`);
 for (const t of TREES) {
   const ids = SKILL_IDS.filter(id => SKILLS[id].tree === t.id);
@@ -56,14 +57,14 @@ for (const t of TREES) {
 }
 for (const id of ['chomp', 'boneMastery', 'whirl', 'dig', 'frenzy', 'bonestorm', 'throw', 'fetchMastery', 'ricochet', 'multi', 'blaze', 'fetchstorm', 'woof', 'goodboy', 'zoom', 'packcall', 'howl', 'moonhowl'])
   ok(!!SKILLS[id], `ported skill ${id} exists`);
-const KINDS = ['active', 'passive', 'channel', 'aura', 'summon'], ELS = ['phys', 'fire', 'frost', 'zap', 'stink', 'holy'];
+const KINDS = ['active', 'passive', 'channel', 'aura', 'summon'], ELS = ['phys', 'fire', 'frost', 'zap', 'stink', 'holy', 'gloom'];
 for (const id of [...SKILL_IDS, 'attack']) {
   const s = id === 'attack' ? ATTACK : SKILLS[id];
   ok(id === 'attack' || (s.row >= 0 && s.row <= 5 && s.col >= 0 && s.col <= 2), `${id} row/col in range`);
   ok(id === 'attack' || s.req === ROW_REQ[s.row], `${id} req matches row`);
   ok(KINDS.includes(s.kind), `${id} kind valid`);
   ok(ELS.includes(s.element), `${id} element valid`);
-  ok([null, 'sword', 'ball', 'staff', 'fuma'].includes(s.wep) && (id === 'attack' || !s.wep || WEAPON_CLASS[s.wep] === s.cls), `${id} wep valid`);
+  ok([null, 'sword', 'ball', 'staff', 'fuma', 'flail', 'lance'].includes(s.wep) && (id === 'attack' || !s.wep || WEAPON_CLASS[s.wep] === s.cls), `${id} wep valid`);
   for (const p of s.pre) ok(SKILLS[p] && SKILLS[p].tree === s.tree && SKILLS[p].row < s.row, `${id} prereq ${p} valid`);
   for (const y of s.syn) ok(!!SKILLS[y.id] && fin(y.p), `${id} synergy ${y.id} valid`);
   for (let l = 1; l <= 30; l++) {
@@ -92,13 +93,13 @@ for (const id of GEAR_BASE_IDS) {
   tierCount[b.tier]++;
   ok(['weapon', 'hat', 'outfit', 'collar', 'charm', 'boots', 'paws'].includes(b.slot), `base ${id} slot`);
   ok(b.icon && b.icon.shape && b.icon.variant && b.icon.colors.length === 3, `base ${id} icon`);
-  if (b.slot === 'weapon') ok(['sword', 'ball', 'staff', 'fuma'].includes(b.wtype) && fin(b.dmg[0]) && b.dmg[1] > b.dmg[0] && fin(b.aspd), `weapon ${id} stats`);
+  if (b.slot === 'weapon') ok(['sword', 'ball', 'staff', 'fuma', 'flail', 'lance'].includes(b.wtype) && fin(b.dmg[0]) && b.dmg[1] > b.dmg[0] && fin(b.aspd), `weapon ${id} stats`);
   if (['hat', 'outfit', 'boots', 'paws'].includes(b.slot)) ok(b.def && b.def[1] >= b.def[0], `armor ${id} def`);
   ok(b.tier === 0 ? b.lvl < 20 : b.tier === 1 ? b.lvl >= 20 && b.lvl < 40 : b.lvl >= 40, `base ${id} tier/lvl consistent`);
 }
 for (const slot of ['weapon', 'hat', 'outfit', 'collar', 'charm', 'boots', 'paws'])
   for (const t of [0, 1, 2]) ok(GEAR_BASE_IDS.some(id => ITEM_BASES[id].slot === slot && ITEM_BASES[id].tier === t), `slot ${slot} has tier ${t}`);
-for (const wt of ['sword', 'ball', 'staff', 'fuma']) for (const t of [0, 1, 2]) ok(GEAR_BASE_IDS.some(id => ITEM_BASES[id].wtype === wt && ITEM_BASES[id].tier === t), `${wt} has tier ${t}`);
+for (const wt of ['sword', 'ball', 'staff', 'fuma', 'flail', 'lance']) for (const t of [0, 1, 2]) ok(GEAR_BASE_IDS.some(id => ITEM_BASES[id].wtype === wt && ITEM_BASES[id].tier === t), `${wt} has tier ${t}`);
 const prefixes = AFFIXES.filter(a => a.type === 'prefix').length, suffixes = AFFIXES.filter(a => a.type === 'suffix').length;
 ok(AFFIXES.length >= 45, '>=45 named affixes');
 ok(new Set(AFFIXES.map(a => a.id)).size === AFFIXES.length, 'affix ids unique');
@@ -995,7 +996,7 @@ hr('POE (the third hero, docs/POE.md)');
 {
   // the class, the trees, the starter kit
   const C = CLASSES.poe;
-  ok(HERO_IDS.join() === 'chewy,moka,poe' && C.weapons.join() === 'fuma' && C.dmgStat.fuma === 'dex' && C.starter.skills.fumaThrow === 1, 'poe: the third class (fūma, Dex, starts with Fūma Throw)');
+  ok(HERO_IDS.slice(0, 3).join() === 'chewy,moka,poe' && C.weapons.join() === 'fuma' && C.dmgStat.fuma === 'dex' && C.starter.skills.fumaThrow === 1, 'poe: the third class (fūma, Dex, starts with Fūma Throw)');
   ok(['shuriken', 'jutsu', 'shadow'].every(t => TREES.some(x => x.id === t && x.cls === 'poe')) && C.trees.join() === 'shuriken,jutsu,shadow', 'poe: three trees');
   for (const t of C.trees) {
     const ids = SKILL_IDS.filter(id => SKILLS[id].tree === t), rows = ids.map(id => SKILLS[id].row).sort().join('');
@@ -1045,6 +1046,45 @@ hr('POE (the third hero, docs/POE.md)');
   ok(HB.fumaFlight(sk.fumaThrow.params(1, d2)) < 1.05 && Math.abs(HB.fumaFlight(sk.fumaThrow.params(20, d2)) - HB.fumaFlight(sk.fumaThrow.params(1, d2))) < 0.08, 'poe: a Fūma Throw round trip stays under ~1 s at every level');
 }
 
+hr('THE SHIH TZU (the fourth hero, docs/SHIHTZU.md)');
+{
+  const HB = await import('./hero-balance.mjs'), { SHIHTZU_TRAINING, DR_CAP } = await import('../src/rpg/skillsShihtzu.js');
+  ok(SHIHTZU_TRAINING.size === 0 && Object.values(SKILLS).filter(s => s.cls === 'shihtzu').every(s => !s.training), 'shihtzu: all 21 skills are built (none in training)');
+  const fl = GEAR_BASE_IDS.filter(id => ITEM_BASES[id].wtype === 'flail');
+  ok(fl.length >= 12 && [0, 1, 2].every(t => fl.some(id => ITEM_BASES[id].tier === t)) && fl.every(id => ITEM_BASES[id].icon.colors?.length >= 2), `shihtzu: ${fl.length} flail bases over three tiers, each with its ball and rope colours`);
+  // ---- hero balance (tools/hero-balance.mjs): the tank (Woeful Wallop) and the hex build vs the Chewy–Moka–Poe mean, same level and gear
+  const sb = HB.stzBand([6, 15, 30, 45]);
+  for (const b of sb) ok(b.dps >= 0.85 && b.dps <= 1.05 && b.ehp >= 1.15 && b.ehp <= 1.4, `shihtzu: level ${b.lvl} Woeful Wallop build: clear ×${b.dps.toFixed(2)}, eHP ×${b.ehp.toFixed(2)} of the mean (the tank)`);
+  for (const b of sb) ok(b.hex.clear >= 0.85 && b.hex.clear <= 1.05, `shihtzu: level ${b.lvl} hex build (Dripping Paw, Grumble Cloud, Mournful Awoo, Everlasting Gloom): clear ×${b.hex.clear.toFixed(2)} of the mean (single ×${b.hex.single.toFixed(2)})`);
+  const { st, d } = HB.buildHero('shihtzu', 45);
+  ok(d.dmgReduce > 0 && d.dmgReduce <= DR_CAP, `shihtzu: damage reduction ${d.dmgReduce}% (capped at ${DR_CAP}%)`);
+}
+
+hr('FOOSY THE DRAGOON (the fifth hero, docs/GOLDEN.md)');
+{
+  const HB = await import('./hero-balance.mjs'), { GOLDEN_TRAINING } = await import('../src/rpg/skillsGolden.js');
+  // (checkpoint 2: all 21 are built: none left "in training")
+  const gt = Object.values(SKILLS).filter(s => s.cls === 'golden');
+  ok(gt.length === 21 && GOLDEN_TRAINING.size === 0 && gt.every(s => !s.training), `golden: all ${gt.length} skills are built (none in training)`);
+  const { WHELP_ACTIVES } = await import('../src/rpg/skillsGolden.js');
+  ok(WHELP_ACTIVES.size === 5 && [...WHELP_ACTIVES].every(id => SKILLS[id]?.tree === 'whelp' && SKILLS[id].kind === 'active'), 'golden: the Whelp Bond has 5 actives, each waiting on Shadow (castBlocked)');
+  const ln = GEAR_BASE_IDS.filter(id => ITEM_BASES[id].wtype === 'lance');
+  ok(ln.length >= 12 && [0, 1, 2].every(t => ln.some(id => ITEM_BASES[id].tier === t)) && ln.every(id => ITEM_BASES[id].icon.colors?.length === 3), `golden: ${ln.length} lance bases over three tiers, each with its head, shaft and pommel colours`);
+  // ---- hero balance (tools/hero-balance.mjs): the lance build and the javelin build vs the Chewy–Moka–Poe–Shih Tzu mean
+  const gb = HB.gldBand([6, 15, 30, 45]);
+  for (const b of gb) ok(b.dps >= 0.85 && b.dps <= 1.05 && b.ehp >= 1.0 && b.stzEhp < 1, `golden: level ${b.lvl} lance build (Sunbeam Thrust): clear ×${b.dps.toFixed(2)}, eHP ×${b.ehp.toFixed(2)} of the mean (×${b.stzEhp.toFixed(2)} the Shih Tzu's: solid, below the tank)`);
+  for (const b of gb) ok(b.jav.clear >= 0.85 && b.jav.clear <= 1.05, `golden: level ${b.lvl} javelin build (Bonk Dart, Tailwag Volley): clear ×${b.jav.clear.toFixed(2)} of the mean (single ×${b.jav.single.toFixed(2)})`);
+  for (const b of gb) ok(b.whelp.clear >= 0.85 && b.whelp.clear <= 1.05, `golden: level ${b.lvl} Whelp Bond build (Ember Breath): clear ×${b.whelp.clear.toFixed(2)} of the mean (single ×${b.whelp.single.toFixed(2)})`);
+  { // Warm Heart: Shadow wakes sooner and mends faster (companion.js reads derived.shadowRevive / shadowRegen; 10 s and 1%/s untrained)
+    const w = HB.buildHero('golden·whelp', 30), d0 = w.d, st2 = w.st; st2.player.skills.warmHeart = 10; const d1 = computeStats(st2);
+    ok(d0.shadowRevive === 10 && d0.shadowRegen === 1 && d1.shadowRevive < 10 && d1.shadowRevive >= 3 && d1.shadowRegen > 1 && d1.treeCostCut.whelp > 0, `golden: Warm Heart 10 wakes Shadow after ${d1.shadowRevive}s (10s untrained), mends ${d1.shadowRegen}%/s, the Bond costs ${d1.treeCostCut.whelp}% less`);
+  }
+  const { d } = HB.buildHero('golden', 30);
+  ok(d.weaponType === 'lance' && d.shadowLife >= 20 && d.shadowDmg >= 20 && d.javMul > 0 && d.whelpMul > 0, `golden: Shadow's bond (+${d.shadowLife}% life, +${d.shadowDmg}% damage), javMul ×${d.javMul}, whelpMul ×${d.whelpMul}`);
+  const h1 = HB.buildHero('golden', 1), R = skillRuntime('attack', h1.st, h1.d);
+  ok(R.params.lance && R.params.radius > 2.6 && R.params.radius > (ATTACK.params(1, { weaponType: 'flail' }).radius || 0), `golden: the reach combo reaches ${R.params.radius} m (the longest melee reach)`);
+}
+
 hr('CHARGED ABILITIES');
 // docs/CHARGE.md: the tables, the rules (stage times, costs, gating), the balance layer and the DPS-band sim
 {
@@ -1054,9 +1094,12 @@ hr('CHARGED ABILITIES');
   const ids = Object.keys(CHARGE);
   // ---- every active skill of both heroes charges, with a full table
   const actives = SKILL_IDS.filter(id => !['passive', 'aura'].includes(SKILLS[id].kind));
-  // (all three heroes: Poe's 18 tables are rpg/chargePoe.js, merged into the table by charge.js)
+  // (all four heroes: Poe's 18 tables are rpg/chargePoe.js, the Shih Tzu's 15 rpg/chargeShihtzu.js, merged into the table by charge.js)
+  // (and Foosy's 15: rpg/chargeGolden.js)
   ok(actives.every(id => CHARGE[id]) && ids.every(id => actives.includes(id)), `charge: a table for every active skill (${ids.length})`);
   ok(ids.filter(id => SKILLS[id].cls === 'poe').length === 18 && ids.filter(id => SKILLS[id].cls === 'poe').every(id => CHARGE[id].pose.startsWith('poe')), 'charge: Poe has 18 tables, each with one of her wind-up poses');
+  ok(ids.filter(id => SKILLS[id].cls === 'shihtzu').length === 15 && ids.filter(id => SKILLS[id].cls === 'shihtzu').every(id => CHARGE[id].pose.startsWith('stz')), 'charge: the Shih Tzu has 15 tables, each with one of his wind-up poses');
+  ok(ids.filter(id => SKILLS[id].cls === 'golden').length === 15 && ids.filter(id => SKILLS[id].cls === 'golden').every(id => CHARGE[id].pose.startsWith('gld')), 'charge: Foosy has 15 tables, each with one of his wind-up poses');
   for (const id of ids) {
     const c = CHARGE[id];
     ok(c.ready === true && SKILLS[id].charge === c, `charge ${id}: ready and attached to its skill`);
@@ -1085,9 +1128,9 @@ hr('CHARGED ABILITIES');
   const R0 = skillRuntime('chomp', st, d), R1 = Ch.chargeRuntime('chomp', st, d, 1), R3 = Ch.chargeRuntime('chomp', st, d, 3), R9 = Ch.chargeRuntime('chomp', st, d, 9);
   ok(R1.charge.stage === 1 && R3.charge.stage === 3 && R9.charge.stage === 3 && R3.cost === Ch.chargeCost(R0.cost, 3, Ch.perksOf(st, 'chomp')), 'charge: chargeRuntime (stage clamp, cost)');
   ok(R3.params.dmgPct > R1.params.dmgPct && R1.params.dmgPct >= R0.params.dmgPct * 0.999 && R3.params.radius >= R1.params.radius, 'charge: a charged Chomp hits harder and wider than a tap, more at Ⅲ');
-  const sx = Sim.simHero('chewy'), sm = Sim.simHero('moka'), sp = Sim.simHero('poe');
+  const sx = Sim.simHero('chewy'), sm = Sim.simHero('moka'), sp = Sim.simHero('poe'), sz = Sim.simHero('shihtzu'), sg = Sim.simHero('golden');
   for (const id of ids) {
-    const H = SKILLS[id].cls === 'moka' ? sm : SKILLS[id].cls === 'poe' ? sp : sx, S = H.st;
+    const H = SKILLS[id].cls === 'moka' ? sm : SKILLS[id].cls === 'poe' ? sp : SKILLS[id].cls === 'shihtzu' ? sz : SKILLS[id].cls === 'golden' ? sg : sx, S = H.st;
     S.player.chargePerks = {}; const T0 = skillRuntime(id, S, H.d);
     S.player.chargePerks = { [id]: Object.fromEntries(Object.entries(CHARGE[id].perks).map(([k, p]) => [k, p.ranks])) };
     const Rs = [1, 2, 3].map(s => Ch.chargeRuntime(id, S, H.d, s));
@@ -1414,6 +1457,99 @@ hr('ZONE DUNGEONS: GENERATOR, PROGRESSION, FIRST-CLEAR UNIQUE');
   ok(leak === 0 && fu.rarity === 'unique' && fu.uniqueId === 'tenguGaleFeather', `uniques: 3000 random unique rolls never give a zone boss unique (${leak}); the first-clear chest's makeUnique does`);
 }
 
+// ------------------------------------------------------------------ zone tiers and modifiers (docs/ZONES.md §5.1; ROADMAP Z-E1, Z-E2)
+hr('ZONE TIERS: SCALING, MODIFIERS, REWARDS, SAVE');
+{
+  const T = await import('../src/rpg/tiers.js'), ZM = await import('../src/rpg/zoneMods.js'), D = await import('../src/dungeon/defs.js'), Gn = await import('../src/dungeon/gen.js'), Z = await import('../src/rpg/zones.js'), Q = await import('../src/world/questSteps.js');
+  // ---- the tier table and the level
+  ok(T.TIERS.length === 6 && T.TIERS.map(t => t.slots).join() === '0,1,2,2,3,3' && T.TIERS.every((t, i) => i === 0 || (t.pack > T.TIERS[i - 1].pack && t.champ > T.TIERS[i - 1].champ && t.qty > T.TIERS[i - 1].qty && t.rarity > T.TIERS[i - 1].rarity && t.xp > T.TIERS[i - 1].xp)), 'tiers: T0–T5, slots 0/1/2/2/3/3, and pack size, rare chance and every reward rise each tier');
+  const bd = D.DUNGEONS.bambooDepths, os = D.DUNGEONS.onsenCaverns;
+  ok([0, 1, 2, 3, 4, 5].every(t => D.floorPlan(bd, 1, { tier: t, heroLvl: 8 }).mlvl === 8 + 4 * t) && D.floorPlan(bd, 2, { tier: 5, heroLvl: 8 }).mlvl === 29 && D.floorPlan(os, 2, { tier: 5, heroLvl: 50 }).mlvl === 56 && T.runLevel([40, 50], 2, { tier: 5 }, 50) === 60, 'tiers: monsters are the band (the hero clamped to it) + 1 a floor + 4 a tier, capped at 60');
+  ok(D.floorPlan(bd, 1, { tier: 5, spirit: 3, heroLvl: 4 }).mlvl === 60 && D.floorPlan(D.DUNGEONS.burrowDeep, 2, { spirit: 9 }).mlvl === 60, 'tiers: a Spirit run is level 60 in every dungeon');
+  const S1 = T.spiritInfo(1), S5 = T.spiritInfo(5), S10 = T.spiritInfo(10), S20 = T.spiritInfo(20);
+  ok(S1.slots === 4 && T.spiritInfo(4).slots === 4 && S5.slots === 5 && T.spiritInfo(9).slots === 5 && S10.slots === 6 && S20.slots === 6, 'spirit: 4 slots, 5 from Spirit 5, 6 from Spirit 10');
+  ok(S10.life > S5.life && S5.life > S1.life && S10.dmg > S1.dmg && S10.qty > S1.qty && S10.qty > T.TIERS[5].qty && S10.pinnacle && S20.pinnacle && !S5.pinnacle && S10.pack <= 1.5 && S20.pack <= 1.5, 'spirit: life, damage and rewards stack per tier (above T5); the pack size has a ceiling; the pinnacle every 10th');
+  // ---- the modifiers: the catalogue and the cleaning
+  const mods = ZM.MOD_IDS;
+  ok(mods.length === 17 && ['swarming', 'teeming', 'rally', 'uniqueHunt', 'fierce', 'stout', 'quick', 'elementalFire', 'elementalFrost', 'elementalZap', 'warded', 'haunted', 'nightMarch', 'hardGround', 'bossWrath', 'treasureTrove', 'cursedShrines'].every(id => ZM.ZONE_MODS[id]), 'mods: the first 15 of ZONES §5 (Elemental as fire / frost / zap) are data');
+  ok(mods.every(id => { const m = ZM.ZONE_MODS[id]; return m.name && m.desc && m.icon && m.color && m.jp && Number.isFinite(m.risk) && (m.layout || m.monster || m.run || m.boss) && Object.keys(m.reward).every(k => ZM.REWARD_KEYS.includes(k)); }), 'mods: each has a name, kanji, icon, colour, effect text, risk, a hook and a reward');
+  ok(ZM.cleanMods(['swarming', 'swarming', 'nope', 'elementalFire', 'elementalZap', 'stout', 'quick'], { tier: 5 }).join() === 'swarming,elementalFire,stout' && ZM.cleanMods(['haunted', 'stout'], { tier: 1 }).join() === 'haunted' && ZM.cleanMods(['haunted'], { tier: 0 }).length === 0 && ZM.cleanMods(mods, { spirit: 10 }).length === 6, 'mods: cleaned to known ids, no repeats, one Elemental, at most the run\'s slots (T0 none)');
+  const n5 = D.normRun({ id: 'tideCaves', floor: 2, tier: 9, mods: ['fierce', 'quick', 'stout', 'warded'] }), nS = D.normRun({ id: 'mapleRoots', tier: 2, spirit: 4, mods: mods }), nB = D.normRun({ id: 'burrow', floor: 3, tier: 3, mods: ['fierce'] });
+  ok(n5.tier === 5 && n5.mods.length === 3 && nS.tier === 5 && nS.spirit === 4 && nS.mods.length === 4 && nB.tier === 0 && nB.spirit === 0 && nB.mods.length === 0, 'runs: normRun caps the tier at 5, a Spirit run is T5, the endless Burrow has no tiers (its tier runs are the Deep Burrow\'s)');
+  // ---- the rewards, summed
+  const rw = ZM.rewardTotals({ tier: 3, mods: ['swarming', 'haunted'] }), rwB = ZM.rewardTotals({ tier: 5, mods: ['bossWrath', 'rally', 'treasureTrove'] }), rw0 = ZM.rewardTotals({});
+  ok(rw.qty === 0.57 && rw.rarity === 0.18 && rw.xp === 0.34 && rw.boss === 0 && rwB.boss === 0.2 && rwB.rarity === 0.4 && rwB.qty === 0.5 && rw0.qty === 0 && rw0.xp === 0, 'rewards: the tier\'s bonus plus every modifier\'s, summed (T3 + Swarming + Haunted: +57% quantity, +18% rarity, +34% xp)');
+  ok(ZM.rewardText(rw) === '+57% item quantity, +18% item rarity, +34% experience' && ZM.rewardText({}) === '', 'rewards: the Lantern\'s reward line');
+  let ex1 = 0, ex2 = 0; const rr = new RNG(77);
+  for (let i = 0; i < 40; i++) { ex1 += ZM.extraItems(50, 0.5, () => rr.next()); ex2 += ZM.extraItems(50, 1.25, () => rr.next()); }
+  ok(Math.abs(ex1 / 2000 - 0.5) < 0.05 && Math.abs(ex2 / 2000 - 1.25) < 0.05 && ZM.extraItems(10, 0) === 0 && ZM.extraItems(0, 3) === 0, `rewards: the quantity bonus adds that share of extra items (+50%: ${(ex1 / 2000).toFixed(3)}, +125%: ${(ex2 / 2000).toFixed(3)} a drop)`);
+  // ---- the merged run and the monster hook
+  const Rr = ZM.resolveRun({ tier: 5, spirit: 10, mods: ['swarming', 'stout', 'fierce', 'quick', 'elementalFrost', 'bossWrath'] });
+  ok(Rr.active && Rr.mods.length === 6 && Rr.layout.pack === 2.1 && Rr.monster.life === 2.8 && Rr.monster.dmg === 1.95 && Rr.monster.speed === 1.25 && Rr.monster.atk === 1.25 && Rr.monster.el === 'frost' && Rr.boss.life === 1.5 && Rr.boss.wrath === 0.4 && !ZM.resolveRun({}).active, 'mods: a run resolves once (Spirit 10, six slots: life ×2 × Stout 1.4; pack ×1.5 (its ceiling) × Swarming 1.4; damage ×1.5 × Fierce 1.3; Quick; Frost; the boss\'s wrath)');
+  const mk = (boss = false) => ({ def: { boss }, lifeMax: 100, life: 100, speed: 3, stats: { life: 100, dmg: [10, 20], speedMul: 1, res: { fire: 0 }, atkMul: 1 } });
+  const mode = { runMods: ZM.resolveRun({ tier: 2, mods: ['stout', 'warded'] }) }, m1 = ZM.monsterMods(mode, mk()), m2 = ZM.monsterMods(mode, m1);
+  ok(m1.lifeMax === 140 && m1.life === 140 && m1.stats.res.fire === 20 && m1.stats.res.frost === 20 && m2.lifeMax === 140 && ZM.monsterMods({}, mk()).lifeMax === 100, 'mods: monsterMods applies life and resistances once (a second pass changes nothing; no run, no change)');
+  const bm = ZM.monsterMods({ runMods: ZM.resolveRun({ tier: 5, mods: ['bossWrath', 'fierce'] }) }, mk(true)), mm = ZM.monsterMods({ runMods: ZM.resolveRun({ tier: 5, mods: ['bossWrath', 'fierce'] }) }, mk(false));
+  ok(bm.lifeMax === 150 && bm.stats.dmg.join() === '16,31' && mm.lifeMax === 100 && mm.stats.dmg.join() === '13,26', "mods: Boss's Wrath lifts only the boss (+50% life, +20% damage on top of Fierce)");
+  const qm = ZM.monsterMods({ runMods: ZM.resolveRun({ tier: 1, mods: ['quick'] }) }, mk()), em = ZM.monsterMods({ runMods: ZM.resolveRun({ tier: 1, mods: ['elementalZap'] }) }, mk());
+  ok(qm.speed === 3.75 && qm.stats.atkMul === 1.25 && em._el?.el === 'zap' && em._el.pct === 0.35, 'mods: Quick speeds moves and attacks; Elemental marks the monster for the extra element');
+  // ---- the generator hook (gen.js generate → layoutMods)
+  let same = true;
+  for (const s of [3, 11, 29]) for (const f of [1, 2]) { const p = D.floorPlan(bd, f, { heroLvl: 9 }), a = Gn.generate({ floor: f, seed: s, plan: p }), b = Gn.generate({ floor: f, seed: s, plan: { ...p, tier: 0, mods: [] } }); if (JSON.stringify(a.spawns) !== JSON.stringify(b.spawns) || a.modded || b.modded) same = false; }
+  ok(same, 'layout: a story run (no tier, no mods) is the same floor exactly');
+  const stat = (run, id = 'bambooDepths', N = 24) => {
+    const o = { tot: 0, champ: 0, uniq: 0, chests: 0, gold: 0, shrines: 0, extra: 0, rooms: 0, maxCount: 0, maxCap: 0, bad: 0, capped: 0 };
+    for (let s = 1; s <= N; s++) for (const f of [1, 2]) {
+      const def = D.DUNGEONS[id], L = Gn.generate({ floor: f, seed: s * 7 + f, plan: D.floorPlan(def, f, { heroLvl: 9, ...run }) }), P = L.spawns.filter(x => !x.boss);
+      o.tot += P.reduce((a, x) => a + x.count + (x.rank === 'normal' ? 0 : 1), 0); o.champ += P.filter(x => x.rank === 'champion').length; o.uniq += P.filter(x => x.rank === 'unique').length;
+      o.chests += L.chests.length; o.gold += L.chests.filter(c => c.quality === 'gold').length; o.shrines += L.shrines.length; o.extra += L.modded?.extra || 0; o.capped += L.modded?.capped ? 1 : 0;
+      o.rooms += L.rooms.filter(r => r.kind !== 'start' && r.kind !== 'boss' && !r.arena).length;
+      for (const x of P) { o.maxCount = Math.max(o.maxCount, x.count); o.maxCap = Math.max(o.maxCap, x.cap || 16); if (x.cap && x.count + 1 > x.cap + 1) o.bad++; }
+      // nothing the hook added may stand in the arena ring, at the arrival or on a chest
+      for (const x of P.filter(q => q.extra)) { if (L.arena && Math.hypot((x.x + 0.5) * 2 - L.arena.x, (x.y + 0.5) * 2 - L.arena.z) < L.arena.r + 2) o.bad++; if (Math.hypot(x.x - L.start.x, x.y - L.start.y) < 5) o.bad++; }
+      for (const c of L.chests.filter(q => q.trove)) if (!L.at(c.x, c.y) || L.chests.some(q => q !== c && q.x === c.x && q.y === c.y)) o.bad++;
+    }
+    for (const k of Object.keys(o)) if (!['maxCount', 'maxCap', 'bad', 'capped'].includes(k)) o[k] /= N * 2;
+    return o;
+  };
+  const s0 = stat({}), sSw = stat({ tier: 1, mods: ['swarming'] }), sTe = stat({ tier: 1, mods: ['teeming'] }), sRa = stat({ tier: 1, mods: ['rally'] }), sUh = stat({ tier: 1, mods: ['uniqueHunt'] }), sTt = stat({ tier: 2, mods: ['treasureTrove', 'cursedShrines'] }), sBig = stat({ tier: 5, mods: ['swarming', 'teeming', 'rally'] });
+  ok(sSw.tot / s0.tot > 1.38 && sSw.tot / s0.tot < 1.62 && sSw.maxCap >= 22 && !sSw.bad, `layout: Swarming (+ T1) makes packs ~×1.48 bigger (${s0.tot.toFixed(0)} → ${sSw.tot.toFixed(0)} a floor; pack cap ${sSw.maxCap})`);
+  ok(sTe.extra / sTe.rooms > 0.7 && sTe.tot > s0.tot * 1.25 && !sTe.bad, `layout: Teeming adds a pack in most rooms (${sTe.extra.toFixed(1)} of ${sTe.rooms.toFixed(1)}), never in the arena or at the arrival`);
+  ok(Math.abs(s0.champ - 2) < 0.01 && sRa.champ >= 4 && Math.abs(s0.uniq - 1) < 0.01 && Math.abs(sUh.uniq - 3) < 0.01, `layout: Rally doubles the champion packs (2 → ${sRa.champ.toFixed(1)}); Unique Hunt adds two unique packs (1 → ${sUh.uniq.toFixed(1)})`);
+  ok(Math.abs(sTt.gold - s0.gold - 2) < 0.05 && Math.abs(sTt.shrines - s0.shrines - 1) < 0.05 && !sTt.bad, `layout: Treasure Trove adds two golden chests a floor, Cursed Shrines one more shrine (${s0.gold.toFixed(2)} → ${sTt.gold.toFixed(2)} gold chests)`);
+  ok(sBig.tot <= ZM.FLOOR_CAP.zone + 1 && sBig.tot > 280 && !sBig.bad, `layout: T5 + Swarming + Teeming + Rally fills a floor to ~${sBig.tot.toFixed(0)} (the ${ZM.FLOOR_CAP.zone} ceiling; capped on ${sBig.capped} floors of 48)`);
+  const dB0 = stat({ tier: 1 }, 'burrowDeep', 12), dB = stat({ tier: 5, mods: ['swarming', 'teeming'] }, 'burrowDeep', 12);
+  ok(dB.tot > dB0.tot * 1.5 && dB.tot <= ZM.FLOOR_CAP.burrow && !dB.bad, `layout: the Deep Burrow's rooms-and-corridors floors take the same hooks (${dB0.tot.toFixed(0)} → ${dB.tot.toFixed(0)})`);
+  // ---- the Deep Burrow
+  const deep = D.DUNGEONS.burrowDeep, dp1 = D.floorPlan(deep, 1, { tier: 2, heroLvl: 30 }), dp2 = D.floorPlan(deep, 2, { tier: 2, heroLvl: 30 });
+  ok(deep.kind === 'deep' && deep.floors === 2 && !deep.waypoints && dp1.theme === 'crystal' && !dp1.boss && dp2.theme === 'moon' && dp2.boss === 'nineTails' && dp1.mlvl === 21 + 8 && dp2.mlvl === 22 + 8 && !dp1.layout, 'deep: the Deep Burrow is 2 Burrow floors (the Crystal Grotto, then the Moonlit Sanctum with Tamamo) at the band of floors 16–20, +4 a tier');
+  // ---- the save: records, the migration, clears, Spirit
+  const sv = Z.normalizeZones({ dungeon: { deepest: 25, waypoints: [1] }, zones: { maple: { dungeon: { cleared: 2, tier: { unlocked: 0, cleared: [] } } }, tidepool: { dungeon: { cleared: 0 } } } });
+  ok(sv.zones.maple.dungeon.tier.unlocked === 1 && sv.zones.maple.dungeon.tier.cleared.join() === '0' && sv.zones.tidepool.dungeon.tier.unlocked === 0 && sv.dungeon.deep.tier.unlocked === 1 && sv.dungeon.deep.tier.cleared.join() === '0' && Z.normalizeZones({ dungeon: { deepest: 12, waypoints: [1] } }).dungeon.deep.tier.unlocked === 0, 'save: old saves start at T0 cleared where the story clear exists (a zone dungeon beaten; the Burrow past floor 20) and T1 opens');
+  ok(Z.tierRecord(sv, 'maple') === Z.tierRecord(sv, 'mapleRoots') && Z.tierRecord(sv, 'burrowDeep') === sv.dungeon.deep && Z.tierRecord(sv, 'burrow') === null && Z.tierOpen(sv, 'mapleRoots') === 1, 'save: a tier record by zone or dungeon id; the Deep Burrow keeps its own; the endless Burrow has none');
+  const again2 = Z.normalizeZones(JSON.parse(JSON.stringify(sv)));
+  ok(again2.zones.maple.dungeon.tier.unlocked === 1 && again2.dungeon.deep.tier.unlocked === 1 && Z.fillTiers({ tier: { cleared: [3, 3, 9, -1, 'x'] }, lantern: { tier: 2, mods: ['swarming', 7] } }).tier.cleared.join() === '3' && Z.fillTiers({ lantern: { tier: 2, mods: ['swarming', 7] } }).lantern.mods.join() === 'swarming', 'save: normalizing is idempotent; a damaged record is repaired (tiers deduped and in range; the Lantern\'s memory cleaned)');
+  const sp = Z.normalizeZones({ dungeon: { deepest: 0, waypoints: [1] } });
+  ok(!Z.spiritOpen(sp) && Z.spiritMax(sp) === 0, 'spirit: closed on a fresh save');
+  for (const z of Z.ZONE_IDS.slice(0, 3)) for (let t = 0; t <= 5; t++) Z.recordDungeonClear(sp, z, t);
+  ok(!Z.spiritOpen(sp), 'spirit: three zone dungeons at T5 are not enough');
+  for (let t = 0; t <= 4; t++) Z.recordDungeonClear(sp, 'onsenCaverns', t);
+  const last = Z.recordDungeonClear(sp, 'onsenCaverns', 5);
+  ok(last.firstTier && last.tierUnlocked === null && Z.spiritOpen(sp) && Z.spiritMax(sp) === 1 && Z.tierOpen(sp, 'burrowDeep') === 0, 'spirit: all four zone dungeons at T5 open Spirit 1 everywhere (the Deep Burrow is optional)');
+  const sc = Z.recordDungeonClear(sp, 'burrowDeep', 5, 1), sc2 = Z.recordDungeonClear(sp, 'tideCaves', 5, 3), sc3 = Z.recordDungeonClear(sp, 'tideCaves', 5, 2);
+  ok(sc.firstTier && sc2.firstTier && !sc3.firstTier && Z.spiritBest(sp) === 3 && Z.spiritMax(sp) === 4 && Z.tierRecord(sp, 'tideCaves').spirit.best === 3 && Z.tierCleared(sp, 'burrowDeep', 5), 'spirit: a Spirit clear in any dungeon opens the next in all; a Spirit clear counts as T5 there');
+  // ---- the quest tier step, the Lantern's memory
+  ok(Q.zoneStepDone({ type: 'tier', dungeon: 'burrowDeep', n: 5 }, sp) && !Q.zoneStepDone({ type: 'tier', dungeon: 'burrowDeep', n: 1 }, sv) && !Q.zoneStepDone({ type: 'tier', dungeon: 'mapleRoots', n: 2 }, sv), 'steps: the tier step reads the Deep Burrow as well as the zone dungeons');
+  const ls = Z.normalizeZones({}); Z.rememberSetup(ls, 'mapleRoots', { tier: 3, spirit: 0, mods: ['stout', 'rally'] });
+  ok(Z.lastSetup(ls, 'maple').tier === 3 && Z.lastSetup(ls, 'mapleRoots').mods.join() === 'stout,rally' && Z.lastSetup(ls, 'bambooDepths') === null, 'save: the Lantern remembers each dungeon\'s last setup');
+  // ---- the clear chest
+  const c1 = T.clearChest({ tier: 1 }), c1f = T.clearChest({ tier: 1 }, true), c5f = T.clearChest({ tier: 5 }, true), c5 = T.clearChest({ tier: 5 }), cS3 = T.clearChest({ spirit: 3 }), cS10 = T.clearChest({ spirit: 10 }, true);
+  ok(c1.rares === 1 && c1f.rares === 2 && c1f.coinMul > c1.coinMul && c5.rares === 3 && c5.gem && !c5.zoneUnique && c5f.zoneUnique && !c1f.zoneUnique, 'chest: rares, a gem from T3, coins by tier; the first clear of a tier adds a rare and doubles the coins; the first T5 clear gives the zone unique again');
+  ok(cS3.endgameChance === T.spiritInfo(3).unique && cS3.rares >= 3 && cS10.pinnacle && cS10.endgameChance === 0, 'chest: a Spirit run\'s chest has a chance at an endgame unique; the pinnacle\'s brings its own');
+  // ---- the Lantern's picks
+  ok([1, 2, 3, 4, 5].every(t => { const r = ZM.recommendMods({ tier: t }), s = ZM.surpriseMods({ tier: t }, Math.random); return r.length === T.TIERS[t].slots && s.length === T.TIERS[t].slots && ZM.cleanMods(r, { tier: t }).length === r.length && ZM.cleanMods(s, { tier: t }).length === s.length; }) && ZM.recommendMods({ tier: 2 }).every(id => ZM.ZONE_MODS[id].risk <= 2), 'lantern: the recommended pick and "surprise me" fill the slots with a valid set (the recommended ones gentle)');
+}
+
 // ------------------------------------------------------------------ render health (ROADMAP R-7: the black flashes)
 hr('RENDER HEALTH: NaN-SAFE NORMALS (ARCHITECTURE "Render health")');
 {
@@ -1488,6 +1624,25 @@ hr('CONTROLS: THE ACTION LAYER (docs/CONTROLS.md §1, core/actions.js)');
   ok(A.text('interact') === 'A' && A.text('interactAlt') === 'D-pad ▼' && A.text('skills') === 'Menu' && A.resolve('Press {potionHeart} now') === 'Press D-pad ◀ now' && A.resolve('Face water and press F to fish.') === 'Face water and press A to fish.' && A.resolve('Press K to learn') === 'Press Menu to learn', "controls: text names the pad's buttons ({tokens}, \"press F\" → A, a panel → Menu)");
   A.setDevice('kbm');
   ok(A.resolve('Press {roll} to roll') === 'Press Space to roll' && A.resolve('Press F to fish.') === 'Press F to fish.', 'controls: on the keyboard old text is left alone and {tokens} name the keys');
+  // touch (CT-5, docs/CONTROLS.md §12): the third device
+  {
+    const { Touch } = await import('../src/core/touch.js');
+    const tp = () => { A._t = performance.now() - 16; A.poll(); };
+    A.setDevice('touch');
+    Touch.hold('skill2'); tp();
+    ok(A.pressed('skill2') && A.held('skill2') && A.held('skill2', 'touch') && !A.held('skill2', 'pad') && !A.held('skill2', 'kbm'), 'controls: touch: a touch button held reads as its action (pressed on the first frame)');
+    tp(); ok(!A.pressed('skill2') && A.held('skill2') && A.heldTime('skill2') > 0, 'controls: touch: a press is one frame; the hold time grows');
+    Touch.release('skill2'); tp(); ok(A.released('skill2') && !A.held('skill2'), 'controls: touch: letting go reads as released');
+    Touch.pulse('roll'); tp(); const p1 = A.pressed('roll') && A.held('roll'); tp(); ok(p1 && !A.held('roll') && A.released('roll'), 'controls: touch: a pulse is held for one frame');
+    Touch.hold('attack'); tp(); A.consume('interact'); ok(!A.pressed('attack', 'touch') && A.held('attack'), "controls: touch: consuming interact takes the attack button's press (its context interact)"); Touch.release('attack'); tp();
+    Object.assign(Touch.stick, { on: true, x: 0, y: 1, mag: 0.5 }); const tm = { ...A.move() }; Touch.stick.on = false;
+    ok(tm.y === 1 && tm.mag === 0.5 && tm.pad, 'controls: touch: the stick is the move vector (analogue)');
+    Object.assign(Touch.aim, { on: true, x: 1, y: 0, mag: 0.8 }); const ta = { ...A.aim() }; Touch.aim.on = false;
+    ok(ta.x === 1 && ta.mag === 0.8, 'controls: touch: a drag off a skill is the aim (as the right stick)');
+    ok(A.text('roll') === 'the roll button' && A.resolve('Ouch! Press Q to munch a Heart Treat.') === 'Ouch! Tap the heart potion to munch a Heart Treat.' && A.resolve('Tap Tab for the next hero · hold Tab to pick') === 'Tap the hero button for the next hero · hold the hero button to pick', 'controls: touch: text names the on-screen controls ("Press Q" → "Tap the heart potion")');
+    Touch.hold('skill1'); A.setDevice('kbm'); ok(!Touch.down.size && !Touch.stick.on, 'controls: another device lets every touch button go');
+    tp();
+  }
   const r0 = A.forKey('R'); A.isBuilding = () => true; const rB = A.forKey('R'); A.isBuilding = () => false;
   ok(r0 === 'potionR' && rB === 'rotate' && A.forKey('Tab') === 'hero', 'controls: R in text is the Rejuv potion, or Rotate while building; Tab is the hero button');
   const r1 = A.rebind('skill1', 'pad', 'RB');
@@ -1506,16 +1661,16 @@ hr('CONTROLS: THE STEAM DECK PROFILE (docs/CONTROLS.md §10, core/deck.js)');
   const D = await import('../src/core/deck.js');
   const Q = q => D.bootGraphics(new URLSearchParams(q));
   const d3 = Q('q=3'), d0 = Q('q=0');
-  ok(d3.preset === 3 && d3.quality === 1 && d3.deck && d0.preset === 0 && d0.quality === 0 && !d0.deck && Q('q=9').preset === 3 && Q('q=x').preset === 2, 'deck: ?q= picks the preset (3: the Deck, built at Medium density; clamped; junk is High)');
+  ok(d3.preset === 3 && d3.quality === 1 && d3.deck && d0.preset === 0 && d0.quality === 0 && !d0.deck && Q('q=4').preset === 4 && Q('q=4').quality === 0 && !Q('q=4').deck && Q('q=9').preset === 4 && Q('q=x').preset === 2, 'deck: ?q= picks the preset (3: the Deck, built at Medium density; 4: Mobile, built at Low; clamped; junk is High)');
   const ls0 = Object.getOwnPropertyDescriptor(globalThis, 'localStorage'), store = { 'chewy3d.settings': JSON.stringify({ quality: 1 }) };
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, writable: true, value: { getItem: k => store[k] ?? null } });
   const s1 = Q(''), sq = Q('q=2'); delete store['chewy3d.settings']; const s0 = Q('');
   if (ls0) Object.defineProperty(globalThis, 'localStorage', ls0); else delete globalThis.localStorage;
   ok(s1.preset === 1 && s1.quality === 1 && sq.preset === 2 && s0.preset === 2, 'deck: R-2, the saved Graphics preset applies at boot; ?q= wins; nothing saved off a Deck screen is High');
   const dpr0 = globalThis.devicePixelRatio; globalThis.devicePixelRatio = 2;
-  ok(D.pixelRatioFor(2) === 1.5 && D.pixelRatioFor(1) === 1 && D.pixelRatioFor(0) === 1 && D.pixelRatioFor(3) === 0.85, 'deck: the pixel ratio (High up to 1.5, Medium and Low 1, the Deck 0.85)');
+  ok(D.pixelRatioFor(2) === 1.5 && D.pixelRatioFor(1) === 1 && D.pixelRatioFor(0) === 1 && D.pixelRatioFor(3) === 0.85 && D.pixelRatioFor(4) === 1, 'deck: the pixel ratio (High up to 1.5, Medium and Low 1, the Deck 0.85, Mobile 1)');
   globalThis.devicePixelRatio = dpr0;
-  ok(!D.deckLike() && D.FPS_CAPS.join() === '0,60,40' && D.PRESET_NAMES.join() === 'Low,Medium,High,Deck' && D.DECK.uiScale === 1.15 && D.DECK.shadowMap <= 2048, 'deck: no screen is not a Deck; the frame caps, the preset names and the Deck numbers');
+  ok(!D.deckLike() && !D.mobileLike() && D.FPS_CAPS.join() === '0,60,40,30' && D.PRESET_NAMES.join() === 'Low,Medium,High,Deck,Mobile' && D.DECK.uiScale === 1.15 && D.DECK.shadowMap <= 2048 && D.MOBILE.pixelRatio === 1 && D.MOBILE.shadowMap === 1024 && D.MOBILE.particles === 0.5 && D.liteOf(4) === D.MOBILE && D.liteOf(3) === D.DECK && D.liteOf(2) === null && D.MOBILE_TEX === 1024 && D.capTexture(null, 1024) === null, 'deck: no screen is not a Deck or a phone; the frame caps, the preset names, the Deck and Mobile numbers');
 }
 
 hr('RESULT');

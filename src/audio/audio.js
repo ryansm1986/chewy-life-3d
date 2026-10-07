@@ -65,8 +65,8 @@ class AudioSystem {
   get ready() { return !!this.ctx && this.ctx.state === 'running'; }
   get currentTrack() { return this.wantTrack; }
   get currentAmbience() { return this.wantAmb; }
-  addGestures() { for (const e of ['pointerdown', 'keydown', 'touchend']) window.addEventListener(e, this.onGesture, { capture: true, passive: true }); }
-  removeGestures() { for (const e of ['pointerdown', 'keydown', 'touchend']) window.removeEventListener(e, this.onGesture, { capture: true }); }
+  addGestures() { for (const e of ['pointerdown', 'pointerup', 'keydown', 'touchend']) window.addEventListener(e, this.onGesture, { capture: true, passive: true }); }
+  removeGestures() { for (const e of ['pointerdown', 'pointerup', 'keydown', 'touchend']) window.removeEventListener(e, this.onGesture, { capture: true }); }
   onGesture() { this.unlock(); }
   // Creates/resumes the AudioContext. Must run inside a user gesture (init() wires that up).
   unlock() {

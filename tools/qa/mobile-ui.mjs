@@ -1,0 +1,129 @@
+// The phone UI check (docs/CONTROLS.md §12, ROADMAP CT-5): a phone in landscape (844×390 at DPR 3, touch), then every
+// panel and overlay in turn: the HUD, the bag (and a tooltip), character, skills (each hero's trees: its three tabs must
+// fit the row, labels and all), quests, map,
+// the game menu's pages, Rosie's shop, the stash, cooking, the workbench, the Travel Map, the gift and seed pickers, a
+// house card and remodel, a dialogue with choices, a guide line, the reel bar, build mode, decorate mode, the title and
+// the portrait rotate overlay. For each: a screenshot, text drawn under the floor (12 CSS px: ui/mobile.css raises what
+// was under), a panel that runs off the screen (it must fit, or scroll inside), and tappables under 44 px.
+// Decorative text is left out: the Japanese subtitles (.jp), the compass's 北, the portrait's "Lv", glyph art (svg).
+//   usage: node tools/qa/mobile-ui.mjs [--report] [view…]   W=844 H=390 DPR=3   SHOT_DIR (default tools/qa/tmp/mobile-ui)
+//   FLOOR=12 TAP=44. Exit 1 when a panel is cut off, or (without --report) text or a tappable is under.
+import fs from 'node:fs';
+import path from 'node:path';
+import { launchTouch, boot, sleep, waitMode, BASE, PHONE } from './touch-lib.mjs';
+
+const OUT = process.env.SHOT_DIR || path.resolve('tools/qa/tmp/mobile-ui');
+const FLOOR = +(process.env.FLOOR || 12), TAP = +(process.env.TAP || 44), STRICT = !process.argv.includes('--report');
+const ONLY = new Set(process.argv.slice(2).filter(a => !a.startsWith('--')));
+const W = +(process.env.W || PHONE.w), H = +(process.env.H || PHONE.h), DPR = +(process.env.DPR || PHONE.dpr);
+fs.mkdirSync(OUT, { recursive: true });
+const { browser, page, errors, F } = await launchTouch({ w: W, h: H, dpr: DPR });
+const ev = (f, a) => page.evaluate(f, a);
+let bad = 0;
+const small = [], tiny = [], clipped = [];
+const DECOR = /\.jp\b|mm-n > span|pc-lv > small|chg-jp|ph-jp/;
+
+const audit = (name, scopes) => ev(([scopes, floor, tap]) => {
+  const vis = el => { for (let e = el; e && e !== document.body; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity < 0.05) return false; } return true; };
+  const label = el => { const own = el.classList.length ? '.' + [...el.classList].slice(0, 2).join('.') : el.tagName.toLowerCase(); const p = el.closest('.panel, .hud, .tc, .dlg, .tut-dock, .hero-wheel, .reel, .bh, .home-hud, .toasts, .ti, .m-rotate'); const pc = p ? '.' + [...p.classList].slice(0, 2).join('.') + ' ' : ''; return pc + own; };
+  const out = new Map(), taps = new Map();
+  const onScreen = r => r.width >= 1 && r.height >= 1 && r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight;
+  for (const sc of scopes) for (const root of document.querySelectorAll(sc)) {
+    const hudText = root.matches('.l-hud, .hud'); // (the HUD's own labels are not menu text: only its tappables count)
+    const w = document.createTreeWalker(hudText ? document.createElement('i') : root, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      const t = n.textContent.replace(/\s+/g, ' ').trim(); if (!t) continue;
+      const el = n.parentElement; if (!el || el.closest('svg')) continue;
+      const r = el.getBoundingClientRect(); if (!onScreen(r) || !vis(el)) continue;
+      const px = parseFloat(getComputedStyle(el).fontSize) * (el.currentCSSZoom ?? 1);
+      if (px < floor) { const k = label(el), o = out.get(k) || { sel: k, px, n: 0, text: t.slice(0, 34) }; o.n++; if (px < o.px) { o.px = px; o.text = t.slice(0, 34); } out.set(k, o); }
+    }
+    for (const el of root.querySelectorAll('button, .btn, .tab, .slot, .node, .sh-item, .seg button, .tog, .dch, .ph-x, .card, .tc-b, .belt, .lvb, .qt-tog, .ck-r, .cr-r, input[type=range]')) {
+      const r = el.getBoundingClientRect(); if (!onScreen(r) || !vis(el) || el.disabled) continue;
+      const m = Math.min(r.width, r.height); if (m >= tap) continue;
+      // (a target may reach past its box: an ::after with negative insets, as the touch buttons and badges have)
+      const a = getComputedStyle(el, '::after'), ext = a.content !== 'none' && a.position === 'absolute' ? Math.max(0, -parseFloat(a.top) || 0) + Math.max(0, -parseFloat(a.bottom) || 0) : 0;
+      if (Math.min(r.width, r.height) + ext * (el.currentCSSZoom ?? 1) >= tap) continue;
+      const k = label(el), o = taps.get(k) || { sel: k, px: m, n: 0 }; o.n++; o.px = Math.min(o.px, m); taps.set(k, o);
+    }
+  }
+  // a panel must be wholly on screen (its body scrolls when it is taller than the screen)
+  const cut = [...document.querySelectorAll('.pw .panel')].filter(p => p.offsetParent && !p.closest('.closing')).map(p => ({ p: [...p.classList].find(c => c.startsWith('p-')) + ` (${p.closest('.pw').className}${p.matches('.p-build') ? ', build ' + !!window.G.build?.active + ', decor ' + !!window.G.housing?.decor?.active : ''})`, r: p.getBoundingClientRect() }))
+    .filter(o => o.r.top < innerHeight && o.r.bottom > 0 && (o.r.top < -2 || o.r.left < -2 || o.r.right > innerWidth + 2 || o.r.bottom > innerHeight + 2)).map(o => ({ sel: o.p, rect: [o.r.left, o.r.top, o.r.right, o.r.bottom].map(v => Math.round(v)) }));
+  // a tab row that must fit (the skill trees' three): every tab inside the row and every label inside its tab
+  for (const row of document.querySelectorAll('.sk-tabs')) {
+    if (!row.offsetParent) continue;
+    const R = row.getBoundingClientRect();
+    for (const t of row.querySelectorAll('.tab')) {
+      if (!vis(t)) continue;
+      const r = t.getBoundingClientRect(), sp = t.querySelector('span');
+      if (r.left < R.left - 2 || r.right > R.right + 2 || (sp && sp.scrollWidth > sp.clientWidth + 1) || r.height < tap) cut.push({ sel: 'tab ' + t.dataset.t + ' "' + t.textContent.trim() + '"', rect: [r.left, r.top, r.right, r.bottom].map(v => Math.round(v)) });
+    }
+  }
+  return { cut, small: [...out.values()].map(o => ({ ...o, px: +o.px.toFixed(1) })).sort((a, b) => a.px - b.px), taps: [...taps.values()].map(o => ({ ...o, px: +o.px.toFixed(1) })).sort((a, b) => a.px - b.px) };
+}, [scopes, FLOOR, TAP]).then(r => {
+  r.small = r.small.filter(s => !DECOR.test(s.sel));
+  console.log(`\n== ${name}: ${r.small.length ? r.small.length + ' text groups under ' + FLOOR + ' px' : 'text ≥ ' + FLOOR + ' px'} · ${r.taps.length ? r.taps.length + ' tappables under ' + TAP + ' px' : 'tappables ≥ ' + TAP + ' px'}${r.cut.length ? ' · CUT OFF' : ''}`);
+  for (const c of r.cut) { console.log(`   CUT OFF ${c.sel} ${JSON.stringify(c.rect)}`); clipped.push({ ...c, where: name }); }
+  for (const s of r.small.slice(0, 14)) console.log(`   ${String(s.px).padStart(5)} px  ${s.sel}  ×${s.n}  "${s.text}"`);
+  for (const t of r.taps.slice(0, 10)) console.log(`   tap ${String(t.px).padStart(5)} px  ${t.sel}  ×${t.n}`);
+  small.push(...r.small.map(s => ({ ...s, where: name }))); tiny.push(...r.taps.map(t => ({ ...t, where: name })));
+  return r;
+});
+const shot = name => page.screenshot({ path: path.join(OUT, name + '.png') });
+const scene = async (name, open, scopes, close) => {
+  if (ONLY.size && !ONLY.has(name)) return;
+  try { await open(); await sleep(page, 700); await shot(name); await audit(name, scopes); }
+  catch (e) { console.log(`!! ${name}: ${String(e.message || e).split('\n')[0]}`); bad++; }
+  try { if (close) await close(); else { await ev(() => { const U = window.G.ui; for (const n of [...U._order]) U.close(n); }); } await sleep(page, 300); } catch (e) { /* next */ }
+};
+
+try {
+  await boot(page, 'fresh&nointro&notut&hour=10');
+  const prof = await ev(() => { const G = window.G, E = G.engine; return { dev: G.controls.device, preset: E.preset, quality: E.quality, pr: +E.renderer.getPixelRatio().toFixed(2), scale: +G.ui.scale.toFixed(3), mobile: G.ui.root.className }; });
+  console.log('profile', JSON.stringify(prof));
+  await ev(() => { const G = window.G; G.state.flags.mokaJoined = true; G.state.flags.poeJoined = true; G.state.flags.hints = { all: true }; G.state.potions = { heart: 4, zoom: 3, rejuv: 1 }; G.state.coins = 2400; G.state.player.lvl = 12; G.state.player.skillPts = 3; G.state.player.statPts = 2; G.state.player.hotbar = ['attack', 'chomp', 'packcall', null, null, null]; G.actions.addPantry('onigiri', 2); G.actions.addPantry('turnip', 4); G.actions.recompute(); G.ui.toasts?.retire?.(0); });
+  await ev(async () => { const G = window.G, I = await import('/src/rpg/items.js'); for (const o of [{ ilvl: 6, rarity: 'rare', slot: 'hat' }, { ilvl: 4, rarity: 'magic', slot: 'boots' }, { ilvl: 3, rarity: 'normal', slot: 'charm' }, { ilvl: 5, rarity: 'magic', slot: 'weapon' }]) { try { const it = I.generateItem?.(o) || I.rollItem?.(o); if (it) G.actions.pickup(it); } catch (e) { /* */ } } });
+  await sleep(page, 600);
+
+  await scene('hud', async () => {}, ['.l-hud', '.tc'], async () => {});
+  await scene('bag', () => ev(() => window.G.ui.open('inventory', { view: 'bag' })), ['.p-inv']);
+  await scene('character', () => ev(() => window.G.ui.open('character')), ['.p-char']);
+  await scene('skills', () => ev(() => window.G.ui.open('skills')), ['.p-skills']);
+  for (const cls of ['moka', 'poe', 'shihtzu']) // (the other heroes' trees: the panel draws the class on state.player; restored after)
+    await scene('skills-' + cls, () => ev(c => { const p = window.G.state.player; window.__cls0 ??= p.cls; p.cls = c; window.G.ui.open('skills'); }, cls), ['.p-skills'],
+      () => ev(() => { const U = window.G.ui; U.close('skills'); window.G.state.player.cls = window.__cls0; }));
+  await scene('quests', () => ev(() => window.G.ui.open('quests')), ['.p-quests']);
+  await scene('map', () => ev(() => window.G.ui.open('map')), ['.p-map']);
+  await scene('menu', () => ev(() => window.G.ui.open('menu')), ['.p-menu']);
+  await scene('settings', () => ev(() => { window.G.ui.open('menu'); window.G.ui.panels.menu.setView('settings'); }), ['.p-menu']);
+  await scene('controls', () => ev(() => { window.G.ui.open('menu'); window.G.ui.panels.menu.setView('controls'); }), ['.p-menu']);
+  await scene('shop', () => ev(() => window.G.openShop()), ['.p-shop', '.p-inv']);
+  await scene('stash', () => ev(() => window.G.ui.open('stash')), ['.p-stash', '.p-inv']);
+  await scene('cook', () => ev(() => window.G.life.kitchen.open('kitchen')), ['.p-cook']);
+  await scene('craft', () => ev(() => window.G.openWorkbench?.('home')), ['.p-craft']);
+  await scene('travel', () => ev(() => window.G.openTravel()), ['.p-travel']);
+  await scene('gift', () => ev(() => { const G = window.G; G.ui.pickGift({ name: 'Rosie', portrait: G.portrait('rosie'), items: [{ key: 'onigiri', name: 'Onigiri', n: 1, pantry: true, love: 'liked' }, { key: 'turnip', name: 'Turnip', n: 4, pantry: true, love: 'like' }] }); }), ['.p-gift']);
+  await scene('seeds', () => ev(() => window.G.ui.open('seeds', { seeds: ['carrotSeed', 'riceSeed'], last: 'carrotSeed', onPick() {} })), ['.p-seeds']);
+  await scene('house-card', () => ev(() => { const G = window.G, rec = G.sim.list.find(r => r.data?.owner === 'usagi') || G.sim.list.find(r => r.data?.owner); G.ui.open('houseCard', { rec }); }), ['.p-house']);
+  await scene('remodel', () => ev(() => { const G = window.G, rec = G.sim.list.find(r => r.data?.owner === 'usagi') || G.sim.list.find(r => r.data?.owner); G.ui.open('remodel', { rec }); }), ['.p-remodel']);
+  await scene('dialogue', async () => {
+    await ev(() => { const G = window.G; G.ui.dialogue({ speaker: 'Rosie', portrait: G.portrait('rosie'), lines: ['Hi Chewy! What can I do for you today?'], choices: [{ text: 'Show me your treats' }, { text: 'Any jobs for me?' }, { text: 'Give a gift' }, { text: 'Bye for now!' }] }); });
+    await sleep(page, 400); for (let i = 0; i < 6 && await ev(() => window.G.ui.dlg.typing); i++) await ev(() => window.G.ui.dlg.advance());
+  }, ['.l-dlg'], async () => { await ev(() => window.G.ui.dlg.finish?.(-1)); });
+  await scene('guide', () => ev(() => { const T = window.G.ui.tutorial; T.step({ n: 2, total: 6, title: 'Fishing with Kero', objective: 'Face the water and press *F* to cast' }); T.say('kero', 'Hold *F* to lift the green zone. Tap *Tab* for the next hero.'); }), ['.tut-dock', '.l-over'], () => ev(() => { const T = window.G.ui.tutorial; T.hide?.(); T.clear?.(); }));
+  await scene('reel', () => ev(() => window.G.ui.reel.start({ icon: '', name: 'Koi', known: false, zone: 0.3 })), ['.reel'], () => ev(() => window.G.ui.reel.hide()));
+  await scene('build', async () => { await ev(() => window.G.build.enter()); await sleep(page, 600); }, ['.p-build', '.l-hud', '.tc'], async () => { await ev(() => window.G.build.exit?.()); await sleep(page, 400); });
+  if (!ONLY.size || ONLY.has('home') || ONLY.has('decorate')) { await ev(() => window.G.openHome()); await waitMode(page, 'interior'); await sleep(page, 900); }
+  await scene('home', async () => {}, ['.l-hud', '.tc'], async () => {});
+  await scene('decorate', async () => { await ev(() => window.G.housing.decor.enter()); await sleep(page, 600); }, ['.p-decor', '.l-hud', '.tc'], () => ev(() => window.G.housing.decor.exit?.()));
+  await scene('portrait', async () => { await page.setViewportSize({ width: H, height: W }); await sleep(page, 500); }, ['.m-rotate'], async () => { await page.setViewportSize({ width: W, height: H }); await sleep(page, 500); });
+  await scene('title', async () => { await ev(() => { window.G.housing?.decor?.active && window.G.housing.decor.exit?.(); window.G.save(); }); await page.goto(`${BASE}/`, { waitUntil: 'load' }); await page.waitForFunction(() => window.__ready === true && window.G?.titleActive, null, { timeout: 60000 }); await sleep(page, 2500); }, ['.l-title', '.ti'], async () => {});
+} catch (e) { console.log('!! run:', e.message); bad++; }
+
+console.log(`\n${small.length} text groups under ${FLOOR} px; ${tiny.length} tappable groups under ${TAP} px; ${clipped.length} panels cut off. Shots: ${OUT}`);
+if (errors.length) { console.log('page errors:', [...new Set(errors)].slice(0, 6).join('\n')); bad++; }
+await browser.close();
+const fail = bad || clipped.length || (STRICT && (small.length || tiny.length));
+console.log(fail ? 'FAIL mobile-ui' : 'PASS mobile-ui');
+process.exit(fail ? 1 : 0);

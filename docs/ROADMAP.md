@@ -47,10 +47,10 @@ House rules for every objective:
 | Z-D4 | **Villager quests**: 4–6 per zone, with objectives in the zone dungeon (the Z-A5 steps) | done | Z-A5, Z-C2 | **All four built**: 6 quests each into bambooDepths / mapleRoots / tideCaves / onsenCaverns (`world/zoneQuests.js`), the provider `G.story.dungeonObjectives`; maple / tidepool / onsen wait on phase C's gates for those dungeons |
 | Z-D5 | **Reopened buildings work**: the shop stock, the inn (heal and respawn), the waypoint, the zone specials | done | Z-D1 | **All four built**: shop, inn, waypoint everywhere; Ninja Dojo + Craftshop (bamboo), Momiji Tea House (tea sets: Well Fed ×1.5), Fish Market (sell the catch ×1.3) + Boatyard (commissions, a row to the sea cave once its gate exists), Bathhouse (Onsen Glow: `rpg/zoneBuffs.js`) + Snow-ore Smith (forge, re-fold) |
 | Z-D6 | **Blender centrepieces** (Opus Blender agent): the Waypoint Shrine hero model (about 1.8 m guardian stone under a small shrine roof, a rune that lights up, zone tints) for all 4 villages; a **dungeon gate per zone** (bamboo spec in ZONES §8.2: a mossy cliff cave mouth 6.5×4.2×3 m framed by the torii, ≤6k tris, `seal` and lantern empties); optionally bespoke siege captains (e.g. Captain Galeclaw). Candidates the helpers flagged: maple (a persimmon drying frame, a chestnut brazier, a Shigaraki tanuki statue, a red parasol set, the hamlet gate); onsen village (the bathhouse karahafu façade, a snow-laden kawara roof kit, a gasshō thatch module, a yukimi-dōrō lantern, the ashiyu foot bath, a kamakura and snow-lantern set); the onsen dungeon gate (it rates 7.5–8 as kit) | todo | Z-C, Z-D | The kit versions work now, with GLB swap-in slots (`data.js WAYSTONE.glb`, `CAPTAINS[id].glb`). Ask the owner about the captains. Candidates from the village art (ZONES §2.2): Akane — a persimmon drying frame, a chestnut brazier, a Shigaraki tanuki, a red parasol set, the hamlet gate, a hiwada tea-house roof; Shiokaze — Funaki's wasen boat, the hull on shear legs, Kaizo's watchtower, the fish kanban + catch set, the anchor monument, a stone-weighted plank roof kit; Yukimi — the bathhouse karahafu façade, a snow-laden kawara roof kit, the gasshō thatch module, a yukimi-dōrō, the ashiyu, a kamakura + lantern set |
-| Z-E1 | **Tiers T1–T5** per zone dungeon: level +4 per tier (cap 60), base density and reward scaling | todo | Z-C2 | ZONES §5 |
-| Z-E2 | **Modifiers** (`src/rpg/zoneMods.js`), the first 15, with hooks in spawn, monster and mode | todo | Z-A2, Z-B5 | |
-| Z-E3 | **The Spirit Lantern UI**: tier select, modifier slots (1/2/2/3/3, Spirit 4–6), a reward summary, Spirit Wicks | todo | Z-E1, Z-E2 | |
-| Z-E4 | **The Spirit endgame**: Spirit Tier 1…∞ after all four T5 clears; a pinnacle boss at Spirit 10 | todo | Z-E3 | The pinnacle boss design is TBD |
+| Z-E1 | **Tiers T1–T5** per zone dungeon and the Deep Burrow: level +4 per tier (cap 60), base density and reward scaling, the tier save and its migration, tier-clear rewards | review | Z-C2 | **Checkpoint 1 built** (the zones-E Opus agent; ZONES §5.1): `rpg/tiers.js`, `rpg/zones.js` tierRecord (+ the migration), `dungeon/tierRun.js` (rewards, the Lantern chest), the Deep Burrow (`DUNGEONS.burrowDeep`: Crystal Grotto → Moonlit Sanctum + Tamamo, band 17–21), `tier:unlocked`, the quest `tier` step; debug `?run=` / `G.tierDebug`; s30 13/13 |
+| Z-E2 | **Modifiers** (`src/rpg/zoneMods.js`), the first 15 as data, with hooks in the generator, at spawn and run-wide; the summed rewards | review | Z-A2, Z-B5 | **Checkpoint 1 built**: 17 entries (Elemental as fire / frost / zap); `layoutMods` in gen.js, `monsterMods`, `tierRun.js` (Haunted's Yūrei `zoneMonsters/spirit.js`, Night March, Hard Ground, Boss's Wrath, Cursed Shrines, the Elemental hit); floor ceiling 340; look review `tools/qa/tier-shots.mjs`. Horde check on a busy machine: a T5 Swarming + Teeming + Rally floor is no slower than T0 (both over the gate under the load) |
+| Z-E3 | **The Spirit Lantern UI**: a lantern at each gate and the Burrow door; tier select, modifier slots (1/2/2/3/3, Spirit 4–6), modifier cards, a reward summary, recommended / "surprise me", the last setup remembered; the run chip; mouse, pad and touch | todo | Z-E1, Z-E2 | No Spirit Wicks: runs are free (the owner, 2026-10-07) |
+| Z-E4 | **The Spirit endgame**: Spirit Tier 1…∞ after all four zone dungeons are cleared at T5 (all five dungeons); endgame uniques; the pinnacle at Spirit 10 | todo | Z-E3 | The numbers and the save are built (ZONES §5.1). The pinnacle is a remixed "all four" fight (the owner, 2026-10-07): Tengu, Danzaburō, Umibōzu, Yuki-onna in phases in one arena |
 | Z-F1 | **Height audit**: route the y = 0 constants (`setY(const)`, `Vector3(x, 0, z)`, `openSpotNear`) through `world.heightAt()` | todo | — | Can start anytime |
 | Z-F2 | **Elevation nav**: flow-field cell heights with step rules, height-aware line of sight, the same step rule in the player's A*, a robust `mouseGround` | todo | Z-F1 | |
 | Z-F3 | **Bamboo rework** with real elevation: terraces, ramps, stairs, cliffs, a bridge and a waterfall, the village terrace, depth layers; the camera-side-steps-down rule; terrain occlusion | todo | Z-F2, Z-D1 | Do Bamboo first, then reuse the recipe |
@@ -71,9 +71,9 @@ House rules for every objective:
 |---|---|---|---|
 | CT-1 | **The action layer, gamepad gameplay** (the console ARPG mapping, aim assist, A context-interact, hold-to-charge), device-aware glyphs | done | CONTROLS §1–2, as built §8. `core/actions.js` (actions, the pad poll, dead zones, last device, rebinding, rumble), `combat/padAim.js` (soft lock + ring), `ui/padGlyphs.js` + `pad.css` (Xbox / PlayStation glyphs, caps that follow the device), Settings › Controls (menu.js). A CT-1 bridge for dialogue, the title, Menu / B / View. QA: s25 (28 checks, a virtual pad), test-rpg "CONTROLS", prod-smoke `pad` |
 | CT-2 | **UI focus navigation** for every menu, panel and dialogue; build and decorate with a virtual cursor | done | CONTROLS §3, as built §9. `ui/padNav.js` (spatial focus over every open panel, the popover and the guide offer: A / B / LB RB / X Y per element, tooltips on the focus, the ring and a glyph-hint footer), `ui/padCursor.js` (build and decorate: a stick-driven paw cursor through `Actions.pointer()`, the D-pad palette), the pause menu's pad row (panels, Build, Decorate, Home). QA: s25 45 checks (sections g, h), prod-smoke `pad` (the focus ring) |
-| CT-3 | **The Steam Deck**: the 1280×800 UI scale and safe area, the Deck quality preset, R-2 (quality at boot), the Deck perf test | built, in review | CONTROLS §4, as built §10. `core/deck.js` (the Deck-like screen, the preset at boot, the Deck's numbers, the frame cap), `Engine.applyPreset / tuneShadows` (the Deck's shadows, redrawn every other frame), `ui/deck.css` (the safe area, the 12 px text floor), Settings › Graphics Low / Medium / High / Deck and Frame cap Off / 60 / 40. QA: s26-deck 8/8, `deck-ui.mjs` (26 views at 1280×800), `deck-perf.mjs`, prod-smoke's `deck` case |
-| CT-4 | **The desktop app**: an Electron Linux (SteamOS) and Windows build, `npm run build:desktop`, `docs/DESKTOP.md` | todo | CONTROLS §5 |
-| CT-5 | **Touch controls** for phones and tablets | todo | CONTROLS §6; after the controller work |
+| CT-3 | **The Steam Deck**: the 1280×800 UI scale and safe area, the Deck quality preset, R-2 (quality at boot), the Deck perf test | done | CONTROLS §4, as built §10. `core/deck.js` (the Deck-like screen, the preset at boot, the Deck's numbers, the frame cap), `Engine.applyPreset / tuneShadows` (the Deck's shadows, redrawn every other frame), `ui/deck.css` (the safe area, the 12 px text floor), Settings › Graphics Low / Medium / High / Deck and Frame cap Off / 60 / 40. QA: s26-deck 8/8, `deck-ui.mjs` (26 views at 1280×800), `deck-perf.mjs`, prod-smoke's `deck` case |
+| CT-4 | **The desktop app**: an Electron Linux (SteamOS) and Windows build, `npm run build:desktop`, `docs/DESKTOP.md` | built; approved by Claude, **waiting on the owner's Steam Deck test** | CONTROLS §5, as built §11; the guide is DESKTOP.md. `tools/desktop/` (`main.cjs` on `app://pawhaven`, `preload.cjs` → `window.pawhaven`, `build-desktop.mjs`, `appimage.mjs` (an AppImage written on any OS), `verify-squashfs.py`, `icon.png`), `src/ui/desktop.js` (Settings › Full screen, Quit). Electron 44.6 + electron-builder 26 as devDependencies. QA: desktop-smoke 5/5 on the packaged Windows app |
+| CT-5 | **Touch controls** for phones and tablets | **built; approved by Claude, waiting on the owner's real-phone checks** (the skill tabs fit, a compact bag, the Mobile memory diet: a Burrow fight about 0.7 GB from 1.1). Open: the owner's real-phone checks (ITCH.md "Mobile": Android Chrome, an iPhone, then tick Mobile friendly + Landscape); perf re-measured on a quiet machine and a real phone | CONTROLS §6, as built §12. `core/touch.js` (the third device of the action layer), `ui/touch.js` + `touch.css` (the floating stick with a sprint ring, the attack button + five skills on an arc + roll + weapon badge, the belt between the orbs, hero / bag / menu by the minimap, Auto or Drag aim with a ground mark, tap to lock / use / walk, pinch zoom, haptics, the fitted hero wheel, the build / decorate edit buttons, fishing), `ui/mobile.js` + `mobile.css` (phone and tablet layout, the safe area, menus fitted with a 12 px floor and 44 px targets, tap / drag / double-tap / long-press, pairs that flip, the rotate overlay, full screen, the folding charge drawer), the Mobile preset (`core/deck.js` MOBILE, `capTexture`; Engine `postPreset`), `public/manifest.webmanifest`, Settings › Controls › Touch. QA: s27-touch 37 checks, `touch-lib.mjs`, `touch-shots.mjs`, `mobile-ui.mjs`, `mobile-perf.mjs`, `mobile-mem.mjs`, prod-smoke `touch`, test-rpg touch checks |
 
 ---
 
@@ -86,8 +86,8 @@ House rules for every objective:
 | H-2 | **Poe, the pug ninja**: her class, 21 skills, charge, joining scene, guide, s20 | done | docs/POE.md |
 | H-2a | Poe's baked rig: install `poe_toy` (done 2026-10-05: round 4b's closed-eye lash fix); remove `pending` on `HERO_MODELS.poeToy` and `FUMA_MODEL`; set palm, back, `fumaMount`, earGain 0.5 and `squint: [0.58, -0.24]`; tune her coat with the samurai shader's darkGrade gate | done | `pending` is gone on both. The GLB fūma shows at its own 0.8 m on the baked rig. The Animator takes a gain per ear (hers stay equal). The coat uses `darkGrade [1, 7, 4, -2, 0.1]`, `darkNeutral 0.85`, `darkFur 1`: lit fur reads `#333036`–`#37333a` in the village. Checked: the face, 24 poses, portraits and the joining scene; s20 and prod-smoke assert `poe_toy` and the GLB fūma. POE.md §8 |
 | H-3 | The Burrow's warm key light makes hero fur read orange: an environment grade tweak | todo | Seen on the samurai Chewy and chewy_b |
-| H-4 | **The Shih Tzu dark knight** (male, name TBD): concepts → the owner picks → Opus Blender model and rig → the class (a toy-flail melee tree, a dark-dog-magic DoT tree, a third tree TBD), charge tables, joining, the 4-hero wheel | in progress | The owner picked **B "Gloomhowl Warlock-Knight"** (a black-and-white coat, a plum tabard, a teal ghostlight). Blender model task `tools/blender/work/codex/shihtzu-toy/` (plus the flail prop). The class agent starts after zones C and D |
-| H-5 | **The Golden Retriever dragoon** (male, name TBD): concepts → the owner picks → Opus Blender model and rig → the class (spear, javelins, dragon-pet trees), charge; **Shadow's dragon whelp outfit plus flying** (only while the dragoon is active: a Blender outfit on the quad rig, wing flaps, a flying companion mode) | in progress | The owner picked **C "Emberleaf Dragon Guard"** (a red-gold coat, emerald scale armour). Blender tasks: `golden-toy/` (plus the lance and javelin props) and `shadow-whelp/` (a re-dress of shadow_toy, locked, plus a mirrored wing prop; rig `shadow_whelp`). The class agent starts after zones C and D |
+| H-4 | **The Shih Tzu dark knight** (male, name TBD): concepts → the owner picks → Opus Blender model and rig → the class (Flail Arts, Gloom Hexes, Ghostlight Tome), charge tables, joining, the 4-hero wheel | in progress | The owner picked **B "Gloomhowl Warlock-Knight"**. The rig `shihtzu_toy` and the flail GLB are installed. Checkpoints 1 and 2 approved (2026-10-07). **Checkpoint 3 in review** (2026-10-07): his joining scene in Momiji Hollow (kneeling by three ghostlight lanterns; he rises to proclaim and a ghost pup licks his face mid-word; he snuffs the lanterns into his tome), Shadow's rumour in town, the "Meet <name>" guide, `tools/qa/s28-shihtzu.mjs` (14/14, in run-all), and the CP2 review fixes. Open: the owner picks his name (`CLASSES.shihtzu.name`); the horde gate on a quiet machine |
+| H-5 | **The Golden Retriever dragoon** (male, name TBD): concepts → the owner picks → Opus Blender model and rig → the class (spear, javelins, dragon-pet trees), charge; **Shadow's dragon whelp outfit plus flying** (only while the dragoon is active: a Blender outfit on the quad rig, wing flaps, a flying companion mode) | in progress | The owner picked **C "Emberleaf Dragon Guard"** (a red-gold coat, emerald scale armour). Blender tasks: `golden-toy/` (plus the lance and javelin props) and `shadow-whelp/` (a re-dress of shadow_toy, locked, plus a mirrored wing prop; rig `shadow_whelp`). **The rigs are installed** (`golden_toy`, `shadow_whelp`) and the sources are archived. The owner named him **Foosy** (id `golden`, "Emberleaf Dragoon"; Lance Arts / Javelins / Whelp Bond; Shadow flies as the whelp only while he is active; joins in Onsen; design in `docs/GOLDEN.md`; 3 checkpoints). Checkpoint 1 approved. **Checkpoint 2 in review** (2026-10-07): all 21 skills built (the Lance Arts, the Javelins, the Whelp Bond driving Shadow), all 15 charge tables solved, the balance with three builds asserted, the lance tints, the kit fallback's helm |
 
 ## 3. Release and other
 
@@ -98,6 +98,7 @@ House rules for every objective:
 | R-5 | **Rebrand to Pawhaven, plus butler pushes** to holiestdiver/pawhaven:html5 | in progress | The rename is done (logo, page, boot, zip, docs; save keys kept). butler is installed. Waiting on the owner's `butler login`, then the first push from 6d53a3b plus the rename |
 | R-7 | **Black flashes** in game (around Chewy's house; dungeon fights), reported by the owner 2026-10-06 | done | Two NaN sources, each a black frame (one NaN texel → the whole frame after the bloom): zero vertex normals in generated meshes (the mailboxes round every house, Chewy's Cottage's too; the trinket stall; building trims; villager face seams) and the monster death squash reaching zero height (a singular matrix: all-zero normal matrices). Fixed at the source (NaN-safe toon normals, `geom.js repairNormals` / `normalMatrixInto`, the squash stops at 2 %) plus a bloom NaN guard. Probe `?nanprobe`, `tools/qa/flash-hunt.mjs`, s24; ARCHITECTURE "Render health" |
 | R-8 | **A stutter on the first open of each menu** | review | Causes: work started on the very frame a menu opened (the village's building-template prewarm and the townsfolk rig pool treat an open menu as "hidden"), icons drawn on GPU-backed canvases (each `toDataURL` waited on the GPU), the panels' first GPU raster, B rendering every building thumbnail at once (~1 s). Fixed: `ui.hidesHitches()` (a menu hides a hitch only once it has opened), CPU-backed icon canvases, `src/ui/prewarm.js` (builds, icons, ghost paints, thumbnails in hidden moments: the title screen), progressive build thumbnails. `tools/qa/menu-stutter.mjs`, s24 |
+| R-9 | **The Burrow floor-2 spawn light washes heroes pale** | review | Seen in the H-5 checkpoint-1 shots at the floor-2 arrival (Foosy's emerald armour and Moka's hat go mint, the fur goes light). **Cause**: not a spawn light. The hero's own follow lantern (`DungeonMode.playerLight`, intensity 7) hung 1.8 m up, 0.2–0.5 m over the toybox heroes' heads, helms and hats, and its falloff (decay 1.6) lit their heads, backs and shoulders at 10–40× the floor's key light. The tone map and the bloom washed them out on every Burrow floor and zone dungeon, mid-floor as much as at the arrival. **Fix**: the lantern hangs 4 m up (`lift`) at intensity 16 (radius 11 kept), so the floor round the hero and the frame keep their brightness. Foosy's armour at the arrival goes from #71C376 to #379753 (the village's is #03845A). The arrival stays 4–10 % brighter than a plain room because of the portal light and the cooking campfire, which are the spot's mood (with both off it's ±1 %). A region's night lantern (the Onsen) keeps 1.8 m |
 | R-2 | The saved quality setting applies at boot (grass and detail density follow Settings, not only `?q=`) | done (CT-3) | `core/deck.js` `bootGraphics()`: `?q=` > the saved preset > the first start's pick; a density change says it follows at the next start. s26 c) |
 | R-3 | The X3595 ANGLE shader warning in the AO pass (Windows) | todo | Warning only |
 | R-4 | Bugs: the starting "welcome" quest's pointer targets Rosie even inside a region; the s5 village-save test flakes when the home sim grows a building in the 1.5 s after reload | todo | Found by the zones-D agent |
@@ -359,3 +360,261 @@ House rules for every objective:
   - **Full run-all**: everything passes, profile-horde included. The one exception was s12's hero-switch leak check,
     which failed twice at +5 geometries against its limit of 4. It passed 22/22 on two re-runs: the extra geometries
     were props the villagers hold, which come and go during the switches. test-rpg and prod-smoke (15 cases) pass.
+- 2026-10-07: **committed b5c54b1, Pawhaven 0.3.0** (controllers CT-1 to CT-3, the R-7 flash fix, the R-8 stutter
+  reduction, lidTilt), pushed to itch.
+  - CT-3 approved: the Deck preset, frame cap, Deck UI, s26, deck-perf; the Burrow fight is about 17 ms p95 on the
+    throttled emulation, to be verified on a real Deck.
+  - CT-4 (Electron desktop app) started.
+  - The golden_toy rig is installed (`public/rigs/golden_toy.*`; run 2 / roll 9 small armour contacts accepted; earGain
+    0.5 suggested).
+  - Shih Tzu rig round 5c: a time-boxed fix of the inner-corner squint panel.
+  - The backspace bytes in the heroModels OFF_DARK regex are fixed.
+- 2026-10-07: 0.3.0 is live on itch (build #2081440). The owner asked to begin **touch and mobile support**: the CT-5
+  agent started (a touch device in the action layer, a floating stick plus action buttons, drag-to-aim, touch menus,
+  the mobile preset, the rotate overlay, s27-touch). Running alongside: CT-4 (the desktop app) and the Shih Tzu rig 5c.
+- 2026-10-07: **the shihtzu_toy rig is installed** (round 5c):
+  - The tilted lid shells were capped 3 mm in front of the eyeball. The 45° squint panel and the blink fleck are gone.
+  - 0 warnings. The values are `lidTilt 0.5507`, `squint [0.74, -0.36]` (a content, half-lidded smile) and `earGain 0.5`.
+  - The shihtzu-toy, golden-toy and shadow-whelp sources are archived in `tools/blender/codex/assets/`, with READMEs.
+  - **The H-4 class agent started** (`shihtzu`; Flail Arts / Gloom Hexes / Ghostlight Tome; the flail's rope and ball on
+    a verlet chain; joins in Maple; N-hero wheel), alongside CT-4 and CT-5.
+- 2026-10-07: **CT-4 built, in review** (the controls Opus agent; CONTROLS §11 as built, docs/DESKTOP.md).
+  - An Electron shell in `tools/desktop/`:
+    - it serves the production build from the app's files on `app://pawhaven`, a secure context (gamepads,
+      localStorage);
+    - one window without chrome, full screen by default; F11, Alt+Enter or Settings › Full screen for a window,
+      remembered;
+    - saves in the app's userData;
+    - `window.pawhaven` gives the desktop flag, the Deck flag (Steam's `SteamDeck=1` picks the Deck preset), the
+      platform, the version, full screen and quit;
+    - **Quit** on the title and **Quit game** in the pause menu save first.
+  - `npm run build:desktop` writes these to `release/desktop/`:
+
+    | File | Size |
+    |---|---|
+    | Windows x64 zip | 181 MB |
+    | Windows portable exe | 124 MB |
+    | Linux x64 AppImage | 158 MB |
+    | Linux x64 tar.gz (executable bits set) | 155 MB |
+
+    - electron-builder can't make an AppImage on Windows: its mksquashfs only runs on Linux, and its staging needs
+      symlinks. So `tools/desktop/appimage.mjs` writes the SquashFS itself and joins it to electron-builder's pinned
+      type-2 runtime.
+    - An independent reader (PySquashfsImage) reads every file back identical.
+    - It has not yet been started on a real Linux machine or Deck.
+  - Electron is a devDependency only. The web bundle has no Electron code, and `tools/build-itch.mjs` is unchanged.
+  - QA:
+    - `tools/qa/desktop-smoke.mjs` 5/5 on the packaged Windows app (Playwright's Electron): the title from the app's
+      files, WebGL2 on the GPU, Full screen switching the window, New Game, a pad walking the hero with the focus ring,
+      Quit game saving and closing, the relaunch finding the save, `SteamDeck=1` picking the Deck preset;
+    - prod-smoke 15/15;
+    - a copy of the itch build script, writing to a scratch folder, passes its iframe test (`dist-itch` was left
+      alone during the 0.3.0 push);
+    - test-rpg: the controls and Deck checks pass. Its 35 failures are all the H-4 Shih Tzu class in progress (its
+      new skills, flails and the class order).
+- 2026-10-07: **CT-4 reviewed**: the shell is sandboxed (context isolation, no Node, an `app://` origin locked to the game folder), desktop-smoke passes 5/5, and the packages are in `release/desktop/`. Claude fixed a second launch so it only focuses the first window. **Open**: the Linux AppImage on a real Deck (DESKTOP.md walks through it); rebuild the packages after H-4 and CT-5 settle (they were built mid-work).
+- 2026-10-07: **CT-5 checkpoint 1 built, in review** (the touch Opus agent; CONTROLS §12). Touch is the action layer's
+  third device (`core/touch.js`; `body.touch-active`; a touch-first screen starts on it; compat mouse events ignored;
+  no browser zoom, scroll, pull-to-refresh or callouts). The play controls (`ui/touch.js`): a floating stick (sprint at
+  its ring), the HUD's own hotbar slots moved into a round attack button + a five-skill arc (cooldowns, charge rings,
+  pips kept), roll, the weapon badge, the belt between the orbs, hero (tap / hold: the wheel, any number of heroes) /
+  bag / menu by the minimap; Auto aim (padAim's soft lock) or Drag aim (a ground mark, cancel by dragging back); taps
+  lock a foe, use or walk; pinch zoom; haptics; Settings › Controls › Touch (size, opacity, left-handed, aim, haptics).
+  QA: s27-touch 23 checks (real multi-touch through CDP), s9, s25 and s26 still green; phone and tablet shots.
+- 2026-10-07: **H-4 checkpoint 1** (the Shih Tzu class agent): `docs/SHIHTZU.md`; `CLASSES.shihtzu` (Str flail, Energy dark
+  arts, the most life, 5% damage reduction, −6% speed); twelve flail bases; 21 skills in `skillsShihtzu.js` (13 held "In
+  training" until checkpoint 2); a new **gloom** element; the baked `shihtzu_toy` (lidTilt, squint, earGain, palm, the coat
+  graded `[1, 12, 7, −3, 0.1]`: a neutral warm charcoal, #3a383a–#3e3c3e in the village; `whiteCap` stops his cream fur
+  blooming peach under the Burrow's key light); the flail GLB with its rope and ball on a verlet chain (`shihtzuGear.js`);
+  the three-swing combo, Woeful Wallop, Dripping Paw (hexes: gloom over time, stacking) and the Gloom Blanket; four-hero
+  switching (the wheel's keys 1–9 and a wider ring, a row of HUD minis for any number of benched heroes). Balance (the
+  Wallop build vs the other three's mean): dps ×0.91–1.02, eHP ×1.21–1.31. test-rpg passes (counts for 84 skills / 12
+  trees); prod-smoke has a `shihtzu` case. Shared files touched: classes, items, skills, stats, actions (rpg), charKit,
+  heroModels, heroes, player, animator, skillRunner, combat, vfx, sfx, game, portraits, npc, tutorial, ui/rpg, glyphs, icons,
+  hud (byte-level: it has a NUL and 6 LF lines), heroWheel.js/.css, test-rpg, hero-balance, prod-smoke.
+- 2026-10-07: **CT-5 checkpoint 2 built, in review** (the touch Opus agent; CONTROLS §12.3–12.8, README "Touch", ITCH.md
+  "Mobile").
+  - The phone HUD: the hero wheel is fitted to the free play area, as a row of cards with 4 or 5 heroes, over a scrim
+    that hides toasts, world labels and the guide. The quest tracker starts folded, and its toggle and the level badges
+    are 44 px.
+  - Menus on a phone (`ui/mobile.js`, `mobile.css`): one panel at a time, fitted, scrolling inside, with the title, tabs
+    and ✕ at the bottom. A 12 px text floor and 44 px targets. Pairs (a shop or the stash beside the bag) flip with a
+    chip.
+    - Gestures: tap (tap-to-move items), drag, double-tap for the right-click, long press for the details.
+    - The K panel's charge drawer folds to its tag. Dialogue choices are 52 px.
+  - Safe areas on every layer; the rotate overlay pauses in portrait; full screen and a landscape lock on the first tap
+    (Android); audio unlocks on the first touch; a web manifest and icons for Add to Home Screen.
+  - Touch flows: build and decorate with edit buttons (Build / Set down, Turn, Cancel, Store, Undo, Done) and the
+    finger as the cursor; fishing (hold the screen to reel); cooking, shops, the bag and the K panel by taps.
+  - The **Mobile preset** (`PRESET.MOBILE`), picked at the first start on a touch-first screen: Low density, pixel
+    ratio 1, no AO or tilt, SMAA low, a 1024 shadow map every other frame, half the particles, 1024 hero skins
+    (`capTexture`), a 30 option in Frame cap.
+  - Fixes on the way:
+    - touch wording never matched (its `\b`s had been written as backspace bytes);
+    - Shadow's tips now wait while fishing (they covered the reel bar on a phone);
+    - on a phone, Cook / Craft / Set off! stay in sight, and a guide's dock sits between the HUD's top corners
+      instead of over the hero / bag / menu buttons.
+  - QA: s27-touch 37/37 (it now also covers the menus, build, decorate, cooking, fishing, portrait and the preset);
+    mobile-ui 26 views PASS; prod-smoke 17 cases PASS (with the new `touch` case); s9 10/10; s25 45/45; s26 8/8;
+    test-rpg passes (s26's Graphics check and test-rpg's Deck checks were updated for the fifth preset and the 30
+    cap). New: mobile-perf and mobile-mem.
+  - **Full run-all** (the machine 83 to 94% busy throughout): 22 of 28 pass, s27 37/37 among them.
+    - s8, s12, s15 and s23 failed on timing or perf under the load. Each passes alone: 13/13, 22/22 (the known
+      +5-geometry flake), 49/49 and 48/48.
+    - profile-horde fails its CPU gates alone too, with baselines of 8 to 21 ms where CT-3's were about 5.
+    - CT-5's own per-frame cost on a desktop page in a Burrow fight measures 0.005 ms (`ui.mobile` 0.001,
+      `ui.touch` 0.002, `Touch.poll` 0.002). Its MutationObserver only runs on a touch screen.
+    - **Re-run profile-horde on a quiet machine.**
+  - Perf (the machine was 80 to 94% busy): unthrottled, Mobile's CPU p95 is 7.6 / 10.2 / 10.3 ms (village / Burrow /
+    zone), with 75% less GPU time than High in the village. Throttled ×3, Mobile matches the Deck preset in the village
+    and runs up to 1.6× it in the big fights.
+  - Memory on Mobile: GPU 200 to 325 MB, against 510 to 655 MB on High. The JS heap is about 100 MB, but the
+    ArrayBuffers (geometry arrays and caches) are 240 MB in the village and 670 MB in a big Burrow fight, with about
+    200 MB kept after trips. That is the iOS risk.
+  - **Open**: the owner's real-phone checks (Android Chrome, an iPhone), then tick Mobile friendly with Landscape; the
+    iOS memory work; perf on a quiet machine and a real phone.
+- 2026-10-07: **H-4 checkpoint 2 built, in review** (the Shih Tzu class agent; docs/SHIHTZU.md §3, §3b, §4).
+  - All 21 skills: the 13 new casts in `combat/shihtzuArts.js` (Tug of Woe's rope and haul, the Maelstrom channel, the
+    Sulk's guard and spin, the Heaviest Sigh's crack and three shockwaves, Grumble Cloud, the mopes, the Awoo's spread,
+    Everlasting Gloom's bursts and jumps, Borrowed Warmth, Bone Ward, the Wayhome Lantern's rekindle), each with its
+    move, effects, sounds and painted icon; the summons in `combat/shihtzuAllies.js` (ghost pups in one instanced batch,
+    Grandpaw with spectacles, moustache, beard and lantern; translucent mint with a solid dark-teal outline).
+  - All 15 charge tables (`rpg/chargeShihtzu.js`), releases (`combat/chargedShihtzu.js`), wind-up poses and sim models;
+    solved: every damage table ×1.21–1.22 at Stage Ⅲ. CHARGE.md §7 has his rows.
+  - The hex build is in the band (clear ×0.88–1.04 of the mean at L6–45) and both builds are asserted in test-rpg; the
+    charge-table check no longer skips him; s19 sweeps his 15 skills.
+  - Fixes from the CP1 review: the slam's whirl stays over his topknot and lands in front along his facing (the dust
+    ring under the ball); the baldric checked walking and sprinting at both rear 45° yaws; the classic kit's topknot,
+    ear locks and a neutral coat; per-base flail tints; the zone-dungeon pack shots (`shihtzu-shots.mjs pack`, `--stage 3`).
+  - Horde perf with his full kit (pups and Grandpaw out, three hex stacks on the 70 nearest, the Maelstrom held), on a
+    busy machine (CPU 85–97%, WardogsClient up to 85% of the 3D engine): he frames like Poe within the noise (Burrow
+    150: p50 8.2 / p95 14.1 ms, PASS; Poe 13.2 / 24.6). The hex badges were one sprite each (644 draws vs Poe's 347):
+    now one particle layer, 347. **Open**: the gate on a quiet machine. SHIHTZU.md §10.
+  - Shared files touched: skillRunner (a channel's own update), combat (a soaked blow returns 0), charge.js,
+    charge-sim.mjs, charge-table.mjs, hero-balance.mjs, test-rpg, s19, profile-horde (his rotation), prod-smoke (his kit in the bundle), tests/rpg.js (`cls=`), CHARGE.md.
+- 2026-10-07: **CT-5 checkpoint 2 approved; the three follow-ups built, in review** (the touch Opus agent; CONTROLS
+  §12.4, 12.7, 12.8).
+  - **The skill tabs fit a phone for every hero.** The three share the row, the name wraps to two lines and the badge
+    sits on the corner. mobile-ui now audits Moka's, Poe's and the Shih Tzu's trees too.
+  - **A compact bag on phones.** The paperdoll is a strip of two 52 px rows, so about three rows of the bag show (one
+    did).
+    - mobile-ui had been auditing nothing for the bag, character and decorate (wrong panel class names). Fixed, plus
+      the 44 px weapon swap and the character sheet's + buttons it then found.
+  - **The Mobile memory diet:**
+    - a dungeon floor's spent staging arrays are freed on every preset (about 130 MB on B8);
+    - on Mobile, opt-in `releaseAfterUpload` drops uploaded arrays for a floor's chunks and the pots;
+    - on Mobile, building templates are capped: prewarm level 1 × 2 variants, evict unused beyond 16;
+    - a lost WebGL context saves and reloads.
+  - Results (mobile-mem): the Burrow fight's ArrayBuffers 650 → 290 MB, about 0.7 GB in all (was 1.1 GB). The village
+    after trips holds 268 MB each time (it grew 347 → 412 → 440 MB before). An evicted template rebuilds and draws.
+  - QA: s27 37/37; on the Mobile preset (`QA_QS=q=4`) s1 13/13 and s13 10/10; mobile-ui 29 views PASS;
+    prod-smoke PASS (the touch case now takes two Burrow floors with released arrays); test-rpg passes. Shared files touched: dungeonWorld.js
+    and dungeonMode.js (byte-level, CRLF), buildings/index.js, village.js, engine.js, lib.mjs (`QA_QS`), prod-smoke.
+- 2026-10-07: **CT-5 reviewed and approved**: the skill tabs fit for all four heroes, the phone bag shows 3 grid rows, and the Mobile memory diet cut a Burrow fight's ArrayBuffers from about 650 MB to 290 MB, with no growth across trips. Open: the owner tests on a real Android phone and an iPhone (ITCH.md "Mobile"), and a quiet-machine run-all before the commit.
+- 2026-10-07: **H-4 checkpoint 3 built, in review** (the Shih Tzu class agent; docs/SHIHTZU.md §5, §10).
+  - The CP2 review fixes: Grandpaw's lantern flame is the soft round mote (no square halo), his right paw holds the
+    lantern out at his side and his left rests on a tome (no more paws at his muzzle); a summon over the hero fades to 35%
+    (`coversHero`); the charged Wallop's sweep is a leading edge round a clear interior, gone in 0.25 s; the Awoo rolls out
+    a ghostlight ring and the hex visibly hops to each foe it spreads to; no summon or prop of his casts a shadow.
+  - The washed-out hero in the CP2 Awoo shot was the hurt flash (animator.js `hit()`, #ff6a6a emissive at full strength
+    on the frame he was struck; it decays in ~0.17 s; Shadow had been knocked out by the crowd): shared behaviour, left as
+    is.
+  - prod-smoke's Poe `flying` wait and s19's Split Shot wait now key on game state; both pass (prod-smoke 17/17 cases, s19 35/35).
+  - Zone horde with his kit vs Poe on the same busy machine: p50 16.7 / 14.4 vs 15.5 / 17.2, p95 27.5 / 27.8 vs 25.9 / 29.7,
+    the CPU phases equal: nothing of his costs more in a zone. The gate still needs a quiet machine.
+  - Checkpoint 3: `src/actors/shihtzuJoin.js` (the Momiji Hollow scene: kneel, light three lanterns, the pup fetches you
+    if you dawdle, proclaim, the lick, the talk, the snuff into the tome, then the banner; reset on leaving; the rumour in
+    town), the `meetShihtzu` guide (`world/guides.js`), five scene poses, `fx.shrineLantern`, `tools/qa/s28-shihtzu.mjs`
+    (14/14, in run-all).
+  - run-all: every scenario passes except profile-horde (the machine was busy: all heroes over the gate) and two flakes
+    that passed on a re-run (s8's F-to-finish, s16 after its guide count went 7 → 8).
+  - Shared files touched: heroes.js (`stzJoin`), guides.js, run-all.mjs, s16-tutorials.mjs (the guide count), s19,
+    prod-smoke, ARCHITECTURE.md, HEROES.md, TUTORIALS.md.
+- 2026-10-07: **H-4 checkpoint 3 reviewed; the Shih Tzu is built** (the Momiji Hollow scene, the rumour, the guide, s28 14/14, run-all green except the horde gate on a busy machine). Open: the owner names him (`CLASSES.shihtzu.name`), and a quiet-machine horde run. **The H-5 class agent started** (`golden`).
+- 2026-10-07: **H-5 checkpoint 1 built, in review** (the dragoon class agent; docs/GOLDEN.md). The owner named him **Foosy**
+  (`CLASSES.golden.name`, フージー; the HUD's kana now read `HERO_TEXT`).
+  - The design: the class (Str lance, Dex javelins, Ene whelp; life below the Shih Tzu's; +20% life and damage for Shadow),
+    twelve lance bases, all 21 skills with their numbers (`skillsGolden.js`; 13 held "In training" until checkpoint 2),
+    the charge idea per active, the whelp design, the balance targets, the joining scene and the code map.
+  - The baked `golden_toy` (`HERO_MODELS.goldenToy`): earGain 0.5, the default squint, the palm from prop_mount.rig.json;
+    **a warm grade and cap** for the coat (heroModels.js `warmGrade` / `warmCap`: the sheet's `#C47A3A` rendered `#cb7100`
+    in the village; now `#c57c3d`; the Burrow's and the Onsen's light no longer blow it to pale peach). The Blender lance
+    (on his back ~45° across, clear of the tail and the crest; drawn two-handed, the left paw IK'd onto the shaft, the shaft
+    sliding through the grip on a thrust) and javelin (in the paw from the draw to the release; the thrown ones one
+    instanced batch). The kit fallback (`goldenKit.js`).
+  - Built: the reach combo (thrust, thrust, swat: a long narrow line), **Sunbeam Thrust** (the sunbeam streak), **Bonk
+    Dart** (a readable arc, a bonk and a splash, a tumble, a stuck javelin), their sounds (`golden.sfx.js`), all 21 skill
+    icons and the lance's item art (`iconsGolden.js`), the `lance` / `javelin` / `whelp` glyphs.
+  - **Shadow the dragon whelp** (`actors/whelp.js`): the `shadow_whelp` rig and the mirrored wing props swap in with a poof
+    only while Foosy is played; he hovers ~1.3 m up beside Foosy across the camera's view, pitches with speed, banks, tucks
+    his legs, beats his wings inside −30..60° (faster with speed and climbing, gliding as he slows), lands and sits when
+    they're idle, walks indoors, in tight corridors, in scenes and when knocked out; the whelp portrait and bust follow
+    the outfit.
+  - Balance (vs the Chewy–Moka–Poe–Shih Tzu mean): the lance build dps ×0.90–0.98, eHP ×1.05–1.09 (×0.9 the Shih Tzu's);
+    the javelin build clear ×0.85–1.05. Both asserted in test-rpg.
+  - QA: test-rpg passes (105 skills / 15 trees; his section); s12 22/22 (five heroes); prod-smoke 18/18 with a `golden`
+    case (his rig and props, the whelp flying, a thrust, a javelin in the air, a switch taking the outfit off).
+  - Shared files touched: classes, items (CRLF), actions (rpg, CRLF), skills, stats, heroModels, animator (the `stance`
+    hook, the quad flight and `earDamp`), companion, player (CRLF), heroes, npc (CRLF), charKit, skillRunner (CRLF),
+    sfx (CRLF), icons, glyphs, ui/rpg, tutorial, hud (byte-level: the badge glyph and HERO_JP), portraits, game,
+    test-rpg (CRLF), hero-balance, prod-smoke, s12-heroes, ROADMAP.
+- 2026-10-07: the owner named the heroes **Floofy** (the Shih Tzu, フルーフィ) and **Foosy** (the Golden, フージー). **H-5 checkpoint 1 approved**: Foosy, the lance and javelins, the whelp in flight, and the 5-hero wheel. Logged R-9, the pale floor-2 spawn light.
+- 2026-10-07: **the owner's phase-E picks**: the Burrow gets tiers and modifiers too (its own Spirit Lantern); runs are free (no Spirit Wicks); 5 tiers; the Spirit 10 pinnacle is a remixed "all four" fight (Tengu, Danzaburo, Umibozu, Yuki-onna). **The Zones phase E agent started** (Z-E1..E4, 3 checkpoints), alongside H-5 (Foosy) and R-9 (the pale floor-2 arrival light).
+- 2026-10-07: **R-9 fixed, in review** (the R-9 agent). The pale heroes came from the follow lantern, not the arrival.
+  A scratch pixel probe (the hero's body drawn black gives the mask; each light toggled in turn) found it: only
+  removing `playerLight` restored the colours (Foosy's armour went from #71C376 to #137347, luma −50 %). The spawn's
+  own lights, the god-ray shafts, halos and floor glows each moved it by 3 % or less, and the bloom (−11 % when off)
+  only amplified the lantern's blow-out. It was the same on floors 1, 2, 3 and 6, the Bamboo Depths and the Tide
+  Caves, at the arrival and mid-floor. **Fix**: dungeonMode.js, `lift: 4` at intensity 16 (CRLF kept). Floor-2
+  arrival, close camera, back view, hero luma before → after: Chewy 108 → 94, Moka 162 → 131, Poe 117 → 88, Floofy 84
+  → 74, Foosy 150 → 129 (Foosy's and Moka's chroma up). Mid-floor rooms moved the same way. At the game camera the
+  frame mean and the floor round the hero stay within 3 %, and the village and regions are unchanged. Shots are in
+  `tools/qa/tmp/r9-shots/` (before-after-close, before-after-game-camera). QA: test-rpg, prod-smoke, s1, s2, s3 and
+  s22 pass. s24 passed 27/27 on a quiet run (its title-smoothness timing failed once while other suites ran). Also
+  noted: the Onsen region's night lantern (1.8 m) and a god-ray shaft room wash heroes the same way. Neither was
+  changed.
+- 2026-10-07: **Zones phase E, checkpoint 1 built, in review** (Z-E1 tiers, Z-E2 modifiers; the zones-E Opus agent; ZONES
+  §5.1 is the design note as built).
+  - Tiers T1–T5 (+4 levels each, pack size ×1.06–1.30, a 4–20% champion promotion, +10–50% quantity, +6–30% rarity,
+    +8–40% xp); Spirit S (level 60, life ×(1 + 0.1 S), damage ×(1 + 0.05 S), shared progress, 4–6 slots).
+  - The 15 modifiers as data with their hooks (the generator, `monsterMods`, `tierRun.js`); the rewards summed and
+    applied (xp, rarity as magic find, extra items, boss loot); the Lantern chest on every tier clear.
+  - The Burrow's tier run is **the Deep Burrow** (Crystal Grotto → Moonlit Sanctum and Tamamo, band 17–21 + 4 a tier); Tamamo
+    on floor 20 opens its T1.
+  - The save keeps a tier record per dungeon, with the migration (an old clear → T0 cleared, T1 open).
+  - The Haunted ghost is new: the Yūrei, built with the region monster kit.
+  - QA: test-rpg (all pass), gen-fuzz (tier runs on every dungeon), s30-tiers 13/13 (new).
+  - Horde check: the machine was busy (WardogsClient held 38% of the GPU). A T5 Swarming + Teeming + Rally floor
+    (335 monsters) with a 150 horde ran at p95 16.6–22.7 ms, against 28.8–32.2 ms for T0 in the same session; to
+    re-run on a quiet machine.
+  - Shots: Haunted, Night March, Elemental (fire, frost), Swarming.
+- 2026-10-07: **H-5 checkpoint 2 built, in review** (the dragoon class agent; docs/GOLDEN.md §3, §3b, §4, §11).
+  - **All 21 skills built** (`GOLDEN_TRAINING` is empty), with their moves, effects and sounds (37 in all):
+    `combat/goldenArts.js` (Sunfall Jump: his own leap, 2.8 m up, untouchable, a landing ring, the crash; Pinwheel Sweep:
+    his facing turned a whole turn; Gallant Charge: his own dash, foes flung aside or carried; Starfall Lance: the lance
+    thrown up and down as a star at the spot, the smouldering crater, the catch; Tailwag Volley, True Flight, Emberleaf
+    Javelin, Sunshower; Steady Paws' brace; Good Retriever's scoop and mark) and `combat/goldenWhelp.js` (the Whelp Bond:
+    Shadow flies to a spot beside Foosy and breathes, divebombs, shields him with spread wings, roars, grows 2.4× for Dragon
+    Heart: he walks into the fight behind Foosy on screen, fades where he'd cover him, draws the foes; through
+    `Whelp.act` in whelp.js). Warm Heart's revive and regen (companion.js). Per-base lance tints (by hue, on the toon).
+    The kit fallback: the crest helm on the classic / Storybook kits, the classic coat measured to `#C47A3A` / `#E0A868`.
+  - **Charge**: 15 tables (`rpg/chargeGolden.js`), releases (`combat/chargedGolden.js`), ten wind-ups, the sim models
+    (`tools/charge-sim-golden.mjs`); solved: every damage skill's full charge ×1.20–1.27 sustained, the buffs and Dragon
+    Heart ×1.09–1.28; edge-weighted charged areas. His rows are in CHARGE.md §7. The test-rpg exemption is gone.
+  - **Balance**: the lance build ×0.98 / 0.90 / 0.98 / 0.95, the javelin build ×0.85 / 1.03 / 0.88 / 1.05, and a third, the
+    Whelp Bond build (Ember Breath), ×0.98 / 0.92 / 0.92 / 0.99 of the mean at levels 6 / 15 / 30 / 45 (Ember Breath
+    flattened: it grew to ×1.72), all asserted.
+  - QA: test-rpg ALL PASSED; prod-smoke PASS 18/18 (the golden case now jumps, has Shadow breathe and casts a charged
+    thrust); pack shots for every active, tapped and charged, and everything at once (`golden-shots.mjs pack`). Horde
+    perf on a busy machine (WardogsClient, CPU ~80%): Foosy's CPU p50 / p95 match Poe's and Floofy's under the same load;
+    his draw calls run higher at 250 (open, GOLDEN.md §11).
+  - Shared files touched: combat.js (goldenGuard in hitPlayer; the roar and Good Retriever's pep in playerBonusPct /
+    atkMul / moveMul), skillRunner.js (CRLF: an own leap / dash is left alone), companion.js, animator.js (`grow`),
+    rpg/charge.js, charge-sim.mjs, charge-table.mjs, hero-balance.mjs, test-rpg.mjs (CRLF), prod-smoke.mjs,
+    profile-horde.mjs (ROT.golden), s19-charge.mjs (five heroes), CHARGE.md, ROADMAP.
+- 2026-10-07: **Bug (owner): tooltips invisible on hover, fixed by Claude.**
+  - The R-8 menu prewarm (`ui/prewarm.js`, in 0.3.0) builds and renders closed panels exactly while a menu is open.
+  - Their setup calls `ui.tip.hide()` (e.g. `InventoryPanel.setView`), so a skill or item tooltip vanished within one
+    80 ms tick, for as long as the prewarm queue lasted.
+  - Fix: `Tooltip.muted` during each prewarm step (`tooltip.js`, `prewarm.js`). The K panel's skill tooltip now stays;
+    the bag, hotbar and HUD tooltips are unchanged. 0.3.0 on itch has the bug until the next push.

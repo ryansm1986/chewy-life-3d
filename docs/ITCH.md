@@ -41,7 +41,8 @@ The version in the zip name comes from `package.json`, so bump it before each up
      default frame.
    - **Fullscreen button**: on.
    - **Click to Play**: on. Visitors don't download 21 MB until they choose to play, and the click also unlocks audio.
-   - **Mobile friendly**: off. The game needs a keyboard and mouse.
+   - **Mobile friendly**: on, with **Orientation: Landscape**, once the owner has played it on a real phone (see
+     [Mobile](#mobile) below). Until then, leave it off.
    - **Scrollbars**: off.
 5. Answer the **AI generation disclosure** on the edit page honestly. Much of this game's code, models, textures and
    text was made with AI tools.
@@ -104,6 +105,50 @@ After adding Japanese text or new symbols, run `npm run fonts`, which needs `pip
 Everything else that ships was made for this project: the models and textures from the Blender pipeline, the procedural
 world, and the WebAudio-synthesised music, effects and voices. If you add a third-party asset, add its licence here
 (`tools/build-itch.mjs`, the licences step).
+
+## Mobile
+
+Phones and tablets play in landscape with touch controls (CT-5; docs/CONTROLS.md §12; README "Touch").
+
+**What works:**
+- The whole game: moving, sprinting, fighting with every skill (charged, auto or drag aimed), rolling, potions and
+  meals, switching heroes, talking, the menus, build and decorate, fishing, cooking, the garden and the shops.
+- The menus fit a phone: one panel at a time, scrolling inside, with the title, tabs and close at the bottom.
+  - No text is under 12 px and no tappable is under 44 px.
+  - Tap, drag, double-tap (the right-click) and long-press (the details).
+- **The Mobile graphics preset** is picked on the first start: a 1:1 pixel ratio, no AO, light shadows, Low grass, half
+  the particles, 1024 hero skins and a 60 fps cap.
+- Holding the phone upright shows a "turn your phone" card and pauses the game.
+- Safe areas: the notch and home bar are kept clear.
+- Audio starts on the first touch.
+
+**Browsers:**
+- **Android Chrome** (and Samsung Internet, Firefox): the first tap goes full screen and locks landscape. This is the
+  best experience. Haptics work.
+- **iPhone Safari**: no full screen for a web page, so the game plays with the browser bar, and Safari has no
+  vibration. Inside itch's page, itch's own full-screen view is the way.
+  - *Add to Home Screen* runs it full screen only when the game is served on its own (the build ships a web manifest
+    and icons). On itch it adds the itch page instead.
+- **iPad Safari**: full screen works on an element. The tablet layout uses bigger buttons.
+- WebGL 2 is required (iOS 15 or later, any recent Android).
+
+**Embed settings for mobile:** tick **Mobile friendly**, set **Orientation** to **Landscape**, and keep the viewport at
+1280 × 720. On a phone itch shows a launch button and opens the game in its own full-screen view.
+
+**Before ticking it (the owner's checks):** these have only been tested in desktop Chrome's phone emulation (CDP touch
+at 844×390 DPR 3 and 1180×820), so test on real devices:
+1. An Android phone (Chrome): play a Burrow fight, open the bag and the shop, build something. Watch the frame rate:
+   Settings › Graphics shows the preset, and Settings › Frame cap 30 is the fallback.
+2. An iPhone (Safari), ideally an older one with 4 GB or less:
+   - **Memory** was the risk. On the Mobile preset the game now holds about 0.5 GB in the village (200 MB GPU,
+     230 MB of geometry arrays, 85 MB of JS).
+   - In a big Burrow fight it holds about 0.7 GB (330 MB GPU, 290 MB of arrays), against 1.1 GB before the memory diet.
+     The village no longer grows trip by trip (CONTROLS §12.7).
+   - Safari reloads a tab that uses too much memory, so play two dungeon trips in a row and see whether the page
+     reloads.
+3. A tablet, if one is handy.
+
+The first load is about 30 MB, which is worth knowing on mobile data.
 
 ## Known gaps before a public release
 

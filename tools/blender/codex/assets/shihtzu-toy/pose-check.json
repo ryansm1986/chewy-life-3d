@@ -1,0 +1,1225 @@
+{
+ "rule": "visible = fur triangles newly crossing cloth / armour vs rest; covered = the designed hidden junctions (see the module doc)",
+ "fur_through_cloth": {
+  "rest": {
+   "label": "REST (ALL BONES AT REST)",
+   "visible_fur_through_cloth": 0,
+   "covered_junction_triangles": 0,
+   "hidden_from_every_camera": 0,
+   "visible_by_pair": {},
+   "covered_by_pair": {},
+   "hidden_by_pair": {}
+  },
+  "walk-game": {
+   "label": "WALK, GAME AMPLITUDE 0.62",
+   "visible_fur_through_cloth": 3,
+   "covered_junction_triangles": 20,
+   "hidden_from_every_camera": 16,
+   "visible_by_pair": {
+    "black_fur_shorts x armour_torso": 1,
+    "ear_locks x pauldron_edge": 2
+   },
+   "covered_by_pair": {
+    "white_wrist_fur x tome_spine": 4,
+    "ball_head_skin x pauldron_trim": 7,
+    "ball_head_skin x armour_sleeve": 2,
+    "plumed_tail x plum_cloak": 4,
+    "white_wrist_fur x plum_cloak": 3
+   },
+   "hidden_by_pair": {
+    "black_fur_shorts x armour_torso": 9,
+    "plumed_tail x plum_cloak": 2,
+    "white_chest_ruff x pauldron_trim": 1,
+    "black_fur_shorts x tabard_panel": 3,
+    "ear_locks x pauldron": 1
+   }
+  },
+  "walk-a": {
+   "label": "WALK EXTREME A (0.8)",
+   "visible_fur_through_cloth": 3,
+   "covered_junction_triangles": 26,
+   "hidden_from_every_camera": 20,
+   "visible_by_pair": {
+    "black_fur_shorts x armour_torso": 1,
+    "ear_locks x pauldron_edge": 2
+   },
+   "covered_by_pair": {
+    "white_wrist_fur x tome_spine": 2,
+    "ball_head_skin x pauldron_trim": 7,
+    "ball_head_skin x armour_sleeve": 2,
+    "plumed_tail x plum_cloak": 10,
+    "white_wrist_fur x plum_cloak": 5
+   },
+   "hidden_by_pair": {
+    "black_fur_shorts x armour_torso": 9,
+    "white_chest_ruff x pauldron_trim": 2,
+    "black_fur_shorts x dark_belt": 3,
+    "plumed_tail x plum_cloak": 2,
+    "black_fur_shorts x tabard_panel": 3,
+    "ear_locks x pauldron": 1
+   }
+  },
+  "walk-b": {
+   "label": "WALK EXTREME B (0.8)",
+   "visible_fur_through_cloth": 4,
+   "covered_junction_triangles": 13,
+   "hidden_from_every_camera": 21,
+   "visible_by_pair": {
+    "black_fur_shorts x tome_cover": 1,
+    "ear_locks x pauldron": 1,
+    "ear_locks x pauldron_edge": 2
+   },
+   "covered_by_pair": {
+    "ball_head_skin x pauldron_trim": 7,
+    "white_wrist_fur x plum_cloak": 5,
+    "ball_head_skin x armour_sleeve": 1
+   },
+   "hidden_by_pair": {
+    "white_chest_ruff x pauldron_trim": 2,
+    "black_fur_shorts x dark_belt": 3,
+    "black_fur_shorts x tome_pages": 2,
+    "black_fur_shorts x armour_torso": 9,
+    "black_fur_shorts x tome_cover": 2,
+    "black_fur_shorts x tabard_panel": 2,
+    "ear_locks x pauldron": 1
+   }
+  },
+  "run": {
+   "label": "RUN (LEGS +-0.97, LEAN 0.26)",
+   "visible_fur_through_cloth": 4,
+   "covered_junction_triangles": 25,
+   "hidden_from_every_camera": 33,
+   "visible_by_pair": {
+    "ear_locks x pauldron": 2,
+    "black_fur_shorts x tabard_panel": 1,
+    "plumed_tail x plum_cloak": 1
+   },
+   "covered_by_pair": {
+    "ball_head_skin x pauldron_trim": 12,
+    "plumed_tail x plum_cloak": 12,
+    "ball_head_skin x armour_sleeve": 1
+   },
+   "hidden_by_pair": {
+    "ear_locks x pauldron": 2,
+    "white_chest_ruff x armour_sleeve": 2,
+    "black_fur_shorts x armour_torso": 10,
+    "black_fur_shorts x dark_belt": 7,
+    "black_fur_shorts x tabard_panel": 3,
+    "black_fur_leg x armour_torso": 7,
+    "white_leg_cuff x armour_torso": 2
+   }
+  },
+  "run-b": {
+   "label": "RUN B",
+   "visible_fur_through_cloth": 3,
+   "covered_junction_triangles": 14,
+   "hidden_from_every_camera": 36,
+   "visible_by_pair": {
+    "ear_locks x pauldron_trim": 1,
+    "ear_locks x pauldron": 1,
+    "black_fur_shorts x armour_torso": 1
+   },
+   "covered_by_pair": {
+    "ball_head_skin x pauldron_trim": 11,
+    "plumed_tail x black_boot": 3
+   },
+   "hidden_by_pair": {
+    "white_chest_ruff x armour_sleeve": 2,
+    "ear_locks x pauldron": 2,
+    "black_fur_shorts x armour_torso": 9,
+    "black_fur_shorts x dark_belt": 6,
+    "black_fur_leg x armour_torso": 7,
+    "black_fur_shorts x tome_pages": 4,
+    "black_fur_shorts x tome_cover": 1,
+    "black_fur_shorts x tabard_panel": 3,
+    "white_leg_cuff x armour_torso": 2
+   }
+  },
+  "swing2h": {
+   "label": "TWO-HANDED OVERHEAD FLAIL SWING",
+   "visible_fur_through_cloth": 0,
+   "covered_junction_triangles": 6,
+   "hidden_from_every_camera": 6,
+   "visible_by_pair": {},
+   "covered_by_pair": {
+    "ball_head_skin x pauldron_trim": 6
+   },
+   "hidden_by_pair": {
+    "ear_locks x silver_gauntlet_cuff": 4,
+    "white_chest_ruff x pauldron_trim": 1,
+    "white_chest_ruff x pauldron": 1
+   }
+  },
+  "spin": {
+   "label": "ONE-ARM FLAIL SPIN",
+   "visible_fur_through_cloth": 2,
+   "covered_junction_triangles": 29,
+   "hidden_from_every_camera": 6,
+   "visible_by_pair": {
+    "ear_locks x silver_gauntlet_cuff": 2
+   },
+   "covered_by_pair": {
+    "white_wrist_fur x tome_spine": 10,
+    "black_mitten_paw x tome_spine": 2,
+    "ball_head_skin x pauldron_trim": 8,
+    "ball_head_skin x armour_sleeve": 5,
+    "black_mitten_paw x tome_cover": 1,
+    "white_wrist_fur x tome_cover": 1,
+    "white_wrist_fur x tome_pages": 2
+   },
+   "hidden_by_pair": {
+    "ear_locks x pauldron": 1,
+    "white_wrist_fur x tome_spine": 1,
+    "ear_locks x silver_gauntlet_cuff": 2,
+    "ear_locks x armour_sleeve": 1,
+    "white_chest_ruff x armour_sleeve": 1
+   }
+  },
+  "cast": {
+   "label": "CASTING (LEFT PAW RAISED)",
+   "visible_fur_through_cloth": 3,
+   "covered_junction_triangles": 7,
+   "hidden_from_every_camera": 42,
+   "visible_by_pair": {
+    "ear_locks x armour_sleeve": 1,
+    "ball_head_skin x plum_hood_roll": 2
+   },
+   "covered_by_pair": {
+    "white_chest_ruff x armour_torso": 2,
+    "ball_head_skin x pauldron_trim": 5
+   },
+   "hidden_by_pair": {
+    "ear_locks x pauldron_trim": 1,
+    "ball_head_skin x armour_torso": 13,
+    "white_chest_ruff x armour_sleeve": 1,
+    "ear_locks x armour_sleeve": 2,
+    "ball_head_skin x plum_hood_roll": 22,
+    "ball_head_skin x plum_hood_bag": 3
+   }
+  },
+  "raised": {
+   "label": "ARMS RAISED Z +-1.3",
+   "visible_fur_through_cloth": 4,
+   "covered_junction_triangles": 2,
+   "hidden_from_every_camera": 25,
+   "visible_by_pair": {
+    "ear_locks x pauldron_edge": 1,
+    "white_chest_ruff x pauldron_rivet": 2,
+    "ear_locks x pauldron_trim": 1
+   },
+   "covered_by_pair": {
+    "ball_head_skin x pauldron_trim": 2
+   },
+   "hidden_by_pair": {
+    "ear_locks x silver_gauntlet_cuff": 12,
+    "ear_locks x armour_sleeve": 6,
+    "ear_locks x pauldron_edge": 2,
+    "white_chest_ruff x pauldron": 2,
+    "ear_locks x pauldron": 3
+   }
+  },
+  "attack": {
+   "label": "ATTACK (RIGHT UPPER ARM -2.4 X)",
+   "visible_fur_through_cloth": 1,
+   "covered_junction_triangles": 18,
+   "hidden_from_every_camera": 7,
+   "visible_by_pair": {
+    "ear_locks x silver_gauntlet_cuff": 1
+   },
+   "covered_by_pair": {
+    "ball_head_skin x pauldron_trim": 8,
+    "ball_head_skin x armour_sleeve": 8,
+    "white_wrist_fur x tome_spine": 2
+   },
+   "hidden_by_pair": {
+    "ear_locks x pauldron": 1,
+    "ear_locks x silver_gauntlet_cuff": 2,
+    "ear_locks x armour_sleeve": 2,
+    "white_chest_ruff x pauldron_trim": 1,
+    "ear_locks x pauldron_trim": 1
+   }
+  },
+  "head": {
+   "label": "HEAD TURNED +0.45 Y, NODDED +0.3 X",
+   "visible_fur_through_cloth": 9,
+   "covered_junction_triangles": 58,
+   "hidden_from_every_camera": 182,
+   "visible_by_pair": {
+    "ball_head_skin x pauldron_rivet": 1,
+    "ball_head_skin x pauldron": 4,
+    "ball_head_skin x pauldron_edge": 1,
+    "ear_locks x pauldron": 1,
+    "ball_head_skin x plum_hood_roll": 2
+   },
+   "covered_by_pair": {
+    "white_wrist_fur x tome_spine": 2,
+    "ball_head_skin x pauldron_trim": 11,
+    "ball_head_skin x pauldron": 4,
+    "ball_head_skin x armour_sleeve": 31,
+    "ball_head_skin x armour_torso": 6,
+    "white_chest_ruff x armour_torso": 4
+   },
+   "hidden_by_pair": {
+    "white_chest_ruff x pauldron": 2,
+    "ball_head_skin x pauldron": 32,
+    "ball_head_skin x pauldron_rivet": 3,
+    "ball_head_skin x pauldron_edge": 8,
+    "ball_head_skin x pauldron_trim": 11,
+    "ball_head_skin x plum_hood_roll": 51,
+    "ball_head_skin x armour_torso": 64,
+    "ear_locks x pauldron": 9,
+    "ball_head_skin x armour_sleeve": 1,
+    "white_chest_ruff x pauldron_trim": 1
+   }
+  },
+  "ears-up": {
+   "label": "EAR TIPS -1.05, EARS -0.35 X",
+   "visible_fur_through_cloth": 19,
+   "covered_junction_triangles": 19,
+   "hidden_from_every_camera": 57,
+   "visible_by_pair": {
+    "ear_locks x pauldron": 14,
+    "ear_locks x plum_hood_roll": 5
+   },
+   "covered_by_pair": {
+    "white_wrist_fur x tome_spine": 2,
+    "ball_head_skin x pauldron_trim": 10,
+    "ball_head_skin x armour_sleeve": 7
+   },
+   "hidden_by_pair": {
+    "ear_locks x pauldron": 27,
+    "ear_locks x armour_sleeve": 10,
+    "ear_locks x plum_hood_roll": 14,
+    "ear_locks x pauldron_trim": 1,
+    "ear_locks x plum_cloak": 2,
+    "ear_locks x pauldron_edge": 3
+   }
+  },
+  "ears-down": {
+   "label": "EAR TIPS +0.6, EARS +0.35 X",
+   "visible_fur_through_cloth": 4,
+   "covered_junction_triangles": 19,
+   "hidden_from_every_camera": 8,
+   "visible_by_pair": {
+    "ear_locks x plum_hood_roll": 2,
+    "ear_locks x plum_cloak": 2
+   },
+   "covered_by_pair": {
+    "white_wrist_fur x tome_spine": 2,
+    "ball_head_skin x pauldron_trim": 10,
+    "ball_head_skin x armour_sleeve": 7
+   },
+   "hidden_by_pair": {
+    "ear_locks x pauldron_trim": 3,
+    "ear_locks x pauldron": 1,
+    "ear_locks x plum_hood_roll": 2,
+    "ear_locks x plum_cloak": 2
+   }
+  },
+  "ears-z": {
+   "label": "EARS Z +-0.3 (OUT)",
+   "visible_fur_through_cloth": 0,
+   "covered_junction_triangles": 19,
+   "hidden_from_every_camera": 0,
+   "visible_by_pair": {},
+   "covered_by_pair": {
+    "white_wrist_fur x tome_spine": 2,
+    "ball_head_skin x pauldron_trim": 10,
+    "ball_head_skin x armour_sleeve": 7
+   },
+   "hidden_by_pair": {}
+  },
+  "tail-l": {
+   "label": "TAIL WAG -0.7",
+   "visible_fur_through_cloth": 1,
+   "covered_junction_triangles": 19,
+   "hidden_from_every_camera": 4,
+   "visible_by_pair": {
+    "ear_locks x pauldron": 1
+   },
+   "covered_by_pair": {
+    "ball_head_skin x pauldron_trim": 10,
+    "ball_head_skin x armour_sleeve": 7,
+    "white_wrist_fur x tome_spine": 2
+   },
+   "hidden_by_pair": {
+    "ear_locks x pauldron": 2,
+    "plumed_tail x plum_cloak": 2
+   }
+  },
+  "tail-r": {
+   "label": "TAIL WAG +0.7 (DROOP -0.3)",
+   "visible_fur_through_cloth": 1,
+   "covered_junction_triangles": 19,
+   "hidden_from_every_camera": 11,
+   "visible_by_pair": {
+    "ear_locks x pauldron": 1
+   },
+   "covered_by_pair": {
+    "ball_head_skin x pauldron_trim": 10,
+    "ball_head_skin x armour_sleeve": 7,
+    "white_wrist_fur x tome_spine": 2
+   },
+   "hidden_by_pair": {
+    "ear_locks x pauldron": 2,
+    "plumed_tail x plum_cloak": 9
+   }
+  },
+  "roll": {
+   "label": "ROLL CROUCH",
+   "visible_fur_through_cloth": 13,
+   "covered_junction_triangles": 38,
+   "hidden_from_every_camera": 82,
+   "visible_by_pair": {
+    "ear_locks x pauldron": 2,
+    "ear_locks x pauldron_trim": 2,
+    "black_fur_leg x tabard_panel": 2,
+    "black_fur_shorts x armour_torso": 4,
+    "black_fur_leg x armour_torso": 2,
+    "plumed_tail x plum_cloak": 1
+   },
+   "covered_by_pair": {
+    "ball_head_skin x armour_sleeve": 5,
+    "ball_head_skin x paw_buckle": 19,
+    "white_chest_ruff x armour_torso": 3,
+    "plumed_tail x plum_cloak": 11
+   },
+   "hidden_by_pair": {
+    "white_chest_ruff x armour_sleeve": 2,
+    "black_fur_shorts x plum_hood_roll": 1,
+    "white_chest_ruff x tabard_panel": 2,
+    "white_chest_ruff x buckle_tab": 4,
+    "white_chest_ruff x paw_buckle": 6,
+    "white_chest_ruff x dark_belt": 5,
+    "black_fur_shorts x tabard_panel": 9,
+    "black_fur_leg x tabard_panel": 9,
+    "black_fur_shorts x armour_torso": 13,
+    "black_fur_leg x armour_torso": 9,
+    "black_fur_leg x tome_cover": 5,
+    "black_fur_shorts x tome_cover": 1,
+    "black_fur_shorts x dark_belt": 3,
+    "ear_locks x pauldron_trim": 1,
+    "black_fur_shorts x tome_pages": 3,
+    "white_leg_cuff x armour_torso": 8,
+    "white_leg_cuff x tome_cover": 1
+   }
+  },
+  "sit": {
+   "label": "SIT (LEGS -1.4, DROP 0.12)",
+   "visible_fur_through_cloth": 14,
+   "covered_junction_triangles": 37,
+   "hidden_from_every_camera": 112,
+   "visible_by_pair": {
+    "black_fur_shorts x tome_cover": 1,
+    "black_fur_leg x tabard_panel": 7,
+    "white_leg_cuff x tabard_panel": 2,
+    "black_fur_shorts x armour_torso": 2,
+    "ear_locks x pauldron": 1,
+    "black_fur_shorts x dark_belt": 1
+   },
+   "covered_by_pair": {
+    "black_mitten_paw x tome_spine": 2,
+    "ball_head_skin x pauldron_trim": 10,
+    "white_wrist_fur x tome_spine": 6,
+    "ball_head_skin x armour_sleeve": 7,
+    "plumed_tail x plum_cloak": 12
+   },
+   "hidden_by_pair": {
+    "ear_locks x pauldron": 2,
+    "black_fur_shorts x armour_torso": 14,
+    "black_fur_shorts x dark_belt": 7,
+    "black_fur_shorts x tabard_panel": 10,
+    "black_fur_shorts x tome_cover": 1,
+    "black_fur_leg x armour_torso": 22,
+    "black_fur_leg x tabard_panel": 20,
+    "white_leg_cuff x armour_torso": 16,
+    "white_leg_cuff x tome_cover": 3,
+    "black_fur_leg x tome_pages": 1,
+    "white_leg_cuff x tabard_panel": 16
+   }
+  }
+ },
+ "ear_contract_poses": {
+  "tips +0.6, ears +0.35": {
+   "lock_new_depth_into_head_mm": 4.5,
+   "lock_new_depth_into_armour_mm": 1.3
+  },
+  "tips -1.05, ears -0.35": {
+   "lock_new_depth_into_head_mm": 4.8,
+   "lock_new_depth_into_armour_mm": 20.3
+  },
+  "ears Z in 0.3": {
+   "lock_new_depth_into_head_mm": 25.4,
+   "lock_new_depth_into_armour_mm": 29.9
+  },
+  "ears Z out 0.3": {
+   "lock_new_depth_into_head_mm": 2.8,
+   "lock_new_depth_into_armour_mm": 0.0
+  },
+  "arms raised Z 1.3": {
+   "lock_new_depth_into_head_mm": 0.0,
+   "lock_new_depth_into_armour_mm": 37.3
+  },
+  "attack -2.4": {
+   "lock_new_depth_into_head_mm": 0.0,
+   "lock_new_depth_into_armour_mm": 20.4
+  }
+ },
+ "earGain_rule": "the game ear motion (animator.js secondary) at each earGain: safe = no lock vertex pushed more than 6 mm deeper into the head (inside test by ray parity) or into the pauldrons / torso / hood / cloak / sleeves than at rest, over S.a in [-1.2, 2.6] (every spring value, the strongest earKick included) and over [-0.8, 1.2] (walk / run / idle)",
+ "earGain_sweep_full": {
+  "1.00": {
+   "lock_new_depth_into_head_mm_max": 3.1,
+   "lock_new_depth_into_armour_mm_max": 37.7,
+   "worst_at_Sa_tip_ear": [
+    -1.2,
+    -0.968,
+    -0.243
+   ]
+  },
+  "0.80": {
+   "lock_new_depth_into_head_mm_max": 3.0,
+   "lock_new_depth_into_armour_mm_max": 18.7,
+   "worst_at_Sa_tip_ear": [
+    -1.2,
+    -0.899,
+    -0.208
+   ]
+  },
+  "0.60": {
+   "lock_new_depth_into_head_mm_max": 1.0,
+   "lock_new_depth_into_armour_mm_max": 22.5,
+   "worst_at_Sa_tip_ear": [
+    0.55,
+    0.39,
+    0.082
+   ]
+  },
+  "0.50": {
+   "lock_new_depth_into_head_mm_max": 0.8,
+   "lock_new_depth_into_armour_mm_max": 29.7,
+   "worst_at_Sa_tip_ear": [
+    0.55,
+    0.341,
+    0.068
+   ]
+  },
+  "0.40": {
+   "lock_new_depth_into_head_mm_max": 1.0,
+   "lock_new_depth_into_armour_mm_max": 33.8,
+   "worst_at_Sa_tip_ear": [
+    0.85,
+    0.395,
+    0.083
+   ]
+  },
+  "0.30": {
+   "lock_new_depth_into_head_mm_max": 0.7,
+   "lock_new_depth_into_armour_mm_max": 34.1,
+   "worst_at_Sa_tip_ear": [
+    0.85,
+    0.319,
+    0.063
+   ]
+  },
+  "0.20": {
+   "lock_new_depth_into_head_mm_max": 18.7,
+   "lock_new_depth_into_armour_mm_max": 22.1,
+   "worst_at_Sa_tip_ear": [
+    2.6,
+    0.503,
+    0.124
+   ]
+  }
+ },
+ "largest_safe_earGain_full_range": 0.0,
+ "earGain_sweep_walk": {
+  "1.00": {
+   "lock_new_depth_into_head_mm_max": 2.2,
+   "lock_new_depth_into_armour_mm_max": 15.4,
+   "worst_at_Sa_tip_ear": [
+    -0.8,
+    -0.828,
+    -0.181
+   ]
+  },
+  "0.80": {
+   "lock_new_depth_into_head_mm_max": 1.6,
+   "lock_new_depth_into_armour_mm_max": 18.3,
+   "worst_at_Sa_tip_ear": [
+    0.7,
+    0.518,
+    0.133
+   ]
+  },
+  "0.60": {
+   "lock_new_depth_into_head_mm_max": 0.8,
+   "lock_new_depth_into_armour_mm_max": 31.4,
+   "worst_at_Sa_tip_ear": [
+    0.45,
+    0.335,
+    0.067
+   ]
+  },
+  "0.50": {
+   "lock_new_depth_into_head_mm_max": 1.0,
+   "lock_new_depth_into_armour_mm_max": 27.1,
+   "worst_at_Sa_tip_ear": [
+    0.7,
+    0.404,
+    0.086
+   ]
+  },
+  "0.40": {
+   "lock_new_depth_into_head_mm_max": 0.8,
+   "lock_new_depth_into_armour_mm_max": 30.4,
+   "worst_at_Sa_tip_ear": [
+    0.7,
+    0.344,
+    0.069
+   ]
+  },
+  "0.30": {
+   "lock_new_depth_into_head_mm_max": 1.0,
+   "lock_new_depth_into_armour_mm_max": 38.1,
+   "worst_at_Sa_tip_ear": [
+    1.2,
+    0.411,
+    0.088
+   ]
+  },
+  "0.20": {
+   "lock_new_depth_into_head_mm_max": 1.4,
+   "lock_new_depth_into_armour_mm_max": 36.1,
+   "worst_at_Sa_tip_ear": [
+    1.2,
+    0.305,
+    0.059
+   ]
+  }
+ },
+ "largest_safe_earGain_walk": 0.0,
+ "closed_eye_eyeball_rays_per_view_of_7200": {
+  "L front": 0,
+  "L 34in": 0,
+  "L 34out": 0,
+  "L game+45": 0,
+  "L game-45": 0,
+  "R front": 0,
+  "R 34in": 0,
+  "R 34out": 0,
+  "R game+45": 0,
+  "R game-45": 0
+ },
+ "open_mouth_rays_of_3000": {
+  "smile 0.4 front": {
+   "back_face_rays (holes)": 0,
+   "cavity_or_tongue_rays": 786
+  },
+  "smile 0.4 34L": {
+   "back_face_rays (holes)": 5,
+   "cavity_or_tongue_rays": 754
+  },
+  "smile 0.4 34R": {
+   "back_face_rays (holes)": 5,
+   "cavity_or_tongue_rays": 754
+  },
+  "smile 0.4 game+45": {
+   "back_face_rays (holes)": 43,
+   "cavity_or_tongue_rays": 354
+  },
+  "smile 0.4 game-45": {
+   "back_face_rays (holes)": 43,
+   "cavity_or_tongue_rays": 354
+  },
+  "smile 0.4 below": {
+   "back_face_rays (holes)": 28,
+   "cavity_or_tongue_rays": 778
+  },
+  "smile 1.0 front": {
+   "back_face_rays (holes)": 0,
+   "cavity_or_tongue_rays": 784
+  },
+  "smile 1.0 34L": {
+   "back_face_rays (holes)": 5,
+   "cavity_or_tongue_rays": 754
+  },
+  "smile 1.0 34R": {
+   "back_face_rays (holes)": 5,
+   "cavity_or_tongue_rays": 754
+  },
+  "smile 1.0 game+45": {
+   "back_face_rays (holes)": 43,
+   "cavity_or_tongue_rays": 355
+  },
+  "smile 1.0 game-45": {
+   "back_face_rays (holes)": 43,
+   "cavity_or_tongue_rays": 355
+  },
+  "smile 1.0 below": {
+   "back_face_rays (holes)": 28,
+   "cavity_or_tongue_rays": 778
+  }
+ },
+ "hole_points_sample": [
+  [
+   "34L",
+   0.4,
+   -0.2255,
+   -0.1243,
+   0.7776
+  ],
+  [
+   "34L",
+   0.4,
+   -0.2234,
+   -0.1236,
+   0.7727
+  ],
+  [
+   "34L",
+   0.4,
+   -0.2216,
+   -0.1227,
+   0.7694
+  ],
+  [
+   "34L",
+   0.4,
+   -0.2198,
+   -0.1217,
+   0.766
+  ],
+  [
+   "34L",
+   0.4,
+   -0.2179,
+   -0.1207,
+   0.7627
+  ],
+  [
+   "34R",
+   0.4,
+   0.2168,
+   -0.1221,
+   0.7628
+  ],
+  [
+   "34R",
+   0.4,
+   0.2189,
+   -0.1228,
+   0.7661
+  ],
+  [
+   "34R",
+   0.4,
+   0.2212,
+   -0.1232,
+   0.7694
+  ],
+  [
+   "34R",
+   0.4,
+   0.2235,
+   -0.1236,
+   0.7727
+  ],
+  [
+   "34R",
+   0.4,
+   0.2261,
+   -0.1235,
+   0.7776
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.1167,
+   -0.2873,
+   0.6998
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.1122,
+   -0.2866,
+   0.6939
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.1129,
+   -0.286,
+   0.6946
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.1103,
+   -0.2859,
+   0.6913
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.111,
+   -0.2853,
+   0.692
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.1084,
+   -0.2853,
+   0.6887
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.109,
+   -0.2846,
+   0.6895
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.1071,
+   -0.284,
+   0.6869
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.1078,
+   -0.2833,
+   0.6876
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.1059,
+   -0.2827,
+   0.685
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.1044,
+   -0.2816,
+   0.6836
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.1027,
+   -0.2807,
+   0.6822
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.1011,
+   -0.2797,
+   0.6809
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.1019,
+   -0.2789,
+   0.6813
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.1003,
+   -0.2779,
+   0.68
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0986,
+   -0.2771,
+   0.6788
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0967,
+   -0.2764,
+   0.6778
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0975,
+   -0.2756,
+   0.6784
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0956,
+   -0.2749,
+   0.6774
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0937,
+   -0.2743,
+   0.6764
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0926,
+   -0.2728,
+   0.676
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0914,
+   -0.2714,
+   0.6756
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0895,
+   -0.2707,
+   0.6746
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0884,
+   -0.2693,
+   0.6743
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0873,
+   -0.2678,
+   0.6739
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0859,
+   -0.2666,
+   0.6737
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0845,
+   -0.2654,
+   0.6737
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0831,
+   -0.2643,
+   0.6737
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0817,
+   -0.2631,
+   0.6737
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0803,
+   -0.2619,
+   0.6737
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0789,
+   -0.2608,
+   0.6737
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0776,
+   -0.2594,
+   0.6734
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0764,
+   -0.2581,
+   0.6732
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0751,
+   -0.2568,
+   0.6729
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0739,
+   -0.2555,
+   0.6727
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0726,
+   -0.2541,
+   0.6725
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0714,
+   -0.2528,
+   0.6722
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0697,
+   -0.2519,
+   0.6709
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0681,
+   -0.251,
+   0.6696
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0685,
+   -0.2506,
+   0.6707
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0423,
+   -0.2587,
+   0.6512
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0434,
+   -0.2577,
+   0.6514
+  ],
+  [
+   "game+45",
+   0.4,
+   -0.0444,
+   -0.2566,
+   0.6515
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0423,
+   -0.2587,
+   0.6512
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0434,
+   -0.2577,
+   0.6514
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0444,
+   -0.2566,
+   0.6515
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0682,
+   -0.2509,
+   0.6695
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0686,
+   -0.2505,
+   0.6706
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0698,
+   -0.2518,
+   0.6708
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0715,
+   -0.2527,
+   0.6721
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0727,
+   -0.2541,
+   0.6723
+  ],
+  [
+   "game-45",
+   0.4,
+   0.074,
+   -0.2554,
+   0.6726
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0752,
+   -0.2567,
+   0.6728
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0765,
+   -0.258,
+   0.6731
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0777,
+   -0.2594,
+   0.6733
+  ],
+  [
+   "game-45",
+   0.4,
+   0.079,
+   -0.2607,
+   0.6735
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0806,
+   -0.2616,
+   0.6733
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0822,
+   -0.2626,
+   0.673
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0835,
+   -0.2639,
+   0.6732
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0848,
+   -0.2652,
+   0.6734
+  ],
+  [
+   "game-45",
+   0.4,
+   0.086,
+   -0.2665,
+   0.6736
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0873,
+   -0.2678,
+   0.6739
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0884,
+   -0.2693,
+   0.6743
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0895,
+   -0.2707,
+   0.6746
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0914,
+   -0.2714,
+   0.6756
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0926,
+   -0.2728,
+   0.676
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0937,
+   -0.2743,
+   0.6764
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0956,
+   -0.2749,
+   0.6774
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0967,
+   -0.2764,
+   0.6778
+  ],
+  [
+   "game-45",
+   0.4,
+   0.0975,
+   -0.2756,
+   0.6784
+  ]
+ ]
+}

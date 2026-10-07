@@ -13,6 +13,7 @@
 // sharedGeo, earGain, hero (id), dispose().
 import * as THREE from 'three';
 import { makeToon, makeOutline } from '../gfx/materials.js';
+import { capTexture } from '../core/deck.js';
 
 const BASE = import.meta.env?.BASE_URL ?? '/';
 const OFF_DARK = typeof location !== 'undefined' && /[?&]off=[^&]*\bdark\b/.test(location.search); // (?off=dark: no darkGrade / darkNeutral, for bisecting render bugs)
@@ -87,6 +88,39 @@ export const HERO_MODELS = {
   poeToy: { file: 'poe_toy', name: 'Poe', outline: '#1c181e', earGain: 0.5, squint: [0.58, -0.24], wave: 'out', palm: [-0.044, -0.054, 0.006], back: [0, 0.048, -0.3],
     darkGrade: [1, 7, 4, -2, 0.1], darkNeutral: 0.85, darkFur: 1,
     fumaMount: { pos: [0, 0.628, -0.35], quat: [0, 0.741451, 0.671007, 0], bone: 'chest', scale: 1 } },
+  // the Toybox Shih Tzu dark knight (docs/SHIHTZU.md §8; tools/blender/codex/assets/shihtzu-toy, the toybox-character skill,
+  // Opus builder; sheet B "Gloomhowl Warlock-Knight"): the 37-bone biped rig public/rigs/shihtzu_toy.*, the tome on his left
+  // hip baked in, the toy flail a separate prop (public/models/shihtzu-flail.glb: actors/shihtzuGear.js FLAIL_MODEL, its
+  // rope and ball on a verlet chain). lidTilt: his eyes face ~31° outward, so the lids hinge on tilted axes (animator.js
+  // lidTurn; the README's hinge (0.852, 0, ∓0.523)); squint [0.74, −0.36]: a content, half-lidded smile ([0.70, −0.44]
+  // glares from 45°); earGain 0.5 (the agent's). palm: the right mitten's grip centre off hand_R (prop_mount.json
+  // one_handed.position_in_hand_frame); the left mirrors it. flailMount: where the flail rides on his back when it's put
+  // away, like a baldric: the handle up his right shoulder blade, its bone pommel poking up between the ears, the rope
+  // slung down across the cape to the ball, hooked at his left hip behind the tome (shihtzuGear.js BACK_HOOK); model
+  // space, game axes, like fumaMount. The coat: the sheet's black
+  // #2C2A30 graded like Poe's (the samurai's gated tools: darkGrade's 5th value gates it to the near-neutral black fur, nose
+  // and lids; a slightly warmer lift, so it reads a neutral warm charcoal, not violet), and whiteCap holds his cream fur
+  // under its own colour (the Burrow's key light blew it out to a glowing peach). Measured in game: docs/SHIHTZU.md §8.
+  shihtzuToy: { file: 'shihtzu_toy', name: 'Floofy', outline: '#1c181e', earGain: 0.5, squint: [0.74, -0.36], lidTilt: 0.5507, wave: 'out', palm: [-0.040, -0.054, 0.004], back: [0, 0.06, -0.27],
+    darkGrade: [1, 12, 7, -3, 0.1], darkNeutral: 0.9, darkFur: 1, whiteCap: 1,
+    flailMount: { pos: [-0.128, 0.683, -0.335], quat: [0, 0, 0.9842, 0.1771], bone: 'chest', scale: 1 } },
+  // the Toybox Golden Retriever dragoon (docs/GOLDEN.md §8; tools/blender/codex/assets/golden-toy, the toybox-character
+  // skill, Opus builder; sheet C "Emberleaf Dragon Guard"): the 37-bone biped rig public/rigs/golden_toy.*, the javelin
+  // quiver on his spine baked in, the toy lance and the javelin separate props (public/models/golden-lance.glb,
+  // golden-javelin.glb: actors/goldenGear.js). earGain 0.5 (the agent's), the default squint (his lids are sized for
+  // +0.488 / −0.24). palm: the right mitten's grip centre off hand_R (prop_mount.rig.json palms.R
+  // palm_offset_in_hand_frame_game; the left mirrors it). lanceMount: where the lance rides on his back when it's put
+  // away (model space, game axes, like fumaMount): slung ~45° across his back over the ear drapes and behind the quiver's
+  // caps, the pommel out past his left hip (his plumed tail is at the right), the head up past his right shoulder. The
+  // coat grade and the cream cap: see GOLDEN.md §8 (measured in game against the sheet's #C47A3A).
+  goldenToy: { file: 'golden_toy', name: 'Foosy', outline: '#3a2212', earGain: 0.5, wave: 'out', palm: [-0.0405, -0.0288, 0.0029], back: [0, 0.1, -0.3],
+    warmGrade: [0.15, 6, 8, 18, 18, 36], warmCap: 1.05,
+    lanceMount: { pos: [0.17, 0.63, -0.43], quat: [-0.0277, 0.0114, 0.38, 0.9245], bone: 'chest', scale: 1 } },
+  // Shadow in his dragon whelp outfit (tools/blender/codex/assets/shadow-whelp: a re-dress of shadow_toy, the same quad
+  // skeleton and face; ROADMAP H-5): worn only while the dragoon is the active hero (actors/whelp.js swaps it in with a
+  // poof). earDamp: his own ears come up through slits in the hood, so their spring swing is held to this fraction (the
+  // flight damps it further); the wings are props (public/models/shadow-whelp-wing.glb) flapped by whelp.js.
+  shadowWhelp: { file: 'shadow_whelp', name: 'Shadow', outline: '#1c181e', earGain: 0, earDamp: 0.6, sitDrop: 0.08, darkGrade: [1, -4, 14, -9] },
 };
 
 // Disney style (baked heroes + sculpted kit) or the classic toon kit: ?chewy=disney|classic overrides the saved choice
@@ -114,7 +148,7 @@ export function setChewyModel(m) { try { localStorage.setItem('chewy.model', m);
 /** the Toybox heroes (vs the Storybook ones): with the samurai Chewy or the Toybox one */
 export const toyHeroes = (m = chewyModel()) => m === 'samurai' || m === 'toy';
 // the Toybox heroes load first, falling back to the Storybook model; the samurai Chewy falls back to the Toybox one
-const TOY = { chewy: 'chewyToy', moka: 'mokaToy', poe: 'poeToy' };
+const TOY = { chewy: 'chewyToy', moka: 'mokaToy', poe: 'poeToy', shihtzu: 'shihtzuToy', golden: 'goldenToy' };
 const cfgFor = id => (id === 'chewy' && chewyModel() === 'samurai' ? ['chewySamurai', 'chewyToy', 'chewy'] : TOY[id] && toyHeroes() ? [TOY[id], id] : [id])
   .map(k => HERO_MODELS[k]).filter(c => c && !c.pending); // (a hero with no Storybook model, or one still pending, skips it)
 
@@ -141,6 +175,7 @@ export function loadHeroModel(id, force = false) {
           tl.loadAsync(dir + meta.tex), meta.normalTex ? tl.loadAsync(dir + meta.normalTex) : null,
         ]);
         tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; if (ntex) ntex.colorSpace = THREE.NoColorSpace;
+        capTexture(tex); if (ntex) capTexture(ntex); // (the Mobile preset: skins at 1024, core/deck.js)
         ASSETS.set(id, { meta, buf, tex, ntex, cfg });
         return true;
       } catch (e) { // ([chewy] warnings are what tools/qa/prod-smoke.mjs watches for: only the last fallback warns)
@@ -243,6 +278,51 @@ const DARK_NEUTRAL = /* glsl */`
     // grade weights its lift, so his darks lift evenly instead of toward violet
     outgoingLight += lf * (1.0 - cDark) * uDarkFur * (1.0 - smoothstep(0.0, 0.55, dl));
   }`;
+// cfg.whiteCap (k): white fur under a strong warm key light (the Burrow's, with the bloom) blows out to a glowing peach:
+// on the bright, near-neutral texels (a cream coat, not the blush or the eyes' colours) the lit colour keeps the fur's
+// own hue and never goes past k × its albedo (as the katana's bone does: charKit.js BONE_LIFT). The Shih Tzu's white
+// blaze, muzzle, beard and topknot.
+export const WHITE_CAP = /* glsl */`
+  {
+    vec3 a = diffuseColor.rgb;
+    float mx = max(max(a.r, a.g), a.b), mn = min(min(a.r, a.g), a.b);
+    float wht = smoothstep(0.42, 0.66, mx) * (1.0 - smoothstep(0.22, 0.42, (mx - mn) / max(mx, 1e-3)));
+    float L = dot(outgoingLight, vec3(0.333)), La = dot(a, vec3(0.333)) + 1e-3;
+    outgoingLight = mix(outgoingLight, a * (L / La), wht * 0.65);
+    outgoingLight = mix(outgoingLight, min(outgoingLight, a * uWhiteCap), wht);
+  }`;
+// cfg.warmGrade [desat, r, g, b, hue0, hue1] (r, g, b: 0..255 sRGB offsets; hues in degrees): the dragoon's red-gold coat.
+// Warm, saturated texels whose hue lies in [hue0, hue1] (his fur, #C47A3A at 28°, and its light feathering, #E0A868 at
+// 32°; not the brass at 40° or the blush at 10°) blend toward their own grey by desat and take the offset, before
+// lighting: the warm key light, the toon's shadow tint and the grade's saturation and warm gain (post.js) pushed the
+// coat to a flat, blue-less orange (#C47A3A read #CB7100 in the village). Portraits render ungraded and zero it.
+// cfg.warmCap (k, with warmGrade): the same texels under a strong warm key light (the Burrow's, the Onsen's mist, with the
+// bloom) blew out to a pale glowing peach: their lit colour keeps the fur's own hue and never passes k × its albedo (as
+// the white cap does for cream fur: WHITE_CAP).
+const WARM_PARS = /* glsl */`
+uniform vec4 uWarmGrade;
+uniform vec2 uWarmHue;
+uniform float uWarmCap;
+float warmW(vec3 sc) { // sc: sRGB-ish albedo; 1 on the coat's hue band (saturated, red-led, hue in uWarmHue)
+  float mx = max(sc.r, max(sc.g, sc.b)), mn = min(sc.r, min(sc.g, sc.b)), ch = mx - mn;
+  float hue = sc.r >= mx && ch > 1e-3 ? 60.0 * (sc.g - sc.b) / ch : -99.0;
+  return smoothstep(0.18, 0.3, ch) * smoothstep(uWarmHue.x - 4.0, uWarmHue.x, hue) * (1.0 - smoothstep(uWarmHue.y, uWarmHue.y + 3.0, hue));
+}`;
+const WARM_GRADE = /* glsl */`
+  {
+    vec3 sc = pow(max(diffuseColor.rgb, 0.0), vec3(1.0 / 2.2));
+    float w = warmW(sc), l = dot(sc, vec3(0.2126, 0.7152, 0.0722));
+    sc += w * (uWarmGrade.x * (vec3(l) - sc) + uWarmGrade.yzw);
+    diffuseColor.rgb = pow(max(sc, 0.0), vec3(2.2));
+  }`;
+const WARM_CAP = /* glsl */`
+  {
+    vec3 a = diffuseColor.rgb;
+    float w = warmW(pow(max(a, 0.0), vec3(1.0 / 2.2))) * step(0.001, uWarmCap);
+    float L = dot(outgoingLight, vec3(0.333)), La = dot(a, vec3(0.333)) + 1e-3;
+    outgoingLight = mix(outgoingLight, a * (L / La), w * 0.5);
+    outgoingLight = mix(outgoingLight, min(outgoingLight, a * uWarmCap), w);
+  }`;
 export function buildHeroModel(id, spec = null) {
   const A = ASSETS.get(id); if (!A) throw new Error(`hero model ${id} not loaded`);
   const cfg = A.cfg || HERO_MODELS[id];
@@ -275,17 +355,28 @@ export function buildHeroModel(id, spec = null) {
   if (cfg.hat) { hatAnchor = new THREE.Group(); hatAnchor.name = 'hatAnchor'; hatAnchor.position.set(cfg.hat[0] * S, cfg.hat[1] * S, cfg.hat[2] * S); hatAnchor.userData.hatScale = cfg.hat[3] ?? 1; B.head.add(hatAnchor); }
   const saya = !quad && cfg.sayaMount ? sayaGroup(cfg.sayaMount, B, abs, S) : null; // (the sheathed katana's hilt: see HERO_MODELS)
   const fumaMount = !quad && cfg.fumaMount ? propMount('fumaMount', cfg.fumaMount, B, abs, S) : null; // (Poe's fūma on her back: see HERO_MODELS)
+  const flailMount = !quad && cfg.flailMount ? propMount('flailMount', cfg.flailMount, B, abs, S) : null; // (the Shih Tzu's flail on his back: shihtzuGear.js)
+  const lanceMount = !quad && cfg.lanceMount ? propMount('lanceMount', cfg.lanceMount, B, abs, S) : null; // (the dragoon's lance on his back: goldenGear.js)
   root.updateMatrixWorld(true);
 
-  const dg = OFF_DARK ? null : cfg.darkGrade, gated = dg?.[4] != null, fg = gated && cfg.furGrade, neutral = gated && cfg.darkNeutral;
+  const dg = OFF_DARK ? null : cfg.darkGrade, gated = dg?.[4] != null, fg = gated && cfg.furGrade, neutral = gated && cfg.darkNeutral, wc = cfg.whiteCap, wg = OFF_DARK ? null : cfg.warmGrade;
   const v4 = a => new THREE.Vector4(a[0], a[1] / 255, a[2] / 255, a[3] / 255);
+  const pars = dg ? ['uniform vec4 uDarkGrade;', gated && 'float cDark = 0.0;', fg && 'uniform vec4 uFurGrade;', neutral && 'uniform vec3 uGradeLift;\nuniform float uDarkNeutral;\nuniform float uDarkLift;\nuniform float uDarkFur;'] : [];
+  if (wc) pars.push('uniform float uWhiteCap;');
+  if (wg) pars.push(WARM_PARS);
+  const colors = [dg && DARK_GRADE(dg[4], !!fg), wg && WARM_GRADE].filter(Boolean); // (the dark coat's grade, the warm coat's: see DARK_GRADE, WARM_GRADE)
+  const outs = [neutral && DARK_NEUTRAL, wc && WHITE_CAP, wg && WARM_CAP].filter(Boolean); // (the cloth neutraliser: see DARK_NEUTRAL; the white cap: WHITE_CAP; the warm coat's cap: WARM_CAP)
   const mat = makeToon({
     map: tex, objectBrush: true, brush: 0, rim: 0.5, term: [-0.04, 0.34], shadowSat: 0.35,
-    ...(dg && {
-      fragPars: ['uniform vec4 uDarkGrade;', gated && 'float cDark = 0.0;', fg && 'uniform vec4 uFurGrade;', neutral && 'uniform vec3 uGradeLift;\nuniform float uDarkNeutral;\nuniform float uDarkLift;\nuniform float uDarkFur;'].filter(Boolean).join('\n'),
-      fragColor: DARK_GRADE(dg[4], !!fg), ...(neutral && { fragOut: DARK_NEUTRAL }), // (the cloth neutraliser: see DARK_NEUTRAL)
-      uniforms: { uDarkGrade: { value: v4(dg) }, ...(fg && { uFurGrade: { value: v4(fg) } }), ...(neutral && { uDarkNeutral: { value: cfg.darkNeutral }, uDarkLift: { value: 1 }, uDarkFur: { value: cfg.darkFur ?? 0 } }) },
-    }),
+    ...(pars.length && { fragPars: pars.filter(Boolean).join('\n') }),
+    ...(colors.length && { fragColor: colors.join('\n') }),
+    ...(outs.length && { fragOut: outs.join('\n') }),
+    uniforms: {
+      ...(dg && { uDarkGrade: { value: v4(dg) } }), ...(fg && { uFurGrade: { value: v4(fg) } }),
+      ...(neutral && { uDarkNeutral: { value: cfg.darkNeutral }, uDarkLift: { value: 1 }, uDarkFur: { value: cfg.darkFur ?? 0 } }),
+      ...(wc && { uWhiteCap: { value: wc } }),
+      ...(wg && { uWarmGrade: { value: v4(wg) }, uWarmHue: { value: new THREE.Vector2(wg[4] ?? 18, wg[5] ?? 36) }, uWarmCap: { value: cfg.warmCap ?? 0 } }),
+    },
   });
   if (ntex) { mat.normalMap = ntex; mat.normalScale.set(0.45, 0.45); }
   if (cfg.tint) mat.color.setRGB(...cfg.tint);
@@ -311,13 +402,13 @@ export function buildHeroModel(id, spec = null) {
   } : {
     body: B.spine, head: B.head, armL: B.upperarm_L, armR: B.upperarm_R, handL: palm('handL'), handR: palm('handR'),
     foreL: B.forearm_L, foreR: B.forearm_R, wristL: B.hand_L, wristR: B.hand_R, saya, // (elbows / wrists: the samurai cuts bend them; animator.js)
-    legL: B.thigh_L, legR: B.thigh_R, earL: B.ear_L, earR: B.ear_R, tail: B.tail1, back, hatAnchor, wave: cfg.wave, anim: cfg.anim, fumaMount,
+    legL: B.thigh_L, legR: B.thigh_R, earL: B.ear_L, earR: B.ear_R, tail: B.tail1, back, hatAnchor, wave: cfg.wave, anim: cfg.anim, fumaMount, flailMount, lanceMount,
     jaw: B.jaw, lids: [B.lidU_L, B.lidU_R], lidsLow: [B.lidD_L, B.lidD_R], lips: [B.lip_L, B.lip_R], eyes: [], brows: [],
     eyeballs: [B.eye_L, B.eye_R],
   };
   return {
     spec: spec || { name: cfg.name }, hero: id, root, parts, mat, outMat, propMat, meshes: [skin], skin, outline, skeleton, height: meta.height,
-    disney: true, bakedDisney: true, sharedGeo: true, earGain: cfg.earGain, model: cfg.file, quadruped: quad, sitDrop: cfg.sitDrop, squint: cfg.squint, lidTilt: cfg.lidTilt,
+    disney: true, bakedDisney: true, sharedGeo: true, earGain: cfg.earGain, model: cfg.file, quadruped: quad, sitDrop: cfg.sitDrop, squint: cfg.squint, lidTilt: cfg.lidTilt, earDamp: cfg.earDamp,
     dispose() { skeleton.dispose(); mat.dispose(); outMat.dispose(); propMat.dispose(); },
   };
 }

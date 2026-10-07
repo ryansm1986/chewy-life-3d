@@ -8,7 +8,9 @@
 //    how far: 2.5–9 m; with no stick, 6 m). Skills, charges, channels and Poe's throws and blinks all read it
 //    (game.js feeds it; combat/charge.js cursorGround and mokaSpells read Actions.padAim between feeds).
 //  - Interactables: the nearest one in front gets the A prompt (pickInteract).
-// One per game (G.padAim); game.js calls update(dt) from handleInput while the pad is the active device.
+//  - Touch (CT-5) aims the same way: its drag-to-aim is the right stick (Actions.aim), its stick the left one, and a tap
+//    on a foe locks it on purpose (target(): kept while it lives and stays within reach, whatever the cone).
+// One per game (G.padAim); game.js calls update(dt) from handleInput while the pad or touch is the active device.
 import * as THREE from 'three';
 import { Actions } from '../core/actions.js';
 import { Events } from '../core/events.js';
@@ -59,6 +61,8 @@ export class PadAim {
   /** the best foe in the cone (sticky: the current lock is kept while it stays roughly in the cone and range) */
   pick(stickMag) {
     const G = this.G, P = G.player, C = G.combat, k = this.strength;
+    const M = this.manual; // (a foe tapped on: kept while it lives and stays within 1.6× the range, whatever the cone)
+    if (M) { if (this.ok(M) && Math.hypot(M.pos.x - P.pos.x, M.pos.z - P.pos.z) < RANGE * 1.6 + (M.radius || 0)) return M; this.manual = null; }
     if (!C?.inRadius || k <= 0) return null;
     const cone = (stickMag > 0 ? CONE + (CONE_FULL - CONE) * stickMag : CONE) * (0.35 + 0.65 * k), cosC = Math.cos(cone);
     const cur = this.lock;
@@ -78,6 +82,8 @@ export class PadAim {
     return best || (pot && ps < 5 ? pot : null); // (a pot only when no monster is in the cone, and close)
   }
   ok(e) { return e.alive && !e.untargetable && e.life > 0 && e.pos && Number.isFinite(e.pos.x); }
+  /** lock a foe on purpose (a touch tap on it): the ring pulses and the lock holds until it dies or is left behind */
+  target(e) { if (!e || !this.ok(e)) return false; this.manual = e; if (this.lock !== e) { this.lock = e; this.pulse = 1; } return true; }
   /** any foe (not a pot) within r: A attacks instead of interacting (CONTROLS §2) */
   foeNear(r = 5) {
     const G = this.G, P = G.player, C = G.combat; if (!C?.inRadius || G.mode !== 'dungeon') return false;
@@ -100,7 +106,7 @@ export class PadAim {
   // ---------------------------------------------------------------- the target ring
   drawRing(dt) {
     const G = this.G, L = this.lock, W = G.world;
-    if (!L || Actions.device !== 'pad') { this.hideRing(); return; }
+    if (!L || Actions.device === 'kbm') { this.hideRing(); return; }
     const ring = this.ring ||= makeRing();
     if (this.ringWorld !== W || ring.parent !== W.scene) { ring.removeFromParent(); W.scene.add(ring); this.ringWorld = W; }
     ring.visible = true;
@@ -112,7 +118,7 @@ export class PadAim {
   }
   hideRing() { if (this.ring?.parent) this.ring.removeFromParent(); this.ringWorld = null; }
   /** the mouse took over, a mode change, a hero switch: nothing locked, nothing drawn */
-  clear() { this.lock = null; this.hideRing(); if (Actions.device !== 'pad') Actions.padAim = null; }
+  clear() { this.lock = null; this.manual = null; this.hideRing(); if (Actions.device === 'kbm') Actions.padAim = null; }
 }
 
 // the ring: chunky cream band with an ink edge and four gold chevrons pointing in, drawn once on a canvas (one draw call;

@@ -1,8 +1,10 @@
 # Controls: gamepad, Steam Deck, touch (design)
 
-Status: **CT-1 and CT-2 done**; **CT-3 built** (2026-10-06, in review). The as-built notes are §8 (CT-1), §9 (CT-2)
-and §10 (CT-3, with the polish before it). CT-4 and CT-5 are planned. Tracked in [ROADMAP.md](ROADMAP.md) as CT-1 to
-CT-5.
+Status: **CT-1 to CT-3 done**; **CT-4 built** (2026-10-07, in review). The as-built notes are §8 (CT-1), §9 (CT-2),
+§10 (CT-3, with the polish before it) and §11 (CT-4; the user guide is [DESKTOP.md](DESKTOP.md)). CT-5 (touch) is
+built through checkpoint 2 and in review: §12 (the touch device, the play controls, the phone HUD, menus on touch, the
+mobile layout, the Mobile preset, perf and memory). The real-phone checks are in [ITCH.md](ITCH.md) ("Mobile").
+Tracked in [ROADMAP.md](ROADMAP.md) as CT-1 to CT-5.
 
 The owner's goals:
 - **controller first**, in a **console ARPG** style (Diablo on console);
@@ -475,3 +477,397 @@ The default mapping uses Xbox names (the Deck's face buttons match):
   - fewer bloom mips;
   - SMAA at Medium;
   - a lower particle cap.
+
+## 11. As built: CT-4, the desktop app (2026-10-07)
+The player's guide (building, Windows, the Steam Deck step by step, saves, troubleshooting) is
+[DESKTOP.md](DESKTOP.md). This section is the engineering summary.
+
+### 11.1 The shell (`tools/desktop/`)
+- **`main.cjs`** (the main process) does four things:
+  - It serves the production build from the app's own files on a private, privileged scheme, `app://pawhaven/`
+    (standard, secure, fetch and CORS enabled). It is a secure context, so the Gamepad API, localStorage and module
+    scripts all work as on https. Paths are normalised and confined to the game folder; anything else gets a 403.
+  - It opens one window: no menu or chrome, full screen unless the player chose windowed, a minimum of 960×600, and
+    the ink background colour while it loads.
+  - F11 and Alt+Enter toggle full screen (the game never sees them). The state and the windowed bounds go in
+    `userData/window.json`.
+  - Links open in the system browser; pop-ups and navigating away are refused.
+- **Saves**: the game's localStorage for the `app://pawhaven` origin, in the app's userData: `%APPDATA%\Pawhaven` or
+  `~/.config/Pawhaven`. They persist across updates and are separate from the browser's.
+- **`preload.cjs`** (context isolation, sandboxed) exposes `window.pawhaven`:
+  - `desktop`, `platform`, `version`;
+  - `deck`: Steam's `SteamDeck=1`, or the `--deck` / `--no-deck` switches;
+  - `isFullscreen()`, `setFullscreen(on)`, `onFullscreen(fn)`;
+  - `quit()`, which closes the window, so the game's `beforeunload` save runs.
+- **The game's side** (`src/ui/desktop.js`, inert in a browser):
+  - Settings › **Full screen** (`settings.fullscreen` mirrors the window both ways);
+  - **Quit** on the title and **Quit game** in the pause menu (save, then `quit()`);
+  - `body.desktop-app`;
+  - `src/core/deck.js` already reads `pawhaven.deck`. A desktop app on a PC keeps its normal preset (the
+    director's call); the Deck preset needs Steam's flag (or the Deck's 1280×800 screen).
+- Chromium switches set in the main process: `ignore-gpu-blocklist` (WebGL2 on any driver, the Deck's Mesa included)
+  and `autoplay-policy=no-user-gesture-required` (the title music plays at once).
+- Test switches: `--windowed`, `--fullscreen`, `--user-data=`, `--query=`, `--url=` (the dev server) and
+  `--game-dir=`.
+
+### 11.2 The build (`npm run build:desktop`, `tools/desktop/build-desktop.mjs`)
+1. The game is built by vite with `base: './'` into `dist-desktop/app/game/`, with the licences (as the itch build).
+2. Next to it go `main.cjs`, `preload.cjs`, `icon.png` and a small `package.json` (main `main.cjs`, no
+   dependencies).
+3. **electron-builder 26** (devDependency) packs it with **Electron 44.6.0** (devDependency) into `asar`. It never
+   publishes, and the app has no node_modules.
+   - It gets Electron already unpacked: `node_modules/electron/dist` for Windows, and for Linux the official zip,
+     downloaded once into `node_modules/.cache/pawhaven-desktop/`.
+   - On this machine, electron-builder's own unzip-then-rename step failed with EPERM: Defender holds the fresh
+     folder while it scans.
+   - Windows targets: `zip` and `portable` (an NSIS self-extractor).
+   - Linux target: `dir`.
+4. **The Linux packages are written by the script itself:**
+   - electron-builder's AppImage step needs Linux: its `mksquashfs` is a Linux binary, and its staging makes
+     symlinks, which Windows refuses without Developer Mode.
+   - `tools/desktop/appimage.mjs` builds the AppImage from the pinned, checksummed type-2 static runtime that
+     electron-builder ships (AppImage/type2-runtime 20251108) plus a **SquashFS 4.0 image it writes itself**: gzip
+     data blocks of 128 KiB, no fragments, no xattrs, uncompressed metadata blocks, files and folders only.
+   - The AppImage's `AppRun` adds `--no-sandbox` only when unprivileged user namespaces are missing (the setuid
+     helper can't be setuid inside a FUSE mount). It also carries the `.desktop` entry, the icon and `.DirIcon`.
+   - The `.tar.gz` is a ustar written with the executable bits: `pawhaven`, `chrome_crashpad_handler`,
+     `chrome-sandbox` and the `.so` files 0755, the rest 0644.
+   - **`tools/desktop/verify-squashfs.py`** reads the AppImage back with an independent reader (PySquashfsImage 0.9).
+     It finds the image after the runtime's ELF sections and compares all 72 app files, byte for byte, plus the 5
+     extras and the modes. Result: PASS, 362 MB of files identical.
+5. Outputs in `release/desktop/` (0.3.0):
+
+| File | Size |
+|---|---|
+| `Pawhaven-0.3.0-win-x64.zip` | 181 MB |
+| `Pawhaven-0.3.0-win-x64-portable.exe` | 124 MB |
+| `Pawhaven-0.3.0-linux-x64.AppImage` | 158 MB |
+| `Pawhaven-0.3.0-linux-x64.tar.gz` | 155 MB |
+
+It also leaves `win-unpacked/` and `linux-unpacked/`. A full build takes about 2.5 minutes once the downloads are
+cached; `--win --dir` takes seconds.
+- **The icon** (`tools/desktop/icon.png`, 512 px) is the title's Chewy badge, rendered from the game by
+  `tools/desktop/make-icon.mjs`.
+- **Kept out of the web and itch bundles**: nothing in `src/` imports Electron. The bundle's only desktop code is
+  `src/ui/desktop.js`, which reads `globalThis.pawhaven`. `tools/build-itch.mjs` and vite's config are unchanged.
+
+### 11.3 QA
+- **`tools/qa/desktop-smoke.mjs`**: Playwright's Electron support boots the packaged
+  `release/desktop/win-unpacked/Pawhaven.exe`, windowed, with throwaway userData folders. 5/5 checks:
+  - a) the title from `app://pawhaven`: a secure context, `window.pawhaven` (desktop, no Deck, win32, 0.3.0), WebGL2
+    on the RTX 5080, and the Quit button;
+  - b) Settings › Full screen and the pause menu's Quit game; the toggle really switches the window to full screen
+    and back;
+  - c) New Game reaches the village. The Gamepad API answers, and the window and document have focus. A virtual pad
+    walks the hero, the glyphs show, and the bag takes the focus ring;
+  - d) Quit game saves and closes the app. A relaunch has the save (Continue) and `window.json`;
+  - e) with `SteamDeck=1` (as Steam sets on a Deck) the app reports a Deck and the first start picks the Deck preset.
+- No physical controller was connected here. The real pad path is the same Gamepad API as Chrome, and the
+  stub-driven check covers the game's side.
+- Screenshots: `tools/qa/tmp/desktop/title.png`, `village.png`.
+- Not run here: the Linux builds. The AppImage's SquashFS is verified by the independent reader, but it has not been
+  started on a Linux machine or a Deck yet. That is the owner's first Deck test (DESKTOP.md walks through it).
+
+## 12. As built: CT-5, touch (2026-10-07)
+Phones and tablets in landscape. Checkpoint 1 was the touch device and the play controls (12.1, 12.2). Checkpoint 2 is
+the phone's HUD and hero wheel, the menus on touch, the mobile layout, build / decorate / the minigames by touch, and the
+Mobile preset with its numbers (12.3 to 12.7). The QA is 12.8.
+
+### 12.1 The touch device (`src/core/touch.js`, `src/core/actions.js`)
+- **Touch is the action layer's third device.** `core/touch.js` holds what the on-screen controls are doing, in
+  actions:
+  - buttons: `Touch.hold(a)` / `release(a)` / `pulse(a)` (held for one frame: a tap decided on release);
+  - `Touch.stick` `{ on, x, y, mag, sprint }` and `Touch.aim` `{ on, x, y, mag }` (x right, y up);
+  - `Touch.taps`, the world taps, which game.js takes each frame.
+- `Actions.poll()` works out the touch buttons' edges and hold times (`Touch.poll`), like the pad's.
+  - `held / pressed / released / consume(a, 'touch')` read them;
+  - `held(a)` with no device includes touch;
+  - consuming `interact` also takes the attack button's press (it is the context interact, as A is).
+- `move()` takes the stick (after WASD, before the pad's left stick), with `pad: true` (analogue walking).
+- `aim()` takes a drag off a skill or the hero button, as the right stick. So `combat/padAim.js`, the charge machine
+  and the hero wheel read touch with no changes of their own.
+- **The last device**:
+  - a touch anywhere (pointerdown or touchstart) makes touch the device: `body.touch-active`, `Actions.style` 'touch';
+  - the mouse events a browser sends after a tap (`sourceCapabilities.firesTouchEvents`, or within 600 ms of the last
+    touch) don't count as the mouse;
+  - a key, a real mouse move or a pad press switch back, and every touch button lets go (`Touch.releaseAll`).
+- A touch-first screen (`(pointer: coarse)` and no `(any-pointer: fine)`) starts on touch, so the controls are up
+  before the first tap.
+- **Text**: `Actions.text(a, 'touch')` names the control ('the roll button', 'the heart potion', 'Skills in the
+  menu'). `resolve()` turns "Press Q to…" into "Tap the heart potion to…" and "hold Tab" into "hold the hero button".
+  Banners' sub lines now go through `resolve()` too (the pad gets its glyph names there as well).
+- The key caps hide by themselves (no bindings on 'touch'); `.kbm-only` and `.pad-only` hints hide on touch.
+- **No browser gestures**:
+  - the viewport meta has `maximum-scale=1, user-scalable=no, viewport-fit=cover`;
+  - the canvas is `touch-action: none` and cancels its touchstart (no compatibility mouse events, no scroll or zoom);
+  - the UI is `touch-action: pan-x pan-y` (lists still scroll, no pinch or double-tap zoom);
+  - `overscroll-behavior: none` (no pull-to-refresh);
+  - Safari's `gesturestart` and any two-finger touchmove are cancelled;
+  - text selection and the long-press callout are off; the long-press context menu was already blocked (input.js).
+
+### 12.2 The play controls (`src/ui/touch.js`, `src/ui/touch.css`)
+They show while touch plays and play is on: not on the title, in a menu or dialogue, in build or decorate mode. Sizes
+are CSS px × `--u`: the screen (an 844 px wide phone is 0.9, a tablet up to 1.3) × Settings › Button size. They sit
+inside the safe area (`env(safe-area-inset-*)`).
+- **The floating stick** (the left half; the right half when left-handed):
+  - it appears where the thumb lands and follows a long push (past 1.7 × its radius);
+  - analogue: a dead zone of 0.12, then 0.26 to 1 of the speed;
+  - pushed out to its ring (1.24 × the radius) it sprints: the ring turns gold and races, the knob glows
+    (`Touch.hold('sprint')`, read by sprint.js);
+  - at rest a faint ghost shows where to put the thumb;
+  - a short tap there is a world tap;
+  - the knob is a pink paw pad.
+- **The cluster** (bottom right, mirrored when left-handed):
+  - the **attack button** (84 px at size 1) is the LMB slot, in a cream frame of dots like the orbs'. It has the pad's
+    A behaviour: it uses or talks when the prompt is up and no foe is near (it shows a paw then), else it attacks the
+    soft lock (tap, hold to charge, hold to repeat). A foe tapped on purpose is walked up to, as a click does.
+  - **the five skill slots** (RMB, 1–4, 52 px) on an arc round it;
+  - **roll** (mint), and the **weapon-set badge** at the attack button's shoulder.
+  - **The HUD's own hotbar slots move into these buttons** while touch plays, and go home when another device does.
+    So their icons (the tile cropped round), cooldown sweeps and numbers, out-of-zoom tint, ready flash, charge
+    sweep, stage pips and perk badges all keep working. A round charge ring replaces the square rim.
+  - An empty slot is a dim dashed circle; a tap opens the skill chooser.
+- **Aim** (Settings › Controls › Touch › Skill aim):
+  - **Auto** (the default): skills go at the soft lock (padAim's cone round the stick or the facing), else along the
+    facing;
+  - **Drag**: drag off a skill button to aim. The drag is the right stick: its direction, and its length (to 140 px)
+    is the distance (2.5–9 m) and narrows the lock's cone. A ground mark shows where it goes: a trail of cream
+    chevrons and a ring where it lands, or padAim's ring on a locked foe. Back onto the button shows a cross; letting
+    go there cancels. A chargeable skill charges from the press and fires charged at the aim; any other skill casts
+    when let go (a still press past 0.22 s holds and repeats, as in Auto).
+- **The belt** (the HUD's potion and meal slots, moved in) sits between the orbs, which shrink to 0.74 and show their
+  numbers. The orbs and belt stay centred, but clear of the cluster on a narrow phone.
+- **Top right**, left of the minimap:
+  - the **hero button**: the next hero's face, the switch cooldown ring and level. A tap is the next hero. A hold opens
+    the hero wheel (fitted to the screen), which stays up for a tap on a card; sliding onto a card and letting go picks
+    it too; a tap elsewhere closes it. It works for any number of heroes.
+  - the **bag** and the **menu** (its dot counts skill and stat points). The pause menu's quick row (Bag, Character,
+    Skills, Journal, Map, Build, Decorate, Home) shows on touch too.
+  - The minimap opens the map.
+- **The world**: a tap on a monster locks it (`padAim.target`: kept while it lives and stays within 1.6 × the lock's
+  range, whatever the cone; the ring and the target frame show). A tap on a villager, a door or anything usable walks
+  over and uses it. Anything else is walked to (click-to-move), with a small ping. Two fingers pinch the zoom (as the
+  wheel). During dialogue a tap anywhere reads on.
+- **The prompt** has no key on touch (a paw badge instead), and a tap on it interacts.
+- The quest arrow keeps out of the cluster and the top corners.
+- **Haptics** (`navigator.vibrate`; iOS Safari has none): a tick on a press, a charge stage, the sprint ring and a
+  cancel; a thump on a charged release, being hurt and a knock-out.
+- **Settings › Controls › Touch**: Button size (75–135%), Opacity (30–100%, 85% by default; a pressed button is
+  opaque), Left-handed, Skill aim (Auto · Drag), Haptics, and a list of what each control does in place of bindings.
+- **The HUD on touch**: the dock (the hotbar strip) and the bottom-right menu row hide; the top-left hero portrait
+  hides (the hero button replaces it); toasts move to the top centre; the materials row hides on a short screen.
+
+### 12.3 The phone's HUD and the hero wheel
+- **The quest tracker** starts folded on a short screen (under 520 px tall); its toggle opens it. The toggle and the
+  hotbar's level badges have 44 px hit areas.
+- **Toasts** sit at the top centre and let taps through. On a phone they step aside while a menu is open (build and
+  decorate keep theirs).
+- **The hero wheel on touch** (`TouchControls.fitWheel`) fits the free play area: left of the cluster and the hero
+  button, above the orbs and belt, inside the safe area.
+  - It is a ring when the ring fits at 85% or more. Otherwise it is a row of cards, 146 px apart, which is what a phone
+    gets with 4 or 5 heroes.
+  - A scrim dims the world. The toasts, world labels and the guide dock hide while it is open.
+  - The hub says "Tap a card to play as…". A closed wheel no longer catches taps (`visibility: hidden`).
+- The quest arrow keeps out of the cluster and the top corners (12.2).
+
+### 12.4 Menus on touch (`src/ui/mobile.js`, `src/ui/mobile.css`)
+- **The screen**: `.m-touch` on the UI root on a touch-first screen (or while touch plays); `.m-phone` when the short side
+  is 500 px or less; `.m-tablet` otherwise.
+- **Scale**: on a phone the panels, dialogue, tooltips and popovers draw at `--m-pscale` 0.86, so the design's 14 px is
+  12 px on screen. A tablet uses at least that. Toasts and banners use the UI scale, but at least 0.78.
+- **The text floor**: anything still under 12 px gets an inline size. That covers the panels, dialogue, tooltips,
+  popovers, the guide dock, the hero wheel, toasts, the reel bar and the flip chip.
+  - A MutationObserver marks it dirty, and it runs at most once a frame.
+  - The Japanese subtitles, key caps, minimap names and level pips are exempt.
+- **Fit**: a phone shows one panel at a time, centred between the safe area's top and bottom margins.
+  - Its body scrolls inside the panel (`pan-y`, overscroll contained), and the panel is never off the top.
+  - Its title, tabs and ✕ (52 px) sit at the bottom, by the thumbs.
+  - Tabs at the top of a body (the shop's Buy / Sell, the skill trees, the journal, the pantry) stick to the body's
+    bottom on a solid band. A wide row of tabs scrolls sideways.
+  - The skill trees' three tabs share their row instead, for every hero ("Starlight Kibble", "Ghostlight Tome"). The
+    name wraps to two lines and the points badge sits on the tab's corner. They are still 52 design px tall.
+  - The bag's paperdoll is a strip of two 52 px rows: the weapon | hat, collar | outfit, boots | the portrait (100 px) |
+    charms | paws, the swap | the second weapon. The slot names hide (an empty slot shows its silhouette, and a long press
+    names it) and the stats stay one row, so about three rows of the bag show under them (one did before).
+  - Cooking and the workbench take the screen's height. Their list and their details scroll separately, and Cook /
+    Craft sticks to the foot of the details.
+  - The Travel Map draws its map at 0.76 so all of it shows. Its details scroll beside it, and Set off! stays in
+    sight.
+  - A guide's dock and offer sit in the free band along the top, between the top-left card and the hero / bag / menu
+    buttons (`--tc-band-l / -w` from the touch layout), so they never cover the buttons they talk about.
+- **Pairs**: two side panels open together (a shop or the stash beside the bag) take turns on a phone. A flip chip at
+  the left edge switches between them; the shop or stash shows first.
+- **Targets**: tabs, buttons, segments and dialogue choices are at least 52 design px (44 on screen). Also enlarged:
+  - toggles (a bigger hit area);
+  - sliders (a 52 px track and a 36 px thumb);
+  - the controls panel's device tabs, the cooking and workbench quantity buttons, the remodel chips, and the guide's
+    Skip.
+- **Gestures** (`Mobile.gestures`):
+  - a tap is the click, so ItemDrag's own click-to-pick-up and click-to-put-down work as tap-to-move;
+  - a finger drag drags an item;
+  - a **double-tap** (330 ms) is the right-click: equip, use, assign, eat or stash. It works on a slot, a skill node, a
+    skill slot, a shop item, a card, or anything with `data-id`;
+  - a **long press** (430 ms) shows the hover tooltip by the finger. It stays for 5 s or until the next touch, and the
+    release doesn't click or pick up;
+  - the browser's own long-press menu is blocked.
+- **The K panel's charge drawer** folds to its tag on a phone. A tap on the tag, or on a node's ⚡ chip, opens it as a
+  sheet over the tree.
+- **Words**:
+  - key caps in tabs hide;
+  - mouse wording in tooltips and footers becomes touch wording (`touchWording`: Right-click → Double-tap, Click → Tap,
+    Ctrl+Click → Drag, the wheel → Pinch, "R to rotate" → "Turn rotates it");
+  - the guides name the control on screen ("press *F*" becomes "press the attack button");
+  - mouse-only hints with no touch equivalent hide (the character sheet's "Shift+click spends 5").
+  - Shadow's tips wait while fishing, so they don't cover the reel bar.
+- **Dialogue**: a tap anywhere reads on. The choices are 52 px buttons with no key caps.
+- **The title on a phone**: the logo at 0.78, the buttons in a row.
+
+### 12.5 The mobile layout
+- **Safe areas**: `env(safe-area-inset-*)` (the viewport has `viewport-fit=cover`), read through a probe element.
+  `?safe=t,r,b,l` fakes a notch for the QA. Every layer stays inside: the HUD, messages, dialogue, panels, the touch
+  controls, the flip chip and the wheel.
+- **Portrait**: a card ("Turn your phone sideways", with a turning phone) covers the game and pauses it
+  (`ui.isPaused`). Turned back, it plays on.
+- The page is `100dvh` tall, so the browser's bars don't cut it off.
+- **Full screen**: the first tap on a touch-first screen asks for it, then locks landscape (`requestFullscreen`
+  with `navigationUI: 'hide'`, then `screen.orientation.lock('landscape')`).
+  - Android Chrome, Samsung Internet and Firefox have it. An iPhone's Safari has no full screen for a page, so the game
+    plays with the browser bar.
+  - Not asked: in the desktop app, or under automation (`navigator.webdriver`) unless `?fs`.
+- **Audio** unlocks on the first touch (`audio.js` also listens for `touchend`).
+- **Add to Home Screen**: `public/manifest.webmanifest` (full screen, landscape, a 192 and a 512 icon made from the
+  desktop icon), `apple-mobile-web-app-capable` and the theme colour. Started from the home screen, an iPhone plays it
+  full screen as well. That works when the game is served on its own; inside itch's iframe the browser adds the itch
+  page.
+
+### 12.6 Build, decorate and the minigames by touch
+- **Build and decorate** (`TouchControls.editTick` and its neighbours): the play controls become edit buttons, and the
+  finger is the cursor (`Actions.tcursor`, which `Actions.pointer()` returns; a click goes into Input for one frame).
+  - On the thumb's side, above the palette: **Build** (**Set down** when decorating, **Remove** for the bulldozer) and
+    **Turn**.
+  - On the other side: **Cancel**, **Store** (decorate, with a piece in hand), **Undo** (decorate) and **Done**.
+  - With a piece in hand, a touch or a drag moves it. A paint tool paints along the drag.
+  - With nothing in hand, a drag pans (the ground follows the finger), and a tap is a click: a house's card, or picking
+    up a piece. Two fingers pan and pinch.
+  - On a phone the palette is full width with a scrolling header, and it folds away while a piece is in hand.
+- **Fishing**: the attack button casts (the context interact at the water), a touch anywhere strikes, and holding the
+  screen reels (`Touch.hold('reel')`). The reel bar shows a pink paw cap (touch's mark, as on the prompt) over
+  "hold to reel". A drag on the stick's side moves the hero instead.
+- **Cooking, the workbench, the seed and gift pickers and the shops** are menus, so they work with taps. Their
+  quantity buttons are 44 px. A long press shows an item's details, and a tap buys.
+- **The garden**: the attack button's context interact at a plot, as A on the pad.
+
+### 12.7 The Mobile preset, perf and memory
+- **`PRESET.MOBILE` = 4** (`core/deck.js`; Settings › Graphics: Low · Medium · High · Deck · Mobile):
+  - Low density;
+  - a pixel ratio of 1 (an 844×390 phone at DPR 3 renders 844×390);
+  - no AO or tilt-shift, SMAA on low, no hit aberration (`Post.noChroma`);
+  - a 1024 sun shadow map over 0.72 of the area, redrawn every other frame;
+  - half the particles;
+  - **hero skins at 1024** (`capTexture`, called from `heroModels.js` at load; a 2048 skin is 22 MB of GPU memory with
+    its mips, a 1024 one 5.6 MB).
+  - Frame cap: a fresh touch-first start caps at 60. Settings › Frame cap now also has 30.
+- It is picked on the first start on a touch-first screen (`mobileLike()`: a coarse pointer and no fine one), unless a
+  quality is saved or `?q=` is given. A preset changed later takes effect for the skins and density after a reload.
+- **`tools/qa/mobile-perf.mjs`**: 844×390 at DPR 3 with touch, the controls up, and the CPU throttled. These numbers
+  were taken with the machine 80 to 94% busy (other agents were building at the time), so treat the throttled ones as
+  a ceiling:
+  - **Unthrottled** (CPU p95, village / Burrow fight / zone fight): Mobile 7.6 / 10.2 / 10.3 ms; High at the same size
+    10.3 / 9.8 / 11.2 ms.
+    - Mobile cuts the GPU work: in the village, 160 draws against 387, 681k triangles against 2.78M, and the render's
+      GPU span p50 1.4 ms against 5.8 ms (75% less).
+  - **CPU ×4**: 63 / 74 / 80 ms p95 (FAIL against the 30 fps line).
+  - **CPU ×3, side by side with the Deck preset under the same load**:
+    - Mobile 42 / 72 / 53 ms;
+    - Deck 46 / 45 / 34 ms. The Deck's own baseline, at 62 to 65% load, was 12 / 17 / 16.5 ms.
+    - The load is most of it. Mobile matches the Deck in the village and runs up to 1.6× it in the big fights.
+  - Phases in the Burrow fight at ×3 (`PHASES=1` now also splits the UI): the damage numbers 2.8 ms, the HUD 2.0 ms,
+    the touch layer 0.35 ms, the render 17 ms.
+  - The real check is a phone. My estimate: a mid-range phone holds 30 fps in the village, and the 60-monster fights dip.
+- **The memory diet** (all of it on the Mobile preset only, except the first item):
+  - **A dungeon floor's staging arrays are freed (every preset).** The batched chunks (`dungeonWorld.js` `Batch`) grow
+    their arrays by doubling, and then copy them out exactly sized. The staging arrays used to stay alive with the floor:
+    about 130 MB on B8. `Chunks.build` now drops them.
+  - **Static geometry lets go of its arrays once uploaded** (`core/deck.js releaseAfterUpload(geo)`, three's
+    `BufferAttribute.onUpload`).
+    - It's opt-in, per call site, never a global switch. Today it covers a floor's chunk meshes (solid props, wall
+      dressing, clutter, the glowing bits) and each pot's own geometry.
+    - Both are built once, drawn as is and disposed with their owner. Nothing raycasts, merges, clones or edits them.
+    - Templates and caches are never released, because a later mesh may be built from them. The same goes for
+      buildings (companions and villagers raycast them), vegetation (BatchedMesh reads its arrays for culling),
+      skinned rigs and terrain.
+    - Bounds are computed before the arrays go. `geometry.userData.released` marks a released geometry.
+    - A lost WebGL context can't re-upload those buffers. If any were released, the game saves on the loss and reloads
+      once the context is back (`Engine`).
+  - **Building templates are capped** (`world/buildings/index.js`).
+    - The prewarm builds level 1 in two variants, 12 templates, instead of every level in all eight variants: 112
+      templates, over 120 MB, built in the background while in a dungeon.
+    - Unused unstyled templates beyond `UNUSED_CAP_MOBILE` (16) are evicted least-recently-used first, as styled ones
+      already were. One is rebuilt on demand (5 to 20 ms) when a building needs it.
+- **`tools/qa/mobile-mem.mjs`** counts every WebGL allocation as the page makes it (an init script wraps the context).
+  After a full GC it also reads the JS heap and the ArrayBuffers' memory (`Runtime.getHeapUsage`).
+  - The run: the village, a Burrow (B8), a fight there (60 more monsters on the hero for 6 s), two more Burrow trips back
+    to back, and a zone dungeon. The village is measured after each trip.
+  - **Before the diet**: ArrayBuffers 241 MB in the village, 600 to 670 MB in the Burrow and 535 MB in the zone. Back in
+    the village they grew trip by trip: 347, 412, then 440 MB.
+  - **After** (Mobile):
+
+    | Stop | GPU | ArrayBuffers | JS heap |
+    |---|---|---|---|
+    | Village | 202 MB | 232 MB | 84 MB |
+    | Burrow B8 | 322 MB | 283 MB | 98 MB |
+    | **The fight** | 330 MB | **290 MB** | 99 MB |
+    | Village after trips 1, 2 and 3 | 193 MB | 268 MB each time | 89 to 90 MB |
+    | Zone | 264 MB | 311 MB | 102 MB |
+
+    - The village no longer grows trip by trip. What stays after the first trip (about 36 MB) is mostly villager rigs
+      kept while they're indoors.
+    - In a big Burrow fight the game now holds about 0.7 GB (290 + 330 + 100 MB), against 1.1 GB before.
+  - **High on the same phone** (before the diet): GPU 513 to 655 MB, with textures at 359 to 394 MB (4096 shadow maps
+    and 2048 skins).
+  - The checks:
+    - in each Burrow, 195 geometries are marked released and 123 have let go (the rest go when first drawn), and two
+      frames draw 92 to 175 calls;
+    - a building template evicted by the cap is rebuilt and drawn;
+    - screenshots at `tools/qa/tmp/mobile-mem/burrow3.png` and `village4.png`.
+    - The verdict: GPU at most 600 MB at any stop, and on Mobile at most 400 MB of ArrayBuffers in the fight
+      (`AB_MAX`).
+  - `performance.memory.usedJSHeapSize` counts the JS heap and the ArrayBuffers together.
+
+### 12.8 QA
+- **`tools/qa/touch-lib.mjs`**: a phone- or tablet-like Chrome (hasTouch, isMobile, a DPR) and fingers driven through
+  CDP `Input.dispatchTouchEvent`, so multi-touch arrives as real touch and pointer events.
+- **`tools/qa/s27-touch.mjs`** (844×390 at DPR 3), 37 checks:
+  - the play controls: the touch device and the HUD; 44 px targets; the stick (direction, analogue, sprint); ground and
+    villager taps; pinch; a monster tap locks; the attack button; every skill; a charge; roll; Drag aim and its cancel;
+    the belt; the weapon badge; the prompt and the attack button using; the hero tap and wheel; the meal; the bag and
+    menu; the Touch settings and left-handed;
+  - the menus: the bag fits a phone; drag, tap-to-move, double-tap to equip, long press for details; the shop (long
+    press, tap to buy, the flip); the K panel (learn, the charge drawer); dialogue taps and choices;
+  - build, decorate, cooking and fishing by touch;
+  - portrait (the overlay pauses); the Mobile preset picked at the first start; back to the mouse and back.
+- **`tools/qa/touch-shots.mjs [phone|tablet|all] [names]`** → `tools/qa/tmp/touch-shots/`. The shots: hud, stick,
+  sprint, wheel, wheel5 (a fake fifth hero), left, controls, dark, dungeon, fight, cancel, charge, build-palette,
+  build, reel, decorate-palette, decorate.
+- **`tools/qa/mobile-ui.mjs`**: 29 views at phone size. These cover the HUD, every panel, the skills panel with each
+  hero's trees, the game menu's pages, the shop, stash, cooking, the workbench, the Travel Map, the gift and seed pickers,
+  a house card, remodel, dialogue, a guide, the reel, build, the home, decorate, portrait and the title.
+  - For each view it lists text under 12 px, tappables under 44 px and panels cut off. The skill tabs must fit their
+    row, labels and all. Screenshots go to `tools/qa/tmp/mobile-ui/`.
+  - Three views had been auditing nothing: the bag, the character sheet and decorate named panel classes that don't
+    exist (`.p-inventory`, `.p-character`, `.p-decorate`; they are `.p-inv`, `.p-char`, `.p-decor`).
+  - Fixing that turned up the weapon swap's key cap and size, and the character sheet's + buttons at 29 px. Both are
+    44 px on touch now.
+- **`tools/qa/mobile-perf.mjs`** and **`tools/qa/mobile-mem.mjs`** (12.7).
+- **prod-smoke's `touch` case**, on the built bundle: a mobile page, a CDP stick drag moves the hero, touch is the device,
+  the controls are up with 6 slots, preset 4, pixel ratio 1, `.m-phone`, and the manifest is linked.
+  - It then takes a Burrow trip and a second floor. Each floor's chunks must have let go of their arrays and still draw.
+- **Any scenario on the Mobile preset**: `QA_QS=q=4 node tools/qa/s1-roundtrip.mjs` (`lib.mjs boot` appends `QA_QS`).
+  s1 (13/13) and s13 (10/10) pass that way.
+- test-rpg's CONTROLS section has 9 touch checks. s9, s25 and s26 stay green. s26's Graphics check and test-rpg's Deck
+  checks now expect the fifth preset (Mobile) and the 30 cap.
+- **Full run-all** (the machine was 83 to 94% busy throughout): s27 passed 37/37.
+  - s8, s12, s15 and s23 failed on timing or perf under the load, and each passed when run alone.
+  - profile-horde fails its CPU gates even alone at this load. CT-5's own cost on a desktop page in a Burrow fight is
+    0.005 ms a frame, so profile-horde needs a re-run on a quiet machine.
+- Not tested here: a real phone. Next steps are the owner's Android and iPhone checks (docs/ITCH.md, "Mobile").

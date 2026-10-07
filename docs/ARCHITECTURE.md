@@ -14,6 +14,11 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
 - **Poe** — third playable hero (docs/POE.md): a black pug ninja (she/her), honey eyes, moss-green top, mustard sash, a
   fox festival mask pushed up on her head; a **giant bone fūma shuriken** (Dexterity) she throws out and back. Shuriken
   Arts / Ninjutsu / Shadow Step. Met in the Bamboo Grove (she tails you, sneezes, joins). Tap `Tab` = next hero, hold = the hero wheel.
+- **The Shih Tzu** — fourth playable hero (docs/SHIHTZU.md; his name is the owner's to pick: `CLASSES.shihtzu.name`): a
+  black-and-white Shih Tzu dark knight (he/him), white topknot with a plum band, plum tabard over light armour, a spell-tome
+  on his hip; a **toy flail** (Strength) and dark dog magic (Energy: hexes, gloom over time). Flail Arts / Gloom Hexes /
+  Ghostlight Tome. The tank: the most life, a damage reduction and the Gloom Blanket. Met in Momiji Hollow, lighting
+  ghostlight lanterns (a ghost pup licks his face mid-proclamation).
 - **Shadow** — sidekick Boston terrier (quadruped, black #1e1c24 + white muzzle/blaze/chest, big bat ears, round eyes, blue collar). Follows and fights (D2 mercenary style).
 - **Rosie** — human little girl, curly brown hair, brown eyes, fair skin, rosy cheeks, pink dress + red bow. Runs "Rosie's Treats" shop & gives quests.
 - Villagers — humanoid cartoony animals (cat, bunny, bear, fox, panda, tanuki, frog, duck…).
@@ -31,7 +36,8 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
   probes: `&nanprobe`, `&nanprobe=spread`, `&rh` (see "Render health" below).
 - QA: `node tools/qa/run-all.mjs [s1 s5 ...]` (the browser scenarios s1-s21; s15 is the homestead, s16 the guided
   tutorials, which every other scenario keeps off with `?nointro`, s17 housing, s18 getting furniture, s19 charge, s20
-  Poe, s21 the zones' phase A: sprint, DungeonDef, seeds, state.zones, quest steps, s25 the gamepad with a virtual pad). `lib.mjs boot()` pins dungeon
+  Poe, s21 the zones' phase A: sprint, DungeonDef, seeds, state.zones, quest steps, s25 the gamepad with a virtual pad,
+  s28 the Shih Tzu). `lib.mjs boot()` pins dungeon
   layouts with `?dseed=1` (the old fixed floors); `dseed=off` lets them reroll.
   Perf: `village-perf.mjs [runs]` (the village at three camera spots), `homestead-perf.mjs [runs]` (a fully planted,
   ripe garden and a reel in progress, each against the same spot without). Profilers: `tools/qa/profile-boot.mjs` (boot → ready),
@@ -58,6 +64,9 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
   The 8 nearest get real point lights; the nearest 32 also feed `U.uPoolPos/uPoolCol`, which ground/grass shaders turn into
   painted light pools via `POOL_GLSL`'s `lightPools(worldPos)` (add `outgoingLight += lightPools(vCWorld) * diffuseColor.rgb`).
   Never toggle a light's `visible` — changing the light count recompiles every shader (seconds of stall).
+  Keep a source well clear of the characters: the pool's falloff (decay 1.6) blows out whatever comes within half a metre
+  of it. The dungeon's follow lantern hangs 4 m over the hero (`lift`, dungeonMode.js); at 1.8 m it turned the heroes'
+  heads and backs mint and peach (ROADMAP R-9).
 - `makeToon` hooks: `vertexPars`, `vertexWorld`, `fragPars`, `fragColor` (after color_fragment), `fragNormal` (perturb the
   view-space `normal`), `fragOut` (modify `outgoingLight`). Every hook string is part of the program cache key.
 - Canopies (`vegetation.js` `LEAF_EDGE`): grazing-angle leaf-lobe discard for ragged silhouettes + a cellular floret texture
@@ -116,6 +125,11 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
   used: event `input:device`, `body.pad-active`), `binds` / `rebind` / `resetBindings` (Settings › Controls, saved in the
   UI settings' `binds`), `text` / `resolve` (key names for text), `rumble()`. `ACTIONS` holds the defaults (the keyboard
   ones are the old keys). game.js calls `Actions.poll()` at the top of every frame; `G.controls` is it.
+- `src/core/touch.js` **the touch device** (CT-5, docs/CONTROLS.md §12): what the on-screen controls (`src/ui/touch.js`)
+  hold, in actions (`Touch.hold / release / pulse`), the floating stick (`Touch.stick`), drag-to-aim (`Touch.aim`) and
+  the world taps (`Touch.taps`, taken by game.js). Actions reads it as the device `'touch'`: `held / pressed / released
+  (a, 'touch')`, `move()` (the stick), `aim()` (the drag, as the right stick); a touch makes it the device
+  (`body.touch-active`).
 - `src/core/engine.js` `Engine` (renderer, `rig` camera, `post`, `tick()`, `render()`, `mouseGround()`), `LightPool`.
   `engine.preset` is Settings › Graphics (0 Low · 1 Medium · 2 High · 3 Deck), read at boot (ROADMAP R-2);
   `engine.quality` (0..2) is the density tier the worlds build grass, flowers, details and shadow maps with (the Deck
@@ -124,7 +138,16 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
   every other frame by `render()`.
 - `src/core/deck.js` the Steam Deck profile (docs/CONTROLS.md §10): `deckLike()` (a 1280×800 screen, the desktop app's
   `window.pawhaven.deck`, `?deck`), `bootGraphics()` (the saved preset, `?q=`, or the first start's pick), `DECK` (the
-  preset's numbers), `pixelRatioFor()`, `FPS_CAPS`.
+  preset's numbers), `pixelRatioFor()`, `FPS_CAPS`. Also phones and tablets (CT-5, CONTROLS §12.7): `mobileLike()` (a
+  coarse pointer and no fine one, `?mobile`), `MOBILE` (the Mobile preset's numbers, `PRESET.MOBILE` = 4), `liteOf(p)`
+  (the Deck's or Mobile's numbers, or null), `capTexture(tex)` (the Mobile preset's 1024 cap on hero skins, called by
+  `heroModels.js` at load), and the Mobile preset's memory diet (CONTROLS §12.7):
+  - `memLite()`: booted on Mobile;
+  - `releaseAfterUpload(geo)`: opt-in. A per-instance static geometry drops its JS arrays once uploaded. It is used by a
+    dungeon floor's chunks and each pot; never by templates or caches;
+  - `releasedGeometries()`: `Engine` saves and reloads on a lost and restored WebGL context once any were released.
+  - The building template cache (`world/buildings/index.js`) evicts unused unstyled templates beyond
+    `UNUSED_CAP_MOBILE` on Mobile, and the village's prewarm stops at level 1 in two variants.
 - `src/gfx/*` materials, post, sky (DayNight), water, textures, geom. `src/world/terrain.js`, `vegetation.js`, `layout.js`, `villageWorld.js`.
 
 ## The town plan: Blossom Hollow 2.0 (src/world/layout.js, plots.js, islandShape.js; design: docs/VILLAGE_PLAN.md)
@@ -236,7 +259,8 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
     walk, the stages, the cancels (roll, panel, hotbar or weapon change, death, hero switch, floor change), the zoom cap,
     Toggle / Off (`ui.settings.chargeMode`), the channel wind-up. Events `charge:start|stage|release|spinout|cancel`.
   - **Releases** `src/combat/chargedSkills.js` + `chargedChewy.js` + `chargedMoka.js` + `chargedPoe.js` (her tables:
-    `src/rpg/chargePoe.js`, merged into `CHARGE`; her wind-ups via `chargePoses.js addChargePoses`): `charged_<id>` methods mixed into
+    `src/rpg/chargePoe.js`, merged into `CHARGE`; her wind-ups via `chargePoses.js addChargePoses`) + `chargedShihtzu.js`
+    (his: `src/rpg/chargeShihtzu.js`, the same way; sim models `tools/charge-sim-shihtzu.mjs`): `charged_<id>` methods mixed into
     SkillRunner; most replay the skill's own `cast_<id>` from the wound-back frame (`fromFrame`) and add their extras; `tame()`
     caps the base cast's flashes, rings and crowns so foes stay readable.
   - **Looks** `src/gfx/chargeFx.js` (`G.vfx.charge`, pooled; the charging path allocates nothing per frame), **poses**
@@ -311,6 +335,18 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   - Three heroes: tap Tab = `switchTo()` the next joined hero; hold Tab ≥ 0.26 s = the hero wheel (`src/ui/heroWheel.js`,
     `heroes.tabInput`, event `hero:wheel`). `flags.poeJoined` gates her; `G.heroes.poeJoin` (`src/actors/poeJoin.js`) runs
     her Bamboo Grove scene (event `poe:joinScene`) and Shadow's rumour in town; `joinPoe()` joins her.
+- **The Shih Tzu** (docs/SHIHTZU.md): `CLASSES.shihtzu`, the flail (`wtype: 'flail'`); skills `src/rpg/skillsShihtzu.js`,
+  casts on SkillRunner by `src/combat/shihtzuSkills.js` (the combo, Woeful Wallop, Dripping Paw, the hexes, the guard) +
+  `shihtzuArts.js` (the other 13) + `shihtzuAllies.js` (the ghost pups, Grandpaw) + `chargedShihtzu.js`; effects
+  `src/gfx/shihtzuFx.js` + `shihtzuFxArts.js` + `shihtzuGhosts.js` (the ghosts: one geometry per kind, instanced pups and
+  bones, a solid outline hull); the flail and its verlet chain `src/actors/shihtzuGear.js`; poses `shihtzuPoses.js`; sounds
+  `src/audio/shihtzu.sfx.js`; icons `src/rpg/iconsShihtzu.js`. His look is the baked Toybox Shih Tzu
+  (`public/rigs/shihtzu_toy.*`, `HERO_MODELS.shihtzuToy`: lidTilt, squint, `flailMount`, the gated coat grade and a white
+  cap) with the Blender flail (`public/models/shihtzu-flail.glb`, tinted per base); the kit (`CAST.shihtzu` +
+  `shihtzuKit.js`) is the fallback. A new element, **gloom**. `flags.shihtzuJoined` gates him; `G.heroes.stzJoin`
+  (`src/actors/shihtzuJoin.js`) runs his Momiji Hollow scene (event `shihtzu:joinScene`) and Shadow's rumour in town;
+  `joinShihtzu()` joins him. The hero wheel and the HUD minis take any number of heroes. prod-smoke requires
+  `shihtzu_toy` and the GLB flail whenever they ship.
 - **The procedural NPCs (villagers, townsfolk, humanoid monsters) are Toybox-style** by default: `src/actors/toyKit.js`, through
   `makeToyHumanoid` in charKit.js. The targets are the 7 approved sheets in tools/blender/work/codex/npc-kit/sheets.
   - **Style:** `kitStyle()` follows the "Hero models" setting (Storybook gives the Disney kit), and "Disney style" off gives the
@@ -350,7 +386,7 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   `beginRun` (the def, the clamped floor, the entry's seeds) → `generate({ floor, seed, plan: floorPlan(...) })`. The
   mode has `def`, `kind`, `zoneId`, `tier`, `mods`, `where()`, `nextRun()`, `hasDeeper()`, `exitPos`, `stairsPos`.
 - **Seeds** reroll per entry (`state.dungeon.runs`, `state.dungeon.seed`); `?dseed=N` pins them for the tab (`G.dseed`).
-- **Hooks**: `zoneMods.packMods` / `monsterMods` in every `spawnPack` (no-ops until phase E).
+- **Hooks**: `zoneMods.packMods` / `monsterMods` in every `spawnPack` (filled in phase E: "Tier runs" below).
 - **Save**: `state.zones[id] = { unlocked, visits, regionBoss, village, siegeCamps, dungeon: { cleared, bestFloor, tier:
   { unlocked, cleared }, spirit }, quests }`; `normalizeZones` migrates `state.regions` (boot, `regionState`).
 - **Quest steps**: zone filters on `kill` / `boss`, `find`, `rescue`, `dungeonFloor`, `tier`, `villageSaved`
@@ -490,6 +526,39 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   - Look tools: `tools/qa/zone-shots.mjs` (a game-camera tour of a zone floor: rooms, arena, stairs, treasure, slots,
     streams), and `/?test=regionMonsters&id=iwabozu` (the monster sheet).
 
+## Tier runs (src/rpg/tiers.js, src/rpg/zoneMods.js, src/dungeon/tierRun.js, src/dungeon/zoneMonsters/spirit.js — design and as-built: docs/ZONES.md §5, §5.1)
+- **A run** `{ tier 0–5, spirit S, mods }` rides on any `DungeonDef` with tiers: the four zone dungeons and the Deep
+  Burrow (`DUNGEONS.burrowDeep`, kind `deep`: two Burrow floors, Crystal Grotto → Moonlit Sanctum and Tamamo).
+  `normRun` caps the tier and cleans the mods; `floorPlan` carries `tier`, `spirit`, `mods`; `levelAt` →
+  `tiers.runLevel` (+4 a tier, cap 60; Spirit 60).
+- **The numbers** (`tiers.js`, pure): `TIERS` (pack, champion chance, quantity / rarity / xp, slots), `spiritInfo(S)`,
+  `runInfo`, `slotsFor`, `clearChest` (the Lantern chest's contents), `runLabel`.
+- **The modifiers** (`zoneMods.js`, pure): `ZONE_MODS` (17 entries: name, kanji, icon, colour, effect, reward, risk,
+  `layout` / `monster` / `boss` / `run` parts), `cleanMods`, `rewardTotals`, `rewardText`, `resolveRun` (everything
+  merged once: `mode.runMods`), `layoutMods` (gen.js `generate` calls it on the finished floor with its own seeded RNG:
+  pack sizes and caps, Teeming's packs, promotions, chests, shrines, the floor ceiling `FLOOR_CAP`; records `L.modded`),
+  `monsterMods` (once per monster: life, damage, speed, attack rate, resistances, `m._el`), `extraItems`,
+  `recommendMods`, `surpriseMods`.
+- **The run** (`tierRun.js`, `mode.tr` when `runMods.active`): `build()` (Night March's `mode.alertR`, the Elemental
+  wrapper over this floor's `combat.hitPlayer`, the ghost warm-up), `start()` (Night March's light and grade, Hard
+  Ground's `G.regenMul`, the run toast), `onMonsterDeath` (Haunted's queue → `riseGhost` → `mode.spawnMonster('yurei')`),
+  `onDrops` / `onChest` (quantity, boss loot, ghosts' drops, Spirit leaders' uniques), `xpMul`, `mfBonus`, `onShrine`
+  (the curse), `startWrath` / `shockwave` (Boss's Wrath), `onBossDefeated` (the Lantern chest, the banner), `dispose`
+  (restores the grade, the regen and the hit wrapper). `installTierDebug`: `?run=<id>:<tier>:<mods>[:<spirit>]`,
+  `G.tierDebug.run / unlock / clearAll`.
+- **DungeonMode** wiring: `runMods` and `tr` in `build`, the banner's run label, `where()` / `nextRun()` carry `spirit`,
+  xp / magic find / drops / chests / shrines / the boss through `tr`, `spawnMonster` applies `monsterMods`,
+  `clearDungeon` records zone and deep clears (`recordDungeonClear(state, def.id, tier, spirit)`), fires
+  `dungeon:cleared` (+ `spirit`, `firstTier`), `tier:unlocked`, `spirit:unlocked`, and Tamamo's story clear opens the
+  Deep Burrow's T1. `Monster.update` notices the hero within `mode.alertR || 9`; `actions.tickRegen` scales natural regen
+  by `G.regenMul`.
+- **Save** (`zones.js`): `tierRecord(state, zone | dungeon id | 'burrowDeep')` → `{ cleared, bestFloor, tier, spirit,
+  lantern }` (the Deep Burrow's in `state.dungeon.deep`), `fillTiers` (the migration), `recordDungeonClear`,
+  `tierCleared`, `tierOpen`, `spiritOpen`, `spiritBest`, `spiritMax`, `rememberSetup`, `lastSetup`, `TIER_DUNGEONS`.
+- **The Yūrei** (`zoneMonsters/spirit.js` + `spirit.sfx.js`, registered with the region monsters): Haunted's ghost.
+- **QA**: test-rpg "ZONE TIERS", gen-fuzz (three tier setups on every tier dungeon), s30-tiers, `profile-horde`
+  `RUN=5:swarming,teeming,rally WORLDS=zone`; look review `tools/qa/tier-shots.mjs`.
+
 ## Hordes: big fights (src/dungeon/horde.js, crowd.js, src/combat/grid.js, src/gfx/spriteBatch.js — ZONES.md §7, ROADMAP Z-B)
 - **Pooled effect looks and telegraphs** (2026-10-06): `lookIn(mode, root, scene)` (horde.js) draws a pooled effect
   look (a projectile, a crow, a snowball, an icicle: cached geometry, toon / ink materials) instanced with the monsters;
@@ -594,7 +663,8 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   step allows it.
 - Old saves past a guide's start get a one-time offer. The Journal's Guides tab replays any guide.
 - Guides start on their own only when enabled: off with `?notut`, and with the QA's `?nointro` unless `?tut`
-  (remembered per tab), so s1-s15 never meet one; s16 drives them (s17 the housing guides, s19 "Hold to power up!", s20 "Meet Poe").
+  (remembered per tab), so s1-s15 never meet one; s16 drives them (s17 the housing guides, s19 "Hold to power up!", s20 "Meet Poe", s28
+  "Meet <the Shih Tzu>").
 
 ## Housing (src/home/ — design and as-built notes: docs/HOUSING.md)
 - **Interiors**: `G.mode = 'interior'`. One persistent `InteriorWorld` (home/interiorWorld.js: its scene, the same light
@@ -658,6 +728,31 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   plays, the pause menu gets a panel row (plus Build, Decorate and Home where they apply).
 - QA `tools/qa/s25-gamepad.mjs` with the virtual pad `tools/qa/pad-lib.mjs`; look review `tools/qa/pad-shots.mjs`;
   test-rpg "CONTROLS".
+- **Touch** (CT-5, CONTROLS §12): `src/ui/touch.js` + `touch.css` (`ui.touch`), a layer between the HUD and the panels,
+  shown while touch plays. It moves the HUD's own hotbar slots, belt and weapon badge into its buttons (and home again
+  for another device), so their icons, cooldowns and charge looks keep working. The floating stick, the attack button
+  (game.js treats touch like the pad: A's context interact, `padAim`'s soft lock; `padAim.target(e)` is a tapped,
+  manual lock), the skill arc with Auto or Drag aim (a ground mark: `touchAimMark`), roll, the belt, hero / bag / menu;
+  canvas taps (`game.js touchTap`: lock a foe, walk to and use, or walk) and pinch (into `Input.mouse.wheel`). The
+  quest arrow asks it what to avoid (`avoidArrow`). Settings › Controls › Touch (`touchSize`, `touchOpacity`,
+  `touchLeft`, `touchAim`, `haptics`). In build and decorate it becomes the edit buttons (Build / Set down, Turn,
+  Cancel, Store, Undo, Done) and the finger is the cursor (`Actions.tcursor`, through `Actions.pointer()`). Fishing
+  reels on a held touch (`Touch.hold('reel')`). The hero wheel is fitted to the free play area (`fitWheel`: a ring, or
+  a row of cards on a phone).
+- **Phones and tablets** (CT-5, CONTROLS §12.3–12.7): `src/ui/mobile.js` + `mobile.css` (`ui.mobile`), everything
+  round the play controls:
+  - the screen classes `.m-touch`, `.m-phone` and `.m-tablet`, and the safe area (`--sa-*`; `?safe=` for the QA);
+  - the menus' scale (`--m-pscale` 0.86 on a phone) and a 12 px text floor (a MutationObserver);
+  - phone panels fitted with their bodies scrolling, the title, tabs and close at the bottom, and pairs taking turns (the
+    flip chip);
+  - the menu gestures (double-tap is the right-click, long press is the tooltip);
+  - the rotate overlay (`ui.isPaused` while upright), full screen on the first tap, and the K panel's folding charge
+    drawer.
+  - The Mobile preset is in `core/deck.js` and the Engine (`postPreset`: SMAA low; `Post.noChroma` keeps the hit aberration pass off).
+  - `public/manifest.webmanifest` and `public/icons/` serve Add to Home Screen.
+  - QA: `tools/qa/s27-touch.mjs` with `touch-lib.mjs` (CDP multi-touch), `touch-shots.mjs`, `mobile-ui.mjs` (every
+    menu at phone size), `mobile-perf.mjs` and `mobile-mem.mjs` (WebGL memory counted at the context; the JS heap
+    after a GC), and prod-smoke's `touch` case.
 - **The Steam Deck** (CT-3, CONTROLS §10): `src/core/deck.js` (above). On a Deck-like screen's first start: the Deck
   graphics preset and the UI at 1.15; `ui.root.deck-ui` turns on `src/ui/deck.css` (the safe area: the UI layers inset
   12 / 18 px; the text floor: the design's sub-12 px text raised to 12; the toasts above the hotbar). The Deck preset:
@@ -666,11 +761,19 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   game.js `frame()` skips display frames to the cap. QA: `tools/qa/s26-deck.mjs` (the profile, R-2, the cap, the text
   floor), `tools/qa/deck-ui.mjs` (every panel at 1280×800: text under 11 px, panels cut off, screenshots),
   `tools/qa/deck-perf.mjs` (frame times in four scenes with the CPU throttled).
+- **The desktop app** (CT-4; docs/DESKTOP.md, CONTROLS §11): an Electron shell in `tools/desktop/` (`main.cjs`
+  serves the build on `app://pawhaven`, one chrome-less window, F11 / Alt+Enter, `window.json`; `preload.cjs` gives
+  `window.pawhaven` { desktop, deck, platform, version, isFullscreen, setFullscreen, onFullscreen, quit }). The game's
+  side is `src/ui/desktop.js` (Settings › Full screen, the Quit buttons; inert in a browser). `npm run build:desktop`
+  (`build-desktop.mjs`: vite `base './'`, electron-builder for Windows zip / portable and `linux-unpacked`, then
+  `appimage.mjs`'s own AppImage writer and a tar.gz with exec bits) → `release/desktop/`. Electron and electron-builder
+  are devDependencies only. QA: `tools/qa/desktop-smoke.mjs` (the packaged Windows app via Playwright's Electron),
+  `tools/desktop/verify-squashfs.py` (the AppImage read back).
 
 ## Persistent state `G.state` (JSON-serialisable, saved to localStorage)
 ```js
 state = {
-  version: 2, activeHero: 'chewy', heroes: { chewy: { player, equipment }, moka: { … }, poe: { … } }, // (saved)
+  version: 2, activeHero: 'chewy', heroes: { chewy: { player, equipment }, moka: { … }, poe: { … }, shihtzu: { … } }, // (saved)
   // player / equipment below = heroes[activeHero].player / .equipment (live aliases, not saved)
   player: { cls:'chewy', name:'Chewy', lvl:1, xp:0, stats:{str:10,dex:10,vit:12,ene:8}, statPts:0, skillPts:1,
             skills:{ chomp:1 }, hotbar:['attack','chomp',null,null,null,null], // [LMB, RMB, 1, 2, 3, 4]

@@ -1,0 +1,321 @@
+{
+ "bones": {
+  "count": 37,
+  "contract_ok": true
+ },
+ "meshes": {
+  "Shihtzu_arm_L": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 462,
+   "tris": 864,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 2
+  },
+  "Shihtzu_arm_R": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 462,
+   "tris": 864,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 2
+  },
+  "Shihtzu_body": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 4008,
+   "tris": 7868,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 3
+  },
+  "Shihtzu_cloak": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 512,
+   "tris": 1020,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 3
+  },
+  "Shihtzu_ear_L": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 2018,
+   "tris": 4032,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 2
+  },
+  "Shihtzu_ear_R": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 2018,
+   "tris": 4032,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 2
+  },
+  "Shihtzu_eye_L": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 376,
+   "tris": 748,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Shihtzu_eye_R": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 376,
+   "tris": 748,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Shihtzu_head": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 2981,
+   "tris": 5804,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 3
+  },
+  "Shihtzu_lidD_L": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 152,
+   "tris": 252,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Shihtzu_lidD_R": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 152,
+   "tris": 252,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Shihtzu_lidU_L": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 368,
+   "tris": 660,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Shihtzu_lidU_R": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 368,
+   "tris": 660,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Shihtzu_mouth_cavity": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 200,
+   "tris": 346,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 3
+  },
+  "Shihtzu_tabard": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 432,
+   "tris": 852,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 3
+  },
+  "Shihtzu_tail": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 402,
+   "tris": 800,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 2
+  },
+  "Shihtzu_tongue": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 56,
+   "tris": 108,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Shihtzu_topknot": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 802,
+   "tris": 1580,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "tome": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 380,
+   "tris": 736,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 2
+  }
+ },
+ "hero_triangles": 32226,
+ "export": {
+  "name": "shihtzu_toy",
+  "height": 1.2,
+  "bones": 37,
+  "verts": 16608,
+  "tris": 32226,
+  "finite": true,
+  "weight_sum_offenders": 0,
+  "skin_index_in_range": true,
+  "index_in_range": true,
+  "degenerate_tris": 0,
+  "normal_unit_ok": true,
+  "inward_wound_tris": 189,
+  "min_y": -0.0029,
+  "max_y": 1.3329,
+  "tris_match_rig": true
+ },
+ "lock_vs_approved_glb": {
+  "Shihtzu_arm_L": {
+   "max_delta_mm": 0.0
+  },
+  "Shihtzu_arm_R": {
+   "max_delta_mm": 0.0
+  },
+  "Shihtzu_body": {
+   "max_delta_mm": 0.0
+  },
+  "Shihtzu_cloak": {
+   "max_delta_mm": 0.0
+  },
+  "Shihtzu_ear_L": {
+   "max_delta_mm": 0.0
+  },
+  "Shihtzu_ear_R": {
+   "max_delta_mm": 0.0
+  },
+  "Shihtzu_eye_L": {
+   "max_delta_mm": 0.0
+  },
+  "Shihtzu_eye_R": {
+   "max_delta_mm": 0.0
+  },
+  "Shihtzu_head": {
+   "max_delta_mm": 0.0
+  },
+  "Shihtzu_tabard": {
+   "max_delta_mm": 0.0
+  },
+  "Shihtzu_tail": {
+   "max_delta_mm": 0.0
+  },
+  "Shihtzu_topknot": {
+   "max_delta_mm": 0.0
+  },
+  "tome": {
+   "max_delta_mm": 0.0
+  }
+ },
+ "atlas_lock": {
+  "pixels_changed_outside_new_charts": 0
+ },
+ "problems": [
+  "export: {\"name\": \"shihtzu_toy\", \"height\": 1.2, \"bones\": 37, \"verts\": 16608, \"tris\": 32226, \"finite\": true, \"weight_sum_offenders\": 0, \"skin_index_in_range\": true, \"index_in_range\": true, \"degenerate_tris\": 0, \"normal_unit_ok\": true, \"inward_wound_tris\": 189, \"min_y\": -0.0029, \"max_y\": 1.3329, \"tris_match_rig\": true}"
+ ],
+ "ok": false
+}

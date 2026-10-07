@@ -1,0 +1,896 @@
+{
+  "bones": [
+    {
+      "name": "root",
+      "parent": null,
+      "head_blender_m": [
+        0.0,
+        -0.02,
+        0.0
+      ],
+      "head_game_m": [
+        0.0,
+        0.0,
+        0.02
+      ]
+    },
+    {
+      "name": "hips",
+      "parent": "root",
+      "head_blender_m": [
+        0.0,
+        -0.01,
+        0.352
+      ],
+      "head_game_m": [
+        0.0,
+        0.352,
+        0.01
+      ]
+    },
+    {
+      "name": "spine",
+      "parent": "hips",
+      "head_blender_m": [
+        0.0,
+        -0.02,
+        0.46
+      ],
+      "head_game_m": [
+        0.0,
+        0.46,
+        0.02
+      ]
+    },
+    {
+      "name": "chest",
+      "parent": "spine",
+      "head_blender_m": [
+        0.0,
+        -0.03,
+        0.58
+      ],
+      "head_game_m": [
+        0.0,
+        0.58,
+        0.03
+      ]
+    },
+    {
+      "name": "neck",
+      "parent": "chest",
+      "head_blender_m": [
+        0.0,
+        -0.032,
+        0.668
+      ],
+      "head_game_m": [
+        0.0,
+        0.668,
+        0.032
+      ]
+    },
+    {
+      "name": "head",
+      "parent": "neck",
+      "head_blender_m": [
+        0.0,
+        0.03668,
+        0.663
+      ],
+      "head_game_m": [
+        0.0,
+        0.663,
+        -0.03668
+      ]
+    },
+    {
+      "name": "jaw",
+      "parent": "head",
+      "head_blender_m": [
+        0.0,
+        -0.20918,
+        0.80773
+      ],
+      "head_game_m": [
+        0.0,
+        0.80773,
+        0.20918
+      ]
+    },
+    {
+      "name": "eye_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.13473,
+        -0.19242,
+        0.90637
+      ],
+      "head_game_m": [
+        0.13473,
+        0.90637,
+        0.19242
+      ]
+    },
+    {
+      "name": "lidU_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.04855,
+        -0.04623,
+        0.9139
+      ],
+      "head_game_m": [
+        0.04855,
+        0.9139,
+        0.04623
+      ]
+    },
+    {
+      "name": "lidD_L",
+      "parent": "head",
+      "head_blender_m": [
+        -0.03249,
+        0.08573,
+        0.91964
+      ],
+      "head_game_m": [
+        -0.03249,
+        0.91964,
+        -0.08573
+      ]
+    },
+    {
+      "name": "brow_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.14309,
+        -0.20653,
+        0.99622
+      ],
+      "head_game_m": [
+        0.14309,
+        0.99622,
+        0.20653
+      ]
+    },
+    {
+      "name": "lip_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.066,
+        -0.34623,
+        0.80773
+      ],
+      "head_game_m": [
+        0.066,
+        0.80773,
+        0.34623
+      ]
+    },
+    {
+      "name": "ear_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.17787,
+        0.08273,
+        1.02761
+      ],
+      "head_game_m": [
+        0.17787,
+        1.02761,
+        -0.08273
+      ]
+    },
+    {
+      "name": "earTip_L",
+      "parent": "ear_L",
+      "head_blender_m": [
+        0.34433,
+        0.11369,
+        0.84298
+      ],
+      "head_game_m": [
+        0.34433,
+        0.84298,
+        -0.11369
+      ]
+    },
+    {
+      "name": "upperarm_L",
+      "parent": "chest",
+      "head_blender_m": [
+        0.232,
+        -0.03,
+        0.602
+      ],
+      "head_game_m": [
+        0.232,
+        0.602,
+        0.03
+      ]
+    },
+    {
+      "name": "forearm_L",
+      "parent": "upperarm_L",
+      "head_blender_m": [
+        0.33082,
+        -0.03838,
+        0.50318
+      ],
+      "head_game_m": [
+        0.33082,
+        0.50318,
+        0.03838
+      ]
+    },
+    {
+      "name": "hand_L",
+      "parent": "forearm_L",
+      "head_blender_m": [
+        0.38376,
+        -0.04288,
+        0.45024
+      ],
+      "head_game_m": [
+        0.38376,
+        0.45024,
+        0.04288
+      ]
+    },
+    {
+      "name": "thigh_L",
+      "parent": "hips",
+      "head_blender_m": [
+        0.115,
+        -0.012,
+        0.335
+      ],
+      "head_game_m": [
+        0.115,
+        0.335,
+        0.012
+      ]
+    },
+    {
+      "name": "shin_L",
+      "parent": "thigh_L",
+      "head_blender_m": [
+        0.19,
+        -0.018,
+        0.198
+      ],
+      "head_game_m": [
+        0.19,
+        0.198,
+        0.018
+      ]
+    },
+    {
+      "name": "foot_L",
+      "parent": "shin_L",
+      "head_blender_m": [
+        0.21,
+        -0.02,
+        0.092
+      ],
+      "head_game_m": [
+        0.21,
+        0.092,
+        0.02
+      ]
+    },
+    {
+      "name": "eye_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.13473,
+        -0.19242,
+        0.90637
+      ],
+      "head_game_m": [
+        -0.13473,
+        0.90637,
+        0.19242
+      ]
+    },
+    {
+      "name": "lidU_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.04855,
+        -0.04623,
+        0.9139
+      ],
+      "head_game_m": [
+        -0.04855,
+        0.9139,
+        0.04623
+      ]
+    },
+    {
+      "name": "lidD_R",
+      "parent": "head",
+      "head_blender_m": [
+        0.03249,
+        0.08573,
+        0.91964
+      ],
+      "head_game_m": [
+        0.03249,
+        0.91964,
+        -0.08573
+      ]
+    },
+    {
+      "name": "brow_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.14309,
+        -0.20653,
+        0.99622
+      ],
+      "head_game_m": [
+        -0.14309,
+        0.99622,
+        0.20653
+      ]
+    },
+    {
+      "name": "lip_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.066,
+        -0.34623,
+        0.80773
+      ],
+      "head_game_m": [
+        -0.066,
+        0.80773,
+        0.34623
+      ]
+    },
+    {
+      "name": "ear_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.17787,
+        0.08273,
+        1.02761
+      ],
+      "head_game_m": [
+        -0.17787,
+        1.02761,
+        -0.08273
+      ]
+    },
+    {
+      "name": "earTip_R",
+      "parent": "ear_R",
+      "head_blender_m": [
+        -0.34433,
+        0.11369,
+        0.84298
+      ],
+      "head_game_m": [
+        -0.34433,
+        0.84298,
+        -0.11369
+      ]
+    },
+    {
+      "name": "upperarm_R",
+      "parent": "chest",
+      "head_blender_m": [
+        -0.232,
+        -0.03,
+        0.602
+      ],
+      "head_game_m": [
+        -0.232,
+        0.602,
+        0.03
+      ]
+    },
+    {
+      "name": "forearm_R",
+      "parent": "upperarm_R",
+      "head_blender_m": [
+        -0.33082,
+        -0.03838,
+        0.50318
+      ],
+      "head_game_m": [
+        -0.33082,
+        0.50318,
+        0.03838
+      ]
+    },
+    {
+      "name": "hand_R",
+      "parent": "forearm_R",
+      "head_blender_m": [
+        -0.38376,
+        -0.04288,
+        0.45024
+      ],
+      "head_game_m": [
+        -0.38376,
+        0.45024,
+        0.04288
+      ]
+    },
+    {
+      "name": "thigh_R",
+      "parent": "hips",
+      "head_blender_m": [
+        -0.115,
+        -0.012,
+        0.335
+      ],
+      "head_game_m": [
+        -0.115,
+        0.335,
+        0.012
+      ]
+    },
+    {
+      "name": "shin_R",
+      "parent": "thigh_R",
+      "head_blender_m": [
+        -0.19,
+        -0.018,
+        0.198
+      ],
+      "head_game_m": [
+        -0.19,
+        0.198,
+        0.018
+      ]
+    },
+    {
+      "name": "foot_R",
+      "parent": "shin_R",
+      "head_blender_m": [
+        -0.21,
+        -0.02,
+        0.092
+      ],
+      "head_game_m": [
+        -0.21,
+        0.092,
+        0.02
+      ]
+    },
+    {
+      "name": "tail1",
+      "parent": "hips",
+      "head_blender_m": [
+        -0.09821,
+        0.33024,
+        0.18735
+      ],
+      "head_game_m": [
+        -0.09821,
+        0.18735,
+        -0.33024
+      ]
+    },
+    {
+      "name": "tail2",
+      "parent": "tail1",
+      "head_blender_m": [
+        -0.12862,
+        0.45104,
+        0.22275
+      ],
+      "head_game_m": [
+        -0.12862,
+        0.22275,
+        -0.45104
+      ]
+    },
+    {
+      "name": "tail3",
+      "parent": "tail2",
+      "head_blender_m": [
+        -0.18929,
+        0.43717,
+        0.30313
+      ],
+      "head_game_m": [
+        -0.18929,
+        0.30313,
+        -0.43717
+      ]
+    },
+    {
+      "name": "tail4",
+      "parent": "tail3",
+      "head_blender_m": [
+        -0.19764,
+        0.44976,
+        0.23975
+      ],
+      "head_game_m": [
+        -0.19764,
+        0.23975,
+        -0.44976
+      ]
+    }
+  ],
+  "triangles": 32226,
+  "lids": {
+    "Shihtzu_lidU_L": {
+      "pivot": [
+        0.04854514786733352,
+        -0.04622600643697103,
+        0.913898378952368
+      ],
+      "pivot_eye_frame": [
+        0.14614298352338884,
+        -0.020378257708432435,
+        0.913898378952368
+      ],
+      "hinge_blender": [
+        0.85216,
+        0.52328,
+        0.0
+      ],
+      "pivot_behind_eye_surface_m": 0.1856,
+      "pivot_offset_m": 0.19,
+      "score": 0.169,
+      "closed_edge_above_rim_mm": -1.05,
+      "squint_coverage": 0.32,
+      "closed_standoff_centre_mm": 4.97,
+      "closed_edge_deepest_below_rim_mm": 1.8,
+      "target": 1.22
+    },
+    "Shihtzu_lidD_L": {
+      "pivot": [
+        -0.032485759274563375,
+        0.0857313784752742,
+        0.9196415865421296
+      ],
+      "pivot_eye_frame": [
+        0.14614298352338884,
+        0.13447250704627314,
+        0.9196415865421296
+      ],
+      "hinge_blender": [
+        0.85216,
+        0.52328,
+        0.0
+      ],
+      "pivot_behind_eye_surface_m": 0.3405,
+      "pivot_offset_m": 0.04,
+      "score": 0.002,
+      "closed_edge_above_rim_mm": null,
+      "squint_coverage": null,
+      "closed_standoff_centre_mm": null,
+      "closed_edge_deepest_below_rim_mm": null,
+      "target": -0.36
+    },
+    "Shihtzu_lidU_R": {
+      "pivot": [
+        -0.04854512141999594,
+        -0.046225963367954204,
+        0.9138985494725721
+      ],
+      "pivot_eye_frame": [
+        -0.14614298352338884,
+        -0.020378207167341456,
+        0.9138985494725721
+      ],
+      "hinge_blender": [
+        0.85216,
+        -0.52328,
+        0.0
+      ],
+      "pivot_behind_eye_surface_m": 0.1856,
+      "pivot_offset_m": 0.19,
+      "score": 0.169,
+      "closed_edge_above_rim_mm": -1.05,
+      "squint_coverage": 0.32,
+      "closed_standoff_centre_mm": 4.97,
+      "closed_edge_deepest_below_rim_mm": 1.8,
+      "target": 1.22
+    },
+    "Shihtzu_lidD_R": {
+      "pivot": [
+        0.032485759274563375,
+        0.0857313784752742,
+        0.9196415865421296
+      ],
+      "pivot_eye_frame": [
+        -0.14614298352338884,
+        0.13447250704627314,
+        0.9196415865421296
+      ],
+      "hinge_blender": [
+        0.85216,
+        -0.52328,
+        0.0
+      ],
+      "pivot_behind_eye_surface_m": 0.3405,
+      "pivot_offset_m": 0.04,
+      "score": 0.002,
+      "closed_edge_above_rim_mm": null,
+      "squint_coverage": null,
+      "closed_standoff_centre_mm": null,
+      "closed_edge_deepest_below_rim_mm": null,
+      "target": -0.36
+    }
+  },
+  "lids_hidden_check": {
+    "Shihtzu_lidU_L@0.0": {
+      "max_sdf_mm": -40.9,
+      "outside_count": 0
+    },
+    "Shihtzu_lidD_L@0.0": {
+      "max_sdf_mm": -1.55,
+      "outside_count": 0
+    },
+    "Shihtzu_lidD_L@-0.1": {
+      "max_sdf_mm": -10.37,
+      "outside_count": 0
+    },
+    "Shihtzu_lidU_R@0.0": {
+      "max_sdf_mm": -40.9,
+      "outside_count": 0
+    },
+    "Shihtzu_lidD_R@0.0": {
+      "max_sdf_mm": -1.55,
+      "outside_count": 0
+    },
+    "Shihtzu_lidD_R@-0.1": {
+      "max_sdf_mm": -10.37,
+      "outside_count": 0
+    },
+    "Shihtzu_mouth_cavity@rest": {
+      "max_sdf_mm": -1.26,
+      "outside_count": 0
+    },
+    "Shihtzu_tongue@rest": {
+      "max_sdf_mm": -16.72,
+      "outside_count": 0
+    }
+  },
+  "squint_designed_for": [
+    0.74,
+    -0.36
+  ],
+  "lidTilt": 0.5507,
+  "lid_hinge_blender": {
+    "L": [
+      0.85216,
+      0.52328,
+      0.0
+    ],
+    "R": [
+      0.85216,
+      -0.52328,
+      0.0
+    ]
+  },
+  "lid_hinge_game": {
+    "L": [
+      0.85216,
+      0.0,
+      -0.52328
+    ],
+    "R": [
+      0.85216,
+      0.0,
+      0.52328
+    ]
+  },
+  "flail_mount": {
+    "units": "metres; game axes [x, y, z] = Blender [x, z, -y]; the game rebuilds bones without rotation, so a bone frame = the model frame translated to the bone head",
+    "prop": "/models/shihtzu-flail.glb",
+    "prop_frame": "the grip centre on the bone handle at the origin; the handle -> rope -> ball along the prop +Y (glTF up)",
+    "one_handed": {
+      "hand": "R",
+      "bone": "hand_R",
+      "hand_head_game": [
+        -0.38376,
+        0.45024,
+        0.04288
+      ],
+      "palm_centre_game": [
+        -0.42398,
+        0.39588,
+        0.04689
+      ],
+      "position_in_hand_frame": [
+        -0.04022,
+        -0.05436,
+        0.00401
+      ],
+      "quaternion_xyzw": [
+        0.633417,
+        -0.26237,
+        -0.278584,
+        0.67256
+      ],
+      "handle_axis_game": [
+        0.04235,
+        0.04235,
+        0.9982
+      ],
+      "arm_dir_game": [
+        -0.70584,
+        -0.70584,
+        0.05989
+      ],
+      "prop_point_at_palm": [
+        0,
+        0,
+        0
+      ]
+    },
+    "left_hand": {
+      "bone": "hand_L",
+      "hand_head_game": [
+        0.38376,
+        0.45024,
+        0.04288
+      ],
+      "palm_centre_game": [
+        0.42398,
+        0.39588,
+        0.04689
+      ],
+      "position_in_hand_frame": [
+        0.04022,
+        -0.05436,
+        0.00401
+      ],
+      "quaternion_xyzw": [
+        0.633417,
+        0.26237,
+        0.278584,
+        0.67256
+      ],
+      "handle_axis_game": [
+        -0.04235,
+        0.04235,
+        0.9982
+      ],
+      "arm_dir_game": [
+        0.70584,
+        -0.70584,
+        0.05989
+      ]
+    },
+    "two_handed": {
+      "right_palm_on_prop": [
+        0,
+        -0.05,
+        0
+      ],
+      "left_palm_on_prop": [
+        0,
+        0.055,
+        0
+      ],
+      "note": "put the prop so its +Y passes through both palms: right palm at prop y -0.050, left at +0.055 (game prop axes)"
+    },
+    "chain_rest_pivots": [
+      {
+        "object": "flail_handle",
+        "parent": null,
+        "pivot_prop_game": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "object": "flail_link_0",
+        "parent": "flail_handle",
+        "pivot_prop_game": [
+          0.0,
+          0.12,
+          0.0
+        ]
+      },
+      {
+        "object": "flail_link_1",
+        "parent": "flail_link_0",
+        "pivot_prop_game": [
+          0.0,
+          0.215,
+          0.0
+        ]
+      },
+      {
+        "object": "flail_link_2",
+        "parent": "flail_link_1",
+        "pivot_prop_game": [
+          0.0,
+          0.31,
+          0.0
+        ]
+      },
+      {
+        "object": "flail_link_3",
+        "parent": "flail_link_2",
+        "pivot_prop_game": [
+          0.0,
+          0.405,
+          0.0
+        ]
+      },
+      {
+        "object": "flail_link_4",
+        "parent": "flail_link_3",
+        "pivot_prop_game": [
+          0.0,
+          0.5,
+          0.0
+        ]
+      },
+      {
+        "object": "flail_link_5",
+        "parent": "flail_link_4",
+        "pivot_prop_game": [
+          0.0,
+          0.595,
+          0.0
+        ]
+      },
+      {
+        "object": "flail_head",
+        "parent": "flail_link_5",
+        "pivot_prop_game": [
+          0.0,
+          0.69,
+          0.0
+        ]
+      }
+    ],
+    "ball_centre_prop_game": [
+      0.0,
+      0.79,
+      0.0
+    ],
+    "ball_diameter_m": 0.22,
+    "rope_length_m": 0.57,
+    "glow_material": "Shihtzu_flail_glow"
+  },
+  "mouth": {
+    "parting_vertices": 25,
+    "split_vertices": 23,
+    "cavity_rim_points": 25
+  },
+  "objects": {
+    "Shihtzu_head": 5804,
+    "Shihtzu_eye_R": 748,
+    "Shihtzu_eye_L": 748,
+    "Shihtzu_ear_L": 4032,
+    "Shihtzu_ear_R": 4032,
+    "Shihtzu_topknot": 1580,
+    "Shihtzu_body": 7868,
+    "Shihtzu_arm_L": 864,
+    "Shihtzu_arm_R": 864,
+    "Shihtzu_tabard": 852,
+    "Shihtzu_cloak": 1020,
+    "Shihtzu_tail": 800,
+    "tome": 736,
+    "Shihtzu_mouth_cavity": 346,
+    "Shihtzu_tongue": 108,
+    "Shihtzu_lidU_L": 660,
+    "Shihtzu_lidD_L": 252,
+    "Shihtzu_lidU_R": 660,
+    "Shihtzu_lidD_R": 252
+  },
+  "notes": [
+    "Game axes: X = Blender +X, Y = Blender +Z, Z = Blender -Y; pose bones use YZX Euler = three.js XYZ.",
+    "Head pivot at the skull base (back of the neck, chin height), not the head centre.",
+    "Lids are surfaces of revolution about their bone X axis: a rotation slides them along themselves.",
+    "The mouth parting was cut in the model (round 4); the lower copies are 100% jaw-side, the corners shared (sealed).",
+    "Weights quantized to an exact 255 sum; <= 4 influences. Topknot rigid to head; ear locks: head (merged top) -> ear -> earTip (lobes).",
+    "The flail is not part of the hero: public/models/shihtzu-flail.glb at export/prop_mount.json."
+  ]
+}

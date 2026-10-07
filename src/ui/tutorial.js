@@ -14,10 +14,11 @@ import { el, esc, replay } from './dom.js';
 import { glyph } from './glyphs.js';
 import { portraitHTML } from './portraits.js';
 import { keyHint, keyCap } from './padGlyphs.js';
+import { CLASSES } from '../rpg/classes.js';
 
 // *word* → bold; while the gamepad plays, an emphasised key (*F*, *Tab*, *Shift*) becomes its pad glyph (ui/padGlyphs.js)
 const md = s => esc(s).replace(/\*([^*]+)\*/g, (m, w) => keyHint(w) || `<b>${w}</b>`);
-const NAMES = { shadow: 'Shadow', kero: 'Kero', moka: 'Moka', rosie: 'Rosie', usagi: 'Usagi', tanu: 'Tanu', poe: 'Poe' };
+const NAMES = { shadow: 'Shadow', kero: 'Kero', moka: 'Moka', rosie: 'Rosie', usagi: 'Usagi', tanu: 'Tanu', poe: 'Poe', shihtzu: CLASSES.shihtzu.name, golden: CLASSES.golden.name }; // (the Shih Tzu's name is the owner's to pick: classes.js)
 
 export class TutorialUI {
   constructor(ui, layer) {

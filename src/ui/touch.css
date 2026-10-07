@@ -1,0 +1,217 @@
+/* Touch controls (ui/touch.js, docs/CONTROLS.md §12, ROADMAP CT-5). Sizes are CSS px × --u (the touch scale: the screen
+   size × Settings › Controls › Touch › Button size); the layer is not zoomed by the UI scale. The HUD's own hotbar slots,
+   belt and weapon-set badge move into these buttons while touch plays, so their looks (icons, cooldown sweeps, charge
+   sweep and pips, counts) come from hud.css / charge.css and are only reshaped here. */
+
+/* ---------------------------------------------------------------- the page: no browser gestures while playing */
+html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
+#game { touch-action: none; -webkit-touch-callout: none; }
+.ui-root { touch-action: pan-x pan-y; } /* (lists still scroll by finger; no pinch or double-tap zoom on the UI) */
+body.touch-active { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+body.touch-active img { -webkit-touch-callout: none; -webkit-user-drag: none; }
+/* the mouse's and the pad's own hints (pad.css: .kbm-only, .pad-only twins) don't apply to touch */
+body.touch-active .kbm-only, body.touch-active .pad-only { display: none !important; }
+
+/* ---------------------------------------------------------------- the layer */
+.l-touch { z-index: 2; } /* (after the HUD in the DOM: above it, under the panels) */
+.tc { position: absolute; inset: 0; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity .25s, visibility 0s .25s; --u: 1; --op: .85; --ink: #4a2c2a; }
+.tc.on { opacity: 1; visibility: visible; transition: opacity .25s, visibility 0s; }
+.tc-safe { position: fixed; left: env(safe-area-inset-left, 0px); top: env(safe-area-inset-top, 0px); right: env(safe-area-inset-right, 0px); bottom: env(safe-area-inset-bottom, 0px); visibility: hidden; pointer-events: none; }
+
+/* every button: a round (or rounded) toy button, a touch target of at least 44 px, semi-transparent until pressed */
+.tc-b { position: absolute; left: 0; top: 0; width: var(--d, 56px); height: var(--d, 56px); margin: calc(var(--d, 56px) / -2) 0 0 calc(var(--d, 56px) / -2);
+  pointer-events: auto; touch-action: none; -webkit-tap-highlight-color: transparent; opacity: var(--op); transition: opacity .15s, transform .18s var(--spring); }
+.tc-b.down { opacity: 1; transform: scale(.92); transition-duration: .05s; }
+.tc-b::after { content: ''; position: absolute; inset: -8px; border-radius: 50%; } /* (a little extra hit area round the edge) */
+
+/* ---------------------------------------------------------------- the HUD's slots, reshaped as round buttons */
+.tc-slot > .hb { position: absolute; inset: 0; width: 100% !important; height: 100% !important; margin: 0; pointer-events: none; }
+.tc-slot .hb-in { border-radius: 50%; border-width: calc(3px * var(--u)); background: radial-gradient(circle at 50% 30%, #fffdf8 0, #fff3e3 55%, #f3dfc6 100%);
+  box-shadow: inset 0 calc(-5px * var(--u)) 0 rgba(200, 160, 120, .3), 0 calc(3px * var(--u)) 0 var(--ink), 0 calc(7px * var(--u)) calc(14px * var(--u)) rgba(50, 22, 34, .3); }
+.tc-slot .hb-ic { left: -8.5%; top: -8.5%; width: 117%; height: 117%; filter: none; } /* (the icon's square tile fills the round button: its frame falls outside the circle) */
+.tc-slot .hb-k, .tc-slot .hc-rim { display: none !important; }
+.tc .hb:hover .hb-in, .tc .belt:hover .hb-in { transform: none; } /* (a phone's sticky hover) */
+.tc-slot .hb-cdt { font-size: calc(17px * var(--u)); -webkit-text-stroke: calc(4px * var(--u)) var(--ink); }
+.tc-slot .hb.empty .hb-in { background: rgba(255, 246, 232, .5); border-style: dashed; border-color: rgba(74, 44, 42, .7); box-shadow: none; transform: scale(.8); }
+.tc-slot:has(.hb.empty) { opacity: calc(var(--op) * .6); }
+.tc-slot .hb.empty .hb-in::before { font-size: calc(24px * var(--u)); color: rgba(74, 44, 42, .4); }
+.tc-slot .hb-perk { right: -3%; top: -3%; }
+.tc-slot .hc-pips { top: calc(-30px * var(--u)); }
+.tc-slot.down .hb-in, .tc-slot .hb.press .hb-in { animation: none; }
+.tc-slot .hb.charging .hb-in { transform: scale(1.06); }
+
+/* the charge ring round a round button (charge.css's rim is a rounded square: this replaces it) */
+.tc-ring { position: absolute; inset: -9%; border-radius: 50%; opacity: 0; pointer-events: none; z-index: 3; transition: opacity .12s;
+  background: conic-gradient(var(--cc, #ffc24a) calc(var(--k, 0) * 360deg), rgba(74, 44, 42, .55) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px)); mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+  filter: drop-shadow(0 0 3px #fff); }
+.tc-slot .hb.charging .tc-ring { opacity: 1; }
+.tc-slot .hb.charging.full .tc-ring { animation: tcRingFull .9s ease-in-out infinite; }
+@keyframes tcRingFull { 50% { filter: drop-shadow(0 0 8px var(--cc, #ffc24a)) drop-shadow(0 0 2px #fff); } }
+
+/* the attack button: bigger, pink, inside a cream band of dots like the orbs' frames */
+.tc-attack .tc-deco { position: absolute; inset: -11%; width: 122%; height: 122%; overflow: visible; pointer-events: none; filter: drop-shadow(0 calc(3px * var(--u)) 0 rgba(74, 44, 42, .35)); }
+.tc-attack > .hb { inset: 4%; width: 92% !important; height: 92% !important; }
+.tc-attack .hb-in { border-width: calc(3.5px * var(--u)); background: radial-gradient(circle at 50% 28%, #fff 0, #ffeef4 50%, #ffc2d6 100%);
+  box-shadow: inset 0 calc(-7px * var(--u)) 0 rgba(255, 110, 160, .25), inset 0 calc(3px * var(--u)) 0 #fff; }
+.tc-attack .hb-ic { left: -8.5%; top: -8.5%; width: 117%; height: 117%; }
+.tc-attack.ctx .hb-ic { opacity: .25; } /* (A would talk / use: the paw shows instead) */
+.tc-attack .tc-use { position: absolute; inset: 22%; display: grid; place-items: center; opacity: 0; transform: scale(.5); transition: opacity .15s, transform .25s var(--pop); color: #ff6f98; pointer-events: none; z-index: 4; }
+.tc-attack .tc-use .gl { width: 100%; height: 100%; filter: drop-shadow(0 2px 0 var(--ink)); }
+.tc-attack.ctx .tc-use { opacity: 1; transform: none; }
+
+/* skills: cream; drag-to-aim shows the direction and the cancel cross */
+.tc-skill .tc-aimdir { position: absolute; left: 50%; top: 50%; width: 0; height: 0; opacity: 0; pointer-events: none; z-index: 5; transition: opacity .1s; }
+.tc-skill .tc-aimdir i { position: absolute; left: calc(var(--d) * .5 + 4px); top: -9px; width: 0; height: 0; border-left: 15px solid #ff8fb0; border-top: 9px solid transparent; border-bottom: 9px solid transparent; filter: drop-shadow(0 0 0 var(--ink)) drop-shadow(1.5px 0 0 var(--ink)) drop-shadow(-1px 0 0 var(--ink)); }
+.tc-skill.aiming .tc-aimdir { opacity: 1; }
+.tc-skill.aiming { opacity: 1; }
+.tc-x { position: absolute; inset: 18%; display: grid; place-items: center; border-radius: 50%; background: rgba(232, 80, 110, .88); border: 3px solid var(--ink); color: #fff; opacity: 0; transform: scale(.4); transition: opacity .12s, transform .2s var(--pop); pointer-events: none; z-index: 6; }
+.tc-x .gl { width: 62%; height: 62%; }
+.tc-skill.cancel .tc-x { opacity: 1; transform: none; }
+.tc-skill.cancel .tc-aimdir { opacity: 0; }
+
+/* roll: a mint button with a tumbling arrow */
+.tc-roll .tc-face { position: absolute; inset: 0; border-radius: 50%; border: calc(3px * var(--u)) solid var(--ink); display: grid; place-items: center;
+  background: radial-gradient(circle at 50% 30%, #f2fff9 0, #c9f5e4 52%, #8fe0c0 100%); box-shadow: inset 0 calc(-5px * var(--u)) 0 rgba(60, 160, 120, .28), 0 calc(3px * var(--u)) 0 var(--ink), 0 calc(7px * var(--u)) calc(14px * var(--u)) rgba(50, 22, 34, .3); }
+.tc-roll svg { width: 64%; height: 64%; overflow: visible; }
+.tc-roll.down svg { animation: tcSpin .4s var(--soft); }
+@keyframes tcSpin { to { transform: rotate(-360deg); } }
+
+/* the weapon-set badge (the HUD's, moved in) */
+.tc-swap > .hb-ws { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; transform: none; pointer-events: none; }
+.tc-swap .ws-in { width: 100%; height: 100%; }
+.tc-swap .ws-ic { font-size: calc(22px * var(--u)); }
+.tc-swap .ws-n { right: auto; left: -6px; bottom: -6px; font-size: 12px; }
+.tc.mirror .tc-swap .ws-n { left: auto; right: -6px; }
+
+/* ---------------------------------------------------------------- the belt: potions and the meal between the orbs */
+.tc-belt { position: absolute; left: 0; top: 0; display: flex; align-items: flex-end; gap: calc(6px * var(--u)); transform: translate(-50%, -100%); pointer-events: none; }
+.tc-belt > .belt { position: relative; width: calc(50px * var(--u)); height: calc(50px * var(--u)); flex: none; pointer-events: auto; touch-action: none; opacity: var(--op); transition: opacity .15s, transform .18s var(--spring); }
+.tc-belt > .belt.down { opacity: 1; transform: scale(.9); }
+.tc-belt > .belt.b-rejuv:not(.has), .tc-belt > .belt.b-meal:not(.has) { display: none; }
+.tc-belt .belt .hb-in { border-radius: calc(14px * var(--u)); border-width: calc(3px * var(--u)); background: radial-gradient(circle at 50% 30%, #fff, #ffeef3);
+  box-shadow: inset 0 -4px 0 rgba(200, 160, 120, .3), 0 3px 0 var(--ink), 0 6px 12px rgba(50, 22, 34, .25); }
+.tc-belt .belt.b-meal .hb-in { background: radial-gradient(circle at 50% 34%, #fff 0 46%, #f3e8dc 48% 56%, #ffe9d2 58%); }
+.tc-belt .belt.b-meal .bt-bowl { display: none; }
+.tc-belt .bt-ic { position: absolute; left: 10%; top: 10%; width: 80%; height: 80%; object-fit: contain; }
+.tc-belt .belt .hb-k { display: none !important; }
+.tc-belt .bt-n { font-size: calc(15px * var(--u)); right: 2px; top: -1px; }
+.tc-belt .belt.none .bt-ic { filter: grayscale(.9) opacity(.45); }
+
+/* ---------------------------------------------------------------- top right: the hero, the bag, the menu */
+.tc-top .tc-b { --d: calc(48px * var(--u)); }
+.tc-sq { border-radius: calc(14px * var(--u)); border: calc(2.5px * var(--u)) solid var(--ink); background: linear-gradient(#fff, #ffeedd); display: grid; place-items: center;
+  box-shadow: 0 calc(3px * var(--u)) 0 var(--ink), 0 6px 12px rgba(50, 22, 34, .22); }
+.tc-sq > .gl { width: 64%; height: 64%; }
+.tc-sq::after { border-radius: calc(18px * var(--u)); }
+.tc-dot { position: absolute; left: -7px; top: -8px; min-width: 20px; height: 20px; padding: 0 4px; border-radius: 10px; background: var(--rose, #e8506e); color: #fff; font: 700 12px/1 var(--font);
+  border: 2px solid var(--ink); display: none; place-items: center; animation: pulse 1.2s ease-in-out infinite; }
+.tc-dot.on { display: grid; }
+.tc-bag.gulp { animation: gulp .55s var(--pop); }
+.tc-hero { border-radius: 50%; }
+.tc-hero .tc-hface { position: absolute; inset: 3px; border-radius: 50%; overflow: hidden; border: calc(3px * var(--u)) solid var(--ink); background: radial-gradient(circle at 50% 30%, #fff 0, #e4fbf6 55%, #b8ece2 100%); box-shadow: 0 3px 0 rgba(74, 44, 42, .35); }
+.tc-hero .tc-hface .p3d, .tc-hero .tc-hface .portrait { position: absolute; left: -8%; top: 4%; width: 116% !important; height: 116% !important; }
+.tc-hero svg.tc-hcd { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); pointer-events: none; }
+.tc-hero .tc-hcd circle { fill: none; stroke: rgba(74, 44, 42, .55); stroke-width: 5; stroke-dasharray: 110; stroke-dashoffset: 110; }
+.tc-hero.cooling .tc-hface { filter: saturate(.4) brightness(.85); }
+.tc-hero .tc-hsw { position: absolute; right: -6px; bottom: -6px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(#fff4c0, #ffcf4a); border: 2px solid var(--ink); box-shadow: 0 2px 0 var(--ink); }
+.tc-hero .tc-hsw .gl { width: 15px; height: 15px; }
+.tc-hero .tc-hlv { position: absolute; left: -5px; top: -5px; min-width: 18px; height: 18px; border-radius: 9px; display: grid; place-items: center; padding: 0 3px; font: 700 12px/1 var(--font); color: #fff;
+  background: #a88cff; border: 2px solid var(--ink); }
+.tc-hero[hidden] { display: none; }
+
+/* ---------------------------------------------------------------- the floating stick */
+.tc-stick { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; transition: opacity .3s; }
+.tc-stick.rest { opacity: .4; }
+.tc-stick.rest .tc-base, .tc-stick.rest .tc-knob { transition: transform .25s var(--soft); }
+.tc-base { position: absolute; left: calc(var(--r) * -1); top: calc(var(--r) * -1); width: calc(var(--r) * 2); height: calc(var(--r) * 2); border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 246, 232, .12) 0 50%, rgba(255, 246, 232, .34) 51% 100%); border: calc(3px * var(--u)) solid rgba(74, 44, 42, .62);
+  box-shadow: inset 0 0 0 calc(3px * var(--u)) rgba(255, 255, 255, .4), 0 calc(3px * var(--u)) 0 rgba(74, 44, 42, .22), 0 0 18px rgba(50, 22, 34, .18); }
+.tc-base::before { content: ''; position: absolute; inset: 22%; border-radius: 50%; border: 2px dashed rgba(74, 44, 42, .22); }
+.tc-chev { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+.tc-chev::before { content: ''; position: absolute; left: -6px; top: calc(var(--r) * -1 + 7px); border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 8px solid rgba(255, 246, 232, .92); filter: drop-shadow(0 1.5px 0 rgba(74, 44, 42, .55)); }
+.tc-chev.e { transform: rotate(90deg); } .tc-chev.s { transform: rotate(180deg); } .tc-chev.w { transform: rotate(270deg); }
+/* the sprint ring: faint while walking, gold with racing dashes while the push is out at the edge */
+.tc-sprint { position: absolute; left: 50%; top: 50%; width: calc(var(--r) * 2 * 1.34); height: calc(var(--r) * 2 * 1.34); margin: calc(var(--r) * -1.34) 0 0 calc(var(--r) * -1.34); border-radius: 50%;
+  border: calc(3px * var(--u)) dashed rgba(255, 246, 232, 0); transition: border-color .2s, box-shadow .2s, opacity .2s; opacity: 0; }
+.tc-stick.live .tc-sprint { opacity: 1; border-color: rgba(255, 246, 232, .5); }
+.tc-stick.sprint .tc-sprint { border-color: #ffcf4a; box-shadow: 0 0 0 2px rgba(74, 44, 42, .5), inset 0 0 0 2px rgba(74, 44, 42, .5), 0 0 16px 4px rgba(255, 207, 74, .55); animation: tcRace .6s linear infinite; }
+@keyframes tcRace { to { transform: rotate(40deg); } }
+.tc-knob { position: absolute; left: calc(var(--k) * -.5); top: calc(var(--k) * -.5); width: var(--k); height: var(--k); border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 50% 30%, #ffe0ea 0, #ffa8c4 55%, #f57aa0 100%); border: calc(3px * var(--u)) solid var(--ink);
+  box-shadow: inset 0 calc(3px * var(--u)) 0 rgba(255, 255, 255, .65), inset 0 calc(-4px * var(--u)) 0 rgba(200, 60, 110, .25), 0 calc(3px * var(--u)) 0 var(--ink), 0 6px 14px rgba(50, 22, 34, .3); }
+.tc-stick.sprint .tc-knob { box-shadow: inset 0 calc(3px * var(--u)) 0 rgba(255, 255, 255, .65), 0 0 0 calc(3px * var(--u)) #ffcf4a, 0 0 0 calc(5px * var(--u)) var(--ink), 0 0 18px 6px rgba(255, 207, 74, .65); }
+.tc-knob .gl { width: 62%; height: 62%; color: #fff6e8; filter: drop-shadow(0 1.5px 0 rgba(74, 44, 42, .45)); }
+
+/* ---------------------------------------------------------------- tap pings on the world */
+.tc-ping { position: absolute; left: 0; top: 0; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; border: 3px solid #fff6e8; box-shadow: 0 0 0 2px rgba(74, 44, 42, .55), inset 0 0 0 2px rgba(74, 44, 42, .55);
+  pointer-events: none; animation: tcPing .5s var(--soft) forwards; }
+.tc-ping.use { border-color: #ffcf4a; }
+.tc-ping.foe { border-color: #ff8fb0; }
+@keyframes tcPing { 0% { transform: scale(.3); opacity: 1; } 100% { transform: scale(1.25); opacity: 0; } }
+
+/* ---------------------------------------------------------------- the HUD while touch plays */
+/* the skills, belt and weapon-set badge live in the touch buttons: the dock is only the gap between the orbs the belt sits in */
+body.touch-active .hud .dock { visibility: hidden; padding: 0; margin: 0 2px 4px; border: 0; width: calc(var(--tc-belt-w, 150px) / var(--ui-scale)); height: 24px; box-shadow: none; }
+body.touch-active .hud .orb-slot { zoom: var(--tc-orbz, .74); }
+body.touch-active .hud .orb { pointer-events: none; }
+body.touch-active .hud .orb-val { opacity: 1; transform: none; }
+body.touch-active .hud .lvl-badges { bottom: 132px; }
+body.touch-active .hud-bc { left: calc(var(--tc-bc-x, 50vw) / var(--ui-scale)); }
+body.touch-active .hud .prompt { left: calc(var(--tc-bc-x, 50vw) / var(--ui-scale)); }
+body.touch-active .hud-br, body.touch-active .hud .hsw { display: none !important; }
+body.touch-active .hud .prompt { pointer-events: auto; }
+body.touch-active .hud .prompt.show { cursor: default; }
+body.touch-active .hud .prompt.hint::before { content: ''; width: 30px; height: 30px; margin: -2px 0 -2px -10px; flex: none; border-radius: 50%; border: 2.5px solid var(--ink); box-shadow: 0 2.5px 0 var(--ink);
+  background: radial-gradient(circle at 50% 66%, #fff6e8 0 26%, transparent 27%), radial-gradient(circle at 26% 34%, #fff6e8 0 11%, transparent 12%), radial-gradient(circle at 50% 24%, #fff6e8 0 11%, transparent 12%), radial-gradient(circle at 74% 34%, #fff6e8 0 11%, transparent 12%), linear-gradient(#ffb3ca, #ff8fb0);
+  animation: bob 1s ease-in-out infinite; }
+body.touch-active .ui-root.tc-short .hud .mats { display: none; }
+body.touch-active .toasts { left: 50%; bottom: auto; top: 108px; transform: translateX(-50%); align-items: center; }
+body.touch-active .toasts, body.touch-active .toasts * { pointer-events: none !important; } /* (a tip over the play area never eats a tap on the world) */
+body.touch-active .ui-root.dlg-open .toasts, body.touch-active .ui-root.building .toasts { top: 108px; bottom: auto; }
+/* the hero wheel on touch (ui/touch.js fitWheel): fitted into the free play area, over a scrim that hides the toasts,
+   tips, quest arrow and world labels; on a phone its cards stand in a row under a pill hub. Its number keys mean
+   nothing on touch. */
+body.touch-active .hero-wheel { inset: auto; left: var(--tc-wl, 0px); top: var(--tc-wt, 0px); width: var(--tc-ww, 100vw); height: var(--tc-wh, 100vh); }
+body.touch-active .hero-wheel::before { display: none; }
+body.touch-active .hero-wheel .hw-ring, body.touch-active .hero-wheel .hw-hub { zoom: var(--tc-wheel, 1); }
+body.touch-active .hw-k { display: none; }
+.hero-wheel.tc-row .hw-hub { width: 320px; height: 68px; border-radius: 34px; gap: 3px; translate: 0 -82px; }
+.hero-wheel.tc-row .hw-hub b { font-size: 21px; }
+.hero-wheel.tc-row .hw-hub span { max-width: 290px; font-size: 13px; }
+.hero-wheel.tc-row .hw-card.locked .hw-tag { display: none; } /* (a row has no room for "Somewhere in the maples…": the hub says it when picked) */
+.hero-wheel.tc-row.show .hw-card.sel { transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y) - 6px)) scale(1.08); }
+.tc-scrim { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 45%, rgba(40, 24, 46, .5), rgba(40, 24, 46, .34)); opacity: 0; transition: opacity .15s; pointer-events: none; }
+.ui-root.tc-wheel .tc-scrim { opacity: 1; }
+.ui-root.tc-wheel :is(.toasts, .l-world, .tut-dock, .tut-flash) { opacity: 0 !important; transition: opacity .12s; }
+/* the quest tracker on a phone starts folded (ui/touch.js); its toggle is a 44 px target whatever the UI scale */
+body.touch-active .hud .qt-tog { position: relative; }
+body.touch-active .hud .qt-tog::after { content: ''; position: absolute; inset: calc(10px - 23px / var(--ui-scale)); border-radius: 50%; }
+body.touch-active .hud .lvb { position: relative; }
+body.touch-active .hud .lvb::after { content: ''; position: absolute; inset: calc(12px - 22px / var(--ui-scale)) -8px; }
+/* the pause menu's quick panel row (the pad's) is touch's way to the panels too */
+body.touch-active .mn-quick { display: flex; }
+/* Settings › Controls › Touch (ui/menu.js): its options, and a list of what each control does in place of bindings */
+.ctl-touch { display: none; margin: 0 0 6px; }
+.p-menu[data-dev="touch"] .ctl-touch { display: block; }
+.ctl-touch .set-row { padding: 7px 6px; }
+.p-menu[data-dev="touch"] [data-a="resetBinds"] { display: none; }
+.ctl-row .ctl-h { font: 500 13px/1.25 var(--font); color: var(--ink2, #7a5650); text-align: right; max-width: 62%; padding: 4px 0; }
+
+/* ---------------------------------------------------------------- build and decorate mode on touch (ui/touch.js edit) */
+.tc.edit { opacity: 1; visibility: visible; transition: opacity .25s, visibility 0s; }
+.tc.edit > :not(.tc-edit, .tc-pings, .tc-safe) { display: none; }
+.tc:not(.edit) .tc-edit { display: none; }
+.tc-eb { border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: .95;
+  background: radial-gradient(circle at 50% 30%, #fffdf8, #ffeedd); border: calc(3px * var(--u)) solid var(--ink); box-shadow: 0 calc(3px * var(--u)) 0 var(--ink), 0 6px 14px rgba(50, 22, 34, .3); }
+.tc-eb.hide { display: none; }
+.tc-eb > i { display: grid; place-items: center; width: 46%; height: 46%; color: var(--ink); }
+.tc-eb > i .gl { width: 100%; height: 100%; }
+.tc-eb > b { position: absolute; left: 50%; bottom: calc(-14px * var(--u)); transform: translateX(-50%); white-space: nowrap; padding: 2px 8px 3px; border-radius: 999px;
+  background: #fff6e8; border: 2px solid var(--ink); font: 700 12px/1 var(--font); color: var(--ink); box-shadow: 0 2px 0 var(--ink); }
+.tc-place { background: radial-gradient(circle at 50% 30%, #f2fff9, #8fe0c0 70%, #5ec79a); }
+.tc-place > i { color: #fff; filter: drop-shadow(0 2px 0 var(--ink)); }
+.tc-place > b { background: #c9f5e4; font-size: 13px; }
+.tc-cancel { background: radial-gradient(circle at 50% 30%, #fff, #ffd6e3); }
+.tc-cancel > i { color: var(--rose, #e8506e); width: 40%; height: 40%; }
+.tc-done { background: radial-gradient(circle at 50% 30%, #fff4c0, #ffcf4a); }

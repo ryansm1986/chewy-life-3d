@@ -41,6 +41,7 @@ export class QuestArrow {
   }
   // slide an edge point along its edge out of the HUD corners (quest tracker, minimap + purse, demand + build button)
   avoid(x, y, W, H, s, mL, mT, mR, mB) {
+    if (this.ui.touch?.on) return this.ui.touch.avoidArrow(x, y); // (touch: its buttons' corners, ui/touch.js)
     const boxes = [[0, 0, 300 * s, 250 * s], [W - 260 * s, 0, W, 345 * s], [W - 230 * s, H - 260 * s, W, H]];
     const onSide = x <= mL + 12 * s || x >= W - mR - 12 * s;
     for (const [x0, y0, x1, y1] of boxes) {

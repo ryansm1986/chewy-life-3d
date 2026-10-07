@@ -31,6 +31,7 @@ export class Sprint {
     const chord = (Actions.binds('swap', 'pad')[0] || '').split('+'), inChord = chord.length > 1 && Actions.binds('sprint', 'pad').some(t => chord.includes(t));
     if (free && Actions.pressed('sprint', 'pad') && !(inChord && Actions.held('swap', 'pad'))) { this.padLatched = !this.padLatched; this.padT = 0; }
     if (inChord && Actions.pressed('swap', 'pad') && this.padT < 0.5) this.padLatched = !this.padLatched;
+    if (free && Actions.held('sprint', 'touch')) return true; // (touch: the stick pushed out to its sprint ring, ui/touch.js)
     if (this.mode !== SPRINT_MODE.TOGGLE) { this.latched = false; return free && (Actions.held('sprint', 'kbm') || !!this.padLatched); }
     if (free && Actions.pressed('sprint', 'kbm')) this.latched = !this.latched;
     return free && (this.latched || !!this.padLatched);

@@ -204,7 +204,7 @@ export class Combat {
     C.bad++; C.kinds[kind] = (C.kinds[kind] || 0) + 1;
     if (C.bad <= 5) console.warn(`[gridcheck] ${kind} mismatch: scan ${want.length} vs grid ${got.length}`);
   }
-  playerBonusPct() { let b = 0; if (this.buffs.howl?.t > 0) b += this.buffs.howl.dmg; return b; }
+  playerBonusPct() { let b = 0; if (this.buffs.howl?.t > 0) b += this.buffs.howl.dmg; if (this.buffs.roar?.t > 0) b += this.buffs.roar.dmg; return b; } // (roar: the dragoon's Mighty Little Roar)
   // Player (or ally) hits a monster with a skill-scaled hit
   // critAdd / critX / forceCrit: Poe's strikes from behind and Vanish's double crit (stats.js rollHit)
   hitMonster(m, { dmgPct = 100, element = 'phys', knock = 0, stun = 0, from = null, noCrit = false, flat = 0, source = 'player', mult = 1, silent = false, critAdd = 0, critX = 1, forceCrit = false } = {}) {
@@ -258,6 +258,8 @@ export class Combat {
     if (rollBlock(G.derived)) { G.ui?.float?.(p.pos.clone().setY(p.pos.y + 1.4), 'Block!', { kind: 'status', color: '#9fd0ff' }); G.vfx.sparks(p.pos.clone().setY(1), { n: 6, color: '#bfe6ff' }); G.skills?.onBlock?.(); /* (Unbending Stance: the samurai parries on his blade) */ Events.emit('sfx', 'block'); return 0; }
     let dmg = playerDamageTaken(G.derived, raw, element, level);
     if (this.buffs.cursed?.t > 0) dmg *= 1 + this.buffs.cursed.pct / 100;
+    if (G.skills?.shihtzuGuard) { dmg = G.skills.shihtzuGuard(dmg, src); if (dmg < 0.5) return 0; }
+    if (G.skills?.goldenGuard) { dmg = G.skills.goldenGuard(dmg, src); if (dmg < 0.5) return 0; } // (the dragoon: the Wing Shield's absorb, Steady Paws' brace — combat/goldenArts.js) // (the Shih Tzu: his damage reduction, the Gloom Blanket, Bone Ward's barrier, the lantern's rekindle — combat/shihtzuSkills.js; 0: soaked whole)
     // a charged Sakura Storm's Blade Wall: a blade shatters instead (docs/CHARGE.md)
     if (G.skills?.boneBlock?.()) { G.ui?.float?.(p.pos.clone().setY(p.pos.y + 1.4), 'Bonk!', { kind: 'status', color: '#fff0c8' }); return 0; }
     // Moka's Bubble Barrier soaks the hit first (mokaSpells.absorb → what gets through)
@@ -332,6 +334,6 @@ export class Combat {
       if (z.t >= z.life) { z.dispose?.(); this.zones.splice(i, 1); }
     }
   }
-  moveMul() { let m = 1; if (this.buffs.howl?.t > 0) m += this.buffs.howl.move / 100; if (this.buffs.frenzy?.stacks) m += (this.buffs.frenzy.stacks * (this.buffs.frenzy.per || 6)) / 100; return m; }
-  atkMul() { let m = 1; if (this.buffs.frenzy?.stacks) m += (this.buffs.frenzy.stacks * (this.buffs.frenzy.per || 6)) / 100; return m; }
+  moveMul() { let m = 1; if (this.buffs.howl?.t > 0) m += this.buffs.howl.move / 100; if (this.buffs.roar?.move && this.buffs.roar.t > 0) m += this.buffs.roar.move / 100; /* (a charged roar's Pep Talk) */ if (this.buffs.frenzy?.stacks) m += (this.buffs.frenzy.stacks * (this.buffs.frenzy.per || 6)) / 100; return m; }
+  atkMul() { let m = 1; if (this.buffs.frenzy?.stacks) m += (this.buffs.frenzy.stacks * (this.buffs.frenzy.per || 6)) / 100; if (this.buffs.roar?.t > 0) m += this.buffs.roar.aspd / 100; if (this.buffs.retrieve?.t > 0) m += this.buffs.retrieve.aspd / 100; return m; } // (roar, retrieve: the dragoon's roar and Good Retriever)
 }

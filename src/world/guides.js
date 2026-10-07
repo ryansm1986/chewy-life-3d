@@ -12,12 +12,16 @@
 //            Stage Ⅰ and let go, the charge perks in the K panel's Charge card, tap vs hold.
 //  - meetPoe: Poe, in town after she joins (docs/POE.md §6): tap Tab for the next hero, hold Tab for the hero wheel and
 //            pick her, her fūma and her trees, and the mini portraits.
+//  - meetShihtzu: the Shih Tzu, in town after he joins (docs/SHIHTZU.md §5): the hero wheel with four, his flail (the
+//            combo and Woeful Wallop), Dripping Paw and the hexes, the Gloom Blanket, his trees. His name reads
+//            CLASSES.shihtzu.name (the owner's to pick).
 import * as THREE from 'three';
 import { POND } from './layout.js';
 import { SKILLS } from '../rpg/skills.js';
 import { pantryIcon } from '../life/pantryIcons.js';
 import { PANTRY } from '../life/pantry.js';
 import { FURNITURE, SURFACES } from '../home/furniture.js';
+import { CLASSES } from '../rpg/classes.js';
 
 const V = (x, z) => new THREE.Vector3(x, 0, z);
 const dist = (G, p) => Math.hypot(G.player.pos.x - p.x, G.player.pos.z - p.z);
@@ -315,5 +319,31 @@ const meetPoe = {
   ],
 };
 
-export const GUIDES = { switch: sw, house, fishing, makeHome, remodel, charge, meetPoe };
+// ------------------------------------------------------------------ four heroes: the Shih Tzu (docs/SHIHTZU.md §5)
+const STZ = CLASSES.shihtzu.name; // (the owner's to pick: one place, classes.js)
+const meetShihtzu = {
+  title: `Meet ${STZ}`, narrator: 'shihtzu', color: '#8a4a8a', priority: 1,
+  blurb: `The hero wheel with four, and ${STZ}'s flail, hexes and the Gloom Blanket.`,
+  offer: `${STZ} can show you his flail and his hexes.`,
+  icon: null,
+  trigger: G => !!G.heroes?.joined('shihtzu') && G.state.activeHero !== 'shihtzu',
+  past: G => !!G.heroes?.joined('shihtzu'),
+  locked: G => (G.heroes?.joined('shihtzu') ? null : 'Meet him in Momiji Hollow first'),
+  steps: [
+    { id: 'hold', say: G => (G.state.activeHero === 'shihtzu' ? 'Good. You chose the gloom. *Hold Tab* again whenever the pack needs another paw.' : `The pack is four now, ${me(G)}. *Hold Tab*: the hero wheel. Choose me — the one in plum. Solemnly. …Or press my number.`),
+      objective: 'Hold *Tab*, pick him, let go', allow: { switching: true },
+      highlight: G => (G.heroSwitching ? null : wheelOpen(G) ? '.hero-wheel .hw-card[data-id="shihtzu"]' : '.hud .hsw'),
+      done: G => G.state.activeHero === 'shihtzu' && !G.heroSwitching },
+    { id: 'flail', say: 'Left-click: my *flail*. Three swings — the third a slam over the top. Right-click: *Woeful Wallop*: one great sigh and a sweep that sends them tumbling. I mean every one.',
+      objective: 'His flail: left-click, right-click', allow: { switching: true }, highlight: G => (G.heroSwitching ? null : '.hud .hb.mouse'), ack: true },
+    { id: 'hex', say: 'Press *1*: *Dripping Paw*. A hex — gloom that stings every half second. Hex a foe again and it stings harder, three stacks deep.',
+      objective: 'Press 1: Dripping Paw, a hex that stacks', allow: { switching: true }, highlight: G => (G.heroSwitching ? null : '.hud .hb[data-i="2"]'), ack: true },
+    { id: 'blanket', say: 'And the *Gloom Blanket*: every hexed foe near me makes me a little harder to hurt. Hex them, then stand your ground. Knights do not run. …Much.',
+      objective: 'Hexed foes nearby: he takes less damage', allow: { switching: true }, ack: true },
+    { id: 'wrap', say: 'My trees are Flail Arts, Gloom Hexes and the Ghostlight Tome (*K*): ghost pups, a lantern, and Grandpaw. Grandpaw sends his regards. To the Burrow.',
+      objective: 'K: Flail Arts, Gloom Hexes, Ghostlight Tome', ack: true, highlight: () => '.hud .mb[data-open="skills"]' },
+  ],
+};
+
+export const GUIDES = { switch: sw, house, fishing, makeHome, remodel, charge, meetPoe, meetShihtzu };
 export const GUIDE_IDS = Object.keys(GUIDES);

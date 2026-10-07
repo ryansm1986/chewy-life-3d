@@ -14,8 +14,9 @@ import { SFX as zBamboo } from '../../dungeon/zoneMonsters/bamboo.sfx.js';
 import { SFX as zMaple } from '../../dungeon/zoneMonsters/maple.sfx.js';
 import { SFX as zTide } from '../../dungeon/zoneMonsters/tidepool.sfx.js';
 import { SFX as zOnsen } from '../../dungeon/zoneMonsters/onsen.sfx.js';
+import { SFX as zSpirit } from '../../dungeon/zoneMonsters/spirit.sfx.js';
 
 export const REGION_SFX = {};
-for (const S of [env, ambient, mBamboo, mMaple, mTide, mOnsen, bTengu, bTanuki, bUmi, bYuki, zBamboo, zMaple, zTide, zOnsen]) {
+for (const S of [env, ambient, mBamboo, mMaple, mTide, mOnsen, bTengu, bTanuki, bUmi, bYuki, zBamboo, zMaple, zTide, zOnsen, zSpirit]) {
   for (const k in S) { if (REGION_SFX[k]) throw new Error(`region sfx clash: ${k}`); REGION_SFX[k] = S[k]; }
 }

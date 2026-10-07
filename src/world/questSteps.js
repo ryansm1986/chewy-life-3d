@@ -8,7 +8,8 @@
 //   rescue { npc, dungeon?, zone?, floor? }               a captive freed ('villager:rescued' { npc, zone, dungeon, floor })
 //   dungeonFloor { dungeon, n }                           reach floor n (the Burrow: state.dungeon.deepest; a zone
 //                                                         dungeon: zones[zone].dungeon.bestFloor)
-//   tier { dungeon, n }                                   clear that zone dungeon at tier n or higher
+//   tier { dungeon, n }                                   clear that dungeon (a zone dungeon or the Deep Burrow) at tier n
+//                                                         or higher
 //   villageSaved { zone }                                 the zone's village is saved
 // The filters are optional: the old steps (an unfiltered kill, boss { id }) count exactly as before.
 import { DUNGEONS } from '../dungeon/defs.js';
@@ -39,7 +40,7 @@ export function bestFloorOf(state, id) {
 /** the state-derived steps: done? (null: not one of them) */
 export function zoneStepDone(s, state) {
   if (s.type === 'dungeonFloor') return bestFloorOf(state, s.dungeon) >= (s.n || 1);
-  if (s.type === 'tier') { const z = DUNGEONS[s.dungeon]?.zone || s.zone; return !!z && tierCleared(state, z, s.n || 1); }
+  if (s.type === 'tier') { const id = s.dungeon || s.zone; return !!id && tierCleared(state, id, s.n || 1); } // (a zone dungeon or the Deep Burrow; a Spirit clear counts as T5)
   if (s.type === 'villageSaved') return !!s.zone && villageSaved(state, s.zone);
   return null;
 }

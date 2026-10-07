@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import { Engine } from './core/engine.js';
 import { Input } from './core/input.js';
 import { Actions } from './core/actions.js';
-import { DECK, FPS_CAPS, PRESET } from './core/deck.js';
+import { Touch } from './core/touch.js';
+import { FPS_CAPS, PRESET, liteOf } from './core/deck.js';
 import { PARTICLE_BUDGET } from './gfx/particles.js';
 import { PadAim } from './combat/padAim.js';
 import { Events } from './core/events.js';
@@ -28,7 +29,8 @@ import { DungeonMode } from './dungeon/dungeonMode.js';
 import { RegionMode } from './regions/regionMode.js';
 import { REGIONS, REGION_IDS, regionState, regionUnlocked } from './regions/index.js';
 import { normRun, dungeonDef } from './dungeon/defs.js';
-import { normalizeZones } from './rpg/zones.js';
+import { normalizeZones, recordDungeonClear, TIER_DUNGEONS } from './rpg/zones.js';
+import { installTierDebug } from './dungeon/tierRun.js';
 import { villageReady, VILLAGES } from './regions/village/data.js';
 import { zoneNpcRig } from './actors/zoneVillagers.js';
 import { soakChip } from './rpg/zoneBuffs.js';
@@ -39,6 +41,8 @@ import { GroundLoot } from './combat/groundLoot.js';
 import { newGameState, createActions, normalizeHeroes, saveableState } from './rpg/actions.js';
 import { CLASSES } from './rpg/classes.js';
 import { HeroManager } from './actors/heroes.js';
+import { loadWhelp, dressWings } from './actors/whelp.js';
+import { loadGoldenProps } from './actors/goldenGear.js';
 import { skillRuntime } from './rpg/skills.js';
 import { disposeScene } from './gfx/dispose.js';
 import { VillageSim } from './world/village.js';
@@ -86,7 +90,8 @@ export async function boot() {
   G.skillParams = (id) => skillRuntime(id, G.state, G.derived)?.params;
 
   // Blender-refined skins for Chewy and Shadow must be in memory before their rigs (and portraits) are built
-  const [uiMod, audioMod] = await Promise.all([P.has('noui') ? null : tryImport('ui', () => import('./ui/ui.js')), P.has('noaudio') ? null : tryImport('audio', () => import('./audio/audio.js')), loadRefinedRigs(REFINED_CAST), loadHeroModels(['chewy', 'moka', 'poe', 'shadow', 'rosie'])]); // (poe: while her model is pending, heroModels.js fetches nothing)
+  const [uiMod, audioMod] = await Promise.all([P.has('noui') ? null : tryImport('ui', () => import('./ui/ui.js')), P.has('noaudio') ? null : tryImport('audio', () => import('./audio/audio.js')), loadRefinedRigs(REFINED_CAST), loadHeroModels(['chewy', 'moka', 'poe', 'shihtzu', 'golden', 'shadow', 'rosie']), loadWhelp()]); // (loadWhelp: Shadow's dragon whelp outfit and its wing prop, worn while the dragoon is played: actors/whelp.js)
+  loadGoldenProps(); // (the dragoon's lance and javelin props: actors/goldenGear.js; procedural stand-ins until they land) // (poe: while her model is pending, heroModels.js fetches nothing)
   G.audio = audioMod?.Audio || null;
   try { G.audio?.init?.(); } catch (e) { console.warn('[audio] init failed', e); }
 
@@ -167,13 +172,23 @@ export async function boot() {
   for (const v of VILLAGERS) portraits.register(v.id, v.spec);
   portraits.register('moka', CAST.moka);
   portraits.register('poe', CAST.poe);
-  G.portrait = (id) => portraits.get(id);
+  portraits.register('shihtzu', CAST.shihtzu);
+  portraits.register('golden', CAST.golden);
+  portraits.dresser('shadowWhelp', dressWings); // (the whelp's bust: his wings peek over his shoulders)
+  // Shadow's face is the whelp's while the dragoon is played (his tips, the HUD's companion card: actors/whelp.js)
+  G.portrait = (id) => portraits.get(id === 'shadow' && G.companion?.whelp?.on ? 'shadowWhelp' : id);
   G.registerPortrait = (id, spec) => { if (!portraits.specs.has(id)) portraits.register(id, spec); }; // (zone villagers: src/regions/village)
   G.zoneNpcBuilder = (id) => zoneNpcRig(id); // a fresh Toybox rig of a zone villager (phase C's dungeon cages; the caller disposes it)
   G.thumbs = new BuildingThumbs(engine);
   try {
     const pm = await import('./ui/portraits.js');
-    for (const id of ['chewy', 'shadow', 'rosie', 'moka', 'poe']) { const url = portraits.get(id); if (url) pm.PORTRAITS[id] = () => `<img class="p3d" src="${url}" alt="" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block">`; }
+    for (const id of ['chewy', 'shadow', 'rosie', 'moka', 'poe', 'shihtzu', 'golden']) { const url = portraits.get(id); if (url) pm.PORTRAITS[id] = () => `<img class="p3d" src="${url}" alt="" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block">`; }
+    { // Shadow's bust follows his outfit (the whelp while the dragoon is played); a swap re-renders the HUD's companion face
+      const img = url => (url ? `<img class="p3d" src="${url}" alt="" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block">` : '');
+      const plain = pm.PORTRAITS.shadow;
+      pm.PORTRAITS.shadow = () => (G.companion?.whelp?.on ? img(G.portrait('shadow')) || plain?.() : plain?.() || '');
+      Events.on('whelp:swap', () => { for (const el of document.querySelectorAll('.pal-face')) el.innerHTML = pm.PORTRAITS.shadow(); });
+    }
     G.refreshChewyPortrait = () => { // after a model swap: re-render the bust and update the HUD face
       portraits.cache.delete('chewy'); const url = portraits.get('chewy'); if (!url) return;
       pm.PORTRAITS.chewy = () => `<img class="p3d" src="${url}" alt="" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block">`;
@@ -219,10 +234,10 @@ export async function boot() {
       if (k === 'music') G.audio?.setVolume?.('music', v);
       if (k === 'sfx') { G.audio?.setVolume?.('sfx', v); G.audio?.setVolume?.('ambience', v * 0.8); }
       if (k === 'shake') engine.rig.shakeMul = v ? 1 : 0;
-      if (k === 'quality') { // (core/deck.js: 3 is the Steam Deck preset)
+      if (k === 'quality') { // (core/deck.js: 3 is the Steam Deck preset, 4 Mobile)
         engine.applyPreset(v);
-        PARTICLE_BUDGET.scale = v === PRESET.DECK ? DECK.particles : 1; G.particleBudget = PARTICLE_BUDGET; // (G: for the QA)
-        const tier = v === PRESET.DECK ? PRESET.MED : v; // (the density the worlds build with: R-2, at the next start)
+        PARTICLE_BUDGET.scale = liteOf(v)?.particles ?? 1; G.particleBudget = PARTICLE_BUDGET; // (G: for the QA)
+        const tier = v === PRESET.DECK ? PRESET.MED : v === PRESET.MOBILE ? PRESET.LOW : v; // (the density the worlds build with: R-2, at the next start)
         if (settingsBooted && tier !== engine.quality) G.ui.toast?.('Grass and scenery detail change at the next start', { icon: 'eye', color: '#ffe0a8' });
       }
       if (k === 'fpsCap') capMs = FPS_CAPS[v] ? 1000 / FPS_CAPS[v] : 0;
@@ -335,7 +350,7 @@ export async function boot() {
       Events.emit('mode:changed', { mode: 'dungeon', floor: floor == null ? null : dungeon.floor, region, ...dungeon.where() }); // (+ zone, dungeon, tier: docs/ZONES.md §8)
       save();
       // first visit: one short, non-blocking tip from Shadow; the rest arrive when they become useful (see hints())
-      if (tip && !G.state.flags.burrowTut) { G.state.flags.burrowTut = true; setTimeout(() => G.mode === 'dungeon' && hint('fight', player.hero === 'moka' ? '*Yip!* Click a monster to zap it — right-click for Splash Bolt!' : player.hero === 'poe' ? '*Yip!* Click a monster to slash it — right-click to throw your fūma (it comes back)!' : '*Yip!* Click a monster to slice it — right-click for Crescent Chomp!'), 1800); }
+      if (tip && !G.state.flags.burrowTut) { G.state.flags.burrowTut = true; setTimeout(() => G.mode === 'dungeon' && hint('fight', player.hero === 'moka' ? '*Yip!* Click a monster to zap it — right-click for Splash Bolt!' : player.hero === 'poe' ? '*Yip!* Click a monster to slash it — right-click to throw your fūma (it comes back)!' : player.hero === 'shihtzu' ? '*Yip!* Click a monster to wallop it with your flail — right-click for Woeful Wallop, 1 for a Dripping Paw hex!' : player.hero === 'golden' ? '*Rawr!* (a very small rawr) Click a monster to poke it with your lance — right-click for Sunbeam Thrust, 1 to toss a Bonk Dart!' : '*Yip!* Click a monster to slice it — right-click for Crescent Chomp!'), 1800); }
     };
     if (G.ui?.transition) G.ui.transition(go); else go();
   }
@@ -343,7 +358,7 @@ export async function boot() {
   // G.enterDungeon(n), the Burrow's floor n as before
   G.enterDungeon = (arg = 1) => {
     const run = normRun(arg), def = dungeonDef(run.id);
-    enterCombatWorld(() => new DungeonMode(G), run, { location: () => (def.kind === 'zone' ? def.name : dungeon.theme.name), sub: `B${run.floor}F`, floor: run.floor });
+    enterCombatWorld(() => new DungeonMode(G), run, { location: () => (def.kind !== 'burrow' ? def.name : dungeon.theme.name), sub: `B${run.floor}F`, floor: run.floor });
   };
   G.enterRegion = (id) => {
     const def = REGIONS[id]; if (!def) return;
@@ -432,6 +447,7 @@ export async function boot() {
   // ---- interaction helpers
   G.story = new Story(G);
   installGateDebug(G, P); // (?villagesaved=1 | =bamboo,…; G.zoneDebug.saveVillage(zone): the zone dungeon gates, regions/dungeonGate.js)
+  installTierDebug(G, P, { recordDungeonClear, TIER_DUNGEONS }); // (?run=bambooDepths:5:swarming,teeming; G.tierDebug: the tier runs, dungeon/tierRun.js)
   G.ui?.setQuestProvider?.(() => G.story.uiList());
   G.questTarget = () => (G.titleActive || G.playerDead ? null : G.tutorials?.target() || (G.mode === 'interior' ? null : G.story.target())); // (a guide's pointer first; indoors only a guide points)
   installServices(G);
@@ -464,17 +480,35 @@ export async function boot() {
     return best;
   }
   const _v = new THREE.Vector3();
-  function pickInteractAtMouse() {
+  function pickInteractAt(x, y, r = 56) {
     const cam = engine.camera;
-    let best = null, bd = 56;
+    let best = null, bd = r;
     const list = G.mode === 'village' ? npcs.filter(n => n.visible).map(n => n.interact).concat(G.world.interactables) : G.world.interactables;
     for (const it of list) {
       _v.copy(it.pos).setY(it.pos.y + 0.6).project(cam);
       const sx = (_v.x * 0.5 + 0.5) * innerWidth, sy = (-_v.y * 0.5 + 0.5) * innerHeight;
-      const d = Math.hypot(sx - Input.mouse.x, sy - Input.mouse.y);
+      const d = Math.hypot(sx - x, sy - y);
       if (d < bd) { bd = d; best = it; }
     }
     return best;
+  }
+  const pickInteractAtMouse = () => pickInteractAt(Input.mouse.x, Input.mouse.y);
+  // a touch tap on the world (CT-5, docs/CONTROLS.md §12): a foe is locked (the attack and skills go at it), someone or
+  // something to use is walked to and used (as a click does), anything else is walked to
+  function touchTap(tp) {
+    const foe = G.mode === 'dungeon' ? G.combat.pickAtScreen(tp.x, tp.y, engine.camera, 60) : null;
+    if (foe) { if (padAim.target(foe)) { hoverEnemy = foe; G.audio?.play?.('ui_click', { vol: 0.45 }); G.ui?.touch?.ping?.(tp.x, tp.y, 'foe'); } return; }
+    const it = pickInteractAt(tp.x, tp.y, 64);
+    if (it) { player.interactTarget = it; player.moveTarget = it.pos.clone(); G.ui?.touch?.ping?.(tp.x, tp.y, 'use'); return; }
+    player.interactTarget = null;
+    player.moveTarget = engine.mouseGround(tp.x / innerWidth * 2 - 1, -(tp.y / innerHeight) * 2 + 1, (x, z) => G.world.heightAt(x, z));
+    G.ui?.touch?.ping?.(tp.x, tp.y, 'walk');
+  }
+  /** a melee skill whose target is beyond its reach (the touch attack then walks up first) */
+  function meleeFar(id, L) {
+    const R = skillRuntime(id, G.state, G.derived);
+    if (!R || !skills.isMelee?.(id, R) || L.breakable) return false;
+    return Math.hypot(L.pos.x - player.pos.x, L.pos.z - player.pos.z) > skills.reach(R, L);
   }
   // which action holds each hotbar slot (for channeling and hold-to-charge, on every device: core/actions.js)
   const SLOT_ACTS = ['attack', 'skillAlt', 'skill1', 'skill2', 'skill3', 'skill4'];
@@ -527,6 +561,7 @@ export async function boot() {
   Events.on('input:device', p => { if (p?.device !== 'pad') padAim.clear(); });
   Actions.isBuilding = () => !!(buildMode.active || G.housing?.decor?.active);
   function handleInput(dt) {
+    const taps = Touch.takeTaps(); // (touch taps on the world since the last frame: ui/touch.js; dropped in build mode and menus)
     if (G.mode === 'village' && Actions.pressed('build') && !player.controlLocked && !G.ui?.isPaused?.() && !G.ui?.anyModal?.()) { buildMode.active ? buildMode.exit() : buildMode.enter(); }
     else if (G.mode === 'interior' && Actions.pressed('build') && (!player.controlLocked || G.housing?.decor.active) && !G.ui?.isPaused?.() && !G.ui?.anyModal?.()) G.housing?.decor.toggle(); // (indoors B decorates: docs/HOUSING.md §2; the player is held still while decorating)
     if (G.housing?.decor.active) { padAim.clear(); return; } // (decorate mode reads the mouse and WASD itself: home/decorate.js)
@@ -544,12 +579,14 @@ export async function boot() {
     }
     if (G.buildFocus) { G.buildFocus = null; }
     const modal = G.ui?.anyModal?.() || (Actions.device === 'pad' && G.ui?.tutorial?.offering); // (the pad answers a guide's offer card with A / B: ui/padNav.js)
-    if (modal || player.controlLocked || G.playerDead) { G.ui?.setInteract?.(null); padAim.clear(); padA = Actions.held('attack', 'pad'); return; }
+    if (modal || player.controlLocked || G.playerDead) { G.ui?.setInteract?.(null); padAim.clear(); padA = Actions.held('attack', 'pad') || Actions.held('attack', 'touch'); return; }
     // Tab / LB: a tap switches to the next hero, holding it opens the hero wheel (heroes.js); the wheel takes the input while open
     if (heroes.tabInput(dt)) { G.ui?.setInteract?.(null); return; }
-    const hb = G.state.player.hotbar, pad = Actions.device === 'pad';
+    // touch (CT-5, docs/CONTROLS.md §12) plays like the pad: its stick and drag-to-aim feed padAim, the attack button is A
+    const hb = G.state.player.hotbar, dev = Actions.device, pad = dev === 'pad' || dev === 'touch';
     // the gamepad aims with the sticks and a soft lock (combat/padAim.js); the mouse with the cursor, as before
     if (pad) padAim.update(dt);
+    if (taps && dev === 'touch') for (const tp of taps) touchTap(tp); // (a foe: lock it; someone or something: go and use it; else walk there)
     const aim = pad ? padAim.point.clone() : engine.mouseGround(Input.mouse.nx, Input.mouse.ny, (x, z) => G.world.heightAt(x, z));
     hoverEnemy = pad ? padAim.lock : G.mode === 'dungeon' && !Input.mouse.overUI ? G.combat.pickAtScreen(Input.mouse.x, Input.mouse.y, engine.camera) : null;
     // LMB: attack enemies under the cursor (or Alt+click: attack in place, at the cursor), otherwise walk / interact.
@@ -572,9 +609,14 @@ export async function boot() {
       return [new THREE.Vector3(player.pos.x + dx * k, player.pos.y, player.pos.z + dz * k), null];
     };
     if (pad) {
-      if (Actions.pressed('attack', 'pad') && aCtx && performance.now() > (G.interactCooldown || 0)) { padA = true; Actions.consume('attack', 'pad'); padIt.onInteract(); }
-      else if (!Actions.held('attack', 'pad')) padA = false;
-      else if (!padA && !indoors && (G.mode === 'dungeon' || lmbCharge)) { const [t, tg] = padCast(hb[0] || 'attack'); skills.charge.feed(0, hb[0] || 'attack', t, tg); } // (tap, hold to charge, or repeat while held)
+      if (Actions.pressed('attack', dev) && aCtx && performance.now() > (G.interactCooldown || 0)) { padA = true; Actions.consume('attack', dev); padIt.onInteract(); }
+      else if (!Actions.held('attack', dev)) padA = false;
+      else if (!padA && !indoors && (G.mode === 'dungeon' || lmbCharge)) {
+        const id0 = hb[0] || 'attack';
+        // a foe tapped on purpose (touch): the attack walks up to it and swings, as a mouse click does
+        if (dev === 'touch' && hoverEnemy && hoverEnemy === padAim.manual && !lmbCharge && meleeFar(id0, hoverEnemy)) skills.approachTo(id0, hoverEnemy);
+        else { const [t, tg] = padCast(id0); skills.charge.feed(0, id0, t, tg); } // (tap, hold to charge, or repeat while held)
+      }
     }
     if (Actions.held('attack', 'kbm') && (!Input.mouse.overUI || lmbCharge)) {
       if (hoverEnemy || (Actions.held('attackInPlace') && G.mode === 'dungeon') || lmbCharge) {
@@ -596,7 +638,7 @@ export async function boot() {
     }
     // RMB / 1-4 (pad: X, Y, RB, RT, LT): a tap casts; holding a chargeable skill charges it (Settings > Charge on hold), others repeat as held
     const slotAim = id => (pad ? padCast(id) : [hoverEnemy ? hoverEnemy.pos : aim, hoverEnemy]);
-    if (!indoors && hb[1] && ((Actions.held('skillAlt', 'kbm') && (!Input.mouse.overUI || skills.charge.owns(1))) || Actions.held('skillAlt', 'pad'))) skills.charge.feed(1, hb[1], ...slotAim(hb[1]));
+    if (!indoors && hb[1] && ((Actions.held('skillAlt', 'kbm') && (!Input.mouse.overUI || skills.charge.owns(1))) || Actions.held('skillAlt', 'pad') || Actions.held('skillAlt', 'touch'))) skills.charge.feed(1, hb[1], ...slotAim(hb[1]));
     if (!indoors) for (let k = 1; k <= 4; k++) if (Actions.held(SLOT_ACTS[k + 1]) && hb[k + 1]) skills.charge.feed(k + 1, hb[k + 1], ...slotAim(hb[k + 1]));
     if (Actions.pressed('potionHeart')) usePotion('heart');
     if (Actions.pressed('potionZoom')) usePotion('zoom');
@@ -605,7 +647,7 @@ export async function boot() {
     if (Actions.pressed('swap')) { G.actions.swapWeapons(); player.setWeapon(G.derived.weaponType || 'sword'); G.audio?.play?.('ui_equip'); G.vfx.sparkle(player.pos.clone().setY(0.8), { n: 6 }); }
     if (Actions.pressed('home') && G.mode === 'dungeon') G.returnToVillage();
     const it = pad ? padIt : nearestInteract();
-    G.ui?.setInteract?.(it ? it.label : null, pad && it ? { act: aCtx ? 'interact' : 'interactAlt' } : undefined); // (the pad's prompt: A, or the D-pad when A would swing)
+    G.ui?.setInteract?.(it ? it.label : null, dev === 'touch' && it ? { key: null } : pad && it ? { act: aCtx ? 'interact' : 'interactAlt' } : undefined); // (the pad's prompt: A, or the D-pad when A would swing; touch: no key, the prompt is tapped: ui/touch.js)
     if (it && Actions.pressed('interact') && performance.now() > (G.interactCooldown || 0)) it.onInteract();
     if (Input.mouse.wheel) rig.zoom(Input.mouse.wheel);
     // target frame
@@ -636,6 +678,7 @@ export async function boot() {
     if (G.titleActive || G.playerDead || ui?.dlg?.active || ui?.iris?.active) return true;
     if (urgent) return false;
     if (G.tutorials?.busy || ui?.tutorial?.offering) return true; // (a guide is talking: Shadow's tips wait)
+    if (G.life?.fishing?.s) return true; // (a cast, a bite or a reel: tips wait for the catch; on a phone a tip covers the reel bar)
     const now = performance.now();
     if (ui?.banners?.busy) hintBannerT = now; // (a beat of calm after a banner, e.g. the victory, before any tip)
     if (ui?.anyModal?.() || now - hintBannerT < 3000 || ui?.toasts?.busy) return true;
@@ -682,7 +725,7 @@ export async function boot() {
       if ((G.dungeon.loot?.list || []).some(e => e.d.type === 'item' && e.to.distanceTo(player.pos) < 5)) tip('loot', 'Shiny! Walk over loot to grab it. Press I to see your bag.');
       // a long walk outdoors without sprinting: Shadow mentions Shift (actors/sprint.js)
       sprintWalkT = G.dungeon.isRegion && player.anim.speed > 3.5 && !player.sprint.on ? sprintWalkT + 0.5 : 0;
-      if (sprintWalkT >= 6) tip('sprint', Actions.device === 'pad' ? 'Click {sprint} to sprint! It stays on while you move. Don\'t worry, I can keep up.' : 'Hold Shift to sprint! Don\'t worry, I can keep up.');
+      if (sprintWalkT >= 6) tip('sprint', Actions.device === 'touch' ? 'Push the stick out to its glowing edge to sprint! Don\'t worry, I can keep up.' : Actions.device === 'pad' ? 'Click {sprint} to sprint! It stays on while you move. Don\'t worry, I can keep up.' : 'Hold Shift to sprint! Don\'t worry, I can keep up.');
     } else if (G.mode === 'village' && !G.titleActive) {
       if (st.quests.done.includes('burrow1') && !G.buildMode && Actions.device !== 'pad') tip('build', 'Press B to plan the village — paint zones and friends will build there!'); // (the pad builds with CT-2's virtual cursor)
       if (regionUnlocked(st, 'bamboo').ok) tip('travel', "The Wayfarer's Post by the bamboo points to new lands! Walk the west trail to find it.");
@@ -771,7 +814,7 @@ export async function boot() {
     rosie.talking = false; rosie.faceBias = 0; rosie.greeted = 30; rosie.state = 'idle'; rosie.t = 4;
     player.controlLocked = false;
     G.story.markTalk('rosie');
-    G.ui?.toast?.(Actions.device === 'pad' ? `Tip: ${Actions.text('menu')} opens the bag, skills and journal · ${Actions.text('swap')} swaps weapons` : 'Tip: I bag · K skills · C character · J quests · X swap weapon', { color: '#8fd0ff' });
+    G.ui?.toast?.(Actions.device === 'touch' ? 'Tip: the bag and menu buttons are by the map · tap a friend to chat' : Actions.device === 'pad' ? `Tip: ${Actions.text('menu')} opens the bag, skills and journal · ${Actions.text('swap')} swaps weapons` : 'Tip: I bag · K skills · C character · J quests · X swap weapon', { color: '#8fd0ff' });
     G.introJoinPending = true; // (the house tour waits for Moka's arrival scene)
     setTimeout(async () => { try { await heroes.introJoin(); } finally { G.introJoinPending = false; } }, 2600); // …and a bookish spaniel mage has been waiting to meet Chewy
   }

@@ -11,9 +11,10 @@ import { keyCap, capInner } from './padGlyphs.js';
 import { pantryIcon } from '../life/pantryIcons.js';
 import { PANTRY } from '../life/pantry.js';
 import { BUFFS, TIER_NAMES } from '../life/meals.js';
+import { HERO_TEXT } from '../rpg/classes.js';
 
 const TAU = Math.PI * 2;
-const HERO_JP = { chewy: 'チューイ', moka: 'モカ', poe: 'ポー' };
+const HERO_JP = Object.fromEntries(Object.entries(HERO_TEXT).map(([k, v]) => [k, v.jp])); // (each hero's kana: classes.js HERO_TEXT, the one place)
 const SLOT_KEYS = ['LMB', 'RMB', '1', '2', '3', '4'];
 const SLOT_ACTS = ['attack', 'skillAlt', 'skill1', 'skill2', 'skill3', 'skill4']; // (their caps follow the device and the bindings: ui/padGlyphs.js)
 
@@ -303,7 +304,7 @@ export class Hud {
     ws.innerHTML = `<div class="ws-in"><span class="ws-ic"></span><b class="ws-n"></b></div>`;
     hb.appendChild(ws);
     ws.addEventListener('click', e => { e.stopPropagation(); const G = this.ui.G; if (!G?.actions?.swapWeapons || G.mode === 'title') return; G.actions.swapWeapons(); G.audio?.play?.('ui_equip'); });
-    tip.bind(ws, () => { const set = this.pl.activeWeapon === 1 ? 1 : 0, wt = this.d.weaponType || 'sword'; return simpleTip(`Weapon set ${set ? 'II' : 'I'} · ${wt === 'ball' ? 'Tennis Ball' : wt === 'staff' ? 'Staff' : wt === 'fuma' ? 'Fūma' : 'Bone Katana'}`, `Each weapon set remembers its own ${glyph('mouseL')} / ${glyph('mouseR')} skills.<br><span class="tt-dim">Press <span class="kc sm">X</span> or click to swap.</span>`); });
+    tip.bind(ws, () => { const set = this.pl.activeWeapon === 1 ? 1 : 0, wt = this.d.weaponType || 'sword'; return simpleTip(`Weapon set ${set ? 'II' : 'I'} · ${wt === 'ball' ? 'Tennis Ball' : wt === 'staff' ? 'Staff' : wt === 'fuma' ? 'Fūma' : wt === 'flail' ? 'Toy Flail' : 'Bone Katana'}`, `Each weapon set remembers its own ${glyph('mouseL')} / ${glyph('mouseR')} skills.<br><span class="tt-dim">Press <span class="kc sm">X</span> or click to swap.</span>`); });
     hb.appendChild(el('div', 'hb-sep'));
     this.belt = [['heart', 'Q', 'Heart Potion', 'Restores Life', 'potionHeart'], ['zoom', 'E', 'Zoom Potion', 'Restores Zoom', 'potionZoom'], ['rejuv', 'R', 'Rejuv Potion', 'Restores Life and Zoom', 'potionR']].map(([k, key, name, desc, act]) => {
       const s = el('div', 'belt b-' + k);
@@ -374,35 +375,42 @@ export class Hud {
     const lv = this.st.heroes?.[nx]?.player?.lvl || 1;
     if (lv !== this.cache.hswLv) { this.cache.hswLv = lv; setText(this.$.hswLv, String(lv)); }
   }
-  /** the other benched hero (with three heroes): a smaller portrait beside the Tab one; a click switches to them */
+  /** the other benched heroes (three heroes or more): a smaller portrait each, in a row beside the Tab one (--k: its
+   *  place, heroWheel.css); a click switches to that hero. this.$.hswB stays the first of them. */
   benchTick(H, nx) {
-    const other = (H?.bench?.() || []).find(b => b !== nx) || null;
-    if (other === this.cache.hswB) { if (other) this.hswBCd(H); return; }
-    this.cache.hswB = other;
-    let b = this.$.hswB;
-    if (!b && other) {
-      b = this.$.hswB = el('button', 'hsw hsw-b');
+    const others = (H?.bench?.() || []).filter(b => b !== nx), key = others.join(',');
+    if (key === this.cache.hswBKey) { if (others.length) this.hswBCd(H); return; }
+    this.cache.hswBKey = key; this.cache.hswBCdv = undefined;
+    const L = this.$.hswBs ||= [];
+    while (L.length < others.length) {
+      const b = el('button', 'hsw hsw-b'), k = L.length;
       b.innerHTML = '<div class="hsw-face"></div><svg class="hsw-cd" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17.5"/></svg><span class="hsw-lv"></span>';
-      this.$.hsw.insertAdjacentElement('afterend', b);
-      b.addEventListener('click', e => { e.stopPropagation(); const id = this.cache.hswB; if (id) this.ui.G?.heroes?.switchTo(id); });
+      b.style.setProperty('--k', k);
+      (L[k - 1] || this.$.hsw).insertAdjacentElement('afterend', b);
+      b.addEventListener('click', e => { e.stopPropagation(); const id = b.dataset.hero; if (id) this.ui.G?.heroes?.switchTo(id); });
       this.ui.tip.bind(b, () => {
-        const G2 = this.ui.G, id = this.cache.hswB; if (!id) return '';
+        const G2 = this.ui.G, id = b.dataset.hero; if (!id) return '';
         const hp = this.st.heroes?.[id]?.player || {}, C = G2.heroes.cls(id);
         return simpleTip(`${esc(C.name)} <span class="jp">${HERO_JP[id] || ''}</span>`, `Level ${hp.lvl || 1} ${esc(C.title)} · hanging out in town.<br><span class="tt-dim">Click to play as ${esc(C.name)} · hold <span class="kc sm">Tab</span> for the hero wheel.</span>`);
       });
+      L.push(b);
     }
-    if (!b) return;
-    b.hidden = !other;
-    if (!other) return;
-    b.querySelector('.hsw-face').innerHTML = portrait(other);
-    b.querySelector('.hsw-lv').textContent = String(this.st.heroes?.[other]?.player?.lvl || 1);
-    replay(b, 'heroswap', 700);
-    this.hswBCd(H);
+    this.$.hswB = L[0] || null;
+    L.forEach((b, k) => {
+      const id = others[k] || null;
+      b.hidden = !id; b.dataset.hero = id || '';
+      if (!id) return;
+      b.querySelector('.hsw-face').innerHTML = portrait(id);
+      b.querySelector('.hsw-lv').textContent = String(this.st.heroes?.[id]?.player?.lvl || 1);
+      replay(b, 'heroswap', 700);
+    });
+    if (others.length) this.hswBCd(H);
   }
   hswBCd(H) {
     const fr = Math.round((H.T ? 1 : clamp((H.cd || 0) / 2)) * 100) / 100;
     if (fr === this.cache.hswBCdv) return;
-    this.cache.hswBCdv = fr; setStyle(this.$.hswB.querySelector('.hsw-cd circle'), 'strokeDashoffset', String((1 - fr) * 110)); setCls(this.$.hswB, 'cooling', fr > 0);
+    this.cache.hswBCdv = fr;
+    for (const b of this.$.hswBs || []) { if (b.hidden) continue; setStyle(b.querySelector('.hsw-cd circle'), 'strokeDashoffset', String((1 - fr) * 110)); setCls(b, 'cooling', fr > 0); }
   }
   /** The sweep-in card while the camera changes heroes: portrait, name, class title. */
   heroCard({ id, name, title, color }) {
@@ -431,7 +439,7 @@ export class Hud {
       const first = this.wsKey === undefined;
       this.wsKey = wsKey;
       const [set, wt] = wsKey.split(':');
-      this.wsBadge.querySelector('.ws-ic').innerHTML = glyph(wt === 'ball' ? 'ball' : wt === 'staff' ? 'staff' : wt === 'fuma' ? 'fuma' : 'sword');
+      this.wsBadge.querySelector('.ws-ic').innerHTML = glyph(wt === 'ball' ? 'ball' : wt === 'staff' ? 'staff' : wt === 'fuma' ? 'fuma' : wt === 'flail' ? 'flail' : wt === 'lance' ? 'lance' : 'sword');
       this.wsBadge.querySelector('.ws-n').textContent = set === '1' ? 'II' : 'I';
       this.$.hotbar.dataset.ws = wt;
       if (!first) { replay(this.wsBadge, 'flip', 520); for (const k of [0, 1]) replay(this.slots[k].el, 'swap', 450); }
@@ -797,7 +805,7 @@ export class Hud {
     const h = this.ui.pop?.querySelector?.('.pop-h');
     if (!h || h.querySelector('.pop-ws')) return;
     const wt = this.d.weaponType || 'sword', set = this.pl.activeWeapon === 1 ? 'II' : 'I';
-    h.insertAdjacentHTML('beforeend', `<span class="pop-ws" data-ws="${wt}">${glyph(wt === 'ball' ? 'ball' : wt === 'staff' ? 'staff' : wt === 'fuma' ? 'fuma' : 'sword')}Set ${set}</span>`);
+    h.insertAdjacentHTML('beforeend', `<span class="pop-ws" data-ws="${wt}">${glyph(wt === 'ball' ? 'ball' : wt === 'staff' ? 'staff' : wt === 'fuma' ? 'fuma' : wt === 'flail' ? 'flail' : wt === 'lance' ? 'lance' : 'sword')}Set ${set}</span>`);
   }
   flashMeal(ok) { const M = this.mealSlot; if (M) replay(M.el, ok ? 'press' : 'deny', 360); }
   flashBelt(k) { const b = this.belt.find(x => x.k === k); if (b) replay(b.el, b.v > 0 ? 'press' : 'deny', 360); }
@@ -808,7 +816,7 @@ export class Hud {
     const def = skillDef(id);
     const lvl = this.pl.skills?.[id] || (id === 'attack' ? 1 : 0);
     const cost = skillCost(id, this.st);
-    const wep = id === 'attack' ? (this.d.weaponType === 'ball' ? 'Basic attack · Red Tennis Ball' : this.d.weaponType === 'staff' ? 'Basic attack · Sparkle Bolt' : this.d.weaponType === 'fuma' ? 'Basic attack · Fūma slashes' : 'Basic attack · Bone Katana') : '';
+    const wep = id === 'attack' ? (this.d.weaponType === 'ball' ? 'Basic attack · Red Tennis Ball' : this.d.weaponType === 'staff' ? 'Basic attack · Sparkle Bolt' : this.d.weaponType === 'fuma' ? 'Basic attack · Fūma slashes' : this.d.weaponType === 'flail' ? 'Basic attack · Flail swings' : 'Basic attack · Bone Katana') : '';
     const setNote = i < 2 ? `<br><span class="tt-dim">Weapon set ${this.pl.activeWeapon === 1 ? 'II' : 'I'} — <span class="kc sm">X</span> swaps to the other set's mouse skills</span>` : '';
     return simpleTip(`${esc(def?.name || id)} ${cap}`, `${def?.desc ? esc(def.desc) + '<br>' : ''}<span class="tt-dim">${id === 'attack' ? wep : 'Level ' + lvl}${cost ? ` · ${Math.round(cost * 10) / 10} Zoom` : ''}</span>${setNote}`);
   }

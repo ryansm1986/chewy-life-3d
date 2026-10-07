@@ -7,6 +7,7 @@ import { Events } from '../core/events.js';
 import { U } from '../gfx/materials.js';
 import { rand, chance, TAU } from '../core/util.js';
 import { navFor, PathFollow } from '../core/nav.js';
+import { Whelp } from './whelp.js';
 
 const _rc = new THREE.Raycaster(), _o = new THREE.Vector3(), _d = new THREE.Vector3(), _inv = new THREE.Vector3();
 const FLAT = new Set(['flowerBed', 'bridge', 'fence']); // too low to hide a dog (or walk-on)
@@ -29,6 +30,7 @@ export class Companion extends Actor {
     // combat entity fields (registered with Combat while in the Burrow)
     this.team = 'ally'; this.height = 0.6; this.res = {}; this.status = {};
     this.lifeMax = 80; this.life = 80; this.fainted = 0; this.biteCd = 0;
+    this.whelp = new Whelp(this); // the dragon whelp outfit and flight while the dragoon is the active hero (actors/whelp.js)
   }
   recalc() {
     const G = this.G, lvl = G.state?.player?.lvl || 1;
@@ -43,7 +45,7 @@ export class Companion extends Actor {
     if (this.fainted > 0) return;
     this.life -= dmg; this.anim.hit('#ff8a8a');
     if (this.life <= 0) {
-      this.life = 0; this.fainted = 10; this.untargetable = true; this.anim.play('die');
+      this.life = 0; this.fainted = this.G.derived?.shadowRevive ?? 10; this.untargetable = true; this.anim.play('die'); // (Warm Heart wakes him sooner: skillsGolden.js)
       this.G.ui?.toast?.('Shadow fainted! He will be back in a moment.', { color: '#9fd0ff' });
       Events.emit('sfx', 'whine');
     }
@@ -56,8 +58,9 @@ export class Companion extends Actor {
       if (this.fainted <= 0) { this.untargetable = false; this.life = Math.round(this.lifeMax * 0.5); this.anim.stop('die'); this.anim.play('happy'); G.vfx.heal(this.pos); }
       return true;
     }
-    this.life = Math.min(this.lifeMax, this.life + this.lifeMax * 0.01 * dt);
+    this.life = Math.min(this.lifeMax, this.life + this.lifeMax * 0.01 * (G.derived?.shadowRegen ?? 1) * dt); // (Warm Heart: he mends faster)
     this.biteCd -= dt; this.frenzyT = Math.max(0, (this.frenzyT || 0) - dt); // (Pack Leader: a charged Pack Call's frenzy)
+    if (this.whelp.act) return true; // (a Whelp Bond move has him: combat/goldenWhelp.js)
     const p = G.player;
     const tgt = G.combat.nearest(p.pos, 'ally', 7.5, e => !e.breakable);
     if (!tgt) return false;
@@ -69,7 +72,7 @@ export class Companion extends Actor {
         this.biteCd = 0.9 / (this.frenzyT > 0 ? 1.3 : 1);
         this.anim.play('bark', { force: true });
         const pw = G.combat.buffs.shadowPower;
-        G.combat.hitMonster(tgt, { dmgPct: 55 * (1 + ((G.derived?.shadowDmg || 0) + (pw?.dmg || 0)) / 100), source: 'shadow', from: this.pos, knock: 0.2 });
+        G.combat.hitMonster(tgt, { dmgPct: 55 * (1 + ((G.derived?.shadowDmg || 0) + (pw?.dmg || 0) + (G.combat.buffs.roar?.t > 0 ? G.combat.buffs.roar.dmg : 0)) / 100), source: 'shadow', from: this.pos, knock: 0.2 }); // (roar: the Mighty Little Roar's courage)
         Events.emit('sfx', 'bark_small', { pos: this.pos });
       }
     }
@@ -79,6 +82,7 @@ export class Companion extends Actor {
   update(dt) {
     const p = this.G.player;
     if (!p) return super.update(dt);
+    this.whelp.update(dt); // (the outfit on / off with the active hero; in flight, his height, pitch and wings)
     const dx = p.pos.x - this.pos.x, dz = p.pos.z - this.pos.z, d = Math.hypot(dx, dz);
     this.stateT += dt;
     if (d > 18) { // teleport-catch-up if lost
@@ -92,7 +96,10 @@ export class Companion extends Actor {
       if (this.moveTo(this.hold.x, this.hold.z, dt, 0.8, 0.15)) { this.faceTarget = this.hold.face; if (!this.anim.action) this.anim.play('sit'); }
       super.update(dt); return;
     }
-    if (this.combatUpdate?.(dt)) { super.update(dt); return; }
+    this.combatBusy = !!this.combatUpdate?.(dt); // (the whelp flies lower to bite)
+    if (this.whelp.steer(dt)) { U.uBenders.value[1].set(this.pos.x, this.pos.y, this.pos.z, 0); super.update(dt); return; } // (a Whelp Bond move: combat/goldenWhelp.js)
+    if (this.combatBusy) { super.update(dt); return; }
+    if (this.whelp.airFollow(dt, p)) { this.barkTick(dt); U.uBenders.value[1].set(this.pos.x, this.pos.y, this.pos.z, 0); super.update(dt); return; } // (in the air: beside the hero across the view, actors/whelp.js)
     if (d > 2.6) {
       // run to a spot beside/behind Chewy (the first follow slot the camera can actually see)
       if ((this.slotT -= dt) <= 0) { this.slotT = 0.35; this.pickSlot(p); }
@@ -123,11 +130,13 @@ export class Companion extends Actor {
       }
       this.anim.mood = p.anim.speed > 0.5 ? 0.6 : 0.2;
     }
-    this.barkT -= dt;
-    if (this.barkT < 0) { this.barkT = rand(10, 25); this.bark(); }
+    this.barkTick(dt);
     U.uBenders.value[1].set(this.pos.x, this.pos.y, this.pos.z, 0.4);
     super.update(dt);
   }
+  barkTick(dt) { this.barkT -= dt; if (this.barkT < 0) { this.barkT = rand(10, 25); this.bark(); } }
+  /** Dragon Heart: a dragon-sized Shadow draws the foes near him (monster.pickTarget) */
+  tauntFor(m) { return this.G.skills?.gldBig && Math.hypot(m.pos.x - this.pos.x, m.pos.z - this.pos.z) < 5 ? 99 : 0; }
   // moveTo that detours round walls when the straight line is blocked (line of sight re-checked 4x a second; a route is
   // only searched while it is blocked, at most every 0.4 s)
   follow(x, z, dt, mul, stop) {

@@ -6,7 +6,8 @@
 //   bridgeDeckHeight(localZ)          walkable deck height of the arched bridge (local space)
 // Geometry is cached per (id, level, variant[, style hash]) where variant = seed mod VARIANTS; meshes are cheap instances.
 // Styled templates (a remodelled house) are capped (STYLED_CAP): the least recently used ones no live model uses are
-// evicted and disposed. Unstyled templates are the village's shared look and are never evicted.
+// evicted and disposed. Unstyled templates are the village's shared look and are kept, except on the Mobile preset, where
+// the unused ones beyond UNUSED_CAP_MOBILE are evicted the same way.
 import * as THREE from 'three';
 import { Builder, instantiate, MATS } from './kit.js';
 import { BUILDINGS, CATEGORIES, sizeOf } from './catalog.js';
@@ -14,10 +15,14 @@ import { MODELS } from './models.js';
 import { bridgeDeckHeight } from './decor.js';
 import { cleanStyle, styleKey } from './styles.js';
 import { clamp, lerp } from '../../core/util.js';
+import { memLite } from '../../core/deck.js';
 
 export { BUILDINGS, CATEGORIES, sizeOf, bridgeDeckHeight };
 export const VARIANTS = 8;
 export const STYLED_CAP = 24;
+/** the Mobile preset (core/deck.js memLite): unstyled templates no live model uses are capped too (least recently used
+ *  first; each is 0.2 to 1.5 MB of arrays). Every other preset keeps them all. */
+export const UNUSED_CAP_MOBILE = 16;
 
 const cache = new Map();
 let tick = 0;
@@ -52,7 +57,9 @@ export function getTemplate(id, level = 1, seed = 0, style = null) {
       + tpl.anims.reduce((a, an) => a + Object.values(an.geos).reduce((b, g) => b + g.attributes.position.count / 3, 0), 0);
     tpl.key = key; tpl.styled = !!st; tpl.users = 0;
     cache.set(key, tpl);
+    tpl.used = ++tick; // (the newest is never the one evicted)
     if (tpl.styled) evictStyled();
+    else if (memLite()) evictUnused(UNUSED_CAP_MOBILE);
   }
   tpl.used = ++tick;
   return tpl;
@@ -63,6 +70,14 @@ function evictStyled() {
   if (styled.length <= STYLED_CAP) return;
   styled.sort((a, b) => a.used - b.used);
   for (const t of styled) { if (styled.length <= STYLED_CAP) break; if (t.users > 0) continue; disposeTpl(t); cache.delete(t.key); styled.splice(styled.indexOf(t), 1); }
+}
+/** (the Mobile preset) drop the least recently used unstyled templates beyond `cap` that no live model uses; one is
+ *  rebuilt on demand (5-20 ms) if a building needs it again */
+function evictUnused(cap) {
+  const idle = [...cache.values()].filter(t => !t.styled && t.users <= 0);
+  if (idle.length <= cap) return;
+  idle.sort((a, b) => a.used - b.used);
+  for (let i = 0; i < idle.length - cap; i++) { disposeTpl(idle[i]); cache.delete(idle[i].key); }
 }
 function disposeTpl(tpl) { for (const g of Object.values(tpl.geos)) g.dispose(); for (const a of tpl.anims) for (const g of Object.values(a.geos)) g.dispose(); }
 /** template cache stats (QA): { all, styled, keys } */

@@ -25,7 +25,9 @@
 //   unarmed, weaponSlot, skillLevels{id:effLvl}, synergy{id:mult}, frenzy{perStack,maxStacks,duration}|null,
 //   auras[{id,lvl,radius,...}], setCounts{setId:n}, dmgAvg, meal{buff,tier,dish} (Well Fed, life/meals.js),
 //   dodge (% chance a monster's hit misses the hero: Poe's class + Swift as Wind; 0 for the others), treeDmgPct{tree:%},
-//   treeCostCut{tree:%} and jutsuMul (Poe: skillsPoe.js poePassives).
+//   treeCostCut{tree:%} and jutsuMul (Poe: skillsPoe.js poePassives); dmgReduce (% less damage taken: the Shih Tzu's class and
+//   Iron Topknot), hexMul, hexDur, hexStacks, pupBonus (the Shih Tzu: skillsShihtzu.js shihtzuPassives); javMul, whelpMul,
+//   brace, retrieve, burnDur, shadowRevive, shadowRegen (the Golden Retriever dragoon: skillsGolden.js goldenPassives).
 //
 // Affix value semantics (item affixes add into these; only computeStats interprets them):
 //   dmgMin/dmgMax = flat added to weapon base damage; def = flat defense (enhanced-defense affixes are pre-converted
@@ -36,16 +38,18 @@ import { SETS, EQUIP_SLOTS } from './items.js';
 import { CLASSES } from './classes.js';
 import { mokaPassives } from './skillsMoka.js';
 import { poePassives } from './skillsPoe.js';
+import { shihtzuPassives } from './skillsShihtzu.js';
+import { goldenPassives } from './skillsGolden.js';
 import { mealAcc, mealPost } from '../life/meals.js';
 import { soakAcc, soakPost } from './zoneBuffs.js';
 
 export const LEVEL_CAP = 60;
 export const RES_CAP = 75;
-export const ELEMENTS = ['phys', 'fire', 'frost', 'zap', 'stink', 'holy'];
+export const ELEMENTS = ['phys', 'fire', 'frost', 'zap', 'stink', 'holy', 'gloom']; // (gloom: the Shih Tzu's dark dog magic, docs/SHIHTZU.md)
 export const RES_KEY = { fire: 'resFire', frost: 'resFrost', zap: 'resZap', stink: 'resStink' };
 export const ELEM_DMG_KEY = { fire: 'fireDmg', frost: 'frostDmg', zap: 'zapDmg', stink: 'stinkDmg' };
-export const ELEMENT_COLORS = { phys: '#fff6e8', fire: '#ff9a3c', frost: '#8fd0ff', zap: '#ffe44a', stink: '#9ee05a', holy: '#fff0a8' };
-export const ELEMENT_NAMES = { phys: 'Physical', fire: 'Fire', frost: 'Frost', zap: 'Zap', stink: 'Stink', holy: 'Holy' };
+export const ELEMENT_COLORS = { phys: '#fff6e8', fire: '#ff9a3c', frost: '#8fd0ff', zap: '#ffe44a', stink: '#9ee05a', holy: '#fff0a8', gloom: '#5ce0c0' };
+export const ELEMENT_NAMES = { phys: 'Physical', fire: 'Fire', frost: 'Frost', zap: 'Zap', stink: 'Stink', holy: 'Holy', gloom: 'Gloom' };
 
 /** Keys required by the contract (docs/ARCHITECTURE.md). */
 export const DERIVED_KEYS = ['str', 'dex', 'vit', 'ene', 'lifeMax', 'zoomMax', 'lifeRegen', 'zoomRegen', 'dmgMin', 'dmgMax', 'dmgPct', 'aspd',
@@ -135,7 +139,7 @@ export function computeStats(state) {
   d.allSkills = acc.allSkills;
   d.cls = CL.id;
   d.treeSkills = {};
-  for (const t of ['bone', 'fetch', 'spirit', 'tide', 'star', 'duck', 'shuriken', 'jutsu', 'shadow']) d.treeSkills[t] = acc.treeSkills[t] || 0;
+  for (const t of ['bone', 'fetch', 'spirit', 'tide', 'star', 'duck', 'shuriken', 'jutsu', 'shadow', 'flail', 'hex', 'tome', 'lance', 'javelin', 'whelp']) d.treeSkills[t] = acc.treeSkills[t] || 0;
   d.skillBonus = { ...acc.skillBonus };
 
   // skill levels & synergies
@@ -152,7 +156,7 @@ export function computeStats(state) {
   const w = eq[weaponSlot];
   d.weaponSlot = weaponSlot;
   d.unarmed = !w;
-  d.weaponType = w ? w.wtype : (CL.weapons[0] === 'staff' || CL.weapons[0] === 'fuma' ? CL.weapons[0] : 'sword'); // bare paws: the class's own style
+  d.weaponType = w ? w.wtype : (CL.weapons[0] === 'staff' || CL.weapons[0] === 'fuma' || CL.weapons[0] === 'flail' || CL.weapons[0] === 'lance' ? CL.weapons[0] : 'sword'); // bare paws: the class's own style
   let masteryPct = 0, masteryCrit = 0;
   d.ballSpeed = 1;
   let extraPierce = 0;
@@ -227,6 +231,9 @@ export function computeStats(state) {
   if (CL.id === 'moka') mokaPassives(d, L, state);
   d.dodge = 0;
   if (CL.id === 'poe') poePassives(d, L, CL); // (her per-tree masteries, Energy for jutsu, Swift as Wind, dodge)
+  d.dmgReduce = 0;
+  if (CL.id === 'shihtzu') shihtzuPassives(d, L, CL); // (his masteries, Energy for the dark arts, Iron Topknot's life, the class's damage reduction)
+  if (CL.id === 'golden') goldenPassives(d, L, CL); // (his masteries, Dexterity for the javelins, Energy for the whelp, Steady Paws, Shadow's bond)
   mealPost(P.meal, d); // (Hearty's max life / regen, and d.meal for the UI)
   soakPost(P.soak, d);
   return d;
@@ -282,16 +289,16 @@ export const monsterDmgBase = L => 3 * (1 + 0.16 * (L - 1)) * Math.pow(1.03, L -
 /**
  * Monster stats for a level/rank/kind.
  * → { level, rank, kind, name, life, dmg:[a,b], def, xp, speedMul, element, ranged, res:{phys,fire,frost,zap,stink,holy},
- *     mods:[], lifeSteal:0, ...mod flags }
+ *     mods:[], lifeSteal:0, ...mod flags }  (+ gloom)
  */
 export function monsterStats(level, rank = 'normal', kind) {
   const L = Math.max(1, Math.round(level));
   const R = RANKS[rank] || RANKS.normal;
   const K = MONSTER_KINDS[kind] || { name: 'Yokai', life: 1, dmg: 1, def: 1, speed: 1, xp: 1, element: 'phys', res: {} };
   const avg = monsterDmgBase(L) * K.dmg * R.dmg;
-  const res = { phys: 0, fire: 0, frost: 0, zap: 0, stink: 0, holy: 0 };
+  const res = { phys: 0, fire: 0, frost: 0, zap: 0, stink: 0, holy: 0, gloom: 0 };
   for (const e in K.res) res[e] = K.res[e];
-  if (R.res) for (const e of ['fire', 'frost', 'zap', 'stink', 'holy']) res[e] += R.res;
+  if (R.res) for (const e of ['fire', 'frost', 'zap', 'stink', 'holy', 'gloom']) res[e] += R.res;
   return {
     level: L, rank, kind: kind || null, name: K.name,
     life: Math.round(monsterLifeBase(L) * K.life * R.life),
@@ -366,7 +373,7 @@ export function rollHit({ derived, skillDmgPct = 100, element = 'phys', target =
   const r = toRand(rng);
   const d = derived;
   const k = skillDmgPct / 100;
-  const parts = { phys: 0, fire: 0, frost: 0, zap: 0, stink: 0, holy: 0 };
+  const parts = { phys: 0, fire: 0, frost: 0, zap: 0, stink: 0, holy: 0, gloom: 0 };
   const base = (d.dmgMin + (d.dmgMax - d.dmgMin) * r()) * k;
   parts[ELEMENTS.includes(element) ? element : 'phys'] += base;
   for (const e in ELEM_DMG_KEY) {

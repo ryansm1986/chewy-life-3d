@@ -46,6 +46,43 @@ export const CLASSES = {
     dodge: 5, // % (stats.js: d.dodge; combat.js hitPlayer rolls it before block)
     starter: { skills: { fumaThrow: 1 }, hotbar: ['attack', 'fumaThrow', null, null, null, null], mouseSets: [['attack', 'fumaThrow'], ['attack', 'fumaThrow']] },
   },
+  // Floofy, the Shih Tzu dark knight (docs/SHIHTZU.md; the owner named him 2026-10-07: his name lives here and in
+  // HERO_TEXT below, nowhere else). The toy flail (Strength, +1% damage per point, like swords) and the dark arts (Gloom
+  // Hexes and the Ghostlight Tome: Energy instead, stats.js shihtzuPassives sets d.hexMul). The tank of the four: the
+  // most life, a class damage reduction (`dr`, %: combat/shihtzuSkills.js shihtzuGuard), and a little slow (`speed`, %).
+  shihtzu: {
+    id: 'shihtzu', name: 'Floofy', title: 'Gloomhowl Knight', species: 'Shih Tzu',
+    blurb: 'A toy flail, gloomy hexes and a tome full of ghost pups. Strength swings the flail, Energy deepens the gloom.',
+    color: '#8a4a8a', accent: '#5ce0c0',
+    pron: { sub: 'he', obj: 'him', pos: 'his' }, garment: 'tabard',
+    trees: ['flail', 'hex', 'tome'],
+    weapons: ['flail'],
+    base: { str: 14, dex: 8, vit: 14, ene: 10 },
+    life: (vit, lvl) => 46 + vit * 4.4 + lvl * 6.4,
+    zoom: (ene, lvl) => 22 + ene * 2.6 + lvl * 2.1,
+    dmgStat: { flail: 'str', sword: 'str', ball: 'dex', staff: 'ene', fuma: 'dex' },
+    dr: 5, // % less damage taken (stats.js: d.dmgReduce; Iron Topknot adds more)
+    speed: -6, // % move speed (heavy armour, short legs)
+    starter: { skills: { woefulWallop: 1, drippingPaw: 1 }, hotbar: ['attack', 'woefulWallop', 'drippingPaw', null, null, null], mouseSets: [['attack', 'woefulWallop'], ['attack', 'drippingPaw']] },
+  },
+  // Foosy, the Golden Retriever dragoon (docs/GOLDEN.md; his name lives here and in HERO_TEXT below, nowhere else). The
+  // toy lance (Strength, +1% damage per point, like swords: the longest melee reach of the five), toy javelins from his quiver (Dexterity instead: stats.js goldenPassives sets d.javMul) and Shadow as
+  // a little dragon whelp (the Whelp Bond: Energy instead, d.whelpMul). The pet hero: Shadow fights at his best beside
+  // him (`shadow`, % more life and damage for Shadow: derived.shadowLife / shadowDmg).
+  golden: {
+    id: 'golden', name: 'Foosy', title: 'Emberleaf Dragoon', species: 'Golden Retriever',
+    blurb: 'A long toy lance, a quiver of toy javelins and Shadow as a little dragon whelp. Strength drives the lance, Dexterity the javelins, Energy the whelp.',
+    color: '#d8903a', accent: '#3a9a6a',
+    pron: { sub: 'he', obj: 'him', pos: 'his' }, garment: 'tabard',
+    trees: ['lance', 'javelin', 'whelp'],
+    weapons: ['lance'],
+    base: { str: 13, dex: 11, vit: 13, ene: 9 },
+    life: (vit, lvl) => 44 + vit * 4.2 + lvl * 6.2,
+    zoom: (ene, lvl) => 22 + ene * 2.6 + lvl * 2.1,
+    dmgStat: { lance: 'str', sword: 'str', ball: 'dex', staff: 'ene', fuma: 'dex', flail: 'str' },
+    shadow: 20, // % more life and damage for Shadow while he's the active hero (stats.js: goldenPassives; Best Friends adds more)
+    starter: { skills: { sunbeamThrust: 1, bonkDart: 1 }, hotbar: ['attack', 'sunbeamThrust', 'bonkDart', null, null, null], mouseSets: [['attack', 'sunbeamThrust'], ['attack', 'bonkDart']] },
+  },
 };
 export const HERO_IDS = Object.keys(CLASSES);
 /** Per-hero flavour for the panels and the hero wheel: the name in kana and the character sheet's class line. */
@@ -53,10 +90,13 @@ export const HERO_TEXT = {
   chewy: { jp: 'チューイ', motto: 'Pup of the Blossom Dojo' },
   moka: { jp: 'モカ', motto: 'Tidewater Mage of the Hollow' },
   poe: { jp: 'ポー', motto: 'Shinobi of the Bamboo Grove' },
+  shihtzu: { jp: 'フルーフィ', motto: 'Warlock-Knight of the Gloomhowl' },
+  golden: { jp: 'フージー', motto: 'Dragoon of the Emberleaf Guard' },
 };
 export const classOf = state => CLASSES[state?.player?.cls || state?.activeHero || 'chewy'] || CLASSES.chewy;
-/** Which class may wield a weapon type ('sword' / 'ball' → Chewy, 'staff' → Moka, 'fuma' → Poe). */
-export const WEAPON_CLASS = { sword: 'chewy', ball: 'chewy', staff: 'moka', fuma: 'poe' };
+/** Which class may wield a weapon type ('sword' / 'ball' → Chewy, 'staff' → Moka, 'fuma' → Poe, 'flail' → the Shih Tzu,
+ *  'lance' → the Golden Retriever dragoon). */
+export const WEAPON_CLASS = { sword: 'chewy', ball: 'chewy', staff: 'moka', fuma: 'poe', flail: 'shihtzu', lance: 'golden' };
 export const canWield = (cls, wtype) => !wtype || WEAPON_CLASS[wtype] === cls;
 /** Villager / story lines are written to Chewy: address whoever is being played instead. */
 export function heroText(s, state) {

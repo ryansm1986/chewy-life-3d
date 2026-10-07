@@ -10,6 +10,10 @@ import { Animator } from './animator.js';
 import { SAMURAI_ROOTED } from './samuraiPoses.js';
 import { POE_ROOTED } from './poePoses.js';
 import { installPoeGear, dressPoe } from './poeGear.js';
+import { installShihtzuGear, dressShihtzu } from './shihtzuGear.js';
+import { SHIHTZU_ROOTED } from './shihtzuPoses.js';
+import { installGoldenGear, dressGolden } from './goldenGear.js';
+import { GOLDEN_ROOTED } from './goldenPoses.js';
 import { reach } from './armIK.js';
 import { Sprint } from './sprint.js';
 import { Actions } from '../core/actions.js';
@@ -22,7 +26,7 @@ import { CLASSES } from '../rpg/classes.js';
 const STAFF_UP = STAFF_GRIP.rotation[0];
 const STAFF_CASTS = new Set(['staffBolt', 'staffCast', 'skyCast', 'wetShake', 'summon', 'yank', 'puddleHop', 'surf', 'beam', 'duckCall', 'cast', 'swing', 'swing2', 'throw']);
 // actions that root the player (WASD won't walk out of them); Moka's staff casts included (animator.js ACTIONS)
-const BUSY = new Set(['swing', 'swing2', 'throw', 'cast', 'bark', 'slam', 'pickup', 'drink', 'staffBolt', 'staffCast', 'skyCast', 'wetShake', 'summon', 'yank', 'puddleHop', 'surf', 'beam', 'duckCall', ...SAMURAI_ROOTED, ...POE_ROOTED]);
+const BUSY = new Set(['swing', 'swing2', 'throw', 'cast', 'bark', 'slam', 'pickup', 'drink', 'staffBolt', 'staffCast', 'skyCast', 'wetShake', 'summon', 'yank', 'puddleHop', 'surf', 'beam', 'duckCall', ...SAMURAI_ROOTED, ...POE_ROOTED, ...SHIHTZU_ROOTED, ...GOLDEN_ROOTED]);
 // the Bone Katana's geometry per item tint (charKit.js katanaGeo): shared by every rig the player ever gets
 const KATANAS = new Map();
 const katanaFor = (colors, hilt = false) => { const k = `${(colors || []).join(',')}|${hilt ? 'h' : 'b'}`; let g = KATANAS.get(k); if (!g) KATANAS.set(k, g = katanaGeo({ colors, hilt })); return g; };
@@ -61,6 +65,8 @@ export class Player extends Actor {
     const baked = (style ?? (heroModelReady(hero) ? 'disney' : 'classic')) === 'disney' && heroModelReady(hero);
     const rig = baked ? buildHeroModel(hero) : buildHumanoid(CAST[hero] || CAST.chewy);
     if (hero === 'poe') dressPoe(rig); // (her fūma rides on her back: poeGear.js — the villager Poe too)
+    if (hero === 'shihtzu') dressShihtzu(rig); // (his toy flail on his back: shihtzuGear.js — the villager too)
+    if (hero === 'golden') dressGolden(rig); // (his toy lance on his back: goldenGear.js — the villager too)
     return rig;
   }
   /** Become another hero (heroes.js): new rig, animator, weapons, name — same position, facing and nav state. */
@@ -72,7 +78,7 @@ export class Player extends Actor {
   }
   replaceRig(rig) {
     const old = this.rig;
-    this.dropStaff(); this.dropFuma();
+    this.dropStaff(); this.dropFuma(); this.dropFlail(); this.dropLance();
     this.world.scene.remove(old.root); old.dispose?.();
     this.rig = rig; this.anim = new Animator(rig);
     enableXray(rig, '#ffc890', 0.6);
@@ -138,6 +144,10 @@ export class Player extends Actor {
     this.weaponType = type;
     if (type === 'fuma') { this.holdFuma(look.colors ? look : this.equippedLook()); return; } // Poe: her fūma on her back / in her paw (poeGear.js)
     this.dropFuma();
+    if (type === 'flail') { this.holdFlail(); return; } // the Shih Tzu: his toy flail on his back / in his paw (shihtzuGear.js)
+    this.dropFlail();
+    if (type === 'lance') { this.holdLance(); return; } // the dragoon: his toy lance on his back / in his paws (goldenGear.js)
+    this.dropLance();
     if (type === 'staff') { // Moka: the staff in hand; the (Chewy-only) sword and ball stay parked and hidden
       this.showStaff(look.colors ? look : this.equippedLook());
       this.sword.scale.setScalar(0.0001); this.sword.castShadow = false;
@@ -237,6 +247,8 @@ export class Player extends Actor {
     this.carrySword(dt);
     this.carryStaff(dt);
     this.carryFuma(dt);
+    this.carryFlail(dt);
+    this.carryLance(dt);
     if (this.staff) tickStaff(this.staff, dt);
   }
   /** the right forearm's bend off its rest (the sprint pumps the elbows: animator.js), for the carry angles below */
@@ -340,3 +352,5 @@ export class Player extends Actor {
   busyAction() { const a = this.anim.action; return a && BUSY.has(a.name) && !this.canMoveWhileActing; }
 }
 installPoeGear(Player.prototype); // holdFuma / dropFuma / carryFuma / setFumaOut (poeGear.js)
+installShihtzuGear(Player.prototype); // holdFlail / dropFlail / carryFlail / setFlailDrawn (shihtzuGear.js)
+installGoldenGear(Player.prototype); // holdLance / dropLance / carryLance (goldenGear.js)

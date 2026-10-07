@@ -1,0 +1,162 @@
+{
+  "units": "metres; blender = Z-up, front -Y; game = Y-up, front +Z: game (x, y, z) = blender (x, z, -y)",
+  "prop": "/models/shihtzu-flail.glb",
+  "prop_pivot": {
+    "object": "flail_handle",
+    "blender": [
+      0,
+      0,
+      0
+    ],
+    "note": "the grip centre on the bone shaft"
+  },
+  "prop_axis": {
+    "blender": [
+      0,
+      0,
+      1
+    ],
+    "game": [
+      0,
+      1,
+      0
+    ],
+    "note": "handle -> rope -> ball, straightened"
+  },
+  "grip_hand": "R",
+  "hero_palm_R": {
+    "blender": [
+      -0.424,
+      -0.0469,
+      0.3959
+    ],
+    "game": [
+      -0.424,
+      0.3959,
+      0.0469
+    ]
+  },
+  "hero_hand_R_wrist": {
+    "blender": [
+      -0.3838,
+      -0.0429,
+      0.4502
+    ],
+    "game": [
+      -0.3838,
+      0.4502,
+      0.0429
+    ]
+  },
+  "hero_grip_axis_R": {
+    "blender": [
+      0.0424,
+      -0.9982,
+      0.0424
+    ],
+    "game": [
+      0.0424,
+      0.0424,
+      0.9982
+    ],
+    "note": "the direction the handle passes through the closed right mitten (across the fingers, forward); put prop +Z along it"
+  },
+  "arm_dir_R": {
+    "blender": [
+      -0.7058,
+      -0.0599,
+      -0.7058
+    ],
+    "game": [
+      -0.7058,
+      -0.7058,
+      0.0599
+    ]
+  },
+  "chain": [
+    {
+      "object": "flail_handle",
+      "pivot_blender": [
+        0,
+        0,
+        0.0
+      ],
+      "parent": null
+    },
+    {
+      "object": "flail_link_0",
+      "pivot_blender": [
+        0,
+        0,
+        0.12
+      ],
+      "parent": "flail_handle"
+    },
+    {
+      "object": "flail_link_1",
+      "pivot_blender": [
+        0,
+        0,
+        0.215
+      ],
+      "parent": "flail_link_0"
+    },
+    {
+      "object": "flail_link_2",
+      "pivot_blender": [
+        0,
+        0,
+        0.31
+      ],
+      "parent": "flail_link_1"
+    },
+    {
+      "object": "flail_link_3",
+      "pivot_blender": [
+        0,
+        0,
+        0.405
+      ],
+      "parent": "flail_link_2"
+    },
+    {
+      "object": "flail_link_4",
+      "pivot_blender": [
+        0,
+        0,
+        0.5
+      ],
+      "parent": "flail_link_3"
+    },
+    {
+      "object": "flail_link_5",
+      "pivot_blender": [
+        0,
+        0,
+        0.595
+      ],
+      "parent": "flail_link_4"
+    },
+    {
+      "object": "flail_head",
+      "pivot_blender": [
+        0,
+        0,
+        0.69
+      ],
+      "parent": "flail_link_5"
+    }
+  ],
+  "head_centre_blender": [
+    0.0,
+    0.0,
+    0.79
+  ],
+  "ball_diameter_m": 0.22,
+  "ball_with_nubs_m": 0.284,
+  "rope_length_m": 0.57,
+  "handle_length_m": 0.272,
+  "straightened_reach_m": 1.036,
+  "glow_material": "Shihtzu_flail_glow",
+  "triangles": 5488
+}

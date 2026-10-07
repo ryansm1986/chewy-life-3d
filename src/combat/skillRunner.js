@@ -11,6 +11,8 @@ import { chargeRuntime, perkAt } from '../rpg/charge.js';
 import { ChargeController } from './charge.js';
 import { installChargedSkills } from './chargedSkills.js';
 import { installPoeSkills } from './poeSkills.js';
+import { installShihtzuSkills } from './shihtzuSkills.js';
+import { installGoldenSkills } from './goldenSkills.js';
 import { bladeFx } from '../gfx/bladeFx.js';
 import { spectralBladeGeo, stormBladeMaterial } from '../gfx/samuraiProps.js';
 import { SAMURAI_CUTS } from '../actors/samuraiPoses.js';
@@ -54,7 +56,7 @@ export class SkillRunner {
       const E = G.state.equipment, alt = G.state.player.activeWeapon === 1 ? E.weapon : E.weaponAlt; // the weapon NOT in hand
       if (alt && alt.wtype === def.wep) { G.actions.swapWeapons(); this.syncWeapon(); Events.emit('sfx', 'ui_equip'); }
       else {
-        if (!this._noWepT || G.engine.time - this._noWepT > 1.5) { this._noWepT = G.engine.time; G.ui?.float?.(P.pos.clone().setY(1.6), def.wep === 'ball' ? 'No ball equipped!' : def.wep === 'staff' ? 'No staff equipped!' : 'No bone katana equipped!', { kind: 'status', color: '#9fd0ff' }); Events.emit('sfx', 'ui_error'); }
+        if (!this._noWepT || G.engine.time - this._noWepT > 1.5) { this._noWepT = G.engine.time; G.ui?.float?.(P.pos.clone().setY(1.6), def.wep === 'ball' ? 'No ball equipped!' : def.wep === 'staff' ? 'No staff equipped!' : def.wep === 'lance' ? 'No lance equipped!' : 'No bone katana equipped!', { kind: 'status', color: '#9fd0ff' }); Events.emit('sfx', 'ui_error'); }
         return false;
       }
     }
@@ -207,6 +209,8 @@ export class SkillRunner {
     const G = this.G, P = G.player, p = R.params;
     if (p.bolt) return this.cast_staffBolt(R, aim, target); // Moka's staff: a free sparkle bolt
     if (p.fuma) return this.cast_fumaSlash(R, aim, target); // Poe's fūma: the one-paw slash combo (poeSkills.js)
+    if (p.flail) return this.cast_flailSwing(R, aim, target); // the Shih Tzu's flail: the three-swing combo (shihtzuSkills.js)
+    if (p.lance) return this.cast_lancePoke(R, aim, target); // the dragoon's lance: two thrusts and a swat (goldenSkills.js)
     if (p.projectile) {
       P.anim.play('throw', { speed: this.animSpeed(0.5), onEvent: ev => { if (ev === 'release') this.throwBall({ dmgPct: p.dmgPct, speed: p.speed, range: p.range, pierce: p.pierce, returns: true }, aim); } });
       return;
@@ -566,7 +570,7 @@ export class SkillRunner {
     this.updateMelee(dt);
     // channels (Whirlwind Stance; Moka's Moonbeam) — each needs its weapon
     if (this.channel) { const cw = getSkill(this.channel.id)?.wep; if (cw && G.derived.weaponType !== cw) this.endChannel(); }
-    if (this.channel && this.channel.id !== 'whirl') this.updateMoonbeam(dt, input);
+    if (this.channel && this.channel.id !== 'whirl') { if (this.channel.update) this.channel.update(dt, input); else this.updateMoonbeam(dt, input); } // (a channel may bring its own update: the Shih Tzu's Maelstrom)
     else if (this.channel) {
       const c = this.channel, p = c.R.params, ch = c.R.charge;
       c.t += dt; c.acc += dt;
@@ -592,10 +596,10 @@ export class SkillRunner {
       }
     }
     // Helmet Splitter's leap arc
-    if (P.leap && P.anim.action?.name !== 'slam') P.leap = null;
-    if (P.leap) { P.leap.t += dt; const k = clamp(P.leap.t / P.leap.dur); P.pos.lerpVectors(P.leap.start, P.leap.end, k); G.world.collision?.resolve(P.pos, P.radius, P.leap.start); }
+    if (P.leap && !P.leap.own && P.anim.action?.name !== 'slam') P.leap = null; // (own: a hero's own leap, e.g. the dragoon's Jump: goldenArts.js moves him)
+    if (P.leap && !P.leap.own) { P.leap.t += dt; const k = clamp(P.leap.t / P.leap.dur); P.pos.lerpVectors(P.leap.start, P.leap.end, k); G.world.collision?.resolve(P.pos, P.radius, P.leap.start); }
     // Flash Draw's dash (a bone-white blur behind him; d.onEnd: the flourish and the cut line)
-    if (P.dash) {
+    if (P.dash && !P.dash.own) { // (own: the dragoon's Gallant Charge runs its own: goldenArts.js)
       const d = P.dash, step = Math.min(d.left, d.speed * dt);
       const before = P.pos.clone();
       this.slideHero(d.dir, step); d.left -= step;
@@ -634,6 +638,8 @@ export class SkillRunner {
     for (const x of this.decoys || []) x.update(dt);
     this.updateMoka(dt);
     this.updatePoe(dt);
+    this.updateShihtzu(dt);
+    this.updateGolden(dt);
     this.keepOutOfBigBodies();
   }
   /** a charged Whirlwind Stance winds down: one last full turn of the blade, a ring of petals, the dizzy burst */
@@ -664,8 +670,12 @@ export class SkillRunner {
     for (const x of this.decoys || []) x.expire(true); this.decoys = [];
     this.clearMoka();
     this.clearPoe();
+    this.clearShihtzu();
+    this.clearGolden();
   }
 }
 installMokaSpells(SkillRunner.prototype);
 installChargedSkills(SkillRunner.prototype);
 installPoeSkills(SkillRunner.prototype);
+installShihtzuSkills(SkillRunner.prototype);
+installGoldenSkills(SkillRunner.prototype);
