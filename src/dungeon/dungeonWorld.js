@@ -268,6 +268,7 @@ class FloorGlows {
   }
 }
 // god-ray planes (slanted, double sided) in one draw call; analytic side/top falloff, per-plane shimmer phase
+const SHAFT_ON_HERO = 0.15; // how much of a shaft's haze lands on a hero standing in it (Shafts.build)
 class Shafts {
   constructor() { this.list = []; }
   add(x, z, w, h, rx, ry, rz, base, ph) { this.list.push([x, z, w, h, rx, ry, rz, base, ph]); }
@@ -285,21 +286,32 @@ class Shafts {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aInfo', new THREE.BufferAttribute(info, 4));
     g.setIndex(new THREE.BufferAttribute(idx, 1));
-    const mat = keepAlphaAdd(new THREE.ShaderMaterial({
-      uniforms: { uTime: U.uTime, uCol: { value: color } },
-      vertexShader: /* glsl */`
-        attribute vec4 aInfo; uniform float uTime; varying vec2 vUv; varying float vA;
-        void main() { vUv = aInfo.xy; vA = aInfo.z * (0.75 + 0.25 * sin(uTime * 0.7 + aInfo.w)); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: /* glsl */`
-        uniform vec3 uCol; varying vec2 vUv; varying float vA;
-        void main() {
-          float side = pow(sin(clamp(vUv.x, 0.0, 1.0) * 3.14159), 2.2);
-          float fade = pow(1.0 - vUv.y, 1.3) * smoothstep(0.0, 0.16, vUv.y);
-          gl_FragColor = vec4(uCol * side * fade * vA, 0.0);
-        }`,
-      side: THREE.DoubleSide,
-    }));
-    const m = new THREE.Mesh(g, mat); m.frustumCulled = false; m.renderOrder = 11; scene.add(m);
+    // Drawn twice by the stencil (ROADMAP R-9): in full everywhere but the heroes and Shadow (charKit enableXray stamps
+    // stencil 1 where they're visible), and at SHAFT_ON_HERO over them. A shaft in front of a hero added its haze straight
+    // onto the fur and armour (heroes read 20-55 % brighter inside one); the air and the floor keep the full shaft. (The
+    // same program for both: stencil state isn't part of the program key. ?raw has no stencil buffer: both draw there.)
+    const mk = (k, func) => {
+      const mm = keepAlphaAdd(new THREE.ShaderMaterial({
+        uniforms: { uTime: U.uTime, uCol: { value: color }, uK: { value: k } },
+        vertexShader: /* glsl */`
+          attribute vec4 aInfo; uniform float uTime; varying vec2 vUv; varying float vA;
+          void main() { vUv = aInfo.xy; vA = aInfo.z * (0.75 + 0.25 * sin(uTime * 0.7 + aInfo.w)); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+        fragmentShader: /* glsl */`
+          uniform vec3 uCol; uniform float uK; varying vec2 vUv; varying float vA;
+          void main() {
+            float side = pow(sin(clamp(vUv.x, 0.0, 1.0) * 3.14159), 2.2);
+            float fade = pow(1.0 - vUv.y, 1.3) * smoothstep(0.0, 0.16, vUv.y);
+            gl_FragColor = vec4(uCol * side * fade * vA * uK, 0.0);
+          }`,
+        side: THREE.DoubleSide,
+      }));
+      mm.stencilWrite = true; mm.stencilWriteMask = 0; mm.stencilRef = 1; mm.stencilFunc = func; // (test only: writes nothing)
+      mm.stencilFail = mm.stencilZFail = mm.stencilZPass = THREE.KeepStencilOp;
+      return mm;
+    };
+    const m = new THREE.Mesh(g, mk(1, THREE.NotEqualStencilFunc)); m.frustumCulled = false; m.renderOrder = 11; scene.add(m);
+    const mh = new THREE.Mesh(g, mk(SHAFT_ON_HERO, THREE.EqualStencilFunc)); mh.frustumCulled = false; mh.renderOrder = 11; scene.add(mh);
+    m.userData.onHero = mh;
     return m;
   }
 }

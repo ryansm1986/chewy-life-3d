@@ -65,8 +65,10 @@ export class TouchControls {
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.releaseAll(); });
     addEventListener('resize', () => { this.layoutT = 0; });
     // no page zoom: Safari's gesture events and any two-finger touchmove
-    document.addEventListener('gesturestart', e => e.preventDefault());
-    document.addEventListener('touchmove', e => { if (e.cancelable && e.touches && e.touches.length > 1) e.preventDefault(); }, { passive: false });
+    // (index.html does the same from the first frame; html.pinch-ok lets a pinch through for the "zoomed in?" card: ui/mobile.js)
+    const pinchOk = () => document.documentElement.classList.contains('pinch-ok');
+    document.addEventListener('gesturestart', e => { if (!pinchOk()) e.preventDefault(); });
+    document.addEventListener('touchmove', e => { if (e.cancelable && e.touches && e.touches.length > 1 && !pinchOk()) e.preventDefault(); }, { passive: false });
     Events.on('input:device', p => this.onDevice(p?.device));
     Events.on('hero:wheel', () => this.fitWheel());
     ui.onSetting(k => { if (k === 'haptics' || /^touch/.test(k)) this.applySettings(); });
@@ -316,7 +318,8 @@ export class TouchControls {
       return;
     }
     const side = this.mirror ? x > innerWidth * 0.5 : x < innerWidth * 0.5;
-    if (side && !this.stickP) { p.kind = 'stick'; this.stickStart(p); }
+    // (not from the top edge in full screen: a drag down from there is the browser's swipe out of full screen, CT-6)
+    if (side && !this.stickP && y >= (this.ui.mobile?.edgeTop || 0)) { p.kind = 'stick'; this.stickStart(p); }
   }
   onMove(e) {
     const p = this.ptrs.get(e.pointerId); if (!p) return;

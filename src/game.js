@@ -31,6 +31,7 @@ import { REGIONS, REGION_IDS, regionState, regionUnlocked } from './regions/inde
 import { normRun, dungeonDef } from './dungeon/defs.js';
 import { normalizeZones, recordDungeonClear, TIER_DUNGEONS } from './rpg/zones.js';
 import { installTierDebug } from './dungeon/tierRun.js';
+import { installLanternApi, installBurrowLantern } from './regions/spiritLantern.js';
 import { villageReady, VILLAGES } from './regions/village/data.js';
 import { zoneNpcRig } from './actors/zoneVillagers.js';
 import { soakChip } from './rpg/zoneBuffs.js';
@@ -448,6 +449,7 @@ export async function boot() {
   G.story = new Story(G);
   installGateDebug(G, P); // (?villagesaved=1 | =bamboo,…; G.zoneDebug.saveVillage(zone): the zone dungeon gates, regions/dungeonGate.js)
   installTierDebug(G, P, { recordDungeonClear, TIER_DUNGEONS }); // (?run=bambooDepths:5:swarming,teeming; G.tierDebug: the tier runs, dungeon/tierRun.js)
+  installLanternApi(G); installBurrowLantern(G, village, { x: L.dungeon.x + 3.1, z: L.dungeon.z + 2.2, yaw: 0 }); // (the Spirit Lanterns: regions/spiritLantern.js, the panel ui/lantern.js)
   G.ui?.setQuestProvider?.(() => G.story.uiList());
   G.questTarget = () => (G.titleActive || G.playerDead ? null : G.tutorials?.target() || (G.mode === 'interior' ? null : G.story.target())); // (a guide's pointer first; indoors only a guide points)
   installServices(G);
@@ -890,6 +892,7 @@ export async function boot() {
       ambient.update(dt, engine.time);
       if (Math.hypot(player.pos.x - L.waterfall.x, player.pos.z - L.waterfall.z) < 70) waterfall.update(dt, engine.time, day); // (mist + spray only nearby)
       villageAmbience(dt);
+      G.burrowLantern?.update(dt, engine.time, vVfx, player.pos); // (the Deep Burrow's Spirit Lantern by the Burrow door)
       vLoot.update(dt);
       updateMarkers(rdt);
     } else if (G.mode === 'interior') {

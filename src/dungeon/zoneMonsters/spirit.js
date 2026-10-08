@@ -36,8 +36,8 @@ function yureiSpec(v) {
   // the face: big round eyes (sleepy lids on the Sleepy one), a little "oh" mouth, blush
   if (v.sleepy) for (const k of [-1, 1]) B.push(tubeC([[k * 0.035, 0.6, 0.285, 0.011], [k * 0.085, 0.585, 0.29, 0.012], [k * 0.135, 0.6, 0.272, 0.011]], INK, 4));
   else for (const k of [-1, 1]) {
-    B.push(ell(0.046, 0.058, 0.026, INK, [k * 0.088, 0.6, 0.268], [0, k * 0.3, 0], 12));
-    B.push(ell(0.018, 0.02, 0.012, '#ffffff', [k * 0.088 - 0.014, 0.62, 0.29], [0, 0, 0], 8), ell(0.008, 0.008, 0.008, '#ffffff', [k * 0.088 + 0.014, 0.583, 0.29], [0, 0, 0], 6));
+    B.push(ell(0.054, 0.066, 0.028, INK, [k * 0.092, 0.6, 0.266], [0, k * 0.3, 0], 12));
+    B.push(ell(0.021, 0.023, 0.013, '#ffffff', [k * 0.092 - 0.016, 0.624, 0.29], [0, 0, 0], 8), ell(0.009, 0.009, 0.009, '#ffffff', [k * 0.092 + 0.016, 0.58, 0.29], [0, 0, 0], 6));
   }
   B.push(ell(0.03, 0.034, 0.016, INK, [0, 0.5, 0.288], [-0.25, 0, 0], 10), ell(0.018, 0.014, 0.01, '#ff8aa0', [0, 0.49, 0.295], [-0.25, 0, 0], 8));
   B.push(...cheeks(0.535, 0.265, 0.155, 0.9, '#ffb0c4'));
@@ -46,7 +46,7 @@ function yureiSpec(v) {
   if (!v.sleepy) {
     // (it sits on the dome's upper front, tilted back to lie on it: the game camera looks down on it)
     const tri = (w, h, d, c, z) => { const s = new THREE.Shape(); s.moveTo(-w / 2, 0); s.lineTo(w / 2, 0); s.lineTo(0, h); s.closePath(); const g = new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: false, curveSegments: 1 }); g.translate(0, -h * 0.4, z); g.rotateX(-0.62); g.translate(0, 0.735, 0.245); g.deleteAttribute('uv'); return paint(g, (p, n, o) => o.set(c)); };
-    B.push(tri(0.158, 0.138, 0.01, '#8e94b8', -0.004), tri(0.136, 0.118, 0.014, '#fffcf2', 0.006));
+    B.push(tri(0.18, 0.158, 0.01, '#5e6490', -0.004), tri(0.152, 0.132, 0.014, '#fffcf0', 0.006));
     // its tie: a thin paper cord round the head from the triangle's corners
     const band = []; for (let i = 0; i <= 16; i++) { const a = -2.35 + i / 16 * 4.7, yy = 0.712 + Math.cos(a) * 0.012; band.push([Math.sin(a + Math.PI) * 0.262, yy, Math.cos(a + Math.PI) * 0.256 - 0.004, 0.011]); }
     B.push(tubeC(band, '#c4c8e0', 5));
@@ -63,7 +63,7 @@ function yureiSpec(v) {
   // is a trail of glow motes the def's update() leaves behind it round the orbit
   const flame = [ell(0.06, 0.066, 0.06, '#9ff4ff', [0, 0, 0], [0, 0, 0], 12), ell(0.035, 0.038, 0.035, '#d8ffff', [0, 0.008, 0.012], [0, 0, 0], 10)];
   const glow = 'outgoingLight += diffuseColor.rgb * 1.15 * step(0.85, diffuseColor.g) * step(0.85, diffuseColor.b) * step(diffuseColor.r, 0.9);';
-  return { mat: { fragOut: glow, rim: 0.9 }, outline: 0.02, parts: [
+  return { mat: { fragOut: glow, rim: 0.3, brush: 0.05, term: [-0.12, 0.42], shadowSat: 0.45 }, outline: 0.02, parts: [ // (a soft, matte cloth: no plastic sheen)
     { name: 'body', geo: B },
     { name: 'armL', geo: arm(1), at: [0.22, 0.47, 0.06] }, { name: 'armR', geo: arm(-1), at: [-0.22, 0.47, 0.06] },
     { name: 'flame', geo: flame, outline: 0, shadow: false, parent: 'pivot' },
@@ -132,8 +132,8 @@ export const MONSTERS = {
     attack: { type: 'melee', range: 1.4, cd: 1.8, windup: YR.WIND },
     stats: { name: 'Yūrei', life: 0.5, dmg: 0.85, def: 0.45, speed: 1.0, xp: 0.5, element: 'frost', res: { frost: 40, gloom: 40, holy: -40, phys: 15 } },
     variants: [
-      { key: 0, sheet: '#fbfaff', shade: '#c9d4f2', hem: '#9fb0e0' },
-      { key: 1, name: 'Sleepy Yūrei', sheet: '#f8f8ff', shade: '#c4cdf0', hem: '#98a8dc', sleepy: true, cap: '#6a8ee0' },
+      { key: 0, sheet: '#e4e2ef', shade: '#b0b8de', hem: '#8e9cd2' },
+      { key: 1, name: 'Sleepy Yūrei', sheet: '#e2e2f0', shade: '#acb6de', hem: '#8a9ad0', sleepy: true, cap: '#6a8ee0' },
     ],
     ai: yureiAI,
     update: (m, dt) => {

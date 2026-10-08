@@ -17,7 +17,13 @@
 //  h) fishing: the attack button casts, a touch strikes, the held screen reels
 //  i) portrait: the rotate overlay, the game paused   j) the Mobile preset picked itself
 //  e) back to the mouse: the slots go home to the hotbar and the touch layer hides; a touch brings them back
-import { launchTouch, boot, waitMode, sleep, makeReport, center } from './touch-lib.mjs';
+//  k) an iPad (CT-6; 1180×820 at DPR 2, iPad Safari's agent): the page's gesture guards (Safari's gesture events, a
+//     two-finger touchmove, a double-click are cancelled; touch-action, no selection, no pull-to-refresh); zoomed in
+//     (CDP page scale 2): the viewport reset is tried, then the "zoomed in?" card pauses and lets a pinch through, and goes
+//     at scale 1; full screen on the first tap, nothing to touch in the top 24 px and no stick from there; full screen
+//     closed: the card pauses, a tap goes back, "Stay in a window" is remembered, a third close in a minute stops asking;
+//     the itch.io buttons setting (Top) moves the HUD down; a save on pagehide; portrait shows the rotate card
+import { launchTouch, boot, waitMode, sleep, makeReport, center, IPAD } from './touch-lib.mjs';
 
 const R = makeReport('S27 touch: the touch device, stick, taps, pinch, attack, skills, charge, drag-aim, roll, belt, heroes, menus');
 const { browser, page, errors, warns, F } = await launchTouch();
@@ -46,7 +52,92 @@ const tapEl = async sel => { const c = await C(sel); if (!c) return false; await
 const innerW = k => Math.round(844 * k), innerH = k => Math.round(390 * k);
 const nudge = async () => { await F.drag(150, 300, 150, 324, { steps: 3 }); await sleep(page, 150); }; // (a touch that is a short stick push, not a tap on the world: touch plays again)
 
+let ipadClose = null;
+async function ipadChecks() {
+  const T = await launchTouch(IPAD), p = T.page, F2 = T.F, cdp = T.cdp;
+  ipadClose = () => T.browser.close();
+  const e2 = (f, a) => p.evaluate(f, a);
+  const w2 = (f, a, timeout = 8000) => p.waitForFunction(f, a, { timeout, polling: 'raf' }).then(() => true, () => false);
+  const shots = 'tools/qa/tmp/ct6';
+  (await import('node:fs')).mkdirSync(shots, { recursive: true });
+  await boot(p, 'fresh&nointro&notut&fs'); // (?fs: full screen on the first tap under automation too)
+  await e2(() => { window.G.state.flags.hints = { all: true }; window.G.ui.toasts?.retire?.(0); });
+  await w2(() => document.querySelector('.tc.on'));
+  // the page's gesture guards
+  const g = await e2(() => {
+    const cv = document.querySelector('#game'), ge = new Event('gesturestart', { cancelable: true }); document.dispatchEvent(ge);
+    let two = null; try { const t = (id, x) => new Touch({ identifier: id, target: cv, clientX: x, clientY: 300 }); const e = new TouchEvent('touchmove', { cancelable: true, bubbles: true, touches: [t(1, 300), t(2, 600)] }); cv.dispatchEvent(e); two = e.defaultPrevented; } catch (x) { two = 'n/a ' + x.message; }
+    const dc = new MouseEvent('dblclick', { cancelable: true, bubbles: true }); document.querySelector('.mm-wrap').dispatchEvent(dc);
+    const h = getComputedStyle(document.documentElement), b = getComputedStyle(document.body);
+    return { gesture: ge.defaultPrevented, two, dbl: dc.defaultPrevented, ta: [h.touchAction, b.touchAction, getComputedStyle(cv).touchAction, getComputedStyle(document.querySelector('.ui-root')).touchAction], sel: b.userSelect, overscroll: h.overscrollBehaviorY, pinchOk: document.documentElement.classList.contains('pinch-ok') };
+  });
+  R.check("iPad: the page cancels Safari's gesture events, a two-finger touchmove and a double-tap; no pinch or double-tap zoom (touch-action), no selection, no pull-to-refresh", g.gesture && g.two === true && g.dbl && g.ta[0] === 'pan-x pan-y' && g.ta[1] === 'pan-x pan-y' && g.ta[2] === 'none' && g.sel === 'none' && g.overscroll === 'none' && !g.pinchOk, JSON.stringify(g));
+  // zoomed in: the viewport reset, then the card (paused, the pinch let through), gone at scale 1. Chrome keeps the page at
+  // scale 1 (it honours maximum-scale=1, so CDP's page scale is clamped), so visualViewport is a mock of Safari zoomed 2x
+  const zoom = k => e2(k => {
+    const real = window.__realVV || (window.__realVV = { d: Object.getOwnPropertyDescriptor(window, 'visualViewport') || Object.getOwnPropertyDescriptor(Window.prototype, 'visualViewport'), on: window.visualViewport });
+    if (k === 1) { if (real.d) Object.defineProperty(window, 'visualViewport', { ...real.d, configurable: true }); real.on.dispatchEvent(new Event('resize')); return visualViewport.scale; }
+    const m = new EventTarget(); Object.assign(m, { scale: k, width: innerWidth / k, height: innerHeight / k, offsetLeft: innerWidth * 0.2, offsetTop: innerHeight * 0.25, pageLeft: innerWidth * 0.2, pageTop: innerHeight * 0.25 });
+    Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => m }); return m.scale;
+  }, k);
+  await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 2 }).catch(() => {});
+  await zoom(2);
+  const zOn = await w2(() => window.G.ui.mobile.hold === 'zoom', null, 6000);
+  const z1 = await e2(() => { const M = window.G.ui.mobile, c = document.querySelector('.mh-zoom').getBoundingClientRect(), vv = visualViewport; return { scale: vv.scale, resets: M.zoomResets || 0, paused: window.G.ui.isPaused(), pinchOk: document.documentElement.classList.contains('pinch-ok'), card: c.width > 0, inView: c.left >= vv.offsetLeft - 1 && c.right <= vv.offsetLeft + vv.width + 1 && c.top >= vv.offsetTop - 1 && c.bottom <= vv.offsetTop + vv.height + 1 }; });
+  await p.screenshot({ path: shots + '/zoom-card.png' });
+  await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 }).catch(() => {});
+  await zoom(1);
+  const zOff = await w2(() => !window.G.ui.mobile.hold && !document.documentElement.classList.contains('pinch-ok') && !window.G.ui.isPaused(), null, 6000);
+  R.check('iPad zoomed in (page scale 2): the viewport reset is tried, then the "zoomed in?" card fits the zoomed view, pauses and lets a pinch through; back at scale 1 it goes and play resumes', zOn && z1.scale > 1.5 && z1.resets >= 1 && z1.paused && z1.pinchOk && z1.card && z1.inView && zOff, JSON.stringify({ zOn, z1, zOff }));
+  // full screen on the first tap; the top 24 px
+  await F2.tap(900, 420); await sleep(p, 200);
+  const fsIn = await w2(() => !!document.fullscreenElement && window.G.ui.mobile.fsNow && window.G.ui.mobile.edgeTop === 24, null, 6000);
+  await w2(() => window.G.ui.touch.layoutT > 3.5, null, 3000);
+  const top = await e2(() => { const els = [...document.querySelectorAll('.mm-wrap, .tc .tc-b, .hud-tl .qt, .hud-tl [class*="tog"], .run-chip')].filter(e => { const r = e.getBoundingClientRect(), cs = getComputedStyle(e); return r.width > 0 && !e.closest('[hidden]') && cs.visibility !== 'hidden' && cs.display !== 'none'; }); return { n: els.length, minTop: Math.round(Math.min(...els.map(e => e.getBoundingClientRect().top))), saT: window.G.ui.mobile.sf.t }; });
+  await F2.down(5, 160, 8); await F2.frame(); await F2.move(5, 160, 160, 6);
+  const noStick = await e2(() => !window.G.ui.touch.stickP && !window.G.ui.touch.T.stick.on);
+  await F2.up(5); await sleep(p, 150);
+  R.check('iPad: the first tap goes full screen; in full screen nothing to touch sits in the top 24 px and a drag down from the top edge starts no stick', fsIn && top.n >= 8 && top.minTop >= 24 && top.saT >= 24 && noStick, JSON.stringify({ fsIn, top, noStick }));
+  // full screen closed: the card, a tap back, Stay in a window
+  await e2(() => document.exitFullscreen());
+  const c1 = await w2(() => window.G.ui.mobile.hold === 'fs' && window.G.ui.isPaused(), null, 6000);
+  await p.screenshot({ path: shots + '/fs-card.png' });
+  const go = await center(p, '.mh-fs [data-a="fs"]');
+  if (go) await F2.tap(go.x, go.y);
+  const back = await w2(() => !!document.fullscreenElement && !window.G.ui.mobile.hold && !window.G.ui.isPaused(), null, 6000);
+  await e2(() => document.exitFullscreen());
+  const c2 = await w2(() => window.G.ui.mobile.hold === 'fs', null, 6000);
+  const stay = await center(p, '.mh-fs [data-a="window"]');
+  if (stay) await F2.tap(stay.x, stay.y);
+  const kept = await w2(() => !window.G.ui.mobile.hold && window.G.ui.settings.touchFs === 1 && !window.G.ui.isPaused(), null, 4000);
+  const remembered = await e2(() => { const M = window.G.ui.mobile; M.fsWas = true; M.fsCheck(); return M.hold === null; });
+  R.check('iPad: full screen closed mid-play pauses under "Back to full screen?"; one tap goes back and play resumes; "Stay in a window" is remembered (no card the next time)', c1 && !!go && back && c2 && !!stay && kept && remembered, JSON.stringify({ c1, go: !!go, back, c2, stay: !!stay, kept, remembered }));
+  const loop = await e2(() => { const U = window.G.ui, m = U.mobile; U.setSetting('touchFs', 0); m.fsLosses = []; m.fsMuted = false; const seen = []; for (let i = 0; i < 3; i++) { m.fsWas = true; m.fsCheck(); seen.push(m.hold); m.setHold(null); } return { seen, muted: !!m.fsMuted }; });
+  R.check('iPad: never a loop: a third full-screen close within a minute stops asking for this visit', loop.seen[0] === 'fs' && loop.seen[1] === 'fs' && loop.seen[2] === null && loop.muted, JSON.stringify(loop));
+  // the itch.io buttons setting: Top keeps the top 100 px clear, Auto off itch keeps nothing
+  await e2(() => window.G.ui.setSetting('itchInset', 1));
+  await w2(() => window.G.ui.mobile.sf.t >= 100, null, 3000); await w2(() => window.G.ui.touch.layoutT > 3.5, null, 3000);
+  const it1 = await e2(() => ({ itch: window.G.ui.mobile.itch, t: window.G.ui.mobile.sf.t, mm: Math.round(document.querySelector('.mm-wrap').getBoundingClientRect().top), bag: Math.round(document.querySelector('.tc-bag').getBoundingClientRect().top) }));
+  await p.screenshot({ path: shots + '/itch-top.png' });
+  await e2(() => window.G.ui.setSetting('itchInset', 0));
+  await w2(() => window.G.ui.mobile.sf.t < 1, null, 3000);
+  const it0 = await e2(() => ({ t: window.G.ui.mobile.sf.t, r: window.G.ui.mobile.sf.r }));
+  R.check("iPad: Settings › Controls › Touch › itch.io buttons: Top keeps the top 100 px clear (minimap, hero / bag / menu move down); Auto on the game's own page keeps nothing", !it1.itch && it1.t >= 100 && it1.mm >= 100 && it1.bag >= 100 && it0.t < 1 && it0.r < 1, JSON.stringify({ it1, it0 }));
+  // a save on pagehide (Safari doesn't always send beforeunload)
+  const sv = await e2(() => { localStorage.setItem('chewy3d.save', 'x'); dispatchEvent(new Event('pagehide')); try { const v = JSON.parse(localStorage.getItem('chewy3d.save')); return !!v && typeof v === 'object' && !!v.flags; } catch (e) { return false; } });
+  R.check('iPad: the game saves on pagehide', sv, JSON.stringify({ sv }));
+  // portrait: the rotate card
+  await p.setViewportSize({ width: 820, height: 1180 });
+  const pr = await w2(() => window.G.ui.mobile.portrait && window.G.ui.isPaused() && getComputedStyle(document.querySelector('.m-rotate')).display !== 'none', null, 4000);
+  await p.setViewportSize({ width: 1180, height: 820 });
+  const pr2 = await w2(() => !window.G.ui.mobile.portrait && !window.G.ui.isPaused(), null, 4000);
+  R.check('iPad portrait shows the rotate card and pauses; back in landscape it plays on', pr && pr2, JSON.stringify({ pr, pr2 }));
+  errors.push(...T.errors.map(e => '[ipad] ' + e));
+}
+
+const ONLY_K = new Error('S27_ONLY=k: the iPad section alone');
 try {
+  if (process.env.S27_ONLY === 'k') throw ONLY_K;
   await boot(page, 'fresh&nointro&notut');
   await ev(() => {
     const G = window.G, st = G.state;
@@ -233,6 +324,21 @@ try {
   await wait(h => window.G.state.activeHero === h && !window.G.heroSwitching, h0, 6000); await sleep(page, 300);
   const h2 = await ev(() => ({ hero: window.G.state.activeHero, open: window.G.heroes.wheelOpen, held: window.G.controls.held('hero') }));
   R.check('holding the hero button opens the wheel, which stays up for a tap on a card; the tap switches', wo && card?.open && h2.hero === h0 && !h2.open && !h2.held, JSON.stringify({ wo, card, h2 }));
+  // five heroes (Floofy and Foosy joined): the touch wheel shows all five cards on screen and a tap on Foosy's plays him
+  // (Shadow puts his dragon wings on)
+  await ev(() => { const G = window.G; G.heroes.joinShihtzu?.(); G.heroes.joinGolden?.(); G.heroes.cd = 0; });
+  await sleep(page, 2300);
+  const hb3 = await C('.tc-hero');
+  await F.hold(hb3.x, hb3.y, 600, 6);
+  const wo5 = await wait(() => window.G.heroes.wheelOpen, null, 2000); await sleep(page, 300);
+  const cards5 = await ev(() => [...document.querySelectorAll('.hero-wheel .hw-card')].map(c => { const r = c.getBoundingClientRect(); return { id: c.dataset.id, x: r.left + r.width / 2, y: r.top + r.height / 2, in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight }; }));
+  const gc = cards5.find(c => c.id === 'golden');
+  if (gc) await F.tap(gc.x, gc.y);
+  await wait(() => window.G.state.activeHero === 'golden' && !window.G.heroSwitching, null, 6000); await sleep(page, 800);
+  const h5 = await ev(() => ({ hero: window.G.state.activeHero, whelp: !!window.G.companion?.whelp?.on }));
+  R.check('five heroes: the touch wheel shows all five cards on screen; a tap on Foosy\'s plays him and Shadow wears his dragon wings', wo5 && cards5.length === 5 && cards5.every(c => c.in) && h5.hero === 'golden' && h5.whelp, JSON.stringify({ cards5, h5 }));
+  await ev(h => { const G = window.G; G.heroes.cd = 0; G.heroes.switchTo(h, { quiet: true }); }, h0);
+  await wait(h => window.G.state.activeHero === h && !window.G.heroSwitching, h0, 6000); await sleep(page, 400);
   await calm();
   await ev(() => { const G = window.G; G.actions.addPantry('onigiri', 2); G.actions.damage(Math.round(G.derived.lifeMax * 0.3)); G.ui.hud.update(0.016); });
   await sleep(page, 400);
@@ -257,7 +363,7 @@ try {
   const mir = await ev(() => { const a = document.querySelector('.tc-attack').getBoundingClientRect(); return { left: window.G.ui.settings.touchLeft, ax: Math.round(a.left + a.width / 2) }; });
   await ev(() => window.G.ui.setSetting('touchLeft', false)); await sleep(page, 1300);
   const mir2 = await ev(() => { const a = document.querySelector('.tc-attack').getBoundingClientRect(); return Math.round(a.left + a.width / 2); });
-  R.check('Settings › Controls opens on its Touch tab (size, opacity, left-handed, aim, haptics, a help list); left-handed mirrors the buttons', ct.dev === 'touch' && ct.opts === 5 && ct.help >= 10 && !ct.reset && mir.left && mir.ax < 200 && mir2 > 640, JSON.stringify({ ct, mir, mir2 }));
+  R.check('Settings › Controls opens on its Touch tab (size, opacity, left-handed, aim, haptics, full screen, itch.io buttons, a help list); left-handed mirrors the buttons', ct.dev === 'touch' && ct.opts === 7 && ct.help >= 10 && !ct.reset && mir.left && mir.ax < 200 && mir2 > 640, JSON.stringify({ ct, mir, mir2 }));
 
   { // (sections f to j: CT-5's second checkpoint, a block of their own)
   // ================================================================ f) the menus on a phone: the bag, the shop, the K panel, dialogue
@@ -420,9 +526,14 @@ try {
   await nudge();
   const t1 = await ev(() => ({ dev: window.G.controls.device, on: document.querySelector('.tc').classList.contains('on'), slotsIn: document.querySelectorAll('.tc-slot > .hb').length }));
   R.check('a mouse move takes the mouse back (the hotbar slots and belt go home, the touch layer hides); a touch brings them back', k1.dev === 'kbm' && !k1.body && !k1.on && k1.hotbar === 6 && k1.belt === 4 && k1.menubtns !== 'none' && t1.dev === 'touch' && t1.on && t1.slotsIn === 6, JSON.stringify({ k1, t1 }));
+
+  // ================================================================ k) an iPad (CT-6)
+  await ipadChecks();
 } catch (e) {
-  R.check('scenario ran to the end', false, e.stack || e.message);
+  if (e === ONLY_K) { try { await ipadChecks(); } catch (x) { R.check('the iPad section ran to the end', false, x.stack || x.message); } }
+  else R.check('scenario ran to the end', false, e.stack || e.message);
 }
 const failed = R.finish(errors, warns);
 await browser.close();
+await ipadClose?.();
 process.exit(failed ? 1 : 0);

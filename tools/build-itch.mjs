@@ -1,7 +1,9 @@
 // itch.io build: a relative-path production build, checked against itch's HTML5 limits, zipped for upload.
 //   npm run build:itch            build + check + zip  ->  release/pawhaven-itch-v<version>.zip
 //   npm run build:itch -- --test  ...then boot the zip's contents inside an itch-style iframe (a sub-folder on another
-//                                 origin path) with headless Chrome and fail on errors / 404s; saves a screenshot
+//                                 origin path) with headless Chrome and fail on errors / 404s; saves a screenshot. Then
+//                                 an iPad on itch's game page (CT-6): itch's own buttons over the frame (their measured
+//                                 boxes) and a frame wider than the screen; the touch HUD must clear both
 // itch serves HTML5 games from a CDN sub-folder inside an iframe, so every URL must be relative (base './'): an
 // absolute "/assets/..." works on the dev server but 404s on itch. The checks below catch that before upload.
 import { build } from 'vite';
@@ -26,7 +28,8 @@ const walk = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(d => (d
 
 // ---- 1. build with relative URLs
 console.log('== building (base ./) ->', path.relative(ROOT, OUT));
-await build({ root: ROOT, base: './', logLevel: 'warn', build: { outDir: OUT, emptyOutDir: true, reportCompressedSize: false, chunkSizeWarningLimit: 8192 } });
+// (VITE_ITCH: the game knows it's the itch build, so inside a frame it keeps clear of itch's buttons: ui/mobile.js, CT-6)
+await build({ root: ROOT, base: './', logLevel: 'warn', define: { 'import.meta.env.VITE_ITCH': JSON.stringify('1') }, build: { outDir: OUT, emptyOutDir: true, reportCompressedSize: false, chunkSizeWarningLimit: 8192 } });
 
 // licences of what ships inside the bundle: the UI fonts (OFL) and the runtime npm dependencies (their LICENSE files;
 // the minified bundle drops the source headers). Models, textures and audio are made by this project.
@@ -115,6 +118,21 @@ const entries = files.map(f => ({ name: rel(f), data: fs.readFileSync(f) })).sor
 fs.writeFileSync(ZIP, zip(entries));
 console.log(`== itch-ready: ${path.relative(ROOT, ZIP)} (${MB(fs.statSync(ZIP).size)} zipped)`);
 
+// itch's game page for an embedded HTML game, as an iPad in landscape (1180 wide) lays it out (CT-6; measured on the real
+// page 2026-10-08, ITCH.md "Mobile"): the header leaves the frame 20 px down; the frame is the embed size (1280 x 720),
+// wider than the screen; #user_tools (game.css between 960 and 1300 px wide: absolute, 10 px in from the top right,
+// z-index 2) holds three 21 px buttons 10 apart, 158, 136 and 123 px wide; the frame's Fullscreen button is 30 px, 8 px
+// in from its bottom right (.fullscreen_btn)
+const ITCH_PAGE = src => `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>
+  body { margin: 0; background: #eee; } .header { height: 20px; }
+  .game_frame { position: relative; margin: 0 auto; width: 1280px; height: 720px; background: #e5e5e5; } .game_frame iframe { display: block; border: 0; }
+  .fullscreen_btn { position: absolute; bottom: 0; right: 0; margin: 8px; width: 30px; height: 30px; padding: 0; border: 0; opacity: .4; background: #222; border-radius: 4px; }
+  .user_tools { position: absolute; top: 0; right: 0; margin: 10px 10px 0 0; padding: 0; list-style: none; z-index: 2; text-align: right; pointer-events: none; }
+  .user_tools li { margin-bottom: 10px; height: 21px; } .user_tools li:last-child { margin-bottom: 0; }
+  .user_tools a { display: inline-block; height: 21px; background: rgba(0, 0, 0, .6); box-shadow: 0 0 0 1px rgba(255, 255, 255, .2); pointer-events: auto; }
+</style></head><body><ul id="user_tools" class="user_tools"><li><a style="width:158px"></a></li><li><a style="width:136px"></a></li><li><a style="width:123px"></a></li></ul>
+<div class="header"></div><div class="game_frame"><button class="fullscreen_btn"></button><iframe src="${src}" width="1280" height="720" allowfullscreen allow="autoplay; fullscreen *; gamepad"></iframe></div></body></html>`;
+
 // ---- 4. optional: boot it the way itch serves it (iframe -> /html/<id>/index.html) and look for errors
 if (TEST) {
   const { chromium } = await import('playwright-core');
@@ -125,6 +143,10 @@ if (TEST) {
     if (url === '/' || url === '/index.html') {
       res.writeHead(200, { 'content-type': 'text/html' });
       return res.end(`<!doctype html><body style="margin:0;background:#111"><iframe src="${PREFIX}index.html" width="1280" height="720" allow="autoplay; fullscreen; gamepad" style="border:0"></iframe></body>`);
+    }
+    if (url === '/ipad.html') { // itch's game page as an iPad sees it (ITCH_PAGE above)
+      res.writeHead(200, { 'content-type': 'text/html' });
+      return res.end(ITCH_PAGE(`${PREFIX}index.html?fresh&nointro&notut`));
     }
     const f = url.startsWith(PREFIX) ? path.join(OUT, url.slice(PREFIX.length)) : null;
     if (!f || !f.startsWith(OUT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end('not found'); }
@@ -155,10 +177,50 @@ if (TEST) {
   } catch (e) { errs.push('did not reach the title screen in 150 s'); }
   const shot = path.join(REL, 'itch-test.png');
   await page.screenshot({ path: shot });
-  await browser.close(); server.close();
+  await browser.close();
   console.log(`== iframe test (${PREFIX}): ${state ? `title in ${((Date.now() - t0) / 1000).toFixed(1)} s` : 'FAILED'} · screenshot ${path.relative(ROOT, shot)}`);
   if (state) console.log('   ' + JSON.stringify(state));
   const fails = [...new Set([...bad, ...errs])];
-  if (fails.length) { console.error('   problems:\n   ' + fails.slice(0, 20).join('\n   ')); process.exit(1); }
+  if (fails.length) { console.error('   problems:\n   ' + fails.slice(0, 20).join('\n   ')); server.close(); process.exit(1); }
   console.log('== iframe test: PASS (no errors, no 404s, no external requests)');
+
+  // ---- 5. an iPad on itch's page: the frame is 1280 wide on a 1180 screen (its right 100 px off the page), and itch's
+  //         button column floats over its top right. The touch HUD must keep clear of both (ui/mobile.js, CT-6)
+  const b2 = await chromium.launch({ executablePath: process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true, args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] });
+  const ctx = await b2.newContext({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, userAgent: 'Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1' });
+  const ip = await ctx.newPage();
+  const errs2 = [];
+  ip.on('pageerror', e => errs2.push('pageerror: ' + e.message));
+  ip.on('console', m => { if (m.type() === 'error' && !/favicon/.test(m.text() + (m.location()?.url || ''))) errs2.push(m.text().slice(0, 200)); });
+  await ip.goto(base + '/ipad.html');
+  const f2 = await (await ip.waitForSelector('iframe')).contentFrame();
+  let ipad = null;
+  try {
+    await f2.waitForFunction(() => window.G?.ui?.ready && document.querySelector('.tc.on') && !document.querySelector('#boot:not(.gone)') && window.G.ui.mobile?.vis, null, { timeout: 150000 });
+    await f2.waitForFunction(() => { const s = window.G.ui.mobile.sf; return s && s.r >= 90 && s.t >= 74; }, null, { timeout: 10000, polling: 'raf' }).catch(() => {});
+    await f2.waitForFunction(() => window.G.ui.touch.layoutT > 0, null, { timeout: 5000, polling: 'raf' }).catch(() => {}); // (the touch controls laid out in it)
+    const fr = await ip.evaluate(() => { const r = document.querySelector('iframe').getBoundingClientRect(); return { x: r.left, y: r.top }; });
+    const over = await ip.evaluate(() => [...document.querySelectorAll('#user_tools a, .fullscreen_btn')].map(e => { const r = e.getBoundingClientRect(); return { n: e.className || 'itch user_tools', x0: r.left, y0: r.top, x1: r.right, y1: r.bottom }; }));
+    const inner = await f2.evaluate(() => {
+      const M = window.G.ui.mobile, sel = '.mm-wrap, .tc .tc-b, .tc-belt > .belt, .hud-tl .qt, .run-chip';
+      const els = [...document.querySelectorAll(sel)].filter(e => { const r = e.getBoundingClientRect(), cs = getComputedStyle(e); return r.width > 0 && !e.closest('[hidden]') && cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0; });
+      return { itch: M.itch, sf: M.sf, vis: M.vis, box: M.itchBox, els: els.map(e => { const r = e.getBoundingClientRect(); return { n: String(e.className.baseVal ?? e.className).split(' ').slice(0, 2).join('.'), x0: r.left, y0: r.top, x1: r.right, y1: r.bottom }; }) };
+    });
+    const hits = [], off = [];
+    for (const e of inner.els) {
+      const p = { n: e.n, x0: e.x0 + fr.x, y0: e.y0 + fr.y, x1: e.x1 + fr.x, y1: e.y1 + fr.y };
+      for (const o of over) if (p.x0 < o.x1 && p.x1 > o.x0 && p.y0 < o.y1 && p.y1 > o.y0) hits.push(`${p.n} under ${o.n}`);
+      if (p.x1 > 1180.5 || p.y1 > 820.5 || p.x0 < -0.5) off.push(`${p.n} off the page (${p.x0.toFixed(0)}..${p.x1.toFixed(0)}, ${p.y0.toFixed(0)}..${p.y1.toFixed(0)})`);
+    }
+    const page2 = await ip.evaluate(() => ({ w: innerWidth, vv: Math.round(visualViewport.width), scale: visualViewport.scale, doc: document.documentElement.scrollWidth }));
+    const rnd = o => o && Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Math.round(v)]));
+    ipad = { itch: inner.itch, sf: rnd(inner.sf), vis: rnd(inner.vis), page: page2, n: inner.els.length, hits, off };
+  } catch (e) { errs2.push('iPad page: the game did not come up with its touch controls (' + e.message.split('\n')[0] + ')'); }
+  const shot2 = path.join(REL, 'itch-test-ipad.png');
+  await ip.screenshot({ path: shot2 });
+  await b2.close(); server.close();
+  console.log(`== iPad on itch's page: ${ipad ? JSON.stringify(ipad) : 'FAILED'} · screenshot ${path.relative(ROOT, shot2)}`);
+  const fails2 = [...errs2, ...(ipad ? [...ipad.hits, ...ipad.off, ...(ipad.itch ? [] : ['the game did not see it is on itch']), ...(ipad.n >= 8 ? [] : [`only ${ipad.n} touch controls measured`])] : [])];
+  if (fails2.length) { console.error('   problems:\n   ' + fails2.slice(0, 20).join('\n   ')); process.exit(1); }
+  console.log("== iPad on itch: PASS (the touch HUD clears itch's buttons and stays on the page)");
 }

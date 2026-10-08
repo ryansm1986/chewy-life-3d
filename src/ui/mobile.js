@@ -12,6 +12,12 @@
 //    details (the hover tooltip) without clicking.
 //  - The rotate overlay in portrait (the game pauses under it), full screen on the first tap where the browser allows
 //    it (Android Chrome; an iPhone can't), and the audio unlocked on the first touch (audio.js listens for it).
+//  - CT-6, iPad and itch (CONTROLS §12.9, ITCH.md "Mobile"): the "back to full screen?" card when full screen closes during
+//    play (one tap re-asks; "Stay in a window" is remembered; never more than twice a minute), nothing to touch in the top
+//    24 px while in full screen (the browser's swipe-down exit), the "zoomed in?" card (a viewport reset first where the
+//    page is the top frame; a pinch is let through while it shows), room kept for itch.io's own buttons over the frame
+//    (Settings › Controls › Touch › itch.io buttons) and for the part of the frame off the page, and a save when the page
+//    is hidden or closed (Safari doesn't always send beforeunload).
 import './mobile.css';
 import { Actions } from '../core/actions.js';
 import { Touch } from '../core/touch.js';
@@ -22,6 +28,19 @@ import { glyph } from './glyphs.js';
 const PSCALE = 0.86, FLOOR = 12.1, LONG_MS = 430, DOUBLE_MS = 330;
 const FLOOR_SCOPE = '.l-panels .pw, .l-dlg, .tt-wrap, .pop-wrap, .tut-dock, .hero-wheel, .toasts, .reel, .m-flip';
 const FLOOR_SKIP = /\bjp\b|\bkc\b|\bmm-n\b|\bpc-lv\b|\bph-jp\b/;
+// CT-6. EDGE_TOP: in full screen nothing to touch in the top 24 px (iPadOS exits full screen on a swipe down from there).
+// ITCH: itch.io's own buttons over an embedded game, in the frame's CSS px, measured on itch's game page (2026-10-08,
+// game.css and the page's markup; ITCH.md "Mobile"): a column of three action buttons ("View all by …", "Follow …",
+// "Add To Collection") 10 px in from the page's top right, 21 px tall, 10 apart, up to 158 px wide (25 tall, 183 wide
+// when the page is wider than 1300 px, where the column is fixed and follows the scroll). The game frame starts 20 px down
+// the page, so the column covers its top 74 px (94 on the wider page). The column only floats over the game from 960 px
+// wide (narrower pages put it in a bar above). itch's "Fullscreen button" is 30 px at the frame's bottom right, 8 px in.
+const EDGE_TOP = 24, ITCH = { top: 80, topWide: 100, side: 200, corner: 28 }, ZOOM_VIS = 0.75, CLIP_MIN = 0.6;
+const FS_SVG = `<svg viewBox="0 0 120 90" class="mh-svg"><rect x="14" y="10" width="92" height="70" rx="12" fill="#fffdf8" stroke="#4a2c2a" stroke-width="5"/><rect x="24" y="20" width="72" height="50" rx="6" fill="#bff0ff"/>
+  <g class="mh-arr" fill="none" stroke="#ff8fb0" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M34 40V30h10M86 40V30H76M34 50v10h10M86 50v10H76"/></g><circle cx="60" cy="45" r="7" fill="#ffcf4a" stroke="#4a2c2a" stroke-width="3"/></svg>`;
+const PINCH_SVG = `<svg viewBox="0 0 120 90" class="mh-svg"><rect x="14" y="10" width="92" height="70" rx="12" fill="#fffdf8" stroke="#4a2c2a" stroke-width="5"/><rect x="24" y="20" width="72" height="50" rx="6" fill="#ffe3ec"/>
+  <g class="mh-f1"><circle cx="38" cy="58" r="9" fill="#ffd6b8" stroke="#4a2c2a" stroke-width="3.5"/></g><g class="mh-f2"><circle cx="82" cy="32" r="9" fill="#ffd6b8" stroke="#4a2c2a" stroke-width="3.5"/></g>
+  <path d="M50 48l8-6M70 42l-8 6" fill="none" stroke="#ff8fb0" stroke-width="5" stroke-linecap="round"/></svg>`;
 
 export class Mobile {
   constructor(ui) {
@@ -36,8 +55,29 @@ export class Mobile {
     const P = new URLSearchParams(location.search);
     const fake = (P.get('safe') || '').split(',').map(Number);
     this.fakeSafe = fake.length === 4 && fake.every(Number.isFinite) ? { t: fake[0], r: fake[1], b: fake[2], l: fake[3] } : null;
-    addEventListener('resize', () => this.layout());
-    addEventListener('orientationchange', () => setTimeout(() => this.layout(), 60));
+    // CT-6: where the game runs. Embedded: inside another page's iframe (itch's). On itch: its CDN's host, the itch build's
+    // flag (tools/build-itch.mjs) or the QA's ?itch, inside a frame
+    this.embedded = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+    this.itch = this.embedded && (/(^|\.)itch\.(zone|io)$/i.test(location.hostname) || import.meta.env.VITE_ITCH === '1' || P.has('itch'));
+    this.hold = null; this.vis = null; this.edgeTop = 0; this.zoomTried = 0; this.fsLosses = [];
+    this.fsNow = this.fsLike(); this.fsWas = this.fsNow;
+    this.cards();
+    addEventListener('resize', () => { this.layout(); this.fsSoon(); });
+    addEventListener('orientationchange', () => { setTimeout(() => this.layout(), 60); this.fsSoon(); });
+    for (const n of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(n, () => this.fsSoon(120));
+    for (const n of ['resize', 'scroll']) globalThis.visualViewport?.addEventListener(n, () => { this.zoomCheck(); if (this.hold === 'zoom') this.placeHold(); });
+    // the part of the frame the page shows (an itch frame wider than an iPad, scrolled, or the page zoomed in)
+    if (this.embedded && typeof IntersectionObserver === 'function') {
+      this.io = new IntersectionObserver(es => { const r = es[es.length - 1].intersectionRect; this.vis = { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height }; this.layout(); this.zoomCheck(); if (this.hold === 'zoom') this.placeHold(); },
+        { threshold: Array.from({ length: 41 }, (_, i) => i / 40) });
+      this.io.observe(document.documentElement);
+    }
+    // a save when the page is hidden or closed: iOS Safari doesn't always send beforeunload (game.js saves on that and
+    // every 30 s); full screen that closed while the page was away asks again when it's back
+    const save = () => { try { this.G?.save?.(); } catch (e) { /* storage unavailable */ } };
+    document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else this.fsSoon(); });
+    addEventListener('pagehide', save);
+    ui.onSetting?.(k => { if (k === 'itchInset' || k === 'touchFs') this.layout(); });
     // the text floor follows the panels' re-renders (a MutationObserver, one pass a frame at most)
     // (only while the screen is touchy: a desktop pays nothing for it; layout() connects and disconnects it)
     this.mo = new MutationObserver(() => { this.floorDirty = true; });
@@ -48,16 +88,56 @@ export class Mobile {
   }
   get G() { return this.ui.G; }
 
-  /** the safe area in CSS px: env(safe-area-inset-*) (viewport-fit=cover), or the QA's ?safe= */
-  safe() {
-    if (this.fakeSafe) return this.fakeSafe;
+  /** the device's safe area in CSS px: env(safe-area-inset-*) (viewport-fit=cover), or the QA's ?safe= */
+  deviceSafe() {
+    if (this.fakeSafe) return { ...this.fakeSafe };
     const cs = getComputedStyle(this.safeProbe), px = v => parseFloat(v) || 0;
     return { t: px(cs.paddingTop), r: px(cs.paddingRight), b: px(cs.paddingBottom), l: px(cs.paddingLeft) };
+  }
+  /** what every touch layer keeps out of (--sa-t / r / b / l; ui/touch.js lays out inside it too): the device's safe area,
+   *  plus on touch (CT-6) the full-screen top edge, the part of an embedded frame the page doesn't show, and itch.io's
+   *  buttons over the frame. Each side is the largest of them (they are all measured from the frame's edge) */
+  safe() {
+    const s = this.deviceSafe();
+    if (!this.touchy) return s;
+    const W = innerWidth, H = innerHeight, v = this.vis;
+    let clipT = 0;
+    if (v && v.width >= W * CLIP_MIN && v.height >= H * CLIP_MIN) {
+      clipT = Math.max(0, v.top);
+      s.l = Math.max(s.l, v.left); s.t = Math.max(s.t, clipT); s.r = Math.max(s.r, W - v.right); s.b = Math.max(s.b, H - v.bottom);
+    }
+    const it = this.itchInset(W, H, clipT);
+    for (const k of ['t', 'r', 'b', 'l']) s[k] = Math.max(s[k], it[k]);
+    s.t = Math.max(s.t, this.edgeTop);
+    this.itchBox = it;
+    return s;
+  }
+  /** room for itch.io's buttons over the frame (ITCH above). Settings › Controls › Touch › itch.io buttons: Auto (0: on
+   *  itch, in a frame on the page) · Top (1) · Side (2) · Off (3), for when itch moves them */
+  itchInset(W, H, clipT = 0) {
+    const m = this.ui.settings?.itchInset ?? 0, o = { t: 0, r: 0, b: 0, l: 0 };
+    if (m === 3) return o;
+    if (m === 1) { o.t = ITCH.topWide; o.b = ITCH.corner; return o; }
+    if (m === 2) { o.r = ITCH.side; return o; }
+    if (!this.itch || this.fsNow) return o; // (full screen: nothing of itch's shows over the game)
+    const sl = Math.max(screen.width, screen.height), v = this.vis;
+    // the page is the device's width (Safari's window: the screen's long side in landscape). itch's maximized frame is the
+    // whole window wide and sits over its buttons; a frame on the page has them over its top right from 960 px
+    const filling = Math.abs(W - sl) <= 2;
+    if (!filling && sl >= 960) o.t = sl > 1300 ? clipT + ITCH.topWide : ITCH.top;
+    // a frame wider than the screen (1280 on a 1180 iPad): itch puts it at the page's left, so the rest is off the right
+    // edge. (The IntersectionObserver can't always see this: a browser may widen the page's layout viewport to the frame)
+    const sw = W > H ? sl : Math.min(screen.width, screen.height), over = W - sw;
+    if (!filling && over > 2 && over < W * 0.4) o.r = over;
+    // itch's Fullscreen button, bottom right, unless that corner is off the page anyway
+    if (!(v && (W - v.right > 30 || H - v.bottom > 30))) o.b = ITCH.corner;
+    return o;
   }
   layout() {
     const R = this.ui.root, W = innerWidth, H = innerHeight;
     this.ml = mobileLike(); // (cached: matchMedia and the URL once per layout, not every frame)
     const touchy = this.touchy = this.ml || Actions.device === 'touch';
+    this.edgeTop = touchy && this.fsNow ? EDGE_TOP : 0;
     if (touchy !== !!this.moOn) {
       this.moOn = touchy;
       if (touchy) { const ui = this.ui; for (const L of [ui.layers.panels, ui.layers.dlg, ui.layers.over, ui.layers.msg]) this.mo.observe(L, { childList: true, subtree: true, characterData: true }); this.mo.observe(R, { childList: true }); } // (the hero wheel joins the root)
@@ -75,7 +155,103 @@ export class Mobile {
     st.setProperty('--m-side', ((Math.max(sf.l, sf.r) + 8) / ps).toFixed(1) + 'px');
     const portrait = touchy && H > W * 1.05;
     if (portrait !== this.portrait) { this.portrait = portrait; R.classList.toggle('m-portrait', portrait); if (portrait) this.ui.tip?.hide?.(); }
+    R.classList.toggle('m-itch', !!this.itch); R.classList.toggle('m-fs', !!this.fsNow);
     this.floorDirty = true;
+    const sig = Object.values(sf).map(n => n.toFixed(0)).join(',');
+    if (sig !== this._sfSig) { this._sfSig = sig; if (this.ui.touch) this.ui.touch.layoutT = 0; } // (the touch controls lay out again in the new safe area)
+  }
+
+  // ---------------------------------------------------------------- CT-6: full screen, zoom (the cards that pause)
+  cards() {
+    const R = this.ui.root;
+    this.holdEl = el('div', 'm-hold');
+    this.holdEl.innerHTML = `
+      <div class="mh-card mh-fs">${FS_SVG}<b>Back to full screen?</b><span>Full screen closed, so Pawhaven is paused. One tap takes you back.</span>
+        <div class="mh-btns"><button class="btn mh-btn mh-go" data-a="fs">${glyph('play')}Full screen</button><button class="btn mh-btn" data-a="window">Stay in a window</button></div>
+        <em>Tip: a swipe down from the very top edge closes full screen. Settings › Controls › Touch changes this.</em></div>
+      <div class="mh-card mh-zoom">${PINCH_SVG}<b>Zoomed in?</b><span class="mh-z1">Pinch two fingers together on the screen to zoom back out. Pawhaven waits for you.</span>
+        <span class="mh-z2">Can't see all of Pawhaven? Pinch two fingers together to zoom the page back out, or scroll it so the game fits.</span>
+        <div class="mh-btns"><button class="btn mh-btn" data-a="play">Play on</button></div></div>`;
+    R.appendChild(this.holdEl);
+    this.holdEl.addEventListener('click', e => {
+      const b = e.target.closest('button[data-a]'); if (!b) return;
+      this.ui.sfx?.('tab');
+      const a = b.dataset.a;
+      if (a === 'fs') {
+        this.fsAsked = true;
+        this.fullscreen(true).then(ok => { if (!ok && this.hold === 'fs') { this.setHold(null); this.ui.toast?.('Full screen isn\'t allowed here, so Pawhaven plays in the window.', { icon: 'eye' }); } });
+      } else if (a === 'window') {
+        this.ui.setSetting('touchFs', 1); this.setHold(null);
+        this.ui.toast?.('Playing in a window. Settings › Controls › Touch › Full screen brings it back.', { icon: 'eye' });
+      } else if (a === 'play') { this.zoomDismissed = true; this.setHold(null); }
+    });
+  }
+  /** pause under a card ('fs', 'zoom') or carry on (null); the zoom card lets a pinch through to the page (index.html) */
+  setHold(k) {
+    if (k === this.hold) return;
+    this.hold = k;
+    const R = this.ui.root;
+    R.classList.toggle('m-hold-fs', k === 'fs'); R.classList.toggle('m-hold-zoom', k === 'zoom');
+    document.documentElement.classList.toggle('pinch-ok', k === 'zoom');
+    if (k) { this.ui.touch?.releaseAll?.(true); Touch.releaseAll(); this.ui.tip?.hide?.(); }
+    this.placeHold();
+  }
+  /** the zoom card covers the part of the page on screen, drawn at its normal size whatever the zoom: the top frame's
+   *  visual viewport, or the part of the frame the zoomed page shows (its zoom about the screen's width over that part) */
+  placeHold() {
+    let x = 0, y = 0, w = innerWidth, h = innerHeight, k = 1;
+    const vv = globalThis.visualViewport, v = this.vis;
+    if (this.hold === 'zoom' && !this.embedded && vv) { x = vv.offsetLeft; y = vv.offsetTop; w = vv.width; h = vv.height; k = 1 / Math.max(1, vv.scale); }
+    else if (this.hold === 'zoom' && v && v.width > 0) { x = v.left; y = v.top; w = v.width; h = v.height; k = clamp(v.width / (innerWidth > innerHeight ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height)), 0.35, 1); }
+    const S = this.holdEl.style;
+    S.left = x.toFixed(1) + 'px'; S.top = y.toFixed(1) + 'px'; S.width = w.toFixed(1) + 'px'; S.height = h.toFixed(1) + 'px';
+    S.setProperty('--mh-k', k.toFixed(3));
+  }
+  /** in full screen: ours (the Fullscreen API), or the whole frame the screen's size (itch put the frame in full screen) */
+  fsLike() {
+    const d = document;
+    if (d.fullscreenElement || d.webkitFullscreenElement) return true;
+    if (!this.embedded) return false;
+    const sl = Math.max(screen.width, screen.height), ss = Math.min(screen.width, screen.height);
+    return Math.abs(Math.max(innerWidth, innerHeight) - sl) <= 2 && Math.abs(Math.min(innerWidth, innerHeight) - ss) <= 2;
+  }
+  canFs() { const d = document, e = d.documentElement; return !!((d.fullscreenEnabled || d.webkitFullscreenEnabled) && (e.requestFullscreen || e.webkitRequestFullscreen)) && !globalThis.pawhaven?.desktop; }
+  /** look again once a resize or rotation has settled (a rotation passes through odd sizes) */
+  fsSoon(ms = 450) { clearTimeout(this.fsT); this.fsT = setTimeout(() => this.fsCheck(), ms); }
+  fsCheck() {
+    const fs = this.fsLike();
+    if (fs !== this.fsNow) { this.fsNow = fs; this.layout(); }
+    if (fs) { this.fsWas = true; this.fsPending = false; if (this.hold === 'fs') this.setHold(null); return; }
+    if (this.fsWas) { this.fsWas = false; this.fsPending = true; }
+    if (!this.fsPending || document.hidden || !this.touchy || this.portrait) return; // (asked once the page is back and level)
+    this.fsPending = false;
+    if (this.ui.settings.touchFs === 1 || this.fsMuted || !this.canFs() || this.hold) return;
+    // never a loop: a third close within a minute means the player wants the window, for this visit
+    const now = performance.now(); this.fsLosses = this.fsLosses.filter(t => now - t < 60000); this.fsLosses.push(now);
+    if (this.fsLosses.length >= 3) { this.fsMuted = true; this.ui.toast?.('Playing in the window. Settings › Controls › Touch › Full screen asks again.', { icon: 'eye' }); return; }
+    this.setHold('fs');
+  }
+  /** zoomed in: the top frame's visual viewport over 1.01, or (in a frame) the page shows under 3/4 of it each way */
+  zoomState() {
+    if (!this.embedded) { const s = globalThis.visualViewport?.scale ?? 1; return s > 1.01 ? 'top' : null; }
+    const v = this.vis, W = innerWidth, H = innerHeight;
+    return v && v.width > 0 && v.height > 0 && v.width < W * ZOOM_VIS && v.height < H * ZOOM_VIS ? 'frame' : null;
+  }
+  zoomCheck() {
+    const z = this.zoomState();
+    if (!z) { this.zoomTried = 0; this.zoomDismissed = false; if (this.hold === 'zoom') this.setHold(null); return; }
+    if (!this.touchy || this.hold || this.zoomDismissed || this.portrait) return;
+    // the top frame: a viewport reset first (the viewport meta changed and put back), then the card if it didn't work
+    if (z === 'top' && this.zoomTried < 1) { this.zoomTried++; this.resetZoom(); clearTimeout(this.zoomT); this.zoomT = setTimeout(() => this.zoomCheck(), 400); return; }
+    this.holdEl.classList.toggle('frame', z === 'frame');
+    this.setHold('zoom');
+  }
+  resetZoom() {
+    const m = document.querySelector('meta[name="viewport"]'); if (!m) return;
+    const c = m.getAttribute('content');
+    this.zoomResets = (this.zoomResets || 0) + 1;
+    m.setAttribute('content', 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
+    requestAnimationFrame(() => requestAnimationFrame(() => m.setAttribute('content', c)));
   }
 
   // ---------------------------------------------------------------- per frame (UI.update)
@@ -84,6 +260,8 @@ export class Mobile {
     if (this.phone) this.pairs();
     if (this.floorDirty && this.touchy) { this.floorDirty = false; this.floor(); }
     if (this.tipUntil && performance.now() > this.tipUntil) { this.tipUntil = 0; this.ui.tip.hide(); }
+    // CT-6: the zoom and full screen, twice a second (the events cover most of it; this catches what they miss)
+    if (this.touchy && (this._ct6 = (this._ct6 || 0) + 1) % 30 === 0) { this.zoomCheck(); if (this.fsPending || this.fsLike() !== this.fsNow) this.fsCheck(); }
   }
   /** raise any text the menus still draw under 12 px (after the scale and mobile.css): an inline size on its element */
   floor() {
@@ -173,16 +351,20 @@ export class Mobile {
     if (this.fsAsked || !mobileLike()) return;
     this.fsAsked = true;
     if (navigator.webdriver && !new URLSearchParams(location.search).has('fs')) return; // (the QA's browsers: no full screen unless ?fs)
-    if (this.ui.settings.mobileFullscreen === false) return;
+    if (this.ui.settings.mobileFullscreen === false || this.ui.settings.touchFs === 1) return; // (Settings › Controls › Touch › Full screen: Off)
     this.fullscreen(true);
   }
+  /** → a promise of whether it went (or was already) full screen. iPadOS before 16.4 has only the webkit-prefixed call,
+   *  which returns nothing: the fullscreenchange that follows tells */
   fullscreen(on) {
-    const d = document, el = d.documentElement;
+    const d = document, el = d.documentElement, cur = d.fullscreenElement || d.webkitFullscreenElement;
     try {
-      if (on && !d.fullscreenElement && d.fullscreenEnabled && el.requestFullscreen && !globalThis.pawhaven?.desktop) {
-        el.requestFullscreen({ navigationUI: 'hide' }).then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => {});
-      } else if (!on && d.fullscreenElement) d.exitFullscreen?.().catch(() => {});
+      const req = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (on && !cur && this.canFs() && req) {
+        return Promise.resolve(req.call(el, { navigationUI: 'hide' })).then(() => { screen.orientation?.lock?.('landscape').catch(() => {}); return true; }, () => false);
+      } else if (!on && cur) (d.exitFullscreen || d.webkitExitFullscreen)?.call(d)?.catch?.(() => {});
     } catch (e) { /* not allowed here */ }
+    return Promise.resolve(on ? !!cur : true);
   }
 }
 
@@ -192,4 +374,3 @@ function fire(e, type, bubbles = true) {
 }
 /** an element's effective CSS zoom (the browsers without currentCSSZoom) */
 function zoomOf(e) { let z = 1; for (let p = e; p && p !== document.body; p = p.parentElement) { const v = parseFloat(getComputedStyle(p).zoom); if (v > 0 && v !== 1) z *= v; } return z; }
-void clamp;

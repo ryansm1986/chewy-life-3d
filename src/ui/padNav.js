@@ -22,7 +22,7 @@ const START = {
   inventory: '.slot[data-c="inv"].has, .slot[data-c="inv"], .pslot[data-id]',
   stash: '.slot[data-c="stash"]', shop: '.sh-item', skills: '.node.can, .node.learned, .node', character: '.at-plus:not([disabled]), .attr .at-plus, .dr',
   quests: '.q-item, .gd-card .btn, .fl-card', cook: '.ck-row.sel, .ck-row', craft: '.ck-row.sel, .ck-row', travel: '.tv-pin.sel, .tv-pin.here, .tv-pin', gift: '.gf-card', seeds: '.sp-card',
-  houseCard: '.btn.pink, .btn', remodel: '.rm-set.on, .rm-set',
+  houseCard: '.btn.pink, .btn', remodel: '.rm-set.on, .rm-set', lantern: '.ln-go',
 };
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const SEL = '.on, .sel, .selected, .active';
@@ -301,6 +301,12 @@ const HANDLERS = [
   { match: '.chg-pk', label() { return { a: 'Learn' }; } },
   { match: '.ck-row', label() { return { a: 'Choose' }; } },
   { match: '.dr', a() {}, label() { return { a: '' }; } }, // (a stat row: its tooltip only)
+  { // the Spirit Lantern (ui/lantern.js): A adds / removes a card or sets off, X "Surprise me", Y "Recommended"
+    match: '.p-lantern button',
+    x(e, nav) { nav.ui.panels.lantern.surprise(); },
+    y(e, nav) { nav.ui.panels.lantern.recommend(); },
+    label(e) { return { a: e.matches('.ln-card') ? (e.classList.contains('on') ? 'Remove' : 'Add') : e.matches('.ln-go') ? 'Set off' : e.matches('.ln-slot') ? 'Take out' : 'Select', x: 'Surprise me', y: 'Recommended' }; },
+  },
 ];
 function isPantryBuy(e) { return !e.classList.contains('sell') && e.classList.contains('pgood') && !e.classList.contains('tool'); }
 function handlerFor(e) { if (!e) return null; for (const h of HANDLERS) if (e.matches(h.match)) return h; return null; }

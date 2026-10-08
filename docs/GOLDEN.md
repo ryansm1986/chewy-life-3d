@@ -1,6 +1,6 @@
 # Foosy: the Emberleaf Dragoon (the fifth hero)
 
-Status: **checkpoint 2 built** (ROADMAP H-5). This design; the class and its twelve lance bases (each tinted on the prop);
+Status: **built, checkpoint 3** (ROADMAP H-5). This design; the class and its twelve lance bases (each tinted on the prop);
 **all 21 skills built** (`src/rpg/skillsGolden.js`) with their moves, effects, sounds and icons, the Whelp Bond driving
 Shadow; **all 15 charge tables**, perks and releases, solved by the sim (§3b, CHARGE.md §7); the balance pass with three
 builds asserted (§4); the baked model `golden_toy` with the Blender lance and javelin props, the coat graded to the sheet,
@@ -8,7 +8,8 @@ the kit fallback's crest helm; **Shadow as a flying dragon whelp** while Foosy i
 flight, the landing, indoors); five-hero switching. Play him at once from `/?hero=golden` (he counts as joined).
 His name is **Foosy** (the owner's pick), in one place: `CLASSES.golden.name` (`src/rpg/classes.js`; `HERO_TEXT.golden`
 holds the kana, フージー). Everything else reads it. The id stays `golden`.
-Checkpoint 3: the Onsen joining scene, the rumour, the "Meet Foosy" guide, `s29-golden`.
+Checkpoint 3 added the Onsen joining scene (§5), the rumour, the "Meet Foosy" guide with Shadow's take-off, `s29-golden`,
+and the floor loot drawn instanced (his draw calls at Poe's level, §11).
 
 ## 1. Who he is
 - A male Golden Retriever (he/him): a deep red-gold coat with lighter feathering, long feathered floppy ears, a cream
@@ -252,29 +253,57 @@ and the Whelp Bond build at **clear ×0.85–1.05**.
   95 → 100%; Tailwag Volley 85 + 9 → 96 + 9, cost 7 + 0.35 → 4.2 + 0.33 (it was starved of zoom); Bonk Dart 130 → 140%,
   cost 3 → 2.5, its splash 40% in 1.1 m → 50% in 1.3 m.
 
-## 5. Joining (checkpoint 3: `src/actors/goldenJoin.js`, owned by HeroManager like the others: `G.heroes.gldJoin`)
-- **The scene** runs in the **Onsen** zone (`JOIN_AT.golden = 'onsen'`, by Yukimi Spa Village's hot springs), on any visit
-  while he hasn't joined. Until then he isn't in town and the wheel's card says "Standing guard by the hot springs…".
-  - *guard*: by the steaming spring, standing very straight with his lance planted, the little dragon on his helm.
-  - *vow*: he steps forward, raises the lance in salute and begins a solemn knightly vow ("I, Foosy of the Emberleaf Guard,
-    do swear upon my lance to guard these springs against all—"). A tennis ball bounces out of the bathhouse (a bather's).
-    His ears go up, his tail goes, and the vow is abandoned mid-word: he drops the lance and bounds after it, comes back
-    with it, sits, very pleased, and finishes: "—against all comers. …Is this yours? It was very well thrown."
-  - *the gift*: he has been guarding something for Shadow: a dragon whelp costume ("Every dragoon needs a dragon. Would he
-    like to be mine?"). Shadow tries it on: a poof (`whelp:swap`), a wobbly first flap, a tiny roar that comes out as a
-    squeak, then he flies a happy loop round them both.
-  - `prepareJoin`; "May I join your pack? I promise to guard it with my whole heart." (two answers); `joinGolden()`
-    (banner, `flags.goldenJoined`, the save). He lives at Chewy's house from the next town visit.
-  - Leaving the zone, dying or a hero switch before he speaks resets it.
-- **The rumour**: in town, once the Shih Tzu has joined and Foosy hasn't, Shadow passes it on once: a very polite dog in
-  emerald armour is guarding the hot springs at Yukimi and won't let anyone in without a password ("…Is the password
-  'ball'?"); or the unlock it still needs.
+## 5. Joining (built in checkpoint 3: `src/actors/goldenJoin.js`, owned by HeroManager like the others: `G.heroes.gldJoin`)
+- **The scene** runs in the **Onsen** zone (`JOIN_AT.golden = 'onsen'`, at Yukimi's big hot spring, `onsen.js SPRINGS[0]`),
+  on any visit while he hasn't joined. Until then he isn't in town and the wheel's card says "Standing guard by the hot
+  springs…". The scene's actor is a `SceneGolden` (an Actor with his gear: the lance in his paw, `gldAttention` and the
+  other scene poses in `goldenPoses.js`); it is built hidden on arrival and shown two seconds in, once the field is calm.
+  - **Staging** (`stage`, worked out once as he takes his post): his post on the big spring's rim; your mark beside him
+    on screen (2.7 m across, a step toward the camera); Shadow's mark between you, in front; where the ball lands (his
+    other side or behind him). Every spot is dry, level and **in plain view of the game camera**: rays from each actor's
+    middle and head up the camera's line against the scenery (`screened`). The scenery near the spring is gathered a
+    few milliseconds a frame while he waits (`prepStep` / `occBuild`: the big merged batches cut to their triangles in
+    a box round the spring above knee height, sorted into half-metre strips across the screen so a ray meets a few
+    thousand triangles; the trees' batched and instanced meshes and the small props as they are; no actors, ground or
+    see-through things), so taking the post costs ~15–25 ms once. Pairs that leave the spring and its steam in front of
+    them are scored down.
+  - *guard*: at his post, facing the camera, standing very straight, the lance upright (`gldAttention`). Within 16 m
+    Shadow notices him once (a "?" and the hint `gldGuard`: "…Is he a statue?").
+  - *vow* (within 5 m, the field calm): controls lock, you walk to your mark (`moveTarget`; on it after 4 s if the way
+    is blocked) and Shadow trots to his and sits watching. The scene's camera (`frameTick`, every frame of the scene) frames the beat's actors with a margin and
+    keeps the group in the middle of the screen: him and you, Shadow once he's called, the ball during the fetch, the
+    loop's circle during the loop; the distance from the group's size on screen (the 20° lens), 14–26 m. He turns, salutes
+    (`gldSalute`) and begins: "Halt! Who approaches the springs of Yukimi? …A traveller. Then bear witness: I, Foosy of
+    the Emberleaf Guard, do solemnly swear upon my lance to guard these springs against all—". A tennis ball (a
+    procedural one, with a seam) arcs out of the old bathhouse (the zone's `feature` POI) and bounces past him ("Fetch!").
+    He startles (`gldStartle`, a "!"), the lance falls and lies on the ground, he bounds after the ball, picks it up
+    (it rides in his jaw, following the head), trots back to his post, sits with it, very pleased (`gldSitProud`, a
+    heart), drops it at your feet and finishes: "—against all comers. … Is this yours? It was very well thrown."
+  - *talk*: two answers ("That ball is the bathhouse's." / "Good catch!"), then the gift: Shadow is called to his mark,
+    he offers a little emerald bundle (`gldOffer`): "Every dragoon needs a dragon. Would you like to be mine?" Shadow
+    barks, the bundle goes, and **Shadow wears the whelp outfit though Foosy isn't the one played** (`Whelp.forced`
+    overrides `wanted()`; the swap's poof): a wobbly first flap (up, a bump back down, up for real), a tiny roar that
+    comes out as a squeak (`whelp_roar`), then a happy twelve-point loop round you both at 1.3 m. "…Magnificent. He is a
+    natural. A little squeaky."
+  - `prepareJoin`; "May I join your pack? I promise to guard it with my whole heart." ("Welcome to the pack! ♡" / "Only
+    if you bring the ball."); he picks up his lance, bows (`gldBow`), trots off and is gone in a poof; `joinGolden()`
+    (banner, `flags.goldenJoined`, the save; near the pack's level). `Whelp.forced` clears (the outfit comes off with a
+    poof) and Shadow's hint `gldWings` says he wears his wings whenever Foosy is played. He lives at Chewy's house from the
+    next town visit, the lance on his back.
+  - Leaving the zone, dying or a hero switch mid-scene resets it all (the actor, the ball, the bundle, the lance on the
+    ground, `forced`, Shadow's hold); it plays again on the next visit.
+- **The rumour**: in town, once the Shih Tzu has joined and Foosy hasn't, Shadow passes it on once (`gldRumour`): a very
+  polite dog in emerald armour is guarding the hot springs at Yukimi Onsen and won't let anyone in without the password
+  ("…Is the password 'ball'?"), with the Wayfarer's Post, or the unlock the zone still needs.
 - **The guide** "Meet Foosy" (`world/guides.js meetGolden`, narrated by him, the class colour; the title and lines read
   `CLASSES.golden.name`): *hold* Tab, the wheel with five, pick him; *lance* (left-click the reach combo, right-click
-  Sunbeam Thrust); *javelin* (1: Bonk Dart); **whelp** (Shadow flies beside him while he's played: watch him take off, hover
-  and land; Ember Breath on 2 once learned); *wrap* (his trees, K).
+  Sunbeam Thrust); *javelin* (1: Bonk Dart); **whelp**: Shadow flies beside him while he's played; done when Shadow is
+  airborne and lifted (`whelp.air > 0.9`, `lift > 0.6`: walk a few steps and he takes off), after 3 s on the step; *wrap*
+  (his trees, K).
 - `?hero=golden` (debug) and `G.heroes.joinGolden()` (QA) join him at once.
-- QA: `tools/qa/s29-golden.mjs` (modelled on s28-shihtzu).
+- QA: `tools/qa/s29-golden.mjs` (a: the scene beat by beat, b: a reset mid-scene and the rumour, c: the guide, d: every
+  skill tapped in a Burrow fight and a real Sunbeam Thrust hold, e: a charged burst's frames; `SHOTS=1` saves the beats to
+  `tools/qa/tmp/s29/`); `prod-smoke.mjs` checks his guard at the Onsen in the built bundle.
 
 ## 6. Shadow the dragon whelp (`src/actors/whelp.js`; Companion.update calls it)
 - **The rule**: Shadow wears the whelp outfit **only while Foosy is the active hero** (`Whelp.wanted()`: `activeHero ===
@@ -427,9 +456,14 @@ Settings › Hero models › Samurai or Toybox use him (`cfgFor`: goldenToy); St
 - Heroes: `src/actors/heroes.js` (JOIN_AT, JOIN_HINT, HOME_OFS, HERO_CHAT, `joinGolden`), `src/actors/heroModels.js`
   (`HERO_MODELS.goldenToy`, `lanceMount`, `warmGrade` / `warmCap`), `src/gfx/portraits.js` (his framing, `dresser`),
   `src/game.js` (his model and portrait), `src/ui/hud.js` (the weapon badge's glyph; the kana from HERO_TEXT).
-- Checkpoint 3 (planned): `src/actors/goldenJoin.js`, `world/guides.js meetGolden`, `tools/qa/s29-golden.mjs`.
+- Joining: `src/actors/goldenJoin.js` (`GoldenJoin`: the Onsen scene, its `SceneGolden` actor, the ball and the bundle, the
+  rumour; HeroManager owns it as `gldJoin` and ticks it after `stzJoin`), the scene poses in `goldenPoses.js`
+  (`gldAttention`, `gldSalute`, `gldStartle`, `gldSitProud`, `gldOffer`, `gldBow`), `Whelp.forced` in `whelp.js` (the gift's
+  try-on), `world/guides.js meetGolden`, `tools/qa/s29-golden.mjs`.
+- Floor loot (shared, `src/combat/groundLoot.js`): coins, potions, materials, pantry, gems, quest items and items are
+  drawn in the Horde's instanced batches in a fight (`lookIn`), released on pickup (§11).
 
-## 11. Performance (checkpoint 2; `tools/qa/profile-horde.mjs`, ROT.golden: his full kit with the whelp breathing and swooping)
+## 11. Performance (checkpoints 2 and 3; `tools/qa/profile-horde.mjs`, ROT.golden: his full kit with the whelp breathing and swooping)
 The rotation casts every 160 ms: Dragon Heart, Ember Breath ×4, Divebomb Swoop ×3, the lance moves, the javelins (a volley,
 the rain, an Emberleaf), the roar, the shield. Measured on a **busy machine** (WardogsClient using 38% of the 3D engine,
 the CPU at 76–82%, other Chrome sessions; the tool's verdict BUSY), Poe, Floofy and Foosy back to back under the same load
@@ -443,8 +477,24 @@ the CPU at 76–82%, other Chrome sessions; the tool's verdict BUSY), Poe, Floof
 | zone, 250 | 20.7 / 27.7 | 21.9 / 34.4 | 19.2 / 28.9 |
 
 (first tries; the retries swung with the load: Poe's zone 150 went to 20.2 / 50.3.) Nothing of his costs more CPU than the
-others'. His draw calls run higher at 250 (the zone ~1,000 against Poe's ~650; the Burrow ~800 against ~500): a bonk's
-ring was a mesh and a material per javelin (a rain of 25 drew 25), now a particle, and the bright middle stars are
-budgeted to three a frame; the census of drawn objects outside the horde batches matches Poe's, so the rest is still to
-pin down (the floor's loot from his kill rate is a candidate: ~200 drops lie on the floor by the end of the window). The
-gate needs a quiet machine.
+others'.
+
+**Draw calls at 250 (checkpoint 3).** They ran higher than Poe's (the zone ~1,000 against ~650; the Burrow ~800 against
+~500). `profile-horde.mjs DRAWCAT=1` (a per-category option: hide one kind of object at a time over a few frames and
+average the harness's per-frame `renderer.info` count) pinned it: **the floor's loot**. His kill rate leaves ~270 drops
+on the floor by the end of the 250 window against Poe's ~77, and each drop was a mesh plus an outline plus a shadow (the
+loot's share: ~510–700 draws against Poe's ~200). Before that, a bonk's ring was a mesh and a material per javelin (now a
+particle) and the bright middle stars are budgeted to three a frame. **The fix** (`src/combat/groundLoot.js`): in a fight,
+coins, potions, materials, pantry goods, gems, quest items and items are drawn in the Horde's instanced batches
+(`dungeon/horde.js lookIn`, the toon body and its ink on cached geometry: one draw per kind, however many lie there) and
+released from them on pickup; furniture (its geometry may not be cached) and textured drops stay plain meshes. After it,
+the same run (`DRAWCAT=1 WORLDS=zone,burrow HEROES=golden,poe`, two passes each, a BUSY machine: WardogsClient at up to
+89% of the 3D engine, the CPU at 88–100%):
+
+| draws per frame at 250 | Foosy | Poe |
+|---|---|---|
+| zone (Bamboo Depths) | 491 / 487 | 560 / 564 |
+| Burrow | 420 / 480 | 438 / 429 |
+
+His loot now costs ~40–70 draws for ~180–260 drops; he sits at or under Poe's count (the Burrow's second pass +12%,
+within the 10–15% target). The CPU gate needs a quiet machine.

@@ -1,7 +1,9 @@
 // Tier run look review (docs/ZONES.md §5.1; ROADMAP Z-E2): boots a tier run with modifiers and shoots a pack fight at the
 // game camera. One page per run; shots wait on game state (the dungeon up, the pack awake, ghosts risen), not wall time.
 //   node tools/qa/tier-shots.mjs [--run bambooDepths:5:haunted] [--tag name] [--lvl 30] [--hero chewy] [--kill 6]
-//        [--hud 0] [--seed 1] [--dist 27]
+//        [--hud 0] [--seed 1] [--dist 27] [--kind kakashi] [--watch 4]
+//   --kind: the pack with the most of that kind; --watch S: S more seconds of the fight, a shot each 1.3 s, and the most
+//   members winding up at once (the attack tokens: dungeon/tokens.js)
 // → <SHOT_DIR>/tier_<tag>_<n>.png and a line per shot (draw calls, triangles, monsters on the floor, awake)
 import { chromium } from 'playwright-core';
 import fs from 'node:fs';
@@ -9,7 +11,7 @@ import path from 'node:path';
 
 const args = process.argv.slice(2), arg = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
 const runQ = arg('run', 'bambooDepths:5:haunted'), tag = arg('tag', runQ.replace(/[:,]/g, '_')), lvl = +arg('lvl', 30), hero = arg('hero', 'chewy');
-const kill = +arg('kill', 6), hud = arg('hud', '1') !== '0', seed = arg('seed', '1'), dist = +arg('dist', 0);
+const kill = +arg('kill', 6), hud = arg('hud', '1') !== '0', seed = arg('seed', '1'), dist = +arg('dist', 0), kind = arg('kind', ''), watch = +arg('watch', 0);
 const OUT = process.env.SHOT_DIR || path.resolve('tools/qa/out/tier');
 fs.mkdirSync(OUT, { recursive: true });
 const BASE = process.env.BASE || 'http://localhost:5173';
@@ -41,14 +43,14 @@ const shot = async (name, note = '') => {
   console.log(`${name.padEnd(10)} calls=${r.calls} tris=${(r.tris / 1e3) | 0}k monsters=${r.n} awake=${r.awake} ghosts=${r.ghosts} ${note} → ${f}`);
 };
 // the biggest pack near the arrival: the hero stands 6.5 m from it on the camera side, the pack wakes
-const info = await page.evaluate(({ hud, dist }) => {
+const info = await page.evaluate(({ hud, dist, kind }) => {
   const G = window.G, D = G.dungeon, P = G.player;
   if (!hud) { const ui = document.getElementById('ui'); if (ui) ui.style.display = 'none'; }
   P.invuln = true; window.__inv = setInterval(() => { P.invuln = true; G.actions.restoreAll?.(); }, 300);
   const groups = new Map();
   for (const m of D.monsters) { if (m.def.boss) continue; const k = m._pack || m.leader || m; const g = groups.get(k) || []; g.push(m); groups.set(k, g); }
   const s = D.startPos; let best = null;
-  for (const g of groups.values()) { if (g.length < 5) continue; let cx = 0, cz = 0; for (const m of g) { cx += m.pos.x; cz += m.pos.z; } cx /= g.length; cz /= g.length; const sc = g.length * 2 - Math.hypot(cx - s.x, cz - s.z) * 0.6; if (!best || sc > best.sc) best = { g, cx, cz, sc }; }
+  for (const g of groups.values()) { if (g.length < 5) continue; let cx = 0, cz = 0; for (const m of g) { cx += m.pos.x; cz += m.pos.z; } cx /= g.length; cz /= g.length; const sc = (kind ? g.filter(m => m.id === kind).length * 50 : 0) + g.length * 2 - Math.hypot(cx - s.x, cz - s.z) * 0.6; if (!best || sc > best.sc) best = { g, cx, cz, sc }; }
   const g = best.g; let x = best.cx + 4.6, z = best.cz + 4.6;
   for (let k = 0; k < 24 && !G.world.walkable(x, z); k++) { const a = k * 0.7; x = best.cx + Math.cos(a) * 6.5; z = best.cz + Math.sin(a) * 6.5; }
   P.setPos(x, z); G.companion?.setPos?.(x + 0.8, z + 0.6); P.faceTarget = P.facing = Math.atan2(best.cx - x, best.cz - z);
@@ -56,11 +58,19 @@ const info = await page.evaluate(({ hud, dist }) => {
   for (const m of g) m.alert();
   window.__pack = g;
   return { pack: g.length, kinds: [...new Set(g.map(m => m.id))], ranks: [...new Set(g.map(m => m.rank))], run: D.tr?.label, mods: D.mods, n: D.monsters.length, mlvl: D.layout.mlvl, modded: D.layout.modded, el: D.runMods.monster.el };
-}, { hud, dist });
+}, { hud, dist, kind });
 console.log(`${runQ}: ${JSON.stringify(info)}`);
 await page.waitForFunction(() => window.__pack.filter(m => m.alive).some(m => Math.hypot(m.pos.x - window.G.player.pos.x, m.pos.z - window.G.player.pos.z) < 4.5), null, { timeout: 8000 }).catch(() => {});
 await page.waitForTimeout(400);
 await shot('1-pack');
+for (let i = 0; i < Math.round(watch / 1.3); i++) {
+  const w = await page.evaluate(async () => { // (sample the wind-ups every 50 ms for 1.3 s: the pack's and the floor's most at once)
+    const G = window.G, T = await import('/src/dungeon/tokens.js'); let pack = 0, all = 0;
+    for (let k = 0; k < 26; k++) { await new Promise(r => setTimeout(r, 50)); pack = Math.max(pack, window.__pack.filter(m => m.alive && m.state === 'windup').length); all = Math.max(all, G.dungeon.monsters.filter(m => m.alive && m.state === 'windup').length); }
+    return { pack, all, tokens: T.tokenStats(G.dungeon) };
+  });
+  await shot(`w${i + 1}`, `(most winding up at once: pack ${w.pack}, floor ${w.all}; tokens granted ${w.tokens.granted} denied ${w.tokens.denied})`);
+}
 if (kill > 0) {
   await page.evaluate(k => { const G = window.G, live = window.__pack.filter(m => m.alive).slice(0, k); for (const m of live) G.combat.applyDamageToMonster ? G.combat.applyDamageToMonster(m, m.life + 5, { element: 'phys' }) : m.takeDamage(m.life + 5); }, kill);
   await page.waitForFunction(() => (window.G.dungeon.tr?.stats.ghosts || 0) > 0 || !window.G.dungeon.runMods.run.haunted, null, { timeout: 5000 }).catch(() => {});

@@ -19,6 +19,11 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
   on his hip; a **toy flail** (Strength) and dark dog magic (Energy: hexes, gloom over time). Flail Arts / Gloom Hexes /
   Ghostlight Tome. The tank: the most life, a damage reduction and the Gloom Blanket. Met in Momiji Hollow, lighting
   ghostlight lanterns (a ghost pup licks his face mid-proclamation).
+- **Foosy** — fifth playable hero (docs/GOLDEN.md; `CLASSES.golden.name`, id `golden`): a red-gold Golden Retriever dragoon
+  (he/him) in emerald scale armour with a crest helm carrying a little dragon; a **toy lance** (Strength, the longest reach)
+  and blunt **toy javelins** (Dexterity). Lance Arts / Javelins / Whelp Bond. While he's played **Shadow wears a dragon
+  whelp outfit and flies** beside him; the Whelp Bond drives Shadow (breath, swoops, a wing shield, a roar, Dragon Heart).
+  Met at the hot springs of Yukimi Onsen (a solemn vow undone by a tennis ball; he gives Shadow the costume).
 - **Shadow** — sidekick Boston terrier (quadruped, black #1e1c24 + white muzzle/blaze/chest, big bat ears, round eyes, blue collar). Follows and fights (D2 mercenary style).
 - **Rosie** — human little girl, curly brown hair, brown eyes, fair skin, rosy cheeks, pink dress + red bow. Runs "Rosie's Treats" shop & gives quests.
 - Villagers — humanoid cartoony animals (cat, bunny, bear, fox, panda, tanuki, frog, duck…).
@@ -347,6 +352,19 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   (`src/actors/shihtzuJoin.js`) runs his Momiji Hollow scene (event `shihtzu:joinScene`) and Shadow's rumour in town;
   `joinShihtzu()` joins him. The hero wheel and the HUD minis take any number of heroes. prod-smoke requires
   `shihtzu_toy` and the GLB flail whenever they ship.
+- **Foosy** (docs/GOLDEN.md): `CLASSES.golden`, the lance (`wtype: 'lance'`); skills `src/rpg/skillsGolden.js`, casts on
+  SkillRunner by `src/combat/goldenSkills.js` (the reach combo, Sunbeam Thrust, Bonk Dart, the javelins' flight) +
+  `goldenArts.js` (the other Lance Arts and Javelins, Steady Paws, Good Retriever) + `goldenWhelp.js` (the Whelp Bond,
+  through `Whelp.act`) + `chargedGolden.js` (charge tables `src/rpg/chargeGolden.js`, sim models
+  `tools/charge-sim-golden.mjs`); effects `src/gfx/goldenFx.js` (one instanced batch for every javelin); the lance and
+  javelin props, the guard and the per-base tints `src/actors/goldenGear.js`; poses `goldenPoses.js`; sounds
+  `src/audio/golden.sfx.js`; icons `src/rpg/iconsGolden.js`. His look is the baked `golden_toy` (`HERO_MODELS.goldenToy`:
+  a hue-gated warm grade and cap for the coat, `lanceMount`) with the Blender lance and javelin; the kit (`CAST.golden` +
+  `goldenKit.js`, the helm built on the classic kits) is the fallback. **Shadow the whelp** (`src/actors/whelp.js`): the
+  `shadow_whelp` rig and the mirrored wing prop, worn while `activeHero === 'golden'` (or `Whelp.forced`), a flight mode
+  drawn over the companion's ground AI (`poseQuad` fly / grow). `flags.goldenJoined` gates him; `G.heroes.gldJoin`
+  (`src/actors/goldenJoin.js`) runs his Onsen scene (event `golden:joinScene`) and Shadow's rumour in town; `joinGolden()`
+  joins him. Ground loot is drawn instanced with the monsters (`groundLoot.js` → `horde.js lookIn`).
 - **The procedural NPCs (villagers, townsfolk, humanoid monsters) are Toybox-style** by default: `src/actors/toyKit.js`, through
   `makeToyHumanoid` in charKit.js. The targets are the 7 approved sheets in tools/blender/work/codex/npc-kit/sheets.
   - **Style:** `kitStyle()` follows the "Hero models" setting (Storybook gives the Disney kit), and "Disney style" off gives the
@@ -556,6 +574,26 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   lantern }` (the Deep Burrow's in `state.dungeon.deep`), `fillTiers` (the migration), `recordDungeonClear`,
   `tierCleared`, `tierOpen`, `spiritOpen`, `spiritBest`, `spiritMax`, `rememberSetup`, `lastSetup`, `TIER_DUNGEONS`.
 - **The Yūrei** (`zoneMonsters/spirit.js` + `spirit.sfx.js`, registered with the region monsters): Haunted's ghost.
+- **Attack tokens** (`dungeon/tokens.js`, every DungeonMode / RegionMode): `Monster.update` calls `attackToken` when its
+  cooldown runs out (beyond melee reach, a pack / kind budget near the hero, WEIGHT for multi-lane attacks) and
+  `alertBubble` for its "!"; `releaseToken` on death / vanish / dispose; `tokenStats(mode)` for QA.
+- **The Spirit Lantern** (`regions/spiritLantern.js`): `lanternModel`, `placeLantern(G, W, id, { x, y, z, yaw, lightI })`
+  (the gate: `installGate`, `look.spirit` / `spiritI`; the village: `installBurrowLantern`, `G.burrowLantern`, updated in
+  game.js's village frame), `installLanternApi` → `G.lantern.info / open / enter`. The panel `ui/lantern.js`
+  (`LanternPanel`, 'lantern'), icons `ui/lanternIcons.js`, the run chip `ui/runChip.js` (in `.hud-tr`); padNav START and
+  HANDLERS entries for `.p-lantern`.
+- **The pinnacle, the Four Seasons** (ZONES §5.3): `dungeon/pinnacleLayout.js` (pure: `SEASONS`, `SEASON_LIFE`,
+  `PINNACLE_UNIQUE`, `pinnacleLayout(L)` from gen.js `generate` on a pinnacle run's boss floor: the first season's boss,
+  `L.pinnacle`, an `L.arena` for the Deep Burrow's room) and `dungeon/pinnacle.js` (`Pinnacle`, owned by `TierRun` as
+  `tr.pin`: `share` (a season's life), `seasonFalls(m)` (asked by `DungeonMode.onMonsterDeath` before a boss's death
+  counts: true for Spring to Autumn), `spawnNext`, `finale`, the spirits (`raiseStatue`: `buildMonster` of the fallen
+  boss with see-through Lambert materials), the echoes (`gale`, `ink`, `roll`, gated by `quiet()` / `bossBusy(b)`, then
+  `hold(b, t)` on the boss's own cooldown), the season's air, `onDrops` → `curate` → `dropRing` (the Pinnacle hoard, after the Victory
+  banner), `PIN_WHITEOUT` (Yuki-onna's `m.woMul`, read in her `updateWhiteout`)). Also read by `zoneRun.js` (the seal
+  stays up until `pin.done`) and `checkFloorClear` (not between seasons); `b.victorySub` sets the Victory line.
+- **The endgame uniques**: `rpg/items.js` UNIQUES tagged `spirit` (`zone: 'spirit'` keeps them out of `generateItem`);
+  `tierRun.js` `ENDGAME_UNIQUES()` (not the `pinnacle` one) for the chests and leaders, `clearDrops` adds Shiki to the
+  pinnacle's chest.
 - **QA**: test-rpg "ZONE TIERS", gen-fuzz (three tier setups on every tier dungeon), s30-tiers, `profile-horde`
   `RUN=5:swarming,teeming,rally WORLDS=zone`; look review `tools/qa/tier-shots.mjs`.
 
@@ -773,7 +811,7 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
 ## Persistent state `G.state` (JSON-serialisable, saved to localStorage)
 ```js
 state = {
-  version: 2, activeHero: 'chewy', heroes: { chewy: { player, equipment }, moka: { … }, poe: { … }, shihtzu: { … } }, // (saved)
+  version: 2, activeHero: 'chewy', heroes: { chewy: { player, equipment }, moka: { … }, poe: { … }, shihtzu: { … }, golden: { … } }, // (saved)
   // player / equipment below = heroes[activeHero].player / .equipment (live aliases, not saved)
   player: { cls:'chewy', name:'Chewy', lvl:1, xp:0, stats:{str:10,dex:10,vit:12,ene:8}, statPts:0, skillPts:1,
             skills:{ chomp:1 }, hotbar:['attack','chomp',null,null,null,null], // [LMB, RMB, 1, 2, 3, 4]

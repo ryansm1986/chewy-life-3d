@@ -28,7 +28,7 @@ const server = await preview({ logLevel: 'error', build: { outDir }, preview: { 
 const url = server.resolvedUrls.local[0].replace(/\/$/, '');
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true, args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] });
 let failed = 0;
-for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['poe', '/?fresh&nointro&hero=poe'], ['shihtzu', '/?fresh&nointro&hero=shihtzu'], ['golden', '/?fresh&nointro&hero=golden'], ['home', '/?fresh&nointro'], ['pad', '/?fresh&nointro&notut'], ['deck', '/?fresh&nointro&notut'], ['touch', '/?fresh&nointro&notut'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`]), ...Object.values(DUNGEONS).filter(dd => dd.gate).map(dd => ['zone:' + dd.id, '/?fresh&nointro']), ['tier:bambooDepths', '/?fresh&nointro&notut'], ['tier:burrowDeep', '/?fresh&nointro&notut']]) { // (every zone dungeon that has its gate: its kit, a dense floor, the arena)
+for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['poe', '/?fresh&nointro&hero=poe'], ['shihtzu', '/?fresh&nointro&hero=shihtzu'], ['golden', '/?fresh&nointro&hero=golden'], ['home', '/?fresh&nointro'], ['pad', '/?fresh&nointro&notut'], ['deck', '/?fresh&nointro&notut'], ['touch', '/?fresh&nointro&notut'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`]), ...Object.values(DUNGEONS).filter(dd => dd.gate).map(dd => ['zone:' + dd.id, '/?fresh&nointro']), ['tier:bambooDepths', '/?fresh&nointro&notut'], ['tier:burrowDeep', '/?fresh&nointro&notut'], ['pinnacle:bambooDepths', '/?fresh&nointro&notut']]) { // (every zone dungeon that has its gate: its kit, a dense floor, the arena)
   const page = await browser.newPage(label === 'touch' ? { viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true } : { viewport: label === 'deck' ? { width: 1280, height: 800 } : { width: 1600, height: 900 } }); // (deck: the Steam Deck's screen; touch: a phone in landscape)
   const errs = [];
   page.on('pageerror', e => errs.push('pageerror: ' + e.message));
@@ -167,9 +167,14 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
   if (regionId) { // every outdoor region in the bundle (docs/REGIONS.md): built, populated, with its own boss (or its dungeon gate)
     await page.waitForFunction(() => window.G?.dungeon?.isRegion && !window.G.ui?.iris?.active, null, { timeout: 30000 }).catch(() => errs.push('region never loaded'));
     s.region = await page.evaluate(() => ({ id: window.G.dungeon?.regionId, monsters: window.G.dungeon?.monsters?.length || 0, boss: !!window.G.dungeon?.boss, gate: !!window.G.dungeon?.gate }));
+    if (regionId === 'onsen') { // Foosy's joining scene in the bundle (docs/GOLDEN.md §5): on guard by the big spring, his rig and lance
+      await page.waitForFunction(() => window.G.heroes.gldJoin?.state === 'guard', null, { timeout: 15000 }).catch(() => {});
+      s.region.gld = await page.evaluate(() => { const S = window.G.heroes.gldJoin, k = S.knight; return { state: S.state, vis: !!k?.visible, act: k?.anim.action?.name || null, model: k?.rig?.model || null, lance: !!k?.lance, glb: !!k?.lance?.glb, spring: k ? Math.round(Math.hypot(k.pos.x - 55.5, k.pos.z - 64.5) * 10) / 10 : -1 }; });
+    }
   }
   // (a zone whose boss moved into its dungeon has the dungeon gate at the trail's end instead: docs/ZONES.md §8.2)
-  const regionOk = !s.region || (s.region.id === regionId && s.region.monsters >= 10 && (s.region.boss || s.region.gate));
+  const rg = s.region?.gld, gldSceneOk = regionId !== 'onsen' || (rg?.state === 'guard' && rg.vis && rg.act === 'gldAttention' && rg.lance && rg.spring < 6 && (!TOY_GOLDEN || rg.model === 'golden_toy') && (!GLD_PROPS || rg.glb));
+  const regionOk = !s.region || (s.region.id === regionId && s.region.monsters >= 10 && (s.region.boss || s.region.gate) && gldSceneOk);
   const zoneId = label.startsWith('zone:') ? label.slice(5) : null;
   if (zoneId) { // a zone dungeon in the bundle (docs/ZONES.md §8.2): its cave kit, a dense floor, the arena with its boss
     s.zone = await page.evaluate(async id => {
@@ -193,7 +198,27 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
       return { kind: D?.kind, label: D?.tr?.label, mods: D?.mods?.length || 0, n: D?.monsters?.length || 0, ghost: !!D?.monsters?.some(x => x._ghost), el: D?.monsters?.filter(x => x._el).length || 0, lvl: D?.layout?.mlvl || 0 };
     }, tierId);
   }
-  const tierOk = !s.tier || (s.tier.label === 'Tier 5' && s.tier.mods === 3 && s.tier.ghost && s.tier.el > 20 && s.tier.n >= (tierId === 'burrowDeep' ? 40 : 180));
+  const pinId = label.startsWith('pinnacle:') ? label.slice(9) : null;
+  if (pinId) { // the Spirit Lantern's panel and the pinnacle in the bundle (docs/ZONES.md §5.2, §5.3): Spirit 10's Four Seasons, end to end
+    s.pin = await page.evaluate(async id => {
+      const G = window.G, sleep = ms => new Promise(q => setTimeout(q, ms)), o = {}; G.state.flags.burrowTut = true; G.player.invuln = true;
+      G.tierDebug.clearAll(5); G.state.zones.bamboo.dungeon.spirit.best = 9;
+      G.lantern.open(id); await sleep(400); o.cards = document.querySelectorAll('.p-lantern .ln-card').length; o.spiritTab = !!document.querySelector('.ln-tier.spirit'); G.ui.close('lantern');
+      G.tierDebug.run(id, 5, [], 10, 2);
+      for (let i = 0; i < 300 && !(G.dungeon?.tr?.pin && G.dungeon.boss && !G.ui?.iris?.active); i++) await sleep(120);
+      const D = G.dungeon, pin = D?.tr?.pin; if (!pin) return o;
+      o.chip = document.querySelector('.run-chip.on')?.textContent.trim(); const seen = [];
+      for (let k = 0; k < 4; k++) {
+        for (let i = 0; i < 120 && !(D.boss?.alive && pin.k === k); i++) await sleep(100);
+        if (!D.boss) break; seen.push(D.boss.id); D.boss.alert(); await sleep(1200); G.player.invuln = true;
+        G.combat.hitMonster(D.boss, { dmgPct: 1e8 });
+      }
+      for (let i = 0; i < 80 && !G.world.interactables.some(t => /Lantern chest/.test(t.label)); i++) await sleep(100);
+      return { ...o, seen: seen.join(), spirits: pin.stats.falls, done: pin.done, chest: G.world.interactables.some(t => /Lantern chest/.test(t.label)) };
+    }, pinId);
+  }
+  const pinOk = !s.pin || (s.pin.cards === 17 && s.pin.spiritTab && /Spirit 10/.test(s.pin.chip || '') && s.pin.seen === 'tenguMaster,umibozu,danzaburo,yukiOnna' && s.pin.done && s.pin.chest);
+  const tierOk = pinOk && (!s.tier || (s.tier.label === 'Tier 5' && s.tier.mods === 3 && s.tier.ghost && s.tier.el > 20 && s.tier.n >= (tierId === 'burrowDeep' ? 40 : 180)));
   const zoneOk = tierOk && (!s.zone || (s.zone.kind === 'zone' && s.zone.kit && s.zone.n >= 120 && !!s.zone.boss && s.zone.arena >= 15));
   const h = s.home, homeOk = !h || (h.mode === 'interior' && h.items >= 12 && h.batches >= 10 && h.jobs === 4 && h.palette && h.thumbs >= 3 && h.back === 'village');
   const pz = s.poe, poeOk = !pz || (pz.hero === 'poe' && (!TOY_POE || (s.model === 'poe_toy' && pz.baked)) && (!POE_FUMA || (pz.fuma === 'glb' && pz.villagerFuma === 'glb')) && pz.back && pz.wt === 'fuma' && pz.cast && pz.flying && pz.caught && pz.icons && pz.switch && pz.after === 'chewy' && pz.poeVillager);

@@ -22,6 +22,8 @@ import { ChargeHud } from './chargeHud.js';
 import { ShopPanel } from './shop.js';
 import { MapPanel, QuestPanel, normQuest } from './map.js';
 import { TravelPanel } from './travel.js';
+import { LanternPanel } from './lantern.js';
+import { RunChip } from './runChip.js';
 import { MenuPanel } from './menu.js';
 import { SeedPickerPanel, pantryGain, pantryTipHTML } from './pantry.js';
 import { CookPanel } from './cook.js';
@@ -101,9 +103,11 @@ export const UI = {
       decorate: new DecoratePanel(this), // (decorate mode indoors: docs/HOUSING.md)
       craft: new CraftPanel(this), // (the workbench: docs/HOUSING.md §3)
       houseCard: new HouseCardPanel(this), remodel: new RemodelPanel(this), // (a house's mailbox: Upgrade / Remodel / Enter — docs/HOUSING.md §5-6)
+      lantern: new LanternPanel(this), // (the Spirit Lantern: a dungeon's tiers and modifiers — docs/ZONES.md §5.2)
     };
     this.homeHud = new HomeHud(this); // (indoors: the house name, the Decorate button)
     this.chargeHud = new ChargeHud(this); // (the hotbar's charge ring + stage pips: docs/CHARGE.md)
+    this.runChip = new RunChip(this); // (a tier run's tier and modifiers, under the minimap: docs/ZONES.md §5.2)
     this.skills = this.panels.skills;
     // popover + skill drag ghost
     this.pop = el('div', 'pop-wrap'); this.pop.innerHTML = '<div class="pop-box"></div>'; this.layers.over.appendChild(this.pop);
@@ -247,7 +251,7 @@ export const UI = {
     for (const [n, p] of Object.entries(this.panels)) if (p.isOpen && !NON_BLOCKING.has(n)) return true;
     return false;
   },
-  isPaused() { return this.ready && (this.mode === 'title' || this.isOpen('menu') || !!this.mobile?.portrait); }, // (a phone held upright: the rotate overlay, ui/mobile.js)
+  isPaused() { return this.ready && (this.mode === 'title' || this.isOpen('menu') || !!this.mobile?.portrait || !!this.mobile?.hold); }, // (a phone held upright: the rotate overlay; the full-screen and zoom cards: ui/mobile.js)
   /** A moment a one-off hitch can't be seen, for heavy cache-filling work (building templates: world/village.js, the
    *  townsfolk rig pool: game.js, the build palette's thumbnails: ui/prewarm.js): the title screen, or a menu / dialogue
    *  that has been up past its open animation (`ms`). Not the open itself: that frame is the one the player watches

@@ -203,3 +203,26 @@ body.touch-active .ch-pts .tt-dim { display: none; }
 body.touch-active .wswap .kc { display: none; }
 .ui-root.m-touch .p-char .at-plus { width: 52px; height: 52px; border-radius: 14px; }
 .ui-root.m-touch .p-char .at-plus .gl { width: 22px; height: 22px; }
+
+/* ---------------------------------------------------------------- CT-6: the cards that pause (full screen closed, zoomed in) */
+/* the rotate card's look; under it in portrait. While the zoom card shows the page may pinch (index.html, html.pinch-ok) */
+.m-hold { position: fixed; left: 0; top: 0; width: 100%; height: 100%; z-index: 190; box-sizing: border-box; overflow: hidden; display: none; place-items: center; padding: 24px; pointer-events: auto; touch-action: none;
+  background: radial-gradient(circle at 50% 38%, rgba(255, 246, 232, .94), rgba(255, 216, 230, .94) 70%, rgba(246, 194, 214, .94)); }
+.ui-root.m-hold-fs .m-hold, .ui-root.m-hold-zoom .m-hold { display: grid; }
+.m-hold .mh-card { display: none; flex-direction: column; align-items: center; gap: 10px; max-width: 380px; text-align: center; color: var(--ink); transform: scale(var(--mh-k, 1)); }
+.ui-root.m-hold-fs .mh-fs, .ui-root.m-hold-zoom .mh-zoom { display: flex; }
+.mh-card b { font: 700 26px/1.1 var(--font); }
+.mh-card span { font: 600 16px/1.35 var(--font); color: var(--ink2); }
+.mh-card em { margin-top: 4px; font: 600 13px/1.3 var(--font); font-style: normal; color: var(--ink2); opacity: .8; }
+.m-hold:not(.frame) .mh-z2, .m-hold.frame .mh-z1 { display: none; }
+.mh-svg { width: 132px; height: 99px; margin: 4px 0 6px; filter: drop-shadow(0 5px 0 rgba(74, 44, 42, .25)); }
+.mh-btns { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 8px; }
+.m-hold .mh-btn { min-height: 52px; padding: 0 22px; font-size: 19px; }
+.m-hold .mh-go { background: linear-gradient(#ffc6d8, #ff8fb0); color: #fff; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
+.mh-arr { animation: mhOut 1.6s var(--soft, ease) infinite; transform-origin: 60px 45px; }
+@keyframes mhOut { 0%, 30% { transform: scale(.82); } 70%, 100% { transform: scale(1.06); } }
+.mh-f1 { animation: mhIn1 1.8s var(--soft, ease) infinite; } .mh-f2 { animation: mhIn2 1.8s var(--soft, ease) infinite; }
+@keyframes mhIn1 { 0%, 20% { transform: translate(0, 0); } 70%, 100% { transform: translate(12px, -8px); } }
+@keyframes mhIn2 { 0%, 20% { transform: translate(0, 0); } 70%, 100% { transform: translate(-12px, 8px); } }
+/* the zoom card asks for a pinch: let it through to the page (index.html cancels gestures unless html.pinch-ok) */
+html.pinch-ok, html.pinch-ok body, html.pinch-ok .ui-root, html.pinch-ok .m-hold { touch-action: auto !important; }

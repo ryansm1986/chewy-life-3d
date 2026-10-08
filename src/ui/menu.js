@@ -68,6 +68,8 @@ export class MenuPanel extends Panel {
           <div class="set-row" title="The buttons on the left, the stick on the right"><div class="set-n">${glyph('paw')}Left-handed</div><button class="tog" data-k="touchLeft"><i></i></button></div>
           <div class="set-row" title="Auto: skills go at the nearest foe, else where you face. Drag: drag off a skill to aim it, back onto it to cancel, let go to cast."><div class="set-n">${glyph('star')}Skill aim</div><div class="seg" data-k="touchAim" style="--w:96px">${['Auto', 'Drag'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
           <div class="set-row" title="A little buzz on presses, charges and hits (phones that can)"><div class="set-n">${glyph('bolt')}Haptics</div><button class="tog" data-k="haptics"><i></i></button></div>
+          <div class="set-row" title="Ask: when full screen closes during play, the game pauses and one tap goes back. Off: stay in the window (no full screen on the first tap either)."><div class="set-n">${glyph('eye')}Full screen</div><div class="seg" data-k="touchFs" style="--w:96px">${['Ask', 'Off'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+          <div class="set-row" title="Room kept clear of itch.io's own buttons over the game. Auto: on itch, when the game is in the page. Top or Side if they ever cover something; Off for none."><div class="set-n">${glyph('star')}itch.io buttons</div><div class="seg" data-k="itchInset" style="--w:78px">${['Auto', 'Top', 'Side', 'Off'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
         </div>
         <div class="ctl-list"></div>
         <div class="ctl-note"></div>

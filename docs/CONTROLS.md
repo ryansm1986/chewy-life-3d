@@ -604,6 +604,7 @@ Mobile preset with its numbers (12.3 to 12.7). The QA is 12.8.
   - `overscroll-behavior: none` (no pull-to-refresh);
   - Safari's `gesturestart` and any two-finger touchmove are cancelled;
   - text selection and the long-press callout are off; the long-press context menu was already blocked (input.js).
+  - CT-6 does all of this from the first frame in `index.html`, and adds the zoom and full-screen cards (§12.9).
 
 ### 12.2 The play controls (`src/ui/touch.js`, `src/ui/touch.css`)
 They show while touch plays and play is on: not on the title, in a menu or dialogue, in build or decorate mode. Sizes
@@ -871,3 +872,67 @@ inside the safe area (`env(safe-area-inset-*)`).
   - profile-horde fails its CPU gates even alone at this load. CT-5's own cost on a desktop page in a Burrow fight is
     0.005 ms a frame, so profile-horde needs a re-run on a quiet machine.
 - Not tested here: a real phone. Next steps are the owner's Android and iPhone checks (docs/ITCH.md, "Mobile").
+
+### 12.9 As built: CT-6, iPad and phones on itch (2026-10-08)
+The owner's iPad report from itch: the page zoomed in by accident and wouldn't zoom back out, full screen was easy to
+leave, and itch's own buttons sat over the minimap and the hero, bag and menu buttons. What itch does on an iPad was
+measured from its live page (docs/ITCH.md, "iPad and itch"). In short, iPadOS Safari sends a Mac user agent, so itch
+embeds the game in the page at 1280 × 720. On a 1180 px screen that frame runs 100 px off the right, and itch's button
+column floats over its top right. The iframe is allowed full screen (`allow="… fullscreen * …"`).
+- **Gestures, from the first frame** (`index.html`, before the game loads):
+  - Safari's `gesturestart` / `gesturechange` / `gestureend`, any multi-finger `touchmove` (or one with a `scale` other
+    than 1) and `dblclick` are cancelled;
+  - `html, body` are `touch-action: pan-x pan-y`, so there is no pinch or double-tap zoom anywhere and lists still
+    scroll. WebKit intersects touch-action with the ancestors, so `none` there would stop the menus' lists scrolling.
+    The boot screen is `none`;
+  - no text selection, no long-press callout or "Save image" (`img`, `canvas`), no pull-to-refresh
+    (`overscroll-behavior: none`);
+  - `html.pinch-ok` turns all of it off. ui/touch.js's own guards respect it too.
+- **"Zoomed in?" card** (`Mobile.zoomCheck`, `.m-hold .mh-zoom`):
+  - **The top frame**: `visualViewport.scale` over 1.01. A viewport reset is tried first (the viewport meta is
+    rewritten with `minimum-scale=1` and put back two frames later). Whether iPadOS honours that is part of the owner's
+    test. If the page is still zoomed 400 ms later, the card shows.
+  - **In a frame**: a cross-origin frame's `visualViewport.scale` is always 1, so the IntersectionObserver's visible rect
+    of the document stands in. Under three quarters each way, the card shows with "Can't see all of Pawhaven?".
+  - The card pauses the game (`ui.isPaused` includes `mobile.hold`), sets `html.pinch-ok` so a pinch reaches the page,
+    and is drawn over the part on screen at its normal size (`placeHold`: the visual viewport, scaled by 1 / scale).
+    It goes by itself when the zoom ends; "Play on" dismisses it until then.
+- **"Back to full screen?" card** (`Mobile.fsCheck`, `.mh-fs`):
+  - **In full screen** means `fullscreenElement` (or the webkit one), or, in a frame, a frame the screen's size (itch
+    put the frame in full screen).
+  - **When it ends**, checked 450 ms after a resize so a rotation doesn't count, or when the page is visible again, on a
+    touch screen in landscape where full screen is possible: the game pauses under the card.
+  - **Full screen** asks again (a user gesture; `webkitRequestFullscreen` before iPadOS 16.4). **Stay in a window**
+    sets Settings › Controls › Touch › **Full screen: Off**, which also stops the first-tap full screen.
+  - **No loop**: a third close within a minute stops asking for the visit, with a toast. It never asks without the API
+    (an iPhone) or in the desktop app.
+- **The top edge in full screen**: `edgeTop` 24 px goes into `--sa-t`, so the HUD, the touch buttons and the panels
+  start below it (the minimap's top is at 33 px on an iPad). The stick doesn't start from a touch in that strip, since a
+  drag down from there is iPadOS's exit.
+- **itch's buttons and the off-page strip** (`Mobile.safe` / `itchInset`): on touch, each side of the safe area is the
+  largest of four insets, so every layer (`--sa-*`) and the touch layout (`TouchControls.safe`) respect them all:
+  - the device's own safe area;
+  - the full-screen top edge;
+  - the part of the frame the page doesn't show (the IntersectionObserver, when it sees at least 60% each way);
+  - itch's buttons. **Auto** applies on itch (inside a frame on an `itch.zone` / `itch.io` host, with the itch build's
+    `VITE_ITCH` flag, or with the QA's `?itch`), out of full screen and not in itch's maximized frame:
+    - the button column's 80 px at the top (`clipT + 100` above 1300 px, where the column is fixed);
+    - the Fullscreen button's 28 px at the bottom;
+    - the frame's width past the screen's on the right. The observer can miss this, because a browser may widen the
+      page's layout viewport to the frame, as Chrome's mobile emulation does.
+  - Settings › Controls › Touch › **itch.io buttons**: Auto · Top (100 px top, 28 bottom) · Side (200 px right) · Off.
+- **Saves**: on `pagehide` and whenever the page is hidden, besides game.js's `beforeunload` and every 30 s. iOS Safari
+  doesn't always send `beforeunload`. There's no leave-page prompt.
+- **Can't be fixed from inside the frame**: a zoom of itch's page that starts outside the game; Safari's swipe-down and
+  ✕ exits from full screen and its edge swipe for Back; itch's own buttons, and the frame wider than the screen. The game
+  keeps clear of those, pauses and offers one tap back. The itch dashboard settings that avoid most of it, and the
+  owner's iPad checklist, are in ITCH.md "iPad and itch".
+- **QA**:
+  - **s27 k)**: 8 checks on an iPad (1180×820, DPR 2, iPad Safari's agent; `touch-lib.mjs` `IPAD`). They cover the
+    guards; zoom (a mocked 2× `visualViewport`, because Chrome clamps CDP's page scale to `maximum-scale=1`); the first-tap
+    full screen and the 24 px edge; the card's tap back, Stay in a window and the loop guard; the itch.io buttons Top
+    setting; the pagehide save; and portrait.
+    - `S27_ONLY=k node tools/qa/s27-touch.mjs` runs only this section. Shots go to `tools/qa/tmp/ct6/`.
+  - **`build-itch --test`**: after the desktop iframe pass, an iPad on a replica of itch's page (the measured column
+    boxes, a 1280 × 720 frame 20 px down, the Fullscreen button). It checks that no touch control lies under itch's
+    buttons or off the 1180 px page, and saves `release/itch-test-ipad.png`.

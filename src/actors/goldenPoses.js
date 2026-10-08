@@ -164,6 +164,21 @@ const SHOWER_FLING = K({ armR: [-3.1, 0, 0.15], foreR: [0, 0, 0], armL: [-3.0, 0
 // ---- the Whelp Bond's call ("Shadow, breathe!"): the left paw flung out at the foes, a bark of a command, the guard kept
 const CALL = K({ armL: [-1.55, 0, 0.1], foreL: [-0.1, 0, 0], head: [-0.1, 0.15, 0], body: [0.04, 0.12, 0], mouth: 0.8, tailWag: 2, earKick: 1 });
 
+// ---- his joining scene (actors/goldenJoin.js): at attention (very straight, chin up, the lance upright and close), the
+// vow's salute (the lance raised high before him), the startle at the ball (ears up, a hop), the proud sit with the ball,
+// the gift held out in both paws, a knightly bow
+const ATTENTION = K({ armR: [-0.42, 0, 0.18], foreR: [-0.85, 0, 0.1], armL: [0.05, 0, 0.05], foreL: [-0.1, 0, 0], body: [-0.07, 0, 0], head: [-0.12, 0, 0],
+  dir: [0.08, 1, -0.16], up: [1, 0, 0], sq: -0.05, armLock: 1 });
+const SALUTE = K({ armR: [-2.3, 0, 0.25], foreR: [-0.55, 0, 0.1], armL: [-0.15, 0, 0.1], foreL: [-0.2, 0, 0], body: [-0.1, 0.08, 0], head: [-0.22, 0, 0],
+  dir: [0.22, 1, 0.08], up: [1, 0, 0], sq: -0.07, y: 0.02, mouth: 0.35, armLock: 1 });
+const STARTLE = K({ armR: [-1.4, 0, 0.4], foreR: [-0.4, 0, 0], armL: [-0.9, 0, -0.4], foreL: [-0.6, 0, 0], body: [-0.05, 0.55, 0], head: [-0.2, 0.75, 0], legL: [-0.2], legR: [0.15],
+  dir: [0.6, 0.75, 0.2], up: [1, 0, 0], sq: -0.08, earKick: -3, mouth: 0.4, armLock: 1 });
+const STARTLE_END = K({ body: [0.1, 0.65, 0], head: [-0.05, 0.6, 0], earKick: -2, tailWag: 3, happy: 1, mouth: 0.6 });
+const SIT_PROUD = K({ legL: [-1.4], legR: [-1.4], y: -0.12, sq: 0.04, body: [-0.06, 0, 0], head: [-0.12, 0, 0], armR: [-0.25, 0, 0.1], armL: [-0.25, 0, -0.1], foreR: [-0.3], foreL: [-0.3] });
+const OFFER = K({ armR: [-1.35, 0, 0.42], foreR: [-0.45, 0, 0.1], armL: [-1.35, 0, -0.42], foreL: [-0.45, 0, 0], body: [0.12, 0, 0], head: [0.15, 0, 0], sq: 0.02 });
+const BOW = K({ armR: [-0.9, 0, 0.75], foreR: [-1.2, 0, 0.2], armL: [0.15, 0, 0.1], body: [0.55, 0, 0], head: [0.25, 0, 0], legL: [-0.15], legR: [0.15],
+  dir: [0.35, 0.94, -0.1], up: [1, 0, 0], sq: 0.04, eyesClosed: 1, armLock: 1 });
+
 const act = (dur, ev, keys, extra, flags = {}) => ({ dur, ev, ...flags, pose: (t, P, A) => { track(A, keys, t); extra?.(t, A); } });
 const LANCE = { lance: true, guard: true };
 const jw = (a, b) => (t, A) => { A.javW = t > a && t < b ? 1 : 0; }; // (the javelin in his paw from the draw to the release)
@@ -212,6 +227,17 @@ export const GOLDEN_ACTIONS = {
     const rear = ease.outQuad(S(0, 0.32, t)) * (1 - S(0.32, 0.45, t)), slam = S(0.4, 0.46, t) * (1 - io(S(0.6, 1, t)));
     A.body.x += -0.4 * rear + 0.12 * slam; A.y += 0.1 * rear; A.sq += -0.06 * rear + 0.12 * slam; A.mouth = Math.max(A.mouth, 0.5 * slam); A.head.x += -0.2 * rear;
   } },
+  // ---- his joining scene at the Onsen (actors/goldenJoin.js): standing guard at attention, the vow's salute, the
+  // startle at the ball, the proud sit with it, the gift held out, the bow
+  gldAttention: { dur: 99, hold: true, ...LANCE, pose: (t, P, A) => { const k = io(clamp(t / 0.35)); addKey(A, ATTENTION, k); A.sq += Math.sin(t * 1.9) * 0.008 * k; } },
+  gldSalute: { dur: 99, hold: true, ...LANCE, pose: (t, P, A) => { const k = ease.outBack(clamp(t / 0.5)); addKey(A, ATTENTION, 1 - clamp(k)); addKey(A, SALUTE, k); A.armR.x += Math.sin(t * 1.7) * 0.02; } },
+  gldStartle: act(0.55, null, [[0, SALUTE], [0.25, STARTLE, out], [0.7, STARTLE], [1, STARTLE_END, io]], (t, A) => { A.y += 0.12 * bump(0.05, 0.4, t); A.tailWag += 4 * S(0.2, 0.6, t); }, { guard: true }),
+  gldSitProud: { dur: 99, hold: true, pose: (t, P, A) => {
+    const k = ease.outQuad(clamp(t / 0.35)); addKey(A, SIT_PROUD, k);
+    A.tailWag += 4 * k; A.happy = 1; A.eyesHappy = t > 0.4 ? 1 : 0; A.y += 0.03 * Math.abs(Math.sin(t * 5)) * k;
+  } },
+  gldOffer: { dur: 99, hold: true, pose: (t, P, A) => { const k = io(clamp(t / 0.45)); addKey(A, OFFER, k); A.tailWag += 2 * k; A.happy = 1; } },
+  gldBow: act(1.1, { low: 0.45 }, [[0, ATTENTION], [0.4, BOW, out], [0.65, BOW], [1, ATTENTION, io]], null, LANCE),
 };
 /** the guard stance while the lance is drawn (animator.js `stance`; goldenGear.js sets it), breathing a little */
 export function LANCE_GUARD(A, t, k) {

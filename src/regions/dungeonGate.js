@@ -18,6 +18,7 @@ import { villageSaved, saveVillage } from '../rpg/zones.js';
 import { villageOf } from './village/data.js';
 import { Placer } from './assets/bambooKit.js';
 import { gateLook } from './gates/index.js';
+import { placeLantern } from './spiritLantern.js';
 import { loadGlb, glbInstance } from '../gfx/glbAssets.js';
 import { paint } from '../gfx/geom.js';
 import { makeCanvas } from '../gfx/textures.js';
@@ -77,6 +78,10 @@ export function installGate(mode) {
       G.enterDungeon({ id: def.id, floor: 1 });
     } };
   W.interactables.push(it); gate.it = it;
+  // the Spirit Lantern beside the gate (the tier runs: regions/spiritLantern.js; a look may move it: look.spirit [lx, lz])
+  { const [sx, sz] = lp(...(look.spirit || [4.1, 2.7])); const lan = gate.lantern = placeLantern(G, W, def.id, { x: sx, y: W.heightAt(sx, sz), z: sz, yaw, lightI: look.spiritI ?? 3 });
+    W.blockCells?.(sx, sz, 0.5);
+    (mode.spinners ||= []).push((dt, t) => lan.update(dt, t, G.vfx, G.player?.pos)); W.disposers.push(() => lan.dispose()); }
   // already saved: open from the start (no ceremony)
   if (villageSaved(G.state, zone)) openGate(mode, gate, false);
   // the village saved while we're here: the seal breaks live

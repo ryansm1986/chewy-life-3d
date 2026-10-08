@@ -143,6 +143,16 @@ Status: **built** (2026-10-03). There are three guides, run by a small reusable 
   4. The Gloom Blanket: hexed foes near him soften every blow (Got it).
   5. Wrap-up: his trees (K spotlit), "Grandpaw sends his regards" (Got it).
   - QA: `tools/qa/s28-shihtzu.mjs` section c runs it end to end.
+- **Meet Foosy** (`meetGolden`; the title and lines read `CLASSES.golden.name`) starts in town once he has joined
+  (docs/GOLDEN.md §5), while you play someone else; offered once to older saves past his join, locked in the Journal
+  until then:
+  1. Hold Tab: the wheel with five (his card spotlit); pick him (`done` once he's the active hero and the switch is over).
+  2. His lance: left-click the reach combo, right-click Sunbeam Thrust (the mouse slots spotlit; Got it).
+  3. Press 1: Bonk Dart (slot 1 spotlit; Got it).
+  4. Shadow the dragon whelp: walk a little and he takes off beside you (`done` keyed on the flight: the whelp outfit on,
+     airborne, ~0.6 m up, after 3 s on the step so the line can be read: he may be up already).
+  5. Wrap-up: his trees (K spotlit), the Whelp Bond (Got it).
+  - QA: `tools/qa/s29-golden.mjs` section c runs it end to end.
   - QA: `tools/qa/s20-poe.mjs` section c runs it end to end.
 
 ## Hooks added for the guides

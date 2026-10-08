@@ -837,11 +837,12 @@ function updateWhiteout(m, dt) {
   const k = ease.inOutQuad(wo.k), W = m.world, sc = W.scene, cam = G.engine.camera, P = G.player;
   // fog pulled in just behind Chewy (the haze overlay does the close-up whiteout), background to snow
   const camD = cam.position.distanceTo(G.engine.rig.target || P.pos);
+  const wm = m.woMul ?? 1, kf = k * wm; // (m.woMul: a fight may thin her whiteout: the pinnacle's Winter, dungeon/pinnacle.js)
   const fk = inHall(Y) ? ARENA_TUNE.woFog : 1; // (down in the hall the fog reaches only part way to snow-white: the cave stays a cave)
-  if (sc.fog) { sc.fog.near = lerp(wo.save.near, camD + 3, k); sc.fog.far = lerp(wo.save.far, camD + 24, k); sc.fog.color.copy(wo.save.color).lerp(WO_FOG, k * fk); }
-  if (sc.background?.isColor) sc.background.copy(wo.save.bg).lerp(WO_FOG, k * fk);
+  if (sc.fog) { sc.fog.near = lerp(wo.save.near, camD + 3, kf); sc.fog.far = lerp(wo.save.far, camD + 24, kf); sc.fog.color.copy(wo.save.color).lerp(WO_FOG, kf * fk); }
+  if (sc.background?.isColor) sc.background.copy(wo.save.bg).lerp(WO_FOG, kf * fk);
   // overlay: Chewy's small clear circle, the lanterns' big warm ones (screen-space ellipses of ground circles)
-  const U = wo.mesh.material.uniforms; U.uA.value = (inHall(Y) ? ARENA_TUNE.woA : 0.82) * k; U.uT.value = m.B.t; U.uAsp.value = cam.aspect;
+  const U = wo.mesh.material.uniforms; U.uA.value = (inHall(Y) ? ARENA_TUNE.woA : 0.82) * kf; U.uT.value = m.B.t; U.uAsp.value = cam.aspect;
   cam.matrixWorld.extractBasis(_cr, _cu, _cf);
   const rx = _cr.x, rz = _cr.z, rl = Math.hypot(rx, rz) || 1, fx = -_cf.x, fz = -_cf.z, fl = Math.hypot(fx, fz) || 1;
   WB.rx = rx / rl; WB.rz = rz / rl; WB.fx = fx / fl; WB.fz = fz / fl;

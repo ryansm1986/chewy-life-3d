@@ -73,6 +73,7 @@ function gateSpring(seed = 0, R = 1.15) {
 export const ONSEN_GATE = {
   seal: '#bfe8ff',
   lanternI: 1.6, // (dungeonGate's lantern lights when it opens: soft, the snow would blow out under the full 4.5)
+  spirit: [-5.0, 3.9], spiritI: 1.6, // (the Spirit Lantern stands left of the torii, the hot spring is on the right; a soft light on the snow)
   glb: { url: null, scale: 1, yaw: 0, y: 0 },
   build({ main, dress, lp, gx, gz, yaw, rim, W }) {
     main.piece(iceMouth(0), gx, gz, yaw, { y: rim - 0.15 });

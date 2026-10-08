@@ -259,7 +259,7 @@ export class ZoneRun {
     // the arena: the hero steps into the ring → the lanterns flare one by one, the seal rises, the boss wakes
     const A = this.L.arena, b = M.boss;
     if (A && b?.alive && !this.arenaOn && P && !G.playerDead && Math.hypot(P.pos.x - A.x, P.pos.z - A.z) < A.r - 2.2) this.enterArena(b);
-    if (this.arenaOn && (!b || !b.alive) && S?.want) this.setSeal(false);
+    if (this.arenaOn && (!b || !b.alive) && S?.want && !(M.tr?.pin && !M.tr.pin.done)) this.setSeal(false); // (the pinnacle keeps it up between seasons)
   }
   enterArena(b) {
     const G = this.G, W = this.mode.world; this.arenaOn = true;

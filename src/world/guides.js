@@ -15,6 +15,9 @@
 //  - meetShihtzu: the Shih Tzu, in town after he joins (docs/SHIHTZU.md §5): the hero wheel with four, his flail (the
 //            combo and Woeful Wallop), Dripping Paw and the hexes, the Gloom Blanket, his trees. His name reads
 //            CLASSES.shihtzu.name (the owner's to pick).
+//  - meetGolden: Foosy, in town after he joins (docs/GOLDEN.md §5): the hero wheel with five, his lance (the reach combo,
+//            Sunbeam Thrust), Bonk Dart, Shadow the dragon whelp taking off beside him (keyed on his flight), his trees.
+//            His name reads CLASSES.golden.name.
 import * as THREE from 'three';
 import { POND } from './layout.js';
 import { SKILLS } from '../rpg/skills.js';
@@ -345,5 +348,32 @@ const meetShihtzu = {
   ],
 };
 
-export const GUIDES = { switch: sw, house, fishing, makeHome, remodel, charge, meetPoe, meetShihtzu };
+// ------------------------------------------------------------------ five heroes: Foosy the dragoon (docs/GOLDEN.md §5)
+const GLD = CLASSES.golden.name;
+const whelpUp = G => G.state.activeHero === 'golden' && !!G.companion?.whelp?.on && G.companion.whelp.air > 0.9 && G.companion.whelp.lift > 0.6;
+const meetGolden = {
+  title: `Meet ${GLD}`, narrator: 'golden', color: '#d8903a', priority: 1,
+  blurb: `The hero wheel with five, ${GLD}'s lance and javelins, and Shadow the dragon whelp.`,
+  offer: `${GLD} can show you his lance, his javelins and Shadow's wings.`,
+  icon: null,
+  trigger: G => !!G.heroes?.joined('golden') && G.state.activeHero !== 'golden',
+  past: G => !!G.heroes?.joined('golden'),
+  locked: G => (G.heroes?.joined('golden') ? null : 'Meet him at the hot springs of Yukimi first'),
+  steps: [
+    { id: 'hold', say: G => (G.state.activeHero === 'golden' ? 'Reporting for duty! *Hold Tab* whenever the pack needs another paw.' : `The pack is five now, ${me(G)}! *Hold Tab*: the hero wheel. Choose me — the one in emerald. With honour. …Or press my number.`),
+      objective: 'Hold *Tab*, pick him, let go', allow: { switching: true },
+      highlight: G => (G.heroSwitching ? null : wheelOpen(G) ? '.hero-wheel .hw-card[data-id="golden"]' : '.hud .hsw'),
+      done: G => G.state.activeHero === 'golden' && !G.heroSwitching },
+    { id: 'lance', say: 'Left-click: my *lance*. Two long thrusts and a swat — I can reach them from further away than anyone. Right-click: *Sunbeam Thrust*, one big earnest lunge down a whole line of them.',
+      objective: 'His lance: left-click, right-click', allow: { switching: true }, highlight: G => (G.heroSwitching ? null : '.hud .hb.mouse'), ack: true },
+    { id: 'javelin', say: 'Press *1*: *Bonk Dart*. A toy javelin from my quiver — the gold tip bonks, and whoever stands beside gets a little bonk too. They never stab. They bonk.',
+      objective: 'Press 1: Bonk Dart', allow: { switching: true }, highlight: G => (G.heroSwitching ? null : '.hud .hb[data-i="2"]'), ack: true },
+    { id: 'whelp', say: G => `And while you play me, Shadow wears his *dragon wings*! Walk a little — watch him take off and fly beside us. He lands when we rest, and walks indoors. Every dragoon needs a dragon.`,
+      objective: 'Walk a little: Shadow takes off', allow: { switching: true }, done: (G, T) => (T.cur?.t || 0) > 3 && whelpUp(G) }, // (time to read it: he may be up already)
+    { id: 'wrap', say: 'My trees are Lance Arts, Javelins and the Whelp Bond (*K*): Shadow breathes embers, swoops, shields you and roars. A very small roar. To the springs — I mean, to the Burrow!',
+      objective: 'K: Lance Arts, Javelins, Whelp Bond', ack: true, highlight: () => '.hud .mb[data-open="skills"]' },
+  ],
+};
+
+export const GUIDES = { switch: sw, house, fishing, makeHome, remodel, charge, meetPoe, meetShihtzu, meetGolden };
 export const GUIDE_IDS = Object.keys(GUIDES);

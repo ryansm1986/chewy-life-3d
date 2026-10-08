@@ -275,8 +275,8 @@ async function run(world, hero) {
   // DRAWCAT=1: draw calls per frame (every pass) owed to each category at 250: each one hidden in turn, the difference
   // from the whole frame's count (the fight keeps running; 20 frames a category)
   if (process.env.DRAWCAT) console.log('draw calls per frame by category', JSON.stringify(await page.evaluate(async () => {
-    const G = window.G, S = G.world.scene, H = G.dungeon._horde, r = G.engine.renderer, info = r.info.render;
-    const frames = n => new Promise(res => { let k = 0, c0 = info.calls, sum = 0; const f = () => { sum += info.calls - c0; c0 = info.calls; if (++k < n) requestAnimationFrame(f); else res(sum / n); }; requestAnimationFrame(() => { c0 = info.calls; requestAnimationFrame(f); }); });
+    const G = window.G, S = G.world.scene, H = G.dungeon._horde;
+    const PF = window.__perf, frames = n => new Promise(res => { const c0 = PF.calls.length; PF.on = true; let k = 0; const f = () => { if (++k < n) return requestAnimationFrame(f); PF.on = false; const c = PF.calls.slice(c0); res(c.reduce((a, b) => a + b, 0) / Math.max(1, c.length)); }; requestAnimationFrame(f); }); // (the frame's own count: the harness reads it after render)
     const own = new Set(), mark = o => o && own.add(o);
     const P = G.player, sh = G.companion, gld = G.vfx.gld, stz = G.vfx.stz;
     const lootObjs = () => { const L = G.dungeon.loot; const out = []; for (const x of L?.list || L?.items || []) for (const k of ['mesh', 'obj', 'group', 'root', 'beam', 'label', 'sprite']) if (x[k]?.isObject3D) out.push(x[k]); return out; };

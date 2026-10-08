@@ -173,7 +173,7 @@ try {
   await sleep(page, 1700);
   const miss = await T();
   // (the housing guides, Make it home and Remodel, are listed too: tools/qa/s17-housing.mjs runs them; Hold to power up!: s19-charge; and Meet Poe: s20-poe)
-  R.check('the Guides tab lists all three (done ✓) and replays one; a missed bite loops back to the cast with a kind word', gl.length === 8 && ['Two heroes', 'Home, sweet home', 'Fishing with Kero'].every(t => gl.some(x => /^done/.test(x) && x.endsWith(t))) && miss.step === 'cast' && /slow|again/i.test(miss.say), JSON.stringify({ gl, miss }));
+  R.check('the Guides tab lists all three (done ✓) and replays one; a missed bite loops back to the cast with a kind word', gl.length === 9 && ['Two heroes', 'Home, sweet home', 'Fishing with Kero'].every(t => gl.some(x => /^done/.test(x) && x.endsWith(t))) && miss.step === 'cast' && /slow|again/i.test(miss.say), JSON.stringify({ gl, miss }));
   await clickSel('.to-skip'); await sleep(page, 400);
   const sk = await G(() => ({ active: window.G.tutorials.active, rec: window.G.state.flags.tutorials.fishing, tut: window.G.life.fishing.tut, dock: document.querySelector('.tut').classList.contains('on'), toast: window.QA.toasts.some(t => /Guide skipped/.test(t)) }));
   R.check('Skip ends the guide at once (normal fishing restored) and says where to replay it', !sk.active && sk.rec.skipped && sk.tut === null && !sk.dock && sk.toast, JSON.stringify(sk));

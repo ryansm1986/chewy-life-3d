@@ -118,7 +118,7 @@ export class Whelp {
     this.landed = false;    // came down to sit (an idle landing: takes off when the hero moves)
     this.tightT = 0; this.tight = false; this.prevFace = 0; this.bank = 0; this.prevSpd = 0; this.glide = 0;
     this.lastWorld = null; this.flapSfx = 0;
-    this.act = null; this.kick = 0; this.burst = 0;
+    this.act = null; this.kick = 0; this.burst = 0; this.forced = null;
   }
   /** Companion.update calls this first: a Whelp Bond move steering him (combat/goldenWhelp.js sets `act`) → true when it
    *  took the move */
@@ -139,7 +139,7 @@ export class Whelp {
   }
   get G() { return this.sh.G; }
   /** should he be wearing it? only while the dragoon is the active hero */
-  wanted() { return this.G?.state?.activeHero === 'golden'; }
+  wanted() { return this.forced ?? this.G?.state?.activeHero === 'golden'; } // (forced: Foosy's joining scene dresses him for a while: goldenJoin.js)
   /** put the outfit on / take it off: a new rig in place (same spot, facing, life and state), with a poof */
   swap(on, quiet = false) {
     const sh = this.sh, G = this.G;

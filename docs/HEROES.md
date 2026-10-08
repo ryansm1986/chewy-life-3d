@@ -7,7 +7,9 @@ the other hero lives in Blossom Hollow as a villager. The same seams are the bas
 (see docs/MULTIPLAYER.md). The third hero, **Poe** (a black pug ninja with a giant bone fūma), has her own doc:
 docs/POE.md (class, skills, charge, joining in the Bamboo Grove, the hero wheel; QA tools/qa/s20-poe.mjs). The fourth,
 **the Shih Tzu** (a black-and-white dark knight with a toy flail and dark dog magic; name TBD), has docs/SHIHTZU.md
-(class, skills, charge, joining in Momiji Hollow; QA tools/qa/s28-shihtzu.mjs).
+(class, skills, charge, joining in Momiji Hollow; QA tools/qa/s28-shihtzu.mjs). The fifth, **Foosy** (a Golden Retriever
+dragoon with a toy lance and javelins; Shadow flies beside him as a dragon whelp), has docs/GOLDEN.md (class, skills,
+charge, the whelp, joining at the Onsen; QA tools/qa/s29-golden.mjs).
 
 ## 1. Who is Moka
 - Boykin Spaniel (South Carolina's retriever): rich chocolate/liver wavy-curly coat, long pendant wavy ears, golden
@@ -108,12 +110,15 @@ free little sparkle bolt. Hotbar hints on first join. Staff bases span tiers lik
 - The Shih Tzu joins in Momiji Hollow (the Maple zone): kneeling by the trail, lighting ghostlight lanterns; he rises to
   proclaim and a ghost pup licks his face mid-word; once Poe has joined, Shadow passes on the rumour in town
   (`src/actors/shihtzuJoin.js`, docs/SHIHTZU.md §5).
+- Foosy joins at the hot springs of Yukimi Onsen: standing guard, he begins a solemn vow and a tennis ball from the
+  bathhouse undoes it; he gives Shadow a dragon whelp costume; once the Shih Tzu has joined, Shadow passes on the rumour
+  in town (`src/actors/goldenJoin.js`, docs/GOLDEN.md §5).
 
 ## 7. Code map
 - `src/rpg/classes.js` — class table. `src/rpg/skillsMoka.js` — Moka's skill defs (merged into SKILLS).
 - `src/actors/heroes.js` — HeroManager: roster, state linking, switching + transition, NPC-mode heroes, Shadow;
   tap / hold Tab (`tabInput`) and the hero wheel (`src/ui/heroWheel.js`); Poe's joining scene (`poeJoin.js`) and the
-  Shih Tzu's (`shihtzuJoin.js`).
+  Shih Tzu's (`shihtzuJoin.js`), Foosy's (`goldenJoin.js`).
 - `src/actors/heroModels.js` — baked hero models (Chewy, Moka, and Shadow on the quad contract); `src/actors/heroGear.js` — staff geometry.
 - `src/combat/mokaSpells.js` — SkillRunner cast implementations for Moka; `src/gfx/spellFx.js` — spell VFX.
 - Blender: `tools/blender/disney/moka.py` (build.py `char=moka`), export `public/rigs/moka_disney.*` (63.9k tris, the

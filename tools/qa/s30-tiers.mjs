@@ -11,6 +11,12 @@
 //  e) Cursed Shrines (a shrine's curse), Elemental: Frost (the extra frost folded into a hit, the chill), Quick
 //  f) the Deep Burrow: Tamamo's story clear opens its T1; floor 1 the Crystal Grotto, floor 2 the Moonlit Sanctum with
 //     Tamamo; her fall opens T2; the way home is Blossom Hollow
+//  g) the Spirit Lantern (Z-E3): lit at the gate (asleep where nothing is cleared), the Burrow door's lantern; the panel
+//     (tiers, cards, slots, the summed reward, Recommended / Surprise me), Enter → the run, the memory, the run chip
+//  h) the panel on a landscape phone: two columns (the run unscrolled on the left with Enter in sight, the cards scrolling
+//     on the right), the title bar at the bottom, 44 px targets, 12 px text; the same with a Spirit 10 run's six slots
+//  i) the pinnacle (Spirit 10): the Four Seasons in turn in the ring, the seal kept between them, the spirits and their
+//     echoes (on the boss's quiet beat), the season loot held for the hoard, the clear and Shiki, the pinnacle's unique
 import { launch, boot, sleep, makeReport } from './lib.mjs';
 
 const R = makeReport('S30 tiers: migration, a tier run, rewards, the clear, run-wide modifiers, the Deep Burrow');
@@ -167,6 +173,123 @@ try {
     return out;
   });
   R.check('floor 2: the Moonlit Fox Sanctum with Tamamo; her fall clears the Deep Burrow at T1 (dungeon:cleared { id: burrowDeep, kind: deep }), opens T2, raises the Lantern chest, and the portal leads home (no stairs)', f2.theme === 'moon' && f2.boss === 'nineTails' && f2.clear?.id === 'burrowDeep' && f2.clear.kind === 'deep' && f2.clear.tier === 1 && f2.unl?.id === 'burrowDeep' && f2.unl.tier === 2 && f2.deep.unlocked === 2 && f2.chest && f2.home >= 1 && !f2.stairs, JSON.stringify(f2));
+  // ---------------------------------------------------------------- g) the Spirit Lantern: at the gate, the panel, set off, the memory, the run chip
+  await ev(() => { const G = window.G; G.zoneDebug.saveVillage('bamboo'); G._zoneArrive = { zone: 'bamboo', gate: true }; G.enterRegion('bamboo'); });
+  await waitDungeon(() => window.G?.dungeon?.regionId === 'bamboo' && window.G.dungeon.gate?.lantern && !window.G.ui?.iris?.active);
+  const g1 = await ev(() => {
+    const G = window.G, l = G.dungeon.gate.lantern, t0 = window.QA.toasts.length;
+    const asleep = G.lantern.open('mapleRoots'); const why = window.QA.toasts.slice(t0).join(' | ');
+    return { lit: l.model.lit, label: l.it.label, near: Math.hypot(l.pos.x - G.dungeon.gate.pos.x, l.pos.z - G.dungeon.gate.pos.z), asleep, why, burrow: !!G.burrowLantern?.model.lit };
+  });
+  R.check('the Spirit Lantern stands by the Bamboo Depths gate, lit (T3 open); a dungeon not yet cleared keeps its lantern asleep (a toast says why); the Burrow door\'s lantern is lit (Tamamo beaten)', g1.lit && /Spirit Lantern: Bamboo Depths/.test(g1.label) && g1.near < 8 && g1.asleep === false && /sleeps/.test(g1.why) && g1.burrow, JSON.stringify(g1));
+  await ev(() => { const G = window.G; G.player.setPos(G.dungeon.gate.lantern.it.pos.x + 1, G.dungeon.gate.lantern.it.pos.z + 1); G.dungeon.gate.lantern.it.onInteract(); });
+  await page.waitForFunction(() => window.G.ui.isOpen('lantern') && document.querySelector('.p-lantern .ln-card'), null, { timeout: 5000 });
+  await sleep(page, 500);
+  await page.click('.ln-tier[data-t="3"]'); await page.click('.ln-card[data-m="swarming"]'); await page.click('.ln-card[data-m="stout"]');
+  const g2 = await ev(() => { const P = window.G.ui.panels.lantern, q = s => document.querySelector(s); return { sel: JSON.parse(JSON.stringify(P.sel)), slots: document.querySelectorAll('.ln-slot.has').length, qty: q('.ln-rw[data-k="qty"] b')?.textContent, go: q('.ln-go b')?.textContent, locked: document.querySelectorAll('.ln-tier.locked').length, cards: document.querySelectorAll('.ln-card').length }; });
+  await page.click('.ln-card[data-m="haunted"]', { force: true }); // (slots full: refused; aria-disabled)
+  const g3 = await ev(() => window.G.ui.panels.lantern.sel.mods.join());
+  R.check('the panel: tiers T1–T3 open (T4, T5 locked), 17 modifier cards; two picks fill T3\'s two slots and a third is refused; the reward sums (T3 +30% + Swarming 15% + Stout 10% = +55% quantity); "Enter Tier 3"', g2.sel.tier === 3 && g2.sel.mods.join() === 'swarming,stout' && g2.slots === 2 && g2.qty === '+55%' && /Enter Tier 3/.test(g2.go || '') && g2.locked === 2 && g2.cards === 17 && g3 === 'swarming,stout', JSON.stringify({ g2, g3 }));
+  const g4 = await ev(() => { const P = window.G.ui.panels.lantern; P.recommend(); const rec = P.sel.mods.slice(); P.surprise(); const sur = P.sel.mods.slice(); P.sel.mods = ['swarming', 'stout']; P.render(); return { rec, sur }; });
+  R.check('"Recommended" and "Surprise me" fill the slots with a valid set', g4.rec.length === 2 && g4.sur.length === 2 && new Set(g4.sur).size === 2, JSON.stringify(g4));
+  await page.click('.ln-go');
+  await waitDungeon(() => window.G?.dungeon?.kind === 'zone' && window.G.dungeon.def.id === 'bambooDepths' && !window.G.ui?.iris?.active);
+  const g5 = await ev(() => { const G = window.G, D = G.dungeon, chip = document.querySelector('.run-chip'); return { tier: D.tier, mods: D.mods.join(), floor: D.floor, open: G.ui.isOpen('lantern'), last: JSON.parse(JSON.stringify(G.state.zones.bamboo.dungeon.lantern)), chip: chip?.classList.contains('on') ? chip.textContent.trim() : null, icons: chip?.querySelectorAll('i').length || 0, inHud: !!chip?.closest('.hud-tr') }; });
+  R.check('Enter sets off: Bamboo Depths floor 1 at Tier 3 with Swarming and Stout; the setup is remembered; the run chip (in the HUD\'s top-right stack) shows the tier and two modifier icons', g5.tier === 3 && g5.mods === 'swarming,stout' && g5.floor === 1 && !g5.open && g5.last?.tier === 3 && g5.last.mods.join() === 'swarming,stout' && /Tier 3/.test(g5.chip || '') && g5.icons === 2 && g5.inHud, JSON.stringify(g5));
+  await ev(() => { const G = window.G; G._zoneArrive = { zone: 'bamboo', gate: true }; G.enterRegion('bamboo'); });
+  await waitDungeon(() => window.G?.dungeon?.regionId === 'bamboo' && window.G.dungeon.gate?.lantern && !window.G.ui?.iris?.active);
+  const g6 = await ev(async () => { const G = window.G; G.lantern.open('bambooDepths'); await new Promise(r => setTimeout(r, 300)); const P = G.ui.panels.lantern, out = { sel: JSON.parse(JSON.stringify(P.sel)), chip: document.querySelector('.run-chip')?.classList.contains('on') }; G.ui.close('lantern'); return out; });
+  R.check('the lantern remembers the last setup (Tier 3, Swarming + Stout) when it opens again; the run chip is gone outside the run', g6.sel.tier === 3 && g6.sel.mods.join() === 'swarming,stout' && g6.chip === false, JSON.stringify(g6));
+  // ---------------------------------------------------------------- i) the pinnacle: Spirit 10's Four Seasons (docs/ZONES.md §5.3)
+  await ev(() => { const G = window.G, P = G.state.player; P.lvl = 60; P.stats = { str: 140, dex: 140, vit: 400, ene: 200 }; G.actions.recompute(); G.tierDebug.clearAll(5); G.state.zones.bamboo.dungeon.spirit.best = 9; window.__pev = []; // (a level 60 hero: Spirit 10's blows land between the armour's ticks)
+    const E = window.QA.Events; for (const n of ['pinnacle:season', 'pinnacle:cleared', 'dungeon:cleared', 'boss:dead']) E.on(n, p => window.__pev.push([n, JSON.parse(JSON.stringify(p || {}))])); G.tierDebug.run('bambooDepths', 5, [], 10, 2); });
+  await waitDungeon(() => window.G?.dungeon?.floor === 2 && window.G.dungeon.tr?.pin && window.G.dungeon.boss && !window.G.ui?.iris?.active, 90000);
+  await armour();
+  const i1 = await ev(async () => {
+    const G = window.G, D = G.dungeon, A = D.layout.arena, b = D.boss, pin = D.tr.pin, sleep = ms => new Promise(r => setTimeout(r, ms));
+    const o = { pinnacle: !!D.layout.pinnacle, boss: b.id, arena: A?.r, life: b.lifeMax, spirit: D.spirit, chip: document.querySelector('.run-chip')?.textContent.trim() };
+    G.player.setPos(A.x + 3, A.z + 3); // (into the ring: the seal rises, Spring wakes)
+    for (let k = 0; k < 60 && !b.introDone; k++) await sleep(100);
+    o.intro = b.introDone; o.seal = D.zr?.seal?.want; await sleep(1500);
+    return o;
+  });
+  R.check('Spirit 10 in the Bamboo Depths: floor 2 is the pinnacle; its ring (r 17) holds Master Tengu, Spring, who wakes when the hero steps in (the seal rises)', i1.pinnacle && i1.boss === 'tenguMaster' && i1.arena >= 15 && i1.spirit === 10 && i1.intro && i1.seal === 1, JSON.stringify(i1));
+  const i2 = await ev(async () => {
+    const G = window.G, D = G.dungeon, pin = D.tr.pin, sleep = ms => new Promise(r => setTimeout(r, ms)), b = D.boss, items0 = D.loot.list.filter(e => e.d.type === 'item').length;
+    G.combat.hitMonster(b, { dmgPct: 1e8 }); await sleep(300);
+    const o = { dead: !b.alive, boss: D.boss, busy: pin.busy, seal: D.zr.seal.want, spirits: pin.statues.length, cleared: window.__pev.some(e => e[0] === 'dungeon:cleared'), bossDead: window.__pev.some(e => e[0] === 'boss:dead'), season: window.__pev.find(e => e[0] === 'pinnacle:season')?.[1] || null };
+    await sleep(1500); o.items = D.loot.list.filter(e => e.d.type === 'item').length - items0; o.hoard = pin.hoard.length;
+    for (let k = 0; k < 300 && !(D.boss?.alive && D.boss.introDone); k++) await sleep(100); // (game time: a loaded machine runs it slower)
+    o.next = D.boss?.id; o.intro = !!D.boss?.introDone; o.seal2 = D.zr.seal.want; o.k = pin.k; o.share = D.boss ? D.boss.lifeMax : 0;
+    return o;
+  });
+  R.check('Spring falls: no clear and no boss:dead (pinnacle:season { summer }), the seal stays up, its spirit rises at the ring\'s edge, its items wait in the hoard (none on the floor); Umibōzu, Summer, rises and wakes', i2.dead && i2.boss === null && i2.busy && i2.seal === 1 && i2.spirits === 1 && !i2.cleared && !i2.bossDead && i2.season?.season === 'summer' && i2.items === 0 && i2.hoard >= 1 && i2.next === 'umibozu' && i2.intro && i2.seal2 === 1 && i2.k === 1, JSON.stringify(i2));
+  const i3 = await ev(async () => { // the fight runs: Spring's echo comes in a quiet moment, on its own
+    const G = window.G, D = G.dungeon, pin = D.tr.pin, sleep = ms => new Promise(r => setTimeout(r, ms));
+    pin.echoT = Math.min(pin.echoT, 1.5);
+    let overlap = 0;
+    for (let k = 0; k < 400 && !pin.stats.echoes.gale; k++) await sleep(100);
+    const t0 = performance.now(); while (performance.now() - t0 < 1200) { if ((D.sigDimT || 0) > 0.05) overlap++; await sleep(100); } // (the boss holds its next move while the echo is up)
+    return { echoes: { ...pin.stats.echoes }, overlap, statue: pin.statues[0]?.a };
+  });
+  R.check('Summer: Spring\'s spirit sends its echo (the GALE, a lane through the hero) in the boss\'s quiet moment, and the boss holds its next telegraph until it lands', i3.echoes.gale >= 1 && i3.overlap === 0 && i3.statue > 0.3, JSON.stringify(i3));
+  const i4 = await ev(async () => {
+    const G = window.G, D = G.dungeon, pin = D.tr.pin, sleep = ms => new Promise(r => setTimeout(r, ms)), seen = [];
+    for (let s = 0; s < 2; s++) { for (let k = 0; k < 300 && !(D.boss?.alive && pin.k === s + 1); k++) await sleep(100); if (!D.boss?.alive) break; G.combat.hitMonster(D.boss, { dmgPct: 1e8 }); for (let k = 0; k < 300 && !(D.boss?.alive && D.boss.introDone && pin.k === s + 2); k++) await sleep(100); seen.push(D.boss?.id); }
+    const o = { seen, k: pin.k, spirits: pin.statues.length, seasons: pin.stats.seasons.join() };
+    window.__pev.length = 0; const last = D.boss, pre = new Set(D.loot.list), t0 = performance.now();
+    if (last?.alive) G.combat.hitMonster(last, { dmgPct: 1e8 });
+    const ring = () => { const c = D.tr.chestAt; return c ? D.loot.list.filter(e => !pre.has(e) && Math.hypot(e.to.x - c.x, e.to.z - c.z) > 2.2) : []; }; // (the hoard: round the chest, beyond its own drops)
+    let it = null; for (let k = 0; k < 80 && !it; k++) { await sleep(100); it = G.world.interactables.find(i => /Lantern chest/.test(i.label)); }
+    o.clear = window.__pev.find(e => e[0] === 'dungeon:cleared')?.[1] || null; o.pin = window.__pev.some(e => e[0] === 'pinnacle:cleared'); o.done = pin.done; o.victory = last?.victorySub;
+    o.best = G.state.zones.bamboo.dungeon.spirit.best;
+    while (performance.now() - t0 < 3400) await sleep(100);
+    o.early = ring().length; // (nothing of the hoard while the Victory banner is up)
+    if (it) {
+      const inv = () => (G.state.inventory?.items || G.state.inventory || []).filter(Boolean), bag0 = new Set(inv().map(i => i.uid)), before = new Set(D.loot.list);
+      G.player.setPos(it.pos.x + 1, it.pos.z); it.onInteract();
+      for (let k = 0, n = -1, same = 0; k < 60 && same < 5; k++) { await sleep(100); const m = D.loot.list.length + inv().length; same = m === n ? same + 1 : 0; n = m; }
+      const got = [...D.loot.list.filter(e => !before.has(e) && e.d.type === 'item').map(e => e.d.item), ...inv().filter(i => !bag0.has(i.uid) && i.rarity)];
+      o.unique = got.some(i => i.uniqueId === 'shikiLantern');
+    }
+    for (let k = 0; k < 120 && !(pin.stats.hoard && ring().length >= pin.stats.hoard); k++) await sleep(100);
+    const H = ring(), c = D.tr.chestAt, its = H.filter(e => e.d.type === 'item');
+    o.hoard = { n: H.length, items: its.length, rares: its.filter(e => ['rare', 'unique', 'set'].includes(e.d.item.rarity)).length, rMin: +Math.min(...H.map(e => Math.hypot(e.to.x - c.x, e.to.z - c.z))).toFixed(2), rMax: +Math.max(...H.map(e => Math.hypot(e.to.x - c.x, e.to.z - c.z))).toFixed(2), at: Math.round(performance.now() - t0) };
+    return o;
+  });
+  R.check('Autumn (Danzaburō) and Winter (Yuki-onna) follow, three spirits round the ring; Winter\'s fall is the clear (dungeon:cleared { spirit: 10 }, pinnacle:cleared, Spirit 11 open), the Pinnacle hoard (the four seasons\' items, curated to 10–20 of higher rarity) rises in a ring round the chest once the Victory banner has gone, and the Lantern chest gives Shiki, the Lantern of Four Seasons', i4.seen.join() === 'danzaburo,yukiOnna' && i4.k === 3 && i4.spirits === 3 && i4.seasons === 'spring,summer,autumn,winter' && i4.clear?.spirit === 10 && i4.pin && i4.done && /four seasons/i.test(i4.victory || '') && i4.best >= 10 && i4.unique && i4.early === 0 && i4.hoard.items >= 10 && i4.hoard.items <= 20 && i4.hoard.rares >= 4 && i4.hoard.rMin >= 2.2 && i4.hoard.rMax >= 5, JSON.stringify(i4));
+  // ---------------------------------------------------------------- h) the panel on a phone (two columns, the run unscrolled, 44 px targets, 12 px text)
+  {
+    const { launchTouch, PHONE } = await import('./touch-lib.mjs');
+    const T = await launchTouch(PHONE);
+    try {
+      await boot(T.page, 'fresh&nointro&notut');
+      await T.page.evaluate(() => { const G = window.G; G.tierDebug.unlock('bambooDepths', 3); G.lantern.open('bambooDepths'); });
+      await T.page.waitForFunction(() => window.G.ui.isOpen('lantern') && document.querySelector('.p-lantern .ln-card'), null, { timeout: 8000 });
+      await T.page.waitForTimeout(800);
+      const measure = () => T.page.evaluate(() => {
+        const W = innerWidth, H = innerHeight, q = s => document.querySelector(s), box = s => q(s).getBoundingClientRect(), small = [], tiny = [];
+        const panel = box('.pw[data-name="lantern"] .panel'), side = q('.p-lantern .ln-side'), sb = side.getBoundingClientRect(), cards = q('.p-lantern .ln-cards'), cb = cards.getBoundingClientRect(), go = box('.ln-go');
+        const scale = parseFloat(getComputedStyle(document.getElementById('ui')).getPropertyValue('--m-pscale')) || 1;
+        for (const b of document.querySelectorAll('.p-lantern button')) { const r = b.getBoundingClientRect(); if (r.width < 2) continue; if (Math.min(r.width, r.height) < 43.5) small.push(`${b.className.split(' ').slice(0, 2).join('.')}:${r.width.toFixed(0)}x${r.height.toFixed(0)}`); }
+        for (const e of document.querySelectorAll('.p-lantern .pb :is(b, span, small, em, div)')) { if (!e.offsetWidth || ![...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue; const f = parseFloat(getComputedStyle(e).fontSize) * scale; if (f < 11.9) tiny.push(`${e.className || e.tagName}:${f.toFixed(1)}`); }
+        const ph = box('.pw[data-name="lantern"] .ph'), pb = box('.pw[data-name="lantern"] .pb');
+        return { phone: document.getElementById('ui').classList.contains('m-phone'), fits: panel.left >= 0 && panel.right <= W + 1 && panel.bottom <= H + 1, twoCol: cb.left > sb.right - 2 && cb.top < sb.top + 30,
+          unscrolled: side.scrollHeight <= side.clientHeight + 2, goSeen: go.top >= sb.top && go.bottom <= pb.bottom + 2 && go.bottom <= H, cardsScroll: cards.scrollHeight > cards.clientHeight, slots: document.querySelectorAll('.ln-slot').length,
+          small: small.slice(0, 6), tiny: [...new Set(tiny)].slice(0, 6), barBelow: ph.top >= pb.bottom - 2 };
+      });
+      const ok = h => h.phone && h.fits && h.twoCol && h.unscrolled && h.goSeen && h.cardsScroll && !h.small.length && !h.tiny.length && h.barBelow;
+      const h = await measure();
+      R.check('phone (844 × 390): the Lantern panel fits in two columns: the run on the left unscrolled with Enter in sight, the cards scrolling on the right; the title bar at the bottom; every button ≥ 44 px, all text ≥ 12 px', ok(h), JSON.stringify(h));
+      await T.page.evaluate(() => { const G = window.G; G.ui.close('lantern'); G.tierDebug.clearAll(5); G.state.zones.bamboo.dungeon.spirit.best = 9; G.lantern.open('bambooDepths'); });
+      await T.page.waitForFunction(() => window.G.ui.isOpen('lantern') && document.querySelector('.ln-tier.spirit'), null, { timeout: 8000 });
+      await T.page.evaluate(() => { const P = window.G.ui.panels.lantern; P.setTier({ spirit: 10 }); P.surprise(); });
+      await T.page.waitForTimeout(500);
+      const h2 = await measure();
+      R.check('phone, a Spirit 10 run (the − / + stepper, six slots, the "Four Seasons"): the left column still fits unscrolled', ok(h2) && h2.slots === 6 && /Four Seasons/.test(await T.page.evaluate(() => document.querySelector('.ln-go small').textContent)), JSON.stringify(h2));
+    } catch (e) { R.check('phone: the Lantern panel', false, e.message); }
+    await T.browser.close();
+  }
 } catch (e) {
   R.check('scenario ran to the end', false, e.message);
 }

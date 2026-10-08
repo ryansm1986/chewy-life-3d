@@ -1,6 +1,6 @@
 # Zones: rescue the village, clear its dungeon, then push tiers (design)
 
-Status: **phases A–D built** (designed 2026-10-05; sprint and the foundations §8.1, §9.1; the dungeons §8.2; the villages §2.1, §2.2); **phase E: tiers and modifiers built, in review** (§5.1; the Spirit Lantern and the endgame next). The work is tracked in [ROADMAP.md](ROADMAP.md); this file is the design.
+Status: **phases A–D built** (designed 2026-10-05; sprint and the foundations §8.1, §9.1; the dungeons §8.2; the villages §2.1, §2.2); **phase E built: tiers, modifiers, the Spirit Lantern, the Spirit endgame and its pinnacle** (§5.1, §5.2, §5.3). The work is tracked in [ROADMAP.md](ROADMAP.md); this file is the design.
 
 The owner's direction (2026-10-05):
 - Every zone has **a village to save** from monsters.
@@ -464,7 +464,133 @@ Code map: `src/rpg/tiers.js` (the numbers), `src/rpg/zoneMods.js` (the catalogue
   every tier dungeon; **s30-tiers** (the migration on a real reload, a T2 run end to end with Boss's Wrath and Treasure
   Trove, the clear's events, chest and banner, a quest's tier step, Haunted / Night March / Hard Ground, Cursed Shrines,
   Elemental: Frost, the Deep Burrow T1 end to end).
-- **Next**: Z-E3 (the Spirit Lantern objects and panel, the run chip), Z-E4 (Spirit's endgame uniques, the pinnacle).
+- **Readability in big packs** (the checkpoint 1 review, `dungeon/tokens.js`). Nothing is hidden: every telegraph on
+  screen is a real attack; monsters wait their turn to start one.
+  - **Attack tokens**: when a monster's attack cooldown runs out beyond melee reach of the hero (2.8 m), it needs a token
+    first. One pack's tokens may weigh at most 2 (3 from T3 and in Spirit runs), and one kind's near the hero (20 m) at
+    most 4 (5 from T3). A token weighs 1, or more for an attack that draws several telegraphs (the kakashi's crows 2, the
+    sazae-oni's star of spines 3); a heavy one may always go alone. No token: its cooldown is pushed back 0.25–0.65 s
+    (it keeps moving and kiting), so volleys come in staggered waves. The token is held through the wind-up and the
+    attack, and given back when the AI resets its cooldown, after 1.4 s unused, or on death. Bosses and their adds are
+    never gated. A swarmed T3 scarecrow pack now throws one volley of crows at a time (2–3 lanes), T5 with Teeming two.
+  - **Alert bubbles**: one "!" per pack (2.5 s), at most 3 a second across the floor; the rest wake silently.
+- **The Yūrei**, after review: a matte cloth (rim 0.3, a faint brush), a slightly greyer sheet, bigger eyes and a bigger,
+  ink-edged paper triangle, so its face reads at the game camera.
+- **Next**: Z-E4 (§5.3).
+
+### 5.2 As built: the Spirit Lantern (phase E checkpoint 2: Z-E3; 2026-10-08)
+- **The lantern** (`regions/spiritLantern.js`): a hexagonal stone tōrō about 2.5 m tall: a stepped plinth with moss,
+  a stout octagonal pillar with a shimenawa and two shide, a lotus-petal platform, a firebox of six posts round a paper
+  box with a kumiko lattice, a flat-faced hipped roof of dark slate with lighter hip ridges and fern-curl warabite at
+  the corners, two violet silk tassels at the front corners and a hōju on top. Asleep (no tier open) its paper is
+  dark; lit, the paper glows lavender round a cyan spirit flame, three ofuda circle it, motes rise, and it casts a
+  soft violet light (3, 1.6 on snow).
+  - **At each zone gate**: `installGate` stands it at gate-local (4.1, 2.7), beside the torii; a gate look may move it
+    (`look.spirit`, `look.spiritI`: the onsen gate puts it left of the torii, the hot spring being on the right).
+  - **At the Burrow door** in Blossom Hollow (`installBurrowLantern`): the Deep Burrow's, lit when Tamamo has fallen
+    (live on `tier:unlocked`).
+  - F: lit → the panel; asleep → a toast ("Clear the Bamboo Depths once to wake it" / "Beat Tamamo on Burrow floor 20").
+- **`G.lantern`** (`installLanternApi`): `info(id)` (the open tier, tiers cleared, Spirit open / max / best, the last
+  setup, the level per run), `open(id)`, `enter(id, run)` (cleans the run to what's open, remembers it per dungeon,
+  enters floor 1). The panel never imports world code.
+- **The panel** (`ui/lantern.js`, `ui/lantern.css`, icons `ui/lanternIcons.js`), 1010 px:
+  - left: the dungeon and its best clear; the tiers as a tab row (T1–T5, locked ones greyed, a ✓ on cleared ones, and
+    霊 Spirit with a − / + stepper once open; the pinnacle tiers say so); the run's level, pack size, champion chance (and
+    Spirit's life / damage); the modifier slots (click one to take it out); Recommended / Surprise me / Clear; the
+    summed reward (quantity, rarity, XP, boss loot; a zero is dashed); Enter, which names the run and says it is free;
+  - right: 17 modifier cards in three columns: a hand-drawn icon in the modifier's colour, its name, effect and reward,
+    a risk pip row under the icon; picked cards are ringed in their colour with a ✓; with the slots full the rest grey
+    out (a click is refused and the slots flash); another Elemental swaps for the picked one;
+  - the last setup per dungeon opens again (if still open), else the highest open tier with nothing picked.
+  - **Keyboard**: 1–5 the tier, Enter sets off, Esc closes. **Pad**: the focus starts on Enter; LB / RB step the tiers
+    (the tab row), A adds / removes / sets off, Y Recommended, X Surprise me (padNav HANDLERS), B back; the footer and
+    the hints bar show the glyphs. **Touch / phone** (after review): two columns, as on the desktop. On a landscape
+    phone (844 × 390) the left 42% holds the whole run unscrolled: a one-line header (the name and "Best"; on a Spirit
+    tier its − / + stepper beside it, the name over "Best"), the tier row, the stats folded into one line ("Lv 24–25 ·
+    Packs ×1.18 · Champions +12%"), the slots, Recommended / Surprise me / Clear, the rewards as one row of chips
+    ("+45% qty") and Enter; the cards scroll on the right, two to a row, fading out at the bottom. The panel fills the
+    safe area's height (`--m-top` / `--m-bot`) and its width inside `--sa-l` / `--sa-r`; every target ≥ 44 px, all text
+    ≥ 12 px on screen; the key footer hides on touch. A tablet keeps the desktop layout (at its menu scale).
+- **The run chip** (`ui/runChip.js`): in a tier or Spirit run, a pill at the foot of the HUD's top-right stack (under
+  the coins and materials, so it follows the HUD's safe area): the lantern, "Tier 4" / "Spirit 7", an icon per
+  modifier; hovering lists them with their effects and the summed reward.
+- **QA**: s30 g) the lantern lit at the gate, asleep elsewhere, the Burrow door's; the panel (tiers, 17 cards, the slot
+  limit, the summed reward, Recommended / Surprise me), Enter → the run with the picks, the memory, the run chip; h) the
+  panel on a phone (two columns, the left one unscrolled with Enter in sight, the cards scrolling, the title bar at the
+  bottom, 44 px targets, 12 px text), also for a Spirit 10 run's six slots. Look review: `tools/qa/lantern-shots.mjs`
+  (the Burrow door, a gate, the panel on desktop, pad, phone and tablet).
+- **The run chip on itch** (CT-6's itch inset: `--sa-t` 80, `--sa-r` 100 in an iPad's 1280-wide frame): the chip sits in
+  `.hud-tr`, so it follows the inset (measured at x 1031–1167, y 329–360 in the frame: clear of itch's buttons and on
+  the page); CT-6's `build-itch --test` iPad check lists `.run-chip` among the HUD pieces it keeps clear.
+
+### 5.3 As built: the Spirit endgame and the pinnacle, "The Four Seasons" (phase E checkpoint 3: Z-E4; 2026-10-08)
+Code map: `src/dungeon/pinnacleLayout.js` (the data and the floor), `src/dungeon/pinnacle.js` (the fight: `tr.pin`), the
+endgame uniques in `src/rpg/items.js`; ARCHITECTURE.md "Tier runs".
+- **The Spirit endgame** (the numbers and the save: §5.1): when all four zone dungeons are cleared at T5, every Spirit
+  Lantern (the four gates and the Burrow door) shows the 霊 Spirit tab; a Spirit S clear opens S + 1 in all five. The
+  run chip says "Spirit S"; the Lantern's Enter says "the Four Seasons" on a pinnacle tier.
+- **The endgame uniques** (`UNIQUES` tagged `spirit`, `zone: 'spirit'`: never rolled at random), level 58, one per
+  season, for any hero (a charm, a collar, a hat, paws):
+
+  | Unique | Base | Stats |
+  |---|---|---|
+  | Harukaze, the Spring Wind Omamori | omamori | move speed, cooldowns, attack speed, zap resistance, +1 all skills |
+  | Natsunami, the Summer Tide | jeweled collar | life, energy, frost and fire resistance, life regen |
+  | Akiyo, the Autumn Leaf Hat | kasa | defense, magic find, gold find, all resistances, life |
+  | Fuyugomori, the Winter Hush | mittens | crit, crit damage, dexterity, frost resistance, attack speed |
+  | **Shiki, the Lantern of Four Seasons** (the pinnacle's, level 60) | lucky cat | +2 all skills, all resistances, life, magic find, cooldowns, +10% xp |
+
+  The four drop from a Spirit run's Lantern chest (min(25%, 3% + 1% S)) and its unique packs' leaders (min(3%, 0.5% +
+  0.1% S)); Shiki only from the Four Seasons' Lantern chest, every time.
+- **The pinnacle** (every 10th Spirit tier, in any of the five dungeons): the last boss floor's boss is the Four Seasons
+  (`pinnacleLayout`, from gen.js): **Spring** Master Tengu, **Summer** Umibōzu, **Autumn** Danzaburō, **Winter**
+  Yuki-onna, one at a time, in the floor's ring: a zone dungeon's arena (r 17 m), or the Deep Burrow's boss room (30 m
+  across; r 12.5 m for the fights, cleared of packs).
+  - **Each season is its boss's own fight** (its moves, its add waves, its second phase), retuned for the ring as in its
+    own dungeon. Its life is a share of a full boss's (Spring, Summer, Autumn 45%, Winter 60%, on top of Spirit's
+    life ×(1 + 0.1 S)): about four boss lives in all at S10.
+  - **A season falls**: no clear yet. Its adds vanish and its shots fizzle, the seal stays up, a card names the next
+    season ("Summer 夏: The tide comes in, warm and enormous."), and the next boss rises opposite the hero 3.6 s later
+    with its own intro. A season leaves only coins and potions where it falls; its items and gems wait for the Pinnacle
+    hoard (the ring stays clear of loot labels mid-fight).
+  - **The spirits and their echoes** (the remix): a fallen season stays as a spirit at the ring's edge (a translucent
+    copy of its boss in its season's colour, bobbing; a quarter of the ring each, none at the mouth) and keeps one of
+    its moves going in the later seasons:
+    - Spring's **gale**: a lane of wind from its spirit through the hero (1.3 s), half a blow and a shove;
+    - Summer's **ink rain**: three circles round the hero (1.15 s), a hit and a chill where the ink lands;
+    - Autumn's **rolling leaf-boulder**: a lane from its spirit across the ring (1.45 s), a hit and a sideways knock.
+
+    One echo at a time, every 8.5 / 7.2 / 6.2 s in Summer / Autumn / Winter, only in the boss's quiet moment (no
+    telegraph of its own up, `DungeonMode.sigDimT`, and not in one of its moves, `bossBusy`), and the boss holds its next
+    move until the echo lands (`hold`: its own cooldown). Every telegraph on screen is one attack, one beat at a time.
+  - **The air of the season**: petals (Spring), a few sea-glow motes (Summer), maple leaves (Autumn) and snow (Winter)
+    drift round the hero, and a soft light of the season's colour hangs over the ring (intensity 2.4). Nothing else
+    tints the screen. **Winter's whiteout** (after review) is her own, thinned here only: at 62% of its strength (her
+    haze overlay, the fog's pull-in and its snow colour; `PIN_WHITEOUT`, read by Yuki-onna as `m.woMul`), so with
+    Spirit's life making it a long phase the ring keeps most of its colour; the hero's and the lanterns' warm circles
+    stay clear. Her own fight in the Onsen Caverns is unchanged.
+  - **Winter falls**: the spirits burst into their seasons and fade, the Victory banner says "All four seasons have
+    fallen!", the clear is recorded (`dungeon:cleared { spirit }`, `pinnacle:cleared`), and the Lantern chest rises
+    (2.5 s) with Shiki on top of the Spirit chest. A toast (not a second banner) says "The Four Seasons are stilled!" and
+    which Spirit tier is open.
+  - **The Pinnacle hoard** (after review: 63 items had made a wall of labels over the hero, the chest and the banner):
+    the four seasons' held items and Winter's whole drop (with the run's quantity extras) become one hoard, curated
+    (`curate`): the
+    best 15 items by rarity, then worth; for every 6 cut, one of the rest is traded up for a fresh rare (at most 5); the
+    best 2 gems; the coins in 4 full piles; 3 potions; Winter's seeds or furniture find as they came. About 20–27 drops,
+    15–18 of them items, nearly all rare or better. It rises 4.4 s
+    after the kill, once the Victory banner has gone (so no label ever covers it), out of the chest's glow into a wide
+    ring (r 2.8–5.4 m, every drop at least 2.3 m from the chest) round a point drawn 3 m from the chest toward the
+    ring's middle, so the whole circle lies on open floor and the hero by the chest stays clear (`dropRing`).
+  - Events: `pinnacle:season { season, n, from }`, `pinnacle:cleared`.
+- **QA**: test-rpg (the pinnacle floor on every tier dungeon at S10 / S20, never at S9 or on floor 1; the endgame
+  uniques: built, level 58+, never rolled at random); **s30** i) Spirit 10 in the Bamboo Depths end to end (Spring
+  wakes in the ring; its fall is no clear, the seal holds, its spirit rises, its items wait; Summer rises; Spring's gale
+  comes in a quiet beat with the boss holding; Autumn, Winter; the clear, Spirit 11, Shiki from the chest; nothing of
+  the hoard while the Victory banner is up, then 10–20 items, 4+ rares, in a ring 2.2–5 m and more from the chest);
+  **prod-smoke** `pinnacle:bambooDepths` (the Lantern's Spirit tab and 17 cards, the run chip, the four in turn, the
+  chest). Look review: `tools/qa/pinnacle-shots.mjs` (each season's fight with its adds called, an echo in flight,
+  Winter's whiteout, the Victory banner, the hoard).
 
 ## 6. Elevation and depth (outdoor zones)
 - **Goal**: zones with **real playable elevation**:

@@ -14,6 +14,7 @@
 //  - Boss's Wrath: at 40% life the boss flies into a wrath: it enrages, calls a wave of the dungeon's monsters, and
 //    every 8 s sends a telegraphed shockwave ring out round it.
 //  - Cursed Shrines: a shrine's blessing comes with a curse (combat.buffs.cursed: +25% damage taken for 20 s).
+//  - the pinnacle (every 10th Spirit tier's boss floor, layout.pinnacle): the Four Seasons, dungeon/pinnacle.js (this.pin).
 //  - the clear (the run's last boss): the Lantern chest rises (rpg/tiers.js clearChest), the banner names the tier
 //    opened (or the Spirit endgame), the events fire (DungeonMode.clearDungeon).
 import * as THREE from 'three';
@@ -22,6 +23,8 @@ import { extraItems, ZONE_MODS } from '../rpg/zoneMods.js';
 import { runLabel, clearChest } from '../rpg/tiers.js';
 import { generateItem, makeUnique, makeGem, GEM_TYPES, UNIQUES } from '../rpg/items.js';
 import { ZONE_UNIQUE } from '../rpg/zoneProgress.js';
+import { Pinnacle } from './pinnacle.js';
+import { PINNACLE_UNIQUE } from './pinnacleLayout.js';
 import { playerDamageTaken } from '../rpg/stats.js';
 import { tele, chill } from '../regions/monsters/bamboo.js';
 import { makeOutline } from '../gfx/materials.js';
@@ -42,6 +45,7 @@ export class TierRun {
     this.rng = new RNG(((mode.run?.packSeed || 1) * 13 + 7) >>> 0);
     this.ghostQ = []; this.ghostsAlive = 0; this.wrath = null; this.seenT = 0;
     this.stats = { ghosts: 0, extraItems: 0, curses: 0, wrath: 0, elHits: 0, shock: 0 }; // (QA: s30, the shots)
+    this.pin = mode.layout?.pinnacle ? new Pinnacle(mode) : null; // (the Four Seasons: Spirit 10, 20, …)
   }
   get rewards() { return this.R.rewards; }
   get label() { return runLabel(this.R); }
@@ -56,6 +60,7 @@ export class TierRun {
     if (Ru.alertR) M.alertR = Ru.alertR; // (Monster.update's notice radius: Night March)
     if (this.R.monster.el) this.wrapHits();
     if (Ru.haunted) M.warmMonsters?.(['yurei']);
+    this.pin?.build();
   }
   /** DungeonMode.start, once the grade is set and the packs are out */
   start() {
@@ -63,6 +68,7 @@ export class TierRun {
     if (R.run.night) this.night();
     if (R.run.regen !== 1) G.regenMul = R.run.regen;
     this.decorateAll();
+    this.pin?.start();
     const names = R.mods.map(id => ZONE_MODS[id].short || ZONE_MODS[id].name);
     if (R.tier > 0 || R.spirit > 0 || names.length) setTimeout(() => { if (G.dungeon === this.mode) G.ui?.toast?.(`${this.label}${names.length ? ': ' + names.join(' · ') : ''}`, { icon: 'lantern', color: R.spirit ? '#c8b8ff' : '#ffd88a' }); }, 3000);
   }
@@ -149,6 +155,7 @@ export class TierRun {
     if (Rw.qty > 0) for (const d of drops) if (d.type === 'coins') d.n = Math.round(d.n * (1 + Rw.qty * 0.5));
     this.stats.extraItems += n;
     if (this.R.spirit > 0 && m.rank === 'unique' && this.rng.chance(this.R.info.leaderUnique)) { const u = this.endgameUnique(m.level); if (u) drops.push(u); }
+    this.pin?.onDrops(m, drops, isBoss); // (the pinnacle: each season's items wait for Winter's hoard)
   }
   /** a chest's drops: the quantity bonus as extra items; the run's clear chest adds its own hoard (clearDrops) */
   onChest(chest, drops) {
@@ -216,6 +223,7 @@ export class TierRun {
   // ------------------------------------------------------------------ per frame
   update(dt) {
     const M = this.mode;
+    this.pin?.update(dt);
     for (let i = this.ghostQ.length - 1; i >= 0; i--) { const q = this.ghostQ[i]; q.t -= dt; if (q.t <= 0) { this.ghostQ.splice(i, 1); this.riseGhost(q); } }
     if ((this.seenT -= dt) <= 0) { this.seenT = 0.25; if (this.R.monster.el) this.decorateAll(); }
     const b = M.boss, Bw = this.R.boss.wrath;
@@ -245,7 +253,7 @@ export class TierRun {
     setTimeout(() => {
       if (G.dungeon !== M) return;
       const chest = M.makeChest(p, 'gold');
-      chest.tierClear = { spec, first: clear.first, zone: M.zoneId, tier: R.tier, spirit: R.spirit, pinnacleUnique: clear.pinnacleUnique || null };
+      chest.tierClear = { spec, first: clear.first, zone: M.zoneId, tier: R.tier, spirit: R.spirit, pinnacleUnique: clear.pinnacleUnique || (spec.pinnacle && this.pin ? PINNACLE_UNIQUE : null) };
       G.vfx?.pillar?.(p, { color: R.spirit ? '#c8b8ff' : '#ffd88a', life: 1.6, r: 1.0, h: 7 }); G.vfx?.sparkle?.(p.clone().setY(1), { n: 30, color: R.spirit ? '#e8deff' : '#fff2a0', r: 1 });
       M.world.interactables.push({ pos: p, radius: 1.3, label: 'Open the Lantern chest', onInteract() { if (chest.opened) return; chest.open(); M.world.interactables.splice(M.world.interactables.indexOf(this), 1); } });
       M.world.collision.addCircle(p.x, p.z, 0.5);
@@ -253,7 +261,8 @@ export class TierRun {
     setTimeout(() => {
       if (G.dungeon !== M) return;
       const sub = clear.spiritOpened ? 'The Spirit endgame is open at every Spirit Lantern!' : clear.tierUnlocked ? `Tier ${clear.tierUnlocked} is open at the Spirit Lantern` : R.spirit ? `Spirit ${R.spirit + 1} is open at every Spirit Lantern` : 'The Lantern chest rises…';
-      G.ui?.banner?.(`${M.def.name}: ${this.label} cleared!`, sub, { style: 'quest' });
+      if (this.pin) G.ui?.toast?.(`The Four Seasons are stilled! ${sub}`, { icon: 'lantern', color: '#c8b8ff' }); // (the pinnacle: no second banner over its hoard's labels; the Victory banner said it)
+      else G.ui?.banner?.(`${M.def.name}: ${this.label} cleared!`, sub, { style: 'quest' });
     }, clear.first && M.zr ? 6200 : 4300);
   }
   dispose() {
@@ -263,6 +272,7 @@ export class TierRun {
     const S = this.nightSaved;
     if (S) { const gr = G.engine.post.grade.uniforms; gr.get('uGain').value.copy(S.gain); gr.get('uSat').value = S.sat; gr.get('uVignette').value = S.vig; gr.get('uVigColor').value.copy(S.vigC); this.nightSaved = null; }
     this.ghostQ.length = 0; this.wrath = null;
+    this.pin?.dispose();
   }
 }
 

@@ -61,8 +61,10 @@ export class RegionMode extends DungeonMode {
     if (arrive.gate && this.gate) this.startPos = this.gate.arrival.clone(); // (back out of the zone dungeon: in front of its gate)
     for (const sp of L.spawns) this.spawnPack(sp);
     this.village?.start(arrive); // (the siege camps and the captain)
-    // dusk / night regions: a warm lantern glow follows the hero (daylight regions don't need it)
-    if ((def.mood?.night || 0) > 0.3) this.playerLight = this.world.lightPool.addSource({ pos: new THREE.Vector3(), color: new THREE.Color('#ffd8a8'), intensity: 5, radius: 9, priority: 10 });
+    // dusk / night regions: a warm lantern glow follows the hero (daylight regions don't need it). Hung 4 m up like the
+    // Burrow's (dungeonMode.js, ROADMAP R-9) and softer than it: at 1.8 m and 5 it turned Foosy's emerald mint in the
+    // Onsen, and over snow anything past ~4 lifts the white ground over the bloom threshold, which washes the hero again
+    if ((def.mood?.night || 0) > 0.3) this.playerLight = this.world.lightPool.addSource({ pos: new THREE.Vector3(), color: new THREE.Color('#ffd8a8'), intensity: 3.5, radius: 9, priority: 10, lift: 4 });
     G.ui?.banner?.(def.name, `${def.jp} · Lv ${def.levels[0]}–${def.levels[1]}`, { style: 'area' });
     const b = MONSTERS[L.boss];
     if (b) setTimeout(() => { if (G.dungeon === this && this.boss?.alive && !this.boss.introDone) G.ui?.toast?.(`${b.name} waits at the end of the trail…`, { icon: 'oni', color: '#ff8a9a' }); }, 3200);

@@ -20,6 +20,7 @@ import { Actions } from '../core/actions.js';
 import { HeroWheel } from '../ui/heroWheel.js';
 import { PoeJoin } from './poeJoin.js';
 import { ShihtzuJoin } from './shihtzuJoin.js';
+import { GoldenJoin } from './goldenJoin.js';
 
 const V = (x, z) => new THREE.Vector3(x, 0, z);
 const ease = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
@@ -83,6 +84,7 @@ export class HeroManager {
     this.wheel = null;   // ui/heroWheel.js (made on first use)
     this.poeJoin = new PoeJoin(G, this); // Poe's joining scene in the Bamboo Grove + the rumour in town (actors/poeJoin.js)
     this.stzJoin = new ShihtzuJoin(G, this); // the Shih Tzu's scene in Momiji Hollow + his rumour in town (actors/shihtzuJoin.js)
+    this.gldJoin = new GoldenJoin(G, this); // Foosy's scene at the Onsen's hot springs + his rumour in town (actors/goldenJoin.js)
     // back in town: a hero who joined while you were out (Poe, in the bamboo) moves into the cottage
     Events.on('mode:changed', p => { if (p?.mode === 'village') this.spawnBench(); });
     setLootClass(this.active);
@@ -224,6 +226,7 @@ export class HeroManager {
     this.cd = Math.max(0, this.cd - dt);
     this.poeJoin.update(dt);
     this.stzJoin.update(dt);
+    this.gldJoin.update(dt);
     // a Tab press or the wheel can't outlive play input (a dialogue, a menu, a switch starting)
     const ui = this.G.ui;
     if ((this.tab || this.wheelOpen) && (this.G.player?.controlLocked || ui?.dlg?.active || ui?.anyModal?.() || this.G.titleActive || this.T)) { this.tab = null; if (this.wheelOpen) this.pickFromWheel(null); }

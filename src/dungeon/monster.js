@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { MONSTERS, MonsterAnim } from './monsters.js';
 import { hordeOf } from './horde.js';
 import { crowdOf, NOGRID, PAD } from './crowd.js';
+import { attackToken, releaseToken, alertBubble } from './tokens.js';
 import { monsterStats, applyRandomMods, MONSTER_MODS } from '../rpg/stats.js';
 import { Animator } from '../actors/animator.js';
 import { makeOutline } from '../gfx/materials.js';
@@ -147,7 +148,7 @@ export class Monster {
   alert() {
     if (this.def.boss && !this.introDone) { this.introDone = true; this.mode.bossIntro?.(this); }
     this.aggro = true;
-    if (this.state === 'idle') { this.emote('!', 0.9); }
+    if (this.state === 'idle' && alertBubble(this)) { this.emote('!', 0.9); } // (one "!" per pack, a few a second at most: tokens.js)
     if (NOGRID) { for (const m of this.mode.monsters) if (m !== this && m.alive && !m.aggro && dist(m.pos.x, m.pos.z, this.pos.x, this.pos.z) < 7) { m.aggro = true; } return; }
     const g = crowdOf(this.mode), near = g.near(this.pos.x, this.pos.z, 7 + PAD); // (the floor's monster grid: crowd.js)
     for (let i = 0; i < near.length; i++) { const m = near[i]; if (m !== this && m.alive && !m.aggro && dist(m.pos.x, m.pos.z, this.pos.x, this.pos.z) < 7) { m.aggro = true; } }
@@ -156,7 +157,7 @@ export class Monster {
   cancelAttack() { this.state = 'chase'; this.anim.wind = 0; this.anim.spin = 0; if (this.telegraph) { this.telegraph.t = 999; this.telegraph = null; } }
   die() {
     if (!this.alive) return;
-    this.alive = false; this.life = 0;
+    this.alive = false; this.life = 0; releaseToken(this);
     this.cancelAttack();
     if (this.light) { this.world.lightPool.removeSource(this.light); this.light = null; }
     const G = this.G;
@@ -174,7 +175,7 @@ export class Monster {
   // `delay` s it bursts into sparkles and squashes away. No xp, no loot.
   vanish(delay = 0) {
     if (!this.alive) return;
-    this.alive = false; this.life = 0; this.vanished = true;
+    this.alive = false; this.life = 0; this.vanished = true; releaseToken(this);
     this.cancelAttack(); this.knock.set(0, 0, 0);
     if (this.light) { this.world.lightPool.removeSource(this.light); this.light = null; }
     const M = this.mode, i = M.monsters.indexOf(this); if (i >= 0) M.monsters.splice(i, 1);
@@ -201,7 +202,7 @@ export class Monster {
     }
     if (!this.shadow.geometry?.userData?.shared) this.shadow.geometry?.dispose();
     if (this.light) { this.world.lightPool.removeSource(this.light); this.light = null; }
-    crowdOf(this.mode).remove(this);
+    crowdOf(this.mode).remove(this); releaseToken(this);
     this.disposed = true;
   }
   // ------------------------------------------------------------------ AI
@@ -211,6 +212,7 @@ export class Monster {
     this.separate(dt);
     const G = this.G, P = G.player, st = this.status;
     this.stateT += dt; this.cd -= dt * (this.stats.atkMul || 1) * (this.enraged ? 1.4 : 1);
+    if (this._tok || this.cd <= 0) attackToken(this, dt); // (big packs take turns to wind up a ranged attack: tokens.js)
     let moving = false;
     // knockback slide
     if (this.knock.lengthSq() > 0.001) {

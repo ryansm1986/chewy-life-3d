@@ -68,7 +68,7 @@ export class DungeonMode {
     this.playerLight = this.world.lightPool.addSource({ pos: new THREE.Vector3(), color: new THREE.Color('#ffd8a8'), intensity: 16, radius: 11, priority: 10, lift: 4 });
     G.ui?.banner?.(`Floor ${this.floor}`, `${this.def.name}${this.tr ? ' · ' + this.tr.label : ''} — ${this.theme.name}`, { style: 'area' });
     // boss floors: a small heads-up toast (the big boss banner is saved for the actual encounter)
-    if (L.boss) setTimeout(() => { if (G.dungeon === this && this.boss?.alive && !this.boss.introDone) G.ui?.toast?.(`${MONSTERS[L.boss].name} lurks in the deepest chamber…`, { icon: 'oni', color: '#ff8a9a' }); }, 2600);
+    if (L.boss && !L.pinnacle) setTimeout(() => { if (G.dungeon === this && this.boss?.alive && !this.boss.introDone) G.ui?.toast?.(`${MONSTERS[L.boss].name} lurks in the deepest chamber…`, { icon: 'oni', color: '#ff8a9a' }); }, 2600);
     if (this.kind === 'burrow') G.state.dungeon.deepest = Math.max(G.state.dungeon.deepest || 0, this.floor); // (the Burrow's record; a zone dungeon keeps its own)
     else if (this.zoneId) noteFloor(G.state, this.zoneId, this.floor);
     // dungeon colour grade (the village day/night grade doesn't run down here)
@@ -467,7 +467,7 @@ export class DungeonMode {
     xp = Math.round(xp * (1 + (D.xpBonus || 0) / 100));
     if (this.zr) xp = Math.max(1, Math.round(xp * this.zr.xpMul(m))); // (a dense zone floor pays less per kill: zoneRun.js DENSITY)
     if (this.tr) xp = Math.max(1, Math.round(xp * this.tr.xpMul(m))); // (a tier run's xp bonus; a Haunted ghost pays a third)
-    const isBoss = m === this.boss;
+    const isBoss = m === this.boss && !this.tr?.pin?.seasonFalls(m); // (the pinnacle: a season falls, the next rises: dungeon/pinnacle.js)
     // the Victory banner goes up before the xp lands, so a level-up from the kill folds into it (no second banner)
     if (isBoss) this.onBossDefeated(m, xp);
     G.actions.addXp(xp);
@@ -493,7 +493,7 @@ export class DungeonMode {
   }
   // every monster on the floor gone: a supply cache (wood / stone / coins) pops out at Chewy's feet
   checkFloorClear() {
-    if (this.floorCleared || this.monsters.some(m => m.alive)) return;
+    if (this.floorCleared || this.monsters.some(m => m.alive) || this.tr?.pin?.busy) return;
     this.floorCleared = true;
     const G = this.G;
     setTimeout(() => {
@@ -518,7 +518,7 @@ export class DungeonMode {
     this.victoryT = 0; this.victoryWarm = warm; this.sigilCalm = true; // the broken seal: the arena sigil settles down
     G.vfx.calm?.(2.5); // a level-up from this kill celebrates quietly under the banner instead of bleaching the screen
     G.ui?.floats?.hush?.(2.8); // clear the damage numbers off the stage for the moment
-    G.ui?.banner?.('Victory!', `${b.name} was defeated!`, { style: 'victory', xp });
+    G.ui?.banner?.('Victory!', b.victorySub || `${b.name} was defeated!`, { style: 'victory', xp }); // (victorySub: the pinnacle's own line)
     this.clearBossFight(b);
     Events.emit('boss:dead', { id: b.id, floor: this.floor, ...this.where() });
     this.clearDungeon(b);
@@ -645,7 +645,7 @@ export class DungeonMode {
     for (const m of this.dying) m.update(dt); // death squash / poof animation
     this.loot.update(dt);
     for (const s of this.spinners || []) s(dt, t);
-    if (this.playerLight) this.playerLight.pos.copy(G.player.pos).setY(G.player.pos.y + (this.playerLight.lift ?? 1.8)); // (a region's night lantern keeps 1.8)
+    if (this.playerLight) this.playerLight.pos.copy(G.player.pos).setY(G.player.pos.y + (this.playerLight.lift ?? 1.8)); // (lift: the Burrow's and a night region's lantern hang 4 m up, R-9)
     // boss bar
     if (this.boss?.alive && this.boss.aggro) G.ui?.setBoss?.({ name: this.boss.name, hp: this.boss.life, max: this.boss.lifeMax });
     this.updateBossFraming(dt);

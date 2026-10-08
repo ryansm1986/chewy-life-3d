@@ -3,6 +3,7 @@ import { RNG, Noise } from '../core/util.js';
 import { generateZone } from './zoneGen.js';
 import { ZONE_THEMES } from './zoneKits/themes.js';
 import { layoutMods, resolveRun } from '../rpg/zoneMods.js';
+import { pinnacleLayout } from './pinnacleLayout.js';
 
 export const CELL = 2; // world units per cell
 // kit: which geometry/shader kit renders the biome (defaults to the theme key); sun/sunI: key light colour & strength
@@ -31,6 +32,7 @@ export function generate({ floor = 1, seed = 1, plan = null } = {}) {
   const L = generateFloor({ floor, seed, plan });
   const R = plan && (plan.tier || plan.spirit || plan.mods?.length) ? resolveRun(plan) : null;
   if (R?.active) layoutMods(L, { ...plan, runMods: R }, new RNG(seed * 6151 + floor * 2477 + 17));
+  if (R?.info?.pinnacle && L.boss) pinnacleLayout(L); // (every 10th Spirit tier: the Four Seasons in the last boss's ring, pinnacleLayout.js)
   return L;
 }
 function generateFloor({ floor = 1, seed = 1, plan = null } = {}) {

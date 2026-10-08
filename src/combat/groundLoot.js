@@ -17,11 +17,15 @@ import { PANTRY, CROPS } from '../life/pantry.js';
 import { FURNITURE, SURFACES, SETS as FSETS, itemDef } from '../home/furniture.js';
 import { furnitureGroup, furnitureTemplate } from '../home/furnitureMesh.js';
 import { surfaceTexture } from '../home/surfaces.js';
+import { lookIn } from '../dungeon/horde.js';
 
 const RCOL = { normal: '#f4efe6', magic: '#6ea8ff', rare: '#ffd84a', unique: '#ff9a3c', set: '#5ee07a' };
 const MAT_COL = { wood: '#b07a4a', stone: '#b8b0c0', petal: '#ffb0d0', crystal: '#9ae8ff', bone: '#fff4e0', mochi: '#ffe0ec', silk: '#e8e0ff', lantern: '#ff8a4a' };
 const POT_COL = { heart: '#ff6a8a', zoom: '#5aa8ff', rejuv: '#b88aff' };
 const cache = {};
+// drops drawn instanced with the monsters in a fight (dungeon/horde.js lookIn: toon + ink on cached geometry; a fast
+// killer leaves a few hundred on the floor, each was 3+ draws): the ones whose geometry is always cached
+const INSTANCED_DROPS = new Set(['coins', 'potion', 'material', 'pantry', 'gem', 'quest', 'item']);
 function geo(key, make) { return cache[key] || (cache[key] = make()); }
 
 function coinGeo() {
@@ -171,7 +175,8 @@ export class GroundLoot {
     if (!mesh) return;
     mesh.castShadow = true;
     if (mesh.geometry) { const ol = new THREE.Mesh(mesh.geometry, makeOutline('#3a2230', 0.012)); mesh.add(ol); }
-    this.world.scene.add(mesh);
+    if (INSTANCED_DROPS.has(d.type)) lookIn(this.G.dungeon?.loot === this ? this.G.dungeon : null, mesh, this.world.scene); // (adopted by the floor's Horde, else a scene object; a textured one stays in the scene)
+    else this.world.scene.add(mesh);
     const e = { id: uid(), d, mesh, from, to, t: 0, fly: 0.55, beam, color, label, spin: rand(-3, 3) };
     // the label stands on the item itself (not at Chewy's height), so a pile of drops doesn't bury him
     if (label) this.G.ui?.lootLabel?.add?.({ id: e.id, name: label, color, worldPos: to, lift: d.type === 'furniture' ? -0.55 : 0.16, onClick: () => this.tryPickup(e, true) }); // (a find's name sits under it: the piece floats above)
@@ -223,6 +228,7 @@ export class GroundLoot {
   }
   remove(e) {
     const i = this.list.indexOf(e); if (i >= 0) this.list.splice(i, 1);
+    const ud = e.mesh.userData; if (ud.lookH) { if (!ud.lookH.disposed && ud.lookModel?.slots) ud.lookH.release(ud.lookModel); ud.lookH = null; } // (off the Horde's batches)
     e.mesh.parent?.remove(e.mesh);
     if (e.beam) { e.beam.alive = false; }
     if (e.light) this.world.lightPool.removeSource(e.light);

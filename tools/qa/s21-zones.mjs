@@ -266,7 +266,8 @@ try {
     const G = window.G; G.save(); const st = JSON.parse(localStorage.getItem('chewy3d.save'));
     delete st.zones; st.regions = { unlocked: { bamboo: true, maple: true }, cleared: { bamboo: 2 }, visits: { bamboo: 5, maple: 1 } };
     const txt = JSON.stringify(st); localStorage.setItem('chewy3d.save', txt);
-    addEventListener('beforeunload', () => localStorage.setItem('chewy3d.save', txt)); // (after the game's own save-on-unload)
+    const keep = () => localStorage.setItem('chewy3d.save', txt); // (after the game's own saves on leaving: beforeunload, and ui/mobile.js's pagehide / hidden, CT-6)
+    addEventListener('beforeunload', keep); addEventListener('pagehide', keep); document.addEventListener('visibilitychange', keep); addEventListener('unload', keep);
     return !!st.regions;
   });
   await page.goto(`${BASE}/?notitle&nointro&notut&hour=11&dseed=1`, { waitUntil: 'load' });
