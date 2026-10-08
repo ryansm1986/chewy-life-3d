@@ -1,0 +1,32 @@
+/* Debug tools, the always-loaded part (src/debug/access.js): the password prompt and the HUD's bug button. The menu's
+   own styles (debug.css) load with the menu. */
+.p-dbg-gate { width: 420px; }
+.p-dbg-gate .ph { justify-content: center; }
+.dg { display: flex; flex-direction: column; gap: 12px; padding: 4px 4px 2px; }
+.dg-top { display: flex; align-items: center; gap: 12px; }
+.dg-bug { flex: none; width: 54px; height: 54px; border-radius: 16px; border: 3px solid var(--ink); background: radial-gradient(circle at 50% 35%, #fff, #ffe6ee); display: grid; place-items: center;
+  box-shadow: 0 3px 0 var(--ink); animation: dgBob 2.4s ease-in-out infinite; }
+.dg-bug .dbg-bug-ic { width: 38px; height: 38px; }
+.dg-t { margin: 0; font: 500 15px/1.35 var(--font); color: var(--ink2); }
+.dg-f { margin: 0; }
+.dg-in { width: 100%; box-sizing: border-box; font: 600 18px/1 var(--font); color: var(--ink); padding: 12px 14px; min-height: 48px; border: 3px solid var(--ink); border-radius: 14px;
+  background: #fffaf2; box-shadow: inset 0 3px 0 rgba(74, 44, 42, .12); outline: none; letter-spacing: .08em; -webkit-user-select: text; user-select: text; touch-action: manipulation; }
+.dg-in:focus { border-color: #e8507a; box-shadow: inset 0 3px 0 rgba(74, 44, 42, .12), 0 0 0 4px rgba(255, 143, 176, .45); }
+.dg-in:disabled { opacity: .55; }
+.dg-msg { min-height: 20px; font: 600 15px/1.3 var(--font); color: var(--ink2); text-align: center; }
+.dg-msg.bad { color: #d24a68; }
+.dg-btns { display: flex; gap: 10px; justify-content: center; }
+.dg-btns .btn { flex: 1 1 0; justify-content: center; }
+.dg-btns .btn:disabled { opacity: .5; filter: grayscale(.5); }
+.p-dbg-gate.dg-shake { animation: shake .45s ease-in-out; }
+@keyframes dgBob { 0%, 100% { translate: 0 0; rotate: -4deg; } 50% { translate: 0 -3px; rotate: 4deg; } }
+.ui-root.m-touch .dg-in { min-height: 52px; font-size: 18px; } /* (18 px: iOS Safari doesn't zoom into it) */
+
+/* the HUD's bug button: small, quiet, left of the minimap (placed by access.js) */
+.dbg-bug { position: fixed; z-index: 3; width: 40px; height: 40px; padding: 0; border-radius: 13px; border: 2.5px solid var(--ink); background: linear-gradient(#fff, #ffe9ef);
+  box-shadow: 0 3px 0 var(--ink), 0 5px 10px rgba(50, 22, 34, .2); display: grid; place-items: center; cursor: pointer; pointer-events: auto; opacity: .72; transition: opacity .2s, transform .15s; }
+.dbg-bug::after { content: ''; position: absolute; inset: -4px; } /* (a 48 px target) */
+.dbg-bug:hover, .dbg-bug:active { opacity: 1; transform: translateY(-1px); }
+.dbg-bug .dbg-bug-ic { width: 28px; height: 28px; }
+.dbg-bug.hide { display: none; }
+.ui-root.m-touch .dbg-bug { width: 44px; height: 44px; }

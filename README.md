@@ -20,6 +20,10 @@ full screen (F11 or Settings › *Full screen* for a window), plays with a contr
 troubleshooting).
 Sign-in, upload steps and page settings are in [docs/ITCH.md](docs/ITCH.md).
 
+**Debug tools** (for testing: unlock every hero and zone, jump the story, travel anywhere, spawn items, god mode…):
+add `?debug` to the URL, or tap the version in Settings › About seven times, then enter the password. Then F10, the backquote key,
+the bug button or Select + Start on a pad. See [docs/DEBUG.md](docs/DEBUG.md).
+
 ## Controls
 | Key / Mouse | Action |
 |---|---|

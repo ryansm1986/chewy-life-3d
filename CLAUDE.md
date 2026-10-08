@@ -13,7 +13,9 @@ A cozy 3D browser action-RPG and village sim (Three.js + Vite), starring Chewy, 
   - [ARCHITECTURE](docs/ARCHITECTURE.md): the code map;
   - [REGIONS](docs/REGIONS.md), [HEROES](docs/HEROES.md), [POE](docs/POE.md), [CHARGE](docs/CHARGE.md),
     [HOUSING](docs/HOUSING.md), [HOMESTEAD](docs/HOMESTEAD.md), [TUTORIALS](docs/TUTORIALS.md),
-    [VILLAGE_PLAN](docs/VILLAGE_PLAN.md), [ITCH](docs/ITCH.md), [MULTIPLAYER](docs/MULTIPLAYER.md).
+    [VILLAGE_PLAN](docs/VILLAGE_PLAN.md), [ITCH](docs/ITCH.md), [MULTIPLAYER](docs/MULTIPLAYER.md),
+    [DEBUG](docs/DEBUG.md): the password-gated debug menu (`?debug`, or seven taps on the version); new features add
+    their actions with `registerDebug` (`src/debug/registry.js`).
 - Run it: `npm run dev` (port 5173).
 
 ## How the owner wants work done

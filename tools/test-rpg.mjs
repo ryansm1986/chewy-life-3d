@@ -1680,6 +1680,29 @@ hr('CONTROLS: THE STEAM DECK PROFILE (docs/CONTROLS.md §10, core/deck.js)');
   ok(!D.deckLike() && !D.mobileLike() && D.FPS_CAPS.join() === '0,60,40,30' && D.PRESET_NAMES.join() === 'Low,Medium,High,Deck,Mobile' && D.DECK.uiScale === 1.15 && D.DECK.shadowMap <= 2048 && D.MOBILE.pixelRatio === 1 && D.MOBILE.shadowMap === 1024 && D.MOBILE.particles === 0.5 && D.liteOf(4) === D.MOBILE && D.liteOf(3) === D.DECK && D.liteOf(2) === null && D.MOBILE_TEX === 1024 && D.capTexture(null, 1024) === null, 'deck: no screen is not a Deck or a phone; the frame caps, the preset names, the Deck and Mobile numbers');
 }
 
+hr('DEBUG TOOLS: THE REGISTRY AND THE PASSWORD (docs/DEBUG.md, src/debug/registry.js)');
+{
+  const R = await import('../src/debug/registry.js');
+  const { DEBUG_PASS: PW, skipNote } = await import('./qa/debug-pass.mjs'); // (the repo is public: the word comes from the env or a git-ignored file)
+  if (PW) ok(await R.checkPassword(PW) && await R.checkPassword(`  ${PW} `) && !(await R.checkPassword(PW.toUpperCase())) && !(await R.checkPassword('')), 'debug: the password matches its SHA-256 (trimmed, case kept); others are refused');
+  else skipNote('debug: the password matches its SHA-256');
+  ok(!(await R.checkPassword('not-the-password')) && !(await R.checkPassword('')), 'debug: a wrong password is refused');
+  const real = globalThis.crypto; Object.defineProperty(globalThis, 'crypto', { value: {}, configurable: true });
+  const jsA = await R.sha256Hex('pawhaven test'), e0 = await R.sha256Hex(''), jsP = PW ? await R.sha256Hex(PW) : null;
+  Object.defineProperty(globalThis, 'crypto', { value: real, configurable: true });
+  ok(jsA === await R.sha256Hex('pawhaven test') && e0 === 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' && (!PW || jsP === R.PASS_HASH), 'debug: the JS SHA-256 fallback (no Web Crypto, e.g. a LAN dev server) gives the same hashes');
+  if (PW) {
+    const fs = await import('node:fs'), src = ['access.js', 'registry.js', 'debugMenu.js', 'debugActions.js', 'debugToggles.js'].map(f => fs.readFileSync(new URL('../src/debug/' + f, import.meta.url), 'utf8')).join('');
+    ok(!src.includes(PW), 'debug: no plaintext password in the source');
+  }
+  const v0 = R.registryVersion();
+  R.registerDebug('qaTest', [{ label: 'One', run: () => 'a' }, { note: 'hi' }], { title: 'QA', order: 999 });
+  R.registerDebug('qaTest', [{ label: 'One', run: () => 'b' }, { label: 'Two', choices: [1, 2], run: () => '' }]);
+  const S = R.DEBUG_SECTIONS.get('qaTest');
+  ok(S.title === 'QA' && S.actions.length === 3 && S.actions[0].run() === 'b' && R.registryVersion() === v0 + 2 && R.debugSections().at(-1) === S, 'debug: registerDebug adds to a section, replaces an action of the same label, keeps the order');
+  R.DEBUG_SECTIONS.delete('qaTest');
+}
+
 hr('RESULT');
 if (fails) {
   log(`FAILED ${fails}/${checks} checks:`);

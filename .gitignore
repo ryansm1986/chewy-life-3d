@@ -7,3 +7,4 @@ dist-itch/
 release/
 tools/fonts/src/
 dist-desktop/
+tools/qa/.debug-pass

@@ -11,6 +11,7 @@ import { normKey } from '../core/input.js';
 import { padGlyph } from './padGlyphs.js';
 import { PRESET_NAMES } from '../core/deck.js';
 import { DESKTOP, quitGame } from './desktop.js';
+import { version as VERSION } from '../../package.json'; // (Settings › About; seven taps on it ask for the debug password: src/debug/access.js)
 
 const MOUSE_CAP = { mouse0: () => glyph('mouseL'), mouse2: () => glyph('mouseR') };
 // Settings › Controls › Touch: what each on-screen control does (ui/touch.js, docs/CONTROLS.md §12)
@@ -53,6 +54,8 @@ export class MenuPanel extends Panel {
         <div class="set-row"><div class="set-n">${glyph('sparkle')}Disney style</div><button class="tog" data-k="disneyChewy"><i></i></button></div>
         <div class="set-row" title="Keys and controller buttons, rumble, aim assist"><div class="set-n">${glyph('question')}Controls</div><button class="btn sm" data-a="controls">Change…</button></div>
         <div class="set-row" title="Which hero models to play with: the samurai Chewy, the Toybox Chewy, or the Storybook heroes. Switching saves and reloads."><div class="set-n">${glyph('star')}Hero models</div><div class="seg" data-k="heroModel">${['Samurai', 'Toybox', 'Storybook'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+        <div class="set-row mn-about" title="Pawhaven, a cozy adventure with Chewy and friends"><div class="set-n">${glyph('sakura')}About</div><button class="btn sm mn-ver" data-a="version">Pawhaven v${VERSION}</button></div>
+        <div class="set-row mn-debug" title="Testing tools: F10 or \` , the bug button, Select + Start on a pad"><div class="set-n">${glyph('key')}Debug tools: on</div><div class="mn-dbg-b"><button class="btn sm" data-a="debugOpen">Open</button><button class="btn sm pink" data-a="debugOff">Turn off</button></div></div>
         <div class="mn-foot"><button class="btn" data-a="back">${glyph('swap')}Back</button></div>
       </div>
       <div class="mn-v mn-controls">
@@ -96,6 +99,9 @@ export class MenuPanel extends Panel {
     if (a === 'home') { this.ui.close('menu'); if (this.ui.G?.mode === 'dungeon') this.ui.G.returnToVillage?.(); return; }
     if (a === 'build') { this.ui.close('menu'); const B = this.ui.G?.build; if (B && !B.active && this.ui.G.mode === 'village') B.enter(); return; } // (the pad's way into build mode)
     if (a === 'decorate') { this.ui.close('menu'); const D = this.ui.G?.housing?.decor; if (D && !D.active && this.ui.G.mode === 'interior') D.enter(); return; }
+    if (a === 'version') { this.ui.G?.debug?.versionTap(); return; } // (seven taps: the debug password prompt)
+    if (a === 'debugOpen') { this.ui.G?.debug?.open(); return; }
+    if (a === 'debugOff') { this.ui.G?.debug?.disable(); this.sync(); return; }
     if (a === 'resetBinds') { this.cancelWait(); Actions.resetBindings(this.dev); this.ui.saveBinds(); this.note(this.dev === 'pad' ? 'Controller buttons reset.' : 'Keys reset.'); this.renderControls(); return; }
     if (a === 'resume') this.ui.close('menu');
     else if (a === 'settings' || a === 'controls') this.setView(a);
@@ -135,6 +141,7 @@ export class MenuPanel extends Panel {
     const h = this.ui._menuH || {};
     this.body.querySelector('[data-a="save"]').style.display = h.save ? '' : 'none';
     const mode = this.ui.G?.mode, show = (a, on) => { const b = this.body.querySelector(`[data-a="${a}"]`); if (b) b.style.display = on ? '' : 'none'; };
+    const dbg = this.body.querySelector('.mn-debug'); if (dbg) dbg.style.display = this.ui.G?.debug?.on ? '' : 'none'; // (Settings › About: debug tools on this device)
     show('home', mode === 'dungeon'); show('build', mode === 'village' && !this.ui.G?.build?.active); show('decorate', mode === 'interior' && !!this.ui.G?.housing?.canDecorate?.());
   }
   render() { this.sync(); if (this.view === 'controls') this.renderControls(); }

@@ -59,6 +59,7 @@ import { WORLD } from './world/layout.js';
 import { installLife } from './life/index.js';
 import { Tutorials } from './world/tutorials.js';
 import { installHousing } from './home/housing.js';
+import { installDebugAccess } from './debug/access.js';
 
 // UI and audio load in parallel with the world. The import() paths must be literal so Vite bundles them for the
 // production build (a variable path with @vite-ignore worked on the dev server but 404'd in dist: no UI, no sound).
@@ -462,6 +463,7 @@ export async function boot() {
     try { if (P.has('tut')) sessionStorage.removeItem('chewy3d.notut'); else if (off) sessionStorage.setItem('chewy3d.notut', '1'); else off = !!sessionStorage.getItem('chewy3d.notut'); } catch (e) { /* storage unavailable */ }
     G.tutorials = new Tutorials(G, { enabled: !off });
   }
+  installDebugAccess(G); // debug tools: off by default; the password prompt, F10 / ` / the bug / Select+Start, the lazy menu (src/debug, docs/DEBUG.md)
   const vMap = G.villageMinimap = new VillageMinimap(G);
   Events.on('village:changed', () => { vMap.dirty = true; });
   Events.on('garden:till', () => { vMap.dirty = true; }); // (Chewy's bed turns from lawn to soil on the map)
@@ -736,7 +738,7 @@ export async function boot() {
   }
 
   // ---- save / load
-  function save() { try { if (G.playerDead || G.state.player.life === 0) G.state.player.life = null; /* never persist a knocked-out Chewy */ G.state.hour = day.hour; G.state.day = day.day; localStorage.setItem('chewy3d.save', JSON.stringify(saveableState(G.state))); } catch (e) { /* storage unavailable */ } }
+  function save() { if (G.saveBlocked) return; /* (the debug menu's Restore is reloading onto the backup) */ try { if (G.playerDead || G.state.player.life === 0) G.state.player.life = null; /* never persist a knocked-out Chewy */ G.state.hour = day.hour; G.state.day = day.day; localStorage.setItem('chewy3d.save', JSON.stringify(saveableState(G.state))); } catch (e) { /* storage unavailable */ } }
   G.save = save;
   setInterval(save, 30000);
   addEventListener('beforeunload', save);
@@ -853,6 +855,7 @@ export async function boot() {
     }
     const rdt = engine.tick();
     Actions.poll(); // the gamepad's buttons and sticks for this frame (core/actions.js)
+    G.debug?.frame(rdt); // (debug tools: Select+Start, the menu's session toggles: src/debug)
     // pause gameplay for the pause menu, and in the Burrow while reading dialogue (nothing should hit Chewy mid-sentence)
     const paused = G.ui?.isPaused?.() || (G.mode === 'dungeon' && G.ui?.dlg?.active);
     const dt = paused ? 0 : rdt;

@@ -211,7 +211,7 @@ export const UI = {
   open(name, opts) {
     const p = this.panels[name]; if (!p || !this.ready) return;
     if (name === 'build') { if (this.mode !== 'village') return; opts = opts || this._lastBuild || this._buildProvider?.() || { categories: [] }; this._lastBuild = opts; }
-    if (this.mode === 'title' && name !== 'menu') return;
+    if (this.mode === 'title' && name !== 'menu' && !p.overTitle) return; // (overTitle: the debug password prompt, src/debug/access.js)
     if (this.isOpen('menu') && name !== 'menu') return;
     if (p.side === 'left' || p.side === 'right') for (const q of Object.values(this.panels)) if (q !== p && q.isOpen && q.side === p.side) this.close(q.name, true);
     if (p.side === 'center') for (const q of Object.values(this.panels)) if (q !== p && q.isOpen && q.side === 'center') this.close(q.name, true);

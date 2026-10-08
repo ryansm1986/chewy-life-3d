@@ -3,6 +3,7 @@
 // (The dev server resolves things the bundle can't — e.g. a variable import() path — so this catches "works in dev,
 // no UI in the real game" bugs.)  usage: node tools/qa/prod-smoke.mjs
 import { DUNGEONS } from '../../src/dungeon/defs.js';
+import { DEBUG_PASS, skipNote } from './debug-pass.mjs'; // (the debug password: the env or a git-ignored file, never in the repo)
 import { build, preview } from 'vite';
 import { chromium } from 'playwright-core';
 import os from 'node:os';
@@ -28,7 +29,7 @@ const server = await preview({ logLevel: 'error', build: { outDir }, preview: { 
 const url = server.resolvedUrls.local[0].replace(/\/$/, '');
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true, args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] });
 let failed = 0;
-for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['poe', '/?fresh&nointro&hero=poe'], ['shihtzu', '/?fresh&nointro&hero=shihtzu'], ['golden', '/?fresh&nointro&hero=golden'], ['home', '/?fresh&nointro'], ['pad', '/?fresh&nointro&notut'], ['deck', '/?fresh&nointro&notut'], ['touch', '/?fresh&nointro&notut'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`]), ...Object.values(DUNGEONS).filter(dd => dd.gate).map(dd => ['zone:' + dd.id, '/?fresh&nointro']), ['tier:bambooDepths', '/?fresh&nointro&notut'], ['tier:burrowDeep', '/?fresh&nointro&notut'], ['pinnacle:bambooDepths', '/?fresh&nointro&notut']]) { // (every zone dungeon that has its gate: its kit, a dense floor, the arena)
+for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['poe', '/?fresh&nointro&hero=poe'], ['shihtzu', '/?fresh&nointro&hero=shihtzu'], ['golden', '/?fresh&nointro&hero=golden'], ['home', '/?fresh&nointro'], ['pad', '/?fresh&nointro&notut'], ['deck', '/?fresh&nointro&notut'], ['touch', '/?fresh&nointro&notut'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`]), ...Object.values(DUNGEONS).filter(dd => dd.gate).map(dd => ['zone:' + dd.id, '/?fresh&nointro']), ['tier:bambooDepths', '/?fresh&nointro&notut'], ['tier:burrowDeep', '/?fresh&nointro&notut'], ['pinnacle:bambooDepths', '/?fresh&nointro&notut'], ['debug', '/?fresh&nointro&notut&debug']]) { // (every zone dungeon that has its gate: its kit, a dense floor, the arena)
   const page = await browser.newPage(label === 'touch' ? { viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true } : { viewport: label === 'deck' ? { width: 1280, height: 800 } : { width: 1600, height: 900 } }); // (deck: the Steam Deck's screen; touch: a phone in landscape)
   const errs = [];
   page.on('pageerror', e => errs.push('pageerror: ' + e.message));
@@ -162,6 +163,24 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
     await page.evaluate(() => window.G.returnToVillage()); await page.waitForFunction(() => window.G?.mode === 'village' && !window.G.ui?.iris?.active, null, { timeout: 60000 });
     await page.evaluate(() => window.G.enterDungeon(4)); s.touch.burrow2 = await floor();
   }
+  if (label === 'village') s.noDebug = await page.evaluate(() => !performance.getEntriesByType('resource').some(e => /debugMenu/.test(e.name)) && !window.G.ui.panels.debug && !document.querySelector('.dbg-bug')); // (debug off: its lazy chunk is never fetched)
+  if (label === 'debug') { // the debug menu in the bundle (docs/DEBUG.md): ?debug asks for the password, the right one opens the lazy menu
+    await page.waitForFunction(() => window.G.ui.isOpen('debugGate'), null, { timeout: 15000 }).catch(() => errs.push('no password prompt'));
+    await page.fill('.dg-in', 'nope'); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
+    const refused = await page.evaluate(() => !window.G.debug.on && window.G.ui.isOpen('debugGate'));
+    if (DEBUG_PASS) { await page.fill('.dg-in', DEBUG_PASS); await page.keyboard.press('Enter'); }
+    else { skipNote('production debug: the right password'); await page.evaluate(() => { window.G.ui.close('debugGate', true); window.G.debug.enable({ open: true }); }); } // (on through the remembered flag's own path)
+    await page.waitForFunction(() => window.G.ui.isOpen('debug'), null, { timeout: 15000 }).catch(() => errs.push('the debug menu never opened'));
+    s.debug = await page.evaluate(async () => {
+      const G = window.G, r = { refused: false, on: G.debug.on, chunk: performance.getEntriesByType('resource').some(e => /debugMenu/.test(e.name)), tabs: document.querySelectorAll('.p-debug .dbg-tabs .tab').length, css: getComputedStyle(document.querySelector('.p-debug')).width };
+      document.querySelector('.p-debug [data-tab="village"]').click(); await new Promise(q => setTimeout(q, 200));
+      const c0 = G.state.coins, chip = [...document.querySelectorAll('.p-debug .dbg-chip')].find(b => b.textContent.trim() === '+1k'); chip?.click();
+      await new Promise(q => setTimeout(q, 300)); r.coins = G.state.coins - c0; r.used = !!G.state.debugUsed;
+      return r;
+    });
+    s.debug.refused = refused;
+    await page.keyboard.press('F10'); await page.waitForTimeout(400); s.debug.closed = await page.evaluate(() => !window.G.ui.isOpen('debug'));
+  }
   if (label === 'deck') s.deck = await page.evaluate(() => { const G = window.G, E = G.engine; return { preset: E.preset, quality: E.quality, pr: E.renderer.getPixelRatio(), ao: E.post.ao.enabled, shadow: G.world.sun.shadow.mapSize.x, ui: G.ui.settings.uiScale, safe: getComputedStyle(document.querySelector('.l-hud')).top, floor: getComputedStyle(document.querySelector('.hud .loc-s') || document.body).fontSize }; }); // (CT-3: the Deck profile and deck.css in the bundle)
   const regionId = label.startsWith('region:') ? label.slice(7) : null;
   if (regionId) { // every outdoor region in the bundle (docs/REGIONS.md): built, populated, with its own boss (or its dungeon gate)
@@ -225,11 +244,12 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
   const sz = s.shihtzu, stzOk = !sz || (sz.hero === 'shihtzu' && (!TOY_STZ || (s.model === 'shihtzu_toy' && sz.baked)) && (!STZ_FLAIL || (sz.flail === 'glb' && sz.links && sz.villager === 'glb')) && sz.chain && sz.wt === 'flail' && sz.dr >= 5 && sz.icons && sz.kit?.pups >= 2 && sz.kit.gp && sz.kit.lantern && sz.switch && sz.after === 'chewy');
   const gd = s.golden, gldOk = !gd || (gd.hero === 'golden' && (!TOY_GOLDEN || (gd.model === 'golden_toy' && gd.baked)) && (!GLD_PROPS || (gd.lance && gd.villager)) && gd.wt === 'lance' && gd.shadowLife >= 20
     && gd.whelp && (!WHELP || (gd.whelpModel === 'shadow_whelp' && gd.wings)) && gd.flying && gd.icons && gd.thrust && gd.dart && gd.javelin && gd.landed && gd.jump && gd.air && gd.crash && gd.breath && gd.puffed && gd.charged && gd.switch && gd.after === 'chewy' && gd.whelpOff);
+  const db = s.debug, debugOk = (label !== 'village' || s.noDebug) && (!db || (db.refused && db.on && db.chunk && db.tabs >= 10 && db.css === '760px' && db.coins === 1000 && db.used && db.closed));
   const pd = s.pad, padOk = !pd || (pd.dev === 'pad' && pd.moved > 1.5 && pd.glyphs >= 6 && pd.cursor && pd.cast >= 1 && pd.focus);
   const tc = s.touch, touchOk = !tc || (tc.dev === 'touch' && tc.on && tc.slots === 6 && tc.preset === 4 && tc.pr === 1 && tc.phone && tc.moved > 1 && tc.manifest && tc.burrow?.gone > 0 && tc.burrow.calls > 0 && tc.burrow2?.gone > 0 && tc.burrow2.calls > 0);
   const dk = s.deck, deckOk = !dk || (dk.preset === 3 && dk.quality === 1 && dk.pr === 0.85 && !dk.ao && dk.shadow === 1536 && dk.ui === 1.15 && dk.safe === '12px' && dk.floor === '12px');
   const m = s.moka, mokaOk = !m || ((!TOY_MOKA || s.model === 'moka_toy') && m.baked && m.staff && m.wt === 'staff' && m.cast && m.switch && m.after === 'chewy' && m.chewyBaked && m.mokaVillager);
-  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && mokaOk && padOk && touchOk && deckOk && poeOk && stzOk && gldOk && regionOk && zoneOk && homeOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!CHEWY_MODEL || s.model === CHEWY_MODEL) && (!SAMURAI_CHEWY || s.saya) && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
+  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && debugOk && mokaOk && padOk && touchOk && deckOk && poeOk && stzOk && gldOk && regionOk && zoneOk && homeOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!CHEWY_MODEL || s.model === CHEWY_MODEL) && (!SAMURAI_CHEWY || s.saya) && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
   console.log(`${ok ? 'PASS' : 'FAIL'}  production ${label}: ${JSON.stringify(s)}${errs.length ? '\n   ' + [...new Set(errs)].slice(0, 8).join('\n   ') : ''}`);
   if (!ok) failed++;
   await page.close();

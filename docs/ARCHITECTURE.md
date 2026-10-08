@@ -35,6 +35,9 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
   → PNGs saved to the scratchpad `shots/` folder (path printed). Console errors/warnings are printed. ALWAYS check them.
 - Isolated dev scenes: `src/tests/NAME.js` exporting `default function()`; open with `/?test=NAME`. Each module owner makes
   their own test page. Set `window.__ready = true` when the scene is ready to screenshot.
+- **The debug menu** (docs/DEBUG.md, ROADMAP R-10): `?debug` or seven taps on Settings › About's version, a password,
+  then F10 / the backquote key / the bug button / Select + Start. `src/debug/`: `registry.js` (`registerDebug(section, actions)`, the
+  hash) and `access.js` always load; the menu is a lazy chunk. QA: `tools/qa/s35-debug.mjs`.
 - Post debug: `&off=ao,tilt,main,smaa` disables passes (also `bloom`, `grade`, `guard`: the bloom's NaN guard, and
   `dark`: the hero darkGrade), `&raw` renders without post, `&q=0|1|2|3` the graphics preset (3: the Steam Deck; it wins over Settings), `&deck` /
   `&deck=0` force the Deck-like screen on or off, `&hour=13` time of day. NaN / flash

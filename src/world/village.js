@@ -323,10 +323,10 @@ export class VillageSim {
   // paved, its plots unlock and a toast names the new district. S.ringRank never goes down.
   // A district never opens on the first day: the starter village fills its homes within seconds (10 → 12+ villagers),
   // which used to open the outer South Meadows before Chewy had done anything. It opens with the next morning.
-  checkRings() {
+  checkRings(force = false) { // (force: the debug menu's Village rank opens the districts on day 1 too)
     const V = this.S, rank = this.stats.rank, have = this.ringRank();
     if (rank <= have) return;
-    if ((this.G.day?.day ?? this.G.state?.day ?? 1) <= 1) return;
+    if (!force && (this.G.day?.day ?? this.G.state?.day ?? 1) <= 1) return;
     for (let r = have + 1; r <= rank; r++) {
       for (const P of PATHS) if (P.rank === r) this.openStreet(P);
       for (const D of Object.values(DISTRICTS)) if (D.ring === r) (this.ringNews ||= []).push(D.name);
@@ -582,6 +582,7 @@ export class VillageSim {
     this.demand.C = clamp((pop * 0.45 - cJobs + 2) / 8, -1, 1);
     this.demand.W = clamp((pop * 0.35 - wJobs + 1) / 8, -1, 1);
     S.rank = pop >= 80 ? 5 : pop >= 50 ? 4 : pop >= 28 ? 3 : pop >= 12 ? 2 : 1;
+    if (this.S.rankFloor > S.rank) S.rank = Math.min(5, this.S.rankFloor); // (the debug menu's Village rank: state.village.rankFloor, docs/DEBUG.md)
     this.checkRings();
     if (!silent) this.G.ui?.setRCI?.(this.demand);
     this.G.state.village.stats = { ...S, demand: { ...this.demand } };
