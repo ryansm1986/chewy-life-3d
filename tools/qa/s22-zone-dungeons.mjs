@@ -2,7 +2,8 @@
 //  a) the gate: the region boss no longer spawns outdoors; the gate at the trail's end is sealed (label, F refuses,
 //     mode.gatePos for the pointer) until the village is saved; 'village:saved' unseals it live
 //  b) entering: "Enter Bamboo Depths" → floor 1 (kind zone, the bamboo cave kit, the zone's roster, 120–160 monsters in
-//     packs of 8–16 laid out as clusters 4–8 m wide, 2 champion packs and a unique pack, no Burrow records)
+//     packs of 8–16 laid out as clusters 4–8 m wide (measured where the formation placed them), 2 champion packs and a
+//     unique pack, no Burrow records; 10 s of game time on, the idle packs still stand inside their camps' discs)
 //  c) the objectives API with a fake provider (G.story.dungeonObjectives): a cage in an objective slot, locked while its
 //     guards stand, F frees the villager → 'villager:rescued' { npc, zone, dungeon, floor }; a 'drop' on the marked
 //     champion pack → a quest drop on the ground → 'quest:find' { item, zone, dungeon, floor }, not in the bag;
@@ -63,7 +64,10 @@ try {
   await ev(() => { const P = window.G.player; P.invuln = true; window.__inv = setInterval(() => { P.invuln = true; window.G.actions.restoreAll?.(); }, 250); }); // (the test teleports through dense packs)
   const b = await ev(() => {
     const G = window.G, D = G.dungeon, L = D.layout, W = G.world, zr = D.zr;
-    const packs = zr.packs.map(p => { const ms = p.members; let cx = 0, cz = 0; for (const m of ms) { cx += m.pos.x; cz += m.pos.z; } cx /= ms.length; cz /= ms.length; let w = 0; for (const m of ms) w = Math.max(w, Math.hypot(m.pos.x - cx, m.pos.z - cz)); return { n: ms.length, rank: p.sp.rank, kind: p.sp.kind, w: +(w * 2).toFixed(1) }; });
+    // (R-14: the formation's width is measured where zoneRun placed each member (pack.spawnAt), not where they stand by
+    // now: an idle pack mills about, and measuring live positions after the iris flaked at 9.5-10.1 m)
+    const width = pts => { let cx = 0, cz = 0; for (const [x, z] of pts) { cx += x; cz += z; } cx /= pts.length; cz /= pts.length; let w = 0; for (const [x, z] of pts) w = Math.max(w, Math.hypot(x - cx, z - cz)); return +(w * 2).toFixed(1); };
+    const packs = zr.packs.map(p => ({ n: p.members.length, rank: p.sp.rank, kind: p.sp.kind, w: width(p.spawnAt) }));
     const roomPacks = packs.filter(p => p.kind !== 'corridor');
     return { kind: D.kind, def: D.def.id, floor: D.floor, theme: L.theme, kit: !!W.kit, n: D.monsters.length, roster: [...D.theme.monsters, D.def.tank].filter(Boolean), ids: [...new Set(D.monsters.map(m => m.id))],
       packs: packs.length, sizes: [Math.min(...roomPacks.map(p => p.n)), Math.max(...roomPacks.map(p => p.n))], widths: [Math.min(...roomPacks.map(p => p.w)), Math.max(...roomPacks.map(p => p.w))],
@@ -73,6 +77,17 @@ try {
   });
   R.check('floor 1: a zone floor on the bamboo cave kit, the zone\'s roster, ~9 chambers, stairs, no waypoint and no Burrow records; the exit portal leads back to the grove', b.kind === 'zone' && b.def === 'bambooDepths' && b.floor === 1 && b.theme === 'bambooCave' && b.kit && b.ids.every(i => b.roster.includes(i)) && b.rooms >= 8 && b.stairs && !b.wp && b.deepest && b.wps && b.best === 1 && /Bamboo Grove/.test(b.exit || ''), JSON.stringify(b));
   R.check('density: 120–160 monsters, room packs of 8–16 in cluster formations 4–8 m wide, 2 champion packs and 1 unique pack', b.n >= 120 && b.n <= 165 && b.sizes[0] >= 8 && b.sizes[1] <= 17 && b.widths[0] >= 2.5 && b.widths[1] <= 9 && b.champ === 2 && b.uniq === 1, JSON.stringify({ n: b.n, sizes: b.sizes, widths: b.widths, champ: b.champ, uniq: b.uniq, packs: b.packs }));
+  // the formation holds: ten seconds of game time later every idle pack (none of it alerted) still mills about inside its
+  // camp's disc (Monster.home), where it used to random-walk apart (4.9 → 17 m wide in 20 s)
+  const t0 = await ev(() => window.G.engine.time);
+  await page.waitForFunction(t => window.G.engine.time > t + 10, t0, { timeout: 60000 });
+  const hold = await ev(() => {
+    const zr = window.G.dungeon.zr, width = pts => { let cx = 0, cz = 0; for (const [x, z] of pts) { cx += x; cz += z; } cx /= pts.length; cz /= pts.length; let w = 0; for (const [x, z] of pts) w = Math.max(w, Math.hypot(x - cx, z - cz)); return +(w * 2).toFixed(1); };
+    const idle = zr.packs.filter(p => p.sp.kind !== 'corridor' && !p.members.some(m => m.aggro || !m.alive));
+    const ws = idle.map(p => ({ w: width(p.members.map(m => [m.pos.x, m.pos.z])), r2: +(p.sp.r * 2).toFixed(1), home: p.members.every(m => m.home) }));
+    return { packs: idle.length, max: Math.max(...ws.map(o => o.w)), over: ws.filter(o => o.w > o.r2 + 1), homes: ws.every(o => o.home) };
+  });
+  R.check('the formations hold: 10 s of game time on, every idle pack still stands inside its camp (≤ its 4–8 m disc + 1 m)', hold.packs >= 6 && hold.homes && hold.max <= 9 && !hold.over.length, JSON.stringify(hold));
   R.check('the objectives API: DungeonMode asked G.story.dungeonObjectives({ dungeon, floor, zone, tier }) at build', b.objCall && b.objCall.dungeon === 'bambooDepths' && b.objCall.floor === 1 && b.objCall.zone === 'bamboo' && b.objCall.tier === 0, JSON.stringify(b.objCall));
   // ---------------------------------------------------------------- c) the cage and the quest drop
   const c1 = await ev(async () => {

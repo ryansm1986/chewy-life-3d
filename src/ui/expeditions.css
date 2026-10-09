@@ -122,6 +122,12 @@
 .ex-tog.on .ex-sw::after { transform: translateX(15px); }
 .ex-tog.locked .ex-sw { opacity: .55; }
 .ex-tog[disabled] { opacity: .55; cursor: default; }
+/* R-14: a lunch someone else packs (burrow1: Rosie's): on and locked, a warm pink, the switch at full strength */
+.ex-tog.packed { background: linear-gradient(170deg, #fff, #ffe6ee); cursor: default; }
+.ex-tog.packed .ex-sw { opacity: 1; background: #ff9fbd; }
+.ex-heart { font-style: normal; color: #e8506e; }
+.ex-facts > .packed b { color: #d8507a; }
+.ex-by { font-weight: 700; color: #d8507a; }
 .ex-pots .btn { min-width: 34px; justify-content: center; padding: 3px 8px; font-size: 18px; }
 .ex-pn { font: 700 18px var(--font); min-width: 14px; text-align: center; }
 /* the power bar, the odds and Send off */

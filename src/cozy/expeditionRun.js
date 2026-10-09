@@ -195,7 +195,7 @@ class CozyRun {
   send(id, crew = [], supplies = {}) {
     const G = this.G, st = this.st, o = objective(st, id);
     if (!o || !objectiveOpen(st, o) || this.sentOn(id)) return { ok: false, why: 'That job is taken' };
-    const sup = { meals: { ...(supplies.meals || {}) }, potions: Math.max(0, Math.min(3, supplies.potions || 0, st.potions?.heart || 0)) };
+    const sup = { meals: o.supplies?.freeLunch ? {} : { ...(supplies.meals || {}) }, potions: Math.max(0, Math.min(3, supplies.potions || 0, st.potions?.heart || 0)) }; // (freeLunch: the giver packs it, burrow1's Rosie: nothing from the pantry)
     const chk = canSend(st, o, crew, sup, this.town());
     if (!chk.ok) { Events.emit('sfx', 'ui_error'); return chk; }
     // the supplies are spent now (they ate the lunches, whatever happens); nothing on a hero is ever at risk
@@ -204,6 +204,7 @@ class CozyRun {
     const frac = o.power > 0 ? Math.min(1, chk.need / o.power) : 1;
     const e = startExpedition(st, o, crew, sup, { r: chk.r, need: chk.need, power: chk.power, odds: chk.odds.key, p: chk.odds.p, lunch: !!chk.odds.lunch || chk.meals.have >= crew.length, hours: tripHours(o, crew, st), seed: (Math.random() * 2 ** 32) >>> 0, frac });
     e.place = { label: o.place.label, color: o.place.color, area: o.place.area };
+    if (o.supplies?.freeLunch) e.lunchBy = o.giver || 'rosie'; // (R-14: the away view says whose lunch they carry; a hire eats it too)
     for (const k of crew) { const m = parseMember(k); if (m?.type === 'hero') this.leaveTown(m.id); }
     const names = this.crewNames(crew);
     G.ui?.toast?.(`${names} set${crew.length > 1 ? '' : 's'} off: ${o.name}`, { icon: 'map', color: '#8fd0ff', sub: `A trip of ${aboutHours(e.hours)} · ${backBy(G.day?.hour ?? 12, e.hours)}` });
@@ -265,7 +266,7 @@ class CozyRun {
     // the rewards
     const loot = o && forced !== 'broken' ? rollLoot(o, result, rng, e.frac || 1) : { coins: 0, mats: {}, pantry: {}, items: [], find: false };
     if (crewHaul(st, e.crew)) loot.mats = porterMats(loot.mats, true); // (a Porter: +25% materials)
-    const xp = {}, levels = {}, fed = mealsPacked(e.supplies?.meals).fed >= e.crew.length;
+    const xp = {}, levels = {}, fed = mealsPacked(e.supplies?.meals).fed >= e.crew.length || !!e.lunchBy;
     for (const k of e.crew) {
       const m = parseMember(k);
       if (m?.type === 'hire' && o && forced !== 'broken') { // a hire: XP on their own curve, morale from the trip (cozy/guild.js)

@@ -255,7 +255,7 @@ export class Monster {
           if ((frac < 0.66 && this.summoned === 0) || (frac < 0.33 && this.summoned === 1)) { this.summoned++; this.mode.summonAround(this, this.def.summon, this.def.summonN?.[this.summoned - 1] ?? 3 + this.summoned); G.ui?.toast?.(`${this.name} ${this.summoned === 1 ? 'calls for backup!' : 'is getting really mad!'}`, { color: '#ff8a9a', icon: 'oni' }); this.emote(this.summoned === 1 ? '!' : 'anger', 1.6); G.engine.rig.shake(0.4); if (this.summoned === 2) this.enraged = true; }
         }
       } else if (!this.leader) { // idle wander
-        if (!this.wander || this.stateT > 4) { this.wander = this.pos.clone().add(new THREE.Vector3(rand(-3, 3), 0, rand(-3, 3))); this.stateT = 0; }
+        if (!this.wander || this.stateT > 4) { const h = this.home, a = rand(0, TAU), r = h ? h.r * Math.sqrt(Math.random()) : 0; this.wander = h ? new THREE.Vector3(h.x + Math.cos(a) * r, 0, h.z + Math.sin(a) * r) : this.pos.clone().add(new THREE.Vector3(rand(-3, 3), 0, rand(-3, 3))); this.stateT = 0; } // (home: a zone pack's camp disc, dungeon/zoneRun.js: it mills about inside it)
         if (dist(this.wander.x, this.wander.z, this.pos.x, this.pos.z) > 0.3 && this.stateT < 2.5) { this.move(_dir.copy(this.wander).sub(this.pos).setY(0).normalize(), dt, 0.35); moving = true; }
       } else if (this.leader.alive && dist(this.leader.pos.x, this.leader.pos.z, this.pos.x, this.pos.z) > 2.5) {
         this.move(_dir.copy(this.leader.pos).sub(this.pos).setY(0).normalize(), dt, 0.5); moving = true;

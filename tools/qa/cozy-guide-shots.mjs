@@ -3,23 +3,42 @@
 // (1600×900, the mouse) and on a phone (844×390, touch: the lines in touch's words, the dock in the top band). The steps
 // are driven through the game's own API (the board opened at the board, the crew picked, sent, the clock moved); s16
 // g–j drives the same guides with real keys and clicks and checks them.
-//   usage: node tools/qa/cozy-guide-shots.mjs [desktop|phone|all]   SHOT_DIR (default tools/qa/tmp/cozy-guides)
+// R-14: the phones are two (844×390 and 667×375), and a second pass shows every other guide step that opens a panel
+// (fishing's menu and Journal, the house tour's bag and pantry, the charge card, the house card and remodel, decorating's
+// menu and palette, Meet Poe's wheel and a panel opened while it waits). At every phone shot the objective card must
+// not cover the open panel's tabs, buttons or ✕, nor what the guide spotlights (ui-audit-lib guideOverlap): a FAIL.
+//   usage: node tools/qa/cozy-guide-shots.mjs [desktop|phone|phone-se|all] [--cozy|--panels]   SHOT_DIR (default
+//   tools/qa/tmp/cozy-guides)
 import fs from 'node:fs';
 import path from 'node:path';
 import { launch, boot, sleep, drainDialogue, waitMode } from './lib.mjs';
 import { launchTouch, PHONE } from './touch-lib.mjs';
+import { guideOverlap } from './ui-audit-lib.mjs';
 
 const OUT = process.env.SHOT_DIR || path.resolve('tools/qa/tmp/cozy-guides');
-const WHICH = process.argv[2] || 'all';
+const ARGS = process.argv.slice(2), WHICH = ARGS.find(a => !a.startsWith('--')) || 'all';
+const PASSES = ARGS.includes('--cozy') ? ['cozy'] : ARGS.includes('--panels') ? ['panels'] : ['cozy', 'panels'];
+const DEVS = { desktop: null, phone: { ...PHONE }, 'phone-se': { ...PHONE, w: 667, h: 375 } };
 fs.mkdirSync(OUT, { recursive: true });
-let bad = 0;
+let bad = 0, covered = 0;
+
+/** a device's browser and its shot: the screenshot, then (on a phone) the card's overlap check */
+async function open(dev) {
+  const L = DEVS[dev] ? await launchTouch(DEVS[dev]) : await launch({ w: 1600, h: 900 });
+  const ev = (f, a) => L.page.evaluate(f, a);
+  const phone = !!DEVS[dev];
+  const shot = async n => { if (phone) await ev(() => window.G.controls.setDevice('touch')); await sleep(L.page, 700); // (the dialogue helper's keys made the keyboard the device: the phone's lines are touch's)
+    await L.page.screenshot({ path: path.join(OUT, `${dev}-${n}.png`) });
+    const o = await ev(guideOverlap), hit = o.filter(x => x.panel); // (R-14's rule: a panel up; without one, a note)
+    console.log(`  ${dev} ${n}${hit.length ? `  ${phone ? 'COVERS' : '(desktop) covers'} ${hit.length}` : ''}${o.length > hit.length ? `  (note, no panel: the card over ${o.length - hit.length})` : ''}`);
+    for (const x of o.slice(0, 4)) console.log(`     card ${JSON.stringify(x.card)} over ${x.sel} ${JSON.stringify(x.rect)}`);
+    if (phone && hit.length) covered++;
+  };
+  return { ...L, ev, shot, phone };
+}
 
 async function run(dev) {
-  const L = dev === 'phone' ? await launchTouch({ ...PHONE }) : await launch({ w: 1600, h: 900 });
-  const { browser, page, errors } = L;
-  const ev = (f, a) => page.evaluate(f, a);
-  const shot = async n => { if (dev === 'phone') await ev(() => window.G.controls.setDevice('touch')); await sleep(page, 700); // (the dialogue helper's keys made the keyboard the device: the phone's lines are touch's)
-    await page.screenshot({ path: path.join(OUT, `${dev}-${n}.png`) }); console.log(`  ${dev} ${n}`); };
+  const { browser, page, errors, ev, shot } = await open(dev);
   const step = (id, s, t = 20000) => page.waitForFunction(([id, s]) => window.G.tutorials.active === id && window.G.tutorials.cur?.step?.id === s && window.G.tutorials.cur.entered && !window.G.tutorials.paused, [id, s], { timeout: t });
   const at = (x, z, d = 1.0) => ev(([x, z, d]) => { const G = window.G, P = G.player; P.setPos(x + d * 0.7, z - d * 0.7); P.moveTarget = null; P.faceTo(x, z); P.facing = P.faceTarget; G.interactCooldown = 0; const r = G.engine.rig; r.focus.copy(P.pos); r.snap(); }, [x, z, d]);
   const ok = () => ev(() => { const b = document.querySelector('.to-ok'); if (b && getComputedStyle(b).display !== 'none') b.click(); });
@@ -61,7 +80,7 @@ async function run(dev) {
     await step('nose', 'wrap'); await shot('nose-7-rosie');
     await ok(); await ev(() => window.G.ui.closeAll());
     // the Guild
-    await ev(() => { window.G.state.coins = 3000; window.G.cozy.guild.debugBuild({ level: 1 }); });
+    await ev(() => { const G = window.G, T = G.state.cozy.exp.tired || {}; for (const k of Object.keys(T)) delete T[k]; G.state.coins = 3000; G.cozy.guild.debugBuild({ level: 1 }); }); // (rested: Moka home from a partial rests 6 h, and the Guild's crew of two needs her)
     await step('guild', 'door', 30000); await shot('guild-1-door');
     await ev(() => window.G.cozy.guild.open()); await step('guild', 'hire'); await shot('guild-2-hire');
     await ev(() => window.G.cozy.guild.hire(0)); await step('guild', 'roster'); await shot('guild-3-roster');
@@ -77,7 +96,59 @@ async function run(dev) {
   if (errors.length) { console.log('page errors:', [...new Set(errors)].slice(0, 4).join('\n')); bad++; }
   await browser.close();
 }
-if (WHICH === 'desktop' || WHICH === 'all') await run('desktop');
-if (WHICH === 'phone' || WHICH === 'all') await run('phone');
-console.log(bad ? 'FAIL cozy-guide-shots' : `PASS cozy-guide-shots → ${OUT}`);
-process.exit(bad ? 1 : 0);
+// ---------------------------------------------------------------- R-14: the other guides' panel steps
+async function runPanels(dev) {
+  const { browser, page, errors, ev, shot } = await open(dev);
+  const go = async (n, id, st, openFn, { paused = false } = {}) => {
+    try {
+      await ev(([id, st]) => { const T = window.G.tutorials; if (T.active !== id) T.start(id, { replay: true }); T.goto(st); }, [id, st]);
+      if (openFn) await ev(openFn);
+      await page.waitForFunction(p => { const T = window.G.tutorials; return T.cur?.step && (p ? T.paused : T.cur.entered && !T.paused); }, paused, { timeout: 15000 });
+      await shot(n);
+    } catch (e) { console.log(`!! ${dev} ${n}: ${String(e.message || e).split('\n')[0]}`); bad++; }
+  };
+  const closeAll = () => ev(() => window.G.ui.closeAll());
+  try {
+    await boot(page, 'fresh&nointro&tut&hour=10');
+    await ev(() => { const G = window.G, S = G.state.flags; S.hints = { all: true, garden: 1, build: 1, travel: 1, skills: 1, stats: 1, loot: 1, potion: 1 }; S.burrowTut = true; S.mokaJoined = true; S.poeJoined = true; S.mailboxOpened = true; S.tutorials = { switch: { done: true }, house: { done: true }, nose: { done: true } }; G.state.fishing = { ...(G.state.fishing || {}), rod: 1 }; G.state.player.lvl = 8; G.state.player.skillPts = 2; G.actions.recompute(); G.actions.addPantry('onigiri', 2); G.actions.addPantry('turnip', 3); });
+    await sleep(page, 600);
+    // fishing: the Fish Log (touch: the menu's Journal, then its Fish Log tab), then the wrap-up over the Journal
+    await go('p-fish-menu', 'fishing', 'log', () => window.G.ui.open('menu'));
+    await go('p-fish-journal', 'fishing', 'log', () => { const U = window.G.ui; U.close('menu', true); U.open('quests'); });
+    await go('p-fish-wrap', 'fishing', 'wrap', () => { const P = window.G.ui.panels.quests; P.tab = 'fish'; P._sig = null; P.render(); });
+    await closeAll(); await ev(() => window.G.tutorials.stop());
+    // the house tour: the Pantry (the bag first), then the wrap-up over it
+    await go('p-house-bag', 'house', 'pantry', () => window.G.ui.open('inventory', { view: 'bag' }));
+    await go('p-house-pantry', 'house', 'wrap', () => window.G.ui.panels.inventory.setView('pantry'));
+    await closeAll(); await ev(() => window.G.tutorials.stop());
+    // the charge card in the Skills panel
+    await go('p-charge-card', 'charge', 'card', () => window.G.ui.open('skills'));
+    await go('p-charge-wrap', 'charge', 'wrap');
+    await closeAll(); await ev(() => window.G.tutorials.stop());
+    // remodel: the house card's Remodel, the style sets
+    await go('p-remodel-card', 'remodel', 'card', () => { const G = window.G, rec = G.sim.list.find(r => r.data?.owner === 'usagi') || G.sim.list.find(r => r.data?.owner); G.ui.open('houseCard', { rec }); });
+    await go('p-remodel-sets', 'remodel', 'sets', () => { const G = window.G, rec = G.sim.list.find(r => r.data?.owner === 'usagi') || G.sim.list.find(r => r.data?.owner); G.ui.close('houseCard', true); G.ui.open('remodel', { rec }); });
+    await closeAll(); await ev(() => window.G.tutorials.stop());
+    // Meet Poe: the hero wheel (the card steps aside), and a panel opened while a step waits (the card fades, paused)
+    await go('p-poe-wheel', 'meetPoe', 'hold', () => window.G.heroes.openWheel());
+    await ev(() => window.G.heroes.pickFromWheel(null)); await sleep(page, 400);
+    await go('p-poe-paused-skills', 'meetPoe', 'fuma', () => window.G.ui.open('skills'), { paused: true });
+    await closeAll(); await ev(() => window.G.tutorials.stop());
+    // decorating (in the cottage): the menu's Decorate, then the palette's Home Rating step
+    await ev(() => window.G.openHome()); await waitMode(page, 'interior'); await sleep(page, 900);
+    await go('p-deco-menu', 'makeHome', 'decorate', () => window.G.ui.open('menu'));
+    await go('p-deco-rating', 'makeHome', 'rating', () => { window.G.ui.close('menu', true); window.G.housing.decor.enter(); });
+    await ev(() => { window.G.housing.decor.exit?.(); window.G.tutorials.stop(); });
+  } catch (e) { console.log(`!! ${dev} panels: ${String(e.message || e).split('\n')[0]}`); bad++; }
+  if (errors.length) { console.log('page errors:', [...new Set(errors)].slice(0, 4).join('\n')); bad++; }
+  await browser.close();
+}
+
+for (const dev of WHICH === 'all' ? Object.keys(DEVS) : [WHICH]) {
+  if (!(dev in DEVS)) { console.log('unknown device', dev); process.exit(2); }
+  if (PASSES.includes('cozy')) await run(dev);
+  if (PASSES.includes('panels')) await runPanels(dev);
+}
+if (covered) console.log(`${covered} phone shots with the guide card over a panel's tab, button or the spotlit target`);
+console.log(bad || covered ? 'FAIL cozy-guide-shots' : `PASS cozy-guide-shots → ${OUT}`);
+process.exit(bad || covered ? 1 : 0);

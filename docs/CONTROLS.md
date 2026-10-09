@@ -696,7 +696,9 @@ inside the safe area (`env(safe-area-inset-*)`).
   - The Travel Map draws its map at 0.76 so all of it shows. Its details scroll beside it, and Set off! stays in
     sight.
   - A guide's dock and offer sit in the free band along the top, between the top-left card and the hero / bag / menu
-    buttons (`--tc-band-l / -w` from the touch layout), so they never cover the buttons they talk about.
+    buttons (`--tc-band-l / -w` from the touch layout), so they never cover the buttons they talk about. With a panel up
+    (R-14) the objective card sits in the free strip of the panel's title band, or along the top with the panel moved
+    down under it, and covers none of its tabs, buttons, ✕ or spotlit target (TUTORIALS.md, "A phone with a panel up").
 - **Pairs**: two side panels open together (a shop or the stash beside the bag) take turns on a phone. A flip chip at
   the left edge switches between them; the shop or stash shows first.
 - **Targets**: tabs, buttons, segments and dialogue choices are at least 52 design px (44 on screen). Also enlarged:

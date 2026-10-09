@@ -866,7 +866,10 @@ The code map is in [ARCHITECTURE.md](ARCHITECTURE.md) ("The cozy path, phase D")
 The code map is in [ARCHITECTURE.md](ARCHITECTURE.md) ("The cozy path, phase E").
 - **The Blossom Hollow story** (§3.1): the Board's Story tab offers the fight of the quest being played, from the quest
   data (nothing new in the quest list): **"Peek into the Burrow"** (burrow1: power 12, 2 h, *Rosie packs the lunch*: a
-  free lunch that counts as fed, so Moka at level 1 alone is good odds; the 3 Mochi Jelly come home), **"The King of
+  free lunch that counts as fed, so Moka at level 1 alone is good odds; the 3 Mochi Jelly come home; R-14: the Board
+  shows it plainly, "Lunch packed by Rosie ♡" with the toggle on and locked and "packed by Rosie" in the facts, never
+  "0 in the pantry"; no dish leaves the pantry, the Away view says "Rosie's lunch ♡", and a hire on the trip eats it
+  too, for morale), **"The King of
   Squish"** (60, 6 h, gate: *A Home for Everyone* done), **"Umbrella Trouble"** (120, 6 h, a Blossom Shrine),
   **"Oni's Kitchen Nightmare"** (180, 8 h, the Hot Spring and 30 villagers), **"Nine Tails of Moonlight"** (240, 10 h,
   Guild L2 and rank 4). A boss route: a lunch each, 2 magic + a rare, 16–30 materials, ~60% of a hands-on run's XP, the
@@ -992,7 +995,10 @@ The code map is in [ARCHITECTURE.md](ARCHITECTURE.md) ("The cozy path, phase F")
     ("move to … and press A"), and touch's ("tap", "the attack button"); the director says them again when the device
     changes. The Journal's Guides tab lists twelve. On a phone (the speech card steps aside while a panel is up) the
     objective card moves into the panel's title band whenever what it spotlights sits under its place at the top (a
-    Guild card), and Rosie's thank-you waits for the board to close.
+    Guild card), and Rosie's thank-you waits for the board to close. **R-14**: that left the card over the Board's tabs
+    (and on the narrow Skills panel over its ✕); now, with any panel up, it takes the title band's free strip when the
+    whole card fits there, else a strip along the top with the panel moved down under it, and never covers a tab, a
+    button, the ✕ or what it spotlights (TUTORIALS.md, "A phone with a panel up").
   - Shots of every step on the desktop and a phone: `tools/qa/cozy-guide-shots.mjs` → `tools/qa/tmp/cozy-guides/`.
 - **QA and balance** (§8, §9):
   - s31–s34 and s37 (parts a–c) are in run-all; s37's part d is opt-in (`S37_FULL=1`, `run-all s37-full`).

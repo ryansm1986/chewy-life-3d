@@ -64,6 +64,29 @@ Status: **built** (2026-10-03; the cozy path's three guides 2026-10-09). The gui
 - `GuidesView`: the Journal's Guides tab (`ui/map.js`).
 - Every element is re-measured each frame, so the spotlight follows things that move (the reel card beside the player,
   dialogue choices sliding in).
+- **A phone with a panel up** (R-14, `TutorialUI.place()`): the speech card steps aside, and the objective card covers
+  none of the panel's tabs, buttons, ✕ or what the step spotlights. It takes the first place that fits:
+  - **the title band**: the free strip of the panel's bottom title band, right of its name (and any header tabs) and left
+    of the ✕, by the thumbs (`.tut.band`). The whole card must fit with its lines unclipped; if it doesn't, it tries
+    again without the paw and with a ✓ for *Got it!* (`.tight`). It never sits over the spotlit element.
+  - **the top strip**: a card along the top, as wide as the room between what the HUD shows at that height (its top-left
+    card, the minimap column), with the panel moved down under it (`.tut.strip`; the UI root's `.tut-strip` and
+    `--tut-push`; the panel's body scrolls inside, as ever). Its line wraps; a narrow strip goes `.tight` too.
+  - A spotlit element the panel's body cuts off (a house card's buttons once the panel moved down) scrolls into view.
+  - It is placed again when the panel (and when its opening spring ends), the step, its line, the spotlit element or
+    the screen changes, and a band is measured again twice a second. The open panel is the UI's topmost open one, never
+    the menu prewarm's closed panel (`ui/prewarm.js` draws one for a frame at opacity 0.004). On 844×390 the Board, the
+    Guild and remodel take the band; the narrower Journal, menu, bag, Skills, house card and stash take the strip (as does
+    a card with both *Got it!* and *Skip step*, or the Guild on 667×375). A build or decorate palette along the bottom
+    leaves the card at the top.
+  - *Got it!* and *Skip step* reach 44 px on touch through a taller hit area (`mobile.css`).
+  - A tablet keeps the desktop layout (the title on top): the card sits in the panel's title row and covers no tappable;
+    on the Board it reaches over the end of the panel's Japanese subtitle.
+  - Not covered by the rule (no panel up): on 667×375 Shadow's long gather line wraps tall in the top band and pushes the
+    card over half of the gather prompt it spotlights (`cozy-guide-shots.mjs` logs it as a note).
+  - QA: `tools/qa/cozy-guide-shots.mjs` (both phones, 844×390 and 667×375: every cozy guide step, and a second pass
+    over the other guides' panel steps) and `mobile-ui.mjs` (`guide-*` scenes: a card over each panel a guide opens)
+    fail when the card covers one of those (`ui-audit-lib.mjs guideOverlap`).
 
 ## The guides
 - **Two heroes (Moka)** starts right after her join scene.
@@ -193,8 +216,9 @@ Status: **built** (2026-10-03; the cozy path's three guides 2026-10-09). The gui
     5. A crew of two (skippable). 6. Wages in the morning banner (Got it).
   - **Peaceful paths** (a tip, not a guide: `cozy/cozyGuide.js`): on the first visit to a saved zone, `G.hint('peaceful')`
     and the minimap spotlit for 3 s with a callout on the violet rings (the spotlight only while guides run).
-  - On a phone with a panel up the speech card steps aside (as before); the objective card now moves into the panel's
-    title band when the spotlit element sits under its place at the top (`.tut.low`, ui/tutorial.js).
+  - On a phone with a panel up the speech card steps aside (as before); the objective card sits in the panel's title
+    band, or along the top with the panel moved down (R-14: "A phone with a panel up" above; CZ-11's `.tut.low` moved it
+    only when the spotlit element sat under it, and the Board's tabs stayed covered).
   - QA: `tools/qa/s16-tutorials.mjs` sections g–j (`S16_ONLY=ghij`); s16's guide count is twelve; every step shot on the
     desktop and a phone by `tools/qa/cozy-guide-shots.mjs`.
 

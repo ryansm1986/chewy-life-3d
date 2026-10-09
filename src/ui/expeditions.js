@@ -94,10 +94,12 @@ export class ExpeditionPanel extends Panel {
   get cap() { return maxCrew(this.G?.state); }
   supplies(o) {
     const C = this.C, n = this.crew.length, need = o ? C.exp.mealsNeeded(o, this.crew) : 0;
-    const meals = (this.lunch || need > 0) && n ? C.exp.pickMeals(n) : {};
+    const meals = (this.lunch || need > 0) && n && !o?.supplies?.freeLunch ? C.exp.pickMeals(n) : {}; // (a lunch someone packs: none from the pantry)
     return { meals, potions: this.potions };
   }
-  lunchLocked() { const o = this.current(); return !!o && (o.supplies?.meals || 0) > 0; }
+  /** who packs this job's lunch (supplies.freeLunch: Rosie, for burrow1), or null */
+  lunchBy(o) { return o?.supplies?.freeLunch ? this.G.story?.nameOf?.(o.giver) || 'a friend' : null; }
+  lunchLocked() { const o = this.current(); return !!o && ((o.supplies?.meals || 0) > 0 || !!o.supplies?.freeLunch); }
   info(o = this.current()) { if (!o?.id || !this.C) return null; return this.C.exp.info(o.id, this.crew, this.supplies(o)); }
   // ---------------------------------------------------------------- actions
   setView(v) { if (v === this.view) return; this.view = v; this.armed = null; if (v === 'reports') this.newestUnread(); this.ui.sfx('tab'); this.render(); }
@@ -249,8 +251,8 @@ export class ExpeditionPanel extends Panel {
     const need = I?.need || o.power, have = I?.power || 0, max = Math.max(need * 1.5, have * 1.08, 1);
     const odds = I && this.crew.length ? I.odds : null;
     const pk = Object.values(this.supplies(o).meals).reduce((a, b) => a + b, 0), dishes = Object.entries(st.pantry || {}).filter(([k, n]) => PANTRY[k]?.kind === 'dish' && n > 0).reduce((a, [, n]) => a + n, 0);
-    const lunchOn = (this.lunch || mNeed > 0) && this.crew.length > 0;
-    const lunchSub = mNeed > 0 ? `${mNeed} needed · ${dishes} in the pantry` : o.supplies?.mealSure ? `${dishes ? 'Makes it a sure thing' : 'Cook a dish first'}` : `${dishes} in the pantry`;
+    const by = this.lunchBy(o), lunchOn = by || ((this.lunch || mNeed > 0) && this.crew.length > 0); // (R-14: a packed lunch shows on and locked, never "0 in the pantry")
+    const lunchSub = by ? 'The crew is fed: +10% power' : mNeed > 0 ? `${mNeed} needed · ${dishes} in the pantry` : o.supplies?.mealSure ? `${dishes ? 'Makes it a sure thing' : 'Cook a dish first'}` : `${dishes} in the pantry`;
     const pots = st.potions?.heart || 0;
     const why = !this.atBoard ? "Send crews from the Expedition Board (by the Wayfarer's Post, or at the Guild)" : I?.ok ? '' : I?.why || '';
     const goSub = I?.ok ? `${esc(this.crewNames(this.crew))} · ${esc(backBy(hour, hrs))}` : esc(why);
@@ -258,7 +260,7 @@ export class ExpeditionPanel extends Panel {
     return `<div class="ex-det" style="--pc:${o.place.color}">
         <div class="ex-dh"><span class="ex-dic">${cozyIcon(o.kind === 'errand' ? 'errand' : 'story')}</span><div class="ex-dt"><b>${esc(o.name)}</b><span class="ex-dp">${o.questTitle ? `${esc(o.questTitle)} · ` : ''}${esc(o.place.label)}${o.place.jp ? ` <span class="jp">${esc(o.place.jp)}</span>` : ''}</span></div><span class="ex-kind">${o.kind === 'errand' ? 'Errand' : 'Story'}</span></div>
         <p class="ex-desc">${esc(o.desc || '')}</p>
-        <div class="ex-facts"><div${fast ? ' class="fast" title="A Scout knows the shortcuts: 15% off the trip"' : ''}>${cozyIcon('clock')}<b>${esc(aboutHours(hrs))}</b><span>${esc(backBy(hour, hrs))}</span></div><div>${cozyIcon('power')}<b>${need}</b><span>power needed</span></div><div>${cozyIcon('lunch')}<b>${o.supplies?.meals ? '1 each' : 'optional'}</b><span>lunches</span></div></div>
+        <div class="ex-facts"><div${fast ? ' class="fast" title="A Scout knows the shortcuts: 15% off the trip"' : ''}>${cozyIcon('clock')}<b>${esc(aboutHours(hrs))}</b><span>${esc(backBy(hour, hrs))}</span></div><div>${cozyIcon('power')}<b>${need}</b><span>power needed</span></div><div${by ? ' class="packed"' : ''}>${cozyIcon('lunch')}<b>${by ? 'packed' : o.supplies?.meals ? '1 each' : 'optional'}</b><span>${by ? `by ${esc(by)}` : 'lunches'}</span></div></div>
         ${gates ? `<div class="ex-gates">${gates}</div>` : ''}
         <div class="ex-rews">${this.rewardsRow(o, I)}</div>
       </div>
@@ -266,7 +268,7 @@ export class ExpeditionPanel extends Panel {
         <div class="ex-sh">${cozyIcon('crew')}<b>Crew</b><em>${this.crew.length} of ${this.cap}</em><span class="ex-sp"></span><button class="btn sm" data-a="best">${glyph('star')}Best crew</button><button class="btn sm" data-a="clear" ${this.crew.length || this.potions ? '' : 'disabled'}>${glyph('x')}Clear</button></div>
         <div class="ex-crew">${members || '<div class="ex-empty">Nobody else has joined the pack yet.</div>'}</div>
         <div class="ex-sup">
-          <button class="ex-tog${lunchOn ? ' on' : ''}${mNeed > 0 ? ' locked' : ''}" data-a="lunch" ${this.crew.length ? '' : 'disabled'}>${cozyIcon('lunch')}<span><b>Pack lunches${pk ? ` ×${pk}` : ''}</b><small>${esc(lunchSub)}</small></span><i class="ex-sw"></i></button>
+          <button class="ex-tog${lunchOn ? ' on' : ''}${mNeed > 0 || by ? ' locked' : ''}${by ? ' packed' : ''}" data-a="lunch" ${this.crew.length || by ? '' : 'disabled'}${by ? ` title="${esc(by)} packed the lunch: nothing from your pantry"` : ''}>${cozyIcon('lunch')}<span><b>${by ? `Lunch packed by ${esc(by)} <i class="ex-heart">♡</i>` : `Pack lunches${pk ? ` ×${pk}` : ''}`}</b><small>${esc(lunchSub)}</small></span><i class="ex-sw"></i></button>
           <div class="ex-pots" title="Heart Treats for the road: +3% each">${cozyIcon('heart')}<span><b>Heart Treats</b><small>+3% each · ${pots} on your belt</small></span><button class="btn sm" data-pot="-1" ${this.potions ? '' : 'disabled'}>−</button><b class="ex-pn">${this.potions}</b><button class="btn sm" data-pot="1" ${this.potions < Math.min(3, pots) ? '' : 'disabled'}>+</button></div>
         </div>
       </div>
@@ -283,7 +285,7 @@ export class ExpeditionPanel extends Panel {
   awayMain(e) {
     const left = this.C.exp.left(e), f = Math.max(0, Math.min(1, 1 - left / e.hours)), O = ODDS.find(x => x.key === e.odds) || oddsOf(e.r || 1);
     const armed = this.armed?.u === e.uid;
-    const sup = Object.entries(e.supplies?.meals || {}).map(([k, n]) => `<img class="ex-mi" src="${pantryIcon(k)}" alt="" title="${esc(PANTRY[k]?.name || k)}">${n > 1 ? `×${n}` : ''}`).join('') + (e.supplies?.potions ? ` ${cozyIcon('heart')}×${e.supplies.potions}` : '');
+    const sup = (e.lunchBy ? `<span class="ex-by">${esc(this.G.story?.nameOf?.(e.lunchBy) || e.lunchBy)}'s lunch ♡</span>` : '') + Object.entries(e.supplies?.meals || {}).map(([k, n]) => `<img class="ex-mi" src="${pantryIcon(k)}" alt="" title="${esc(PANTRY[k]?.name || k)}">${n > 1 ? `×${n}` : ''}`).join('') + (e.supplies?.potions ? ` ${cozyIcon('heart')}×${e.supplies.potions}` : '');
     return `<div class="ex-det ex-trip" style="--pc:${e.place?.color || '#8fd0ff'}">
         <div class="ex-dh"><span class="ex-dic">${cozyIcon('away')}</span><div class="ex-dt"><b>${esc(e.name)}</b><span class="ex-dp">${esc(e.place?.label || '')}</span></div><span class="ex-kind">On the road</span></div>
         <div class="ex-walk">${e.crew.map(k => `<div class="ex-wm">${this.face(k)}<b>${esc(this.member(k)?.name || '')}</b><span>Lv ${this.member(k)?.lvl || 1}</span></div>`).join('')}</div>

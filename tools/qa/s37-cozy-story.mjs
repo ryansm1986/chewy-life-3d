@@ -81,7 +81,22 @@ if (want('a')) {
   await ev(page, () => { window.G.heroes.join('moka'); }); await sleep(page, 600); await drainDialogue(page, [0]);
   const q0 = await ev(page, () => ({ act: window.G.state.quests.active.map(q => q.id), moka: window.G.heroes.joined('moka'), story: window.G.cozy.exp.objectives('story').map(o => o.id) }));
   R.check('a) a fresh game: Rosie\'s welcome done, Moka joins; "Something Squishy" is on the Board\'s Story tab as "Peek into the Burrow"', q0.act.includes('burrow1') && q0.moka && q0.story.includes('quest:burrow1'), q0);
-  // burrow1 by Moka's crew: Rosie packs the lunch
+  // burrow1 by Moka's crew: Rosie packs the lunch. R-14: the Board says so plainly (the toggle on and locked, "Lunch
+  // packed by Rosie ♡", never "0 in the pantry"), a tap can't turn it off, the odds count her lunch (fed), and a dish in
+  // the pantry stays there
+  await ev(page, () => window.G.actions.addPantry('onigiri', 1, { silent: true }));
+  let rl = null;
+  if (await atBoard(page)) {
+    await click(page, '.p-exp .ex-tab[data-v="story"]'); await click(page, '.p-exp .ex-obj[data-o="quest:burrow1"]'); await click(page, '.p-exp [data-a="clear"]:not([disabled])');
+    const tog = () => ev(page, () => { const t = document.querySelector('.p-exp .ex-tog'); return t ? { on: t.classList.contains('on'), locked: t.classList.contains('locked'), dis: t.disabled, text: t.textContent.replace(/\s+/g, ' ').trim(), fact: [...document.querySelectorAll('.p-exp .ex-facts > div')].map(d => d.textContent.replace(/\s+/g, ' ').trim()).join(' | ') } : null; });
+    const empty = await tog();
+    await click(page, '.p-exp .ex-mem[data-m="hero:moka"]');
+    const t0 = await tog(); await click(page, '.p-exp [data-a="lunch"]'); const t1 = await tog();
+    const I = await ev(page, () => { const P = window.G.ui.panels.expeditions, I = P.info(); return { fed: I.crewPower.fed, odds: I.odds.key, meals: Object.keys(P.supplies(P.current()).meals).length }; });
+    rl = { empty, t0, t1, I };
+    await ev(page, () => window.G.ui.closeAll());
+  }
+  R.check('a) R-14: burrow1\'s lunch reads as Rosie\'s on the Board (on and locked before and after a crew is picked, "Lunch packed by Rosie ♡", not "in the pantry"), a tap leaves it on, the odds count it (fed), no dish is packed', !!rl && [rl.empty, rl.t0, rl.t1].every(t => t && t.on && t.locked && !t.dis && /Lunch packed by Rosie ♡/.test(t.text) && !/in the pantry/.test(t.text)) && /packed\s*by Rosie/.test(rl.t0.fact) && rl.I.fed && rl.I.odds === 'good' && rl.I.meals === 0, rl);
   let b1 = null;
   for (let k = 0; k < 6 && !(await ev(page, () => window.G.state.quests.done.includes('burrow1'))); k++) { // (good odds, not a sure thing: a partial leaves half the kills, and she tries again after a rest)
     const rest = await ev(page, () => (window.G.state.cozy.exp.tired['hero:moka'] || 0) - window.G.cozy.clock.h);
@@ -90,7 +105,9 @@ if (want('a')) {
     await skip(page, 2.1); await sleep(page, 900);
   }
   await page.waitForFunction(() => window.G.state.quests.active.some(q => q.id === 'homes' || q.id === 'lights'), null, { timeout: 6000 }).catch(() => {});
-  const b1r = await ev(page, () => ({ done: window.G.state.quests.done.includes('burrow1'), mochi: window.G.state.materials.mochi, rep: window.G.cozy.exp.reports().at(-1)?.result, potions: window.G.state.potions.heart, next: window.G.state.quests.active.map(q => q.id) }));
+  const b1r = await ev(page, () => ({ done: window.G.state.quests.done.includes('burrow1'), mochi: window.G.state.materials.mochi, rep: window.G.cozy.exp.reports().at(-1)?.result, potions: window.G.state.potions.heart, next: window.G.state.quests.active.map(q => q.id), onigiri: window.G.state.pantry.onigiri || 0 }));
+  R.check("a) R-14: Rosie's lunch, not the pantry's: the onigiri in the pantry is still there after Moka's trip", b1r.onigiri === 1, { onigiri: b1r.onigiri });
+  await ev(page, () => window.G.actions.spendPantry({ onigiri: 1 }, { quiet: true })); // (the later parts start from the pantry they always had)
   const b1rep = b1r.rep === 'success' ? await readReport(page, 'a2-report-burrow1') : null;
   R.check('a) burrow1 by Moka alone (level 1, good odds with Rosie\'s lunch): the quest done, the 3 Mochi Jelly home, its reward paid, "A Home for Everyone" next', b1.sent && b1.odds === 'good' && b1r.done && b1r.mochi >= 3 && b1r.potions >= 3 && (b1r.next.includes('homes') || b1r.next.includes('lights')) && /Something Squishy: done/.test(b1rep?.ribbon || ''), { b1, b1r, b1rep });  // the farm for lunches: four turnips
   const farm = await ev(page, () => { const G = window.G, g = G.life.garden; const ok = G.actions.buyPantry('turnipSeed', 10, 4); g.syncBeds?.(true); return { ok, tiles: g.beds[0].tiles.slice(0, 4) }; });

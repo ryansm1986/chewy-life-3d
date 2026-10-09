@@ -190,11 +190,17 @@ body.touch-active .ch-pts .tt-dim { display: none; }
 .ui-root.m-phone.touch-ui .tut-dock { width: min(600px, calc(var(--tc-band-w, 516px) / var(--m-pscale))); }
 .ui-root.m-phone.touch-ui .tut-offer { max-width: calc(var(--tc-band-w, 516px) / var(--ui-scale)); }
 /* a menu open during a guide on a phone (R-12: the fishing guide's menu → Journal): the speech bubble steps aside, so
-   the objective card alone sits over the panel's top edge and the buttons it points at stay clear and tappable */
+   the objective card alone shows, in the panel's title band or along the top (R-14: ui/tutorial.js place()) */
 .ui-root.m-phone.has-panel .tut-say { display: none; }
+/* R-14: the card along the top: the panel moves down under it (its body scrolls inside, as ever) */
+.ui-root.m-phone.tut-strip .pw:not(.side-bottom) { top: calc(var(--tut-push, 0px) / var(--m-pscale)); }
 /* while a guide speaks (its bubble over the objective) the toasts would stack under the dock: they step aside */
 .ui-root.m-phone:has(.tut.on .tut-say.on) .toasts { opacity: 0; }
 .ui-root.m-touch .tut-dock .to-skip { min-height: 52px; display: inline-flex; align-items: center; }
+/* R-14: the card's Got it! and Skip step reach 44 px through a taller hit area (the card keeps its slim look, in the
+   title band too) */
+.ui-root.m-touch .tut-obj :is(.to-ok, .to-step) { position: relative; }
+.ui-root.m-touch .tut-obj :is(.to-ok, .to-step)::after { content: ''; position: absolute; inset: -14px -4px; }
 .ui-root.m-phone .reel .rl-ex { font-size: 22px; }
 .ui-root.m-phone .pw:not(.side-bottom) .pb:has(> .tabs) > * { flex-shrink: 0; } /* (a scrolling tab row would shrink to nothing in the column) */
 

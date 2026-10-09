@@ -815,7 +815,9 @@ clearings hold the gates.
     ring, and a wall band seals it, so the approach is the only way in (gen-fuzz checks this). Half the time, floor 2
     also has a second treasure room. It has no stairs.
   - **Density**: 120–160 monsters a floor (the generator aims for 130–150). Room packs hold 8–16 monsters, corridor
-    packs 6–10, and no pack is larger than 16. Each pack forms a cluster 4–8 m wide (`spawn.r` 2–4 m).
+    packs 6–10, and no pack is larger than 16. Each pack forms a cluster 4–8 m wide (`spawn.r` 2–4 m). Idle, its
+    members mill about inside that disc (`Monster.home`, set by `zoneRun.spawnPack`; R-14): before, each one
+    random-walked from wherever it stood, so a floor's packs drifted from about 5 m to 17 m wide in 20 s.
   - **Elites stay rare**: each floor has at most 2 champion packs (the treasure guards first) and exactly 1 unique pack
     (on floor 2, the one at the approach).
   - **Marks for phase D**: a pack that can carry a quest drop has `spawn.mark = 'champion' | 'unique'`, and the

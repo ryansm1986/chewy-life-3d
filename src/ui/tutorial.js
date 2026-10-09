@@ -10,6 +10,9 @@
 //  - GuidesView: the Journal's Guides tab (replay any guide).
 // Elements are re-measured every frame (the reel card follows the player), and nothing here takes keyboard focus:
 // Esc still closes panels, and gameplay keys go to the game.
+// A phone with a panel up (R-14, place()): the objective card never covers the panel's tabs, its buttons, its ✕ or what
+// the guide spotlights. It sits in the free strip of the panel's title band (between its name and ✕, by the thumbs) when
+// the whole card fits there, else in a slim strip along the top with the panel moved down under it.
 import './tutorial.css';
 import { el, esc, replay } from './dom.js';
 import { glyph } from './glyphs.js';
@@ -19,6 +22,18 @@ import { CLASSES } from '../rpg/classes.js';
 
 // *word* → bold; while the gamepad plays, an emphasised key (*F*, *Tab*, *Shift*) becomes its pad glyph (ui/padGlyphs.js)
 const md = s => esc(s).replace(/\*([^*]+)\*/g, (m, w) => keyHint(w) || `<b>${w}</b>`);
+/** is it drawn (no hidden or faded-out ancestor)? */
+const shown = e => { for (let a = e; a && a.nodeType === 1; a = a.parentElement) { const cs = getComputedStyle(a); if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity < 0.05) return false; } return true; };
+/** an element's visible box: its rect clipped by every scrolling or clipping ancestor (R-14: the Board's crew grid scrolls
+ *  inside the crew column on a phone, and its own box reaches far below what shows, over the title band) */
+const visRect = e => {
+  const r = e.getBoundingClientRect(); let L = r.left, T = r.top, R = r.right, B = r.bottom;
+  for (let a = e.parentElement; a && a !== document.body; a = a.parentElement) {
+    const cs = getComputedStyle(a); if (cs.overflowX === 'visible' && cs.overflowY === 'visible') continue;
+    const c = a.getBoundingClientRect(); L = Math.max(L, c.left); R = Math.min(R, c.right); T = Math.max(T, c.top); B = Math.min(B, c.bottom);
+  }
+  return { left: L, top: T, right: R, bottom: B, width: Math.max(0, R - L), height: Math.max(0, B - T) };
+};
 const NAMES = { shadow: 'Shadow', kero: 'Kero', moka: 'Moka', rosie: 'Rosie', usagi: 'Usagi', tanu: 'Tanu', poe: 'Poe', shihtzu: CLASSES.shihtzu.name, golden: CLASSES.golden.name, hachi: 'Old Hachi' }; // (the Shih Tzu's name is the owner's to pick: classes.js)
 
 export class TutorialUI {
@@ -29,7 +44,7 @@ export class TutorialUI {
       <div class="tut-mid"><div class="tut-flash"><b></b><small></small></div></div>
       <div class="tut-top"><div class="tut-dock">
         <div class="tut-say"><div class="ts-por"></div><div class="ts-bub"><b class="ts-name"></b><div class="ts-tx"></div></div></div>
-        <div class="tut-obj"><span class="to-ic"></span><span class="to-n"></span><div class="to-t"><small class="to-h"></small><b class="to-tx"></b></div><button class="btn sm mint to-ok">${glyph('check')}Got it!<span class="pad-only">${keyCap('map', { sm: true })}</span></button><button class="btn sm to-step">Skip step</button><button class="to-skip" title="Skip this guide">Skip</button></div>
+        <div class="tut-obj"><span class="to-ic"></span><span class="to-n"></span><div class="to-t"><small class="to-h"></small><b class="to-tx"></b></div><button class="btn sm mint to-ok">${glyph('check')}<span class="to-okt">Got it!</span><span class="pad-only">${keyCap('map', { sm: true })}</span></button><button class="btn sm to-step">Skip step</button><button class="to-skip" title="Skip this guide">Skip</button></div>
       </div></div>
       <div class="tut-top"><div class="tut-offer"><div class="tf-por"></div><div class="tf-t"><small>New guide available</small><b></b><span></span></div><div class="tf-b"><button class="btn sm pink tf-yes">${glyph('play')}Show me!</button><button class="btn sm tf-no">No thanks<span class="pad-only">${keyCap('roll', { sm: true })}</span></button></div></div></div>`;
     layer.appendChild(r);
@@ -74,7 +89,7 @@ export class TutorialUI {
     if (this.sig.calls) { const list = this.callouts; this.sig.calls = null; this.setCallouts(list); }
   }
   setPaused(p) { this.root.classList.toggle('paused', !!p); if (p) { this.highlight([]); this.setCallouts([]); this.flash(null); } }
-  hide() { this.root.classList.remove('on', 'paused'); this.say(null); this.highlight([]); this.setCallouts([]); this.flash(null); }
+  hide() { this.root.classList.remove('on', 'paused'); this.say(null); this.highlight([]); this.setCallouts([]); this.flash(null); this.setPlace(null); this._placeKey = ''; }
   // ---------------------------------------------------------------- spotlight + callouts
   /** elements to ring (the first gets the dimming spotlight) */
   highlight(els) { this.hl = (els || []).filter(Boolean); if (!this.hl.length) this.root.classList.remove('spot'); }
@@ -98,12 +113,7 @@ export class TutorialUI {
     const s = this.ui.scale || 1;
     // the spotlight follows its element (they move: the reel card, the dialogue choices sliding in)
     const e = this.hl.find(x => x.isConnected && x.offsetParent !== null);
-    // a phone with a panel up: when the spotlit element sits under the dock's place at the top, the dock moves down into
-    // the panel's title band (between its title and ✕), so it never covers what it points at (CZ-11: a Guild card)
-    const RT = this.ui.root?.classList, low0 = this.root.classList.contains('low');
-    let low = false;
-    if (e && RT?.contains('m-phone') && RT.contains('has-panel') && e.closest?.('.pw')) { if (!low0) this._dockB = this.$.dock.getBoundingClientRect().bottom; low = e.getBoundingClientRect().top < (this._dockB || 0) + 4; }
-    if (low !== low0) this.root.classList.toggle('low', low);
+    this.place(dt); // (a phone with a panel up: the card's place, R-14)
     if (e) {
       const r = e.getBoundingClientRect(), pad = 8 * s;
       if (r.width > 2 && r.height > 2) {
@@ -127,6 +137,91 @@ export class TutorialUI {
       k.style.opacity = '1';
       k.style.transform = `translate(${x.toFixed(1)}px,${(y + Math.sin(this.t * 4 + i) * 3 * s).toFixed(1)}px)`;
     });
+  }
+  // ---------------------------------------------------------------- a phone with a panel up (R-14)
+  /** Where the objective card sits while a panel fills a phone's screen, so it covers none of the panel's tabs, buttons,
+   *  ✕ or spotlit target (CZ-11 only moved it when the spotlit thing sat under it; the Board's tabs stayed covered):
+   *  - 'band': the free strip of the panel's title band, right of its name (and any header tabs), left of the ✕: the
+   *    whole card, its line unclipped, or 'tight' (no paw, a ✓ for Got it!); never over what it spotlights;
+   *  - 'strip': along the top, between what the HUD shows there (stripBox), the panel moved down under it
+   *    (.ui-root.tut-strip, --tut-push: mobile.css); its line wraps, and a narrow strip goes 'tight' too.
+   *  Placed when the panel (or its opening spring), the step, its line, the spotlit element or the screen changes; a band
+   *  is measured again twice a second. */
+  place(dt) {
+    const R = this.ui.root, P = R?.classList.contains('m-phone') && this.root.classList.contains('on') ? this.phonePanel() : null;
+    const key = P ? `${this._step?.n}|${this._step?.title}|${this.$.otx.textContent}|${this.$.obj.className.replace(/\s*\bpop\b/, '')}|${innerWidth}x${innerHeight}|${P.classList.contains('opening')}` : ''; // (opening: the panel springs in scaled; placed again once it stands)
+    const fresh = key !== this._placeKey || P !== this._placeP || this.hl[0] !== this._placeHl;
+    if (!fresh && (this._placeT = (this._placeT || 0) + dt) < 0.5) return;
+    this._placeKey = key; this._placeP = P; this._placeHl = this.hl[0]; this._placeT = 0;
+    if (!P) { this.setPlace(null); return; }
+    if (!fresh && this._place === 'strip') return; // (the strip covers nothing: it stays until the panel, the step or the screen changes)
+    if (!(this.tryBand(P, false) || this.tryBand(P, true))) this.setPlace('strip'); // (a band is measured again twice a second)
+    if (fresh) this.reveal(P);
+  }
+  /** a spotlit element its panel's body cuts off (the strip moved the panel down: a house card's buttons) scrolls into
+   *  view, once a placement; one taller than the body stays as it is */
+  reveal(P) {
+    for (const h of this.hl) {
+      if (!h?.isConnected || !P.contains(h)) continue;
+      let sc = h.parentElement; while (sc && sc !== P && !/auto|scroll/.test(getComputedStyle(sc).overflowY)) sc = sc.parentElement;
+      if (!sc || sc === P) continue;
+      const r = h.getBoundingClientRect(), c = sc.getBoundingClientRect(), z = sc.currentCSSZoom || 1;
+      if (r.height > c.height - 8) continue;
+      if (r.bottom > c.bottom - 2) sc.scrollTop += (r.bottom - c.bottom + 8) / z;
+      else if (r.top < c.top + 2) sc.scrollTop -= (c.top - r.top + 8) / z;
+    }
+  }
+  /** the panel a phone shows: the topmost open one (one at a time; a build or decorate palette along the bottom is not one,
+   *  the card stays on top; nor the menu prewarm's closed panel, drawn for a frame at opacity 0.004: ui/prewarm.js) */
+  phonePanel() {
+    const U = this.ui; let top = null;
+    for (const n of U._order || []) { const w = U.panels?.[n]?.isOpen && U.panels[n].wrap; if (w && !w.inert && !/\b(side-bottom|m-back|closing)\b/.test(w.className) && w.offsetParent !== null) top = w; }
+    return top;
+  }
+  tryBand(P, tight) {
+    this.setPlace(null); // (the panel at its own place, not moved down)
+    const ph = P.querySelector(':scope > .panel > .ph'), x = ph?.querySelector('.ph-x'); if (!x || x.offsetParent === null) return false;
+    const B = ph.getBoundingClientRect(), X = x.getBoundingClientRect();
+    let left = B.left;
+    for (const k of ph.querySelectorAll(':scope > .ph-tag, :scope > .ph-extra > *')) { const r = k.getBoundingClientRect(); if (r.width > 0 && r.height > 0) left = Math.max(left, r.right); }
+    const l = left + 8, w = X.left - 8 - l, top = Math.min(B.top, X.top), h = Math.max(B.bottom, X.bottom) - top;
+    if (w < 160) return false;
+    const st = this.root.style;
+    st.setProperty('--tb-l', l.toFixed(1) + 'px'); st.setProperty('--tb-w', w.toFixed(1) + 'px'); st.setProperty('--tb-t', top.toFixed(1) + 'px'); st.setProperty('--tb-h', h.toFixed(1) + 'px');
+    this.root.classList.add('band'); this.root.classList.toggle('tight', tight); this._place = 'band';
+    if (this.bandOk()) return true;
+    this.root.classList.remove('band', 'tight'); this._place = null;
+    return false;
+  }
+  /** the band's card: whole (inside the strip, its lines unclipped) and over nothing it spotlights. (The dock is measured,
+   *  not the card: the card's pop-in scales it for half a second; with a panel up the dock holds the card alone.) */
+  bandOk() {
+    if (this._place !== 'band') return false;
+    const o = this.$.dock.getBoundingClientRect(), w = parseFloat(this.root.style.getPropertyValue('--tb-w')) || 0;
+    if (o.width > w + 1 || [this.$.otx, this.$.h].some(t => t.scrollWidth > t.clientWidth + 1)) return false;
+    return !this.hl.some(h => { if (!h?.isConnected || h.offsetParent === null) return false; const r = visRect(h); return Math.min(r.right, o.right) - Math.max(r.left, o.left) > 1 && Math.min(r.bottom, o.bottom) - Math.max(r.top, o.top) > 1; });
+  }
+  setPlace(mode) {
+    const c = this.root.classList, R = this.ui.root;
+    if (mode !== 'band') c.remove('band', 'tight');
+    c.toggle('strip', mode === 'strip'); this._place = mode;
+    if (mode === 'strip') {
+      const b = this.stripBox(), st = this.root.style;
+      st.setProperty('--ts-l', b.l.toFixed(1) + 'px'); st.setProperty('--ts-w', b.w.toFixed(1) + 'px');
+      if (this.$.otx.parentElement.clientWidth < 96) c.add('tight'); // (a narrow strip: room for the line first)
+      const o = this.$.dock.getBoundingClientRect(); R?.style.setProperty('--tut-push', Math.ceil(o.bottom + 6) + 'px'); R?.classList.add('tut-strip');
+    } else R?.classList.remove('tut-strip');
+  }
+  /** the strip along the top: the width between what the HUD shows at its height (the top-left card, the minimap column,
+   *  the touch buttons) → { l, w } in CSS px */
+  stripBox() {
+    const sf = this.ui.mobile?.sf || { l: 0, r: 0 }, W = innerWidth;
+    let l = (sf.l || 0) + 8, r = W - (sf.r || 0) - 8;
+    for (const e of this.ui.root?.querySelectorAll('.hud-tl > *, .hud-tr > *, .tc.on .tc-top > *') || []) {
+      const b = e.getBoundingClientRect(); if (b.width < 1 || b.top > 64 || !shown(e)) continue;
+      if (b.left + b.width / 2 < W / 2) l = Math.max(l, b.right + 8); else r = Math.min(r, b.left - 8);
+    }
+    return { l, w: Math.max(220, r - l) };
   }
   // ---------------------------------------------------------------- the offer card
   /** → Promise<boolean> */

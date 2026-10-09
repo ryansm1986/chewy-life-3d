@@ -508,6 +508,8 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
     - builds the arena seal.
   - **Packs and loot**:
     - `spawnPack(sp)`: the formations, champion / unique leaders, fodder pacing (`DENSITY`) and the `def.tank` mix;
+      each member's `home` (the camp's disc: `Monster`'s idle wander stays inside it) and `pack.spawnAt` (where the
+      formation put each member: s22 measures the widths there; R-14);
     - `xpMul`, `filterDrops` (thinned fodder drops, the carried quest item), `chestDrops`, `onQuestLoot`.
   - **Every frame** `update()`: the cages, the seal, and the arena trigger (`enterArena` → seal, lantern flare,
     `boss.alert()`).
@@ -1019,7 +1021,10 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   line follows the device (`dv(touch, pad, keys)`, *F* through `keyHint`). Event `cozy:burrowChoice { choice }`.
   `G.cozyGuide = { ask(), choiceOpen }`. `ui/tutorial.js` + `tutorial.css .tut.low`: on a phone with a panel up, when the
   spotlit element sits under the dock's place at the top, the objective card moves into the panel's title band (between
-  its title and ✕); the Nose's wrap waits for the board to close, so a phone shows Rosie's line.
+  its title and ✕); the Nose's wrap waits for the board to close, so a phone shows Rosie's line. (R-14 replaced `.tut.low`
+  with `TutorialUI.place()`: `.tut.band` / `.tight` in the title band's free strip, else `.tut.strip` along the top with
+  the panel moved down by the UI root's `.tut-strip` / `--tut-push`; `tools/qa/ui-audit-lib.mjs guideOverlap` checks it
+  in `cozy-guide-shots.mjs` and `mobile-ui.mjs`.)
 - **Fixes**: `expeditionRun.finishAll` (the debug action) puts a trip a hair past due (`start + hours − h` could round
   to just above 0 and stay out).
 - **QA**: `tools/qa/cozy-ui-lib.mjs` (`seedCozy`: something in every cozy surface; `cozyScenes`; `quietUi`), run by

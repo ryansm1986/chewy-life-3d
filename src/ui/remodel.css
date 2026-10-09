@@ -66,3 +66,6 @@
 .rm-o em { position: absolute; right: -5px; top: -5px; }
 .rm-o em .gl { width: 13px; height: 13px; }
 .rm-auto { font-size: 10.5px; padding: 3px 7px 4px; }
+/* touch (a tablet's panel zoom is about 0.86): the house card's small print keeps the 12 px on-screen floor (CONTROLS §12;
+   tools/qa/mobile-ui.mjs DEVICE=ipad, house-card) */
+.ui-root.m-touch .p-house :is(.hc-stars small, .hc-stats, .rm-c, .rm-c b, .rm-free) { font-size: 14px; }

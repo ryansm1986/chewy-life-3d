@@ -89,9 +89,16 @@
 .gd-st .gd-ok .gl { width: 14px; height: 14px; }
 .gd-st .gd-on { background: #fff3c0; border-color: #d6a92a; }
 .gd-card.locked { filter: saturate(.6); }
-/* a phone, a panel up, the spotlit thing under the dock's top place (ui/tutorial.js update): the objective card moves into
-   the panel's title band at the bottom, between its title and the ✕ (the speech bubble already steps aside: mobile.css) */
-.ui-root.m-phone .tut.low .tut-top:has(> .tut-dock) { top: auto; bottom: calc(var(--sa-b, 0px) + 6px); left: auto; right: calc(var(--sa-r, 0px) + 84px); width: auto; }
-.ui-root.m-phone .tut.low .tut-dock { margin-top: 0; width: auto; max-width: 420px; }
-.ui-root.m-phone .tut.low .tut-obj { min-width: 0; }
-.ui-root.m-phone .tut.low .to-tx { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* R-14: a phone with a panel up (ui/tutorial.js place(); the speech bubble already steps aside: mobile.css). The objective
+   card covers none of the panel's tabs, buttons, ✕ or spotlit target:
+   - band: in the free strip of the panel's title band (--tb-l / -t / -w / -h), against the ✕; tight: no paw, a ✓ for Got it!
+   - strip: along the top, between the HUD's corners (--ts-l / -w), the panel moved down under it (mobile.css .tut-strip,
+     --tut-push) */
+.ui-root.m-phone .tut.band .tut-top:has(> .tut-dock) { left: var(--tb-l); top: var(--tb-t); width: var(--tb-w); height: var(--tb-h); right: auto; bottom: auto; justify-content: flex-end; align-items: center; }
+.ui-root.m-phone .tut.band .tut-dock { margin-top: 0; width: auto; max-width: calc(var(--tb-w) / var(--m-pscale, 1)); }
+.ui-root.m-phone .tut.strip .tut-top:has(> .tut-dock) { top: var(--sa-t, 0px); left: var(--ts-l); width: var(--ts-w); right: auto; }
+.ui-root.m-phone .tut.strip .tut-dock { margin-top: 6px; width: auto; max-width: calc(var(--ts-w) / var(--m-pscale, 1)); }
+.ui-root.m-phone :is(.tut.band, .tut.strip) .tut-obj { min-width: 0; }
+.ui-root.m-phone .tut.band :is(.to-tx, .to-h) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* (clipped: no band; the strip's line wraps) */
+.ui-root.m-phone .tut.tight :is(.to-ic, .to-okt) { display: none; }
+.ui-root.m-phone .tut.tight .to-ok { min-width: 52px; justify-content: center; }

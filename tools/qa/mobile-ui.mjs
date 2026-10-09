@@ -5,7 +5,10 @@
 // house card and remodel, a dialogue with choices, a guide line, the reel bar, build mode, decorate mode, the title and
 // the portrait rotate overlay. For each: a screenshot, text drawn under the floor (12 CSS px: ui/mobile.css raises what
 // was under), a panel that runs off the screen (it must fit, or scroll inside), a header button outside its panel's
-// frame (R-13: tools/qa/ui-audit-lib.mjs; all five heroes' trees), and tappables under 44 px.
+// frame (R-13: tools/qa/ui-audit-lib.mjs; all five heroes' trees), and tappables under 44 px. R-14: a guide's objective
+// card over the panels the guides open (the Board, the Guild, the Journal, the menu, the pantry, Skills, a house card,
+// remodel, the stash), with what it spotlights: on a phone it must cover none of the panel's tabs, buttons or ✕, nor the
+// spotlit target (ui-audit-lib guideOverlap; a tablet's are listed, not failed: its panels keep their desktop layout).
 // Decorative text is left out: the Japanese subtitles (.jp), the compass's 北, the portrait's "Lv", glyph art (svg).
 //   CT-7: "cut off" is measured against the safe area (--sa-*: a notch, CT-6's itch insets, the full-screen top edge), not
 //   the bare screen; a body whose content runs past it must scroll; Settings is audited with every row it can show (the
@@ -18,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { launchTouch, boot, sleep, waitMode, BASE, PHONE, IPAD } from './touch-lib.mjs';
 import { seedCozy, cozyScenes, quietUi } from './cozy-ui-lib.mjs';
-import { headerOutside } from './ui-audit-lib.mjs';
+import { headerOutside, guideOverlap } from './ui-audit-lib.mjs';
 
 const OUT = process.env.SHOT_DIR || path.resolve('tools/qa/tmp/mobile-ui');
 const FLOOR = +(process.env.FLOOR || 12), TAP = +(process.env.TAP || 44), STRICT = !process.argv.includes('--report');
@@ -29,7 +32,7 @@ fs.mkdirSync(OUT, { recursive: true });
 const { browser, page, errors, F } = await launchTouch({ w: W, h: H, dpr: DPR, ua: DEV.ua });
 const ev = (f, a) => page.evaluate(f, a);
 let bad = 0;
-const small = [], tiny = [], clipped = [];
+const small = [], tiny = [], clipped = [], covered = [];
 const DECOR = /\.jp\b|mm-n > span|pc-lv > small|chg-jp|ph-jp|\.kc\b/; // (key caps are glyph art: ui/mobile.js's text floor skips them too)
 
 const audit = (name, scopes) => ev(([scopes, floor, tap]) => {
@@ -47,8 +50,8 @@ const audit = (name, scopes) => ev(([scopes, floor, tap]) => {
       const px = parseFloat(getComputedStyle(el).fontSize) * (el.currentCSSZoom ?? 1);
       if (px < floor) { const k = label(el), o = out.get(k) || { sel: k, px, n: 0, text: t.slice(0, 34) }; o.n++; if (px < o.px) { o.px = px; o.text = t.slice(0, 34); } out.set(k, o); }
     }
-    for (const el of root.querySelectorAll('button, .btn, .tab, .slot, .node, .sh-item, .seg button, .tog, .dch, .ph-x, .card, .tc-b, .belt, .lvb, .qt-tog, .ck-r, .cr-r, input[type=range]')) {
-      const r = el.getBoundingClientRect(); if (!onScreen(r) || !vis(el) || el.disabled) continue;
+    for (const el of root.querySelectorAll('button, .btn, .tab, .slot, .node:not(.lg), .sh-item, .seg button, .tog, .dch, .ph-x, .card, .tc-b, .belt, .lvb, .qt-tog, .ck-r, .cr-r, input[type=range]')) {
+      const r = el.getBoundingClientRect(); if (!onScreen(r) || !vis(el) || el.disabled) continue; // (.lg.node: the map legend's swatch, not a tappable)
       const m = Math.min(r.width, r.height); if (m >= tap) continue;
       // (a target may reach past its box: an ::after with negative insets, as the touch buttons and badges have)
       const a = getComputedStyle(el, '::after'), ext = a.content !== 'none' && a.position === 'absolute' ? Math.max(0, -parseFloat(a.top) || 0) + Math.max(0, -parseFloat(a.bottom) || 0) : 0;
@@ -96,6 +99,9 @@ const scene = async (name, open, scopes, close) => {
     await open(); await sleep(page, 700); await shot(name); await audit(name, scopes);
     // R-13: a header button (title-row button, tab or badge, or the skill trees' tab row) outside its panel's frame
     for (const o of await ev(headerOutside)) { console.log(`   CUT OFF ${o.sel} ${JSON.stringify(o.rect)} outside the frame ${JSON.stringify(o.frame)}`); clipped.push({ sel: o.sel, rect: o.rect, where: name }); }
+    // R-14: the guide's objective card over the panel's tabs, buttons, ✕ or the spotlit target
+    const phone = await ev(() => window.G.ui.root.classList.contains('m-phone'));
+    for (const o of await ev(guideOverlap)) { console.log(`   ${phone ? 'COVERS' : '(tablet) covers'} ${o.sel} ${JSON.stringify(o.rect)} under the guide card ${JSON.stringify(o.card)}`); if (phone && o.panel) covered.push({ ...o, where: name }); }
   }
   catch (e) { console.log(`!! ${name}: ${String(e.message || e).split('\n')[0]}`); bad++; }
   try { if (close) await close(); else { await ev(() => { const U = window.G.ui; for (const n of [...U._order]) U.close(n); }); } await sleep(page, 300); } catch (e) { /* next */ }
@@ -141,9 +147,30 @@ try {
   await scene('reel', () => ev(() => window.G.ui.reel.start({ icon: '', name: 'Koi', known: false, zone: 0.3 })), ['.reel'], () => ev(() => window.G.ui.reel.hide()));
   // the cozy path (docs/COZY.md §10; CZ-10): the Board's views, the Guild's tabs, the Sightings, the away card, the
   // Journal's Crews tab, the menu's Crews view, the HUD's chip and away minis, and the touch hero wheel with an away hero
-  if (!ONLY.size || [...ONLY].some(n => n.startsWith('cozy'))) { console.log('cozy seed', JSON.stringify(await seedCozy(page))); await quietUi(page); }
+  if (!ONLY.size || [...ONLY].some(n => n.startsWith('cozy') || n.startsWith('guide-'))) { console.log('cozy seed', JSON.stringify(await seedCozy(page))); await quietUi(page); }
   for (const c of cozyScenes(ev)) await scene(c.name, async () => { await c.open(); await quietUi(page, 4000); }, c.scopes, c.close); // (banners played out: a clean shot)
   await scene('cozy-wheel', () => ev(() => window.G.heroes.openWheel()), ['.hero-wheel'], () => ev(() => window.G.heroes.pickFromWheel(null)));
+  // R-14: a guide's card (Got it! and Skip step shown) over each panel a guide opens, spotlighting what its step does
+  const rec = () => { const G = window.G; return G.sim.list.find(r => r.data?.owner === 'usagi') || G.sim.list.find(r => r.data?.owner); };
+  const GUIDE_OVER = [
+    ['board-crew', () => window.G.ui.open('expeditions', { at: 'board', view: 'story' }), '.p-exp .ex-crew'],
+    ['board-send', () => window.G.ui.open('expeditions', { at: 'board', view: 'story' }), '.p-exp .ex-go'],
+    ['board-away', () => window.G.ui.open('expeditions', { at: 'board', view: 'away' }), '.p-exp .ex-trip'],
+    ['guild-roster', () => window.G.cozy.guild.open('roster'), '.p-guild .gd-hire:not(.free):not(.lock)'],
+    ['guild-hire', () => window.G.cozy.guild.open('hire'), '.p-guild .gd-cands'],
+    ['journal', () => window.G.ui.open('quests'), '.p-quests .q-tabs .tab[data-t="fish"]'],
+    ['menu', () => window.G.ui.open('menu'), '.p-menu [data-a="open:quests"]'],
+    ['pantry', () => window.G.ui.open('inventory', { view: 'pantry' }), null],
+    ['skills', () => window.G.ui.open('skills'), '.p-skills .chg-drawer'],
+    ['house-card', `(${rec})() && window.G.ui.open('houseCard', { rec: (${rec})() })`, '.p-house .hc-btns'],
+    ['remodel', `(${rec})() && window.G.ui.open('remodel', { rec: (${rec})() })`, '.p-remodel .rm-sets'],
+    ['stash', () => window.G.ui.open('stash'), null],
+  ];
+  for (const [n, open, spot] of GUIDE_OVER)
+    await scene('guide-' + n, async () => {
+      await ev(() => window.G.ui.closeAll()); await ev(open); await sleep(page, 300);
+      await ev(sp => { const T = window.G.ui.tutorial; T.step({ n: 4, total: 7, title: 'The Expedition Board', objective: 'Add Moka to the crew', ack: true, skippable: true }); T.highlight(sp ? [...document.querySelectorAll(sp)].slice(0, 1) : []); }, spot);
+    }, ['.tut-dock'], () => ev(() => { const T = window.G.ui.tutorial; T.hide(); window.G.ui.closeAll(); }));
   await scene('build', async () => { await ev(() => window.G.build.enter()); await sleep(page, 600); }, ['.p-build', '.l-hud', '.tc'], async () => { await ev(() => window.G.build.exit?.()); await sleep(page, 400); });
   if (!ONLY.size || ONLY.has('home') || ONLY.has('decorate')) { await ev(() => window.G.openHome()); await waitMode(page, 'interior'); await sleep(page, 900); }
   await scene('home', async () => {}, ['.l-hud', '.tc'], async () => {});
@@ -154,9 +181,9 @@ try {
   await scene('title-settings', () => ev(() => window.G.ui.open('menu', { view: 'settings', from: 'title' })), ['.p-menu']);
 } catch (e) { console.log('!! run:', e.message); bad++; }
 
-console.log(`\n${small.length} text groups under ${FLOOR} px; ${tiny.length} tappable groups under ${TAP} px; ${clipped.length} panels cut off. Shots: ${OUT}`);
+console.log(`\n${small.length} text groups under ${FLOOR} px; ${tiny.length} tappable groups under ${TAP} px; ${clipped.length} panels cut off; ${covered.length} things under a guide card. Shots: ${OUT}`);
 if (errors.length) { console.log('page errors:', [...new Set(errors)].slice(0, 6).join('\n')); bad++; }
 await browser.close();
-const fail = bad || clipped.length || (STRICT && (small.length || tiny.length));
+const fail = bad || clipped.length || covered.length || (STRICT && (small.length || tiny.length));
 console.log(fail ? 'FAIL mobile-ui' : 'PASS mobile-ui');
 process.exit(fail ? 1 : 0);

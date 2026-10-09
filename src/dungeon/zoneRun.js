@@ -127,6 +127,11 @@ export class ZoneRun {
       if (champ) { m.rank = 'champion'; m.lifeMax = m.life = Math.round(m.life * DENSITY.champLife); m.name = pack.leader?.name || m.name; m.eliteColor = '#6aa8ff'; m._xpMul = DENSITY.champXp; }
       else { m.lifeMax = m.life = Math.max(1, Math.round(m.life * DENSITY.life)); m.stats.dmg = m.stats.dmg.map(v => Math.max(1, Math.round(v * DENSITY.dmg))); m._xpMul = DENSITY.xp; m._thin = true; }
     }
+    // (R-14) the camp: idle members mill about inside the formation's disc (Monster.home) instead of random-walking away
+    // from it (a floor's packs used to drift 4.9 → 17 m wide in 20 s); spawnAt: where the formation put each member
+    const home = { x: c.x, z: c.z, r: R };
+    for (const m of pack.members) m.home = home;
+    pack.spawnAt = pack.members.map(m => [m.pos.x, m.pos.z]);
     if (sp.quest) sp.quest.pack = pack;
     return pack;
   }
