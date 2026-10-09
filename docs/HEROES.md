@@ -170,10 +170,11 @@ camera at rest and mid-swing; tinted blades keep their hue and stay light.
 
 **The model in the game**: the samurai Chewy (`public/rigs/chewy_samurai.*`, 41.1k triangles, the 37-bone hero contract;
 its face rig is chewy_b's) is the default Chewy: `HERO_MODELS.chewySamurai`, `chewyModel()` 'samurai'.
-- **Choosing it**: Settings > Hero models (Samurai / Toybox / Storybook) or `?chewymodel=samurai|toy|disney`. Samurai and
-  Toybox both use the Toybox Moka and Poe. A save that had 'toy' (the old default) moves to 'samurai' once
-  (`chewy.modelV` 2); after that the player's choice is kept.
-- **Fallbacks**: a missing file falls back silently to the Toybox Chewy (chewy_b), then to the Storybook one.
+- **No choice** (CT-7, the owner's call 2026-10-08): the game always plays the samurai Chewy with the Toybox Moka, Poe,
+  Floofy and Foosy. Settings' "Hero models" and "Disney style" are gone, and old saved choices (`chewy.model`, `chewy.style`)
+  are dropped quietly. `?chewymodel=toy|disney` and `?chewy=classic` remain for the QA and dev.
+- **Fallbacks**: a missing file falls back silently to the Toybox Chewy (chewy_b), then to his kit build; never to the
+  Storybook model.
 - **Attach points**: the katana's paw grip (`palm`) and the back mount are chewy_b's: the same skeleton, checked in close
   shots at rest and mid-cut.
 - **Drawn double-sided** (`doubleSided`): in the export, the haori's back panel with the big gold paw crest (306

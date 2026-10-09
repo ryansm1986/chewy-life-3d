@@ -397,7 +397,27 @@ const DISH = {
 };
 
 // ================================================================== public API
+// Pound Mochi (docs/COZY.md §7.2: a recipe that makes the building material): the wooden usu, a soft white mound of
+// mochi in it, the kine mallet resting across
+function poundMochi(g) {
+  shadow(g, 24, 19, 3.2);
+  // the usu: a fat wooden tub, its rim lighter
+  g.beginPath(); g.moveTo(-17, -1); g.lineTo(-15, 15); g.bezierCurveTo(-14, 20, 14, 20, 15, 15); g.lineTo(17, -1); g.closePath();
+  paint(g, lin(g, -17, 0, 17, 0, [[0, '#c88a52'], [0.45, '#a86a3c'], [1, '#7a4a2a']]), 2);
+  g.strokeStyle = hexA('#5a3420', 0.55); g.lineWidth = 1.1; for (const y of [6, 12]) { g.beginPath(); g.moveTo(-16, y); g.bezierCurveTo(-8, y + 2.5, 8, y + 2.5, 16, y); g.stroke(); }
+  ell(g, 0, -1, 17, 5.5); paint(g, lin(g, 0, -6, 0, 4, [[0, '#f2c890'], [1, '#c8935c']]), 2);
+  // the mochi: a soft white heap, a little dusting of flour
+  g.beginPath(); g.moveTo(-12, 0); g.bezierCurveTo(-12, -13, 12, -14, 12, 0); g.quadraticCurveTo(0, 3, -12, 0); g.closePath(); paint(g, volR(g, '#fffdf8', -2, -6, 13, 0.25, 0.1), 2);
+  dots(g, [[-5, -5], [3, -8], [6, -3], [-1, -2]], 0.8, 'rgba(225,215,200,0.9)');
+  shine(g, -4, -7, 3.2, 1.6, -0.5, 0.8);
+  // the kine: a mallet head on a long handle, resting across the tub
+  g.save(); g.translate(8, -12); g.rotate(-0.55);
+  rr(g, -1.6, -2, 3.2, 26, 1.4); paint(g, lin(g, -2, 0, 2, 0, [[0, '#e8c088'], [1, '#b88a52']]), 1.6);
+  rr(g, -7, -9, 14, 8, 3.5); paint(g, lin(g, -7, -9, 7, -1, [[0, '#d8a060'], [1, '#9a6a3a']]), 1.8);
+  g.restore();
+}
 export function drawPantry(g, id) {
+  if (id === 'poundMochi') return poundMochi(g);
   const d = PANTRY[id]; if (!d) { circ(g, 0, 0, 12); paint(g, '#cccccc', 2); return; }
   if (d.kind === 'seed') return seedPacket(g, d.crop);
   if (d.kind === 'crop') { shadow(g, 22, 16, 3.4); return CROP_ART[id]?.(g); }

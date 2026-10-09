@@ -49,6 +49,16 @@ body.touch-active .ch-pts .tt-dim { display: none; }
 .ui-root.m-phone .p-travel .tv-map { zoom: .76; }
 .ui-root.m-phone .p-travel .tv-side { max-height: 334px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; touch-action: pan-y; scrollbar-width: thin; scrollbar-color: rgba(74, 44, 42, .35) transparent; }
 .ui-root.m-phone .p-travel .tv-go { position: sticky; bottom: 0; z-index: 3; flex: none; }
+/* a tablet's panel taller than the screen (Settings and Controls on an iPad, a phone-sized tablet or a foldable: ROADMAP
+   CT-7) fits it the same way, between the safe area's margins with its body scrolling inside. ui/mobile.js fitTall()
+   sets .m-fit only on a panel that needs it, so the panels that already fit keep their own layout (title on top) */
+.ui-root.m-tablet .pw.m-fit:not(.side-bottom) { top: var(--m-top); bottom: var(--m-bot); display: flex; flex-direction: column; justify-content: center; translate: none !important; }
+.ui-root.m-tablet .pw.m-fit:is(.side-left, .side-right) { transform: none; }
+.ui-root.m-tablet .pw.m-fit.side-center { transform: translateX(-50%); }
+.ui-root.m-tablet .pw.m-fit:not(.side-bottom) > .panel { max-height: 100%; min-height: 0; display: flex; flex-direction: column; }
+.ui-root.m-tablet .pw.m-fit:not(.side-bottom) > .panel > .ph { flex: none; }
+.ui-root.m-tablet .pw.m-fit:not(.side-bottom) .pb { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; touch-action: pan-y;
+  scrollbar-width: thin; scrollbar-color: rgba(74, 44, 42, .35) transparent; padding-right: 2px; }
 /* a modal (the game menu) scrim covers the screen, whatever the panel's box */
 .ui-root.m-phone .pw .modal-bg { position: fixed; inset: -50vh -50vw; left: -50vw; top: -50vh; width: 200vw; height: 200vh; }
 
@@ -110,17 +120,24 @@ body.touch-active .ch-pts .tt-dim { display: none; }
 .ui-root.m-phone .m-flip button { min-height: 46px; flex-direction: column; gap: 2px; padding: 4px 10px; font-size: 12px; border-radius: 20px; }
 .ui-root.m-phone .m-flip button .gl { width: 24px; height: 24px; }
 /* rows that run wider than a phone: settings wrap, tab rows scroll sideways */
-.ui-root.m-phone .pw .set-row { flex-wrap: wrap; row-gap: 6px; }
+.ui-root.m-touch .pw .set-row { flex-wrap: wrap; row-gap: 6px; } /* (CT-7: a tablet too: Graphics' five presets ran past a tablet's panel) */
 .ui-root.m-phone .pw .tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; max-width: 100%; }
 .ui-root.m-phone .pw .tabs::-webkit-scrollbar { display: none; }
 .ui-root.m-phone .pw .tabs > * { flex: none; }
 /* the skill trees' three tabs share the row on a phone, whatever the hero ("Starlight Kibble", "Ghostlight Tome"): the
    name wraps to two lines, the points badge sits on the tab's corner, and the row doesn't scroll */
-.ui-root.m-phone .pw .sk-tabs { overflow: visible; padding-top: 12px; }
-.ui-root.m-phone .pw .sk-tabs .tab { flex: 1 1 0; min-width: 0; position: relative; justify-content: flex-start; gap: 5px; padding: 5px 9px 6px 8px; }
-.ui-root.m-phone .pw .sk-tabs .tab .gl { flex: none; }
-.ui-root.m-phone .pw .sk-tabs .tab > span { min-width: 0; white-space: normal; text-align: left; line-height: 1.04; }
-.ui-root.m-phone .pw .sk-tabs .tab .tab-n { position: absolute; right: -7px; top: -10px; z-index: 1; }
+.ui-root.m-touch .pw .sk-tabs { overflow: visible; padding-top: 12px; }
+.ui-root.m-touch .pw .sk-tabs .tab { flex: 1 1 0; min-width: 0; position: relative; justify-content: flex-start; gap: 5px; padding: 5px 9px 6px 8px; }
+.ui-root.m-touch .pw .sk-tabs .tab .gl { flex: none; }
+.ui-root.m-touch .pw .sk-tabs .tab > span { min-width: 0; white-space: normal; text-align: left; line-height: 1.04; }
+.ui-root.m-touch .pw .sk-tabs .tab .tab-n { position: absolute; right: -7px; top: -10px; z-index: 1; }
+/* CT-7, a tablet's own targets (its panels keep their desktop layout): the ✕, the bag's weapon swap and build's overlay
+   toggles reach 44 px through a wider hit area, not a bigger look; the skill tabs above share their row on a tablet too
+   (a hero's third tree ran past the panel's side) */
+.ui-root.m-tablet .pw .ph-x::after { content: ''; position: absolute; inset: -8px; border-radius: 50%; }
+.ui-root.m-tablet .p-inv .wswap::after { content: ''; position: absolute; inset: -12px -4px; }
+.ui-root.m-tablet .p-build .ovl { position: relative; }
+.ui-root.m-tablet .p-build .ovl::after { content: ''; position: absolute; inset: -16px -2px; }
 .ui-root.m-touch .pw .tab .kc, .ui-root.m-touch :is(.gf-k, .sp-k) { display: none; }
 /* sliders: a 44 px track to grab, the bar drawn in the middle of it */
 .ui-root.m-touch .sld input[type=range] { height: 52px; border: 0; border-radius: 0; background: none; touch-action: none; }
@@ -128,6 +145,7 @@ body.touch-active .ch-pts .tt-dim { display: none; }
 .ui-root.m-touch .sld input[type=range]::-moz-range-track { height: 16px; border-radius: 12px; border: 3px solid var(--ink); background: linear-gradient(90deg, #ffb3c9 0, #ff8fb0 var(--p, 50%), #f3e3cf var(--p, 50%)); }
 .ui-root.m-touch .sld input[type=range]::-webkit-slider-thumb { width: 36px; height: 36px; margin-top: -10px; }
 /* the controls panel's device tabs, the cook's and workbench's quantity buttons, remodel's chips, a guide's Skip */
+.ui-root.m-touch .ctl-row .ctl-b { min-height: 52px; } /* (CT-7: a binding on the Keyboard and Controller tabs, reached on touch too) */
 .ui-root.m-touch .ctl-tabs button { min-height: 52px; padding: 0 16px; }
 .ui-root.m-touch .pw :is(.rm-o.chip, .rm-o.sw) { min-height: 52px; min-width: 52px; }
 .ui-root.m-touch .tut-dock .to-skip { padding: 10px 14px; margin: -10px -8px; }

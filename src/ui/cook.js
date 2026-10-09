@@ -10,7 +10,7 @@ import { padGlyph } from './padGlyphs.js';
 import { Panel } from './panel.js';
 import { PANTRY, RARE_NAMES, RARE_COLORS, KIND_INFO } from '../life/pantry.js';
 import { pantryIcon } from '../life/pantryIcons.js';
-import { RECIPES, RECIPE_IDS, STATIONS, cookbookOf, maxCook, haveOf, wildIds, cookableAt, hintFor } from '../life/cooking.js';
+import { RECIPES, RECIPE_IDS, STATIONS, cookbookOf, maxCook, haveOf, wildIds, cookableAt, hintFor, dishDef } from '../life/cooking.js';
 import { BUFFS, TIER_NAMES } from '../life/meals.js';
 import { VILLAGERS } from '../actors/roster.js';
 
@@ -18,6 +18,9 @@ const NAMES = Object.fromEntries([['rosie', 'Rosie'], ...VILLAGERS.map(v => [v.i
 const WILD = { fish: { name: 'Any fish', icon: 'crucian' }, crop: { name: 'Any veggies', icon: 'carrot' } };
 const ingName = k => (WILD[k] ? WILD[k].name : k.startsWith('mat:') ? k.slice(4)[0].toUpperCase() + k.slice(5) : PANTRY[k]?.name || k);
 const MIX_MAX = 4;
+// a material recipe's stand-in for the meal buff (Pound Mochi: docs/COZY.md §7.2)
+const MAKE_B = { name: 'For building', glyph: 'mochi', color: '#ff9ec4', text: () => '' };
+const buffOf = d => BUFFS[d.food.buff] || MAKE_B;
 
 export class CookPanel extends Panel {
   constructor(ui) { super(ui, { name: 'cook', title: 'Cooking', jp: 'りょうり', side: 'left', cls: 'p-cook', icon: 'fire' }); this.tab = 'book'; this.sel = null; this.qty = 1; this.picks = {}; }
@@ -95,7 +98,7 @@ export class CookPanel extends Panel {
   get order() {
     const st = this.st, kn = st.cookbook?.known || {}, here = id => cookableAt(id, this.station);
     const known = RECIPE_IDS.filter(id => id in kn), unk = RECIPE_IDS.filter(id => !(id in kn));
-    const a = known.filter(here).sort((x, y) => (maxCook(st, y) > 0) - (maxCook(st, x) > 0) || PANTRY[x].food.tier - PANTRY[y].food.tier || PANTRY[x].value - PANTRY[y].value);
+    const a = known.filter(here).sort((x, y) => (maxCook(st, y) > 0) - (maxCook(st, x) > 0) || dishDef(x).food.tier - dishDef(y).food.tier || dishDef(x).value - dishDef(y).value);
     return [...a, ...unk.filter(here), ...known.filter(id => !here(id)), ...unk.filter(id => !here(id))];
   }
   render() {
@@ -106,18 +109,18 @@ export class CookPanel extends Panel {
     if (sig === this._sig) return; this._sig = sig;
     this.$.tabN.textContent = Object.keys(kn).length;
     this.$.list.innerHTML = ids.map((id, i) => {
-      const d = PANTRY[id], known = id in kn, here = cookableAt(id, this.station), m = known && here ? maxCook(st, id) : 0, B = BUFFS[d.food.buff];
+      const d = dishDef(id), known = id in kn, here = cookableAt(id, this.station), m = known && here ? maxCook(st, id) : 0, B = buffOf(d);
       const tag = !here ? `<i class="ck-tag">${glyph(RECIPES[id].at.includes('oven') ? 'shop' : 'home')}${RECIPES[id].at.includes('oven') ? 'Oven' : 'Kitchen'}</i>` : known ? `<i class="ck-n ${m ? 'ok' : ''}">×${m}</i>` : '';
       return `<div class="ck-row ${known ? 'known' : 'unk'} ${here ? '' : 'away'} ${id === this.sel ? 'on' : ''} ${m ? 'can' : ''}" data-id="${id}" style="--i:${i};--bc:${B.color}">
         <div class="ck-ic"><img class="${known ? '' : 'sil'}" src="${pantryIcon(id)}" alt="" draggable="false"></div>
-        <div class="ck-t"><b>${known ? esc(d.name) : '???'}</b><small>${known ? `${glyph(B.glyph)}${B.name} ${TIER_NAMES[d.food.tier]}` : esc(hintFor(id, NAMES).how)}</small></div>${tag}</div>`;
+        <div class="ck-t"><b>${known ? esc(d.name) : '???'}</b><small>${known ? (d.kind === 'make' ? `${glyph(B.glyph)}${d.n} ${esc(d.mat[0].toUpperCase() + d.mat.slice(1))} for building` : `${glyph(B.glyph)}${B.name} ${TIER_NAMES[d.food.tier]}`) : esc(hintFor(id, NAMES).how)}</small></div>${tag}</div>`;
     }).join('');
     if (this.tab === 'book') this.renderDet(); else this.renderMix();
   }
   select(id) { this.sel = id; this.qty = 1; this._sig = null; this.render(); }
   renderDet() {
     const st = this.st, id = this.sel; if (!id) { this.$.det.innerHTML = ''; return; }
-    const d = PANTRY[id], R = RECIPES[id], known = id in (st.cookbook?.known || {}), here = cookableAt(id, this.station), B = BUFFS[d.food.buff], m = known && here ? maxCook(st, id) : 0;
+    const d = dishDef(id), R = RECIPES[id], known = id in (st.cookbook?.known || {}), here = cookableAt(id, this.station), B = buffOf(d), m = known && here ? maxCook(st, id) : 0;
     this.qty = Math.max(1, Math.min(this.qty, Math.max(1, m)));
     const rc = RARE_COLORS[d.rare || 0], H = hintFor(id, NAMES);
     const ing = R.ing.map(({ k, n }) => {
@@ -134,8 +137,8 @@ export class CookPanel extends Panel {
         <div class="ck-art ${known ? '' : 'unk'}"><img class="${known ? '' : 'sil'}" src="${pantryIcon(id)}" alt="" draggable="false"></div>
         <div class="ck-info"><div class="ck-name"><b>${known ? esc(d.name) : '???'}</b>${known ? `<span class="jp">${esc(d.jp)}</span>` : ''}${d.rare ? `<i class="ck-rare" style="--rc:${rc}">${RARE_NAMES[d.rare]}</i>` : ''}</div>
           <div class="ck-desc">${known ? esc(d.desc) : 'A dish you have yet to learn.'}</div>
-          <div class="ck-eff"><span class="ck-chip heal">${glyph('heart')}Heals <b>${Math.round(d.food.heal * 100)}%</b></span><span class="ck-chip buff">${glyph(B.glyph)}<b>${B.name} ${TIER_NAMES[d.food.tier]}</b>· ${d.food.mins} min</span></div>
-          <div class="ck-btext">${esc(B.text(d.food.tier))}${known && (st.cookbook.cooked?.[id] || 0) ? ` · cooked ×${st.cookbook.cooked[id]}` : ''}</div></div></div>
+          <div class="ck-eff">${d.kind === 'make' ? `<span class="ck-chip buff">${glyph(d.mat)}Makes <b>${d.n * (known ? this.qty : 1)} ${esc(d.mat[0].toUpperCase() + d.mat.slice(1))}</b></span>` : `<span class="ck-chip heal">${glyph('heart')}Heals <b>${Math.round(d.food.heal * 100)}%</b></span><span class="ck-chip buff">${glyph(B.glyph)}<b>${B.name} ${TIER_NAMES[d.food.tier]}</b>· ${d.food.mins} min</span>`}</div>
+          <div class="ck-btext">${esc(B.text(d.food.tier))}${known && (st.cookbook.cooked?.[id] || 0) ? `${d.kind === 'make' ? 'Pounded' : ' · cooked'} ×${st.cookbook.cooked[id]}` : ''}</div></div></div>
       <div class="ck-ing-h">${glyph('leaf')}Ingredients</div><div class="ck-ing">${ing}</div>${where}${go}`;
   }
   // ---------------------------------------------------------------- Try a mix
@@ -202,10 +205,10 @@ export class CookPanel extends Panel {
     void P.offsetWidth; P.classList.add('go');
   }
   potDone(r) {
-    const d = PANTRY[r.id], P = this.$.pot, o = this.$.out;
+    const d = dishDef(r.id), P = this.$.pot, o = this.$.out;
     o.querySelector('img').src = pantryIcon(r.id);
     o.querySelector('b').textContent = `${d.name}${r.n > 1 ? ` ×${r.n}` : ''}!`;
-    o.querySelector('small').innerHTML = r.learned ? `${glyph('sparkle')}New recipe discovered!` : r.fallback ? 'Not quite a recipe… but tasty!' : 'Into the pantry~';
+    o.querySelector('small').innerHTML = r.learned ? `${glyph('sparkle')}New recipe discovered!` : r.fallback ? 'Not quite a recipe… but tasty!' : d.kind === 'make' ? `${glyph(d.mat)}+${d.n * r.n} ${esc(d.mat)} for building~` : 'Into the pantry~';
     P.classList.add('done'); if (r.learned) P.classList.add('learned');
     const rc = o.getBoundingClientRect();
     this.ui.burst?.(rc.left + rc.width / 2, rc.top + rc.height * 0.35, { n: r.learned ? 26 : 16, spread: r.learned ? 120 : 80, colors: ['#ffcf4a', '#fff3b8', '#ff8fb0', '#8fe0c0'] });

@@ -33,7 +33,15 @@ export const RECIPES = {
   sushiPlatter: { ing: [{ k: 'rice', n: 1 }, { k: 'fish', n: 3 }], at: ['kitchen'], learn: { from: 'mochi', hearts: 3, request: 'mochi' } },
   fishermansFeast: { ing: [{ k: 'fish', n: 2 }, { k: 'rice', n: 1 }, { k: 'daikon', n: 1 }], at: ['kitchen'], learn: { request: 'tanu', book: 600, rank: 3 } },
   moonKoiBento: { ing: [{ k: 'moonKoi', n: 1 }, { k: 'rice', n: 2 }, { k: 'seaweed', n: 1 }], at: ['kitchen'], learn: { from: 'kitsune', hearts: 3 } },
+  // Pound Mochi (docs/COZY.md §7.2, §8: the cozy path's mochi): not a dish but the building material, 2 rice → 2 Mochi
+  poundMochi: { ing: [{ k: 'rice', n: 2 }], at: ['kitchen', 'oven'], learn: 'starter', out: { mat: 'mochi', n: 2 } },
 };
+/** recipes that make a building material instead of a dish (their name and words: MAKES) */
+export const MAKES = {
+  poundMochi: { name: 'Pound Mochi', jp: 'もちつき', desc: 'Steamed rice pounded with the big mallet into soft, stretchy mochi: 2 Mochi for building (the Paw Clinic wants 3).', value: 30, mat: 'mochi', n: 2 },
+};
+/** a recipe's dish card: the pantry dish it makes, or for a material recipe a card in the same shape (no meal buff) */
+export const dishDef = id => PANTRY[id] || (MAKES[id] ? { id, kind: 'make', ...MAKES[id], rare: 0, food: { heal: 0, buff: null, tier: 1, mins: 0 } } : null);
 export const RECIPE_IDS = Object.keys(RECIPES);
 export const STARTERS = RECIPE_IDS.filter(id => RECIPES[id].learn === 'starter');
 /** Rosie's cookbook pages for sale → [{ id, price, rank }] */

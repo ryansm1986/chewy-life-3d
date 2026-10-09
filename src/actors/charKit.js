@@ -23,8 +23,9 @@ const C = h => new THREE.Color(h);
 const INK = '#3a2230';
 // The procedural cast's style. 'toy' (default): the Toybox kit (toyKit.js), the same toy line as the baked Toybox
 // heroes; 'disney': the sculpted Storybook kit (disneyKit.js); 'classic': the Pokopia-style chibi kit with ink outlines.
-// ?kit=toy|disney|classic overrides. Otherwise it follows the Settings: "Disney style" off -> classic; "Hero models"
-// Storybook -> the Disney kit, so the villagers always match the heroes they stand next to.
+// ?kit=toy|disney|classic overrides. Otherwise it follows the heroes (actors/heroModels.js, locked to the samurai and
+// Toybox cast since CT-7): the QA's ?chewy=classic -> classic, ?chewymodel=disney -> the Disney kit, so the villagers
+// always match the heroes they stand next to.
 export const kitStyle = () => {
   const k = new URLSearchParams(location.search).get('kit');
   if (k) return k;

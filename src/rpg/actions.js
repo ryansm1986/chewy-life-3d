@@ -566,7 +566,8 @@ export function createActions(G) {
     }
     if (o.learn) learnRecipe(id);
     const c = cookbookOf(S()); c.cooked[id] = (c.cooked[id] || 0) + times;
-    addPantry(id, times, { src: 'cook' });
+    if (R.out?.mat) addMaterial(R.out.mat, (R.out.n || 1) * times); // (Pound Mochi: a building material, docs/COZY.md §7.2)
+    else addPantry(id, times, { src: 'cook' });
     emit('dish:cooked', { id, n: times, spent: spend, src: o.src || null });
     return { id, n: times, spent: spend };
   }
@@ -676,6 +677,24 @@ export function createActions(G) {
     }
     return gained;
   }
+  /** XP for any hero (docs/COZY.md §3.3: a crew's benched heroes level while away). The hero being played goes through
+   *  addXp; a benched hero gets the same catch-up (double XP more than 2 levels below the top hero) and the same level-ups
+   *  (stat and skill points), and 'hero:levelup' { id, lvl, from } instead of the big banner. → { gained, from, lvl } */
+  function addXpTo(id, n) {
+    const st = S(), h = st.heroes?.[id], P = h?.player;
+    if (!P || !(n > 0)) return { gained: 0, from: P?.lvl || 1, lvl: P?.lvl || 1 };
+    if (id === st.activeHero) { const from = P.lvl; return { gained: addXp(n), from, lvl: P.lvl }; }
+    const from = P.lvl;
+    if (P.lvl >= LEVEL_CAP) return { gained: 0, from, lvl: from };
+    let top = P.lvl;
+    for (const k in st.heroes) if (k === 'chewy' || st.flags?.[`${k}Joined`]) top = Math.max(top, st.heroes[k].player.lvl);
+    const gained = Math.max(1, Math.round(n * (top - P.lvl > 2 ? 2 : 1)));
+    P.xp = (P.xp || 0) + gained;
+    while (P.lvl < LEVEL_CAP && P.xp >= xpToNext(P.lvl)) { P.xp -= xpToNext(P.lvl); P.lvl++; P.statPts = (P.statPts || 0) + 5; P.skillPts = (P.skillPts || 0) + 1; }
+    if (P.lvl >= LEVEL_CAP) P.xp = 0;
+    if (P.lvl > from) { P.life = null; P.zoom = null; emit('hero:levelup', { id, lvl: P.lvl, from }); }
+    return { gained, from, lvl: P.lvl };
+  }
   function addSkillPts(n = 1) { S().player.skillPts += n; emit('stats:changed', d()); }
   function addStatPts(n = 5) { S().player.statPts += n; emit('stats:changed', d()); }
   /** Refund every stat and skill point (Rosie's "Forget-Me-Not Tea"). */
@@ -754,7 +773,7 @@ export function createActions(G) {
   const api = {
     // contract
     equip, unequip, swapWeapons, moveItem, dropItem, pickup, usePotion, sellItem, buyItem, learnSkill, addStat,
-    setHotbar, addXp, addCoins, spendCoins, addMaterial, hasMaterials, spendMaterials, recompute, learnPerk,
+    setHotbar, addXp, addXpTo, addCoins, spendCoins, addMaterial, hasMaterials, spendMaterials, recompute, learnPerk,
     // extras
     tickRegen, activeHots, addPotion, heal, restoreZoom, spendZoom, damage, restoreAll, life, zoom,
     addSkillPts, addStatPts, respec, socket, getItem, firstFree, canEquip, equipProblem, setPieces,

@@ -1,0 +1,46 @@
+/* The dig ring (ui/digRing.js; docs/COZY.md §7.1): a paper disc over the hero, the ring filling round a golden band. */
+.dig-ring { position: absolute; left: 0; top: 0; display: none; pointer-events: none; z-index: 6; }
+.dig-ring.show { display: block; }
+.dr-card { position: relative; width: 84px; height: 84px; margin: -42px 0 0 -42px; border: 3.5px solid var(--ink); border-radius: 50%;
+  background: var(--paper-noise), radial-gradient(circle at 50% 38%, #fffdf8, #ffeedd 72%); box-shadow: 0 5px 0 rgba(74, 44, 42, .3), 0 12px 24px rgba(40, 20, 40, .28), inset 0 3px 0 #fff; }
+.dr-card.start { animation: drIn .38s var(--pop) both; }
+.dr-svg { position: absolute; inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px); transform: rotate(-90deg); overflow: visible; }
+.dr-svg circle { fill: none; stroke-linecap: butt; }
+.dr-track { stroke: #ead8c4; stroke-width: 8; }
+.dr-band { stroke: #ffc83a; stroke-width: 10; filter: drop-shadow(0 0 2px rgba(255, 196, 40, .8)); }
+.dr-tick { stroke: var(--ink); stroke-width: 11; }
+.dr-fill { stroke: #8fd4a4; stroke-width: 6; stroke-linecap: round; transition: stroke .08s; }
+.dr-card.gold .dr-fill { stroke: #ff9a1a; }
+.dr-card.past .dr-fill { stroke: #a6c8b0; }
+.dr-paw { position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; color: #8a5a3a; transition: transform .1s; }
+.dr-paw svg, .dr-paw img { width: 100%; height: 100%; }
+.dig-ring:not(.auto) .dr-paw { animation: drScoop .32s ease-in-out infinite alternate; }
+.dig-ring.auto .dr-paw { animation: drScoop .24s ease-in-out infinite alternate; }
+.dr-card.gold .dr-paw { color: #e88a10; transform: scale(1.12); }
+.dr-word { position: absolute; left: 50%; top: -30px; transform: translateX(-50%); white-space: nowrap; font: 800 19px/1 var(--font); color: #fff;
+  -webkit-text-stroke: 5px var(--ink); paint-order: stroke fill; letter-spacing: .3px; opacity: 0; }
+.dr-card.done .dr-word { animation: drWord .9s var(--pop) both; }
+.dr-card.done.perfect .dr-word { color: #ffd23a; font-size: 22px; }
+.dr-card.done.perfect { animation: drPerfect .9s var(--pop) both; border-color: #b8740a; box-shadow: 0 5px 0 rgba(74, 44, 42, .3), 0 0 0 4px rgba(255, 210, 60, .55), 0 12px 24px rgba(40, 20, 40, .28); }
+.dr-card.done.normal { animation: drNormal .9s ease-out both; }
+.dr-card.gone { animation: drGone .25s ease-in both; }
+.dr-hint { position: absolute; left: 0; top: 50px; transform: translateX(-50%); display: flex; align-items: center; gap: 5px; white-space: nowrap;
+  padding: 3px 9px 4px 5px; border: 2.5px solid var(--ink); border-radius: 13px; background: #fffaf2; font: 700 12px/1 var(--font); color: var(--ink2);
+  box-shadow: 0 3px 0 rgba(74, 44, 42, .25); }
+.dig-ring.auto .dr-hint .kbm-only, .dig-ring.auto .dr-hint .pad-only, .dig-ring.auto .dr-hint .touch-only { display: none !important; }
+body.touch-active .dr-hint .kbm-only { display: none !important; }
+.dr-tap { display: inline-block; width: 18px; height: 18px; border-radius: 50%; background: #ff8fb0; color: #fff; padding: 2px; border: 2px solid var(--ink); }
+.dr-tap svg, .dr-tap img { width: 100%; height: 100%; }
+@keyframes drIn { 0% { opacity: 0; transform: scale(.4) rotate(-12deg); } 70% { opacity: 1; transform: scale(1.08) rotate(3deg); } 100% { transform: none; } }
+@keyframes drScoop { from { transform: translateY(-2px) rotate(-10deg); } to { transform: translateY(2px) rotate(8deg); } }
+@keyframes drWord { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.6); } 25% { opacity: 1; transform: translate(-50%, -4px) scale(1.12); } 75% { opacity: 1; transform: translate(-50%, -8px) scale(1); } 100% { opacity: 0; transform: translate(-50%, -16px) scale(.96); } }
+@keyframes drPerfect { 0% { transform: scale(1); } 20% { transform: scale(1.18) rotate(-4deg); } 45% { transform: scale(1.04) rotate(2deg); } 100% { transform: scale(.7); opacity: 0; } }
+@keyframes drNormal { 0% { transform: scale(1); } 20% { transform: scale(1.08); } 100% { transform: scale(.7); opacity: 0; } }
+@keyframes drGone { to { transform: scale(.5); opacity: 0; } }
+/* a phone: the HUD layer is drawn at 0.62, so the card and its words are sized up (the hint ≥ 12 px on screen) */
+.ui-root.m-phone .dr-card { width: 116px; height: 116px; margin: -58px 0 0 -58px; border-width: 4.5px; }
+.ui-root.m-phone .dr-paw { width: 42px; height: 42px; margin: -21px 0 0 -21px; }
+.ui-root.m-phone .dr-word { font-size: 28px; top: -42px; -webkit-text-stroke-width: 7px; }
+.ui-root.m-phone .dr-card.done.perfect .dr-word { font-size: 32px; }
+.ui-root.m-phone .dr-hint { top: 68px; font-size: 20px; padding: 4px 13px 5px 7px; border-width: 3px; border-radius: 18px; }
+.ui-root.m-phone .dr-tap { width: 30px; height: 30px; }

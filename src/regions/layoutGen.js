@@ -9,6 +9,7 @@
 //     obstacles (populate's ctx.blockCells) so monsters path around them.
 import { RNG } from '../core/util.js';
 import { regionTerrain } from './regionTerrain.js';
+import { wildAreas, areaIssues, wildIssues, wildRank, wildLevel, WILD } from '../cozy/peaceful.js';
 
 export const REGION_SIZE = 112, RCELL = 2, RN = REGION_SIZE / RCELL; // 56 x 56 cells
 
@@ -49,8 +50,18 @@ function makePlan(def) {
   // the zone village (docs/ZONES.md §2, src/regions/village): a clearing on the trail, { at: [x, z], r } in the recipe
   // (data, so phase F's terrain rework can move it); camps and POIs keep out of it
   const village = L.village?.at ? { x: L.village.at[0], z: L.village.at[1], r: L.village.r ?? 14, ...(L.village.shore != null ? { shore: L.village.shore } : {}), ...(L.village.clear ? { clear: L.village.clear } : {}) } : null; // (shore: a raw height below which the flattening fades out: a sea / lake edge stays wet)
+  // the wild areas (docs/COZY.md §6.2, cozy/peaceful.js): recipe data, off the main trail. The check is enforced: an
+  // area closer to the trail than r + WILD.trailGap, or over the village / the arrival / the arena, is dropped (and
+  // listed in plan.wildIssues, which test-rpg asserts is empty). Camps and POIs keep out of the rest.
+  const issues = [];
+  const wild = wildAreas(L.wild || []).filter((a, i, all) => {
+    const bad = areaIssues(a, { trail, village, start, arena }, all).filter(e => e.kind !== 'wild' && e.kind !== 'edge');
+    issues.push(...bad);
+    if (bad.length && typeof console !== 'undefined') console.warn(`[region] ${def.id}: wild area ${a.id} dropped (${bad.map(e => e.kind).join(', ')})`);
+    return !bad.length;
+  });
   // keep-out discs [[x, z, r]...] where no camp / POI site may land (the biome's landmarks: pools, grottos, gardens)
-  const avoided = c => (L.avoid || []).some(([x, z, r]) => Math.hypot(c.x - x, c.z - z) < r + (c.r || 0)) || (!!village && Math.hypot(c.x - village.x, c.z - village.z) < village.r + (c.r || 0) + 3);
+  const avoided = c => (L.avoid || []).some(([x, z, r]) => Math.hypot(c.x - x, c.z - z) < r + (c.r || 0)) || (!!village && Math.hypot(c.x - village.x, c.z - village.z) < village.r + (c.r || 0) + 3) || wild.some(w => Math.hypot(c.x - w.x, c.z - w.z) < w.r + (c.r || 0) + 4);
   const campR = L.campR ?? 6.5;
   for (let tries = 0; camps.length < want && tries < 400; tries++) {
     const k = 0.2 + rng.next() * 0.66;
@@ -79,17 +90,38 @@ function makePlan(def) {
     pois.push(p); spurs.push(spline([[x, z], [(x + p.x) / 2 + rng.range(-1.5, 1.5), (z + p.z) / 2 + rng.range(-1.5, 1.5)], [p.x, p.z]], 1.2));
     i++;
   }
+  // each wild area's spur: from the trail (outside the village and the arrival glade) through the area's own control
+  // points to a few metres inside its rim; `entry` is where it crosses the rim (the marker posts stand there). Its own
+  // RNG, so the camps and POIs roll exactly as they would without the wild.
+  const wrng = new RNG(hash(def.id) * 7919 + 4243);
+  for (const a of wild) {
+    const via = a.spur, first = via[0] || [a.x, a.z];
+    let bi = 0, bd = 1e9;
+    trail.forEach(([x, z], i) => {
+      if (village && Math.hypot(x - village.x, z - village.z) < village.r + 2) return;
+      if (Math.hypot(x - sx, z - sz) < start.r + 2 || Math.hypot(x - ax, z - az) < ar + 2) return;
+      const d = Math.hypot(x - first[0], z - first[1]); if (d < bd) { bd = d; bi = i; }
+    });
+    const [tx, tz] = trail[bi], last = via.length ? via[via.length - 1] : [tx, tz];
+    const dl = Math.hypot(a.x - last[0], a.z - last[1]) || 1, inX = a.x - (a.x - last[0]) / dl * (a.r - 4), inZ = a.z - (a.z - last[1]) / dl * (a.r - 4);
+    const ctl = [[tx, tz], ...via, [inX, inZ]];
+    if (!via.length) ctl.splice(1, 0, [(tx + inX) / 2 + wrng.range(-1.5, 1.5), (tz + inZ) / 2 + wrng.range(-1.5, 1.5)]);
+    const s = spline(ctl, 1.2); spurs.push(s);
+    let e = s[s.length - 1]; for (const p of s) if (Math.hypot(p[0] - a.x, p[1] - a.z) <= a.r) { e = p; break; }
+    a.entry = [+e[0].toFixed(2), +e[1].toFixed(2)]; a.k = bi / Math.max(1, trail.length - 1);
+  }
   const open = (L.open || []).map(([x, z, r]) => ({ x, z, r }));
-  const P = { trail, spurs, camps, pois, start, arena, open, village, trailW: L.trailW ?? 1.5, lanes: L.lanes ?? 6.5 };
+  const P = { trail, spurs, camps, pois, start, arena, open, village, wild, trailW: L.trailW ?? 1.5, lanes: L.lanes ?? 6.5 };
+  P.wildIssues = [...issues, ...wildIssues(P)];
   // playable skeleton as capsules / discs (the terrain's play mask and the placement keep-outs read this)
   P.segs = [];
   for (const path of [trail, ...spurs]) for (let i = 0; i < path.length - 1; i++) P.segs.push([path[i][0], path[i][1], path[i + 1][0], path[i + 1][1], path === trail ? P.lanes : 3.2]);
-  P.discs = [{ ...start, r: start.r + 2, kind: 'start' }, ...camps.map(c => ({ ...c, r: c.r + 1.5, kind: 'camp' })), ...pois.map(p => ({ ...p, r: p.r + 1.5, kind: 'poi' })), { ...arena, r: arena.r + 3.5, kind: 'arena' }, ...open.map(o => ({ ...o, kind: 'open' })), ...(village ? [{ ...village, kind: 'village' }] : [])];
+  P.discs = [{ ...start, r: start.r + 2, kind: 'start' }, ...camps.map(c => ({ ...c, r: c.r + 1.5, kind: 'camp' })), ...pois.map(p => ({ ...p, r: p.r + 1.5, kind: 'poi' })), { ...arena, r: arena.r + 3.5, kind: 'arena' }, ...open.map(o => ({ ...o, kind: 'open' })), ...(village ? [{ ...village, kind: 'village' }] : []), ...wild.map(a => ({ x: a.x, z: a.z, r: a.r, kind: 'wild' }))];
   return P;
 }
 
 /** The per-visit layout (docs/REGIONS.md §3.2). */
-export function generateRegion(def, { visit = 0, mlvl = def.levels[0] } = {}) {
+export function generateRegion(def, { visit = 0, mlvl = def.levels[0], heroLvl = mlvl } = {}) {
   const W = RN, H = RN;
   const plan = regionPlan(def);
   const T = regionTerrain(def, plan); // CPU heightfield, cached per region
@@ -146,6 +178,22 @@ export function generateRegion(def, { visit = 0, mlvl = def.levels[0] } = {}) {
   }
   // a stray chest in a random camp clearing now and then (rerolls per visit)
   if (sites.length && rng.chance(0.5)) { const s = rng.pick(sites), a = rng.range(0, 6.283), c = openNear(toCell(s.x + Math.cos(a) * 3.5, s.z + Math.sin(a) * 3.5)); chests.push({ x: c.x, y: c.y, quality: 'wood' }); }
+  // the wild areas (docs/COZY.md §6.2): 2–3 packs each, placed inside the disc per visit, the zone's kinds a step above
+  // the highest hero (wildLevel: hero + 2, kept within the band's low + 2 … top + 1) with hotter ranks; a wild cache (a golden chest) on the far side from the entry. Their own RNG, so the camps
+  // roll the same with or without them. RegionMode leashes their monsters to the disc (cozy/wildWorld.js).
+  const wr = new RNG(hash(def.id) * 7919 + visit * 104729 + 911), wlvl = wildLevel(def.levels, heroLvl);
+  for (const a of plan.wild || []) {
+    const got = [];
+    for (let tries = 0; got.length < a.packs && tries < 60; tries++) {
+      const ang = wr.range(0, 6.283), rr = Math.sqrt(wr.next()) * (a.r - 3.5), x = a.x + Math.cos(ang) * rr, z = a.z + Math.sin(ang) * rr;
+      if (got.some(g => Math.hypot(g.x - x, g.z - z) < 6) || (a.entry && Math.hypot(a.entry[0] - x, a.entry[1] - z) < 6)) continue;
+      const c = openNear(toCell(x, z)); if (!at(c.x, c.y)) continue;
+      got.push({ x, z }); spawns.push({ x: c.x, y: c.y, rank: wildRank(wr.next()), count: wr.int(WILD.count[0], WILD.count[1]), lvl: wlvl, wild: a.id });
+    }
+    const ex = a.entry ? a.entry[0] : a.x + a.r, ez = a.entry ? a.entry[1] : a.z, el = Math.hypot(a.x - ex, a.z - ez) || 1;
+    const cc = openNear(toCell(a.x + (a.x - ex) / el * a.r * 0.45, a.z + (a.z - ez) / el * a.r * 0.45));
+    if (at(cc.x, cc.y)) chests.push({ x: cc.x, y: cc.y, quality: 'gold', wild: a.id });
+  }
   const bc = openNear(toCell(plan.arena.x, plan.arena.z));
   const bossRoom = { ...box(bc.x, bc.y, Math.round(plan.arena.r / RCELL)), kind: 'boss', lvl: mlvl + 2 };
   rooms.push(bossRoom);
@@ -157,6 +205,7 @@ export function generateRegion(def, { visit = 0, mlvl = def.levels[0] } = {}) {
     paths: [plan.trail, ...plan.spurs], arena: { x: plan.arena.x, z: plan.arena.z, r: plan.arena.r }, pois,
     camps: sites.map(s => ({ x: s.x, z: s.z, r: s.r })), plan, visit,
     village: plan.village, // (the zone village's clearing { x, z, r } or null: src/regions/village)
+    wild: plan.wild || [], // (the wild areas [{ id, name, jp, x, z, r, packs, entry }]: docs/COZY.md §6.2)
   };
   Object.defineProperty(L, 'terrain', { value: T, enumerable: false }); // (not serialised; RegionWorld reuses it)
   return L;

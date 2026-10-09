@@ -8,6 +8,7 @@ import * as F from '../assets/bambooFlora.js';
 import * as Pr from '../assets/bambooProps.js';
 import { Placer, M } from '../assets/bambooKit.js';
 import { Events } from '../../core/events.js';
+import { farAt, spots, tallOk, gladeGround } from '../../cozy/wildKit.js';
 
 // the stream (world metres, north → south-east); it crosses the trail once, under the footbridge
 const STREAM = [[34, -8], [37, 10], [33, 26], [39, 42], [38, 56], [41, 70], [50, 86], [58, 104], [62, 122]];
@@ -177,12 +178,56 @@ function populate(ctx) {
   }
   // --- the arrival glade: a bench and a lantern by the Wayfarer's Stone
   { const S = plan.start; PL.piece(Pr.bambooBench(1), S.x + 3.4, S.z + 1.6, -0.6); ctx.addCollider(S.x + 3.4, S.z + 1.6, 0.5); PL.piece(Pr.lantern(21), S.x - 2.8, S.z + 2.6, 0.8); ctx.addCollider(S.x - 2.8, S.z + 2.6, 0.3); }
+  wildDressing(ctx, PL);
   // hand everything over to the world
   ctx.add(PL.build());
   for (const c of PL.colliders) ctx.addCollider(c.x, c.z, c.r);
   for (const b of PL.blockers) ctx.blockCells(b.x, b.z, b.r);
   for (const l of PL.lights) ctx.addLight({ ...l, nightOnly: false, intensity: (l.intensity ?? 3) * 0.7 });
   ctx.onDispose(() => PL.dispose());
+}
+
+// ------------------------------------------------------------------ the wild areas and the glades (docs/COZY.md §6)
+// The Fallen Shrine: an old shrine's cracked platform and hokora on the far rim, its stone lanterns knocked over, loose
+// steps in the leaf litter. The Kamaitachi Thicket: culm clumps closing in round the far rim, scratched mossy boulders,
+// deep litter. Tall things only on the far half (the camera looks from +x / +z). In a saved zone, the emptied camp
+// sites grow back as glades: hostas in flower, ferns, moss (one shared batch each: no new draw calls).
+function wildDressing(ctx, PL) {
+  const H = (x, z) => ctx.heightAt(x, z);
+  for (const [w, a] of (ctx.plan.wild || []).entries()) {
+    ctx.paint('litter', a.x, a.z, a.r + 1.5, 0.8); ctx.paint('moss', a.x, a.z, a.r * 0.75, 0.3);
+    const boulder = (s, sc) => { PL.multi(F.mossBoulder(s.rnd() * 4 | 0), s.x, H(s.x, s.z) - 0.1, s.z, { rot: s.rot, s: sc }); ctx.addCollider(s.x, s.z, 0.45 * sc); };
+    if (a.id === 'fallenShrine') {
+      const [x, z] = farAt(a, 0.6), rot = Math.PI / 4;
+      PL.piece(Pr.ruinedShrine(3), x, z, rot); ctx.addCollider(x - 0.28, z - 0.28, 1.4); ctx.blockCells(x - 0.3, z - 0.3, 1.5); ctx.reserve(x, z, 3.2);
+      // its lanterns, knocked over in the leaves; one still standing by the steps
+      { const [lx, lz] = farAt(a, 0.36, 0.55); PL.piece(Pr.lantern(51), lx, lz, rot); ctx.addCollider(lx, lz, 0.3); ctx.reserve(lx, lz, 0.8); }
+      for (const s of spots(ctx, a, 3, { k0: 0.3, k1: 0.85, r: 0.5, path: 1.4, seed: 31 + w })) { PL.piece(Pr.lantern(60 + (s.rnd() * 9 | 0)), s.x, s.z, s.rot, { y: H(s.x, s.z) + 0.22, tiltX: 1.45 }); ctx.addCollider(s.x, s.z, 0.35); }
+      for (const s of spots(ctx, a, 9, { k0: 0.1, k1: 0.95, r: 0.35, path: 0.6, seed: 41 + w })) PL.put('d:stone', Pr.slab(s.rnd() * 9 | 0, { R: 0.3 + s.rnd() * 0.12, moss: 0.55 }), s.x, H(s.x, s.z) + 0.01, s.z, { rot: s.rot });
+      for (const s of spots(ctx, a, 4, { k0: 0.75, k1: 1.0, r: 0.6, seed: 47 + w })) boulder(s, 0.8 + s.rnd() * 0.6);
+    } else {
+      // the thicket: clumps close in round the far rim, short young culms on the camera side
+      for (const s of spots(ctx, a, 16, { k0: 0.74, k1: 1.06, r: 0.85, space: 1.35, path: 1.6, seed: 53 + w })) {
+        const tall = tallOk(a, s.x, s.z, 2);
+        PL.multi(F.stand(tall ? (s.rnd() < 0.5 ? 'clump' : 'arch') : 'young', s.rnd() * 2 | 0), s.x, H(s.x, s.z) - 0.05, s.z, { rot: s.rot });
+        ctx.addCollider(s.x, s.z, tall ? 0.7 : 0.45); ctx.blockCells(s.x, s.z, tall ? 0.8 : 0.5); ctx.paintFx('canopy', s.x, s.z, 3, 1); ctx.paintFx('shade', s.x, s.z, 3.6, 0.85);
+      }
+      for (const s of spots(ctx, a, 6, { k0: 0.35, k1: 0.95, r: 0.6, path: 1.2, seed: 61 + w })) boulder(s, 0.7 + s.rnd() * 0.7);
+      for (const s of spots(ctx, a, 7, { k0: 0.3, k1: 0.72, r: 0.7, space: 2.6, path: 1.6, seed: 63 + w })) { PL.multi(F.stand('young', s.rnd() * 2 | 0), s.x, H(s.x, s.z) - 0.05, s.z, { rot: s.rot }); ctx.addCollider(s.x, s.z, 0.45); ctx.blockCells(s.x, s.z, 0.5); }
+      for (const s of spots(ctx, a, 10, { k0: 0.1, k1: 0.95, r: 0.4, path: 0.5, seed: 67 + w })) PL.multi(F.litter(s.rnd() * 4 | 0, 'bamboo'), s.x, H(s.x, s.z) + 0.01, s.z, { rot: s.rot, s: 1.2 + s.rnd() * 0.6 });
+    }
+    for (const s of spots(ctx, a, 7, { k0: 0.82, k1: 1.0, r: 0.4, path: 1.2, seed: 71 + w })) PL.multi(F.fern(s.rnd() * 4 | 0, { big: 1.1 + s.rnd() * 0.3 }), s.x, H(s.x, s.z), s.z, { rot: s.rot });
+  }
+  if (!ctx.peaceful) return;
+  for (const [i, g] of ctx.glades.entries()) {
+    gladeGround(ctx, g);
+    for (const s of spots(ctx, g, 9, { k0: 0.12, k1: 0.8, r: 0.4, path: 1.2, seed: 101 + i })) {
+      const q = s.rnd(), y = H(s.x, s.z);
+      if (q < 0.5) PL.multi(F.hosta(s.rnd() * 3 | 0, s.rnd() < 0.5 ? 'variegated' : 'gold'), s.x, y, s.z, { rot: s.rot, s: 1 + s.rnd() * 0.3 });
+      else if (q < 0.8) PL.multi(F.fern(s.rnd() * 4 | 0, { big: 1 + s.rnd() * 0.3 }), s.x, y, s.z, { rot: s.rot });
+      else PL.multi(F.mossMound(s.rnd() * 4 | 0), s.x, y - 0.02, s.z, { rot: s.rot, s: 0.9 + s.rnd() * 0.5 });
+    }
+  }
 }
 
 // ------------------------------------------------------------------ effects + critters
@@ -197,9 +242,9 @@ function effects(ctx) {
   W.glints({ on: 'water', count: 160, box: [30, 1, 26] });
   if (CR && CM) {
     const lane = ctx.plan.camps.map(c => ({ x: c.x, z: c.z, r: 9 }));
-    CR.add({ name: 'sparrow', geo: CM.bird({ body: '#a07850', belly: '#f0e2c8', head: '#6a4a30', beak: '#3a2a20' }), count: 12, habitat: 'ground', homes: [...lane, { x: ctx.plan.start.x, z: ctx.plan.start.z, r: 8 }], speed: 1.4, flee: 4, hop: 0.14, flap: { from: 0.05, speed: 18, amp: 0.8 } });
+    CR.add({ name: 'sparrow', geo: CM.bird({ body: '#a07850', belly: '#f0e2c8', head: '#6a4a30', beak: '#3a2a20' }), count: ctx.peaceful ? 18 : 12, habitat: 'ground', homes: [...lane, { x: ctx.plan.start.x, z: ctx.plan.start.z, r: 8 }], speed: 1.4, flee: 4, hop: 0.14, flap: { from: 0.05, speed: 18, amp: 0.8 } });
     CR.add({ name: 'frog', geo: CM.frog({ body: '#6aba4a', belly: '#e8f0b0' }), count: 8, habitat: 'ground', homes: [...STREAM.slice(3, 7).map(([x, z]) => ({ x: x + 2.4, z, r: 2.5 })), { x: POND.x, z: POND.z, r: POND.r + 2 }], speed: 1.1, flee: 2.5, hop: 0.25 });
-    CR.add({ name: 'butterfly', geo: CM.butterfly({ wing: '#ffe07a' }), count: 10, habitat: 'air', homes: lane, alt: [0.8, 1.8], speed: 1.2, flee: 0, flap: { from: 0.01, speed: 14, amp: 1.1 } });
+    CR.add({ name: 'butterfly', geo: CM.butterfly({ wing: '#ffe07a' }), count: ctx.peaceful ? 16 : 10, habitat: 'air', homes: lane, alt: [0.8, 1.8], speed: 1.2, flee: 0, flap: { from: 0.01, speed: 14, amp: 1.1 } });
   }
   const shishi = ctx.shishi; let clacked = false;
   return { update: (dt, t) => {
@@ -275,6 +320,11 @@ export default {
     camps: 7, campR: 6.5, campGap: 12, pois: 3, poiKinds: ['cache', 'shrine', 'feature'], lanes: 4.5, trailW: 1.45, // (narrow lanes: the grove closes in)
     poiAt: [[22, 49, 'feature'], [81, 49, 'shrine']], // (fixed: the village takes the middle of the trail, where random sites used to land)
     avoid: [[POND.x, POND.z, POND.r + 6], ...STREAM.slice(1, 8).map(([x, z]) => [x, z, 5])],
+    // the wild areas (docs/COZY.md §6.2): they keep their yokai once Takemori is saved; off the trail, on side paths
+    wild: [
+      { id: 'thicket', name: 'the Kamaitachi Thicket', jp: '鎌鼬の藪', at: [94, 70], r: 12, packs: 3 },
+      { id: 'fallenShrine', name: 'the Fallen Shrine', jp: '崩れ社', at: [16, 24], r: 12, packs: 2 },
+    ],
   },
   populate, effects, interactables,
   footstep(pos, world) {

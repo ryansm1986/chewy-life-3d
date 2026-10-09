@@ -24,6 +24,10 @@ import { MapPanel, QuestPanel, normQuest } from './map.js';
 import { TravelPanel } from './travel.js';
 import { LanternPanel } from './lantern.js';
 import { RunChip } from './runChip.js';
+import { ExpeditionPanel } from './expeditions.js';
+import { AwayCardPanel } from './awayCard.js';
+import { SightingsPanel } from './sightings.js';
+import { CozyChip } from './cozyChip.js';
 import { MenuPanel } from './menu.js';
 import { SeedPickerPanel, pantryGain, pantryTipHTML } from './pantry.js';
 import { CookPanel } from './cook.js';
@@ -104,10 +108,13 @@ export const UI = {
       craft: new CraftPanel(this), // (the workbench: docs/HOUSING.md §3)
       houseCard: new HouseCardPanel(this), remodel: new RemodelPanel(this), // (a house's mailbox: Upgrade / Remodel / Enter — docs/HOUSING.md §5-6)
       lantern: new LanternPanel(this), // (the Spirit Lantern: a dungeon's tiers and modifiers — docs/ZONES.md §5.2)
+      expeditions: new ExpeditionPanel(this), awayCard: new AwayCardPanel(this), // (the cozy path: the Expedition Board, "While you were away…" — docs/COZY.md §4)
+      sightings: new SightingsPanel(this), // (the Sightings board: the wild areas' daily bounties — docs/COZY.md §6.3)
     };
     this.homeHud = new HomeHud(this); // (indoors: the house name, the Decorate button)
     this.chargeHud = new ChargeHud(this); // (the hotbar's charge ring + stage pips: docs/CHARGE.md)
     this.runChip = new RunChip(this); // (a tier run's tier and modifiers, under the minimap: docs/ZONES.md §5.2)
+    this.cozyChip = new CozyChip(this); // (crews out and reports waiting, under the run chip: docs/COZY.md §10)
     this.skills = this.panels.skills;
     // popover + skill drag ghost
     this.pop = el('div', 'pop-wrap'); this.pop.innerHTML = '<div class="pop-box"></div>'; this.layers.over.appendChild(this.pop);

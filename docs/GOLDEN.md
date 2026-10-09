@@ -354,8 +354,8 @@ and the Whelp Bond build at **clear ×0.85–1.05**.
 Built by an Opus agent with the toybox-character skill (sources archived in `tools/blender/codex/assets/golden-toy/`;
 the README has the rebuild). Installed: `public/rigs/golden_toy.{json,bin,png}` + `golden_toy_n.png` (37 bones, 17,403
 vertices, 1.2 m with the crest) and `public/models/golden-lance.glb` (5,996 triangles), `golden-javelin.glb` (2,472).
-Settings › Hero models › Samurai or Toybox use him (`cfgFor`: goldenToy); Storybook has none, so he stays the kit there
-(`CAST.golden`), as he does if the files are missing.
+The game uses him (`cfgFor`: goldenToy; the hero choice in Settings is gone since CT-7); `?chewymodel=disney` (the QA's
+Storybook set) has none, so he stays the kit there (`CAST.golden`), as he does if the files are missing.
 - **The entry**: `earGain: 0.5`, the default squint (his lids are sized for +0.488 / −0.24), `outline: '#3a2212'`, `wave:
   'out'`, `palm: [−0.0405, −0.0288, 0.0029]` (the right mitten's grip centre off `hand_R`: prop_mount.rig.json's palms;
   the left mirrors it), `back: [0, 0.1, −0.3]`, `lanceMount` (below).

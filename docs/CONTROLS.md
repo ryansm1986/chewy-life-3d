@@ -600,7 +600,8 @@ Mobile preset with its numbers (12.3 to 12.7). The QA is 12.8.
 - **No browser gestures**:
   - the viewport meta has `maximum-scale=1, user-scalable=no, viewport-fit=cover`;
   - the canvas is `touch-action: none` and cancels its touchstart (no compatibility mouse events, no scroll or zoom);
-  - the UI is `touch-action: pan-x pan-y` (lists still scroll, no pinch or double-tap zoom);
+  - the UI is `touch-action: pan-x pan-y` (lists still scroll, no pinch or double-tap zoom); since CT-7 the HUD, the world
+    labels and the touch layer are `none`, and a one-finger touchmove outside a scrolling list is cancelled (§12.10);
   - `overscroll-behavior: none` (no pull-to-refresh);
   - Safari's `gesturestart` and any two-finger touchmove are cancelled;
   - text selection and the long-press callout are off; the long-press context menu was already blocked (input.js).
@@ -936,3 +937,71 @@ column floats over its top right. The iframe is allowed full screen (`allow="…
   - **`build-itch --test`**: after the desktop iframe pass, an iPad on a replica of itch's page (the measured column
     boxes, a 1280 × 720 frame 20 px down, the Fullscreen button). It checks that no touch control lies under itch's
     buttons or off the 1180 px page, and saves `release/itch-test-ipad.png`.
+
+### 12.10 As built: CT-7, the owner's phone and iPad report (2026-10-08)
+The report: Settings ran off a phone's screen, the iPad in full screen was cut off at the sides, and a stick drag on the
+left sometimes dragged the whole screen. Settings also lost two rows (below).
+- **One cast, no choice** (`actors/heroModels.js`): Settings' "Hero models" (Samurai · Toybox · Storybook) and "Disney
+  style" rows are gone. `chewyModel()` is always 'samurai' and `heroStyle()` 'disney', so the game plays the samurai Chewy
+  with the Toybox Moka, Poe, Floofy and Foosy.
+  - Old saves' choices (`chewy.model`, `chewy.modelV`, `chewy.style`, and the settings' `disneyChewy` / `heroModel`) are
+    dropped quietly on the first call.
+  - The Toybox cast never falls back to a Storybook model: a missing or still-loading Toybox rig plays its kit build
+    (Toybox style), and the samurai Chewy falls back to the Toybox Chewy, then his kit.
+  - `?chewymodel=toy|disney` and `?chewy=classic|disney` still work, for the QA and dev only.
+- **Panels that fit a tablet** (`Mobile.fitTall`, `mobile.css` `.m-fit`). CT-5's fit (between the safe area's margins,
+  the body scrolling inside) was phone-only (`.m-phone`).
+  - On a tablet, Settings (about 1,000 px tall at the menus' 0.86) and Controls › Touch ran off the top and bottom of an
+    iPad: opened from the title, −109 to 895 px on a 1180×820 screen and −135 to 869 on a 1024×768 one; even the
+    12.9" (1366×1024) lost a few px at the top.
+  - Now a tablet's panel that would cross the safe area's margins where it sits (centred 20 px above the middle, 40 at
+    the sides) gets `.m-fit`: the phone's fit with the title on top. Panels that already fit keep their layout.
+  - Rows wrap on every touch screen (Graphics' five presets ran past a tablet's panel). The skill trees' three tabs share
+    their row on a tablet too (a hero's third tab ran past the panel's side).
+  - A tablet's ✕, the bag's weapon swap and build's overlay toggles reach 44 px through a wider hit area.
+  - The Keyboard and Controller tabs' binding buttons are 44 px on touch.
+  - Phones were already fitted in Chrome at 844×390, 932×430 and 667×375 (every Settings view scrolls inside). What the
+    owner's phone did differently can't be reproduced here; the likely causes are a phone or foldable whose short side
+    is over 500 px (it was a "tablet", with no fit) or Safari's own bars. Both are covered now.
+- **The iPad in full screen** (`Mobile.reseen`). The IntersectionObserver that measures the part of the frame on the page
+  only reports when the visible fraction crosses a threshold.
+  - So a frame that grew while staying wholly visible kept its old rect. itch's frame put in full screen on a
+    1366×1024 iPad stayed "1280 × 720", and the HUD kept clear of a strip that wasn't there: 86 px at the right and
+    304 px at the bottom, so the controls sat in from the side and up the screen. A 1180×820 iPad lost 100 px at the
+    bottom the same way.
+  - A resize, rotation or full-screen change now drops the old rect and observes again, which reports the new one.
+  - In full screen the frame is the screen, so the off-page clip isn't applied at all, and a rect bigger than the frame
+    (a stale one) is ignored.
+  - itch's insets already applied only out of full screen; they still do.
+- **No page pan from a drag** (`index.html`, `touch.css`):
+  - CT-6 made `html, body` `touch-action: pan-x pan-y` so lists scroll. A thumb that landed on anything but the canvas
+    in the stick's half (the quest tracker, the portrait card, a loot label) could pan the page, and one-finger
+    touchmoves were never cancelled. Inside itch's frame on an iPad, an uncancelled touchmove scrolls itch's page around
+    the frame. So the stick sometimes "picked up the whole screen".
+  - Now `index.html` cancels every one-finger touchmove that didn't start in something that scrolls (a menu's list, a tab
+    row, a slider, a text field), from the first frame. `html.pinch-ok` (the zoom card) still lets it through.
+  - The world labels, the HUD and the touch layer are `touch-action: none`, as the canvas was. Only the menus keep their
+    pan.
+  - Safari's edge swipe for Back can't be cancelled by a page; the stick's base keeps clear of the edge.
+- **QA**:
+  - **s27 k)** has 10 checks now:
+    - in full screen at 1180×820, 1194×834, 1366×1024 and 1024×768, the canvas and every HUD edge element fill the
+      screen with nothing kept clear but the 24 px top, and Settings and Controls › Touch fit, scrolling;
+    - ~2 s of big stick circles with a real finger (CDP) walk the hero with every touchmove cancelled and the page and
+      visual viewport at 0, and a drag from the quest tracker is cancelled too.
+    - Shots: `tools/qa/tmp/ct7/ipad-fs-<size>.png`, `-settings.png`, and `ipad-fs-portrait.png` (the rotate card).
+  - **`mobile-ui.mjs`** didn't catch Settings because it only ran at a phone's size, where the fit existed, and its "cut
+    off" was the bare screen with 2 px of slack.
+    - It now measures against the safe area, flags a body whose content runs past it without scrolling (or is clipped
+      at a side), and audits Settings with every row (the debug row too), each Controls tab (touch, keyboard, controller)
+      and Settings from the title.
+    - `DEVICE=ipad` runs it all at 1180×820, DPR 2, with iPad Safari's agent. Both pass.
+  - **`build-itch --test`**: the iPad replica (now with a scrolling page under the game) adds a stick drag in big circles
+    and a drag from the quest tracker (itch's page and the frame never scroll, and every touchmove in the frame is
+    cancelled, because Chrome won't chain the frame's scroll to the page as Safari does), then itch's Fullscreen button:
+    the HUD fills the screen with only the top 24 px kept.
+    - It also runs a 1366×1024 iPad Pro, whose frame fits the page windowed (the stale-rect case).
+    - Shots: `release/itch-test-ipad[-pro][-fullscreen].png`.
+- **Only a real iPad and phone can confirm**: Safari's own scroll chaining from the frame to itch's page (Chrome doesn't
+  chain it, so the tests check the cancelled touchmoves instead); iPadOS element full screen inside itch's frame and
+  the sizes it reports; Safari's toolbars over a phone's Settings; and the edge swipe for Back next to the stick.

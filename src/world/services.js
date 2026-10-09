@@ -4,6 +4,7 @@ import { BUILDINGS } from './buildings/index.js';
 import { generateItem, shopStock, itemValue, ITEM_BASES } from '../rpg/items.js';
 import { Events } from '../core/events.js';
 import { randInt } from '../core/util.js';
+import { sleepHours } from '../cozy/clock.js';
 
 export function installServices(G) {
   const ui = () => G.ui;
@@ -37,6 +38,7 @@ export function installServices(G) {
   G.sleep = () => {
     const go = () => {
       const d = G.day; const h = d.hour;
+      G.cozy?.clock?.add?.(sleepHours(h)); // (the world clock skips the night too: crews sent in the evening are back by morning, docs/COZY.md §4.4)
       d.day++; d.hour = 6.5; d._lastHour = 6.5; // (sleeping always crosses the 6:00 day change, even from 2 am: crops grow)
       G.village.world.onNewDay?.(d.day);
       G.actions.restoreAll();

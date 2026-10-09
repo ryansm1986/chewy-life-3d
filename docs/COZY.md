@@ -1,7 +1,8 @@
 # Cozy path: expeditions, the Adventurers' Guild, peaceful zones and scavenging (design)
 
-Status: **designed 2026-10-08; the owner answered §14 the same day** (the decisions are folded in below). Nothing is
-built. The work is tracked in
+Status: **designed 2026-10-08; the owner answered §14 the same day** (the decisions are folded in below). **Phase A
+(CZ-1, CZ-2) is built** (§13.1); **phase B (CZ-3, CZ-4) is built, in review** (§13.2); **phase C (CZ-5, CZ-6) is
+built** (§13.3). The work is tracked in
 [ROADMAP.md](ROADMAP.md) §1c (CZ-1…CZ-12); this file is the design.
 
 The owner's direction (2026-10-08):
@@ -135,7 +136,7 @@ who sends Moka gets the Board guide. Both meet the other later (§11).
 ### 3.2 The zones (`regions/village/*`, `dungeon/zoneRun.js`, `world/zoneQuests.js`)
 | Beat | Today | Cozy route | Gate (town + supplies) |
 |---|---|---|---|
-| **The siege** (3 camps, cages, the captain's ward, the captain) | Fight in the village | **[C] "Relieve <village>"**, 6 h. Its power scales with the camps still standing (each broken camp −25%; the captain is the last 25%). On success: the camps fall, the cages open, the captain is driven off ("Captain Galeclaw flees into the Depths!"), `saveVillage` with `savedBy: 'crew'`, `village:saved` | Takemori: the Guild built, or 2 heroes in the crew. Akane: rank 3. Shiokaze: rank 3 + Guild L2. Yukimi: Guild L3. Each: 1 meal pack per crew member |
+| **The siege** (3 camps, cages, the captain's ward, the captain) | Fight in the village | **[C] "Relieve <village>"**, 6 h. Its power scales with the camps still standing (each broken camp −25%; the captain is the last 25%). On success: the camps fall, the cages open, the captain is driven off ("Captain Galeclaw flees into the Depths!"), `saveVillage` with `savedBy: 'crew'`, `village:saved` | Takemori: the Guild built, **or a crew of 2, or one hero with packed lunches** (the director's call at phase A: the first relief must be reachable with only Moka benched, since Poe joins in Takemori's own zone and the Guild comes in phase D; gates are data in `cozy/objectives.js RELIEFS`, CZ-9 may retune). Akane: rank 3. Shiokaze: rank 3 + Guild L2. Yukimi: Guild L3. Each: 1 meal pack per crew member |
 | **The celebration** | Plays live when the captain falls | Plays on your **next arrival** in the zone (`zones[z].celebrate`): arriving at the Waypoint Shrine, the crew stands in the square with the villagers, the overlays grow in, everyone cheers. The crew's heroes then go home | — |
 | **The zone's hero joining** (Poe in Bamboo, Floofy in Maple, Foosy in Onsen) | Any visit while not joined, once `calm()` (nothing chasing within 13 m) | **No change needed.** The scenes need no fight, only a calm moment. In a saved, peaceful zone they always get one. While besieged, the Travel Map card says "Under siege: yokai on the trail" so a cozy player knows to send the relief first | The zone is open |
 | **Villager quests** (6 per zone, objectives in the zone dungeon) | `dungeonFloor`, `find` (champion / unique / chest), `rescue` (behind a guard pack), `kill` N, `boss` | **[C] one objective per step**, 4 h each ("Find Chiku's Ledger", "Bring Kome home", "Teach 12 Kamaitachi manners"). The crew returns with the quest item or the rescued villager (they walk home to the village). **The turn-in talk stays yours** | The village saved (as now), the quest's prereqs |
@@ -180,6 +181,7 @@ who sends Moka gets the Board guide. Both meet the other later (§11).
   magic 2, rare 3, unique or set 4; at most 36, so ×1.72).
 - **A hire's power** = 6 × level × morale (0.85–1.15) × (1 + 0.05 × Guild level). Level for level, a hero is about 1.5×
   a hire.
+- **Gates are data** (`RELIEFS[zone].gates`, kinds `rank`, `pop`, `built`, `guild`, `heroes`, `crew`, `lunches`, `any`), so a later phase retunes them without code. A lone hero with packed lunches can go where a gate allows it; their power alone sets the (often only Risky) odds.
 - **Bonuses**: a class that suits the objective +15% (a Guard on a siege, a Scout on a "find", a Healer on a rescue,
   §5.2); fed (every member has a meal pack of tier 2+) +10%; up to 3 heart potions +3% each.
 - **An objective's power** = its level × a kind factor: errand 6, quest objective 9, Burrow boss 12, siege 14, dungeon
@@ -398,8 +400,9 @@ state.cozy = {
   walk from the Wayfarer's Stone to the village and to the dungeon gate **never crosses one** (a layoutGen check and a
   test-rpg assertion: every trail segment is at least r + 3 m from each wild disc). Each is a disc of r 12–16 m, its
   packs placed inside it per visit.
-- **Their monsters**: the zone's kinds at the band's top + 1, ranks rolled hotter (champion 30%, unique 18%), 2–3
-  packs; **leashed** to the disc (they won't chase past r + 6 m and walk back), so the peaceful map stays peaceful. A
+- **Their monsters**: the zone's kinds at **clamp(the highest hero's level + 2, the band's low + 2, the band's top + 1)**
+  (the director's call at CZ-3: a flat band top + 1 put level-13 packs in front of a level-4 hero), ranks rolled hotter
+  (champion 30%, unique 18%: they carry the danger), 2–3 packs; **leashed** to the disc (they won't chase past r + 6 m and walk back), so the peaceful map stays peaceful. A
   wild cache chest in each.
 - **Marking**:
   - **in the world**: posts at the entrances strung with a shimenawa hung with red ofuda and a little wooden "yokai"
@@ -486,6 +489,10 @@ the day). `state.cozy.scav[area] = { day, taken: [nodeId] }`.
 
 **Sinks**: buildings and upgrades, house upgrades and remodels, the workbench and commissions, potions, the Snow Forge;
 **new**: Guild levels, hire sign-on and wages, meal packs (dishes the kitchen makes), the Guild's two tools.
+
+**For CZ-12** (the director, at phase A's review): a relief pays each crew member about +4,300 XP against an errand's
++360 (§4.6: the 3 camps and the captain, worth ~46 kills of the zone's level). That jump is likely what makes the
+expedition-only pace fast (Takemori after ~27 real minutes with Moka alone: §13.1); look at it with the pace targets.
 
 **The balance goal**: neither path is strictly better.
 - The fighter keeps everything that makes fighting worth it: uniques, gems, the tiers' loot, the endgame.
@@ -610,6 +617,160 @@ Shared files get **small, surgical hooks**, each owned by one phase.
 
 Every phase ends with screenshots at the game camera against the 9/10 bar, its QA scenario in run-all, and
 `prod-smoke` passing.
+
+### 13.1 Phase A as built (CZ-1, CZ-2; 2026-10-08)
+The code map is in [ARCHITECTURE.md](ARCHITECTURE.md) ("The cozy path, phase A").
+- **The world clock** (`src/cozy/clock.js`): 35 s a world hour in every mode, `dt` 0 while paused (as the day clock);
+  sleep adds the hours to 6:30. **Time away**: as §4.4.1, with one change of mechanism: the wall-clock mark is raised
+  every frame while the loop runs (so every save carries it), and a loop that stalls for more than 5 s (a hidden tab,
+  a frozen window) counts that gap as time away, whichever of the frame and `visibilitychange` comes first. The card
+  (`ui/awayCard.js`) shows after a load or a return when a crew came home or is still out, on the first calm moment (no
+  dialogue, banner, panel, transition or guide).
+- **The state** (`src/cozy/state.js`): `state.cozy` with `v: 1`; `normalizeCozy` at boot. An old save loads with 0 hours
+  away. `zones[z].savedBy` / `celebrate` / `dungeon.crew` in `rpg/zones.js`.
+- **Objectives** (`src/cozy/objectives.js`): errands (§4.7) for Blossom Hollow's outskirts (level 2), the Burrow's
+  upper floors (level 4) and each saved zone (its band + 1), 4–5 templates each, 3 drawn per world day; the four siege
+  reliefs as data, with **only Takemori offered** (`STORY_READY`; CZ-9 opens the rest with the story's reroute).
+- **The Takemori gate** (the director's call): *the Guild built, or a crew of 2, or one hero with packed lunches*, so a
+  cozy player with only Moka benched can relieve it (Poe joins in Takemori's own zone; the Guild is phase D's). Gates
+  are data (§4.2).
+- **The expedition core** (`src/cozy/expeditions.js`): §4.2–§4.6 as written: power, odds, `canSend`, `resolve`
+  (success / partial / setback; 6 h tired), loot (never uniques or gems; a relief: a magic and a rare), XP to benched
+  heroes (`actions.addXpTo`, with the catch-up). Not yet: class bonuses and Scouts (hires, phase D), trophies (CZ-9).
+- **The runtime** (`src/cozy/expeditionRun.js`): the return, the hold rule (§4.5), "You beat us to it!" (§4.9), "Call
+  them home" (no rewards, supplies back), the load audit (§9). A relief saves the village with `savedBy: 'crew'`, frees
+  the cages and leaves `celebrate`. The news is a gold ribbon on the relief's report ("Takemori Village is saved!", the
+  freed villagers named); the village's own banner plays only on your next arrival in that zone (CZ-9 makes it the full
+  scene). No zone or siege banner fires anywhere else. Heroes walk
+  off to the Wayfarer's Post when sent and back in when they return.
+- **The Board** (`cozy/expeditionBoard.js`, `ui/expeditions.js`): beside the Wayfarer's Post; Story · Errands · Away ·
+  Reports (Village quests come with CZ-9); mouse, pad (Y best crew, X clear), touch and the phone's two columns. The HUD
+  chip (`ui/cozyChip.js`) and the away heroes in the wheel and the HUD minis.
+- **Debug** (the Cozy tab): world hours +1 / +8 / +24, finish every expedition, an 8 h absence, the clock set back a day,
+  reset the mark, a sure-thing crew, show the away card.
+- **The pace** (`tools/expedition-sim.mjs`, expeditions only): Takemori is relieved after about 27 real minutes with
+  Moka alone (Moka ~L8, 10 trips) and about 17 with Moka and Poe; COZY §8's 1.5–2.5 h counts the whole session (building,
+  farming, cooking: the lunch needs a crop). Tuning is CZ-12's.
+- **QA**: test-rpg "COZY", s31-expeditions (the cozy route end to end on a fresh game with no fighting and no debug
+  unlocks), prod-smoke `cozy`.
+
+### 13.2 Phase B as built (CZ-3, CZ-4; 2026-10-08)
+The code map is in [ARCHITECTURE.md](ARCHITECTURE.md) ("The cozy path, phase B").
+- **The spawn rule** (`src/cozy/peaceful.js`, pure): `RegionMode.build` keeps every spawn while a zone is besieged and
+  only the wild areas' packs (and a sighting, and a boss spawn) once `zones[z].village === 'saved'`. The emptied camp sites
+  are `layout.glades`: their camp dirt grows back and each biome puts its own flowers there (hostas, spider lilies,
+  camellias, morning glories), and the critters that already lived at the camp sites come in greater numbers (deer,
+  sparrows and butterflies, hares, crabs), all in their existing batches. The first visit after a save says "The yokai
+  have gone quiet around …, except in the wild places" once. Weather, night, the Burrow and the dungeons are untouched.
+  A saved zone fields about half the monsters (22–25 against 49–59) and 10–35% fewer draw calls on the trail.
+- **The wild areas** (recipe data `layout.wild`; Tidepool's in `assets/tidepoolTerrain.js`), all eight as proposed:
+
+  | Zone | Wild areas (r) | Dressing (each biome's own kit; tall pieces only on the far half) |
+  |---|---|---|
+  | Bamboo | the Kamaitachi Thicket (12), the Fallen Shrine (12) | culm clumps closing round the rim, scratched mossy boulders; a ruined shrine, toppled stone lanterns, loose steps |
+  | Maple | the Scarecrow Fields (14), Old Root Hollow (12) | a furrowed stubble paddy with scarecrows, a drying rack, straw huts; a great crimson maple over a fairy ring of mushrooms |
+  | Tidepool | the Crab Flats (14), the Wreck Shoals (13) | open sand with shells, starfish and pebbles; an older wreck, driftwood, a net rack |
+  | Onsen | the Snowman Slope (13), the Frozen Falls (13) | snowmen in drifts; a second frozen cascade with ice-crusted rocks |
+
+  `layoutGen` gives each a flattened `wild` disc and a side path from the trail (`entry`: where it meets the rim; the
+  recipe's `spur` points steer it, Maple's round the waterfall). **The trail check is enforced**: an area closer than
+  r + 3 m to the main trail, or over the village, the arrival or the arena, is dropped and listed in `plan.wildIssues`
+  (test-rpg asserts none). The packs and spurs use their own RNG, so the trail camps roll exactly as before. Each visit:
+  2–3 packs per area, a golden wild cache on the far side. **The leash** (`cozy/wildWorld.js`): past r + 6 m a wild
+  monster gives up, walks back to its spawn spot (round by the entry if it's stuck, healing a little) and settles; after
+  14 s still outside it slips home in a puff. `wild:enter { zone, area }` with a toast on entering
+  ("The Kamaitachi Thicket: wild yokai about!", once a minute per area), `wild:cleared` when an area's packs are down.
+- **The markers** (`cozy/wildMarkers.js`): at each entry a gateway of two weathered posts strung with a twisted
+  shimenawa hung with red ofuda and white shide (cloth: they flutter), a red charm on each post and a little "yokai" sign
+  (a red oni face, three claw scratches), merged into the region's static prop chunks (no extra draw calls); a soft dashed
+  violet band on the ground round each rim (one transparent mesh a zone, alpha at most 0.42). The minimap and the big map
+  draw a dashed violet ring with a claw badge, today's sightings as red pins, and phase C's scavenge marks (dig spots as
+  paws, quest digs as gold pins, gather spots on the big map); the map legend has them (`LEGEND_REGION`). The Travel Map
+  card adds **Trail** (peaceful / under siege), **Wild** (the areas) and **Sighting** rows, and a red dot on the zone's pin.
+- **The Sightings board** (`cozy/sightings.js`, pure; `ui/sightings.js`): three a world day (the world clock's day,
+  seeded), each in a different wild area of the open zones: a named **unique** with escorts (renown 3), a **champion pack**
+  under a named leader (2) or a **big swarm** (2). The pack spawns in its area on that day's visits (kept, leashed, named,
+  a red pin). Beaten: the bounty drops where the last one fell (coins 1.5 × the pack's own average, 5–9 of the zone's
+  materials, a gem at 25%), renown and its title (Wanderer, Yokai Spotter at 3, Bounty Hunter 10, Wild Warden 25, Legend of
+  the Wilds 50), `sighting:cleared { id, zone, area, kind, name, renown, gained }`, and the card's 討伐 stamp. The board:
+  beside the Expedition Board at the Wayfarer's Post (`cozy/sightingsBoard.js`, 2 draw calls), every saved zone village's
+  notice board, and the Guild's later (`ui.open('sightings')`). Mouse, pad (A on a card's button opens the Travel Map on its
+  zone) and the phone (one column, 44 px targets, the 12 px floor). `state.cozy.sightings = { day, list, renown, total }`.
+- **Debug** (the Cozy tab, "Peaceful zones and the wild", "The Sightings board"): show wild areas (rim and leash rings),
+  go to a wild area, peaceful on a zone (session only), spawn a sighting here (by kind), refresh the sightings, add renown.
+- **The interface for scavenging** (CZ-5): `peaceful.js` `wildAreas`, `wildAt`, `inWild`, `isPeaceful`; in a zone
+  `G.dungeon.wildAt`, `layout.wild` / `.glades` / `.peaceful`, populate's `ctx.inWild` / `wildAt` / `peaceful` / `glades`;
+  `G.peaceful`; `installPeaceful` calls `G.cozy.scav.setWild`.
+- **QA**: test-rpg "COZY: THE PEACEFUL OVERWORLD" and "COZY: THE SIGHTINGS BOARD"; `tools/qa/s32-peaceful.mjs` (in
+  run-all); prod-smoke `peaceful`; `tools/qa/wild-shots.mjs` (the look and perf review, `--besieged` to compare; shots in
+  `tools/qa/tmp/wild/`). s28's walk now starts from a saved zone's village arrival too.
+- **Autosave**: `sighting:cleared` deserves an event autosave (a bounty and renown); recommended to R-11's list, not wired
+  here. `wild:cleared` and `wild:enter` change nothing saved.
+
+### 13.3 Phase C as built (CZ-5, CZ-6; 2026-10-08)
+The code map is in [ARCHITECTURE.md](ARCHITECTURE.md) ("The cozy path, phase C").
+- **The rules** (`src/cozy/scavenge.js`, pure): 21 node kinds and five areas as §7.2 (Blossom Hollow 10 nodes: 3
+  driftwood, 3 river-stone cairns, 3 sakura drifts, the old mulberry; each zone 16: 6 wood, 4 stone, 3 specialty (Tidepool
+  2 silk + 2 crystal), 3 forage (Tidepool 2)), a dig table per area (one roll; a Perfect dig rolls once more; never two
+  furniture finds), 2–3 dig spots a world day (+1 with Shadow's Bandana), `state.cozy.scav = { [area]: { day, taken, found,
+  dug, quest }, tools: { basket, bandana }, stats: { gathered, dug, perfect, streak, best }, cheat }`. A record from an
+  earlier world day is wiped when next read, so the nodes refill, and the spots move, on the world clock; time away
+  counts (a day crossed while the game was closed refills them, and the away card says "The driftwood has washed back
+  up…" under **Around the island**). **Deviations from §7.2**: there are no chestnut or shell pantry items, so Maple's
+  forage is a hollow log with honeycomb and shiitake, and Tidepool's seaweed node adds a few coins for its shells.
+- **Placement** (`scavengeWorld.js`): Blossom Hollow's sites are hand-picked (the beach, the river banks, the sakura belts,
+  the farms), each nudged to the nearest open spot; a zone's come from fixed slots on its glades (the camp sites, phase
+  B's wildlife glades once saved), the trail's edges, the POIs and the arrival (a lattice near the trail as the fallback),
+  picked spread out in a fixed order so ids stay put. Nothing within 2.5 m of a wild area (phase B's `wildAreas`), the
+  village, the arena or the trail, and **nothing the camera can't see**: a column grid of the scenery (every batched tree,
+  clump, prop and roof by its box, merged chunks by triangle) and the heightfield are marched along the camera's line;
+  in a zone a spot must be clear from the game yaw (45°), and spots clear from both 45° yaws are taken first; at home
+  from both (build mode turns the camera there). About 30–50 ms an area.
+- **The look** (`scavengeModels.js`): toy props in the zone kits' language, about a metre across and 0.45–0.9 m tall so
+  they stand out of the grass, each with a small taken remnant: the beribboned driftwood bundle, river-stone cairns, a
+  sakura drift with fallen sprigs, the mulberry with silk cocoons; dry culm bundles lashed with straw, mossy rubble, a
+  broken culm hung with cocoons and a silk moth, shoots and shiitake; maple branches, terrace stones, a leaf heap, a hollow
+  log of honeycomb with a bee; bleached driftwood, a sea-stone cairn with a starfish, a net knotted over a rock with
+  floats, a rock pool of sea glass with coral, seaweed and shells; snowy pine boughs, rimstone hot-spring terraces, ice
+  crystals, a snow-capped stump with shiitake and a honey pot; the dig mound (a paw print pressed in) and the dug hole in
+  four grounds. **3 draw calls an area**: one BatchedMesh holds every node, its taken look and the dig spots
+  (setGeometryIdAt swaps them), one Points draw twinkles over the full ones (gold over a quest dig), and one instanced
+  draw lays **the "you can take this" cue** under every full node and found dig spot: a soft cream ring on the ground
+  that breathes slowly (normal blending, alpha ≤ 0.6, drawn 0.4 m nearer than it is so the grass blades round it don't
+  hide it, never over the prop or an actor). The same cue for every kind, so the petal drift reads as a node among the
+  meadow's own wildflowers. No lights.
+- **Future (a grass-mask hook)**: the GPU grass field still pokes a few blades through the lowest props (the drifts, the
+  mounds). A per-spot hole in the grass mask (the village's tile texture alpha, a region's grass `allow`) would clear it;
+  that's the grass owner's file, not done here.
+- **The interactions**: a gather is F / A / tap / a click (the pickup pose through `life/tools.js run`, which may now run
+  in a zone); the dig locks control like fishing: the hero shuffles onto the spot's side as the camera sees it, Shadow
+  digs across from them, the ring (`ui/digRing.js`) fills over 1.4 s with the golden band at 70–85%, and letting go in it
+  is a **Perfect dig** (the bonus roll, a ring burst, a rumble, a touch buzz, a streak count); holding to the end or
+  letting go elsewhere is a good dig. A press let go at once (a tap, the touch prompt, a click that walked there) and
+  **Settings › Dig with Shadow › Tap** fill the ring by themselves (a good dig). Moving, a hit or leaving cancels with
+  nothing lost. **Shadow's nose**: within 12 m (18 with the Bandana) of a hidden spot he lifts his nose and sniffs, trots
+  to it, paws the ground and sits; the mound shows with a sparkle and a bark (`scavenge:found`), and phase B's minimaps
+  draw it as a paw (`mapMarks()`). Shadow's tips wait while you dig.
+- **Quest digs**: an active zone quest's `find` item from that zone (Takumi's heartwood, Nami's sea glass…) turns up in
+  one of the day's spots (gold sparkle), once a world day, and counts through `quest:find` with the step's own place.
+- **Pound Mochi** (`life/cooking.js`): a starter recipe, 2 rice → 2 Mochi (a material), at the stove or Rosie's oven, and
+  what two rice make in "Try a mix". The Cook panel shows "Makes 2 Mochi" for it.
+- **The pace** (`tools/scavenge-sim.mjs`, every target met): a zone sweep gives 18 wood, 12 stone, 4.5–6.4 of its
+  specialty, 4.5–5 forage and 2.5 dig finds; Blossom Hollow's round 9 wood, 6 stone, 4.5 petal, a silk. With the routine of
+  a world day (home, two zone sweeps, one errand, the farm's mochi and Pound Mochi), no building or upgrade (the Guild's
+  three levels included) waits more than 0.8 world days for its combat-only materials once its rank opens (the Hot
+  Spring's crystal is the longest). Early lanterns and crystal lean on the errands; scavenging alone gives about 0.3
+  lantern and 0.4 crystal a day at home.
+- **Not here**: homestead XP for a gather (1) and a dig (4) is CZ-9's (`SCAV_XP`); the Guild sells the Basket and the
+  Bandana (phase D: `state.cozy.scav.tools`); the "Shadow's Nose" guide is CZ-11's.
+- **Debug** (the Cozy tab, "Scavenging"): refill every node, show every node (today's spots, minimap marks for a minute),
+  a perfect-dig streak (5 or 20 digs), walk to the nearest node, the Guild's tools on / off.
+- **Events**: `scavenge:gather { node, area, kind, mats, pantry, coins }`, `scavenge:dig { area, spot, perfect, streak,
+  mats, coins, find, quest }`, `scavenge:found`, `scavenge:refill`. A dig's furniture find autosaves (`core/autosave.js`).
+- **QA**: test-rpg "COZY: SCAVENGING"; `tools/qa/s33-scavenge.mjs` (in run-all: placement, occlusion, the gather, the nose,
+  the dig on the keyboard, mouse, pad and touch, Tap mode, a cancel, all four zones, a quest dig, Pound Mochi, the away
+  line, the debug actions; shots in `tools/qa/tmp/s33-scavenge/`); `tools/qa/scavenge-shots.mjs` (the look review: a
+  studio lineup per area, each area at the game camera from both 45° yaws, the nose and the dig); prod-smoke `dig`.
 
 **Existing work it touches**:
 - **Z-F (elevation)**: the wild discs and the scavenge spots are recipe data placed relative to the terrain, like the

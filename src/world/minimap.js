@@ -32,6 +32,49 @@ function questPin(ctx, G, cx, cz, k, t, rimR) {
   return true;
 }
 
+// scavenging marks (phase C, cozy/scavengeWorld.js mapMarks()): Shadow's dig spots as little paws, a quest dig as a
+// gold pin, gather nodes as tiny green dots (the big map only: on the small disc they'd clutter)
+function scavMarks(ctx, G, cx, cz, k, big) {
+  let L = null; try { L = G.cozy?.scav?.mapMarks?.(); } catch (e) { L = null; }
+  if (!L?.length) return;
+  ctx.save(); ctx.lineWidth = 1.2; ctx.strokeStyle = '#4a2c2a';
+  for (const m of L) {
+    const x = (m.x - cx) * k, y = (m.z - cz) * k;
+    if (m.kind === 'node') { if (!big) continue; ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fillStyle = '#7ad890'; ctx.fill(); continue; }
+    if (m.kind === 'quest') { ctx.beginPath(); ctx.arc(x, y, 4.2, 0, Math.PI * 2); ctx.fillStyle = '#ffd84a'; ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.arc(x, y, 1.4, 0, Math.PI * 2); ctx.fillStyle = '#4a2c2a'; ctx.fill(); continue; }
+    pawMark(ctx, x, y, big ? 1.15 : 1);
+  }
+  ctx.restore();
+}
+/** a little paw (a pad and three toes), centred at (x, y) */
+export function pawMark(ctx, x, y, s = 1, fill = '#c08452') {
+  ctx.fillStyle = fill; ctx.strokeStyle = '#4a2c2a'; ctx.lineWidth = 1.1;
+  ctx.beginPath(); ctx.ellipse(x, y + 0.8 * s, 2.6 * s, 2.1 * s, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  for (const [dx, dy] of [[-2.4, -1.9], [0, -3.1], [2.4, -1.9]]) { ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, 1.15 * s, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+}
+/** a wild area on a map: a dashed violet ring and a claw badge in its middle (docs/COZY.md §6.2) */
+export function wildMark(ctx, x, y, r, s = 1) {
+  ctx.save();
+  ctx.setLineDash([5 * s, 4 * s]); ctx.lineWidth = 2.2 * s; ctx.strokeStyle = 'rgba(170, 110, 240, .95)';
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(160, 100, 230, .14)'; ctx.fill();
+  clawBadge(ctx, x, y, s);
+  ctx.restore();
+}
+/** the claw badge: a violet disc with three slashes */
+export function clawBadge(ctx, x, y, s = 1) {
+  ctx.beginPath(); ctx.arc(x, y, 6.5 * s, 0, Math.PI * 2); ctx.fillStyle = '#8a56d8'; ctx.fill(); ctx.lineWidth = 1.6 * s; ctx.strokeStyle = '#fff'; ctx.stroke();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5 * s; ctx.lineCap = 'round';
+  for (const d of [-2.6, 0, 2.6]) { ctx.beginPath(); ctx.moveTo(x + (d - 2) * s, y - 3.4 * s); ctx.lineTo(x + (d + 1.6) * s, y + 3.4 * s); ctx.stroke(); }
+}
+/** a sighting's red pin (a red disc with a white rim and a dark heart) */
+export function sightingPin(ctx, x, y, s = 1, t = 0) {
+  const p = 1 + Math.sin(t * 4) * 0.12;
+  ctx.beginPath(); ctx.arc(x, y, 9 * s * p, 0, Math.PI * 2); ctx.fillStyle = 'rgba(232, 60, 70, .22)'; ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, 5.2 * s, 0, Math.PI * 2); ctx.fillStyle = '#e8343c'; ctx.fill(); ctx.lineWidth = 1.8 * s; ctx.strokeStyle = '#fff'; ctx.stroke();
+  ctx.beginPath(); ctx.arc(x, y, 1.8 * s, 0, Math.PI * 2); ctx.fillStyle = '#4a1620'; ctx.fill();
+}
+
 export class VillageMinimap {
   constructor(G) { this.G = G; this.base = null; this.dirty = true; this.scale = 2; }
   rebuild() {
@@ -106,6 +149,7 @@ export class VillageMinimap {
       }
       ctx.restore();
     }
+    scavMarks(ctx, G, cx, cz, k, !!o.big);
     // quest objective pin (falls back to a sparkle on the quest giver)
     if (!questPin(ctx, G, cx, cz, k, o.time ?? performance.now() / 1000, o.big ? 0 : size / 2 - 22)) {
       const q = G.state.quests.active?.[0];
@@ -179,6 +223,7 @@ export class DungeonMinimap {
     if (this.mode.stairsPos && seen(this.mode.stairsPos.x, this.mode.stairsPos.z)) dot(this.mode.stairsPos.x, this.mode.stairsPos.z, 5, '#8fd0ff');
     if (this.mode.startPos) dot(this.mode.startPos.x - 1.6, this.mode.startPos.z - 1.6, 4.5, '#b89aff');
     this.extra?.(ctx, dot, seen, cx, cz, k, o);
+    scavMarks(ctx, G, cx, cz, k, !!o.big);
     questPin(ctx, G, cx, cz, k, o.time ?? performance.now() / 1000, o.big ? 0 : size / 2 - 22);
     // waypoint (diamond) once its room has been seen
     const wp = L.waypoint;
@@ -212,6 +257,12 @@ export class RegionMinimap extends DungeonMinimap {
     }
   }
   extra(ctx, dot, seen, cx, cz, k, o) {
+    // the wild areas: always marked (their posts are a known place, seen or not), and today's sightings' red pins
+    // (docs/COZY.md §6.2, §6.3)
+    const s = o.big ? 1.25 : 1;
+    for (const a of this.mode.layout.wild || []) wildMark(ctx, (a.x - cx) * k, (a.z - cz) * k, a.r * k, s);
+    const t = o.time ?? performance.now() / 1000;
+    for (const p of this.mode.wild?.pins?.() || []) sightingPin(ctx, (p.x - cx) * k, (p.z - cz) * k, s, t);
     const A = this.mode.layout.arena; if (!A || !seen(A.x, A.z)) return;
     ctx.save(); ctx.strokeStyle = 'rgba(255,74,106,.8)'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
     ctx.beginPath(); ctx.arc((A.x - cx) * k, (A.z - cz) * k, A.r * k, 0, Math.PI * 2); ctx.stroke(); ctx.restore();

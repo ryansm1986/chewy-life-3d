@@ -16,8 +16,8 @@
 //    play (one tap re-asks; "Stay in a window" is remembered; never more than twice a minute), nothing to touch in the top
 //    24 px while in full screen (the browser's swipe-down exit), the "zoomed in?" card (a viewport reset first where the
 //    page is the top frame; a pinch is let through while it shows), room kept for itch.io's own buttons over the frame
-//    (Settings › Controls › Touch › itch.io buttons) and for the part of the frame off the page, and a save when the page
-//    is hidden or closed (Safari doesn't always send beforeunload).
+//    (Settings › Controls › Touch › itch.io buttons) and for the part of the frame off the page. (The save when the page
+//    is hidden or closed moved to core/autosave.js, for every platform.)
 import './mobile.css';
 import { Actions } from '../core/actions.js';
 import { Touch } from '../core/touch.js';
@@ -62,9 +62,10 @@ export class Mobile {
     this.hold = null; this.vis = null; this.edgeTop = 0; this.zoomTried = 0; this.fsLosses = [];
     this.fsNow = this.fsLike(); this.fsWas = this.fsNow;
     this.cards();
-    addEventListener('resize', () => { this.layout(); this.fsSoon(); });
-    addEventListener('orientationchange', () => { setTimeout(() => this.layout(), 60); this.fsSoon(); });
-    for (const n of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(n, () => this.fsSoon(120));
+    // (CT-7: a resize, rotation or full screen measures the visible part of the frame afresh: reseen())
+    addEventListener('resize', () => { this.reseen(); this.layout(); this.fsSoon(); });
+    addEventListener('orientationchange', () => { this.reseen(); setTimeout(() => this.layout(), 60); this.fsSoon(); });
+    for (const n of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(n, () => { this.reseen(); this.fsSoon(120); });
     for (const n of ['resize', 'scroll']) globalThis.visualViewport?.addEventListener(n, () => { this.zoomCheck(); if (this.hold === 'zoom') this.placeHold(); });
     // the part of the frame the page shows (an itch frame wider than an iPad, scrolled, or the page zoomed in)
     if (this.embedded && typeof IntersectionObserver === 'function') {
@@ -72,11 +73,9 @@ export class Mobile {
         { threshold: Array.from({ length: 41 }, (_, i) => i / 40) });
       this.io.observe(document.documentElement);
     }
-    // a save when the page is hidden or closed: iOS Safari doesn't always send beforeunload (game.js saves on that and
-    // every 30 s); full screen that closed while the page was away asks again when it's back
-    const save = () => { try { this.G?.save?.(); } catch (e) { /* storage unavailable */ } };
-    document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else this.fsSoon(); });
-    addEventListener('pagehide', save);
+    // full screen that closed while the page was away asks again when it's back (the save when the page is hidden or
+    // closed is core/autosave.js's, on every platform: iOS Safari doesn't always send beforeunload)
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) this.fsSoon(); });
     ui.onSetting?.(k => { if (k === 'itchInset' || k === 'touchFs') this.layout(); });
     // the text floor follows the panels' re-renders (a MutationObserver, one pass a frame at most)
     // (only while the screen is touchy: a desktop pays nothing for it; layout() connects and disconnects it)
@@ -88,6 +87,15 @@ export class Mobile {
   }
   get G() { return this.ui.G; }
 
+  /** CT-7: the IntersectionObserver only reports when the visible fraction crosses a threshold, so a frame that grows
+   *  while staying wholly visible (itch's frame put in full screen: 1280 × 720 → the iPad's 1366 × 1024) kept the old
+   *  rect, and the HUD kept clear of a strip that wasn't there (the right 86 px and the bottom 304). The old rect is
+   *  dropped on a resize, rotation or full-screen change, and observing again reports the new one */
+  reseen() {
+    if (!this.io) return;
+    this.vis = null;
+    try { this.io.unobserve(document.documentElement); this.io.observe(document.documentElement); } catch (e) { /* */ }
+  }
   /** the device's safe area in CSS px: env(safe-area-inset-*) (viewport-fit=cover), or the QA's ?safe= */
   deviceSafe() {
     if (this.fakeSafe) return { ...this.fakeSafe };
@@ -102,7 +110,9 @@ export class Mobile {
     if (!this.touchy) return s;
     const W = innerWidth, H = innerHeight, v = this.vis;
     let clipT = 0;
-    if (v && v.width >= W * CLIP_MIN && v.height >= H * CLIP_MIN) {
+    // the part of the frame off the page: not in full screen (the frame is the screen), and never a rect bigger than the
+    // frame (one measured before a resize)
+    if (v && !this.fsNow && v.width <= W + 2 && v.height <= H + 2 && v.width >= W * CLIP_MIN && v.height >= H * CLIP_MIN) {
       clipT = Math.max(0, v.top);
       s.l = Math.max(s.l, v.left); s.t = Math.max(s.t, clipT); s.r = Math.max(s.r, W - v.right); s.b = Math.max(s.b, H - v.bottom);
     }
@@ -259,9 +269,25 @@ export class Mobile {
     if (this.touchy !== (this.ml || Actions.device === 'touch')) this.layout();
     if (this.phone) this.pairs();
     if (this.floorDirty && this.touchy) { this.floorDirty = false; this.floor(); }
+    if (this.touchy && !this.phone && this.ui._order.length && (this._fitN = (this._fitN || 0) + 1) % 3 === 0) this.fitTall();
     if (this.tipUntil && performance.now() > this.tipUntil) { this.tipUntil = 0; this.ui.tip.hide(); }
     // CT-6: the zoom and full screen, twice a second (the events cover most of it; this catches what they miss)
     if (this.touchy && (this._ct6 = (this._ct6 || 0) + 1) % 30 === 0) { this.zoomCheck(); if (this.fsPending || this.fsLike() !== this.fsNow) this.fsCheck(); }
+  }
+  /** CT-7: a tablet's panel taller than the screen (Settings and Controls on an iPad; a foldable or a phone-sized tablet)
+   *  gets .m-fit: it sits between the safe area's margins with its body scrolling inside, as a phone's panels do
+   *  (mobile.css). A panel that fits keeps its own layout. Its natural height is its box plus what its body scrolls */
+  fitTall() {
+    const ui = this.ui, sf = this.sf || this.safe(), H = innerHeight;
+    for (const n of ui._order) {
+      const P = ui.panels[n], w = P?.wrap;
+      if (!w || !P.isOpen || P.side === 'bottom' || !P.panel || !P.body) continue;
+      const fit = w.classList.contains('m-fit'), z = P.panel.currentCSSZoom ?? this.pscale ?? 1;
+      const nat = (P.panel.offsetHeight + (fit ? P.body.scrollHeight - P.body.clientHeight : 0)) * z;
+      // where it would sit unfitted: centred 20 px (40 at the sides) above the middle (style.css .pw.side-*)
+      const cy = H / 2 - (P.side === 'center' ? 20 : 40) * z, over = cy - nat / 2 < sf.t + 8 || cy + nat / 2 > H - sf.b - 8;
+      if (over !== fit) w.classList.toggle('m-fit', over);
+    }
   }
   /** raise any text the menus still draw under 12 px (after the scale and mobile.css): an inline size on its element */
   floor() {

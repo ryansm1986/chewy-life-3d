@@ -39,6 +39,21 @@
     ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (n) { D.addEventListener(n, stop, { passive: false }); });
     D.addEventListener('touchmove', function (e) { if ((e.touches && e.touches.length > 1) || (e.scale !== undefined && e.scale !== 1)) stop(e); }, { passive: false });
     D.addEventListener('dblclick', stop, { passive: false });
+    // CT-7: one finger never pans the page either (nor itch's page around the frame, which a touchmove left uncancelled in
+    // our frame would scroll), unless it started in something that scrolls: a menu's list, a tab row, a slider, a text
+    // field. The canvas, the HUD and the stick's side are touch-action: none as well (ui/touch.css).
+    var free = {}, scrolls = function (e) {
+      for (; e && e.nodeType === 1 && e !== D.documentElement; e = e.parentElement) {
+        if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName) || e.isContentEditable) return true;
+        var s = getComputedStyle(e);
+        if ((/auto|scroll/.test(s.overflowY) && e.scrollHeight > e.clientHeight + 1) || (/auto|scroll/.test(s.overflowX) && e.scrollWidth > e.clientWidth + 1)) return true;
+      }
+      return false;
+    };
+    D.addEventListener('touchstart', function (e) { for (var i = 0; i < e.changedTouches.length; i++) { var t = e.changedTouches[i]; free[t.identifier] = scrolls(t.target); } }, { capture: true, passive: true });
+    D.addEventListener('touchmove', function (e) { for (var i = 0; i < e.changedTouches.length; i++) if (!free[e.changedTouches[i].identifier]) { stop(e); return; } }, { capture: true, passive: false });
+    var done = function (e) { for (var i = 0; i < e.changedTouches.length; i++) delete free[e.changedTouches[i].identifier]; };
+    D.addEventListener('touchend', done, { capture: true, passive: true }); D.addEventListener('touchcancel', done, { capture: true, passive: true });
   })();
 </script>
 </head>

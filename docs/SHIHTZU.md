@@ -308,9 +308,9 @@ Both are asserted: the tank at **dps ×0.85–1.05, eHP ×1.15–1.4**, the hex 
 ## 8. The baked model (`HERO_MODELS.shihtzuToy`, the flail prop and its chain, the coat)
 Built by an Opus agent with the toybox-character skill (sources archived in `tools/blender/codex/assets/shihtzu-toy/`;
 the README has the rebuild). Installed: `public/rigs/shihtzu_toy.{json,bin,png}` + `shihtzu_toy_n.png` (37 bones,
-16,608 vertices, 1.2 m with the topknot) and `public/models/shihtzu-flail.glb` (5,488 triangles). Settings › Hero models
-› Samurai or Toybox use him (`cfgFor`: shihtzuToy); Storybook has none, so he stays the kit there (`CAST.shihtzu`), as he
-does if the files are missing.
+16,608 vertices, 1.2 m with the topknot) and `public/models/shihtzu-flail.glb` (5,488 triangles). The game uses him
+(`cfgFor`: shihtzuToy; the hero choice in Settings is gone since CT-7); the QA's `?chewymodel=disney` has none, so he
+stays the kit there (`CAST.shihtzu`), as he does if the files are missing.
 - **The entry**: `lidTilt: 0.5507` (his eyes face ~31° outward: the lids hinge on tilted axes), `squint: [0.74, −0.36]`
   (a content, half-lidded smile), `earGain: 0.5`, `outline: '#1c181e'`, `wave: 'out'`, `palm: [−0.040, −0.054, 0.004]`
   (the right mitten's grip centre off `hand_R`, from prop_mount.json; the left mirrors it), `back: [0, 0.06, −0.27]`.

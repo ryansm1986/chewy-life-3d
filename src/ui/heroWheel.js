@@ -10,6 +10,8 @@ import { keyCap } from './padGlyphs.js';
 import { HERO_TEXT } from '../rpg/classes.js';
 import { el, esc } from './dom.js';
 import { portrait } from './portraits.js';
+import { cozyIcon } from './cozyIcons.js';
+import './cozy.css';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9']; // (one per hero, in roster order: any number of heroes)
 export class HeroWheel {
@@ -28,10 +30,10 @@ export class HeroWheel {
       const a = -Math.PI / 2 + (i / n) * Math.PI * 2, R = n > 5 ? 228 : n > 4 ? 206 : n > 3 ? 190 : 178; // (the first hero at the top, the others round the ring; a wider ring for more heroes)
       const c = el('button', 'hw-card'); c.dataset.id = h.id; // (the Meet Poe guide spotlights her card)
       c.style.setProperty('--hc', h.color); c.style.setProperty('--x', `${Math.cos(a) * R}px`); c.style.setProperty('--y', `${Math.sin(a) * R}px`); c.style.setProperty('--i', i);
-      c.classList.toggle('active', h.active); c.classList.toggle('locked', !h.joined); c.classList.toggle('blocked', h.joined && !h.active && !h.ready);
+      c.classList.toggle('active', h.active); c.classList.toggle('locked', !h.joined); c.classList.toggle('blocked', h.joined && !h.active && !h.ready); c.classList.toggle('away', !!h.away); // (away: out on an expedition, docs/COZY.md §4.8)
       const url = this.G.portrait?.(h.id), face = url ? `<img class="p3d" src="${url}" alt="" draggable="false">` : portrait(h.id);
       const jp = h.joined ? HERO_TEXT[h.id]?.jp || '' : '';
-      c.innerHTML = `<div class="hw-face">${face}${h.joined ? '' : '<i class="hw-q">?</i>'}</div>
+      c.innerHTML = `<div class="hw-face">${face}${h.joined ? '' : '<i class="hw-q">?</i>'}</div>${h.away ? `<i class="cz-away-badge" title="Away on an expedition">${cozyIcon('pack')}</i>` : ''}
         <div class="hw-t"><b>${esc(h.name)}${jp ? `<span class="jp">${jp}</span>` : ''}</b><span>${esc(h.title)}</span>${h.joined ? `<em>Lv ${h.lvl}</em>` : ''}</div>
         <span class="kc sm hw-k">${i + 1}</span>${h.active ? '<span class="hw-tag">Playing</span>' : !h.ready && h.joined ? `<span class="hw-tag dim">${esc(h.why)}</span>` : !h.joined ? `<span class="hw-tag dim">${esc(h.why)}</span>` : ''}`;
       c.addEventListener('pointerenter', () => this.select(i));
@@ -57,7 +59,11 @@ export class HeroWheel {
     this.hub.innerHTML = `<b>${esc(h.joined ? h.name : '???')}</b><span>${h.active ? 'Playing now' : h.ready ? `${Actions.device === 'touch' ? 'Tap a card' : `Let go of ${keyCap('hero', { sm: true })}`} to play as ${esc(h.name)}` : esc(h.why)}</span>`; // (touch: the wheel stays up for a tap, ui/touch.js)
     this.G.audio?.play?.('ui_hover', { vol: 0.5 });
   }
-  confirm() { const c = this.cards[this.sel]; this.H.pickFromWheel(c && c.h.ready ? c.h.id : null); }
+  confirm() {
+    const c = this.cards[this.sel];
+    if (c?.h.away) this.G.ui?.toast?.(`${c.h.name} is away on an expedition: ${c.h.away.label}`, { color: '#8fd0ff', duration: 3 }); // (a click on an away card says so)
+    this.H.pickFromWheel(c && c.h.ready ? c.h.id : null);
+  }
   /** Tab let go: switch to the highlighted hero (if it can be played now), else just close */
   release() { this.confirm(); }
   /** per frame while open (heroes.tabInput): number keys, Esc, pointing the mouse toward a card */

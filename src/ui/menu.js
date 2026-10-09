@@ -11,6 +11,7 @@ import { normKey } from '../core/input.js';
 import { padGlyph } from './padGlyphs.js';
 import { PRESET_NAMES } from '../core/deck.js';
 import { DESKTOP, quitGame } from './desktop.js';
+import { AUTOSAVE_LABELS } from '../core/autosave.js';
 import { version as VERSION } from '../../package.json'; // (Settings › About; seven taps on it ask for the debug password: src/debug/access.js)
 
 const MOUSE_CAP = { mouse0: () => glyph('mouseL'), mouse2: () => glyph('mouseR') };
@@ -49,11 +50,11 @@ export class MenuPanel extends Panel {
         <div class="set-row"><div class="set-n">${glyph('bolt')}Screen shake</div><button class="tog" data-k="shake"><i></i></button></div>
         <div class="set-row" title="Hold a skill's button to charge it. Toggle: press once to start charging, again to release. Off: holding repeats the skill."><div class="set-n">${glyph('zap')}Charge on hold</div><div class="seg" data-k="chargeMode">${['On', 'Off', 'Toggle'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
         <div class="set-row" title="Hold Shift while moving to sprint (+40% speed). Toggle: tap Shift to start sprinting; tap it again, or stop, to walk."><div class="set-n">${glyph('boots')}Sprint (Shift)</div><div class="seg" data-k="sprintMode">${['Hold', 'Toggle'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+        <div class="set-row" title="Digging with Shadow. Hold: hold the button and let go in the golden band for a Perfect dig. Tap: one press digs by itself (a normal find)."><div class="set-n">${glyph('paw')}Dig with Shadow</div><div class="seg" data-k="digMode">${['Hold', 'Tap'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+        <div class="set-row" title="Saves on its own every few minutes of play, and after quests, level ups, building and big finds. Off: only those milestones, and when you leave."><div class="set-n">${glyph('save')}Autosave</div><div class="seg" data-k="autosave">${AUTOSAVE_LABELS.map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
         <div class="set-row"><div class="set-n">${glyph('star')}Show FPS</div><button class="tog" data-k="showFps"><i></i></button></div>${DESKTOP ? `
         <div class="set-row" title="Off: a window (F11 or Alt+Enter switch too)"><div class="set-n">${glyph('eye')}Full screen</div><button class="tog" data-k="fullscreen"><i></i></button></div>` : ''}
-        <div class="set-row"><div class="set-n">${glyph('sparkle')}Disney style</div><button class="tog" data-k="disneyChewy"><i></i></button></div>
         <div class="set-row" title="Keys and controller buttons, rumble, aim assist"><div class="set-n">${glyph('question')}Controls</div><button class="btn sm" data-a="controls">Change…</button></div>
-        <div class="set-row" title="Which hero models to play with: the samurai Chewy, the Toybox Chewy, or the Storybook heroes. Switching saves and reloads."><div class="set-n">${glyph('star')}Hero models</div><div class="seg" data-k="heroModel">${['Samurai', 'Toybox', 'Storybook'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
         <div class="set-row mn-about" title="Pawhaven, a cozy adventure with Chewy and friends"><div class="set-n">${glyph('sakura')}About</div><button class="btn sm mn-ver" data-a="version">Pawhaven v${VERSION}</button></div>
         <div class="set-row mn-debug" title="Testing tools: F10 or \` , the bug button, Select + Start on a pad"><div class="set-n">${glyph('key')}Debug tools: on</div><div class="mn-dbg-b"><button class="btn sm" data-a="debugOpen">Open</button><button class="btn sm pink" data-a="debugOff">Turn off</button></div></div>
         <div class="mn-foot"><button class="btn" data-a="back">${glyph('swap')}Back</button></div>
@@ -126,7 +127,7 @@ export class MenuPanel extends Panel {
     this.setView(this.opts.view || 'main'); this.panel.classList.toggle('from-title', this.opts.from === 'title'); }
   sync() {
     const s = this.ui.settings;
-    for (const seg of this.body.querySelectorAll('.seg')) { // (Graphics, Charge on hold, Hero models)
+    for (const seg of this.body.querySelectorAll('.seg')) { // (Graphics, Charge on hold, ...)
       const v = s[seg.dataset.k] ?? 0;
       for (const b of seg.querySelectorAll('button')) b.classList.toggle('on', +b.dataset.v === v);
       seg.style.setProperty('--sel', v);

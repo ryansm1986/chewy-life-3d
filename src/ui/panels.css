@@ -328,7 +328,6 @@
 .set-n { display: flex; align-items: center; gap: 9px; font: 700 16px var(--font); }
 .set-n .gl { width: 26px; height: 26px; }
 .seg { position: relative; display: flex; padding: 3px; background: #f3e3cf; border: 3px solid var(--ink); border-radius: 14px; --w: 74px; }
-.seg[data-k="heroModel"] { --w: 80px; } /* ("Storybook") */
 .seg button { position: relative; z-index: 1; width: var(--w); padding: 6px 0 7px; border: 0; background: none; font: 700 14px/1 var(--font); cursor: pointer; transition: color .2s; }
 .seg button.on { color: #fff; -webkit-text-stroke: 3.5px var(--ink); paint-order: stroke fill; }
 .seg-pill { position: absolute; left: 3px; top: 3px; bottom: 3px; width: var(--w); border-radius: 10px; background: linear-gradient(#ffc6d8, #ff8fb0); border: 2px solid var(--ink); box-shadow: 0 2px 0 var(--ink);

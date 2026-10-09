@@ -23,6 +23,8 @@ const START = {
   stash: '.slot[data-c="stash"]', shop: '.sh-item', skills: '.node.can, .node.learned, .node', character: '.at-plus:not([disabled]), .attr .at-plus, .dr',
   quests: '.q-item, .gd-card .btn, .fl-card', cook: '.ck-row.sel, .ck-row', craft: '.ck-row.sel, .ck-row', travel: '.tv-pin.sel, .tv-pin.here, .tv-pin', gift: '.gf-card', seeds: '.sp-card',
   houseCard: '.btn.pink, .btn', remodel: '.rm-set.on, .rm-set', lantern: '.ln-go',
+  expeditions: '.ex-go:not([disabled]), .ex-mem.can, .ex-obj.sel, .ex-recall, .ex-obj', awayCard: '.aw-ok', // (the cozy path: docs/COZY.md §10)
+  sightings: '.sg-go:not([disabled])', // (the Sightings board: docs/COZY.md §6.3)
 };
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const SEL = '.on, .sel, .selected, .active';
@@ -306,6 +308,20 @@ const HANDLERS = [
     x(e, nav) { nav.ui.panels.lantern.surprise(); },
     y(e, nav) { nav.ui.panels.lantern.recommend(); },
     label(e) { return { a: e.matches('.ln-card') ? (e.classList.contains('on') ? 'Remove' : 'Add') : e.matches('.ln-go') ? 'Set off' : e.matches('.ln-slot') ? 'Take out' : 'Select', x: 'Surprise me', y: 'Recommended' }; },
+  },
+  { // the Sightings board (ui/sightings.js): A on a sighting's button opens the Travel Map on its zone
+    match: '.p-sight button',
+    label() { return { a: 'Travel Map' }; },
+  },
+  { // the Expedition Board (ui/expeditions.js): A adds / removes a crew member, picks a job or sends; Y the best crew, X clear
+    match: '.p-exp button',
+    x(e, nav) { const P = nav.ui.panels.expeditions; if (P.view === 'story' || P.view === 'errands') P.clear(); },
+    y(e, nav) { const P = nav.ui.panels.expeditions; if (P.view === 'story' || P.view === 'errands') P.best(); },
+    label(e, nav) {
+      const P = nav.ui.panels.expeditions, pick = P.view === 'story' || P.view === 'errands';
+      const a = e.matches('.ex-mem') ? (e.classList.contains('on') ? 'Remove' : 'Add') : e.matches('.ex-go') ? 'Send off' : e.matches('.ex-recall') ? 'Call home' : e.matches('.ex-obj') ? (P.view === 'reports' ? 'Read' : 'Pick') : e.matches('.ex-tog') ? 'Lunches' : 'Select';
+      return { a, x: pick ? 'Clear' : '', y: pick ? 'Best crew' : '' };
+    },
   },
 ];
 function isPantryBuy(e) { return !e.classList.contains('sell') && e.classList.contains('pgood') && !e.classList.contains('tool'); }

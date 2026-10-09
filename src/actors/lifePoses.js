@@ -194,6 +194,23 @@ export const LIFE_ACTIONS = {
   } },
   nod: { dur: 0.8, pose: (u, P, A) => { A.head.x += Math.max(0, Math.sin(u * Math.PI * 3)) * 0.2 * (1 - u); A.happy = 1; } },
 
+  // ---- scavenging (docs/COZY.md §7.1: cozy/scavengeWorld.js)
+  // the hero's dig beside Shadow (hold): down on the haunches, leaning in, both paws scooping in turn, dirt-happy
+  scavDig: { dur: 99, hold: true, pose: (t, P, A) => {
+    const k = ease.outQuad(clamp(t / 0.22)), w = Math.sin(t * 15), b = Math.abs(Math.sin(t * 7.5));
+    A.y += -0.1 * k; A.body.x += (0.62 + 0.06 * b) * k; A.body.y += w * 0.08 * k;
+    A.legL.x += -0.55 * k; A.legR.x += -0.45 * k;
+    A.armR.x += (-1.25 + 0.65 * w) * k; A.armR.z += 0.22 * k; A.armL.x += (-1.25 - 0.65 * w) * k; A.armL.z += -0.22 * k;
+    A.head.x += (0.26 - 0.06 * b) * k; A.head.z += w * 0.05 * k; A.sq += (0.05 + 0.02 * b) * k; A.tailWag = 2; A.happy = 1;
+  } },
+  // Shadow's pawing at a spot (hold; a quadruped's front paws scoop in actors/animator.js poseQuad): nose to the ground
+  pawDig: { dur: 99, hold: true, pose: (t, P, A) => { const k = ease.outQuad(clamp(t / 0.2)); A.body.x += 0.5 * k; A.head.x += 0.3 * k; A.sq += 0.04 * Math.abs(Math.sin(t * 13)) * k; A.tailWag = 2.5; } },
+  // Shadow's nose: up it goes, a few quick sniffs (one-shot)
+  sniff: { dur: 1.0, pose: (u, P, A) => {
+    const k = inOut(u, 0.15, 0.2), s = Math.max(0, Math.sin(u * Math.PI * 9)) * (u > 0.2 && u < 0.85 ? 1 : 0);
+    A.head.x += (-0.42 + 0.08 * s) * k; A.head.y += Math.sin(u * Math.PI * 2) * 0.25 * k; A.body.x += -0.12 * k; A.sq += 0.02 * s; A.earKick += 1.5 * s; A.tailWag = 1.5;
+  } },
+
   // ---- woken up by a knock at night (npc.js sleepy doorstep answer)
   // a big yawn: head tipped back, one paw politely over the mouth, the other arm stretching up, up on the toes
   sleepyYawn: { dur: 2.4, pose: (u, P, A) => {

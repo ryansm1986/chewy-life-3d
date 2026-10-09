@@ -22,7 +22,11 @@
 //     (CDP page scale 2): the viewport reset is tried, then the "zoomed in?" card pauses and lets a pinch through, and goes
 //     at scale 1; full screen on the first tap, nothing to touch in the top 24 px and no stick from there; full screen
 //     closed: the card pauses, a tap goes back, "Stay in a window" is remembered, a third close in a minute stops asking;
-//     the itch.io buttons setting (Top) moves the HUD down; a save on pagehide; portrait shows the rotate card
+//     the itch.io buttons setting (Top) moves the HUD down; a save on pagehide; portrait shows the rotate card.
+//     CT-7: in full screen at 1180×820, 1194×834, 1366×1024 and 1024×768 the canvas and HUD fill the screen (nothing past
+//     an edge, nothing kept clear but the 24 px top) and Settings / Controls › Touch fit, scrolling inside (shots in
+//     tools/qa/tmp/ct7/); ~2 s of big stick circles with a real finger walk the hero and never pan the page (every
+//     touchmove cancelled), nor does a drag from the quest tracker
 import { launchTouch, boot, waitMode, sleep, makeReport, center, IPAD } from './touch-lib.mjs';
 
 const R = makeReport('S27 touch: the touch device, stick, taps, pinch, attack, skills, charge, drag-aim, roll, belt, heroes, menus');
@@ -98,6 +102,50 @@ async function ipadChecks() {
   const noStick = await e2(() => !window.G.ui.touch.stickP && !window.G.ui.touch.T.stick.on);
   await F2.up(5); await sleep(p, 150);
   R.check('iPad: the first tap goes full screen; in full screen nothing to touch sits in the top 24 px and a drag down from the top edge starts no stick', fsIn && top.n >= 8 && top.minTop >= 24 && top.saT >= 24 && noStick, JSON.stringify({ fsIn, top, noStick }));
+  // CT-7: in full screen at every iPad size (both orientations' landscape; portrait is the rotate card) the canvas and the
+  // HUD fill exactly the screen: nothing past an edge, no side or bottom kept clear (only the 24 px top edge), and
+  // Settings and Controls › Touch fit between the safe area's margins with their bodies scrolling
+  const ct7 = 'tools/qa/tmp/ct7';
+  (await import('node:fs')).mkdirSync(ct7, { recursive: true });
+  const edges = () => e2(() => {
+    const M = window.G.ui.mobile, E = window.G.engine, cv = E.renderer.domElement, W = innerWidth, H = innerHeight, pr = E.renderer.getPixelRatio();
+    const els = [...document.querySelectorAll('.mm-wrap, .tc .tc-b, .tc-belt > .belt, .hud-tl, .hud-tr, .hud-bc, .qtrack, .run-chip')].filter(e => { const r = e.getBoundingClientRect(), cs = getComputedStyle(e); return r.width > 0 && !e.closest('[hidden]') && cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0; });
+    const out = els.map(e => { const r = e.getBoundingClientRect(); return { n: String(e.className.baseVal ?? e.className).split(' ').slice(0, 2).join('.'), r: [r.left, r.top, r.right, r.bottom].map(Math.round) }; }).filter(o => o.r[0] < -0.5 || o.r[1] < -0.5 || o.r[2] > W + 0.5 || o.r[3] > H + 0.5);
+    const xs = els.map(e => e.getBoundingClientRect()), right = Math.max(...xs.map(r => r.right)), bottom = Math.max(...xs.map(r => r.bottom));
+    return { W, H, fs: !!document.fullscreenElement, sf: M.sf, cv: [cv.width, cv.height, Math.round(cv.getBoundingClientRect().width), Math.round(cv.getBoundingClientRect().height)], cvOk: Math.abs(cv.getBoundingClientRect().width - W) < 1 && Math.abs(cv.getBoundingClientRect().height - H) < 1 && Math.abs(cv.width - Math.round(W * pr)) <= 1, n: els.length, out, gapR: Math.round(W - right), gapB: Math.round(H - bottom) };
+  });
+  const fitMenu = view => e2(v => new Promise(res => { const U = window.G.ui, M = U.panels.menu; U.open('menu'); const [vw, d] = v.split(':'); M.setView(vw); if (d) { M.dev = d; M.renderControls(); }
+    setTimeout(() => { const P = document.querySelector('.p-menu'), r = P.getBoundingClientRect(), pb = P.querySelector('.pb'), sf = U.mobile.sf; const ok = r.top >= sf.t - 1 && r.bottom <= innerHeight - sf.b + 1 && (pb.scrollHeight <= pb.clientHeight + 2 || /auto|scroll/.test(getComputedStyle(pb).overflowY)); res({ v, ok, r: [r.top, r.bottom].map(Math.round), pb: [pb.scrollHeight, pb.clientHeight] }); }, 900); }), view);
+  const fsSizes = [];
+  for (const [w, h] of [[1180, 820], [1194, 834], [1366, 1024], [1024, 768]]) {
+    await p.setViewportSize({ width: w, height: h });
+    await w2(([w, h]) => innerWidth === w && innerHeight === h && window.G.ui.touch.layoutT > 3.5, [w, h], 4000); await sleep(p, 300);
+    const e = await edges();
+    await p.screenshot({ path: `${ct7}/ipad-fs-${w}x${h}.png` });
+    const menus = [];
+    for (const v of ['settings', 'controls:touch']) { menus.push(await fitMenu(v)); if (v === 'settings') await p.screenshot({ path: `${ct7}/ipad-fs-${w}x${h}-settings.png` }); }
+    await e2(() => window.G.ui.close('menu')); await sleep(p, 300);
+    fsSizes.push({ ...e, menus });
+  }
+  await p.setViewportSize({ width: 820, height: 1180 }); await w2(() => window.G.ui.mobile.portrait, null, 3000); await sleep(p, 300);
+  await p.screenshot({ path: `${ct7}/ipad-fs-portrait.png` });
+  await p.setViewportSize({ width: 1180, height: 820 }); await w2(() => !window.G.ui.mobile.portrait && window.G.ui.touch.layoutT > 3.5, null, 4000);
+  const fsOk = fsSizes.every(s => s.cvOk && !s.out.length && s.n >= 10 && s.sf.r < 1 && s.sf.l < 1 && s.sf.b < 1 && s.sf.t <= 24.5 && s.gapR < 40 && s.menus.every(m => m.ok));
+  R.check('iPad full screen at 1180×820, 1194×834, 1366×1024 and 1024×768: the canvas fills the screen, every HUD edge element is inside it with no side or bottom kept clear, and Settings and Controls › Touch fit with their bodies scrolling (CT-7)', fsOk, JSON.stringify(fsSizes.map(s => ({ W: s.W, H: s.H, fs: s.fs, sf: Object.values(s.sf).map(Math.round), cv: s.cv, n: s.n, out: s.out, gapR: s.gapR, gapB: s.gapB, menus: s.menus.map(m => m.ok ? m.v : m) }))));
+  // CT-7: a stick drag never pans the page: ~2 s of big circles with a real finger (CDP), every touchmove cancelled, the
+  // page and the visual viewport still at 0, and the hero walked; then a drag that starts on the quest tracker (the HUD,
+  // not the canvas) is cancelled too
+  await e2(() => { window.__tmv = { n: 0, free: 0 }; addEventListener('touchmove', e => { window.__tmv.n++; if (!e.defaultPrevented) window.__tmv.free++; }); });
+  const p0 = await e2(() => [window.G.player.pos.x, window.G.player.pos.z]);
+  await F2.down(6, 230, 600); await F2.frame();
+  let walked = 0;
+  for (let i = 1; i <= 60; i++) { const a = i / 60 * Math.PI * 4; await F2.move(6, 230 + Math.cos(a) * 110, 600 + Math.sin(a) * 110); await p.waitForTimeout(32); if (i % 6 === 0) { const q = await e2(() => [window.G.player.pos.x, window.G.player.pos.z]); walked = Math.max(walked, Math.hypot(q[0] - p0[0], q[1] - p0[1])); } }
+  const mid = await e2(() => ({ on: window.G.ui.touch.T.stick.on, sx: scrollX, sy: scrollY, vx: visualViewport.offsetLeft, vy: visualViewport.offsetTop, pl: visualViewport.pageLeft, pt: visualViewport.pageTop, de: document.documentElement.scrollTop + document.body.scrollTop + document.documentElement.scrollLeft }));
+  await F2.up(6); await sleep(p, 200);
+  const qt = await center(p, '.hud-tl .qtrack'); let qv = null;
+  if (qt) { await F2.down(7, qt.x, qt.y); await F2.frame(); await F2.move(7, qt.x + 140, qt.y + 160, 10); qv = await e2(() => ({ sx: scrollX, sy: scrollY, vx: visualViewport.offsetLeft, vy: visualViewport.offsetTop })); await F2.up(7); await sleep(p, 150); }
+  const tmv = await e2(() => window.__tmv);
+  R.check('iPad: 2 s of big stick circles (a real finger) move the hero and never pan the page: every touchmove cancelled, scroll and the visual viewport at 0; a drag from the quest tracker is cancelled too (CT-7)', mid.on && walked > 1 && !mid.sx && !mid.sy && !mid.vx && !mid.vy && !mid.de && tmv.n > 50 && tmv.free === 0 && !!qt && !qv.sx && !qv.sy && !qv.vx && !qv.vy, JSON.stringify({ mid, walked: +walked.toFixed(2), tmv, qt: !!qt, qv }));
   // full screen closed: the card, a tap back, Stay in a window
   await e2(() => document.exitFullscreen());
   const c1 = await w2(() => window.G.ui.mobile.hold === 'fs' && window.G.ui.isPaused(), null, 6000);

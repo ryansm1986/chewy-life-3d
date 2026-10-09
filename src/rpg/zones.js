@@ -4,7 +4,8 @@
 //                       village: 'besieged' | 'saved', siegeCamps: [...],
 //                       dungeon: { cleared, bestFloor, tier: { unlocked, cleared: [t...] }, spirit: { best },
 //                                  lantern: { tier, spirit, mods } | null },
-//                       quests: {...} }
+//                       quests: {...},
+//                       savedBy: 'hero' | 'crew' | null, celebrate (a crew's save not yet seen), dungeon.crew (docs/COZY.md) }
 //   The Deep Burrow (the Burrow's tier runs: dungeon/defs.js burrowDeep) keeps the same dungeon record in
 //   state.dungeon.deep (tierRecord).
 //   The four outdoor regions (src/regions) are the zones; a zone's dungeon is dungeon/defs.js ZONE_DUNGEON[id].
@@ -30,6 +31,10 @@ export function fillZone(z) {
   if (!Array.isArray(z.siegeCamps)) z.siegeCamps = [];
   z.dungeon = fillTiers(z.dungeon);
   z.quests = obj(z.quests) || {};
+  // the cozy path (docs/COZY.md §3.2, §9): who saved the village ('hero' | 'crew'; null while besieged), and a crew's
+  // save waiting to be celebrated on the next arrival
+  z.savedBy = z.village === 'saved' ? (z.savedBy === 'crew' ? 'crew' : 'hero') : null;
+  z.celebrate = z.village === 'saved' && !!z.celebrate;
   return z;
 }
 /** A dungeon's clear / tier record made whole: { cleared, bestFloor, tier: { unlocked, cleared: [t…] }, spirit: { best },
@@ -42,6 +47,7 @@ export function fillTiers(d, storyClear = false) {
   t.unlocked = Math.max(0, Math.min(TIER_MAX, +t.unlocked || 0));
   t.cleared = Array.isArray(t.cleared) ? [...new Set(t.cleared.map(v => Math.floor(+v)).filter(v => v >= 0 && v <= TIER_MAX))].sort((a, b) => a - b) : [];
   d.spirit = obj(d.spirit) || {}; d.spirit.best = Math.max(0, Math.floor(+d.spirit.best || 0));
+  d.crew = Math.max(0, Math.floor(+d.crew || 0)); // (first clears by a crew: docs/COZY.md §3.2; the boss unique still waits for your own)
   if (d.cleared > 0 || storyClear) { if (!t.cleared.includes(0)) t.cleared.unshift(0); t.unlocked = Math.max(1, t.unlocked); } // (the migration)
   const ln = obj(d.lantern);
   d.lantern = ln ? { tier: Math.max(0, Math.min(TIER_MAX, Math.floor(+ln.tier || 0))), spirit: Math.max(0, Math.floor(+ln.spirit || 0)), mods: Array.isArray(ln.mods) ? ln.mods.filter(x => typeof x === 'string').slice(0, 6) : [] } : null;
@@ -146,6 +152,7 @@ export const spiritMax = state => (spiritOpen(state) ? spiritBest(state) + 1 : 0
 /** the Lantern remembers each dungeon's last setup */
 export function rememberSetup(state, id, run) { const d = tierRecord(state, id); if (!d) return null; d.lantern = { tier: run.tier || 0, spirit: run.spirit || 0, mods: [...(run.mods || [])] }; return d.lantern; }
 export const lastSetup = (state, id) => tierRecord(state, id)?.lantern || null;
-/** The zone's village is saved (phase D's siege end calls this, then emits 'village:saved'). → true the first time */
-export function saveVillage(state, id) { const z = zoneOf(state, id); if (z.village === 'saved') return false; z.village = 'saved'; z.siegeCamps = []; return true; }
+/** The zone's village is saved (phase D's siege end calls this, then emits 'village:saved'; a crew's relief passes
+ *  by = 'crew': docs/COZY.md §3.2). → true the first time */
+export function saveVillage(state, id, by = 'hero') { const z = zoneOf(state, id); if (z.village === 'saved') return false; z.village = 'saved'; z.siegeCamps = []; z.savedBy = by === 'crew' ? 'crew' : 'hero'; return true; }
 export const villageSaved = (state, id) => zoneOf(state, id).village === 'saved';

@@ -25,7 +25,8 @@ export class Tools {
     if (!m[kind]) { m[kind] = new THREE.Mesh(GEO[kind](), rig.propMat || rig.mat); m[kind].castShadow = true; }
     return m[kind];
   }
-  /** Start a tool action. o: { prop: 'hoe'|'can'|'bag'|null, pose, dur, at, face: {x,z}, onAct(), onEvent(name), onEnd(done) } */
+  /** Start a tool action. o: { prop: 'hoe'|'can'|'bag'|null, pose, dur, at, face: {x,z}, onAct(), onEvent(name), onEnd(done),
+   *  anywhere (not only in the village: a scavenging gather in a zone, docs/COZY.md §7.1) } */
   run(o) {
     const P = this.P; if (!P || this.cur) return false;
     P.moveTarget = null; P.interactTarget = null; P.route?.clear?.();
@@ -68,7 +69,7 @@ export class Tools {
     const c = this.cur; if (!c) return;
     const P = this.P, G = this.G;
     // anything else the player does cancels the chore
-    const moved = MOVE_KEYS.some(k => Input.down(k)) || Actions.move().pad || Actions.held('roll', 'pad') || P.moveTarget || P.rollT > 0 || G.mode !== 'village' || G.playerDead;
+    const moved = MOVE_KEYS.some(k => Input.down(k)) || Actions.move().pad || Actions.held('roll', 'pad') || P.moveTarget || P.rollT > 0 || (G.mode !== 'village' && !c.anywhere) || G.playerDead; // (anywhere: a gather in a zone, cozy/scavengeWorld.js)
     const other = P.anim.action && P.anim.action.name !== c.pose;
     if (moved || other) { this.end(false); return; }
     c.t += dt;

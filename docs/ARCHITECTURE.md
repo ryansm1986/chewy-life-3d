@@ -207,7 +207,7 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
 - Summons/repeats: `cloneRig(template)` shares the baked geometry, with its own bones, skeleton and materials (spirit pups).
 - `rig.dispose()` frees a throwaway rig (skips shared geometry). Don't store Object3Ds in `userData` (clone deep-copies it via JSON).
 - `enableXray(rig)` adds skinned silhouette twins bound to the same skeleton.
-- **Disney style (default; Settings > Disney style, saved, applied on reload; `?kit=classic` / `?chewy=classic`)**:
+- **Disney style (always, since CT-7 removed the Settings toggle; `?kit=classic` / `?chewy=classic` for the QA)**:
   `makeDisneyHumanoid` / `makeDisneyBoston` (charKit.js) build the same skeleton and part names as the classic kit,
   with parts from `src/actors/disneyKit.js`: per-species heads sculpted at runtime from blended signed-distance forms
   (`src/gfx/sdf.js` surface nets; cached per species, ~30-90 ms the first time, ~12 ms per villager after), eyes with
@@ -303,11 +303,12 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   spec `CAST[hero]`; Moka's staff is `heroGear.makeStaff(item.icon)` (six designs by variant).
 - Chewy's default baked model is the **samurai Chewy** (`public/rigs/chewy_samurai.*`, sheet E "Black and Gold",
   tools/blender/work/codex/chewy-samurai; docs/HEROES.md §8). Same 37-bone skeleton and face rig as the Toybox Chewy.
-  - `chewyModel()` picks samurai | toy | disney (`?chewymodel=`, Settings > Hero models). Samurai and toy both use the
-    Toybox Moka and Poe; disney is the Storybook heroes. A saved 'toy' from before the samurai moves to 'samurai' once
-    (`chewy.modelV`); after that the choice is kept.
-  - `cfgFor` falls back silently: chewySamurai → chewyToy (the **Toybox Chewy**, `public/rigs/chewy_b.*`) → the Storybook
-    model, so a missing file never breaks Chewy.
+  - `chewyModel()` is always 'samurai' (CT-7: Settings no longer offers "Hero models" or "Disney style"; the old saved
+    `chewy.model` / `chewy.style` / `chewy.modelV` and the settings' `disneyChewy` / `heroModel` are dropped quietly on
+    the first call). `?chewymodel=toy|disney` and `?chewy=classic` stay for the QA only: toy is the Toybox Chewy, disney
+    the Storybook heroes.
+  - `cfgFor` falls back silently: chewySamurai → chewyToy (the **Toybox Chewy**, `public/rigs/chewy_b.*`) → his kit
+    build. The Toybox cast never falls back to a Storybook model (only `?chewymodel=disney` loads those).
   - `HERO_MODELS.chewySamurai` holds its tint, palm / back attach points, the `sayaMount` (the sheathed katana's hilt in
     the saya at his left hip), the cloth and fur grade (`darkGrade` with a chroma gate, `furGrade`, `darkNeutral`,
     `darkFur`: see heroModels.js and docs/HEROES.md §8) and per-model Animator tuning (`anim`: `barkTuck`, `sitThigh`).
@@ -329,8 +330,8 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   - It also sets `darkGrade` for her hair and a `hat` anchor for the nightcap.
   - prod-smoke requires `rosie_toy` whenever it ships.
 - Moka's default baked model is the **Toybox Moka** (`public/rigs/moka_toy.*`, sources in tools/blender/codex/assets/moka-toy).
-  - `cfgFor` loads `mokaToy` first and falls back to the Storybook `moka_disney`, like Chewy. The Settings choice is
-    "Hero models" (Samurai or Toybox: the Toybox Moka; Storybook: hers).
+  - `cfgFor` loads `mokaToy`; a missing file falls back to her kit build (Toybox style), never the Storybook
+    `moka_disney` (that is `?chewymodel=disney` only).
   - Her entry sets `wave: 'front'`, `darkGrade` and `palm`.
   - prod-smoke requires `moka_toy` when playing Moka whenever it ships.
 - **Poe** (docs/POE.md): `CLASSES.poe`, the fūma (`wtype: 'fuma'`); skills `src/rpg/skillsPoe.js`, casts installed on
@@ -370,7 +371,7 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   joins him. Ground loot is drawn instanced with the monsters (`groundLoot.js` → `horde.js lookIn`).
 - **The procedural NPCs (villagers, townsfolk, humanoid monsters) are Toybox-style** by default: `src/actors/toyKit.js`, through
   `makeToyHumanoid` in charKit.js. The targets are the 7 approved sheets in tools/blender/work/codex/npc-kit/sheets.
-  - **Style:** `kitStyle()` follows the "Hero models" setting (Storybook gives the Disney kit), and "Disney style" off gives the
+  - **Style:** `kitStyle()` is the Toybox kit; the QA's `?chewymodel=disney` gives the Disney kit and `?chewy=classic` the
     classic kit. `?kit=toy|disney|classic` overrides both.
   - **Eyes:** oval holes cut into one smooth skull; eye pads creased the face and zigzagged the toon band.
   - **Lids and lashes:** the lid ribbons carry the blink ∪, and the lower lids carry the happy ^ (`rig.squint`). The lash line
@@ -811,6 +812,102 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   are devDependencies only. QA: `tools/qa/desktop-smoke.mjs` (the packaged Windows app via Playwright's Electron),
   `tools/desktop/verify-squashfs.py` (the AppImage read back).
 
+## The cozy path, phase A (src/cozy/ — design: docs/COZY.md; ROADMAP CZ-1, CZ-2)
+- **Pure modules** (node-tested in tools/test-rpg.mjs "COZY"):
+  - `clock.js`: the world clock (`state.cozy.clock = { h, wall }`): world hours in every mode at the day clock's rate
+    (`SECS_PER_HOUR` 35), stopped while paused; `sleepHours`; time away (`awayHours`, `catchUp`, `OFFLINE_CAP_H` 8,
+    the wall-clock high-water mark `markWall`: a clock set back counts 0, a jump forward only the cap); the board's words
+    (`aboutHours`, `backIn`, `backBy`, `realSpan`).
+  - `state.js`: `normalizeCozy` (boot, after `normalizeZones`; lazy and idempotent, `v: 1`), `cozyOf`, `heroAway`,
+    `tiredLeft`, member keys `hero:<id>` / `hire:<id>`.
+  - `objectives.js`: `objective(state, id)` (errands `errand:<day>:<area>:<id>`, rebuilt from the id; the reliefs
+    `relief:<zone>`), `errandsFor` (3 a world day per open area), `storyObjectives` (phase A: `STORY_READY`, Takemori),
+    `objectivePower` (camps still standing), `RELIEFS` (gates as data).
+  - `expeditions.js`: power (`heroPower`, `crewPower`), odds (`oddsOf`, `chance`), `gateCheck`, `canSend`, `resolve`,
+    `partialProgress`, `rollLoot` (never uniques or gems), `xpFor`, `startExpedition` / `finishExpedition`,
+    `brokenExpeditions` (load audit), `crewLines`.
+- **The runtime** `expeditionRun.js` `installCozy(G, village)` (game.js, after housing) → `G.cozy = { clock: { h, day, add },
+  exp: { send, cancel, list, reports, objectives, info, read, take, unread, finishAll, … }, guild, scav, tick, pulse,
+  heroAway, awayInfo, awayNow, showAway, board }`. game.js calls `G.cozy.tick(dt)` every frame (the clock; the mark each
+  frame; a stall over 5 s, a hidden tab, counts as time away); crews come home every 0.5 s of play; a siege relief
+  returning while you're in its zone outdoors waits (`hold`); `village:saved` from you brings a relief crew home early
+  ("beaten", supplies back); a relief saves the village (`saveVillage(…, 'crew')`, the cages freed, `celebrate` for the
+  next arrival's banner). Heroes walk off to the Wayfarer's Post when sent and back in on return. The Cozy debug section
+  (`registerDebug('cozy')`). Events: `expedition:sent`, `expedition:back { uid, obj, result }`, `cozy:changed`,
+  `hero:away { id, away }`, `hero:levelup { id, lvl, from }` (actions `addXpTo`).
+- **The board** `expeditionBoard.js`: the model beside the Post (one merged mesh, its hull, a lantern), colliders, the
+  F interaction, a "!" while a report waits.
+- **UI**: `ui/expeditions.js` + `.css` (the Expedition Board panel, 'expeditions'), `ui/awayCard.js` ('awayCard'),
+  `ui/cozyChip.js` (the crews chip in `.hud-tr`), `ui/cozyIcons.js`, `ui/cozy.css` (the chip, the away badge on the hero
+  wheel and the HUD minis, the away card). padNav START / HANDLERS entries (`.p-exp`: Y best crew, X clear).
+- **Hooks**: heroes.js (`away`, `bench` / `next` / `spawnBench` / `canSwitch` skip away heroes, `benchShown`, `roster`'s
+  `away`), heroWheel.js, hud.js (benchTick), rpg/actions.js (`addXpTo`), rpg/zones.js (`savedBy`, `celebrate`,
+  `dungeon.crew`, `saveVillage(state, id, by)`), world/services.js (sleep adds the skipped hours), ui.js, padNav.js.
+- **QA**: test-rpg "COZY", `tools/qa/s31-expeditions.mjs` (the cozy route end to end: a fresh game, no fighting, Takemori
+  saved; away heroes; the hold rule; time away; pad and phone; shots in `tools/qa/tmp/s31-expeditions/`), prod-smoke
+  `cozy`, `tools/expedition-sim.mjs` (the pace).
+
+## The cozy path, phase B: the peaceful overworld (src/cozy/ — design and as built: docs/COZY.md §6, §13.2; ROADMAP CZ-3, CZ-4)
+- **Pure modules** (test-rpg "COZY: THE PEACEFUL OVERWORLD", "COZY: THE SIGHTINGS BOARD"):
+  - `peaceful.js`: `WILD` (radius, packs, the level rule, ranks, leash 6 m, trail gap 3 m), `normArea` / `wildAreas`
+    (recipe `layout.wild` → `{ id, name, jp, x, z, r, packs, spur }`), `wildAt` / `inWild`, `areaIssues` / `wildIssues`
+    (the trail check), `isPeaceful` (+ the session `setPeacefulOverride`), `peacefulFilter`, `wildRank`, `wildLevel`
+    (clamp(hero + 2, band low + 2, band top + 1)), `pastLeash`, `titled`.
+  - `sightings.js`: `rollSightings(day, zones)` (3 a world day, seeded), `bountyFor` / `packCoins`, `sightingsToday`,
+    `clearSighting`, `renownTitle` / `nextTitle`, `sightingsOf` (`state.cozy.sightings = { day, list, renown, total }`;
+    `normalizeCozy` keeps it).
+- **The layout** (`regions/layoutGen.js`): `makePlan` drops a wild area that fails the trail check (`plan.wildIssues`),
+  keeps camps and POIs out, adds a side path (`entry`) and a `wild` disc (flattened by regionTerrain like a camp);
+  `generateRegion(def, { visit, mlvl, heroLvl })` adds 2–3 packs per area (tagged `wild`) and a golden cache (`wild`),
+  with their own RNG. `layout.wild`.
+- **The mode** (`regions/regionMode.js`): `build` sets `layout.peaceful`, filters the spawns, sets `layout.glades`, adds
+  today's sightings (`G.peaceful.addSightings`), wraps the layout's populate hook with `wildPopulate` (the markers) and
+  adds a saved village's notice board (`G.peaceful.zoneBoard`); `start` makes a `WildRuntime` and tags the wild and
+  sighting packs; `spawnPack` honours `sp.monster`; `wildAt(x, z, pad)`. RegionWorld's populate ctx: `inWild`, `wildAt`,
+  `peaceful`, `glades`; `isFree` keeps a wild disc's floor clear (r − 2.5).
+- **The runtime**: `wildWorld.js` (`WildRuntime`: the leash, the entry toast, `wild:enter` / `wild:cleared`, the
+  sighting packs' names, pins and the bounty trigger, the debug rings); `wildMarkers.js` (`wildMarker` gateway kit piece,
+  `edgeTint`, `wildPopulate`); `wildKit.js` (`farAt`, `tallOk`, `spots`, `gladeGround` for the biomes' dressing);
+  `peacefulRun.js` `installPeaceful(G, village)` (game.js, after scavenging) → `G.peaceful = { isPeaceful, wildAreas,
+  wildAt, override, sightings, hoursLeft, renown, card, addSightings, claim, board, zoneBoard }` and the Cozy debug
+  actions; `sightingsBoard.js` (Blossom Hollow's board beside the Expedition Board). Event: `sighting:cleared`.
+- **The biomes**: each recipe's `wildDressing` (bamboo, maple, onsen; Tidepool's in `assets/tidepoolWorld.js`) dresses
+  its two areas and, on a peaceful visit, the glades; their effects add glade critters to existing batches.
+- **UI**: `ui/sightings.js` + `.css` ('sightings'; also the map legend swatches and the Travel Map's dot), `ui/map.js`
+  (`LEGEND_REGION`), `ui/travel.js` (the Trail / Wild / Sighting rows, `.tv-sight`), `world/minimap.js` (`wildMark`,
+  `sightingPin`, `pawMark`, phase C's `scavMarks`), padNav (`.p-sight`: A opens the Travel Map).
+- **QA**: `tools/qa/s32-peaceful.mjs`, prod-smoke `peaceful`, `tools/qa/wild-shots.mjs`.
+
+## The cozy path, phase C: scavenging (src/cozy/ — design and as built: docs/COZY.md §7, §13.3; ROADMAP CZ-5, CZ-6)
+- **Pure** (test-rpg "COZY: SCAVENGING"): `scavenge.js`: `NODE_KINDS` (21: name, verb, mats / pantry / coins ranges,
+  model), `AREA_DEFS` (home and the four zones: node counts, the dig table, 2–3 spots a day, the dig mound's ground),
+  `scavState` (`state.cozy.scav`), `areaRec` (the world-day refill), `takeNode` / `findSpot` / `digSpot` (the streak),
+  `spotCount` / `pickSpots` / `spotId`, `gatherYield` / `digYield` (a Perfect dig's bonus roll), `digResult` (the band,
+  `DIG_BAND` 0.7–0.85 of `DIG_SECS` 1.4), `questFind` / `markQuestDig`, `staleAreas` (the away card), `meanGather` /
+  `meanDig` (the sim), `SCAV_XP` (CZ-9's numbers).
+- **Runtime**: `scavengeWorld.js` `installScavenge(G, village)` (game.js, after installCozy) → `G.cozy.scav = { area,
+  view, nodes, spots, busy, session, gather(id), digAt(id, { k }), reveal, refill, mapMarks, setWild, update, ringSpeed,
+  screenWhy, homeSites }`; `life/index.js` calls its `update(dt)` every frame. A view per world (the village's lives for
+  the session; a zone's is built on `mode:changed` and taken out of the scene by the region's disposers): placement
+  (`HOME_SITES` / `HOME_DIG`; `zoneSlots`, `digSlots`), the camera check (`occluders`: a 0.5 m column grid of the opaque
+  scenery; `screened`: the heightfield and the grid marched along the camera's line from the game yaw and both 45°
+  yaws), one BatchedMesh (`scavengeModels.js scavBatch`), one Points sparkle and one instanced ground-ring cue (`ringMaterial`; 3 draws an area), the interactables (a node each and a
+  pool of 4 dig spots, parked at y −50 when hidden or taken, so the village's list never changes length), the gather
+  (`tools.run({ anywhere })`), the dig session (control locked; the hold read from interact / attack / reel on every
+  device; the stand-beside staging; `ui/digRing.js`), Shadow's nose, the day's refill (`cozy:changed` and every frame),
+  the away card's lines, the Cozy debug actions.
+- **Models**: `scavengeModels.js` `nodeGeos(model)` → `{ full, taken }`, `digGeos(ground)` → `{ mound, dug }` (Builder
+  pieces flattened to position / normal / colour, cached for the session), `scavMaterial()` (one vegToon, never disposed),
+  `scavBatch`, `placeAt`, `studioGround` (QA).
+- **Hooks**: `actors/companion.js` (`noseTo`, `digWith`, `digDone`, `scavTick` ahead of combat and the whelp),
+  `actors/lifePoses.js` (`scavDig`, `pawDig`, `sniff`), `actors/animator.js` (a quadruped's front paws scoop on `dig` /
+  `pawDig`), `life/tools.js` (`anywhere`), `life/life.sfx.js` (`sniff`, `dig_perfect`), `life/cooking.js` (`poundMochi`
+  with `out: { mat, n }`, `MAKES`, `dishDef`) + `rpg/actions.js cook` + `ui/cook.js` + `life/pantryIcons.js` (Pound Mochi),
+  `ui/menu.js` (Settings › Dig with Shadow: `settings.digMode` 0 hold · 1 tap), `ui/awayCard.js` + `expeditionRun.js`
+  (`away.refills`), `game.js` (install; Shadow's tips wait while `G.cozy.scav.busy`). Phase B's `world/minimap.js` draws
+  `mapMarks()`.
+- **QA**: `tools/qa/s33-scavenge.mjs`, `tools/qa/scavenge-shots.mjs`, `tools/scavenge-sim.mjs`, prod-smoke `dig`.
+
 ## Persistent state `G.state` (JSON-serialisable, saved to localStorage)
 ```js
 state = {
@@ -843,8 +940,42 @@ state = {
   //   workbench: { known, crafted }; per building record: interior, owner, style, homeStars
   cookbook: { known: { recipe: day }, cooked: { recipe: n }, quick },
   // per hero: heroes[id].player.meal = { dish, buff, tier, left (s of play), dur } (Well Fed)
+  cozy: { v, clock: { h, wall }, exp: { active, reports, progress, done, errands, tired, seq }, guild, scav: { [area]: { day, taken, found, dug, quest }, tools, stats, cheat }, sightings }, // the cozy path (src/cozy/state.js, scavenge.js)
 }
 ```
+
+## Save flow (src/core/autosave.js, src/ui/saveGlyph.js — ROADMAP R-11)
+- **Write**: `G.save()` (game.js `save()`) skips while `G.saveBlocked` (the debug menu's Restore), never stores a
+  knocked-out hero (`life: null`), stamps the hour and day, then `writeSave(saveableState(G.state))`: the stored save it
+  replaces is copied to `chewy3d.save.prev` first (a rotating backup; only when the stored one is known good, and not when
+  it is unchanged), then `chewy3d.save`. A full storage (`QuotaExceededError`) drops `.prev` and retries; still full →
+  one toast a session, no exception. The debug menu's slot (`chewy3d.save.debugBackup`) is separate and untouched.
+- **Read**: `loadSave()` → `autosave.loadSave(validate)`: parse + `version` + the normalizers (`normalizeHeroes` /
+  `normalizeZones` / `normalizeCozy`; idempotent, so boot runs them again harmlessly). A main save that won't parse or
+  normalize boots from `.prev` with a gentle toast (and isn't rotated over it). No main save is a new game: `.prev` is
+  never used then (New Game removes the main save).
+- **When**: mode changes (dungeon / region / village / houses), the menu's Save and Quit, the desktop app's Quit game,
+  game events that call `G.save()` themselves, plus the autosave module's:
+  - **timed**: Settings › Autosave (`ui.settings.autosave` = index into Off / 1 / 2 / 5 min, default 2 min). Counts play
+    time only (page visible, not paused, not the title). Any save restarts it.
+  - **events** (≤ 1 per 20 s; a burst folds into one save at the window's end; dropped if the game saved after the event):
+    `quest:update`, `player:levelup`, `hero:levelup`, `village:changed`, `building:levelup`, `house:upgraded`,
+    `hero:joined`, `village:saved`, `villager:rescued`, `village:campCleared`, `dungeon:cleared`, `region:cleared`,
+    `pinnacle:cleared`, `tier:unlocked`, `spirit:unlocked`, `expedition:sent`, `expedition:back`, `item:pickup` of a
+    unique / set item, `coins:changed` with `delta ≤ -300` (a big purchase). Off stops only the timed saves.
+  - **deferred, never skipped** while `blocker(G)` names something: `saveBlocked`, the title, the hero down, a
+    transition (iris, a house door), a hero switch, a cutscene (`introFocus`, `introJoinPending`, `cutscene`), a joining
+    scene (`heroes.poeJoin / stzJoin / gldJoin.busy`), a boss fight (alive and aggro / intro / within 14 m), an arena
+    seal, a build-mode tool or drag, a decor piece in hand. It goes 4 s after the blocker clears.
+  - **page lifecycle** (every platform; was touch-only in ui/mobile.js): `visibilitychange` → hidden, `pagehide`,
+    `beforeunload`; one write per burst (600 ms), not on the title.
+- **Cost**: the module times every write (`G.autosave.stat`). Over 4 ms (a running average) the autosave waits for
+  `requestIdleCallback` (3 s cap). A fat late-game save (5 heroes, every zone / tier / village, 160 stash items, ~210
+  buildings, every furniture; 151 KB) stringifies in ~0.7 ms and writes (with the rotation) in ~1.4 ms on the dev PC.
+- **Glyph**: a paw pill, "saving…", in the HUD layer's bottom-left (bottom-right on touch, left-handed), so inside the
+  safe area / itch inset / Deck margins; ~1.6 s; no toast; `prefers-reduced-motion` drops the paw steps.
+- **Test hooks**: `G.autosave` — `manual = true` (the real 1 s clock stops), `advance(s, { play })`, `state()`, `log`,
+  `life`, `stat`. QA: `tools/qa/s36-autosave.mjs`.
 
 ## Items
 ```js

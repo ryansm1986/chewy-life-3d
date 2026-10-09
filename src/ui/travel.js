@@ -57,12 +57,13 @@ export class TravelPanel extends Panel {
   render() {
     const L = this.list(), hero = this.G?.state?.player?.lvl || 1;
     // pins over the painted map
+    const card = id => (id !== 'village' && this.G?.peaceful?.card?.(id)) || null; // (the wild areas, peace and today's sightings: cozy/peacefulRun.js)
     this.pins.innerHTML = L.map((p, i) => {
-      const s = SPOT[p.id] || { x: 0.5, y: 0.5, g: 'pin' };
+      const s = SPOT[p.id] || { x: 0.5, y: 0.5, g: 'pin' }, live = p.unlocked && (card(p.id)?.sightings || []).some(q => !q.done);
       const cls = ['tv-pin', p.unlocked ? 'open' : 'locked', p.here ? 'here' : '', p.id === this.sel ? 'sel' : '', p.cleared ? 'cleared' : ''].join(' ');
       return `<button class="${cls}" data-id="${p.id}" style="left:${s.x * 100}%;top:${s.y * 100}%;--pc:${p.color}">
         <span class="tv-pin-ic">${glyph(p.unlocked ? s.g : 'lock')}</span><span class="tv-pin-n"><b>${i + 1}</b>${esc(p.short || p.name)}</span>
-        ${p.cleared ? `<span class="tv-stamp">${p.dungeon ? '踏破' : '討伐'}</span>` : ''}${p.here ? `<span class="tv-here">${glyph('paw')}</span>` : ''}</button>`;
+        ${p.cleared ? `<span class="tv-stamp">${p.dungeon ? '踏破' : '討伐'}</span>` : ''}${p.here ? `<span class="tv-here">${glyph('paw')}</span>` : ''}${live ? '<span class="tv-sight" title="A sighting today"></span>' : ''}</button>`;
     }).join('');
     const p = L.find(x => x.id === this.sel) || L[0]; if (!p) { this.card.innerHTML = ''; return; }
     const lv = p.levels ? `Lv ${p.levels[0]}–${p.levels[1]}` : 'Home';
@@ -72,6 +73,7 @@ export class TravelPanel extends Panel {
       : !p.unlocked ? `<div class="tv-st locked">${glyph('lock')}${esc(p.why || 'Locked')}</div>`
       : `<button class="btn tv-go">${glyph('map')}${p.id === 'village' ? 'Head home' : 'Set off!'}</button>`;
     this.card.style.setProperty('--pc', p.color);
+    const pc = card(p.id), sights = (pc?.sightings || []).filter(q => !q.done);
     this.card.innerHTML = `<div class="tv-wm">${glyph(SPOT[p.id]?.g || 'map')}</div><div class="tv-hd"><span class="tv-ic">${glyph(SPOT[p.id]?.g || 'map')}</span><div><b>${esc(p.name)}</b><span class="jp">${esc(p.jp || '')}</span></div></div>
       <p class="tv-sub">${esc(p.sub || '')}</p>
       <div class="tv-rows">
@@ -81,6 +83,9 @@ export class TravelPanel extends Panel {
         ${p.dungeon ? `<div><span>Dungeon</span><b>${esc(p.dungeon.name)}${p.dungeon.cleared ? ` <em class="tv-beat">cleared ×${p.dungeon.cleared}</em>` : ''}</b></div>` : ''}
         ${p.boss ? `<div><span>Boss</span><b>${esc(p.dungeon?.boss || p.boss)}${p.dungeon ? ' <em class="tv-beat">deep in the dungeon</em>' : p.cleared ? ` <em class="tv-beat">defeated ×${p.cleared}</em>` : ''}</b></div>` : ''}
         ${p.monsters?.length ? `<div><span>Yokai</span><b>${p.monsters.map(esc).join(', ')}</b></div>` : ''}
+        ${p.village && pc ? `<div><span>Trail</span><b>${pc.peaceful ? 'Peaceful <em class="tv-beat">yokai only in the wild places</em>' : 'Under siege <em class="tv-beat">yokai on the trail</em>'}</b></div>` : ''}
+        ${pc?.wild?.length ? `<div class="tv-wild"><span>Wild</span><b>${pc.wild.map(esc).join(', ')}</b></div>` : ''}
+        ${p.unlocked && sights.length ? `<div class="tv-sightrow"><span>Sighting</span><b>${sights.map(q => esc(q.name)).join(', ')} <em class="tv-beat">bounty today</em></b></div>` : ''}
         ${p.levels ? `<div><span>Visits</span><b>${p.visits || 0}</b></div>` : ''}
       </div>
       ${status}`;

@@ -233,6 +233,11 @@ export class RegionWorld {
       inCamp: (x, z, pad = 0) => P.camps.some(c => Math.hypot(x - c.x, z - c.z) < c.r + pad),
       inPoi: (x, z, pad = 0) => P.pois.some(c => Math.hypot(x - c.x, z - c.z) < c.r + pad),
       inVillage: (x, z, pad = 0) => !!P.village && Math.hypot(x - P.village.x, z - P.village.z) < P.village.r + pad,
+      // the wild areas (docs/COZY.md §6.2: plan.wild, cozy/peaceful.js) and this visit's peaceful state: a saved zone's
+      // emptied camp sites are wildlife glades (layout.glades, set by RegionMode before the world builds)
+      inWild: (x, z, pad = 0) => (P.wild || []).some(a => Math.hypot(x - a.x, z - a.z) < a.r + pad),
+      wildAt: (x, z, pad = 0) => (P.wild || []).find(a => Math.hypot(x - a.x, z - a.z) < a.r + pad) || null,
+      peaceful: !!this.L.peaceful, glades: this.L.glades || [],
       onMap: (x, z, pad = 0) => x > pad && z > pad && x < SIZE - pad && z < SIZE - pad,
       isFree: (x, z, r = 0.5, o = {}) => W.isFree(x, z, r, o),
       canPlace: (x, z, r = 0.5, o = {}) => { if (!W.isFree(x, z, r, o)) return false; if (o.reserve !== false) W.reserve(x, z, o.space ?? r); return true; },
@@ -285,7 +290,8 @@ export class RegionWorld {
     if (inMap) {
       if (o.path !== 0 && this.pathDist(x, z) < (o.path ?? P.trailW + 0.9) + r) return false;
       if (!o.clearings && (Math.hypot(x - P.arena.x, z - P.arena.z) < P.arena.r + (o.arena ?? 0.5) + r || Math.hypot(x - P.start.x, z - P.start.z) < P.start.r + r ||
-        P.camps.some(c => Math.hypot(x - c.x, z - c.z) < c.r + r) || P.pois.some(c => Math.hypot(x - c.x, z - c.z) < c.r + r))) return false;
+        P.camps.some(c => Math.hypot(x - c.x, z - c.z) < c.r + r) || P.pois.some(c => Math.hypot(x - c.x, z - c.z) < c.r + r) ||
+        (P.wild || []).some(a => Math.hypot(x - a.x, z - a.z) < a.r - 2.5 + r))) return false; // (a wild area: its rim may hold the wild's plants, its floor stays open for the fight)
       if (o.lanes && T.openDist(x, z) < r + (o.lanes === true ? 0 : o.lanes)) return false;
       // the zone village's clearing (src/regions/village) keeps the wild out, clearings or not; the village's own pieces pass o.village
       if (!o.village && P.village && Math.hypot(x - P.village.x, z - P.village.z) < P.village.r + r + (r >= 0.6 ? P.village.clear || 0 : 0)) return false; // (clear: a ring the village's land keeps free of the wild's trees)

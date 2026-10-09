@@ -8,7 +8,10 @@ his Boston terrier sidekick **Shadow**, and **Rosie**, a little girl with curly 
 - Double-click **`Play Chewy Life.cmd`** (installs dependencies the first time, builds the game in about a second, then opens it in your browser at http://localhost:4173), or
 - `npm install` then `npm run dev` and open http://localhost:5173
 
-Chrome / Edge recommended (WebGL2). Saves automatically to the browser's local storage.
+Chrome / Edge recommended (WebGL2). Saves automatically to the browser's local storage: on every trip between places,
+after quests, level ups, building and big finds, when the tab is hidden or closed, and every couple of minutes of play
+(Settings › *Autosave*: Off · 1 min · 2 min · 5 min; a little paw "saving…" shows in the corner). The save before the
+latest is kept as a backup and loads by itself if the latest one is ever damaged.
 
 **itch.io** (<https://holiestdiver.itch.io/pawhaven>): `npm run push:itch` builds, tests and pushes with butler;
 `npm run build:itch` makes an upload-ready zip in `release/` (`npm run test:itch` also boots it in an itch-style iframe).
@@ -125,7 +128,7 @@ its own (on itch, use itch's full-screen view).
 - Cute yokai monsters (mochi slimes, dust bunnies, kinoko, lantern ghosts, kasa-obake, fox-fire wisps, oni imps, tanuki bandits) in packs led by **champions** and **uniques** with D2-style modifiers (fire enchanted, frosty aura, teleporting, vampiric…).
 - Bosses every 5 floors: **King Mochi**, **Lord Karakasa**, **Oni Chef Gorobei**, **Tamamo the Nine-Tailed**.
 - **Three skill trees × 7 skills** (Bone Blade, Fetch Mastery, Pack Spirit) with synergies, 60 levels, stat points.
-- **Chewy the samurai**: a black-and-gold haori and hakama, and a Bone Katana drawn from the saya at his hip for quick-draw cuts, two-handed swings, stances and battle cries; a combo ends with the katana slid home into its saya (Settings › *Hero models*: Samurai, Toybox or Storybook).
+- **Chewy the samurai**: a black-and-gold haori and hakama, and a Bone Katana drawn from the saya at his hip for quick-draw cuts, two-handed swings, stances and battle cries; a combo ends with the katana slid home into its saya.
 - **Poe the pug ninja**, the third hero: met in the Whispering Bamboo Grove, where she "stealthily" tails you (snorting) until a sneeze gives her away. A giant bone fūma shuriken thrown out and back, and three trees — Shuriken Arts (kunai fans, buzz-saws, shuriken rain), Ninjutsu (smoke bombs, shadow clones, a fire puff ball, thunder paw, a smoke dragon) and Shadow Step (backstabs, afterimage dashes, vanish, caltrops, bullseye marks) — all 18 actives chargeable (docs/POE.md).
 - **Charged abilities**: hold any active skill to charge it (a ring fills to Stage Ⅰ, Ⅱ, Ⅲ) and let go for a bigger version — a rolling shockwave cleave, a piercing fastball, a giant squeaker, a meteor shower… Skill points buy **charge perks** per skill in the K panel's Charge card: more stages, a quicker wind-up, extra projectiles and a unique trick for every skill.
 - **Loot**: normal / magic / rare / unique / set items with affixes, sockets and treat gems; loot beams for rares+; potions, materials and coins.

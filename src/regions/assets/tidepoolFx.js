@@ -35,7 +35,9 @@ export class TidepoolFx {
     if (!CR || !CM) return;
     // crabs on the sand near the waterline (they walk sideways and bolt when you come close)
     const beaches = [S.wreckBeach, S.cove, S.start, ...S.via.slice(0, 3)].map(([x, z]) => ({ x, z, r: 7 }));
-    CR.add({ name: 'crab', geo: CM.crab({ body: '#e8583a' }), count: 12, habitat: 'ground', homes: beaches, speed: 1.5, flee: 3, side: true, hop: 0.02, size: [0.8, 1.2], idle: [1, 3.5] });
+    // (a saved zone's wildlife glades, the emptied camp sites, get crabs of their own: docs/COZY.md §6.1)
+    if (ctx.peaceful) beaches.push(...(ctx.glades || []).map(g => ({ x: g.x, z: g.z, r: g.r + 1.5 })));
+    CR.add({ name: 'crab', geo: CM.crab({ body: '#e8583a' }), count: ctx.peaceful ? 17 : 12, habitat: 'ground', homes: beaches, speed: 1.5, flee: 3, side: true, hop: 0.02, size: [0.8, 1.2], idle: [1, 3.5] });
     CR.add({ name: 'crabBlue', geo: CM.crab({ body: '#4a8ad8' }), count: 5, habitat: 'ground', homes: beaches.slice(0, 3), speed: 1.4, flee: 3, side: true, hop: 0.02, size: [0.7, 0.95] });
     // gulls wheeling over the coast (they don't flee: they're up high)
     CR.add({ name: 'gull', geo: CM.bird({ body: '#f2f4f6', belly: '#ffffff', head: '#fafafa', beak: '#f0b040', s: 1.35 }), count: 7, habitat: 'air',

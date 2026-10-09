@@ -96,6 +96,7 @@ export class Companion extends Actor {
       if (this.moveTo(this.hold.x, this.hold.z, dt, 0.8, 0.15)) { this.faceTarget = this.hold.face; if (!this.anim.action) this.anim.play('sit'); }
       super.update(dt); return;
     }
+    if ((this.nose || this.digging) && this.scavTick(dt, p)) { this.barkTick(dt); U.uBenders.value[1].set(this.pos.x, this.pos.y, this.pos.z, 0.4); super.update(dt); return; } // (scavenging: his nose, his digging)
     this.combatBusy = !!this.combatUpdate?.(dt); // (the whelp flies lower to bite)
     if (this.whelp.steer(dt)) { U.uBenders.value[1].set(this.pos.x, this.pos.y, this.pos.z, 0); super.update(dt); return; } // (a Whelp Bond move: combat/goldenWhelp.js)
     if (this.combatBusy) { super.update(dt); return; }
@@ -151,6 +152,66 @@ export class Companion extends Actor {
     return false;
   }
   bark() { this.anim.play('bark', { force: false }); Events.emit('sfx', 'bark_small', { pos: this.pos }); }
+  // ------------------------------------------------------------------ scavenging (docs/COZY.md §7.1, cozy/scavengeWorld.js)
+  /** Shadow smells a hidden dig spot: his nose goes up, he trots over, paws the ground and sits by it (onArrive: the spot
+   *  shows); onGiveUp if he can't get there. → false when he can't go now (flying as the whelp, fainted, staged, busy) */
+  noseTo(x, z, { onArrive = null, onGiveUp = null } = {}) {
+    if (this.nose || this.digging || this.hold || this.fainted > 0 || this.whelp?.on || this.combatBusy) return false;
+    this.nose = { x, z, phase: 'sniff', t: 0, onArrive, onGiveUp };
+    this.faceTo(x, z); this.anim.play('sniff');
+    Events.emit('sfx', 'sniff', { pos: this.pos });
+    return true;
+  }
+  /** he digs at (x, z) until digDone: at `at` when given (cozy/scavengeWorld.js stages him across the spot from the hero),
+   *  else on the far side of the spot from `from` */
+  digWith(x, z, from, at = null) {
+    if (this.nose) this.nose = null;
+    const dx = x - from.x, dz = z - from.z, l = Math.hypot(dx, dz) || 1;
+    this.digging = at ? { x, z, tx: at.x, tz: at.z, t: 0 } : { x, z, tx: x + dx / l * 0.8, tz: z + dz / l * 0.8, t: 0 };
+  }
+  digDone(perfect) {
+    if (!this.digging) return;
+    this.digging = null;
+    if (this.anim.action?.name === 'pawDig') this.anim.stop('pawDig');
+    if (perfect) { this.anim.play('happy'); Events.emit('sfx', 'bark_small', { pos: this.pos }); }
+    else if (perfect === false) this.anim.play('bark', { force: false });
+  }
+  scavTick(dt, p) {
+    const D = this.digging;
+    if (D) {
+      D.t += dt;
+      if (this.whelp?.on) return false;
+      if (this.moveTo(D.tx, D.tz, dt, 1.3, 0.12) || D.t > 1.6) { this.faceTo(D.x, D.z); if (this.anim.action?.name !== 'pawDig') this.anim.play('pawDig'); }
+      this.anim.mood = 1;
+      return true;
+    }
+    const N = this.nose;
+    N.t += dt;
+    const far = Math.hypot(p.pos.x - N.x, p.pos.z - N.z);
+    // (the hero walked or sprinted on: he gives up and keeps up with them, and the spot shows itself through onGiveUp)
+    if (this.fainted > 0 || this.whelp?.on || (N.phase !== 'sit' && (far > 12 || (p.sprint?.k || 0) > 0.5))) { this.nose = null; N.onGiveUp?.(); return false; }
+    if (N.phase === 'sniff') {
+      this.faceTo(N.x, N.z);
+      if (N.t > 0.85) { N.phase = 'trot'; N.t = 0; this.route.clear(); }
+    } else if (N.phase === 'trot') {
+      // stand at the spot's edge on the hero's side, facing it
+      const dx = p.pos.x - N.x, dz = p.pos.z - N.z, l = Math.hypot(dx, dz) || 1, tx = N.x + dx / l * 0.82, tz = N.z + dz / l * 0.82;
+      if (this.follow(tx, tz, dt, 1.35, 0.25) || N.t > 7) {
+        if (N.t > 7 && Math.hypot(this.pos.x - tx, this.pos.z - tz) > 1.2) this.setPos(tx, tz); // (stuck behind something: he squeezes through)
+        N.phase = 'paw'; N.t = 0; this.faceTo(N.x, N.z); this.anim.play('pawDig');
+      }
+      this.anim.mood = 0.8;
+      if (this.anim.action?.name === 'sit') this.anim.stop('sit');
+    } else if (N.phase === 'paw') {
+      this.faceTo(N.x, N.z);
+      if (N.t > 1.0) { N.phase = 'sit'; N.t = 0; this.anim.stop('pawDig'); this.anim.play('sit'); N.onArrive?.(); Events.emit('sfx', 'bark_small', { pos: this.pos }); }
+    } else {
+      this.faceTo(p.pos.x, p.pos.z);
+      if (!this.anim.action) this.anim.play('sit');
+      if (N.t > 6 || far < 1.8 || far > 10) { this.nose = null; return false; }
+    }
+    return true;
+  }
   // ------------------------------------------------------------------ staying in view (village)
   // 1 = the spot is straight toward the camera from Chewy, -1 = right behind him
   camSide(p, x, z) {

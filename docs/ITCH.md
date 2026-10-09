@@ -71,7 +71,8 @@ itch's command-line uploader, **butler**, uploads only what changed since the la
 
 ## Saves on itch
 
-The game saves to `localStorage` under the keys `chewy3d.save`, the settings, `chewy.style` and `chewy.model`. On itch
+The game saves to `localStorage` under the keys `chewy3d.save` and the settings (`chewy.style` and `chewy.model` were
+the old hero choices, dropped since CT-7). On itch
 that storage belongs to itch's game-hosting domain, not to itch.io, so:
 
 - A save lives in one browser on one machine. A private window, or clearing site data, loses it.
@@ -209,6 +210,15 @@ was easy to leave, and itch's own buttons sat over the minimap and the hero, bag
   in full screen, or in itch's maximized frame.
 - **Saves** on `pagehide` and when the page is hidden (switching apps), as well as `beforeunload` and every 30 s. iOS
   Safari doesn't always send `beforeunload`. There's no "leave page?" prompt: progress is already saved.
+- **CT-7 (the owner's second report, 2026-10-08; CONTROLS §12.10):**
+  - **The stick never drags the page.** A one-finger drag is cancelled unless it starts in a list that scrolls, and the
+    HUD and the play area don't pan. Before, a thumb that landed on the quest tracker or a label could scroll itch's page
+    around the game.
+  - **Full screen fills the iPad.** Going full screen (the game's or itch's Fullscreen button) used to keep an old
+    measurement of the frame, so the HUD kept clear of strips that weren't there (the right side and the bottom). It's
+    measured again on every resize and full-screen change, and in full screen nothing is reserved except the top 24 px.
+  - **Settings fits a tablet** (and every touch screen): a panel taller than the screen scrolls inside it.
+  - **Hero models and Disney style are gone from Settings**: the game is always the samurai Chewy and the Toybox heroes.
 
 **What can't be fixed from inside the frame:**
 - A zoom of itch's own page that starts outside the game (on the page around it). The game can only notice it (the
@@ -260,6 +270,13 @@ exactly):
    page: the progress is still there.
 10. Settings › Controls › Touch › itch.io buttons: try **Top** and **Side** to see the room each keeps, then set it back
     to **Auto**.
+11. (CT-7) In play, put a thumb down on the quest list or the portrait at the top left, and on the empty ground at the
+    bottom left, and drag in big circles: the hero walks (from the ground), and neither the game nor itch's page moves.
+12. (CT-7) Go full screen (the first tap, or itch's Fullscreen button) in landscape, then turn the iPad round and back:
+    the minimap, the buttons and the attack cluster sit right at the screen's edges, nothing is cut off at either side,
+    and there's no empty strip at the right or the bottom.
+13. (CT-7) Open Settings, and Settings › Controls › Touch, in full screen and windowed: the whole panel shows and its
+    list scrolls. Settings has no "Hero models" or "Disney style" rows.
 
 ## Known gaps before a public release
 

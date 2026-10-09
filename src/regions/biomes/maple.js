@@ -11,6 +11,7 @@ import * as BF from '../assets/bambooFlora.js';
 import { Placer, M } from '../assets/bambooKit.js';
 import { viewGuard, handOver, polyDist, sstep, trailCrossing, bridgeDeck, alongTrail, arenaGate } from '../biomeKit.js';
 import { paint, merge, xf } from '../../gfx/geom.js';
+import { farAt, spots, tallOk, gladeGround } from '../../cozy/wildKit.js';
 
 // the river springs from a waterfall on a mossy cliff (north of the crossing, facing south so the camera sees it),
 // runs under the taikobashi and wanders off south-west
@@ -65,7 +66,11 @@ function surface(x, z, h, slope, c, o) {
   const ak = sstep(0, -3, ad), core = sstep(-3, -7, ad + n * 2.2);
   const row = Math.sin((x * Math.sin(0.3) + z * Math.cos(0.3)) * Math.PI / 0.95) > 0.1 ? 1 : 0; // furrows
   o.dirt = Math.max(o.dirt, core * (0.3 + row * 0.35)); o.litter *= 1 - core * 0.5;
-  o.grass = (1 - o.litter * 0.75) * (1 - fk * 0.7) * (1 - ak * 0.45) * (1 - core * 0.4);
+  // the Scarecrow Fields (a wild area, docs/COZY.md §6.2): an old paddy gone to stubble, furrowed like the clearing
+  const sf = (c.plan.wild || []).find(a => a.id === 'scarecrowFields');
+  let sk = 0;
+  if (sf) { sk = sstep(-1, -4, Math.hypot(x - sf.x, z - sf.z) - sf.r + n * 1.6); const fr = Math.sin(((x - sf.x) * 0.31 + (z - sf.z) * 0.95) * Math.PI / 1.05) > 0.1 ? 1 : 0; o.dirt = Math.max(o.dirt, sk * (0.38 + fr * 0.32)); o.litter *= 1 - sk * 0.6; }
+  o.grass = (1 - o.litter * 0.75) * (1 - fk * 0.7) * (1 - ak * 0.45) * (1 - core * 0.4) * (1 - sk * 0.35);
   return o;
 }
 
@@ -190,7 +195,52 @@ function populate(ctx) {
   }
   // --- the arrival: a bench and a lantern
   { const S = plan.start; PL.piece(Pr.bench(0), S.x - 3.2, S.z - 1.4, 0.8); ctx.addCollider(S.x - 3.2, S.z - 1.4, 0.5); PL.piece(Pr.jizo(9), S.x + 2.6, S.z - 2.8, -0.5); ctx.addCollider(S.x + 2.6, S.z - 2.8, 0.3); }
+  wildDressing(ctx, PL);
   handOver(ctx, PL);
+}
+
+// ------------------------------------------------------------------ the wild areas and the glades (docs/COZY.md §6)
+// The Scarecrow Fields: a paddy gone to stubble (its furrows are in the surface), grinning scarecrows with their crows,
+// a drying rack and straw huts on the far rim. Old Root Hollow: a great crimson maple on the far rim over a fairy ring
+// of mushrooms, burrs and leaf heaps. Tall things only on the far half. In a saved zone the emptied camp sites grow back
+// as glades: red spider lilies, mushrooms and susuki (the same batches: no new draw calls).
+function wildDressing(ctx, PL) {
+  const H = (x, z) => ctx.heightAt(x, z);
+  for (const [w, a] of (ctx.plan.wild || []).entries()) {
+    if (a.id === 'scarecrowFields') {
+      for (let k = -5; k <= 5; k++) { // stubble rows along the furrows (low: the fight walks over them)
+        const ox = Math.cos(0.32) * k * 2.1, oz = -Math.sin(0.32) * k * 2.1, L = Math.sqrt(Math.max(0, (a.r - 2.5) ** 2 - (k * 2.1) ** 2)) * 1.6;
+        if (L > 2) PL.multi(Pr.stubble(k + 20, { L }), a.x + ox, H(a.x + ox, a.z + oz), a.z + oz, { rot: 0.32 });
+      }
+      const [hx, hz] = farAt(a, 0.82); PL.piece(Pr.hasa(5, { L: 3.6 }), hx, hz, Math.PI / 4 + Math.PI / 2); ctx.addCollider(hx, hz, 1.3); ctx.reserve(hx, hz, 2.4);
+      for (const s of spots(ctx, a, 2, { k0: 0.75, k1: 0.95, r: 0.8, far: true, seed: 21 + w })) { PL.piece(Pr.warabocchi(30 + (s.rnd() * 4 | 0), { s: 0.95 }), s.x, s.z, s.rot); ctx.addCollider(s.x, s.z, 0.55); }
+      for (const s of spots(ctx, a, 5, { k0: 0.25, k1: 0.9, r: 0.5, space: 3, path: 1.4, seed: 25 + w })) { PL.piece(Pr.kakashi(s.rnd() * 3 | 0), s.x, s.z, Math.PI / 4 + (s.rnd() - 0.5) * 0.9); ctx.addCollider(s.x, s.z, 0.3); }
+      for (const s of spots(ctx, a, 6, { k0: 0.2, k1: 0.95, r: 0.4, seed: 29 + w })) PL.piece(Pr.sheaf(50 + (s.rnd() * 6 | 0)), s.x, s.z, s.rot);
+    } else {
+      ctx.paint('litter', a.x, a.z, a.r + 1, 0.9); ctx.paint('moss', a.x, a.z, a.r * 0.5, 0.35);
+      const [tx, tz] = farAt(a, 0.86); PL.multi(F.maple('dome', 2, 'crimson'), tx, H(tx, tz) - 0.05, tz, { rot: 0.4, s: 1.35 });
+      ctx.addCollider(tx, tz, 0.6); ctx.blockCells(tx, tz, 0.8); ctx.paintFx('canopy', tx, tz, 5, 1); ctx.paintFx('shade', tx, tz, 5, 0.7); ctx.reserve(tx, tz, 2.5);
+      // a fairy ring of mushrooms in the hollow's middle
+      const [fx, fz] = farAt(a, 0.2, 0.9);
+      for (let k = 0; k < 11; k++) { const ang = k / 11 * Math.PI * 2, x = fx + Math.cos(ang) * 2.6, z = fz + Math.sin(ang) * 2.6; PL.multi(F.mushrooms(k % 4, k % 3 ? 'amanita' : 'shiitake'), x, H(x, z), z, { rot: ang * 3, s: 1.1 }); }
+      for (const s of spots(ctx, a, 4, { k0: 0.5, k1: 0.95, r: 0.6, path: 1.4, seed: 33 + w })) PL.multi(F.leafPile(s.rnd() * 4 | 0, { R: 0.8 + s.rnd() * 0.4, h: 0.4, dye: 'mixed' }), s.x, H(s.x, s.z), s.z, { rot: s.rot });
+      for (const s of spots(ctx, a, 6, { k0: 0.3, k1: 0.95, r: 0.35, seed: 37 + w })) PL.multi(F.burrs(s.rnd() * 3 | 0), s.x, H(s.x, s.z), s.z, { rot: s.rot });
+      for (const s of spots(ctx, a, 7, { k0: 0.78, k1: 1.05, r: 0.9, space: 1.8, far: true, seed: 39 + w })) { PL.multi(s.rnd() < 0.5 ? F.chestnut(s.rnd() * 3 | 0) : F.maple('weep', 1 + (s.rnd() * 2 | 0), s.rnd() < 0.5 ? 'crimson' : 'orange'), s.x, H(s.x, s.z) - 0.05, s.z, { rot: s.rot, s: 0.75 + s.rnd() * 0.2 }); ctx.addCollider(s.x, s.z, 0.4); ctx.blockCells(s.x, s.z, 0.5); ctx.paintFx('canopy', s.x, s.z, 3, 1); }
+      // the hollow's hem: mossy old boulders and burr-heaps round the camera-side rim (low: they never hide the fight)
+      for (const s of spots(ctx, a, 6, { k0: 0.82, k1: 1.04, r: 0.6, path: 1.4, seed: 41 + w })) { PL.multi(BF.mossBoulder(s.rnd() * 4 | 0), s.x, H(s.x, s.z) - 0.1, s.z, { rot: s.rot, s: 0.7 + s.rnd() * 0.6 }); ctx.addCollider(s.x, s.z, 0.4); }
+    }
+    for (const s of spots(ctx, a, 6, { k0: 0.85, k1: 1.02, r: 0.4, path: 1.2, seed: 43 + w })) PL.multi(F.susuki(s.rnd() * 3 | 0), s.x, H(s.x, s.z), s.z, { rot: s.rot });
+  }
+  if (!ctx.peaceful) return;
+  for (const [i, g] of ctx.glades.entries()) {
+    gladeGround(ctx, g);
+    for (const s of spots(ctx, g, 10, { k0: 0.12, k1: 0.8, r: 0.4, path: 1.2, seed: 101 + i })) {
+      const q = s.rnd(), y = H(s.x, s.z);
+      if (q < 0.5) PL.multi(F.higanbana(s.rnd() * 3 | 0), s.x, y, s.z, { rot: s.rot });
+      else if (q < 0.75) PL.multi(F.mushrooms(s.rnd() * 4 | 0, s.rnd() < 0.5 ? 'shimeji' : 'shiitake'), s.x, y, s.z, { rot: s.rot });
+      else PL.multi(F.susuki(s.rnd() * 3 | 0), s.x, y, s.z, { rot: s.rot, s: 0.9 + s.rnd() * 0.3 });
+    }
+  }
 }
 
 // ------------------------------------------------------------------ critter models (+z forward, feet at y = 0)
@@ -229,7 +279,7 @@ function effects(ctx) {
     CR.add({ name: 'akatombo', geo: CM.butterfly({ body: '#b82a1a', wing: '#ffb8a0' }), count: 14, habitat: 'air', homes: [...lanes, ...FIELDS.map(([x, z, r]) => ({ x, z, r }))], alt: [0.9, 2.2], speed: 2.2, flee: 0, flap: { from: 0.01, speed: 26, amp: 0.7 } });
     CR.add({ name: 'crow', geo: CM.bird({ body: '#2a2a34', belly: '#3a3a46', head: '#22222a', beak: '#3a3432', s: 1.3 }), count: 6, habitat: 'ground', homes: FIELDS.map(([x, z, r]) => ({ x, z, r })), speed: 1.3, flee: 5, hop: 0.12, flap: { from: 0.05, speed: 14, amp: 0.8 } });
     CR.add({ name: 'squirrel', geo: squirrelGeo(), count: 8, habitat: 'ground', homes: [...lanes, { x: ORCHARD.x, z: ORCHARD.z, r: ORCHARD.r }], speed: 2.4, flee: 4, hop: 0.16, idle: [1, 3] });
-    CR.add({ name: 'deer', geo: deerGeo(), count: 3, habitat: 'ground', homes: RIVER.slice(4, 8).map(([x, z]) => ({ x, z, r: 7 })), speed: 1.1, flee: 7, hop: 0, idle: [3, 7] });
+    CR.add({ name: 'deer', geo: deerGeo(), count: ctx.peaceful ? 6 : 3, habitat: 'ground', homes: [...RIVER.slice(4, 8).map(([x, z]) => ({ x, z, r: 7 })), ...(ctx.glades || []).map(g => ({ x: g.x, z: g.z, r: g.r + 2 }))], speed: 1.1, flee: 7, hop: 0, idle: [3, 7] });
     CR.add({ name: 'koi', geo: CM.fish({ body: '#ff7a3a', fin: '#fff0e0', s: 1.3 }), count: 8, habitat: 'water', homes: RIVER.slice(3, 7).map(([x, z]) => ({ x, z, r: 3 })), speed: 0.7, flee: 2, depth: [0.2, 0.35], shadow: false });
   }
   return null;
@@ -303,6 +353,11 @@ export default {
     village: { at: [78, 79], r: 12.5, clear: 4 }, // (clear: the hamlet keeps its land free of the wild's trees for 4 m round)
     camps: 7, campR: 6.5, campGap: 12, pois: 3, poiKinds: ['cache', 'shrine', 'feature'], poiAt: [[58, 42, 'feature'], [52, 62, 'cache'], [98, 84, 'shrine']], lanes: 4.5, trailW: 1.45,
     avoid: [...FIELDS.map(([x, z, r]) => [x, z, r - 1]), [ORCHARD.x, ORCHARD.z, 1], [FALL.x, FALL.z, 5], ...RIVER.slice(0, 9).map(([x, z]) => [x, z, 3.4])], // (+ the site's own radius)
+    // the wild areas (docs/COZY.md §6.2): they keep their yokai once Akane is saved; off the trail, on side paths
+    wild: [
+      { id: 'scarecrowFields', name: 'the Scarecrow Fields', jp: '案山子の田', at: [84, 32], r: 14, packs: 3, spur: [[75, 57], [80, 47]] }, // (the side path climbs east of the waterfall)
+      { id: 'oldRoot', name: 'Old Root Hollow', jp: '古根の窪', at: [16, 64], r: 12, packs: 2 },
+    ],
   },
   populate, effects, interactables,
   footstep(pos, world) {

@@ -43,11 +43,11 @@ const OFF_DARK = typeof location !== 'undefined' && /[?&]off=[^&]*\bdark\b/.test
 //   The rig then carries parts.fumaMount: a group at the hub turned to that orientation (actors/poeGear.js dressPoe).
 export const HERO_MODELS = {
   chewy: { file: 'chewy_disney', name: 'Chewy', outline: '#2a1812', earGain: 2.2, palm: [0, -0.045, 0.012], back: [0, 0.02, -0.125] },
-  // the "Toybox" Chewy (tools/blender/work/codex/chewy-b, the codex-blender skill): the samurai's fallback, and selectable
-  // (Settings > Hero models > Toybox, ?chewymodel=toy); the Storybook (Disney) one above is the last fallback
+  // the "Toybox" Chewy (tools/blender/work/codex/chewy-b, the codex-blender skill): the samurai's fallback, and the QA's
+  // ?chewymodel=toy. The Storybook (Disney) one above is reached only by ?chewymodel=disney (CT-7)
   chewyToy: { file: 'chewy_b', name: 'Chewy', outline: '#2a1812', earGain: 1.6, tint: [1.05, 1.12, 1.18], palm: [0, -0.055, 0.015], back: [0, 0.13, -0.17] }, // tint: under the warm toon light and grade the painted chocolate reads maroon; a cool lift brings back the sheet's chocolate
   // the samurai Chewy (tools/blender/work/codex/chewy-samurai, sheet E "Black and Gold"; docs/HEROES.md §8): the default
-  // Chewy (chewyModel() 'samurai'), falling back to chewy_b, then the Storybook one. The skeleton and the face rig are
+  // Chewy (chewyModel() 'samurai'), falling back to chewy_b (then his kit build). The skeleton and the face rig are
   // chewy_b's, and so is the fur's paint (and its tint, which keeps his eye whites and muzzle white). sayaMount from
   // that folder's export/saya_mount.json (model metres, game axes; the scabbard is 0.553 m long, the mouth's inner slot
   // 12 mm deep, so the tsuba sits flush). darkGrade's 5th value gates it to the near-neutral cloth (chroma under it) and darkNeutral
@@ -69,8 +69,8 @@ export const HERO_MODELS = {
   // villager, not a playable hero (game.js hands her Villager this rig); hat: the nightcap anchor on her curls [x, y, z, scale]; wave: 'out' waves and cheers outward, squint: her happy lids [upper, lower] (animator.js);
   // darkGrade: the warm grade turned her chocolate hair maroon (a tint would grey her skin), so only the dark texels shift
   rosie: { file: 'rosie_toy', name: 'Rosie', outline: '#4e2a18', earGain: 0, darkGrade: [0.4, -10, 6, 4], wave: 'out', squint: [0.40, -0.26], palm: [0, -0.05, 0.012], back: [0, 0.1, -0.15], hat: [0, 0.44, -0.03, 1.15] },
-  // the Toybox Moka (tools/blender/codex/assets/moka-toy, the toybox-character skill, Opus builder): the default Moka; the
-  // Storybook one below stays the fallback. Its attach points and grade are set when the rig lands.
+  // the Toybox Moka (tools/blender/codex/assets/moka-toy, the toybox-character skill, Opus builder): the Moka; the
+  // Storybook one below is only for ?chewymodel=disney. Its attach points and grade are set when the rig lands.
   mokaToy: { file: 'moka_toy', name: 'Moka', outline: '#2a1510', earGain: 0.45, darkGrade: [0.2, 4, 16, 12], wave: 'front', palm: [0, -0.054, 0.009], back: [0, 0.02, -0.13] },
   moka: { file: 'moka_disney', name: 'Moka', outline: '#2a1510', earGain: 1.7, earFlip: true, palm: [0, -0.045, 0.012], back: [0, 0.02, -0.13] },
   // the Toybox Poe (docs/POE.md §8; tools/blender/work/codex/poe-toy, the toybox-character skill, Opus builder): the
@@ -123,34 +123,49 @@ export const HERO_MODELS = {
   shadowWhelp: { file: 'shadow_whelp', name: 'Shadow', outline: '#1c181e', earGain: 0, earDamp: 0.6, sitDrop: 0.08, darkGrade: [1, -4, 14, -9] },
 };
 
-// Disney style (baked heroes + sculpted kit) or the classic toon kit: ?chewy=disney|classic overrides the saved choice
-export function heroStyle() {
-  const p = new URLSearchParams(location.search).get('chewy');
-  if (p) return p;
-  try { return localStorage.getItem('chewy.style') || 'disney'; } catch { return 'disney'; }
+// The game plays one cast (ROADMAP CT-7, the owner's call 2026-10-08): the samurai Chewy and the Toybox Moka, Poe, Floofy
+// and Foosy, on the baked ('disney') style. Settings no longer offers "Hero models" or "Disney style"; the old saved
+// choices (localStorage chewy.style, chewy.model, chewy.modelV, and the settings' disneyChewy / heroModel) are dropped
+// quietly on the first call. The URL keeps the QA's and dev's overrides only: ?chewy=classic|disney (the classic toon kit)
+// and ?chewymodel=samurai|toy|disney (the Toybox Chewy, chewy_b; or the Storybook heroes).
+const QS = new URLSearchParams(typeof location === 'object' ? location.search : '');
+let forgot = false;
+function forgetOldChoice() {
+  if (forgot) return;
+  forgot = true;
+  try {
+    for (const k of ['chewy.style', 'chewy.model', 'chewy.modelV']) localStorage.removeItem(k);
+    const S = 'chewy3d.settings', s = JSON.parse(localStorage.getItem(S) || 'null');
+    if (s && ('disneyChewy' in s || 'heroModel' in s)) { delete s.disneyChewy; delete s.heroModel; localStorage.setItem(S, JSON.stringify(s)); }
+  } catch { /* private mode */ }
 }
-export function setHeroStyle(s) { try { localStorage.setItem('chewy.style', s); } catch { /* private mode */ } }
-// which baked heroes (Settings > Hero models; ?chewymodel= overrides the saved choice): 'samurai' (the default: the
-// samurai Chewy, the other heroes Toybox), 'toy' (the Toybox Chewy, chewy_b, and the Toybox heroes) or 'disney' (the
-// Storybook heroes). A saved 'toy' from before the samurai (it was the default then) moves to 'samurai' once
-// (chewy.modelV 2); after that the saved choice is kept.
+/** 'disney' (the baked heroes and the sculpted kit), or ?chewy= for the QA */
+export function heroStyle() {
+  const p = QS.get('chewy');
+  if (p) return p;
+  forgetOldChoice();
+  return 'disney';
+}
+/** (kept for old imports: the style is no longer a choice, so nothing is saved) */
+export function setHeroStyle() { /* CT-7: locked */ }
+/** which baked heroes: 'samurai' always (the samurai Chewy, the other heroes Toybox); ?chewymodel=toy|disney for the QA */
 export const CHEWY_MODELS = ['samurai', 'toy', 'disney'];
 export function chewyModel() {
-  const p = new URLSearchParams(location.search).get('chewymodel');
+  const p = QS.get('chewymodel');
   if (p) return p;
-  try {
-    let m = localStorage.getItem('chewy.model');
-    if (localStorage.getItem('chewy.modelV') !== '2') { if (m === 'toy') localStorage.setItem('chewy.model', m = 'samurai'); localStorage.setItem('chewy.modelV', '2'); }
-    return m || 'samurai';
-  } catch { return 'samurai'; }
+  forgetOldChoice();
+  return 'samurai';
 }
-export function setChewyModel(m) { try { localStorage.setItem('chewy.model', m); localStorage.setItem('chewy.modelV', '2'); } catch { /* private mode */ } }
+/** (kept for old imports: the model is no longer a choice, so nothing is saved) */
+export function setChewyModel() { /* CT-7: locked */ }
 /** the Toybox heroes (vs the Storybook ones): with the samurai Chewy or the Toybox one */
 export const toyHeroes = (m = chewyModel()) => m === 'samurai' || m === 'toy';
-// the Toybox heroes load first, falling back to the Storybook model; the samurai Chewy falls back to the Toybox one
+// The Toybox heroes, and the samurai Chewy falling back to the Toybox one (chewy_b). Never a Storybook model on the
+// Toybox cast: a hero whose Toybox rig is missing or still loading plays its kit build (Toybox style) instead. Only
+// ?chewymodel=disney reaches the Storybook models.
 const TOY = { chewy: 'chewyToy', moka: 'mokaToy', poe: 'poeToy', shihtzu: 'shihtzuToy', golden: 'goldenToy' };
-const cfgFor = id => (id === 'chewy' && chewyModel() === 'samurai' ? ['chewySamurai', 'chewyToy', 'chewy'] : TOY[id] && toyHeroes() ? [TOY[id], id] : [id])
-  .map(k => HERO_MODELS[k]).filter(c => c && !c.pending); // (a hero with no Storybook model, or one still pending, skips it)
+const cfgFor = id => (id === 'chewy' && chewyModel() === 'samurai' ? ['chewySamurai', 'chewyToy'] : TOY[id] && toyHeroes() ? [TOY[id]] : [id])
+  .map(k => HERO_MODELS[k]).filter(c => c && !c.pending); // (a hero with no model, or one still pending, plays its kit)
 
 const ASSETS = new Map();  // id -> { meta, buf, tex, ntex, geo?, olGeo? }
 const LOADING = new Map(); // id -> Promise<boolean>

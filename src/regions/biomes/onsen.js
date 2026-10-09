@@ -11,6 +11,9 @@ import { jizo } from '../assets/mapleProps.js';
 import { Placer } from '../assets/bambooKit.js';
 import { paint, merge, xf } from '../../gfx/geom.js';
 import { viewGuard, handOver, sstep, alongTrail, arenaGate } from '../biomeKit.js';
+import { kit } from '../assets/bambooProps.js';
+import { G as KG } from '../../world/buildings/kit.js';
+import { farAt, spots, tallOk, gladeGround } from '../../cozy/wildKit.js';
 
 const LEVEL = -0.3;                                              // the region's water level (the frozen pond and lake)
 const POND = { x: 76, z: 50, r: 5.2 };                           // the frozen pond the trail crosses
@@ -192,7 +195,59 @@ function populate(ctx) {
   }
   // --- the arrival glade: a lantern, a bench under snow
   { const S = plan.start; PL.piece(Pr.yukimiLantern(33), S.x - 2.6, S.z - 2.8, 0.8); ctx.addCollider(S.x - 2.6, S.z - 2.8, 0.4); PL.piece(Pr.bench(1), S.x + 3.2, S.z - 1.8, -0.4); ctx.addCollider(S.x + 3.2, S.z - 1.8, 0.5); }
+  wildDressing(ctx, PL);
   handOver(ctx, PL, { lightMul: 0.85 });
+}
+
+// ------------------------------------------------------------------ the wild areas and the glades (docs/COZY.md §6)
+// a lopsided snowman (the Yuki-daruma's little cousins): a packed body and head, coal eyes, a carrot, a red bucket hat,
+// twig arms and a knitted scarf; s scales it
+const SM = new Map(), SNOW_W = new THREE.Color('#f6f9ff'), SNOW_S = new THREE.Color('#c4d2ee');
+function snowman(seed = 0, s = 1) {
+  const key = seed + ':' + s; if (SM.has(key)) return SM.get(key);
+  const pc = kit(seed * 13 + 91, B => {
+    const snow = (p, n, o) => o.copy(SNOW_W).lerp(SNOW_S, Math.max(0, 0.45 - n.y) * 0.9);
+    const body = KG.sph(0.46 * s, 14, 10); body.scale(1, 0.9, 1); body.translate(0, 0.4 * s, 0); B.add(body, snow);
+    const head = KG.sph(0.3 * s, 12, 9); head.translate(0.03 * s, 1.0 * s, 0); B.add(head, snow);
+    for (const e of [-1, 1]) { const g = KG.sph(0.038 * s, 6, 4); g.translate(0.03 * s + e * 0.1 * s, 1.05 * s, 0.26 * s); B.add(g, '#2a2630'); }
+    for (const y of [0.32, 0.55]) { const g = KG.sph(0.04 * s, 6, 4); g.translate(0, y * s, 0.42 * s); B.add(g, '#2a2630'); }
+    const nose = KG.cone(0.045 * s, 0.22 * s, 6); nose.rotateX(Math.PI / 2); nose.translate(0.03 * s, 0.98 * s, 0.38 * s); B.add(nose, '#ff8a2a');
+    const hat = KG.cyl(0.15 * s, 0.19 * s, 0.22 * s, 10); hat.rotateZ(0.18); hat.translate(0.0, 1.32 * s, 0); B.add(hat, '#d8483a');
+    const scarf = KG.torus(0.27 * s, 0.06 * s, 5, 12); scarf.rotateX(Math.PI / 2); scarf.translate(0.02 * s, 0.76 * s, 0); B.add(scarf, '#3a8ad8');
+    const tail = KG.box(0.1 * s, 0.32 * s, 0.05 * s, 0.02); tail.rotateZ(-0.3); tail.translate(0.2 * s, 0.6 * s, 0.3 * s); B.add(tail, '#3a8ad8');
+    for (const e of [-1, 1]) { const a = KG.cyl(0.018 * s, 0.025 * s, 0.6 * s, 5); a.rotateZ(e * 1.05); a.translate(e * 0.62 * s, 0.68 * s, 0); B.add(a, '#6a4a36'); }
+  }, 0.012);
+  SM.set(key, pc); return pc;
+}
+// The Snowman Slope: a drifted hillside of snowmen (and the yokai that hide among them). The Frozen Falls: a second
+// frozen cascade on the far rim with ice-crusted rocks. Tall things only on the far half. In a saved zone the emptied
+// camp sites grow back as glades: camellias in bloom on the snow, frost grass (the same batches: no new draw calls).
+function wildDressing(ctx, PL) {
+  const H = (x, z) => ctx.heightAt(x, z);
+  for (const [w, a] of (ctx.plan.wild || []).entries()) {
+    ctx.paint('snow', a.x, a.z, a.r + 1, 0.85);
+    if (a.id === 'snowmanSlope') {
+      for (const s of spots(ctx, a, 6, { k0: 0.3, k1: 0.95, r: 0.55, space: 2.4, path: 1.4, seed: 21 + w })) { const sc = 0.8 + s.rnd() * 0.5; PL.piece(snowman(s.rnd() * 5 | 0, sc), s.x, s.z, Math.PI / 4 + (s.rnd() - 0.5) * 1.2); ctx.addCollider(s.x, s.z, 0.45 * sc); }
+      for (const s of spots(ctx, a, 7, { k0: 0.7, k1: 1.05, r: 0.9, path: 1.2, seed: 27 + w })) PL.multi(F.drift(s.rnd() * 8 | 0, { R: 1 + s.rnd() * 0.8, h: 0.45 }), s.x, H(s.x, s.z) - 0.1, s.z, { rot: s.rot });
+    } else {
+      const [fx, fz] = farAt(a, 0.58); PL.piece(Pr.frozenFall(3, { W: 3.6, H: 4.0 }), fx, fz, Math.PI / 4, { y: H(fx, fz) - 0.15 }); // (in frame from the area's middle)
+      for (const t of [-1.6, 0, 1.6]) ctx.addCollider(fx + Math.cos(Math.PI / 4) * t, fz - Math.sin(Math.PI / 4) * t, 1.1);
+      ctx.blockCells(fx, fz, 2); ctx.reserve(fx, fz, 3.4);
+      for (const [u, v, sc] of [[-2.7, 0.6, 1.3], [2.8, 0.5, 1.1], [-3.6, 2.4, 0.8], [3.4, 2.6, 0.9]]) { const c = Math.SQRT1_2, x = fx + c * u + c * v, z = fz - c * u + c * v; PL.multi(F.snowRock(12 + (u * 3 | 0) & 3, { R: 0.75 }), x, H(x, z) - 0.2, z, { rot: u, s: sc }); ctx.addCollider(x, z, 0.6 * sc); }
+      for (const s of spots(ctx, a, 5, { k0: 0.3, k1: 0.95, r: 0.6, path: 1.3, seed: 31 + w })) PL.multi(F.snowRock(s.rnd() * 4 | 0, { R: 0.5 + s.rnd() * 0.3, wet: true }), s.x, H(s.x, s.z) - 0.12, s.z, { rot: s.rot });
+    }
+    for (const s of spots(ctx, a, 5, { k0: 0.82, k1: 1.0, r: 0.8, far: true, path: 1.4, seed: 37 + w })) { PL.multi(F.snowFir(s.rnd() * 5 | 0, { H: 4.6 }), s.x, H(s.x, s.z) - 0.06, s.z, { rot: s.rot, s: 0.9 + s.rnd() * 0.3 }); ctx.addCollider(s.x, s.z, 0.4); ctx.blockCells(s.x, s.z, 0.5); }
+  }
+  if (!ctx.peaceful) return;
+  for (const [i, g] of ctx.glades.entries()) {
+    gladeGround(ctx, g, 'snow');
+    for (const s of spots(ctx, g, 9, { k0: 0.12, k1: 0.8, r: 0.45, path: 1.2, seed: 101 + i })) {
+      const q = s.rnd(), y = H(s.x, s.z);
+      if (q < 0.45) PL.multi(F.snowBush(s.rnd() * 4 | 0, 'camellia'), s.x, y - 0.05, s.z, { rot: s.rot, s: 0.7 + s.rnd() * 0.3 });
+      else if (q < 0.85) PL.multi(F.frostGrass(s.rnd() * 3 | 0), s.x, y, s.z, { rot: s.rot });
+      else PL.multi(F.drift(s.rnd() * 8 | 0, { R: 0.7, h: 0.3 }), s.x, y - 0.05, s.z, { rot: s.rot });
+    }
+  }
 }
 
 // ------------------------------------------------------------------ effects + critters
@@ -208,7 +263,7 @@ function effects(ctx) {
     const big = SPRINGS[0];
     CR.add({ name: 'snowMonkey', geo: monkeyGeo(), count: 4, habitat: 'bath', homes: [{ x: big.x, z: big.z, r: big.r - 0.6 }], speed: 0.25, flee: 0, sink: 0.22, idle: [3, 8] });
     CR.add({ name: 'crane', geo: craneGeo(), count: 3, habitat: 'ground', homes: [{ x: POND.x, z: POND.z, r: POND.r + 3 }], speed: 0.6, flee: 5, hop: 0, idle: [2, 6] });
-    CR.add({ name: 'hare', geo: hareGeo(), count: 6, habitat: 'ground', homes: ctx.plan.camps.map(c => ({ x: c.x, z: c.z, r: 9 })), speed: 2.2, flee: 5, hop: 0.22 });
+    CR.add({ name: 'hare', geo: hareGeo(), count: ctx.peaceful ? 9 : 6, habitat: 'ground', homes: ctx.plan.camps.map(c => ({ x: c.x, z: c.z, r: 9 })), speed: 2.2, flee: 5, hop: 0.22 });
   }
   return null;
 }
@@ -279,6 +334,11 @@ export default {
     camps: 7, campR: 6, campGap: 11, pois: 3, poiKinds: ['cache', 'shrine', 'feature'], poiAt: [[45, 67, 'feature'], [74, 28, 'shrine'], [82, 60, 'cache']], lanes: 5, trailW: 1.5,
     open: [[54, 64, 5.5]],
     avoid: [[INN.x, INN.z, 4], ...SPRINGS.map(s => [s.x, s.z, s.r]), [FALL.x, FALL.z, 4]], // (camps may sit out on the frozen pond)
+    // the wild areas (docs/COZY.md §6.2): they keep their yokai once Yukimi is saved; off the trail, on side paths
+    wild: [
+      { id: 'snowmanSlope', name: 'the Snowman Slope', jp: '雪だるま坂', at: [92, 82], r: 13, packs: 3 },
+      { id: 'frozenFalls', name: 'the Frozen Falls', jp: '凍て滝', at: [38, 38], r: 13, packs: 2 },
+    ],
   },
   populate, effects, interactables,
   footstep(pos, world) {

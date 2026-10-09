@@ -7,6 +7,11 @@
 html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 #game { touch-action: none; -webkit-touch-callout: none; }
 .ui-root { touch-action: pan-x pan-y; } /* (lists still scroll by finger; no pinch or double-tap zoom on the UI) */
+/* CT-7: the play surface never pans the page, whatever the thumb lands on (the quest tracker, a portrait, a loot label,
+   the stick's side): the world labels, the HUD and the touch layer are touch-action: none, as the canvas is. Only the
+   menus' lists and tab rows keep their pan (mobile.css), and index.html cancels any one-finger touchmove that didn't
+   start in something that scrolls (itch's page around the frame scrolled on an uncancelled one) */
+.ui-root > :is(.l-world, .l-hud, .l-touch) { touch-action: none; }
 body.touch-active { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 body.touch-active img { -webkit-touch-callout: none; -webkit-user-drag: none; }
 /* the mouse's and the pad's own hints (pad.css: .kbm-only, .pad-only twins) don't apply to touch */

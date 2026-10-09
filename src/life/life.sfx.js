@@ -93,6 +93,17 @@ export const SFX = {
     s.noise({ f: 2200, f2: 4200, q: 0.7, a: 0.01, d: 0.16, v: 0.16, color: 'pink' });
     [0, 7, 12, 16].forEach((k, i) => s.bell({ at: 0.1 + i * 0.08, f: 523.25 * Math.pow(2, k / 12) * 2, d: 0.5, v: 0.07 }));
   } },
+  // scavenging (docs/COZY.md §7): Shadow's nose, three quick snuffles
+  sniff: { vary: 0.08, max: 1, gap: 0.5, trim: 2.0, fn(s) {
+    for (let i = 0; i < 3; i++) s.noise({ at: i * 0.11 + R(0, 0.02), f: R(2600, 3400), f2: R(1800, 2400), q: 1.2, a: 0.01, d: 0.06, v: 0.2, color: 'pink' });
+  } },
+  // a perfect dig: a springy "pon!" out of the ground, then a little rising koto run and a glint
+  dig_perfect: { vary: 0.02, max: 1, gap: 0.3, trim: 1.4, fn(s) {
+    s.tone({ pts: [[0, 320], [0.06, 820]], a: 0.002, d: 0.12, v: 0.3 });
+    s.noise({ ft: 'lowpass', f: 600, a: 0.002, d: 0.08, v: 0.3, color: 'brown' });
+    [0, 4, 7, 12].forEach((k, i) => s.pluck({ at: 0.08 + i * 0.055, m: 76 + k, v: 0.2, kind: 'koto' }));
+    s.sparkle({ at: 0.28, n: 6, base: 2637, v: 0.035, spread: 0.4 });
+  } },
   // a loved gift: a happy "kyaa!" sweep and hearts
   gift_loved: { vary: 0.02, max: 1, gap: 0.4, trim: 1.3, fn(s) {
     s.tone({ pts: [[0, 600], [0.14, 1300], [0.3, 1100]], type: 'triangle', a: 0.006, d: 0.32, v: 0.14 });

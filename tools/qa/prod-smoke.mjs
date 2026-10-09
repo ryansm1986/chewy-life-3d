@@ -29,7 +29,7 @@ const server = await preview({ logLevel: 'error', build: { outDir }, preview: { 
 const url = server.resolvedUrls.local[0].replace(/\/$/, '');
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true, args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] });
 let failed = 0;
-for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['poe', '/?fresh&nointro&hero=poe'], ['shihtzu', '/?fresh&nointro&hero=shihtzu'], ['golden', '/?fresh&nointro&hero=golden'], ['home', '/?fresh&nointro'], ['pad', '/?fresh&nointro&notut'], ['deck', '/?fresh&nointro&notut'], ['touch', '/?fresh&nointro&notut'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`]), ...Object.values(DUNGEONS).filter(dd => dd.gate).map(dd => ['zone:' + dd.id, '/?fresh&nointro']), ['tier:bambooDepths', '/?fresh&nointro&notut'], ['tier:burrowDeep', '/?fresh&nointro&notut'], ['pinnacle:bambooDepths', '/?fresh&nointro&notut'], ['debug', '/?fresh&nointro&notut&debug']]) { // (every zone dungeon that has its gate: its kit, a dense floor, the arena)
+for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['poe', '/?fresh&nointro&hero=poe'], ['shihtzu', '/?fresh&nointro&hero=shihtzu'], ['golden', '/?fresh&nointro&hero=golden'], ['home', '/?fresh&nointro'], ['pad', '/?fresh&nointro&notut'], ['deck', '/?fresh&nointro&notut'], ['touch', '/?fresh&nointro&notut'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`]), ...Object.values(DUNGEONS).filter(dd => dd.gate).map(dd => ['zone:' + dd.id, '/?fresh&nointro']), ['tier:bambooDepths', '/?fresh&nointro&notut'], ['tier:burrowDeep', '/?fresh&nointro&notut'], ['pinnacle:bambooDepths', '/?fresh&nointro&notut'], ['debug', '/?fresh&nointro&notut&debug'], ['cozy', '/?fresh&nointro&notut'], ['dig', '/?fresh&nointro&notut'], ['peaceful', '/?fresh&nointro&notut&villagesaved=bamboo']]) { // (every zone dungeon that has its gate: its kit, a dense floor, the arena)
   const page = await browser.newPage(label === 'touch' ? { viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true } : { viewport: label === 'deck' ? { width: 1280, height: 800 } : { width: 1600, height: 900 } }); // (deck: the Steam Deck's screen; touch: a phone in landscape)
   const errs = [];
   page.on('pageerror', e => errs.push('pageerror: ' + e.message));
@@ -181,6 +181,38 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
     s.debug.refused = refused;
     await page.keyboard.press('F10'); await page.waitForTimeout(400); s.debug.closed = await page.evaluate(() => !window.G.ui.isOpen('debug'));
   }
+  if (label === 'peaceful') { // the peaceful overworld in the bundle (docs/COZY.md §6): a saved Bamboo with only its wild packs, the gateways and the edge tint, the leash tags, the Sightings board and a bounty
+    s.peaceful = await page.evaluate(async () => {
+      const G = window.G, sleep = ms => new Promise(q => setTimeout(q, ms)), r = {};
+      G.state.player.lvl = 8; G.state.flags.poeJoined = true;
+      r.board = !!G.peaceful?.board?.group?.parent && G.village.world.interactables.includes(G.peaceful.board.it);
+      G.ui.open('sightings', { at: 'village' }); await sleep(500); r.cards = document.querySelectorAll('.p-sight .sg-card').length; r.css = getComputedStyle(document.querySelector('.p-sight')).width; G.ui.closeAll();
+      G.enterRegion('bamboo'); await new Promise(q => { const f = () => (G.dungeon?.isRegion && !G.ui?.iris?.active && G.dungeon.monsters.length ? q() : requestAnimationFrame(f)); f(); }); await sleep(500);
+      const D = G.dungeon, L = D.layout;
+      r.peace = D.peaceful; r.wild = L.wild.length; r.allWild = D.monsters.every(m => !!m.wild); r.edge = !!D.world.scene.getObjectByName('wildEdge'); r.glades = L.glades.length;
+      r.zoneBoard = D.world.interactables.some(i => i.label === 'Read the Sightings board');
+      const g = [...D.wild.sights.values()][0]; r.sight = !!g;
+      if (g) { const r0 = G.peaceful.renown().n; for (const m of g.monsters) m.takeDamage(1e9); await sleep(800); r.bounty = G.peaceful.renown().n > r0; }
+      return r;
+    });
+  }
+  if (label === 'cozy') { // the cozy path in the bundle (docs/COZY.md §4): the board by the Post, a crew sent from its panel and back, the report, the chip, the away card
+    s.cozy = await page.evaluate(async () => {
+      const G = window.G, sleep = ms => new Promise(q => setTimeout(q, ms)), r = {};
+      G.state.flags.mokaJoined = true; G.heroes.spawnBench();
+      r.board = !!G.cozy?.board?.group?.parent && G.village.world.interactables.includes(G.cozy.board.it);
+      G.ui.open('expeditions', { at: 'board', view: 'errands' }); await sleep(500);
+      const P = G.ui.panels.expeditions; r.css = getComputedStyle(document.querySelector('.p-exp')).width; r.cards = document.querySelectorAll('.p-exp .ex-obj').length;
+      document.querySelector('.p-exp .ex-mem[data-m="hero:moka"]')?.click(); await sleep(150);
+      document.querySelector('.p-exp .ex-go:not([disabled])')?.click(); await sleep(300);
+      r.out = G.cozy.exp.list().length; r.away = G.heroes.away('moka') && !G.heroes.bench().includes('moka');
+      G.ui.closeAll(); G.cozy.clock.add(3.1); await sleep(600);
+      r.back = G.cozy.exp.list().length === 0; r.report = G.cozy.exp.reports()[0]?.result || null; r.xp = Object.values(G.cozy.exp.reports()[0]?.xp || {})[0] || 0;
+      r.chip = !!document.querySelector('.cz-chip.on'); r.inTown = !!G.heroes.villagers.moka;
+      G.cozy.showAway(); await sleep(400); r.card = G.ui.isOpen('awayCard'); G.ui.closeAll();
+      void P; return r;
+    });
+  }
   if (label === 'deck') s.deck = await page.evaluate(() => { const G = window.G, E = G.engine; return { preset: E.preset, quality: E.quality, pr: E.renderer.getPixelRatio(), ao: E.post.ao.enabled, shadow: G.world.sun.shadow.mapSize.x, ui: G.ui.settings.uiScale, safe: getComputedStyle(document.querySelector('.l-hud')).top, floor: getComputedStyle(document.querySelector('.hud .loc-s') || document.body).fontSize }; }); // (CT-3: the Deck profile and deck.css in the bundle)
   const regionId = label.startsWith('region:') ? label.slice(7) : null;
   if (regionId) { // every outdoor region in the bundle (docs/REGIONS.md): built, populated, with its own boss (or its dungeon gate)
@@ -240,16 +272,36 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
   const tierOk = pinOk && (!s.tier || (s.tier.label === 'Tier 5' && s.tier.mods === 3 && s.tier.ghost && s.tier.el > 20 && s.tier.n >= (tierId === 'burrowDeep' ? 40 : 180)));
   const zoneOk = tierOk && (!s.zone || (s.zone.kind === 'zone' && s.zone.kit && s.zone.n >= 120 && !!s.zone.boss && s.zone.arena >= 15));
   const h = s.home, homeOk = !h || (h.mode === 'interior' && h.items >= 12 && h.batches >= 10 && h.jobs === 4 && h.palette && h.thumbs >= 3 && h.back === 'village');
+  if (label === 'dig') { // scavenging in the bundle (docs/COZY.md §7): a gather, Shadow's nose, a held dig let go in the golden band
+    const E = (fn, a) => page.evaluate(fn, a), W = (fn, t = 5000) => page.waitForFunction(fn, null, { timeout: t }).catch(() => {});
+    s.dig = await E(() => { const G = window.G, S = G.cozy.scav, r = { nodes: S.nodes().length, draws: 0, w0: G.state.materials.wood }; G.village.world.scene.traverse(o => { if (/^scavenge:/.test(o.name)) r.draws++; }); const n = S.nodes()[0]; G.player.setPos(n.x + 0.6, n.z - 0.6); G.player.moveTarget = null; G.interactCooldown = 0; return r; });
+    await page.waitForTimeout(250); await page.keyboard.press('f');
+    await W(() => window.G.cozy.scav.nodes()[0].taken, 3000);
+    s.dig.gathered = await E(w0 => window.G.cozy.scav.nodes()[0].taken && window.G.state.materials.wood > w0, s.dig.w0);
+    await E(() => { const G = window.G, sp = G.cozy.scav.spots()[0]; G.player.setPos(sp.x + 5, sp.z + 4.5); G.player.moveTarget = null; G.companion.setPos(sp.x + 5.6, sp.z + 5); });
+    await W(() => window.G.cozy.scav.spots()[0].state === 'found', 15000);
+    s.dig.nose = await E(() => window.G.cozy.scav.spots()[0].state === 'found');
+    await E(() => { const G = window.G, sp = G.cozy.scav.spots()[0]; G.player.setPos(sp.x + 0.7, sp.z - 0.7); G.player.moveTarget = null; G.interactCooldown = 0; });
+    await page.waitForTimeout(250);
+    await page.keyboard.down('f');
+    await W(() => (window.G.cozy.scav.session?.k || 0) >= 0.74);
+    await page.keyboard.up('f');
+    await W(() => !window.G.cozy.scav.busy, 4000);
+    Object.assign(s.dig, await E(() => ({ dug: window.G.cozy.scav.spots()[0].state === 'dug', perfect: window.G.state.cozy.scav.stats.perfect })));
+  }
   const pz = s.poe, poeOk = !pz || (pz.hero === 'poe' && (!TOY_POE || (s.model === 'poe_toy' && pz.baked)) && (!POE_FUMA || (pz.fuma === 'glb' && pz.villagerFuma === 'glb')) && pz.back && pz.wt === 'fuma' && pz.cast && pz.flying && pz.caught && pz.icons && pz.switch && pz.after === 'chewy' && pz.poeVillager);
   const sz = s.shihtzu, stzOk = !sz || (sz.hero === 'shihtzu' && (!TOY_STZ || (s.model === 'shihtzu_toy' && sz.baked)) && (!STZ_FLAIL || (sz.flail === 'glb' && sz.links && sz.villager === 'glb')) && sz.chain && sz.wt === 'flail' && sz.dr >= 5 && sz.icons && sz.kit?.pups >= 2 && sz.kit.gp && sz.kit.lantern && sz.switch && sz.after === 'chewy');
   const gd = s.golden, gldOk = !gd || (gd.hero === 'golden' && (!TOY_GOLDEN || (gd.model === 'golden_toy' && gd.baked)) && (!GLD_PROPS || (gd.lance && gd.villager)) && gd.wt === 'lance' && gd.shadowLife >= 20
     && gd.whelp && (!WHELP || (gd.whelpModel === 'shadow_whelp' && gd.wings)) && gd.flying && gd.icons && gd.thrust && gd.dart && gd.javelin && gd.landed && gd.jump && gd.air && gd.crash && gd.breath && gd.puffed && gd.charged && gd.switch && gd.after === 'chewy' && gd.whelpOff);
+  const dg = s.dig, digOk = !dg || (dg.nodes === 10 && dg.draws === 3 && dg.gathered && dg.nose && dg.dug && dg.perfect === 1);
+  const pc = s.peaceful, peaceOk = !pc || (pc.board && pc.cards >= 1 && pc.css === '760px' && pc.peace && pc.wild === 2 && pc.allWild && pc.edge && pc.glades >= 2 && pc.zoneBoard && (!pc.sight || pc.bounty));
+  const cz = s.cozy, cozyOk = !cz || (cz.board && cz.css === '1010px' && cz.cards >= 6 && cz.out === 1 && cz.away && cz.back && /success|partial|setback/.test(cz.report) && cz.xp > 0 && cz.chip && cz.inTown && cz.card);
   const db = s.debug, debugOk = (label !== 'village' || s.noDebug) && (!db || (db.refused && db.on && db.chunk && db.tabs >= 10 && db.css === '760px' && db.coins === 1000 && db.used && db.closed));
   const pd = s.pad, padOk = !pd || (pd.dev === 'pad' && pd.moved > 1.5 && pd.glyphs >= 6 && pd.cursor && pd.cast >= 1 && pd.focus);
   const tc = s.touch, touchOk = !tc || (tc.dev === 'touch' && tc.on && tc.slots === 6 && tc.preset === 4 && tc.pr === 1 && tc.phone && tc.moved > 1 && tc.manifest && tc.burrow?.gone > 0 && tc.burrow.calls > 0 && tc.burrow2?.gone > 0 && tc.burrow2.calls > 0);
   const dk = s.deck, deckOk = !dk || (dk.preset === 3 && dk.quality === 1 && dk.pr === 0.85 && !dk.ao && dk.shadow === 1536 && dk.ui === 1.15 && dk.safe === '12px' && dk.floor === '12px');
   const m = s.moka, mokaOk = !m || ((!TOY_MOKA || s.model === 'moka_toy') && m.baked && m.staff && m.wt === 'staff' && m.cast && m.switch && m.after === 'chewy' && m.chewyBaked && m.mokaVillager);
-  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && debugOk && mokaOk && padOk && touchOk && deckOk && poeOk && stzOk && gldOk && regionOk && zoneOk && homeOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!CHEWY_MODEL || s.model === CHEWY_MODEL) && (!SAMURAI_CHEWY || s.saya) && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
+  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && debugOk && cozyOk && peaceOk && digOk && mokaOk && padOk && touchOk && deckOk && poeOk && stzOk && gldOk && regionOk && zoneOk && homeOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!CHEWY_MODEL || s.model === CHEWY_MODEL) && (!SAMURAI_CHEWY || s.saya) && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
   console.log(`${ok ? 'PASS' : 'FAIL'}  production ${label}: ${JSON.stringify(s)}${errs.length ? '\n   ' + [...new Set(errs)].slice(0, 8).join('\n   ') : ''}`);
   if (!ok) failed++;
   await page.close();

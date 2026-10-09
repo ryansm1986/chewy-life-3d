@@ -7,6 +7,7 @@ import * as A from './tidepoolAssets.js';
 import { TidepoolFx } from './tidepoolFx.js';
 
 import { TP_SITES, coastDist, LV, poolsFor } from './tidepoolTerrain.js';
+import { farAt, spots, gladeGround } from '../../cozy/wildKit.js';
 export { TP_SITES };
 const S = TP_SITES;
 
@@ -21,7 +22,8 @@ export function tidepoolPopulate(ctx) {
   const startD = (x, z) => Math.hypot(x - S.start[0], z - S.start[1]);
   // big things stay out of the play skeleton; low dressing may sit in the lanes but never on the trail or a fight floor
   const wild = (x, z, pad = 1) => H.openDist(x, z) > pad && arenaD(x, z) > 15;
-  const lowOk = (x, z) => H.trailDist(x, z) > 2.3 && campD(x, z) > 0.5 && arenaD(x, z) > 12 && startD(x, z) > 5;
+  const flats = (P?.wild || []).filter(a => a.id === 'crabFlats'); // (the Crab Flats stay open sand: docs/COZY.md §6.2)
+  const lowOk = (x, z) => H.trailDist(x, z) > 2.3 && campD(x, z) > 0.5 && arenaD(x, z) > 12 && startD(x, z) > 5 && !flats.some(a => Math.hypot(x - a.x, z - a.z) < a.r - 1);
   const cache = new Map(), V3 = (k, f) => { let g = cache.get(k); if (!g) { g = f(); cache.set(k, g); } return g; };
   const putAll = (out, x, y, z, rot = 0, s = 1) => { for (const [k, g] of Object.entries(out)) if (g?.isBufferGeometry) PL.put(k, g, x, y, z, { rot, s }); };
   const piece = (pc, x, z, rot, s = 1, y) => { PL.piece(pc, x, y ?? h(x, z), z, rot, s); };
@@ -163,6 +165,44 @@ export function tidepoolPopulate(ctx) {
   }
   // ---- the start cove: a lamp by the Wayfarer's Stone and a bench of driftwood
   { const [x, z] = S.start; piece(A.shoreLamp(1), x + 3.2, z - 2.4, -0.7); PL.collider(x + 3.2, z - 2.4, 0.3); }
+
+  // ---- the wild areas (docs/COZY.md §6.2): the Crab Flats (a sand flat strewn with shells, starfish and pebbles,
+  //      barnacled rock shelves round its far rim) and the Wreck Shoals (a second, older wreck on the far rim, driftwood,
+  //      nets and rocks). Tall things only on the far half. In a saved zone the emptied camp sites grow back as glades:
+  //      morning glory mats, dune grass and shells (the same batches: no new draw calls).
+  for (const [w, a] of (P?.wild || []).entries()) {
+    ctx.paint('sand', a.x, a.z, a.r + 1.2, 0.85, 0.5); ctx.paint('grass', a.x, a.z, a.r - 0.5, a.id === 'crabFlats' ? 0 : 0.25, 0.4); // (a flat: no dune grass)
+    const mark = s => occ.mark(s.x, s.z, 0.6);
+    if (a.id === 'wreckShoals') {
+      const [wx, wz] = farAt(a, 0.62); piece(A.wreck(7), wx, wz, Math.PI / 4 + 0.5); PL.collider(wx, wz, 1.4); PL.collider(wx + 1.1, wz - 0.9, 1.0); H.block(wx, wz, 2); occ.mark(wx, wz, 3.5); ctx.reserve(wx, wz, 3.5);
+      for (const s of spots(ctx, a, 4, { k0: 0.3, k1: 0.95, r: 0.9, path: 1.4, seed: 21 + w })) { PL.put('body', drift[s.rnd() * 3 | 0], s.x, h(s.x, s.z) - 0.04, s.z, { rot: s.rot, s: 1 + s.rnd() * 0.4 }); mark(s); }
+      { const [nx, nz] = farAt(a, 0.82, -0.85); piece(A.netRack(9), nx, nz, Math.PI / 4); PL.collider(nx, nz, 1.2); occ.mark(nx, nz, 2.8); ctx.reserve(nx, nz, 2); }
+    } else {
+      for (const s of spots(ctx, a, 44, { k0: 0.05, k1: 0.97, r: 0.25, space: 0.6, path: 0.5, seed: 23 + w })) {
+        const k = s.rnd(), y = h(s.x, s.z) + 0.005;
+        if (k < 0.5) PL.put('body', shellV[s.rnd() * 4 | 0], s.x, y, s.z, { rot: s.rot, s: 1.8 + s.rnd() * 1.0 });
+        else if (k < 0.72) PL.put('body', starV[s.rnd() * 3 | 0], s.x, y, s.z, { rot: s.rot, s: 1.6 + s.rnd() * 0.6 });
+        else PL.put('stone', pebV[s.rnd() * 2 | 0], s.x, y - 0.02, s.z, { rot: s.rot, s: 1.1 + s.rnd() * 0.6 });
+      }
+      // a few shallow puddles left by the tide (a glinting wet-sand patch: the terrain's own wet band look)
+      for (const s of spots(ctx, a, 4, { k0: 0.2, k1: 0.8, r: 1.2, space: 2.4, path: 1.2, seed: 24 + w })) ctx.paint('accent', s.x, s.z, 1.4 + s.rnd(), 0.7, 0.7);
+    }
+    for (const s of spots(ctx, a, 5, { k0: 0.84, k1: 1.05, r: 1.2, far: true, path: 1.4, seed: 27 + w })) {
+      const g = V3('wshelf' + (s.rnd() * 3 | 0), () => A.rockShelf(60 + w, 3.2, 2.2, 0.8)); PL.put('rock', g.rock, s.x, h(s.x, s.z) - 0.12, s.z, { rot: s.rot, s: 0.8 + s.rnd() * 0.3 });
+      PL.collider(s.x, s.z, 1.0); H.block(s.x, s.z, 1.1); occ.mark(s.x, s.z, 1.8);
+    }
+    for (const s of spots(ctx, a, 6, { k0: 0.4, k1: 1.0, r: 0.5, path: 1.2, seed: 29 + w })) { const g = V3('boulder' + (s.rnd() * 4 | 0), () => A.boulder(50, 0.7, 0.6)); PL.put('rock', g.rock, s.x, h(s.x, s.z) - 0.08, s.z, { rot: s.rot, s: 0.5 + s.rnd() * 0.5 }); mark(s); }
+  }
+  if (ctx.peaceful) for (const [i, g] of (ctx.glades || []).entries()) {
+    gladeGround(ctx, g, 'grass', 0.55);
+    for (const s of spots(ctx, g, 10, { k0: 0.12, k1: 0.8, r: 0.45, path: 1.2, seed: 101 + i })) {
+      const q = s.rnd(), y = h(s.x, s.z);
+      if (q < 0.45) PL.put('grass', gloryV[s.rnd() * 3 | 0], s.x, y - 0.005, s.z, { rot: s.rot, s: 1.1 + s.rnd() * 0.5 });
+      else if (q < 0.8) PL.put('reed', grassV[s.rnd() * 3 | 0], s.x, y - 0.03, s.z, { rot: s.rot, s: 0.9 + s.rnd() * 0.5 });
+      else PL.put('body', shellV[s.rnd() * 4 | 0], s.x, y + 0.005, s.z, { rot: s.rot, s: 1.3 });
+      occ.mark(s.x, s.z, 0.5);
+    }
+  }
 
   const group = PL.build(); H.add(group);
   for (const l of PL.lights) H.light(l);

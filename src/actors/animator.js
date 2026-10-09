@@ -361,6 +361,8 @@ export class Animator {
     const pf = fly * (0.95 + Math.sin(t * 6.5) * 0.08), pb = fly * (1.2 + Math.sin(t * 6.5 + 1.4) * 0.12);
     this._set(FL, s * amp + pf, 0, -0.08 * fly); this._set(BR, s * amp + pb, 0, 0.1 * fly);
     this._set(FR, -s * amp + pf, 0, 0.08 * fly); this._set(BL, -s * amp + pb, 0, -0.1 * fly);
+    // digging (Shadow at a scavenging spot, docs/COZY.md §7.1): the front paws scoop in turn
+    if (this.action && (this.action.name === 'dig' || this.action.name === 'pawDig')) { const w = Math.sin(this.action.t * 24), k = Math.min(1, this.action.t / 0.15); this._set(FL, (-0.75 + w * 0.65) * k, 0, -0.06 * k); this._set(FR, (-0.75 - w * 0.65) * k, 0, 0.06 * k); }
     // sit: the body pitches up at the front so the rump settles onto the ground (only the body drops, the front paws stay
     // planted), the haunches come down and the hind legs fold forward along the ground; the head counter-tilts to look ahead
     const sk = sitting ? ease.outQuad(Math.min(1, this.action.t / 0.3)) : 0;

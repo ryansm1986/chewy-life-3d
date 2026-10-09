@@ -587,15 +587,15 @@ hr('HOMESTEAD');
     ok([...fk].every(k => PANTRY[k].kind === 'forage') && fk.has('seaweed') && forageDrops('nowhere', 'boss', seq(1)).length === 0, 'forage drops: the region\'s own finds (none outside the regions)'); }
 
   // ---- recipes and mixes
-  ok(RECIPE_IDS.length === 15 && RECIPE_IDS.every(id => PANTRY[id]?.kind === 'dish') && PANTRY_IDS.filter(id => PANTRY[id].kind === 'dish').every(id => RECIPES[id]), 'recipes: one per dish');
-  ok(STARTERS.join() === 'grilledFish,roastedVeggies,onigiri', 'recipes: the three starters');
+  ok(RECIPE_IDS.length === 16 && RECIPE_IDS.every(id => PANTRY[id]?.kind === 'dish' || RECIPES[id].out?.mat) && PANTRY_IDS.filter(id => PANTRY[id].kind === 'dish').every(id => RECIPES[id]), 'recipes: one per dish (and Pound Mochi, which makes a material)');
+  ok(STARTERS.join() === 'grilledFish,roastedVeggies,onigiri,poundMochi', 'recipes: the three starters, and Pound Mochi (COZY §7.2)');
   const MATS = new Set(MATERIAL_KEYS);
   for (const id of RECIPE_IDS) {
     const R = RECIPES[id], L = R.learn;
     ok(R.at.length && R.at.every(s => STATIONS[s]) && R.ing.length && R.ing.every(x => x.n >= 1 && (x.k === 'fish' || x.k === 'crop' || (x.k.startsWith('mat:') ? MATS.has(x.k.slice(4)) : !!PANTRY[x.k] && PANTRY[x.k].kind !== 'dish'))), `recipe ${id} stations + ingredients valid`);
     ok(L === 'starter' || !!(L.from || L.quest || L.book || L.request), `recipe ${id} can be learned`);
     ok(L === 'starter' || hintFor(id).how.length > 5, `recipe ${id} has a hint`);
-    ok(!R.at.includes('oven') || R.at.length === 1, `recipe ${id}: baked goods only at the oven`);
+    ok(!R.at.includes('oven') || R.at.length === 1 || !!R.out, `recipe ${id}: baked goods only at the oven (Pound Mochi: the stove or Rosie's)`);
   }
   ok(RECIPE_IDS.filter(id => cookableAt(id, 'campfire')).sort().join() === 'grilledFish,grilledTrout,roastedVeggies', 'campfires cook simple recipes only');
   ok(COOKBOOK.every(p => p.price > 0 && !RECIPES[p.id].learn.from || RECIPES[p.id].learn.book) && teachesOf('kuma').hearts.includes('honeyCake') && teachesOf('usagi').request.includes('cabbageRolls'), 'cookbook pages, villager teachers');
@@ -1701,6 +1701,302 @@ hr('DEBUG TOOLS: THE REGISTRY AND THE PASSWORD (docs/DEBUG.md, src/debug/registr
   const S = R.DEBUG_SECTIONS.get('qaTest');
   ok(S.title === 'QA' && S.actions.length === 3 && S.actions[0].run() === 'b' && R.registryVersion() === v0 + 2 && R.debugSections().at(-1) === S, 'debug: registerDebug adds to a section, replaces an action of the same label, keeps the order');
   R.DEBUG_SECTIONS.delete('qaTest');
+}
+
+hr('COZY: THE WORLD CLOCK, TIME AWAY, STATE, OBJECTIVES, EXPEDITIONS (docs/COZY.md, src/cozy)');
+{
+  const K = await import('../src/cozy/clock.js'), CS = await import('../src/cozy/state.js'), O = await import('../src/cozy/objectives.js'), X = await import('../src/cozy/expeditions.js');
+  const Z = await import('../src/rpg/zones.js');
+  const fresh = () => CS.normalizeCozy(Z.normalizeZones(normalizeHeroes(newGameState())));
+  // ---- the clock
+  { const st = fresh();
+    ok(K.SECS_PER_HOUR === 35 && K.OFFLINE_CAP_H === 8, 'cozy clock: 35 real s per world hour (the day clock rate), an 8 h cap per absence');
+    K.tickClock(st, 35); ok(Math.abs(st.cozy.clock.h - 1) < 1e-9, 'cozy clock: 35 s of play is one world hour');
+    K.tickClock(st, 0); K.addHours(st, -5); K.addHours(st, NaN); ok(Math.abs(st.cozy.clock.h - 1) < 1e-9, 'cozy clock: only ever goes up (a paused dt of 0, negatives and NaN add nothing)');
+    ok(K.worldDay(23.9) === 0 && K.worldDay(24) === 1 && K.worldDay(49) === 2, 'cozy clock: a world day is 24 world hours');
+    ok(K.sleepHours(22) === 8.5 && K.sleepHours(2) === 4.5 && K.sleepHours(6.5) === 24 && K.sleepHours(13) === 17.5, 'cozy clock: sleep adds the hours to 6:30 the next morning');
+    ok(K.aboutHours(6) === 'about 6 h' && K.aboutHours(2.6) === 'about 2½ h' && K.aboutHours(0.3) === 'under an hour' && K.backIn(0) === 'any minute now' && K.backIn(2) === 'back in about 2 h', "cozy clock: the board's words");
+    ok(K.backBy(9, 6) === 'back by afternoon' && K.backBy(20, 10) === 'back by tomorrow morning', 'cozy clock: "back by …" from the village hour');
+    ok(K.realSpan(3 * 3600e3 + 12 * 60e3) === '3 h 12 min' && K.realSpan(20e3) === 'a few seconds' && K.realSpan(4 * 60e3) === '4 min', "cozy clock: the away card's real time");
+  }
+  // ---- time away and the tamper guards (COZY §4.4.1)
+  { const st = fresh(), T0 = 1.8e12;
+    const a0 = K.catchUp(st, T0);
+    ok(a0.first && a0.hours === 0 && st.cozy.clock.wall === T0 && st.cozy.clock.h === 0, 'time away: an old save (no mark) counts nothing and sets the mark');
+    const a1 = K.catchUp(st, T0 + 70e3);
+    ok(Math.abs(a1.hours - 2) < 1e-9 && !a1.capped && st.cozy.clock.wall === T0 + 70e3 && Math.abs(st.cozy.clock.h - 2) < 1e-9, 'time away: 70 s away = 2 world hours, the mark moves up');
+    const a2 = K.catchUp(st, T0 + 70e3 + 86400e3);
+    ok(a2.hours === 8 && a2.capped && Math.abs(st.cozy.clock.h - 10) < 1e-9, 'time away: a day away counts the cap (8 world hours)');
+    const wall = st.cozy.clock.wall, a3 = K.catchUp(st, wall - 3600e3);
+    ok(a3.hours === 0 && a3.backwards && st.cozy.clock.wall === wall && Math.abs(st.cozy.clock.h - 10) < 1e-9, 'time away: a clock set backwards counts 0 and the mark stays');
+    const a4 = K.catchUp(st, wall + 365 * 86400e3), a5 = K.catchUp(st, wall + 60e3);
+    ok(a4.hours === 8 && a5.hours === 0 && a5.backwards && st.cozy.clock.wall === wall + 365 * 86400e3 && Math.abs(st.cozy.clock.h - 18) < 1e-9, 'time away: a clock set far forwards gives only the cap, and setting it back afterwards gives nothing');
+    const a6 = K.catchUp(st, wall + 365 * 86400e3 + 3e3);
+    ok(a6.hours > 0 && a6.hours < 0.1, 'time away: a quick reload counts only seconds');
+    ok(K.awayHours(st, wall + 365 * 86400e3 + 38e3).hours > 0.9 && st.cozy.clock.wall === wall + 365 * 86400e3 + 3e3, 'time away: awayHours only measures (no change)');
+  }
+  // ---- state.cozy: lazy, idempotent, migrates old saves (COZY §9)
+  { const old = normalizeHeroes(newGameState()); delete old.cozy;
+    const st = CS.normalizeCozy(old), j1 = JSON.stringify(st.cozy);
+    ok(st.cozy.v === CS.COZY_V && st.cozy.clock.h === 0 && st.cozy.clock.wall === 0 && Array.isArray(st.cozy.exp.active) && st.cozy.exp.errands.day === -1 && st.cozy.sightings.day === -1, 'cozy state: an old save gets an empty cozy state (no mark: 0 hours away on its first load)');
+    CS.normalizeCozy(st); ok(JSON.stringify(st.cozy) === j1, 'cozy state: normalizeCozy is idempotent');
+    const bad = { cozy: { clock: { h: -4, wall: 'x' }, exp: { active: [{ uid: 'x1', obj: 'errand:0:home:drift', crew: ['hero:moka', 'nope', 7], start: 2, hours: 2 }, { uid: 'x1', obj: 'dup', crew: ['hero:poe'] }, { obj: 'no uid' }, { uid: 'x9', obj: 'o', crew: [] }], reports: [{ uid: 'r', result: 'success' }, { uid: 's', result: 'weird' }], done: { a: '3', b: -2 }, tired: { 'hero:moka': 5, nonsense: 9, 'hero:poe': -1 }, seq: 0 } } };
+    CS.normalizeCozy(bad); const E = bad.cozy.exp;
+    ok(bad.cozy.clock.h === 0 && bad.cozy.clock.wall === 0 && E.active.length === 1 && E.active[0].crew.join() === 'hero:moka' && E.reports.length === 1 && E.done.b === 0 && E.tired['hero:moka'] === 5 && !('nonsense' in E.tired) && !('hero:poe' in E.tired) && E.seq === 1, 'cozy state: a broken cozy state is type-checked (bad crews, duplicate uids, odd results and timers dropped)');
+    ok(JSON.stringify(saveableState(st)).includes('"cozy"'), 'cozy state: saved with the household');
+    ok(CS.parseMember('hero:moka')?.id === 'moka' && CS.parseMember('hire:h3')?.type === 'hire' && !CS.parseMember('pet:x') && !CS.parseMember(''), 'cozy state: crew member keys are hero: or hire: (hire-ready)');
+  }
+  // ---- the zone records: savedBy, celebrate, dungeon.crew (rpg/zones.js)
+  { const st = Z.normalizeZones({ zones: { bamboo: { village: 'saved' }, maple: { village: 'besieged', savedBy: 'crew', celebrate: true } } });
+    ok(st.zones.bamboo.savedBy === 'hero' && st.zones.bamboo.celebrate === false && st.zones.maple.savedBy === null && st.zones.maple.celebrate === false && st.zones.bamboo.dungeon.crew === 0, 'zones: an old saved village counts as saved by a hero; besieged ones have no savedBy; dungeon.crew 0');
+    ok(Z.saveVillage(st, 'maple', 'crew') && st.zones.maple.savedBy === 'crew' && Z.zoneOf(st, 'maple').savedBy === 'crew' && !Z.saveVillage(st, 'maple', 'hero') && st.zones.maple.savedBy === 'crew', 'zones: saveVillage(…, "crew") records the crew, and only the first save counts');
+  }
+  // ---- objectives (COZY §3.2, §4.2, §4.7)
+  { const st = fresh();
+    const ids0 = O.errandIds('home', 5), ids1 = O.errandIds('home', 5);
+    ok(ids0.length === 3 && ids0.join() === ids1.join() && new Set(ids0).size === 3 && O.errandIds('burrow', 5).length === 3, 'errands: 3 a day per area, the same all day (seeded by the world day)');
+    let differ = 0; for (let d = 0; d < 20; d++) if (O.errandIds('home', d).join() !== O.errandIds('home', d + 1).join()) differ++;
+    ok(differ >= 12, 'errands: they re-roll with the world day');
+    ok(O.openAreas(st).join() === 'home,burrow' && O.errandsFor(st, 3).length === 6, 'errands: Blossom Hollow and the Burrow from day 1');
+    Z.saveVillage(st, 'bamboo'); ok(O.openAreas(st).includes('bamboo') && O.errandsFor(st, 3).length === 9, 'errands: a saved zone opens its errands');
+    const e = O.objective(st, O.errandIds('burrow', 2)[0]);
+    ok(e && e.kind === 'errand' && e.level === 4 && e.power === 24 && [2, 3].includes(e.hours) && e.gates.length === 0 && e.supplies.mealSure && e.rewards.kills === 15 && e.rewards.find === 0.08, 'errands: power 6 × level, 2–3 h, no gates, lunches make them a sure thing, ~15 kills of XP, a find at 8%');
+    ok(O.objective(st, 'errand:99:home:drift')?.name && !O.objective(st, 'errand:1:home:nope') && !O.objective(st, 'relief:nowhere') && !O.objective(st, 'banana'), "objectives: any day's errand rebuilds from its id; unknown ones are null");
+    const st2 = fresh(), R = O.objective(st2, 'relief:bamboo');
+    ok(R && R.kind === 'siege' && R.level === 6 && R.power === 84 && R.hours === 6 && R.binds.village === 'bamboo' && R.supplies.meals === 1 && R.rewards.items.join() === 'magic,rare' && R.rewards.kills > 40, 'relief: Takemori is level 6 (the band + 2), power 84, 6 h, a lunch each, a magic and a rare');
+    ok(O.storyObjectives(st2).length === 0, 'relief: not offered while Bamboo is closed');
+    st2.heroes.moka.player.lvl = 4; st2.flags.mokaJoined = true;
+    ok(O.storyObjectives(st2).map(o => o.id).join() === 'relief:bamboo', "relief: offered once Bamboo opens (a crew's levels count: any hero at level 4)");
+    ok(O.objectivePower(st2, R) === 84 && O.campsStanding(st2, 'bamboo') === 3, 'relief: all three camps standing → the full 84');
+    const Zb = Z.zoneOf(st2, 'bamboo'); Zb.siegeCamps = [{ id: 'west', cleared: true }, { id: 'east', cleared: true }, { id: 'south', cleared: false }];
+    ok(O.objectivePower(st2, R) === 42 && O.campsStanding(st2, 'bamboo') === 1, 'relief: each broken camp takes 25% off (the captain is the last 25%)');
+    Z.saveVillage(st2, 'bamboo'); ok(O.storyObjectives(st2).length === 0 && !O.objectiveOpen(st2, R), 'relief: gone once the village is saved');
+  }
+  // ---- power, odds, gates (COZY §4.2)
+  { const st = fresh(); st.flags.mokaJoined = st.flags.poeJoined = true;
+    st.heroes.moka.player.lvl = 6;
+    const g0 = X.gearPoints(st.heroes.moka.equipment);
+    ok(g0 === 1 && Math.abs(X.heroPower(st, 'moka') - 60 * 1.02) < 1e-9, 'power: 10 × level × (1 + 0.02 × gear points): Moka L6 with her starter staff = 61.2');
+    ok(X.gearPoints({ weapon: { rarity: 'unique' }, hat: { rarity: 'rare' }, boots: { rarity: 'magic' }, paws: { rarity: 'set' } }) === 13, 'power: gear points normal 1, magic 2, rare 3, unique / set 4');
+    ok(Math.abs(X.chance(0.6) - 1 / 6) < 1e-9 && Math.abs(X.chance(0.85) - 0.35 / 0.6) < 1e-9 && X.chance(1.1) === 1 && X.chance(0.4) === 0, 'odds: p = clamp((r − 0.5) / 0.6): r 0.6 → 17%, 0.85 → 58%, 1.1 → 100%');
+    ok(X.oddsOf(0.59).key === 'nope' && X.oddsOf(0.6).key === 'risky' && X.oddsOf(0.85).key === 'good' && X.oddsOf(1.1).key === 'sure' && X.oddsOf(0.59).p === 0, 'odds: Too risky < 0.6 ≤ Risky < 0.85 ≤ Good odds < 1.1 ≤ Sure thing');
+    const er = O.objective(st, 'errand:0:home:drift');
+    ok(X.oddsOf(0.7, er, true).key === 'sure' && X.oddsOf(0.7, er, false).key === 'risky' && X.oddsOf(0.5, er, true).key === 'nope', 'odds: an errand with lunches packed is a sure thing (once it can be sent at all)');
+    st.pantry = { cabbageRolls: 2, onigiri: 5 };
+    const P2 = X.crewPower(st, ['hero:moka', 'hero:poe'], er, { meals: { cabbageRolls: 2 }, potions: 3 });
+    ok(P2.fed && P2.potions === 3 && Math.abs(P2.mul - 1.19) < 1e-9 && Math.abs(P2.total - P2.base * 1.19) < 1e-9, 'power: fed (every lunch tier 2+) +10%, heart potions +3% each');
+    ok(!X.crewPower(st, ['hero:moka', 'hero:poe'], er, { meals: { cabbageRolls: 1, onigiri: 1 } }).fed, 'power: a plain lunch for one of them: not fed');
+    ok(JSON.stringify(X.pickMeals(st.pantry, 2)) === '{"cabbageRolls":2}' && JSON.stringify(X.pickMeals(st.pantry, 3)) === '{"onigiri":3}' && JSON.stringify(X.pickMeals({}, 2)) === '{}', 'supplies: lunches pick tier 2+ dishes when there are enough for everyone, else the plainest');
+    const R = O.objective(st, 'relief:bamboo'), town = { rank: 1, pop: 5, built: {}, guild: 0 };
+    ok(/Playing now/.test(X.canSend(st, R, ['hero:chewy'], {}, town).why), "canSend: the hero being played can't go");
+    ok(/Not met yet/.test(X.canSend(st, R, ['hero:shihtzu'], {}, town).why), "canSend: a hero who hasn't joined can't go");
+    ok(/lunch/.test(X.canSend(st, R, ['hero:moka'], {}, town).why) && X.canSend(st, R, ['hero:moka'], { meals: { onigiri: 1 } }, town).checks[0].ok, 'canSend: Takemori takes the Guild, a crew of 2, or one hero with packed lunches (the cozy route with only Moka benched)');
+    ok(!X.gateCheck(R.gates[0], st, town, ['hero:moka'], {}).ok && X.gateCheck(R.gates[0], st, town, ['hero:moka', 'hero:poe'], {}).ok && X.gateCheck(R.gates[0], st, { guild: 1 }, ['hero:moka'], {}).ok, 'gates: the relief gate is data (any of: guild, crew of 2, lunches)');
+    ok(/Pack 2 lunches/.test(X.canSend(st, R, ['hero:moka', 'hero:poe'], {}, town).why), 'canSend: a siege needs a lunch each');
+    st.heroes.poe.player.lvl = 1; st.heroes.moka.player.lvl = 1;
+    ok(/never make it/.test(X.canSend(st, R, ['hero:moka', 'hero:poe'], { meals: { onigiri: 2 } }, town).why), "canSend: below r 0.6 it's too risky to send");
+    st.heroes.moka.player.lvl = 6; st.heroes.poe.player.lvl = 5;
+    const c = X.canSend(st, R, ['hero:moka', 'hero:poe'], { meals: { onigiri: 2 } }, town);
+    ok(c.ok && c.need === 84 && c.odds.key === 'sure' && c.checks.every(x => x.ok), 'canSend: Moka L6 + Poe L5 with lunches: a sure thing for Takemori');
+    ok(!X.canSend(st, R, ['hero:moka', 'hero:poe', 'hero:chewy', 'hero:golden', 'hero:shihtzu'], {}, town).ok, 'canSend: at most 4 in a crew');
+  }
+  // ---- resolve, rewards, the trip (COZY §4.3, §4.6)
+  { const st = fresh(), R = O.objective(st, 'relief:bamboo'), er = O.objective(st, 'errand:0:burrow:patrol'), seq = a => { let i = 0; return () => a[i++ % a.length]; };
+    ok(X.resolve(1.0, seq([0.5]), R).result === 'success' && X.resolve(0.9, seq([0.9]), R).result === 'partial' && X.resolve(0.7, seq([0.9]), R).result === 'setback', 'resolve: a roll under p succeeds; a miss at r ≥ 0.75 is a partial, below a setback');
+    ok(X.partialProgress(st, R, 0.8).camps === 1 && X.partialProgress(st, R, 1.0).camps === 2 && X.partialProgress(st, { kind: 'dungeon' }, 0.8).floor === 2, 'resolve: a partial siege breaks round(3r) − 1 camps (at least 1); a dungeon gets to floor 2');
+    let s = 7; const rng = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+    const L1 = X.rollLoot(R, 'success', rng), L2 = X.rollLoot(R, 'partial', rng), L3 = X.rollLoot(R, 'setback', rng), L4 = X.rollLoot(R, 'recalled', rng);
+    const nm = L => Object.values(L.mats).reduce((a, b) => a + b, 0);
+    ok(L1.items.map(i => i.rarity).join() === 'magic,rare' && L1.items.every(i => i.ilvl === 6) && nm(L1) >= 10 && nm(L1) <= 20 && L1.coins >= R.rewards.coins[0], 'rewards: a relief brings a magic and a rare, 10–20 materials, the coins');
+    ok(L2.items.map(i => i.rarity).join() === 'rare' && nm(L2) <= 10 && L3.items.length === 0 && nm(L3) <= 7 && L4.coins === 0 && !L4.items.length, 'rewards: half on a partial (the rare kept), a third on a setback, nothing when called home');
+    ok(!L1.items.some(i => i.rarity === 'unique' || i.rarity === 'set') && !JSON.stringify(L1).includes('gem'), 'rewards: never a unique or a gem from a crew');
+    const xs = X.xpFor(er, 3, 'success'), xp = X.xpFor(er, 3, 'partial'), xb = X.xpFor(er, 3, 'setback'), xh = X.xpFor(er, 20, 'success');
+    ok(xs === 15 * O.killXp(4) && xp === xs && Math.abs(xb - xs / 2) <= 1 && xh < xs * 0.2 && xh >= 1, "rewards: XP worth ~15 kills of the errand's level, full on a partial, half on a setback, small for a hero far above it");
+    st.flags.mokaJoined = true; st.heroes.moka.player.lvl = 3; st.cozy.clock.h = 10;
+    const e = X.startExpedition(st, er, ['hero:moka'], { meals: {}, potions: 0 }, { r: 1.3, need: 24, power: 31, odds: 'sure', p: 1, seed: 5 });
+    ok(CS.heroAway(st, 'moka') === e && st.cozy.exp.errands.day === 0 && st.cozy.exp.errands.taken.includes(er.id) && X.hoursLeft(st, e) === er.hours, 'trip: a crew on the road (the hero is away, the errand taken for the day)');
+    ok(X.memberWhy(st, 'hero:moka') === 'Away on an expedition', "trip: an away hero can't be sent again");
+    const rep = X.finishExpedition(st, e, er, { result: 'partial', xp: { 'hero:moka': 50 }, lines: [{ who: 'hero:moka', text: 'hi' }] });
+    ok(!CS.heroAway(st, 'moka') && rep.result === 'partial' && !rep.read && CS.unreadReports(st) === 1 && CS.tiredLeft(st, 'hero:moka') === 6 && /Resting/.test(X.memberWhy(st, 'hero:moka')), 'trip: home again; a partial leaves the crew resting 6 world hours, the report unread');
+    st.cozy.clock.h += 6.5; ok(X.memberWhy(st, 'hero:moka') === '', 'trip: rested again after 6 world hours');
+    const e2 = X.startExpedition(st, er, ['hero:moka'], {}, { r: 1, need: 24, power: 24, odds: 'good', p: 0.8 }); X.finishExpedition(st, e2, er, { result: 'success' });
+    ok(st.cozy.exp.done[er.id] === 1 && CS.tiredLeft(st, 'hero:moka') === 0, 'trip: a success counts as done, no rest needed');
+    st.activeHero = 'moka'; const e3 = X.startExpedition(st, er, ['hero:moka'], {}, { r: 1, need: 1, power: 1, odds: 'good', p: 1 });
+    ok(X.brokenExpeditions(st, id => O.objective(st, id)).some(b => b.e === e3), 'load: an expedition with the hero being played comes home (COZY §9)');
+    const e4 = X.startExpedition(st, { ...er, id: 'gone:1' }, ['hero:poe'], {}, { r: 1, need: 1, power: 1, odds: 'good', p: 1 });
+    ok(X.brokenExpeditions(st, id => O.objective(st, id)).filter(b => b.e === e4).length === 1, "load: an expedition whose objective is gone or whose hero isn't joined comes home");
+    ok(X.crewLines(st, ['hero:poe', 'hero:moka'], 'success', () => 0).length === 2 && X.crewLines(st, ['hero:poe'], 'beaten', () => 0)[0].text.includes('beat'), 'report: a line from each member in their voice');
+  }
+  // ---- XP for benched heroes (rpg/actions.js addXpTo: COZY §3.3)
+  { const G = { state: fresh() }, A = createActions(G), st = G.state, ev = [];
+    st.flags.mokaJoined = true;
+    const off = Events.on('hero:levelup', e => ev.push(e)), off2 = Events.on('player:levelup', e => ev.push({ player: e }));
+    st.heroes.chewy.player.lvl = 10;
+    const g = A.addXpTo('moka', xpToNext(1) * 0.6);
+    ok(g.gained === Math.round(xpToNext(1) * 1.2) && g.from === 1 && g.lvl === 2 && st.heroes.moka.player.statPts === 5 && st.heroes.moka.player.skillPts === 2 && ev.length === 1 && ev[0].id === 'moka' && ev[0].lvl === 2, 'addXpTo: a benched hero far behind gets double XP and levels (points, a hero:levelup, no player banner)');
+    ok(st.player === st.heroes.chewy.player && st.player.lvl === 10, 'addXpTo: the hero being played is untouched');
+    const g2 = A.addXpTo('chewy', 10); ok(g2.gained >= 10 && g2.from === 10, 'addXpTo: the active hero goes through addXp');
+    ok(A.addXpTo('nobody', 50).gained === 0 && A.addXpTo('moka', 0).gained === 0, 'addXpTo: nothing for an unknown hero or 0 XP');
+    if (typeof off === 'function') off(); if (typeof off2 === 'function') off2();
+  }
+}
+
+hr('COZY: THE PEACEFUL OVERWORLD AND THE WILD AREAS (docs/COZY.md §6, cozy/peaceful.js)');
+{
+  const PZ = await import('../src/cozy/peaceful.js'), LG = await import('../src/regions/layoutGen.js'), Z = await import('../src/rpg/zones.js');
+  const { REGION_IDS, REGIONS } = await import('../src/regions/index.js');
+  const D2 = (a, x, z) => Math.hypot(a.x - x, a.z - z);
+  // ---- the recipe data: 2 named wild areas a zone, as data the terrain rework (Z-F) carries
+  for (const id of REGION_IDS) {
+    const def = REGIONS[id], raw = def.layout.wild || [], A = PZ.wildAreas(def), P = LG.regionPlan(def);
+    ok(raw.length === 2 && A.length === 2 && A.every(a => a.name && a.jp && a.r >= 12 && a.r <= 16 && a.packs >= 2 && a.packs <= 3) && new Set(A.map(a => a.id)).size === 2, `wild: ${id} has 2 named wild areas (r 12–16, 2–3 packs) in its recipe`);
+    ok(P.wild.length === 2 && !P.wildIssues.length, `wild: ${id}'s plan keeps both areas with no issues (${JSON.stringify(P.wildIssues)})`);
+    // the hard rule: every main-trail point at least r + 3 m from each disc (the walk to the village and the gate never crosses one)
+    const worst = Math.min(...P.wild.map(a => Math.min(...P.trail.map(([x, z]) => D2(a, x, z) - a.r))));
+    ok(worst >= PZ.WILD.trailGap, `wild: ${id}'s main trail stays ≥ r + ${PZ.WILD.trailGap} m from both areas (closest ${worst.toFixed(1)} m)`);
+    ok(P.wild.every(a => a.entry && Math.abs(D2(a, a.entry[0], a.entry[1]) - a.r) < 1.6) && P.spurs.length >= 2 + P.pois.length, `wild: ${id}: a side path reaches each area, its entry on the rim`);
+    ok(P.camps.every(c => P.wild.every(a => D2(a, c.x, c.z) > a.r + c.r)) && P.pois.every(p => P.wild.every(a => D2(a, p.x, p.z) > a.r + p.r)), `wild: ${id}: camp sites and POIs keep out of the wild areas`);
+    ok(P.discs.filter(d => d.kind === 'wild').length === 2, `wild: ${id}: the areas are 'wild' discs in the plan (flattened, kept clear)`);
+    // per visit: the packs inside the discs, hotter, at the band's top + 1; a wild cache in each
+    let packs = 0, inside = 0, uniq = 0, champ = 0, lvlOk = true, caches = 0, campSame = true;
+    for (let v = 1; v <= 40; v++) {
+      const L = LG.generateRegion(def, { visit: v, mlvl: def.levels[0] });
+      for (const sp of L.spawns.filter(s => s.wild)) { packs++; const a = P.wild.find(w => w.id === sp.wild); if (a && D2(a, (sp.x + 0.5) * 2, (sp.y + 0.5) * 2) < a.r + 1.5) inside++; if (sp.rank === 'unique') uniq++; if (sp.rank === 'champion') champ++; if (sp.lvl !== def.levels[0] + 2) lvlOk = false; }
+      caches += L.chests.filter(c => c.wild && c.quality === 'gold').length;
+      if (v === 1) campSame = L.spawns.filter(s => !s.wild && !s.boss).length === Math.min(def.layout.camps ?? 7, P.camps.length);
+    }
+    const want = P.wild.reduce((n, a) => n + a.packs, 0) * 40;
+    ok(packs === want && inside === packs && lvlOk, `wild: ${id}: ${want / 40} wild packs a visit, all inside their discs, level ${def.levels[0] + 2} for a level-1 hero (${inside}/${packs})`);
+    { const hi = LG.generateRegion(def, { visit: 1, heroLvl: 99 }).spawns.filter(s => s.wild), mid = LG.generateRegion(def, { visit: 1, heroLvl: def.levels[0] + 3 }).spawns.filter(s => s.wild);
+      ok(hi.every(s => s.lvl === def.levels[1] + 1) && mid.every(s => s.lvl === def.levels[0] + 5), `wild: ${id}: the packs sit a step above the strongest hero (hero + 2), capped at the band's top + 1`); }
+    ok(uniq / packs > 0.08 && uniq / packs < 0.3 && champ / packs > 0.18 && champ / packs < 0.45, `wild: ${id}: ranks run hot (unique ${(uniq / packs * 100).toFixed(0)}%, champion ${(champ / packs * 100).toFixed(0)}%)`);
+    ok(caches === 80 && campSame, `wild: ${id}: a golden wild cache in each area every visit; the trail camps still roll`);
+  }
+  // ---- the check is enforced: an area on the trail is dropped and reported
+  { const def = REGIONS.bamboo, P0 = LG.regionPlan(def), [tx, tz] = P0.trail[Math.round(P0.trail.length * 0.15)];
+    const bad = { ...def, layout: { ...def.layout, wild: [...def.layout.wild, { id: 'onTheTrail', name: 'the bad idea', jp: '', at: [tx, tz], r: 12 }] } };
+    const P = LG.regionPlan(bad);
+    ok(P.wild.length === 2 && !P.wild.some(a => a.id === 'onTheTrail') && P.wildIssues.some(e => e.id === 'onTheTrail' && e.kind === 'trail'), 'wild: layoutGen drops an area that sits on the trail (and lists why)');
+    ok(PZ.areaIssues({ id: 'x', x: 56, z: 56, r: 12 }, { trail: [[56, 56], [60, 60]] }).some(e => e.kind === 'trail') && !PZ.areaIssues({ id: 'y', x: 20, z: 20, r: 12 }, { trail: [[80, 80], [90, 90]] }).length, 'wild: areaIssues flags a disc on the trail, passes one far off it'); }
+  // ---- the helpers (the interface for CZ-5's scavenging)
+  { const A = [{ id: 'a', x: 20, z: 20, r: 12 }, { id: 'b', x: 80, z: 80, r: 14 }];
+    ok(PZ.wildAt(A, 25, 22)?.id === 'a' && PZ.wildAt(A, 80, 93)?.id === 'b' && PZ.wildAt(A, 50, 50) === null && PZ.inWild(A, 33, 20, 2) && !PZ.inWild(A, 33, 20), 'wild: wildAt / inWild find the disc at a point (pad grows it)');
+    ok(PZ.pastLeash(A[0], 20 + 12 + PZ.WILD.leash + 0.5, 20) && !PZ.pastLeash(A[0], 20 + 12 + PZ.WILD.leash - 0.5, 20), `wild: the leash is r + ${PZ.WILD.leash} m`);
+    ok(PZ.wildRank(0.1) === 'unique' && PZ.wildRank(0.3) === 'champion' && PZ.wildRank(0.6) === 'normal' && PZ.wildLevel([4, 12], 4) === 6 && PZ.wildLevel([4, 12], 1) === 6 && PZ.wildLevel([4, 12], 8) === 10 && PZ.wildLevel([4, 12], 30) === 13, 'wild: ranks 18% unique / 30% champion; level = clamp(hero + 2, band low + 2, band top + 1)');
+    ok(PZ.titled('the Kamaitachi Thicket') === 'The Kamaitachi Thicket' && PZ.normArea({ at: [1, 2], r: 40 }).r === 16 && PZ.normArea({ at: ['x'] }) === null, 'wild: titled() and normArea clamp / reject'); }
+  // ---- the spawn rule (COZY §6.1)
+  { const st = Z.normalizeZones(normalizeHeroes(newGameState()));
+    const L = { spawns: [{ rank: 'normal' }, { rank: 'champion' }, { rank: 'normal', wild: 'thicket' }, { rank: 'boss', boss: 'tenguMaster' }, { rank: 'unique', keep: true }] };
+    ok(!PZ.isPeaceful(st, 'bamboo') && PZ.peacefulFilter(st, 'bamboo', L).length === 5, 'peaceful: a besieged zone spawns everything (the trail camps too)');
+    Z.saveVillage(st, 'bamboo');
+    const kept = PZ.peacefulFilter(st, 'bamboo', L);
+    ok(PZ.isPeaceful(st, 'bamboo') && kept.length === 3 && kept.every(s => s.wild || s.boss || s.keep) && !PZ.isPeaceful(st, 'maple'), 'peaceful: a saved zone keeps only its wild packs (and a boss / a kept sighting); other zones stay as they are');
+    PZ.setPeacefulOverride('maple', true); PZ.setPeacefulOverride('bamboo', false);
+    ok(PZ.isPeaceful(st, 'maple') && !PZ.isPeaceful(st, 'bamboo') && PZ.peacefulOverride('maple') === true, 'peaceful: the debug override wins');
+    PZ.setPeacefulOverride('maple', null); PZ.setPeacefulOverride('bamboo', null);
+    ok(!PZ.isPeaceful(st, 'maple') && PZ.isPeaceful(st, 'bamboo') && PZ.peacefulOverride('maple') === null, 'peaceful: clearing the override follows the save again'); }
+}
+
+hr('COZY: SCAVENGING (docs/COZY.md §7, §8, cozy/scavenge.js)');
+{
+  const SC = await import('../src/cozy/scavenge.js'), K = await import('../src/cozy/clock.js'), CS = await import('../src/cozy/state.js'), Z = await import('../src/rpg/zones.js');
+  const ZQ = await import('../src/world/zoneQuests.js');
+  const fresh = () => CS.normalizeCozy(Z.normalizeZones(normalizeHeroes(newGameState())));
+  const seqr = seed => { const r = new RNG(seed); return () => r.next(); };
+  // ---- the tables (COZY §7.2)
+  ok(SC.SCAV_AREAS.join() === 'home,bamboo,maple,tidepool,onsen' && SC.SCAV_AREAS.every(a => SC.AREA_DEFS[a]), 'scavenge: Blossom Hollow and the four zones');
+  ok(SC.nodeCount('home') >= 10 && SC.nodeCount('home') <= 12 && ['bamboo', 'maple', 'tidepool', 'onsen'].every(a => SC.nodeCount(a) >= 14 && SC.nodeCount(a) <= 18), 'scavenge: 10–12 nodes at home, 14–18 a zone');
+  ok(Object.values(SC.AREA_DEFS).every(A => Object.keys(A.nodes).every(k => SC.NODE_KINDS[k]) && A.dig.every(o => o.w > 0) && ['loam', 'leafy', 'sand', 'snow'].includes(A.ground)), 'scavenge: every area names real node kinds, a dig table and a ground');
+  const MATS = new Set(MATERIAL_KEYS);
+  ok(Object.values(SC.NODE_KINDS).every(K2 => K2.verb && K2.model && Object.keys(K2.mats || {}).every(m => MATS.has(m)) && (!K2.pantry || K2.pantry.pool.every(id => PANTRY[id]?.kind === 'forage'))), 'scavenge: node kinds give real materials and forage');
+  // the combat-only materials all come from scavenging (COZY §0.5, §8)
+  const from = new Set(); for (const A of Object.values(SC.AREA_DEFS)) { for (const k of Object.keys(A.nodes)) for (const m of Object.keys(SC.NODE_KINDS[k].mats || {})) from.add(m); for (const o of A.dig) for (const m of Object.keys(o.mats || {})) from.add(m); }
+  ok(['petal', 'bone', 'silk', 'crystal', 'lantern', 'wood', 'stone'].every(m => from.has(m)), `scavenge: petal, bone, silk, crystal and lantern come without a fight (${[...from].join(', ')})`);
+  // ---- yields
+  { const r = seqr(3); let lo = 99, hi = 0; for (let i = 0; i < 400; i++) { const y = SC.gatherYield('driftwood', r); lo = Math.min(lo, y.mats.wood); hi = Math.max(hi, y.mats.wood); }
+    ok(lo === 2 && hi === 4, 'gather: driftwood gives 2–4 wood');
+    const b = SC.gatherYield('driftwood', () => 0, { basket: true }), f = SC.gatherYield('shoots', () => 0, { basket: true });
+    ok(b.mats.wood === 3 && f.pantry.bamboo === 2, "gather: the Forager's Basket adds one");
+    ok(Object.keys(SC.gatherYield('nope', r).mats).length === 0, 'gather: an unknown kind gives nothing'); }
+  { const r = seqr(5); let one = 0, two = 0, finds2 = 0;
+    for (let i = 0; i < 2000; i++) { const a = SC.digYield('bamboo', r), b = SC.digYield('bamboo', r, { perfect: true }); one += Object.values(a.mats).reduce((s, n) => s + n, 0) + (a.coins ? 1 : 0); two += Object.values(b.mats).reduce((s, n) => s + n, 0) + (b.coins ? 1 : 0); }
+    ok(two > one * 1.6, `dig: a Perfect dig rolls twice (${(two / 2000).toFixed(2)} vs ${(one / 2000).toFixed(2)} finds a dig)`);
+    for (let i = 0; i < 3000; i++) { const y = SC.digYield('home', () => 0.999, { perfect: true }); if (y.find) finds2++; }
+    ok(finds2 === 3000, 'dig: never two furniture finds from one dig (the second roll falls back)'); }
+  ok(SC.digResult(0.69) === 'normal' && SC.digResult(0.7) === 'perfect' && SC.digResult(0.85) === 'perfect' && SC.digResult(0.86) === 'normal' && SC.digResult(1) === 'normal' && SC.DIG_SECS === 1.4, 'dig: the golden band is 70–85% of a 1.4 s ring; anywhere else is a good dig (never a fail)');
+  // ---- the state, the day's refill, time away
+  { const st = fresh(); st.cozy.scav = { home: { day: 0, taken: ['home:1', 7], dug: 'x' }, tools: { basket: 1 }, stats: { streak: -3 } };
+    const S = SC.scavState(st);
+    ok(S.home.taken.join() === 'home:1' && Array.isArray(S.home.dug) && S.tools.basket === true && S.tools.bandana === false && S.stats.streak === 0 && S.cheat.perfect === 0, 'scav state: a type-checked fill');
+    CS.normalizeCozy(st); ok(st.cozy.scav.home.taken.join() === 'home:1', 'scav state: normalizeCozy keeps it');
+    ok(SC.takeNode(st, 'home', 'home:2') && !SC.takeNode(st, 'home', 'home:2') && SC.nodeTaken(st, 'home', 'home:2') && SC.scavState(st).stats.gathered === 1, 'scav: a node is gathered once a day');
+    K.addHours(st, 23.5); ok(SC.nodeTaken(st, 'home', 'home:2'), 'scav: still gathered later the same world day');
+    K.addHours(st, 0.6); ok(!SC.nodeTaken(st, 'home', 'home:2') && SC.areaRec(st, 'home').day === 1, 'scav: a new world day refills every node');
+    SC.takeNode(st, 'bamboo', 'bamboo:4'); ok(SC.staleAreas(st, 2).includes('bamboo') && !SC.staleAreas(st, 1).includes('bamboo'), "scav: staleAreas names what a crossed day refilled (the away card's line)");
+    // time away counts toward the refill (COZY §4.4.1: node refills only)
+    const st2 = fresh(); st2.cozy.clock.wall = 1e12; st2.cozy.clock.h = 20; SC.takeNode(st2, 'maple', 'maple:3');
+    K.catchUp(st2, 1e12 + 8 * 35e3); ok(st2.cozy.clock.h === 28 && !SC.nodeTaken(st2, 'maple', 'maple:3'), 'scav: an absence that crosses a world day refills the nodes'); }
+  { const st = fresh();
+    ok(SC.findSpot(st, 'home', 's1') && !SC.findSpot(st, 'home', 's1') && SC.spotFound(st, 'home', 's1'), 'dig spots: Shadow finds a spot once');
+    let k = SC.digSpot(st, 'home', 's1', true); ok(SC.spotDug(st, 'home', 's1') && !SC.spotFound(st, 'home', 's1') && k.streak === 1, 'dig spots: digging it clears the paw mark');
+    k = SC.digSpot(st, 'home', 's2', true); ok(k.streak === 2 && k.best === 2, 'dig: perfect digs build a streak');
+    k = SC.digSpot(st, 'home', 's3', false); ok(k.streak === 0 && k.best === 2 && st.cozy.scav.stats.perfect === 2 && st.cozy.scav.stats.dug === 3, 'dig: a good dig ends the streak; the best stays');
+    st.cozy.scav.cheat.perfect = 2; ok(SC.cheatPerfect(st) && SC.cheatPerfect(st) && !SC.cheatPerfect(st), 'dig: the debug streak spends its digs'); }
+  { const days = Array.from({ length: 60 }, (_, d) => SC.spotCount('bamboo', d));
+    ok(days.every(n => n === 2 || n === 3) && days.includes(2) && days.includes(3) && SC.spotCount('bamboo', 4, { bandana: true }) === SC.spotCount('bamboo', 4) + 1, "dig spots: 2–3 a day (one more with Shadow's Bandana)");
+    const cands = Array.from({ length: 12 }, (_, i) => ({ x: (i % 4) * 20, z: Math.floor(i / 4) * 20 }));
+    const a = SC.pickSpots('maple', 7, cands, 3), b = SC.pickSpots('maple', 7, cands, 3), c = SC.pickSpots('maple', 8, cands, 3);
+    ok(a.join() === b.join() && a.length === 3 && new Set(a).size === 3 && a.join() !== c.join(), 'dig spots: picked by the day (the same all day, moved the next)');
+    ok(a.every((i, k) => a.every((j, l) => k === l || Math.hypot(cands[i].x - cands[j].x, cands[i].z - cands[j].z) >= 14)), 'dig spots: spread at least 14 m apart'); }
+  // ---- quest items from dig spots (COZY §7.2)
+  { const st = fresh(); st.quests.active = [{ id: 'tk_heartwood', step: 0, prog: 1 }];
+    const q = SC.questFind(st, 'bamboo', ZQ.ZONE_QUESTS, ZQ.QUEST_ITEMS);
+    ok(q && q.item === 'tk_heartwood' && SC.questFind(st, 'maple', ZQ.ZONE_QUESTS, ZQ.QUEST_ITEMS) === null && SC.questFind(st, 'home', ZQ.ZONE_QUESTS, ZQ.QUEST_ITEMS) === null, "quest digs: an active find step's item turns up in its own zone's dig spots");
+    SC.markQuestDig(st, 'bamboo'); ok(SC.questFind(st, 'bamboo', ZQ.ZONE_QUESTS, ZQ.QUEST_ITEMS) === null, 'quest digs: one a world day');
+    K.addHours(st, 24); ok(!!SC.questFind(st, 'bamboo', ZQ.ZONE_QUESTS, ZQ.QUEST_ITEMS), 'quest digs: another the next day');
+    st.quests.active[0].prog = 3; ok(SC.questFind(st, 'bamboo', ZQ.ZONE_QUESTS, ZQ.QUEST_ITEMS) === null, 'quest digs: none once the step has all it needs'); }
+  // ---- the pace (COZY §7.3; tools/scavenge-sim.mjs checks the whole table)
+  { const sw = area => { const A = SC.AREA_DEFS[area], o = {}; for (const [k, n] of Object.entries(A.nodes)) for (const [m, v] of Object.entries(SC.meanGather(k))) o[m] = (o[m] || 0) + v * n; return o; };
+    const b = sw('bamboo'), h = sw('home');
+    ok(Math.abs(b.wood - 18) <= 3 && Math.abs(b.stone - 12) <= 3 && b.silk >= 4 && b.silk <= 6 && Math.abs(b.forage - 5) <= 1.5, `pace: a Bamboo sweep ≈ 18 wood, 12 stone, 4–6 silk, 5 forage (${b.wood}, ${b.stone}, ${b.silk}, ${b.forage})`);
+    ok(h.wood <= b.wood * 0.6 && h.stone <= b.stone * 0.6 && h.petal >= 3, `pace: Blossom Hollow's round about half (${h.wood} wood, ${h.stone} stone, ${h.petal} petal)`); }
+  // ---- Pound Mochi (COZY §7.2)
+  { const G = { state: newGameState() }, A = createActions(G), st = G.state; st.pantry = { rice: 4 }; st.materials.mochi = 0;
+    ok(RECIPES.poundMochi?.out?.mat === 'mochi' && cookableAt('poundMochi', 'kitchen') && cookableAt('poundMochi', 'oven') && !cookableAt('poundMochi', 'campfire') && knows({ cookbook: cookbookOf({}) }, 'poundMochi'), "Pound Mochi: a starter recipe at the stove or Rosie's");
+    const r = A.cook('poundMochi', 2);
+    ok(r && st.materials.mochi === 4 && !st.pantry.rice && !st.pantry.poundMochi, 'Pound Mochi: 2 rice → 2 Mochi (a material, not a dish)');
+    ok(matchMix({ rice: 2 }) === 'poundMochi' && matchMix({ rice: 1 }) === 'onigiri', 'Pound Mochi: two rice in "Try a mix" pound into mochi'); }
+}
+
+hr('COZY: THE SIGHTINGS BOARD (docs/COZY.md §6.3, cozy/sightings.js)');
+{
+  const SG = await import('../src/cozy/sightings.js'), CS = await import('../src/cozy/state.js'), Z = await import('../src/rpg/zones.js');
+  const zones = [
+    { zone: 'bamboo', lvl: 6, areas: [{ id: 'thicket', name: 'the Kamaitachi Thicket' }, { id: 'fallenShrine', name: 'the Fallen Shrine' }], monsters: [{ id: 'kamaitachi', name: 'Kamaitachi' }, { id: 'kodama', name: 'Kodama' }] },
+    { zone: 'maple', lvl: 13, areas: [{ id: 'scarecrowFields', name: 'the Scarecrow Fields' }, { id: 'oldRoot', name: 'Old Root Hollow' }], monsters: [{ id: 'kuri', name: 'Kuri' }] },
+  ];
+  const a = SG.rollSightings(4, zones), b = SG.rollSightings(4, zones), c = SG.rollSightings(5, zones);
+  ok(a.length === 3 && JSON.stringify(a) === JSON.stringify(b) && JSON.stringify(a) !== JSON.stringify(c), 'sightings: 3 a world day, the same all day (seeded by the day), new ones the next');
+  ok(new Set(a.map(s => s.zone + s.area)).size === 3 && new Set(a.map(s => s.zone)).size === 2 && a.map(s => s.kind).sort().join() === 'champion,swarm,unique', 'sightings: each in a different wild area, spread over the open zones; a unique, a champion pack and a swarm');
+  ok(a.every(s => s.name && s.line && s.areaName && s.lvl === zones.find(z => z.zone === s.zone).lvl && s.renown === SG.KINDS[s.kind].renown && !s.done), 'sightings: named, a line for the board, the zone\'s wild level, renown by kind');
+  ok(a.every(s => s.bounty.coins === Math.round(1.5 * SG.packCoins(s.kind, s.lvl, s.count)) && Object.values(s.bounty.mats).reduce((n, v) => n + v, 0) >= 4 && Object.keys(s.bounty.mats).every(k => SG.ZONE_MATS[s.zone].includes(k))), 'sightings: the bounty is 1.5 × the pack\'s own coins, plus the zone\'s materials');
+  let gems = 0, n = 0; for (let d = 0; d < 400; d++) for (const s of SG.rollSightings(d, zones)) { n++; if (s.bounty.gem) gems++; }
+  ok(Math.abs(gems / n - SG.GEM_P) < 0.05, `sightings: a gem in about 1 bounty in 4 (${(gems / n * 100).toFixed(0)}%)`);
+  ok(SG.rollSightings(1, []).length === 0 && SG.rollSightings(1, [zones[0]]).length === 2, 'sightings: none with no zone open; one zone with two areas gives two');
+  { const four = ['bamboo', 'maple', 'tidepool', 'onsen'].map(z => ({ ...zones[0], zone: z })); let bad = 0; for (let d = 0; d < 300; d++) { const r = SG.rollSightings(d, four); if (r.length !== 3 || r.some(s => !s.kind || !s.bounty)) bad++; }
+    ok(bad === 0, 'sightings: with all four zones open every day rolls three whole sightings (the kinds shuffle stays in its 3)', bad); }
+  // the state: today's list, the world day, clearing, renown, the save
+  const st = CS.normalizeCozy(Z.normalizeZones(normalizeHeroes(newGameState())));
+  ok(st.cozy.sightings.day === -1 && st.cozy.sightings.renown === 0, 'sightings: a new save has no sightings and no renown');
+  const L1 = SG.sightingsToday(st, 2, zones), L2 = SG.sightingsToday(st, 2, zones);
+  ok(L1 === L2 && L1.length === 3 && st.cozy.sightings.day === 2, 'sightings: today\'s list is rolled once a world day');
+  const s0 = SG.clearSighting(st, L1[0].id), again = SG.clearSighting(st, L1[0].id);
+  ok(s0 && s0.done && !again && st.cozy.sightings.renown === s0.renown && st.cozy.sightings.total === 1 && SG.liveIn(st, s0.zone).every(s => s.id !== s0.id), 'sightings: clearing one pays its renown once and marks it done');
+  st.cozy.sightings.renown = 12; CS.normalizeCozy(st);
+  ok(st.cozy.sightings.renown === 12 && st.cozy.sightings.total === 1 && st.cozy.sightings.list.length === 3, 'sightings: normalizeCozy keeps the list, the renown and the count');
+  ok(SG.renownTitle(0) === 'Wanderer' && SG.renownTitle(12) === 'Bounty Hunter' && SG.renownTitle(99) === 'Legend of the Wilds' && SG.nextTitle(12).title === 'Wild Warden' && SG.nextTitle(60) === null, 'sightings: renown titles');
+  const L3 = SG.sightingsToday(st, 3, zones);
+  ok(L3 !== L1 && L3.every(s => !s.done && s.day === 3) && st.cozy.sightings.renown === 12, 'sightings: the next world day brings three new ones; renown stays');
 }
 
 hr('RESULT');

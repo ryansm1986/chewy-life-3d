@@ -15,8 +15,7 @@ import { Companion } from './actors/companion.js';
 import { Villager } from './actors/npc.js';
 import { CAST, REFINED_CAST, prebuildHumanoid } from './actors/charKit.js';
 import { loadRefinedRigs } from './actors/refinedRigs.js';
-import { chewyStyle, setChewyStyle } from './actors/disneyChewy.js';
-import { loadHeroModels, chewyModel, setChewyModel, CHEWY_MODELS, heroModelReady, buildHeroModel } from './actors/heroModels.js';
+import { loadHeroModels, heroModelReady, buildHeroModel } from './actors/heroModels.js';
 import { VILLAGERS, randomVillagerSpec } from './actors/roster.js';
 import { U } from './gfx/materials.js';
 import { glowTexture } from './gfx/textures.js';
@@ -60,6 +59,12 @@ import { installLife } from './life/index.js';
 import { Tutorials } from './world/tutorials.js';
 import { installHousing } from './home/housing.js';
 import { installDebugAccess } from './debug/access.js';
+import { installAutosave, writeSave, loadSave as readSave } from './core/autosave.js';
+import { makeSaveGlyph } from './ui/saveGlyph.js';
+import { normalizeCozy } from './cozy/state.js';
+import { installCozy } from './cozy/expeditionRun.js';
+import { installScavenge } from './cozy/scavengeWorld.js';
+import { installPeaceful } from './cozy/peacefulRun.js';
 
 // UI and audio load in parallel with the world. The import() paths must be literal so Vite bundles them for the
 // production build (a variable path with @vite-ignore worked on the dev server but 404'd in dist: no UI, no sound).
@@ -74,7 +79,7 @@ export async function boot() {
 
   // ---- persistent state + actions
   const saved = !P.has('fresh') && loadSave();
-  G.state = normalizeZones(normalizeHeroes(saved || newGameState())); // one progression per hero, state.player = the active hero (docs/HEROES.md); state.zones, migrated from state.regions (rpg/zones.js)
+  G.state = normalizeCozy(normalizeZones(normalizeHeroes(saved || newGameState()))); // one progression per hero, state.player = the active hero (docs/HEROES.md); state.zones, migrated from state.regions (rpg/zones.js); state.cozy, the world clock and the expeditions (cozy/state.js, docs/COZY.md §9)
   if (P.has('hero') && G.state.heroes[P.get('hero')]) { // debug / tests: start as another hero (?hero=moka)
     const id = P.get('hero'); G.state.activeHero = id; G.state.player = G.state.heroes[id].player; G.state.equipment = G.state.heroes[id].equipment;
     if (id !== 'chewy') G.state.flags[`${id}Joined`] = true;
@@ -200,23 +205,9 @@ export async function boot() {
 
   // ---- UI
   if (uiMod?.UI) { G.ui = uiMod.UI; try { G.ui.init(G); G.ui.setMode?.('village'); } catch (e) { console.error('[ui] init failed', e); G.ui = null; } }
-  if (G.ui) { // Settings > Disney style: the sculpted cast (Disney Chewy + disneyKit villagers) or the classic toon kit.
-    // Every character is built at boot, so switching saves and reloads (the save keeps all progress).
-    G.ui.settings.disneyChewy = chewyStyle() === 'disney';
-    G.ui.settings.heroModel = Math.max(0, CHEWY_MODELS.indexOf(chewyModel())); // Hero models: the samurai Chewy, the Toybox one or the Storybook heroes (all need the Disney style)
-    G.ui.onSetting((k, v) => {
-      if (k === 'heroModel') {
-        const m = CHEWY_MODELS[v] || 'samurai'; setChewyModel(m);
-        G.ui.toast?.(m === 'samurai' ? 'Switching to the samurai Chewy…' : m === 'toy' ? 'Switching to the Toybox heroes…' : 'Switching to the Storybook heroes…');
-        setTimeout(() => { try { G.save?.(); } catch (e) { console.warn('[style] save failed', e); } location.reload(); }, 450);
-        return;
-      }
-      if (k !== 'disneyChewy') return;
-      setChewyStyle(v ? 'disney' : 'classic');
-      G.ui.toast?.(v ? 'Switching to the Disney style…' : 'Switching to the classic style…');
-      setTimeout(() => { try { G.save?.(); } catch (e) { console.warn('[style] save failed', e); } location.reload(); }, 450);
-    });
-  }
+  // (Settings no longer has "Disney style" or "Hero models": the cast is the samurai Chewy and the Toybox heroes, ROADMAP
+  // CT-7; actors/heroModels.js drops the old saved choices, and ?chewy= / ?chewymodel= stay for the QA)
+  if (G.ui) { delete G.ui.settings.disneyChewy; delete G.ui.settings.heroModel; }
   // defensive rate limit: collapse duplicate toasts and cap bursts
   if (G.ui?.toast) {
     const raw = G.ui.toast.bind(G.ui); const recent = new Map(); let bucket = 3, lastT = performance.now();
@@ -248,7 +239,7 @@ export async function boot() {
     G.ui.onSetting?.(applySetting);
     for (const [k, v] of Object.entries(G.ui.settings || {})) applySetting(k, v, G.ui.settings);
     settingsBooted = true;
-    G.ui.onMenu?.({ save: () => { save(); G.ui.toast?.('Game saved ♡', { color: '#8fe0c0' }); }, quit: () => { save(); location.reload(); } });
+    G.ui.onMenu?.({ save: () => { save(); }, /* (the menu shows its own "Game saved!" toast: ui/menu.js) */ quit: () => { save(); location.reload(); } });
   }
   const BUFF_INFO = { howl: ['War Banner', 'music', '#ff9a6a'], frenzy: ['Flowing Water', 'bolt', '#ffd84a'], shrineZoom: ['Zoomies Shrine', 'bolt', '#8fe0c0'], shrineLuck: ['Lucky Cat', 'clover', '#ffd84a'], shrineXp: ['Sparkle Shrine', 'sparkle', '#b8a8ff'], cursed: ['Cursed', 'skull', '#b88aff'], shadowPower: ['Pack Call', 'shadowDog', '#8ab8ff'], moonlit: ['Moonlit Rally', 'moon', '#ffb080'] };
   function syncBuffs() {
@@ -456,6 +447,9 @@ export async function boot() {
   installServices(G);
   installLife(G, village); // farming, the pantry, the Seed Stall (docs/HOMESTEAD.md)
   installHousing(G); // enterable houses, the cottage's bed / chest / stove, decorating (docs/HOUSING.md)
+  installCozy(G, village); // the cozy path: the world clock and time away, the expeditions and the Expedition Board → G.cozy (src/cozy, docs/COZY.md)
+  installScavenge(G, village); // scavenging: gather nodes and Shadow's dig spots at home and in the zones → G.cozy.scav (cozy/scavengeWorld.js, docs/COZY.md §7)
+  installPeaceful(G, village); // the peaceful overworld: a saved zone keeps only its wild areas' monsters + its wild areas and the Sightings board → G.peaceful (cozy/peacefulRun.js, docs/COZY.md §6)
   // guided tutorials (docs/TUTORIALS.md). They start on their own unless ?notut — and the QA's ?nointro sessions count
   // as notut (unless ?tut), remembered for the tab, so a QA reload of its own save stays quiet too.
   {
@@ -682,7 +676,7 @@ export async function boot() {
     if (G.titleActive || G.playerDead || ui?.dlg?.active || ui?.iris?.active) return true;
     if (urgent) return false;
     if (G.tutorials?.busy || ui?.tutorial?.offering) return true; // (a guide is talking: Shadow's tips wait)
-    if (G.life?.fishing?.s) return true; // (a cast, a bite or a reel: tips wait for the catch; on a phone a tip covers the reel bar)
+    if (G.life?.fishing?.s || G.cozy?.scav?.busy) return true; // (a cast, a bite or a reel, or a dig: tips wait; on a phone a tip covers the reel bar / the dig ring)
     const now = performance.now();
     if (ui?.banners?.busy) hintBannerT = now; // (a beat of calm after a banner, e.g. the victory, before any tip)
     if (ui?.anyModal?.() || now - hintBannerT < 3000 || ui?.toasts?.busy) return true;
@@ -733,15 +727,14 @@ export async function boot() {
     } else if (G.mode === 'village' && !G.titleActive) {
       if (st.quests.done.includes('burrow1') && !G.buildMode && Actions.device !== 'pad') tip('build', 'Press B to plan the village — paint zones and friends will build there!'); // (the pad builds with CT-2's virtual cursor)
       if (regionUnlocked(st, 'bamboo').ok) tip('travel', "The Wayfarer's Post by the bamboo points to new lands! Walk the west trail to find it.");
-      if (heroes.joined('moka') && !heroes.T && heroes.cd <= 0 && !G.tutorials?.covers('switch')) tip('tabSwitch', `Press Tab to play as ${heroes.name(heroes.next())} — ${heroes.name()} will hang out in town.`);
+      if (heroes.joined('moka') && heroes.next() && !heroes.T && heroes.cd <= 0 && !G.tutorials?.covers('switch')) tip('tabSwitch', `Press Tab to play as ${heroes.name(heroes.next())} — ${heroes.name()} will hang out in town.`);
     }
   }
 
   // ---- save / load
-  function save() { if (G.saveBlocked) return; /* (the debug menu's Restore is reloading onto the backup) */ try { if (G.playerDead || G.state.player.life === 0) G.state.player.life = null; /* never persist a knocked-out Chewy */ G.state.hour = day.hour; G.state.day = day.day; localStorage.setItem('chewy3d.save', JSON.stringify(saveableState(G.state))); } catch (e) { /* storage unavailable */ } }
+  function save() { if (G.saveBlocked) return; /* (the debug menu's Restore is reloading onto the backup) */ try { if (G.playerDead || G.state.player.life === 0) G.state.player.life = null; /* never persist a knocked-out Chewy */ G.state.hour = day.hour; G.state.day = day.day; writeSave(saveableState(G.state)); /* (the old save → .prev first) */ } catch (e) { /* storage unavailable */ } }
   G.save = save;
-  setInterval(save, 30000);
-  addEventListener('beforeunload', save);
+  installAutosave(G, { indicator: makeSaveGlyph(G.ui) }); // the timed and event autosaves, the page-hide / unload saves, the paw glyph (core/autosave.js, ROADMAP R-11)
 
   // ambience: water proximity + day/night music swaps (village only)
   let ambT = 0, wasNight = day.isNight();
@@ -861,6 +854,7 @@ export async function boot() {
     const dt = paused ? 0 : rdt;
     if (G.mode === 'village') day.update(dt);
     else if (G.mode === 'interior') day.tick(dt); // (time passes inside; home/housing.js lights the room for the hour)
+    G.cozy?.tick(dt); // the world clock runs in every mode at the day clock's rate (stopped while paused), crews come home (cozy/expeditionRun.js)
     if (G.titleActive) { rig.yawTarget += dt * 0.06; rig.yaw = rig.yawTarget; }
     else handleInput(dt);
     G.actions.tickRegen(dt);
@@ -923,6 +917,6 @@ export async function boot() {
   setTimeout(() => { window.__ready = true; const b = document.getElementById('boot'); if (b) { b.classList.add('gone'); setTimeout(() => b.remove(), 700); } }, P.has('floor') || P.has('region') ? 2500 : 400);
 }
 
-function loadSave() {
-  try { const s = localStorage.getItem('chewy3d.save'); if (!s) return null; const st = JSON.parse(s); return st?.version ? st : null; } catch { return null; }
+function loadSave() { // the main save, else .prev when the main one won't parse or normalize (core/autosave.js; normalizing twice is harmless)
+  return readSave(st => normalizeCozy(normalizeZones(normalizeHeroes(st))));
 }

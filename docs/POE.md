@@ -313,8 +313,9 @@ integrated by `fumaFlight()` (the same equations as `poeSkills.js updateFuma`).
 ## 8. The baked model (`HERO_MODELS.poeToy`, the fūma prop, the mount, the coat)
 Built by an Opus agent with the toybox-character skill (sources `tools/blender/work/codex/poe-toy`; the approved sheet
 `option-D`). Installed 2026-10-05: `public/rigs/poe_toy.{json,bin,png}` + `poe_toy_n.png` (37 bones, 30,072 tris, 1.2 m)
-and `public/models/poe-fuma.glb` (1,232 faces). Settings › Hero models › Samurai or Toybox use her (`cfgFor`: poeToy
-first); Storybook has no Poe, so she stays the kit there (`CAST.poe`), as she does if the files are missing.
+and `public/models/poe-fuma.glb` (1,232 faces). The game uses her (`cfgFor`: poeToy; the hero
+choice in Settings is gone since CT-7); the QA's `?chewymodel=disney` has no Poe, so she stays the kit there
+(`CAST.poe`), as she does if the files are missing.
 - **The rig**: the 37-bone biped contract, as Chewy and Moka, with **no fūma in it** (the hero exporter merges every
   skinned mesh into one). `HERO_MODELS.poeToy` (`src/actors/heroModels.js`):
   - `palm: [-0.044, -0.054, 0.006]`: the fūma's grip, the right paw's centre off the `hand_R` bone (her paws sit out

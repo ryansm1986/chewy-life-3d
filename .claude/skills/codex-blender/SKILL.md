@@ -174,9 +174,9 @@ saw.
   - Meshes named like eye / tongue / mouth / lid get no ink hull.
 - **Runtime**: add an entry to `HERO_MODELS` in `src/actors/heroModels.js`.
   - Set file, earGain, and palm / back (the weapon and sheath attach points under `hand_R` / `chest`).
-  - The Chewy model choice is `chewyModel()`: `?chewymodel=samurai|toy|disney` (samurai is the default since 2026-10-05)
-    and Settings > Hero models (Samurai / Toybox / Storybook). It falls back
-    silently to the next variant.
+  - The Chewy model is `chewyModel()`: always 'samurai' in play (Settings' Hero models choice was removed in CT-7);
+    `?chewymodel=toy|disney` previews the others for QA. It falls back silently to the Toybox Chewy, then the kit
+    (never a Storybook model).
   - Check with `/?test=chars&only=chewy&walk=1` or `&act=swing`, then in the village, in the portraits, with
     `s12-heroes` and with prod-smoke.
 

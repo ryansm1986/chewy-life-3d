@@ -8,7 +8,9 @@ import { FishLogView } from './fishlog.js';
 import { GuidesView } from './tutorial.js';
 import { pantryIcon } from '../life/pantryIcons.js';
 
-const LEGEND_VILLAGE = [['you', 'Chewy'], ['shop', 'Shops'], ['home', 'Homes'], ['craft', 'Workshops'], ['quest', 'Quest'], ['gate', 'Burrow gate']];
+const LEGEND_VILLAGE = [['you', 'Chewy'], ['shop', 'Shops'], ['home', 'Homes'], ['craft', 'Workshops'], ['quest', 'Quest'], ['gate', 'Burrow gate'], ['dig', "Shadow's dig spot"], ['node', 'Gather spot']];
+// an outdoor zone (docs/COZY.md §6.2–§7): the wild areas, today's sightings, the scavenging marks (the swatches: ui/sightings.css)
+const LEGEND_REGION = [['you', 'Chewy'], ['mon', 'Monsters'], ['elite', 'Elites'], ['wild', 'Wild area'], ['sight', 'Sighting'], ['dig', "Shadow's dig spot"], ['node', 'Gather spot'], ['portal', "Wayfarer's Stone"], ['quest', 'Quest']];
 const LEGEND_DUNGEON = [['you', 'Chewy'], ['mon', 'Monsters'], ['elite', 'Elites'], ['boss', 'Boss'], ['stairs', 'Stairs down'], ['portal', 'Portal home'], ['wp', 'Waypoint'], ['quest', 'Quest']];
 const LEGEND_HOME = [['you', 'You'], ['furn', 'Furniture'], ['rugs', 'Rugs'], ['door', 'The door'], ['pup', 'Shadow']]; // (indoors: docs/HOUSING.md)
 export class MapPanel extends Panel {
@@ -25,10 +27,11 @@ export class MapPanel extends Panel {
   }
   onOpen() { this.acc = 0; this.draw(); }
   render() {
-    const dun = this.ui.mode === 'dungeon', home = this.ui.mode === 'interior';
-    if (this._lgMode !== this.ui.mode) {
-      this._lgMode = this.ui.mode;
-      this.body.querySelector('.mp-legend').innerHTML = (dun ? LEGEND_DUNGEON : home ? LEGEND_HOME : LEGEND_VILLAGE).map(([c, t]) => `<div><i class="lg ${c}"></i>${t}</div>`).join('');
+    const dun = this.ui.mode === 'dungeon', home = this.ui.mode === 'interior', region = dun && !!this.ui.G?.dungeon?.isRegion;
+    const lg = region ? 'region' : this.ui.mode;
+    if (this._lgMode !== lg) {
+      this._lgMode = lg;
+      this.body.querySelector('.mp-legend').innerHTML = (region ? LEGEND_REGION : dun ? LEGEND_DUNGEON : home ? LEGEND_HOME : LEGEND_VILLAGE).map(([c, t]) => `<div><i class="lg ${c}"></i>${t}</div>`).join('');
     }
     const loc = this.ui.hud?.cache.loc;
     const name = dun ? (loc?.name || 'The Burrow') : home ? (loc?.name || 'Home') : 'Blossom Hollow';

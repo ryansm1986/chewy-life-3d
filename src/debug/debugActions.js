@@ -408,7 +408,7 @@ export function registerCoreSections(G, api) {
   ], { title: 'Time', icon: 'sun', order: 80 });
 
   // the cozy path (ROADMAP CZ-*, docs/COZY.md) registers its own actions here: registerDebug('cozy', [...]) from src/cozy
-  registerDebug('cozy', [], { title: 'Cozy', icon: 'leaf', order: 90, note: 'Nothing here yet. The cozy path (ROADMAP CZ-1…CZ-12, docs/COZY.md) adds its own actions with registerDebug(\'cozy\', […]): the world clock, time away, expeditions, the Adventurers\' Guild and its hires, scavenging.' });
+  registerDebug('cozy', [], { title: 'Cozy', icon: 'leaf', order: 90 }); // (its actions and note: src/cozy/expeditionRun.js; phases C and D add theirs)
 
   registerDebug('save', [
     { label: 'Back up this save', noMark: true, hint: () => backupHint(), run: () => api.backup() },

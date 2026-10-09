@@ -18,6 +18,9 @@ import { Events } from '../core/events.js';
 import { packMods, monsterMods } from '../rpg/zoneMods.js';
 import { ZoneVillage } from './village/village.js'; // the zone's village: hub, siege, villagers, quests (docs/ZONES.md §2)
 import { installGate } from './dungeonGate.js'; // the zone dungeon's gate at the trail's end (its boss moved inside: docs/ZONES.md §8.2)
+import { isPeaceful, peacefulFilter, wildAt } from '../cozy/peaceful.js'; // the peaceful overworld and its wild areas (docs/COZY.md §6)
+import { WildRuntime } from '../cozy/wildWorld.js';
+import { wildPopulate } from '../cozy/wildMarkers.js';
 
 export class RegionMode extends DungeonMode {
   constructor(G, id) {
@@ -36,10 +39,18 @@ export class RegionMode extends DungeonMode {
     const visit = R.visits[def.id] = (R.visits[def.id] || 0) + 1;
     this.visit = visit; this.floor = 0;
     const heroLvl = G.state.player?.lvl || 1;
-    const layout = this.layout = generateRegion(def, { visit, mlvl: regionLevel(def, heroLvl) });
+    let topLvl = heroLvl; for (const h of Object.values(G.state.heroes || {})) topLvl = Math.max(topLvl, h.player?.lvl || 1); // (the wild areas: a step above the strongest hero, cozy/peaceful.js wildLevel)
+    const layout = this.layout = generateRegion(def, { visit, mlvl: regionLevel(def, heroLvl), heroLvl: topLvl });
     layout.boss = this.bossId();
     for (const sp of layout.spawns) if (sp.boss) sp.boss = layout.boss;
+    // the peaceful overworld (docs/COZY.md §6.1): once the zone's village is saved, only its wild areas' packs spawn,
+    // and the emptied trail camp sites are wildlife glades (populate reads layout.peaceful / glades: ctx.peaceful)
+    this.peaceful = layout.peaceful = isPeaceful(G.state, def.id);
+    layout.spawns = peacefulFilter(G.state, def.id, layout);
+    layout.glades = this.peaceful ? layout.plan.camps.map(c => ({ x: c.x, z: c.z, r: c.r })) : [];
+    G.peaceful?.addSightings?.(layout, def.id); // (today's sightings in this zone's wild areas: cozy/peacefulRun.js, docs/COZY.md §6.3)
     this.village = ZoneVillage.for(this); // (sets layout.hooks: the village's static pieces go in while the world builds)
+    { const h = layout.hooks || {}, vp = h.populate; Object.defineProperty(layout, 'hooks', { value: { ...h, populate: ctx => { vp?.(ctx); wildPopulate(ctx); } }, configurable: true, enumerable: false }); } // (the wild areas' posts, ofuda and edge tint: cozy/wildMarkers.js)
     const world = this.world = new RegionWorld(G.engine, layout, def);
     // the bits of a Burrow theme that DungeonMode / the game read
     this.theme = { name: def.name, monsters: this.roster(), grade: def.mood?.grade, wall: ['#6a5a4a'], light: '#ffd8a8', accent: def.color };
@@ -49,6 +60,7 @@ export class RegionMode extends DungeonMode {
     this.flow = new Int16Array(layout.W * layout.H); this.flowT = 0;
     this.buildInteractables();
     this.village?.attach(world); // (overlays, cages, villagers, the buildings' doors, mode.villagePos)
+    G.peaceful?.zoneBoard?.(this); // (a saved village's notice board reads the Sightings: cozy/peacefulRun.js)
     this.gate = installGate(this); // (no outdoor boss in a gated zone; mode.gatePos)
     return world;
   }
@@ -59,13 +71,21 @@ export class RegionMode extends DungeonMode {
     const arrive = G._zoneArrive?.zone === this.regionId ? G._zoneArrive : {}; G._zoneArrive = null;
     const vp = this.village?.arrival(arrive); if (vp) { this.campAnchor = this.startPos; this.startPos = vp; } // (the cooking campfire stays by the Wayfarer's Stone)
     if (arrive.gate && this.gate) this.startPos = this.gate.arrival.clone(); // (back out of the zone dungeon: in front of its gate)
-    for (const sp of L.spawns) this.spawnPack(sp);
+    this.wild = new WildRuntime(this); // (the wild areas: leash, entry toast: cozy/wildWorld.js)
+    for (const sp of L.spawns) { const n0 = this.monsters.length; this.spawnPack(sp); if (sp.wild) this.wild.tag(this.monsters.slice(n0), sp.wild); if (sp.sighting) this.wild.sighting(sp.sightingOf, this.monsters.slice(n0)); }
     this.village?.start(arrive); // (the siege camps and the captain)
     // dusk / night regions: a warm lantern glow follows the hero (daylight regions don't need it). Hung 4 m up like the
     // Burrow's (dungeonMode.js, ROADMAP R-9) and softer than it: at 1.8 m and 5 it turned Foosy's emerald mint in the
     // Onsen, and over snow anything past ~4 lifts the white ground over the bloom threshold, which washes the hero again
     if ((def.mood?.night || 0) > 0.3) this.playerLight = this.world.lightPool.addSource({ pos: new THREE.Vector3(), color: new THREE.Color('#ffd8a8'), intensity: 3.5, radius: 9, priority: 10, lift: 4 });
     G.ui?.banner?.(def.name, `${def.jp} · Lv ${def.levels[0]}–${def.levels[1]}`, { style: 'area' });
+    // the first visit to a zone once it's peaceful: say so, once (docs/COZY.md §9)
+    const qk = 'cozyQuiet_' + def.id;
+    if (this.peaceful && !G.state.flags[qk] && G.state.zones?.[def.id]?.village === 'saved') {
+      G.state.flags[qk] = true;
+      const vn = this.village?.def?.name;
+      setTimeout(() => { if (G.dungeon === this) G.ui?.toast?.(`The yokai have gone quiet${vn ? ` around ${vn}` : ''}, except in the wild places`, { icon: 'leaf', color: '#a8e6b0', sub: 'The wild places: violet rings on the map, red ofuda at their gates', duration: 6 }); }, 3600);
+    }
     const b = MONSTERS[L.boss];
     if (b) setTimeout(() => { if (G.dungeon === this && this.boss?.alive && !this.boss.introDone) G.ui?.toast?.(`${b.name} waits at the end of the trail…`, { icon: 'oni', color: '#ff8a9a' }); }, 3200);
     this.world.applyMood(G);
@@ -82,7 +102,7 @@ export class RegionMode extends DungeonMode {
     // camp kinds rotate through the roster (from a random start each visit) so a visit never ends up all one kind
     const kinds = this.theme.monsters;
     if (this._packN == null) this._packN = this.rng.int(0, kinds.length - 1);
-    const kind = kinds[this._packN++ % kinds.length], variant = this.rng.int(0, 3);
+    const kind = sp.monster && kinds.includes(sp.monster) ? sp.monster : kinds[this._packN++ % kinds.length], variant = this.rng.int(0, 3); // (sp.monster: a sighting's own kind)
     let leader = null;
     if (sp.rank !== 'normal') { leader = monsterMods(this, new Monster(this, kind, { level: lvl, rank: sp.rank, variant, x: c.x, z: c.z, rng: () => this.rng.next() })); this.monsters.push(leader); this.combat.add(leader); }
     const n = Math.max(1, Math.round(sp.count * (MONSTERS[kind].pack || 1)));
@@ -106,7 +126,9 @@ export class RegionMode extends DungeonMode {
     if (exit) { exit.label = "Touch the Wayfarer's Stone"; exit.onInteract = () => (G.openTravel ? G.openTravel({ from: this.regionId }) : G.returnToVillage()); }
     this.region.interactables?.({ G, mode: this, world: W, layout: this.layout, add: it => inter.push(it) });
   }
-  update(dt, t) { super.update(dt, t); this.village?.update(dt, t); }
+  update(dt, t) { super.update(dt, t); this.village?.update(dt, t); this.wild?.update(dt, t); }
+  /** the wild area at a point (docs/COZY.md §6.2: CZ-5's scavenging keeps its nodes out, or puts special ones in) */
+  wildAt(x, z, pad = 0) { return wildAt(this.layout.wild, x, z, pad); }
   onBossDefeated(b, xp = 0) {
     if (b.siegeCaptain && this.village) return this.village.captainDefeated(b, xp); // (the village's captain: it saves the village)
     super.onBossDefeated(b, xp); // victory beat + a return portal where it fell (DungeonMode skips the stairs in regions)
@@ -122,5 +144,5 @@ export class RegionMode extends DungeonMode {
     Events.emit('dungeon:cleared', { id, kind: 'region', tier: 0, floor: 0, zone: id, boss: b.id, first: R.cleared[id] === 1 });
     G.save?.();
   }
-  dispose() { this.village?.dispose(); super.dispose(); this.world.dispose?.(); }
+  dispose() { this.wild?.dispose(); this.village?.dispose(); super.dispose(); this.world.dispose?.(); }
 }

@@ -118,6 +118,11 @@ export const LAYOUT = {
   open: S.open,
   // landmark sites the engine's camp / POI placement keeps clear of (layout.avoid)
   avoid: [[15, 45, 7], [25.5, 25.5, 6], [68, 12.5, 6], [11.5, 69, 4], [47, 13, 5], [57, 16, 5]],
+  // the wild areas (docs/COZY.md §6.2): they keep their yokai once Shiokaze Port is saved; off the coast trail
+  wild: [
+    { id: 'crabFlats', name: 'the Crab Flats', jp: '蟹の干潟', at: [54, 58], r: 14, packs: 3 },
+    { id: 'wreckShoals', name: 'the Wreck Shoals', jp: '難破の浅瀬', at: [86, 68], r: 13, packs: 2 },
+  ],
 };
 export const RECIPE = { terrain: TERRAIN, layout: LAYOUT };
 export const SITES = TP_SITES;

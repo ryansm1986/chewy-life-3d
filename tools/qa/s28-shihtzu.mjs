@@ -24,21 +24,32 @@ const shot = async name => { if (SHOTS) await page.screenshot({ path: `${OUT}/${
 const quiet = () => ev(() => { const G = window.G; G.sim.tickT = -1e9; clearInterval(window.__freeze); window.__freeze = setInterval(() => { G.sim.tickT = -1e9; }, 200); G.state.flags.hints = { ...(G.state.flags.hints || {}), garden: 1, build: 1, travel: 1, skills: 1, stats: 1, loot: 1, potion: 1, fight: 1 }; });
 const poeIn = () => ev(() => { const G = window.G; G.state.flags.mokaJoined = true; G.state.flags.poeJoined = true; for (const id of ['moka', 'poe']) { const v = G.heroes.villagers[id]; if (v) { v.frozen = false; v.waitingToJoin = false; } } });
 const toMaple = async () => {
-  await ev(() => { const G = window.G; G.state.player.lvl = 14; G.actions.recompute(); G.state.flags.burrowTut = true; window.__walkI = 0; G.enterRegion('maple'); });
+  await ev(() => { const G = window.G; G.state.player.lvl = 14; G.actions.recompute(); G.state.flags.burrowTut = true; window.__walkI = null; G.enterRegion('maple'); });
   await waitMode(page, 'dungeon'); await sleep(page, 600);
   await ev(() => { for (const m of window.G.dungeon.monsters) { m.pos.set(-500, 0, -500); m.aggro = false; } }); // (a quiet hollow)
 };
-/** walk n small steps along the region's trail from the arrival */
+/** walk n small steps along the region's trail from the arrival (the trail start, or in a saved zone the village's
+ *  Waypoint Shrine: the first step finds the nearest trail point, then it walks on toward the dungeon gate) */
 const walk = async (n) => {
   for (let i = 0; i < n; i++) {
     await ev(() => {
       const G = window.G, P = G.player, ok = (x, z) => G.world.walkable(x, z) && !G.world.collision?.solidAt?.(x, z, 0.3), tr = G.dungeon?.layout?.plan?.trail;
       if (!tr) return;
-      let bi = window.__walkI || 0, bd = 1e9; for (let j = Math.max(0, bi - 2); j < Math.min(tr.length, bi + 12); j++) { const q = Math.hypot(tr[j][0] - P.pos.x, tr[j][1] - P.pos.z); if (q < bd) { bd = q; bi = j; } } window.__walkI = bi;
+      if (window.__walkI == null) { let j0 = 0, d0 = 1e9; tr.forEach(([x, z], j) => { const q = Math.hypot(x - P.pos.x, z - P.pos.z); if (q < d0) { d0 = q; j0 = j; } }); if (d0 > 2.5) { P.setPos(tr[j0][0], tr[j0][1]); G.engine.rig.focus.copy(P.pos); G.engine.rig.snap?.(); } } // (a saved zone: step onto the road from the shrine)
+      let bi = window.__walkI ?? 0, bd = 1e9; for (let j = window.__walkI == null ? 0 : Math.max(0, bi - 2); j < (window.__walkI == null ? tr.length : Math.min(tr.length, bi + 12)); j++) { const q = Math.hypot(tr[j][0] - P.pos.x, tr[j][1] - P.pos.z); if (q < bd) { bd = q; bi = j; } } window.__walkI = bi;
       const nx = tr[Math.min(tr.length - 1, bi + 2)], L = Math.hypot(nx[0] - P.pos.x, nx[1] - P.pos.z) || 1, d = { x: (nx[0] - P.pos.x) / L, z: (nx[1] - P.pos.z) / L };
       const x = P.pos.x + d.x * 0.35, z = P.pos.z + d.z * 0.35; if (ok(x, z)) { P.setPos(x, z); P.facing = P.faceTarget = Math.atan2(d.x, d.z); }
     });
     await sleep(page, 55);
+  }
+};
+/** walk until his scene starts (a saved zone's arrival is the village: a longer walk out before a spot ahead is free) */
+const walkOn = async () => {
+  await walk(24);
+  for (let k = 0; k < 8; k++) {
+    await page.waitForFunction(() => window.G.heroes.stzJoin.state !== 'wait', null, { timeout: 7000 }).catch(() => {});
+    if ((await ev(() => window.G.heroes.stzJoin.state)) !== 'wait') return;
+    await walk(12);
   }
 };
 const J = () => ev(() => {
@@ -64,7 +75,7 @@ try {
   await ev(() => { window.__scene = []; window.G.events.on('shihtzu:joinScene', p => window.__scene.push(p.phase)); });
   await toMaple();
   const a0 = await J();
-  await walk(24);
+  await walkOn();
   await page.waitForFunction(() => window.G.heroes.stzJoin.state === 'kneel', null, { timeout: 30000 }).catch(() => {});
   await page.waitForFunction(() => window.G.heroes.stzJoin.lanterns.filter(L => L.want > 0).length >= 2, null, { timeout: 8000 }).catch(() => {});
   const a1 = await J();
@@ -99,13 +110,13 @@ try {
   if (PART.includes('b')) { // ================================================================ b) a reset mid-scene; the pup fetches you; an old save's rumour
   await boot(page, 'fresh&nointro&notut'); await quiet(); await poeIn();
   await ev(() => { window.__scene = []; window.G.events.on('shihtzu:joinScene', p => window.__scene.push(p.phase)); });
-  await toMaple(); await walk(24);
+  await toMaple(); await walkOn();
   await page.waitForFunction(() => window.G.heroes.stzJoin.state === 'kneel', null, { timeout: 30000 }).catch(() => {});
   await ev(() => window.G.returnToVillage()); await waitMode(page, 'village'); await sleep(page, 600);
   const b0 = await J();
   await toMaple(); const b1 = await J();
   R.check('leaving the hollow mid-scene resets it (no knight, no lanterns, no pup left behind); the next visit starts it again', b0.state === 'off' && !b0.knight && !b0.lanterns && !b0.pupSlots && !b0.joined && b1.state === 'wait', JSON.stringify({ b0, b1 }));
-  await walk(24);
+  await walkOn();
   await page.waitForFunction(() => window.G.heroes.stzJoin.state === 'kneel', null, { timeout: 30000 }).catch(() => {});
   const bk = await J();
   await page.waitForFunction(() => window.__scene.includes('proclaim'), null, { timeout: 26000 }).catch(() => {}); // (stand still: the pup comes to fetch you)

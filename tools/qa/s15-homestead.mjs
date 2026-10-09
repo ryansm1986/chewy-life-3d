@@ -335,7 +335,7 @@ try {
   }
   await sleep(page, 2600);
   const oven = await G(() => { const G = window.G, p = G.ui.panels.cook; return { open: G.ui.isOpen('cook'), station: p.station, can: [...document.querySelectorAll('.ck-row.known:not(.away)')].map(r => r.dataset.id), mochi: 'strawberryMochi' in G.state.cookbook.known, done: G.story.Q.done.includes('tasteTest') }; });
-  R.check('Taste Test: three dishes cooked, then Rosie tastes them (the Strawberry Mochi recipe); "Bake with Rosie" opens her oven, where only baked goods cook', taste?.step === 1 && oven.done && oven.mochi && rosieCh.includes('Bake with Rosie 🧁') && oven.open && oven.station === 'oven' && oven.can.length >= 1 && oven.can.every(id => ['strawberryMochi', 'honeyCake', 'melonBread'].includes(id)), JSON.stringify({ taste, rosieCh, oven }));
+  R.check('Taste Test: three dishes cooked, then Rosie tastes them (the Strawberry Mochi recipe); "Bake with Rosie" opens her oven, where only baked goods cook (and Pound Mochi: COZY §7.2)', taste?.step === 1 && oven.done && oven.mochi && rosieCh.includes('Bake with Rosie 🧁') && oven.open && oven.station === 'oven' && oven.can.length >= 1 && oven.can.every(id => ['strawberryMochi', 'honeyCake', 'melonBread', 'poundMochi'].includes(id)), JSON.stringify({ taste, rosieCh, oven }));
   await G(() => window.G.ui.closeAll()); await sleep(page, 300);
 
   // ---------------------------------------------------------------- m) eating and Well Fed

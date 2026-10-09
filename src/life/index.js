@@ -29,7 +29,11 @@ export function installLife(G, village) {
   const cooks = installCookSocial(G, kitchen);
   const life = G.life = {
     tools, garden, fishing, kitchen,
-    update(dt) { if (G.mode === 'village') garden.update(dt); else if (tools.busy) tools.cancel(); fishing.update(dt); kitchen.update(dt); },
+    update(dt) {
+      if (G.mode === 'village') garden.update(dt); else if (tools.cur?.anywhere) tools.update(dt); else if (tools.busy) tools.cancel(); // (a gather in a zone: cozy/scavengeWorld.js)
+      fishing.update(dt); kitchen.update(dt);
+      G.cozy?.scav?.update?.(dt); // scavenging: the day's refill, Shadow's nose, the dig (docs/COZY.md §7)
+    },
     onNewDay(day) { social.onNewDay(day); return garden.onNewDay(day); },
     onTalk: async (npc, say) => { await social.onTalk(npc, say); await cooks.onTalk(npc, say); },
     markerFor: id => social.markerFor(id) || cooks.markerFor(id),

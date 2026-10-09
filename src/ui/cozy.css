@@ -1,0 +1,57 @@
+/* The cozy path's small pieces (docs/COZY.md §10): the HUD's crews chip (ui/cozyChip.js), the away badge on the hero
+   wheel's cards and the HUD minis (ui/heroWheel.js, ui/hud.js), and the "While you were away…" card (ui/awayCard.js). */
+/* the crews chip: under the minimap's column, after the run chip */
+.cz-chip { display: none; align-items: center; gap: 5px; padding: 3px 11px 3px 4px; border: 3px solid var(--ink); border-radius: 999px; pointer-events: auto; cursor: pointer;
+  background: linear-gradient(#fffdf8, #e0ecff); box-shadow: 0 3px 0 rgba(74, 44, 42, .3); font: 700 14px/1 var(--font); color: var(--ink); position: relative; }
+.cz-chip.on { display: flex; animation: czPop .4s var(--spring); }
+.cz-chip:hover { transform: translateY(-1px); }
+.cz-chip.news { background: linear-gradient(#fffdf8, #ffe0ea); }
+.cz-chip .cz-ic { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: radial-gradient(circle, #fff 30%, #cfe0ff); border: 2px solid var(--ink); }
+.cz-chip .cz-ic .gl { width: 24px; height: 24px; }
+.cz-chip b { white-space: nowrap; }
+.cz-bang { position: absolute; right: -7px; top: -9px; width: 22px; height: 22px; border-radius: 50%; background: #ff5a7a; border: 2.5px solid var(--ink); color: #fff; font: 700 14px/17px var(--font); font-style: normal; text-align: center; animation: czBang 1.4s ease-in-out infinite; }
+@keyframes czPop { 0% { transform: scale(.5); } 70% { transform: scale(1.08); } }
+@keyframes czBang { 50% { transform: scale(1.2) rotate(8deg); } }
+.tt .cz-tr { font: 500 13px/1.3 var(--font); margin: 3px 0; }
+.tt .cz-tr.news { font-weight: 700; color: #c83a6a; }
+.ui-root.m-phone .cz-chip { font-size: 14px; min-height: 44px; padding-right: 12px; }
+.ui-root.m-phone .cz-chip .cz-ic { width: 34px; height: 34px; }
+/* away heroes: greyed, with a backpack badge (the hero wheel's card, the HUD's minis) */
+.cz-away-badge { position: absolute; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #fff; border: 2.5px solid var(--ink); box-shadow: 0 2px 0 rgba(74, 44, 42, .3); font-style: normal; pointer-events: none; z-index: 2; }
+.cz-away-badge .gl { width: 24px; height: 24px; }
+.hw-card.away .cz-away-badge { right: calc(50% - 56px); top: 58px; }
+.hw-card.away .hw-face { filter: grayscale(.7) opacity(.85); }
+.hw-card.away .hw-tag.dim { background: #6a90d4; }
+.hsw.away .hsw-face { filter: grayscale(.75) opacity(.8); }
+.hsw.away .cz-away-badge { right: -8px; bottom: -8px; width: 20px; height: 20px; border-width: 2px; }
+.hsw.away .cz-away-badge .gl { width: 16px; height: 16px; }
+.hsw.away .hsw-cd { display: none; }
+/* "While you were away…" */
+.p-away { width: 560px; }
+.aw { display: flex; flex-direction: column; gap: 9px; }
+.aw-hd { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border: 3px solid var(--ink); border-radius: 16px; background: radial-gradient(circle at 16% 30%, #fff, #ffe9d6 70%); box-shadow: 0 4px 0 rgba(74, 44, 42, .25); }
+.aw-lic { display: grid; place-items: center; width: 56px; height: 56px; flex: none; border-radius: 16px; border: 3px solid var(--ink); background: radial-gradient(circle at 45% 40%, #fff, #ffd8b0); }
+.aw-lic .gl { width: 44px; height: 44px; }
+.aw-hd b { display: block; font: 700 22px/1.1 var(--font); }
+.aw-hd span { font: 500 14px/1.3 var(--font); color: var(--ink2); }
+.aw-sh { font: 700 14px var(--font); color: var(--ink2); margin: 2px 2px -3px; }
+.aw-list { display: flex; flex-direction: column; gap: 6px; }
+.aw-row { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border: 3px solid var(--ink); border-radius: 14px; background: #fffdf8; box-shadow: 0 3px 0 rgba(74, 44, 42, .2); }
+.aw-row.out { background: #f4f8ff; }
+.aw-faces { display: flex; flex: none; }
+.aw-face { position: relative; width: 40px; height: 40px; border-radius: 50%; overflow: hidden; border: 2.5px solid var(--ink); background: radial-gradient(circle at 50% 30%, #fff, #ffe2c8); margin-right: -10px; }
+.aw-face:last-child { margin-right: 0; }
+.aw-face .p3d, .aw-face svg { position: absolute; left: -8%; top: 4%; width: 116% !important; height: 116% !important; object-fit: cover; }
+.aw-t { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.aw-t b { font: 700 15px/1.1 var(--font); }
+.aw-t span { font: 500 13px/1.25 var(--font); color: var(--ink2); }
+.aw-ic .gl { width: 28px; height: 28px; }
+.aw-left { font: 700 13px var(--font); font-style: normal; color: #4a72b8; white-space: nowrap; }
+.aw-quiet { margin: 2px 4px; font: 500 15px/1.35 var(--font); color: var(--ink2); text-align: center; }
+.aw-ok { align-self: center; margin-top: 4px; }
+.aw-ok .gl { width: 26px; height: 26px; }
+.ui-root.m-phone .p-away { width: min(560px, calc((100vw - var(--sa-l) - var(--sa-r)) / var(--m-pscale) - 64px)); }
+.ui-root.m-phone .p-away .aw-hd span, .ui-root.m-phone .p-away .aw-t span, .ui-root.m-phone .p-away .aw-sh, .ui-root.m-phone .p-away .aw-left { font-size: 14px; }
+.ui-root.m-phone .p-away .aw-row .btn { min-height: 52px; }
+.ui-root.m-phone .p-away .aw-ok { min-height: 56px; }
+.ui-root.m-phone .p-away .aw { padding-bottom: 18px; } /* (the phone's title bar sits under the card: room for it below the button) */

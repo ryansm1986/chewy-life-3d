@@ -6,22 +6,28 @@
 // the portrait rotate overlay. For each: a screenshot, text drawn under the floor (12 CSS px: ui/mobile.css raises what
 // was under), a panel that runs off the screen (it must fit, or scroll inside), and tappables under 44 px.
 // Decorative text is left out: the Japanese subtitles (.jp), the compass's 北, the portrait's "Lv", glyph art (svg).
-//   usage: node tools/qa/mobile-ui.mjs [--report] [view…]   W=844 H=390 DPR=3   SHOT_DIR (default tools/qa/tmp/mobile-ui)
+//   CT-7: "cut off" is measured against the safe area (--sa-*: a notch, CT-6's itch insets, the full-screen top edge), not
+//   the bare screen; a body whose content runs past it must scroll; Settings is audited with every row it can show (the
+//   debug row too) and every Controls tab (touch, keyboard, controller), from the game and from the title; and the same
+//   run works at a tablet's size (DEVICE=ipad: 1180×820 at DPR 2 with iPad Safari's agent, or W / H / DPR), where
+//   panels taller than the screen used to run off it (the phone's fit was phone-only).
+//   usage: node tools/qa/mobile-ui.mjs [--report] [view…]   W=844 H=390 DPR=3 | DEVICE=ipad   SHOT_DIR (default tools/qa/tmp/mobile-ui)
 //   FLOOR=12 TAP=44. Exit 1 when a panel is cut off, or (without --report) text or a tappable is under.
 import fs from 'node:fs';
 import path from 'node:path';
-import { launchTouch, boot, sleep, waitMode, BASE, PHONE } from './touch-lib.mjs';
+import { launchTouch, boot, sleep, waitMode, BASE, PHONE, IPAD } from './touch-lib.mjs';
 
 const OUT = process.env.SHOT_DIR || path.resolve('tools/qa/tmp/mobile-ui');
 const FLOOR = +(process.env.FLOOR || 12), TAP = +(process.env.TAP || 44), STRICT = !process.argv.includes('--report');
 const ONLY = new Set(process.argv.slice(2).filter(a => !a.startsWith('--')));
-const W = +(process.env.W || PHONE.w), H = +(process.env.H || PHONE.h), DPR = +(process.env.DPR || PHONE.dpr);
+const DEV = process.env.DEVICE === 'ipad' ? IPAD : PHONE;
+const W = +(process.env.W || DEV.w), H = +(process.env.H || DEV.h), DPR = +(process.env.DPR || DEV.dpr);
 fs.mkdirSync(OUT, { recursive: true });
-const { browser, page, errors, F } = await launchTouch({ w: W, h: H, dpr: DPR });
+const { browser, page, errors, F } = await launchTouch({ w: W, h: H, dpr: DPR, ua: DEV.ua });
 const ev = (f, a) => page.evaluate(f, a);
 let bad = 0;
 const small = [], tiny = [], clipped = [];
-const DECOR = /\.jp\b|mm-n > span|pc-lv > small|chg-jp|ph-jp/;
+const DECOR = /\.jp\b|mm-n > span|pc-lv > small|chg-jp|ph-jp|\.kc\b/; // (key caps are glyph art: ui/mobile.js's text floor skips them too)
 
 const audit = (name, scopes) => ev(([scopes, floor, tap]) => {
   const vis = el => { for (let e = el; e && e !== document.body; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity < 0.05) return false; } return true; };
@@ -47,9 +53,19 @@ const audit = (name, scopes) => ev(([scopes, floor, tap]) => {
       const k = label(el), o = taps.get(k) || { sel: k, px: m, n: 0 }; o.n++; o.px = Math.min(o.px, m); taps.set(k, o);
     }
   }
-  // a panel must be wholly on screen (its body scrolls when it is taller than the screen)
-  const cut = [...document.querySelectorAll('.pw .panel')].filter(p => p.offsetParent && !p.closest('.closing')).map(p => ({ p: [...p.classList].find(c => c.startsWith('p-')) + ` (${p.closest('.pw').className}${p.matches('.p-build') ? ', build ' + !!window.G.build?.active + ', decor ' + !!window.G.housing?.decor?.active : ''})`, r: p.getBoundingClientRect() }))
-    .filter(o => o.r.top < innerHeight && o.r.bottom > 0 && (o.r.top < -2 || o.r.left < -2 || o.r.right > innerWidth + 2 || o.r.bottom > innerHeight + 2)).map(o => ({ sel: o.p, rect: [o.r.left, o.r.top, o.r.right, o.r.bottom].map(v => Math.round(v)) }));
+  // a panel must be wholly inside the safe area (CT-7: not just the screen; its body scrolls when it is taller), and a
+  // body whose content runs past it must scroll (else the rest is cut off inside the panel)
+  const sa = window.G.ui.mobile?.sf || { t: 0, r: 0, b: 0, l: 0 };
+  const bodyCut = p => { // the body's content: scrolled inside it, or (not scrolling) wholly inside the safe area; never clipped at a side
+    const b = p.querySelector(':scope > .pb'); if (!b) return false;
+    if (b.scrollWidth > b.clientWidth + 6 && getComputedStyle(b).overflowX === 'hidden') return true; // (a row wider than the body: clipped at its side)
+    if (b.scrollHeight <= b.clientHeight + 2) return false;
+    const oy = getComputedStyle(b).overflowY; if (/auto|scroll/.test(oy)) return false;
+    return oy !== 'visible' || b.getBoundingClientRect().top + b.scrollHeight * (b.currentCSSZoom ?? 1) > innerHeight - sa.b + 2;
+  };
+  const cut = [...document.querySelectorAll('.pw .panel')].filter(p => p.offsetParent && !p.closest('.closing')).map(p => ({ el: p, p: [...p.classList].find(c => c.startsWith('p-')) + ` (${p.closest('.pw').className}${p.matches('.p-build') ? ', build ' + !!window.G.build?.active + ', decor ' + !!window.G.housing?.decor?.active : ''})`, r: p.getBoundingClientRect() }))
+    .filter(o => o.r.top < innerHeight && o.r.bottom > 0 && (o.r.top < sa.t - 2 || o.r.left < sa.l - 2 || o.r.right > innerWidth - sa.r + 2 || o.r.bottom > innerHeight - sa.b + 2 || bodyCut(o.el)))
+    .map(o => ({ sel: o.p, rect: [o.r.left, o.r.top, o.r.right, o.r.bottom].map(v => Math.round(v)) }));
   // a tab row that must fit (the skill trees' three): every tab inside the row and every label inside its tab
   for (const row of document.querySelectorAll('.sk-tabs')) {
     if (!row.offsetParent) continue;
@@ -96,8 +112,11 @@ try {
   await scene('quests', () => ev(() => window.G.ui.open('quests')), ['.p-quests']);
   await scene('map', () => ev(() => window.G.ui.open('map')), ['.p-map']);
   await scene('menu', () => ev(() => window.G.ui.open('menu')), ['.p-menu']);
-  await scene('settings', () => ev(() => { window.G.ui.open('menu'); window.G.ui.panels.menu.setView('settings'); }), ['.p-menu']);
-  await scene('controls', () => ev(() => { window.G.ui.open('menu'); window.G.ui.panels.menu.setView('controls'); }), ['.p-menu']);
+  // Settings at its tallest: the debug row shown too (G.debug.on, faked for the scene)
+  await scene('settings', () => ev(() => { const G = window.G; if (G.debug && !G.__dbgOn) { G.__dbgOn = Object.getOwnPropertyDescriptor(G.debug, 'on') || { value: G.debug.on, configurable: true, writable: true }; Object.defineProperty(G.debug, 'on', { get: () => true, configurable: true }); } G.ui.open('menu'); G.ui.panels.menu.setView('settings'); }), ['.p-menu'],
+    () => ev(() => { const G = window.G; G.ui.close('menu'); if (G.__dbgOn) { Object.defineProperty(G.debug, 'on', G.__dbgOn); delete G.__dbgOn; } }));
+  for (const dev of ['touch', 'kbm', 'pad']) // (Controls: the Touch tab with its options and help list, the key bindings, the pad's)
+    await scene(dev === 'touch' ? 'controls' : 'controls-' + dev, () => ev(d => { const M = window.G.ui.panels.menu; window.G.ui.open('menu'); M.setView('controls'); M.dev = d; M.renderControls(); }, dev), ['.p-menu']);
   await scene('shop', () => ev(() => window.G.openShop()), ['.p-shop', '.p-inv']);
   await scene('stash', () => ev(() => window.G.ui.open('stash')), ['.p-stash', '.p-inv']);
   await scene('cook', () => ev(() => window.G.life.kitchen.open('kitchen')), ['.p-cook']);
@@ -119,6 +138,8 @@ try {
   await scene('decorate', async () => { await ev(() => window.G.housing.decor.enter()); await sleep(page, 600); }, ['.p-decor', '.l-hud', '.tc'], () => ev(() => window.G.housing.decor.exit?.()));
   await scene('portrait', async () => { await page.setViewportSize({ width: H, height: W }); await sleep(page, 500); }, ['.m-rotate'], async () => { await page.setViewportSize({ width: W, height: H }); await sleep(page, 500); });
   await scene('title', async () => { await ev(() => { window.G.housing?.decor?.active && window.G.housing.decor.exit?.(); window.G.save(); }); await page.goto(`${BASE}/`, { waitUntil: 'load' }); await page.waitForFunction(() => window.__ready === true && window.G?.titleActive, null, { timeout: 60000 }); await sleep(page, 2500); }, ['.l-title', '.ti'], async () => {});
+  // Settings from the title (its Settings button: no game menu behind it)
+  await scene('title-settings', () => ev(() => window.G.ui.open('menu', { view: 'settings', from: 'title' })), ['.p-menu']);
 } catch (e) { console.log('!! run:', e.message); bad++; }
 
 console.log(`\n${small.length} text groups under ${FLOOR} px; ${tiny.length} tappable groups under ${TAP} px; ${clipped.length} panels cut off. Shots: ${OUT}`);

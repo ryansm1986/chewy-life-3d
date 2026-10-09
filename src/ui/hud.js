@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { el, esc, fmt, setText, setVar, setCls, setStyle, replay, clamp, damp, rarityColor } from './dom.js';
 import { glyph, glyphURL, MATERIALS } from './glyphs.js';
 import { portrait } from './portraits.js';
+import { cozyIcon } from './cozyIcons.js';
 import { skillIconURL, hotbarIconURL, skillDef, skillCost, xpProgress, potionIconURL, potionInfo, materialIconURL, skillUsable } from './rpg.js';
 import { simpleTip } from './tooltip.js';
 import { Actions } from '../core/actions.js';
@@ -378,7 +379,8 @@ export class Hud {
   /** the other benched heroes (three heroes or more): a smaller portrait each, in a row beside the Tab one (--k: its
    *  place, heroWheel.css); a click switches to that hero. this.$.hswB stays the first of them. */
   benchTick(H, nx) {
-    const others = (H?.bench?.() || []).filter(b => b !== nx), key = others.join(',');
+    // (heroes away on an expedition stay in the row, greyed with a backpack: docs/COZY.md §4.8)
+    const others = (H?.benchShown?.() || H?.bench?.() || []).filter(b => b !== nx), key = others.join(',') + '|' + others.filter(b => H?.away?.(b)).join(',');
     if (key === this.cache.hswBKey) { if (others.length) this.hswBCd(H); return; }
     this.cache.hswBKey = key; this.cache.hswBCdv = undefined;
     const L = this.$.hswBs ||= [];
@@ -387,10 +389,11 @@ export class Hud {
       b.innerHTML = '<div class="hsw-face"></div><svg class="hsw-cd" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17.5"/></svg><span class="hsw-lv"></span>';
       b.style.setProperty('--k', k);
       (L[k - 1] || this.$.hsw).insertAdjacentElement('afterend', b);
-      b.addEventListener('click', e => { e.stopPropagation(); const id = b.dataset.hero; if (id) this.ui.G?.heroes?.switchTo(id); });
+      b.addEventListener('click', e => { e.stopPropagation(); const id = b.dataset.hero; if (!id) return; const aw = this.ui.G?.cozy?.awayInfo?.(id); if (aw) this.ui.toast(`${this.ui.G.heroes.name(id)} is away on an expedition: ${aw.label}`, { color: '#8fd0ff', duration: 3 }); else this.ui.G?.heroes?.switchTo(id); });
       this.ui.tip.bind(b, () => {
         const G2 = this.ui.G, id = b.dataset.hero; if (!id) return '';
-        const hp = this.st.heroes?.[id]?.player || {}, C = G2.heroes.cls(id);
+        const hp = this.st.heroes?.[id]?.player || {}, C = G2.heroes.cls(id), aw = G2.cozy?.awayInfo?.(id);
+        if (aw) return simpleTip(`${esc(C.name)} <span class="jp">${HERO_JP[id] || ''}</span>`, `Level ${hp.lvl || 1} ${esc(C.title)} · away on an expedition: ${esc(aw.obj)}.<br><span class="tt-dim">${esc(aw.label)}</span>`);
         return simpleTip(`${esc(C.name)} <span class="jp">${HERO_JP[id] || ''}</span>`, `Level ${hp.lvl || 1} ${esc(C.title)} · hanging out in town.<br><span class="tt-dim">Click to play as ${esc(C.name)} · hold <span class="kc sm">Tab</span> for the hero wheel.</span>`);
       });
       L.push(b);
@@ -401,6 +404,7 @@ export class Hud {
       b.hidden = !id; b.dataset.hero = id || '';
       if (!id) return;
       b.querySelector('.hsw-face').innerHTML = portrait(id);
+      const away = !!H?.away?.(id); setCls(b, 'away', away); b.querySelector('.cz-away-badge')?.remove(); if (away) b.insertAdjacentHTML('beforeend', `<i class="cz-away-badge">${cozyIcon('pack')}</i>`);
       b.querySelector('.hsw-lv').textContent = String(this.st.heroes?.[id]?.player?.lvl || 1);
       replay(b, 'heroswap', 700);
     });

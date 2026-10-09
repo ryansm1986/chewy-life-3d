@@ -21,6 +21,7 @@ import { HeroWheel } from '../ui/heroWheel.js';
 import { PoeJoin } from './poeJoin.js';
 import { ShihtzuJoin } from './shihtzuJoin.js';
 import { GoldenJoin } from './goldenJoin.js';
+import { heroAway } from '../cozy/state.js';
 
 const V = (x, z) => new THREE.Vector3(x, 0, z);
 const ease = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
@@ -93,12 +94,16 @@ export class HeroManager {
   cls(id = this.active) { return CLASSES[id] || CLASSES.chewy; }
   name(id = this.active) { return this.cls(id).name; }
   joined(id) { return id === 'chewy' || !!this.G.state.flags?.[`${id}Joined`]; }
-  /** heroes the player could switch to right now (joined and not the active one), in roster order */
-  bench() { return HERO_IDS.filter(id => id !== this.active && this.joined(id)); }
+  /** out on an expedition (docs/COZY.md §4.8): not on the bench, not in the wheel's picks, not in town */
+  away(id) { return !!heroAway(this.G.state, id); }
+  /** heroes the player could switch to right now (joined, not the active one, not away), in roster order */
+  bench() { return HERO_IDS.filter(id => id !== this.active && this.joined(id) && !this.away(id)); }
+  /** the HUD's minis: the bench and the heroes away on expeditions (shown greyed with a backpack: ui/hud.js) */
+  benchShown() { return HERO_IDS.filter(id => id !== this.active && this.joined(id)); }
   /** the next joined hero after `from` in roster order (wrapping round): what a Tab tap switches to */
   next(from = this.active) {
     const n = HERO_IDS.length, i0 = HERO_IDS.indexOf(from);
-    for (let k = 1; k < n; k++) { const id = HERO_IDS[(i0 + k) % n]; if (id !== this.active && this.joined(id)) return id; }
+    for (let k = 1; k < n; k++) { const id = HERO_IDS[(i0 + k) % n]; if (id !== this.active && this.joined(id) && !this.away(id)) return id; }
     return null;
   }
   get wheelOpen() { return !!this.wheel?.open; }
@@ -118,6 +123,7 @@ export class HeroManager {
     for (const id of HERO_IDS) {
       if (id === this.active || this.villagers[id]) continue;
       if (!this.joined(id) && JOIN_AT[id] !== 'fountain') continue;
+      if (this.away(id)) continue; // (out on an expedition: they walk back in from the Wayfarer's Post: cozy/expeditionRun.js)
       const at = this.joined(id) ? this.homeSpot(id) : V(L.plaza.x + 2.4, L.plaza.z - 1.2);
       const v = this.spawnVillager(id, at.x, at.z);
       if (!this.joined(id)) { v.waitingToJoin = true; v.frozen = true; v.faceTo(L.spawn.x, L.spawn.z); }
@@ -152,7 +158,8 @@ export class HeroManager {
   /** '' when a switch to `to` can start now, otherwise a short reason for the player */
   canSwitch(to = this.next()) {
     const G = this.G, P = G.player, ui = G.ui;
-    if (!this.bench().length) return this.joined('moka') ? 'Nobody to switch with' : 'Moka is waiting by the fountain!';
+    if (to && to !== this.active && this.joined(to) && this.away(to)) return `${this.name(to)} is away on an expedition`;
+    if (!this.bench().length) return HERO_IDS.some(id => id !== this.active && this.joined(id) && this.away(id)) ? 'Everyone else is out on an expedition' : this.joined('moka') ? 'Nobody to switch with' : 'Moka is waiting by the fountain!';
     if (!to || to === this.active || !this.joined(to)) return 'Nobody to switch with';
     if (this.T) return 'busy';
     if (this.cd > 0) return 'busy';
@@ -218,8 +225,9 @@ export class HeroManager {
   roster() {
     return HERO_IDS.map(id => {
       const C = this.cls(id), joined = this.joined(id), active = id === this.active;
-      const why = active ? 'Playing now' : joined ? this.canSwitch(id) : JOIN_HINT[id] || 'Not met yet';
-      return { id, name: joined || active ? C.name : '???', title: joined || active ? C.title : 'Not met yet', color: C.color, lvl: this.G.state.heroes?.[id]?.player?.lvl || 1, active, joined: joined || active, ready: !active && joined && !why, why: why === 'busy' ? 'Just a moment…' : why };
+      const away = !active && joined ? this.G.cozy?.awayInfo?.(id) || null : null; // (out on an expedition: docs/COZY.md §4.8)
+      const why = active ? 'Playing now' : away ? `Away · ${away.label}` : joined ? this.canSwitch(id) : JOIN_HINT[id] || 'Not met yet';
+      return { id, name: joined || active ? C.name : '???', title: joined || active ? C.title : 'Not met yet', color: C.color, lvl: this.G.state.heroes?.[id]?.player?.lvl || 1, active, joined: joined || active, away, ready: !active && joined && !why, why: why === 'busy' ? 'Just a moment…' : why };
     });
   }
   update(dt) {
