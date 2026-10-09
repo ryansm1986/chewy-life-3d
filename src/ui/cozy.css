@@ -16,6 +16,9 @@
 .tt .cz-tr.news { font-weight: 700; color: #c83a6a; }
 .ui-root.m-phone .cz-chip { font-size: 14px; min-height: 44px; padding-right: 12px; }
 .ui-root.m-phone .cz-chip .cz-ic { width: 34px; height: 34px; }
+.ui-root.m-phone .cz-chip::after { content: ''; position: absolute; inset: -16px -6px; } /* (a 44 px target on screen at the phone HUD's scale) */
+/* the away minis' time left (ui/cozyChip.js keeps it fresh): a little pill under the greyed face */
+.hsw .cz-away-t { position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%); padding: 0 4px; border-radius: 7px; border: 2px solid var(--ink); background: #e2ecff; font: 700 11px/1.15 var(--font); font-style: normal; color: var(--ink); white-space: nowrap; pointer-events: none; z-index: 3; }
 /* away heroes: greyed, with a backpack badge (the hero wheel's card, the HUD's minis) */
 .cz-away-badge { position: absolute; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #fff; border: 2.5px solid var(--ink); box-shadow: 0 2px 0 rgba(74, 44, 42, .3); font-style: normal; pointer-events: none; z-index: 2; }
 .cz-away-badge .gl { width: 24px; height: 24px; }
@@ -23,7 +26,7 @@
 .hw-card.away .hw-face { filter: grayscale(.7) opacity(.85); }
 .hw-card.away .hw-tag.dim { background: #6a90d4; }
 .hsw.away .hsw-face { filter: grayscale(.75) opacity(.8); }
-.hsw.away .cz-away-badge { right: -8px; bottom: -8px; width: 20px; height: 20px; border-width: 2px; }
+.hsw.away .cz-away-badge { left: -7px; top: -6px; right: auto; bottom: auto; width: 20px; height: 20px; border-width: 2px; } /* (top left: the time pill sits under the face, the level top right) */
 .hsw.away .cz-away-badge .gl { width: 16px; height: 16px; }
 .hsw.away .hsw-cd { display: none; }
 /* "While you were away…" */
@@ -55,3 +58,54 @@
 .ui-root.m-phone .p-away .aw-row .btn { min-height: 52px; }
 .ui-root.m-phone .p-away .aw-ok { min-height: 56px; }
 .ui-root.m-phone .p-away .aw { padding-bottom: 18px; } /* (the phone's title bar sits under the card: room for it below the button) */
+/* the Journal's Crews tab (ui/crewLog.js): the crews out, the totals, the report log */
+.cl-tab .gl { width: 22px; height: 22px; }
+.cl-wrap { height: 440px; display: flex; flex-direction: column; gap: 7px; min-height: 0; }
+.cl-top { display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 6px; border-radius: 16px; background: rgba(255, 255, 255, .72); border: 2.5px solid rgba(74, 44, 42, .2); }
+.cl-ic { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 13px; border: 2.5px solid var(--ink); background: radial-gradient(circle at 45% 40%, #fff, #ffd8b0); }
+.cl-ic .gl { width: 34px; height: 34px; }
+.cl-nums { flex: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.cl-nums div { display: flex; flex-direction: column; align-items: center; }
+.cl-nums b { font: 700 20px/1 var(--font); color: #3a72b8; }
+.cl-nums span { font: 600 12px/1.1 var(--font); color: var(--ink2); }
+.cl-go { flex: none; gap: 4px; min-height: 40px; }
+.cl-go .gl { width: 22px; height: 22px; }
+.cl-sh { display: flex; align-items: center; gap: 5px; font: 700 14px var(--font); color: var(--ink2); margin: 1px 2px -2px; }
+.cl-sh .gl { width: 20px; height: 20px; }
+.cl-outs { display: flex; flex-direction: column; gap: 5px; flex: none; }
+.cl-out { display: flex; align-items: center; gap: 9px; padding: 5px 10px 6px 7px; border: 2.5px solid var(--ink); border-radius: 13px; background: linear-gradient(170deg, #fafcff, color-mix(in srgb, var(--pc) 16%, #eef4ff)); }
+.cl-faces { display: flex; flex: none; }
+.cl-face { position: relative; width: 36px; height: 36px; border-radius: 50%; overflow: hidden; border: 2.5px solid var(--ink); background: radial-gradient(circle at 50% 30%, #fff, #ffe2c8); margin-right: -9px; }
+.cl-face:last-child { margin-right: 0; }
+.cl-face .p3d, .cl-face svg { position: absolute; left: -8%; top: 4%; width: 116% !important; height: 116% !important; object-fit: cover; }
+.cl-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; text-align: left; }
+.cl-t > b { font: 700 14.5px/1.15 var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cl-t > span { font: 500 12.5px/1.2 var(--font); color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cl-t > em { display: inline-flex; align-items: center; gap: 3px; font: 700 12.5px/1.2 var(--font); font-style: normal; color: #b07a10; }
+.cl-t > em .gl { width: 15px; height: 15px; }
+.cl-bar { position: relative; display: block; height: 8px; margin-top: 3px; border-radius: 6px; border: 2px solid var(--ink); background: #fff; overflow: hidden; }
+.cl-bar > i { position: absolute; inset: 0 auto 0 0; width: calc(var(--f) * 100%); background: linear-gradient(90deg, color-mix(in srgb, var(--pc) 55%, #fff), var(--pc)); }
+.cl-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 6px; padding: 3px 4px 6px 2px; scrollbar-width: thin; scrollbar-color: rgba(74, 44, 42, .35) transparent; }
+.cl-rep { position: relative; flex: none; display: flex; align-items: center; gap: 9px; width: 100%; padding: 6px 10px 6px 7px; border: 2.5px solid var(--ink); border-radius: 13px; cursor: pointer; pointer-events: auto; font: inherit; color: var(--ink);
+  background: linear-gradient(170deg, #fffdf8, color-mix(in srgb, var(--rc) 10%, #fff6ea)); box-shadow: 0 3px 0 rgba(74, 44, 42, .22); transition: transform .16s var(--spring); }
+.cl-rep:hover { transform: translateY(-1px); box-shadow: 0 4px 0 rgba(74, 44, 42, .25), 0 0 0 3px color-mix(in srgb, var(--rc) 40%, transparent); }
+.cl-st { display: grid; place-items: center; width: 38px; height: 38px; flex: none; border-radius: 11px; border: 2.5px solid var(--rc); background: color-mix(in srgb, var(--rc) 12%, #fff); transform: rotate(-5deg); }
+.cl-st .gl { width: 26px; height: 26px; }
+.cl-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.cl-side small { font: 600 12px var(--font); color: var(--ink2); white-space: nowrap; }
+.cl-loot { display: flex; gap: 4px; }
+.cl-loot span { display: inline-flex; align-items: center; gap: 2px; padding: 1px 7px 1px 3px; border-radius: 999px; border: 2px solid var(--ink); background: #fff; font: 700 12px/1.2 var(--font); white-space: nowrap; }
+.cl-loot span.tro { background: linear-gradient(#fff6dc, #f4cf7a); }
+.cl-loot .gl { width: 15px; height: 15px; }
+.cl-rep.unread .cl-t > b { color: #c83a6a; }
+.cl-dot { position: absolute; right: -5px; top: -5px; width: 13px; height: 13px; border-radius: 50%; background: #ff5a7a; border: 2px solid var(--ink); }
+.cl-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 28px 20px; text-align: center; font: 500 14.5px/1.4 var(--font); color: var(--ink2); }
+.cl-empty .gl { width: 54px; height: 54px; opacity: .75; }
+.ui-root.m-phone .cl-wrap { height: auto; min-height: 0; }
+.ui-root.m-phone .cl-nums span, .ui-root.m-phone .cl-t > span, .ui-root.m-phone .cl-t > em, .ui-root.m-phone .cl-side small, .ui-root.m-phone .cl-loot span, .ui-root.m-phone .cl-sh { font-size: 14px; }
+.ui-root.m-phone .cl-go { min-height: 52px; }
+.ui-root.m-phone .cl-list { overflow: visible; }
+/* the pause menu's Crews button (pad and touch: ui/menu.js): the crews out, or "!" for a report waiting */
+.mn-crews { position: relative; }
+.mn-crews-n { position: absolute; right: -7px; top: -8px; min-width: 20px; height: 20px; padding: 0 4px; border-radius: 10px; background: #6aa0e0; border: 2px solid var(--ink); color: #fff; font: 700 12px/16px var(--font); font-style: normal; text-align: center; }
+.mn-crews-n.news { background: #ff5a7a; }

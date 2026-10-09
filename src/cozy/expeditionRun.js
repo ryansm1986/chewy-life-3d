@@ -430,7 +430,7 @@ class CozyRun {
   }
   finishAll() {
     const E = expOf(this.st), h = cozyOf(this.st).clock.h;
-    for (const e of E.active) e.start = Math.min(e.start, h - e.hours);
+    for (const e of E.active) e.start = Math.min(e.start, h - e.hours - 1e-6); // (a hair past due: start + hours - h can round to just above 0)
     this.check();
     return E.active.length;
   }

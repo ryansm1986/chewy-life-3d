@@ -78,7 +78,7 @@ export class Decorator {
   toggle() { return this.active ? (this.exit(), false) : this.enter(); }
   paletteOpts() {
     return {
-      house: () => ({ name: this.H.home?.name || 'Home', wall: this.W?.wallId, floor: this.W?.floorId, own: [this.I?.ownWall, this.I?.ownFloor].filter(Boolean), rating: this.H.ratingNow?.() || null, owner: this.H.home?.owner || null }),
+      house: () => ({ name: this.H.home?.name || 'Home', wall: this.W?.wallId, floor: this.W?.floorId, own: [this.I?.ownWall, this.I?.ownFloor].filter(Boolean), rating: this.H.ratingNow?.() || null, owner: this.H.home?.owner || null, likes: this.H.tasteOf?.(this.H.rec?.data)?.likesFurniture || [] }), // (likes: the hearts on the favourites' cards)
       state: () => ({ sel: this.sel, holding: this.hold ? this.hold.it.id : null, canUndo: this.undoStack.length > 0 }),
       onSelect: id => this.select(id),
       onSurface: id => this.applySurface(id),

@@ -223,6 +223,12 @@ export class Tutorials {
     this.ui?.flash(st.flash?.[0] || null, st.flash?.[1] || '');
     this.updateArrow(dt);
   }
+  /** offer a guide now (once; the card waits for a calm moment): the Board guide for a fighter's first look at the board
+   *  (cozy/cozyGuide.js, docs/COZY.md §11) → true if it was queued */
+  offer(id) {
+    const r = this.S[id]; if (!GUIDES[id] || !this.enabled || r?.done || r?.offered || r?.started || this.cur?.id === id || this.offers.includes(id)) return false;
+    this.offers.push(id); return true;
+  }
   async offerNext() {
     const id = this.offers.shift(), g = GUIDES[id]; if (!g) return;
     this.rec(id).offered = true; this.G.save?.();

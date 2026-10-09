@@ -5,6 +5,7 @@
 // panels (the Menu button is how the pad reaches the bag, character, skills, journal and map) and Home.
 import { el, esc, replay } from './dom.js';
 import { glyph } from './glyphs.js';
+import { cozyIcon } from './cozyIcons.js';
 import { Panel } from './panel.js';
 import { Actions, ACTIONS, ACTION_GROUPS, PAD_BINDABLE } from '../core/actions.js';
 import { normKey } from '../core/input.js';
@@ -31,7 +32,7 @@ export class MenuPanel extends Panel {
     this.body.innerHTML = `<div class="mn-views">
       <div class="mn-v mn-main">
         <div class="mn-hero"><div class="mn-paws">${glyph('paw')}${glyph('paw')}${glyph('paw')}</div><div class="mn-zz"><b class="mn-who">Chewy</b> is taking a little break<span>z</span><span>z</span><span>z</span></div></div>
-        <div class="mn-quick">${QUICK.map(([n, g, l]) => `<button class="btn" data-a="open:${n}">${glyph(g)}${l}</button>`).join('')}<button class="btn" data-a="build">${glyph('hammer')}Build</button><button class="btn" data-a="decorate">${glyph('home')}Decorate</button><button class="btn" data-a="home">${glyph('home')}Home</button></div>
+        <div class="mn-quick">${QUICK.map(([n, g, l]) => `<button class="btn" data-a="open:${n}">${glyph(g)}${l}</button>`).join('')}<button class="btn" data-a="build">${glyph('hammer')}Build</button><button class="btn" data-a="decorate">${glyph('home')}Decorate</button><button class="btn" data-a="home">${glyph('home')}Home</button><button class="btn mn-crews" data-a="crews">${cozyIcon('pack')}Crews<i class="mn-crews-n"></i></button></div>
         <div class="mn-btns">
           <button class="btn big mint" data-a="resume">${glyph('play')}Resume</button>
           <button class="btn big" data-a="settings">${glyph('gear')}Settings</button>
@@ -98,6 +99,7 @@ export class MenuPanel extends Panel {
   act(a) {
     const h = this.ui._menuH || {};
     if (a.startsWith('open:')) { this.ui.close('menu'); this.ui._user = true; try { this.ui.open(a.slice(5), a === 'open:inventory' ? { view: 'bag' } : undefined); } finally { this.ui._user = false; } return; } // (the pad's way to the panels)
+    if (a === 'crews') { this.ui.close('menu'); const C = this.ui.G?.cozy; this.ui.open('expeditions', { view: C?.exp.unread() ? 'reports' : C?.exp.list().length ? 'away' : 'reports', at: 'menu' }); return; } // (the crews' status: the board's Away and Reports, to read: docs/COZY.md §10)
     if (a === 'home') { this.ui.close('menu'); if (this.ui.G?.mode === 'dungeon') this.ui.G.returnToVillage?.(); return; }
     if (a === 'build') { this.ui.close('menu'); const B = this.ui.G?.build; if (B && !B.active && this.ui.G.mode === 'village') B.enter(); return; } // (the pad's way into build mode)
     if (a === 'decorate') { this.ui.close('menu'); const D = this.ui.G?.housing?.decor; if (D && !D.active && this.ui.G.mode === 'interior') D.enter(); return; }
@@ -144,6 +146,8 @@ export class MenuPanel extends Panel {
     this.body.querySelector('[data-a="save"]').style.display = h.save ? '' : 'none';
     const mode = this.ui.G?.mode, show = (a, on) => { const b = this.body.querySelector(`[data-a="${a}"]`); if (b) b.style.display = on ? '' : 'none'; };
     const dbg = this.body.querySelector('.mn-debug'); if (dbg) dbg.style.display = this.ui.G?.debug?.on ? '' : 'none'; // (Settings › About: debug tools on this device)
+    const CZ = this.ui.G?.cozy, nOut = CZ?.exp.list().length || 0, nUn = CZ?.exp.unread() || 0; show('crews', !!CZ && (nOut + (CZ.exp.reports().length || 0)) > 0); // (once a crew has been sent: their status, read-only)
+    const cn = this.body.querySelector('.mn-crews-n'); if (cn) { cn.textContent = nUn ? '!' : nOut ? String(nOut) : ''; cn.classList.toggle('news', !!nUn); cn.style.display = nUn || nOut ? '' : 'none'; }
     show('home', mode === 'dungeon'); show('build', mode === 'village' && !this.ui.G?.build?.active); show('decorate', mode === 'interior' && !!this.ui.G?.housing?.canDecorate?.());
   }
   render() { this.sync(); if (this.view === 'controls') this.renderControls(); }

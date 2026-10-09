@@ -13,6 +13,8 @@ import { portrait } from './portraits.js';
 import { cozyIcon } from './cozyIcons.js';
 import './cozy.css';
 
+/** an away hero's card tag, short: "Away · ~2 h" (the hub says it in full when the card is picked: COZY §4.8) */
+const awayTag = a => { const l = a.label || ''; return `Away · ${l.startsWith('back in about ') ? '~' + l.slice(14) : l.startsWith('back in under') ? '< 1 h' : l.startsWith('any minute') ? 'any minute' : 'camped'}`; };
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9']; // (one per hero, in roster order: any number of heroes)
 export class HeroWheel {
   constructor(G, heroes) {
@@ -35,7 +37,7 @@ export class HeroWheel {
       const jp = h.joined ? HERO_TEXT[h.id]?.jp || '' : '';
       c.innerHTML = `<div class="hw-face">${face}${h.joined ? '' : '<i class="hw-q">?</i>'}</div>${h.away ? `<i class="cz-away-badge" title="Away on an expedition">${cozyIcon('pack')}</i>` : ''}
         <div class="hw-t"><b>${esc(h.name)}${jp ? `<span class="jp">${jp}</span>` : ''}</b><span>${esc(h.title)}</span>${h.joined ? `<em>Lv ${h.lvl}</em>` : ''}</div>
-        <span class="kc sm hw-k">${i + 1}</span>${h.active ? '<span class="hw-tag">Playing</span>' : !h.ready && h.joined ? `<span class="hw-tag dim">${esc(h.why)}</span>` : !h.joined ? `<span class="hw-tag dim">${esc(h.why)}</span>` : ''}`;
+        <span class="kc sm hw-k">${i + 1}</span>${h.active ? '<span class="hw-tag">Playing</span>' : !h.ready && h.joined ? `<span class="hw-tag dim">${esc(h.away ? awayTag(h.away) : h.why)}</span>` : !h.joined ? `<span class="hw-tag dim">${esc(h.why)}</span>` : ''}`;
       c.addEventListener('pointerenter', () => this.select(i));
       c.addEventListener('click', e => { e.stopPropagation(); this.select(i); this.confirm(); });
       this.ring.appendChild(c);

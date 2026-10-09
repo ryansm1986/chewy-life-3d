@@ -154,7 +154,8 @@ const reload = async (page, qs) => { await page.goto(`${BASE}/?${qs}&dseed=1`, {
   const after = await page.evaluate(() => { window.G.state.coins = 5150; window.G.save(); return { prev: JSON.parse(localStorage.getItem('chewy3d.save.prev')).coins, main: JSON.parse(localStorage.getItem('chewy3d.save')).coins }; });
   R.check('e) the next save replaces the damaged main without rotating it over the good .prev', after.prev === 4242 && after.main === 5150, after);
   // a main save that parses but won't normalize
-  await page.evaluate(() => { const G = window.G; G.save(); G.saveBlocked = true; localStorage.setItem('chewy3d.save', JSON.stringify({ version: 2, coins: 77, heroes: { chewy: { player: null } } })); });
+  // (a change first: an unchanged save never rotates, writeSave's cur !== json, so the 5150 save must be replaced to reach .prev)
+  await page.evaluate(() => { const G = window.G; G.state.coins = 5151; G.save(); G.saveBlocked = true; localStorage.setItem('chewy3d.save', JSON.stringify({ version: 2, coins: 77, heroes: { chewy: { player: null } } })); });
   await reload(page, 'nointro&notut&notitle');
   const norm = await page.evaluate(() => ({ coins: window.G.state.coins, lvl: window.G.state.player.lvl }));
   R.check('e) a main save that won\'t normalize: .prev too', norm.coins === 5150 && norm.lvl >= 1, norm);

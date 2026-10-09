@@ -268,7 +268,7 @@ export class Housing {
     return !!(b.owner && (f?.invited || this.decorateRequest(b.owner)));
   }
   /** the rating of the room you're in, now (the decorate palette's chip) */
-  ratingNow() { return this.rec ? homeRating(this.world?.items ? { ...this.rec.data.interior, items: this.world.items } : this.interiorOf(this.rec.data), this.tasteOf(this.rec.data)) : null; }
+  ratingNow() { return this.rec ? homeRating(this.world?.items ? { ...this.rec.data.interior, items: this.world.items } : this.interiorOf(this.rec.data), this.tasteOf(this.rec.data), { have: this.G.state.furniture }) : null; } // (have: the favourite-piece tip names one in storage first)
 
   // ---------------------------------------------------------------- going in and out
   enter(rec = this.cottage(), o = {}) {
@@ -346,7 +346,7 @@ export class Housing {
   async react() {
     const G = this.G, V = this.visit, rec = this.rec, b = rec?.data; if (!V || !b) return;
     const v = this.hosted(V.owner); if (!v) return;
-    const I = this.interiorOf(b), r = homeRating(I, this.tasteOf(b)), changed = JSON.stringify(I.items) + I.wall + I.floor !== V.sig;
+    const I = this.interiorOf(b), r = homeRating(I, this.tasteOf(b), { have: G.state.furniture }), changed = JSON.stringify(I.items) + I.wall + I.floor !== V.sig;
     b.homeStars = r.stars;
     const f = G.story?.friend?.(V.owner), news = r.stars > V.best ? r.stars - V.best : 0;
     const req = this.decorateRequest(V.owner);
@@ -354,7 +354,7 @@ export class Housing {
     if (!changed && !req) { v.anim.play('wave'); G.ui?.toast?.(pick(BYE), { icon: 'home', color: '#ffd8a8' }); return; }
     const lines = [];
     if (news) lines.push(pick(LOVE).replace('*me*', `*${this.nameOf(V.owner)}*`) + `  ${'★'.repeat(r.stars)}`);
-    else if (changed && !out?.done) lines.push(pick(HMM).replace('{tip}', r.tips[0] || 'a little lamp'));
+    else if (changed && !out?.done) lines.push(pick(HMM).replace('{tip}', (r.tips[0] || 'a little lamp').replace(/\btheir\b/, 'my'))); // (in their own words: "a puffy armchair (my favourite)")
     if (out && !out.done && out.missing?.length) lines.push(`For my request, I'd still love ${out.missing.join(' and ')}!`);
     if (out?.done) lines.push('And that\'s everything I asked for! You\'re the best decorator in Blossom Hollow!');
     if (!lines.length) lines.push(pick(BYE));

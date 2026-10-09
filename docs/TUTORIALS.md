@@ -1,6 +1,6 @@
 # Guided tutorials
 
-Status: **built** (2026-10-03). There are three guides, run by a small reusable director:
+Status: **built** (2026-10-03; the cozy path's three guides 2026-10-09). The guides are run by a small reusable director:
 - the house tour, narrated by Shadow;
 - switching heroes, narrated by Moka;
 - fishing, narrated by Kero.
@@ -115,12 +115,16 @@ Status: **built** (2026-10-03). There are three guides, run by a small reusable 
 - **Make it home (Shadow)** starts the next time you're in the cottage after the house tour (docs/HOUSING.md §7):
   1. Go in (if it was offered outside).
   2. The household jobs: the arrow hops from the bed to the chest, the stove and the workbench.
-  3. B: the Decorate button is spotlit.
-  4. Place the cushion: its card in the palette is spotlit (one is given if there's none).
-  5. Pick it up, R, put it down (`decor:move`).
+  3. B: the Decorate button is spotlit (touch: the menu button, then the menu's Decorate; the pad: the menu's Decorate).
+  4. Place the cushion: its card in the palette is spotlit (one is given if there's none); touch: slide it, *Set down*.
+  5. Pick it up, R, put it down (`decor:move`); touch: *Turn* and *Set down* are spotlit.
   6. A wallpaper: the Wallpaper & Floors tab, then a wallpaper's card, are spotlit (one is given if there's none).
-  7. The Home Rating chip is spotlit (Got it).
-  8. Wrap-up: Tanu's Trinkets, the workbench, villagers love help decorating.
+  7. The Home Rating and its tip (R-13): the tip names a favourite in storage ("Try: a pack photo (your favourite)"), and
+     the step is to follow it: the All tab, then the favourite's card (a heart on it), are spotlit with the rating, and
+     hanging or placing a favourite completes the step (`decor:place`). Got it! is there too. A Pack Photo is given when
+     the tip asks for a favourite and none is in storage. On a phone the rating is a chip over the palette.
+  8. Wrap-up: Tanu's Trinkets, the workbench, villagers love help decorating (touch: tap *Done*).
+  Every line is in the device's words (keys and mouse, touch, the pad).
 - **Remodel (Tanu)** starts the first time a mailbox is opened, over the house card:
   1. (Open a mailbox, when replayed.)
   2. The house card: Upgrade / Remodel / Enter spotlit, a callout on the upgrade cost; click Remodel.
@@ -164,6 +168,35 @@ Status: **built** (2026-10-03). There are three guides, run by a small reusable 
   5. Wrap-up: his trees (K spotlit), the Whelp Bond (Got it).
   - QA: `tools/qa/s29-golden.mjs` section c runs it end to end.
   - QA: `tools/qa/s20-poe.mjs` section c runs it end to end.
+
+- **The cozy path's guides** (docs/COZY.md §11, §13.6; ROADMAP CZ-11). Every line follows the device (`dv(touch, pad,
+  keys)` in guides.js, *F* through `keyHint`): keys, the pad's glyphs and words, touch's "tap" and "the attack button".
+  - **Rosie's question** (not a guide: `cozy/cozyGuide.js`): once, on the first calm moment after the house tour with
+    burrow1 untouched, a dialogue: "Go yourself, or send Moka?" (`flags.burrowChoice` 'self' | 'crew'). *Send Moka*
+    starts the Board guide; either answer keeps burrow1 and lets Shadow's Nose follow.
+  - **The Expedition Board (Shadow)** starts from *Send Moka*; a fighter's first look at the board offers it
+    (`Tutorials.offer(id)`); old saves past burrow1 get the offer (`past`):
+    1. The arrow to the board by the Wayfarer's Post. 2. *F* at it (the prompt spotlit). 3. The job card spotlit (Peek
+    into the Burrow, picked for you; Got it). 4. Moka's card spotlit (the step waits for her in the crew). 5. *Send off!*
+    spotlit (`expedition:sent`; skippable). 6. The Away view; close the board. 7. The crews chip (Got it).
+    A closed board sends steps 3–5 back to step 2.
+  - **Shadow's Nose (Shadow)** after the answer (on the crew path after the Board guide); old saves past burrow1 or with
+    a gather get the offer:
+    1. The nearest full gather spot (the driftwood when it's near; the prompt spotlit at it; `scavenge:gather`). 2. Shadow
+    sniffs a spot out (`found`). 3. *Hold F*, let go in the gold (Tap mode: press; `scavenge:dig`). 4. The HUD materials
+    (a Perfect dig is cheered; Got it). 5–6. On the crew path: wait for Moka's crew (the chip), then its report spotlit
+    on the board (the chip, or the pause menu's Crews on a pad). 7. Wrap-up: Rosie's thank-you on the crew path (said
+    with her as the speaker), else Shadow's.
+  - **The Adventurers' Guild (Old Hachi)** the first time the Guild stands (old saves with a Guild: the offer):
+    1. His door (the arrow; *F*). 2. Today's candidates spotlit: sign one on (skippable; done at once with a roster).
+    3. The roster card (callouts: class, morale, power and wage; Got it). 4. The Expedition Board button inside.
+    5. A crew of two (skippable). 6. Wages in the morning banner (Got it).
+  - **Peaceful paths** (a tip, not a guide: `cozy/cozyGuide.js`): on the first visit to a saved zone, `G.hint('peaceful')`
+    and the minimap spotlit for 3 s with a callout on the violet rings (the spotlight only while guides run).
+  - On a phone with a panel up the speech card steps aside (as before); the objective card now moves into the panel's
+    title band when the spotlit element sits under its place at the top (`.tut.low`, ui/tutorial.js).
+  - QA: `tools/qa/s16-tutorials.mjs` sections g–j (`S16_ONLY=ghij`); s16's guide count is twelve; every step shot on the
+    desktop and a phone by `tools/qa/cozy-guide-shots.mjs`.
 
 ## Hooks added for the guides
 - `fishing.js`:

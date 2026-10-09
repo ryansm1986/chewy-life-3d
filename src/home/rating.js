@@ -34,8 +34,11 @@ export function floorCells(layout) {
   return (L?.rooms || []).reduce((a, r) => a + r.w * r.d, 0) || 120;
 }
 
-/** → { score (0-100), stars (1-5), parts: { filled, variety, sets, lighting, taste, finish }, has: {...}, tips: [text] } */
-export function homeRating(interior, T = null) {
+/** "a pack photo", "an ikebana": a piece named the way a tip says it */
+export const aPiece = id => { const n = (FURNITURE[id]?.name || id).toLowerCase(); return (/^[aeiou]/.test(n) ? 'an ' : 'a ') + n; };
+/** → { score (0-100), stars (1-5), parts: { filled, variety, sets, lighting, taste, finish }, has: {...}, tips: [text] }
+ *  o.have: the furniture storage ({ id: n }): the favourite-piece tip names one you have first */
+export function homeRating(interior, T = null, o = {}) {
   const items = (interior?.items || []).filter(it => FURNITURE[it.id]);
   const defs = items.map(it => FURNITURE[it.id]);
   const cells = floorCells(interior?.layout);
@@ -71,15 +74,20 @@ export function homeRating(interior, T = null) {
   const lighting = lamps >= 2 ? RATING_PARTS.lighting : lamps === 1 ? 6 : 0;
   if (lamps < 2 && has.light) tips.push({ k: 'light2', text: 'a second lamp', gain: RATING_PARTS.lighting - lighting });
   // ---- taste: pieces in the owner's style, and the ones they love
-  let taste = 0, styled = 0, loved = 0;
+  let taste = 0, styled = 0, loved = 0, fav = null;
   if (T) {
     const style = (T.style || []).filter(t => t !== 'cozy'), likes = new Set(T.likesFurniture || []);
     const brought = items.filter(it => !it.own).map(it => FURNITURE[it.id]); // (their own things are theirs already)
     styled = brought.filter(d => d.tags.some(t => style.includes(t))).length;
-    loved = new Set(brought.filter(d => likes.has(d.id)).map(d => d.id)).size;
+    const placed = new Set(brought.filter(d => likes.has(d.id)).map(d => d.id));
+    loved = placed.size;
     taste = 15 * Math.min(1, styled / 8) + 10 * Math.min(1, loved / 3);
     if (styled < 8) tips.push({ k: 'style', text: `more ${style.slice(0, 2).join(' or ')} things`, gain: 15 * (1 - styled / 8), tag: style[0] });
-    if (loved < 3) tips.push({ k: 'loved', text: 'one of their favourite pieces', gain: 10 * (1 - loved / 3) });
+    // the favourite-piece tip names one (R-13: "one of their favourite pieces" never said which, and stayed after one
+    // was placed): the next favourite not in the room yet, one in storage first; it moves on with each one placed
+    const left = [...likes].filter(id => FURNITURE[id] && !placed.has(id));
+    fav = left.find(id => (o.have?.[id] || 0) > 0) || left[0] || null;
+    if (loved < 3 && fav) tips.push({ k: 'loved', text: `${aPiece(fav)} (their favourite)`, gain: 10 * (1 - loved / 3), id: fav });
   } else taste = 12; // (no owner: a neutral half)
   // ---- finish: a wall item, a rug, your own wallpaper or floor
   const own = (interior?.wall && interior.wall !== DEFAULT_WALL && SURFACES[interior.wall]) || (interior?.floor && interior.floor !== DEFAULT_FLOOR && SURFACES[interior.floor]);
@@ -89,7 +97,7 @@ export function homeRating(interior, T = null) {
   const score = Math.max(0, Math.min(100, Object.values(parts).reduce((a, v) => a + v, 0)));
   const stars = starsOf(score);
   tips.sort((a, b) => b.gain - a.gain);
-  return { score: Math.round(score), stars, parts, has: { ...has, lamps, styled, loved, cover: +coverFrac.toFixed(2), pieces, want, bestSet }, tips: tips.map(t => t.text), tipKeys: tips.map(t => t.k) };
+  return { score: Math.round(score), stars, parts, has: { ...has, lamps, styled, loved, fav, cover: +coverFrac.toFixed(2), pieces, want, bestSet }, tips: tips.map(t => t.text), tipKeys: tips.map(t => t.k) };
 }
 export const starsOf = score => (score >= STAR_AT[4] ? 5 : score >= STAR_AT[3] ? 4 : score >= STAR_AT[2] ? 3 : score >= STAR_AT[1] ? 2 : 1);
 /** ★★★☆☆ */

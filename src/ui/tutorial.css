@@ -89,3 +89,9 @@
 .gd-st .gd-ok .gl { width: 14px; height: 14px; }
 .gd-st .gd-on { background: #fff3c0; border-color: #d6a92a; }
 .gd-card.locked { filter: saturate(.6); }
+/* a phone, a panel up, the spotlit thing under the dock's top place (ui/tutorial.js update): the objective card moves into
+   the panel's title band at the bottom, between its title and the ✕ (the speech bubble already steps aside: mobile.css) */
+.ui-root.m-phone .tut.low .tut-top:has(> .tut-dock) { top: auto; bottom: calc(var(--sa-b, 0px) + 6px); left: auto; right: calc(var(--sa-r, 0px) + 84px); width: auto; }
+.ui-root.m-phone .tut.low .tut-dock { margin-top: 0; width: auto; max-width: 420px; }
+.ui-root.m-phone .tut.low .tut-obj { min-width: 0; }
+.ui-root.m-phone .tut.low .to-tx { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

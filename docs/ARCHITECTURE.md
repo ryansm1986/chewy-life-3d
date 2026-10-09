@@ -992,6 +992,43 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   the Onsen Caverns with no fights); prod-smoke `crewclear`; the pace: `tools/expedition-sim.mjs` (Takemori) and
   `tools/story-sim.mjs` (all four zones).
 
+## The cozy path, phase F: UI polish, tutorials, QA (design and as built: docs/COZY.md §10, §11, §13.6; ROADMAP CZ-10…CZ-12)
+- **The Board** (`ui/expeditions.js` + `.css`): on the mouse, the pad and tablets the crew cards are compact (a face,
+  the name, level and power, the class and the state; three columns, three rows, a full Guild roster scrolls) and the
+  odds and *Send off!* share a row, so the panel fits 1600×900, 1280×720 and the Deck (`.deck-ui`: the crew two rows,
+  the job's line clamped). An away member's tag is short ("back ~2 h"; the title has it in full). The phone's picker
+  counts by key (`current(L)`, `step()`: `list()` builds fresh objects, so `indexOf` said "0 of 2").
+- **The Guild** (`ui/guild.css`): the roster's rows are `max-content` (a card's buttons stay inside it), the away pill
+  keeps its time on one line.
+- **The Journal's Crews tab** (`ui/crewLog.js`, `ui/map.js` QuestPanel, `cozy.css .cl-*`): the crews out (faces, the
+  job, a bar, the time left), the totals (reports, successes, out now, keepsakes) and the report log; a row opens that
+  report on the board (`at: 'journal'`, read-only). The Journal's five tabs share their row (`panels.css .q-tabs`).
+- **The pause menu's Crews** (`ui/menu.js`, the quick row on a pad or touch): opens the board's Reports or Away to read
+  (`at: 'menu'`); a "!" or the count on it. The HUD chip does the same on a click or tap; its phone hit area is 44 px.
+- **Away heroes**: the HUD minis get a time pill ("~2 h", `ui/cozyChip.js minis()`, refreshed with the chip each second;
+  the backpack badge moved to their top left); the wheel's card tag is short ("Away · ~2 h", `ui/heroWheel.js awayTag`);
+  on touch's row of cards the tags sit under the cards (`touch.css`), clear of the hub. `ui/touch.js fitWheel` marks the
+  text floor dirty (`ui.mobile.floorDirty`): its observer never looked inside the wheel, so a fitted wheel's text could
+  draw at 8 px.
+- **The tutorials** (`world/guides.js`: `board`, `nose`, `guild`; `cozy/cozyGuide.js`; `world/tutorials.js offer(id)`;
+  `ui/tutorial.js` knows Old Hachi): Rosie's welcome line (game.js); her burrow1 question once after the house tour
+  (`flags.burrowChoice` 'self' | 'crew'; "Send Moka" starts the Board guide); Shadow's Nose after the answer (after the
+  Board guide on the crew path; its last steps wait for Moka's crew, spotlight the report and give Rosie the last
+  word); Old Hachi's guide when the Guild stands; the Board guide offered on a fighter's first look at the board; the
+  Peaceful paths tip (`G.hint('peaceful')`) and the minimap spotlit for 3 s on the first visit to a saved zone. Every
+  line follows the device (`dv(touch, pad, keys)`, *F* through `keyHint`). Event `cozy:burrowChoice { choice }`.
+  `G.cozyGuide = { ask(), choiceOpen }`. `ui/tutorial.js` + `tutorial.css .tut.low`: on a phone with a panel up, when the
+  spotlit element sits under the dock's place at the top, the objective card moves into the panel's title band (between
+  its title and ✕); the Nose's wrap waits for the board to close, so a phone shows Rosie's line.
+- **Fixes**: `expeditionRun.finishAll` (the debug action) puts a trip a hair past due (`start + hours − h` could round
+  to just above 0 and stay out).
+- **QA**: `tools/qa/cozy-ui-lib.mjs` (`seedCozy`: something in every cozy surface; `cozyScenes`; `quietUi`), run by
+  `mobile-ui.mjs` (phone, `DEVICE=ipad`), `deck-ui.mjs` (now `[view…]` too) and `cozy-ui-shots.mjs` (desktop, 1600×900
+  and 1280×720) → `tools/qa/tmp/{mobile-ui,deck-ui,cozy-ui}/cozy-*`; s16 g–j (the cozy guides end to end, the device
+  wording, the fighter's offer, Old Hachi, Peaceful paths, old-save offers; `S16_ONLY`); s31 g (a real 0.5.1 save:
+  `tools/qa/fixtures/precozy-0.5.1.json`, made by `tools/qa/make-precozy-fixture.mjs` against a 0.5.1 server); s31 e and
+  s23 key their waits on the game's state (the pad's board, the soak's length, the leak trend: R-6).
+
 ## Persistent state `G.state` (JSON-serialisable, saved to localStorage)
 ```js
 state = {

@@ -617,6 +617,7 @@ export class TouchControls {
     st.setProperty('--tc-wl', L.toFixed(1) + 'px'); st.setProperty('--tc-wt', T.toFixed(1) + 'px');
     st.setProperty('--tc-ww', FW.toFixed(1) + 'px'); st.setProperty('--tc-wh', FH.toFixed(1) + 'px');
     st.setProperty('--tc-wheel', Math.max(0.4, k).toFixed(3));
+    if (this.ui.mobile) this.ui.mobile.floorDirty = true; // (the text floor's observer doesn't watch inside the wheel: its fitted cards are raised to 12 px on the next frame, CZ-10)
   }
 }
 

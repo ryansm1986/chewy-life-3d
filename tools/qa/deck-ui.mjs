@@ -7,11 +7,12 @@
 // doesn't fit on the screen, and anything the safe area should hold that reaches within 8 px of the screen's edge.
 // Decorative text is left out: the Japanese subtitles (.jp), the compass's 北, the portrait's "Lv", glyph art (svg).
 // Exit 1 when the profile is wrong, a panel is cut off, or any text is under (--report: list only).
-//   usage: node tools/qa/deck-ui.mjs [--report]   SHOT_DIR (default tools/qa/tmp/deck-ui)   FLOOR=11
+//   usage: node tools/qa/deck-ui.mjs [--report] [view…]   SHOT_DIR (default tools/qa/tmp/deck-ui)   FLOOR=11
 import fs from 'node:fs';
 import path from 'node:path';
 import { launch, boot, sleep, waitMode, BASE } from './lib.mjs';
 import { installPad, padDown, padUp, padTap, padStick } from './pad-lib.mjs';
+import { seedCozy, cozyScenes, quietUi } from './cozy-ui-lib.mjs';
 
 const OUT = process.env.SHOT_DIR || path.resolve('tools/qa/tmp/deck-ui');
 const FLOOR = +(process.env.FLOOR || 11), STRICT = !process.argv.includes('--report');
@@ -55,7 +56,9 @@ const audit = (name, scopes) => ev(([scopes, floor]) => {
   return r;
 });
 const shot = (name) => page.screenshot({ path: path.join(OUT, name + '.png') });
+const ONLY = new Set(process.argv.slice(2).filter(a => !a.startsWith('--'))); // (deck-ui.mjs [view…]: just those)
 const scene = async (name, open, scopes, close) => {
+  if (ONLY.size && !ONLY.has(name)) return;
   try { await open(); await sleep(page, 650); await shot(name); await audit(name, scopes); }
   catch (e) { console.log(`!! ${name}: ${String(e.message || e).split('\n')[0]}`); bad++; }
   try { if (close) await close(); else { await ev(() => { const U = window.G.ui; for (const n of [...U._order]) U.close(n); }); } await sleep(page, 250); } catch (e) { /* next */ }
@@ -98,6 +101,10 @@ try {
   }, ['.l-dlg'], async () => { for (let i = 0; i < 8 && await ev(() => window.G.ui.dlg.active); i++) { await padTap(page, 'B'); await sleep(page, 300); } });
   await scene('guide', () => ev(() => { const T = window.G.ui.tutorial; T.step({ n: 2, total: 6, title: 'Fishing with Kero', objective: 'Face the water and press *F* to cast' }); T.say('kero', 'Hold *F* to lift the green zone. Tap *Tab* for the next hero, *Shift* to sprint.'); }), ['.tut-dock'], () => ev(() => window.G.ui.tutorial.hide()));
   await scene('hero-wheel', async () => { await padDown(page, 'LB'); await sleep(page, 450); await padStick(page, 'right', 0.9, 0.3); }, ['.hero-wheel'], async () => { await padStick(page, 'right', 0, 0); await ev(() => window.G.heroes.pickFromWheel(null)); await padUp(page, 'LB'); });
+  // the cozy path (docs/COZY.md §10; CZ-10): every cozy view with the pad playing (the board's focus on its cards)
+  console.log('cozy seed', JSON.stringify(await seedCozy(page))); await quietUi(page);
+  for (const c of cozyScenes(ev)) await scene(c.name, async () => { await c.open(); await quietUi(page, 4000); await sleep(page, 300); await padTap(page, 'DRight'); }, [...c.scopes, ...P_HINTS], c.close);
+  await scene('cozy-wheel', async () => { await padDown(page, 'LB'); await sleep(page, 450); await padStick(page, 'right', 0.3, 0.9); }, ['.hero-wheel'], async () => { await padStick(page, 'right', 0, 0); await ev(() => window.G.heroes.pickFromWheel(null)); await padUp(page, 'LB'); });
   await scene('reel', () => ev(() => window.G.ui.reel.start({ icon: '', name: 'Koi', known: false, zone: 0.3 })), ['.reel'], () => ev(() => window.G.ui.reel.hide()));
   await scene('build', async () => { await ev(() => window.G.build.enter()); await sleep(page, 500); await padTap(page, 'DRight'); }, ['.p-build', '.pc-hints', '.l-hud', ...P_HINTS], async () => { await ev(() => window.G.build.exit?.() ?? window.G.build.leave?.()); });
   await ev(() => window.G.openHome()); await waitMode(page, 'interior'); await sleep(page, 900);

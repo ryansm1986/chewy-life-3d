@@ -4,7 +4,8 @@
 // the game menu's pages, Rosie's shop, the stash, cooking, the workbench, the Travel Map, the gift and seed pickers, a
 // house card and remodel, a dialogue with choices, a guide line, the reel bar, build mode, decorate mode, the title and
 // the portrait rotate overlay. For each: a screenshot, text drawn under the floor (12 CSS px: ui/mobile.css raises what
-// was under), a panel that runs off the screen (it must fit, or scroll inside), and tappables under 44 px.
+// was under), a panel that runs off the screen (it must fit, or scroll inside), a header button outside its panel's
+// frame (R-13: tools/qa/ui-audit-lib.mjs; all five heroes' trees), and tappables under 44 px.
 // Decorative text is left out: the Japanese subtitles (.jp), the compass's 北, the portrait's "Lv", glyph art (svg).
 //   CT-7: "cut off" is measured against the safe area (--sa-*: a notch, CT-6's itch insets, the full-screen top edge), not
 //   the bare screen; a body whose content runs past it must scroll; Settings is audited with every row it can show (the
@@ -16,6 +17,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { launchTouch, boot, sleep, waitMode, BASE, PHONE, IPAD } from './touch-lib.mjs';
+import { seedCozy, cozyScenes, quietUi } from './cozy-ui-lib.mjs';
+import { headerOutside } from './ui-audit-lib.mjs';
 
 const OUT = process.env.SHOT_DIR || path.resolve('tools/qa/tmp/mobile-ui');
 const FLOOR = +(process.env.FLOOR || 12), TAP = +(process.env.TAP || 44), STRICT = !process.argv.includes('--report');
@@ -89,7 +92,11 @@ const audit = (name, scopes) => ev(([scopes, floor, tap]) => {
 const shot = name => page.screenshot({ path: path.join(OUT, name + '.png') });
 const scene = async (name, open, scopes, close) => {
   if (ONLY.size && !ONLY.has(name)) return;
-  try { await open(); await sleep(page, 700); await shot(name); await audit(name, scopes); }
+  try {
+    await open(); await sleep(page, 700); await shot(name); await audit(name, scopes);
+    // R-13: a header button (title-row button, tab or badge, or the skill trees' tab row) outside its panel's frame
+    for (const o of await ev(headerOutside)) { console.log(`   CUT OFF ${o.sel} ${JSON.stringify(o.rect)} outside the frame ${JSON.stringify(o.frame)}`); clipped.push({ sel: o.sel, rect: o.rect, where: name }); }
+  }
   catch (e) { console.log(`!! ${name}: ${String(e.message || e).split('\n')[0]}`); bad++; }
   try { if (close) await close(); else { await ev(() => { const U = window.G.ui; for (const n of [...U._order]) U.close(n); }); } await sleep(page, 300); } catch (e) { /* next */ }
 };
@@ -106,7 +113,7 @@ try {
   await scene('bag', () => ev(() => window.G.ui.open('inventory', { view: 'bag' })), ['.p-inv']);
   await scene('character', () => ev(() => window.G.ui.open('character')), ['.p-char']);
   await scene('skills', () => ev(() => window.G.ui.open('skills')), ['.p-skills']);
-  for (const cls of ['moka', 'poe', 'shihtzu']) // (the other heroes' trees: the panel draws the class on state.player; restored after)
+  for (const cls of ['moka', 'poe', 'shihtzu', 'golden']) // (the other heroes' trees: the panel draws the class on state.player; restored after)
     await scene('skills-' + cls, () => ev(c => { const p = window.G.state.player; window.__cls0 ??= p.cls; p.cls = c; window.G.ui.open('skills'); }, cls), ['.p-skills'],
       () => ev(() => { const U = window.G.ui; U.close('skills'); window.G.state.player.cls = window.__cls0; }));
   await scene('quests', () => ev(() => window.G.ui.open('quests')), ['.p-quests']);
@@ -132,6 +139,11 @@ try {
   }, ['.l-dlg'], async () => { await ev(() => window.G.ui.dlg.finish?.(-1)); });
   await scene('guide', () => ev(() => { const T = window.G.ui.tutorial; T.step({ n: 2, total: 6, title: 'Fishing with Kero', objective: 'Face the water and press *F* to cast' }); T.say('kero', 'Hold *F* to lift the green zone. Tap *Tab* for the next hero.'); }), ['.tut-dock', '.l-over'], () => ev(() => { const T = window.G.ui.tutorial; T.hide?.(); T.clear?.(); }));
   await scene('reel', () => ev(() => window.G.ui.reel.start({ icon: '', name: 'Koi', known: false, zone: 0.3 })), ['.reel'], () => ev(() => window.G.ui.reel.hide()));
+  // the cozy path (docs/COZY.md §10; CZ-10): the Board's views, the Guild's tabs, the Sightings, the away card, the
+  // Journal's Crews tab, the menu's Crews view, the HUD's chip and away minis, and the touch hero wheel with an away hero
+  if (!ONLY.size || [...ONLY].some(n => n.startsWith('cozy'))) { console.log('cozy seed', JSON.stringify(await seedCozy(page))); await quietUi(page); }
+  for (const c of cozyScenes(ev)) await scene(c.name, async () => { await c.open(); await quietUi(page, 4000); }, c.scopes, c.close); // (banners played out: a clean shot)
+  await scene('cozy-wheel', () => ev(() => window.G.heroes.openWheel()), ['.hero-wheel'], () => ev(() => window.G.heroes.pickFromWheel(null)));
   await scene('build', async () => { await ev(() => window.G.build.enter()); await sleep(page, 600); }, ['.p-build', '.l-hud', '.tc'], async () => { await ev(() => window.G.build.exit?.()); await sleep(page, 400); });
   if (!ONLY.size || ONLY.has('home') || ONLY.has('decorate')) { await ev(() => window.G.openHome()); await waitMode(page, 'interior'); await sleep(page, 900); }
   await scene('home', async () => {}, ['.l-hud', '.tc'], async () => {});

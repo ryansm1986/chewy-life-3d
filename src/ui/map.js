@@ -6,6 +6,8 @@ import { Panel } from './panel.js';
 import { drawPlaceholderMap } from './hud.js';
 import { FishLogView } from './fishlog.js';
 import { GuidesView } from './tutorial.js';
+import { CrewLogView } from './crewLog.js';
+import { cozyIcon } from './cozyIcons.js';
 import { pantryIcon } from '../life/pantryIcons.js';
 
 const LEGEND_VILLAGE = [['you', 'Chewy'], ['shop', 'Shops'], ['home', 'Homes'], ['craft', 'Workshops'], ['quest', 'Quest'], ['gate', 'Burrow gate'], ['dig', "Shadow's dig spot"], ['node', 'Gather spot']];
@@ -69,11 +71,12 @@ export class MapPanel extends Panel {
 export class QuestPanel extends Panel {
   constructor(ui) { super(ui, { name: 'quests', title: 'Journal', jp: 'クエスト帳', side: 'left', cls: 'p-quests', icon: 'book' }); this.sel = null; this.tab = 'active'; }
   init() {
-    this.body.innerHTML = `<div class="tabs q-tabs"><button class="tab on" data-t="active">${glyph('scroll')}Active <b class="tab-n">0</b></button><button class="tab" data-t="done">${glyph('check')}Done <b class="tab-n">0</b></button><button class="tab fl-tab" data-t="fish" style="--tc:#6ab8ff"><img class="pt-ti" src="${pantryIcon('koi')}" alt="">Fish Log <b class="tab-n">0</b></button><button class="tab gd-tab" data-t="guides" style="--tc:#c3b3ff">${glyph('book')}Guides</button></div>
+    this.body.innerHTML = `<div class="tabs q-tabs"><button class="tab on" data-t="active">${glyph('scroll')}Active <b class="tab-n">0</b></button><button class="tab" data-t="done">${glyph('check')}Done <b class="tab-n">0</b></button><button class="tab fl-tab" data-t="fish" style="--tc:#6ab8ff"><img class="pt-ti" src="${pantryIcon('koi')}" alt="">Fish Log <b class="tab-n">0</b></button><button class="tab cl-tab" data-t="crews" style="--tc:#8fc0f0">${cozyIcon('pack')}Crews <b class="tab-n">0</b></button><button class="tab gd-tab" data-t="guides" style="--tc:#c3b3ff">${glyph('book')}Guides</button></div>
       <div class="q-wrap"><div class="q-list"></div><div class="q-detail"></div></div>`;
     this.$ = { list: this.body.querySelector('.q-list'), det: this.body.querySelector('.q-detail'), wrap: this.body.querySelector('.q-wrap') };
     this.fish = new FishLogView(this.ui); this.body.appendChild(this.fish.root); // (docs/HOMESTEAD.md)
     this.guides = new GuidesView(this.ui); this.body.appendChild(this.guides.root); // (replay the tutorials: docs/TUTORIALS.md)
+    this.crews = new CrewLogView(this.ui); this.body.appendChild(this.crews.root); // (the expeditions' log: docs/COZY.md §10)
     this.body.querySelector('.q-tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (t) { if (t.dataset.t !== this.tab) this.ui.sfx?.('tab'); this.tab = t.dataset.t; this.sel = null; this._sig = null; this.render(); } });
     this.$.list.addEventListener('click', e => { const q = e.target.closest('.q-item'); if (q) { this.sel = q.dataset.id; this._sig = null; this.render(); this.ui.sfx?.('tab'); } });
   }
@@ -82,12 +85,14 @@ export class QuestPanel extends Panel {
     const all = this.ui.questList(true);
     const act = all.filter(q => !q.done), done = all.filter(q => q.done);
     const tabs = this.body.querySelectorAll('.q-tabs .tab');
-    tabs[0].classList.toggle('on', this.tab === 'active'); tabs[1].classList.toggle('on', this.tab === 'done'); tabs[2].classList.toggle('on', this.tab === 'fish'); tabs[3].classList.toggle('on', this.tab === 'guides');
+    for (const t of tabs) t.classList.toggle('on', t.dataset.t === this.tab);
     tabs[0].querySelector('.tab-n').textContent = act.length; tabs[1].querySelector('.tab-n').textContent = done.length;
     tabs[2].querySelector('.tab-n').textContent = Object.keys(this.st.fishLog || {}).length;
-    this.$.wrap.style.display = this.tab === 'fish' || this.tab === 'guides' ? 'none' : ''; this.fish.root.style.display = this.tab === 'fish' ? '' : 'none'; this.guides.root.style.display = this.tab === 'guides' ? '' : 'none';
+    tabs[3].querySelector('.tab-n').textContent = this.crews.count();
+    this.$.wrap.style.display = ['fish', 'guides', 'crews'].includes(this.tab) ? 'none' : ''; this.fish.root.style.display = this.tab === 'fish' ? '' : 'none'; this.guides.root.style.display = this.tab === 'guides' ? '' : 'none'; this.crews.root.style.display = this.tab === 'crews' ? '' : 'none';
     if (this.tab === 'fish') { this.fish.render(); return; }
     if (this.tab === 'guides') { this.guides._sig = null; this.guides.render(); return; }
+    if (this.tab === 'crews') { this.crews.render(); return; }
     const list = this.tab === 'active' ? act : done;
     if (!this.sel || !list.find(q => q.id === this.sel)) this.sel = list[0]?.id || null;
     const sig = this.tab + this.sel + JSON.stringify(list);

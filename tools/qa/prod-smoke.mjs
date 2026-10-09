@@ -1,9 +1,10 @@
 // Production-build smoke test: `vite build` into a temp dir, serve it with `vite preview` on a free port, boot the
 // title screen and the village, and fail if the UI/audio did not load or the page logged errors.
 // (The dev server resolves things the bundle can't — e.g. a variable import() path — so this catches "works in dev,
-// no UI in the real game" bugs.)  usage: node tools/qa/prod-smoke.mjs
+// no UI in the real game" bugs.)  usage: node tools/qa/prod-smoke.mjs [case…]
 import { DUNGEONS } from '../../src/dungeon/defs.js';
-import { DEBUG_PASS, skipNote } from './debug-pass.mjs'; // (the debug password: the env or a git-ignored file, never in the repo)
+import { DEBUG_PASS, skipNote } from './debug-pass.mjs';
+import { tooltipCheck } from './tooltip-lib.mjs'; // (R-13: a tooltip's background, read off the screen) // (the debug password: the env or a git-ignored file, never in the repo)
 import { build, preview } from 'vite';
 import { chromium } from 'playwright-core';
 import os from 'node:os';
@@ -29,7 +30,9 @@ const server = await preview({ logLevel: 'error', build: { outDir }, preview: { 
 const url = server.resolvedUrls.local[0].replace(/\/$/, '');
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true, args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] });
 let failed = 0;
-for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['poe', '/?fresh&nointro&hero=poe'], ['shihtzu', '/?fresh&nointro&hero=shihtzu'], ['golden', '/?fresh&nointro&hero=golden'], ['home', '/?fresh&nointro'], ['pad', '/?fresh&nointro&notut'], ['deck', '/?fresh&nointro&notut'], ['touch', '/?fresh&nointro&notut'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`]), ...Object.values(DUNGEONS).filter(dd => dd.gate).map(dd => ['zone:' + dd.id, '/?fresh&nointro']), ['tier:bambooDepths', '/?fresh&nointro&notut'], ['tier:burrowDeep', '/?fresh&nointro&notut'], ['pinnacle:bambooDepths', '/?fresh&nointro&notut'], ['debug', '/?fresh&nointro&notut&debug'], ['cozy', '/?fresh&nointro&notut'], ['guild', '/?fresh&nointro&notut'], ['dig', '/?fresh&nointro&notut'], ['fish', '/?fresh&nointro&notut&hour=10'], ['peaceful', '/?fresh&nointro&notut&villagesaved=bamboo'], ['crewclear', '/?fresh&nointro&notut&villagesaved=bamboo']]) { // (every zone dungeon that has its gate: its kit, a dense floor, the arena)
+const ONLY = process.argv.slice(2).filter(a => !a.startsWith('--'));
+for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['poe', '/?fresh&nointro&hero=poe'], ['shihtzu', '/?fresh&nointro&hero=shihtzu'], ['golden', '/?fresh&nointro&hero=golden'], ['home', '/?fresh&nointro'], ['tooltip', '/?fresh&nointro&notut'], ['pad', '/?fresh&nointro&notut'], ['deck', '/?fresh&nointro&notut'], ['touch', '/?fresh&nointro&notut'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`]), ...Object.values(DUNGEONS).filter(dd => dd.gate).map(dd => ['zone:' + dd.id, '/?fresh&nointro']), ['tier:bambooDepths', '/?fresh&nointro&notut'], ['tier:burrowDeep', '/?fresh&nointro&notut'], ['pinnacle:bambooDepths', '/?fresh&nointro&notut'], ['debug', '/?fresh&nointro&notut&debug'], ['cozy', '/?fresh&nointro&notut'], ['guild', '/?fresh&nointro&notut'], ['dig', '/?fresh&nointro&notut'], ['fish', '/?fresh&nointro&notut&hour=10'], ['peaceful', '/?fresh&nointro&notut&villagesaved=bamboo'], ['crewclear', '/?fresh&nointro&notut&villagesaved=bamboo']]) { // (every zone dungeon that has its gate: its kit, a dense floor, the arena)
+  if (ONLY.length && !ONLY.includes(label)) continue; // (node tools/qa/prod-smoke.mjs tooltip home: just those cases)
   const page = await browser.newPage(label === 'touch' ? { viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true } : { viewport: label === 'deck' ? { width: 1280, height: 800 } : { width: 1600, height: 900 } }); // (deck: the Steam Deck's screen; touch: a phone in landscape)
   const errs = [];
   page.on('pageerror', e => errs.push('pageerror: ' + e.message));
@@ -252,6 +255,8 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
       r.back = G.cozy.exp.list().length === 0; r.report = G.cozy.exp.reports()[0]?.result || null; r.xp = Object.values(G.cozy.exp.reports()[0]?.xp || {})[0] || 0;
       r.chip = !!document.querySelector('.cz-chip.on'); r.inTown = !!G.heroes.villagers.moka;
       G.cozy.showAway(); await sleep(400); r.card = G.ui.isOpen('awayCard'); G.ui.closeAll();
+      G.ui.open('quests', { tab: 'crews' }); await sleep(400); r.log = document.querySelectorAll('.p-quests .cl-rep').length; G.ui.closeAll(); // (the Journal's Crews tab: CZ-10)
+      r.guides = G.tutorials?.list?.().length || 0; // (the cozy guides are in the bundle: CZ-11)
       void P; return r;
     });
   }
@@ -343,6 +348,19 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
     Object.assign(s.fish, await E(() => { const c = document.querySelector('.reel.show .rl-card'); return { card: !!c, howto: !!c?.classList.contains('howto'), zoom: c ? getComputedStyle(c).zoom : null, how: c ? getComputedStyle(c.querySelector('.rl-how')).display : null, fishing: document.querySelector('.ui-root').classList.contains('fishing'), lean: +window.G.life.fishing.fk.toFixed(2) }; }));
     await page.keyboard.press('a'); await W(() => !window.G.life.fishing.s, 3000);
   }
+  if (label === 'tooltip') { // R-13 (the owner's "tooltip backgrounds invisible"): the mouse over the HUD's bag button, a hotbar slot, a skill node and the bag's weapon; each tooltip shows with its gradient and reads dark on the screen (tools/qa/tooltip-lib.mjs; shots in tools/qa/tmp/prod-smoke/)
+    // (the launcher's way in: Play Chewy Life.cmd opens the bundle's title screen; Continue, clicked, loads the save)
+    await page.evaluate(() => window.G.save()); await page.goto(url + '/?notut');
+    await page.waitForFunction(() => window.__ready === true && window.G?.titleActive, null, { timeout: 60000 }).catch(() => errs.push('tooltip: no title screen'));
+    await page.waitForTimeout(1200);
+    const cont = await page.evaluate(() => { const r = document.querySelector('.ti-btns [data-a="continue"]')?.getBoundingClientRect(); return r ? [r.x + r.width / 2, r.y + r.height / 2] : null; });
+    if (cont) await page.mouse.click(cont[0], cont[1]);
+    await page.waitForFunction(() => !window.G.titleActive && !window.G.ui.iris?.active, null, { timeout: 20000 }).catch(() => errs.push('tooltip: Continue did not start the game'));
+    await page.waitForTimeout(1200);
+    const r = await tooltipCheck(page, { shot: path.resolve('tools/qa/tmp/prod-smoke/tooltip') });
+    s.tooltip = { ok: r.ok, ...Object.fromEntries(Object.entries(r.kinds).map(([k, v]) => [k, v ? { luma: v.luma, bg: /gradient/.test(v.bg || '') ? 'gradient' : v.bg || null, ok: v.ok } : null])) };
+  }
+  const ttOk = !s.tooltip || s.tooltip.ok;
   const fi = s.fish, fishOk = !fi || (fi.cue && Math.abs(parseFloat(fi.bang) - 46) < 1 && fi.lean > 0.5 && fi.card && fi.howto && fi.zoom === '1.15' && fi.how === 'flex' && fi.fishing);
   const pz = s.poe, poeOk = !pz || (pz.hero === 'poe' && (!TOY_POE || (s.model === 'poe_toy' && pz.baked)) && (!POE_FUMA || (pz.fuma === 'glb' && pz.villagerFuma === 'glb')) && pz.back && pz.wt === 'fuma' && pz.cast && pz.flying && pz.caught && pz.icons && pz.switch && pz.after === 'chewy' && pz.poeVillager);
   const sz = s.shihtzu, stzOk = !sz || (sz.hero === 'shihtzu' && (!TOY_STZ || (s.model === 'shihtzu_toy' && sz.baked)) && (!STZ_FLAIL || (sz.flail === 'glb' && sz.links && sz.villager === 'glb')) && sz.chain && sz.wt === 'flail' && sz.dr >= 5 && sz.icons && sz.kit?.pups >= 2 && sz.kit.gp && sz.kit.lantern && sz.switch && sz.after === 'chewy');
@@ -352,13 +370,13 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
   const pc = s.peaceful, peaceOk = !pc || (pc.board && pc.cards >= 1 && pc.css === '760px' && pc.peace && pc.wild === 2 && pc.allWild && pc.edge && pc.glades >= 2 && pc.zoneBoard && (!pc.sight || pc.bounty));
   const gl = s.guild, guildOk = !gl || (gl.built && gl.model && gl.hachi && gl.css === '960px' && gl.cands === 3 && gl.hired && gl.out === 1 && gl.away && gl.back && gl.xp > 0 && gl.inTown);
   const cc = s.crewclear, crewOk = !cc || (cc.offered && cc.out === 1 && cc.result === 'success' && cc.crew === 1 && cc.cleared === 0 && cc.t1 === 1 && cc.maple && cc.fan === 1 && cc.ribbon && cc.stamp === '救' && cc.lit);
-  const cz = s.cozy, cozyOk = !cz || (cz.board && cz.css === '1010px' && cz.cards >= 6 && cz.out === 1 && cz.away && cz.back && /success|partial|setback/.test(cz.report) && cz.xp > 0 && cz.chip && cz.inTown && cz.card);
+  const cz = s.cozy, cozyOk = !cz || (cz.board && cz.css === '1010px' && cz.cards >= 6 && cz.out === 1 && cz.away && cz.back && /success|partial|setback/.test(cz.report) && cz.xp > 0 && cz.chip && cz.inTown && cz.card && cz.log >= 1 && cz.guides === 12);
   const db = s.debug, debugOk = (label !== 'village' || s.noDebug) && (!db || (db.refused && db.on && db.chunk && db.tabs >= 10 && db.css === '760px' && db.coins === 1000 && db.used && db.closed));
   const pd = s.pad, padOk = !pd || (pd.dev === 'pad' && pd.moved > 1.5 && pd.glyphs >= 6 && pd.cursor && pd.cast >= 1 && pd.focus);
   const tc = s.touch, touchOk = !tc || (tc.dev === 'touch' && tc.on && tc.slots === 6 && tc.preset === 4 && tc.pr === 1 && tc.phone && tc.moved > 1 && tc.manifest && tc.burrow?.gone > 0 && tc.burrow.calls > 0 && tc.burrow2?.gone > 0 && tc.burrow2.calls > 0);
   const dk = s.deck, deckOk = !dk || (dk.preset === 3 && dk.quality === 1 && dk.pr === 0.85 && !dk.ao && dk.shadow === 1536 && dk.ui === 1.15 && dk.safe === '12px' && dk.floor === '12px');
   const m = s.moka, mokaOk = !m || ((!TOY_MOKA || s.model === 'moka_toy') && m.baked && m.staff && m.wt === 'staff' && m.cast && m.switch && m.after === 'chewy' && m.chewyBaked && m.mokaVillager);
-  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && debugOk && cozyOk && crewOk && guildOk && peaceOk && digOk && fishOk && mokaOk && padOk && touchOk && deckOk && poeOk && stzOk && gldOk && regionOk && zoneOk && homeOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!CHEWY_MODEL || s.model === CHEWY_MODEL) && (!SAMURAI_CHEWY || s.saya) && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
+  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && ttOk && debugOk && cozyOk && crewOk && guildOk && peaceOk && digOk && fishOk && mokaOk && padOk && touchOk && deckOk && poeOk && stzOk && gldOk && regionOk && zoneOk && homeOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!CHEWY_MODEL || s.model === CHEWY_MODEL) && (!SAMURAI_CHEWY || s.saya) && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
   console.log(`${ok ? 'PASS' : 'FAIL'}  production ${label}: ${JSON.stringify(s)}${errs.length ? '\n   ' + [...new Set(errs)].slice(0, 8).join('\n   ') : ''}`);
   if (!ok) failed++;
   await page.close();

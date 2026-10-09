@@ -30,7 +30,20 @@ export class CozyChip {
     const C = this.C; if (!C) return;
     this.ui.open('expeditions', { view: C.exp.unread() ? 'reports' : 'away', at: 'chip' });
   }
+  /** the HUD's away minis (ui/hud.js greys them and adds the backpack): their time left as a pill, "~2 h" (COZY §4.8) */
+  minis() {
+    const C = this.C;
+    for (const b of this.ui.layers.hud.querySelectorAll('.hsw.hsw-b')) {
+      const aw = !b.hidden && b.classList.contains('away') && b.dataset.hero ? C?.awayInfo?.(b.dataset.hero) : null;
+      let t = b.querySelector('.cz-away-t');
+      if (!aw) { t?.remove(); continue; }
+      const w = aw.label.startsWith('back in about ') ? '~' + aw.label.slice(14) : aw.label.startsWith('back in under') ? '< 1 h' : aw.label.startsWith('any minute') ? 'soon' : 'camped';
+      if (!t) { t = document.createElement('i'); t.className = 'cz-away-t'; b.appendChild(t); }
+      if (t.textContent !== w) t.textContent = w;
+    }
+  }
   refresh() {
+    try { this.minis(); } catch (e) { /* the HUD may not be built yet */ }
     const C = this.C, E = this.el;
     if (!C || this.ui.mode === 'title') { E.classList.remove('on'); this.sig = ''; return; }
     const list = C.exp.list(), unread = C.exp.unread();

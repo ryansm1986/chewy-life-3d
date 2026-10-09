@@ -25,7 +25,7 @@ import { POND } from './layout.js';
 import { SKILLS } from '../rpg/skills.js';
 import { pantryIcon } from '../life/pantryIcons.js';
 import { PANTRY } from '../life/pantry.js';
-import { FURNITURE, SURFACES } from '../home/furniture.js';
+import { FURNITURE, SURFACES, tabOf } from '../home/furniture.js';
 import { CLASSES } from '../rpg/classes.js';
 import { Actions } from '../core/actions.js';
 
@@ -225,6 +225,14 @@ const decoOpen = G => !!G.housing?.decor?.active;
 const store = G => G.state.furniture || {};
 const cushionId = G => ['zabutonBlue', 'zabutonPink'].find(id => store(G)[id] > 0) || 'zabutonBlue';
 const wallpaperId = G => Object.keys(store(G)).find(id => SURFACES[id]?.kind === 'wall' && store(G)[id] > 0 && id !== G.world?.wallId) || null;
+// the Home Rating's favourite-piece tip (home/rating.js names one, R-13): the piece it names when it's in storage
+const likes = G => G.housing?.tasteOf?.(G.housing.rec?.data)?.likesFurniture || [];
+const favHave = G => { const id = G.housing?.ratingNow?.()?.has?.fav; return id && store(G)[id] > 0 ? id : null; };
+const favCard = G => { const id = favHave(G); if (!id) return null; const P = G.ui.panels.decorate; return P.tab !== 'all' && tabOf(FURNITURE[id]) !== P.tab ? '.p-decor .tab[data-t="all"]' : `.p-decor .card[data-id="${id}"]`; };
+const dev3 = (t, p, k) => () => (Actions.device === 'touch' ? t : Actions.device === 'pad' ? p : k); // (touch, pad, keys and mouse: said again when the device changes)
+/** the way into decorate mode: the HUD's Decorate button (mouse), or the menu's Decorate (touch: its menu button; the pad: Start) */
+const decoBtn = G => (Actions.device === 'touch' || Actions.device === 'pad' ? (G.ui?.isOpen?.('menu') ? '.p-menu [data-a="decorate"]' : touch() ? '.tc.on .tc-menu' : null) : '.home-tools .deco-btn');
+const favLine = (G, id) => `Your *${FURNITURE[id].name}* is one of your favourites: see the heart on its card? ${touch() ? 'Tap it' : 'Pick it'}, then ${FURNITURE[id].mount === 'wall' ? 'hang it on a wall' : 'put it down'}${touch() ? ' with *Set down*' : ''}!`;
 const makeHome = {
   title: 'Make it home', narrator: 'shadow', color: '#ff8fb0', priority: 3, indoors: true,
   blurb: 'Decorate the cottage: place, turn and move furniture, change the wallpaper, and the Home Rating.',
@@ -242,21 +250,32 @@ const makeHome = {
       tick: (G, T, dt) => { if ((T.data.jt -= dt) > 0) return; T.data.ji = (T.data.ji + 1) % JOBS.length; T.data.jt = 1.6; },
       target: (G, T) => { const [use, label] = JOBS[Math.max(0, T.data.ji)]; const it = G.mode === 'interior' ? G.world.interactables.find(i => i.use === use) : null; return it ? { pos: it.pos, label } : null; },
       done: (G, T) => T.cur.t > 6.6 },
-    { id: 'decorate', say: 'Press *B* — or the *Decorate* button — to decorate!', objective: 'Press *B* to decorate', allow: { interior: true, panels: ['decorate'] },
-      highlight: G => (decoOpen(G) ? null : '.home-tools .deco-btn'), done: G => decoOpen(G) },
-    { id: 'place', resumeAt: 'decorate', say: 'This is your storage. Pick the cushion, then click the floor to put it down.', objective: 'Place the cushion on the floor', allow: { interior: true, panels: ['decorate'] },
+    // (R-13: every line in the device's words; touch and the pad reach Decorate through the menu, the HUD's button is
+    //  the mouse's. The rating step's tip is one you can follow: the favourite it names, hung or put down)
+    { id: 'decorate', say: dev3('Tap the menu button, then *Decorate*!', 'Open the menu (*Esc*) and pick *Decorate*!', 'Press *B* — or the *Decorate* button — to decorate!'),
+      objective: dev3('Menu → *Decorate*', 'Menu (*Esc*) → *Decorate*', 'Press *B* to decorate'), allow: { interior: true, panels: ['decorate', 'menu'] },
+      highlight: G => (decoOpen(G) ? null : decoBtn(G)), done: G => decoOpen(G) },
+    { id: 'place', resumeAt: 'decorate', say: dev3('This is your storage. Tap the cushion, slide it where you like it, then tap *Set down*.', 'This is your storage. Pick the cushion, move the paw over the floor and press *F* to put it down.', 'This is your storage. Pick the cushion, then click the floor to put it down.'),
+      objective: 'Place the cushion on the floor', allow: { interior: true, panels: ['decorate', 'menu'] },
       onEnter: G => { if (!(store(G).zabutonBlue > 0) && !(store(G).zabutonPink > 0)) G.actions.addFurniture('zabutonBlue', 1, { src: 'gift' }); },
-      highlight: G => (!decoOpen(G) ? '.home-tools .deco-btn' : G.housing.decor.sel ? null : `.p-decor .card[data-id="${cushionId(G)}"]`),
+      highlight: G => (!decoOpen(G) ? decoBtn(G) : G.housing.decor.sel ? (touch() ? '.tc-place' : null) : `.p-decor .card[data-id="${cushionId(G)}"]`),
       waitFor: { event: 'decor:place', test: p => FURNITURE[p.id]?.mount !== 'wall' } },
-    { id: 'move', resumeAt: 'decorate', say: 'Woof! Now click it to pick it up, press *R* to turn it, and click again to put it down somewhere new.', objective: 'Pick it up, turn it (*R*), put it down', allow: { interior: true, panels: ['decorate'] },
-      highlight: G => (!decoOpen(G) ? '.home-tools .deco-btn' : null), waitFor: 'decor:move' },
-    { id: 'wallpaper', resumeAt: 'decorate', say: 'Ooh, and new wallpaper! Open *Wallpaper & Floors* and pick one.', objective: 'Change the wallpaper', allow: { interior: true, panels: ['decorate'] },
+    { id: 'move', resumeAt: 'decorate', say: dev3('Woof! Now tap it to pick it up, *Turn* it, slide it somewhere new and tap *Set down*.', 'Woof! Now press *F* on it to pick it up, turn it with *Y*, and press *F* again somewhere new.', 'Woof! Now click it to pick it up, press *R* to turn it, and click again to put it down somewhere new.'),
+      objective: dev3('Pick it up, *Turn* it, *Set down*', 'Pick it up, turn it (*Y*), put it down', 'Pick it up, turn it (*R*), put it down'), allow: { interior: true, panels: ['decorate', 'menu'] },
+      highlight: G => (!decoOpen(G) ? decoBtn(G) : touch() && G.housing.decor.hold ? ['.tc-rot', '.tc-place'] : null), waitFor: 'decor:move' },
+    { id: 'wallpaper', resumeAt: 'decorate', say: 'Ooh, and new wallpaper! Open *Wallpaper & Floors* and pick one.', objective: 'Change the wallpaper', allow: { interior: true, panels: ['decorate', 'menu'] },
       onEnter: G => { if (!wallpaperId(G)) G.actions.addFurniture('wp_dots', 1, { src: 'gift' }); },
-      highlight: G => { if (!decoOpen(G)) return '.home-tools .deco-btn'; const P = G.ui.panels.decorate; if (P.tab !== 'surface') return '.p-decor .tab[data-t="surface"]'; const w = wallpaperId(G); return w ? `.p-decor .card[data-id="${w}"]` : null; },
+      highlight: G => { if (!decoOpen(G)) return decoBtn(G); const P = G.ui.panels.decorate; if (P.tab !== 'surface') return '.p-decor .tab[data-t="surface"]'; const w = wallpaperId(G); return w ? `.p-decor .card[data-id="${w}"]` : null; },
       waitFor: { event: 'decor:surface', test: p => p.kind === 'wall' } },
-    { id: 'rating', resumeAt: 'decorate', say: 'See the stars? That\'s your *Home Rating*. The tip under it says what would make it even cosier.', objective: 'The Home Rating', allow: { interior: true, panels: ['decorate'] },
-      highlight: G => (decoOpen(G) ? '.p-decor .dc-rate' : '.home-tools .deco-btn'), ack: true },
-    { id: 'wrap', say: "Tanu sells furniture at his stall on Market Street, the workbench makes it, and the villagers love help decorating their homes — ask them \"Need any help?\". Press *B* when you're done!", objective: 'More furniture: Tanu, the workbench, finds', allow: { interior: true, panels: ['decorate'] }, ack: true },
+    { id: 'rating', resumeAt: 'decorate', allow: { interior: true, panels: ['decorate', 'menu'] }, ack: true,
+      // (a favourite in storage: the starter Pack Photo, or a gift when none is there and the tip asks for one)
+      onEnter: G => { const R = G.housing?.ratingNow?.(); if (R && R.has.loved < 3 && !favHave(G) && likes(G).includes('packPhoto') && !G.world?.items?.some(i => i.id === 'packPhoto')) G.actions.addFurniture('packPhoto', 1, { src: 'gift' }); },
+      say: G => `See the stars? That's your *Home Rating*, and its tip says what would make it even cosier. ${favHave(G) ? favLine(G, favHave(G)) : 'Follow the tips and watch the stars go up!'}`,
+      objective: G => { const id = favHave(G); return id ? `Try the tip: ${FURNITURE[id].mount === 'wall' ? 'hang' : 'place'} the ${FURNITURE[id].name}` : 'The Home Rating'; },
+      highlight: G => { if (!decoOpen(G)) return decoBtn(G); const c = !G.housing.decor.sel && !G.housing.decor.hold && favCard(G); return c ? [c, '.p-decor .dc-rate'] : touch() && G.housing.decor.sel ? ['.tc-place', '.p-decor .dc-rate'] : '.p-decor .dc-rate'; },
+      waitFor: { event: 'decor:place', test: (p, G) => likes(G).includes(p.id) } }, // (or Got it!)
+    { id: 'wrap', say: dev3("Tanu sells furniture at his stall on Market Street, the workbench makes it, and the villagers love help decorating their homes — ask them \"Need any help?\". Tap *Done* when you're done!", "Tanu sells furniture at his stall on Market Street, the workbench makes it, and the villagers love help decorating their homes — ask them \"Need any help?\". Press *B* when you're done!", "Tanu sells furniture at his stall on Market Street, the workbench makes it, and the villagers love help decorating their homes — ask them \"Need any help?\". Press *B* when you're done!"),
+      objective: 'More furniture: Tanu, the workbench, finds', allow: { interior: true, panels: ['decorate', 'menu'] }, ack: true },
   ],
 };
 
@@ -397,5 +416,171 @@ const meetGolden = {
   ],
 };
 
-export const GUIDES = { switch: sw, house, fishing, makeHome, remodel, charge, meetPoe, meetShihtzu, meetGolden };
+// ------------------------------------------------------------------ the cozy path (docs/COZY.md §11; ROADMAP CZ-11)
+// Every line follows the device: keys (*F* is the pad's A through keyHint), the pad's own words, and touch's ("tap",
+// "the attack button"); the director says a function's line again when the device changes.
+const dev = () => Actions.device;
+const dv = (t, p, k) => () => (dev() === 'touch' ? t : dev() === 'pad' ? p : k); // touch, pad, keys and mouse
+const expOpen = G => !!G.ui?.isOpen?.('expeditions');
+const expP = G => G.ui?.panels?.expeditions;
+const atBoard = G => expOpen(G) && !!expP(G)?.atBoard;
+const boardPos = G => G.cozy?.board?.it?.pos || null;
+const PEEK = 'quest:burrow1';
+const peekListed = G => !!G.cozy?.exp.objectives('story').some(o => o.id === PEEK);
+const peekOut = G => !!G.cozy?.exp.list().some(e => e.obj === PEEK);
+const peekReport = G => [...(G.cozy?.exp.reports() || [])].reverse().find(r => r.obj === PEEK) || null;
+/** the friend the Board guide sends: Moka (the burrow1 choice), else the first hero (then hire) free to go */
+const crewKey = G => {
+  const mem = G.cozy?.exp.members() || [], free = m => !m.active && !m.away && !m.onBreak && !(m.tired > 0);
+  const m = mem.find(x => x.key === 'hero:moka' && free(x)) || mem.find(x => x.type === 'hero' && free(x)) || mem.find(free);
+  return m ? { key: m.key, name: m.name } : null;
+};
+const crewName = (G, T) => (T.data.crew ||= crewKey(G))?.name || 'a friend';
+/** the board's panel on a job card: Peek into the Burrow when it's offered, else whatever job the view shows */
+const showJob = G => { const P = expP(G); if (!P || !expOpen(G)) return; if (!['story', 'village', 'errands'].includes(P.view)) P.setView(peekListed(G) ? 'story' : 'errands'); if (peekListed(G) && P.view === 'story') P.pick(PEEK); };
+const board = {
+  title: 'The Expedition Board', narrator: 'shadow', color: '#8fc0f0', priority: 2,
+  blurb: 'Send friends on a job from the board by the Wayfarer\'s Post: the job, the crew, the odds, Send off!, and the crews chip.',
+  offer: 'Shadow can show you how to send a crew off on a job while you stay home.',
+  icon: null,
+  trigger: () => false, // (it starts from Rosie's burrow1 question, "Send Moka", or as an offer the first time a fighter opens the board: cozy/cozyGuide.js)
+  past: G => houseDone(G) && !!G.state.quests?.done?.includes('burrow1'), // (an old save past the Burrow's first quest)
+  locked: G => (G.cozy?.board ? null : 'The board stands by the Wayfarer\'s Post'),
+  onStart: (G, T) => { T.data.crew = null; },
+  steps: [
+    { id: 'walk', say: G => `Woof! ${crewKey(G)?.name || 'Your friend'} is packing a bag! The *Expedition Board* is by the Wayfarer's Post, at the west end of town. Follow me!`, objective: 'Go to the Expedition Board',
+      target: G => (boardPos(G) ? { pos: boardPos(G), label: 'Expedition Board' } : null), allow: { panels: ['expeditions'] },
+      done: G => atBoard(G) || (boardPos(G) && dist(G, boardPos(G)) < 3.2) },
+    { id: 'open', say: dv('Tap the board, or the attack button, to read it.', 'Press *F* at the board to read it.', 'Press *F* at the board to read it.'), objective: dv('Tap the board to open it', 'Open the board (*F*)', 'Open the board (*F*)'),
+      target: G => (atBoard(G) || !boardPos(G) ? null : { pos: boardPos(G), label: 'Expedition Board' }), highlight: G => (atBoard(G) ? null : prompt), allow: { panels: ['expeditions'] },
+      done: G => atBoard(G) },
+    { id: 'job', resumeAt: 'open', allow: { panels: ['expeditions'] }, ack: true, objective: 'The job card',
+      onEnter: G => showJob(G),
+      say: G => (peekListed(G) ? "This is the job: *Peek into the Burrow*. The card says how long it takes, how much *power* the crew needs, and what they'll bring home." : 'Each card is a job: how long it takes, how much *power* the crew needs, and what comes home. Story jobs move the story on; errands bring materials.'),
+      tick: (G, T) => { if (!expOpen(G)) T.goto('open'); },
+      highlight: () => '.p-exp .ex-det' },
+    { id: 'crew', resumeAt: 'open', allow: { panels: ['expeditions'] },
+      onEnter: (G, T) => { T.data.crew = crewKey(G); showJob(G); },
+      say: (G, T) => { const n = crewName(G, T); return dev() === 'touch' ? `Now tap *${n}'s card* to put ${n === 'Moka' ? 'her' : 'them'} in the crew.` : dev() === 'pad' ? `Now move to *${n}'s card* and press *F* to put ${n === 'Moka' ? 'her' : 'them'} in the crew.` : `Now click *${n}'s card* to put ${n === 'Moka' ? 'her' : 'them'} in the crew.`; },
+      objective: (G, T) => `Add ${crewName(G, T)} to the crew`,
+      tick: (G, T) => { if (!expOpen(G)) T.goto('open'); },
+      highlight: (G, T) => (T.data.crew ? `.p-exp .ex-mem[data-m="${T.data.crew.key}"]` : '.p-exp .ex-crew'),
+      done: (G, T) => !!expP(G)?.crew?.length && (!T.data.crew || expP(G).crew.includes(T.data.crew.key)) },
+    { id: 'send', resumeAt: 'open', allow: { panels: ['expeditions'] }, skippable: true,
+      say: G => `${peekListed(G) ? 'Rosie packed the lunch, so the odds are good. ' : 'The bar shows the crew\'s power against the job\'s: the odds are in words beside it. '}${dev() === 'touch' ? 'Tap *Send off!*' : dev() === 'pad' ? 'Move to *Send off!* and press *F*.' : 'Click *Send off!*, or press Enter.'}`,
+      objective: dv('Tap Send off!', 'Send them off (*F* on Send off!)', 'Click Send off!'),
+      tick: (G, T) => { if (!expOpen(G)) T.goto('open'); },
+      highlight: () => '.p-exp .ex-go', waitFor: 'expedition:sent' },
+    { id: 'away', allow: { panels: ['expeditions'] }, objective: dv('Close the board (✕)', 'Close the board (B)', 'Close the board (Esc)'),
+      say: (G, T) => `${crewName(G, T)}'s off! The trip shows under *Away*, with when they'll be back. ${dev() === 'touch' ? 'Tap ✕ to close the board.' : dev() === 'pad' ? 'Press B to close the board.' : 'Press Esc to close the board.'}`,
+      highlight: G => (expOpen(G) ? '.p-exp .ex-trip, .p-exp .ex-det' : null), done: G => !expOpen(G) },
+    { id: 'chip', objective: 'The crews chip', ack: true,
+      say: G => `See the backpack by the map? That's the crew: ${G.cozy?.exp.list()[0] ? G.cozy.exp.left(G.cozy.exp.list()[0]) >= 0.75 ? `back in about ${Math.max(1, Math.round(G.cozy.exp.left(G.cozy.exp.list()[0])))} hours` : 'back any moment' : 'off on the road'}. ${dev() === 'touch' ? 'Tap it' : dev() === 'pad' ? 'The pause menu\'s *Crews*' : 'Click it'} to see how they're doing. Let's dig while we wait!`,
+      highlight: () => '.hud .cz-chip.on' },
+  ],
+};
+
+// Shadow's nose: a gather node, a dig spot (the hold and the golden band), the HUD's materials; on the crew path, the
+// crew's return (the report spotlit) and Rosie's thank-you
+const scavFree = G => (G.cozy?.scav?.nodes() || []).filter(n => !n.taken && n.on);
+const nearNode = (G, kind) => { let best = null, bd = 1e9; for (const n of scavFree(G)) { const d = dist(G, n) + (kind && n.kind !== kind ? 40 : 0) + (n.kind === 'mulberry' ? 80 : 0); if (d < bd) { bd = d; best = n; } } return best; }; // (the old mulberry last: a tree you gather under, its one cocoon a day)
+const nearSpot = (G, states) => { let best = null, bd = 1e9; for (const s of G.cozy?.scav?.spots() || []) { if (!states.includes(s.state)) continue; const d = dist(G, s); if (d < bd) { bd = d; best = s; } } return best; };
+const NODE_NAME = { driftwood: 'driftwood', riverStone: 'river stones', petalDrift: 'petal drift', mulberry: 'old mulberry' };
+const digTap = G => G.ui?.settings?.digMode === 1;
+const crewPath = G => G.state.flags?.burrowChoice === 'crew';
+/** Rosie's burrow1 question is still to come (cozy/cozyGuide.js asks it): unanswered, burrow1 not done and untouched
+ *  (also in the 2.5 s between the welcome and burrow1's start), never in the Burrow */
+const choiceOpen = G => { const F = G.state.flags || {}, Q = G.state.quests || {}, q = Q.active?.find(x => x.id === 'burrow1'); if (F.burrowChoice || F.burrowTut || Q.done?.includes('burrow1')) return false; return !q || (q.step === 0 && !(q.prog > 0)); };
+const nose = {
+  title: "Shadow's Nose", narrator: 'shadow', color: '#e0b070', priority: 6,
+  blurb: 'Gather driftwood, stones and petals, dig up what Shadow sniffs out (let go in the gold!), and where it all goes.',
+  offer: 'Shadow can show you how to find building materials without a single fight.',
+  icon: () => pantryIcon('shiitake'),
+  // after the house tour once Rosie's Burrow question is answered (on the crew path, after the Board guide)
+  trigger: G => houseDone(G) && G.mode === 'village' && !choiceOpen(G) && (!crewPath(G) || !!G.state.flags.tutorials?.board?.done),
+  past: G => houseDone(G) && (!!G.state.quests?.done?.includes('burrow1') || (G.state.cozy?.scav?.stats?.gathered || 0) > 0),
+  locked: G => (houseDone(G) ? null : 'Finish "Home, sweet home" first'),
+  onStart: (G, T) => { T.data.crew = crewPath(G) && (peekOut(G) || (peekReport(G) && !peekReport(G).read)); },
+  steps: [
+    { id: 'gather', objective: dv('Gather something (tap it)', 'Gather something (*F*)', 'Gather something (*F*)'),
+      onEnter: (G, T) => { T.data.node = nearNode(G, 'driftwood') || nearNode(G); },
+      say: (G, T) => { const n = T.data.node, w = NODE_NAME[n?.kind] || 'something shiny'; return `Yip! Time for my nose. Building stuff doesn't need fighting: see the ${w}? Walk up and ${dev() === 'touch' ? 'tap it, or the attack button' : 'press *F*'} to gather it. The little glowing ring means it's ready.`; },
+      target: (G, T) => { const n = T.data.node && scavFree(G).find(x => x.id === T.data.node.id) || nearNode(G); return n ? { pos: V(n.x, n.z), label: 'Gather spot' } : null; },
+      highlight: G => (document.querySelector(prompt) && scavFree(G).some(n => dist(G, n) < 2.2) ? prompt : null), waitFor: 'scavenge:gather' }, // (the prompt only when it's the gather's: the board's own "Read" is up right after the Board guide)
+    { id: 'sniff', objective: 'Follow Shadow: he smells something!',
+      say: 'Sniff… sniff… I smell something buried! Follow me: when I paw the ground and sit, that\'s the spot.',
+      target: G => { const s = nearSpot(G, ['found']) || nearSpot(G, ['hidden']); return s ? { pos: V(s.x, s.z), label: 'Shadow smells something' } : null; },
+      done: G => !!nearSpot(G, ['found']) || !nearSpot(G, ['hidden']) },
+    { id: 'dig', objective: G => (digTap(G) ? dv('Tap to dig', 'Dig (*F*)', 'Dig (*F*)')() : dv('Hold to dig, let go in the gold', 'Hold *F*, let go in the gold', 'Hold *F*, let go in the gold')()),
+      say: G => (digTap(G) ? `Here! ${dev() === 'touch' ? 'Tap the attack button' : 'Press *F*'} and we'll dig it up together.` : `Here! ${dev() === 'touch' ? '*Hold* the attack button' : '*Hold F*'} to dig. The ring fills up: let go while it's in the *gold band* for a Perfect dig. Any other time still digs it up. Nothing is ever lost!`),
+      target: G => { const s = nearSpot(G, ['found']); return s ? { pos: V(s.x, s.z), label: 'Dig here' } : null; },
+      highlight: G => (G.cozy?.scav?.busy ? null : document.querySelector(prompt) ? prompt : null),
+      on: { 'scavenge:dig': (p, T) => { T.data.perfect = !!p.perfect; } },
+      waitFor: 'scavenge:dig' },
+    { id: 'mats', objective: 'Your materials', ack: true,
+      say: (G, T) => `${T.data.perfect ? 'A PERFECT DIG! Woof woof, a bonus find! ' : digTap(G) ? 'We got it! ' : 'We got it! Next time, let go in the gold for a bonus. '}Everything we find goes into your *materials*, up here: wood, stone, petals, silk, bones… All the gather spots fill up again every day, and I sniff out new dig spots each morning.`,
+      highlight: G => (G.ui?.root?.classList.contains('tc-short') ? null : '.hud .mats') },
+    { id: 'back', objective: 'Wait for the crew to come home', skippable: true,
+      say: G => `${peekOut(G) ? 'The crew is still out. Gather and dig a little more: the chip by the map shows a *!* when they\'re home.' : 'The crew is home!'}`,
+      highlight: () => '.hud .cz-chip.on',
+      done: (G, T) => !T.data.crew || !peekOut(G) },
+    { id: 'report', allow: { panels: ['expeditions', 'menu'] }, skippable: true,
+      objective: "Read the crew's report", // (short: on a phone it sits in the board's title band; the line says how)
+      say: G => `They're back! ${dev() === 'touch' ? 'Tap the backpack chip' : dev() === 'pad' ? 'Open the menu and pick *Crews*' : 'Click the backpack chip'} to read their report.`,
+      highlight: G => (expOpen(G) ? '.p-exp .ex-rep' : dev() === 'pad' && G.ui?.isOpen?.('menu') ? '.p-menu [data-a="crews"]' : '.hud .cz-chip.on'),
+      done: (G, T) => !T.data.crew || !peekReport(G) || (peekReport(G).read && (!expOpen(G) || T.cur.t > 4)) },
+    { id: 'wrap', ack: true,
+      // (on the crew path Rosie has the last word, the turn-in: COZY §11. Her line is said with her as the speaker, once the
+      //  board is closed: a phone hides the speech card while a panel is up)
+      onEnter: (G, T) => { if (T.data.crew && peekReport(G)?.result === 'success') T.say(`${crewKey(G)?.name || 'Your friend'} brought my Mochi Jelly home, and the squeaks are all sorted! Thank you, ${me(G)}, and thank you, Shadow. Both ways help!`, 'rosie'); },
+      say: (G, T) => (T.data.crew && peekReport(G)?.result === 'success' ? '' : "Gather spots, dig spots, errands from the board: that's everything a home needs. And if you ever want a scrap, the Burrow is always squeaky. Woof!"),
+      objective: 'Gather, dig, send crews: build without a fight' },
+  ],
+};
+
+// Old Hachi's guide, the first time the Adventurers' Guild stands: hire a candidate, the roster card, a crew of two,
+// the wages in the morning banner
+const guildOpen = G => !!G.ui?.isOpen?.('guild');
+const guildP = G => G.ui?.panels?.guild;
+const guildDoor = G => { const r = G.cozy?.guild?.rec?.(); return r?.door ? V(r.door.x, r.door.z) : null; };
+const rosterN = G => G.state.cozy?.guild?.hires?.length || 0;
+const guildGuide = {
+  title: "The Adventurers' Guild", narrator: 'hachi', color: '#3f7a72', priority: 3,
+  blurb: 'Old Hachi\'s lodge: sign a hire on, read the roster card, send a crew of two, and the wages.',
+  offer: "Old Hachi can show you how hiring adventurers works.",
+  icon: null,
+  trigger: G => !!G.cozy?.guild?.built?.() && G.mode === 'village',
+  past: G => !!G.cozy?.guild?.built?.(),
+  locked: G => (G.cozy?.guild?.built?.() ? null : 'Build the Adventurers\' Guild first (village rank 2)'),
+  onStart: G => { G.cozy?.guild?.faceHTML?.('hachi'); }, // (registers his bust for the speech card)
+  steps: [
+    { id: 'door', allow: { panels: ['guild'] }, objective: dv('Go into the Guild (tap the door)', 'Go into the Guild (*F* at the door)', 'Go into the Guild (*F* at the door)'),
+      say: G => `Hmph. So you built it, ${me(G)}. Come in, come in: ${dev() === 'touch' ? 'tap the door' : '*F* at the door'}. Mind the step.`,
+      target: G => (guildOpen(G) || !guildDoor(G) ? null : { pos: guildDoor(G), label: "Adventurers' Guild" }),
+      highlight: G => (guildOpen(G) ? null : guildDoor(G) && dist(G, guildDoor(G)) < 3 ? prompt : null), done: G => guildOpen(G) },
+    { id: 'hire', resumeAt: 'door', allow: { panels: ['guild'] }, skippable: true, objective: 'Sign on a hire',
+      onEnter: (G, T) => { T.data.had = rosterN(G); const P = guildP(G); if (P && guildOpen(G) && P.view !== 'hire') P.setView('hire'); },
+      say: G => `Today's three. Pick one whose trade suits the work: a Guard for a siege, a Scout for a hunt, a Porter to carry more home. ${dev() === 'touch' ? 'Tap *Sign on*' : dev() === 'pad' ? '*F* on *Sign on*' : 'Click *Sign on*'}: the fee's on the button.`,
+      highlight: G => (!guildOpen(G) ? null : guildP(G)?.view === 'hire' ? '.p-guild .gd-cands' : '.p-guild .gd-tab[data-v="hire"]'),
+      tick: (G, T) => { if (!guildOpen(G) && T.cur.t > 1) T.goto('door'); },
+      done: (G, T) => rosterN(G) > (T.data.had ?? 0) || (rosterN(G) > 0 && T.cur.t > 0.2 && T.data.had > 0) },
+    { id: 'roster', resumeAt: 'door', allow: { panels: ['guild'] }, ack: true, objective: 'The roster card',
+      onEnter: G => { const P = guildP(G); if (P && guildOpen(G) && P.view !== 'roster') P.setView('roster'); },
+      say: 'Your roster. Each card: their *power* (a crew adds it up), their *class*, their mood in *hearts*, and the *wage* they want each day. Happy hires work harder.',
+      highlight: G => (guildOpen(G) ? (guildP(G)?.view === 'roster' ? '.p-guild .gd-hire:not(.free):not(.lock)' : '.p-guild .gd-tab[data-v="roster"]') : null),
+      callouts: G => (guildOpen(G) && guildP(G)?.view === 'roster' && !G.ui.root.classList.contains('m-phone') ? [{ el: '.p-guild .gd-hire .gd-cls', text: 'Class', side: 'right' }, { el: '.p-guild .gd-hire .gd-hearts', text: 'Morale', side: 'right' }, { el: '.p-guild .gd-hire .gd-hs', text: 'Power · wage', side: 'right' }] : []),
+      tick: (G, T) => { if (!guildOpen(G)) T.goto('door'); } },
+    { id: 'board', resumeAt: 'door', allow: { panels: ['guild', 'expeditions'] }, skippable: true, objective: 'Open the Expedition Board',
+      say: G => `Hires go out like your heroes do, and two make a crew. The *Expedition Board* hangs right here: ${dev() === 'touch' ? 'tap it' : dev() === 'pad' ? '*F* on it' : 'click it'}.`,
+      highlight: G => (guildOpen(G) ? '.p-guild .gd-board[data-board="exp"]' : null), done: G => expOpen(G) },
+    { id: 'two', allow: { panels: ['guild', 'expeditions'] }, skippable: true, objective: 'Put two in a crew',
+      onEnter: G => showJob(G),
+      say: G => `Put a hire and a friend in the crew: ${dev() === 'touch' ? 'tap' : dev() === 'pad' ? '*F* on' : 'click'} two cards. A class that suits the job adds *+15%*. Send them, or not: your call.`,
+      highlight: G => (expOpen(G) ? '.p-exp .ex-crew' : null), done: G => (expP(G)?.crew?.length || 0) >= 2 || !!G.cozy?.exp.list().some(e => e.crew.length >= 2) },
+    { id: 'wages', ack: true, allow: { panels: ['guild', 'expeditions'] }, objective: 'Wages, every morning',
+      say: 'One more thing. Wages come out of your coins each morning: the day\'s banner says *Guild wages*. Pay them, feed them, send them out. That\'s the whole trade. Hmph.' },
+  ],
+};
+
+export const GUIDES = { switch: sw, house, fishing, makeHome, remodel, charge, meetPoe, meetShihtzu, meetGolden, board, nose, guild: guildGuide };
 export const GUIDE_IDS = Object.keys(GUIDES);

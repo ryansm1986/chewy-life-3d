@@ -19,7 +19,7 @@ import { CLASSES } from '../rpg/classes.js';
 
 // *word* → bold; while the gamepad plays, an emphasised key (*F*, *Tab*, *Shift*) becomes its pad glyph (ui/padGlyphs.js)
 const md = s => esc(s).replace(/\*([^*]+)\*/g, (m, w) => keyHint(w) || `<b>${w}</b>`);
-const NAMES = { shadow: 'Shadow', kero: 'Kero', moka: 'Moka', rosie: 'Rosie', usagi: 'Usagi', tanu: 'Tanu', poe: 'Poe', shihtzu: CLASSES.shihtzu.name, golden: CLASSES.golden.name }; // (the Shih Tzu's name is the owner's to pick: classes.js)
+const NAMES = { shadow: 'Shadow', kero: 'Kero', moka: 'Moka', rosie: 'Rosie', usagi: 'Usagi', tanu: 'Tanu', poe: 'Poe', shihtzu: CLASSES.shihtzu.name, golden: CLASSES.golden.name, hachi: 'Old Hachi' }; // (the Shih Tzu's name is the owner's to pick: classes.js)
 
 export class TutorialUI {
   constructor(ui, layer) {
@@ -98,6 +98,12 @@ export class TutorialUI {
     const s = this.ui.scale || 1;
     // the spotlight follows its element (they move: the reel card, the dialogue choices sliding in)
     const e = this.hl.find(x => x.isConnected && x.offsetParent !== null);
+    // a phone with a panel up: when the spotlit element sits under the dock's place at the top, the dock moves down into
+    // the panel's title band (between its title and ✕), so it never covers what it points at (CZ-11: a Guild card)
+    const RT = this.ui.root?.classList, low0 = this.root.classList.contains('low');
+    let low = false;
+    if (e && RT?.contains('m-phone') && RT.contains('has-panel') && e.closest?.('.pw')) { if (!low0) this._dockB = this.$.dock.getBoundingClientRect().bottom; low = e.getBoundingClientRect().top < (this._dockB || 0) + 4; }
+    if (low !== low0) this.root.classList.toggle('low', low);
     if (e) {
       const r = e.getBoundingClientRect(), pad = 8 * s;
       if (r.width > 2 && r.height > 2) {

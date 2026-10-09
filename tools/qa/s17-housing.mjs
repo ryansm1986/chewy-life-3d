@@ -22,9 +22,11 @@
 //  m) Chewy's cottage grows to L2 and L3: the furniture comes along, the household jobs still work
 //  n) the styled-template cache stays under its cap; remodel cycles grow nothing
 // Phase 4 (the guides, with the director on: ?tut):
-//  o) "Make it home" (Shadow): it starts the next time you're in the cottage after the house tour; the jobs; B (the
-//     Decorate button spotlit); a cushion from storage (its card spotlit); pick up, turn, put down; a wallpaper (the tab
-//     and the card spotlit); the Home Rating chip; the wrap-up; in the Guides tab
+//  o) "Make it home" (Shadow), all with the real mouse and keys (R-13): it starts the next time you're in the cottage
+//     after the house tour (F at the door); the jobs; B (the Decorate button spotlit); a cushion from storage (its card
+//     spotlit); pick up, turn, put down; a wallpaper (the tab and the card spotlit); the Home Rating's tip followed (it
+//     names the Pack Photo, a favourite: a heart on its card; hung on a wall, the step completes and the tip moves on);
+//     the wrap-up's Got it!; in the Guides tab
 //  p) "Remodel" (Tanu): it starts when a mailbox is first opened, over the house card; Remodel; a set; a swatch; the
 //     cost; Remodel applies it and ends the guide; an old save that had been inside the cottage is offered Make it home
 // SHOTS=<dir> saves screenshots of the key moments.
@@ -353,8 +355,13 @@ try {
   await G(() => { const G = window.G; G.sim.tickT = -1e9; clearInterval(window.__freeze); window.__freeze = setInterval(() => { G.sim.tickT = -1e9; }, 200); G.state.flags.hints = { garden: 1, build: 1, travel: 1, skills: 1, stats: 1, loot: 1, potion: 1 }; G.state.flags.tutorials = { house: { done: true, step: 'wrap' } }; });
   await sleep(page, 2500);
   const g0 = await G(() => ({ en: window.G.tutorials.enabled, active: window.G.tutorials.active }));
-  // ---------------------------------------------------------------- o) Make it home
-  await enter();
+  // ---------------------------------------------------------------- o) Make it home, with the real mouse and keys (R-13)
+  // (F at the cottage door; B; a click on the cushion's card and on the floor; a click, R, a click; the Wallpaper tab and
+  //  a card; then the Home Rating's tip, followed: its favourite (a heart on the card) hung on a wall; Got it!)
+  const mouseOn = sel => G(sel => { const e = [...document.querySelectorAll(sel)].find(x => x.offsetParent !== null); if (!e) return null; const r = e.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2, t = document.elementFromPoint(x, y); return { x, y, hit: !!t && (t === e || e.contains(t)) }; }, sel)
+    .then(async p => { if (!p) return false; await page.mouse.move(p.x - 6, p.y - 6); await sleep(page, 60); await page.mouse.move(p.x, p.y, { steps: 3 }); await sleep(page, 90); await page.mouse.down(); await sleep(page, 50); await page.mouse.up(); await sleep(page, 250); return p.hit; });
+  await G(() => { const G = window.G, d = G.heroes.homeDoor(); G.player.setPos(d.x + 0.6, d.z + 0.3); G.player.moveTarget = null; }); await sleep(page, 400);
+  await G(() => { window.G.interactCooldown = 0; }); await tap(page, 'f', 70); await waitMode(page, 'interior');
   await stepIs('makeHome', 'jobs', 15000); await sleep(page, 800);
   const m1 = await tut();
   await snap('guide_home_jobs');
@@ -365,26 +372,45 @@ try {
   await stepIs('makeHome', 'place', 8000); await sleep(page, 900);
   const m3 = { ...(await tut()), ring: await ringOn('.p-decor .card[data-id="zabutonBlue"]') };
   await snap('guide_home_cushion');
-  await pick('zabutonBlue'); await sleep(page, 250); await click(9, 6);
+  const hits = [await mouseOn('.p-decor .card[data-id="zabutonBlue"]')]; await click(9, 6);
   await stepIs('makeHome', 'move', 8000); await sleep(page, 500);
   const m4 = await tut();
   await click(9, 6, 0.06); await sleep(page, 200); await tap(page, 'r', 60); await sleep(page, 200); await click(10, 6);
   await stepIs('makeHome', 'wallpaper', 8000); await sleep(page, 600);
   const m5a = await ringOn('.p-decor .tab[data-t="surface"]');
-  await tab('surface'); await sleep(page, 500);
+  hits.push(await mouseOn('.p-decor .tab[data-t="surface"]')); await sleep(page, 400);
   const m5b = await ringOn('.p-decor .card[data-id="wp_stripes"]');
   await snap('guide_home_wallpaper');
-  await pick('wp_stripes'); await sleep(page, 400);
+  hits.push(await mouseOn('.p-decor .card[data-id="wp_stripes"]')); await sleep(page, 300);
   await stepIs('makeHome', 'rating', 8000); await sleep(page, 700);
-  const m6 = { ...(await tut()), ring: await ringOn('.p-decor .dc-rate') };
+  // the rating step: its tip names a favourite you have (the starter Pack Photo), and the step waits for it
+  const m6 = { ...(await tut()), ring: await ringOn('.p-decor .tab[data-t="all"]'), rate: await G(() => ({ tip: document.querySelector('.p-decor .dc-tip').textContent, stars: document.querySelector('.p-decor .dc-stars').textContent, fav: window.G.housing.ratingNow().has.fav, ok: getComputedStyle(document.querySelector('.to-ok')).display })) };
   await snap('guide_home_rating');
-  await clickSel('.to-ok'); await stepIs('makeHome', 'wrap', 6000); await sleep(page, 600);
-  const m7 = await tut();
+  hits.push(await mouseOn('.p-decor .tab[data-t="all"]')); await sleep(page, 500);
+  const m6b = { ring: await ringOn(`.p-decor .card[data-id="${m6.rate.fav}"]`), heart: await G(id => !!document.querySelector(`.p-decor .card[data-id="${id}"] .dc-fav`), m6.rate.fav) };
+  await page.mouse.move(20, 20); await sleep(page, 100);
+  const cardXY = await G(id => { const r = document.querySelector(`.p-decor .card[data-id="${id}"]`).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }, m6.rate.fav);
+  await page.mouse.move(cardXY[0], cardXY[1], { steps: 4 }); await sleep(page, 500);
+  m6b.tip = await G(() => document.querySelector('.tt-wrap.show .tt-fav')?.textContent || '');
+  await snap('guide_home_favourite');
+  hits.push(await mouseOn(`.p-decor .card[data-id="${m6.rate.fav}"]`)); await sleep(page, 200);
+  // (a free spot on the back wall under the mouse, clear of the guide's dock: the ghost says when it fits)
+  await G(() => { window.__r13 = []; window.G.events.on('decor:place', p => window.__r13.push(p.id)); window.G.events.on('tutorial:step', p => window.__r13.push('step:' + p.step)); });
+  for (const cx of [6, 7, 5, 8, 3, 9, 4, 2]) {
+    const xy = await cellXY(cx, 0, 1.3, 'n');
+    if (await G(([x, y]) => !!document.elementFromPoint(x, y)?.closest?.('.tut-dock, .pw, .hud'), xy)) continue; // (under the dock or a panel: not the wall)
+    await hover(cx, 0, 1.3, 'n');
+    if (await G(() => window.G.housing.decor.ghostOk)) { await page.mouse.down(); await sleep(page, 50); await page.mouse.up(); await sleep(page, 300); break; }
+  }
+  await stepIs('makeHome', 'wrap', 6000); await sleep(page, 600);
+  const m7 = { ...(await tut()), rate: await G(() => ({ tip: document.querySelector('.p-decor .dc-tip').textContent, hung: window.G.world.items.some(i => i.id === 'packPhoto' && i.mount === 'wall'), loved: window.G.housing.ratingNow().has.loved, ev: window.__r13 })) };
   await snap('guide_home_wrap');
-  await clickSel('.to-ok'); await sleep(page, 900);
+  hits.push(await mouseOn('.to-ok')); await sleep(page, 900);
   const m8 = await G(() => ({ rec: window.G.state.flags.tutorials.makeHome, active: window.G.tutorials.active, items: window.G.world.items.filter(i => i.id === 'zabutonBlue').length, wall: window.G.world.wallId }));
   R.check('"Make it home" starts in the cottage after the house tour (Shadow): the household jobs, then B with the Decorate button spotlit', g0.en && m1.active === 'makeHome' && m1.dock && /bed|chest|stove/i.test(m1.say) && m2.ring && /B/.test(m2.say), JSON.stringify({ g0, m1, m2 }));
-  R.check('…the cushion\'s card spotlit, placed, picked up, turned and moved; the wallpaper tab and card spotlit; the Home Rating chip; the wrap-up (Tanu, the workbench, villagers); done', m3.ring && /cushion/i.test(m3.say) && /R/.test(m4.say) && m5a && m5b && m6.ring && /Rating/.test(m6.say) && /Tanu/.test(m7.say) && /workbench/.test(m7.say) && m8.rec?.done && !m8.rec.skipped && !m8.active && m8.items >= 1 && m8.wall === 'wp_stripes', JSON.stringify({ m3, m4, m5a, m5b, m6, m7, m8 }));
+  R.check('…the cushion\'s card spotlit, placed, picked up, turned and moved; the wallpaper tab and card spotlit (every click a real one on its element)', m3.ring && /cushion/i.test(m3.say) && /R/.test(m4.say) && m5a && m5b && hits.slice(0, 3).every(Boolean), JSON.stringify({ m3, m4, m5a, m5b, hits }));
+  R.check('R-13: the Home Rating\'s tip names a favourite you have ("Try: a pack photo (your favourite)", a heart on its card and its tooltip) and the step is that tip: hanging it on a wall completes it (Got it! still there); the tip moves on to the next favourite', /Rating/.test(m6.say) && /Pack Photo/.test(m6.say) && /Pack Photo/.test(m6.obj) && /pack photo \(your favourite\)/.test(m6.rate.tip) && m6.ok !== 'none' && m6.ring && m6b.ring && m6b.heart && /favourites/.test(m6b.tip) && m7.rate.hung && m7.rate.loved >= 1 && m7.rate.ev?.[0] === 'packPhoto' && !/pack photo/.test(m7.rate.tip) && /favourite/.test(m7.rate.tip) && hits.slice(3).every(Boolean), JSON.stringify({ m6, m6b, m7: m7.rate, hits }));
+  R.check('…the wrap-up (Tanu, the workbench, villagers); Got it! clicked; done', /Tanu/.test(m7.say) && /workbench/.test(m7.say) && m8.rec?.done && !m8.rec.skipped && !m8.active && m8.items >= 1 && m8.wall === 'wp_stripes', JSON.stringify({ m7, m8 }));
   await tap(page, 'b', 70); await sleep(page, 400);
   await G(() => window.G.housing.exit({ instant: true })); await waitMode(page, 'village'); await sleep(page, 1200);
   // ---------------------------------------------------------------- p) Remodel

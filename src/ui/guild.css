@@ -72,7 +72,7 @@
 .gd-signed { align-self: stretch; display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 50px; border-radius: 14px; border: 3px dashed #6ac08a; font: 700 15px var(--font); color: #3a8a5a; }
 .gd-signed .gl { width: 20px; height: 20px; }
 /* Roster */
-.gd-roster { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; max-height: 470px; overflow-y: auto; overscroll-behavior: contain; padding: 4px 3px 6px; scrollbar-width: thin; scrollbar-color: rgba(74, 44, 42, .35) transparent; }
+.gd-roster { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: max-content; gap: 9px; max-height: 470px; overflow-y: auto; overscroll-behavior: contain; padding: 4px 3px 6px; scrollbar-width: thin; scrollbar-color: rgba(74, 44, 42, .35) transparent; }
 .gd-hire { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: 'face t' 'face l' 's s' 'w w' 'b b'; gap: 4px 9px; align-items: center; padding: 9px 10px; min-height: 150px;
   border: 3px solid var(--ink); border-radius: 15px; background: linear-gradient(175deg, #fffdf8, color-mix(in srgb, var(--cc) 12%, #fff6ea)); box-shadow: 0 3px 0 rgba(74, 44, 42, .25); }
 .gd-hire > .gd-face { grid-area: face; }
@@ -91,9 +91,9 @@
 .gd-hs .gl { width: 16px; height: 16px; }
 .gd-hs b { color: var(--ink); font-weight: 700; }
 .gd-hs .mood { margin-left: auto; font-style: italic; }
-.gd-where { grid-area: w; display: flex; align-items: center; gap: 4px; font: 700 12.5px/1.15 var(--font); padding: 4px 7px; border-radius: 10px; border: 2px solid rgba(74, 44, 42, .22); background: #fff; min-width: 0; }
+.gd-where { grid-area: w; display: flex; align-items: center; gap: 4px; white-space: nowrap; font: 700 12.5px/1.15 var(--font); padding: 4px 7px; border-radius: 10px; border: 2px solid rgba(74, 44, 42, .22); background: #fff; min-width: 0; }
 .gd-where .gl { width: 16px; height: 16px; flex: none; }
-.gd-where em { font: 500 12px var(--font); font-style: normal; color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-left: 2px; }
+.gd-where em { flex: 1 1 0; min-width: 0; font: 500 12px var(--font); font-style: normal; color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-left: 2px; }
 .gd-where.away { background: #e2ecff; } .gd-where.brk { background: #ffe0d4; color: #a8483a; } .gd-where.tired { background: #ffeed8; } .gd-where.ok { background: #e2f6ea; }
 .gd-hb { grid-area: b; display: flex; gap: 6px; justify-content: flex-end; }
 .gd-hb .btn { min-height: 36px; padding: 4px 11px; font-size: 13.5px; }

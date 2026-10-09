@@ -9,6 +9,8 @@
 //      (no cozy state) loads with 0 hours away; a saved expedition whose hero is now being played comes home
 //   e) the pad (Y best crew, A send) and the phone (two columns, 44 px targets, the 12 px floor), with shots of the
 //      Board, the chip, the report and the away card → tools/qa/tmp/s31-expeditions/
+//   g) a real pre-cozy save (0.5.1, tools/qa/fixtures/precozy-0.5.1.json) loads: state.cozy normalised, 0 hours away, the
+//      zones and heroes intact; and saves and reloads as a cozy save (CZ-12)
 //   usage: node tools/qa/s31-expeditions.mjs
 import fs from 'node:fs';
 import { launch, boot, sleep, waitIdle, waitMode, drainDialogue, makeReport, BASE } from './lib.mjs';
@@ -218,15 +220,23 @@ if (want('e')) {
   await installPad(page);
   await ev(page, () => { const G = window.G; G.state.flags.mokaJoined = true; G.state.flags.poeJoined = true; G.state.heroes.moka.player.lvl = 9; G.state.heroes.poe.player.lvl = 8; G.state.pantry = { cabbageRolls: 4 }; G.heroes.spawnBench(); });
   await padTap(page, 'A'); await sleep(page, 300);
-  await atBoard(page);
+  // (CZ-12: the board opened with the pad's own A, never a key: a key press made the keyboard the device, and the
+  //  first pad press after it only switched back, so Y could land before the pad's focus was up. Every wait below
+  //  keys on the game's state, not on the clock)
+  await ev(page, () => { const G = window.G, it = G.cozy.board.it; G.player.setPos(it.pos.x, it.pos.z); G.player.moveTarget = null; G.ui.closeAll(); G.interactCooldown = 0; });
+  await page.waitForFunction(() => !!window.G.interact?.target || !!document.querySelector('.hud .prompt.show'), null, { timeout: 5000 }).catch(() => {});
+  await padTap(page, 'A');
+  if (!(await page.waitForFunction(() => window.G.ui.isOpen('expeditions'), null, { timeout: 5000 }).then(() => true).catch(() => false))) await atBoard(page); // (a fallback: F)
   await ev(page, () => { const P = window.G.ui.panels.expeditions; P.view = 'story'; P.render(); });
-  await sleep(page, 500);
-  await padTap(page, 'Y'); await sleep(page, 500);
-  const pb = await ev(page, () => ({ crew: window.G.ui.panels.expeditions.crew, hints: document.querySelector('.pad-hints')?.textContent || '', ring: document.querySelector('.pad-ring.on') != null }));
+  await page.waitForFunction(() => window.G.controls.device === 'pad' && !!document.querySelector('.pad-ring.on') && !!document.querySelector('.p-exp .ex-mem'), null, { timeout: 8000 }).catch(() => {});
+  await padTap(page, 'Y');
+  await page.waitForFunction(() => (window.G.ui.panels.expeditions.crew || []).length >= 1, null, { timeout: 5000 }).catch(() => {});
+  const pb = await ev(page, () => ({ crew: window.G.ui.panels.expeditions.crew, hints: document.querySelector('.pad-hints')?.textContent || '', ring: document.querySelector('.pad-ring.on') != null, dev: window.G.controls.device }));
   await shot(page, 'e-pad-board');
   // focus Send off and press A
   await ev(page, () => { const nav = window.G.ui.padNav, go = document.querySelector('.p-exp .ex-go'); nav.focus(go, []); });
-  await padTap(page, 'A'); await sleep(page, 600);
+  await padTap(page, 'A');
+  await page.waitForFunction(() => window.G.cozy.exp.list().length === 1 && window.G.ui.panels.expeditions.view === 'away', null, { timeout: 5000 }).catch(() => {});
   const pa = await ev(page, () => ({ out: window.G.cozy.exp.list().length, view: window.G.ui.panels.expeditions.view }));
   await shot(page, 'e-pad-away');
   R.check('e) the pad: Y picks the best crew, the hints name Best crew and Clear, A on Send off sends', pb.crew.length >= 1 && /Best crew/.test(pb.hints) && pb.ring && pa.out === 1 && pa.view === 'away', { pb, pa });
@@ -266,6 +276,39 @@ if (want('f')) {
   await shot(page, 'f-phone-away-card');
   const card = await ev(page, () => { const p = document.querySelector('.p-away'), r = p?.getBoundingClientRect(), b = document.querySelector('.p-away .aw-ok')?.getBoundingClientRect(), h = document.querySelector('.pw[data-name="awayCard"] .ph')?.getBoundingClientRect(); return p ? { fits: r.top >= -1 && r.bottom <= innerHeight + 1, gap: h && b ? Math.round(h.top - b.bottom) : null } : null; });
   R.check('f) the phone: the report fits; the away card fits, its button clear of the title bar', !b3.small.length && !b3.tiny.length && card?.fits && card.gap >= 4, { b3, card });
+  errs.push(...errors); warns.push(...w); await browser.close();
+}
+// ================================================================== g) a real pre-cozy save (0.5.1) loads (CZ-12)
+// tools/qa/fixtures/precozy-0.5.1.json: made by Pawhaven 0.5.1 (dc43b27) through its own save path
+// (tools/qa/make-precozy-fixture.mjs): Moka and Poe in the pack, burrow1 done, Takemori saved and the Bamboo Depths
+// cleared by hand. It loads with no errors, state.cozy normalised, 0 hours away (no card), the zones and heroes intact.
+if (want('g')) {
+  const fx = JSON.parse(fs.readFileSync(new URL('./fixtures/precozy-0.5.1.json', import.meta.url), 'utf8'));
+  const { browser, page, errors, warns: w } = await launch({ w: 1280, h: 720 });
+  await page.goto(`${BASE}/?notitle&nointro&notut&dseed=1`, { waitUntil: 'load' });
+  await page.waitForFunction(() => window.__ready === true && window.G?.player, null, { timeout: 90000 });
+  await ev(page, s => { window.G.saveBlocked = true; localStorage.clear(); for (const [k, v] of Object.entries(s)) localStorage.setItem(k, v); }, fx.storage); // (no save of this page's own over it)
+  await page.goto(`${BASE}/?notitle&nointro&notut&dseed=1`, { waitUntil: 'load' });
+  await page.waitForFunction(() => window.__ready === true && window.G?.player, null, { timeout: 90000 });
+  await sleep(page, 2500);
+  const m = await ev(page, () => {
+    const G = window.G, st = G.state, C = st.cozy, Z = st.zones;
+    return {
+      cozy: !!C && C.v === 1 && C.clock.h < 0.5 && C.clock.wall > 0 && Array.isArray(C.exp?.active) && C.exp.active.length === 0 && C.exp.reports.length === 0 && C.guild?.level === 0 && !!C.scav && !!C.sightings,
+      away: G.cozy.awayNow(), card: G.ui.isOpen('awayCard'),
+      bamboo: { v: Z.bamboo.village, by: Z.bamboo.savedBy, cel: Z.bamboo.celebrate, crew: Z.bamboo.dungeon.crew, cleared: Z.bamboo.dungeon.cleared }, maple: Z.maple.village,
+      heroes: { moka: st.heroes.moka.player.lvl, poe: st.heroes.poe.player.lvl, chewy: st.player.lvl, joined: ['moka', 'poe'].map(id => G.heroes.joined(id)) },
+      coins: st.coins, quests: { active: st.quests.active.map(q => q.id), done: st.quests.done }, board: G.cozy.exp.objectives('errands').length, story: G.cozy.exp.objectives('story').map(o => o.id),
+    };
+  });
+  R.check('g) a real 0.5.1 save (before the cozy path) loads with no errors: state.cozy normalised, 0 hours away and no away card; Takemori saved by hand (savedBy hero, no celebration owed), the Bamboo Depths still an own clear, heroes, levels, coins and quests intact; the Board offers errands',
+    m.cozy && !m.away && !m.card && m.bamboo.v === 'saved' && m.bamboo.by === 'hero' && m.bamboo.cel === false && m.bamboo.crew === 0 && m.bamboo.cleared === 1 && m.maple === 'besieged' && m.heroes.moka === 7 && m.heroes.poe === 6 && m.heroes.chewy === 9 && m.heroes.joined.every(Boolean) && m.coins === 1840 && m.quests.done.includes('burrow1') && m.quests.active.includes('homes') && m.board >= 3 && !errors.length, m);
+  // and it saves and loads again as a cozy save
+  await ev(page, () => { window.G.saveBlocked = false; window.G.save(); });
+  await page.goto(`${BASE}/?notitle&nointro&notut&dseed=1`, { waitUntil: 'load' });
+  await page.waitForFunction(() => window.__ready === true && window.G?.player, null, { timeout: 90000 }); await sleep(page, 1500);
+  const m2 = await ev(page, () => ({ v: window.G.state.cozy?.v, coins: window.G.state.coins, by: window.G.state.zones.bamboo.savedBy, away: window.G.cozy.awayNow()?.hours || 0 }));
+  R.check('g) …and saves and reloads as a cozy save (the cozy state kept; a quick reload counts only seconds away)', m2.v === 1 && m2.coins === 1840 && m2.by === 'hero' && m2.away < 0.2, m2);
   errs.push(...errors); warns.push(...w); await browser.close();
 }
 console.log('  shots: ' + OUT.pathname);

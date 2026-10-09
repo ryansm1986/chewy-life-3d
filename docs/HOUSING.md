@@ -172,6 +172,12 @@ Paths are relative to the repo. A full report is in the session; these are the l
   - **taste**: the owner's liked tags and styles (add `style: [...]`, `likesFurniture: [...]` to `roster.js` per villager);
   - **wall and rug**: their presence.
   The rating shows in decorate mode and as a "Home: ★★★☆☆" chip at the door.
+- **The favourite-piece tip** (R-13, 2026-10-09): it names a piece, `a puffy armchair (their favourite)` (`your favourite`
+  in your own home, `my favourite` in the owner's words): the next favourite not in the room yet, one in your storage
+  first (`homeRating(interior, taste, { have: storage })`, `has.fav`), so it moves on with each one placed. It used to
+  say "one of their favourite pieces": it never said which, and it stayed until three were placed. In the palette a
+  favourite's card has a heart (`.dc-fav`) and its tooltip says "One of your / their favourites". The cottage's are
+  the pack's (`COTTAGE_TASTE`: bookshelf, armchair, fish tank, pack photo; the Pack Photo is in the starter storage).
 - **Effects**:
   - The rating adds to that home's `b.happy` (`village.js:563`), so to rent, demand and level-up needs.
   - Raising a villager's rating gives hearts the first time each new star is reached.
@@ -224,7 +230,7 @@ Add a guide: **"Make it home"** with Shadow, triggered the first time the player
 2. Press B to decorate and place a cushion from storage.
 3. Rotate and move it.
 4. Change the wallpaper.
-5. The Home Rating chip.
+5. The Home Rating chip, and its tip followed: the favourite it names (R-13).
 6. "Tanu sells furniture, the workbench makes it, and villagers love help decorating."
 A short **"Remodel"** step comes the first time the player opens the mailbox. Use `tutorials.js`.
 
@@ -560,6 +566,11 @@ A short **"Remodel"** step comes the first time the player opens the mailbox. Us
   spotlit; one is given if there's none), the Home Rating chip, and the wrap-up (Tanu's Trinkets, the workbench,
   helping villagers). An old save that has been inside the cottage (`flags.homeVisits` or a saved interior) is offered
   it once (`past`).
+  - R-13 (2026-10-09, the owner: "'Try one of your favorite pieces' … doesn't seem to be completable"): the rating step
+    spotlit the tip, which named no piece and never changed when one was placed. The step now follows the tip (hang the
+    Pack Photo, the heart on its card; Got it! stays), every line is in the device's words (touch and the pad reach
+    Decorate through the menu), a phone shows the rating as a chip over the palette, and a tap no longer leaves a hover
+    tooltip up (`ui/mobile.js`). s17 o) plays it with the real mouse and keys and follows the tip.
 - **"Remodel"** (Tanu, `guides.js remodel`, 5 steps): it starts the first time a mailbox is opened (`flags.mailboxOpened`),
   over the house card (`startPanels`): Upgrade / Remodel / Enter (the button row spotlit, a callout on the upgrade
   cost), the set cards, a swatch (the panel emits `remodel:draft`), the cost; Remodel ends it.

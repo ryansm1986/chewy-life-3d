@@ -329,6 +329,10 @@ export class Mobile {
       if (d && tag) { d.classList.toggle('m-open'); ui.sfx('tab'); }
       else if (d && chip) d.classList.add('m-open');
     }, true);
+    // a tap is a click, not a hover: the tooltip its compat mouseover opened (a palette card's, a slot's) closes once the
+    // click is through, so it never stays over the room, the edit buttons or a guide's spotlight (R-13). A long press
+    // shows it on purpose (tipUntil; its click is eaten before this)
+    R.addEventListener('click', e => { if (Touch.fromTouch(e) && !this.tipUntil) setTimeout(() => { if (!this.tipUntil) ui.tip.hide(); }, 0); }, true);
     R.addEventListener('pointerdown', e => {
       if (e.pointerType !== 'touch') return;
       if (this.tipUntil) { this.tipUntil = 0; ui.tip.hide(); }

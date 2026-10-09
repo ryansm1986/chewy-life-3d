@@ -33,6 +33,7 @@ const OBJ_VIEWS = new Set(['story', 'village', 'errands']);
 const RESULT = { success: ['Success!', 'check', '#3aa860'], partial: ['Partly done', 'away', '#e0952a'], setback: ['Muddy and tired', 'cross', '#c86a5a'], beaten: ['You beat us to it!', 'heart', '#d86a9a'], recalled: ['Called home', 'pack', '#7a8aa8'] };
 const matIcon = k => `<img class="ex-mi" src="${materialIconURL(k)}" alt="" draggable="false">`;
 const listNames = a => (a.length <= 1 ? a[0] || '' : `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}`);
+const shortBack = h => { const t = backIn(h); return t.startsWith('back in about ') ? `back ~${t.slice(14)}` : t.startsWith('back in under') ? 'back < 1 h' : 'any minute'; }; // (a crew card's tag: "back ~2 h")
 const fmtN = n => (n >= 10000 ? `${Math.round(n / 1000)}k` : String(Math.round(n)));
 
 export class ExpeditionPanel extends Panel {
@@ -86,7 +87,7 @@ export class ExpeditionPanel extends Panel {
     return [];
   }
   keyOf(x) { return x.uid || x.id; }
-  current() { const L = this.list(); if (!L.length) return null; return L.find(x => this.keyOf(x) === this.sel[this.view]) || L[0]; }
+  current(L = this.list()) { if (!L.length) return null; return L.find(x => this.keyOf(x) === this.sel[this.view]) || L[0]; }
   members() { return this.C?.exp.members() || []; }
   member(k) { return this.members().find(m => m.key === k) || null; }
   memberWhy(k) { const m = this.member(k); if (!m) return 'Unknown'; if (m.active) return 'Playing now'; if (m.away) return 'Away'; if (m.onBreak) return 'On a break'; if (m.tired > 0) return 'Resting'; return ''; }
@@ -110,7 +111,7 @@ export class ExpeditionPanel extends Panel {
   }
   step(d) {
     const L = this.list(); if (L.length < 2) return;
-    const i = Math.max(0, L.indexOf(this.current()));
+    const k = this.keyOf(this.current(L)), i = Math.max(0, L.findIndex(x => this.keyOf(x) === k)); // (by key: each list() call builds fresh objects)
     this.pick(this.keyOf(L[(i + d + L.length) % L.length]));
   }
   toggle(k) {
@@ -171,13 +172,13 @@ export class ExpeditionPanel extends Panel {
   // ---------------------------------------------------------------- render
   render() {
     const B = this.body, C = this.C; if (!C) { B.innerHTML = ''; return; }
-    const v = this.view, L = this.list(), cur = this.current();
+    const v = this.view, L = this.list(), cur = this.current(L), idx = cur ? Math.max(0, L.findIndex(x => this.keyOf(x) === this.keyOf(cur))) : 0;
     if (cur) this.sel[v] = this.keyOf(cur);
     if (v === 'reports' && cur && !cur.read) C.exp.read(cur.uid);
     const counts = { story: this.list('story').length, village: this.list('village').length, errands: this.list('errands').length, away: C.exp.list().length, reports: C.exp.reports().length }, unread = C.exp.unread();
     const tabs = VIEWS.filter(([k]) => k !== 'village' || counts.village).map(([k, label, ic]) => `<button class="tab ex-tab${v === k ? ' on' : ''}" data-v="${k}" style="--tc:${{ story: '#e8a05a', village: '#c08ad8', errands: '#6ac08a', away: '#6aa0e0', reports: '#d8789a' }[k]}">${cozyIcon(ic)}<span class="ex-tl">${label}</span>${k === 'reports' && unread ? `<i class="tab-n ex-new">${unread}</i>` : counts[k] ? `<i class="tab-n">${counts[k]}</i>` : ''}</button>`).join('');
     const items = L.map(x => this.card(x, cur)).join('') || `<div class="ex-empty">${this.emptyText(v)}</div>`;
-    const pick = L.length ? `<div class="ex-pick"><button class="btn sm ex-arr" data-step="-1" ${L.length < 2 ? 'disabled' : ''} aria-label="Previous">‹</button><div><b>${esc(cur ? cur.name : '')}</b><span>${L.indexOf(cur) + 1} of ${L.length}</span></div><button class="btn sm ex-arr" data-step="1" ${L.length < 2 ? 'disabled' : ''} aria-label="Next">›</button></div>` : '';
+    const pick = L.length ? `<div class="ex-pick"><button class="btn sm ex-arr" data-step="-1" ${L.length < 2 ? 'disabled' : ''} aria-label="Previous">‹</button><div><b>${esc(cur ? cur.name : '')}</b><span>${idx + 1} of ${L.length}</span></div><button class="btn sm ex-arr" data-step="1" ${L.length < 2 ? 'disabled' : ''} aria-label="Next">›</button></div>` : '';
     let main = '';
     if (OBJ_VIEWS.has(v)) main = cur ? this.objectiveMain(cur) : `<div class="ex-det ex-none">${cozyIcon('board')}<p>${this.emptyText(v)}</p></div>`;
     else if (v === 'away') main = cur ? this.awayMain(cur) : `<div class="ex-det ex-none">${cozyIcon('away')}<p>No crews are out right now. Pick a story job or an errand and send a crew!</p></div>`;
@@ -240,10 +241,10 @@ export class ExpeditionPanel extends Panel {
     const gates = (I?.checks || []).map(c => `<div class="ex-gate ${c.ok ? 'ok' : 'no'}">${cozyIcon(c.ok ? 'check' : 'cross')}<span>${esc(c.label)}${!c.ok && c.have ? ` <em>(${esc(c.have)})</em>` : ''}</span></div>`).join('');
     const members = this.members().filter(m => !m.active || true).map(m => {
       const on = this.crew.includes(m.key), why = this.memberWhy(m.key);
-      const tag = on ? `<span class="ex-mtag on">${glyph('check')}In the crew</span>` : m.active ? '<span class="ex-mtag dim">Playing now</span>' : m.away ? `<span class="ex-mtag away">${cozyIcon('pack')}${esc(backIn(m.away.left))}</span>` : m.onBreak ? '<span class="ex-mtag tired">On a break</span>' : m.tired > 0 ? `<span class="ex-mtag tired">Resting ${Math.ceil(m.tired)} h</span>` : '<span class="ex-mtag">Ready</span>';
+      const tag = on ? `<span class="ex-mtag on">${glyph('check')}In the crew</span>` : m.active ? '<span class="ex-mtag dim">Playing now</span>' : m.away ? `<span class="ex-mtag away" title="${esc(`${m.away.obj}: ${backIn(m.away.left)}`)}">${cozyIcon('pack')}${esc(shortBack(m.away.left))}</span>` : m.onBreak ? '<span class="ex-mtag tired">On a break</span>' : m.tired > 0 ? `<span class="ex-mtag tired">Resting ${Math.ceil(m.tired)} h</span>` : '<span class="ex-mtag">Ready</span>';
       const K = m.type === 'hire' ? HIRE_CLASSES[m.cls] : null, suits = K && classSuits(m.cls, o); // (a hire: their class, +15% where it suits, COZY §4.2)
       const cls = K ? `<span class="ex-mcls${suits ? ' suits' : ''}" style="--cc:${K.color}" title="${esc(K.name)}: suits ${esc(K.suitWord)}${K.perkWord ? ` · ${esc(K.perkWord)}` : ''}">${esc(K.name)}${suits ? ' +15%' : ''}</span>` : '';
-      return `<button class="ex-mem${on ? ' on' : ''}${why ? ' no' : ' can'}${K ? ' hire' : ''}" data-m="${m.key}" style="--hc:${m.color}" title="${esc(m.name)}${K ? ` (${esc(K.name)}, ${'♥'.repeat(moraleHearts(m.morale))})` : ''}: power ${Math.round(m.power)}${why ? ` · ${why}` : ''}">${this.face(m.key)}<b>${esc(m.name)}</b><span class="ex-mlv">Lv ${m.lvl} · ${cozyIcon('power')}${Math.round(m.power)}</span>${cls}${tag}</button>`;
+      return `<button class="ex-mem${on ? ' on' : ''}${why ? ' no' : ' can'}${K ? ' hire' : ''}" data-m="${m.key}" style="--hc:${m.color}" title="${esc(m.name)}${K ? ` (${esc(K.name)}, ${'♥'.repeat(moraleHearts(m.morale))})` : ''}: power ${Math.round(m.power)}${why ? ` · ${why}` : ''}">${this.face(m.key)}<b>${esc(m.name)}</b><span class="ex-mlv">Lv ${m.lvl} · ${cozyIcon('power')}${Math.round(m.power)}</span><span class="ex-mtags">${cls}${tag}</span></button>`;
     }).join('');
     const need = I?.need || o.power, have = I?.power || 0, max = Math.max(need * 1.5, have * 1.08, 1);
     const odds = I && this.crew.length ? I.odds : null;

@@ -10,9 +10,17 @@
 //     lands) → J → Fish Log → wrap
 //  e) a missed bite in the guide brings the fish back (R-12: no recast); Skip; the Journal's Guides tab replays a guide
 //  f) a reload mid-guide resumes it; an old save past a guide's start gets a one-time offer (accept / decline)
+//  g) the cozy path (docs/COZY.md §11): Rosie's "Go yourself, or send Moka?" after the house tour → Send Moka → the
+//     Board guide (the board's arrow, F, the job card, Moka's card, Send off!, Away, the chip) → Shadow's Nose (a gather,
+//     the sniffed-out dig spot, hold F in the gold, the materials) → Moka back: the chip, the report → Rosie's thank-you
+//  h) "I'll go myself": the Nose only, its lines in the keys', the pad's and touch's words; a fighter's first look at
+//     the board offers the Board guide
+//  i) the Guild built → Old Hachi's guide (the door, sign one on, the roster card, the board inside, a crew of two, wages)
+//  j) Peaceful paths (Shadow's tip and the minimap spotlit on the first visit to a saved zone); old saves get the three
+//     new guides as offers (past). S16_ONLY=gh runs just those sections (a–f run together).
 // SHOTS=<dir> saves screenshots of the key moments.
 import path from 'node:path';
-import { launch, boot, sleep, makeReport, drainDialogue, tap, installProbes, BASE } from './lib.mjs';
+import { launch, boot, sleep, waitMode, makeReport, drainDialogue, tap, installProbes, BASE } from './lib.mjs';
 
 // HOUR=22 runs it at night (Kero is then tucked up indoors when the fishing guide starts, instead of off on a walk)
 const HOUR = +(process.env.HOUR || 10), NIGHT = HOUR >= 21 || HOUR < 6;
@@ -26,8 +34,12 @@ const stepIs = (id, step, timeout = 15000) => page.waitForFunction(([id, step]) 
 const keyF = async () => { await G(() => { window.G.interactCooldown = 0; }); await tap(page, 'f', 70); };
 const ringOn = sel => G(sel => { const r = document.querySelector('.tut-spot').getBoundingClientRect(), e = document.querySelector(sel); if (!e || !document.querySelector('.tut').classList.contains('spot')) return false; const b = e.getBoundingClientRect(); return Math.abs((r.left + r.width / 2) - (b.left + b.width / 2)) < 6 && Math.abs((r.top + r.height / 2) - (b.top + b.height / 2)) < 6; }, sel);
 const clickSel = sel => G(sel => { const e = document.querySelector(sel); e?.click(); return !!e; }, sel);
-const setup = () => G(() => { const G = window.G; G.sim.tickT = -1e9; clearInterval(window.__freeze); window.__freeze = setInterval(() => { G.sim.tickT = -1e9; }, 200); G.state.flags.hints = { garden: 1, build: 1, travel: 1, skills: 1, stats: 1, loot: 1, potion: 1 }; });
+const setup = (cozy = false) => G(cozy => { const G = window.G, F = G.state.flags; G.sim.tickT = -1e9; clearInterval(window.__freeze); window.__freeze = setInterval(() => { G.sim.tickT = -1e9; }, 200); F.hints = { garden: 1, build: 1, travel: 1, skills: 1, stats: 1, loot: 1, potion: 1 };
+  // (sections a–f: the cozy path's three guides and Rosie's burrow1 question stay out of the way; g–j run them)
+  if (!cozy) { const S = F.tutorials ||= {}; for (const id of ['board', 'nose', 'guild']) S[id] ||= { done: true, skipped: true }; F.burrowChoice ||= 'self'; } }, cozy);
+const ONLY = process.env.S16_ONLY || ''; // (S16_ONLY=gh: just those sections; a–f run together)
 try {
+  if (!ONLY || /[a-f]/.test(ONLY)) {
   // ---------------------------------------------------------------- a) QA sessions stay quiet
   await boot(page, `fresh&nointro&hour=${HOUR}`);
   await G(() => window.G.story.markTalk('rosie')); await sleep(page, 3000);
@@ -174,7 +186,7 @@ try {
   await sleep(page, 2400);
   const miss = { ...(await T()), phase: await G(() => window.G.life.fishing.s?.phase || null) };
   // (the housing guides, Make it home and Remodel, are listed too: tools/qa/s17-housing.mjs runs them; Hold to power up!: s19-charge; and Meet Poe: s20-poe)
-  R.check('the Guides tab lists all three (done ✓) and replays one; a missed bite in the guide brings the fish back (no recast) with a kind word', gl.length === 9 && ['Two heroes', 'Home, sweet home', 'Fishing with Kero'].every(t => gl.some(x => /^done/.test(x) && x.endsWith(t))) && miss.step === 'wait' && miss.phase === 'wait' && /slow|back/i.test(miss.say), JSON.stringify({ gl, miss }));
+  R.check('the Guides tab lists all twelve (the first three done ✓) and replays one; a missed bite in the guide brings the fish back (no recast) with a kind word', gl.length === 12 && ['Two heroes', 'Home, sweet home', 'Fishing with Kero'].every(t => gl.some(x => /^done/.test(x) && x.endsWith(t))) && miss.step === 'wait' && miss.phase === 'wait' && /slow|back/i.test(miss.say), JSON.stringify({ gl, miss }));
   await clickSel('.to-skip'); await sleep(page, 400);
   const sk = await G(() => ({ active: window.G.tutorials.active, rec: window.G.state.flags.tutorials.fishing, tut: window.G.life.fishing.tut, dock: document.querySelector('.tut').classList.contains('on'), toast: window.QA.toasts.some(t => /Guide skipped/.test(t)) }));
   R.check('Skip ends the guide at once (normal fishing restored) and says where to replay it', !sk.active && sk.rec.skipped && sk.tut === null && !sk.dock && sk.toast, JSON.stringify(sk));
@@ -213,6 +225,179 @@ try {
   const of4 = await G(() => ({ offer: document.querySelector('.tut-offer')?.classList.contains('on'), t: document.querySelector('.tf-t b')?.textContent, active: window.G.tutorials.active }));
   // (skipping the house tour unlocks the housing guide "Make it home": that one is offered now, for the first time)
   R.check('…and never again after a reload', (!of4.offer || of4.t === 'Make it home') && !of4.active, JSON.stringify(of4));
+  }
+  // ================================================================ the cozy path's guides (docs/COZY.md §11; CZ-11)
+  const cozyBoot = async (qs = '') => { await boot(page, `fresh&nointro&tut&hour=${HOUR}${qs}`); await setup(true); await G(() => { window.__tutEv = []; for (const n of ['tutorial:start', 'tutorial:done', 'tutorial:offer', 'expedition:sent', 'expedition:back', 'scavenge:gather', 'scavenge:dig', 'cozy:burrowChoice']) window.G.events.on(n, p => window.__tutEv.push([n, p])); }); };
+  const toNear = (p, d = 1.4) => G(([p, d]) => { const G = window.G, P = G.player; P.setPos(p.x + d, p.z + 0.3); P.faceTo(p.x, p.z); P.facing = P.faceTarget; P.moveTarget = null; G.engine.rig.focus?.copy(P.pos); G.engine.rig.snap?.(); }, [p, d]);
+  const standAt = (p, d = 1.0) => G(([p, d]) => { const G = window.G, P = G.player; P.setPos(p.x + d * 0.7, p.z - d * 0.7); P.moveTarget = null; P.interactTarget = null; P.faceTo(p.x, p.z); P.facing = P.faceTarget; G.companion.setPos(p.x - 1.2, p.z + 1.2); G.ui.closeAll?.(); G.interactCooldown = 0; const r = G.engine.rig; r.focus.copy(P.pos); r.snap(); }, [p, d]); // (as s33: beside the node or spot, facing it)
+  const objText = () => G(() => document.querySelector('.to-tx')?.innerHTML || '');
+  const sayText = () => G(() => document.querySelector('.ts-tx')?.textContent || '');
+  // a fresh game to the moment after the house tour: Rosie's welcome done, Moka in the pack, the house tour finished
+  const pastHouse = async (answered = false) => { // (answered: Rosie's question already answered "myself", the Board guide and the Nose done)
+    await G(answered => { const F = window.G.state.flags, S = F.tutorials ||= {}; S.switch = { done: true }; S.house = { done: true }; if (answered) { F.burrowChoice = 'self'; S.board = { done: true }; S.nose = { done: true }; } window.G.story.markTalk('rosie'); }, answered);
+    await page.waitForFunction(() => window.G.state.quests.active.some(q => q.id === 'burrow1'), null, { timeout: 8000 });
+    await G(() => { window.G.heroes.join('moka'); }); // (not awaited in the page: it resolves when her scene's dialogue ends)
+    await sleep(page, 500); await drainDialogue(page, [0]);
+  };
+  const choiceUp = () => page.waitForFunction(() => window.G.ui.dlg.active && (window.G.ui.dlg.choices || []).length === 2 && /send/i.test(JSON.stringify(window.G.ui.dlg.choices)), null, { timeout: 25000 }).then(() => true).catch(() => false);
+
+  if (!ONLY || ONLY.includes('g')) {
+    // ---------------------------------------------------------------- g) Rosie's question → Send Moka → the Board guide → Shadow's Nose → the report and Rosie
+    await cozyBoot(); await pastHouse();
+    const up = await choiceUp(); await sleep(page, 1200); // (the dialogue box slides in)
+    const q1 = await G(() => { const d = window.G.ui.dlg; return { choices: (d.choices || []).map(c => c.text || c), lines: (d.lines || []).map(l => l.text || l) }; });
+    await snap('cozy_choice');
+    await drainDialogue(page, [1]);
+    await stepIs('board', 'walk', 15000); await sleep(page, 900);
+    const b1 = await G(() => { const G = window.G, q = G.questTarget(), b = G.cozy.board.it.pos; return { kind: q?.kind, onBoard: !!q && Math.hypot(q.pos.x - b.x, q.pos.z - b.z) < 0.1, choice: G.state.flags.burrowChoice, say: document.querySelector('.ts-tx')?.textContent || '', q: G.state.quests.active.find(x => x.id === 'burrow1')?.step }; });
+    await snap('cozy_board_walk');
+    R.check("g) Rosie asks \"Go yourself, or send Moka?\" after the house tour; Send Moka keeps burrow1 and starts Shadow's Board guide: the arrow on the Expedition Board", up && /Go yourself, or send Moka/.test(q1.lines.join(' ')) && q1.choices.length === 2 && b1.choice === 'crew' && b1.q === 0 && b1.kind === 'tut' && b1.onBoard && /Expedition Board/.test(b1.say), JSON.stringify({ q1, b1 }));
+    await toNear(await G(() => window.G.cozy.board.it.pos), 1.2);
+    await stepIs('board', 'open', 8000); await sleep(page, 500);
+    const o1 = { ring: await ringOn('.hud .prompt.show'), obj: await objText() };
+    await keyF();
+    await stepIs('board', 'job', 8000); await sleep(page, 700);
+    const j1 = { ring: await ringOn('.p-exp .ex-det'), sel: await G(() => window.G.ui.panels.expeditions.sel.story), view: await G(() => window.G.ui.panels.expeditions.view), say: await sayText() };
+    await snap('cozy_board_job');
+    R.check('g) at the board: "Press F" (the prompt spotlit) opens it; the job card (Peek into the Burrow) spotlit', o1.ring && /F/.test(o1.obj) && j1.ring && j1.view === 'story' && j1.sel === 'quest:burrow1' && /Peek into the Burrow/.test(j1.say), JSON.stringify({ o1, j1 }));
+    await clickSel('.to-ok');
+    await stepIs('board', 'crew', 6000); await sleep(page, 600);
+    const c1 = { ring: await ringOn('.p-exp .ex-mem[data-m="hero:moka"]'), obj: await objText() };
+    await snap('cozy_board_crew');
+    await page.click('.p-exp .ex-mem[data-m="hero:moka"]');
+    await stepIs('board', 'send', 6000); await sleep(page, 600);
+    const s1 = { ring: await ringOn('.p-exp .ex-go'), ok: await G(() => !document.querySelector('.p-exp .ex-go').disabled) };
+    await snap('cozy_board_send');
+    await page.click('.p-exp .ex-go');
+    await stepIs('board', 'away', 6000); await sleep(page, 600);
+    const a1 = await G(() => ({ out: window.G.cozy.exp.list().map(e => [e.obj, e.crew.join()]), view: window.G.ui.panels.expeditions.view }));
+    await snap('cozy_board_away');
+    R.check("g) Moka's card spotlit and picked, Send off! spotlit and sent; the Away view", c1.ring && /Moka/.test(c1.obj) && s1.ring && s1.ok && a1.out.length === 1 && a1.out[0][0] === 'quest:burrow1' && a1.out[0][1] === 'hero:moka' && a1.view === 'away', JSON.stringify({ c1, s1, a1 }));
+    await page.keyboard.press('Escape');
+    await stepIs('board', 'chip', 6000); await sleep(page, 700);
+    const ch = { ring: await ringOn('.hud .cz-chip.on'), say: await sayText() };
+    await snap('cozy_board_chip');
+    await clickSel('.to-ok');
+    await stepIs('nose', 'gather', 15000); await sleep(page, 900);
+    const n0 = await G(() => { const G = window.G, q = G.questTarget(), n = G.cozy.scav.nodes().find(x => q && Math.hypot(q.pos.x - x.x, q.pos.z - x.z) < 0.1); return { rec: G.state.flags.tutorials.board, node: n?.kind || null, say: document.querySelector('.ts-tx')?.textContent || '' }; });
+    await snap('cozy_nose_gather');
+    R.check('g) the chip spotlit ("let\'s dig while we wait"), the Board guide done; Shadow\'s Nose starts: the arrow on a driftwood gather spot', ch.ring && /dig while we wait/.test(ch.say) && n0.rec.done && !n0.rec.skipped && !!n0.node && /Walk up and press F/.test(n0.say), JSON.stringify({ ch, n0 }));
+    const node = await G(() => { const q = window.G.questTarget(); return { x: q.pos.x, z: q.pos.z }; });
+    await standAt(node, 0.9); await sleep(page, 400); await keyF();
+    await page.waitForFunction(() => window.G.tutorials.active === 'nose' && ['sniff', 'dig'].includes(window.G.tutorials.cur?.step?.id), null, { timeout: 8000 }); await sleep(page, 400); // (sniff passes at once when Shadow already found a spot)
+    const spot = await G(() => { const G = window.G, P = G.player, s = G.cozy.scav.spots().filter(x => x.state === 'hidden').sort((a, b) => Math.hypot(a.x - P.pos.x, a.z - P.pos.z) - Math.hypot(b.x - P.pos.x, b.z - P.pos.z))[0]; return s ? { x: s.x, z: s.z, id: s.id } : null; });
+    if (spot) await toNear(spot, 5);
+    await stepIs('nose', 'dig', 25000); await sleep(page, 600);
+    const d0 = await G(() => { const s = window.G.cozy.scav.spots().find(x => x.state === 'found'); return s ? { x: s.x, z: s.z } : null; });
+    await standAt(d0, 1.0); await sleep(page, 500);
+    const d1 = { obj: await objText(), ring: await ringOn('.hud .prompt.show') };
+    await snap('cozy_nose_dig');
+    await G(() => { window.G.interactCooldown = 0; }); await page.keyboard.down('f'); // (held to the end: a good dig)
+    await page.waitForFunction(() => window.__tutEv.some(e => e[0] === 'scavenge:dig'), null, { timeout: 9000 }).catch(() => {}); await page.keyboard.up('f');
+    await stepIs('nose', 'mats', 8000); await sleep(page, 600);
+    const m1 = { ring: await ringOn('.hud .mats'), say: await sayText() };
+    await snap('cozy_nose_mats');
+    R.check('g) the gather (F at the spot), Shadow sniffs a dig spot out, "Hold F… let go in the gold" (the prompt spotlit), the dig; the HUD materials spotlit', /Hold/.test(d1.obj) && d1.ring && m1.ring && /materials/.test(m1.say), JSON.stringify({ d1, m1 }));
+    await clickSel('.to-ok');
+    await stepIs('nose', 'back', 6000); await sleep(page, 500);
+    await G(() => window.G.cozy.clock.add(2.5)); // (the debug clock: Moka's 2 h trip is over)
+    await stepIs('nose', 'report', 10000); await sleep(page, 700);
+    const r0 = { ring: await ringOn('.hud .cz-chip.on') };
+    await page.click('.hud .cz-chip.on');
+    await page.waitForFunction(() => window.G.ui.isOpen('expeditions') && window.G.ui.panels.expeditions.view === 'reports', null, { timeout: 5000 });
+    await sleep(page, 600); const r1 = { ring: await ringOn('.p-exp .ex-rep') }; await snap('cozy_nose_report');
+    await sleep(page, 3500); await page.keyboard.press('Escape'); // (read, then the board closed: Rosie's line follows)
+    await stepIs('nose', 'wrap', 12000); await sleep(page, 600);
+    const w1 = await G(() => ({ who: document.querySelector('.ts-name')?.textContent, say: document.querySelector('.ts-tx')?.textContent || '', burrow1: window.G.state.quests.done.includes('burrow1') }));
+    await snap('cozy_nose_wrap');
+    await clickSel('.to-ok'); await sleep(page, 500);
+    const w2 = await G(() => ({ rec: window.G.state.flags.tutorials.nose, active: window.G.tutorials.active }));
+    R.check("g) Moka's crew comes home: the chip spotlit, the report spotlit on the board; Rosie's thank-you (burrow1 done by the crew); the Nose guide done", r0.ring && r1.ring && w1.who === 'Rosie' && /Mochi Jelly/.test(w1.say) && w1.burrow1 && w2.rec.done && !w2.active, JSON.stringify({ r0, r1, w1, w2 }));
+    await G(() => window.G.ui.closeAll());
+  }
+
+  if (!ONLY || ONLY.includes('h')) {
+    // ---------------------------------------------------------------- h) "Go yourself": no Board guide, the Nose; the words follow the device; the fighter's board offer
+    await cozyBoot(); await pastHouse();
+    await choiceUp();
+    await drainDialogue(page, [0]);
+    await stepIs('nose', 'gather', 15000); await sleep(page, 600);
+    const h1 = await G(() => ({ choice: window.G.state.flags.burrowChoice, board: window.G.state.flags.tutorials.board || null, ev: window.__tutEv.filter(e => e[0] === 'tutorial:start').map(e => e[1].id) }));
+    const words = {};
+    for (const d of ['kbm', 'pad', 'touch']) { await G(d => window.G.controls.setDevice(d), d); await sleep(page, 300); words[d] = { obj: await objText(), say: await G(() => document.querySelector('.ts-tx')?.innerHTML || '') }; }
+    await G(() => window.G.controls.setDevice('kbm'));
+    R.check('h) "I\'ll go myself" keeps the old path (no Board guide) and Shadow\'s Nose follows; its lines follow the device: F on keys, the pad\'s button glyph, "tap" on touch', h1.choice === 'self' && !h1.board && h1.ev.join() === 'nose' && /F/.test(words.kbm.obj) && /kc[^"]*pad/.test(words.pad.obj) && /tap/i.test(words.touch.obj) && /tap it/.test(words.touch.say), JSON.stringify({ h1, words }));
+    await clickSel('.to-skip'); await sleep(page, 400);
+    // a fighter opens the board: the Board guide comes as an offer card once it's closed
+    await toNear(await G(() => window.G.cozy.board.it.pos), 1.2); await sleep(page, 300); await keyF();
+    await page.waitForFunction(() => window.G.ui.isOpen('expeditions'), null, { timeout: 5000 }); await sleep(page, 400);
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.querySelector('.tut-offer')?.classList.contains('on'), null, { timeout: 15000 }).catch(() => {});
+    const h2 = await G(() => ({ t: document.querySelector('.tf-t b')?.textContent, on: document.querySelector('.tut-offer')?.classList.contains('on') }));
+    await snap('cozy_board_offer');
+    await clickSel('.tf-yes'); await sleep(page, 600);
+    const h3 = await G(() => ({ active: window.G.tutorials.active, step: window.G.tutorials.cur?.step?.id }));
+    R.check('h) the other path later: a fighter\'s first look at the board offers "The Expedition Board" (Show me! starts it)', h2.on && h2.t === 'The Expedition Board' && h3.active === 'board', JSON.stringify({ h2, h3 }));
+    await clickSel('.to-skip'); await sleep(page, 300);
+  }
+
+  if (!ONLY || ONLY.includes('i')) {
+    // ---------------------------------------------------------------- i) Old Hachi's guide when the Guild is first built
+    await cozyBoot(); await pastHouse(true);
+    await G(() => { window.G.state.coins = 3000; });
+    await drainDialogue(page);
+    await G(() => window.G.cozy.guild.debugBuild({ level: 1 }));
+    await stepIs('guild', 'door', 20000); await sleep(page, 900);
+    const g1 = await G(() => { const G = window.G, q = G.questTarget(), r = G.cozy.guild.rec(); return { kind: q?.kind, onDoor: !!q && !!r && Math.hypot(q.pos.x - r.door.x, q.pos.z - r.door.z) < 0.2, who: document.querySelector('.ts-name')?.textContent, por: !!document.querySelector('.ts-por img') }; });
+    await snap('cozy_guild_door');
+    await G(() => window.G.cozy.guild.open());
+    await stepIs('guild', 'hire', 8000); await sleep(page, 700);
+    const g2 = { ring: await ringOn('.p-guild .gd-cands') }; await snap('cozy_guild_hire');
+    await page.click('.p-guild .gd-sign:not([disabled])');
+    await stepIs('guild', 'roster', 8000); await sleep(page, 800);
+    const g3 = { ring: await ringOn('.p-guild .gd-hire:not(.free):not(.lock)'), calls: await G(() => [...document.querySelectorAll('.tut-call')].map(c => c.textContent)) }; await snap('cozy_guild_roster');
+    await clickSel('.to-ok');
+    await stepIs('guild', 'board', 8000); await sleep(page, 500);
+    const g4 = { ring: await ringOn('.p-guild .gd-board[data-board="exp"]') };
+    await page.click('.p-guild .gd-board[data-board="exp"]');
+    await stepIs('guild', 'two', 8000); await sleep(page, 600);
+    const g5 = { ring: await ringOn('.p-exp .ex-crew') }; await snap('cozy_guild_two');
+    for (const k of await G(() => { const P = window.G.ui.panels.expeditions; return P.members().filter(m => !P.memberWhy(m.key)).slice(0, 2).map(m => m.key); })) await page.click(`.p-exp .ex-mem[data-m="${k}"]`);
+    await stepIs('guild', 'wages', 8000); await sleep(page, 500);
+    const g6 = await sayText();
+    await snap('cozy_guild_wages');
+    await clickSel('.to-ok'); await sleep(page, 400);
+    const g7 = await G(() => ({ rec: window.G.state.flags.tutorials.guild, hires: window.G.state.cozy.guild.hires.length }));
+    R.check("i) the Guild built → Old Hachi's guide: his door (arrow, his bust), the candidates spotlit and one signed on, the roster card with callouts, the board inside, a crew of two, the wages line", g1.kind === 'tut' && g1.onDoor && g1.who === 'Old Hachi' && g1.por && g2.ring && g3.ring && g3.calls.length === 3 && g4.ring && g5.ring && /Guild wages/.test(g6) && g7.rec.done && g7.hires === 1, JSON.stringify({ g1, g2, g3, g4, g5, g6, g7 }));
+    await G(() => window.G.ui.closeAll());
+  }
+
+  if (!ONLY || ONLY.includes('j')) {
+    // ---------------------------------------------------------------- j) Peaceful paths; old saves get the three as offers (past)
+    await cozyBoot('&villagesaved=bamboo'); await pastHouse(true);
+    await G(() => { window.G.state.player.lvl = 6; });
+    await drainDialogue(page);
+    await G(() => window.G.enterRegion('bamboo')); await waitMode(page, 'dungeon');
+    await page.waitForFunction(() => !!window.G.state.flags.hints?.peaceful, null, { timeout: 30000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.tut')?.classList.contains('spot'), null, { timeout: 4000 }).catch(() => {});
+    const p1 = { tip: await G(() => window.QA.toasts.some(t => /quiet now/.test(t) && /red ofuda/.test(t))), ring: await ringOn('.hud .mm-wrap'), call: await G(() => document.querySelector('.tut-call')?.textContent || '') };
+    await snap('cozy_peaceful');
+    await page.waitForFunction(() => !document.querySelector('.tut')?.classList.contains('spot'), null, { timeout: 8000 }).catch(() => {});
+    const p2 = await G(() => document.querySelector('.tut')?.classList.contains('spot'));
+    R.check('j) the first visit to a saved zone: Shadow\'s "Peaceful paths" tip (the red ofuda), the minimap spotlit with the wild rings called out, then it clears', p1.tip && p1.ring && /violet rings/.test(p1.call) && !p2, JSON.stringify({ p1, p2 }));
+    // an old save: past burrow1, the Guild built, no records of the three → one offer each (past)
+    await G(() => { const G = window.G, F = G.state.flags; G.cozy.guild.debugBuild({ level: 1 }); for (const id of ['board', 'nose', 'guild']) delete F.tutorials[id]; F.tutorials.active = null; if (!G.state.quests.done.includes('burrow1')) G.state.quests.done.push('burrow1'); G.state.quests.active = G.state.quests.active.filter(q => q.id !== 'burrow1'); G.save(); });
+    await page.goto(`${BASE}/?notitle&tut`, { waitUntil: 'load' });
+    await page.waitForFunction(() => window.__ready === true && window.G?.player, null, { timeout: 90000 }); await installProbes(page); await setup(true);
+    const offers = [];
+    for (let k = 0; k < 6; k++) { // (the older guides this save is past come too: Hold to power up!, after the zone trip)
+      const ok = await page.waitForFunction(() => document.querySelector('.tut-offer')?.classList.contains('on'), null, { timeout: 25000 }).then(() => true).catch(() => false);
+      if (!ok) break;
+      offers.push(await G(() => document.querySelector('.tf-t b').textContent));
+      await clickSel('.tf-no'); await sleep(page, 400);
+    }
+    R.check('j) an old save past their starts gets each new guide once as an offer (past): the Board, Shadow\'s Nose, the Guild', ['The Expedition Board', "Shadow's Nose", "The Adventurers' Guild"].every(t => offers.includes(t)), JSON.stringify(offers));
+  }
 } catch (e) {
   errors.push('[harness] ' + e.stack);
   try { R.note('at failure: ' + JSON.stringify(await G(() => { const G = window.G, T = G.tutorials, ui = G.ui; return { active: T.active, step: T.cur?.step?.id, entered: T.cur?.entered, paused: T.paused, why: T.cur && T.pauseReason(T.cur.step), pending: [...T.pending], offers: T.offers, rec: G.state.flags.tutorials, rod: G.state.fishing?.rod, hero: G.state.activeHero, open: Object.keys(ui.panels).filter(n => ui.isOpen(n)), dlg: ui.dlg.active, locked: G.player.controlLocked }; }))); } catch (e2) { /* page gone */ }

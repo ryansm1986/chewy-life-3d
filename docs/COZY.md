@@ -1,8 +1,10 @@
 # Cozy path: expeditions, the Adventurers' Guild, peaceful zones and scavenging (design)
 
 Status: **designed 2026-10-08; the owner answered §14 the same day** (the decisions are folded in below). **Phase A
-(CZ-1, CZ-2) is built** (§13.1); **phase B (CZ-3, CZ-4) is built, in review** (§13.2); **phase C (CZ-5, CZ-6) is
-built** (§13.3); **phase D (CZ-7, CZ-8) is built** (§13.4); **phase E (CZ-9) is built, checkpoint 2 in review** (§13.5). The work is tracked in
+(CZ-1, CZ-2) is built** (§13.1); **phase B (CZ-3, CZ-4) is built** (§13.2); **phase C (CZ-5, CZ-6) is
+built** (§13.3); **phase D (CZ-7, CZ-8) is built** (§13.4); **phase E (CZ-9) is built** (§13.5); **phase F (CZ-10…CZ-12:
+the UI on every device, the tutorials, QA and balance) is built, in review** (§13.6): the cozy path is complete as
+built. The work is tracked in
 [ROADMAP.md](ROADMAP.md) §1c (CZ-1…CZ-12); this file is the design.
 
 The owner's direction (2026-10-08):
@@ -943,6 +945,73 @@ The code map is in [ARCHITECTURE.md](ARCHITECTURE.md) ("The cozy path, phase E")
   with no fights: a zone villager's rescue and find by crews, the Guild built and upgraded, the town grown to rank 4
   with painted zones and the player's home upgrades, the other three zones' reliefs and dungeons by crews; shots in
   `tools/qa/tmp/s37-cozy-story/`); prod-smoke `crewclear`; the sims `tools/expedition-sim.mjs`, `tools/story-sim.mjs`.
+
+### 13.6 Phase F as built (CZ-10, CZ-11, CZ-12; 2026-10-09)
+The code map is in [ARCHITECTURE.md](ARCHITECTURE.md) ("The cozy path, phase F").
+- **The UI on every device** (§10). Every cozy surface was shot with something in it (`tools/qa/cozy-ui-lib.mjs` seeds a
+  state: crews out, three reports, the Guild at level 2 with four hires, sightings) at 1600×900 and 1280×720
+  (`tools/qa/cozy-ui-shots.mjs`), on a phone and an iPad (`tools/qa/mobile-ui.mjs`) and on the Deck with the pad
+  (`tools/qa/deck-ui.mjs`); both audits now run the cozy views (0 text under the floor, 0 targets under 44 px, 0 panels
+  cut off). What the shots turned up, and the fixes:
+  - **the Board ran off a 1600×900 screen** (978 px tall with seven crew cards): the crew is now compact cards in three
+    columns (a face, the name, level and power, the class and the state; three rows show, a full roster scrolls) and the
+    odds sit beside *Send off!*, so it fits 1600×900 and 1280×720; on the Deck the crew shows two rows and the job's line
+    is clamped. An away member's tag says "back ~2 h";
+  - the phone's ◀ ▶ picker said "0 of 2" and stepped from the wrong card (it compared fresh objects);
+  - the Guild roster's buttons hung out of their cards (its rows were squeezed to the cards' minimum height), and an
+    away hire's time wrapped;
+  - the touch hero wheel's text drew at 8 px (the text floor's observer never looked inside the wheel); its away tag sat
+    under the hub, and now sits under the card ("Away · ~2 h");
+  - the HUD chip's hit area on a phone was 27 px (now 44);
+  - the HUD minis show the time left as a pill ("~2 h"), the backpack badge at their top left.
+  - **New**: the Journal's **Crews** tab (the crews out, the totals, the report log; a row opens its report on the
+    board, to read) and the pause menu's **Crews** button (pad and touch: the board's Reports or Away, to read). The
+    crew's walk-in on return is phase A's (heroes from the Wayfarer's Post, hires as their villagers).
+- **The tutorials** (§11):
+  - Rosie's welcome has the line ("Some folks march into the Burrow with a sword…").
+  - **Rosie's question**, once, on the first calm moment after the house tour: "Go yourself, or send Moka?" (*I'll go
+    myself!* · *Send Moka with a lunch*). burrow1 is already the active quest either way. Going yourself is as before
+    (Shadow's fight tips in the Burrow, the charge guide after the trip).
+  - **"The Expedition Board" (Shadow, 7 steps)** after *Send Moka*: the arrow to the board, *F* at it (the prompt
+    spotlit), the job card spotlit (Peek into the Burrow), Moka's card, *Send off!*, the Away view, the crews chip ("back
+    in about 2 hours… let's dig while we wait!").
+  - **"Shadow's Nose" (Shadow, 7 steps)** after the answer (on the crew path, after the Board guide): a gather spot (the
+    driftwood when it's near), Shadow sniffing a dig spot out, *hold F* and let go in the gold (Tap mode: press), the HUD
+    materials; on the crew path it waits for Moka's crew, spotlights the chip and the report, and Rosie has the last word
+    (the turn-in: "…brought my Mochi Jelly home!").
+  - **"The Adventurers' Guild" (Old Hachi, 6 steps)** the first time the Guild stands: his door, sign a candidate on, the
+    roster card (callouts on the class, the morale hearts, power and wage), the Expedition Board inside, a crew of two, the
+    wages in the morning banner.
+  - **Peaceful paths**: Shadow's tip on the first visit to a saved zone ("It's quiet now! The wild places are still
+    wild…: look for the red ofuda…") and the minimap spotlit for 3 s with a callout on the violet rings. **Deviation**:
+    the HUD's minimap has no legend of its own, so the minimap itself is spotlit (the big map's legend has the rings).
+  - **The other path later**: a fighter's first look at the board offers the Board guide (the card waits for the board
+    to close); a cozy player's first Burrow trip brings the fight tips and the charge guide as before. **Old saves**: each
+    of the three is offered once through `past(G)` (the Board and the Nose past burrow1, the Guild once built).
+  - **Every line follows the device**: the keys (*F*, *Hold F*), the pad's glyphs (through `keyHint`) and its own words
+    ("move to … and press A"), and touch's ("tap", "the attack button"); the director says them again when the device
+    changes. The Journal's Guides tab lists twelve. On a phone (the speech card steps aside while a panel is up) the
+    objective card moves into the panel's title band whenever what it spotlights sits under its place at the top (a
+    Guild card), and Rosie's thank-you waits for the board to close.
+  - Shots of every step on the desktop and a phone: `tools/qa/cozy-guide-shots.mjs` → `tools/qa/tmp/cozy-guides/`.
+- **QA and balance** (§8, §9):
+  - s31–s34 and s37 (parts a–c) are in run-all; s37's part d is opt-in (`S37_FULL=1`, `run-all s37-full`).
+  - prod-smoke: `cozy` (a crew sent and back, the report, the chip, the away card, now the Journal's Crews tab and the
+    twelve guides), `peaceful`, `dig`, `guild`, `crewclear`.
+  - **The pace** (`tools/expedition-sim.mjs`, `story-sim.mjs`, `scavenge-sim.mjs`): Takemori saved with Moka alone at
+    about 146 real minutes (p10 133, p90 150: inside 1.5–2.5 h); with an early Guild hire about 74 (the accepted, paid
+    shortcut, a NOTE); story-sim's busy Guild (its hires take Moka's errands) about 3.1 h for Takemori and **all four
+    villages at about 11.3 h** (8–12); scavenging: every building's materials within 0.8 world days of its rank.
+  - **The old-save check** (s31 g): a real 0.5.1 save (`tools/qa/fixtures/precozy-0.5.1.json`, made by 0.5.1's own save
+    path: `tools/qa/make-precozy-fixture.mjs` against `git archive dc43b27`) loads with no errors, `state.cozy` normalised,
+    0 hours away (no card), Takemori saved by hand (`savedBy: 'hero'`, no celebration owed), the Bamboo Depths still an own
+    clear, heroes, levels, coins and quests intact; it saves and reloads as a cozy save.
+  - **The flakes**: s31 e's pad board now opens with the pad's own A (a key press had made the keyboard the device, so the
+    first pad press only switched back) and every wait keys on the game's state; s23's soak checks the glow's length (20
+    min), not the seconds left a slow run's dialogue ate into, and its door waits on the dialogue. **R-6 run down: no
+    leak.** Ten round trips with every upload and dispose tracked: the GL texture count wanders 289–295 with no trend
+    (292 → 293). What a trip leaves are live textures uploaded for the first time (the bone textures of townsfolk the
+    town sync swapped in, a few canvas labels), and the next trip frees others. s23 now checks the trend over four trips.
 
 **Existing work it touches**:
 - **Z-F (elevation)**: the wild discs and the scavenge spots are recipe data placed relative to the terrain, like the

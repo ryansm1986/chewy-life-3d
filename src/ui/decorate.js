@@ -21,7 +21,7 @@ export function furnitureThumb(G, id, now = true) {
   const foot = d.mount === 'wall' ? [d.size[0] * CELL, 0.3] : [d.size[0] * CELL, d.size[1] * CELL];
   return T.object(key, () => furnitureGroup(id), { foot, min: 0.28, dir: d.mount === 'wall' ? [0.55, 0.45, 1.2] : [1, 1.05, 1.2] });
 }
-export function furnitureTipHTML(id, n = null) {
+export function furnitureTipHTML(id, n = null, fav = null) { // fav: 'your' | 'their' (a favourite of this home's: R-13)
   const d = FURNITURE[id] || SURFACES[id]; if (!d) return '';
   const set = SETS[d.set], cat = d.kind ? (d.kind === 'wall' ? 'Wallpaper' : 'Floor') : CATS[d.cat]?.name;
   const size = d.kind ? '' : d.mount === 'wall' ? `${d.size[0] * CELL} × ${d.size[1] * CELL} m on a wall` : `${d.size[0] * CELL} × ${d.size[1] * CELL} m`;
@@ -29,6 +29,7 @@ export function furnitureTipHTML(id, n = null) {
     <div class="tt-l tt-dim">${esc(cat || '')}${size ? ' · ' + size : ''}${set ? ` · <b style="color:${set.color}">${esc(set.name)}</b>` : ''}</div>
     <div class="tt-d">${esc(d.desc || '')}</div>
     ${(d.tags || []).length ? `<div class="tt-l fu-tags">${d.tags.map(t => `<span>${TAG_NAME[t] || t}</span>`).join('')}</div>` : ''}
+    ${fav ? `<div class="tt-l tt-fav">${glyph('heart')}${fav === 'your' ? 'One of your favourites' : 'One of their favourites'}</div>` : ''}
     ${n != null ? `<div class="tt-l tt-dim">In storage: <b>${n}</b></div>` : ''}</div>`;
 }
 
@@ -54,7 +55,7 @@ export class DecoratePanel extends Panel {
       else { this.opts.onSelect?.(id); replay(c, 'picked', 500); }
     });
     this.$.cards.addEventListener('wheel', e => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { this.$.cards.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
-    this.$.cards.addEventListener('mouseover', e => { const c = e.target.closest('.card'); if (!c || c === this._hov) return; this._hov = c; this.ui.tip.show(furnitureTipHTML(c.dataset.id, this.st.furniture?.[c.dataset.id] || 0), '', c); });
+    this.$.cards.addEventListener('mouseover', e => { const c = e.target.closest('.card'); if (!c || c === this._hov) return; this._hov = c; const h = this.opts.house?.() || {}; this.ui.tip.show(furnitureTipHTML(c.dataset.id, this.st.furniture?.[c.dataset.id] || 0, (h.likes || []).includes(c.dataset.id) ? (h.owner ? 'their' : 'your') : null), '', c); });
     this.$.cards.addEventListener('mouseout', e => { const c = e.target.closest('.card'); if (c && !c.contains(e.relatedTarget)) { this._hov = null; this.ui.tip.hide(c); } });
     this.$.store.addEventListener('click', () => { this.opts.onStore?.(); this.ui.sfx?.('click'); });
     this.$.undo.addEventListener('click', () => { this.opts.onUndo?.(); this.ui.sfx?.('click'); });
@@ -96,7 +97,8 @@ export class DecoratePanel extends Panel {
     this.$.store.disabled = !holding; this.$.store.classList.toggle('on', !!holding);
     this.$.undo.disabled = !s.canUndo;
     const list = this.list();
-    const sig = this.tab + '|' + list.map(e => `${e.id}:${e.n}:${e.on ? 1 : 0}`).join(',') + '|' + (s.sel || '');
+    const likes = new Set(h.likes || []); // (this home's favourite pieces: a heart on their cards, R-13)
+    const sig = this.tab + '|' + list.map(e => `${e.id}:${e.n}:${e.on ? 1 : 0}`).join(',') + '|' + (s.sel || '') + '|' + [...likes].join(',');
     if (sig === this._sig) return;
     this._sig = sig;
     this.queue.length = 0;
@@ -105,8 +107,9 @@ export class DecoratePanel extends Panel {
       const surf = !!SURFACES[e.id], d = e.def, set = SETS[d.set];
       const art = surf ? `<img src="${surfaceSwatch(e.id)}" alt="" class="dc-sw" draggable="false">` : (() => { const u = furnitureThumb(G, e.id, false); if (!u) this.queue.push(e.id); return `<img src="${u || glyphURL('home')}" alt="" class="${u ? '' : 'gi dc-wait'}" data-th="${e.id}" draggable="false">`; })();
       const count = surf ? (d.free || (e.on && !e.n) ? '' : `<span class="dc-n">×${e.n}</span>`) : `<span class="dc-n">×${e.n}</span>`;
-      return `<div class="card dc-card ${e.on ? 'built dc-on' : ''} ${s.sel === e.id ? 'sel' : ''}" data-id="${esc(e.id)}" style="--i:${i};--cc:${set?.color || '#ffcf4a'}">
-        <div class="cd-art">${art}${count}</div><div class="cd-n">${esc(d.name)}</div>
+      const fav = !surf && likes.has(e.id) ? `<span class="dc-fav" title="${h.owner ? 'One of their favourites' : 'One of your favourites'}">${glyph('heart')}</span>` : '';
+      return `<div class="card dc-card ${e.on ? 'built dc-on' : ''} ${s.sel === e.id ? 'sel' : ''} ${fav ? 'fav' : ''}" data-id="${esc(e.id)}" style="--i:${i};--cc:${set?.color || '#ffcf4a'}">
+        <div class="cd-art">${art}${count}${fav}</div><div class="cd-n">${esc(d.name)}</div>
         ${e.on ? `<div class="cd-built">${glyph('check')}<span>On</span></div>` : ''}</div>`;
     }).join('') : `<div class="bd-empty">${glyph('sakura')}${this.tab === 'surface' ? 'No wallpapers or floors in storage yet.' : 'Nothing in storage here yet.'}</div>`;
     this.pump();

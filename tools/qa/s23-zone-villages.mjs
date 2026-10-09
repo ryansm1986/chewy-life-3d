@@ -188,9 +188,14 @@ try {
   const mem = async () => { let geo = 1e9, tex = 1e9; for (let i = 0; i < 4; i++) { const r = await ev(() => { const m = window.G.engine.renderer.info.memory; return { geo: m.geometries, tex: m.textures }; }); geo = Math.min(geo, r.geo); tex = Math.min(tex, r.tex); await sleep(page, 250); } return { geo, tex }; };
   await ev(() => window.G.returnToVillage()); await waitMode(page, 'village'); await sleep(page, 600);
   const m0 = await mem();
-  for (let i = 0; i < 2; i++) { await enterZone(); await ev(() => window.G.returnToVillage()); await waitMode(page, 'village'); await sleep(page, 600); }
-  const m1 = await mem();
-  R.check('leaks: two village ⇄ zone round trips don\'t grow GPU geometries or textures', m1.geo - m0.geo <= 6 && m1.tex - m0.tex <= 4, JSON.stringify({ m0, m1 })); // (≤ 4 textures: the region ⇄ village trip itself drifts ~0.7 a trip with no village at all — small quads and skinned depth passes, not the village's)
+  const trips = async n => { for (let i = 0; i < n; i++) { await enterZone(); await ev(() => window.G.returnToVillage()); await waitMode(page, 'village'); await sleep(page, 600); } };
+  await trips(2); const m1 = await mem();
+  await trips(2); const m2 = await mem();
+  // (R-6, run down in CZ-12: no leak. Over 10 trips the count wanders 289–295 with no trend: the textures a trip leaves
+  //  are live ones uploaded for the first time (the bone textures of townsfolk the town sync swapped in, canvas labels
+  //  drawn once) and the next trip frees others. So the check is a trend over four trips, not one sample's noise: the
+  //  better of the two samples within 4 of the start, the last within 8)
+  R.check('leaks: village ⇄ zone round trips don\'t grow GPU geometries or textures (no trend over four trips)', Math.min(m1.geo, m2.geo) - m0.geo <= 6 && m2.geo - m0.geo <= 10 && Math.min(m1.tex, m2.tex) - m0.tex <= 4 && m2.tex - m0.tex <= 8, JSON.stringify({ m0, m1, m2 }));
 
   // ---------------------------------------------------------------- h) the other three villages: siege → captain → saved, their specials, perf
   const OTHER = {
@@ -198,7 +203,7 @@ try {
     tidepool: { name: 'Shiokaze Port', captain: 'Captain Brineclaw', lvl: 21, specials: ['fishmonger', 'boatwright'] },
     onsen: { name: 'Yukimi Spa Village', captain: 'Captain Frostbelly', lvl: 29, specials: ['bathhouse', 'smith'] },
   };
-  const door = async kind => { await ev(k => { const Vl = window.G.dungeon.village, it = Vl.inter.find(i => i.building?.kind === k); window.G.player.setPos(it.pos.x, it.pos.z); it.onInteract(); return true; }, kind); await page.waitForFunction(() => window.G.ui?.dlg?.active, null, { timeout: 4000 }).catch(() => {}); };
+  const door = async kind => { await ev(k => { const Vl = window.G.dungeon.village, it = Vl.inter.find(i => i.building?.kind === k); window.G.player.setPos(it.pos.x, it.pos.z); it.onInteract(); return true; }, kind); await page.waitForFunction(() => window.G.ui?.dlg?.active, null, { timeout: 12000 }).catch(() => {}); }; // (keyed on the dialogue: a loaded machine takes longer than 4 s)
   const callsAt = () => ev(async () => { const G = window.G, E = G.engine, Vl = G.dungeon.village, P = G.player; P.setPos(Vl.site.x, Vl.site.z); E.rig.focus.copy(P.pos); E.rig.snap?.(); await new Promise(r => setTimeout(r, 1200)); const R2 = E.renderer, er = E.render, cc = [], tt = []; E.render = function () { R2.info.autoReset = false; R2.info.reset(); const x = er.apply(this, arguments); cc.push(R2.info.render.calls); tt.push(R2.info.render.triangles); R2.info.autoReset = true; return x; }; await new Promise(r => setTimeout(r, 800)); E.render = er; cc.sort((a, b) => a - b); tt.sort((a, b) => a - b); return { calls: cc[cc.length >> 1], tris: tt[tt.length >> 1] }; });
   for (const [zone, Z] of Object.entries(OTHER)) {
     await ev(([z, lvl]) => { const G = window.G, S = G.state; S.zones[z].unlocked = true; S.player.lvl = Math.max(S.player.lvl, lvl); S.coins = 20000; S.materials = { ...(S.materials || {}), wood: 99, stone: 99, crystal: 20, silk: 20, lantern: 10 }; G.actions.recompute(); window.__ev = []; G.enterRegion(z); }, [zone, Z.lvl]); // (the reload's listeners record the events)
@@ -239,8 +244,8 @@ try {
     if (zone === 'onsen') {
       await ev(() => { const P = window.G.state.player; P.soak = null; P.life = 5; window.G.actions.recompute(); });
       await door('bathhouse'); await drainDialogue(page, [0]);
-      const b = await ev(() => { const G = window.G, P = G.state.player; return { soak: P.soak?.left, life: P.life, max: G.derived.lifeMax, regen: G.derived.lifeRegen, chip: !!G.ui && true }; });
-      R.check('onsen: a soak at the Yukimi Bathhouse heals fully and leaves Onsen Glow on the hero (20 min)', b.soak >= 1190 && b.life == null, JSON.stringify(b));
+      const b = await ev(() => { const G = window.G, P = G.state.player; return { soak: P.soak?.left, dur: P.soak?.dur, life: P.life, max: G.derived.lifeMax, regen: G.derived.lifeRegen, chip: !!G.ui && true }; });
+      R.check('onsen: a soak at the Yukimi Bathhouse heals fully and leaves Onsen Glow on the hero (20 min)', b.dur === 1200 && b.soak > 0 && b.life == null, JSON.stringify(b)); // (CZ-12: its 20-min length, not the seconds left, which a slow run's dialogue ate into)
       const n0 = await ev(() => window.G.state.inventory.filter(Boolean).length + window.G.state.stash.filter(Boolean).length);
       await door('smith'); await drainDialogue(page, [0, 0]);
       const n1 = await ev(() => window.G.state.inventory.filter(Boolean).length + window.G.state.stash.filter(Boolean).length);

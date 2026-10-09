@@ -102,7 +102,11 @@ body.touch-active .ch-pts .tt-dim { display: none; }
 .ui-root.m-phone .p-build .ph::-webkit-scrollbar { display: none; }
 .ui-root.m-phone .p-build .ph > * { flex: none; }
 .ui-root.m-phone .p-build .ph-x { position: absolute; top: 4px; right: 6px; width: 52px; height: 52px; }
-.ui-root.m-phone :is(.bd-side, .dc-side) { display: none !important; }
+.ui-root.m-phone .bd-side:not(.dc-side), .ui-root.m-phone .dc-side > :not(.dc-rate) { display: none !important; }
+/* R-13: the Home Rating on a phone, a chip over the palette's top edge (its stars and tip; the decorate guide points at it) */
+.ui-root.m-phone .p-decor .dc-side { position: absolute; left: 50%; bottom: calc(100% + 10px); width: auto; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; transform: translateX(-50%); pointer-events: none; }
+.ui-root.m-phone .p-decor .dc-rate { flex-direction: row; align-items: center; gap: 8px; padding: 4px 12px 5px; border: 2.5px solid var(--ink); background: #fff8ec; box-shadow: 0 3px 0 rgba(74, 44, 42, .3); white-space: nowrap; }
+.ui-root.m-phone .p-decor .dc-tip { max-width: 340px; font-size: 13px; white-space: normal; text-align: left; }
 .ui-root.m-phone .p-build :is(.bd-cards, .dc-cards) { touch-action: pan-x; padding-top: 8px; }
 .ui-root.m-phone .p-build .cd-art { height: 52px; }
 .ui-root.m-phone .p-build .cd-n { min-height: 0; }

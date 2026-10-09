@@ -19,6 +19,12 @@
 .dc-card .cd-art img.dc-sw { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; filter: none; }
 .dc-card .cd-art img.dc-wait { opacity: .35; animation: spinSlow 3s linear infinite; }
 .dc-n { position: absolute; right: 4px; bottom: 4px; font: 700 11px/1.3 var(--font); background: #fff; border: 2px solid var(--ink); border-radius: 7px; padding: 0 5px; box-shadow: 0 2px 0 rgba(74, 44, 42, .3); }
+/* a favourite of this home's (its owner's likes, or the pack's in the cottage: home/rating.js, R-13): a heart on the card */
+.dc-fav { position: absolute; left: 4px; top: 4px; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: linear-gradient(#ffe0ea, #ff8fb0); border: 2px solid var(--ink); box-shadow: 0 2px 0 rgba(74, 44, 42, .3); }
+.dc-fav .gl { width: 14px; height: 14px; }
+.dc-card.fav .cd-art { box-shadow: inset 0 0 0 2px #ff8fb0; }
+.tt-fav { display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 4px; font-weight: 700; color: #ffb3c9; }
+.tt-fav .gl { width: 15px; height: 15px; }
 .dc-card.dc-on { cursor: default; }
 .dc-card.dc-on .cd-art { opacity: .8; }
 .dc-side { justify-content: space-between; }

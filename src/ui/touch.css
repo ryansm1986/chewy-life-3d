@@ -184,6 +184,7 @@ body.touch-active .hw-k { display: none; }
 .hero-wheel.tc-row .hw-hub { width: 320px; height: 68px; border-radius: 34px; gap: 3px; translate: 0 -82px; }
 .hero-wheel.tc-row .hw-hub b { font-size: 21px; }
 .hero-wheel.tc-row .hw-hub span { max-width: 290px; font-size: 13px; }
+.hero-wheel.tc-row .hw-card .hw-tag { top: auto; bottom: -27px; } /* (under the card: the hub pill sits over the row's top, CZ-10) */
 .hero-wheel.tc-row .hw-card.locked .hw-tag { display: none; } /* (a row has no room for "Somewhere in the maples…": the hub says it when picked) */
 .hero-wheel.tc-row.show .hw-card.sel { transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y) - 6px)) scale(1.08); }
 .tc-scrim { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 45%, rgba(40, 24, 46, .5), rgba(40, 24, 46, .34)); opacity: 0; transition: opacity .15s; pointer-events: none; }

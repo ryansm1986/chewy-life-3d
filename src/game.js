@@ -67,6 +67,7 @@ import { installHomesteadXp } from './cozy/homesteadXp.js';
 import { installScavenge } from './cozy/scavengeWorld.js';
 import { installPeaceful } from './cozy/peacefulRun.js';
 import { installGuild } from './cozy/guildRun.js';
+import { installCozyGuide } from './cozy/cozyGuide.js';
 
 // UI and audio load in parallel with the world. The import() paths must be literal so Vite bundles them for the
 // production build (a variable path with @vite-ignore worked on the dev server but 404'd in dist: no UI, no sound).
@@ -468,6 +469,7 @@ export async function boot() {
     try { if (P.has('tut')) sessionStorage.removeItem('chewy3d.notut'); else if (off) sessionStorage.setItem('chewy3d.notut', '1'); else off = !!sessionStorage.getItem('chewy3d.notut'); } catch (e) { /* storage unavailable */ }
     G.tutorials = new Tutorials(G, { enabled: !off });
   }
+  installCozyGuide(G); // the cozy path's tutorial moments: Rosie's burrow1 question, the Board guide offered to a fighter, the Peaceful paths tip (cozy/cozyGuide.js, docs/COZY.md §11)
   installDebugAccess(G); // debug tools: off by default; the password prompt, F10 / ` / the bug / Select+Start, the lazy menu (src/debug, docs/DEBUG.md)
   const vMap = G.villageMinimap = new VillageMinimap(G);
   Events.on('village:changed', () => { vMap.dirty = true; });
@@ -817,7 +819,7 @@ export async function boot() {
     const prevDist = rig.distTarget; G.introFocus = player.pos.clone().lerp(rosie.pos, 0.5); rig.distTarget = 20;
     const pr = G.portrait('rosie');
     await G.ui.dialogue({ speaker: 'Rosie', portrait: pr, lines: ["Good morning, Chewy! ♡ Did you sleep well? Shadow did. He snored like a tiny tractor.", "Welcome to *Blossom Hollow*! The sakura are blooming and everyone is so happy you're here."] });
-    await G.ui.dialogue({ speaker: 'Rosie', portrait: pr, lines: ['Walk with *WASD* or click the ground, and hold *Shift* to sprint. Press *F* near friends to chat.', 'Press *B* to plan the village — paint zones for homes, shops and workshops, then watch it grow!', "And… there's something squeaky in *the Burrow* on the shrine hill. Take your Bone Katana — and your red tennis ball!"] });
+    await G.ui.dialogue({ speaker: 'Rosie', portrait: pr, lines: ['Walk with *WASD* or click the ground, and hold *Shift* to sprint. Press *F* near friends to chat.', 'Press *B* to plan the village — paint zones for homes, shops and workshops, then watch it grow!', "And… there's something squeaky in *the Burrow* on the shrine hill. Take your Bone Katana — and your red tennis ball!", "Some folks march into the Burrow with a sword. Others send a friend with a packed lunch and keep the kettle on. Both help!"] }); // (the cozy path's line: docs/COZY.md §11)
     G.introFocus = null; rig.distTarget = prevDist; shadow.hold = null;
     rosie.talking = false; rosie.faceBias = 0; rosie.greeted = 30; rosie.state = 'idle'; rosie.t = 4;
     player.controlLocked = false;
