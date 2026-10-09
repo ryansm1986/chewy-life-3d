@@ -396,6 +396,7 @@ export class VillageSim {
     this.spawnModel(b, !silent);
     this.refreshTiles();
     if (!silent) { Events.emit('sfx', 'build_place'); Events.emit('village:changed'); this.simulate(true); this.paintOverlay(); }
+    Events.emit('building:placed', { id: b.id, type, free }); // (a building you paid for: homestead XP, cozy/homesteadXp.js; the town's own growth is free)
     return b;
   }
   nextIdx() { let m = -1; for (const b of this.S.buildings) m = Math.max(m, b.idx ?? -1); return m + 1; }
@@ -526,6 +527,7 @@ export class VillageSim {
       case 'dungeonGate': return mk('Enter the Burrow', () => G.openBurrowMenu?.(), 1.8);
       case 'fishingHut': return mk("Kero's Fishing Hut", () => G.openFishHut?.()); // (rods, and fish sell best here: docs/HOMESTEAD.md)
       case 'lumber': return mk('Use the workbench 🔨', () => G.openWorkbench?.('lumber')); // (furniture crafting: docs/HOUSING.md §3)
+      case 'guild': return mk("Enter the Adventurers' Guild", () => G.cozy?.guild?.open?.(), 1.5); // (Old Hachi's lodge: the hires, the Board, the Sightings — cozy/guildRun.js, docs/COZY.md §5)
       default: return G.housing?.doorInter?.(b, door) || null; // (a named villager's home: visit / knock — home/housing.js)
     }
   }
@@ -799,6 +801,7 @@ export class VillageSim {
     if (coins) this.G.actions.addCoins(coins);
     for (const k in mats) this.G.actions.addMaterial(k, mats[k]);
     const parts = [`+${coins} coins`, ...Object.entries(mats).map(([k, n]) => `+${n} ${k}`)];
+    const wages = this.G.cozy?.guild?.bannerLine?.(); if (wages) parts.push(wages); // (the Guild's wages, paid on the world clock: cozy/guildRun.js, COZY §5.2)
     this.G.ui?.banner?.(`Day ${day}`, `Village income: ${parts.join(', ')}`, { style: 'quest' });
     this.S.income = [{ day, coins, mats }, ...(this.S.income || [])].slice(0, 7);
     this.checkRings(); // (a rank reached on day 1 opens its district this morning)

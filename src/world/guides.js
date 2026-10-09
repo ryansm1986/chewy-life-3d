@@ -2,7 +2,9 @@
 //  - switch: Moka, right after she joins: Tab to play her, her spells, find Chewy, switch back, what's shared.
 //  - house:  Shadow, after Rosie's welcome (once Moka's arrival scene is over): the cottage (inside: the chest, the bed,
 //            the stove), the garden bed (till, plant, water), the Pantry, and where seeds come from.
-//  - fishing: Kero, as soon as you have a rod: the bank, the cast, the wait, the bite, the reel, the Fish Log.
+//  - fishing: Kero, as soon as you have a rod: the bank, the cast, the wait, the bite, the reel, the Fish Log. Its lines
+//            follow the device (touch: tap Fish, tap the screen, hold the screen; the menu's Journal); the fish
+//            always lands (R-12).
 //  - makeHome: Shadow, the next time you're in the cottage after the house tour (docs/HOUSING.md §7): the household
 //            jobs, B to decorate, a cushion from storage, moving and turning it, a wallpaper, the Home Rating, and where
 //            more furniture comes from.
@@ -25,6 +27,7 @@ import { pantryIcon } from '../life/pantryIcons.js';
 import { PANTRY } from '../life/pantry.js';
 import { FURNITURE, SURFACES } from '../home/furniture.js';
 import { CLASSES } from '../rpg/classes.js';
+import { Actions } from '../core/actions.js';
 
 const V = (x, z) => new THREE.Vector3(x, 0, z);
 const dist = (G, p) => Math.hypot(G.player.pos.x - p.x, G.player.pos.z - p.z);
@@ -34,6 +37,17 @@ const prompt = '.hud .prompt.show';
 
 // ------------------------------------------------------------------ the fishing guide (Kero)
 const kero = G => G.npcs?.find(n => n.id === 'kero') || null;
+const touch = () => Actions.device === 'touch'; // (the lines in touch's words: the director re-says them when the device changes)
+const tt = (t, k) => () => (touch() ? t : k);
+// the reel card's coach callouts: on the side away from the hero (ui/reel.js .side) when there's room for them there,
+// else on the roomier side; all pointing from just past the card
+const reelCalls = G => {
+  const R = G.ui?.reel, b = R?.$?.card?.getBoundingClientRect?.(), need = 230 * Math.max(0.62, G.ui?.scale || 1);
+  let sd = R?.side === 'l' ? 'left' : 'right';
+  if (b?.width) { const room = { left: b.left, right: innerWidth - b.right }, other = sd === 'left' ? 'right' : 'left'; if (room[sd] < need && room[other] > room[sd]) sd = other; }
+  const edge = '.reel.show .rl-card';
+  return [{ el: '.reel.show .rl-zone', edge, text: touch() ? 'Your zone: *hold the screen* to lift it' : 'Your zone: *hold F* to lift it', side: sd }, { el: '.reel.show .rl-fish', edge, text: 'The fish', side: sd, at: 0.5 }, { el: '.reel.show .rl-meter', edge, text: 'Catch meter: fill it up!', side: sd, at: 0.12 }];
+};
 /** a bank spot on the koi pond, on the side nearest the player (any hour, wherever Kero has wandered) */
 function pondSpot(G) {
   const F = G.life.fishing, P = G.player.pos, c = { x: POND.x, z: POND.z }, a0 = Math.atan2(P.z - c.z, P.x - c.x);
@@ -83,27 +97,35 @@ const fishing = {
       onEnter: (G, T) => claimKero(G, T),
       target: (G, T) => ({ pos: V(T.data.spot.x, T.data.spot.z), label: 'Fishing spot' }),
       done: (G, T) => dist(G, T.data.spot) < 1.3 || (G.life.fishing.target?.spot === 'pond' && !G.life.fishing.target.blocked) },
-    { id: 'cast', say: 'Face the water and press *F* to cast. Nice and easy.', objective: 'Face the water and press *F* to cast',
-      onEnter: G => { G.life.fishing.tut = { biteAfter: 3.2, window: 1.2, fish: 'crucian', zone: 0.34, drain: 0.55, forgiveEarly: true }; },
+    { id: 'cast', say: tt('Face the water and tap *Fish* (or the attack button) to cast. Nice and easy.', 'Face the water and press *F* to cast. Nice and easy.'),
+      objective: tt('Face the water and tap *Fish* to cast', 'Face the water and press *F* to cast'),
+      // (the first cast: a sure bite after 3.2 s, a long window and a bite that comes back, a wide zone, and it always lands)
+      onEnter: G => { G.life.fishing.tut = { biteAfter: 3.2, window: 2, fish: 'crucian', zone: 0.42, drain: 0.4, floor: 0.05, forgiveEarly: true, retryBite: true }; },
       target: (G, T) => (G.life.fishing.target && !G.life.fishing.target.blocked ? null : { pos: V(T.data.spot.x, T.data.spot.z), label: 'Fishing spot' }),
       highlight: () => prompt, waitFor: 'fishing:cast', allow: { switching: false } },
-    { id: 'wait', resumeAt: 'cast', say: "Now watch the float — don't press yet! Little dips are *nibbles*: the fish is only tasting.", objective: 'Watch the float… wait for the big splash',
+    { id: 'wait', resumeAt: 'cast', say: tt("Now watch the float — don't tap yet! Little dips are *nibbles*: the fish is only tasting.", "Now watch the float — don't press yet! Little dips are *nibbles*: the fish is only tasting."), objective: 'Watch the float… wait for the big splash',
       on: {
         'fishing:nibble': (p, T) => T.say("A nibble… not yet. Wait for the *big splash* and the \"!\""),
-        'fishing:early': (p, T) => T.say("Patience! That was only a nibble. Wait for the splash, then press *F*."),
+        'fishing:early': (p, T) => T.say(touch() ? 'Patience! That was only a nibble. Wait for the splash, then tap the screen.' : 'Patience! That was only a nibble. Wait for the splash, then press *F*.'),
         'fishing:end': (p, T) => { if (p.result !== 'catch') T.goto('cast', { say: 'You reeled in. Cast again whenever you like — *F* facing the water.' }); },
       }, waitFor: 'fishing:bite' },
-    { id: 'bite', resumeAt: 'cast', say: 'NOW! Press *F*!', objective: 'Press *F* — quick!', flash: ['NOW!', 'Press *F*'],
-      on: { 'fishing:end': (p, T) => T.goto('cast', { say: "Ribbit… too slow, but that's fine — the fish will be back. Cast again!" }) },
+    // (the bite's "NOW!" is the big cue at the float itself, ui/reel.js, not a flash in the middle of the screen over it)
+    { id: 'bite', resumeAt: 'cast', say: tt('NOW! Tap the screen!', 'NOW! Press *F*!'), objective: tt('Tap the screen — quick!', 'Press *F* — quick!'),
+      on: {
+        'fishing:miss': (p, T) => T.goto('wait', { say: "Ribbit… a little slow, but it's coming back! Watch for the next splash." }),
+        'fishing:end': (p, T) => T.goto('cast', { say: "Ribbit… you reeled in. Cast again whenever you like!" }),
+      },
       waitFor: 'fishing:reel' },
-    { id: 'reel', resumeAt: 'cast', say: 'Hold *F* to lift the green zone, let go to let it sink. Keep the fish inside it to fill the meter!', objective: 'Keep the fish in the green zone until the meter is full',
-      callouts: () => [{ el: '.reel.show .rl-zone', text: 'Your zone: *hold F* to lift it', side: 'left' }, { el: '.reel.show .rl-fish', text: 'The fish', side: 'left', at: 0.5 }, { el: '.reel.show .rl-meter', text: 'Catch meter: fill it up!', side: 'right' }],
+    { id: 'reel', resumeAt: 'cast', say: tt('Hold a finger anywhere on the screen to lift the green zone, and let go to let it sink. Keep the fish inside it to fill the meter!', 'Hold *F* to lift the green zone, let go to let it sink. Keep the fish inside it to fill the meter!'), objective: 'Keep the fish in the green zone until the meter is full',
+      callouts: reelCalls,
       on: { 'fishing:end': (p, T) => { if (p.result !== 'catch') T.goto('cast', { say: p.result === 'escape' ? 'It wriggled free! Keep the green zone right on the fish. Cast again!' : 'Cast again — you nearly had it!' }); } },
       waitFor: 'fish:caught' },
-    { id: 'log', say: 'A crucian carp! Every catch goes into your *Fish Log*. Open your Journal (*J*), then the Fish Log tab.', objective: 'Open the Journal (*J*) → Fish Log',
+    { id: 'log', say: tt('A crucian carp! Every catch goes into your *Fish Log*. Tap the menu button, then *Journal*, then the Fish Log tab.', 'A crucian carp! Every catch goes into your *Fish Log*. Open your Journal (*J*), then the Fish Log tab.'),
+      objective: tt('Menu → *Journal* → Fish Log', 'Open the Journal (*J*) → Fish Log'),
       onEnter: G => { G.life.fishing.tut = null; releaseKero(G); }, // (the first fish is in: Kero gets on with his day)
-      highlight: G => (G.ui.isOpen('quests') ? '.p-quests .q-tabs .tab[data-t="fish"]' : '.hud .mb[data-open="quests"]'),
-      allow: { panels: ['quests'] }, done: G => G.ui.isOpen('quests') && G.ui.panels.quests.tab === 'fish' },
+      // (touch has no Journal button on the HUD: the menu button, then the menu's Journal)
+      highlight: G => (G.ui.isOpen('quests') ? '.p-quests .q-tabs .tab[data-t="fish"]' : !touch() ? '.hud .mb[data-open="quests"]' : G.ui.isOpen('menu') ? '.p-menu [data-a="open:quests"]' : '.tc.on .tc-menu'),
+      allow: { panels: ['quests', 'menu'] }, done: G => G.ui.isOpen('quests') && G.ui.panels.quests.tab === 'fish' },
     { id: 'wrap', say: 'Different fish bite in the river, at the sea and at night. Sell them at my Fishing Hut, or cook them at home. Catch two more for my quest — ribbit!', objective: "Catch 3 fish for Kero's quest — try other spots and times",
       ack: true, allow: { panels: ['quests'] } },
   ],

@@ -13,22 +13,33 @@
 //   sleep adds the hours it skips (G.cozy.clock.add).
 //   Events: 'expedition:sent' { uid, obj, crew }, 'expedition:back' { uid, obj, result }, 'cozy:changed' (the board,
 //   the chip), 'hero:away' { id, away }.
-//   The story side (COZY §12): G.story.crewObjectives(state) lists the story's crew routes (set here until CZ-9's
-//   reroute installs its own); a siege relief saves the village through rpg/zones.js saveVillage(…, 'crew') and
-//   'village:saved' { crew: true }, and leaves zones[z].celebrate for the next arrival.
+//   The story side (COZY §3, §12; CZ-9): G.story.crewObjectives(state) lists the story's crew routes (world/story.js);
+//   a quest route completes its fight steps through G.story.crewResult (a boss's quest unique waits for your own win);
+//   a siege relief saves the village through rpg/zones.js saveVillage(…, 'crew') and 'village:saved' { crew: true },
+//   and leaves zones[z].celebrate (with the crew's names) for the next arrival (regions/village/village.js plays it);
+//   a dungeon clear counts dungeon.crew, opens the next zone, wakes the Lantern (rpg/zones.js recordCrewClear, the
+//   Deep Burrow's on Tamamo) and fires 'dungeon:cleared' / 'tier:unlocked' with crew: true. A full success brings the
+//   boss's or the captain's trophy (furniture). "You beat us to it!" (COZY §4.9) for every kind: a quest step, a clear or
+//   a save you finished first brings the crew home early.
 import * as THREE from 'three';
 import { Events } from '../core/events.js';
 import { mulberry32 } from '../core/util.js';
 import { registerDebug } from '../debug/registry.js';
 import { generateItem } from '../rpg/items.js';
 import { CLASSES, HERO_IDS } from '../rpg/classes.js';
-import { zoneOf, saveVillage } from '../rpg/zones.js';
+import { zoneOf, saveVillage, recordCrewClear, noteFloor } from '../rpg/zones.js';
+import { zoneUnlockOnClear } from '../rpg/zoneProgress.js';
+import { REGIONS } from '../regions/index.js';
+import { DUNGEONS, ZONE_DUNGEON } from '../dungeon/defs.js';
+import { MONSTERS } from '../dungeon/monsters.js';
 import { pickFind } from '../home/finds.js';
 import { VILLAGES, ZONE_NPCS } from '../regions/village/data.js';
 import { tickClock, addHours, catchUp, markWall, worldDay, backIn, backBy, aboutHours, SECS_PER_HOUR, OFFLINE_CAP_H } from './clock.js';
-import { normalizeCozy, cozyOf, expOf, heroAway, heroKey, parseMember, unreadReports, tiredLeft } from './state.js';
-import { objective, storyObjectives, errandsFor, objectivePower, reliefOpen, objectiveOpen } from './objectives.js';
-import { canSend, resolve, partialProgress, rollLoot, xpFor, crewLines, startExpedition, finishExpedition, hoursLeft, brokenExpeditions, memberInfo, pickMeals, mealsNeeded, heroPower } from './expeditions.js';
+import { normalizeCozy, cozyOf, expOf, heroAway, heroKey, parseMember, unreadReports, tiredLeft, memberAway } from './state.js';
+import { objective, storyObjectives, villageObjectives, errandsFor, objectivePower, reliefOpen, objectiveOpen } from './objectives.js';
+import { ZONE_QUESTS, questItemName } from '../world/zoneQuests.js';
+import { canSend, resolve, partialProgress, rollLoot, xpFor, crewLines, startExpedition, finishExpedition, hoursLeft, brokenExpeditions, memberInfo, pickMeals, mealsNeeded, heroPower, tripHours, crewSoft, crewHaul, mealsPacked } from './expeditions.js';
+import { guildState, hireOf, hireReturn, porterMats } from './guild.js';
 import { addExpeditionBoard } from './expeditionBoard.js';
 
 const GAP_MS = 5000; // a frame loop that stalls this long (a hidden tab, a frozen window) counts as time away
@@ -63,6 +74,7 @@ class CozyRun {
         pickMeals: n => pickMeals(G.state.pantry, n),
         mealsNeeded: (o, crew) => mealsNeeded(o, crew),
         members: () => self.members(),
+        tripHours: (o, crew) => tripHours(o, crew || [], G.state), // (a Scout in the crew: 15% off)
       },
       guild: null, scav: null,
       tick: dt => self.tick(dt),
@@ -79,6 +91,9 @@ class CozyRun {
     if (a.hours > 0 || a.backwards) this.away = { ...a, load: true, returned: [], fresh: true };
     this.audit();
     Events.on('village:saved', e => { if (!e?.crew) this.beaten(e?.zone); });
+    // you finished a quest step or a dungeon clear first (COZY §4.9): looked at on the next tick, never inside the change
+    Events.on('quest:update', () => { this.beatT = 0.25; });
+    Events.on('dungeon:cleared', e => { if (!e?.crew) this.beatT = 0.25; });
     Events.on('mode:changed', e => this.onMode(e));
     Events.on('meal:eaten', () => this.cure(heroKey(G.state.activeHero), 'A good meal: rested again!'));
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.pulse(); });
@@ -114,6 +129,7 @@ class CozyRun {
     if (G.titleActive) return;
     if ((this.checkT -= dt) <= 0 && dt > 0) { this.checkT = 0.5; this.check(); }
     if (this.away && !this.away.shown) this.maybeAwayCard();
+    if (this.beatT > 0 && (this.beatT -= Math.max(dt, 1 / 60)) <= 0) this.beatenAll();
     if ((this.boardMarkT -= Math.max(dt, 1 / 60)) <= 0) { this.boardMarkT = 0.4; this.board?.setMark?.(this.boardMark()); }
     this.board?.update?.(dt);
   }
@@ -144,6 +160,7 @@ class CozyRun {
   objectives(view) {
     const st = this.st;
     if (view === 'story') return (this.G.story?.crewObjectives?.(st) || storyObjectives(st)).filter(o => !this.sentOn(o.id));
+    if (view === 'village') return (this.G.story?.villageObjectives?.(st) || villageObjectives(st)).filter(o => !this.sentOn(o.id)); // (the zone villagers' quests: COZY §3.2)
     if (view === 'errands') { const E = expOf(st), day = worldDay(cozyOf(st).clock.h); return errandsFor(st, day).filter(o => !(E.errands.day === day && E.errands.taken.includes(o.id)) && !this.sentOn(o.id)); }
     return [];
   }
@@ -156,6 +173,11 @@ class CozyRun {
       const key = heroKey(id), info = memberInfo(st, key);
       const away = heroAway(st, id), tired = tiredLeft(st, key);
       out.push({ ...info, active: id === st.activeHero, away: away ? { obj: away.name, left: hoursLeft(st, away) } : null, tired });
+    }
+    for (const H of guildState(st).hires) { // the Guild's hires (phase D, cozy/guild.js): after the heroes
+      const key = `hire:${H.id}`, info = memberInfo(st, key); if (!info) continue;
+      const away = memberAway(st, key);
+      out.push({ ...info, active: false, away: away ? { obj: away.name, left: hoursLeft(st, away) } : null, tired: tiredLeft(st, key), onBreak: !!H.onBreak });
     }
     return out;
   }
@@ -180,7 +202,7 @@ class CozyRun {
     if (Object.keys(sup.meals).length && !G.actions.spendPantry(sup.meals, { quiet: true, src: 'expedition' })) return { ok: false, why: 'The lunches went missing!' };
     if (sup.potions > 0) { st.potions.heart -= sup.potions; Events.emit('potions:changed', st.potions); }
     const frac = o.power > 0 ? Math.min(1, chk.need / o.power) : 1;
-    const e = startExpedition(st, o, crew, sup, { r: chk.r, need: chk.need, power: chk.power, odds: chk.odds.key, p: chk.odds.p, lunch: !!chk.odds.lunch || chk.meals.have >= crew.length, hours: o.hours, seed: (Math.random() * 2 ** 32) >>> 0, frac });
+    const e = startExpedition(st, o, crew, sup, { r: chk.r, need: chk.need, power: chk.power, odds: chk.odds.key, p: chk.odds.p, lunch: !!chk.odds.lunch || chk.meals.have >= crew.length, hours: tripHours(o, crew, st), seed: (Math.random() * 2 ** 32) >>> 0, frac });
     e.place = { label: o.place.label, color: o.place.color, area: o.place.area };
     for (const k of crew) { const m = parseMember(k); if (m?.type === 'hero') this.leaveTown(m.id); }
     const names = this.crewNames(crew);
@@ -231,7 +253,7 @@ class CozyRun {
     else if (!objectiveOpen(st, o)) result = 'beaten'; // (the village was saved while they were out)
     else {
       const needNow = objectivePower(st, o); r = e.power / Math.max(1, Math.min(e.need, needNow)); // (camps you broke meanwhile count: COZY §4.9)
-      const res = resolve(r, rng, o, e.lunch);
+      const res = resolve(r, rng, o, e.lunch, crewSoft(st, e.crew)); // (a Healer turns a setback into a partial)
       result = res.result;
       if (result === 'partial') progress = partialProgress(st, o, r);
     }
@@ -242,9 +264,18 @@ class CozyRun {
     }
     // the rewards
     const loot = o && forced !== 'broken' ? rollLoot(o, result, rng, e.frac || 1) : { coins: 0, mats: {}, pantry: {}, items: [], find: false };
-    const xp = {}, levels = {};
+    if (crewHaul(st, e.crew)) loot.mats = porterMats(loot.mats, true); // (a Porter: +25% materials)
+    const xp = {}, levels = {}, fed = mealsPacked(e.supplies?.meals).fed >= e.crew.length;
     for (const k of e.crew) {
-      const m = parseMember(k); if (m?.type !== 'hero' || !o || forced === 'broken') continue;
+      const m = parseMember(k);
+      if (m?.type === 'hire' && o && forced !== 'broken') { // a hire: XP on their own curve, morale from the trip (cozy/guild.js)
+        const H = hireOf(st, m.id); if (!H) continue;
+        const g = hireReturn(st, m.id, { xp: xpFor(o, H.lvl, result, e.frac || 1), result, fed });
+        if (g?.gained) xp[k] = g.gained;
+        if (g && g.to > g.from) { levels[k] = [g.from, g.to]; Events.emit('hire:levelup', { id: m.id, lvl: g.to, from: g.from }); }
+        continue;
+      }
+      if (m?.type !== 'hero' || !o || forced === 'broken') continue;
       const P = st.heroes?.[m.id]?.player; if (!P) continue;
       const n = xpFor(o, P.lvl, result, e.frac || 1);
       if (n > 0) { const g = A.addXpTo ? A.addXpTo(m.id, n) : { gained: 0 }; xp[k] = g.gained; if (g.lvl > g.from) levels[k] = [g.from, g.lvl]; }
@@ -257,16 +288,36 @@ class CozyRun {
     const items = loot.items.map(x => generateItem({ ilvl: x.ilvl, rarity: x.rarity, rng }));
     const waiting = items.filter(it => !A.pickup(it));
     // the world: a siege's relief or its broken camps
-    let saved = null;
+    let saved = null, story = null, cleared = null, deep = null;
     if (o?.kind === 'siege') {
       if (result === 'success') saved = this.relieve(o.binds.village, e, quiet);
       else if (result === 'partial' && progress?.camps) this.breakCamps(o.binds.village, progress.camps);
     }
+    const label = this.crewLabel(e.crew);
+    if (o?.binds?.quest && (result === 'success' || result === 'partial')) { // a Blossom Hollow quest's fight (COZY §3.1)
+      const at = result === 'partial' ? G.story?.def?.(o.binds.quest)?.steps?.[st.quests.active.find(q => q.id === o.binds.quest)?.step ?? -1] : null;
+      story = G.story?.crewResult?.(o.binds.quest, result, { crew: label }) || null;
+      if (story && o.boss) story.owed = result === 'success' && !!st.quests.owed?.[o.boss];
+      if (result === 'partial') note = at?.type === 'kill' ? 'They chased off half of the yokai. The rest are hiding: you, or another crew, can finish it.' : at?.type === 'floor' ? `They made it down to floor ${o.level}. ${MONSTERS[o.boss]?.name || 'The boss'} is still there, waiting.` : `They found ${MONSTERS[o.boss]?.name || 'the boss'}, but not the way past. Next time!`;
+      if (result === 'success' && o.deep) deep = this.wakeDeep();
+    }
+    if (o?.binds?.zq && (result === 'success' || result === 'partial')) { // a zone villager's quest step (COZY §3.2)
+      story = this.zoneQuestResult(o, result, label);
+      if (result === 'partial') note = o.step?.type === 'kill' ? 'They chased off half of them. The rest are hiding: you, or another crew, can finish it.' : o.step?.type === 'find' && (o.step.n || 1) > 1 ? 'They found some of them. The rest are still down there.' : 'They found the trail: the next try is a sure thing for a crew as strong.';
+    }
+    if (o?.binds?.dungeon) { // a zone dungeon's first clear (COZY §3.2)
+      if (result === 'success') cleared = this.crewClear(o.binds.dungeon, label);
+      else if (result === 'partial') { noteFloor(st, o.binds.dungeon, 2); note = `They made it down to floor 2 of the ${DUNGEONS[o.dungeonId]?.name || 'dungeon'}. The next try needs 30% less.`; }
+    }
+    if (loot.trophy) A.addFurniture?.(loot.trophy, 1, { src: 'trophy' }); // (a keepsake for your home: COZY §4.6)
     const lines = crewLines(st, e.crew, result === 'recalled' ? 'setback' : result, rng);
     if (result === 'partial' && o?.kind === 'siege' && progress?.camps) note = `${progress.camps} camp${progress.camps > 1 ? 's' : ''} broken. The captain still holds the square.`;
     if (result === 'beaten') note = 'You beat us to it! The lunches are back in the pantry.';
     if (result === 'recalled') note = 'Called home early: no rewards, and the lunches are back in the pantry.';
-    const rep = finishExpedition(st, e, o, { result, progress, xp, levels, lines, items: waiting, note, loot: { coins: loot.coins, mats: loot.mats, pantry: loot.pantry, items: items.map(it => ({ name: it.name, rarity: it.rarity, uid: it.uid })), furniture } });
+    const rep = finishExpedition(st, e, o, { result, progress, xp, levels, lines, items: waiting, note, loot: { coins: loot.coins, mats: loot.mats, pantry: loot.pantry, items: items.map(it => ({ name: it.name, rarity: it.rarity, uid: it.uid })), furniture, trophy: loot.trophy || null } });
+    if (story) rep.quest = story; // (the story news: the quest done, or what's left; the Journal names the crew)
+    if (cleared) rep.cleared = cleared;
+    if (deep) rep.deep = deep;
     rep.place = e.place || o?.place || null;
     if (o?.desc && o.kind === 'errand') rep.desc = o.desc; // (the errand's own line, under the report's header)
     if (forced === 'broken') for (const k of e.crew) delete expOf(st).tired[k]; // (no rest after a trip cut short)
@@ -285,7 +336,7 @@ class CozyRun {
     const where = rep.kind === 'errand' ? rep.name.replace(/^[A-Z]/, c => c.toLowerCase()) : rep.place?.label || rep.name;
     const word = { success: 'is back', partial: 'is back (partly done)', setback: 'is back, muddy and tired', beaten: 'is back early', recalled: 'came home' }[rep.result] || 'is back';
     const ups = Object.entries(rep.levels || {}).map(([k, [, to]]) => `${memberInfo(this.st, k)?.name || ''} is level ${to} now!`);
-    const news = rep.saved ? `${rep.saved.village} is saved! ` : '';
+    const news = rep.saved ? `${rep.saved.village} is saved! ` : rep.cleared ? `The ${rep.cleared.dungeon} is clear! ` : rep.quest?.done ? `${rep.quest.title}: done! ` : '';
     G.ui?.toast?.(`${rep.crew.length > 1 ? `${lead}'s crew` : lead} ${word}: ${rep.kind === 'errand' ? where : rep.name}!`, { icon: 'map', color: rep.result === 'success' ? '#8fe0c0' : '#ffd8a8', sub: `${news}${ups.length ? `${ups.join(' ')} · the report is on the board` : `${names} · the report is on the Expedition Board`}`, duration: 6 });
     Events.emit('sfx', rep.result === 'success' ? 'ui_quest_done' : 'rune_chime');
     void e;
@@ -295,6 +346,7 @@ class CozyRun {
    *  village's own banner and celebration play on your next arrival in that zone (onMode). */
   relieve(zone, e, quiet) {
     const G = this.G, st = this.st, Z = zoneOf(st, zone), V = VILLAGES[zone], freed = [];
+    Z.celebrateCrew = e.crew.filter(k => parseMember(k)).slice(0, 5); // (who stands in the square on your next arrival: village.js)
     Z.quests.freed ||= [];
     for (const c of V?.camps || []) if (c.cage && !Z.quests.freed.includes(c.cage)) {
       Z.quests.freed.push(c.cage); freed.push(ZONE_NPCS[c.cage]?.name || c.cage);
@@ -312,6 +364,57 @@ class CozyRun {
     const Z = zoneOf(this.st, zone), V = VILLAGES[zone]; if (!V) return;
     for (const c of V.camps) if (!Z.siegeCamps.some(s => s.id === c.id)) Z.siegeCamps.push({ id: c.id, cleared: false });
     for (const s of Z.siegeCamps) { if (n <= 0) break; if (!s.cleared) { s.cleared = true; n--; } }
+  }
+  /** A crew home from a zone villager's quest step (COZY §3.2): a success does the step (the quest item comes back with
+   *  them, a rescued villager walks home to the village, a floor reached is noted); a partial keeps half a count. The
+   *  turn-in talk stays yours. → { title, done: false, step, item?, rescued? } for the report */
+  zoneQuestResult(o, result, crew) {
+    const G = this.G, st = this.st, s = o.step, qid = o.binds.zq, Q = ZONE_QUESTS[qid];
+    const q = st.quests?.active?.find(x => x.id === qid); if (!q || !Q || q.step !== o.binds.step) return null;
+    const zone = o.place.zone, out = { title: Q.title, done: false, step: s.text, giver: ZONE_NPCS[Q.giver]?.name || '' };
+    if (result === 'success') {
+      if (s.type === 'dungeonFloor') noteFloor(st, zone, s.n || 1);
+      if (s.type === 'find') out.item = (s.n > 1 ? `${s.n} × ` : '') + questItemName(s.item);
+      G.story?.completeStep?.(qid, o.binds.step, { crew });
+      if (s.type === 'rescue') { out.rescued = ZONE_NPCS[s.npc]?.name || s.npc; Events.emit('villager:rescued', { npc: s.npc, zone, dungeon: o.place.dungeon, floor: s.floor || 1, crew: true }); G.story?.addHearts?.(s.npc, 10); }
+      out.turnIn = true;
+    } else if ((s.type === 'kill' || s.type === 'find') && (s.n || 1) > 1) {
+      const half = Math.ceil((s.n || 1) / 2); if ((q.prog || 0) < half) { q.prog = half; Events.emit('quest:update'); }
+    }
+    return out;
+  }
+  /** "Moka" or "Moka's crew": who the Journal and the reports say did it */
+  crewLabel(crew) { const lead = memberInfo(this.st, crew[0])?.name || 'A'; return crew.length > 1 ? `${lead}'s crew` : lead; }
+  /** a zone dungeon's first clear by a crew (COZY §3.2, §14.2) → { dungeon, zone, opened, lantern } for the report */
+  crewClear(zone, crew) {
+    const G = this.G, st = this.st, did = ZONE_DUNGEON[zone], D = DUNGEONS[did], Z = zoneOf(st, zone);
+    if (!D || Z.dungeon.cleared > 0 || Z.dungeon.crew > 0) return null;
+    const r = recordCrewClear(st, did); // (dungeon.crew + the Lantern's T1; dungeon.cleared stays: your own first clear keeps the boss unique)
+    noteFloor(st, zone, D.floors || 2); // (the crew went all the way down: a quest's "reach floor 2" holds)
+    const opened = zoneUnlockOnClear(st, zone);
+    for (const q of [...(st.quests?.active || [])]) { // any quest waiting on this dungeon's boss: done by the crew
+      const d = G.story?.def?.(q.id), s = d?.steps?.[q.step];
+      if (s?.type === 'boss' && s.dungeon === did) G.story.completeStep(q.id, q.step, { crew });
+    }
+    Events.emit('dungeon:cleared', { id: did, kind: 'zone', tier: 0, spirit: 0, floor: D.floors || 2, zone, boss: D.boss, first: false, crew: true });
+    if (r?.tierUnlocked) Events.emit('tier:unlocked', { id: did, zone, tier: 1, crew: true });
+    G.story?.progress?.('any');
+    if (G.mode === 'dungeon' && G.dungeon?.kind === 'region' && G.dungeon.zoneId === zone) G.dungeon.gate?.lantern?.refresh?.(); // (standing by its gate: the Lantern lights live)
+    return { dungeon: D.name, zone, opened: opened ? REGIONS[opened]?.name || opened : null, openedId: opened || null, lantern: !!r?.tierUnlocked, boss: MONSTERS[D.boss]?.name || 'the boss' };
+  }
+  /** a crew calmed Tamamo: the Spirit Lantern by the Burrow door wakes (the Deep Burrow's T1, COZY §3.1) */
+  wakeDeep() {
+    const r = recordCrewClear(this.st, 'burrowDeep');
+    if (r?.tierUnlocked) Events.emit('tier:unlocked', { id: 'burrowDeep', zone: null, tier: 1, crew: true });
+    return { lantern: !!r?.tierUnlocked };
+  }
+  /** you finished a quest step or a clear first (COZY §4.9): the crews whose objective is no longer on offer come home */
+  beatenAll() {
+    for (const e of [...expOf(this.st).active]) {
+      const o = objective(this.st, e.obj);
+      if (!o || o.kind === 'siege' || o.kind === 'errand') continue;
+      if (!objectiveOpen(this.st, o)) this.complete(e, o, 'beaten');
+    }
   }
   /** you finished it first (COZY §4.9): the crew on that objective comes home early */
   beaten(zone) {
@@ -338,9 +441,9 @@ class CozyRun {
   onMode(e) {
     const G = this.G;
     if (e?.mode === 'village' || (e?.mode === 'dungeon' && G.dungeon?.kind !== 'region')) this.check(); // (a held relief moves in once you've left)
-    if (e?.mode === 'dungeon' && G.dungeon?.kind === 'region') { // a crew's save is celebrated on the next arrival (CZ-9 makes it the full scene)
+    if (e?.mode === 'dungeon' && G.dungeon?.kind === 'region') { // a crew's save is celebrated on the next arrival: the village's own scene (regions/village/village.js), or this banner where there's no village
       const zone = G.dungeon.zoneId, Z = zone && G.state.zones?.[zone];
-      if (Z?.celebrate && Z.village === 'saved') {
+      if (Z?.celebrate && Z.village === 'saved' && !G.dungeon.village) {
         Z.celebrate = false;
         const V = VILLAGES[zone];
         setTimeout(() => {
@@ -374,7 +477,7 @@ class CozyRun {
   // ------------------------------------------------------------------ "While you were away…"
   awaySays() {
     const A = this.away; if (!A) return false;
-    if (A.returned.length || A.refills?.length) return true; // (refills: the nodes a crossed world day brought back, cozy/scavengeWorld.js)
+    if (A.returned.length || A.refills?.length || A.guild?.length) return true; // (refills: the nodes a crossed world day brought back, cozy/scavengeWorld.js; guild: wages and morale, cozy/guildRun.js)
     return A.hours >= 0.5 && expOf(this.st).active.length > 0;
   }
   maybeAwayCard() {
@@ -393,7 +496,7 @@ class CozyRun {
       ms: A.ms, hours: A.hours, capped: A.capped, load: A.load, cap: OFFLINE_CAP_H,
       reports: A.returned.map(uid => E.reports.find(r => r.uid === uid)).filter(Boolean),
       out: E.active.map(e => ({ uid: e.uid, name: e.name, crew: e.crew, left: hoursLeft(this.st, e), hold: e.hold })),
-      refills: A.refills || [],
+      refills: A.refills || [], guild: A.guild || [],
     });
     return true;
   }

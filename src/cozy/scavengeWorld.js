@@ -86,6 +86,7 @@ class ScavRun {
       digAt: (id, o) => self.digNow(id, o),
       reveal: () => self.revealAll(),
       refill: () => self.refillAll(true),
+      redraw: () => self.refillAll(false), // (redraw today's nodes and spots: the Guild's Bandana adds a spot at once, cozy/guildRun.js)
       mapMarks: () => self.mapMarks(),
       setWild: fn => { self.wildFn = typeof fn === 'function' ? fn : null; },
       update: dt => self.update(dt),

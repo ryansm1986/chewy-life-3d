@@ -752,9 +752,22 @@ inside the safe area (`env(safe-area-inset-*)`).
   - With nothing in hand, a drag pans (the ground follows the finger), and a tap is a click: a house's card, or picking
     up a piece. Two fingers pan and pinch.
   - On a phone the palette is full width with a scrolling header, and it folds away while a piece is in hand.
-- **Fishing**: the attack button casts (the context interact at the water), a touch anywhere strikes, and holding the
-  screen reels (`Touch.hold('reel')`). The reel bar shows a pink paw cap (touch's mark, as on the prompt) over
-  "hold to reel". A drag on the stick's side moves the hero instead.
+- **Fishing**: the attack button or a tap on the "Fish" prompt casts (the context interact at the water), a touch
+  anywhere strikes, and holding the screen reels (`Touch.hold('reel')`). A drag on the stick's side moves the hero
+  instead.
+  - **R-12** (the owner's "I can't see the mechanic, especially on mobile"; HOMESTEAD §7 "R-12"): while a session
+    runs, `.ui-root.fishing` fades the skill cluster, the belt and the orbs to 22% and lets touches through them to the
+    world, so a thumb anywhere reels (it used to be swallowed by a skill button); the stick and the menu stay.
+  - The bite: the big "!" with "Tap!" at the float, and a 60 ms buzz (`Touch.buzz`; iOS Safari has no vibration).
+  - The reel card is 1.3× on touch (a 190 px bar on a phone), placed clear of the dock, the HUD and the stick; on a
+    phone the guide's dock steps aside while it's up (`.ui-root.reeling`). Its first reels show a thumb on glass
+    pressing and letting go ("Hold ▲" / "Let go ▼"); after that, the paw cap over "hold the screen".
+  - Settings › Fishing **Auto** (the default) plays **Relaxed** on touch: a wider zone, half the drain, a 1.5 s bite.
+  - Kero's guide says it in touch's words ("tap Fish", "Tap the screen", "Hold a finger anywhere on the screen") and
+    goes to the Fish Log through the menu button and the menu's Journal. On a phone any guide's speech bubble steps
+    aside while a panel is open (`.ui-root.m-phone.has-panel .tut-say`): it covered the menu's Journal row.
+  - QA: s27 l) plays the whole guide with real fingers on a phone (844×390, the iPhone's agent) and an iPad in itch's
+    frame (`S27_ONLY=l`; shots in `tools/qa/tmp/r12-fishing/phone/`, `ipad/`).
 - **Cooking, the workbench, the seed and gift pickers and the shops** are menus, so they work with taps. Their
   quantity buttons are 44 px. A long press shows an item's details, and a tap buys.
 - **The garden**: the attack button's context interact at a plot, as A on the pad.

@@ -37,6 +37,15 @@ export const BUILDINGS = {
     name: 'Notice Board', cat: 'special', size: [1, 1], levels: 1,
     cost: { coins: 25, wood: 4 }, desc: 'Lost mittens, found kittens and brand-new quests — pinned with love.',
   },
+  // the Adventurers' Guild (docs/COZY.md §5.1; cozy/guildRun.js): Old Hachi's lodge, hires for the crews. Village rank 2
+  // (buildMode RANK_REQ); level 1 needs no combat-only material (petal: home's sakura drifts); levels 2 and 3 at ranks 3
+  // and 4 (cozy/guild.js GUILD_RANK). glb: a slot for a later Blender centrepiece (the toybox / codex-blender pipeline).
+  guild: {
+    name: "Adventurers' Guild", jp: '冒険者ギルド', cat: 'special', size: [4, 3], levels: 3, unique: true, jobs: [2, 3, 4], glb: null,
+    cost: { coins: 400, wood: 30, stone: 16, petal: 4 }, levelCost: [null, { coins: 900, wood: 40, stone: 30, silk: 4, lantern: 2 }, { coins: 1800, wood: 60, stone: 40, crystal: 4, lantern: 4 }],
+    variants: ["Adventurers' Guild", "Adventurers' Guild Hall", "Grand Adventurers' Guild"],
+    desc: 'Old Hachi signs on adventurers for your crews, and the Expedition Board hangs inside the door.',
+  },
   // ------------------------------------------------------------------ zoned growth
   home: {
     name: 'Cozy Home', cat: 'home', zone: 'R', size: [2, 2], sizes: [[2, 2], [3, 3], [3, 3]], levels: 3,

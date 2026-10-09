@@ -534,6 +534,8 @@
 .tv-pin.sel .tv-pin-ic { box-shadow: 0 0 0 5px #fff, 0 0 0 9px var(--pc), 0 6px 0 rgba(74, 44, 42, .35); animation: tvPulse 1.6s ease-in-out infinite; }
 @keyframes tvPulse { 50% { transform: scale(1.07); } }
 .tv-stamp { position: absolute; right: -16px; top: -8px; font: 700 12px/1 var(--font); color: #fff; background: #d8403a; border: 2px solid #8a1f1a; border-radius: 4px; padding: 3px 3px; transform: rotate(14deg); box-shadow: 0 2px 0 rgba(0,0,0,.2); }
+.tv-stamp.crew { background: #2f9a7a; border-color: #17604a; } /* (救: cleared by a crew, docs/COZY.md §3.2) */
+.tv-pin.cleared .tv-sight { right: auto; left: -4px; } /* (a stamped pin: the sighting dot moves to the other corner, so neither hides the other) */
 .tv-here { position: absolute; left: -14px; top: -10px; width: 26px; height: 26px; animation: tvHop 1.2s ease-in-out infinite; }
 .tv-here .gl { width: 26px; height: 26px; }
 @keyframes tvHop { 50% { transform: translateY(-5px); } }

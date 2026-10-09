@@ -33,6 +33,7 @@ import { ZoneVillager, zoneSpec } from '../../actors/zoneVillagers.js';
 import { prebuildHumanoid } from '../../actors/charKit.js';
 import { CAPTAINS } from './captains.js';
 import { villageTalk, buildingAction, wakeLines } from './talk.js';
+import { crewParty } from '../../cozy/crewParty.js'; // (a crew's relief celebrated on arrival: docs/COZY.md §3.2)
 import { rand, pick, clamp, lerp, TAU, mulberry32 } from '../../core/util.js';
 
 const THEMES = { bamboo: Bamboo, maple: Maple, tidepool: Tidepool, onsen: Onsen };
@@ -53,6 +54,9 @@ export class ZoneVillage {
     const Z = this.Z = zoneOf(this.G.state, this.zone);
     Z.quests.freed ||= []; Z.quests.rescued ||= [];
     this.saved = Z.village === 'saved';
+    // a crew's relief not yet seen (docs/COZY.md §3.2): the village is saved but plays its celebration on this arrival, the
+    // saved look growing in as for a siege you broke yourself, with the crew in the square
+    this.party = this.saved && !!Z.celebrate;
     // the siege camps' progress persists until the village is saved (then saveVillage clears the list)
     if (!this.saved) for (const c of def.camps) if (!Z.siegeCamps.some(s => s.id === c.id)) Z.siegeCamps.push({ id: c.id, cleared: false });
     this.camps = def.camps.map(c => { const p = screenAt(this.site, c.at[0], c.at[1]); return { ...c, ...p, ...slotOf(this.site, p.x, p.z), cleared: this.saved || !!Z.siegeCamps.find(s => s.id === c.id)?.cleared, monsters: [] }; });
@@ -81,7 +85,7 @@ export class ZoneVillage {
       if (b.face === 'camera') at.rot = Math.PI / 4; // (a low camera-side piece shows its front: +z toward the camera)
       let info = null;
       if (b.kind === 'waypoint' && WAYSTONE.glb) { const KB = new Builder(1); info = build(KB); KB.finish(); } // (Z-D6: a Blender shrine stands in: attach places it)
-      else ctx.prop(B => { B.yaw0 = at.rot; info = build(B); if (this.saved) info.saved?.(B); }, { x: at.x, z: at.z, y: h0, rot: at.rot, seed: hashStr(this.def.id + b.id) % 9973, occluder: true }); // (saved: its overlay in the same prop, so it warps with the walls it hangs on)
+      else ctx.prop(B => { B.yaw0 = at.rot; info = build(B); if (this.saved && !this.party) info.saved?.(B); }, { x: at.x, z: at.z, y: h0, rot: at.rot, seed: hashStr(this.def.id + b.id) % 9973, occluder: true }); // (saved: its overlay in the same prop, so it warps with the walls it hangs on; a crew's party grows it in: attach)
       const rec = { ...b, ...at, info };
       this.buildings.push(rec);
       this.solidRect(rec, info.fp);
@@ -98,7 +102,7 @@ export class ZoneVillage {
     for (const l of this.decor.lamps || []) this.lamps.push(l);
     handOver(ctx, PL, { lightMul: 0 });
     // a saved village is built clean every visit: its saved dressing joins the region's merged prop chunks (no extra draw calls)
-    if (this.saved) { ctx.prop(B => { B.push([-S.x, -h0, -S.z]); this.savedDressing(B, { buildings: false }); B.pop(); }, { x: S.x, z: S.z, y: h0, warp: 0.03, seed: hashStr(this.def.id) % 9973 + 13 }); this.savedStatic = true; }
+    if (this.saved && !this.party) { ctx.prop(B => { B.push([-S.x, -h0, -S.z]); this.savedDressing(B, { buildings: false }); B.pop(); }, { x: S.x, z: S.z, y: h0, warp: 0.03, seed: hashStr(this.def.id) % 9973 + 13 }); this.savedStatic = true; }
     // the siege's ground scars (the region is rebuilt per visit: a saved village is simply clean)
     if (!this.saved) {
       for (const c of this.camps) { ctx.paint('dirt', c.x, c.z, c.r + 1.2, 0.85, 0.5); ctx.paint('grass', c.x, c.z, c.r + 0.8, 0.1, 0.5); }
@@ -138,7 +142,8 @@ export class ZoneVillage {
     this.mode.villagePos = V3(S.x, h0, S.z); // (the quest pointer: story.js placeFor)
     // the two overlays: the siege (only built while besieged) and the saved village (hidden until the celebration)
     if (!this.saved) { this.buildSiege(); this.buildSaved(); }
-    this.setSavedLook(this.saved, true);
+    if (this.party) this.buildSaved(); // (the crew's party: the saved look grows in, as a separate group)
+    this.setSavedLook(this.saved && !this.party, true);
     // the cages of camps whose captive is still inside
     for (const c of this.camps) if (c.cage && !this.saved && !this.Z.quests.freed.includes(c.cage)) this.makeCage(c);
     // the villagers, then the interactables
@@ -265,7 +270,7 @@ export class ZoneVillage {
     return out;
   }
   spawnVillagers() {
-    const W = this.world, folkN = this.saved ? this.def.folk.n : 0;
+    const W = this.world, folkN = this.saved && !this.party ? this.def.folk.n : 0; // (a crew's party: the townsfolk step out to cheer)
     const list = [...this.presentIds(), ...Array.from({ length: folkN }, (_, i) => ({ id: `${this.def.id}_folk${i}`, folk: true }))];
     for (const d of list) {
       const home = this.homeOf(d);
@@ -328,6 +333,7 @@ export class ZoneVillage {
   start(arrive = {}) {
     const M = this.mode, G = this.G;
     if (arrive.respawn && this.saved) setTimeout(() => this.wakeAtInn(), 900);
+    if (this.party) this.startParty();
     if (this.saved) return;
     // the townsfolk come out when the siege lifts: their rigs are built now, behind the entry iris
     for (let i = 0; i < this.def.folk.n; i++) prebuildHumanoid(zoneSpec(`${this.def.id}_folk${i}`));
@@ -498,12 +504,24 @@ export class ZoneVillage {
     this.pendingSaved = first; // ('village:saved' goes out with the "…is saved!" banner, so the story's beats follow it in order)
     G.save?.();
   }
+  /** A crew's relief, celebrated on this arrival (docs/COZY.md §3.2): the crew stand in the square in front of the
+   *  shrine you arrive at, the village's lanterns and shop fronts grow in, everyone cheers, then the crew heads home. */
+  startParty() {
+    const Z = this.Z;
+    Z.celebrate = false; // (once: a reload mid-scene doesn't play it again)
+    this.crew = crewParty(this, Z.celebrateCrew || []);
+    this.partyBy = this.crew?.members?.length ? (this.crew.members.length > 1 ? `${this.crew.members[0].name}'s crew` : this.crew.members[0].name) : 'your crew';
+    Z.celebrateCrew = [];
+    this.celebrate = { t: 0, stage: 0, crew: true };
+    Events.emit('village:celebrate', { zone: this.zone, village: this.def.id, crew: (this.crew?.members || []).map(m => m.key) });
+  }
   updateCelebration(dt) {
     const C = this.celebrate; if (!C) return;
     const G = this.G; C.t += dt;
-    if (C.stage === 0 && C.t > 1.5) {
+    if (this.crew) { this.crew.update(dt, C.stage >= 1 && C.t < 8); if (C.crew && C.t > 8.2) this.crew.leave(); }
+    if (C.stage === 0 && C.t > (C.crew ? 2.2 : 1.5)) {
       C.stage = 1;
-      G.ui?.banner?.(`${this.def.name} is saved!`, `${this.def.jp} · ${this.def.sub}`, { style: 'quest' });
+      G.ui?.banner?.(`${this.def.name} is saved!`, C.crew ? `${this.def.jp} · ${this.partyBy} drove the siege off` : `${this.def.jp} · ${this.def.sub}`, { style: 'quest' });
       this.emitSaved();
       Events.emit('sfx', 'ui_levelup');
       // the siege comes down: banners crumple, boards pop off in puffs
@@ -555,7 +573,7 @@ export class ZoneVillage {
       C.stage = 4;
       for (const cg of this.cages) { G.vfx?.poof?.(V3(cg.x, this.h0 + 0.6, cg.z), { color: '#efe2c8', n: 10, size: 0.5 }); cg.group.visible = false; if (cg.marker) cg.marker.visible = false; }
     }
-    if (C.t > 9) this.celebrate = null;
+    if (C.t > (C.crew ? 15 : 9)) { this.celebrate = null; if (this.crew) { this.crew.dispose(); this.crew = null; } }
   }
   emitSaved() { if (!this.pendingSaved) return; this.pendingSaved = false; Events.emit('village:saved', { zone: this.zone, village: this.def.id }); }
   spawnFolk() {
@@ -627,6 +645,7 @@ export class ZoneVillage {
     this.emitSaved(); // (left before the banner: the event still goes out)
     for (const v of this.villagers) { try { v.dispose(); } catch (e) { /* the scene teardown frees the rest */ } }
     this.villagers.length = 0;
+    if (this.crew) { this.crew.dispose(); this.crew = null; }
   }
 }
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);

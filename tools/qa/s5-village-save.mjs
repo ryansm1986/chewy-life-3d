@@ -168,6 +168,8 @@ try {
   const errBefore = errors.length;
   await page.goto(`${BASE}/?notitle`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__ready === true && window.G?.player, null, { timeout: 60000 });
+  // (the home sim's own growth tick must not add a building between the reload and the compare: ROADMAP R-4's flake)
+  await page.evaluate(() => { const G = window.G; G.sim.tickT = -1e9; window.__simFreeze = setInterval(() => { G.sim.tickT = -1e9; }, 100); });
   await sleep(page, 1500);
   await page.evaluate(() => { delete window.QA; });
   const { installProbes } = await import('./lib.mjs'); await installProbes(page);

@@ -63,6 +63,7 @@ const GUILD = [{ id: 'guild L1', rank: 2, cost: { coins: 400, wood: 30, stone: 1
 const items = [];
 for (const [id, b] of Object.entries(BUILDINGS)) {
   if (b.prebuilt && !b.levelCost) continue;
+  if (id === 'guild') continue; // (its levels open at ranks 2, 3 and 4, not 1 + level: the GUILD list below)
   const rank = RANK_REQ[id] || 1;
   if (!b.prebuilt) items.push({ id, rank, cost: b.cost || {} });
   (b.levelCost || []).forEach((c, i) => { if (c) items.push({ id: `${id} L${i + 1}`, rank: Math.max(rank, i + 1), cost: c }); });

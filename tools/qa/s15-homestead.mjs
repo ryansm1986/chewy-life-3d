@@ -8,9 +8,13 @@
 //  g) save / load of the pantry, the garden and the Fish Log; an old (v1 layout) save loads clean with empty homestead state
 // Phase 2: fishing —
 //  h) Kero's "Pond Guardian's Apprentice" (offered from day 2; no rod, no prompt); talking to him gives the Bamboo Rod
-//  i) at the koi pond through the real keys: F casts (rod in hand, float in the water), pressing early scares the fish,
-//     a missed bite gets away, holding F through the reel bar lands it (pantry, Fish Log, toast), letting go loses it,
-//     WASD reels in; three catches finish Kero's quest
+//  i) at the koi pond through the real keys: F casts (rod in hand, float in the water ~3 m out, the camera leaning to
+//     it), an early press gets "Not yet…" (the second scares the fish), a missed bite nibbles again once then gets away,
+//     the bite's cue at the float (the big "!", the ping), holding F through the reel bar lands it (pantry, Fish Log,
+//     toast) with the card on screen and clear of everything (the how-to on the first reels), letting go loses it, WASD
+//     reels in; a bot with a human's 0.26 s reaction lands a common fish on the real keys; three catches finish Kero's quest
+//  R-12) the balance: tools/fishing-sim.mjs in the page (beginner bot: the tier targets per rod, Relaxed easier still);
+//     Settings › Fishing (Auto · Normal · Relaxed: Auto is Normal with keys)
 //  j) fish by spot and hour; records and milestones (Kero's gift marker and gift); the Fishing Hut (rods, Kero buys fish)
 //  k) region fishing: a tide-pool shore, and ice fishing on Yukimi Onsen's frozen pond
 // Phase 3: cooking —
@@ -23,6 +27,7 @@
 //     signature dish; Rosie's cookbook pages and her premium for dishes
 import fs from 'node:fs';
 import { launch, boot, sleep, makeReport, drainDialogue, tap, waitMode, waitIdle, installProbes, BASE } from './lib.mjs';
+import { reelAudit, cueAudit, humanReel, simRates } from './fish-lib.mjs';
 
 const R = makeReport('S15 homestead: pantry + farming + fishing + cooking');
 const { browser, page, errors, warns } = await launch();
@@ -180,18 +185,34 @@ try {
   await phase('wait');
   const c1 = await G(() => { const F = window.G.life.fishing, b = F.bobber.position, w = F.water(b.x, b.z); return { y: +b.y.toFixed(2), inWater: !!w, line: !!F.line.parent }; });
   R.check('F at the water\'s edge: "Fish 🎣 Koi Pond", the rod in paw, the cast lands the float in the water (controls locked)', /Fish .* Koi Pond/.test(lb.label) && lb.t?.spot === 'pond' && c0?.phase === 'cast' && c0.prop === 'rod1' && c0.locked && c1.inWater && c1.line, JSON.stringify({ lb, c0, c1 }));
+  // R-12: the float lands ~3 m out (clear of the hero's head from the camera), and the camera leans toward it
+  await sleep(page, 900);
+  const lean = await G(() => { const G = window.G, P = G.player, s = G.life.fishing.s, f = G.engine.rig.focus, d = Math.hypot(s.x - P.pos.x, s.z - P.pos.z); return { cast: +d.toFixed(2), lean: +(((f.x - P.pos.x) * (s.x - P.pos.x) + (f.z - P.pos.z) * (s.z - P.pos.z)) / (d * d)).toFixed(2), scale: G.life.fishing.bobber.scale.x }; });
+  R.check('R-12: the float lands about 3 m out and reads at the game camera (a bigger toy float); the camera leans ~45% of the way to it', lean.cast > 2.4 && lean.cast < 3.6 && lean.lean > 0.3 && lean.lean < 0.55 && lean.scale > 1.5, JSON.stringify(lean));
+  await tap(page, 'f', 50); await sleep(page, 400);
+  const early1 = await G(() => ({ s: window.G.life.fishing.s?.phase || null, cue: document.querySelector('.fish-cue.show .fc-in.early') ? document.querySelector('.fish-cue .fc-t').textContent : null }));
   await tap(page, 'f', 50); await sleep(page, 400);
   const early = await G(() => ({ s: !!window.G.life.fishing.s, locked: window.G.player.controlLocked, tool: window.G.player.toolOut, toast: window.QA.toasts.some(t => /Too early/.test(t)), log: Object.keys(window.G.state.fishLog || {}).length }));
-  R.check('pressing F before the bite scares the fish: the session ends, controls and the sword come back', !early.s && !early.locked && !early.tool && early.toast && early.log === 0, JSON.stringify(early));
+  R.check('pressing F before the bite: the first press of a cast gets a gentle "Not yet…" at the float and the fish stays; the second scares it (the session ends, controls and the sword come back)', early1.s === 'wait' && /Not yet/.test(early1.cue || '') && !early.s && !early.locked && !early.tool && early.toast && early.log === 0, JSON.stringify({ early1, early }));
   await sleep(page, 500); await castToBite();
   const bite = await G(() => ({ fish: window.G.life.fishing.s.fish, window: window.G.life.fishing.s.window }));
-  await sleep(page, 900);
+  await sleep(page, 250);
+  const cue = await cueAudit(page), ping = await G(() => window.QA.sfx.slice(-12).includes('bite_ping'));
+  await page.screenshot({ path: 'tools/qa/tmp/r12-fishing/s15-bite.png' }).catch(() => {});
+  R.check('R-12: the bite\'s cue: a big "!" at the float (on screen, nothing over it) with the key to press, and the ping', cue.on && cue.kind === 'bite' && cue.onScreen && cue.nearFloat && !cue.over.length && cue.bangPx >= 36 && ping, JSON.stringify({ cue, ping }));
+  await sleep(page, 1100);
+  const miss1 = await G(() => ({ s: window.G.life.fishing.s?.phase || null, fish: window.G.life.fishing.s?.fish, cue: !!document.querySelector('.fish-cue.show .fc-in.miss') }));
+  await G(() => { const s = window.G.life.fishing.s; if (s) s.wait = s.t + 0.01; }); await phase('bite', 3000); await sleep(page, 1300);
   const late = await G(() => ({ s: !!window.G.life.fishing.s, toast: window.QA.toasts.some(t => /got away/.test(t)) }));
-  R.check('a bite (a ~0.6 s window) missed: "It got away!"', !!bite.fish && bite.window > 0.5 && bite.window < 0.8 && !late.s && late.toast, JSON.stringify({ bite, late }));
+  R.check('a missed bite (a 1 s window with the Bamboo Rod) nibbles again ("Missed!", the same fish); missed again: "It got away!"', !!bite.fish && bite.window === 1 && miss1.s === 'wait' && miss1.fish === bite.fish && miss1.cue && !late.s && late.toast, JSON.stringify({ bite, miss1, late }));
   await sleep(page, 500); await castToBite();
   await G(() => { window.__reelMode = 'catch'; const s = window.G.life.fishing.s; s.fish = 'koi'; });
   await tap(page, 'f', 40);
-  const r0 = await G(() => ({ phase: window.G.life.fishing.s?.phase, bar: document.querySelector('.reel')?.classList.contains('show'), name: document.querySelector('.rl-name')?.textContent }));
+  const r0 = await G(() => ({ phase: window.G.life.fishing.s?.phase, bar: document.querySelector('.reel')?.classList.contains('show'), name: document.querySelector('.rl-name')?.textContent, sure: window.G.life.fishing.s?.sim?.floor > 0 }));
+  await sleep(page, 700);
+  const ra = await reelAudit(page);
+  await page.screenshot({ path: 'tools/qa/tmp/r12-fishing/s15-reel.png' }).catch(() => {});
+  R.check('R-12: the reel card is on screen, nothing covers it and it covers neither the hero nor the float; text ≥ 12 px, a 190+ px bar; the first reel shows the how-to (the F key, Hold ▲ / Let go ▼); the first catch ever always lands', ra.card && ra.onScreen && !ra.over.length && !ra.coversHero && !ra.coversFloat && ra.namePx >= 12 && ra.howPx >= 12 && ra.bar.h >= 190 && ra.howto && ra.key && r0.sure, JSON.stringify({ ra, sure: r0.sure }));
   await page.waitForFunction(() => !window.G.life.fishing.s || window.G.life.fishing.s.phase === 'land', null, { timeout: 30000 });
   const r1 = await G(() => ({ phase: window.G.life.fishing.s?.phase || null, fm: !!window.G.life.fishing.s?.fm?.parent }));
   await page.waitForFunction(() => !window.G.life.fishing.s, null, { timeout: 5000 });
@@ -214,9 +235,32 @@ try {
     await G(() => { const S = window.G.life.fishing.s?.sim; if (S) { S.m = 0.97; S.z = Math.max(0, Math.min(1 - S.zh, S.f - S.zh / 2)); } });
     await page.waitForFunction(() => !window.G.life.fishing.s, null, { timeout: 15000 }); await sleep(page, 300);
   };
-  await quick('crucian'); await quick('loach');
-  const q3 = await G(() => { const G = window.G; return { done: G.story.Q.done.includes('keroRod'), species: Object.keys(G.state.fishLog).length }; });
-  R.check("three catches finish Kero's quest", q3.done && q3.species === 3, JSON.stringify(q3));
+  // a bot with a human's reaction (it acts on what the bar showed 0.26 s ago) on the real F key lands a common fish
+  await toPond(); await sleep(page, 300); await castToBite();
+  await G(() => { window.__reelMode = null; window.G.life.fishing.s.fish = 'crucian'; }); await tap(page, 'f', 40); await phase('reel', 3000);
+  const howN = await G(() => ({ reels: window.G.state.fishing.reels, howto: document.querySelector('.rl-card').classList.contains('howto'), sure: window.G.life.fishing.s.sim.floor > 0 }));
+  const hb = await humanReel(page, { press: () => page.keyboard.down('KeyF'), release: () => page.keyboard.up('KeyF'), delay: 260 });
+  await page.waitForFunction(() => !window.G.life.fishing.s, null, { timeout: 8000 }); await sleep(page, 300);
+  const hc = await G(() => window.G.state.fishLog.crucian?.n || 0);
+  R.check('R-12: a bot with a human\'s 0.26 s reaction lands a crucian carp on the real F key (Normal, the Bamboo Rod, no safety floor); the how-to still shows on the third reel', hb === 'catch' && hc === 1 && !howN.sure && howN.reels === 3 && howN.howto, JSON.stringify({ hb, hc, howN }));
+  await quick('loach');
+  const q3 = await G(() => { const G = window.G; return { done: G.story.Q.done.includes('keroRod'), species: Object.keys(G.state.fishLog).length, howto: document.querySelector('.rl-card').classList.contains('howto'), reels: G.state.fishing.reels }; });
+  R.check("three catches finish Kero's quest; from the fourth reel the card drops the how-to", q3.done && q3.species === 3 && !q3.howto && q3.reels >= 4, JSON.stringify(q3));
+
+  // ---------------------------------------------------------------- R-12) the balance, Settings › Fishing
+  const sim = { r1: await simRates(page, { rod: 1, N: 150 }), r2: await simRates(page, { rod: 2, N: 150 }), x1: await simRates(page, { rod: 1, relaxed: true, N: 150 }) };
+  const { TARGETS } = await G(async () => ({ TARGETS: (await import('/tools/fishing-sim.mjs')).TARGETS }));
+  R.check('R-12: the balance sim in the page (a beginner bot, 0.28-0.36 s reaction): every tier meets its target with the Bamboo Rod and the Moonlit Rod; the Moonlit Rod lands the rare and legendary fish noticeably more often; Relaxed lands more still', sim.r1.every((v, i) => v >= TARGETS.rod1[i]) && sim.r2.every((v, i) => v >= TARGETS.rod2[i]) && sim.r2[2] - sim.r1[2] > 0.15 && sim.r2[3] - sim.r1[3] > 0.25 && sim.x1.every((v, i) => v >= sim.r1[i]) && sim.r1[3] < 0.5, JSON.stringify({ sim, TARGETS }));
+  const fm = await G(async () => {
+    const G = window.G, F = G.life.fishing, ui = G.ui; ui.open('menu'); ui.panels.menu.setView('settings'); await new Promise(r => setTimeout(r, 300));
+    const seg = [...document.querySelectorAll('.seg[data-k="fishMode"] button')].map(b => b.textContent);
+    const auto = { relaxed: F.relaxed(), zone: F.params().zone };
+    document.querySelector('.seg[data-k="fishMode"] button[data-v="2"]')?.click(); await new Promise(r => setTimeout(r, 100));
+    const rel = { relaxed: F.relaxed(), ...F.params(), saved: ui.settings.fishMode };
+    document.querySelector('.seg[data-k="fishMode"] button[data-v="0"]')?.click(); ui.closeAll();
+    return { seg, auto, rel, back: ui.settings.fishMode };
+  });
+  R.check('R-12: Settings › Fishing: Auto · Normal · Relaxed; Auto is Normal with keys; Relaxed widens the zone (×1.2), halves the drain and lengthens the bite (×1.5)', fm.seg.join() === 'Auto,Normal,Relaxed' && !fm.auto.relaxed && fm.auto.zone === 0.32 && fm.rel.relaxed && fm.rel.saved === 2 && Math.abs(fm.rel.zone - 0.384) < 1e-6 && fm.rel.drain === 0.5 && fm.rel.window === 1.5 && fm.back === 0, JSON.stringify(fm));
 
   // ---------------------------------------------------------------- j) spots and hours, records, milestones, the Fishing Hut
   const j0 = await G(async () => {

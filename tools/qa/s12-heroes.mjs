@@ -136,7 +136,7 @@ try {
   for (let k = 0; k < 7; k++) {
     await page.evaluate(() => { window.G.heroes.cd = 0; window.G.heroes.switchTo(undefined, { quiet: true }); });
     await sleep(page, SW);
-    mem.push(await page.evaluate(() => ({ ...window.QA.mem(), npcs: window.G.npcs.length, heroes: Object.keys(window.G.heroes.villagers).length })));
+    mem.push(await page.evaluate(() => ({ ...window.QA.mem(), npcs: window.G.npcs.filter(n => !n.folk).length, heroes: Object.keys(window.G.heroes.villagers).length })));
   }
   const m = k => mem[k];
   R.note(`switch memory: ${mem.map(x => `${x.geo}g/${x.tex}t/${x.npcs}n`).join(' ')}`);

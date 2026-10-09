@@ -63,8 +63,10 @@ import { installAutosave, writeSave, loadSave as readSave } from './core/autosav
 import { makeSaveGlyph } from './ui/saveGlyph.js';
 import { normalizeCozy } from './cozy/state.js';
 import { installCozy } from './cozy/expeditionRun.js';
+import { installHomesteadXp } from './cozy/homesteadXp.js';
 import { installScavenge } from './cozy/scavengeWorld.js';
 import { installPeaceful } from './cozy/peacefulRun.js';
+import { installGuild } from './cozy/guildRun.js';
 
 // UI and audio load in parallel with the world. The import() paths must be literal so Vite bundles them for the
 // production build (a variable path with @vite-ignore worked on the dev server but 404'd in dist: no UI, no sound).
@@ -144,6 +146,7 @@ export async function boot() {
   heroes.spawnBench();
   // townsfolk move in as homes fill up (capped for performance)
   const folk = [], FOLK_MAX = 16;
+  let folkSeq = 0; // (ids never repeat: a townsfolk who moved out for a hire leaves their portrait behind)
   // Building a villager costs ~20 ms: a visible hitch if it happens mid-play. Newcomers' rigs are pre-built while
   // nobody can see a hitch (boot, title, dialogue, menus, the Burrow) and move in from this pool; newcomers arrive
   // one per check, and only wait when the pool is empty and the village is on screen.
@@ -154,14 +157,20 @@ export async function boot() {
   setInterval(() => { if (hitchHidden()) stockFolk(); }, 350);
   function syncTownsfolk() {
     const homes = sim.list.filter(r => r.data.type === 'home' && (r.data.residents || 0) > 0);
-    const want = Math.min(FOLK_MAX, Math.max(0, Math.round(sim.stats.population * 0.6) - 4));
+    const hires = G.cozy?.guild?.inTown?.() || 0; // the Guild's hires take the townsfolk slots first (docs/COZY.md §5.2: cozy/hires.js)
+    const want = Math.max(0, Math.min(FOLK_MAX, Math.round(sim.stats.population * 0.6) - 4) - hires);
+    if (folk.length > want) { // a hire moved in: the newest townsfolk moves out, while nobody is looking
+      const v = folk[folk.length - 1];
+      if (hitchHidden() || !v.visible || !v.onScreen?.()) { folk.pop(); v.retire(); const i = npcs.indexOf(v); if (i >= 0) npcs.splice(i, 1); v.dispose(); }
+      return;
+    }
     if (folk.length < want && homes.length) {
       if (!folkPool.length && !hitchHidden()) return; // wait for a pre-built rig rather than hitch on screen
       const h = homes[folk.length % homes.length];
       const spec = folkPool.shift() || randomVillagerSpec();
       const anchors = [L.plaza, ...sim.list.filter(r => r.data.type === 'shop').map(r => ({ x: r.door.x, z: r.door.z }))];
       const a = anchors[Math.floor(Math.random() * anchors.length)];
-      const v = new Villager(village, G, spec, { id: 'folk' + folk.length, anchor: { x: a.x, z: a.z }, home: h.door.clone(), wander: 6 });
+      const v = new Villager(village, G, spec, { id: 'folk' + (folkSeq++), anchor: { x: a.x, z: a.z }, home: h.door.clone(), wander: 6 });
       v.setPos(h.door.x, h.door.z); v.folk = true; portraits.register(v.id, spec);
       v.interact.label = `Chat with ${spec.name}`;
       folk.push(v); npcs.push(v);
@@ -359,7 +368,7 @@ export async function boot() {
   };
   // The Travel Map (ui/travel.js) reads places from here: Blossom Hollow + the four regions (docs/REGIONS.md §1)
   // a gated zone's Travel Map card: its dungeon (cleared stamp, the boss inside) instead of the outdoor boss (docs/ZONES.md §8.2)
-  const zoneCard = id => { const gd = gateDef(id); if (!gd) return {}; const n = G.state.zones?.[id]?.dungeon?.cleared || 0; return { cleared: n, dungeon: { name: gd.name, cleared: n, boss: MONSTERS[gd.boss]?.name || null } }; };
+  const zoneCard = id => { const gd = gateDef(id); if (!gd) return {}; const n = G.state.zones?.[id]?.dungeon?.cleared || 0, crew = G.state.zones?.[id]?.dungeon?.crew || 0; return { cleared: n || crew, dungeon: { name: gd.name, cleared: n, crew, boss: MONSTERS[gd.boss]?.name || null } }; }; // (crew: cleared by a crew, the 救 stamp: docs/COZY.md §3.2)
   G.travel = {
     list: () => {
       const R = regionState(G.state), here = G.mode === 'village' ? 'village' : G.dungeon?.regionId;
@@ -448,8 +457,10 @@ export async function boot() {
   installLife(G, village); // farming, the pantry, the Seed Stall (docs/HOMESTEAD.md)
   installHousing(G); // enterable houses, the cottage's bed / chest / stove, decorating (docs/HOUSING.md)
   installCozy(G, village); // the cozy path: the world clock and time away, the expeditions and the Expedition Board → G.cozy (src/cozy, docs/COZY.md)
+  installHomesteadXp(G); // small XP for farming, fishing, cooking, building and scavenging (cozy/homesteadXp.js, docs/COZY.md §3.3)
   installScavenge(G, village); // scavenging: gather nodes and Shadow's dig spots at home and in the zones → G.cozy.scav (cozy/scavengeWorld.js, docs/COZY.md §7)
   installPeaceful(G, village); // the peaceful overworld: a saved zone keeps only its wild areas' monsters + its wild areas and the Sightings board → G.peaceful (cozy/peacefulRun.js, docs/COZY.md §6)
+  installGuild(G, village); // the Adventurers' Guild: Old Hachi, hires (townsfolk who live at the Guild), their wages on the world clock → G.cozy.guild (cozy/guildRun.js, docs/COZY.md §5)
   // guided tutorials (docs/TUTORIALS.md). They start on their own unless ?notut — and the QA's ?nointro sessions count
   // as notut (unless ?tut), remembered for the tab, so a QA reload of its own save stays quiet too.
   {
@@ -874,6 +885,7 @@ export async function boot() {
     else if (!G.titleActive) {
       const lead = new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing)).multiplyScalar(Math.min(1, player.anim.speed / 4) * 1.2);
       rig.focus.set(player.pos.x + lead.x, player.pos.y + 0.6, player.pos.z + lead.z);
+      G.life?.fishing?.frameFocus?.(rig.focus); // (fishing: the camera leans toward the float, life/fishing.js)
     }
     if (G.mode === 'interior') { if (!G.decorFocus) G.housing.biasFocus(rig.focus); G.housing.clampFocus(rig.focus, G.decorFocus ? -1.2 : 1.2); } // (the camera leans to the back walls and stays over the room)
     rig.update(dt);

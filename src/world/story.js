@@ -15,6 +15,7 @@ import { stepGain, zoneStepDone, zoneStepHave, destOf } from './questSteps.js';
 import { DUNGEONS } from '../dungeon/defs.js';
 import { ZONE_QUESTS, dungeonObjectives as zoneObjectives, offersFor } from './zoneQuests.js'; // (zone villagers' quests: docs/ZONES.md §3)
 import { ZONE_NPCS } from '../regions/village/data.js';
+import { storyObjectives, villageObjectives, CREW_STEP_TYPES } from '../cozy/objectives.js'; // (the cozy path's crew routes: docs/COZY.md §3)
 
 // step types: talk(npc) | collect(material,n) | kill(monster?,n) | boss(id) | floor(n) | build(type,n) | pop(n) | zone(n)
 //   | fish(n) (catch n fish: life/fishing.js 'fish:caught') | plant(n) / harvest(n) (life/garden.js) | cook(n) dishes
@@ -100,6 +101,11 @@ export class Story {
     Events.on('dungeon:cleared', e => this.progress('tier', e));
     Events.on('village:saved', e => this.progress('villageSaved', e));
     setInterval(() => this.progress('pop'), 5000);
+    // the cozy path (docs/COZY.md §3, §12): the crew routes the Expedition Board lists under Story, and the quest uniques a
+    // crew left waiting for your own first win over that boss
+    this.crewObjectives = st => storyObjectives(st);
+    this.villageObjectives = st => villageObjectives(st); // (the zone villagers' quests: the Board's Village quests tab)
+    Events.on('boss:dead', e => this.payOwed(e));
   }
   get Q() { return this.G.state.quests; }
   def(id) { return QUESTS[id] || ZONE_QUESTS[id] || this.Q.requests?.[id]?.def; }
@@ -153,7 +159,10 @@ export class Story {
     if (r.skillPts) A.addSkillPts(r.skillPts);
     if (r.mats) for (const k in r.mats) A.addMaterial(k, r.mats[k]);
     if (r.potions) for (const k in r.potions) A.addPotion(k, r.potions[k]);
-    if (r.unique) this.giveItem(makeUnique(pick(UNIQUE_IDS), Math.max(5, G.state.player.lvl)));
+    if (r.unique) { // (a crew's win leaves the unique waiting for your own: docs/COZY.md §0.3)
+      const bi = d.steps.findIndex((s, i) => s.type === 'boss' && q.crewSteps?.includes(i));
+      if (bi >= 0) this.owe(d.steps[bi], d, q); else this.giveItem(makeUnique(pick(UNIQUE_IDS), Math.max(5, G.state.player.lvl)));
+    }
     if (r.pantry) for (const k in r.pantry) { A.addPantry(k, r.pantry[k], { src: 'quest' }); G.ui?.pantryGain?.(k, r.pantry[k], {}); }
     if (r.recipe) setTimeout(() => G.life?.teach?.(r.recipe, { from: d.giver, src: 'quest' }), 1800);
     if (r.furniture) setTimeout(() => { A.addFurniture?.(r.furniture, 1, { src: 'quest' }); G.ui?.toast?.(`${this.nameOf(d.giver)} gave you a ${FURNITURE[r.furniture]?.name || r.furniture}! (in your furniture storage)`, { icon: 'home', color: '#ffb07a' }); }, 1800);
@@ -166,6 +175,53 @@ export class Story {
     if (d.request) { delete this.Q.requests[q.id]; const k = this.Q.done.lastIndexOf(q.id); if (k >= 0) this.Q.done.splice(k, 1); }
     if (d.next) setTimeout(() => this.start(d.next), 2500);
     Events.emit('quest:update');
+  }
+  // ------------------------------------------------------------------ the cozy path: steps done by a crew (docs/COZY.md §3, §4.9)
+  /** Complete step i of an active quest (it must be the current one). crew: who did it (the Journal says "done by …").
+   *  The quest moves on as if you'd done it; a last step completes the quest. → true if it moved */
+  completeStep(id, i, { crew = null } = {}) {
+    const q = this.Q.active.find(x => x.id === id), d = q && this.def(id);
+    if (!d || q.step !== i || !d.steps[i]) return false;
+    if (crew) { (q.crewSteps ||= []).includes(i) || q.crewSteps.push(i); q.crewBy = crew; }
+    q.step++; q.prog = 0;
+    if (q.step >= d.steps.length) this.complete(q, d);
+    else this.G.ui?.toast?.(`Quest updated: ${d.steps[q.step].text}`, { color: '#ffd84a' });
+    Events.emit('quest:update');
+    this.progress('any'); // (a state-derived next step that already holds: burrow1's Mochi Jelly the crew brought home)
+    return true;
+  }
+  /** A crew came home from a quest's route (cozy/expeditionRun.js). success: every fight step left is done (burrow1's
+   *  kills and its Mochi Jelly; a Burrow boss's floor and the boss); partial: what they managed (half of burrow1's kills;
+   *  a boss quest's floor), so you or the next crew only do the rest. → { title, done, steps } for the report */
+  crewResult(id, result, { crew = '' } = {}) {
+    const d = this.def(id), q0 = this.Q.active.find(x => x.id === id); if (!d || !q0) return null;
+    const out = { title: d.title, done: false, steps: 0 };
+    const cur = () => { const q = this.Q.active.find(x => x.id === id); const s = q && d.steps[q.step]; return q && s && CREW_STEP_TYPES.has(s.type) && (s.type !== 'collect' || s.mat === 'mochi') ? { q, s } : null; };
+    if (result === 'success') {
+      for (let k = 0, c; k < 6 && (c = cur()); k++) if (this.completeStep(id, c.q.step, { crew })) out.steps++; else break;
+    } else if (result === 'partial') {
+      const c = cur();
+      if (c?.s.type === 'kill') { const half = Math.ceil((c.s.n || 1) / 2); if ((c.q.prog || 0) < half) { c.q.prog = half; out.steps = 0.5; Events.emit('quest:update'); } }
+      else if (c?.s.type === 'floor' && this.completeStep(id, c.q.step, { crew })) out.steps = 1;
+    }
+    out.done = this.Q.done.includes(id) || (!this.Q.active.some(x => x.id === id) && !!d.request);
+    return out;
+  }
+  /** a quest unique a crew's win left for you: owed until you beat that boss yourself (docs/COZY.md §0.3, §14.1) */
+  owe(s, d, q) {
+    const key = s.id || (s.dungeon ? `dungeon:${s.dungeon}` : null); if (!key) return;
+    (this.Q.owed ||= {})[key] = { quest: q.id, title: d.title };
+  }
+  /** your own win over a boss pays the quest unique its crew route left waiting */
+  payOwed(e) {
+    const O = this.Q.owed; if (!O || !e) return;
+    for (const key of [e.id, e.dungeon ? `dungeon:${e.dungeon}` : null]) {
+      const w = key && O[key]; if (!w) continue;
+      delete O[key];
+      const G = this.G;
+      setTimeout(() => { this.giveItem(makeUnique(pick(UNIQUE_IDS), Math.max(5, G.state.player.lvl))); G.ui?.toast?.(`${w.title}: the treasure your crew left for you is yours!`, { icon: 'star', color: '#ffd84a', duration: 5 }); }, 3200);
+      Events.emit('quest:update');
+    }
   }
   // complete any active 'talk to <npc>' step
   markTalk(id) {
@@ -216,10 +272,12 @@ export class Story {
     const G = this.G, st = G.state;
     const act = this.Q.active.filter(q => this.def(q.id));
     const order = [...act.filter(q => !this.def(q.id).request), ...act.filter(q => this.def(q.id).request)];
-    const npcPos = id => { const n = G.npcs?.find(x => x.id === id && x.visible); return n ? { pos: n.pos, label: n.name, kind: 'npc' } : null; };
+    // (Blossom Hollow's villagers only while you're in the village: their records stay in G.npcs while you're in a
+    // region, at village coordinates: ROADMAP R-4, the welcome quest's pointer at Rosie from inside a zone)
+    const npcPos = id => { const n = G.mode === 'village' && G.npcs?.find(x => x.id === id && x.visible); return n ? { pos: n.pos, label: n.name, kind: 'npc' } : null; };
     for (const q of order) {
       const d = this.def(q.id), s = d.steps[q.step]; if (!s) continue;
-      if (s.type === 'talk') { const t = npcPos(s.npc) || this.zoneTalkTarget(s); if (t) return t; continue; }
+      if (s.type === 'talk') { const t = npcPos(s.npc) || this.zoneTalkTarget(s) || this.homeTalkTarget(s); if (t) return t; continue; }
       if (s.type === 'decorate') { // their home's door (inside it: nothing to point at)
         const rec = G.mode === 'village' && G.sim?.list.find(r => r.data.owner === s.npc);
         if (rec) return { pos: rec.door, label: `${this.nameOf(s.npc)}'s home`, kind: 'place' };
@@ -277,7 +335,8 @@ export class Story {
         else if (s.type === 'floor') have = Math.min(s.n, st.dungeon.deepest || 0);
         else have = zoneStepHave(s, st) ?? (q.prog || 0);
       }
-      return { text: s.text, have: done ? need : Math.min(need, have), need, done };
+      const crew = done && q.crewSteps?.includes(i) && q.crewBy; // (done by a crew: docs/COZY.md §4.10)
+      return { text: crew ? `${s.text} · done by ${q.crewBy}` : s.text, have: done ? need : Math.min(need, have), need, done, crew: crew || null };
     };
     const act = this.Q.active.map(q => { const d = this.def(q.id); if (!d) return null; return { id: q.id, title: d.title, desc: d.desc, giver: this.nameOf(d.giver), main: !d.request, steps: d.steps.map((s, i) => stepView(q, s, i)).slice(0, q.step + 1), reward: d.reward }; }).filter(Boolean);
     const done = this.Q.done.filter(id => QUESTS[id]).map(id => ({ id, title: QUESTS[id].title, desc: QUESTS[id].desc, giver: this.nameOf(QUESTS[id].giver), main: true, steps: QUESTS[id].steps.map(s => ({ text: s.text, have: 1, need: 1, done: true })), reward: QUESTS[id].reward, done: true }));
@@ -291,6 +350,13 @@ export class Story {
     if (D?.kind === 'region' && D.zoneId === n.zone) { const p = D.village?.npcPos?.(s.npc); return p ? { pos: p, label: n.name, kind: 'npc' } : D.villagePos ? { pos: D.villagePos, label: 'The village', kind: 'place' } : null; }
     if (D && D.kind !== 'region') return D.exitPos ? { pos: D.exitPos, label: 'The way out', kind: 'place' } : null;
     return this.placeFor(s, { zone: n.zone, village: true });
+  }
+  /** A Blossom Hollow villager's talk step while you're out (ROADMAP R-4): the way home from a zone (its Wayfarer's
+   *  Stone) or a dungeon (the way out); nothing indoors. */
+  homeTalkTarget(s) {
+    if (ZONE_NPCS[s.npc]) return null;
+    const D = this.G.mode === 'dungeon' ? this.G.dungeon : null;
+    return D?.exitPos ? { pos: D.exitPos, label: D.kind === 'region' ? "The Wayfarer's Stone" : 'The way out', kind: 'place' } : null;
   }
   /** Phase C's provider (docs/ZONES.md §3): what the active quests need placed on a dungeon floor →
    *  [{ kind: 'cage', npc, label, quest }, { kind: 'drop', item, n, label, from, quest }] (world/zoneQuests.js) */
@@ -451,6 +517,17 @@ export class Story {
     return null;
   }
   canRequest(id) { const f = this.friend(id); return (f.reqDay || 0) !== (this.G.day?.day || 1); }
+  /** A gathering ask in place of a kill ask (docs/COZY.md §3.1): driftwood, river stones or petals, things Blossom
+   *  Hollow's own gather nodes and Shadow's digs give (cozy/scavenge.js) */
+  scavengeRequest(npc) {
+    const id = npc.id, [mat, n, line] = pick([
+      ['wood', randInt(5, 8), 'Could you gather some driftwood from the beach for me? I\'m mending my fence, and the tide always brings the best bits.'],
+      ['stone', randInt(4, 7), 'I\'d love some smooth river stones for my garden path. The ones by the bridge are the prettiest!'],
+      ['petal', randInt(3, 5), 'Could you sweep up some sakura petals for me? I\'m making petal tea. Don\'t tell Shadow, he eats them.'],
+      ['bone', randInt(2, 3), 'Shadow keeps digging up the oddest little bones… Could you bring me a few? It\'s for a wind chime. Don\'t ask.'],
+    ]);
+    return { steps: [{ type: 'deliver', mat, n, npc: id, text: `Bring ${n} ${mat} to ${npc.name}` }], text: line, scavenge: true };
+  }
   async requestFlow(npc, say) {
     const G = this.G, id = npc.id, f = this.friend(id);
     const lvl = G.state.player.lvl;
@@ -462,7 +539,10 @@ export class Story {
       ...this.homesteadRequests(npc), // (appended: the first three keep their places)
       ...this.decorateRequests(npc), // (appended: docs/HOUSING.md §4)
     ];
-    const t = pick(templates);
+    let t = pick(templates);
+    // the cozy path (docs/COZY.md §3.1): half the "defeat yokai" asks become a scavenging ask instead, so a player who
+    // never fights gets as many requests (and "Maybe later" never costs a heart)
+    if (t === templates[1] && Math.random() < 0.5) t = this.scavengeRequest(npc);
     const c = await say([t.text], [{ text: 'Leave it to me!' }, { text: 'Maybe later' }]);
     if (c !== 0) return;
     f.reqDay = G.day?.day || 1;

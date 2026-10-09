@@ -275,3 +275,4 @@
 .ui-root.m-phone .p-exp .ex-line p b { font-size: 14px; }
 .ui-root.m-phone .p-exp .ex-none p { font-size: 15px; }
 .ui-root.m-phone .p-exp .ex-empty { font-size: 15px; }
+.ex-rw.trophy, .ex-lt.trophy { background: linear-gradient(#fff6dc, #f4cf7a); } /* (a keepsake: docs/COZY.md §4.6) */

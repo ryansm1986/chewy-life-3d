@@ -51,6 +51,7 @@ export class Tutorials {
     const names = new Set(['mode:changed']);
     for (const g of Object.values(GUIDES)) for (const st of g.steps) { const w = st.waitFor; if (w) names.add(typeof w === 'string' ? w : w.event); for (const k in st.on || {}) names.add(k); }
     for (const n of names) Events.on(n, p => this.onEvent(n, p));
+    Events.on('input:device', () => this.redevice()); // (a step's lines can be in the device's words: the fishing guide's)
     this.ui = null;
     // a guide that was running when the game was saved picks up where it left off
     if (S.active && GUIDES[S.active]) setTimeout(() => this.resume(S.active), 900); // (a replay of a finished guide too)
@@ -132,7 +133,14 @@ export class Tutorials {
   }
 
   // ---------------------------------------------------------------- per step
-  say(text, who = null) { if (this.cur) { this.cur.said = { text, who: who || this.cur.step.who || this.cur.guide.narrator }; if (!this.paused) this.ui?.say(this.cur.said.who, text); } }
+  /** the input device changed: a step whose objective or line is a function says it again in the new device's words */
+  redevice() {
+    const c = this.cur, st = c?.step; if (!st || !c.entered) return;
+    const G = this.G;
+    if (typeof st.objective === 'function') this.ui?.objective?.(this.safe(() => st.objective(G, this), ''));
+    if (c.ownSay && typeof st.say === 'function') { const t = this.safe(() => st.say(G, this), null); if (t) { this.say(t); c.ownSay = true; } }
+  }
+  say(text, who = null) { if (this.cur) { this.cur.ownSay = false; this.cur.said = { text, who: who || this.cur.step.who || this.cur.guide.narrator }; if (!this.paused) this.ui?.say(this.cur.said.who, text); } }
   onEvent(name, p) {
     if (name === 'mode:changed') { this.hideArrow(); return; }
     const c = this.cur; if (!c || !c.step || !c.entered) return;
@@ -199,6 +207,7 @@ export class Tutorials {
       this.ui?.step({ title: g.title, icon: g.icon?.(), n: c.i + 1, total, objective: typeof st.objective === 'function' ? st.objective(G, this) : st.objective, ack: st.ack, skippable: st.skippable });
       const text = c.carry || (typeof st.say === 'function' ? st.say(G, this) : st.say);
       if (text) this.say(text);
+      c.ownSay = !c.carry; // (the step's own line: redevice() may say it again in the new device's words)
       Events.emit('tutorial:step', { id: c.id, step: st.id, n: c.i + 1 });
     }
     if (was) { this.ui?.setPaused(false); if (c.said) this.ui?.say(c.said.who, c.said.text); }

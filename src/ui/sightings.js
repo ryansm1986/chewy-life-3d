@@ -24,7 +24,7 @@ export class SightingsPanel extends Panel {
   render() {
     const P = this.G?.peaceful; if (!P) { this.body.innerHTML = ''; return; }
     const L = P.sightings(), R = P.renown(), here = this.G.dungeon?.isRegion ? this.G.dungeon.regionId : null, at = this.opts?.at;
-    const where = at && ZONE[at] ? `${this.G.dungeon?.village?.def?.name || ZONE[at][0]}'s notice board` : 'Posted by the Wayfarer\'s Post';
+    const where = at === 'guild' ? "Pinned up inside the Adventurers' Guild" : at && ZONE[at] ? `${this.G.dungeon?.village?.def?.name || ZONE[at][0]}'s notice board` : 'Posted by the Wayfarer\'s Post';
     const card = (s, i) => {
       const Z = ZONE[s.zone] || [s.zone, '#c8a0ff'], K = KINDS[s.kind] || { label: s.kind }, B = s.bounty || {};
       const mats = Object.entries(B.mats || {}).map(([k, n]) => `<span class="sg-chip" title="${esc(k)}">${glyph(k)}${n}</span>`).join('');

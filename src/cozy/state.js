@@ -13,7 +13,8 @@
 //       tired:    { [member key]: world hour it ends },
 //       seq:      n,                                      // the next expedition uid
 //     },
-//     guild: {}, scav: {}, sightings: { day, list, renown, total }, // phases D, C and B fill these (COZY §5–§7)
+//     guild: { level, hires, seq, cand, wages, met },                  // the Adventurers' Guild (cozy/guild.js, phase D)
+//     scav: {}, sightings: { day, list, renown, total },              // phases C and B fill these (COZY §6, §7)
 //   }
 //
 // New state is additive and lazy (the homestead pattern, COZY §9): normalizeCozy is an idempotent, type-checked fill
@@ -21,6 +22,7 @@
 // a clock with no wall-clock mark, so its first load counts no time away. A member key is 'hero:<id>' (benched heroes)
 // or 'hire:<id>' (the Guild's hires, phase D): the crew lists are hire-ready from the start.
 import { fillClock } from './clock.js';
+import { fillGuild } from './guild.js';
 
 export const COZY_V = 1;
 const obj = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
@@ -84,7 +86,7 @@ export function normalizeCozy(state) {
   E.tired = obj(E.tired) || {};
   for (const k of Object.keys(E.tired)) if (!parseMember(k) || !(num(E.tired[k]) > 0)) delete E.tired[k];
   E.seq = Math.max(1, Math.floor(num(E.seq, 1)));
-  c.guild = obj(c.guild) || {};
+  c.guild = fillGuild(c.guild); // (cozy/guild.js: the Guild's level, the hires, the candidates, the wages)
   c.scav = obj(c.scav) || {};
   const si = obj(c.sightings) || {};
   c.sightings = { day: Math.floor(num(si.day, -1)), list: arr(si.list), renown: Math.max(0, Math.floor(num(si.renown))), total: Math.max(0, Math.floor(num(si.total))) }; // (cozy/sightings.js: the board, renown)

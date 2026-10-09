@@ -679,7 +679,10 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   (the seed picker), waters and harvests by what the tile needs. Growth happens on `onNewDay`.
 - **Fishing** (`fishing.js`, `fishSocial.js`): one interactable per world follows the water ahead. The session runs
   cast → wait → bite → reel (`ui/reel.js` draws a `ReelSim`) → catch. `recordCatch` updates the Fish Log, and the
-  `fish:caught` event feeds quests. Kero's quest gives the rod; his Fishing Hut sells rods and buys fish.
+  `fish:caught` event feeds quests. Kero's quest gives the rod; his Fishing Hut sells rods and buys fish. R-12
+  (HOMESTEAD §7): `fishData.reelParams(rod, { relaxed })` (Settings › Fishing, `fishMode`), the cue at the float and
+  the card's placement in `ui/reel.js`, the camera's lean (`Fishing.frameFocus`, from game.js), and the balance sim
+  `tools/fishing-sim.mjs` (test-rpg; QA helpers in `tools/qa/fish-lib.mjs`).
 - **Cooking** (`kitchen.js`, `cookSocial.js`, `ui/cook.js`):
   - Stations: the cottage kitchen, a campfire camp by every Burrow / region arrival point (simple recipes), and
     Rosie's oven (baked goods).
@@ -908,6 +911,87 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   `mapMarks()`.
 - **QA**: `tools/qa/s33-scavenge.mjs`, `tools/qa/scavenge-shots.mjs`, `tools/scavenge-sim.mjs`, prod-smoke `dig`.
 
+## The cozy path, phase D: the Adventurers' Guild and hires (src/cozy/ — design and as built: docs/COZY.md §5, §13.4; ROADMAP CZ-7, CZ-8)
+- **Pure** (test-rpg "COZY: THE ADVENTURERS' GUILD AND HIRES"): `guild.js`: `fillGuild` / `guildState` (`state.cozy.guild`;
+  `normalizeCozy` calls it), `HIRE_CLASSES` (Guard, Archer, Scout, Healer, Porter: suits, perk, look, lines), `classSuits`
+  / `classBonus` (+15% once a crew) / `crewClasses` / `scoutHours` / `porterMats`, `rollCandidates` / `candidatesToday` /
+  `candidateLevel`, `canHire` / `signOn` / `dismiss`, `settleWages` (per world day, back pay first) / `payBack` /
+  `dailyWages`, `hireReturn` (XP on `hireXpToNext`, morale, trips), `hirePower`, `hireWhy`, `ROSTER_CAP` / `CREW_CAP` /
+  `GUILD_RANK` / `hireLevelCap`, `upgradeCheck` / `levelPerks`, `GUILD_TOOLS`. The expedition core reads it:
+  `expeditions.js` `memberInfo` (a hire's card), `crewPower` (the class bonus), `memberWhy` (on a break), `maxCrew`,
+  `tripHours(o, crew, state)` (a Scout), `resolve(…, soft)` (a Healer), `crewSoft` / `crewHaul`, `crewLines` (a hire's
+  voice).
+- **Runtime**: `guildRun.js` `installGuild(G, village)` (game.js, after installPeaceful) → `G.cozy.guild = { level, built,
+  rec, open, candidates, hire, dismiss, payBack, roster, hireInfo, upgradeInfo, upgrade, tools, buyTool, nameOf, faceHTML,
+  bannerLine, dailyWages, inTown, hachi, newDayIn, talkHachi, talkHire, settle, debugBuild, debugHires, folk }`; it wraps
+  `G.cozy.tick` (a crossed world day settles the wages at once; after an absence the lines go to the away card's
+  `away.guild`), syncs the level from the building (`village:changed`, `building:levelup`), upgrades through the houses'
+  scaffold (`G.housing.ext.construct` → `sim.levelUp`), and registers the Cozy debug section's Guild actions.
+  `hires.js` `installHires(G, run)`: `HACHI_SPEC` (+ `hachiExtras`: brows, the walking stick in `handR`, the map case),
+  `hireSpec(h)` (the seed's townsfolk + `CLASS_LOOK` extras), the `GuildFolk` villagers (Old Hachi, role `shop`, at the
+  door; a Villager per hire, `v.hire`, homed at the Guild; `interacted` overridden to the Guild's talks), `leave` /
+  `walkIn` on `expedition:sent` / `expedition:back`, `inTown()`, `prewarm` (the rig built behind the panel).
+- **The model** `world/buildings/guild.js` `guild(B, level)` (levels 1–3, the kit's Builder; `crest`, `bigSign`,
+  `crossedArms`, `weaponRack`, `trainingDummy`, `yardBoard`, `wallMap`, `staff`, `pack`, `supplyCart`), registered in
+  `models.js`, `index.js` DETAIL `[1, 2, 2]`.
+- **UI**: `ui/guild.js` + `.css` (`'guild'`: Hire · Roster · Guild, the two boards); `ui/expeditions.js` (hires in the crew
+  picker, the class chip and bonus, `at: 'guild'` sends, the crew cap), `ui/awayCard.js` (At the Guild; hire faces and
+  names), `ui/cozyChip.js` (hire names), `ui/sightings.js` (`at: 'guild'`); padNav `START.guild`, `.p-guild button`.
+- **Hooks**: `world/buildings/catalog.js` (`guild`), `world/plots.js` (`CIVIC`, `PLOT_TYPES`), `world/buildMode.js`
+  (`RANK_REQ.guild`, `keepWhy`: the Guild stays while hires live there), `world/village.js` (`interactionFor` 'guild',
+  the banner's wages line in `onNewDay`), `game.js` (install; `syncTownsfolk` counts the hires first; unique townsfolk
+  ids), `cozy/state.js` (`fillGuild`), `cozy/expeditionRun.js` (`members` lists the hires; a hire's XP and morale on the
+  return; the Porter's haul; `tripHours`; `away.guild`), `cozy/scavengeWorld.js` (`redraw`).
+- **QA**: `tools/qa/s34-guild.mjs`, prod-smoke `guild`, `tools/qa/guild-shots.mjs`.
+
+## The cozy path, phase E: the story rerouted (src/cozy/ — design and as built: docs/COZY.md §3, §13.5; ROADMAP CZ-9)
+- **Pure** (test-rpg "COZY: THE STORY REROUTED"): `cozy/objectives.js` gains the story's crew routes: `BURROW_ROUTES`
+  (burrow1, king, umbrella, oni, tails → objective `quest:<id>`, kinds `quest` / `burrowBoss`, their gates, trophies
+  and the boss whose quest unique waits), `questRouteStep` / `questLeft` (your kills and floors shrink the need),
+  `DUNGEON_ROUTES` + `dungeonRouteOpen` (`dungeon:<zone>`: the zone dungeons' first clears, 2 Heart Treats needed),
+  `RELIEFS[z].trophy` (the captains' banners), `STORY_READY` (all four reliefs), and the zone villagers' quests
+  (`zq:<quest>:<step>`: a find, a rescue, a kill count, a floor, a boss once the dungeon is cleared; `zoneQuestStep` /
+  `villageObjectives`; `o.trail` from a partial), `burrowErrandLevel` (the Burrow's errands go as deep as the story).
+  `expeditions.js`: gate kind `quest`, `supplies.freeLunch` (Rosie's lunch counts as fed), `supplies.potionsNeed`, a quest
+  partial, the trophy (a success only) and burrow1's Mochi Jelly in `rollLoot`; **the XP model** `XP_SHARE` /
+  `xpLevelMul` / `xpFor` (a share of a level, level-matched); `levelGapMul` in `crewPower` (a member far below the
+  objective pulls less); `oddsOf` makes a trail found a sure thing at r ≥ 0.9. `guild.js`: `candidateLevel` = the
+  strongest hero − 2, at least 3 (`CAND_MIN`). `rpg/zones.js` `recordCrewClear(state, id)`
+  (`dungeon.crew`, T0 counted and T1 open, `dungeon.cleared` untouched; `fillTiers` keeps a crew's Lantern awake),
+  `rpg/zoneProgress.js` `openedByPrev` reads `dungeon.crew`.
+- **The story** (`world/story.js`): `crewObjectives` (= `storyObjectives`), `completeStep(id, i, { crew })` (the step
+  done as yours would be; `q.crewSteps` / `q.crewBy`: the Journal says "· done by Moka's crew"), `crewResult(id, result,
+  { crew })` (a success does every fight step left; a partial half of burrow1's kills or a boss quest's floor), `owe` /
+  `payOwed` (a quest unique whose boss a crew beat is kept in `state.quests.owed` until your own win over that boss:
+  `boss:dead`), `homeTalkTarget` (ROADMAP R-4).
+- **Runtime** (`cozy/expeditionRun.js`): `complete()` applies a quest route through `G.story.crewResult`, a dungeon
+  clear through `crewClear(zone, crew)` (recordCrewClear, `noteFloor`, `zoneUnlockOnClear`, any boss step of that
+  dungeon done by the crew, `dungeon:cleared` / `tier:unlocked` with `crew: true`, the gate's Lantern refreshed live),
+  Tamamo through `wakeDeep()` (the Deep Burrow's T1); the trophy to storage (`addFurniture(…, { src: 'trophy' })`); the
+  report's `quest` / `cleared` / `deep` news; `beatenAll()` ("You beat us to it!" for quest and dungeon routes, on
+  `quest:update` / `dungeon:cleared`, a tick later); `relieve()` keeps `zones[z].celebrateCrew`; `zoneQuestResult()` (a
+  zone villager's step: the item home, a rescued villager walking home (`villager:rescued` with `crew: true`), a floor
+  noted, half a count on a partial; the turn-in talk stays yours); `objectives('village')` (the Board's Villages tab).
+- **Homestead XP** (`cozy/homesteadXp.js`, installed from game.js): `HOME_XP`, `homeXp`, `homeXpBase`; the events
+  `garden:harvest`, `fish:caught`, `dish:cooked`, `building:placed` (new, `world/village.js place`), `scavenge:gather`,
+  `scavenge:dig` pay the hero being played (`actions.addXp`, the "+N xp" float); event `homestead:xp`.
+- **The kill-request swap**: `Story.scavengeRequest(npc)` replaces half the "defeat yokai" asks in `requestFlow`.
+- **The celebration on arrival**: `regions/village/village.js` `party` (a crew's save not yet seen: the saved look built
+  as a growable group), `startParty()` → `cozy/crewParty.js` `crewParty(village, keys)` (the crew as Actors: heroes'
+  own rigs, hires' Toybox villagers, either side of you at the Waypoint Shrine; they cheer, then walk off and poof);
+  `updateCelebration` plays the crew's banner ("… drove the siege off"). Event `village:celebrate`. The heroes'
+  joining scenes wait for it (`calm()` in poeJoin / shihtzuJoin / goldenJoin).
+- **Trophies**: `home/furniture.js` set `trophy` (`TROPHY_IDS`: 4 Burrow bosses, 4 zone bosses, 4 captains' banners;
+  `trophy: <boss id>`, never sold), the models in `home/trophyModels.js` (`TROPHY_BUILDERS`, registered in
+  `furnitureMesh.js`).
+- **UI**: `ui/expeditions.js` (the keepsake and story chips, the quest title, the report's ribbons, the Villages tab and
+  its icon in `ui/cozyIcons.js`; padNav's X / Y work there too), `ui/travel.js` +
+  game.js `zoneCard` (the 救 stamp and "cleared by a crew"), `ui/panels.css` `.tv-stamp.crew`.
+- **QA**: test-rpg "COZY: THE STORY REROUTED"; `tools/qa/s37-cozy-story.mjs` (the headline: a fresh game to the Bamboo
+  Depths' crew clear with no fights; the keepsakes in a room; all four sieges and their celebrations; the whole story to
+  the Onsen Caverns with no fights); prod-smoke `crewclear`; the pace: `tools/expedition-sim.mjs` (Takemori) and
+  `tools/story-sim.mjs` (all four zones).
+
 ## Persistent state `G.state` (JSON-serialisable, saved to localStorage)
 ```js
 state = {
@@ -940,7 +1024,7 @@ state = {
   //   workbench: { known, crafted }; per building record: interior, owner, style, homeStars
   cookbook: { known: { recipe: day }, cooked: { recipe: n }, quick },
   // per hero: heroes[id].player.meal = { dish, buff, tier, left (s of play), dur } (Well Fed)
-  cozy: { v, clock: { h, wall }, exp: { active, reports, progress, done, errands, tired, seq }, guild, scav: { [area]: { day, taken, found, dug, quest }, tools, stats, cheat }, sightings }, // the cozy path (src/cozy/state.js, scavenge.js)
+  cozy: { v, clock: { h, wall }, exp: { active, reports, progress, done, errands, tired, seq }, guild: { level, hires: [{ id, seed, name, cls, lvl, xp, morale, since, owed, unpaid, floor, onBreak, trips, wins }], seq, cand: { day, list }, wages: { day, paid, short, total, banner }, met }, scav: { [area]: { day, taken, found, dug, quest }, tools, stats, cheat }, sightings }, // the cozy path (src/cozy/state.js, scavenge.js)
 }
 ```
 

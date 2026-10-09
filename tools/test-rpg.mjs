@@ -23,6 +23,8 @@ import { BUFFS, mealFor, mealActive } from '../src/life/meals.js';
 import { growNight, harvestCrop, isRipe, SPRINKLE } from '../src/life/gardenRules.js';
 import { FISH, FISH_IDS, SPOTS, biters, rollFish, rollSize, recordCatch, timeOf, MILESTONES } from '../src/life/fishData.js';
 import { ReelSim } from '../src/life/reelSim.js';
+import { table as fishTable, tierMeans, TARGETS as FISH_TARGETS } from './fishing-sim.mjs';
+import { reelParams, RODS } from '../src/life/fishData.js';
 import { FURNITURE, FURNITURE_IDS, SURFACES, SURFACE_IDS, SETS as FSETS, CATS as FCATS, TABS as FTABS, CELL as FCELL, footprint, storable, itemDef, storageList, tabOf, STARTER_STORAGE } from '../src/home/furniture.js';
 import { LAYOUTS, shellOf, layoutFor, isBack, WALL_H } from '../src/home/rooms.js';
 import { canPlace, poseOf, boxOf, cellsOf, wallSpan, frontCell, nextK } from '../src/home/placement.js';
@@ -682,8 +684,18 @@ hr('HOMESTEAD');
   };
   { let ok1 = 0, tt = 0; for (let k = 0; k < 60; k++) { const r = bot(0.18, 'smooth', 0.28, 1, 100 + k); if (r.done === 'catch') { ok1++; tt += r.t; } }
     ok(ok1 >= 57 && tt / ok1 > 2.5 && tt / ok1 < 6, `reel: an easy fish is caught in a few seconds (${ok1}/60, ${(tt / Math.max(1, ok1)).toFixed(1)}s)`); }
-  { let r1 = 0, r2 = 0; for (let k = 0; k < 80; k++) { if (bot(0.78, 'darter', 0.28, 1, 300 + k).done === 'catch') r1++; if (bot(0.78, 'darter', 0.36, 0.82, 300 + k).done === 'catch') r2++; }
-    ok(r1 < 72 && r2 > r1, `reel: the Moon Koi is hard, easier with the Moonlit Rod (${r1} vs ${r2} of 80)`); }
+  // R-12, the cozy retune (tools/fishing-sim.mjs: a bot with a human's 0.28-0.36 s reaction plays the real ReelSim)
+  { const t1 = tierMeans(fishTable({ rod: 1, N: 200 })), t2 = tierMeans(fishTable({ rod: 2, N: 200 })), tx = tierMeans(fishTable({ rod: 1, relaxed: true, N: 200 })), pc = v => v.map(x => Math.round(x * 100) + '%').join(' / ');
+    ok(t1.every((v, i) => v >= FISH_TARGETS.rod1[i]), `reel balance, the Bamboo Rod: a beginner lands common / uncommon / rare / legendary ${pc(t1)} (targets ${pc(FISH_TARGETS.rod1)})`);
+    ok(t2.every((v, i) => v >= FISH_TARGETS.rod2[i]) && t2[2] - t1[2] > 0.15 && t2[3] - t1[3] > 0.25, `reel balance, the Moonlit Rod helps noticeably: ${pc(t2)}`);
+    ok(t1[2] < 0.85 && t1[3] < 0.5, `reel balance: the rare and legendary fish still ask for care with the Bamboo Rod (${pc(t1)})`);
+    ok(tx.every((v, i) => v >= t1[i]) && tx[0] >= 0.97 && tx[2] >= 0.9, `reel balance, Relaxed (Settings › Fishing): easier still, ${pc(tx)}`);
+    const r1 = reelParams(1), r2 = reelParams(2), rx = reelParams(1, { relaxed: true });
+    ok(r1.zone === RODS[1].zone && r2.zone > r1.zone && r2.drain < r1.drain && r2.window > r1.window && rx.zone > r1.zone && rx.drain === r1.drain / 2 && rx.window === 1.5 && r1.window >= 0.9, `reel params: the rods and Relaxed (${JSON.stringify({ r1, r2, rx })})`);
+    const order = id => FISH[id].d, tier = id => PANTRY[id].rare || 0; ok(FISH_IDS.every(a => FISH_IDS.every(b => tier(a) <= tier(b) || order(a) > order(b))), 'fish difficulty rises with rarity (the rare fish in the Fish Log are the hard ones)'); }
+  { const s = new ReelSim({ d: 0.3, rng: seq(4) }); ok(s.f >= s.z && s.f <= s.z + s.zh, 'reel: the zone starts on the fish');
+    s.f = s.ft = 0.97; s.z = 0; s.tt = 99; const m0 = s.m; for (let i = 0; i < 60; i++) s.step(1 / 60, false); ok(s.m === m0 && !s.done, 'reel: no drain in the first second (the grace)'); }
+  { const s = new ReelSim({ d: 0.5, floor: 0.04, rng: seq(5) }); s.f = s.ft = 0.97; s.tt = 99; for (let i = 0; i < 1200; i++) s.step(1 / 60, false); ok(!s.done && s.m === 0.04, 'reel: a floor (the guide, the first catch) never lets it escape'); }
   { const s = new ReelSim({ d: 0.4, rng: seq(2) }); s.f = s.ft = 0.95; s.tt = 99; let t = 0; while (!s.done && t < 10) { s.step(1 / 60, false); t += 1 / 60; }
     ok(s.done === 'escape' && s.m === 0 && t < 3, 'reel: letting go loses the fish within a couple of seconds');
     ok(s.step(1 / 60, true) === 'escape', 'reel: done is final'); }
@@ -954,7 +966,7 @@ hr('FURNITURE SOURCES');
   ok(['melonStool', 'catTower', 'pumpkinLamp'].every(id => FURNITURE[id].shop === false && Rc.recipeFor(id)), 'recipes: every craft-only piece has a recipe');
   ok(Rc.RECIPES.melonStool.pantry.melon && Rc.RECIPES.melonStool.mats.wood && Rc.RECIPES.catTower.mats.wood && Rc.RECIPES.catTower.mats.silk && Rc.RECIPES.pumpkinLamp.pantry.pumpkin && Rc.RECIPES.pumpkinLamp.mats.lantern, 'recipes: melon + wood, wood + silk, pumpkin + lantern');
   ok(Rc.START_RECIPES.length >= 4 && Rc.SCROLLS.length >= 4 && Rc.RECIPE_IDS.some(id => Rc.RECIPES[id].learn === 'reward'), 'recipes: some known from the start, some sold as scrolls, some given as thanks');
-  ok(FURNITURE_IDS.filter(id => FURNITURE[id].shop === false).every(id => Rc.recipeFor(id) || Fd.FIND_WHERE.some(w => Fd.FIND_TABLES[w].includes(id))), 'every never-sold piece can be crafted or found');
+  ok(FURNITURE_IDS.filter(id => FURNITURE[id].shop === false && !FURNITURE[id].trophy).every(id => Rc.recipeFor(id) || Fd.FIND_WHERE.some(w => Fd.FIND_TABLES[w].includes(id))), 'every never-sold piece can be crafted or found (the keepsakes come from crews: COZY §4.6)');
   { // the workbench state and the craft math
     const s = newGameState(); delete s.workbench;
     ok(!Rc.knowsRecipe(s, 'andonLamp') && Rc.knowsRecipe(s, 'woodChair') && Rc.knownRecipes(s).length === Rc.START_RECIPES.length, 'workbench: the start recipes are known from the beginning');
@@ -1770,7 +1782,7 @@ hr('COZY: THE WORLD CLOCK, TIME AWAY, STATE, OBJECTIVES, EXPEDITIONS (docs/COZY.
     ok(O.objectivePower(st2, R) === 84 && O.campsStanding(st2, 'bamboo') === 3, 'relief: all three camps standing → the full 84');
     const Zb = Z.zoneOf(st2, 'bamboo'); Zb.siegeCamps = [{ id: 'west', cleared: true }, { id: 'east', cleared: true }, { id: 'south', cleared: false }];
     ok(O.objectivePower(st2, R) === 42 && O.campsStanding(st2, 'bamboo') === 1, 'relief: each broken camp takes 25% off (the captain is the last 25%)');
-    Z.saveVillage(st2, 'bamboo'); ok(O.storyObjectives(st2).length === 0 && !O.objectiveOpen(st2, R), 'relief: gone once the village is saved');
+    Z.saveVillage(st2, 'bamboo'); ok(!O.storyObjectives(st2).some(o => o.kind === 'siege') && !O.objectiveOpen(st2, R), 'relief: gone once the village is saved');
   }
   // ---- power, odds, gates (COZY §4.2)
   { const st = fresh(); st.flags.mokaJoined = st.flags.poeJoined = true;
@@ -1811,7 +1823,10 @@ hr('COZY: THE WORLD CLOCK, TIME AWAY, STATE, OBJECTIVES, EXPEDITIONS (docs/COZY.
     ok(L2.items.map(i => i.rarity).join() === 'rare' && nm(L2) <= 10 && L3.items.length === 0 && nm(L3) <= 7 && L4.coins === 0 && !L4.items.length, 'rewards: half on a partial (the rare kept), a third on a setback, nothing when called home');
     ok(!L1.items.some(i => i.rarity === 'unique' || i.rarity === 'set') && !JSON.stringify(L1).includes('gem'), 'rewards: never a unique or a gem from a crew');
     const xs = X.xpFor(er, 3, 'success'), xp = X.xpFor(er, 3, 'partial'), xb = X.xpFor(er, 3, 'setback'), xh = X.xpFor(er, 20, 'success');
-    ok(xs === 15 * O.killXp(4) && xp === xs && Math.abs(xb - xs / 2) <= 1 && xh < xs * 0.2 && xh >= 1, "rewards: XP worth ~15 kills of the errand's level, full on a partial, half on a setback, small for a hero far above it");
+    ok(xs === Math.round(X.XP_SHARE.errand * xpToNext(3)) && xp === xs && Math.abs(xb - xs / 2) <= 1 && xh < X.XP_SHARE.errand * xpToNext(4) * 0.2 && xh >= 1, "rewards: XP is a share of a level (an errand 0.15 of the hero's own level up to the errand's), full on a partial, half on a setback, small for a hero far above it (CZ-9)");
+    ok(X.xpLevelMul(4, 4) === 1 && X.xpLevelMul(2, 4) === 1 && X.xpLevelMul(6, 4) === 0.5 && X.xpLevelMul(40, 4) === 0.1, 'rewards: above the objective\'s level the XP diminishes (1 / (1 + 0.5 × the levels above), at least a tenth)');
+    const dg = { kind: 'dungeon', level: 8, rewards: {} };
+    ok(X.xpFor(dg, 8, 'success') === xpToNext(8) && X.xpFor(dg, 6, 'success') === xpToNext(6), 'rewards: a dungeon clear is about one level (no more "level 10 in one trip")');
     st.flags.mokaJoined = true; st.heroes.moka.player.lvl = 3; st.cozy.clock.h = 10;
     const e = X.startExpedition(st, er, ['hero:moka'], { meals: {}, potions: 0 }, { r: 1.3, need: 24, power: 31, odds: 'sure', p: 1, seed: 5 });
     ok(CS.heroAway(st, 'moka') === e && st.cozy.exp.errands.day === 0 && st.cozy.exp.errands.taken.includes(er.id) && X.hoursLeft(st, e) === er.hours, 'trip: a crew on the road (the hero is away, the errand taken for the day)');
@@ -1997,6 +2012,208 @@ hr('COZY: THE SIGHTINGS BOARD (docs/COZY.md §6.3, cozy/sightings.js)');
   ok(SG.renownTitle(0) === 'Wanderer' && SG.renownTitle(12) === 'Bounty Hunter' && SG.renownTitle(99) === 'Legend of the Wilds' && SG.nextTitle(12).title === 'Wild Warden' && SG.nextTitle(60) === null, 'sightings: renown titles');
   const L3 = SG.sightingsToday(st, 3, zones);
   ok(L3 !== L1 && L3.every(s => !s.done && s.day === 3) && st.cozy.sightings.renown === 12, 'sightings: the next world day brings three new ones; renown stays');
+}
+
+hr('COZY: THE ADVENTURERS\' GUILD AND HIRES (docs/COZY.md §5, cozy/guild.js)');
+{
+  const GD = await import('../src/cozy/guild.js'), CS = await import('../src/cozy/state.js'), X = await import('../src/cozy/expeditions.js'), O = await import('../src/cozy/objectives.js'), Z = await import('../src/rpg/zones.js');
+  const { BUILDINGS } = await import('../src/world/buildings/catalog.js'), PL = await import('../src/world/plots.js');
+  const fresh = () => CS.normalizeCozy(Z.normalizeZones(normalizeHeroes(newGameState())));
+  // ---- the building (COZY §5.1)
+  { const B = BUILDINGS.guild, COMBAT = ['bone', 'silk', 'crystal', 'lantern', 'mochi'];
+    ok(B && B.cat === 'special' && B.unique && B.levels === 3 && B.size.join() === '4,3' && 'glb' in B, 'guild: a unique special building, 4x3, three levels, a glb slot');
+    ok(JSON.stringify(B.cost) === JSON.stringify({ coins: 400, wood: 30, stone: 16, petal: 4 }) && Object.keys(B.cost).every(k => !COMBAT.includes(k)), 'guild: level 1 costs 400 coins, 30 wood, 16 stone, 4 petal (no combat-only material)');
+    ok(JSON.stringify(B.levelCost[1]) === JSON.stringify({ coins: 900, wood: 40, stone: 30, silk: 4, lantern: 2 }) && JSON.stringify(B.levelCost[2]) === JSON.stringify({ coins: 1800, wood: 60, stone: 40, crystal: 4, lantern: 4 }), 'guild: levels 2 and 3 cost as COZY §5.1');
+    ok(GD.GUILD_RANK.join() === '0,2,3,4', 'guild: built at village rank 2, level 2 at 3, level 3 at 4');
+    const civic = PL.PLOTS.filter(p => p.allows.includes('guild')).map(p => p.id).sort();
+    ok(civic.join() === 'civic-e,civic-w' && PL.PLOT_TYPES.has('guild'), 'guild: stands on the civic plots (civic-e, civic-w) and only on a plot');
+    ok(civic.every(id => { const p = PL.PLOT_BY_ID[id], r = PL.DOOR_ROT[p.door] % 2; return !!PL.plotSpot(p, r ? 3 : 4, r ? 4 : 3); }), 'guild: fits both civic plots (the footprint stays 4x3 on every level)');
+  }
+  // ---- the state and migration (COZY §9)
+  { const old = normalizeHeroes(newGameState()); delete old.cozy;
+    const st = CS.normalizeCozy(old), g = st.cozy.guild;
+    ok(g.level === 0 && g.hires.length === 0 && g.seq === 1 && g.cand.day === -1 && g.wages.day === -1 && !g.met, 'guild state: an old save gets an empty Guild (not built, no hires)');
+    const j = JSON.stringify(st.cozy.guild); CS.normalizeCozy(st); ok(JSON.stringify(st.cozy.guild) === j, 'guild state: normalizeCozy is idempotent');
+    const bad = { cozy: { guild: { level: 9, hires: [{ id: 'h2', name: 'Kenta', cls: 'wizard', lvl: -3, morale: 7, owed: -5 }, { id: 'h2', name: 'dup' }, { nope: 1 }, 'x'], seq: 0, cand: { day: 3, list: [{ i: 0, cls: 'scout', name: 'A', lvl: 2, seed: 7 }, { cls: 'bard' }] }, wages: { day: 'x', short: -1 }, extra: 'kept' } } };
+    CS.normalizeCozy(bad); const B = bad.cozy.guild;
+    ok(B.level === 3 && B.hires.length === 1 && B.hires[0].cls === 'guard' && B.hires[0].lvl === 1 && B.hires[0].morale === GD.MORALE_MAX && B.hires[0].owed === 0 && B.seq === 3 && B.cand.list.length === 1 && B.wages.day === -1 && B.extra === 'kept', 'guild state: a broken Guild is type-checked (bad classes, levels, morale, duplicates; seq past the ids; other fields kept)');
+    ok(JSON.stringify(saveableState(st)).includes('"guild"'), 'guild state: saved with the household');
+  }
+  // ---- candidates and sign-on (COZY §5.2)
+  { const st = fresh();
+    const a = GD.rollCandidates(5, 4, 1), b = GD.rollCandidates(5, 4, 1), c = GD.rollCandidates(6, 4, 1);
+    ok(a.length === 3 && JSON.stringify(a) === JSON.stringify(b) && JSON.stringify(a) !== JSON.stringify(c), 'candidates: three a world day, seeded by the day');
+    ok(new Set(a.map(x => x.cls)).size === 3 && a.every(x => GD.CLASS_IDS.includes(x.cls) && x.lvl >= 3 && x.lvl <= 5 && x.name) && new Set(a.map(x => x.name)).size === 3, 'candidates: three different classes, three names, a level near the crew\'s − 2');
+    ok(GD.rollCandidates(1, 60, 1).every(x => x.lvl === 20) && GD.rollCandidates(1, 60, 3).every(x => x.lvl <= 40), 'candidates: capped at the Guild\'s hire level cap (20 / 30 / 40)');
+    st.heroes.chewy.player.lvl = 9; ok(GD.candidateLevel(st) === 7, 'candidates: two below the strongest joined hero (CZ-9)');
+    { const s2 = fresh(); s2.flags.mokaJoined = true; s2.heroes.moka.player.lvl = 4; s2.cozy.guild.level = 1;
+      const lv = GD.candidateLevel(s2), C = GD.rollCandidates(3, lv, 1), weakest = Math.min(...C.map(x => x.lvl));
+      const h = GD.signOn(s2, { ...C.find(x => x.lvl === weakest), taken: false }, 0), er = O.objective(s2, O.errandIds('burrow', 3)[0]);
+      const c = X.canSend(s2, er, ['hire:' + h.id], {}, { rank: 2, guild: 1 });
+      ok(lv === 3 && weakest >= 3 && c.ok && ['risky', 'good', 'sure'].includes(c.odds.key), 'candidates: a fresh rank-2 Guild\'s weakest candidate (Chewy L1, Moka L4) takes a Burrow errand alone, at Risky or better (CZ-9)', { lv, weakest, odds: c.odds.key, r: c.r }); }
+    const L = GD.candidatesToday(st, 2);
+    ok(L === GD.candidatesToday(st, 2) && st.cozy.guild.cand.day === 2 && L.length === 3, 'candidates: today\'s list is rolled once a world day and kept');
+    ok(!GD.canHire(st, L[0], 9999).ok && /isn't built/.test(GD.canHire(st, L[0], 9999).why), 'hire: nobody signs on before the Guild is built');
+    st.cozy.guild.level = 1;
+    ok(!GD.canHire(st, L[0], 0).ok && GD.canHire(st, L[0], 9999).ok && GD.canHire(st, L[0], 0).fee === 40 * L[0].lvl, 'hire: the sign-on fee is 40 × level');
+    const h = GD.signOn(st, L[0], 2 * 24 + 5);
+    ok(h.id === 'h1' && h.since === 2 && h.morale === 1 && h.lvl === L[0].lvl && L[0].taken && !GD.canHire(st, L[0], 9999).ok, 'hire: signed on (h1, since world day 2, morale 1), the candidate taken');
+    GD.signOn(st, L[1], 50); GD.signOn(st, L[2], 50);
+    const more = GD.rollCandidates(9, 4, 1)[0];
+    ok(st.cozy.guild.hires.length === 3 && /roster is full/.test(GD.canHire(st, more, 9999).why), 'hire: the roster cap is 3 at level 1');
+    st.cozy.guild.level = 2; ok(GD.canHire(st, more, 9999).ok && GD.rosterCap(2) === 6 && GD.rosterCap(3) === 9, 'hire: 6 at level 2, 9 at level 3');
+    ok(GD.dismiss(st, 'h2')?.id === 'h2' && st.cozy.guild.hires.length === 2 && !GD.dismiss(st, 'h2'), 'dismiss: a kind goodbye takes them off the roster');
+  }
+  // ---- wages on the world clock (COZY §5.2, §4.4.1)
+  { const st = fresh(); st.cozy.guild.level = 1;
+    const c = GD.rollCandidates(0, 3, 1).map(x => ({ ...x, lvl: 3 }));
+    const h1 = GD.signOn(st, c[0], 0), h2 = GD.signOn(st, c[1], 0);
+    let o = GD.settleWages(st, 0, 100);
+    ok(o.days === 0 && o.paid === 0 && st.cozy.guild.wages.day === 0, 'wages: the first settle starts the clock (no pay)');
+    o = GD.settleWages(st, 1, 100);
+    ok(o.days === 1 && o.paid === 24 && h1.morale === 1.02 && h2.morale === 1.02 && st.cozy.guild.wages.banner === 24, 'wages: a world day pays 4 × level each, a paid day lifts morale, the morning banner hears of it');
+    ok(GD.dailyWages(st) === 24 && GD.wageOf(5) === 20, 'wages: 4 × level coins a world day');
+    o = GD.settleWages(st, 3, 30);
+    ok(o.days === 2 && o.paid === 30 && o.short === 18 && h1.owed === 6 && h2.owed === 12 && h2.unpaid === 1 && h2.morale < 1, 'wages: time away counts (two world days at once); short coins leave a hire owed and glum');
+    GD.settleWages(st, 4, 0); GD.settleWages(st, 5, 0); GD.settleWages(st, 6, 0); GD.settleWages(st, 7, 0);
+    ok(h2.morale === GD.MORALE_MIN && h2.onBreak && h1.morale === GD.MORALE_MIN && h1.onBreak, 'wages: three days at the morale floor and they take a break (benched, not gone)');
+    ok(X.memberWhy(st, 'hire:' + h2.id).startsWith('On a break'), 'wages: a hire on a break can\'t join a crew');
+    const owed = h2.owed, p = GD.payBack(st, h2.id, 9999);
+    ok(p.paid === owed && p.back && !h2.onBreak && h2.owed === 0 && h2.morale >= 0.9, 'wages: paying back their wages brings them back from the break');
+    o = GD.settleWages(st, 8, 9999);
+    ok(!h1.onBreak && h1.owed === 0 && o.perHire[h1.id].back, 'wages: the next pay day settles the back pay first and ends the break');
+    const st2 = fresh(); st2.cozy.guild.level = 1; GD.settleWages(st2, 4, 0); const nh = GD.signOn(st2, c[2], 4 * 24 + 1);
+    ok(GD.settleWages(st2, 4, 99).paid === 0 && GD.settleWages(st2, 5, 99).paid === GD.wageOf(nh.lvl), 'wages: a hire\'s first wage is the day after they sign on');
+  }
+  // ---- crews: power, classes, perks (COZY §4.2, §5.2)
+  { const st = fresh(); st.cozy.guild.level = 1;
+    const mk = (cls, lvl = 4) => GD.signOn(st, { i: 0, seed: 1, name: cls, cls, lvl, taken: false }, 0);
+    const g = mk('guard'), a = mk('archer'), s = mk('scout');
+    const m = X.memberInfo(st, 'hire:' + g.id);
+    ok(m.type === 'hire' && Math.abs(m.power - 6 * 4 * 1 * 1.05) < 1e-9 && m.cls === 'guard' && m.name === 'guard', 'hires: power = 6 × level × morale × (1 + 0.05 × the Guild\'s level)');
+    g.morale = 1.15; ok(Math.abs(X.memberInfo(st, 'hire:' + g.id).power - 6 * 4 * 1.15 * 1.05) < 1e-9, 'hires: morale scales their power');
+    st.flags.mokaJoined = true; st.heroes.moka.player.lvl = 4;
+    ok(Math.abs(X.heroPower(st, 'moka') / X.memberInfo(st, 'hire:' + a.id).power - 1.59) < 0.05, 'hires: level for level a hero is about 1.5× a hire');
+    const siege = O.objective(st, 'relief:bamboo'), errand = O.errandsFor(st, 0)[0];
+    ok(GD.classSuits('guard', siege) && GD.classSuits('scout', errand) && GD.classSuits('porter', errand) && GD.classSuits('archer', { kind: 'dungeon' }) && GD.classSuits('healer', { kind: 'quest', tags: ['rescue'] }) && GD.classSuits('scout', { kind: 'quest', tags: ['find'] }) && !GD.classSuits('archer', siege), 'classes: Guard sieges, Archer dungeon clears, Scout finds and errands, Healer rescues, Porter errands');
+    const P0 = X.crewPower(st, ['hire:' + a.id], siege), P1 = X.crewPower(st, ['hire:' + a.id, 'hire:' + g.id], siege), P2 = X.crewPower(st, ['hire:' + g.id, 'hire:' + mk('guard').id], siege);
+    ok(P0.mul === 1 && Math.abs(P1.mul - 1.15) < 1e-9 && Math.abs(P2.mul - 1.15) < 1e-9 && P1.cls.cls === 'guard', 'classes: a class that suits the job adds 15% to the crew, once');
+    ok(X.tripHours(errand, ['hire:' + s.id], st) === Math.round(errand.hours * 0.85 * 100) / 100 && X.tripHours(errand, ['hire:' + g.id], st) === errand.hours, 'classes: a Scout takes 15% off the trip');
+    ok(X.resolve(0.6, () => 0.99, siege, false, true).result === 'partial' && X.resolve(0.6, () => 0.99, siege, false, false).result === 'setback', 'classes: a Healer turns a setback into a partial');
+    ok(JSON.stringify(GD.porterMats({ wood: 8, stone: 3 }, true)) === JSON.stringify({ wood: 10, stone: 4 }), 'classes: a Porter brings 25% more materials');
+    ok(X.maxCrew(st) === 4 && GD.crewCap(3) === 5, 'crews: 4 a crew, 5 at Guild level 3');
+    const five = ['hero:moka', ...['guard', 'archer', 'scout', 'healer'].map(c => 'hire:' + mk(c, 9).id)];
+    st.cozy.guild.level = 1; ok(/At most 4/.test(X.canSend(st, errand, five, {}, {}).why), 'crews: five can\'t go at Guild level 1');
+    st.cozy.guild.level = 3; ok(X.canSend(st, errand, five, {}, { guild: 3 }).ok, 'crews: five go at Guild level 3');
+    ok(X.crewLines(st, ['hire:' + g.id], 'success', () => 0)[0].text === GD.HIRE_CLASSES.guard.lines[0], 'reports: a hire speaks in their class\'s voice');
+  }
+  // ---- leveling and morale from expeditions (COZY §4.6, §5.2)
+  { const st = fresh(); st.cozy.guild.level = 1;
+    const h = GD.signOn(st, { i: 0, seed: 3, name: 'Rin', cls: 'scout', lvl: 1, taken: false }, 0);
+    ok(GD.hireXpToNext(1) === Math.round(xpToNext(1) * 0.8) && GD.hireXpToNext(10) === Math.round(xpToNext(10) * 0.8), 'leveling: the hero curve × 0.8');
+    let r = GD.hireReturn(st, h.id, { xp: GD.hireXpToNext(1) + 1, result: 'success', fed: true });
+    ok(r.from === 1 && r.to === 2 && Math.abs(h.morale - 1.08) < 1e-9 && h.trips === 1 && h.wins === 1, 'leveling: a trip\'s XP levels a hire; a success and a fed lunch lift morale');
+    r = GD.hireReturn(st, h.id, { xp: 1e9, result: 'setback' });
+    ok(r.to === 20 && h.lvl === 20 && h.xp < GD.hireXpToNext(20) && Math.abs(h.morale - 1.03) < 1e-9, 'leveling: capped at 10 + 10 × the Guild\'s level; a setback lowers morale');
+    st.cozy.guild.level = 2; GD.hireReturn(st, h.id, { xp: 1e9, result: 'success' }); ok(h.lvl === 30, 'leveling: a bigger Guild trains them further (30 at level 2)');
+    for (let i = 0; i < 9; i++) GD.hireReturn(st, h.id, { result: 'success', fed: true }); ok(h.morale === GD.MORALE_MAX, 'morale: never above 1.15');
+    for (let i = 0; i < 9; i++) GD.hireReturn(st, h.id, { result: 'setback' }); ok(h.morale === GD.MORALE_MIN && GD.moraleHearts(h.morale) === 1 && GD.moraleHearts(1) === 2 && GD.moraleHearts(1.1) === 3, 'morale: never below 0.85; 1–3 hearts');
+    GD.hireReturn(st, h.id, { xp: 50, result: 'recalled' }); ok(h.trips === 21, 'morale: a recalled crew counts no trip');
+  }
+  // ---- the load audit: a dismissed hire's crew comes home (COZY §9)
+  { const st = fresh(); st.cozy.guild.level = 1;
+    const h = GD.signOn(st, { i: 0, seed: 3, name: 'Rin', cls: 'scout', lvl: 3, taken: false }, 0), o = O.errandsFor(st, 0)[0];
+    const e = X.startExpedition(st, o, ['hire:' + h.id], {}, { r: 1, need: 10, power: 10, odds: 'good', p: 0.8 });
+    ok(!X.brokenExpeditions(st, id => O.objective(st, id)).length, 'load: a hire\'s expedition resumes');
+    GD.dismiss(st, h.id); ok(X.brokenExpeditions(st, id => O.objective(st, id)).some(b => b.e === e && /hire/.test(b.why)), 'load: a crew whose hire left the roster comes home');
+  }
+  // ---- upgrades and tools (COZY §5.1, §7.1)
+  { const lc = BUILDINGS.guild.levelCost;
+    ok(!GD.upgradeCheck(0, lc, 4).ok && GD.upgradeCheck(1, lc, 2).why === 'Needs village rank 3' && GD.upgradeCheck(1, lc, 3).ok && GD.upgradeCheck(2, lc, 3).why === 'Needs village rank 4' && GD.upgradeCheck(3, lc, 5).max, 'upgrades: level 2 at rank 3, level 3 at rank 4, then it is the grandest');
+    ok(GD.upgradeCheck(1, lc, 3, () => false).poor && JSON.stringify(GD.upgradeCheck(2, lc, 4).cost) === JSON.stringify(lc[2]), 'upgrades: the cost is the catalog\'s');
+    const P = [1, 2, 3].map(GD.levelPerks);
+    ok(P.map(p => p.roster).join() === '3,6,9' && P.map(p => p.crew).join() === '4,4,5' && P.map(p => p.levelCap).join() === '20,30,40' && P.map(p => p.power).join() === '5,10,15', 'upgrades: each level: the roster, the crew size, the hire level cap, the power bonus');
+    ok(Object.keys(GD.GUILD_TOOLS).join() === 'basket,bandana' && Object.values(GD.GUILD_TOOLS).every(t => t.cost.coins > 0 && !t.cost.bone && !t.cost.crystal && !t.cost.lantern), 'tools: the Forager\'s Basket and Shadow\'s Bandana, no combat-only material');
+  }
+}
+
+hr('COZY: THE STORY REROUTED (docs/COZY.md §3, ROADMAP CZ-9)');
+{
+  const CS = await import('../src/cozy/state.js'), O = await import('../src/cozy/objectives.js'), X = await import('../src/cozy/expeditions.js');
+  const Z = await import('../src/rpg/zones.js'), ZP = await import('../src/rpg/zoneProgress.js'), F = await import('../src/home/furniture.js');
+  const fresh = () => CS.normalizeCozy(Z.normalizeZones(normalizeHeroes(newGameState())));
+  const town = { rank: 1, pop: 5, built: {}, guild: 0 };
+  ok(['bamboo', 'maple', 'tidepool', 'onsen'].every(z => O.STORY_READY.has(`relief:${z}`)), 'sieges: all four reliefs are on the Board (phase A offered Takemori only)');
+  // ---- the Blossom Hollow story's fights (COZY §3.1)
+  { const st = fresh(); st.flags.mokaJoined = true;
+    st.quests = { active: [{ id: 'burrow1', step: 0, prog: 0 }], done: ['welcome'], requests: {} };
+    const L = O.storyObjectives(st), b1 = L.find(o => o.id === 'quest:burrow1');
+    ok(b1 && b1.kind === 'quest' && b1.power === 12 && b1.hours === 2 && b1.binds.quest === 'burrow1' && b1.supplies.freeLunch && b1.rewards.mochi === 3, 'burrow1: "Peek into the Burrow" on the Board: power 12, 2 h, Rosie packs the lunch, the 3 Mochi Jelly come home');
+    const c = X.canSend(st, b1, ['hero:moka'], {}, town);
+    ok(c.ok && c.crewPower.fed && c.odds.key === 'good', 'burrow1: Moka at level 1 alone, fed by Rosie\'s lunch: good odds', { r: c.r, odds: c.odds.key });
+    st.quests.active[0].prog = 4; ok(O.objectivePower(st, b1) === 6, 'burrow1: your kills count (4 of 8 made: half the need)');
+    st.quests.active[0] = { id: 'burrow1', step: 1, prog: 0 }; ok(O.objectivePower(st, b1) === 3 && O.objectiveOpen(st, b1), 'burrow1: only the Mochi Jelly left: a quarter of the need');
+    let s = 3; const rng = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+    const L1 = X.rollLoot(b1, 'success', rng), L2 = X.rollLoot(b1, 'partial', rng);
+    ok(L1.mats.mochi >= 3 && L2.mats.mochi >= 2 && !L1.trophy, 'burrow1: the crew brings the Mochi Jelly (half of it on a partial)');
+    st.quests.active = [{ id: 'homes', step: 0, prog: 0 }]; ok(!O.storyObjectives(st).some(o => o.binds?.quest), 'routes: a quest with nothing to fight (homes) has no crew route');
+    st.quests = { active: [{ id: 'king', step: 0, prog: 0 }], done: ['welcome', 'burrow1', 'homes', 'lights'], requests: {} };
+    const K = O.objective(st, 'quest:king');
+    ok(K.kind === 'burrowBoss' && K.power === 60 && K.hours === 6 && K.rewards.trophy === 'trophyMochiCrown' && K.rewards.items.join() === 'magic,magic,rare' && K.boss === 'mochiKing' && K.supplies.meals === 1, 'king: power 60 (floor 5 × 12), 6 h, a lunch each; brings King Mochi\'s crown cushion, 2 magic and a rare (no unique, no gem)');
+    ok(X.gateCheck(K.gates[0], st, town, [], {}).ok && !X.gateCheck(K.gates[0], { quests: { done: [] } }, town, [], {}).ok, 'king: its gate is "A Home for Everyone" done (a quest gate)');
+    st.quests.active[0].step = 1; ok(O.objectivePower(st, K) === 42, 'king: once the floor is reached (by you or a crew), 30% less');
+    ok(X.partialProgress(st, K, 0.8).quest === 'king', 'king: a partial keeps the quest\'s progress (Story.crewResult: the floor reached)');
+    const T = O.objective(st, 'quest:tails'), U = O.objective(st, 'quest:umbrella'), N = O.objective(st, 'quest:oni');
+    ok(U.power === 120 && N.power === 180 && T.power === 240 && T.hours === 10 && T.deep && N.gates.some(g => g.kind === 'pop' && g.n === 30) && T.gates.some(g => g.kind === 'guild' && g.n === 2) && T.gates.some(g => g.kind === 'rank' && g.n === 4), 'umbrella / oni / tails: powers 120 / 180 / 240, the Hot Spring and 30 villagers, Guild L2 and rank 4; Tamamo wakes the Deep Burrow');
+    const Lk = X.rollLoot(K, 'success', rng), Lp = X.rollLoot(K, 'partial', rng);
+    ok(Lk.trophy === 'trophyMochiCrown' && !Lp.trophy && !JSON.stringify(Lk).includes('unique') && !JSON.stringify(Lk).includes('gem'), 'trophies: a full success brings the keepsake; never a unique or a gem');
+  }
+  // ---- the zone dungeons' first clears (COZY §3.2)
+  { const st = fresh(); st.flags.mokaJoined = st.flags.poeJoined = true; st.heroes.moka.player.lvl = 8;
+    ok(!O.storyObjectives(st).some(o => o.kind === 'dungeon'), 'dungeon: no clear on offer while Takemori is besieged');
+    Z.saveVillage(st, 'bamboo', 'crew');
+    const D = O.storyObjectives(st).find(o => o.id === 'dungeon:bamboo');
+    ok(D && D.power === 144 && D.hours === 10 && D.level === 8 && D.rewards.trophy === 'trophyTenguFan' && D.supplies.potionsNeed === 2 && D.gates[0].kind === 'rank', 'dungeon: "Clear the Bamboo Depths" once Takemori is saved: level 8, power 144, 10 h, rank 2, a lunch each and 2 Heart Treats; the Tengu\'s fan');
+    st.pantry = { onigiri: 2 }; st.heroes.poe.player.lvl = 7;
+    ok(/Heart Treats/.test(X.canSend(st, D, ['hero:moka', 'hero:poe'], { meals: { onigiri: 2 } }, { rank: 2 }).why) && X.canSend(st, D, ['hero:moka', 'hero:poe'], { meals: { onigiri: 2 }, potions: 2 }, { rank: 2 }).ok, 'dungeon: it needs the 2 Heart Treats packed');
+    Z.noteFloor(st, 'bamboo', 2); ok(O.objectivePower(st, D) === 101, 'dungeon: floor 2 reached (your run, or a crew\'s partial): 30% less');
+    const r = Z.recordCrewClear(st, 'bambooDepths'), d = st.zones.bamboo.dungeon;
+    ok(r.tierUnlocked === 1 && d.crew === 1 && d.cleared === 0 && d.tier.cleared.includes(0) && Z.tierOpen(st, 'bambooDepths') === 1, 'dungeon: a crew\'s clear counts dungeon.crew, wakes the Lantern (T1), and leaves dungeon.cleared at 0');
+    ok(ZP.openedByPrev(st, 'maple') && !O.storyObjectives(st).some(o => o.id === 'dungeon:bamboo'), 'dungeon: it opens the next zone (openedByPrev reads dungeon.crew) and leaves the Board');
+    const rc = Z.recordDungeonClear(st, 'bambooDepths', 0);
+    ok(rc.first === true && d.cleared === 1, 'dungeon: your own first clear afterwards is still the first (the boss unique: dungeon/zoneRun.js)');
+    const st2 = Z.normalizeZones({ zones: { maple: { dungeon: { crew: 1 } } } });
+    ok(st2.zones.maple.dungeon.tier.unlocked === 1 && st2.zones.maple.dungeon.tier.cleared.includes(0), 'dungeon: a saved crew clear keeps its Lantern awake on load (fillTiers)');
+    const dp = Z.recordCrewClear(st, 'burrowDeep'); ok(dp.tierUnlocked === 1 && Z.tierOpen(st, 'burrowDeep') === 1 && (st.dungeon.deepest || 0) < 21, 'Tamamo by a crew: the Deep Burrow\'s Lantern wakes (T1), the Burrow\'s deepest floor untouched');
+  }
+  // ---- the zone villagers' quests (COZY §3.2)
+  { const st = fresh(); st.heroes.moka.player.lvl = 6; st.flags.mokaJoined = true; Z.saveVillage(st, 'bamboo');
+    st.quests = { active: [{ id: 'tk_ledger', step: 0, prog: 0 }, { id: 'tk_windScroll', step: 0, prog: 4 }, { id: 'tk_kome', step: 0, prog: 0 }, { id: 'tk_roots', step: 0, prog: 0 }, { id: 'tk_tengu', step: 0, prog: 0 }], done: [], requests: {} };
+    const L = O.villageObjectives(st), ids = L.map(o => o.id);
+    ok(ids.join() === 'zq:tk_ledger:0,zq:tk_windScroll:0,zq:tk_kome:0,zq:tk_roots:0', 'village quests: one route per step in the dungeon (a find, a kill count, a rescue, a floor); the boss waits for the dungeon\'s own clear route', ids);
+    const Fd = L[0], K = L[1], Rs = L[2];
+    ok(Fd.kind === 'quest' && Fd.level === 7 && Fd.power === 63 && Fd.hours === 4 && Fd.tags.includes('find') && Fd.rewards.questItem === 'tk_ledger' && Fd.name === "Find Chiku's Ledger", 'village quests: "Find Chiku\'s Ledger": level 7 (the band + 3), power 63, 4 h, a Scout suits it');
+    ok(Rs.tags.includes('rescue') && Rs.rewards.rescue === 'tk_kome' && Rs.name === 'Bring Kome home', 'village quests: "Bring Kome home" (a Healer suits it)');
+    ok(O.objectivePower(st, K) === Math.round(63 * (1 - 4 / 12)) && K.name === 'Teach 12 Kamaitachi some manners', 'village quests: your kills count (4 of 12: two thirds of the need)');
+    const D = O.objective(st, 'dungeon:bamboo'); void D;
+    st.zones.bamboo.dungeon.crew = 1; ok(O.villageObjectives(st).some(o => o.id === 'zq:tk_tengu:0' && o.kind === 'dungeon' && o.power === 144), 'village quests: once the dungeon is cleared, a boss step gets its own route (dungeon power)');
+    st.quests.active[0].step = 1; ok(!O.objectiveOpen(st, Fd) && !O.villageObjectives(st).some(o => o.id === 'zq:tk_ledger:0'), 'village quests: the turn-in talk is yours (no route), and a step done takes its route off the Board');
+    const tr = { ...Rs, trail: true }; ok(X.oddsOf(0.92, tr).key === 'sure' && X.oddsOf(0.8, tr).key === 'risky', 'village quests: a partial finds the trail: the next try is a sure thing at r ≥ 0.9');
+    ok(X.partialProgress(st, Rs, 0.8).trail === true, 'village quests: a rescue\'s partial finds the trail');
+  }
+  // ---- homestead XP (COZY §3.3)
+  { const H = await import('../src/cozy/homesteadXp.js');
+    ok(H.homeXpBase('harvest', { crop: 'turnip', n: 1 }) === 6 && H.homeXpBase('harvest', { crop: 'carrot', n: 2 }) === 18, 'homestead XP: a harvest pays 3 × the crop\'s days (each)');
+    ok(H.homeXpBase('cook', { n: 2 }) === 8 && H.homeXpBase('build', { free: false }) === 8 && H.homeXpBase('build', { free: true }) === 0 && H.homeXpBase('gather') === 1 && H.homeXpBase('dig') === 4, 'homestead XP: a dish 4, a building you place 8 (the town\'s own growth 0), a gather 1, a dig 4');
+    ok(H.homeXpBase('fish', { id: 'crucian' }) === 4 && H.homeXpBase('fish', { id: 'moonKoi' }) === 12, 'homestead XP: a fish 4–12 by its rarity');
+    ok(H.homeXp(4, 1) === 4 && H.homeXp(4, 10) === 8 && H.homeXp(4, 30) === 16 && H.homeXp(0, 9) === 0, 'homestead XP: × (1 + level / 10)');
+  }
+  // ---- the sieges' trophies and the keepsakes (COZY §4.6)
+  { const st = fresh();
+    ok(['bamboo', 'maple', 'tidepool', 'onsen'].every(z => F.FURNITURE[O.objective(st, `relief:${z}`).rewards.trophy]?.mount === 'wall'), 'trophies: every relief brings its captain\'s torn banner (a wall piece)');
+    ok(Object.values(O.DUNGEON_ROUTES).every(R => F.FURNITURE[R.trophy]) && Object.values(O.BURROW_ROUTES).filter(B => B.trophy).every(B => F.FURNITURE[B.trophy]), 'trophies: every Burrow boss and zone boss has its keepsake');
+    ok(F.TROPHY_IDS.length === 12 && F.TROPHY_IDS.every(id => F.FURNITURE[id].shop === false && F.FURNITURE[id].set === 'trophy' && F.shopRank(F.FURNITURE[id]) === 0 && F.storable(id)), 'trophies: 12 keepsakes (4 Burrow bosses, 4 zone bosses, 4 captains), never sold, kept in storage like furniture');
+  }
 }
 
 hr('RESULT');

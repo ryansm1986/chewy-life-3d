@@ -12,7 +12,11 @@ Status: **built** (2026-10-03). There are three guides, run by a small reusable 
   ack?, skippable?, allow?, resumeAt? }`:
   - `say`: a line (or `(G, T) => line`) from the narrator, shown in a speech card. It is not the dialogue box, so it
     never blocks input.
-  - `objective`: the objective card's line ("2/6", the guide's title, *Skip*).
+  - `objective`: the objective card's line ("2/6", the guide's title, *Skip*). It can be a function too.
+  - A step whose `say` or `objective` is a function says it again when the input device changes (`redevice`, on
+    `input:device`), so a line can be in the device's words (the fishing guide's "tap" on touch). A line set by an
+    `on` handler stays until the next.
+  - `callouts` may give `edge`: another element whose side the callout sits past, at its own element's height.
   - `target(G, T) → { pos, label, npc? }`: a chunky bouncing pink 3D arrow with a pulsing ground ring at the spot.
     `G.questTarget` asks the director first, so the edge arrow (off screen) and the minimap pin point there too.
   - `highlight(G, T) → selector | Element | [..]`: a soft pulsing spotlight ring round a UI element, with the rest of
@@ -93,13 +97,19 @@ Status: **built** (2026-10-03). There are three guides, run by a small reusable 
      - he stands frozen beside the spot, without his usual greeting "!" (the bite has one);
      - he gets on with his day once the first fish is in, or the guide ends;
      - a reload re-claims him at the step it resumes.
-  2. "Face the water and press F", with the prompt spotlit.
+  2. "Face the water and press F" (touch: "tap Fish (or the attack button)"), with the prompt spotlit.
   3. The wait. This first cast is guaranteed to bite after 3.2 s. Nibbles are explained, and an early press gets a
-     gentle tip instead of losing the fish (`Fishing.tut`: `biteAfter`, `forgiveEarly`).
-  4. The bite: a big "NOW! Press F" and a 1.2 s window. A miss loops back to the cast with a kind word.
-  5. The reel: callouts point at the zone, the fish and the meter. The fish is an easy crucian carp with a bigger zone
-     and a slower drain (`zone` 0.34, `drain` 0.55). An escape loops back to the cast.
-  6. The catch, then the Journal button is spotlit, then the Fish Log tab is spotlit.
+     gentle tip and a "Not yet…" at the float instead of losing the fish (`Fishing.tut`: `biteAfter`, `forgiveEarly`).
+  4. The bite: the big "!" and "NOW!" at the float itself (no flash in the middle of the screen: it sat on the float),
+     "NOW! Press F" (touch: "Tap the screen") and a 2 s window. A miss brings the fish back (`retryBite`): the step goes
+     back to the wait with "a little slow, but it's coming back!", no recast.
+  5. The reel: callouts point at the zone, the fish and the meter, from the side of the card away from the hero (the
+     roomier side when that one is too narrow; `edge`: they sit just past the card). The fish is an easy crucian carp
+     with a wide zone and a slow drain (`zone` 0.42, `drain` 0.4), and the meter has a `floor`: it always lands. The
+     card shows the how-to (a thumb, the F key or A pressing; "Hold ▲" / "Let go ▼"). On touch: "Hold a finger anywhere
+     on the screen"; on a phone the dock steps aside while the card is up.
+  6. The catch, then the Journal button is spotlit (touch: the menu button, then the menu's Journal: the step allows the
+     menu, so the guide stays up in it), then the Fish Log tab is spotlit.
   7. Wrap-up: other spots and times, selling at the Hut, cooking. Kero's "catch 3 fish" quest carries on as normal.
 
 - **Make it home (Shadow)** starts the next time you're in the cottage after the house tour (docs/HOUSING.md §7):

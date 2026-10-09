@@ -417,3 +417,63 @@
 .hud .buff.meal img { width: 30px; height: 30px; filter: drop-shadow(0 1px 0 rgba(74, 44, 42, .3)); }
 .hud .buff.meal::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; border: 2px dashed color-mix(in srgb, var(--bc) 80%, var(--ink)); animation: spinSlow 9s linear infinite; pointer-events: none; }
 .toast .t-heal, .t-heal { color: #ff5a8a; font-weight: 700; }
+
+/* R-12: the reel at a size every screen reads (the card is zoomed on its own, inside the HUD's --ui-scale), its text never
+   under 12 px on screen, the first reels' "how to", the cue at the float, and touch's quiet controls while fishing */
+.rl-card { zoom: 1.15; }
+.ui-root.m-touch .rl-card { zoom: 1.3; }
+.rl-name { font-size: max(14px, calc(13px / var(--ui-scale) / 1.15)); max-width: 82px; }
+.rl-hint { font-size: max(11px, calc(12.5px / var(--ui-scale) / 1.15)); }
+.ui-root.m-touch .rl-hint, .ui-root.m-touch .rl-name { font-size: max(11px, calc(12.5px / var(--ui-scale) / 1.3)); }
+/* the how to: shown on the first reels (and in the guide) in place of the hint */
+.rl-how { display: none; align-items: center; justify-content: center; gap: 6px; margin-top: 6px; }
+.rl-card.howto .rl-how { display: flex; }
+.rl-card.howto .rl-hint { display: none; }
+.rh-dev { position: relative; width: 42px; height: 48px; display: grid; place-items: center; } /* (pad.css / mobile.css / touch.css show the active device's) */
+.rh-glass { position: absolute; left: 0; right: 0; bottom: 0; height: 10px; border-radius: 5px; background: linear-gradient(#bfe6ff, #8fc8f0); border: 2px solid var(--ink); }
+.rh-thumb { position: absolute; left: 8px; bottom: 6px; width: 26px; height: 34px; transform-origin: 50% 100%; animation: rhThumb 2.4s ease-in-out infinite; }
+.rh-key { display: grid; place-items: center; animation: rhKey 2.4s ease-in-out infinite; }
+.rl-how .rh-key.kc { width: 30px; height: 30px; min-width: 30px; font-size: 16px; line-height: 26px; }
+.rh-t { position: relative; width: 64px; height: 34px; }
+.rh-t b { position: absolute; inset: 0; display: grid; place-items: center; font: 800 max(11px, calc(12.5px / var(--ui-scale) / 1.15)) / 1 var(--font); white-space: nowrap; }
+.ui-root.m-touch .rh-t b { font-size: max(11px, calc(12.5px / var(--ui-scale) / 1.3)); }
+.rh-up { color: #2f9a68; animation: rhUp 2.4s step-end infinite; }
+.rh-dn { color: #c0546e; animation: rhDn 2.4s step-end infinite; }
+@keyframes rhThumb { 0%, 46% { transform: translateY(5px) scaleY(.86); } 50%, 96% { transform: translateY(-5px); } 100% { transform: translateY(5px) scaleY(.86); } }
+@keyframes rhKey { 0%, 46% { transform: translateY(2px) scale(.9); filter: brightness(.92); } 50%, 100% { transform: none; } }
+@keyframes rhUp { 0% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes rhDn { 0% { opacity: 0; } 50% { opacity: 1; } }
+/* the first reels: the zone shows which way it is going */
+.rl-card.howto .rl-bar.hold .rl-zone::after, .rl-card.howto .rl-bar:not(.hold) .rl-zone::after { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; font: 800 16px/1 var(--font); color: rgba(40, 110, 80, .7); }
+.rl-card.howto .rl-bar.hold .rl-zone::after { content: '▲'; }
+.rl-card.howto .rl-bar:not(.hold) .rl-zone::after { content: '▼'; color: rgba(160, 80, 100, .55); }
+
+/* the cue at the float: a big "!" when it bites (with what to press), "Not yet…", "Missed!" */
+.fish-cue { position: absolute; left: 0; top: 0; display: none; pointer-events: none; z-index: 7; }
+.fish-cue.show { display: block; }
+.fc-in { position: absolute; left: 0; top: 0; zoom: 1.15; }
+.ui-root.m-touch .fc-in { zoom: 1.35; }
+.fc-bang { position: absolute; left: -23px; bottom: 12px; display: none; width: 46px; height: 46px; border-radius: 50%; border: 4px solid var(--ink); background: radial-gradient(circle at 35% 30%, #ffd9a0, #ff8a3a 60%, #f0602a); color: #fff; font: 900 32px/38px var(--font); text-align: center;
+  -webkit-text-stroke: 5px var(--ink); paint-order: stroke fill; box-shadow: 0 4px 0 rgba(74, 44, 42, .35), 0 0 0 5px rgba(255, 255, 255, .85), 0 0 22px 8px rgba(255, 216, 74, .75); }
+.fc-in.bite .fc-bang { display: block; animation: fcBang .45s var(--pop) both, fcShake .18s ease-in-out .45s 6 alternate; }
+.fc-t { position: absolute; left: 30px; bottom: 20px; display: flex; align-items: center; gap: 5px; padding: 4px 10px 5px; border: 3px solid var(--ink); border-radius: 14px; background: linear-gradient(#fffdf6, #fff0d4); box-shadow: 0 3px 0 rgba(74, 44, 42, .3);
+  font: 800 max(12px, calc(13px / var(--ui-scale) / 1.15)) / 1.1 var(--font); color: var(--ink); white-space: nowrap; animation: fcBang .4s var(--pop) both; }
+.fc-in:not(.bite) .fc-t { left: auto; right: auto; transform: translateX(-50%); bottom: 14px; }
+/* (under the float instead when the guide's dock or the HUD is above it) */
+.fish-cue.below .fc-bang { bottom: auto; top: 14px; }
+.fish-cue.below .fc-t { bottom: auto; top: 22px; }
+.fish-cue.below .fc-in:not(.bite) .fc-t { top: 14px; }
+.fc-t:empty { display: none; }
+.fc-t b { color: #e8506e; }
+.fc-t > span { display: inline-flex; align-items: center; }
+.fc-in.early .fc-t, .fc-in.miss .fc-t { font-size: max(11px, calc(12px / var(--ui-scale) / 1.15)); color: var(--ink2); animation: fcFade 1.4s ease-in both; }
+@keyframes fcBang { 0% { transform: scale(.2); opacity: 0; } 70% { transform: scale(1.15); opacity: 1; } 100% { transform: none; } }
+@keyframes fcShake { from { transform: rotate(-9deg); } to { transform: rotate(9deg); } }
+@keyframes fcFade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+
+/* touch while a fishing session runs: the screen is the reel, so the skill cluster, the belt and the orbs step back
+   (the stick stays: a drag walks away); a phone's guide dock steps aside during the reel itself */
+body.touch-active .ui-root.fishing :is(.tc-cluster, .tc-belt, .hud-bc) { opacity: .22; transition: opacity .3s; }
+/* (and a thumb that lands on one reels too: the touch goes through to the world, ui/touch.js onCanvasDown) */
+body.touch-active .ui-root.fishing :is(.tc-cluster, .tc-belt, .hud-bc), body.touch-active .ui-root.fishing :is(.tc-cluster, .tc-belt, .hud-bc) * { pointer-events: none !important; }
+.ui-root.m-phone.reeling .tut-dock { display: none !important; }

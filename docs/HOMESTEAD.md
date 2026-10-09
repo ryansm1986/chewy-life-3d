@@ -107,12 +107,16 @@ There's no player farming, fishing, cooking, crafting, seasons or weather. Usefu
 - **Flow**:
   1. **Cast**: the `fish` pose. The rod replaces the hidden sword and ball in the hand; the bobber flies out with
      `splash_cast`.
-  2. **Wait**: 2–8 s, with small nibble bobs to tease.
-  3. **Bite**: a "!" emote, a splash, the bobber dips. Press **F or LMB within about 0.6 s** (too early or late: "It got
-     away!").
-  4. **Reel bar**: a short HUD widget (about 4–8 s). A fish icon darts along a vertical bar. Hold F or LMB to raise your catch
-     zone, release to let it fall. Keep the fish in the zone to fill the catch meter; empty means it escapes. Each fish has a
-     difficulty (speed and darting). Movement keys cancel at any time.
+  2. **Wait**: 2–8 s, with small nibble bobs to tease. An early press gets a gentle "Not yet…" (R-12: the first of a cast
+     is forgiven; Relaxed and the guide forgive them all).
+  3. **Bite**: a big "!" at the float with what to press, a splash, the float dips, a ping, a buzz on touch and a rumble
+     on the pad. Press **F, LMB or a tap within the rod's window** (R-12: 1 s with the Bamboo Rod, was 0.6 s). A miss and
+     the fish nibbles again (once; twice in Relaxed); a second miss: "It got away!".
+  4. **Reel bar**: a short HUD widget (about 4–8 s). A fish icon darts along a vertical bar. Hold F, LMB or a finger
+     anywhere on the screen to raise your catch zone, release to let it sink. Keep the fish in the zone to fill the catch
+     meter; empty means it escapes, with no penalty ("It got away — no harm done"). Each fish has a difficulty (speed,
+     darting and a slightly smaller zone) that rises with its rarity. Movement keys cancel at any time. The first catch
+     ever, and the guide's, always land. See "R-12" in §7 for the cozy tuning and its measured success rates.
   5. **Catch**: the `reel` pose, the fish arcs out (a `koiMesh`-style fish recoloured per species), a size is rolled, and a toast
      shows name, size and "New record!". Then the clap pose.
 - **Fish** (about 15): by spot (pond / river / sea / region), time window (day, evening, night) and rarity. For example:
@@ -582,3 +586,84 @@ There's no player farming, fishing, cooking, crafting, seasons or weather. Usefu
     Log) and the tests.
 - **Line endings**: `git ls-files --eol` shows index = worktree for every modified file. hud.js keeps its mixed
   CRLF / LF lines and its NUL byte, and every new file is LF.
+
+### R-12: see the mechanic, and make it cozy (2026-10-08)
+The owner's report: "The fishing tutorial I think is broken, especially on mobile. I can't see the mechanic. The fishing
+mechanic is also too hard currently." Reproduced on a phone (844×390 and 667×375, DPR 3, the iPhone's agent), an iPad
+(1180×820, in full screen and in itch's frame) and the desktop, playing Kero's guide from a fresh rod with real input
+(shots: `tools/qa/tmp/r12-fishing/before/` and `after/`, and the QA's `phone/`, `ipad/`).
+- **Why the mechanic couldn't be seen** (the root causes):
+  - **The float hid behind the hero.** It landed ~2.6 m out, straight past the hero from the game camera, so it sat on
+    the hero's head; at 13 cm across it was ~6 px on a phone; and the bite's "!" emote over the hero covered the same
+    spot. "Watch the float" pointed at nothing.
+  - **On a phone the guide's dock covered the reel card.** The card sat beside the hero at the top of the screen, under
+    Kero's speech and the objective card (the fish, the zone and the meter all hidden), and the coach callouts sat on the
+    hero.
+  - **The bite's "NOW!" flash sat in the middle of the screen**, over the float itself.
+  - **Tiny text**: the card's hint was 8 px on an iPad and 9 px on the desktop.
+  - **The guide spoke keys on touch**: "Hold the attack button" (any touch reels), and the Fish Log step pointed at a
+    Journal button touch doesn't have.
+  - **The menu's Journal under the dock** (touch's Fish Log step): on a phone Kero's speech and the objective card sat
+    over the menu's top rows, so the Journal button was half covered and a tap could land on the dock.
+  - **A thumb on a skill button didn't reel**: during a reel any touch on the world reels, but the skill buttons caught
+    the touches in their corner of the screen.
+- **Why it was too hard**: measured with **`tools/fishing-sim.mjs`**, a bot with a human's reaction time playing the real
+  `ReelSim` (profiles: *first* 0.34-0.44 s, little prediction; *beginner* 0.28-0.36 s, the touch and display lag
+  included, part prediction "after a couple of tries"; *casual* 0.2-0.26 s). The old zone was a slippery double integrator
+  (it kept its speed and overshot by the reaction time), 0.28 of the bar, it started at the bottom while the fish
+  started in the middle, and the meter drained about as fast as it filled. Success per rarity tier (common / uncommon /
+  rare / legendary), the reel alone:
+
+  | | before: Bamboo | before: Moonlit | after: Bamboo | after: Moonlit | after: Relaxed (Bamboo) |
+  |---|---|---|---|---|---|
+  | first try | 0 / 0 / 1 / 0 % | 37 / 16 / 27 / 0 % | 100 / 82 / 43 / 4 % | 100 / 99 / 87 / 40 % | 100 / 100 / 100 / 91 % |
+  | beginner | 0 / 0 / 3 / 0 % | 36 / 22 / 33 / 3 % | **100 / 96 / 70 / 19 %** | **100 / 100 / 97 / 73 %** | 100 / 100 / 100 / 100 % |
+  | casual | 39 / 29 / 41 / 1 % | 88 / 81 / 93 / 36 % | 100 / 100 / 92 / 46 % | 100 / 100 / 100 / 94 % | 100 / 100 / 100 / 100 % |
+
+  The bite: a beginner made the old 0.62 s window 95% of the time (a first-timer 88%); the new 1 s window, ~100%.
+  A common fish's reel takes ~4 s now (it was 7-11 s of hovering in and out). Commons sit above the 85-90% target on
+  purpose: even the *first* profile lands them every time, and a real first-timer's misses are the bite and the early
+  press, which are forgiving now too.
+- **What changed**:
+  - **The float and the camera** (`life/fishing.js`): it casts 3.3 m out (`CAST`; less where the water is narrower), the
+    float is 1.9× (a toy float), a soft ring breathes round it every 1.5 s, and while a session runs the camera leans
+    45% of the way to it (`frameFocus`, called by game.js after it sets the focus; eased in and out). No "!" emote over
+    the hero at the bite.
+  - **The cue at the float** (`ui/reel.js` `cue` / `track`, `.fish-cue`): the bite's big orange "!" with what to press
+    beside it (the F key, the pad's A, "Tap!"; "NOW!" in the guide), placed above the float, or below it when the dock or
+    the HUD is above; "Not yet… wait for the splash!" for an early press, "Missed! It'll nibble again…" for a miss. The
+    bite also buzzes on touch (`Touch.buzz(60)`), rumbles the pad (`Actions.rumble(0.55, 0.85, 220)`), splashes harder
+    and pings.
+  - **The reel card** (`ui/reel.js`): its own zoom (1.15; 1.3 on touch), text never under 12 px on screen, a bar of
+    190 px on a phone and 226 on an iPad; it is placed where it covers the least: beside the hero and the float, on either
+    side, at any height, scored against the dock, the HUD's corners and bars, the toasts and the touch controls that stay
+    lit (re-measured three times a second, gliding to a new spot). On a phone the guide's dock steps aside while the card
+    is up (`.ui-root.reeling`). The first three reels (and the guide) show **the how-to** in place of the hint: a thumb
+    on glass (touch), the F key (keyboard) or A (pad) pressing and letting go, with "Hold ▲" / "Let go ▼", and an arrow in
+    the zone for the way it is going.
+  - **Touch while fishing** (`.ui-root.fishing`): the skill cluster, the belt and the orbs fade to 22% and let touches
+    through to the world (so a thumb anywhere reels); the stick stays (a drag walks away).
+  - **The reel** (`life/reelSim.js` `REEL`): the zone is damped (it eases to a gentle top speed); it starts on the fish;
+    no drain for the first 1.2 s; a fish just past the zone's edge counts; the meter fills at 0.24 − 0.08·d a second and
+    drains at (0.12 + 0.45·d) × the rod's drain; a harder fish shrinks the zone a little (×(1 + 0.3·(0.4 − d))); a
+    `floor` > 0 means it can't escape (the guide, and the first catch ever).
+  - **The rods and Settings › Fishing** (`life/fishData.js` `RODS`, `reelParams`): the Bamboo Rod's zone 0.32 (was 0.28),
+    drain ×1, bite 1 s (was 0.62); the Moonlit Rod's 0.38, ×0.8, 1.15 s. **Settings › Fishing: Auto · Normal · Relaxed**
+    (`fishMode`); Relaxed: the zone ×1.2, half the drain, the bite ×1.5, every early press forgiven and two misses. **Auto
+    (the default) plays Relaxed on touch**: a thumb on glass reacts ~50-80 ms later than a key (the touch and the display),
+    covers part of the screen and has no key travel to feel, and the owner's report was from a phone; with keys or a pad
+    Auto is Normal.
+  - **The fish** (`FISH[id].d`): the difficulty now rises with the rarity (common 0.15-0.32, uncommon 0.4-0.55, rare
+    0.64-0.68, the Moon Koi 0.72), so the rare fish in the Fish Log are the hard ones (the old salmon, an uncommon, was
+    harder than the gold koi).
+  - **Gentle failures**: the first early press of a cast is a "Not yet…" (a second scares the fish); a missed bite comes
+    back once; an escaped fish says "It got away — no harm done. Cast again!" (or "So close!" on the card).
+  - **Kero's guide** (world/guides.js; docs/TUTORIALS.md): its lines follow the device; no flash over the float; a 2 s
+    bite that comes back after a miss (no recast); the reel is always won; touch's Fish Log step goes through the menu.
+    On a phone a guide's speech bubble steps aside while a panel is open (`mobile.css`, `.has-panel`), so the objective
+    card alone sits on the panel's top edge.
+- **QA**: s15 (the float and the lean, the early press, the cue, the miss that comes back, the card audit, a human-delay
+  bot on the real F key, the sim's tier targets, Settings › Fishing), s16 (the cue and the 2 s window, a miss in the
+  guide), s27 l) (the whole guide by real touch on a phone and an iPad in itch's frame, screenshots of every step;
+  `S27_ONLY=l`), test-rpg (the balance per rod and setting, the params, the grace, the floor), `tools/qa/fish-lib.mjs`
+  (the card and cue audits, the human-delay bot over real input, the sim in the page).

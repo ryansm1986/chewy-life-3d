@@ -21,7 +21,7 @@ export const DISTRICTS = {
 
 const HOME = ['home'], SHOP = ['shop'], WORKS = ['lumber', 'kiln', 'fishingHut'], FARM = ['farm'];
 const DECO = ['park', 'well', 'waterTower', 'koiStatue', 'chewyStatue', 'miniTorii', 'sakuraPlanter', 'fountain'];
-const CIVIC = ['clinic', 'school', 'boneSmith', 'waterTower', 'park'];
+const CIVIC = ['clinic', 'school', 'boneSmith', 'waterTower', 'park', 'guild']; // (guild: the Adventurers' Guild, docs/COZY.md §5.1)
 const MIXED = ['home', 'shop'];
 const P = (id, district, x, z, w, d, door, allows, max = 3, o = {}) => ({ id, district, x, z, w, d, door, allows, max, rank: o.rank || 1, ...o });
 
@@ -114,7 +114,7 @@ export const rectsOverlap = (a, b, pad = 0) => a.x < b.x + b.w + pad && b.x < a.
 // Building types that only stand on plots (zone growth and the palette snap them to one). Everything else (lamps,
 // benches, flower beds, fences, small statues, wells) is placed freely, outside the plots' reserved boxes, or on a
 // plot that lists it.
-export const PLOT_TYPES = new Set(['home', 'shop', 'farm', 'lumber', 'kiln', 'fishingHut', 'park', 'waterTower', 'clinic', 'school', 'shrine', 'onsen', 'boneSmith', 'chewyStatue']);
+export const PLOT_TYPES = new Set(['home', 'shop', 'farm', 'lumber', 'kiln', 'fishingHut', 'park', 'waterTower', 'clinic', 'school', 'shrine', 'onsen', 'boneSmith', 'chewyStatue', 'guild']);
 export const ZONE_TYPES = { 1: ['home'], 2: ['shop'], 3: ['farm', 'lumber', 'kiln', 'fishingHut'] };
 // the zones a plot can take (zone id -> the building types it would grow there)
 export const plotZones = p => Object.keys(ZONE_TYPES).map(Number).filter(z => ZONE_TYPES[z].some(t => p.allows.includes(t)));

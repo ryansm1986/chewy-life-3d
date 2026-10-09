@@ -16,6 +16,8 @@ const ICONS = {
   board: () => ol('<path d="M3 11 L16 4 L29 11 Z"/>', '#d8503a') + ol('<rect x="6" y="10" width="20" height="15" rx="2"/><rect x="7" y="24" width="3" height="6" rx="1"/><rect x="22" y="24" width="3" height="6" rx="1"/>', '#cf9f6e') + ol('<rect x="8.5" y="12.5" width="6.5" height="7.5" rx="1"/>', '#fffaf0', 2.4) + ol('<rect x="17" y="13.5" width="6.5" height="6" rx="1"/>', '#e2f2ff', 2.4) + dot(11.7, 13.4, 1.2, '#e8503a') + dot(20.2, 14.3, 1.2, '#ffd24a') + line('M10 16.5 H13.5 M10 18.4 H12.6', '#b49a80', 1.2) + line('M18.5 17.8 L20 16.2 L21.6 17.6', '#7a9a5a', 1.3),
   // story: a scroll with a red seal
   story: () => ol('<rect x="7" y="6" width="18" height="21" rx="3"/>', '#fff3d8') + ol('<rect x="5" y="4" width="22" height="5" rx="2.5"/><rect x="5" y="24" width="22" height="5" rx="2.5"/>', '#e8c88a', 3) + line('M11 13 H21 M11 16.5 H21 M11 20 H17', '#b49a80', 1.6) + ol('<circle cx="22" cy="21" r="3.6"/>', '#e8503a', 2.6),
+  // the zone villages' quests: a little house with a red roof and a lit window
+  village: () => ol('<path d="M4 15 L16 5 L28 15 Z"/>', '#d8503a') + ol('<rect x="7" y="14" width="18" height="14" rx="2"/>', '#f6e2c0') + ol('<rect x="13.5" y="19" width="5" height="9" rx="1.5"/>', '#a8744a', 3) + ol('<rect x="9" y="17" width="3.6" height="3.6" rx="0.8"/><rect x="19.4" y="17" width="3.6" height="3.6" rx="0.8"/>', '#ffd86a', 2.4) + shine(10, 11),
   // errands: a basket with a leaf
   errand: () => line('M9 14 C9 5 23 5 23 14', INK, 5.4) + line('M9 14 C9 5 23 5 23 14', '#c8904a', 2.4) + ol('<path d="M5 14 H27 L24 27 H8 Z"/>', '#e0b070') + line('M9 18 H23 M10 22 H22', '#b07a40', 1.6) + ol('<path d="M18 13 C18 8 23 6 27 7 C26 11 23 14 18 13 Z"/>', '#7ac86a', 2.6),
   // the crews out: a little hourglass

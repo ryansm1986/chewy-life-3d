@@ -43,6 +43,13 @@ async function sendVia(page, view, objId, members) {
   await ev(page, () => window.G.ui.closeAll());
   return { ...info, sent: !!sent && n > 0 };
 }
+/** after the first few errands by clicks (the Board proven), the same G.cozy.exp.send its Send off calls: CZ-9's level-matched
+ *  XP takes more trips to Moka's level 7 */
+let clicked = 0;
+async function sendErrand(page, id, crew) {
+  if (clicked < 4) { clicked++; return sendVia(page, 'errands', id, crew); }
+  return ev(page, ([id, crew]) => ({ sent: !!window.G.cozy.exp.send(id, crew, {})?.ok }), [id, crew]);
+}
 const skip = (page, h) => ev(page, h => window.G.cozy.clock.add(h), h); // (the debug clock: G.cozy.clock.add, as the Cozy debug section's "Add world hours")
 
 // ================================================================== a) the cozy route, end to end
@@ -66,14 +73,14 @@ if (want('a')) {
   // errands from the Board by clicks, the clock skipped; nights slept for the turnips (sleep adds the hours it skips)
   let trips = 0, nights = 0, firstSend = null, sleepAdd = null, lunches = 0;
   const sleepNight = async () => { const h0 = await ev(page, () => window.G.cozy.clock.h), vh = await ev(page, () => window.G.day.hour); await ev(page, () => window.G.sleep()); await sleep(page, 400); await waitIdle(page); await drainDialogue(page); nights++; const h1 = await ev(page, () => window.G.cozy.clock.h); if (sleepAdd == null) sleepAdd = { add: h1 - h0, from: vh }; };
-  for (let k = 0; k < 40; k++) {
+  for (let k = 0; k < 300; k++) {
     if (process.env.VERBOSE) console.log('  .... loop', k, JSON.stringify(await ev(page, () => ({ lvl: window.G.state.heroes.moka.player.lvl, h: window.G.cozy.clock.h, out: window.G.cozy.exp.list().length }))));
     const st = await ev(page, () => ({ bamboo: window.G.travel.list().find(x => x.id === 'bamboo').unlocked, lvl: window.G.state.heroes.moka.player.lvl, away: window.G.heroes.away('moka'), rest: window.G.state.cozy.exp.tired['hero:moka'] - window.G.cozy.clock.h }));
     if (st.bamboo) break;
     if (st.rest > 0) { await skip(page, st.rest + 0.1); continue; }
     const err = await ev(page, () => { const G = window.G, L = G.cozy.exp.objectives('errands').map(o => ({ id: o.id, I: G.cozy.exp.info(o.id, ['hero:moka'], {}) })).filter(x => x.I.ok); L.sort((a, b) => b.I.r - a.I.r); return L[0]?.id || null; });
     if (!err) { await sleepNight(); await tend('water'); continue; }
-    const r = await sendVia(page, 'errands', err, ['hero:moka']);
+    const r = await sendErrand(page, err, ['hero:moka']);
     if (!firstSend) { firstSend = r; await shot(page, 'a-sent'); }
     if (!r.sent) break;
     trips++;
@@ -91,8 +98,8 @@ if (want('a')) {
   R.check('a) the turnips grow and are cooked into a lunch (Roasted Veggies)', lunches >= 1, { lunches, pantry: await ev(page, () => window.G.state.pantry) });
   // the relief: on the Story tab; more errands until the odds are good, then Moka alone with her lunch
   let relief = null, tries = 0;
-  for (let k = 0; k < 40; k++) {
-    const st = await ev(page, () => { const G = window.G, o = G.cozy.exp.objectives('story')[0]; if (!o) return { none: true, saved: G.state.zones.bamboo.village }; const I = G.cozy.exp.info(o.id, ['hero:moka'], { meals: { roastedVeggies: 1 } }); return { id: o.id, r: I.r, ok: I.ok, why: I.why, rest: (G.state.cozy.exp.tired['hero:moka'] || 0) - G.cozy.clock.h, lunch: G.state.pantry.roastedVeggies || 0 }; });
+  for (let k = 0; k < 300; k++) {
+    const st = await ev(page, () => { const G = window.G, o = G.cozy.exp.objectives('story').find(x => x.kind === 'siege'); if (!o) return { none: true, saved: G.state.zones.bamboo.village }; const I = G.cozy.exp.info(o.id, ['hero:moka'], { meals: { roastedVeggies: 1 } }); return { id: o.id, r: I.r, ok: I.ok, why: I.why, rest: (G.state.cozy.exp.tired['hero:moka'] || 0) - G.cozy.clock.h, lunch: G.state.pantry.roastedVeggies || 0 }; });
     if (st.none) break;
     if (st.rest > 0) { await skip(page, st.rest + 0.1); continue; }
     if (!st.lunch) { await sleepNight(); await tend('water'); await tend('harvest'); await ev(page, () => window.G.actions.cook('roastedVeggies', 1)); continue; }
@@ -105,7 +112,7 @@ if (want('a')) {
     }
     const err = await ev(page, () => { const G = window.G, L = G.cozy.exp.objectives('errands').map(o => ({ id: o.id, I: G.cozy.exp.info(o.id, ['hero:moka'], {}) })).filter(x => x.I.ok); L.sort((a, b) => b.I.r * 0 + (b.I.need - a.I.need)); return L[0]?.id || null; });
     if (!err) { await sleepNight(); await tend('water'); await tend('harvest'); continue; }
-    if (!(await sendVia(page, 'errands', err, ['hero:moka'])).sent) break;
+    if (!(await sendErrand(page, err, ['hero:moka'])).sent) break;
     await skip(page, 3.05);
   }
   const sv = await ev(page, () => { const Z = window.G.state.zones.bamboo; return { village: Z.village, by: Z.savedBy, celebrate: Z.celebrate, freed: Z.quests.freed?.length || 0, events: window.__cz.filter(e => e[0] === 'village:saved').length, lvl: window.G.state.heroes.moka.player.lvl, chewy: window.G.state.player.lvl, reps: window.G.cozy.exp.reports().filter(r => r.kind === 'siege').map(r => r.result) }; });

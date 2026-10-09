@@ -10,7 +10,7 @@ import { backIn } from '../cozy/clock.js';
 import { CLASSES } from '../rpg/classes.js';
 import { Events } from '../core/events.js';
 
-const nm = k => CLASSES[k.split(':')[1]]?.name || k.split(':')[1];
+const nm = k => (k.startsWith('hire:') ? globalThis.G?.cozy?.guild?.nameOf?.(k) : '') || CLASSES[k.split(':')[1]]?.name || k.split(':')[1]; // (a hire's name: cozy/guildRun.js)
 
 export class CozyChip {
   constructor(ui) {

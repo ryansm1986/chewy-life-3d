@@ -17,6 +17,8 @@
 //  - shop:    the village rank from which Tanu's Trinkets can stock it (default: its set's SHOP_RANK); false = never
 //             sold (found in the regions / the Burrow, or crafted at the workbench: home/finds.js, home/recipes.js)
 //  - owner:   a villager whose home it was made for (their personality layout, home/defaults.js)
+//  - trophy:  a keepsake a crew brought home from a story fight (docs/COZY.md §4.6: a Burrow boss, a zone boss or a
+//             siege captain); never sold, never found; its models are in home/trophyModels.js
 export const CELL = 0.5;
 
 export const SETS = {
@@ -27,6 +29,7 @@ export const SETS = {
   tide: { name: 'Tidepool', jp: '磯', color: '#6ac0e8' },
   onsen: { name: 'Onsen Lodge', jp: '温泉', color: '#c3a0ff' },
   festival: { name: 'Festival', jp: '祭り', color: '#ff6f7f' },
+  trophy: { name: 'Keepsakes', jp: '記念品', color: '#e8b04a' },
 };
 
 export const CATS = {
@@ -138,10 +141,28 @@ export const FURNITURE = Object.fromEntries([
   // the Burrow's oddities: never sold, only found (home/finds.js)
   def('luckyCat', { name: 'Lucky Cat', jp: 'まねきねこ', cat: 'tabletop', mount: 'table', size: [1, 1], h: 0.32, set: 'festival', tags: ['festive', 'cute'], price: 240, shop: false, owner: 'tanu', desc: 'A maneki-neko waving one paw. Brings coins. Probably.' }),
   def('yokaiLantern', { name: 'Yokai Lantern', jp: 'ちょうちんおばけ', cat: 'light', size: [1, 1], h: 1.2, set: 'festival', light: L(0.85, '#ffb060', 2.6, 4.5), tags: ['festive', 'lantern', 'retro'], price: 380, shop: false, desc: 'A paper lantern yokai on a stand. It winks when no one is looking.' }),
+  // ---------------------------------------------------------------- Keepsakes: the trophies a crew brings home (docs/COZY.md §4.6)
+  // the Burrow's four bosses
+  def('trophyMochiCrown', { name: "King Mochi's Crown Cushion", jp: 'もちの王冠', cat: 'decor', size: [2, 2], h: 0.62, set: 'trophy', trophy: 'mochiKing', tags: ['cute', 'festive', 'cozy'], price: 400, shop: false, desc: 'A plump mochi cushion on a lacquer stand, still wearing its little gold crown. It squeaks when you sit near it.' }),
+  def('trophyKasaStand', { name: "Karakasa's Umbrella Stand", jp: 'からかさ', cat: 'decor', size: [1, 1], h: 1.22, set: 'trophy', trophy: 'kasaLord', tags: ['retro', 'festive', 'cute'], price: 420, shop: false, desc: "Lord Karakasa's paper umbrella, folded up in a glazed stand. It winks at guests. Mostly at Shadow." }),
+  def('trophyOniCleaver', { name: "Gorobei's Cleaver Plaque", jp: 'ごろべえの包丁', cat: 'wall', mount: 'wall', size: [2, 1], h: 0.46, set: 'trophy', trophy: 'oniChef', tags: ['warm', 'retro'], price: 420, shop: false, desc: "Oni Chef Gorobei's toy cleaver and ladle, crossed on a walnut board. Rosie says the dumplings are safe now." }),
+  def('trophyMoonLantern', { name: "Tamamo's Moon Lantern", jp: '月の灯', cat: 'light', size: [1, 1], h: 1.16, set: 'trophy', trophy: 'nineTails', light: L(0.82, '#f0e6ff', 2.6, 4.6), tags: ['lantern', 'elegant'], price: 600, shop: false, desc: 'A paper moon hung from a stand of nine silver tails. It glows like a very calm night.' }),
+  // the zone dungeons' bosses
+  def('trophyTenguFan', { name: "Tengu's Fan Stand", jp: '天狗のうちわ', cat: 'decor', size: [2, 1], h: 1.24, set: 'trophy', trophy: 'tenguMaster', tags: ['elegant', 'nature'], price: 520, shop: false, desc: "Master Tengu's great feather fan on a lacquer stand. A breeze still ruffles it now and then." }),
+  def('trophyLeafJar', { name: "Danzaburō's Leaf Sake Jar", jp: 'たぬきのとっくり', cat: 'decor', size: [1, 1], h: 0.7, set: 'trophy', trophy: 'danzaburo', tags: ['retro', 'festive', 'nature'], price: 480, shop: false, desc: 'A round sake jar with a maple leaf on its stopper and a straw hat hung on the cord. Smells of chestnuts and mischief.' }),
+  def('trophySeaLantern', { name: "Umibōzu's Sea Lantern", jp: '海坊主の灯', cat: 'light', size: [1, 1], h: 1.2, set: 'trophy', trophy: 'umibozu', light: L(0.8, '#9fe8ff', 2.4, 4.4), tags: ['water', 'lantern'], price: 560, shop: false, desc: 'A glass float in a rope net, hung on a driftwood post. It glows like the bay on a quiet night.' }),
+  def('trophyFrostMirror', { name: "Yuki-onna's Frost Mirror", jp: '雪の鏡', cat: 'decor', size: [1, 1], h: 1.14, set: 'trophy', trophy: 'yukiOnna', tags: ['elegant', 'water'], price: 600, shop: false, desc: 'A round mirror in a frame of frost. Your breath fogs it, even in summer.' }),
+  // the siege captains' torn banners
+  def('bannerGaleclaw', { name: "Galeclaw's Torn Banner", jp: '疾風の旗', cat: 'wall', mount: 'wall', size: [1, 2], h: 0.98, set: 'trophy', trophy: 'captainGaleclaw', tags: ['festive', 'retro'], price: 300, shop: false, desc: "Captain Galeclaw's war banner, torn in the Takemori siege and pinned up with a victory rosette." }),
+  def('bannerStrawgrin', { name: "Strawgrin's Torn Banner", jp: '藁の旗', cat: 'wall', mount: 'wall', size: [1, 2], h: 0.98, set: 'trophy', trophy: 'captainStrawgrin', tags: ['festive', 'retro'], price: 300, shop: false, desc: "Captain Strawgrin's war banner from the Akane siege. A little straw still pokes out of the hem." }),
+  def('bannerBrineclaw', { name: "Brineclaw's Torn Banner", jp: '蟹の旗', cat: 'wall', mount: 'wall', size: [1, 2], h: 0.98, set: 'trophy', trophy: 'captainBrineclaw', tags: ['festive', 'water'], price: 300, shop: false, desc: "Captain Brineclaw's war banner from the Shiokaze siege. It still smells faintly of the sea." }),
+  def('bannerFrostbelly', { name: "Frostbelly's Torn Banner", jp: '雪の旗', cat: 'wall', mount: 'wall', size: [1, 2], h: 0.98, set: 'trophy', trophy: 'captainFrostbelly', tags: ['festive', 'elegant'], price: 300, shop: false, desc: "Captain Frostbelly's war banner from the Yukimi siege, folded neatly. It is always a little cold." }),
 ].map(d => [d.id, d]));
+/** the keepsakes a crew brings home (docs/COZY.md §4.6): every trophy id, in catalog order */
+export const TROPHY_IDS = Object.keys(FURNITURE).filter(id => FURNITURE[id].trophy);
 export const FURNITURE_IDS = Object.keys(FURNITURE);
 // the village rank from which each set's pieces turn up at Tanu's Trinkets (an item's own `shop` wins)
-export const SHOP_RANK = { basics: 1, tea: 2, bamboo: 2, maple: 2, tide: 3, onsen: 3, festival: 3 };
+export const SHOP_RANK = { basics: 1, tea: 2, bamboo: 2, maple: 2, tide: 3, onsen: 3, festival: 3, trophy: 0 };
 /** the rank from which Tanu can sell this item or surface, or 0 when it's never sold */
 export const shopRank = d => (d.shop === false ? 0 : d.shop ?? SHOP_RANK[d.set] ?? 1);
 

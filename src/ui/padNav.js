@@ -25,6 +25,7 @@ const START = {
   houseCard: '.btn.pink, .btn', remodel: '.rm-set.on, .rm-set', lantern: '.ln-go',
   expeditions: '.ex-go:not([disabled]), .ex-mem.can, .ex-obj.sel, .ex-recall, .ex-obj', awayCard: '.aw-ok', // (the cozy path: docs/COZY.md §10)
   sightings: '.sg-go:not([disabled])', // (the Sightings board: docs/COZY.md §6.3)
+  guild: '.gd-sign:not([disabled]), .gd-up:not([disabled]), .gd-pay, .gd-buy:not([disabled]), .gd-board', // (the Adventurers' Guild: docs/COZY.md §5)
 };
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const SEL = '.on, .sel, .selected, .active';
@@ -313,12 +314,16 @@ const HANDLERS = [
     match: '.p-sight button',
     label() { return { a: 'Travel Map' }; },
   },
+  { // the Adventurers' Guild (ui/guild.js): A signs a candidate on, pays back wages, dismisses (twice), upgrades, buys a tool, opens a board
+    match: '.p-guild button',
+    label(e) { return { a: e.matches('.gd-sign') ? 'Sign on' : e.matches('.gd-pay') ? 'Pay' : e.matches('.gd-dis') ? (e.classList.contains('armed') ? 'Dismiss' : 'Dismiss…') : e.matches('.gd-up') ? 'Upgrade' : e.matches('.gd-buy') ? 'Buy' : e.matches('.gd-board') ? 'Open' : 'Select' }; },
+  },
   { // the Expedition Board (ui/expeditions.js): A adds / removes a crew member, picks a job or sends; Y the best crew, X clear
     match: '.p-exp button',
-    x(e, nav) { const P = nav.ui.panels.expeditions; if (P.view === 'story' || P.view === 'errands') P.clear(); },
-    y(e, nav) { const P = nav.ui.panels.expeditions; if (P.view === 'story' || P.view === 'errands') P.best(); },
+    x(e, nav) { const P = nav.ui.panels.expeditions; if (P.view === 'story' || P.view === 'village' || P.view === 'errands') P.clear(); },
+    y(e, nav) { const P = nav.ui.panels.expeditions; if (P.view === 'story' || P.view === 'village' || P.view === 'errands') P.best(); },
     label(e, nav) {
-      const P = nav.ui.panels.expeditions, pick = P.view === 'story' || P.view === 'errands';
+      const P = nav.ui.panels.expeditions, pick = P.view === 'story' || P.view === 'village' || P.view === 'errands'; // (village: the zone villagers' quests, docs/COZY.md §3.2)
       const a = e.matches('.ex-mem') ? (e.classList.contains('on') ? 'Remove' : 'Add') : e.matches('.ex-go') ? 'Send off' : e.matches('.ex-recall') ? 'Call home' : e.matches('.ex-obj') ? (P.view === 'reports' ? 'Read' : 'Pick') : e.matches('.ex-tog') ? 'Lunches' : 'Select';
       return { a, x: pick ? 'Clear' : '', y: pick ? 'Best crew' : '' };
     },

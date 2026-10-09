@@ -2,7 +2,7 @@
 
 Status: **designed 2026-10-08; the owner answered §14 the same day** (the decisions are folded in below). **Phase A
 (CZ-1, CZ-2) is built** (§13.1); **phase B (CZ-3, CZ-4) is built, in review** (§13.2); **phase C (CZ-5, CZ-6) is
-built** (§13.3). The work is tracked in
+built** (§13.3); **phase D (CZ-7, CZ-8) is built** (§13.4); **phase E (CZ-9) is built, checkpoint 2 in review** (§13.5). The work is tracked in
 [ROADMAP.md](ROADMAP.md) §1c (CZ-1…CZ-12); this file is the design.
 
 The owner's direction (2026-10-08):
@@ -501,6 +501,10 @@ expedition-only pace fast (Takemori after ~27 real minutes with Moka alone: §13
 - **The pace targets** (`tools/expedition-sim.mjs` checks them, the charge-sim pattern): Takemori saved at about 1.5–2.5
   hours of play on either path; all four villages saved at about 8–12 hours either way; a cozy player is never short of
   a building's materials for more than one world day once its rank opens.
+- **The Guild's shortcut is intended** (the director, CZ-9): a cozy player who builds the Adventurers' Guild early and
+  signs a hire on relieves Takemori in about 75–95 minutes of expeditions, faster than the 1.5–2.5 h target, because a
+  hire adds a crew member's power. That speed is paid for (the Guild's 400 coins and its materials, the sign-on fee, the
+  daily wages), so it stays; `tools/expedition-sim.mjs` keeps it as a NOTE, not a failure.
 
 ## 9. Save migration
 - **New state is additive and lazy** (no version bump; the homestead pattern): `normalizeCozy(state)` (idempotent, a
@@ -771,6 +775,174 @@ The code map is in [ARCHITECTURE.md](ARCHITECTURE.md) ("The cozy path, phase C")
   the dig on the keyboard, mouse, pad and touch, Tap mode, a cancel, all four zones, a quest dig, Pound Mochi, the away
   line, the debug actions; shots in `tools/qa/tmp/s33-scavenge/`); `tools/qa/scavenge-shots.mjs` (the look review: a
   studio lineup per area, each area at the game camera from both 45° yaws, the nose and the dig); prod-smoke `dig`.
+
+### 13.4 Phase D as built (CZ-7, CZ-8; 2026-10-08)
+The code map is in [ARCHITECTURE.md](ARCHITECTURE.md) ("The cozy path, phase D").
+- **The building** (`BUILDINGS.guild`, `world/buildings/guild.js`): the Adventurers' Guild, 冒険者ギルド, `cat: 'special'`,
+  unique, 4×3 on every level, the civic plots (`civic-e`, `civic-w`), Build mode's `RANK_REQ` 2, the three costs of §5.1,
+  `jobs: [2, 3, 4]`, `glb: null` (the slot for a later Blender centrepiece). Kit-built in the village's toy style:
+  - **level 1**: a two-storey timber lodge: plaster over a plank wainscot, a deep teal pent eave round the ground floor,
+    an irimoya roof with the Guild's crest (a paw on a round plaque) in both gables and a red paw pennant on the ridge;
+    the **kanban** (the big walnut signboard: the crest with a bone crossed behind it, a paper lantern at its corner)
+    standing on the pent roof; the double door with an indigo paw noren between two red posts hung with paper
+    lanterns, a bell, a deck and a step; a wall rack of toy weapons (a sword, a bow, a spear with a pennant) left of the
+    door; **crossed toy swords behind a pot-lid shield** on the upper storey's side; a route map on the back wall, a straw
+    hat and a gourd on pegs; a lean-to on the right over a rack of walking staffs and two packs; the Guild's own little
+    notice board in the yard; a supply cart; a lantern post; a training dummy; a woodpile;
+  - **level 2**: + banners at the front corners, bunting along the porch beam, a hanging paw sign on the lean-to;
+  - **level 3**: + the **lookout** (a tall timber tower with a ladder, a railed platform, its own roof and the Guild's
+    flag), the crests gilded, a third banner.
+  About 41–47 k triangles; night: the windows and lanterns glow, two LightPool lamps (no wash). The door is the
+  interaction (`village.js interactionFor`: "Enter the Adventurers' Guild" → the Guild panel). **Deviation**: the
+  Expedition Board "inside the door" is the Guild panel's **Expedition Board** button (it opens the same board with
+  sending allowed, `at: 'guild'`) rather than a second interactable by the door, so the door's F prompt stays the only one
+  there; the yard board is dressing. Upgrades use the houses' scaffold (`home/exteriors.js construct`). Bulldozing the
+  Guild is refused while hires live there.
+- **Old Hachi** (`cozy/hires.js HACHI_SPEC`, a Toybox villager with `toy.extras`): a retired Akita: a red-fawn coat with
+  the white urajiro, upright ears, a curled tail, **white bushy brows**, an indigo haori, a **red knitted scarf**, a
+  gnarled **walking stick** upright in his right paw (a red cord and a bell on it) and a leather **map case** on his back.
+  He minds the Guild's door like Rosie her shop (role `shop`: he sweeps, stands at the counter spot) and sleeps at the
+  Guild. His talk (warm and gruff): his first words once ("Hmph. So you're the one who built this old dog a lodge…"), then
+  a line for the moment (wages owed, an empty roster, crews out, a glum hire, a full house, or a grumble) and five
+  choices: *Show me the adventurers* (the Hire tab), *The Expedition Board*, *Today's sightings*, *About the Guild* (what
+  this level gives, what the next brings, his two tools) and *Just saying hello*. His 3D bust is the panel's and the
+  dialogue's portrait.
+- **The Guild panel** (`ui/guild.js` + `.css`, 960 px): Old Hachi's word, the level, the roster count and the day's
+  wages; the **Expedition Board** and **Sightings** buttons; tabs **Hire** (today's three candidates: class ribbon,
+  bust, name, level, power, what they suit, their perk or look, the wage, Sign on with the fee) · **Roster** (each hire:
+  bust, class, level and XP, 1–3 morale hearts and a word, power, wage, where they are: in town / away with the trip /
+  resting / on a break with the owed sum, Pay back, Dismiss pressed twice; the free bunks; the locked ones up to 9) ·
+  **Guild** (the upgrade card: the roster, crew size, hire level cap and power bonus now → next, the cost chips with
+  what you have, the rank, Upgrade; and *Hachi's odds and ends*: the two tools). Pad: LB / RB the tabs, A on a card's
+  button (padNav `START.guild`, `.p-guild button`); phone: two columns (Hachi, the boards and the tabs on the left, the
+  cards scrolling on the right), 52 design px targets, the 14 design px floor.
+- **Hires** (`cozy/guild.js`, pure; `cozy/hires.js`, in town): the five classes of §5.2 (**Guard**, **Archer**,
+  **Scout**, **Healer**, **Porter**; the brief's example names were not used). The class rule: **+15% once a crew** when
+  any hire's class suits the objective (by its kind and tags: Guard `siege`, Archer `dungeon`, Scout `find` and
+  `errand`, Healer `rescue`, Porter `errand`); a Scout takes 15% off the trip, a Healer turns a setback into a partial, a
+  Porter brings 25% more materials. Power `6 × level × morale × (1 + 0.05 × Guild level)` (expeditions.js `memberInfo`).
+  - **Candidates**: three a world day (`rollCandidates`, seeded by the world day; three different classes and names),
+    level = the joined heroes' average − 2 (±1), capped at the hire level cap; kept in `cand` for the day.
+  - **Sign-on** 40 × level coins; the roster cap 3 / 6 / 9; the level cap 20 / 30 / 40; a crew of 5 at Guild level 3
+    (`maxCrew`). No two on the roster share a name.
+  - **Wages** 4 × level a world day, **settled on the world clock** (`settleWages`: every crossed world day, back pay
+    first, in roster order, from the coins; the first wage the day after signing on), so time away counts. The morning
+    banner says "Guild wages −N" (`bannerLine`, the coins paid since the last banner); a settle elsewhere toasts it; after
+    an absence the lines go on the away card under **At the Guild**.
+  - **Morale** 0.85–1.15 (start 1): a success +0.05, a fed lunch (tier 2+) +0.03, a paid day +0.02, a setback −0.05, an
+    unpaid day −0.08. **Three days at the floor unpaid** and they take a **break** (benched, still in town, no new wages)
+    until their back pay is paid (the roster's Pay button, or the next pay day with coins). A kind goodbye settles what
+    it can.
+  - **Leveling**: the expedition's own XP (`xpFor`, as a hero's) on the hero curve × 0.8 (`hireXpToNext`), up to the cap;
+    `hire:levelup`; the report and the toast name it.
+  - **The Board**: hires are crew cards after the heroes (their bust, a class chip, "+15%" where they suit), the class
+    bonus beside the odds, the Scout's shorter trip on the clock fact; the reports give each hire a line in their class's
+    voice; the HUD chip and the away card name them.
+  - **In town**: a Villager each (the Toybox kit, `randomVillagerSpec(mulberry32(seed))` + the class look through
+    `toy.extras`: a Guard's headband and pot-lid shield, an Archer's bow and quiver, a Scout's bandana and brass spyglass,
+    a Healer's white satchel with a cross-stitched paw and a pink scarf, a Porter's big backpack and bedroll), living at the
+    Guild (they wander, chat, sit, sleep there). **They take the townsfolk slots first**: game.js `syncTownsfolk` asks
+    `G.cozy.guild.inTown()`, counts them against the population's want (capped at 16) and moves the newest townsfolk out
+    while nobody is looking. Sent, they walk off to the Wayfarer's Post; back, they walk in and wave.
+  - **Save** (§9): `state.cozy.guild` (`fillGuild`, idempotent, type-checked; an old save gets level 0, no hires); the
+    Guild's level is the building's (synced on `village:changed` / `building:levelup`); a crew whose hire left the roster
+    comes home on load (`brokenExpeditions`).
+- **The tools** (§7.1), sold in the Guild tab from level 1: the **Forager's Basket** (240 coins, 8 wood, 2 silk) and
+  **Shadow's Bandana** (320 coins, 3 silk, 4 petal); COZY gave no prices. They set phase C's `state.cozy.scav.tools`
+  flags; the Bandana's extra spot shows at once (`G.cozy.scav.redraw`).
+- **Debug** (the Cozy tab, "The Adventurers' Guild"): build the Guild now (free, a free civic plot), +1 Guild level, give
+  hires (+1 / +3 / fill), max morale, pay wages (a day, or a day with an empty purse).
+- **Events**: `guild:built`, `guild:upgraded`, `guild:hired`, `guild:dismissed`, `guild:wages`, `guild:tool`,
+  `hire:levelup`. The runtime saves (`G.save`) on a hire, a goodbye, back pay, a tool and each wage day. **Autosave**
+  (R-11's list): `guild:hired` and `guild:tool` (coins spent) and `guild:wages` deserve event autosaves if the direct saves
+  are ever removed; `guild:built` / `guild:upgraded` already ride `village:changed` and `building:levelup`.
+- **QA**: test-rpg "COZY: THE ADVENTURERS' GUILD AND HIRES"; `tools/qa/s34-guild.mjs` (in run-all; shots in
+  `tools/qa/tmp/s34-guild/`); prod-smoke `guild`; the look review `tools/qa/guild-shots.mjs` (each level on either civic
+  plot from both 45° yaws, `--night`, `--hires`, `--palette`; shots in `tools/qa/tmp/guild-shots/`).
+
+### 13.5 Phase E as built (CZ-9; checkpoints 1 and 2, 2026-10-09)
+The code map is in [ARCHITECTURE.md](ARCHITECTURE.md) ("The cozy path, phase E").
+- **The Blossom Hollow story** (§3.1): the Board's Story tab offers the fight of the quest being played, from the quest
+  data (nothing new in the quest list): **"Peek into the Burrow"** (burrow1: power 12, 2 h, *Rosie packs the lunch*: a
+  free lunch that counts as fed, so Moka at level 1 alone is good odds; the 3 Mochi Jelly come home), **"The King of
+  Squish"** (60, 6 h, gate: *A Home for Everyone* done), **"Umbrella Trouble"** (120, 6 h, a Blossom Shrine),
+  **"Oni's Kitchen Nightmare"** (180, 8 h, the Hot Spring and 30 villagers), **"Nine Tails of Moonlight"** (240, 10 h,
+  Guild L2 and rank 4). A boss route: a lunch each, 2 magic + a rare, 16–30 materials, ~60% of a hands-on run's XP, the
+  boss's **trophy**; the quest's coins, XP and skill points are paid as ever. A crew's success completes every fight step
+  left (`Story.completeStep`, the Journal says "· done by Moka's crew"); **the quest unique is owed**
+  (`state.quests.owed`) and paid on your own first win over that boss. A crew's Tamamo wakes **the Spirit Lantern by the
+  Burrow door** (the Deep Burrow's T1; the Burrow's deepest floor is untouched).
+- **Partial work carries over both ways** (§4.9): your kills in burrow1 and a boss floor you reached shrink the crew's
+  need (the floor reached: −30%); a crew's partial leaves half of burrow1's kills done, or the boss quest's floor step
+  done ("They made it down to floor 5"), for you or the next crew. You finishing the step first brings the crew home
+  ("You beat us to it!") for quests and dungeon clears as for sieges.
+- **All four sieges** are on the Board (`STORY_READY`), each with its gate (§3.2, unchanged) and its captain's **torn
+  banner** as the trophy. The camps you broke shrink the relief (as phase A). **The celebration on your next arrival**
+  (`regions/village/village.js`): the village builds its saved look as a growable group, the crew (heroes as themselves,
+  hires as their Toybox villagers) stands either side of you at the Waypoint Shrine, the banner says "… is saved! ·
+  Moka's crew drove the siege off", lanterns, bunting and shop fronts grow in, everyone cheers, the townsfolk step out,
+  and the crew waves and heads home. It plays once (a reload mid-scene doesn't replay it). The heroes' joining scenes wait
+  until it's over. **Deviation**: there is no `ZoneVillage.crewSave()`; the deferred `zones[z].celebrate` (+
+  `celebrateCrew`) is the whole interface (§12 allowed either).
+- **The zone dungeons' first clears** (§3.2): **"Clear the <dungeon>"** once its village is saved and it has never been
+  cleared by you or a crew: power 144 / 270 / 396 / 540, 10 h, a lunch each **and 2 Heart Treats** (required), the gates
+  of §3.2. A success: `dungeon.crew` 1, the next zone opens, the Travel Map stamps **救** (a teal stamp; the card says
+  "cleared by a crew"), **Tier 1 opens at its Spirit Lantern** (`recordCrewClear`: T0 counted as cleared, `tier:unlocked`;
+  the Lantern lights live if you stand by its gate), the dungeon's floor 2 counts as reached, any active quest's boss
+  step for it is done by the crew, and the boss's trophy comes home. `dungeon.cleared` stays 0: **your own first clear
+  is still the first** (zoneRun's chest with the boss unique and a rare; a first own clear that is a tier run gets the
+  unique in its Lantern chest: `tierRun.js clearDrops`, checked). A partial: "made it to floor 2" (−30% next time,
+  and your floor 2 counts the same way).
+- **Trophies** (§4.6): 12 keepsakes in a new furniture set, *Keepsakes* (記念品), never sold, placed with the decorate
+  mode like any furniture (`home/trophyModels.js`): King Mochi's crown cushion, Karakasa's umbrella stand, Gorobei's
+  cleaver plaque (wall), Tamamo's moon lantern (a light); the Tengu's fan stand, Danzaburō's leaf sake jar, Umibōzu's sea
+  lantern (a light), Yuki-onna's frost mirror; Galeclaw's, Strawgrin's, Brineclaw's and Frostbelly's torn banners (wall
+  pieces with a victory rosette). A trophy comes with a success only.
+- **R-4** (the welcome pointer inside a region): Blossom Hollow's villagers are pointed at only in the village; from a
+  zone the pointer goes to the Wayfarer's Stone, from a dungeon to the way out.
+- **The zone villagers' quests** (§3.2; checkpoint 2): the Board's **Villages** tab (shown when any is on offer) lists one
+  route per step in the zone dungeon (`zq:<quest>:<step>`, 4 h, power = (the band + 3) × 9, a lunch each): **"Find
+  Chiku's Ledger"**, **"Bring Kome home"**, **"Teach 12 Kamaitachi some manners"**, **"Scout floor 2 of the Bamboo
+  Depths"**; a boss step gets its own route ("Drive off the boss of …", dungeon power, 8 h) only once the dungeon's own
+  first clear is off the Board (that one covers the boss). A success does the step: the quest item comes home with the
+  crew, a rescued villager walks home to the village (they live there from then on), a floor reached is noted; **the
+  turn-in talk stays yours**. A partial keeps half a count, or "found the trail" (the next try is a sure thing at r ≥
+  0.9, §4.3). A Scout suits the finds, a Healer the rescues.
+- **The kill-request swap** (§3.1): half of the villagers' "defeat 10–20 yokai" asks come as a gathering ask instead
+  (driftwood, river stones, petals, or Shadow's dug-up bones: Blossom Hollow's own gather nodes and digs). "Maybe later"
+  never cost a heart, as before.
+- **Homestead XP** (§3.3, its numbers as written): a harvest 3 × the crop's days, a fish 4 / 6 / 9 / 12 by rarity, a dish
+  4, a building you pay for 8 (the town's own growth: none), a gather 1, a dig 4; each × (1 + level / 10), to the hero
+  you walk with, with the "+N xp" float (`cozy/homesteadXp.js`).
+- **The pace** (§8; checkpoint 2). **Deviations, tuned by the sims**:
+  - **Crew XP** (§4.6) is now a share of a level, not "~15 kills of its level": an errand 0.15, a quest step 0.35, a
+    Burrow boss 0.7, a siege 0.8, a dungeon clear 1.0 of `xpToNext` at the hero's own level (or the objective's, when the
+    hero is above it), and above the objective's level it diminishes (1 / (1 + 0.5 × the levels above), at least a
+    tenth). The relief no longer pays ~4,300 XP against an errand's 360, and a dungeon clear is about one level, never
+    two or three in one trip (checkpoint 1's report: Moka +6,850, Poe +14k).
+  - **A member far below the objective pulls less** (§4.2): −4.5% of their power a level below the objective's, at least
+    30%, so five level-10 hires can't clear a level-30 dungeon (the story sim cleared the Onsen Caverns with level 8–13
+    crews before it).
+  - **The Burrow's errands go as deep as the story** (§4.7): level 4 (the upper floors) until King Mochi is gone, then
+    the floors below each Burrow boss beaten ("Burrow patrol: floors 4–7"), so a crew levels near its own level.
+  - **The Guild's candidates** (§5.2): two below the strongest joined hero (a cozy player's Chewy stays low, so the
+    average was too low), and at least level 3: a fresh rank-2 Guild's weakest candidate takes a Burrow errand alone at
+    Risky or better, a home errand as a sure thing.
+  - **The numbers**: `tools/expedition-sim.mjs` (Takemori): Moka alone about 146 min (in COZY's 90–150), Moka and one
+    Guild hire from day 2 about 75–95 min (a hire adds a crew member's power; the relief goes with Moka at level 4–5:
+    the intended, paid-for shortcut, §8). `tools/story-sim.mjs` (new; the whole story, the Guild growing with the town, a hire a day): Takemori about
+    3.1 h (a busy Guild's hires share Moka's errands), all four villages saved at about 9–11 h (COZY's 8–12), the Onsen
+    Caverns at about 12.4 h. `tools/scavenge-sim.mjs`: all targets met (its Guild L3 row now reads rank 4).
+  - **s37's whole story** (part d, scripted, not optimal play): all four villages saved and all four zone dungeons
+    cleared by crews from a fresh game with 0 kills, in 1,585 world hours (15.4 h of the clock; sleeping skips most of
+    it), Moka and Poe at levels 23 and 22, nine hires at 11–20, the walking Chewy at 15 from quests and homestead XP.
+- **QA**: test-rpg "COZY: THE STORY REROUTED"; `tools/qa/s37-cozy-story.mjs` (a: the headline, a fresh game to the Bamboo
+  Depths' crew clear with no fights and no debug unlocks, homestead XP, the request swap; b: the keepsakes in the
+  cottage; c: all four sieges and their celebrations; parts a–c in run-all, ~5–10 min. **d, opt-in** (`S37_FULL=1`,
+  `run-all s37-full`, ~1.5 h; or `ONLY=d` to replay it from part a's last save, `after-a.json`): the rest of the story
+  with no fights: a zone villager's rescue and find by crews, the Guild built and upgraded, the town grown to rank 4
+  with painted zones and the player's home upgrades, the other three zones' reliefs and dungeons by crews; shots in
+  `tools/qa/tmp/s37-cozy-story/`); prod-smoke `crewclear`; the sims `tools/expedition-sim.mjs`, `tools/story-sim.mjs`.
 
 **Existing work it touches**:
 - **Z-F (elevation)**: the wild discs and the scavenge spots are recipe data placed relative to the terrain, like the

@@ -27,6 +27,7 @@ import { RunChip } from './runChip.js';
 import { ExpeditionPanel } from './expeditions.js';
 import { AwayCardPanel } from './awayCard.js';
 import { SightingsPanel } from './sightings.js';
+import { GuildPanel } from './guild.js';
 import { CozyChip } from './cozyChip.js';
 import { MenuPanel } from './menu.js';
 import { SeedPickerPanel, pantryGain, pantryTipHTML } from './pantry.js';
@@ -110,6 +111,7 @@ export const UI = {
       lantern: new LanternPanel(this), // (the Spirit Lantern: a dungeon's tiers and modifiers — docs/ZONES.md §5.2)
       expeditions: new ExpeditionPanel(this), awayCard: new AwayCardPanel(this), // (the cozy path: the Expedition Board, "While you were away…" — docs/COZY.md §4)
       sightings: new SightingsPanel(this), // (the Sightings board: the wild areas' daily bounties — docs/COZY.md §6.3)
+      guild: new GuildPanel(this), // (the Adventurers' Guild: hires, the roster, upgrades and tools — docs/COZY.md §5)
     };
     this.homeHud = new HomeHud(this); // (indoors: the house name, the Decorate button)
     this.chargeHud = new ChargeHud(this); // (the hotbar's charge ring + stage pips: docs/CHARGE.md)

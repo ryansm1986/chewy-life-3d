@@ -6,8 +6,9 @@
 //  c) switching heroes (Moka): after her join → Tab (the switch button spotlit) → her spells, find Chewy → Tab back → wrap
 //     (Shadow's old Tab tip retired)
 //  d) fishing (Kero): after he gives the rod → the bank spot → cast (prompt spotlit) → an early press is forgiven → the
-//     sure bite ("NOW!", a 1.2 s window) → the reel coach callouts → the catch → J → Fish Log → wrap
-//  e) a missed bite loops back to the cast; Skip; the Journal's Guides tab replays a guide
+//     sure bite (the big "!" and "NOW!" at the float, a 2 s window) → the reel coach callouts → the catch (it always
+//     lands) → J → Fish Log → wrap
+//  e) a missed bite in the guide brings the fish back (R-12: no recast); Skip; the Journal's Guides tab replays a guide
 //  f) a reload mid-guide resumes it; an old save past a guide's start gets a one-time offer (accept / decline)
 // SHOTS=<dir> saves screenshots of the key moments.
 import path from 'node:path';
@@ -136,9 +137,9 @@ try {
   const f3 = await G(() => ({ s: window.G.life.fishing.s?.phase || null, say: document.querySelector('.ts-tx').textContent }));
   R.check('pressing too early during the first wait gets a gentle tip, and the fish stays', f3.s === 'wait' && /Patience|nibble/.test(f3.say), JSON.stringify(f3));
   await stepIs('fishing', 'bite', 8000); await sleep(page, 250);
-  const f4 = await G(() => ({ win: window.G.life.fishing.s?.window, fish: window.G.life.fishing.s?.fish, flash: document.querySelector('.tut-flash')?.classList.contains('on'), txt: document.querySelector('.tut-flash b')?.textContent }));
+  const f4 = await G(() => ({ win: window.G.life.fishing.s?.window, fish: window.G.life.fishing.s?.fish, cue: !!document.querySelector('.fish-cue.show .fc-in.bite'), txt: document.querySelector('.fish-cue .fc-t b')?.textContent, flash: document.querySelector('.tut-flash')?.classList.contains('on') }));
   await snap('fish_now');
-  R.check('the sure bite (~3 s): a big "NOW!" and a widened 1.2 s window', f4.flash && f4.txt === 'NOW!' && f4.win === 1.2 && f4.fish === 'crucian', JSON.stringify(f4));
+  R.check('the sure bite (~3 s): a big "!" and "NOW!" at the float itself (R-12: no flash in the middle of the screen over it) and a widened 2 s window', f4.cue && f4.txt === 'NOW!' && !f4.flash && f4.win === 2 && f4.fish === 'crucian', JSON.stringify(f4));
   await tap(page, 'f', 40);
   await stepIs('fishing', 'reel', 4000); await sleep(page, 900);
   const f5 = await G(() => [...document.querySelectorAll('.tut-call')].map(c => ({ t: c.textContent, vis: getComputedStyle(c).opacity === '1' })));
@@ -170,13 +171,14 @@ try {
   await page.waitForFunction(() => window.G.tutorials.active === 'fishing' && ['walk', 'cast'].includes(window.G.tutorials.cur?.step?.id), null, { timeout: 8000 });
   await G(() => { const G = window.G, s = G.tutorials.data.spot, P = G.player; P.setPos(s.x, s.z); P.facing = P.faceTarget = s.face; });
   await stepIs('fishing', 'cast'); await sleep(page, 400); await keyF(); await stepIs('fishing', 'bite', 10000);
-  await sleep(page, 1700);
-  const miss = await T();
+  await sleep(page, 2400);
+  const miss = { ...(await T()), phase: await G(() => window.G.life.fishing.s?.phase || null) };
   // (the housing guides, Make it home and Remodel, are listed too: tools/qa/s17-housing.mjs runs them; Hold to power up!: s19-charge; and Meet Poe: s20-poe)
-  R.check('the Guides tab lists all three (done ✓) and replays one; a missed bite loops back to the cast with a kind word', gl.length === 9 && ['Two heroes', 'Home, sweet home', 'Fishing with Kero'].every(t => gl.some(x => /^done/.test(x) && x.endsWith(t))) && miss.step === 'cast' && /slow|again/i.test(miss.say), JSON.stringify({ gl, miss }));
+  R.check('the Guides tab lists all three (done ✓) and replays one; a missed bite in the guide brings the fish back (no recast) with a kind word', gl.length === 9 && ['Two heroes', 'Home, sweet home', 'Fishing with Kero'].every(t => gl.some(x => /^done/.test(x) && x.endsWith(t))) && miss.step === 'wait' && miss.phase === 'wait' && /slow|back/i.test(miss.say), JSON.stringify({ gl, miss }));
   await clickSel('.to-skip'); await sleep(page, 400);
   const sk = await G(() => ({ active: window.G.tutorials.active, rec: window.G.state.flags.tutorials.fishing, tut: window.G.life.fishing.tut, dock: document.querySelector('.tut').classList.contains('on'), toast: window.QA.toasts.some(t => /Guide skipped/.test(t)) }));
   R.check('Skip ends the guide at once (normal fishing restored) and says where to replay it', !sk.active && sk.rec.skipped && sk.tut === null && !sk.dock && sk.toast, JSON.stringify(sk));
+  await page.keyboard.down('KeyA'); await sleep(page, 120); await page.keyboard.up('KeyA'); await sleep(page, 300); // (the line from that cast is still out: reel it in)
 
   // ---------------------------------------------------------------- f) reload mid-guide; the old-save offer
   await G(() => window.G.tutorials.start('switch', { replay: true }));

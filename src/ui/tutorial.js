@@ -3,7 +3,8 @@
 //    objective, Skip / Got it! / Skip step);
 //  - the spotlight: a soft pulsing ring round a UI element with the rest of the screen dimmed a little (never blocks
 //    clicks: pointer-events none);
-//  - coach callouts: little labelled bubbles pointing at UI elements (the reel bar's zone, fish and meter);
+//  - coach callouts: little labelled bubbles pointing at UI elements (the reel bar's zone, fish and meter; edge: another
+//    element whose side they sit past: the reel's sit just past the card, not over its meter);
 //  - the flash: a big "NOW!" moment;
 //  - the offer card ("New guide available: Fishing. Show me?") for saves that are already past a guide's start;
 //  - GuidesView: the Journal's Guides tab (replay any guide).
@@ -54,6 +55,8 @@ export class TutorialUI {
     $.obj.classList.toggle('ack', !!o.ack); $.obj.classList.toggle('skippable', !!o.skippable);
     replay($.obj, 'pop', 500);
   }
+  /** the objective's text again (the device changed: world/tutorials.js redevice) */
+  objective(text) { if (!this._step) return; this._step = { ...this._step, objective: text }; this.$.otx.innerHTML = md(text || ''); }
   say(who, text) {
     const $ = this.$;
     if (!text) { $.say.classList.remove('on'); this.sig.say = ''; return; }
@@ -112,7 +115,8 @@ export class TutorialUI {
       const t = typeof c.el === 'string' ? document.querySelector(c.el) : c.el;
       if (!t || !t.isConnected || t.offsetParent === null) { k.style.opacity = '0'; return; }
       const r = t.getBoundingClientRect(), w = k.offsetWidth, h = k.offsetHeight, gap = 14 * s;
-      const x = c.side === 'right' ? r.right + gap : c.side === 'top' ? r.left + r.width / 2 - w / 2 : r.left - gap - w;
+      const e = c.edge && document.querySelector(c.edge), xr = e && e.offsetParent !== null ? e.getBoundingClientRect() : r; // (edge: the element whose side it sits past, at t's height)
+      const x = Math.max(4, Math.min(innerWidth - w - 4, c.side === 'right' ? xr.right + gap : c.side === 'top' ? r.left + r.width / 2 - w / 2 : xr.left - gap - w)); // (never off the screen)
       const y = c.side === 'top' ? r.top - gap - h : r.top + r.height * (c.at ?? 0.5) - h / 2;
       k.style.opacity = '1';
       k.style.transform = `translate(${x.toFixed(1)}px,${(y + Math.sin(this.t * 4 + i) * 3 * s).toFixed(1)}px)`;

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
-const ALL = ['gen-fuzz', 's1-roundtrip', 's2-combat', 's3-bosses', 's4-death', 's5-village-save', 's7-inventory', 's8-dialogue', 's9-input', 's10-misc', 's11-story-title', 's12-heroes', 's13-regions', 's14-village-plan', 's15-homestead', 's16-tutorials', 's17-housing', 's18-furniture-sources', 's19-charge', 's20-poe', 's21-zones', 's22-zone-dungeons', 's23-zone-villages', 's24-render-health', 's25-gamepad', 's26-deck', 's27-touch', 's28-shihtzu', 's29-golden', 's30-tiers', 's31-expeditions', 's32-peaceful', 's33-scavenge', 's35-debug', 's36-autosave', 'profile-horde'];
+const ALL = ['gen-fuzz', 's1-roundtrip', 's2-combat', 's3-bosses', 's4-death', 's5-village-save', 's7-inventory', 's8-dialogue', 's9-input', 's10-misc', 's11-story-title', 's12-heroes', 's13-regions', 's14-village-plan', 's15-homestead', 's16-tutorials', 's17-housing', 's18-furniture-sources', 's19-charge', 's20-poe', 's21-zones', 's22-zone-dungeons', 's23-zone-villages', 's24-render-health', 's25-gamepad', 's26-deck', 's27-touch', 's28-shihtzu', 's29-golden', 's30-tiers', 's31-expeditions', 's32-peaceful', 's33-scavenge', 's34-guild', 's35-debug', 's36-autosave', 's37-cozy-story', 'profile-horde'];
 // s31-expeditions: the cozy path's phase A (docs/COZY.md): the cozy route end to end with no fighting (Takemori saved by
 // Moka alone), away heroes, the hold rule, time away, the pad and the phone; shots in tools/qa/tmp/s31-expeditions/.
 // s33-scavenge: scavenging, the cozy path's phase C (docs/COZY.md §7): the nodes at home and in the zones, a gather, Shadow's
@@ -13,10 +13,18 @@ const ALL = ['gen-fuzz', 's1-roundtrip', 's2-combat', 's3-bosses', 's4-death', '
 // tools/qa/tmp/s33-scavenge/.
 // s32-peaceful: the peaceful overworld (docs/COZY.md §6): a saved zone keeps only its wild areas' packs, the leash, the
 // markers, the minimap and Travel Map, the Sightings board and its bounties, the pad and the phone; shots in tools/qa/tmp/s32-peaceful/.
+// s34-guild: the Adventurers' Guild, the cozy path's phase D (docs/COZY.md §5): built from Build mode, Old Hachi and his
+// talk, the panel and its boards, hires end to end (errands, a relief, levels, morale), wages over world days and time away,
+// upgrades and tools, the debug actions, save and reload, the pad and the phone; shots in tools/qa/tmp/s34-guild/.
 // s35-debug: the debug menu (docs/DEBUG.md; the cozy plan reserved s31–s34): the password, the lazy chunk, the actions,
 // backup and restore, the pad and the phone; shots in tools/qa/tmp/s35-debug/.
 // s36-autosave: the autosave (ROADMAP R-11): the timer on its own clock, event saves and the debounce, the boss-fight
 // deferral, the .prev rotation and recovery, the quota, the paw glyph in the safe area; shots in tools/qa/tmp/s36-autosave/.
+// s37-cozy-story: the story rerouted, the cozy path's phase E (docs/COZY.md §3): a fresh game to the first zone dungeon's
+// crew clear with zero fights and no debug unlocks; the keepsakes in a room; all four sieges and their celebrations (parts
+// a–c, ~5–10 min); shots in tools/qa/tmp/s37-cozy-story/.
+// s37-full (opt-in: `run-all s37-full`, not in the default list): s37 with S37_FULL=1, which adds part d, the rest of the
+// story from part a's save: the other three zones' reliefs and dungeons by crews with no fights (~1.5 h).
 // s26-deck: the Steam Deck profile (CONTROLS §10). Its full panel sweep (tools/qa/deck-ui.mjs) and the frame times
 // (tools/qa/deck-perf.mjs) run on their own.
 // s24-render-health builds and serves its own production bundle (the NaN probe, flash-free sessions, menu first opens:
@@ -26,11 +34,13 @@ const ALL = ['gen-fuzz', 's1-roundtrip', 's2-combat', 's3-bosses', 's4-death', '
 // retry (ZONES §7.1; prints a machine-load verdict); 250 is reported only. ~5 min. `run-all s` skips it (scenario
 // prefixes), `run-all profile` runs it alone.
 const want = process.argv.slice(2);
-const list = want.length ? ALL.filter(n => want.some(w => n.startsWith(w))) : ALL;
+const OPT_IN = { 's37-full': { file: 's37-cozy-story', env: { S37_FULL: '1' }, timeout: 150 } }; // (named entries, only when asked for)
+const list = want.length ? [...ALL.filter(n => want.some(w => n.startsWith(w)) && !want.includes('s37-full')), ...Object.keys(OPT_IN).filter(n => want.includes(n))] : ALL;
 const summary = [];
 for (const name of list) {
   const t0 = Date.now();
-  const r = spawnSync(process.execPath, [path.join(dir, name + '.mjs')], { encoding: 'utf8', timeout: 15 * 60 * 1000, maxBuffer: 64 * 1024 * 1024 });
+  const O = OPT_IN[name];
+  const r = spawnSync(process.execPath, [path.join(dir, (O?.file || name) + '.mjs')], { encoding: 'utf8', timeout: (O?.timeout || 15) * 60 * 1000, maxBuffer: 64 * 1024 * 1024, env: { ...process.env, ...(O?.env || {}) } });
   const out = (r.stdout || '') + (r.stderr || '');
   process.stdout.write(out);
   const fails = out.split('\n').filter(l => /^\s+FAIL\s/.test(l)).map(l => l.replace(/^\s+FAIL\s+/, '').split('  — ')[0]);

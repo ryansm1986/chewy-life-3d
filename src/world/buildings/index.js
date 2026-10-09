@@ -30,7 +30,7 @@ let tick = 0;
 // Per level for levelled buildings; landmarks are rich, workshops stay humble.
 const DETAIL = {
   home: [0, 1, 2], shop: [0, 1, 2], farm: [0, 1], lumber: [0, 1], kiln: [0, 1], fishingHut: [0, 1],
-  townHall: 2, rosieShop: 2, shrine: 2, chewyHouse: 1, clinic: 1, school: 1, onsen: 1, boneSmith: 1,
+  townHall: 2, rosieShop: 2, shrine: 2, chewyHouse: 1, clinic: 1, school: 1, onsen: 1, boneSmith: 1, guild: [1, 2, 2],
 };
 function detailOf(id, level) { const d = DETAIL[id]; return Array.isArray(d) ? d[Math.min(d.length, level) - 1] : d ?? 1; }
 function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }

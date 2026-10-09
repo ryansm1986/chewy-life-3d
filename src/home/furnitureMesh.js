@@ -13,7 +13,8 @@ import { merge } from '../gfx/geom.js';
 import { FURNITURE, CELL, footprint } from './furniture.js';
 import { BUILDERS as B1 } from './furnitureModels.js';
 import { BUILDERS2 } from './furnitureModels2.js';
-const BUILDERS = { ...B1, ...BUILDERS2 };
+import { TROPHY_BUILDERS } from './trophyModels.js'; // (the keepsakes a crew brings home: docs/COZY.md §4.6)
+const BUILDERS = { ...B1, ...BUILDERS2, ...TROPHY_BUILDERS };
 import { clamp } from '../core/util.js';
 
 const cache = new Map();

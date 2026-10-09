@@ -15,7 +15,9 @@
 import { PANTRY } from '../life/pantry.js';
 import { CLASSES } from '../rpg/classes.js';
 import { cozyOf, expOf, parseMember, memberAway, tiredLeft } from './state.js';
-import { killXp, objectivePower, campsStanding } from './objectives.js';
+import { objectivePower, campsStanding } from './objectives.js';
+import { xpToNext } from '../rpg/stats.js';
+import { hirePower, classBonus, crewCap, hireWhy, scoutHours, crewClasses, hireLine, HIRE_CLASSES } from './guild.js';
 
 export const MAX_CREW = 4;
 /** below this ratio a crew can't be sent */
@@ -57,9 +59,10 @@ export function memberInfo(state, key) {
     const C = CLASSES[m.id] || {};
     return { key, type: 'hero', id: m.id, name: C.name || m.id, title: C.title || '', color: C.color || '#8fd0ff', lvl: h.player?.lvl || 1, power: heroPower(state, m.id) };
   }
-  const H = state.cozy?.guild?.hires?.find?.(x => x.id === m.id); // (phase D: the Guild's roster)
+  const H = state.cozy?.guild?.hires?.find?.(x => x.id === m.id); // (phase D: the Guild's roster, cozy/guild.js)
   if (!H) return null;
-  return { key, type: 'hire', id: m.id, name: H.name || 'Hire', lvl: H.lvl || 1, cls: H.cls, power: 6 * (H.lvl || 1) * (H.morale || 1) * (1 + 0.05 * (state.cozy.guild.level || 0)) };
+  const K = HIRE_CLASSES[H.cls] || {};
+  return { key, type: 'hire', id: m.id, name: H.name || 'Hire', title: K.name || '', color: K.color || '#c8a070', lvl: H.lvl || 1, cls: H.cls, morale: H.morale || 1, power: hirePower(H, state.cozy.guild.level || 0) };
 }
 /** the dishes packed (supplies.meals) → { n, fed: n of tier 2+ } */
 export function mealsPacked(meals) {
@@ -68,13 +71,17 @@ export function mealsPacked(meals) {
   return { n, fed };
 }
 /** The crew's power for an objective → { base, mul, total, fed, potions, parts: [{ key, power }] } */
+/** A member far below the objective's level pulls less of their weight (CZ-9: five level-10 hires shouldn't clear a
+ *  level-30 dungeon): −4.5% a level below it, at least 30% → 0.3–1 */
+export const levelGapMul = (lvl, objLvl) => (objLvl > lvl ? Math.max(0.3, 1 - 0.045 * (objLvl - lvl)) : 1);
 export function crewPower(state, crew, o, supplies = {}) {
-  const parts = crew.map(k => ({ key: k, power: memberInfo(state, k)?.power || 0 }));
+  const parts = crew.map(k => { const m = memberInfo(state, k); return { key: k, power: (m?.power || 0) * (o ? levelGapMul(m?.lvl || 1, o.level || 1) : 1) }; });
   const base = parts.reduce((a, p) => a + p.power, 0);
-  const pk = mealsPacked(supplies.meals), fed = crew.length > 0 && pk.fed >= crew.length;
+  const pk = mealsPacked(supplies.meals), fed = crew.length > 0 && (pk.fed >= crew.length || !!o?.supplies?.freeLunch); // (freeLunch: Rosie packs one, burrow1)
   const potions = Math.max(0, Math.min(3, supplies.potions || 0));
-  const mul = 1 + (fed ? 0.1 : 0) + 0.03 * potions; // (a class that suits the objective: +15%, the hires' classes, phase D)
-  return { base, mul, total: base * mul, fed, potions, parts };
+  const cb = o ? classBonus(state, crew, o) : { mul: 0, keys: [], cls: null }; // (a hire whose class suits the objective: +15% once, COZY §4.2)
+  const mul = 1 + (fed ? 0.1 : 0) + 0.03 * potions + cb.mul;
+  return { base, mul, total: base * mul, fed, potions, parts, cls: cb };
 }
 /** the success chance at a ratio r */
 export const chance = r => clamp((r - 0.5) / 0.6);
@@ -82,6 +89,7 @@ export const chance = r => clamp((r - 0.5) / 0.6);
  *  thing once it can be sent at all (COZY §4.7). */
 export function oddsOf(r, o = null, lunch = false) {
   if (o?.supplies?.mealSure && lunch && r >= SEND_MIN) return { ...ODDS[0], p: 1, r, lunch: true };
+  if (o?.trail && r >= 0.9) return { ...ODDS[0], p: 1, r, trail: true }; // (a find or a rescue whose trail a partial found: COZY §4.3)
   const O = ODDS.find(x => r >= x.min);
   return { ...O, p: O.key === 'nope' ? 0 : chance(r), r };
 }
@@ -95,6 +103,7 @@ export function gateCheck(g, state, town = {}, crew = [], supplies = {}) {
     case 'guild': return { label: g.label || (g.n > 1 ? `Adventurers' Guild level ${g.n}` : "The Adventurers' Guild built"), ok: (town.guild || 0) >= g.n, have: town.guild ? `level ${town.guild} now` : 'not built yet' };
     case 'heroes': return { label: g.label || `${g.n} heroes in the crew`, ok: heroes >= g.n, have: `${heroes} now` };
     case 'crew': return { label: g.label || `A crew of ${g.n}`, ok: crew.length >= g.n, have: `${crew.length} now` };
+    case 'quest': return { label: g.label || `${g.id} done`, ok: !!state.quests?.done?.includes(g.id), have: '' };
     case 'lunches': { const n = mealsPacked(supplies.meals).n; return { label: g.label || 'Packed lunches', ok: crew.length > 0 && n >= crew.length, have: n ? `${n} packed` : 'none packed' }; }
     case 'any': { const sub = g.any.map(x => gateCheck(x, state, town, crew, supplies)); return { label: g.label, ok: sub.some(s => s.ok), have: sub.map(s => s.have).filter(Boolean).join(', '), any: sub }; }
     default: return { label: g.label || g.kind, ok: true, have: '' };
@@ -108,13 +117,19 @@ export function memberWhy(state, key, active = state.activeHero) {
     if (!state.heroes?.[m.id]) return 'Unknown';
     if (!joined(state, m.id)) return 'Not met yet';
     if (m.id === active) return 'Playing now: switch to someone else to send them';
-  } else if (!memberInfo(state, key)) return 'Unknown';
+  } else { if (!memberInfo(state, key)) return 'Unknown'; const w = hireWhy(state, m.id); if (w) return w; }
   if (memberAway(state, key)) return 'Away on an expedition';
   const t = tiredLeft(state, key); if (t > 0) return `Resting: ${Math.ceil(t)} h`;
   return '';
 }
-/** the trip's length in world hours (a Scout hire takes 15% off: phase D) */
-export const tripHours = (o, crew) => o.hours;
+/** the trip's length in world hours (a Scout hire takes 15% off, COZY §5.2) */
+export const tripHours = (o, crew, state = null) => (state ? scoutHours(state, crew, o.hours) : o.hours);
+/** the most in a crew: 4, and 5 at Guild level 3 (COZY §4.1) */
+export const maxCrew = state => crewCap(state?.cozy?.guild?.level || 0);
+/** a Healer in the crew turns a setback into a partial (COZY §5.2) */
+export const crewSoft = (state, crew) => crewClasses(state, crew).has('healer');
+/** a Porter in the crew brings 25% more materials */
+export const crewHaul = (state, crew) => crewClasses(state, crew).has('porter');
 /** lunches the objective needs (per member; 0: optional) */
 export const mealsNeeded = (o, crew) => (o?.supplies?.meals || 0) * crew.length;
 /** Pick n dishes from the pantry for the lunches: tier 2+ first when there are enough for everyone (fed: +10%), else
@@ -135,24 +150,28 @@ export function canSend(state, o, crew = [], supplies = {}, town = {}, active = 
   const out = { ok: false, why: '', need, power: P.total, crewPower: P, r, odds, checks, meals: { need: mNeed, have: pk.n } };
   if (!o) { out.why = 'Nothing picked'; return out; }
   if (!crew.length) { out.why = 'Pick a crew'; return out; }
-  if (crew.length > MAX_CREW) { out.why = `At most ${MAX_CREW} in a crew`; return out; }
+  const cap = maxCrew(state);
+  if (crew.length > cap) { out.why = `At most ${cap} in a crew`; return out; }
   for (const k of crew) { const w = memberWhy(state, k, active); if (w) { out.why = `${memberInfo(state, k)?.name || k}: ${w}`; return out; } }
   const bad = checks.find(c => !c.ok); if (bad) { out.why = `Needs: ${bad.label}`; return out; }
   if (pk.n < mNeed) { out.why = `Pack ${mNeed} lunch${mNeed > 1 ? 'es' : ''} (one each): cook a few dishes`; return out; }
+  const pNeed = o.supplies?.potionsNeed || 0; // (a dungeon clear: 2 Heart Treats, COZY §3.2)
+  if ((supplies.potions || 0) < pNeed) { out.why = `Pack ${pNeed} Heart Treats for the road`; return out; }
   if (odds.key === 'nope') { out.why = "They'd never make it. A stronger crew, or a few more levels?"; return out; }
   out.ok = true;
   return out;
 }
 /** The roll → { result: 'success' | 'partial' | 'setback', p, roll } */
-export function resolve(r, rng, o = null, lunch = false) {
+export function resolve(r, rng, o = null, lunch = false, soft = false) {
   const p = oddsOf(r, o, lunch).p, roll = rng();
-  return { result: roll < p ? 'success' : r >= PARTIAL_MIN ? 'partial' : 'setback', p, roll };
+  return { result: roll < p ? 'success' : r >= PARTIAL_MIN || soft ? 'partial' : 'setback', p, roll, soft: soft && roll >= p && r < PARTIAL_MIN }; // (soft: a Healer in the crew)
 }
 /** what a partial keeps (COZY §4.3): a siege breaks round(3r) − 1 camps (at least 1, never the last stand: the captain
  *  stays); a dungeon gets to floor 2; a find finds the trail → { camps? , floor?, trail? } */
 export function partialProgress(state, o, r) {
   if (o.kind === 'siege') { const s = campsStanding(state, o.binds.village); return { camps: Math.max(0, Math.min(s, Math.max(1, Math.round(3 * r) - 1))) }; }
   if (o.kind === 'dungeon') return { floor: 2 };
+  if (o.binds?.quest) return { quest: o.binds.quest }; // (a Burrow quest: burrow1's kills half done, a boss's floor reached: Story.crewResult)
   if (o.tags?.includes('find') || o.tags?.includes('rescue')) return { trail: true };
   return {};
 }
@@ -163,7 +182,7 @@ function weighted(pool, rng) {
   for (const [k, w] of e) { x -= w; if (x <= 0) return k; }
   return e[e.length - 1][0];
 }
-/** The loot for a result → { coins, mats: { k: n }, pantry: { id: n }, items: [{ rarity, ilvl }], find: bool }
+/** The loot for a result → { coins, mats: { k: n }, pantry: { id: n }, items: [{ rarity, ilvl }], find: bool, trophy?: id }
  *  (items are rolled into real items by the runtime: rpg/items.js generateItem) */
 export function rollLoot(o, result, rng, frac = 1) {
   const share = (RESULT_PAY[result] || RESULT_PAY.success)[0] * frac, R = o.rewards || {}, out = { coins: 0, mats: {}, pantry: {}, items: [], find: false };
@@ -178,16 +197,25 @@ export function rollLoot(o, result, rng, frac = 1) {
   else if (share >= 0.49 && items.length) out.items.push({ rarity: items[items.length - 1], ilvl: o.level });
   for (const [rar, c] of Object.entries(R.itemChance || {})) if (rng() < c * share) out.items.push({ rarity: rar, ilvl: o.level });
   if (R.find && rng() < R.find * share) out.find = true;
+  const full = result === 'success'; // (a success with part of the job already done (frac < 1: camps you broke, a floor reached) still finishes it)
+  if (R.mochi && share > 0) out.mats.mochi = (out.mats.mochi || 0) + (full ? R.mochi : Math.ceil(R.mochi / 2)); // (burrow1's Mochi Jelly: the crew brings it home, half on a partial)
+  if (R.trophy && full) out.trophy = R.trophy; // (the boss's or the captain's keepsake: a success only, COZY §4.6)
   return out;
 }
-/** XP for a hero at level `lvl` (COZY §4.6): worth `kills` kills of the objective's level, scaled like a kill is for a
- *  hero far above it (rpg/stats.js xpForKill), times the result's share and the part of the objective that was left */
+/** The XP a crew earns, as a share of a level (COZY §4.6; retuned at CZ-9 from "~15 kills of its level", which gave a
+ *  relief ~4,300 XP and a dungeon clear a level or two in one trip): errand 0.15, a quest step 0.35, a Burrow boss 0.7,
+ *  a siege 0.8, a dungeon clear 1.0 of a level (tools/expedition-sim.mjs: Moka alone relieves Takemori in ~2.5 h). */
+export const XP_SHARE = { errand: 0.15, quest: 0.35, burrowBoss: 0.7, siege: 0.8, dungeon: 1.0 };
+/** above the objective's level the XP diminishes: 1 / (1 + 0.5 × the levels above), never below a tenth */
+export const xpLevelMul = (lvl, objLvl) => { const d = lvl - objLvl; return d <= 0 ? 1 : Math.max(0.1, 1 / (1 + 0.5 * d)); };
+/** XP for a hero (or a hire) at level `lvl` (COZY §4.6): the objective's share of a level (the hero's own level, or the
+ *  objective's when the hero is above it, diminishing), times the result's share (a setback half) and the part of the
+ *  objective that was left (frac). A hero far behind the pack still gets addXpTo's catch-up (double). */
 export function xpFor(o, lvl, result, frac = 1) {
   const pay = (RESULT_PAY[result] || RESULT_PAY.success)[1]; if (!(pay > 0)) return 0;
-  const diff = lvl - o.level;
-  let m = 1;
-  if (diff > 5) m = Math.max(0.05, 1 - (diff - 5) * 0.12);
-  return Math.max(1, Math.round((o.rewards?.kills || 0) * killXp(o.level) * m * pay * frac));
+  const share = o.rewards?.xpShare ?? XP_SHARE[o.kind] ?? XP_SHARE.errand;
+  const at = Math.max(1, Math.min(lvl || 1, o.level || 1)); // (a hero below the objective's level earns a share of their own level, not several levels at once)
+  return Math.max(1, Math.round(share * xpToNext(at) * xpLevelMul(lvl, o.level || 1) * pay * frac));
 }
 
 // ------------------------------------------------------------------ the crew's words (a line each in the report)
@@ -201,7 +229,9 @@ const HERO_LINES = {
 /** one line per crew member for the report, in their voice */
 export function crewLines(state, crew, result, rng) {
   return crew.map(k => {
-    const m = memberInfo(state, k), L = HERO_LINES[m?.id]?.[result] || HERO_LINES[m?.id]?.success || ['Back home safe!'];
+    const m = memberInfo(state, k);
+    if (m?.type === 'hire') return { who: k, name: m.name, text: hireLine(m, rng) };
+    const L = HERO_LINES[m?.id]?.[result] || HERO_LINES[m?.id]?.success || ['Back home safe!'];
     return { who: k, name: m?.name || '', text: L[Math.floor(rng() * L.length)] };
   });
 }

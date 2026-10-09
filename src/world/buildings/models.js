@@ -7,6 +7,7 @@ import { well, waterTower, stoneLantern, streetLamp, park, shrine, onsen, clinic
 import { bench, flowerBed, fountain, sakuraPlanter, miniTorii, koiStatue, lanternString, fence, bridge, chewyStatue } from './decor.js';
 import { G, C } from './kit.js';
 import { sprinkler } from '../../life/gardenModels.js';
+import { guild } from './guild.js';
 import { BUILDINGS } from './catalog.js';
 
 function placeholder(B) {
@@ -19,6 +20,7 @@ export const MODELS = {
   townHall, chewyHouse, rosieShop, boneSmith, dungeonGate, bulletinBoard, farm, lumber, kiln, fishingHut,
   well, waterTower, stoneLantern, streetLamp, park, shrine, onsen, clinic, school,
   bench, flowerBed, fountain, sakuraPlanter, miniTorii, koiStatue, lanternString, fence, bridge, chewyStatue, sprinkler,
+  guild, // (the Adventurers' Guild, levels 1-3: buildings/guild.js, docs/COZY.md §5.1)
   home: (B, L) => (L === 1 ? homeL1(B) : L === 2 ? homeL2(B) : homeL3(B)),
   shop: (B, L) => (L === 1 ? shopL1(B) : L === 2 ? shopL2(B) : shopL3(B)),
 };

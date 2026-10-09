@@ -53,6 +53,7 @@ export class PoeJoin {
     const G = this.G, P = G.player;
     if (!P || G.playerDead || G.ui?.dlg?.active || G.heroSwitching || G.ui?.anyModal?.() || P.controlLocked || G.ui?.iris?.active) return false;
     if (G.dungeon?.boss?.introDone && G.dungeon.boss.alive && G.dungeon.boss.aggro) return false;
+    if (G.dungeon?.village?.celebrate) return false; // (a crew's relief being celebrated in the square: docs/COZY.md §3.2)
     for (const m of G.dungeon?.monsters || []) if (m.alive && m.aggro && dist(m.pos.x, m.pos.z, P.pos.x, P.pos.z) < 13) return false;
     return true;
   }

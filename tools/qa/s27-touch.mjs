@@ -27,7 +27,15 @@
 //     an edge, nothing kept clear but the 24 px top) and Settings / Controls › Touch fit, scrolling inside (shots in
 //     tools/qa/tmp/ct7/); ~2 s of big stick circles with a real finger walk the hero and never pan the page (every
 //     touchmove cancelled), nor does a drag from the quest tracker
+//  l) R-12, the fishing guide by touch on a phone (844×390, DPR 3, the iPhone's agent) and an iPad (1180×820, in itch's
+//     frame): Kero's guide from a fresh rod with real fingers, in touch's words; the prompt tap casts; an early tap gets
+//     "Not yet…"; the bite's big "!" at the float (on screen, nothing over it, a buzz); the tap strikes; the reel card on
+//     screen and clear of everything (the phone's dock steps aside), 12 px+ text, the thumb how-to, the callouts on
+//     screen; a finger held over the faded skill buttons still reels; a bot with a human's reaction lands it; the menu →
+//     Journal → Fish Log on touch; the balance sim with Auto (Relaxed on touch). Shots: tools/qa/tmp/r12-fishing/<device>/.
+//     S27_ONLY=l runs only this section.
 import { launchTouch, boot, waitMode, sleep, makeReport, center, IPAD } from './touch-lib.mjs';
+import { reelAudit, cueAudit, humanReel, simRates } from './fish-lib.mjs';
 
 const R = makeReport('S27 touch: the touch device, stick, taps, pinch, attack, skills, charge, drag-aim, roll, belt, heroes, menus');
 const { browser, page, errors, warns, F } = await launchTouch();
@@ -183,9 +191,85 @@ async function ipadChecks() {
   errors.push(...T.errors.map(e => '[ipad] ' + e));
 }
 
-const ONLY_K = new Error('S27_ONLY=k: the iPad section alone');
+// ---------------------------------------------------------------- l) R-12: the fishing guide by touch
+const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+const fishClose = [];
+async function fishGuide(name, D, qs = '') {
+  const T = await launchTouch(D), p = T.page, F2 = T.F, W = D.w, H = D.h;
+  fishClose.push(() => T.browser.close());
+  const e2 = (f, a) => p.evaluate(f, a), w2 = (f, a, timeout = 8000) => p.waitForFunction(f, a, { timeout, polling: 'raf' }).then(() => true, () => false);
+  const out = `tools/qa/tmp/r12-fishing/${name}`; (await import('node:fs')).mkdirSync(out, { recursive: true });
+  const shot = n => p.screenshot({ path: `${out}/${n}.png` });
+  const step = () => e2(() => ({ step: window.G.tutorials.cur?.step?.id || null, say: document.querySelector('.ts-tx')?.textContent || '', obj: document.querySelector('.to-tx')?.textContent || '', phase: window.G.life.fishing.s?.phase || null }));
+  const stepIs = (id, t = 15000) => w2(id => window.G.tutorials.cur?.step?.id === id && window.G.tutorials.cur.entered && !window.G.tutorials.paused, id, t);
+  const ringOn = sel => e2(sel => { const r = document.querySelector('.tut-spot').getBoundingClientRect(), e = document.querySelector(sel); if (!e || !document.querySelector('.tut').classList.contains('spot')) return false; const b = e.getBoundingClientRect(); return Math.abs((r.left + r.width / 2) - (b.left + b.width / 2)) < 6 && Math.abs((r.top + r.height / 2) - (b.top + b.height / 2)) < 6; }, sel);
+  const tapSel = async sel => { const c = await center(p, sel); if (!c) return false; await F2.tap(c.x, c.y); return true; };
+  await boot(p, 'fresh&nointro&tut&hour=10' + qs);
+  await e2(() => { const G = window.G; G.state.flags.hints = { all: true }; G.ui.toasts?.retire?.(0); G.day.day = 2; window.__vib = []; navigator.vibrate = ms => { window.__vib.push(ms); return true; }; });
+  await F2.drag(W * 0.16, H * 0.78, W * 0.16, H * 0.84, { steps: 3 }); await sleep(p, 300); // (a touch: touch is the device)
+  await w2(() => document.body.classList.contains('touch-active') && document.querySelector('.tc.on'));
+  // a fresh rod (Kero's gift): the guide starts; the bank spot
+  await e2(() => { const G = window.G, P = G.player; G.state.fishing = { rod: 1, gotRod: true, milestones: [] }; P.moveTarget = null; P.setPos(150, 158); G.engine.rig.focus.copy(P.pos); G.engine.rig.snap(); });
+  const walk = await stepIs('walk', 20000); await sleep(p, 1200); await shot('1-walk');
+  await e2(() => { const G = window.G, s = G.tutorials.data.spot, P = G.player; P.moveTarget = null; P.setPos(s.x, s.z); P.facing = P.faceTarget = s.face; });
+  await stepIs('cast'); await sleep(p, 900);
+  const c0 = { ...(await step()), ring: await ringOn('.hud .prompt.show') }; await shot('2-bank');
+  await tapSel('.hud .prompt.show');
+  const cast = await w2(() => window.G.life.fishing.s?.phase === 'wait', null, 6000);
+  await sleep(p, 300); await shot('3-cast');
+  R.check(`${name}: Kero's guide starts from a fresh rod and speaks touch ("tap Fish", no keys); a tap on the spotlit prompt casts`, walk && /tap \*?Fish|tap Fish/.test(c0.say) && !/\bF\b|press/i.test(c0.say + c0.obj) && c0.ring && cast, JSON.stringify({ walk, c0, cast }));
+  await stepIs('wait', 6000); await sleep(p, 900);
+  const w0 = await step();
+  const fl = await e2(() => { const G = window.G, b = G.life.fishing.bobber.position.clone().project(G.engine.camera), x = (b.x * 0.5 + 0.5) * innerWidth, y = (-b.y * 0.5 + 0.5) * innerHeight; const covered = [...document.querySelectorAll('.tut.on .tut-say.on, .tut.on .tut-obj, .hud-tl, .hud-tr')].some(e => { const r = e.getBoundingClientRect(); return x > r.left && x < r.right && y > r.top && y < r.bottom; }); return { x: Math.round(x), y: Math.round(y), on: x > 0 && x < innerWidth && y > 0 && y < innerHeight, covered }; });
+  await shot('4-wait');
+  await F2.tap(W * 0.6, H * 0.5); await sleep(p, 350);
+  const e1 = { ...(await step()), cue: await e2(() => document.querySelector('.fish-cue.show .fc-in.early')?.textContent || null) };
+  await shot('4b-early');
+  R.check(`${name}: the wait: "don't tap yet" (no keys); the float is on screen and nothing covers it; an early tap gets "Not yet…" at the float and Kero's tip (the fish stays)`, /don't tap|not yet/i.test(w0.say) && !/press/i.test(w0.say) && fl.on && !fl.covered && e1.phase === 'wait' && /Not yet/.test(e1.cue || '') && /tap the screen|not yet/i.test(e1.say) && !/press/i.test(e1.say), JSON.stringify({ w0, fl, e1 }));
+  await stepIs('bite', 10000); await sleep(p, 300);
+  const b0 = { ...(await step()), cue: await cueAudit(p), vib: await e2(() => window.__vib.slice()) };
+  await shot('5-bite');
+  R.check(`${name}: the bite: a big "!" with "NOW! Tap!" right at the float, on screen with nothing over it, a buzz, and Kero says "Tap the screen"`, b0.cue.on && b0.cue.kind === 'bite' && /NOW!/.test(b0.cue.text) && b0.cue.onScreen && b0.cue.nearFloat && !b0.cue.over.length && b0.cue.bangPx >= 40 && b0.vib.some(v => v >= 40) && /Tap the screen/.test(b0.say), JSON.stringify(b0));
+  await F2.tap(W * 0.6, H * 0.5);
+  const reel = await w2(() => window.G.life.fishing.s?.phase === 'reel', null, 3000); await sleep(p, 800);
+  const ra = await reelAudit(p), r0 = await step();
+  const calls = await e2(() => { const card = document.querySelector('.reel.show .rl-card').getBoundingClientRect(); return [...document.querySelectorAll('.tut-call')].map(c => { const r = c.getBoundingClientRect(); return { t: c.textContent, on: getComputedStyle(c).opacity === '1' && r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight, overCard: Math.min(r.right, card.right) - Math.max(r.left, card.left) > 2 && Math.min(r.bottom, card.bottom) - Math.max(r.top, card.top) > 2 }; }); });
+  await shot('6-reel');
+  R.check(`${name}: the reel card: on screen, nothing over it (${name === 'phone' ? "the dock steps aside" : 'the dock clear of it'}), clear of the hero and the float; 12 px+ text and a 180+ px bar; the thumb how-to (Hold ▲ / Let go ▼); "hold a finger anywhere"; three callouts on screen beside it`, reel && ra.card && ra.onScreen && !ra.over.length && !ra.coversHero && !ra.coversFloat && ra.namePx >= 12 && ra.howPx >= 12 && ra.bar.h >= 180 && ra.howto && ra.thumb && (name !== 'phone' || !ra.dock) && /anywhere on the screen/.test(r0.say) && calls.length === 3 && calls.every(c => c.on && !c.overCard), JSON.stringify({ reel, ra, r0: r0.say, calls }));
+  // a finger held where the (faded) skill buttons sit still reels, played by a bot with a human's 0.26 s reaction
+  const fx = W * 0.8, fy = H * 0.62;
+  const under = await e2(([x, y]) => { const e = document.elementFromPoint(x, y); return e ? e.tagName.toLowerCase() + '.' + [...e.classList].join('.') : null; }, [fx, fy]);
+  const hb = await humanReel(p, { press: () => F2.down(3, fx, fy), release: () => F2.up(3), delay: 260 });
+  await stepIs('log', 8000); await sleep(p, 700);
+  const l0 = { ...(await step()), ring: await ringOn('.tc.on .tc-menu'), crucian: await e2(() => window.G.state.fishLog?.crucian?.n || 0) };
+  await shot('7-catch');
+  R.check(`${name}: a finger held over the faded skill buttons reels (it reaches the world), a bot with a human's reaction lands the guide's crucian; then the menu button is spotlit with "the menu button, then Journal"`, /^canvas/.test(under || '') && hb === 'catch' && l0.crucian === 1 && l0.ring && /menu button/.test(l0.say), JSON.stringify({ under, hb, l0 }));
+  await tapSel('.tc.on .tc-menu'); await w2(() => window.G.ui.isOpen('menu'), null, 3000); await sleep(p, 500);
+  const m0 = { open: await e2(() => window.G.ui.isOpen('menu')), ring: await ringOn('.p-menu [data-a="open:quests"]'), paused: await e2(() => window.G.tutorials.paused) };
+  await shot('8-menu');
+  await e2(() => { window.__clk = []; if (!window.__clkOn) { window.__clkOn = true; for (const t of ['pointerdown', 'pointerup', 'click']) addEventListener(t, e => window.__clk.push(t + ':' + (e.target.closest?.('[data-a]')?.dataset.a || e.target.tagName)), true); } });
+  await tapSel('.p-menu [data-a="open:quests"]');
+  if (!(await w2(() => window.G.ui.isOpen('quests'), null, 3000))) { await tapSel('.p-menu [data-a="open:quests"]'); await w2(() => window.G.ui.isOpen('quests'), null, 3000); } // (a tap held long under a loaded machine reads as a long press: once more)
+  await sleep(p, 500);
+  const j0 = { open: await e2(() => window.G.ui.isOpen('quests')), ring: await ringOn('.p-quests .q-tabs .tab[data-t="fish"]'), ev: await e2(() => window.__clk.slice(0, 8)) };
+  await shot('9-journal');
+  await tapSel('.p-quests .q-tabs .tab[data-t="fish"]');
+  const wrap = await stepIs('wrap', 5000); await sleep(p, 500); await shot('10-fishlog');
+  R.check(`${name}: menu (the guide stays up, Journal spotlit) → Journal (the Fish Log tab spotlit) → the Fish Log: the guide's wrap-up`, m0.open && m0.ring && !m0.paused && j0.open && j0.ring && wrap, JSON.stringify({ m0, j0, wrap }));
+  const sim = { auto: await e2(() => window.G.life.fishing.relaxed()), touch: await simRates(p, { rod: 1, relaxed: true, N: 120 }), normal: await simRates(p, { rod: 1, N: 120 }) };
+  R.check(`${name}: Settings › Fishing Auto plays Relaxed on touch; with it the beginner bot lands every tier at least as often as Normal (commons ≥ 95%, rare ≥ 85%)`, sim.auto && sim.touch.every((v, i) => v >= sim.normal[i]) && sim.touch[0] >= 0.95 && sim.touch[2] >= 0.85, JSON.stringify(sim));
+  errors.push(...T.errors.map(e => `[${name}] ` + e));
+}
+async function fishChecks() {
+  for (const [name, D, qs] of [['phone', { w: 844, h: 390, dpr: 3, ua: IPHONE_UA }, ''], ['ipad', IPAD, '&itch']]) {
+    try { await fishGuide(name, D, qs); } catch (x) { R.check(`${name}: the fishing guide by touch ran to the end`, false, x.stack || x.message); }
+  }
+}
+
+const ONLY_K = new Error('S27_ONLY=k: the iPad section alone'), ONLY_L = new Error('S27_ONLY=l: the fishing guide section alone');
 try {
   if (process.env.S27_ONLY === 'k') throw ONLY_K;
+  if (process.env.S27_ONLY === 'l') throw ONLY_L;
   await boot(page, 'fresh&nointro&notut');
   await ev(() => {
     const G = window.G, st = G.state;
@@ -577,11 +661,15 @@ try {
 
   // ================================================================ k) an iPad (CT-6)
   await ipadChecks();
+  // ================================================================ l) R-12: the fishing guide by touch (a phone, an iPad)
+  await fishChecks();
 } catch (e) {
   if (e === ONLY_K) { try { await ipadChecks(); } catch (x) { R.check('the iPad section ran to the end', false, x.stack || x.message); } }
+  else if (e === ONLY_L) await fishChecks();
   else R.check('scenario ran to the end', false, e.stack || e.message);
 }
 const failed = R.finish(errors, warns);
 await browser.close();
 await ipadClose?.();
+for (const c of fishClose) await c();
 process.exit(failed ? 1 : 0);

@@ -21,7 +21,7 @@ function stakeGeo() {
   ]);
 }
 
-const RANK_REQ = { shrine: 2, boneSmith: 2, waterTower: 2, fountain: 2, onsen: 3, clinic: 3, school: 3, koiStatue: 3, chewyStatue: 4, bridge: 2, sprinkler: 3 };
+const RANK_REQ = { shrine: 2, boneSmith: 2, waterTower: 2, fountain: 2, onsen: 3, clinic: 3, school: 3, koiStatue: 3, chewyStatue: 4, bridge: 2, sprinkler: 3, guild: 2 }; // (guild: the Adventurers' Guild, docs/COZY.md §5.1)
 
 export class BuildMode {
   constructor(G, sim) {
@@ -163,11 +163,17 @@ export class BuildMode {
   downA() { return Input.mouseDown(0) || (this.pad && Actions.padDown('A')); }
   /** a hint for the prompt: the pad's wording (and its A glyph when A does it) */
   say(mouse, pad, act = true) { if (this.pad) this.G.ui?.setInteract?.(pad, { key: act ? 'pad:interact' : null }); else this.G.ui?.setInteract?.(mouse); }
+  /** why a building can't be bulldozed ('' if it can): the landmarks stay; the Guild stays while hires live there (cozy/guildRun.js) */
+  keepWhy(b) {
+    if (BUILDINGS[b.type].prebuilt) return `${BUILDINGS[b.type].name} can't be removed`;
+    if (b.type === 'guild' && this.G.state.cozy?.guild?.hires?.length) return "The Guild's hires live here: say goodbye to them first";
+    return '';
+  }
   /** X on the pad: remove the building under the cursor (press twice; the landmarks stay) */
   padRemove(cur) {
     const sim = this.sim, b = sim.buildingAt(cur.x, cur.z), G = this.G;
     if (!b) { Events.emit('sfx', 'ui_error'); return; }
-    if (BUILDINGS[b.type].prebuilt) { G.ui?.toast?.(`${BUILDINGS[b.type].name} can't be removed`, { color: '#ffb0bc' }); return; }
+    const keep = this.keepWhy(b); if (keep) { G.ui?.toast?.(keep, { color: '#ffb0bc' }); return; }
     const now = performance.now();
     if (this._rm?.b === b && now - this._rm.t < 1800) { this._rm = null; sim.remove(b); return; }
     this._rm = { b, t: now };
@@ -268,10 +274,11 @@ export class BuildMode {
     } else if (this.tool.kind === 'bulldoze') {
       const b = sim.buildingAt(cur.x, cur.z);
       U.uCursor.value.set(cur.x + 0.5, cur.z + 0.5, 1, 1); this.cursorCol('#ff7a8a', 0.25);
-      if (this.pad) this.say('', b ? (BUILDINGS[b.type].prebuilt ? `${BUILDINGS[b.type].name} can't be removed` : `Remove ${BUILDINGS[b.type].name} (50% refund)`) : 'Point at a building to remove it', !!b && !BUILDINGS[b.type].prebuilt);
-      else G.ui?.setInteract?.(b ? (BUILDINGS[b.type].prebuilt ? `${BUILDINGS[b.type].name} can't be removed` : `Click to remove ${BUILDINGS[b.type].name} (50% refund)`) : 'Click a building to remove it');
+      const keep = b ? this.keepWhy(b) : '';
+      if (this.pad) this.say('', b ? (keep || `Remove ${BUILDINGS[b.type].name} (50% refund)`) : 'Point at a building to remove it', !!b && !keep);
+      else G.ui?.setInteract?.(b ? (keep || `Click to remove ${BUILDINGS[b.type].name} (50% refund)`) : 'Click a building to remove it');
       if (b) { const [w, d] = sim.dims(b.type, b.rot, b.level); U.uCursor.value.set(b.x + w / 2, b.z + d / 2, w, d); }
-      if (b && !BUILDINGS[b.type].prebuilt && this.hitA()) sim.remove(b);
+      if (b && !keep && this.hitA()) sim.remove(b);
     }
   }
 }

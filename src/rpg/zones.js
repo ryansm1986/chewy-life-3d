@@ -48,7 +48,7 @@ export function fillTiers(d, storyClear = false) {
   t.cleared = Array.isArray(t.cleared) ? [...new Set(t.cleared.map(v => Math.floor(+v)).filter(v => v >= 0 && v <= TIER_MAX))].sort((a, b) => a - b) : [];
   d.spirit = obj(d.spirit) || {}; d.spirit.best = Math.max(0, Math.floor(+d.spirit.best || 0));
   d.crew = Math.max(0, Math.floor(+d.crew || 0)); // (first clears by a crew: docs/COZY.md §3.2; the boss unique still waits for your own)
-  if (d.cleared > 0 || storyClear) { if (!t.cleared.includes(0)) t.cleared.unshift(0); t.unlocked = Math.max(1, t.unlocked); } // (the migration)
+  if (d.cleared > 0 || d.crew > 0 || storyClear) { if (!t.cleared.includes(0)) t.cleared.unshift(0); t.unlocked = Math.max(1, t.unlocked); } // (the migration; a crew's clear wakes the Lantern too: docs/COZY.md §3.2)
   const ln = obj(d.lantern);
   d.lantern = ln ? { tier: Math.max(0, Math.min(TIER_MAX, Math.floor(+ln.tier || 0))), spirit: Math.max(0, Math.floor(+ln.spirit || 0)), mods: Array.isArray(ln.mods) ? ln.mods.filter(x => typeof x === 'string').slice(0, 6) : [] } : null;
   return d;
@@ -138,6 +138,18 @@ export function recordDungeonClear(state, id, tier = 0, spirit = 0) {
     if (tier >= d.tier.unlocked && d.tier.unlocked < TIER_MAX) tierUnlocked = d.tier.unlocked = Math.min(TIER_MAX, tier + 1);
   }
   return { first, cleared: d.cleared, tierUnlocked, firstTier, spirit };
+}
+/** A crew cleared the dungeon for the story (docs/COZY.md §3.2, §14.2: a zone dungeon's first clear, or the Deep
+ *  Burrow's Tamamo): dungeon.crew counts it and the Lantern wakes (T0 counts as cleared, T1 opens), but dungeon.cleared
+ *  stays as it was, so your own first clear is still the first (the boss unique: dungeon/zoneRun.js, tierRun.js).
+ *  → { crew, tierUnlocked: 1 | null } */
+export function recordCrewClear(state, id) {
+  const d = tierRecord(state, id); if (!d) return null;
+  const was = d.tier.unlocked;
+  d.crew++;
+  if (!d.tier.cleared.includes(0)) d.tier.cleared.unshift(0);
+  if (d.tier.unlocked < 1) d.tier.unlocked = 1;
+  return { crew: d.crew, tierUnlocked: was < 1 ? 1 : null };
 }
 /** has the dungeon (a zone, its dungeon, or the Deep Burrow) been cleared at tier n or higher? (a Spirit clear counts as T5) */
 export const tierCleared = (state, id, n) => { const d = tierRecord(state, id); return !!d && (d.tier.cleared.some(t => t >= n) || (n <= TIER_MAX && d.spirit.best > 0)); };
