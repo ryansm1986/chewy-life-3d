@@ -35,12 +35,15 @@ export function spectralMaterial(core = '#fff6e6', rim = '#c8d8ff', a = 0.7) {
 }
 /** Sakura Storm's blades: bone-white with a sakura-pink rim (shared: its alpha stays put) */
 export function stormBladeMaterial() { return M.storm || (M.storm = spectralMaterial('#fff6ec', '#ffb8d0', 0.72)); }
-/** the blade alone (no hilt), for the spectral blades: charKit.js katanaGeo's blade, centred on its middle */
-export function spectralBladeGeo() {
-  if (M.sbg) return M.sbg;
-  const g = katanaGeo(); g.computeBoundingBox();
+/** the blade alone (no hilt), for the spectral blades: charKit.js katanaGeo's blade, centred on its middle. look: the
+ *  katana look (default the game's: Sakura Storm's bone blades); Moonlit Blades pass 'classic', a pointed blade of
+ *  moonlight that still falls point-first (the bone blade has a knob pair at each end, so either way a knob would land) */
+export function spectralBladeGeo(look = null) {
+  const key = `sbg|${look ?? ''}`;
+  if (M[key]) return M[key];
+  const g = katanaGeo(look == null ? {} : { variant: look }); g.computeBoundingBox();
   g.translate(0, -(g.boundingBox.max.y + 0.06) / 2, 0); // (the hilt's still there, but small and spectral too: a whole ghost katana)
-  return (M.sbg = g);
+  return (M[key] = g);
 }
 
 // ------------------------------------------------------------------ the kabuto (the spirit pups' tiny helmets)

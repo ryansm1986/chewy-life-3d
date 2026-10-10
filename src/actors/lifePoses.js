@@ -210,6 +210,12 @@ export const LIFE_ACTIONS = {
     const k = inOut(u, 0.15, 0.2), s = Math.max(0, Math.sin(u * Math.PI * 9)) * (u > 0.2 && u < 0.85 ? 1 : 0);
     A.head.x += (-0.42 + 0.08 * s) * k; A.head.y += Math.sin(u * Math.PI * 2) * 0.25 * k; A.body.x += -0.12 * k; A.sq += 0.02 * s; A.earKick += 1.5 * s; A.tailWag = 1.5;
   } },
+  // Shadow leading the way (actors/shadowLead.js): nose down to the trail for a couple of quick sniffs, on the move or
+  // standing (one-shot; the locomotion carries on under it)
+  groundSniff: { dur: 1.0, pose: (u, P, A) => {
+    const k = inOut(u, 0.18, 0.25), s = Math.max(0, Math.sin(u * Math.PI * 8)) * (u > 0.2 && u < 0.8 ? 1 : 0);
+    A.head.x += (0.5 - 0.07 * s) * k; A.head.y += Math.sin(u * Math.PI * 1.5) * 0.18 * k; A.body.x += 0.14 * k; A.sq += 0.015 * s; A.earKick += 0.8 * s; A.tailWag = 2;
+  } },
 
   // ---- woken up by a knock at night (npc.js sleepy doorstep answer)
   // a big yawn: head tipped back, one paw politely over the mouth, the other arm stretching up, up on the toes

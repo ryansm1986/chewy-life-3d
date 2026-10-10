@@ -13,11 +13,15 @@ import { padGlyph } from './padGlyphs.js';
 import { PRESET_NAMES } from '../core/deck.js';
 import { DESKTOP, quitGame } from './desktop.js';
 import { AUTOSAVE_LABELS } from '../core/autosave.js';
+import { LEAD_LABELS } from './leadUI.js'; // (Settings › Shadow leads the way: ROADMAP R-17)
+import { TARGET_KEYS, TARGET_LABELS, TARGETING, targetingOf, targetingHint } from '../combat/autoTarget.js';
 import { version as VERSION } from '../../package.json'; // (Settings › About; seven taps on it ask for the debug password: src/debug/access.js)
 
 const MOUSE_CAP = { mouse0: () => glyph('mouseL'), mouse2: () => glyph('mouseR') };
 // Settings › Controls › Touch: what each on-screen control does (ui/touch.js, docs/CONTROLS.md §12)
 const TOUCH_HELP = [['Move', 'The stick: put a thumb down on the left (the right, left-handed)'], ['Sprint', 'Push the stick out to its glowing ring'], ['Attack · talk · use', 'The big button (it shows a paw when it will talk or use)'], ['Skills', 'The buttons round it: tap to cast, hold to charge'], ['Aim', 'Auto: the nearest foe, else where you face. Drag: drag off a skill, back onto it to cancel'], ['Target', 'Tap a monster'], ['Walk · talk · open', 'Tap the ground, a friend or a door'], ['Roll', 'The mint button'], ['Potions · meal', 'The belt between the orbs'], ['Swap weapons', 'The small badge by the big button'], ['Hero', 'Tap the portrait: the next hero. Hold it: the hero wheel'], ['Zoom', 'Pinch with two fingers'], ['Map · bag · menu', 'Tap the minimap; the buttons beside it']];
+// Settings › Controls › Targeting (CT-8, docs/CONTROLS.md §13): one row per device tab, its own key, and a line under it
+const TGT_ROW = dev => `<div class="set-row ctl-tgt" title="Off: you aim. Assist: a light snap onto foes near your aim. Auto: skills pick the best foe or group all round you."><div class="set-n">${glyph('pin')}Targeting</div><div class="seg" data-k="${TARGET_KEYS[dev]}" style="--w:78px">${TARGET_LABELS.map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div><div class="ctl-tgt-h" data-tgt="${dev}" style="margin:-2px 6px 6px;font:500 12.5px var(--font);opacity:.72"></div>`;
 const QUICK = [['inventory', 'bag', 'Bag'], ['character', 'star', 'Character'], ['skills', 'sparkle', 'Skills'], ['quests', 'book', 'Journal'], ['map', 'map', 'Map']];
 
 export class MenuPanel extends Panel {
@@ -52,6 +56,7 @@ export class MenuPanel extends Panel {
         <div class="set-row" title="Hold a skill's button to charge it. Toggle: press once to start charging, again to release. Off: holding repeats the skill."><div class="set-n">${glyph('zap')}Charge on hold</div><div class="seg" data-k="chargeMode">${['On', 'Off', 'Toggle'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
         <div class="set-row" title="Hold Shift while moving to sprint (+40% speed). Toggle: tap Shift to start sprinting; tap it again, or stop, to walk."><div class="set-n">${glyph('boots')}Sprint (Shift)</div><div class="seg" data-k="sprintMode">${['Hold', 'Toggle'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
         <div class="set-row" title="Digging with Shadow. Hold: hold the button and let go in the golden band for a Perfect dig. Tap: one press digs by itself (a normal find)."><div class="set-n">${glyph('paw')}Dig with Shadow</div><div class="seg" data-k="digMode">${['Hold', 'Tap'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+        <div class="set-row" title="Shadow walks ahead to the objective on a real path, waits for you, and stops short of yokai (a fight always comes first). Quests: on the steps that say he leads the way. Always: to the active objective. Off: only when you ask him (L, R3 out of a fight, a tap on the quest tracker, or the Journal's Follow Shadow)."><div class="set-n">${glyph('paw')}Shadow leads the way</div><div class="seg" data-k="shadowLead" style="--w:78px">${LEAD_LABELS.map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
         <div class="set-row" title="The reel. Relaxed: a wider catch zone, half the drain, a longer bite and early presses forgiven. Auto: Relaxed on a touch screen, Normal with keys or a controller."><div class="set-n">${glyph('wave')}Fishing</div><div class="seg" data-k="fishMode" style="--w:78px">${['Auto', 'Normal', 'Relaxed'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
         <div class="set-row" title="Saves on its own every few minutes of play, and after quests, level ups, building and big finds. Off: only those milestones, and when you leave."><div class="set-n">${glyph('save')}Autosave</div><div class="seg" data-k="autosave">${AUTOSAVE_LABELS.map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
         <div class="set-row"><div class="set-n">${glyph('star')}Show FPS</div><button class="tog" data-k="showFps"><i></i></button></div>${DESKTOP ? `
@@ -63,16 +68,20 @@ export class MenuPanel extends Panel {
       </div>
       <div class="mn-v mn-controls">
         <div class="ctl-tabs"><button data-dev="kbm">Keyboard &amp; mouse</button><button data-dev="pad">Controller</button><button data-dev="touch">Touch</button></div>
+        <div class="ctl-kbm">
+          ${TGT_ROW('kbm')}
+        </div>
         <div class="ctl-opts">
+          ${TGT_ROW('pad')}
           <div class="set-row" title="Light pulses on hits and charged releases"><div class="set-n">${glyph('bolt')}Rumble</div><button class="tog" data-k="rumble"><i></i></button></div>
-          <div class="set-row" title="The soft lock on the foe nearest your aim: how wide its cone is (0: off)"><div class="set-n">${glyph('eye')}Aim assist</div><div class="sld"><input type="range" min="0" max="100" data-k="aimAssist"><b></b></div></div>
+          <div class="set-row" title="Assist's soft lock on the foe nearest your aim: how wide its cone is. In Auto: how much the right stick snaps to a foe while it aims (0: not at all)"><div class="set-n">${glyph('eye')}Aim assist</div><div class="sld"><input type="range" min="0" max="100" data-k="aimAssist"><b></b></div></div>
           <div class="set-row" title="Auto follows the controller (the Steam Deck shows Xbox letters)"><div class="set-n">${glyph('star')}Button glyphs</div><div class="seg" data-k="padGlyphs" style="--w:96px">${['Auto', 'Xbox', 'PlayStation'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
         </div>
         <div class="ctl-touch">
           <div class="set-row" title="How big the on-screen buttons and the stick are"><div class="set-n">${glyph('sparkle')}Button size</div><div class="sld"><input type="range" min="75" max="135" data-k="touchSize"><b></b></div></div>
           <div class="set-row" title="How see-through the buttons are while you aren't pressing them"><div class="set-n">${glyph('eye')}Opacity</div><div class="sld"><input type="range" min="30" max="100" data-k="touchOpacity"><b></b></div></div>
           <div class="set-row" title="The buttons on the left, the stick on the right"><div class="set-n">${glyph('paw')}Left-handed</div><button class="tog" data-k="touchLeft"><i></i></button></div>
-          <div class="set-row" title="Auto: skills go at the nearest foe, else where you face. Drag: drag off a skill to aim it, back onto it to cancel, let go to cast."><div class="set-n">${glyph('star')}Skill aim</div><div class="seg" data-k="touchAim" style="--w:96px">${['Auto', 'Drag'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+          ${TGT_ROW('touch')}
           <div class="set-row" title="A little buzz on presses, charges and hits (phones that can)"><div class="set-n">${glyph('bolt')}Haptics</div><button class="tog" data-k="haptics"><i></i></button></div>
           <div class="set-row" title="Ask: when full screen closes during play, the game pauses and one tap goes back. Off: stay in the window (no full screen on the first tap either)."><div class="set-n">${glyph('eye')}Full screen</div><div class="seg" data-k="touchFs" style="--w:96px">${['Ask', 'Off'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
           <div class="set-row" title="Room kept clear of itch.io's own buttons over the game. Auto: on itch, when the game is in the page. Top or Side if they ever cover something; Off for none."><div class="set-n">${glyph('star')}itch.io buttons</div><div class="seg" data-k="itchInset" style="--w:78px">${['Auto', 'Top', 'Side', 'Off'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
@@ -86,7 +95,7 @@ export class MenuPanel extends Panel {
       const tab = e.target.closest('.ctl-tabs button'); if (tab) { this.cancelWait(); this.dev = tab.dataset.dev; this.ui.sfx('tab'); this.renderControls(); return; }
       const bb = e.target.closest('.ctl-b'); if (bb) { this.startWait(bb.dataset.bind); return; }
       const b = e.target.closest('[data-a]'); if (b) { this.act(b.dataset.a); replay(b, 'pressed', 300); return; }
-      const s = e.target.closest('.seg button'); if (s) { this.ui.setSetting(s.parentElement.dataset.k, +s.dataset.v); this.sync(); return; }
+      const s = e.target.closest('.seg button'); if (s) { const k = s.parentElement.dataset.k; this.ui.setSetting(k, +s.dataset.v); if (/^target/.test(k) && this.view === 'controls') this.renderControls(); else this.sync(); return; } // (Targeting: the touch help follows it)
       const t = e.target.closest('.tog'); if (t) { this.ui.setSetting(t.dataset.k, !this.ui.settings[t.dataset.k]); this.sync(); }
     });
     this.body.addEventListener('input', e => {
@@ -142,6 +151,7 @@ export class MenuPanel extends Panel {
       r.nextElementSibling.textContent = k === 'uiScale' || k === 'aimAssist' || k === 'touchSize' || k === 'touchOpacity' ? v + '%' : v;
     }
     for (const t of this.body.querySelectorAll('.tog')) t.classList.toggle('on', k0(s, t.dataset.k));
+    for (const h of this.body.querySelectorAll('.ctl-tgt-h')) h.textContent = targetingHint(h.dataset.tgt, targetingOf(s, h.dataset.tgt)); // (CT-8)
     const h = this.ui._menuH || {};
     this.body.querySelector('[data-a="save"]').style.display = h.save ? '' : 'none';
     const mode = this.ui.G?.mode, show = (a, on) => { const b = this.body.querySelector(`[data-a="${a}"]`); if (b) b.style.display = on ? '' : 'none'; };
@@ -167,8 +177,12 @@ export class MenuPanel extends Panel {
     const dev = this.dev || 'kbm', list = this.body.querySelector('.ctl-list'); if (!list) return;
     this.panel.dataset.dev = dev;
     for (const b of this.body.querySelectorAll('.ctl-tabs button')) b.classList.toggle('on', b.dataset.dev === dev);
+    const kb = this.body.querySelector('.ctl-kbm'); if (kb) kb.hidden = dev !== 'kbm'; // (the keyboard tab's Targeting row)
     let html = '';
-    if (dev === 'touch') { list.innerHTML = TOUCH_HELP.map(([t, d]) => `<div class="ctl-row"><span class="ctl-t">${esc(t)}</span><span class="ctl-h">${esc(d)}</span></div>`).join(''); this.sync(); return; } // (touch has no bindings: what each control does, ui/touch.js)
+    if (dev === 'touch') { // (touch has no bindings: what each control does, ui/touch.js; the aim rows follow Targeting, CT-8)
+      const tm = targetingOf(this.ui.settings, 'touch'), help = TOUCH_HELP.map(([t, d]) => [t, t === 'Aim' ? (tm === TARGETING.AUTO ? 'Auto: skills pick the best foe or group all round you' : tm === TARGETING.ASSIST ? 'Assist: the foe in front of you, else where you face' : 'Off: drag off a skill to aim it, back onto it to cancel') : t === 'Target' && tm === TARGETING.AUTO ? 'Tap a monster, or flick the stick toward one' : d]);
+      list.innerHTML = help.map(([t, d]) => `<div class="ctl-row"><span class="ctl-t">${esc(t)}</span><span class="ctl-h">${esc(d)}</span></div>`).join(''); this.sync(); return;
+    }
     for (const [g, title] of ACTION_GROUPS) {
       const rows = Object.entries(ACTIONS).filter(([id, A]) => A.group === g && (Actions.binds(id, dev).length || Actions.rebindable(id, dev)));
       if (!rows.length) continue;

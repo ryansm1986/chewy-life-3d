@@ -75,6 +75,9 @@ Every action is one tap and says what it did in a toast. The ones that travel cl
 - *Skill points* +1 / +10 / +50, *Stat points* +5 / +50 / +250, *Max every skill* (the active hero's skills at 20),
   *Reset skills* (two taps: every point back, as the Forget-Me-Not Tea).
 - *Shadow's whelp outfit*: with Foosy (the normal rule), on, or off, for the session.
+- *Katana look (R-15)* (registered by `actors/player.js`, at the top of the tab): B, the bone blade (the game's), or the
+  looks it was picked from: A (bone tip), C (chew-toy bone) and the classic blade, live for the session;
+  `?katana=a|b|c|classic` does the same from boot (the loot drop and Sakura Storm's spectral blades too).
 
 **World**
 - *Open every zone*: all four zones open on the Travel Map.
@@ -121,13 +124,17 @@ Every action is one tap and says what it did in a toast. The ones that travel cl
   textures).
 - *Kill every monster here*; *Spawn a pack*: a kind, a count (3, 8, 16, 30) and a leader (none, champion, unique)
   next to the hero, alerted.
+- *Targeting on this device* (CT-8, `combat/autoTarget.js`): Off, Assist or Auto for the device playing now (the same
+  setting as Settings › Controls › Targeting, so it is saved).
 
 **Time**
 - *Time of day* (6 am … midnight), *Skip to the next morning*, *Skip a whole day* (through 6:00, so the crops grow and
   the village has its morning).
 - *Weather* (in a zone, until you leave): clear, snow, petals, leaves, fireflies, mist, or the zone's own.
 
-**Cozy**: empty for now. The cozy path (ROADMAP CZ-*, docs/COZY.md) adds its own actions here.
+**Cozy**: the cozy path's actions (ROADMAP CZ-*, docs/COZY.md), and *Shadow leads the way* (ROADMAP R-17,
+`ui/leadUI.js`): a test walk (a "Follow Shadow" reach step to an open spot 25–45 m off in this world), the setting
+(Off · Quests · Always), and his leading stats (plans, their cost, time leading, pack warnings, arrivals).
 
 **Save**: back up, restore (two taps), turn debug off.
 

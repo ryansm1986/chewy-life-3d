@@ -42,7 +42,9 @@ export function fingers(page, cdp) {
       const x0 = p.x, y0 = p.y;
       for (let i = 1; i <= steps; i++) { p.x = x0 + (x - x0) * i / steps; p.y = y0 + (y - y0) * i / steps; await send('touchMove'); if (steps > 1) await page.waitForTimeout(16); }
     },
-    async up(id) { if (!pts.has(id)) return; pts.delete(id); await send('touchEnd'); },
+    // (CDP's touchEnd releases the points it lists, [] meaning all: so with other fingers still down only this one is
+    // listed; listing the ones still down let them go instead: a held stick dropped when a skill was tapped, CT-8)
+    async up(id) { const p = pts.get(id); if (!p) return; pts.delete(id); await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: pts.size ? [{ x: p.x, y: p.y, id: p.id, radiusX: 6, radiusY: 6, force: 1 }] : [] }); },
     async upAll() { for (const id of [...pts.keys()]) await F.up(id); },
     async tap(x, y, id = 9) { await F.down(id, x, y); await frame(); await F.up(id); await frame(); },
     async hold(x, y, ms, id = 9) { await F.down(id, x, y); await page.waitForTimeout(ms); await F.up(id); await frame(); },

@@ -11,7 +11,7 @@ import { MATERIALS } from '../ui/glyphs.js';
 import { pantryIcon } from '../life/pantryIcons.js';
 import { meetsNeed, homeRating, starText } from '../home/rating.js';
 import { FURNITURE } from '../home/furniture.js';
-import { stepGain, zoneStepDone, zoneStepHave, destOf } from './questSteps.js';
+import { stepGain, zoneStepDone, zoneStepHave, destOf, reachIsHere, REACH_R } from './questSteps.js';
 import { DUNGEONS } from '../dungeon/defs.js';
 import { ZONE_QUESTS, dungeonObjectives as zoneObjectives, offersFor } from './zoneQuests.js'; // (zone villagers' quests: docs/ZONES.md §3)
 import { ZONE_NPCS } from '../regions/village/data.js';
@@ -22,11 +22,14 @@ import { storyObjectives, villageObjectives, CREW_STEP_TYPES } from '../cozy/obj
 //   | deliver(npc, mat, n, pantry?) (a material, or with pantry: true a pantry good — crops, fish, dishes)
 //   | decorate(npc, need) (decorate their home: need = { tag?, n?, rug?, light?, stars?, ids? } — home/rating.js
 //     meetsNeed, checked when you leave their home: docs/HOUSING.md §4)
+//   | reach(at, x, z) (walk to a spot: world/questSteps.js, polled by reachTick)
+//   any step may say lead: true (or lead(G, q) → bool) — Shadow leads the way to it (actors/shadowLead.js, ROADMAP R-17:
+//     its text, or its giver's line, says so)
 //   the zones (docs/ZONES.md §3, rules in world/questSteps.js): kill / boss take optional zone, dungeon, floor and tier
 //   filters | find(item, n) | rescue(npc) | dungeonFloor(dungeon, n) | tier(dungeon, n) | villageSaved(zone)
 export const QUESTS = {
   welcome: { title: 'Welcome Home, Chewy', giver: 'rosie', desc: 'Rosie wants to show you around Blossom Hollow.', steps: [{ type: 'talk', npc: 'rosie', text: 'Say hi to Rosie' }], reward: { coins: 50, xp: 20 }, next: 'burrow1' },
-  burrow1: { title: 'Something Squishy', giver: 'rosie', desc: 'Strange squeaks echo from the Burrow on the shrine hill. Go take a peek!', steps: [{ type: 'kill', n: 8, text: 'Defeat yokai in the Burrow' }, { type: 'collect', mat: 'mochi', n: 3, text: 'Bring back Mochi Jelly' }], reward: { coins: 120, xp: 80, potions: { heart: 3 } }, next: 'homes' },
+  burrow1: { title: 'Something Squishy', giver: 'rosie', desc: 'Strange squeaks echo from the Burrow on the shrine hill. Go take a peek!', steps: [{ type: 'kill', n: 8, text: 'Defeat yokai in the Burrow', lead: (G, q) => G.state.flags?.burrowChoice === 'self' && !(q.prog > 0) }, { type: 'collect', mat: 'mochi', n: 3, text: 'Bring back Mochi Jelly' }], reward: { coins: 120, xp: 80, potions: { heart: 3 } }, next: 'homes' },
   homes: { title: 'A Home for Everyone', giver: 'rosie', desc: 'New friends want to move in! Paint a homes zone (B → Zones) next to a path and let the village grow.', steps: [{ type: 'build', btype: 'home', n: 9, text: 'Grow the village to 9 homes' }], reward: { coins: 200, xp: 120, mats: { wood: 20, stone: 10 } }, next: 'lights' },
   lights: { title: 'Lights of Blossom Hollow', giver: 'rosie', desc: 'Nights are a little spooky. Place lanterns so everyone can find their way home.', steps: [{ type: 'buildAny', btypes: ['stoneLantern', 'streetLamp', 'lanternString'], n: 3, text: 'Build 3 more lanterns' }], reward: { coins: 150, xp: 150, mats: { lantern: 3 } }, next: 'king' },
   king: { title: 'The King of Squish', giver: 'rosie', desc: 'A giant mochi with a crown is hogging Floor 5. Time to deflate that ego!', steps: [{ type: 'floor', n: 5, text: 'Reach Floor 5' }, { type: 'boss', id: 'mochiKing', text: 'Defeat King Mochi' }], reward: { coins: 500, xp: 600, skillPts: 1, unique: true }, next: 'shrine' },
@@ -78,6 +81,7 @@ export const NIGHT_CHAT = {
 // a decorate request's extra thank-you: a workbench recipe (home/recipes.js, learn: 'reward')
 const CRAFT_REWARD = { mochi: 'catTower', kero: 'fishTank' };
 const HEART_REWARDS = { 3: { coins: 100, text: 'Here, a little something for being such a good friend!' }, 6: { item: 'magic', text: 'I found this and thought of you!' }, 9: { item: 'rare', text: 'You\'re my best friend in the whole village. Take this, please!' } };
+const REACH_POS = new WeakMap(); // reach step → { w: world, p: its spot on that world's ground } (never on the step: it's saved)
 
 export class Story {
   constructor(G) {
@@ -267,24 +271,26 @@ export class Story {
   }
   /** how many of a deliver step's goods the household has (materials, or pantry goods for a homestead request) */
   haveFor(s) { const st = this.G.state; return s.pantry ? st.pantry?.[s.mat] || 0 : st.materials[s.mat] || 0; }
-  // where the current objective is, for the on-screen quest pointer → { pos, label, kind } | null
-  target() {
+  // where the current objective is, for the on-screen quest pointer → { pos, label, kind, quest, step, lead } | null
+  // (only: that quest's objective; lead: the step says Shadow leads the way, actors/shadowLead.js)
+  target(only = null) {
     const G = this.G, st = G.state;
-    const act = this.Q.active.filter(q => this.def(q.id));
+    const act = this.Q.active.filter(q => this.def(q.id) && (!only || q.id === only));
     const order = [...act.filter(q => !this.def(q.id).request), ...act.filter(q => this.def(q.id).request)];
+    const tag = (t, q, s) => Object.assign(t, { quest: q.id, step: q.step, lead: typeof s.lead === 'function' ? !!s.lead(G, q) : !!s.lead });
     // (Blossom Hollow's villagers only while you're in the village: their records stay in G.npcs while you're in a
     // region, at village coordinates: ROADMAP R-4, the welcome quest's pointer at Rosie from inside a zone)
     const npcPos = id => { const n = G.mode === 'village' && G.npcs?.find(x => x.id === id && x.visible); return n ? { pos: n.pos, label: n.name, kind: 'npc' } : null; };
     for (const q of order) {
       const d = this.def(q.id), s = d.steps[q.step]; if (!s) continue;
-      if (s.type === 'talk') { const t = npcPos(s.npc) || this.zoneTalkTarget(s) || this.homeTalkTarget(s); if (t) return t; continue; }
+      if (s.type === 'talk') { const t = npcPos(s.npc) || this.zoneTalkTarget(s) || this.homeTalkTarget(s); if (t) return tag(t, q, s); continue; }
       if (s.type === 'decorate') { // their home's door (inside it: nothing to point at)
         const rec = G.mode === 'village' && G.sim?.list.find(r => r.data.owner === s.npc);
-        if (rec) return { pos: rec.door, label: `${this.nameOf(s.npc)}'s home`, kind: 'place' };
+        if (rec) return tag({ pos: rec.door, label: `${this.nameOf(s.npc)}'s home`, kind: 'place' }, q, s);
         continue;
       }
-      if (s.type === 'deliver') { if (this.haveFor(s) >= s.n) { const t = npcPos(s.npc); if (t) return t; } continue; }
-      const t = this.placeFor(s, destOf(s)); if (t) return t;
+      if (s.type === 'deliver') { if (this.haveFor(s) >= s.n) { const t = npcPos(s.npc); if (t) return tag(t, q, s); } continue; }
+      const t = this.placeFor(s, destOf(s)); if (t) return tag(t, q, s);
     }
     return null;
   }
@@ -298,21 +304,25 @@ export class Story {
     const at = (pos, label) => (pos ? { pos, label, kind: 'place' } : null);
     const zone = dest.zone || null, burrow = dest.dungeon === 'burrow';
     if (G.mode === 'village') {
+      if (dest.home) return dest.reach ? at(this.reachPos(s), s.label || s.text) : null; // (a reach step at home: its spot)
       if (burrow) { const gate = G.sim?.list.find(r => r.data.type === 'dungeonGate'); return gate ? at(gate.door, 'The Burrow') : null; }
       const tp = zone && G.world.landmarks?.travel; if (!tp) return null;
       const p = this._postPos ||= { x: tp.x, y: G.world.heightAt?.(tp.x, tp.z) || 0, z: tp.z };
       return at(p, "The Wayfarer's Post");
     }
     const here = D.kind === 'region' ? null : D.def?.id;
+    if (dest.home) return at(D.exitPos, D.kind === 'region' ? "The Wayfarer's Stone" : 'The way out'); // (a reach step at home, from out here)
     if (dest.dungeon && here === dest.dungeon) { // in the right dungeon
       if (dest.floor && D.floor < dest.floor) return at(D.stairsPos, 'Stairs down');
       if (dest.floor && D.floor > dest.floor) return at(D.exitPos, 'The way out');
       if (dest.boss) return D.boss?.alive ? at(D.boss.pos, D.boss.name) : at(D.stairsPos, 'Stairs down');
+      if (dest.reach) return at(this.reachPos(s), s.label || s.text);
       if (dest.mark) return at(D.questMark?.(s), s.text);
       return null;
     }
     if (burrow) return null; // (a Burrow step: nothing to point at in a region / a zone dungeon, as before)
     if (D.kind === 'region' && D.zoneId === zone) { // the step's zone, outdoors
+      if (dest.reach && !dest.dungeon) return at(this.reachPos(s), s.label || s.text);
       if (dest.village) return at(D.villagePos, 'The village');
       if (dest.dungeon) return at(D.gatePos, DUNGEONS[dest.dungeon]?.name || 'The dungeon');
       return dest.boss && D.boss?.alive ? at(D.boss.pos, D.boss.name) : null;
@@ -320,6 +330,30 @@ export class Story {
     if (dest.dungeon && D.kind === 'zone' && here !== dest.dungeon) return at(D.exitPos, 'The way out'); // (another zone's dungeon)
     if (zone && D.zoneId !== zone) return at(D.exitPos, D.kind === 'region' ? "The Wayfarer's Stone" : 'The way out'); // (somewhere else: travel on)
     return null;
+  }
+  /** a reach step's spot on this world's ground (cached per world) */
+  reachPos(s) {
+    const W = this.G.world; let c = REACH_POS.get(s);
+    if (!c || c.w !== W) REACH_POS.set(s, c = { w: W, p: { x: s.x, y: W?.heightAt?.(s.x, s.z) || 0, z: s.z } });
+    return c.p;
+  }
+  /** where the hero is, for reach steps: { home, zone, dungeon (a floor's dungeon id; null in a region), floor } */
+  whereNow() {
+    const G = this.G, D = G.mode === 'dungeon' ? G.dungeon : null;
+    return { home: G.mode === 'village', zone: D?.zoneId || null, dungeon: D && D.kind !== 'region' ? D.def?.id || null : null, floor: D?.floor ?? null };
+  }
+  /** reach steps: the hero at the spot completes it (polled a few times a second by actors/shadowLead.js) */
+  reachTick(dt) {
+    if ((this._reachT = (this._reachT || 0) - dt) > 0) return;
+    this._reachT = 0.2;
+    const P = this.G.player; if (!P || this.G.playerDead) return;
+    let hit = false, w = null;
+    for (const q of this.Q.active) {
+      const s = this.def(q.id)?.steps[q.step]; if (s?.type !== 'reach') continue;
+      if (!reachIsHere(s, w ||= this.whereNow())) continue;
+      if (Math.hypot(P.pos.x - s.x, P.pos.z - s.z) < (s.r || REACH_R)) { q.prog = 1; hit = true; }
+    }
+    if (hit) this.progress('reach');
   }
   // quest objects for the UI tracker / journal
   uiList() {

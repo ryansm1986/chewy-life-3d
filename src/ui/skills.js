@@ -7,6 +7,7 @@ import { padGlyph } from './padGlyphs.js';
 import { Panel } from './panel.js';
 import { TREES, treesFor, skillList, skillDef, skillIconURL, hotbarIconURL, skillInfoLines, canLearnSkill, effLevel, treeInfo, skillTraining } from './rpg.js';
 import { ChargeDrawer, chipState, chargeTipHTML } from './chargePanel.js';
+import { aimLine } from '../combat/autoTarget.js';
 
 const COLW = 118, ROWH = 80, NODE = 64, PADX = 64, PADY = 26;
 const SLOT_NAMES = ['LMB', 'RMB', '1', '2', '3', '4'];
@@ -23,8 +24,15 @@ export class SkillsPanel extends Panel {
     this.chg = new ChargeDrawer(this); // (the Charge drawer docked to the tree's right: docs/CHARGE.md §4)
     b.querySelector('.sk-tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (t) this.setTree(t.dataset.t); });
     const N = this.$.nodes;
-    N.addEventListener('mouseover', e => { const n = e.target.closest('.node'); if (!n || n === this._hov) return; this._hov = n; this.hoverId = n.dataset.id; this.ui.tip.show(this.tipHTML(n.dataset.id), 'skill', n); });
-    N.addEventListener('mouseout', e => { const n = e.target.closest('.node'); if (n && !n.contains(e.relatedTarget)) { this._hov = null; this.hoverId = null; this.ui.tip.hide(n); } });
+    // (R-16: on the ⚡ chip the node's tooltip steps aside: it sat over the Charge drawer and hid the switch the chip makes)
+    N.addEventListener('mouseover', e => {
+      const n = e.target.closest('.node'); if (!n) return;
+      const chip = !!e.target.closest('.nd-chg.on');
+      if (n === this._hov && chip === this._hovChip) return;
+      this._hov = n; this._hovChip = chip; this.hoverId = n.dataset.id;
+      if (chip) this.ui.tip.hide(); else this.ui.tip.show(this.tipHTML(n.dataset.id), 'skill', n);
+    });
+    N.addEventListener('mouseout', e => { const n = e.target.closest('.node'); if (n && !n.contains(e.relatedTarget)) { this._hov = null; this._hovChip = false; this.hoverId = null; this.ui.tip.hide(n); } });
     N.addEventListener('contextmenu', e => { const n = e.target.closest('.node'); if (!n) return; e.preventDefault(); this.assignPopover(n.dataset.id, n); });
     N.addEventListener('pointerdown', e => {
       const n = e.target.closest('.node'); if (!n || e.button !== 0) return;
@@ -41,7 +49,11 @@ export class SkillsPanel extends Panel {
     addEventListener('pointerup', e => {
       const p = this._press; this._press = null;
       if (this._drag) { const id = this._drag; this._drag = null; this.ui.dragSkillEnd(id, e.clientX, e.clientY); return; }
-      if (p && e.target.closest?.('.node') === p.n) { if (e.target.closest?.('.nd-chg')) { this.chg.show(p.id); this._treeSig = null; this.render(); this.ui.sfx?.('tab'); return; } this.learn(p.id, p.n); }
+      if (p && e.target.closest?.('.node') === p.n) {
+        if (e.target.closest?.('.nd-chg')) { this.chg.choose(p.id); return; }
+        if (this.ui.mobile?.dblTap === e) return; // (the second tap of a double-tap is the assign popover, not a second learn)
+        this.learn(p.id, p.n);
+      }
     });
   }
   lvl(id) { return this.st.player?.skills?.[id] || 0; }
@@ -150,6 +162,7 @@ export class SkillsPanel extends Panel {
     const before = [...(this.st.player?.hotbar || [])];
     const r = A?.learnSkill?.(id);
     if (r === false) { replay(n, 'deny', 420); return; }
+    this.chg.select(id); // (R-16: the drawer shows the skill just learned)
     this.render();
     const nn = this.$.nodes.querySelector(`.node[data-id="${id}"]`) || n;
     replay(nn, 'learned-pop', 800);
@@ -190,6 +203,7 @@ export class SkillsPanel extends Panel {
       <div class="tt-name">${esc(s.name)}</div>
       <div class="tt-kind"><span>${esc(T.name)} · ${KIND[s.kind] || 'Active'}${wep}</span><span class="jp">${T.jp || ''}</span></div>
       ${s.desc ? `<div class="tt-desc">${esc(s.desc)}</div>` : ''}
+      ${!s.passive && aimLine(id) ? `<div class="tt-aim">${esc(aimLine(id))}</div>` : ''}
       <div class="tt-lvrow"><span>Level <b>${lvl}</b>/${s.maxLvl}</span>${bonus > 0 && lvl ? `<span class="tt-bonus">+${bonus} from gear</span>` : ''}${hot >= 0 ? `<span class="kc sm">${SLOT_NAMES[hot]}</span>` : ''}</div>
       ${cur.length ? `<div class="tt-sect"><div class="tt-sh">Current</div>${cur.map(l => `<div class="tt-l">${esc(l)}</div>`).join('')}</div>` : ''}
       ${next.length ? `<div class="tt-sect next"><div class="tt-sh">${lvl ? 'Next level' : 'Level 1'}</div>${next.map(l => `<div class="tt-l">${esc(l)}</div>`).join('')}</div>` : lvl >= s.maxLvl ? '<div class="tt-max">✦ Mastered! ✦</div>' : ''}
@@ -217,6 +231,7 @@ export class SkillsPanel extends Panel {
     if (!def || (def.passive && id !== 'attack')) return;
     if (id !== 'attack' && this.lvl(id) <= 0) return;
     A?.setHotbar?.(slot, id);
+    this.chg.select(id); // (R-16: and the skill just assigned)
     this.ui.hud.flashSlot(slot);
     this.ui.sfx?.('assign');
     this._treeSig = null; this.refresh();
@@ -233,6 +248,7 @@ export class SkillsPanel extends Panel {
       const b = e.target.closest('.pop-sk'); if (!b) return false;
       const id = b.dataset.id || null;
       this.G.actions?.setHotbar?.(slot, id);
+      this.chg.select(id);
       this.ui.hud.flashSlot(slot); this._treeSig = null; this.refresh();
       return true;
     }, 'up');

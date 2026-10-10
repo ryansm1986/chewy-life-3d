@@ -103,7 +103,8 @@ duration or count), plus the signature payoff growing with the stage.
 - **Tooltips**: each skill shows "Hold to charge: Ⅰ …". Perks show their exact numbers at their next rank, as the skill tooltips do
   (`info()`).
 - **Skill tree panel** (`ui/skills.js`):
-  - each active skill has its Charge perks sub-row;
+  - each active skill has its Charge perks sub-row (as built: a Charge drawer beside the tree, one skill at a time, picked on
+    its own skill strip: §9 "K panel" and "R-16");
   - learned perks glow; locked ones show the level they need;
   - **a preview**: hovering a perk animates a tiny diagram (Split Shot shows 3 fanned arrows, and so on), or at least gives a clear
     icon and text.
@@ -405,6 +406,36 @@ All numbers at skill level 10 with no gear, read from `src/rpg/charge.js` (regen
   why it can't be bought yet, and a small animated preview of its family. Click buys a rank. Each active node in the
   tree carries a ⚡ chip (points spent; it pulses when a perk can be bought; ringed when shown); clicking the chip picks
   the skill without learning it. The skill tooltip gains a "Hold to charge" section. Respec (Rosie's tea) refunds perks.
+- **R-16, the drawer's skill strip** (the owner, 2026-10-09: "I can't use the charge tree on anything but default attack.
+  That window can't change."). The only switch was the ⚡ chip, a badge of about 27 × 21 px at a node's corner that read as
+  a counter; with the mouse, the node's tooltip (anchored to the node's right) covered 26-68% of the drawer, its head
+  included, so a chip click changed it out of sight; a click on the node itself (the natural try) learned a point
+  instead; on touch the chip was 18-21 px to a finger and a phone's sheet covered the tree, so each switch was three
+  taps; the pad's X worked but only the hint pill said so. Now:
+  - **The strip** (`ChargeDrawer.renderPick`, `chargeSkillsOf(tree)`): "Choose a skill to charge ▾" beside the tag, then
+    one button per chargeable skill of the tree in reading order (row, then column), 4 to 6 per tree. Learned ones are
+    bright, unlearned ones greyed but open to preview ("not learned yet"; their perks refuse). The shown one is ringed
+    white and in the tree colour, as the chip rings its node; a badge counts the points spent; a gold dot means a perk
+    can be bought. Hovering (or the pad's focus on) a button names it in the label. The swap animation slides the
+    content below the strip, so the strip holds still under the pointer.
+  - **Picks**: a strip button, a node's ⚡ chip (the node's tooltip steps aside while the pointer is on it), learning a
+    skill, assigning one (the popover, a drag, 1–4 while hovering, the hotbar's slot chooser), the pad's X on a node and
+    LT / RT (`cycle`, wrapping). Each tree remembers its pick (`sel[tree]`) for the session, closing K included.
+  - **Touch**: the strip's buttons are 52 design px (44.7 on a phone's 0.86); the chip's hit area is 52 px through an
+    `::after` reaching left and up into its node, clear of the node's middle (a tap there still learns); a phone's
+    sheet is wider (410 px), its strip sticks to its top while it scrolls, and its tag clears the strip. A double-tap
+    on a node used to learn twice (once per tap) before the assign popover; the second tap no longer learns
+    (`Mobile.dblTap`). The sheet's text was measured while folded (unzoomed) and stayed under 12 px until something
+    re-rendered; opening it now re-runs the floor. A press held past the 0.43 s long press on something with no tooltip
+    to show (a strip button) used to swallow its tap; now it is still the tap (`Mobile.longPress`).
+  - **The fit** (`ChargeDrawer.fit` / `tallest`): docked 134 px down the panel's edge, the drawer slides up that edge as
+    far as the tallest skill of its tree needs to stay on the screen (1280 × 720 at UI 125%: Bone Blade's Whirlwind
+    Stance is 685 px tall), its tag kept on screen, so it doesn't jump between that tree's skills.
+  - **QA**: s19 i) (19 checks, `S19_ONLY=i`): the mouse, a phone's and an iPad's fingers and the pad each switch to a
+    skill that isn't the default and buy its perk (each click and tap waits for its target to be at rest: the
+    popover's pop-in moves its slots ~70 px); a strip button held 0.56 s still switches; `desktop-ui.mjs` and `mobile-ui.mjs` (`charge-<hero>`) run
+    `ui-audit-lib drawerFit` (every skill of every tree, every size and UI size) and count the chips as tappables;
+    prod-smoke `charge` (the bundle, the real mouse). Shots `tools/qa/tmp/r16/`.
 - `tools/qa/charge-shots.mjs --pose` shoots each wind-up and the held Stage Ⅲ with a tight camera for the pose review.
 - **The balance pass** (phase 3): `tools/charge-sim.mjs` models a 60 s skill-build fight per skill (real costs, cooldowns,
   zoom regen, charge times; the basic Attack fills idle time, so waiting for zoom isn't free; 70% packs, 30% single targets).

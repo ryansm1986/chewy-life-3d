@@ -31,6 +31,10 @@ Status: **built** (2026-10-03; the cozy path's three guides 2026-10-09). The gui
   - `allow: { dialogue, switching, interior, panels: [...] }`: what doesn't pause this step (`interior`: it runs inside
     a house, docs/HOUSING.md).
   - `resumeAt`: where a reload picks up (a cast in progress restarts at the cast).
+  - `lead: true`: Shadow leads the way to the step's target (ROADMAP R-17, `actors/shadowLead.js`; ARCHITECTURE "Shadow
+    leads the way"). Give it to a step whose line says he leads ("Follow me!", "Follow Shadow…"), so the words and what he
+    does match: the house tour's door, inside and garden steps, the Board guide's walk, the nose guide's sniff (his nose
+    takes over once he smells the spot). The target's `{ guide, step, lead }` tag reaches `G.questTarget`.
 - **Pausing**: the speech, spotlight and arrow hide, and the objective card fades, during dialogue, panels, screen
   transitions, hero switches, build mode, and anywhere but the village, unless the step allows it (a step with
   `allow.interior` runs inside a house too, with its arrow in the room).

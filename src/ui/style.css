@@ -234,6 +234,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1c1424; }
 .tt-skill .tt-name { color: var(--tc); text-shadow: 0 0 12px color-mix(in srgb, var(--tc) 50%, transparent), 0 2px 0 rgba(0, 0, 0, .45); }
 .tt-skill .tt-kind .jp { color: var(--tc); }
 .tt-desc { color: #f1e4d6; margin-bottom: 6px; }
+.tt-aim { margin: -2px 0 6px; font-size: 12.5px; color: #cfe6ff; } /* where a skill goes with this device's Targeting (CONTROLS §13) */
 .tt-lvrow { display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 13px; color: #d8cfe0; }
 .tt-lvrow b { color: #fff; }
 .tt-lvrow .kc { color: var(--ink); }

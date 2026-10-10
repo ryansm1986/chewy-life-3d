@@ -41,15 +41,37 @@
 
 /* ---------------------------------------------------------------- the K panel's Charge drawer (ui/chargePanel.js) */
 .p-skills { overflow: visible; }
-.chg-drawer { position: absolute; left: calc(100% - 6px); top: 134px; width: 330px; z-index: -1; padding: 30px 16px 14px 24px; border: 4px solid var(--ink); border-left-width: 3px; border-radius: 0 26px 26px 0;
+.chg-drawer { position: absolute; left: calc(100% - 6px); top: 134px; width: 340px; z-index: -1; padding: 30px 16px 14px 24px; border: 4px solid var(--ink); border-left-width: 3px; border-radius: 0 26px 26px 0;
   background: var(--paper-noise), linear-gradient(172deg, #fffcf6 0%, #fff4e4 60%, #ffecd8 100%); box-shadow: 0 8px 0 rgba(74, 44, 42, .3), 0 22px 44px rgba(60, 26, 40, .28), inset 0 3px 0 #fff; }
 .chg-drawer[hidden] { display: none; }
-.chg-drawer.swap { animation: chgSwap .42s var(--pop); }
+.chg-drawer.swap > :not(.chg-tag, .chg-pl, .chg-pick) { animation: chgSwap .42s var(--pop); } /* (R-16: the strip stays still under the pointer) */
 @keyframes chgSwap { 0% { transform: translateX(-14px); opacity: .4; } 100% { transform: none; opacity: 1; } }
 .chg-tag { position: absolute; left: 18px; top: -16px; display: flex; align-items: center; gap: 6px; padding: 4px 14px 6px 8px; color: #fff; font: 700 17px/1 var(--font);
   background: linear-gradient(color-mix(in srgb, var(--tc) 55%, #fff), var(--tc)); border: 3px solid var(--ink); border-radius: 13px 15px 15px 6px; box-shadow: 0 3px 0 var(--ink); -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; transform: rotate(-2deg); }
 .chg-tag .gl { width: 22px; height: 22px; }
 .chg-jp { font-style: normal; font-size: 11px; -webkit-text-stroke: 3px var(--ink); }
+/* R-16: the skill strip under the tag: which skill the drawer shows, one button per chargeable skill of the tree */
+.chg-pl { position: absolute; top: 8px; right: 16px; left: 148px; display: flex; align-items: center; justify-content: flex-end; gap: 3px; font: 700 11.5px/1.1 var(--font); color: var(--ink2); white-space: nowrap; pointer-events: none; }
+.chg-plt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.chg-plc { flex: none; width: 0; height: 0; margin: 1px 1px 0 2px; border: 5px solid transparent; border-bottom: 0; border-top: 6px solid var(--tc); filter: drop-shadow(0 1.5px 0 var(--ink)); }
+.chg-pl.named { color: var(--ink); }
+.chg-plk { display: flex; gap: 2px; flex: none; } .chg-plk .kc { margin: 0; }
+body.pad-active .chg-pll, body.pad-active .chg-plc { display: none; } /* (the pad: "Choose a skill" and its LT / RT) */
+.chg-pick { display: flex; justify-content: center; gap: 6px; margin: 0 0 8px; padding: 7px 7px 9px; border-radius: 15px; border: 2.5px solid rgba(74, 44, 42, .22);
+  background: color-mix(in srgb, var(--tc) 15%, #f4e6d4); box-shadow: inset 0 2px 5px rgba(120, 80, 60, .18); }
+.chg-sk { position: relative; flex: none; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 10px; background: none; cursor: pointer; transform: scale(.9); transition: transform .18s var(--spring), box-shadow .18s; }
+/* (the icon is the tile, ink edge and all, as on the tree's nodes) */
+.chg-sk img { position: absolute; inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); object-fit: contain; pointer-events: none; filter: drop-shadow(0 3px 0 var(--ink)); transition: filter .18s; }
+.chg-sk:hover { transform: translateY(-2px) scale(.98); }
+.chg-sk.unl img { filter: grayscale(1) brightness(.95) opacity(.5) drop-shadow(0 3px 0 rgba(74, 44, 42, .55)); }
+.chg-sk.sel { z-index: 2; transform: translateY(-1px); box-shadow: 0 0 0 3px #fff, 0 0 0 5.5px var(--tc), 0 4px 12px 5px color-mix(in srgb, var(--tc) 55%, transparent); } /* (the tree's ⚡ chip rings its pick the same way) */
+.chg-sk.sel img { filter: drop-shadow(0 2px 0 var(--ink)); }
+.chg-sk.sel.unl img { filter: grayscale(.6) opacity(.85) drop-shadow(0 2px 0 rgba(74, 44, 42, .6)); }
+.chg-skn { position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%); z-index: 1; display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; border: 2px solid var(--ink);
+  background: var(--tc); color: #fff; font: 700 11px/1 var(--font); -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
+.chg-skn[hidden] { display: none; }
+.chg-sk.can::before { content: ''; position: absolute; right: -2px; top: -2px; z-index: 1; width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--ink);
+  background: radial-gradient(circle at 40% 35%, #fff8d0, #ffcf4a 70%); animation: badgePulse 1.4s ease-in-out infinite; }
 .chg-head { display: flex; align-items: center; gap: 10px; }
 .chg-ic { width: 48px; height: 48px; flex: none; filter: drop-shadow(0 3px 0 var(--ink)); }
 .chg-ic img { width: 100%; height: 100%; object-fit: contain; }
@@ -110,6 +132,7 @@
 /* the ⚡ chip on the tree's active skill nodes */
 .nd-chg { position: absolute; left: -10px; bottom: -9px; z-index: 2; display: none; align-items: center; gap: 1px; height: 21px; padding: 0 5px 0 2px; border: 2.5px solid var(--ink); border-radius: 10px; background: linear-gradient(#fff, #f3e6d6); font: 700 10.5px/1 var(--font); cursor: pointer; box-shadow: 0 2px 0 rgba(74, 44, 42, .4); transition: transform .2s var(--spring); }
 .nd-chg.on { display: flex; }
+.nd-chg::after { content: ''; position: absolute; inset: -5px -4px; border-radius: 12px; } /* (R-16: a little more to hit than it shows; 44 px on touch: below) */
 .nd-chg .gl { width: 15px; height: 15px; }
 .nd-chg:hover { transform: scale(1.18); }
 .nd-chg.spent { background: linear-gradient(color-mix(in srgb, var(--tc) 35%, #fff), var(--tc)); color: #fff; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }

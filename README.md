@@ -45,6 +45,7 @@ the bug button or Select + Start on a pad. See [docs/DEBUG.md](docs/DEBUG.md).
 | **G** | Eat your quick meal (the last dish you ate) |
 | **Tab** | Switch heroes: tap for the next (Chewy → Moka → Poe), hold for the hero wheel (point or 1–3, let go) |
 | **Z** (hold) | Show every loot label |
+| **L** | Shadow leads the way to the objective (press again: he stays close) · or click a quest in the tracker, or the Journal's *Follow Shadow* · Settings › *Shadow leads the way*: Off · Quests (he leads on his own when a quest says so) · Always |
 | **I · P · C · K · J · M** | Bag · Pantry · Character · Skills · Journal (quests, Fish Log) · Map |
 | **B** | Build mode (village): place buildings, paint R/C/W zones, lay paths, bulldoze · **R** rotate |
 | **B** indoors | Decorate: pick from storage, click to place / pick up · **R** rotate · **Delete** store · **Ctrl+Z** undo · WASD pans |
@@ -65,6 +66,7 @@ devices and sets rumble, aim assist and the glyph style.
 | **LB** | Tap: the next hero · hold: the hero wheel (point with the right stick, let go) |
 | **D-pad** ◀ ▶ ▲ ▼ | Heart potion · Zoom potion · quick meal · interact (hold: every loot label) |
 | **L3 + R3** | Swap weapon sets |
+| **R3** (no foe about) | Shadow leads the way to the objective (in a fight R3 picks the next target) |
 | **View** · **Menu** | The map · the game menu (the bag, character, skills, journal, map, home) |
 | In dialogue | **A** next line / choose · **D-pad** pick a choice · **B** leave |
 | In menus | **D-pad** / stick move the focus · **A** select · **B** back · **LB / RB** tabs · **X / Y** the action named in the hint bar (bag: drop / equip; skills: charge perks / assign; shops: sell all) · the tooltip follows the focus |

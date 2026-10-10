@@ -151,11 +151,11 @@ const house = {
   icon: () => pantryIcon('turnip'),
   trigger: G => G.state.quests?.done?.includes('welcome') && !G.introJoinPending,
   steps: [
-    { id: 'door', say: G => `Yip yip! Follow me, ${me(G)} — this is home!`, objective: "Go to Chewy's Cottage",
+    { id: 'door', say: G => `Yip yip! Follow me, ${me(G)} — this is home!`, objective: "Follow Shadow to Chewy's Cottage", lead: true, // (lead: he leads the way there, actors/shadowLead.js)
       target: G => ({ pos: G.heroes.homeDoor(), label: "Chewy's Cottage" }), done: G => dist(G, G.heroes.homeDoor()) < 2.6 },
     { id: 'enter', say: 'Press *F* at the door to go inside.', objective: 'Press *F* at the cottage door',
       target: G => ({ pos: G.heroes.homeDoor(), label: "Chewy's Cottage" }), highlight: () => prompt, waitFor: 'home:enter' },
-    { id: 'inside', resumeAt: 'enter', say: 'Home sweet home! Let me show you around…', objective: 'Look around the cottage', allow: { interior: true, dialogue: true, panels: ['stash', 'cook'] },
+    { id: 'inside', resumeAt: 'enter', say: 'Home sweet home! Let me show you around…', objective: 'Look around the cottage', lead: true, allow: { interior: true, dialogue: true, panels: ['stash', 'cook'] },
       onEnter: (G, T) => { T.data.ti = -1; T.data.tt = 0.8; T.data.tgt = null; },
       tick: (G, T, dt) => { // the arrow hops from the chest to the bed to the stove, then the door mat
         if (G.mode !== 'interior') return;
@@ -166,12 +166,12 @@ const house = {
         else { T.data.tgt = matSpot(G); T.say("Use them any time with *F*. Now step on the door mat and press *F* — or just walk out — and I'll show you the garden!"); }
       },
       target: (G, T) => T.data.tgt, waitFor: 'home:exit' },
-    { id: 'garden', objective: 'Go to your garden bed', allow: { panels: ['stash'] },
+    { id: 'garden', objective: 'Follow Shadow to your garden bed', lead: true, allow: { panels: ['stash'] },
       onEnter: (G, T) => {
         const F = G.state.flags;
         if (!hasSeeds(G) && !F.shadowSeeds) { F.shadowSeeds = true; G.actions.addPantry('turnipSeed', 3, { src: 'gift' }); G.ui?.pantryGain?.('turnipSeed', 3, {}); T.data.gift = true; }
       },
-      say: (G, T) => (T.data.gift ? 'And this is your garden bed! Here — a housewarming present: *3 turnip seeds*. Woof!' : "And this is your garden bed! Let's grow something."),
+      say: (G, T) => (T.data.gift ? 'Follow me to your garden bed! Here — a housewarming present: *3 turnip seeds*. Woof!' : "Follow me to your garden bed! Let's grow something."),
       target: G => { const g = G.life.garden, i = homeTiles(G)[5] ?? homeTiles(G)[0]; return { pos: g.centre(i), label: 'Garden bed' }; },
       done: G => G.life.garden.target != null || dist(G, G.life.garden.centre(homeTiles(G)[5] ?? homeTiles(G)[0])) < 2 },
     { id: 'till', say: 'Stand at a tile and press *F*: the hoe tills the soil.', objective: 'Till a tile (*F*)',
@@ -329,9 +329,9 @@ const charge = {
     { id: 'perks', say: G => `${SKILLS[rmbSkill(G)]?.charge?.title || 'A charged cast'}! It hits harder and bigger, and costs a little more zoom. Skill points buy *charge perks* too — more stages, a quicker wind-up, and a trick for every skill. Press *K* to see!`,
       objective: 'Open your Skills (*K*)', allow: { panels: ['skills'] },
       highlight: G => (skillsOpen(G) ? null : '.hud .mb[data-open="skills"]'), done: G => skillsOpen(G) },
-    { id: 'card', resumeAt: 'perks', say: "This is the *Charge* card: the skill's stages and its four perks. The *⚡* on a skill picks it here — a glowing one means a perk is ready to buy.", objective: 'The Charge card', allow: { panels: ['skills'] },
+    { id: 'card', resumeAt: 'perks', say: "This is the *Charge* card: a skill's stages and its four perks. Pick the skill on the strip at its top (or with the *⚡* on a skill in the tree); a gold dot means a perk is ready to buy.", objective: 'The Charge card', allow: { panels: ['skills'] },
       highlight: G => (skillsOpen(G) ? '.p-skills .chg-drawer' : '.hud .mb[data-open="skills"]'),
-      callouts: G => (skillsOpen(G) ? [{ el: '.p-skills .chg-stages', text: 'Stages Ⅰ Ⅱ Ⅲ', side: 'right' }, { el: '.p-skills .chg-perks', text: 'Perks: click to buy', side: 'right' }] : []),
+      callouts: G => (skillsOpen(G) ? [{ el: '.p-skills .chg-pick', text: 'Pick a skill', side: 'right' }, { el: '.p-skills .chg-stages', text: 'Stages Ⅰ Ⅱ Ⅲ', side: 'right' }, { el: '.p-skills .chg-perks', text: 'Perks: click to buy', side: 'right' }] : []),
       ack: true },
     { id: 'wrap', say: "Tap for a quick cast, hold for a big one — every active skill can charge. A roll drops a charge, but bumps and bites won't. Woof!", objective: 'Hold any skill to power it up', ack: true, allow: { panels: ['skills'] } },
   ],
@@ -448,7 +448,7 @@ const board = {
   locked: G => (G.cozy?.board ? null : 'The board stands by the Wayfarer\'s Post'),
   onStart: (G, T) => { T.data.crew = null; },
   steps: [
-    { id: 'walk', say: G => `Woof! ${crewKey(G)?.name || 'Your friend'} is packing a bag! The *Expedition Board* is by the Wayfarer's Post, at the west end of town. Follow me!`, objective: 'Go to the Expedition Board',
+    { id: 'walk', say: G => `Woof! ${crewKey(G)?.name || 'Your friend'} is packing a bag! The *Expedition Board* is by the Wayfarer's Post, at the west end of town. Follow me!`, objective: 'Follow Shadow to the Expedition Board', lead: true,
       target: G => (boardPos(G) ? { pos: boardPos(G), label: 'Expedition Board' } : null), allow: { panels: ['expeditions'] },
       done: G => atBoard(G) || (boardPos(G) && dist(G, boardPos(G)) < 3.2) },
     { id: 'open', say: dv('Tap the board, or the attack button, to read it.', 'Press *F* at the board to read it.', 'Press *F* at the board to read it.'), objective: dv('Tap the board to open it', 'Open the board (*F*)', 'Open the board (*F*)'),
@@ -507,7 +507,7 @@ const nose = {
       say: (G, T) => { const n = T.data.node, w = NODE_NAME[n?.kind] || 'something shiny'; return `Yip! Time for my nose. Building stuff doesn't need fighting: see the ${w}? Walk up and ${dev() === 'touch' ? 'tap it, or the attack button' : 'press *F*'} to gather it. The little glowing ring means it's ready.`; },
       target: (G, T) => { const n = T.data.node && scavFree(G).find(x => x.id === T.data.node.id) || nearNode(G); return n ? { pos: V(n.x, n.z), label: 'Gather spot' } : null; },
       highlight: G => (document.querySelector(prompt) && scavFree(G).some(n => dist(G, n) < 2.2) ? prompt : null), waitFor: 'scavenge:gather' }, // (the prompt only when it's the gather's: the board's own "Read" is up right after the Board guide)
-    { id: 'sniff', objective: 'Follow Shadow: he smells something!',
+    { id: 'sniff', objective: 'Follow Shadow: he smells something!', lead: true, // (he leads toward the spot until his nose has it: actors/shadowLead.js)
       say: 'Sniff… sniff… I smell something buried! Follow me: when I paw the ground and sit, that\'s the spot.',
       target: G => { const s = nearSpot(G, ['found']) || nearSpot(G, ['hidden']); return s ? { pos: V(s.x, s.z), label: 'Shadow smells something' } : null; },
       done: G => !!nearSpot(G, ['found']) || !nearSpot(G, ['hidden']) },

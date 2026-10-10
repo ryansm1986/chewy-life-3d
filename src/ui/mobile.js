@@ -326,8 +326,8 @@ export class Mobile {
     R.addEventListener('click', e => {
       if (!this.phone) return;
       const tag = e.target.closest?.('.chg-tag'), chip = e.target.closest?.('.nd-chg'), d = ui.root.querySelector('.chg-drawer');
-      if (d && tag) { d.classList.toggle('m-open'); ui.sfx('tab'); }
-      else if (d && chip) d.classList.add('m-open');
+      if (d && tag) { d.classList.toggle('m-open'); ui.sfx('tab'); this.floorDirty = true; }
+      else if (d && chip) { d.classList.add('m-open'); this.floorDirty = true; } // (R-16: the sheet's text was measured folded, unzoomed: the floor runs again on it)
     }, true);
     // a tap is a click, not a hover: the tooltip its compat mouseover opened (a palette card's, a slot's) closes once the
     // click is through, so it never stays over the room, the edit buttons or a guide's spotlight (R-13). A long press
@@ -353,6 +353,7 @@ export class Mobile {
         lastTap = null;
         if (ui.drag?.held) ui.drag.cancel();
         target.__synth = true;
+        this.dblTap = e; // (R-16: this pointerup is the right-click, so the K panel's node handler doesn't learn a second point on it)
         target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, clientX: e.clientX, clientY: e.clientY }));
         target.__synth = false;
       } else lastTap = target ? { el: target, t: now } : null;
@@ -367,12 +368,16 @@ export class Mobile {
     const ui = this.ui, T = ui.tip;
     if (!lp || ui.drag?.dragging) return;
     lp.fired = true;
-    if (ui.drag?.press) ui.drag.press = null; // (an item: no pick-up on release)
+    const press = ui.drag?.press;
+    if (press) ui.drag.press = null; // (an item: no pick-up on release)
     T.x = Math.min(innerWidth - 20, lp.x); T.y = lp.y - 24;
     const chain = []; for (let e = lp.t; e && e !== ui.root && chain.length < 6; e = e.parentElement) chain.push(e);
     fire(lp.t, 'pointerover'); fire(lp.t, 'mouseover');
     for (const e of chain) { fire(e, 'mouseenter', false); fire(e, 'pointerenter', false); }
     if (T.on) { T.place(); this.tipUntil = performance.now() + 5000; Touch.buzz(8); }
+    // R-16: nothing to show (the Charge drawer's skill strip, a plain button): the release is still its tap, so a press
+    // held a little long, or on a slow frame, isn't swallowed
+    else { lp.fired = false; if (press && ui.drag) ui.drag.press = press; }
   }
 
   // ---------------------------------------------------------------- full screen

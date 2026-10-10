@@ -118,38 +118,47 @@ export function boneSwordGeo({ blade = '#fbf1e0', edge = '#ffffff', grip = '#c9a
 // takes the hilt for a two-handed cut. Per-item tint: [blade, wrap, accent] from the item's icon colours (items.js);
 // the tsuba and rings stay gold. hilt: only the hilt (the sheathed look: the blade is hidden in the saya).
 export const KATANA = { blade0: 0.05, length: 0.62, leftGrip: -0.105, pommel: -0.17, gold: '#ebb84a' };
-let PAW_TSUBA = null;
-function tsubaGeo() {
-  if (PAW_TSUBA) return PAW_TSUBA.clone();
-  const R = 0.07, s = new THREE.Shape();
+// R-15 (docs/ROADMAP.md, the owner's pick 2026-10-09): the blade is look b, "Bone blade": the whole blade a long curved
+// bone (a soft lens, the edge kept) with dog-bone knob pairs at the tip and over the habaki. The other looks stay for
+// the QA and the debug menu (Heroes > Katana look, live: player.js), from boot by ?katana=a|b|c|classic:
+//   a "Bone tip": the classic blade with a waist under the tip and a big knob pair at the tip;
+//   c "Chew-toy bone": a round, ribbed toy bone with bite dimples and fat knobs, a twisted rope grip, a bigger paw tsuba;
+//   classic: the pre-R-15 blade (a lens-section blade with a round tip: bladeGeo), the look id ''.
+// Every look keeps the grip origin, KATANA.leftGrip, the pommel, the length (the tips end at ~0.68 m) and the per-item tint.
+const KATANA_LOOKS = new Set(['a', 'b', 'c']);
+const lookOf = v => (KATANA_LOOKS.has(v) ? v : v === 'classic' || v === '' ? '' : 'b');
+let KLOOK = null;
+/** the katana look: 'b' (the default), 'a', 'c', or '' (classic) */
+export function katanaVariant() {
+  if (KLOOK === null) { let v = null; try { v = new URLSearchParams(globalThis.location?.search || '').get('katana'); } catch (e) { /* no location */ } KLOOK = lookOf(v); }
+  return KLOOK;
+}
+/** switch the look: 'a' | 'b' | 'c' | 'classic' (anything else: the default, b) */
+export function setKatanaVariant(v) { KLOOK = lookOf(v); return KLOOK; }
+const PAW_TSUBA = new Map();
+function tsubaGeo(R = 0.07, depth = 0.012, bevel = 0.004) {
+  const key = `${R}|${depth}|${bevel}`;
+  if (PAW_TSUBA.has(key)) return PAW_TSUBA.get(key).clone();
+  const s = new THREE.Shape(), k = R / 0.07;
   s.absarc(0, 0, R, 0, TAU, false);
   // the paw print, cut through: a pad and four toes (the blade and grip pass through the middle of the pad)
-  const hole = (x, y, rx, ry) => { const h = new THREE.Path(); h.absellipse(x, y, rx, ry, 0, TAU, true); s.holes.push(h); };
+  const hole = (x, y, rx, ry) => { const h = new THREE.Path(); h.absellipse(x * k, y * k, rx * k, ry * k, 0, TAU, true); s.holes.push(h); };
   for (const [x, y, rx, ry] of [[-0.044, 0.008, 0.011, 0.014], [-0.018, 0.04, 0.011, 0.014], [0.018, 0.04, 0.011, 0.014], [0.044, 0.008, 0.011, 0.014], [0, -0.041, 0.019, 0.013]]) hole(x, y, rx, ry);
-  const g = new THREE.ExtrudeGeometry(s, { depth: 0.012, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2, curveSegments: 28 * DETAIL });
-  g.translate(0, 0, -0.006); g.rotateX(-Math.PI / 2);
-  PAW_TSUBA = g;
+  const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2, curveSegments: 14 * DETAIL }); // (R-15: 14, was 28: ~2k fewer triangles, the paw reads the same)
+  g.translate(0, 0, -depth / 2); g.rotateX(-Math.PI / 2);
+  PAW_TSUBA.set(key, g);
   return g.clone();
 }
-export function katanaGeo({ colors = null, hilt = false } = {}) {
+export function katanaGeo({ colors = null, hilt = false, variant = katanaVariant() } = {}) {
   const [bladeC = '#f4e8cf', wrapC = '#c23b3b', accentC = '#f2e4c6'] = colors || [];
   const gold = C(KATANA.gold), goldDk = C(KATANA.gold).multiplyScalar(0.72), bone = C(bladeC).lerp(C('#fffaf2'), 0.35), wrap = C(wrapC); // (the blade a touch whiter than the icon: the warm light reads it pink)
-  const parts = [];
-  // tsuba (round, gold, the paw print cut out) on a pair of thin seppa
-  parts.push(paint(xf(tsubaGeo(), { p: [0, 0.044, 0] }), (p, n, o) => { o.copy(gold); if (Math.abs(n.y) < 0.5) o.copy(goldDk); }));
+  const toy = variant === 'c', parts = [];
+  // tsuba (round, gold, the paw print cut out) on a pair of thin seppa; the chew toy's is bigger and softer
+  parts.push(paint(xf(toy ? tsubaGeo(0.09, 0.012, 0.005) : tsubaGeo(), { p: [0, 0.044, 0] }), (p, n, o) => { o.copy(gold); if (Math.abs(n.y) < 0.5) o.copy(goldDk); }));
   for (const y of [0.031, 0.057]) parts.push(cyl(0.03, 0.004, KATANA.gold, [0, y, 0]));
-  // fuchi collar, the wrapped grip (red ito over cream samegawa diamonds), the kashira ring
+  // fuchi collar, the wrapped grip (red ito over cream samegawa diamonds; the chew toy: a twisted two-strand rope), the kashira ring
   parts.push(cyl(0.031, 0.016, KATANA.gold, [0, 0.022, 0], 0.82));
-  const gl = 0.166, grip = new THREE.CylinderGeometry(1, 1, gl, 18 * DETAIL, 14 * DETAIL, true);
-  { const P = grip.attributes.position;
-    for (let i = 0; i < P.count; i++) { const y = P.getY(i) / gl + 0.5, b = 1 + 0.07 * Math.sin(y * Math.PI); P.setXYZ(i, P.getX(i) * 0.03 * b, P.getY(i), P.getZ(i) * 0.024 * b); } }
-  grip.translate(0, 0.014 - gl / 2, 0); grip.computeVertexNormals();
-  const samegawa = C('#f6eedc');
-  parts.push(paint(grip, (p, n, o) => {
-    const a = Math.atan2(p.z, p.x) / TAU, h = (p.y + 0.15) / gl;
-    const u = a * 6 + h * 5, v = a * 6 - h * 5, du = Math.abs((u - Math.floor(u)) - 0.5), dv = Math.abs((v - Math.floor(v)) - 0.5);
-    o.copy(wrap); if (du + dv < 0.24) o.copy(samegawa); else if (du + dv > 0.74) o.multiplyScalar(0.8);
-  }));
+  parts.push(toy ? ropeGripGeo(wrap) : wrapGripGeo(wrap));
   parts.push(cyl(0.029, 0.014, KATANA.gold, [0, -0.152, 0], 0.82));
   // the bone-knob pommel: a dog-bone end, two lobes across the grip
   parts.push(ell(0.017, 0.016, 0.017, bladeC, [0, -0.162, 0]));
@@ -157,9 +166,39 @@ export function katanaGeo({ colors = null, hilt = false } = {}) {
   if (!hilt) {
     // habaki: the blade collar, in the item's accent
     parts.push(cyl(0.06, 0.036, '#' + C(accentC).lerp(gold, 0.35).getHexString(), [0, 0.072, 0], 0.52));
-    parts.push(bladeGeo(bone));
+    parts.push(KATANA_LOOKS.has(variant) ? boneBladeGeo(bone, variant) : bladeGeo(bone));
   }
   return merge(parts);
+}
+const GRIP_L = 0.166;
+function wrapGripGeo(wrap) {
+  const gl = GRIP_L, grip = new THREE.CylinderGeometry(1, 1, gl, 18 * DETAIL, 14 * DETAIL, true);
+  { const P = grip.attributes.position;
+    for (let i = 0; i < P.count; i++) { const y = P.getY(i) / gl + 0.5, b = 1 + 0.07 * Math.sin(y * Math.PI); P.setXYZ(i, P.getX(i) * 0.03 * b, P.getY(i), P.getZ(i) * 0.024 * b); } }
+  grip.translate(0, 0.014 - gl / 2, 0); grip.computeVertexNormals();
+  const samegawa = C('#f6eedc');
+  return paint(grip, (p, n, o) => {
+    const a = Math.atan2(p.z, p.x) / TAU, h = (p.y + 0.15) / gl;
+    const u = a * 6 + h * 5, v = a * 6 - h * 5, du = Math.abs((u - Math.floor(u)) - 0.5), dv = Math.abs((v - Math.floor(v)) - 0.5);
+    o.copy(wrap); if (du + dv < 0.24) o.copy(samegawa); else if (du + dv > 0.74) o.multiplyScalar(0.8);
+  });
+}
+// the chew toy's grip: a two-strand rope (the item's wrap colour twisted with cream), each strand a soft round ridge
+function ropeGripGeo(wrap) {
+  const gl = GRIP_L, grip = new THREE.CylinderGeometry(1, 1, gl, 24 * DETAIL, 30 * DETAIL, true), pitch = 0.026;
+  const phase = (a, y) => a / TAU * 2 + y / pitch; // (two strands round, one twist every pitch metres)
+  { const P = grip.attributes.position;
+    for (let i = 0; i < P.count; i++) {
+      const x = P.getX(i), y = P.getY(i), z = P.getZ(i), u = y / gl + 0.5, f = phase(Math.atan2(z, x), y), fr = f - Math.floor(f);
+      const b = (1 + 0.06 * Math.sin(u * Math.PI)) * (0.88 + 0.2 * Math.sin(fr * Math.PI));
+      P.setXYZ(i, x * 0.031 * b, y, z * 0.026 * b);
+    } }
+  grip.translate(0, 0.014 - gl / 2, 0); grip.computeVertexNormals();
+  const cream = C('#f6eedc'), y0 = 0.014 - gl / 2;
+  return paint(grip, (p, n, o) => {
+    const f = phase(Math.atan2(p.z / 0.026, p.x / 0.031), p.y - y0), fr = f - Math.floor(f);
+    o.copy(Math.floor(f) % 2 ? cream : wrap).multiplyScalar(0.8 + 0.2 * Math.sin(fr * Math.PI)); // (the grooves between strands darker)
+  });
 }
 // the blade: a lens-shaped bone cross-section (a thick back, a thinner edge), gently curved, ending in a round tip
 function bladeGeo(bone) {
@@ -187,6 +226,118 @@ function bladeGeo(bone) {
   g.setIndex(idx); g.computeVertexNormals();
   return g;
 }
+// ---- R-15: the bone-shaped blades (katanaVariant). The spine curves as today's (sori × T², T = (y − 0.058) / 0.62),
+// so every look bends the same way and its tip ends where today's does (0.68 m up the blade).
+const soriAt = (y, sori = 0.05) => { const T = clamp((y - 0.058) / KATANA.length); return sori * T * T; };
+/** a shaft swept up +Y from ya to yb: N + 1 rings of M points; f(t) → { w: the half width toward the edge (−X), th: the
+ *  half thickness (±Z), cx: the spine's x, lens: 1 today's lens (thinner toward the edge), 0 an ellipse };
+ *  dent(t, a) pushes a point in (m); col(t, e, s, out) paints it (e +1 the edge, −1 the back; s ±1 the flat faces) */
+function sweepGeo(ya, yb, N, M, f, col, dent = null) {
+  const pos = [], idx = [], cols = [], c = new THREE.Color();
+  for (let i = 0; i <= N; i++) {
+    const t = i / N, y = ya + t * (yb - ya), { w, th, cx, lens = 1 } = f(t);
+    for (let k = 0; k < M; k++) {
+      const a = (k / M) * TAU, e = Math.cos(a), s = Math.sin(a);
+      let dx = -e * w, dz = s * th * (1 - lens * 0.26 * (1 + e) / 2);
+      const d = dent ? dent(t, a) : 0;
+      if (d) { const r = Math.hypot(dx, dz) || 1, k2 = Math.max(0, 1 - d / r); dx *= k2; dz *= k2; }
+      pos.push(cx + dx, y, dz);
+      col(t, e, s, c, d); cols.push(c.r, c.g, c.b);
+    }
+  }
+  for (let i = 0; i < N; i++) for (let k = 0; k < M; k++) { const a = i * M + k, b = i * M + (k + 1) % M, cc = a + M, d = b + M; idx.push(a, b, cc, b, d, cc); }
+  const cap = (t, y, flip) => {
+    const o = pos.length / 3, { cx } = f(t); pos.push(cx, y, 0); col(t, 0, 0, c, 0); cols.push(c.r, c.g, c.b);
+    const r0 = Math.round(t * N) * M;
+    for (let k = 0; k < M; k++) flip ? idx.push(o, r0 + k, r0 + (k + 1) % M) : idx.push(o, r0 + (k + 1) % M, r0 + k);
+  };
+  cap(0, ya, false); cap(1, yb, true);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+/** a dog-bone end: two round lobes side by side across the blade (±X), tilted out and away from the shaft (up: +1 the
+ *  tip end, −1 the end over the habaki), and a smaller bridge between them on the shaft's side (the shaft ends inside
+ *  it; the notch stays open on the far side); the outer domes a touch lighter, the creases toward the shaft deeper */
+function boneEnd(bone, x, y, up, { r = 0.036, ry = 1.1, rz = 0.82, gap = 0.033, tilt = 0.42, seg = 16 } = {}) {
+  const parts = [], hi = bone.clone().lerp(C('#fffaf2'), 0.4), lo = bone.clone().multiplyScalar(0.88);
+  const lobe = (cx, cy, sx, sy, sz, a, s, ox, oy, side) => {
+    const g = new THREE.SphereGeometry(1, s * DETAIL, Math.round(s * 0.75) * DETAIL); g.scale(sx, sy, sz); if (a) g.rotateZ(a); g.translate(cx, cy, 0);
+    return paint(g, (p, n, o) => {
+      const vx = p.x - cx, vy = p.y - cy, l = Math.hypot(vx, vy, p.z) || 1, out = (vx * ox + vy * oy) / l, sd = side * vx / l;
+      o.copy(bone);
+      if (!side) { if (out > 0) o.lerp(lo, out * 0.5); return; } // (the bridge: the floor of the notch, a shade deeper)
+      if (out > 0) o.lerp(hi, out * 0.6);
+      const crease = clamp(-out * 0.7 - sd * 0.5); if (crease > 0) o.lerp(lo, crease);
+    });
+  };
+  for (const sd of [-1, 1]) { const a = -sd * tilt * up; parts.push(lobe(x + sd * gap, y, r, r * ry, r * rz, a, seg, -Math.sin(a), Math.cos(a) * up, sd)); }
+  parts.push(lobe(x, y - up * 0.3 * r, gap * 0.95, r * 0.8, r * rz * 0.96, 0, 12, 0, up, 0));
+  return merge(parts);
+}
+function boneBladeGeo(bone, v) {
+  const edge = C('#fffbf2'), back = bone.clone().multiplyScalar(0.93), neck = bone.clone().multiplyScalar(0.9), hi = bone.clone().lerp(C('#fffaf2'), 0.45);
+  const parts = [];
+  if (v === 'a') {
+    // today's blade to two-thirds of the way up, a waist (the bone's neck), then the knob pair at the tip
+    const ya = 0.058, yb = 0.628, tipY = 0.636, sori = 0.05;
+    parts.push(sweepGeo(ya, yb, 34 * DETAIL, 12, t => {
+      const y = ya + t * (yb - ya), T = (y - 0.058) / KATANA.length, waist = 1 - 0.36 * smooth(0.6, 0.86, t) + 0.3 * smooth(0.88, 1, t);
+      return { w: (0.05 - 0.011 * T) * waist, th: (0.021 - 0.005 * T) * (1 - 0.18 * smooth(0.6, 0.86, t)), cx: soriAt(y, sori) };
+    }, (t, e, s, o) => {
+      const k = smooth(0.55, 0.85, t); // (the edge fades out into the neck: the knob end is all bone)
+      o.copy(e > 0.55 && k < 1 ? edge.clone().lerp(bone, k) : e < -0.6 ? back : bone);
+      const nk = smooth(0.66, 0.84, t) * (1 - smooth(0.9, 1, t)); if (nk > 0) o.lerp(neck, nk * 0.7); // (the neck a shade deeper)
+    }));
+    parts.push(boneEnd(bone, soriAt(tipY, sori), tipY, 1, { r: 0.042, gap: 0.034, ry: 1.05 }));
+  } else if (v === 'b') {
+    // one long curved bone: a soft lens section that flares into a knob pair at each end, the white edge between them
+    const baseY = 0.13, tipY = 0.638, ya = baseY + 0.006, yb = tipY - 0.006, sori = 0.06;
+    parts.push(sweepGeo(ya, yb, 40 * DETAIL, 14, t => {
+      const y = ya + t * (yb - ya), fl = (1 - smooth(0, 0.28, t)) + smooth(0.7, 1, t);
+      return { w: 0.03 + 0.004 * (1 - t) + 0.013 * fl, th: 0.019 + 0.006 * fl, cx: soriAt(y, sori), lens: 0.7 };
+    }, (t, e, s, o) => {
+      const mid = smooth(0.08, 0.26, t) * (1 - smooth(0.74, 0.92, t));
+      o.copy(bone);
+      if (e > 0.55) o.lerp(edge, mid); else if (e < -0.6) o.copy(back);
+      const fl = 1 - mid; if (fl > 0) o.lerp(neck, fl * 0.35 * (0.5 + 0.5 * Math.abs(s)));
+      if (Math.abs(s) > 0.7 && e < 0.4) o.lerp(hi, mid * 0.25); // (a soft sheen down the flats)
+    }));
+    parts.push(boneEnd(bone, soriAt(baseY, sori), baseY, -1, { r: 0.039, gap: 0.033, rz: 0.8, ry: 1.05 }));
+    parts.push(boneEnd(bone, soriAt(tipY, sori), tipY, 1, { r: 0.041, gap: 0.034, rz: 0.8, ry: 1.05 }));
+  } else {
+    // the chew toy: a chunky round bone, soft ribs round its middle, two bites' worth of tooth dimples, fat knobs
+    const baseY = 0.136, tipY = 0.632, ya = baseY + 0.008, yb = tipY - 0.008, sori = 0.055, len = yb - ya;
+    const RIB0 = 0.2, RIB1 = 0.8, RIBS = 6;
+    const rib = t => (t < RIB0 || t > RIB1 ? 0 : 0.5 - 0.5 * Math.cos(TAU * RIBS * (t - RIB0) / (RIB1 - RIB0)));
+    // the tooth dimples: [t, angle] (the angle round the section: 0 the edge side, π the back, ±π/2 the flats)
+    const bites = [];
+    for (const [t0, a0, n] of [[0.36, Math.PI / 2 + 0.5, 4], [0.36, -Math.PI / 2 - 0.5, 4], [0.66, Math.PI / 2 - 0.3, 3], [0.66, -Math.PI / 2 + 0.3, 3]])
+      for (let j = 0; j < n; j++) bites.push([t0 + (j - (n - 1) / 2) * 0.034 + Math.abs(j - (n - 1) / 2) * 0.004 * Math.sign(a0), a0 + (j - (n - 1) / 2) * 0.05]);
+    const dentAt = (t, a) => {
+      let d = 0;
+      for (const [tb, ab] of bites) {
+        let da = a - ab; da -= TAU * Math.round(da / TAU);
+        const q = ((t - tb) * len / 0.009) ** 2 + (da * 0.034 / 0.009) ** 2;
+        if (q < 1) d = Math.max(d, 0.0042 * (1 - q) ** 2);
+      }
+      return d;
+    };
+    const lo = bone.clone().multiplyScalar(0.86), groove = bone.clone().multiplyScalar(0.93);
+    parts.push(sweepGeo(ya, yb, 60 * DETAIL, 16, t => {
+      const y = ya + t * (yb - ya), fl = (1 - smooth(0, 0.22, t)) + smooth(0.78, 1, t), w = (0.033 + 0.014 * fl) * (1 + 0.1 * rib(t));
+      return { w, th: w * (0.86 - 0.12 * fl), cx: soriAt(y, sori), lens: 0 };
+    }, (t, e, s, o, d) => {
+      o.copy(bone);
+      if (RIB0 < t && t < RIB1) { const r = rib(t); if (r > 0.5) o.lerp(hi, (r - 0.5) * 0.8); else o.lerp(groove, (0.5 - r) * 1.2); } // (the ribs' crests lighter, the grooves a little deeper)
+      if (d > 0) o.lerp(lo, Math.min(1, d / 0.0025) * 0.45); // (the dimples' own shading does most of it: a hint of tone, never a smudge)
+    }, dentAt));
+    parts.push(boneEnd(bone, soriAt(baseY, sori), baseY, -1, { r: 0.044, gap: 0.033, rz: 0.9, ry: 1.04, tilt: 0.36 }));
+    parts.push(boneEnd(bone, soriAt(tipY, sori), tipY, 1, { r: 0.045, gap: 0.034, rz: 0.9, ry: 1.04, tilt: 0.36 }));
+  }
+  return merge(parts);
+}
 // The katana's own material (shared by every rig): the toon look of the props, plus a lift that keeps the bone parts
 // bone-white: the warm key light and the warm grade read a cream blade pale salmon, so on bright, unsaturated albedo
 // the lit colour takes the albedo's own hue (its brightness kept), slightly cooled against the grade, and never falls
@@ -203,9 +354,18 @@ const BONE_LIFT = /* glsl */`
   outgoingLight = max(outgoingLight, a * uBoneLift * bone);
   outgoingLight = mix(outgoingLight, min(outgoingLight, a * 1.02), bone); // (never past its own bone colour: an overexposed cream blooms pink)
 }`;
-let KMAT = null;
+let KMAT = null, KCLIP = null;
+const katanaToon = () => makeToon({ vertexColors: true, objectBrush: true, brush: 0.02, rim: 0.6, term: [-0.02, 0.28], shadowSat: 0.4, fog: false, fragPars: 'uniform float uBoneLift;', fragOut: BONE_LIFT, uniforms: { uBoneLift: { value: 0.78 } } });
 export function katanaMaterial() {
-  return KMAT || (KMAT = makeToon({ vertexColors: true, objectBrush: true, brush: 0.02, rim: 0.6, term: [-0.02, 0.28], shadowSat: 0.4, fog: false, fragPars: 'uniform float uBoneLift;', fragOut: BONE_LIFT, uniforms: { uBoneLift: { value: 0.78 } } }));
+  return KMAT || (KMAT = katanaToon());
+}
+/** R-15: the same material with five clipping planes (their intersection clipped: player.js sheathClip sets them to a
+ *  box down the saya from its mouth), for the katana in the paw while the noto slides a bone-shaped blade home */
+export function katanaSheathMaterial() {
+  if (KCLIP) return KCLIP;
+  KCLIP = katanaToon();
+  KCLIP.clippingPlanes = Array.from({ length: 5 }, () => new THREE.Plane()); KCLIP.clipIntersection = true; KCLIP.clipShadows = true;
+  return KCLIP;
 }
 const cyl = (r, h, color, p, sz = 1) => { const g = new THREE.CylinderGeometry(r, r, h, 20 * DETAIL, 1); g.scale(1, 1, sz); g.translate(...p); const c = C(color); return paint(g, (pp, n, o) => o.copy(c)); };
 export function tennisBall(r = 0.1) {

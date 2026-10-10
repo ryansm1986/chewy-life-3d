@@ -379,7 +379,8 @@ export class Animator {
     this.rig.offsetY = A.y + fly * (this.flyLift || 0);
     if (this.flyRig) { this.rig.root.rotation.x = fly * (this.flyPitch || 0); this.rig.root.rotation.z = fly * (this.flyBank || 0); }
     this.secondary(dt, A, bob, mv);
-    if (P.tail) P.tail.rotation.set(-0.3 + 0.4 * fly, Math.sin(t * (14 + this.mood * 10)) * (0.5 + this.mood * 0.4) * (1 - 0.6 * fly), 0);
+    const tu = (this.tailUp || 0) * (1 - fly); // (tailUp 0..1: Shadow leading the way carries his tail high, actors/shadowLead.js)
+    if (P.tail) P.tail.rotation.set(-0.3 + 0.4 * fly - 0.55 * tu, Math.sin(t * (14 + this.mood * 10)) * (0.5 + this.mood * 0.4) * (1 - 0.6 * fly) * (1 - 0.3 * tu), 0);
   }
   secondary(dt, A, bob, mv) {
     const P = this.P;

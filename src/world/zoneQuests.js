@@ -2,7 +2,8 @@
 // written with the Z-A5 quest steps (world/questSteps.js). Pure (no three.js): node-tested in tools/test-rpg.mjs.
 //
 //   ZONE_QUESTS[id] = { title, giver, zone, desc, steps, reward, prereq?: [questIds], offer: line, thanks: line }
-//   - steps: kill / boss with dungeon filters, find { item, n, dungeon, floor, from }, rescue { npc, dungeon, floor },
+//   - steps: kill / boss with dungeon filters, find { item, n, dungeon, floor, from }, rescue { npc, dungeon, floor }
+//     (lead: true: Shadow has the captive's scent and leads the way: the gate, the stairs, the cage; ROADMAP R-17),
 //     dungeonFloor { dungeon, n }, and a closing talk { npc } back in the village ("tell them"), so the giver shows a
 //     turn-in '!' and the reward comes from them.
 //   - offered once the village is saved (the dungeon gate opens then, docs/ZONES.md §2), when every prereq is done.
@@ -57,8 +58,8 @@ export const ZONE_QUESTS = {
   },
   tk_kome: {
     title: 'The Missing Cook', giver: 'tk_fuku', zone: 'bamboo',
-    desc: 'Kome, the inn\'s cook, was carried off into the Bamboo Depths. Okami Fuku is worried sick (and so is everyone\'s stomach).',
-    steps: [{ type: 'rescue', npc: 'tk_kome', dungeon: D, floor: 2, text: 'Rescue Kome from the Bamboo Depths (floor 2)' }, { type: 'talk', npc: 'tk_fuku', text: 'Let Okami Fuku know Kome is safe' }],
+    desc: 'Kome, the inn\'s cook, was carried off into the Bamboo Depths. Okami Fuku is worried sick (and so is everyone\'s stomach). Shadow has her scent: follow him!',
+    steps: [{ type: 'rescue', npc: 'tk_kome', dungeon: D, floor: 2, text: 'Rescue Kome from the Bamboo Depths (floor 2)', lead: true }, { type: 'talk', npc: 'tk_fuku', text: 'Let Okami Fuku know Kome is safe' }],
     reward: { coins: 280, xp: 300, hearts: 12, pantry: { onigiri: 3, misoSoup: 2 } },
     offer: 'They took Kome — my cook! Dragged her down into the Depths, all the way to the second floor I\'d wager. Please, bring her home. The rice won\'t cook itself.',
     thanks: 'Kome! You\'re home! …Ahem. Thank you, truly. Have some of her rice balls — she made them before she even took her apron off.',
@@ -91,8 +92,8 @@ export const ZONE_QUESTS = {
   },
   ak_tobi: {
     title: 'The Lost Apprentice', giver: 'ak_ochiyo', zone: 'maple',
-    desc: 'Tobi, Ochiyo\'s apprentice, was carried off into the Maple Roots. She is calm about it. Very calm. Too calm.',
-    steps: [{ type: 'rescue', npc: 'ak_tobi', dungeon: DM, floor: 2, text: 'Rescue Tobi from the Maple Roots (floor 2)' }, { type: 'talk', npc: 'ak_ochiyo', text: 'Bring the news to Ochiyo' }],
+    desc: 'Tobi, Ochiyo\'s apprentice, was carried off into the Maple Roots. She is calm about it. Very calm. Too calm. Shadow has his scent: follow him!',
+    steps: [{ type: 'rescue', npc: 'ak_tobi', dungeon: DM, floor: 2, text: 'Rescue Tobi from the Maple Roots (floor 2)', lead: true }, { type: 'talk', npc: 'ak_ochiyo', text: 'Bring the news to Ochiyo' }],
     reward: { coins: 420, xp: 1100, hearts: 12, furniture: 'teaSet' },
     offer: 'My apprentice, Tobi… the yokai took him down into the Roots. The second hall, I think — I heard him complaining all the way. Please. Bring him home before he breaks their cups too.',
     thanks: 'Tobi. You are home. …Go and wash, you smell of mushrooms. Thank you, truly — take this tea set. It has never once been dropped. Not by me.',
@@ -142,8 +143,8 @@ export const ZONE_QUESTS = {
   },
   sk_kaito: {
     title: 'Man Overboard', giver: 'sk_funaki', zone: 'tidepool',
-    desc: 'Kaito, Funaki\'s deckhand, was dragged into the Tide Caves by the kappa. Funaki says nothing; his hammer says a lot.',
-    steps: [{ type: 'rescue', npc: 'sk_kaito', dungeon: DT, floor: 2, text: 'Rescue Kaito from the Tide Caves (floor 2)' }, { type: 'talk', npc: 'sk_funaki', text: 'Tell Funaki that Kaito is safe' }],
+    desc: 'Kaito, Funaki\'s deckhand, was dragged into the Tide Caves by the kappa. Funaki says nothing; his hammer says a lot. Shadow has his scent: follow him!',
+    steps: [{ type: 'rescue', npc: 'sk_kaito', dungeon: DT, floor: 2, text: 'Rescue Kaito from the Tide Caves (floor 2)', lead: true }, { type: 'talk', npc: 'sk_funaki', text: 'Tell Funaki that Kaito is safe' }],
     reward: { coins: 620, xp: 2400, hearts: 12, mats: { wood: 16 } },
     offer: 'Kaito. The kappa took him. Down to the second cave — I heard him shouting about Umibōzu. Bring him back. Please.',
     thanks: '…Good. Good. Kaito, hold this plank. — Thank you. Take the timber; I won\'t need it, I\'m building a boat that doesn\'t sink with deckhands in it.',
@@ -193,8 +194,8 @@ export const ZONE_QUESTS = {
   },
   yk_hokuto: {
     title: 'The Hiccuping Apprentice', giver: 'yk_tetsu', zone: 'onsen',
-    desc: 'Hokuto, Tetsu\'s apprentice, was carried off into the Onsen Caverns. You can probably find him by the hiccups.',
-    steps: [{ type: 'rescue', npc: 'yk_hokuto', dungeon: DO, floor: 2, text: 'Rescue Hokuto from the Onsen Caverns (floor 2)' }, { type: 'talk', npc: 'yk_tetsu', text: 'Tell Tetsu that Hokuto is safe' }],
+    desc: 'Hokuto, Tetsu\'s apprentice, was carried off into the Onsen Caverns. You can probably find him by the hiccups, and Shadow already has his scent: follow him!',
+    steps: [{ type: 'rescue', npc: 'yk_hokuto', dungeon: DO, floor: 2, text: 'Rescue Hokuto from the Onsen Caverns (floor 2)', lead: true }, { type: 'talk', npc: 'yk_tetsu', text: 'Tell Tetsu that Hokuto is safe' }],
     reward: { coins: 820, xp: 4600, hearts: 12, mats: { crystal: 2, stone: 14 } },
     offer: 'My apprentice. The snow spirits took him to the second cavern. Listen for hiccups. Bring him back to the forge.',
     thanks: '…Hokuto. Go and warm your paws. — Thank you. Here: crystal and stone, the best I have. Bring them back and I\'ll fold you something.',

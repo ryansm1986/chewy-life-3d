@@ -238,11 +238,12 @@ export class Tutorials {
   }
 
   // ---------------------------------------------------------------- the target (world arrow, edge arrow, minimap)
-  /** G.questTarget asks this first: { pos, label, kind: 'tut' } | null */
+  /** G.questTarget asks this first: { pos, label, kind: 'tut', guide, step, lead } | null (lead: the step says Shadow
+   *  leads the way there, actors/shadowLead.js) */
   target() {
     const c = this.cur; if (!c?.step?.target || this.paused || !c.entered) return null;
     const t = this.safe(() => c.step.target(this.G, this), null);
-    return t?.pos ? { pos: t.pos, label: t.label || c.guide.title, kind: 'tut', npc: t.npc } : null;
+    return t?.pos ? { pos: t.pos, label: t.label || c.guide.title, kind: 'tut', npc: t.npc, guide: c.id, step: c.step.id, lead: !!c.step.lead } : null;
   }
   updateArrow(dt) {
     const G = this.G, t = this.target(), A = arrowMarker();

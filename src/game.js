@@ -7,6 +7,7 @@ import { Touch } from './core/touch.js';
 import { FPS_CAPS, PRESET, liteOf } from './core/deck.js';
 import { PARTICLE_BUDGET } from './gfx/particles.js';
 import { PadAim } from './combat/padAim.js';
+import { AutoAim, TARGETING, targetingOf, installTargeting } from './combat/autoTarget.js';
 import { Events } from './core/events.js';
 import { VillageWorld } from './world/villageWorld.js';
 import { DayNight } from './gfx/sky.js';
@@ -68,6 +69,7 @@ import { installScavenge } from './cozy/scavengeWorld.js';
 import { installPeaceful } from './cozy/peacefulRun.js';
 import { installGuild } from './cozy/guildRun.js';
 import { installCozyGuide } from './cozy/cozyGuide.js';
+import { installShadowLead } from './actors/shadowLead.js'; // (Shadow leads the way: ROADMAP R-17)
 
 // UI and audio load in parallel with the world. The import() paths must be literal so Vite bundles them for the
 // production build (a variable path with @vite-ignore worked on the dev server but 404'd in dist: no UI, no sound).
@@ -469,6 +471,7 @@ export async function boot() {
     try { if (P.has('tut')) sessionStorage.removeItem('chewy3d.notut'); else if (off) sessionStorage.setItem('chewy3d.notut', '1'); else off = !!sessionStorage.getItem('chewy3d.notut'); } catch (e) { /* storage unavailable */ }
     G.tutorials = new Tutorials(G, { enabled: !off });
   }
+  installShadowLead(G); // Shadow leads the way to the objective: the pointer follows a quest he was asked to follow, the tracker's tap (actors/shadowLead.js, ROADMAP R-17)
   installCozyGuide(G); // the cozy path's tutorial moments: Rosie's burrow1 question, the Board guide offered to a fighter, the Peaceful paths tip (cozy/cozyGuide.js, docs/COZY.md §11)
   installDebugAccess(G); // debug tools: off by default; the password prompt, F10 / ` / the bug / Select+Start, the lazy menu (src/debug, docs/DEBUG.md)
   const vMap = G.villageMinimap = new VillageMinimap(G);
@@ -569,9 +572,14 @@ export async function boot() {
   let hoverEnemy = null, padA = false; // padA: the pad's A press went to an interactable (no swing until A comes up)
   // the gamepad's aim, soft lock and target ring (combat/padAim.js, docs/CONTROLS.md §2)
   const padAim = G.padAim = new PadAim(G);
+  // auto targeting (CT-8, docs/CONTROLS.md §13): Settings › Controls › Targeting per device, the all-round lock, where each
+  // skill goes in Auto (aimFor), the mouse's Assist (assist), the AoE marker
+  const autoAim = G.autoAim = new AutoAim(G);
+  installTargeting(G);
   Events.on('input:device', p => { if (p?.device !== 'pad') padAim.clear(); });
   Actions.isBuilding = () => !!(buildMode.active || G.housing?.decor?.active);
   function handleInput(dt) {
+    autoAim.tick(dt); // (the AoE marker while a ground skill charges: combat/autoTarget.js)
     const taps = Touch.takeTaps(); // (touch taps on the world since the last frame: ui/touch.js; dropped in build mode and menus)
     if (G.mode === 'village' && Actions.pressed('build') && !player.controlLocked && !G.ui?.isPaused?.() && !G.ui?.anyModal?.()) { buildMode.active ? buildMode.exit() : buildMode.enter(); }
     else if (G.mode === 'interior' && Actions.pressed('build') && (!player.controlLocked || G.housing?.decor.active) && !G.ui?.isPaused?.() && !G.ui?.anyModal?.()) G.housing?.decor.toggle(); // (indoors B decorates: docs/HOUSING.md §2; the player is held still while decorating)
@@ -596,7 +604,9 @@ export async function boot() {
     // touch (CT-5, docs/CONTROLS.md §12) plays like the pad: its stick and drag-to-aim feed padAim, the attack button is A
     const hb = G.state.player.hotbar, dev = Actions.device, pad = dev === 'pad' || dev === 'touch';
     // the gamepad aims with the sticks and a soft lock (combat/padAim.js); the mouse with the cursor, as before
-    if (pad) padAim.update(dt);
+    // (Settings › Controls › Targeting for this device: in Auto the lock is all round, the mouse's too; CT-8)
+    const tmode = targetingOf(G.ui?.settings, dev), auto = tmode === TARGETING.AUTO;
+    if (pad || auto) padAim.update(dt);
     if (taps && dev === 'touch') for (const tp of taps) touchTap(tp); // (a foe: lock it; someone or something: go and use it; else walk there)
     const aim = pad ? padAim.point.clone() : engine.mouseGround(Input.mouse.nx, Input.mouse.ny, (x, z) => G.world.heightAt(x, z));
     hoverEnemy = pad ? padAim.lock : G.mode === 'dungeon' && !Input.mouse.overUI ? G.combat.pickAtScreen(Input.mouse.x, Input.mouse.y, engine.camera) : null;
@@ -611,6 +621,7 @@ export async function boot() {
     // where a pad cast goes: at the lock, but a melee skill (the attack, Chomp) only steps in from close by (reach + 1.8 m);
     // a lock further off gets a swing in place toward it, never a walk across the room (CONTROLS §2: short magnetism)
     const padCast = id => {
+      if (auto) return autoAim.aimFor(id, { fallback: aim }); // (Auto: the lock, the best cluster, the line... per skill: CONTROLS §13.3)
       const L = hoverEnemy; if (!L) return [aim, null];
       const R = skillRuntime(id, G.state, G.derived);
       if (!R || !skills.isMelee?.(id, R) || L.breakable) return [L.pos, L];
@@ -648,7 +659,7 @@ export async function boot() {
       }
     }
     // RMB / 1-4 (pad: X, Y, RB, RT, LT): a tap casts; holding a chargeable skill charges it (Settings > Charge on hold), others repeat as held
-    const slotAim = id => (pad ? padCast(id) : [hoverEnemy ? hoverEnemy.pos : aim, hoverEnemy]);
+    const slotAim = id => (pad ? padCast(id) : auto ? autoAim.aimFor(id, { hover: hoverEnemy, fallback: aim }) : tmode === TARGETING.ASSIST ? autoAim.assist(id, aim, hoverEnemy) : [hoverEnemy ? hoverEnemy.pos : aim, hoverEnemy]); // (the mouse: Auto, Assist's snap, or Off: exactly the cursor)
     if (!indoors && hb[1] && ((Actions.held('skillAlt', 'kbm') && (!Input.mouse.overUI || skills.charge.owns(1))) || Actions.held('skillAlt', 'pad') || Actions.held('skillAlt', 'touch'))) skills.charge.feed(1, hb[1], ...slotAim(hb[1]));
     if (!indoors) for (let k = 1; k <= 4; k++) if (Actions.held(SLOT_ACTS[k + 1]) && hb[k + 1]) skills.charge.feed(k + 1, hb[k + 1], ...slotAim(hb[k + 1]));
     if (Actions.pressed('potionHeart')) usePotion('heart');
@@ -662,8 +673,9 @@ export async function boot() {
     if (it && Actions.pressed('interact') && performance.now() > (G.interactCooldown || 0)) it.onInteract();
     if (Input.mouse.wheel) rig.zoom(Input.mouse.wheel);
     // target frame
-    if (hoverEnemy && !hoverEnemy.breakable && hoverEnemy !== G.dungeon?.boss) G.ui?.setTarget?.( // the boss already has its big bar
-      { name: hoverEnemy.name, hp: hoverEnemy.life, max: hoverEnemy.lifeMax, rarity: hoverEnemy.rank, mods: (hoverEnemy.stats.mods || []).map(m => m) });
+    const tf = hoverEnemy || (auto ? padAim.lock : null); // (the mouse in Auto: the lock's frame when nothing is under the cursor)
+    if (tf && !tf.breakable && tf !== G.dungeon?.boss) G.ui?.setTarget?.( // the boss already has its big bar
+      { name: tf.name, hp: tf.life, max: tf.lifeMax, rarity: tf.rank, mods: (tf.stats.mods || []).map(m => m) });
     else G.ui?.setTarget?.(null);
   }
   function usePotion(key) {

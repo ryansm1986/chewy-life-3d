@@ -1,13 +1,15 @@
 // Chewy the samurai's icons (docs/HEROES.md §8) in the painted sticker look of rpg/icons.js (its drawing kit K is passed
-// in, like the other icon sets): the Bone Katana item icon, and the skill art for the Bone Blade and Pack Spirit trees
+// in, like the other icon sets): the Bone Katana item icon (every sword base's: it's the one katana he carries), and the skill art for the Bone Blade and Pack Spirit trees
 // (Fetch Mastery's tennis-ball icons are unchanged). Everything is drawn on the icon's 64-unit canvas centred on 0, 0.
 import { SAMURAI } from '../gfx/samuraiPalette.js';
 
 const BONE = '#f6ecd6', GOLD = SAMURAI.gold, RED = '#c8382e', PINK = '#ffb8cc', PETAL = '#ffd0dc';
 
 // ------------------------------------------------------------------ the Bone Katana
-/** the katana along +x from x0 (pommel) to x1 (tip), gently curved toward −y: cols [blade, wrap, accent] */
-export function katanaShape(g, K, { x0 = -27, x1 = 28, cols = null, scale = 1, edge = true } = {}) {
+/** the katana along +x from x0 (pommel) to x1 (tip), gently curved toward −y: cols [blade, wrap, accent]. bone (the
+ *  default): the game's blade (charKit.js katanaGeo, ROADMAP R-15), one long curved bone with a dog-bone knob pair at
+ *  each end; bone: false the classic pointed blade (a blade of moonlight: Moonlit Blades) */
+export function katanaShape(g, K, { x0 = -27, x1 = 28, cols = null, scale = 1, edge = true, bone = true } = {}) {
   const { INK, L, D, rr, circ, ell, lin, vol, volR, paint, stroke, shine, hexA } = K;
   const [blade = BONE, wrap = RED, acc = '#f2e4c6'] = cols || [];
   const bladeC = L(blade, 0.25), gx = x0 + 13 * scale, tx = gx + 4 * scale; // grip end, tsuba
@@ -20,18 +22,46 @@ export function katanaShape(g, K, { x0 = -27, x1 = 28, cols = null, scale = 1, e
   g.strokeStyle = hexA('#fff4e0', 0.85); g.lineWidth = 1;
   for (let x = x0 + 3; x < gx + 3; x += 3.2 * scale) { g.beginPath(); g.moveTo(x, -2.6 * scale); g.lineTo(x - 3 * scale, 2.6 * scale); g.moveTo(x - 3 * scale, -2.6 * scale); g.lineTo(x, 2.6 * scale); g.stroke(); }
   g.restore();
-  // the blade: fill, ink the long edges, a white edge line and a faint hamon
-  const n = 24, top = [], bot = [];
-  for (let i = 0; i <= n; i++) {
-    const t = i / n, x = tx + 2 + (x1 - tx - 2) * t, c = cur(t), h = hw(t) * (t > 0.86 ? Math.sqrt(Math.max(0.02, 1 - ((t - 0.86) / 0.14) ** 2)) : 1);
-    top.push([x, c - h]); bot.push([x, c + h * 0.85]);
-  }
-  g.beginPath(); top.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); for (let i = n; i >= 0; i--) g.lineTo(bot[i][0], bot[i][1]); g.closePath();
-  g.fillStyle = lin(g, 0, -5, 0, 5, [[0, L(bladeC, 0.55)], [0.45, bladeC], [1, D(bladeC, 0.2)]]); g.fill();
-  g.strokeStyle = INK; g.lineWidth = 1.9 * Math.min(1, scale + 0.15); g.stroke();
-  if (edge) {
-    g.strokeStyle = 'rgba(255,255,255,0.95)'; g.lineWidth = 1.1; g.beginPath(); for (let i = 1; i < n - 2; i++) { const [x, y] = bot[i]; i === 1 ? g.moveTo(x, y - 1.2) : g.lineTo(x, y - 1.2); } g.stroke();
-    g.strokeStyle = hexA(D(bladeC, 0.25), 0.55); g.lineWidth = 0.9; g.beginPath(); for (let i = 1; i < n - 3; i++) { const t = i / n, x = top[i][0], y = cur(t) + Math.sin(i * 1.9) * 0.5; i === 1 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke();
+  const lw = 1.9 * Math.min(1, scale + 0.15), fill = () => lin(g, 0, -5 * scale, 0, 5 * scale, [[0, L(bladeC, 0.55)], [0.45, bladeC], [1, D(bladeC, 0.2)]]);
+  const bx = tx + 2, n = 24;
+  if (bone && x1 - bx > 10 * scale) {
+    // the bone: a shaft that flares into a knob pair at each end. One outline round the lot: every part's ink stroke
+    // first (twice the width), then every fill over them, so only the outer silhouette keeps its ink
+    const kr = 2.9 * scale, d = kr * 0.8, xb = bx + kr * 1.2, xt = x1 - kr * 0.95, cAt = x => cur((x - bx) / (x1 - bx));
+    const sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+    const top = [], bot = [];
+    for (let i = 0; i <= n; i++) {
+      const u = i / n, x = xb + (xt - xb) * u, c = cAt(x), w = scale * (1.75 + 1.05 * ((1 - sm(0, 0.3, u)) + sm(0.7, 1, u)));
+      top.push([x, c - w]); bot.push([x, c + w * 0.92]);
+    }
+    const knobs = [[xb - kr * 0.15, -1], [xb - kr * 0.15, 1], [xt + kr * 0.15, -1], [xt + kr * 0.15, 1]].map(([x, s]) => [x, cAt(x) + s * d]);
+    const shaft = () => { g.beginPath(); top.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); for (let i = n; i >= 0; i--) g.lineTo(bot[i][0], bot[i][1]); g.closePath(); };
+    g.save(); g.lineJoin = 'round'; g.strokeStyle = INK; g.lineWidth = lw * 2;
+    for (const [x, y] of knobs) { circ(g, x, y, kr); g.stroke(); }
+    shaft(); g.stroke();
+    g.fillStyle = fill(); for (const [x, y] of knobs) { circ(g, x, y, kr); g.fill(); }
+    shaft(); g.fill();
+    g.restore();
+    // the knobs' shine, the white edge between them and a soft shade down the back
+    for (const [x, y] of knobs) shine(g, x - kr * 0.3, y - kr * 0.38, kr * 0.36, kr * 0.22, -0.4, 0.8);
+    if (edge) {
+      g.strokeStyle = 'rgba(255,255,255,0.95)'; g.lineWidth = 1.1; g.beginPath(); for (let i = 3; i <= n - 3; i++) { const [x, y] = bot[i]; i === 3 ? g.moveTo(x, y - 1.1) : g.lineTo(x, y - 1.1); } g.stroke();
+      g.strokeStyle = hexA(D(bladeC, 0.3), 0.5); g.lineWidth = 0.9; g.beginPath(); for (let i = 4; i <= n - 4; i++) { const [x, y] = top[i]; i === 4 ? g.moveTo(x, y + 1.3) : g.lineTo(x, y + 1.3); } g.stroke();
+    }
+  } else if (x1 > bx) {
+    // the classic blade: fill, ink the long edges, a white edge line and a faint hamon
+    const top = [], bot = [];
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, x = bx + (x1 - bx) * t, c = cur(t), h = hw(t) * (t > 0.86 ? Math.sqrt(Math.max(0.02, 1 - ((t - 0.86) / 0.14) ** 2)) : 1);
+      top.push([x, c - h]); bot.push([x, c + h * 0.85]);
+    }
+    g.beginPath(); top.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); for (let i = n; i >= 0; i--) g.lineTo(bot[i][0], bot[i][1]); g.closePath();
+    g.fillStyle = fill(); g.fill();
+    g.strokeStyle = INK; g.lineWidth = lw; g.stroke();
+    if (edge) {
+      g.strokeStyle = 'rgba(255,255,255,0.95)'; g.lineWidth = 1.1; g.beginPath(); for (let i = 1; i < n - 2; i++) { const [x, y] = bot[i]; i === 1 ? g.moveTo(x, y - 1.2) : g.lineTo(x, y - 1.2); } g.stroke();
+      g.strokeStyle = hexA(D(bladeC, 0.25), 0.55); g.lineWidth = 0.9; g.beginPath(); for (let i = 1; i < n - 3; i++) { const t = i / n, x = top[i][0], y = cur(t) + Math.sin(i * 1.9) * 0.5; i === 1 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke();
+    }
   }
   // the gold collar and the round gold tsuba with the paw print cut through it
   rr(g, tx, -3.6 * scale, 3.2 * scale, 7.2 * scale, 1); paint(g, vol(g, L(acc, 0.1), tx, -4, tx + 3, 4, 0.35, 0.25), 1.3);
@@ -41,10 +71,19 @@ export function katanaShape(g, K, { x0 = -27, x1 = 28, cols = null, scale = 1, e
   ell(g, tx - 0.4 * scale, 0, 0.9 * scale, 1.6 * scale); g.fill();
   shine(g, tx - 1.4 * scale, -4.5 * scale, 0.8 * scale, 1.8 * scale, 0, 0.75);
 }
-/** the Bone Katana item icon (handle bottom-left, tip top-right, like every sword icon) */
-export function drawKatanaItem(g, cols, noShadow, K) {
+/** a sword item's icon: every sword base is carried as the Bone Katana (charKit.js katanaGeo), so each is drawn as it in
+ *  the item's tint [blade, wrap, accent] (handle bottom-left, tip top-right, like every weapon icon); fx: a late tier's
+ *  flourish (glow: a soft aura in its accent, stars: sparkles on the blade, gem: a jewel on the collar) */
+export function drawKatanaItem(g, cols, noShadow, K, fx = null) {
   if (!noShadow) K.shadow(g, 25, 15, 3.2);
-  g.save(); g.rotate(-Math.PI / 4); g.translate(-1, 0); katanaShape(g, K, { cols, x0: -30, x1: 32, scale: 1.4 }); g.restore();
+  const acc = cols?.[2] || '#f2e4c6';
+  g.save(); g.translate(0, 1); g.rotate(-Math.PI / 4); // (scale 1.3 from -28 to 29: the knob pairs stay inside the 64 box)
+  if (fx?.glow) for (const x of [-1, 9, 18, 26]) K.glow(g, x, -1.5 - x * 0.16, 10, acc, 0.5);
+  katanaShape(g, K, { cols, x0: -28, x1: 29, scale: 1.3 });
+  if (fx?.gem) { K.ell(g, -3.9, 0, 1.9, 2.4); K.paint(g, K.volR(g, '#e8364a', -3.9, 0, 2.2), 1.1); K.shine(g, -4.4, -0.9, 0.6, 0.45, 0, 0.9); }
+  if (fx?.stars) { K.sparkle(g, 6, -3.4, 2.3, '#fff6c0'); K.sparkle(g, 17, -4.8, 1.7, '#fff6c0'); }
+  if (fx?.glow) K.sparkle(g, 27, -12, 2.6, '#ffffff');
+  g.restore();
 }
 
 // ------------------------------------------------------------------ small motifs
@@ -202,7 +241,7 @@ export function drawSamuraiSkill(g, id, K) {
       g.beginPath(); g.arc(-6, -13, 10, 0.75, TAU - 0.75); g.arc(-0.5, -16, 8.5, TAU - 1.05, 1.05, true); g.closePath(); paint(g, vol(g, '#fff6c0', -16, -23, 4, -3, 0.4, 0.15), 1.8);
       for (const [x, y, s] of [[-12, 6, 0.42], [3, 10, 0.5], [16, 4, 0.4]]) {
         g.save(); g.translate(x, y); g.rotate(Math.PI / 2);
-        katanaShape(g, K, { x0: -16, x1: 13, scale: s, cols: ['#eef2ff', '#9fb4ff', '#dfe6ff'], edge: false });
+        katanaShape(g, K, { x0: -16, x1: 13, scale: s, cols: ['#eef2ff', '#9fb4ff', '#dfe6ff'], edge: false, bone: false }); // (pointed: gfx/bladeFx.js moonBlade)
         g.restore();
         ell(g, x, y + 14 * s + 7, 4.5 * s + 2, 1.6); g.fillStyle = hexA('#dfe8ff', 0.85); g.fill();
       }

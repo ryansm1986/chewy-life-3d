@@ -34,7 +34,7 @@ export function installCozyGuide(G) {
         await say([`Lovely! ${fn}'s packing a bag right now. The Expedition Board is by the Wayfarer's Post: Shadow knows the way!`]);
       } else {
         F().burrowChoice = 'self';
-        await say(['Brave pup! The Burrow\'s gate is up on the shrine hill. Shadow will keep you company on the way.']);
+        await say(['Brave pup! The Burrow\'s gate is up on the shrine hill. Shadow knows the way: follow him!']); // (burrow1's first step leads there: world/story.js, actors/shadowLead.js)
       }
     } finally { P.controlLocked = false; asking = false; G.interactCooldown = performance.now() + 350; }
     Events.emit('cozy:burrowChoice', { choice: F().burrowChoice });

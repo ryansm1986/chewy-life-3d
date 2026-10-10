@@ -79,6 +79,8 @@ export class QuestPanel extends Panel {
     this.crews = new CrewLogView(this.ui); this.body.appendChild(this.crews.root); // (the expeditions' log: docs/COZY.md §10)
     this.body.querySelector('.q-tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (t) { if (t.dataset.t !== this.tab) this.ui.sfx?.('tab'); this.tab = t.dataset.t; this.sel = null; this._sig = null; this.render(); } });
     this.$.list.addEventListener('click', e => { const q = e.target.closest('.q-item'); if (q) { this.sel = q.dataset.id; this._sig = null; this.render(); this.ui.sfx?.('tab'); } });
+    // Follow Shadow: he leads the way to this quest's objective (again: he stops; actors/shadowLead.js, ROADMAP R-17)
+    this.$.det.addEventListener('click', e => { const b = e.target.closest('.qd-lead'); if (!b || b.disabled) return; const L = this.ui.G?.lead; if (!L) return; const on = L.toggle(b.dataset.q); this.ui.sfx?.('click'); this._sig = null; if (on) this.ui.close?.('quests'); else this.render(); });
   }
   onOpen() { if (this.opts?.tab) { this.tab = this.opts.tab; this._sig = null; this.render(); } }
   render() {
@@ -95,7 +97,9 @@ export class QuestPanel extends Panel {
     if (this.tab === 'crews') { this.crews.render(); return; }
     const list = this.tab === 'active' ? act : done;
     if (!this.sel || !list.find(q => q.id === this.sel)) this.sel = list[0]?.id || null;
-    const sig = this.tab + this.sel + JSON.stringify(list);
+    const L = this.ui.G?.lead, leadQ = L?.active && L.intent ? L.intent.t.quest : null; // (Follow Shadow: this quest's objective here, and is he on it)
+    const can = this.tab === 'active' && this.sel && !!this.ui.G?.story?.target?.(this.sel) && this.ui.G?.mode !== 'interior';
+    const sig = this.tab + this.sel + JSON.stringify(list) + can + leadQ;
     if (sig === this._sig) return; this._sig = sig;
     this.$.list.innerHTML = list.map((q, i) => {
       const n = q.objectives.length, k = q.objectives.filter(o => o.done).length;
@@ -105,7 +109,8 @@ export class QuestPanel extends Panel {
     this.$.det.innerHTML = q ? `<div class="qd-h"><div class="qd-n">${esc(q.name)}</div>${q.giver ? `<div class="qd-g">from <b>${esc(q.giver)}</b></div>` : ''}</div>
       ${q.desc ? `<div class="qd-desc">${esc(q.desc)}</div>` : ''}
       <div class="qd-objs">${q.objectives.map(o => `<div class="qo ${o.done ? 'done' : ''}"><i class="qo-box">${o.done ? glyph('check') : ''}</i><span class="qo-t">${esc(o.text)}</span>${o.need > 1 ? `<span class="qo-bar"><i style="width:${Math.min(100, (o.have / o.need) * 100)}%"></i></span><span class="qo-n">${Math.min(o.have, o.need)}/${o.need}</span>` : ''}</div>`).join('')}</div>
-      ${q.rewards ? `<div class="qd-rw"><span class="qd-rh">Rewards</span>${q.rewards}</div>` : ''}` : `<div class="qd-empty">${glyph('book')}</div>`;
+      ${q.rewards ? `<div class="qd-rw"><span class="qd-rh">Rewards</span>${q.rewards}</div>` : ''}
+      ${!q.done && L ? `<button class="btn sm qd-lead${leadQ === q.id ? ' on' : ''}" data-q="${esc(q.id)}"${can || leadQ === q.id ? '' : ' disabled title="Nothing to lead to from here"'}>${glyph('paw')}${leadQ === q.id ? 'Shadow is leading · stop' : 'Follow Shadow'}</button>` : ''}` : `<div class="qd-empty">${glyph('book')}</div>`;
   }
 }
 

@@ -4,13 +4,15 @@
 // pages, Rosie's shop, the stash, cooking, the workbench, the Travel Map, a house card, remodel, the cozy path's Board
 // and Guild, build and decorate. A header button (a title-row button, tab or badge, or a tab row heading the body) whose
 // visible part runs outside its panel's frame fails (tools/qa/ui-audit-lib.mjs headerOutside; the ✕ on the corner and
-// the K panel's docked Charge drawer are by design). Screenshots: the K panel for each hero at 100 %, and every failure.
+// the K panel's docked Charge drawer are by design). R-16: in the K panel scenes the Charge drawer, with each skill of
+// each tree shown from its skill strip, must sit on the screen (tag to foot) with the strip on one row inside its tray
+// (ui-audit-lib drawerFit). Screenshots: the K panel for each hero at 100 %, and every failure.
 //   usage: node tools/qa/desktop-ui.mjs [view…]   SIZES=1280x720,1600x900,1920x1080 SCALES=0.8,1,1.25 COZY=0 (skip the
 //   cozy seed) SHOT_DIR (default tools/qa/tmp/desktop-ui). Dev server only (the cozy seed imports the debug registry).
 import fs from 'node:fs';
 import path from 'node:path';
 import { launch, boot, sleep, waitMode } from './lib.mjs';
-import { headerOutside } from './ui-audit-lib.mjs';
+import { headerOutside, drawerFit } from './ui-audit-lib.mjs';
 import { seedCozy, quietUi } from './cozy-ui-lib.mjs';
 
 const OUT = process.env.SHOT_DIR || path.resolve('tools/qa/tmp/desktop-ui');
@@ -33,7 +35,8 @@ for (const [W, H] of SIZES) {
     try {
       await open(); await sleep(page, 650);
       const out = await ev(headerOutside); checked++;
-      if (out.length) { for (const o of out) { console.log(`   OUTSIDE ${tag} ${name}: ${o.sel} ${JSON.stringify(o.rect)} frame ${JSON.stringify(o.frame)}`); fails.push({ where: `${tag} ${name}`, ...o }); } await shot(`fail-${tag}-${name}`); }
+      if (name.startsWith('skills-')) out.push(...await ev(drawerFit)); // (R-16: the Charge drawer on the screen for every skill)
+      if (out.length) { for (const o of out) { console.log(`   OUTSIDE ${tag} ${name}: ${o.sel} ${JSON.stringify(o.rect)} ${o.frame ? 'frame ' + JSON.stringify(o.frame) : 'screen ' + JSON.stringify(o.screen)}`); fails.push({ where: `${tag} ${name}`, ...o }); } await shot(`fail-${tag}-${name}`); }
       else if (name.startsWith('skills-') && /@1$/.test(tag)) await shot(`${tag.replace('@', '-ui')}-${name}`);
     } catch (e) { console.log(`!! ${tag} ${name}: ${String(e.message || e).split('\n')[0]}`); bad++; }
     try { if (close) await close(); else await closeAll(); await sleep(page, 250); } catch (e) { /* next */ }
@@ -80,7 +83,7 @@ for (const [W, H] of SIZES) {
   if (errors.length) { console.log('page errors:', [...new Set(errors)].slice(0, 4).join('\n')); bad++; }
   await browser.close();
 }
-console.log(`\n${checked} panel views checked; ${fails.length} header buttons outside their panel. Shots: ${OUT}`);
+console.log(`\n${checked} panel views checked; ${fails.length} header buttons outside their panel or Charge drawers off the screen. Shots: ${OUT}`);
 const fail = bad || fails.length;
 console.log(fail ? 'FAIL desktop-ui' : 'PASS desktop-ui');
 process.exit(fail ? 1 : 0);

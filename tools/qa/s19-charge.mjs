@@ -10,12 +10,19 @@
 //     region bounds, even on a long frame
 //  g) the "Hold to power up!" guide (Shadow)
 //  h) perf: frame times through a burst of fully charged releases vs the same burst tapped
+//  i) R-16, the drawer's skill strip by every input: the mouse, a phone's and an iPad's fingers and the pad each switch
+//     the drawer to a skill that isn't the tree's default and buy a perk there; hover names, unlearned previews, each
+//     tree's memory, learn and assign pick, the chip (its tooltip steps aside; 44 px to a finger; a double-tap learns
+//     once), LT / RT, and the drawer on the screen at 1280×720 and UI 125 %. S19_ONLY=i runs just this
 import { launch, boot, waitMode, sleep, makeReport, BASE } from './lib.mjs';
+import { launchTouch, PHONE, IPAD } from './touch-lib.mjs';
+import { installPad, padTap, padReset } from './pad-lib.mjs';
 
 const R = makeReport('S19 charged abilities: hold, perks, channels, every skill, K panel, dash bounds, guide, perf');
 const { browser, page, errors, warns } = await launch({ w: 1280, h: 720 });
 const ev = (f, a) => page.evaluate(f, a);
 const HOUR = 11;
+const ONLY = process.env.S19_ONLY; // (i: only the R-16 section)
 
 async function fight(hero = 'chewy', floor = 2) {
   await boot(page, `fresh&nointro${hero === 'moka' || hero === 'poe' || hero === 'shihtzu' || hero === 'golden' ? `&hero=${hero}` : ''}`);
@@ -53,6 +60,7 @@ const reset = () => ev(() => { const G = window.G; G.skills.cds = {}; G.player.a
 const holdRMB = async (minStage = 1) => { await page.mouse.down({ button: 'right' }); await page.waitForFunction(s => (window.G.skills.charge.active?.stage || 0) >= s, minStage, { timeout: 8000 }); await sleep(page, 60); await page.mouse.up({ button: 'right' }); };
 
 try {
+  skipped: { if (ONLY === 'i') break skipped; // (S19_ONLY=i runs only section i)
   // ================================================================ a) the hold
   await fight('chewy', 2);
   await learn({ skills: { chomp: 10 }, pts: 10, hotbar: [null, 'chomp', 'chomp'] });
@@ -322,6 +330,181 @@ try {
   const chg = await burst(true);
   console.log('perf burst (frame ms): tapped', JSON.stringify(tap), '· charged Ⅲ', JSON.stringify(chg));
   R.check(`perf: a burst of fully charged Ⅲ releases (Meteor + shower, Mallards + loop, Tsunami, Big Dipper) frames like the tapped burst (p95 ${chg.p95} ms vs ${tap.p95} ms, max ${chg.max} ms)`, chg.p95 <= Math.max(40, tap.p95 * 1.6) && chg.max < 250, JSON.stringify({ tap, chg }));
+  } // (S19_ONLY=i: only section i)
+
+  // ================================================================ i) R-16: the drawer's skill strip, by every input
+  // The owner (2026-10-09): "I can't use the charge tree on anything but default attack. That window can't change." By
+  // real input, the drawer is switched to a skill that isn't its tree's default and a perk is bought there: the mouse
+  // (here, 1280×720), fingers on a phone and an iPad (their own browsers), and the pad.
+  const until = (f, a, timeout = 4000, pg = page) => pg.waitForFunction(f, a, { timeout, polling: 'raf' }).then(() => true, () => false);
+  const boxOf = (sel, pg = page) => pg.evaluate(sel => { const e = [...document.querySelectorAll(sel)].find(x => x.getBoundingClientRect().width > 1); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2, w: b.width, h: b.height, t: b.top, b: b.bottom }; }, sel);
+  const drawer = (pg = page) => pg.evaluate(() => {
+    const S = window.G.ui.panels.skills, pl = window.G.state.player, d = document.querySelector('.chg-drawer');
+    return { id: S.chg.id, tree: S.tree, name: document.querySelector('.chg-name')?.textContent, sub: document.querySelector('.chg-sub')?.textContent, pts: pl.skillPts, skills: { ...pl.skills }, perks: JSON.parse(JSON.stringify(pl.chargePerks || {})),
+      strip: [...document.querySelectorAll('.chg-pick .chg-sk')].map(b => b.dataset.k + (b.classList.contains('sel') ? '*' : '') + (b.classList.contains('unl') ? '-' : '') + (b.querySelector('.chg-skn:not([hidden])')?.textContent || '')),
+      label: document.querySelector('.chg-plt')?.textContent, tip: !!window.G.ui.tip.on, chipSel: document.querySelector('.p-skills .nd-chg.sel')?.closest('.node')?.dataset.id || null, open: !!d?.classList.contains('m-open'),
+      pop: !!document.querySelector('.pop-wrap.show'), hot: [...pl.hotbar] };
+  });
+  const seed = (pg = page) => pg.evaluate(() => { const G = window.G, pl = G.state.player; pl.lvl = 14; pl.skillPts = 6; Object.assign(pl.skills, { chomp: 6, whirl: 3, dig: 3 }); pl.chargePerks = {}; G.state.flags.hints = { all: true }; G.actions.recompute(); });
+  const shown = (id, pg = page) => until(id => window.G.ui.panels.skills.chg.id === id && !document.querySelector('.chg-drawer.swap'), id, 4000, pg); // (and its content's slide-in done)
+  const settled = (pg = page) => until(() => window.G.ui.isOpen('skills') && !document.querySelector('.pw.opening, .pw.closing') && document.querySelectorAll('.chg-pick .chg-sk').length > 0, null, 4000, pg); // (the panel's open spring done)
+  // a target at rest: the same box two frames running and nothing finite animating it or its ancestors (the popover's
+  // pop-in moves its slots ~70 px; measured on its first frame, a click lands outside and closes it)
+  const steady = (sel, pg = page) => until(sel => {
+    const e = [...document.querySelectorAll(sel)].find(x => x.getBoundingClientRect().width > 1); if (!e) return false;
+    const r = e.getBoundingClientRect(), k = sel + [r.x, r.y, r.width, r.height].map(v => v.toFixed(1)).join();
+    const moving = document.getAnimations().some(a => a.playState === 'running' && a.effect?.getTiming?.().iterations !== Infinity && a.effect?.target?.contains?.(e));
+    const ok = !moving && window.__steady === k; window.__steady = k; return ok;
+  }, sel, 4000, pg);
+  const mclick = async (sel, o = {}) => { await steady(sel); const b = await boxOf(sel); if (!b) return null; await page.mouse.move(b.x + (o.dx || 0), b.y + (o.dy || 0), { steps: 3 }); await page.mouse.down({ button: o.button || 'left' }); await page.mouse.up({ button: o.button || 'left' }); return b; };
+  // -------- the mouse
+  await boot(page, `fresh&nointro&notut&hour=${HOUR}`); await seed();
+  await page.mouse.move(1200, 360); await page.keyboard.press('KeyK');
+  await settled();
+  const m0 = await drawer();
+  R.check('R-16 mouse: the Charge drawer leads with "Choose a skill to charge" over a strip of the tree\'s chargeable skills (learned bright, Sakura Storm dimmed, the shown one marked)', m0.id === 'chomp' && m0.strip.join() === 'chomp*,whirl,dig,bonestorm-' && /Choose a skill to charge/.test(m0.label), JSON.stringify(m0));
+  const wb = await boxOf('.chg-sk[data-k="whirl"]');
+  await page.mouse.move(wb.x, wb.y, { steps: 3 }); await until(() => /Whirlwind/.test(document.querySelector('.chg-plt')?.textContent || ''));
+  const lab = (await drawer()).label;
+  await page.mouse.down(); await page.mouse.up(); await shown('whirl');
+  const m1 = await drawer();
+  R.check('…hovering a strip button names it; a click shows that skill (Gale Stance), marks it and rings its ⚡ chip in the tree', /Whirlwind Stance/.test(lab) && m1.id === 'whirl' && m1.name === 'Gale Stance' && m1.strip[1] === 'whirl*' && m1.chipSel === 'whirl', JSON.stringify({ lab, m1 }));
+  const wp = await ev(() => document.querySelector('.chg-pk.can')?.dataset.p || null);
+  if (wp) { await mclick(`.chg-pk[data-p="${wp}"]`); await until(p => (window.G.state.player.chargePerks?.whirl?.[p] || 0) > 0, wp); }
+  const m2 = await drawer();
+  R.check('…and a click on a ready perk buys it for Whirlwind Stance: one point, Crescent Chomp untouched, the strip counting it', wp && m2.pts === 5 && m2.perks.whirl?.[wp] === 1 && !m2.perks.chomp && m2.strip[1] === 'whirl*1' && m2.id === 'whirl', JSON.stringify({ wp, m2 }));
+  await mclick('.chg-sk[data-k="bonestorm"]'); await shown('bonestorm');
+  await mclick('.chg-pk'); await until(() => !!document.querySelector('.chg-pk.deny'), null, 1500); // (the refusal's shake)
+  const m3 = await drawer();
+  R.check('an unlearned skill previews from the strip ("not learned yet") and its perks refuse: no point spent', m3.id === 'bonestorm' && /not learned yet/.test(m3.sub) && m3.pts === 5 && !m3.perks.bonestorm, JSON.stringify(m3));
+  await mclick('.chg-sk[data-k="whirl"]'); await shown('whirl');
+  await mclick('.p-skills .sk-tabs .tab[data-t="fetch"]'); await until(() => window.G.ui.panels.skills.tree === 'fetch');
+  const f0 = await drawer();
+  await mclick('.chg-sk[data-k="ricochet"]'); await shown('ricochet');
+  await mclick('.p-skills .sk-tabs .tab[data-t="bone"]'); await until(() => window.G.ui.panels.skills.tree === 'bone');
+  const b1 = await drawer();
+  await page.mouse.move(1200, 360); await page.keyboard.press('KeyK'); await until(() => !window.G.ui.isOpen('skills'));
+  await page.keyboard.press('KeyK'); await settled();
+  const b2 = await drawer();
+  await mclick('.p-skills .sk-tabs .tab[data-t="fetch"]'); await until(() => window.G.ui.panels.skills.tree === 'fetch');
+  const f1 = await drawer();
+  R.check('each tree remembers its pick: Fetch Mastery opens on its default, Bone Blade comes back on Whirlwind Stance (after closing and opening K too), Fetch Mastery on Ricochet', f0.id === 'throw' && b1.id === 'whirl' && b2.id === 'whirl' && f1.id === 'ricochet' && f1.strip.some(s => s.startsWith('ricochet*')), JSON.stringify({ f0: f0.id, b1: b1.id, b2: b2.id, f1: f1.id }));
+  await mclick('.p-skills .sk-tabs .tab[data-t="bone"]'); await until(() => window.G.ui.panels.skills.tree === 'bone');
+  const dig0 = await drawer();
+  await mclick('.p-skills .node[data-id="chomp"] .nd-in', { dy: -12 }); await until(() => window.G.state.player.skills.chomp === 7);
+  const l1 = await drawer();
+  await mclick('.p-skills .node[data-id="dig"] .nd-in', { button: 'right', dy: -12 }); await until(() => !!document.querySelector('.pop-wrap.show .pop-slot'));
+  await mclick('.pop-wrap.show .pop-slot[data-i="3"]'); await until(() => window.G.state.player.hotbar[3] === 'dig');
+  const a1 = await drawer();
+  R.check('learning a skill shows it in the drawer (a point in Crescent Chomp), and so does assigning one (Helmet Splitter to slot 2)', dig0.id === 'whirl' && l1.skills.chomp === 7 && l1.id === 'chomp' && a1.hot[3] === 'dig' && a1.id === 'dig', JSON.stringify({ was: dig0.id, learned: l1.id, chomp: l1.skills.chomp, assigned: a1.id, hot: a1.hot }));
+  const wc = await boxOf('.p-skills .node[data-id="whirl"] .nd-chg');
+  const nb = await boxOf('.p-skills .node[data-id="whirl"] .nd-in');
+  await page.mouse.move(nb.x, nb.y - 14, { steps: 3 }); await until(() => window.G.ui.tip.on);
+  const tipNode = (await drawer()).tip;
+  await page.mouse.move(wc.x, wc.y, { steps: 3 }); await until(() => !window.G.ui.tip.on);
+  const tipChip = (await drawer()).tip;
+  await page.mouse.down(); await page.mouse.up(); await shown('whirl');
+  const c1 = await drawer();
+  R.check('the ⚡ chip: the node\'s tooltip (over the drawer) steps aside on it, and a click shows that skill without learning it', tipNode && !tipChip && c1.id === 'whirl' && !c1.tip && c1.skills.whirl === 3, JSON.stringify({ tipNode, tipChip, id: c1.id, whirl: c1.skills.whirl }));
+  // the fit: 1280×720 at UI 125 %, every Bone Blade skill (the tallest tree) from the strip: the drawer on the screen, and put
+  await ev(() => { const U = window.G.ui; U.setSetting('uiScale', 1.25); U.close('skills'); U.open('skills'); }); await settled();
+  const fit = [];
+  for (const id of ['chomp', 'whirl', 'dig', 'bonestorm']) {
+    await mclick(`.chg-sk[data-k="${id}"]`); await shown(id); await page.mouse.move(1260, 400);
+    fit.push(await ev(() => { const d = document.querySelector('.chg-drawer'), r = d.getBoundingClientRect(), t = d.querySelector('.chg-tag').getBoundingClientRect(); return [window.G.ui.panels.skills.chg.id, Math.round(t.top), Math.round(r.bottom), innerHeight, Math.round(d.querySelector('.chg-pick').getBoundingClientRect().top)]; }));
+  }
+  await ev(() => window.G.ui.setSetting('uiScale', 1));
+  R.check('at 1280×720 and UI 125 % the drawer fits the screen for every Bone Blade skill (its tag to its foot) and stays put while the strip switches', fit.every(f => f[1] >= 0 && f[2] <= f[3]) && new Set(fit.map(f => f[4])).size === 1, JSON.stringify(fit));
+  // -------- the pad
+  await ev(() => window.G.ui.close('skills')); await until(() => !window.G.ui.isOpen('skills'));
+  await installPad(page); await padTap(page, 'DUp'); await until(() => window.G.controls.device === 'pad');
+  await ev(() => window.G.ui.open('skills')); await settled(); await until(() => !!window.G.ui.padNav.cur);
+  await ev(() => window.G.ui.panels.skills.chg.show('chomp'));
+  const p0 = await drawer();
+  await padTap(page, 'RT'); await until(() => window.G.ui.panels.skills.chg.id !== 'chomp');
+  const pR = (await drawer()).id;
+  await padTap(page, 'LT'); await until(() => window.G.ui.panels.skills.chg.id === 'chomp');
+  const pL = (await drawer()).id;
+  await padTap(page, 'LT'); await until(() => window.G.ui.panels.skills.chg.id === 'bonestorm');
+  const pW = (await drawer()).id;
+  const pHint = await ev(() => window.G.ui.padNav.hintsEl.textContent.replace(/\s+/g, ' '));
+  const pCast = await ev(() => ({ charge: !!window.G.skills.charge.active, anim: window.G.player.anim.action?.name || null }));
+  R.check('R-16 pad: RT / LT step the drawer through the strip (Crescent Chomp → Whirlwind Stance, back, and round to Sakura Storm); the hints say so; nothing casts', p0.id === 'chomp' && pR === 'whirl' && pL === 'chomp' && pW === 'bonestorm' && /Charge skill/.test(pHint) && !pCast.charge, JSON.stringify({ p0: p0.id, pR, pL, pW, pHint, pCast }));
+  const navTo = async (sel, max = 40) => {
+    for (let i = 0; i < max; i++) {
+      const s = await ev(sel => {
+        const c = window.G.ui.padNav.cur, t = [...document.querySelectorAll(sel)].find(e => e.offsetParent && e.getBoundingClientRect().width > 1);
+        if (!c || !t) return { err: !c ? 'no focus' : 'no target' };
+        if (c === t || c.matches(sel)) return { done: true };
+        const a = c.getBoundingClientRect(), b = t.getBoundingClientRect(), dx = b.left + b.width / 2 - (a.left + a.width / 2), dy = b.top + b.height / 2 - (a.top + a.height / 2);
+        const rowOk = b.top < a.bottom - 2 && b.bottom > a.top + 2, colOk = b.left < a.right - 2 && b.right > a.left + 2;
+        const across = rowOk || (!colOk && Math.abs(dx) > Math.abs(dy)); // (the farther way first: from the tree into the drawer is across)
+        return { dir: across ? (dx > 0 ? 'DRight' : 'DLeft') : (dy > 0 ? 'DDown' : 'DUp') };
+      }, sel);
+      if (s.done) return true; if (s.err) return false;
+      await ev(() => { window.__navWas = window.G.ui.padNav.cur; });
+      await padTap(page, s.dir, 30);
+      if (await ev(() => window.G.ui.padNav.cur === window.__navWas)) { for (const d of (s.dir === 'DLeft' || s.dir === 'DRight' ? ['DUp', 'DDown'] : ['DRight', 'DLeft'])) { await padTap(page, d, 30); if (!(await ev(() => window.G.ui.padNav.cur === window.__navWas))) break; } }
+    }
+    return false;
+  };
+  const onDig = await navTo('.chg-sk[data-k="dig"]');
+  const digHint = await ev(() => window.G.ui.padNav.hintsEl.textContent.replace(/\s+/g, ' '));
+  await padTap(page, 'A'); await shown('dig');
+  const p1 = await drawer();
+  const onPk = await navTo('.chg-pk.can'), dp = await ev(() => window.G.ui.padNav.cur?.dataset.p || null);
+  await padTap(page, 'A'); await until(p => (window.G.state.player.chargePerks?.dig?.[p] || 0) > 0, dp);
+  const p2 = await drawer();
+  R.check('…the focus reaches the strip ("Show its perks"): A on Helmet Splitter shows it, and A on a ready perk buys it there (one point)', onDig && /Show its perks/.test(digHint) && p1.id === 'dig' && onPk && dp && p2.perks.dig?.[dp] === 1 && p2.pts === p1.pts - 1 && p2.strip[2] === 'dig*1', JSON.stringify({ onDig, digHint, p1: p1.id, onPk, dp, perks: p2.perks, pts: [p1.pts, p2.pts] }));
+  const onNode = await navTo('.p-skills .node[data-id="whirl"]');
+  await until(() => window.G.ui.tip.on, null, 1500);
+  const tipN = (await drawer()).tip;
+  await padTap(page, 'X'); await shown('whirl');
+  const p3 = await drawer();
+  R.check('…X on a skill node shows its charge, and its tooltip steps aside so the drawer shows', onNode && tipN && p3.id === 'whirl' && !p3.tip, JSON.stringify({ onNode, tipN, id: p3.id, tip: p3.tip }));
+  await padReset(page); await ev(() => window.G.ui.close('skills'));
+  // -------- touch: a phone (the drawer a sheet over the tree) and an iPad (docked, as on the desktop)
+  for (const [dname, dev] of [['phone', PHONE], ['iPad', IPAD]]) {
+    const T = await launchTouch(dev), tp = T.page, F = T.F, tev = (f, a) => tp.evaluate(f, a);
+    const tapSel = async (sel, dy = 0) => { await steady(sel, tp); const b = await boxOf(sel, tp); if (b) { b.under = await tev(([x, y]) => { const e = document.elementFromPoint(x, y); return (e?.className?.baseVal ?? e?.className) || e?.tagName || null; }, [b.x, b.y + dy]); await F.tap(b.x, b.y + dy); } return b; };
+    const phone = dname === 'phone', sheet = open => until(o => document.querySelector('.chg-drawer').classList.contains('m-open') === o, open, 4000, tp);
+    try {
+      await boot(tp, `fresh&nointro&notut&hour=${HOUR}`); await seed(tp);
+      await F.tap(dev.w / 2, dev.h / 2); await until(() => window.G.controls.device === 'touch', null, 4000, tp);
+      await tev(() => window.G.ui.open('skills')); await settled(tp);
+      if (phone) { await tapSel('.chg-drawer .chg-tag'); await sheet(true); }
+      const sizes = await tev(() => [...document.querySelectorAll('.chg-pick .chg-sk')].map(b => { const r = b.getBoundingClientRect(); return Math.round(Math.min(r.width, r.height) * 10) / 10; }));
+      const tw = await tapSel('.chg-sk[data-k="whirl"]'); await shown('whirl', tp);
+      const t1 = await drawer(tp);
+      const tpk = await tev(() => document.querySelector('.chg-pk.can')?.dataset.p || null);
+      if (tpk) { await tapSel(`.chg-pk[data-p="${tpk}"]`); await until(p => (window.G.state.player.chargePerks?.whirl?.[p] || 0) > 0, tpk, 4000, tp); }
+      const t2 = await drawer(tp);
+      R.check(`R-16 touch (${dname}): the strip's buttons are 44 px or more; a tap on Whirlwind Stance shows it, and a tap on a ready perk buys it there`, sizes.length === 4 && Math.min(...sizes) >= 44 && t1.id === 'whirl' && tpk && t2.perks.whirl?.[tpk] === 1 && t2.pts === 5 && !t2.perks.chomp && (!phone || t2.open), JSON.stringify({ sizes, id: t1.id, tapped: tw && [Math.round(tw.x), Math.round(tw.y), tw.under], tpk, perks: t2.perks, pts: t2.pts, open: t2.open }));
+      // a press held past the long-press time on a strip button (nothing to show) is still its tap (a slow frame, a slow finger)
+      await steady('.chg-sk[data-k="bonestorm"]', tp); const hb = await boxOf('.chg-sk[data-k="bonestorm"]', tp);
+      if (hb) { await F.down(9, hb.x, hb.y); await tp.waitForTimeout(560); await F.up(9); } // (the hold is the input itself)
+      const held = await shown('bonestorm', tp);
+      R.check(`…(${dname}) a strip button held 0.56 s (past the 0.43 s long press, with no tooltip to show) still switches the drawer`, held, JSON.stringify({ id: (await drawer(tp)).id }));
+      // the ⚡ chip: a tap just above its visible box lands in its hit area (it shows that skill, learns nothing)
+      if (phone) { await tapSel('.chg-drawer .chg-tag'); await sheet(false); }
+      const ch = await boxOf('.p-skills .node[data-id="dig"] .nd-chg', tp), cy = ch ? ch.t - 8 : 0;
+      const hit = ch && await tev(([x, y]) => !!document.elementFromPoint(x, y)?.closest('.nd-chg'), [ch.x, cy]);
+      const s0 = await drawer(tp);
+      if (ch) { await F.tap(ch.x, cy); await shown('dig', tp); }
+      const s1 = await drawer(tp);
+      R.check(`…(${dname}) the ⚡ chip (${ch ? Math.round(ch.w) + '×' + Math.round(ch.h) : '?'} px) takes a finger 8 px above its box, in its hit area: it shows Helmet Splitter${phone ? ' in the opened sheet' : ''} and learns nothing`, hit && s1.id === 'dig' && s1.skills.dig === s0.skills.dig && s1.pts === s0.pts && (!phone || s1.open), JSON.stringify({ ch, hit, id: s1.id, dig: [s0.skills.dig, s1.skills.dig], pts: [s0.pts, s1.pts], open: s1.open }));
+      // a double-tap on a learned node: the assign popover, and one level learned, not two
+      if (phone) { await tapSel('.chg-drawer .chg-tag'); await sheet(false); }
+      const nd = await boxOf('.p-skills .node[data-id="chomp"] .nd-in', tp);
+      const d0 = await drawer(tp);
+      if (nd) { await F.tap(nd.x + 6, nd.y - 8); await F.tap(nd.x + 6, nd.y - 8); await until(() => !!document.querySelector('.pop-wrap.show'), null, 4000, tp); }
+      const d1 = await drawer(tp);
+      R.check(`…(${dname}) a double-tap on a learned node opens the assign popover and learns one level, not two; the drawer shows it`, d1.pop && d1.skills.chomp === d0.skills.chomp + 1 && d1.id === 'chomp', JSON.stringify({ chomp: [d0.skills.chomp, d1.skills.chomp], pop: d1.pop, id: d1.id }));
+      await tp.screenshot({ path: `tools/qa/tmp/r16/s19-${dname}.png` }).catch(() => {});
+    } catch (e) { errors.push(`[${dname}] ` + e.stack); }
+    for (const e of T.errors) errors.push(`[${dname}] ${e}`);
+    await T.browser.close();
+  }
 } catch (e) { errors.push('[harness] ' + e.stack); }
 const failed = R.finish(errors, warns);
 await browser.close();

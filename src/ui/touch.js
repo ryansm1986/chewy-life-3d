@@ -6,9 +6,10 @@
 //  - the cluster (bottom right): the attack button (the LMB slot, with the pad's A behaviour: game.js), the five skill
 //    slots (RMB, 1–4) on an arc round it, the roll button and the weapon-set badge. The HUD's own hotbar slots move in,
 //    so their icons, cooldown sweeps, charge sweep, stage pips and perk badges keep working; they go home when another
-//    device plays. Hold a skill to charge it (a ring fills round the button). Aim (Settings › Controls › Touch): Auto
-//    (the soft lock, else the facing: combat/padAim.js) or Drag (drag off a skill: a ground mark shows where it goes,
-//    back onto the button cancels, letting go casts). An empty slot opens the skill chooser.
+//    device plays. Hold a skill to charge it (a ring fills round the button). Aim (Settings › Controls › Targeting, CT-8):
+//    Auto (the best foe or group all round: combat/autoTarget.js; a quick flick of the stick picks the foe that way),
+//    Assist (the cone soft lock, else the facing: combat/padAim.js) or Off, which is Drag (drag off a skill: a ground mark
+//    shows where it goes, back onto the button cancels, letting go casts). An empty slot opens the skill chooser.
 //  - the belt between the orbs (the HUD's potion and meal slots, moved in).
 //  - top right: the hero button (a tap: the next hero; a hold: the hero wheel, which stays up for a tap on a card), the
 //    bag and the menu. The minimap opens the map.
@@ -26,6 +27,7 @@ import { el, setCls, replay, clamp } from './dom.js';
 import { glyph } from './glyphs.js';
 import { portrait } from './portraits.js';
 import { chargeable } from '../rpg/charge.js';
+import { targetingOf, TARGETING } from '../combat/autoTarget.js';
 
 const SLOT_ACTS = ['attack', 'skillAlt', 'skill1', 'skill2', 'skill3', 'skill4'];
 const BELT_ACT = { heart: 'potionHeart', zoom: 'potionZoom', rejuv: 'potionR' };
@@ -71,7 +73,7 @@ export class TouchControls {
     document.addEventListener('touchmove', e => { if (e.cancelable && e.touches && e.touches.length > 1 && !pinchOk()) e.preventDefault(); }, { passive: false });
     Events.on('input:device', p => this.onDevice(p?.device));
     Events.on('hero:wheel', () => this.fitWheel());
-    ui.onSetting(k => { if (k === 'haptics' || /^touch/.test(k)) this.applySettings(); });
+    ui.onSetting(k => { if (k === 'haptics' || k === 'targetTouch' || /^touch/.test(k)) this.applySettings(); });
     // haptics: a tick per charge stage, a thump on a charged release, being hurt and knocked out
     Events.on('charge:stage', () => this.buzz(12));
     Events.on('charge:release', p => { if (p?.ok && p.stage > 0) this.buzz(16 + 8 * p.stage); });
@@ -189,7 +191,7 @@ export class TouchControls {
   applySettings() {
     const s = this.ui.settings;
     this.mirror = !!s.touchLeft;
-    this.aimMode = s.touchAim === 1 ? 1 : 0;
+    this.aimMode = targetingOf(s, 'touch') === TARGETING.OFF ? 1 : 0; // (Drag: Settings › Controls › Targeting Off on touch; CT-8 merged the old Skill aim into it)
     Touch.opts.haptics = s.haptics !== false;
     this.root.style.setProperty('--op', String(clamp(s.touchOpacity ?? 0.85, 0.3, 1)));
     this.root.classList.toggle('mirror', this.mirror);
@@ -341,7 +343,11 @@ export class TouchControls {
     if (p.kind === 'btn') { p.el.classList.remove('down'); p.h.up?.(p, cancelled); }
     else if (p.kind === 'edit' || p.kind === 'epan') this.editUp(p, cancelled, quick);
     else if (p.kind === 'fish') Touch.release('reel');
-    else if (p.kind === 'stick') { const tap = !cancelled && quick < STICK_TAP_MS && p.moved < TAP_PX * 0.7; this.stickEnd(p); if (tap) this.worldTap(p.x0, p.y0); }
+    else if (p.kind === 'stick') {
+      const tap = !cancelled && quick < STICK_TAP_MS && p.moved < TAP_PX * 0.7;
+      const fx = p.x - p.x0, fy = p.y - p.y0, fd = Math.hypot(fx, fy), flick = !cancelled && !tap && quick < 250 && fd > STICK.r * this.u * 0.7; // (a quick flick: Auto targeting picks the foe that way, combat/padAim.js; CT-8)
+      this.stickEnd(p); if (tap) this.worldTap(p.x0, p.y0); else if (flick) Events.emit('touch:flick', { x: fx / fd, y: -fy / fd });
+    }
     else if (p.kind === 'pinch') { const P = this.pinch; if (P) { const o = P.a === p ? P.b : P.a; this.pinch = null; if (this.ptrs.has(o.id)) { o.kind = 'tap'; o.t0 = -1e9; } } }
     else if (p.kind === 'tap' && !cancelled && quick < TAP_MS && p.moved < TAP_PX) {
       const D = this.ui.dlg;

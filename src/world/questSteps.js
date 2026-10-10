@@ -11,11 +11,17 @@
 //   tier { dungeon, n }                                   clear that dungeon (a zone dungeon or the Deep Burrow) at tier n
 //                                                         or higher
 //   villageSaved { zone }                                 the zone's village is saved
+//   reach { at, x, z, r?, floor?, label? }                walk to a spot (at: 'home' = Blossom Hollow, a zone id = its
+//                                                         region, a dungeon id = that floor); polled by Story.reachTick.
+//                                                         The pointer shows the spot in its world, the way there elsewhere
+//                                                         (ROADMAP R-17: "Follow Shadow to …" steps, lead: true)
 // The filters are optional: the old steps (an unfiltered kill, boss { id }) count exactly as before.
 import { DUNGEONS } from '../dungeon/defs.js';
 import { zoneOf, tierCleared, villageSaved } from '../rpg/zones.js';
 
 export const ZONE_STEP_TYPES = ['find', 'rescue', 'dungeonFloor', 'tier', 'villageSaved'];
+/** how near (m) the hero must come to a reach step's spot */
+export const REACH_R = 2.6;
 
 /** do the step's where-filters (zone / dungeon / floor / tier) all match the event? */
 export function matchesWhere(s, e = {}) {
@@ -66,6 +72,15 @@ export function destOf(s) {
     case 'dungeonFloor': return inD(s.dungeon, { floor: s.n || 1 });
     case 'tier': return inD(s.dungeon, { floor: last(s.dungeon), boss: true });
     case 'villageSaved': return s.zone ? { zone: s.zone, village: true } : null;
+    case 'reach': return !s.at || s.at === 'home' ? { home: true, reach: true } : DUNGEONS[s.at] ? inD(s.at, { floor: s.floor ?? 1, reach: true }) : { zone: s.at, reach: true };
     default: return null;
   }
+}
+/** is a reach step's spot in this world? w = { home: in Blossom Hollow, zone, dungeon (a floor's dungeon id, null in a
+ *  region), floor } (Story.whereNow) */
+export function reachIsHere(s, w) {
+  if (!s || s.type !== 'reach' || !w) return false;
+  if (!s.at || s.at === 'home') return !!w.home;
+  if (DUNGEONS[s.at]) return w.dungeon === s.at && (w.floor ?? 1) === (s.floor ?? 1);
+  return !w.dungeon && w.zone === s.at;
 }

@@ -1,6 +1,7 @@
 // Bridge to src/rpg/* (written by the rpg layer). Uses an eager glob so the UI never hard-fails when a
 // module is missing, and adapts to small naming differences. Everything here has a UI-side fallback.
 import { glyphURL, SLOT_GLYPH } from './glyphs.js';
+import { aimWords } from '../combat/autoTarget.js';
 
 const mods = import.meta.glob('../rpg/*.js', { eager: true });
 const M = name => mods[`../rpg/${name}.js`] || {};
@@ -155,7 +156,7 @@ function norm(d) {
   return {
     id: d.id, name: d.name || d.id, tree: d.tree || d.treeId || 'bone', row: +row || 0, col: +col || 0,
     maxLvl: d.maxLvl ?? d.max ?? d.maxLevel ?? rpg.skills.MAX_SKILL_LVL ?? 20, reqLvl,
-    prereq, desc: d.desc || d.description || '', cost: costF, cd: d.cd ?? d.cooldown ?? 0, synergies: syn,
+    prereq, get desc() { return aimWords(d.desc || d.description || '', d.id); }, cost: costF, cd: d.cd ?? d.cooldown ?? 0, synergies: syn,
     kind, passive: kind === 'passive' || kind === 'aura' || !!d.passive, wep: d.wep || null,
     glyph: d.glyph, raw: d,
   };

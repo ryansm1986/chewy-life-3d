@@ -28,6 +28,9 @@
 //   Diagnostics: PHASES=1 (ms per frame per game phase), FLOOR0=1 (the floor alone first), DIAG=1 (draws per render
 //   call, program switches, scene make-up), ABLATE=1 (render cost with a category hidden), PROF=1 [INCL=re] [CALLERS=fn,…]
 //   (a CPU profile of the 150 window: self time, inclusive time per module, callers).
+//   TARGET=auto (CT-8, docs/CONTROLS.md §13): Settings › Controls › Targeting Auto on the mouse, so the all-round lock runs
+//   every frame, and the rotation casts through G.autoAim.aimFor (the lock, clusters, lines) instead of at the nearest foe;
+//   the rows add the lock's and the aim's own cost per frame ("aim").
 import { chromium } from 'playwright-core';
 import { execFileSync } from 'node:child_process';
 
@@ -38,6 +41,7 @@ const FLOOR = +(process.env.FLOOR || 12), REGION = process.env.REGION || 'bamboo
 const WORLDS = (process.env.WORLDS || 'burrow,region').split(',');
 const HEROES = (process.env.HEROES || (quick ? 'chewy' : 'chewy,moka,poe')).split(',');
 const QS = process.env.QS ? '&' + process.env.QS : '';
+const TARGET = process.env.TARGET || ''; // (auto: CT-8's auto targeting on, see above)
 const LIFE = +(process.env.LIFE || 8), PROF = !!process.env.PROF;
 // RUN=<tier>[:<mods,…>[:<spirit>]]: the zone world as a tier run (docs/ZONES.md §5.1: the T5 Swarming + Teeming + Rally horde check)
 const TIER_RUN = process.env.RUN ? (([t, m, s]) => ({ tier: +t || 0, mods: m ? m.split(',') : [], spirit: +s || 0 }))(process.env.RUN.split(':')) : {};
@@ -89,7 +93,7 @@ async function run(world, hero) {
     const proto = Object.getPrototypeOf(sk), raw = proto.update; const S = window.__skel = { n: 0, ms: 0, bones: 0 };
     S.by = {}; proto.update = function () { const t = performance.now(); raw.call(this); if (window.__perf?.on) { const dt = performance.now() - t; S.n++; S.ms += dt; S.bones += this.bones.length; const k = (this.bones[0]?.name || '?') + '/' + this.bones.length + (this.boneTexture ? '' : ':notex') + (G.world.scene.matrixWorldAutoUpdate === false ? ' [in N8AO re-render]' : ''); const e = S.by[k] ||= [0, 0]; e[0]++; e[1] += dt; } };
   });
-  await page.evaluate(({ world, floor, region, tierRun }) => {
+  await page.evaluate(({ world, floor, region, tierRun, target }) => {
     const G = window.G; G.state.flags.burrowTut = true;
     const P = G.state.player; P.lvl = 30; P.stats = { str: 90, dex: 90, vit: 400, ene: 300 }; P.statPts = 0;
     const tree = { chewy: ['chomp', 'whirl', 'bonestorm', 'blaze', 'fetchstorm', 'woof', 'packcall', 'multi', 'ricochet', 'throw', 'fetchMastery', 'boneMastery', 'dig', 'frenzy', 'howl'],
@@ -100,13 +104,14 @@ async function run(world, hero) {
     for (const id of tree) P.skills[id] = 10;
     G.actions.recompute(); P.life = null; P.zoom = null;
     G.actions.addXp = () => {}; // (no level-up banners in the middle of a measurement)
+    if (target === 'auto') { G.ui?.setSetting?.('targetKbm', 2); G.state.flags.hints = { ...(G.state.flags.hints || {}), autoLock: true }; } // (CT-8: Auto on the mouse)
     if (world === 'region') G.enterRegion(region); else if (world === 'zone') G.enterDungeon({ id: 'bambooDepths', floor: 1, ...tierRun }); else G.enterDungeon(floor); // (zone: a real Bamboo Depths floor, ~140 of its own on top; RUN=5:swarming,teeming,rally makes it a tier run, ~330)
-  }, { world, floor: FLOOR, region: REGION, tierRun: TIER_RUN });
+  }, { world, floor: FLOOR, region: REGION, tierRun: TIER_RUN, target: TARGET });
   await page.waitForFunction(() => window.G?.mode === 'dungeon' && window.G.dungeon?.monsters?.length && !window.G.ui?.iris?.active, null, { timeout: 40000 });
   await page.waitForTimeout(2500);
   if (!gpuName) gpuName = await page.evaluate(() => { try { const gl = window.G.engine.renderer.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); return e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : ''; } catch (e) { return ''; } });
   // ---- in-page harness: horde spawner, the hero's rotation, frame bookkeeping
-  const setup = await page.evaluate(({ life, world, kinds }) => {
+  const setup = await page.evaluate(({ life, world, kinds, target }) => {
     const G = window.G, E = G.engine, D = G.dungeon, P = G.player;
     const BURROW = ['mochi', 'dustbunny', 'kinoko', 'lantern', 'kasa', 'wisp', 'oni', 'tanuki'];
     const REGIONK = ['takenoko', 'kodama', 'kamaitachi', 'kuri', 'kakashi', 'momijiWisp', 'yukiwarashi', 'yukidaruma', 'tsurara', 'kappa', 'heikegani', 'kurage'];
@@ -164,6 +169,13 @@ async function run(world, hero) {
         'emberBreath', 'divebombSwoop', 'starfallLance', 'mightyRoar', 'trueFlight', 'sunfallJump', 'emberBreath', 'gallantCharge', 'bonkDart', 'divebombSwoop'],
     }[P.hero] || ['attack'];
     const BALL = new Set(['blaze', 'fetchstorm', 'multi', 'throw']);
+    // TARGET=auto: the lock (padAim.update, every frame) and every cast's aim (autoAim.aimFor) are timed
+    const AUTO = target === 'auto' && G.autoAim, AIMT = H.aim = { ms: 0, n: 0, picks: 0 };
+    if (AUTO) {
+      const pu = G.padAim.update.bind(G.padAim), af = G.autoAim.aimFor.bind(G.autoAim);
+      G.padAim.update = dt => { const t0 = performance.now(); pu(dt); if (window.__perf?.on) { AIMT.ms += performance.now() - t0; AIMT.n++; } };
+      G.autoAim.aimFor = (id, o) => { const t0 = performance.now(), r = af(id, o); if (window.__perf?.on) { AIMT.ms += performance.now() - t0; AIMT.picks++; } return r; };
+    }
     let ri = 0, nextCast = 0;
     H.cast = () => {
       if (!H.fight || performance.now() < nextCast) return;
@@ -176,7 +188,7 @@ async function run(world, hero) {
       if (P.hero === 'chewy') { const ball = BALL.has(id); if (id !== 'attack' && (G.derived.weaponType === 'ball') !== ball) { G.actions.swapWeapons(); P.setWeapon(G.derived.weaponType); } }
       const t = G.combat.nearest(P.pos, 'ally', 9, e => !e.breakable) || [...H.set].find(m => m.alive);
       H.casts = (H.casts || 0) + 1; H.lastCast = id; H.castFrames = 0;
-      if (t) { P.anim.busy?.() && id !== 'attack' && P.anim.stop(); try { G.skills.tryCast(id, t.pos.clone(), t); } catch (e) { H.castErr = String(e); } }
+      if (t) { P.anim.busy?.() && id !== 'attack' && P.anim.stop(); try { if (AUTO) { const [a, tg] = G.autoAim.aimFor(id, { fallback: t.pos }); G.skills.tryCast(id, a.clone(), tg); } else G.skills.tryCast(id, t.pos.clone(), t); } catch (e) { H.castErr = String(e); } }
       if (id === 'maelstrom' && G.skills.channel?.id === 'maelstrom') { G.skills.channel.toggleHeld = true; H.chanUntil = performance.now() + 1500; }
       if (P.hero === 'shihtzu' && ['ghostPups', 'grandpawsGhost', 'boneWard', 'wayhomeLantern'].includes(id)) H.holdUntil = performance.now() + 800;
     };
@@ -215,10 +227,10 @@ async function run(world, hero) {
     wrap(E.post, 'render', 'render'); wrap(G.world, 'update', 'world'); wrap(G.world.lightPool, 'update', 'lights'); wrap(D._horde, 'sync', 'hordeSync');
     const mem = E.renderer.info.memory;
     return { floorMonsters: D.monsters.length, geo: mem.geometries, tex: mem.textures, isRegion: !!D.isRegion, theme: D.layout.theme, kinds: KINDS.join(',') };
-  }, { life: LIFE, world, kinds: process.env.KINDS || '' });
+  }, { life: LIFE, world, kinds: process.env.KINDS || '', target: TARGET });
 
   const measure = async () => {
-    await page.evaluate(() => { const R = window.__perf; for (const k of ['t', 'w', 'calls', 'tris', 'spawnFrames']) R[k].length = 0; R.ph = {}; window.__horde.spawnLog.length = 0; if (window.__skel) Object.assign(window.__skel, { n: 0, ms: 0, bones: 0, by: {} }); R.on = true; });
+    await page.evaluate(() => { const R = window.__perf; for (const k of ['t', 'w', 'calls', 'tris', 'spawnFrames']) R[k].length = 0; R.ph = {}; window.__horde.spawnLog.length = 0; if (window.__horde.aim) Object.assign(window.__horde.aim, { ms: 0, n: 0, picks: 0 }); if (window.__skel) Object.assign(window.__skel, { n: 0, ms: 0, bones: 0, by: {} }); R.on = true; });
     await page.waitForTimeout(SECS * 1000);
     return page.evaluate(() => {
       const R = window.__perf, H = window.__horde; R.on = false;
@@ -228,6 +240,7 @@ async function run(world, hero) {
         calls: q(c, 0.5), calls95: q(c, 0.95), tris: q(tr, 0.5), geo: mem.geometries, tex: mem.textures,
         hitch: Math.max(0, ...R.spawnFrames), packs: H.spawnLog.length, packMax: Math.max(0, ...H.spawnLog.map(x => x.ms)), packAvg: H.spawnLog.length ? H.spawnLog.reduce((a, x) => a + x.ms / x.n, 0) / H.spawnLog.length : 0,
         alive: window.G.dungeon.monsters.filter(m => m.alive).length, horde: [...H.set].filter(m => m.alive).length, casts: H.casts || 0, err: H.err || H.castErr || null,
+        aim: H.aim?.n ? { ms: +(H.aim.ms / Math.max(1, t.length)).toFixed(3), lockFrames: H.aim.n, picks: H.aim.picks, lock: !!window.G.padAim.lock } : null,
         gld: window.G.player.hero === 'golden' ? { jav: (window.G.skills.gldJav || []).length, big: !!window.G.skills.gldBig, act: window.G.skills.gldW?.kind || null, lift: +(window.G.companion?.whelp?.lift || 0).toFixed(2) } : null,
         stz: window.G.player.hero === 'shihtzu' ? { hexed: window.G.skills.stzHexes?.size || 0, hexMax: H.hexN || 0, allies: (window.G.skills.stzAllies || []).filter(a => a.alive).length, chan: window.G.skills.channel?.id || null } : null,
         skel: window.__skel ? { perFrame: +(window.__skel.n / Math.max(1, t.length)).toFixed(1), ms: +(window.__skel.ms / Math.max(1, t.length)).toFixed(3), bonesPerFrame: +(window.__skel.bones / Math.max(1, t.length)).toFixed(0), by: Object.fromEntries(Object.entries(window.__skel.by || {}).sort((x, y) => y[1][1] - x[1][1]).slice(0, 8).map(([k, [n, ms]]) => [k, `${(n / Math.max(1, t.length)).toFixed(1)}/f ${(ms / Math.max(1, t.length)).toFixed(3)} ms`])) } : null,
@@ -331,7 +344,7 @@ async function run(world, hero) {
 
 function printRow(r) {
   const f = x => x.toFixed(2);
-  console.log(`${(r.world + '/' + r.hero).padEnd(14)} N=${r.N} (alive ${r.alive}, horde ${r.horde})  cpu p50 ${f(r.p50)}  p95 ${f(r.p95)}  p99 ${f(r.p99)}  max ${r.max.toFixed(1)} ms | rAF p50 ${f(r.w50)} p95 ${f(r.w95)} | draws ${r.calls} (p95 ${r.calls95})  tris ${(r.tris / 1000).toFixed(0)}k | geo ${r.geo} tex ${r.tex} | spawn ${r.N === 150 ? '150' : '+100'} in ${r.spawnMs.toFixed(1)} ms, packs ${r.packs} (worst ${r.packMax.toFixed(1)} ms, ${r.packAvg.toFixed(2)} ms/monster), worst spawn frame ${r.hitch.toFixed(1)} ms | casts ${r.casts}${r.inst ? ` | batches ${r.inst.batches} (${r.inst.instances} inst, ${r.inst.models} models)` : ''}${r.slept != null ? `, asleep ${r.slept}` : ''}${r.gridcheck ? ` | gridcheck ${r.gridcheck.bad}/${r.gridcheck.n} bad ${JSON.stringify(r.gridcheck.kinds)}` : ''}${r.crowdcheck ? ` | crowdcheck ${r.crowdcheck.bad}/${r.crowdcheck.n} bad` : ''}${r.stz ? ` | shih tzu: hexed ${r.stz.hexed} (max ${r.stz.hexMax}), ghosts ${r.stz.allies}${r.stz.chan ? ', ' + r.stz.chan : ''}` : ''}${r.err ? ' | ERR ' + r.err.slice(0, 160) : ''}`);
+  console.log(`${(r.world + '/' + r.hero).padEnd(14)} N=${r.N} (alive ${r.alive}, horde ${r.horde})  cpu p50 ${f(r.p50)}  p95 ${f(r.p95)}  p99 ${f(r.p99)}  max ${r.max.toFixed(1)} ms | rAF p50 ${f(r.w50)} p95 ${f(r.w95)} | draws ${r.calls} (p95 ${r.calls95})  tris ${(r.tris / 1000).toFixed(0)}k | geo ${r.geo} tex ${r.tex} | spawn ${r.N === 150 ? '150' : '+100'} in ${r.spawnMs.toFixed(1)} ms, packs ${r.packs} (worst ${r.packMax.toFixed(1)} ms, ${r.packAvg.toFixed(2)} ms/monster), worst spawn frame ${r.hitch.toFixed(1)} ms | casts ${r.casts}${r.aim ? ` | aim ${r.aim.ms} ms/frame (${r.aim.picks} aimFor, lock ${r.aim.lock ? 'on' : 'off'})` : ''}${r.inst ? ` | batches ${r.inst.batches} (${r.inst.instances} inst, ${r.inst.models} models)` : ''}${r.slept != null ? `, asleep ${r.slept}` : ''}${r.gridcheck ? ` | gridcheck ${r.gridcheck.bad}/${r.gridcheck.n} bad ${JSON.stringify(r.gridcheck.kinds)}` : ''}${r.crowdcheck ? ` | crowdcheck ${r.crowdcheck.bad}/${r.crowdcheck.n} bad` : ''}${r.stz ? ` | shih tzu: hexed ${r.stz.hexed} (max ${r.stz.hexMax}), ghosts ${r.stz.allies}${r.stz.chan ? ', ' + r.stz.chan : ''}` : ''}${r.err ? ' | ERR ' + r.err.slice(0, 160) : ''}`);
 }
 
 function printProfile(profile, label) {

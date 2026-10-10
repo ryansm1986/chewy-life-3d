@@ -279,6 +279,13 @@ export const SFX = {
       form: [[0, [950, 2300, 3200]], [0.28, [800, 2000, 3000]]], amp: [[0, 0], [0.05, 1], [0.2, 0.8], [0.3, 0]], q: [7, 9, 9],
       breath: 0.1, body: 0.6, bodyF: 1400, v: 0.3, rev: 0.2 });
   } },
+  // a small dog's warning rumble (Shadow stopping short of a pack: actors/shadowLead.js): low, rough, a little rise at the end
+  growl: { vary: 0.06, max: 1, gap: 0.3, fn(s) {
+    s.voice({ f: [[0, 150], [0.12, 172], [0.42, 162], [0.62, 188], [0.78, 150]], vib: [9, 14, 0.2],
+      form: [[0, [420, 980, 2300]], [0.4, [470, 1050, 2400]], [0.78, [400, 920, 2200]]],
+      amp: [[0, 0], [0.06, 0.8], [0.4, 1], [0.66, 0.85], [0.8, 0]], q: [5, 7, 9], breath: 0.3, rough: 0.6, roughF: 34, body: 0.5, v: 0.5, rev: 0.1 });
+    s.noise({ ft: 'lowpass', f: 380, a: 0.05, d: 0.6, v: 0.18, color: 'brown' });
+  } },
   dig: { vary: 0.1, max: 2, fn(s) {
     for (let i = 0; i < 4; i++) {
       const at = i * 0.12 + Math.random() * 0.02;
@@ -650,7 +657,7 @@ const TRIM = {
   footstep_grass: 3.0, footstep_stone: 2.2, footstep_wood: 1.9, // (the game plays steps at vol 0.35)
   door_knock: 0.7, yawn: 0.25,
   swing: 2.6, swing_heavy: 1.45, throw: 3.3, dash: 3.3, sprint_start: 1.6, hit_crit: 1.15, player_hurt: 0.6, monster_die: 1.5, ghost_wail: 0.7, boss_roar: 0.55, player_die: 0.5,
-  bark: 0.9, bark_small: 0.4, howl: 0.37, whine: 0.3, dig: 2,
+  bark: 0.9, bark_small: 0.4, howl: 0.37, whine: 0.3, dig: 2, growl: 0.55,
   fire_whoosh: 1.15, stink: 0.75, heal: 1.4, potion_drink: 1.6, door_open: 1.5, portal: 1.2, build_place: 1.1, bulldoze: 0.95,
   chest_open: 1.7, waypoint: 1.2, splash: 1.8, bird_chirp: 1.6, cat_meow: 0.3,
   // Moka (calibrated with the ?test=audio render check against hit_flesh / bark / zap)
@@ -675,7 +682,7 @@ export const SFX_GROUPS = {
   Pickups: ['pickup_item', 'pickup_magic', 'pickup_gem', 'pickup_rare', 'pickup_unique', 'pickup_gold', 'drop_item'],
   Footsteps: ['footstep_grass', 'footstep_stone', 'footstep_wood'],
   Combat: ['swing', 'swing_heavy', 'throw', 'ball_bounce', 'hit_flesh', 'hit_crit', 'monster_hit', 'monster_die', 'slime_bounce', 'ghost_wail', 'boss_roar', 'player_hurt', 'player_die'],
-  Dogs: ['bark', 'bark_small', 'howl', 'whine', 'dig'],
+  Dogs: ['bark', 'bark_small', 'howl', 'whine', 'growl', 'dig'],
   Skills: ['explosion_small', 'fire_whoosh', 'frost', 'zap', 'stink', 'heal', 'buff', 'dash', 'sprint_start'],
   World: ['potion_drink', 'door_open', 'door_knock', 'portal', 'build_place', 'build_complete', 'bulldoze', 'chest_open', 'waypoint', 'splash'],
   Critters: ['bird_chirp', 'cat_meow', 'yawn', 'villager_chatter'],

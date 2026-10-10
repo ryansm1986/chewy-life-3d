@@ -85,6 +85,8 @@ export class PadNav {
       else { const n = this.step(cands, A.nav); if (n) { this.focus(n, cands); this.ui.sfx('hover'); } else this.bump(); }
     }
     if (A.padHit('LB') || A.padHit('RB')) { this.tab(S, A.padHit('RB') ? 1 : -1); A.padConsume('LB'); A.padConsume('RB'); }
+    // the K panel: LT / RT step the Charge drawer through the tree's skills (R-16; the focus stays where it is)
+    if (S.top?.name === 'skills' && (A.padHit('LT') || A.padHit('RT'))) { const R = A.padHit('RT'); A.padConsume('LT'); A.padConsume('RT'); S.top.chg.cycle(R ? 1 : -1); }
     if (A.padHit('A') && this.cur) { A.padConsume('A'); this.armed = null; this.press(this.cur); }
     if (A.padHit('X') && this.cur) { A.padConsume('X'); h?.x?.(this.cur, this); }
     if (A.padHit('Y') && this.cur) { A.padConsume('Y'); this.armed = null; h?.y?.(this.cur, this); }
@@ -221,6 +223,7 @@ export class PadNav {
     if (root && [...root.querySelectorAll('.tabs .tab, .ctl-tabs button')].filter(visible).length > 1) list.push(['LB+RB', 'Tabs']);
     if (e?.matches('input[type=range]')) list.push(['DLeft+DRight', 'Adjust']);
     if (S.top?.name === 'map') list.push(['LT+RT', 'Zoom']);
+    if (S.top?.name === 'skills' && !S.top.chg?.el.hidden) list.push(['LT+RT', 'Charge skill']);
     list.push(['B', this.ui.drag?.held ? 'Cancel' : S.key === 'pop' ? 'Close' : 'Back']);
     const sig = list.map(x => x.join(':')).join('|') + Actions.padStyle;
     if (sig !== this._hsig) {
@@ -288,8 +291,8 @@ const HANDLERS = [
     match: '.p-skills .node',
     a(e, nav) { nav.ui.panels.skills.learn(e.dataset.id, e); },
     y(e, nav) { nav.ui.panels.skills.assignPopover(e.dataset.id, e); },
-    x(e, nav) { const S = nav.ui.panels.skills; if (e.querySelector('.nd-chg')) { S.chg.show(e.dataset.id); S._treeSig = null; S.render(); nav.ui.sfx('tab'); } },
-    label(e) { const l = !e.classList.contains('maxed'); return { a: l ? 'Learn' : '', y: e.classList.contains('passive') ? '' : 'Assign', x: e.querySelector('.nd-chg') ? 'Charge perks' : '' }; },
+    x(e, nav) { const S = nav.ui.panels.skills; if (e.querySelector('.nd-chg.on')) S.chg.choose(e.dataset.id); }, // (choose: the node's tooltip steps aside until the focus moves, so the drawer shows)
+    label(e) { const l = !e.classList.contains('maxed'); return { a: l ? 'Learn' : '', y: e.classList.contains('passive') ? '' : 'Assign', x: e.querySelector('.nd-chg.on') ? 'Charge perks' : '' }; },
   },
   { // shops: A buys (or sells one), X sells them all (pantry goods)
     match: '.sh-item',
@@ -302,6 +305,7 @@ const HANDLERS = [
     label(e, nav) { const p = nav.ui.panels.inventory; return { a: 'Choose', y: p?.view === 'pantry' && e.closest('.pv, .p-inv') ? 'Eat' : '' }; },
   },
   { match: '.chg-pk', label() { return { a: 'Learn' }; } },
+  { match: '.chg-sk', label(e) { return { a: e.classList.contains('sel') ? '' : 'Show its perks' }; } }, // (the Charge drawer's skill strip, R-16)
   { match: '.ck-row', label() { return { a: 'Choose' }; } },
   { match: '.dr', a() {}, label() { return { a: '' }; } }, // (a stat row: its tooltip only)
   { // the Spirit Lantern (ui/lantern.js): A adds / removes a card or sets off, X "Surprise me", Y "Recommended"

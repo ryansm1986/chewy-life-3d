@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
-const ALL = ['gen-fuzz', 's1-roundtrip', 's2-combat', 's3-bosses', 's4-death', 's5-village-save', 's7-inventory', 's8-dialogue', 's9-input', 's10-misc', 's11-story-title', 's12-heroes', 's13-regions', 's14-village-plan', 's15-homestead', 's16-tutorials', 's17-housing', 's18-furniture-sources', 's19-charge', 's20-poe', 's21-zones', 's22-zone-dungeons', 's23-zone-villages', 's24-render-health', 's25-gamepad', 's26-deck', 's27-touch', 's28-shihtzu', 's29-golden', 's30-tiers', 's31-expeditions', 's32-peaceful', 's33-scavenge', 's34-guild', 's35-debug', 's36-autosave', 's37-cozy-story', 'profile-horde'];
+const ALL = ['gen-fuzz', 's1-roundtrip', 's2-combat', 's3-bosses', 's4-death', 's5-village-save', 's7-inventory', 's8-dialogue', 's9-input', 's10-misc', 's11-story-title', 's12-heroes', 's13-regions', 's14-village-plan', 's15-homestead', 's16-tutorials', 's17-housing', 's18-furniture-sources', 's19-charge', 's20-poe', 's21-zones', 's22-zone-dungeons', 's23-zone-villages', 's24-render-health', 's25-gamepad', 's26-deck', 's27-touch', 's28-shihtzu', 's29-golden', 's30-tiers', 's31-expeditions', 's32-peaceful', 's33-scavenge', 's34-guild', 's35-debug', 's36-autosave', 's37-cozy-story', 's38-autotarget', 's39-shadow-leads', 'profile-horde'];
 // s31-expeditions: the cozy path's phase A (docs/COZY.md): the cozy route end to end with no fighting (Takemori saved by
 // Moka alone), away heroes, the hold rule, time away, the pad and the phone; shots in tools/qa/tmp/s31-expeditions/.
 // s33-scavenge: scavenging, the cozy path's phase C (docs/COZY.md §7): the nodes at home and in the zones, a gather, Shadow's
@@ -25,6 +25,12 @@ const ALL = ['gen-fuzz', 's1-roundtrip', 's2-combat', 's3-bosses', 's4-death', '
 // a–c, ~5–10 min); shots in tools/qa/tmp/s37-cozy-story/.
 // s37-full (opt-in: `run-all s37-full`, not in the default list): s37 with S37_FULL=1, which adds part d, the rest of the
 // story from part a's save: the other three zones' reliefs and dungeons by crews with no fights (~1.5 h).
+// s38-autotarget: auto targeting (docs/CONTROLS.md §13, ROADMAP CT-8): Settings › Controls › Targeting, every hero's skills
+// hitting all round with no aim, walk up and flee on the pad and a phone, the picks, the mouse's Assist, the AoE marker; shots
+// in tools/qa/tmp/ct8/ (all five heroes, ~8 min; S38_ONLY=a,b,… S38_HEROES=chewy,moka).
+// s39-shadow-leads: Shadow leads the way (ROADMAP R-17): a guide's and a reach step's lead in the village (sprint, the hero
+// stopping or far behind, the turns, the trail, the nose first), the setting, L / the tracker / the Journal, the pauses, no
+// path, a zone, a dungeon floor's packs (stops short, fights, picks up), Foosy's whelp, the perf; shots in tools/qa/tmp/r17/.
 // s26-deck: the Steam Deck profile (CONTROLS §10). Its full panel sweep (tools/qa/deck-ui.mjs) and the frame times
 // (tools/qa/deck-perf.mjs) run on their own.
 // s24-render-health builds and serves its own production bundle (the NaN probe, flash-free sessions, menu first opens:

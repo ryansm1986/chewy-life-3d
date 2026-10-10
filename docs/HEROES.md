@@ -159,14 +159,34 @@ Return Stroke…; docs/CHARGE.md §7 is generated from `src/rpg/charge.js`). Ite
 Katana**, the Rib Sabre the Rib Wakizashi, the Shark Tooth Saber the Shark Tooth Tachi (ids unchanged; older saves'
 items are renamed on load by `renameLegacyItem`, items.js / actions.js `normalizeHeroes`).
 
-**The Bone Katana** (`src/actors/charKit.js` `katanaGeo`): a toy-chunky, gently curved bone blade (as wide and thick as
-the old bone sword, a soft lens section, a rounded tip), a round gold tsuba with a paw print cut through it, a
-red-wrapped grip over cream diamonds, a bone-knob pommel. One shape for every sword item, tinted by the item's icon
-colours [blade, wrap, accent] (the tsuba and rings always gold); the geometry is cached per tint (`player.js`
-`katanaFor`), and the loot drop is the same katana (`groundLoot.js`). Its material (`katanaMaterial`) keeps a bone-white
-blade bone-white under the warm grade and the fog: on the bright, unsaturated parts it holds the albedo's own hue, never
-brighter than the albedo (an overexposed cream blooms pink) and never darker than 0.78 of it, so it reads at the far
-camera at rest and mid-swing; tinted blades keep their hue and stay light.
+**The Bone Katana** (`src/actors/charKit.js` `katanaGeo`): since R-15 (the owner's pick 2026-10-09: "Could the katana
+have a bone shape to it?") the blade is **one long, gently curved bone**: a soft lens section with the white edge kept,
+narrow in the middle and flaring into a dog-bone knob pair at each end (just above the habaki and at the tip; `boneBladeGeo`
+look `b`, swept by `sweepGeo`, the knob pairs by `boneEnd` with a bridge lobe that keeps the notch clean). It keeps the
+katana: the sori, a round gold tsuba with a paw print cut through it, a red-wrapped grip over cream diamonds, a bone-knob
+pommel, the draw from the saya. The grip origin, `KATANA.leftGrip`, the pommel and the length (the tip at ~0.68 m) are as
+before, so the poses, the two-handed IK, the saya mount and the trails line up unchanged.
+- **One shape for every sword item**, tinted by the item's icon colours [blade, wrap, accent] (the tsuba and rings always
+  gold); the geometry is cached per tint and look (`player.js` `katanaFor`); the loot drop is the same katana
+  (`groundLoot.js`), and so are Sakura Storm's spectral blades (`samuraiProps.js spectralBladeGeo`). Moonlit Blades' blades
+  of moonlight are the classic pointed blade (`spectralBladeGeo('classic')`), so they still fall point-first.
+- **The icons** (`rpg/samuraiIcons.js katanaShape`, `drawKatanaItem`): every sword base's icon is the bone katana in its
+  tint (the older per-base shapes went with R-15), the late tiers with a flourish (`icons.js SWORD_FX`: the Moonbone,
+  Kaiju and Starbone glow, the Starbone's stars, the Dragonbone's gem); the Bone Blade skill art draws the same bone
+  blade, and Moonlit Blades' the pointed one.
+- **The noto clip**: the bone blade is 0.626 m from the saya mouth to its tip against a 0.553 m scabbard, and its knobs
+  are twice the saya's width, so while the noto slides it home the paw katana's blade is clipped inside a box down the
+  saya from its mouth (`player.js sheathClip`, `charKit.js katanaSheathMaterial`: five clipping planes, their
+  intersection clipped; the renderer's local clipping is switched on at the first noto).
+- **The other looks** stay for the QA: `?katana=a` (bone tip), `c` (chew-toy bone), `classic` (the pre-R-15 blade), or
+  the debug menu's Heroes › *Katana look* live (docs/DEBUG.md). Shots: `node tools/qa/katana-shots.mjs` (the studio page
+  `?test=katana`; the pick sheet and `--layout final`).
+- **Its material** (`katanaMaterial`) keeps a bone-white blade bone-white under the warm grade and the fog: on the bright,
+  unsaturated parts it holds the albedo's own hue, never brighter than the albedo (an overexposed cream blooms pink) and
+  never darker than 0.78 of it, so it reads at the far camera at rest and mid-swing; tinted blades keep their hue and stay
+  light.
+- **Triangles**: 7.0k in the paw, 4.0k for the sheathed hilt (the tsuba's curve segments halved in R-15, 14 from 28: the
+  bone blade was 9.1k and the hilt 6.0k with the old tsuba; the paw cut-out reads the same at every camera).
 
 **The model in the game**: the samurai Chewy (`public/rigs/chewy_samurai.*`, 41.1k triangles, the 37-bone hero contract;
 its face rig is chewy_b's) is the default Chewy: `HERO_MODELS.chewySamurai`, `chewyModel()` 'samurai'.

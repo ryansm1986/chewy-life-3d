@@ -1261,6 +1261,12 @@ hr('ZONES: DUNGEON DEFS, SEEDS, STATE, QUEST STEPS');
   ok(dst({ type: 'kill', n: 3 }) === JSON.stringify({ dungeon: 'burrow', zone: null }) && dst({ type: 'floor', n: 5 }) === JSON.stringify({ dungeon: 'burrow', zone: null, floor: 5 }) && Q.destOf({ type: 'collect', mat: 'wood' }) === null && Q.destOf({ type: 'collect', mat: 'mochi' }).dungeon === 'burrow', 'steps: destOf keeps the old Burrow targets (kills, floors, bosses, Mochi Jelly)');
   const dF = Q.destOf({ type: 'dungeonFloor', dungeon: 'mapleRoots', n: 2 }), dT = Q.destOf({ type: 'tier', dungeon: 'onsenCaverns', n: 3 }), dV = Q.destOf({ type: 'villageSaved', zone: 'tidepool' }), dK = Q.destOf({ type: 'kill', zone: 'bamboo' });
   ok(dF.dungeon === 'mapleRoots' && dF.zone === 'maple' && dF.floor === 2 && dT.floor === 2 && dT.boss && dV.zone === 'tidepool' && dV.village && dK.zone === 'bamboo' && !dK.dungeon, 'steps: destOf points zone steps at the zone, its gate, a floor or its boss');
+  // the reach step (ROADMAP R-17: "Follow Shadow to …", polled by Story.reachTick): where it points and when it's here
+  const rH = Q.destOf({ type: 'reach', at: 'home', x: 1, z: 2 }), rZ = Q.destOf({ type: 'reach', at: 'bamboo', x: 1, z: 2 }), rD = Q.destOf({ type: 'reach', at: 'bambooDepths', floor: 2, x: 1, z: 2 });
+  ok(rH.home && rH.reach && rZ.zone === 'bamboo' && rZ.reach && !rZ.dungeon && rD.dungeon === 'bambooDepths' && rD.zone === 'bamboo' && rD.floor === 2 && rD.reach && Q.REACH_R > 2, 'steps: a reach step points at its spot at home, in a zone or on a dungeon floor');
+  const here = (s, w) => Q.reachIsHere({ type: 'reach', x: 0, z: 0, ...s }, w);
+  ok(here({ at: 'home' }, { home: true }) && !here({ at: 'home' }, { zone: 'bamboo' }) && here({ at: 'bamboo' }, { zone: 'bamboo', dungeon: null }) && !here({ at: 'bamboo' }, { zone: 'bamboo', dungeon: 'bambooDepths', floor: 1 })
+    && here({ at: 'bambooDepths', floor: 2 }, { zone: 'bamboo', dungeon: 'bambooDepths', floor: 2 }) && !here({ at: 'bambooDepths', floor: 2 }, { zone: 'bamboo', dungeon: 'bambooDepths', floor: 1 }) && !Q.reachIsHere({ type: 'kill' }, { home: true }), 'steps: a reach step is "here" only in its own world (home, the zone outdoors, that floor)');
 }
 
 hr('HORDES: THE CROWD GRID (ROADMAP Z-B3)');
@@ -1372,6 +1378,8 @@ hr('ZONE VILLAGES: DATA, QUESTS, THE DUNGEON PROVIDER');
   ok(ids.every(id => { const r = ZQ.ZONE_QUESTS[id].reward; return r.coins > 0 && r.xp > 0 && r.hearts > 0 && (!r.furniture || FURNITURE[r.furniture]) && Object.keys(r.pantry || {}).every(k => PANTRY[k]); }), 'quests: rewards are coins, xp, friendship, and real furniture / pantry goods');
   ok(ids.every(id => (ZQ.ZONE_QUESTS[id].prereq || []).every(p => ZQ.ZONE_QUESTS[p])) && ids.every(id => ZQ.ZONE_QUESTS[id].steps.every(s => s.type !== 'find' || ZQ.QUEST_ITEMS[s.item]) && ZQ.ZONE_QUESTS[id].steps.every(s => s.type !== 'rescue' || VD.ZONE_NPCS[s.npc])), 'quests: prereqs, quest items and rescued villagers all exist');
   ok(ids.every(id => ZQ.ZONE_QUESTS[id].steps.every(s => Q.destOf(s) !== undefined)), 'quests: every step has a pointer destination rule (questSteps.destOf)');
+  { const all = ZQ.ZONE_QUEST_IDS, led = all.filter(id => ZQ.ZONE_QUESTS[id].steps.some(s => s.lead)); // (ROADMAP R-17: the text says Shadow leads, the step says lead)
+    ok(led.length === 4 && led.every(id => ZQ.ZONE_QUESTS[id].steps[0].type === 'rescue' && /Shadow (already )?has (her|his) scent: follow him!/.test(ZQ.ZONE_QUESTS[id].desc)) && all.every(id => led.includes(id) || !/Shadow has|follow him/i.test(ZQ.ZONE_QUESTS[id].desc)), 'quests: the four rescues say Shadow has the scent, and only they lead (lead: true)'); }
   // ---- offers (only once the village is saved; prereqs gate the later ones)
   const st = Z.normalizeZones({ quests: { active: [], done: [] } });
   ok(ZQ.offersFor(st, 'tk_sasa', false).length === 0, 'quests: nothing is offered while the village is besieged');
@@ -1690,6 +1698,76 @@ hr('CONTROLS: THE STEAM DECK PROFILE (docs/CONTROLS.md §10, core/deck.js)');
   ok(D.pixelRatioFor(2) === 1.5 && D.pixelRatioFor(1) === 1 && D.pixelRatioFor(0) === 1 && D.pixelRatioFor(3) === 0.85 && D.pixelRatioFor(4) === 1, 'deck: the pixel ratio (High up to 1.5, Medium and Low 1, the Deck 0.85, Mobile 1)');
   globalThis.devicePixelRatio = dpr0;
   ok(!D.deckLike() && !D.mobileLike() && D.FPS_CAPS.join() === '0,60,40,30' && D.PRESET_NAMES.join() === 'Low,Medium,High,Deck,Mobile' && D.DECK.uiScale === 1.15 && D.DECK.shadowMap <= 2048 && D.MOBILE.pixelRatio === 1 && D.MOBILE.shadowMap === 1024 && D.MOBILE.particles === 0.5 && D.liteOf(4) === D.MOBILE && D.liteOf(3) === D.DECK && D.liteOf(2) === null && D.MOBILE_TEX === 1024 && D.capTexture(null, 1024) === null, 'deck: no screen is not a Deck or a phone; the frame caps, the preset names, the Deck and Mobile numbers');
+}
+
+hr('CONTROLS: AUTO TARGETING (docs/CONTROLS.md §13, combat/autoTarget.js)');
+{
+  const AT = await import('../src/combat/autoTarget.js');
+  const { scoreFoe: S, bestCluster, bestLine, bestCone, aimSpec, AIM, AIM_KINDS, TARGETING: TG } = AT;
+  // the lock's score (lower wins)
+  ok(S({ d: 3 }) < S({ d: 5 }) && S({ d: 4, cos: 1 }) < S({ d: 4, cos: -1 }) && S({ d: 4, cos: -1 }) < S({ d: 4.6, cos: 1 }), 'autotarget: nearer wins; the facing only breaks ties (a foe behind at 4 m beats one ahead at 4.6 m)');
+  ok(S({ d: 5, lock: true }) < S({ d: 4.2 }) && S({ d: 7, lock: true }) > S({ d: 3 }), 'autotarget: sticky: the current lock holds against a slightly nearer foe, not a much nearer one');
+  ok(S({ d: 2.6, threat: true }) < S({ d: 2 }), 'autotarget: a foe hitting you outranks a slightly nearer idle one');
+  ok(S({ d: 4, elite: true }) < S({ d: 3.7 }) && S({ d: 2, threat: true }) < S({ d: 4, elite: true }) && S({ d: 2.5 }) < S({ d: 4, elite: true }), 'autotarget: elites and bosses get a small bias only: an add hitting you at 2 m (or idle at 2.5 m) beats a boss at 4 m');
+  ok(S({ d: 2, warded: true }) > S({ d: 5 }) && S({ d: 3, sight: false }) > S({ d: 5 }) && S({ d: 3, sight: true }) === S({ d: 3 }), 'autotarget: a warded captain and a foe behind a wall score worse than an open foe further off');
+  // clusters: the big group over the lone foe (even the lock), the range, the members' middle
+  const lone = { x: 3, z: 0, r: 0.4, w: AT.foeWeight(true, false, false) }, grp = [0, 1, 2, 3, 4].map(i => ({ x: 8 + Math.cos(i * 1.3) * 0.9, z: 4 + Math.sin(i * 1.3) * 0.9, r: 0.4, w: 1 }));
+  const c1 = bestCluster([lone, ...grp], 2.5, { ox: 0, oz: 0, range: 14, lock: lone });
+  ok(c1 && c1.n === 5 && Math.hypot(c1.x - 8, c1.z - 4) < 1.2, `autotarget: a ground skill lands on the group of 5, not the lone locked foe (${c1 && [c1.x.toFixed(2), c1.z.toFixed(2), c1.n]})`);
+  const far = grp.map(q => ({ ...q, x: q.x + 4.5 })), c2 = bestCluster(far, 2.5, { ox: 0, oz: 0, range: 12 }); // (the group 13 m off, a 12 m skill)
+  ok(c2 && Math.hypot(c2.x, c2.z) <= 12 + 1e-6 && c2.n >= 3, 'autotarget: the cluster centre stays within the skill\'s range (on its edge, still covering most of a group just past it)');
+  const row = [{ x: 5, z: -1.8, r: 0.3 }, { x: 5, z: 0, r: 0.3 }, { x: 5, z: 1.8, r: 0.3 }], c3 = bestCluster(row, 2.2, { ox: 0, oz: 0, range: 12 });
+  ok(c3 && c3.n === 3 && Math.abs(c3.z) < 0.3, 'autotarget: the centre is nudged to the middle of its members (a row of 3 all inside)');
+  const two = [{ x: 4, z: 0, r: 0.3 }, { x: 4.6, z: 0.4, r: 0.3 }, { x: -4, z: 0, r: 0.3, w: AT.foeWeight(true) }, { x: -4.6, z: 0.4, r: 0.3 }], c4 = bestCluster(two, 1.5, { ox: 0, oz: 0, range: 10 });
+  ok(c4 && c4.x < 0, 'autotarget: between two equal pairs, the one with the lock');
+  const c5 = bestCluster([...grp, lone], 2.5, { ox: 0, oz: 0, range: 14, near: { x: 3.4, z: 0.2, r: 1.5 } });
+  ok(c5 && Math.hypot(c5.x - 3.4, c5.z - 0.2) <= 1.5 + 1e-6 && c5.n === 1, "autotarget: Assist's snap: the cluster within 1.5 m of the cursor, not the bigger group elsewhere");
+  ok(bestCluster([], 2, {}) === null && bestLine([], {}) === null && bestCone([], {}) === null, 'autotarget: no foes, no pick');
+  // lines and cones
+  const east = [3, 5, 7, 9].map(x => ({ x, z: 0.2, r: 0.3 })), north = [{ x: 0, z: 4, r: 0.3 }, { x: 0.2, z: 6, r: 0.3 }];
+  const l1 = bestLine([...north, ...east], { ox: 0, oz: 0, length: 12, width: 1 });
+  ok(l1 && l1.n === 4 && l1.dx > 0.95, 'autotarget: a line goes through the row of 4, not the pair');
+  const near2 = [{ x: 0, z: 3, r: 0.3 }, { x: 0.2, z: 3.8, r: 0.3 }], l2 = bestLine([...near2, ...east], { ox: 0, oz: 0, length: 4, width: 1 });
+  ok(l2 && l2.n === 2 && l2.dz > 0.9, 'autotarget: a short line only counts what it reaches (the close pair north, not the long row east)');
+  const fan = [{ x: 4, z: 1, r: 0.3 }, { x: 4, z: -1, r: 0.3 }, { x: 5, z: 0, r: 0.3 }, { x: -4, z: 0, r: 0.3 }], k1 = bestCone(fan, { ox: 0, oz: 0, range: 8, half: 0.5 });
+  ok(k1 && k1.n === 3 && k1.dx > 0.9, 'autotarget: a fan covers the three ahead, not the one behind');
+  // the aim table: every active skill of every hero, a known kind, finite numbers
+  const act = SKILL_IDS.filter(id => !['passive', 'aura'].includes(SKILLS[id].kind));
+  const miss = act.filter(id => !AIM[id] || !AIM_KINDS.includes(AIM[id].kind)), extra = Object.keys(AIM).filter(id => !SKILLS[id]);
+  ok(!miss.length && !extra.length, `autotarget: the aim table covers every active skill (${act.length}) with a known kind${miss.length ? '; missing ' + miss.join(',') : ''}${extra.length ? '; unknown ' + extra.join(',') : ''}`);
+  const bad = act.filter(id => { const d = SKILLS[id], s = aimSpec(id, { params: d.params(5, { weaponType: d.wep, lifeMax: 100, synergy: {} }) }); return !(s.range > 0 && s.radius > 0 && s.width > 0 && s.half > 0) || (s.kind === 'dash' && !s.idle); });
+  ok(!bad.length, `autotarget: every skill's aim resolves to finite ranges, radii and widths; every dash has its idle form${bad.length ? ': ' + bad.join(',') : ''}`);
+  const atk = w => aimSpec('attack', skillRuntime('attack', { player: { skills: {} } }, { weaponType: w })).kind;
+  ok(atk('sword') === 'melee' && atk('flail') === 'melee' && atk('lance') === 'melee' && atk('fuma') === 'melee' && atk('ball') === 'target' && atk('staff') === 'target', 'autotarget: the basic attack: melee with a katana, flail, lance or fūma; a target with the ball or the staff');
+  ok(['dig', 'sunfallJump', 'heaviestSigh'].every(id => AIM[id].kind === 'leap') && ['zoom', 'puddleHop', 'afterimageDash', 'gallantCharge', 'substitution', 'caltropFlip'].every(id => AIM[id].kind === 'dash'), 'autotarget: attack-leaps always go at the cluster; the movement dashes are escape-first');
+  ok(['meteor', 'fetchstorm', 'pawRune', 'whirlpool', 'starfallLance', 'grumbleCloud', 'shurikenRain'].every(id => AIM[id].kind === 'ground') && ['greatWave', 'tugOfWoe', 'smokeDragon', 'trueFlight'].every(id => AIM[id].kind === 'line') && ['multi', 'feathers', 'kunaiFan', 'tailwagVolley'].every(id => AIM[id].kind === 'cone'), 'autotarget: the ground AoEs, the lines and the fans are classed as such');
+  // the setting: per device, its defaults and the migration
+  ok(AT.targetingOf({}, 'kbm') === TG.ASSIST && AT.targetingOf({}, 'pad') === TG.AUTO && AT.targetingOf({}, 'touch') === TG.AUTO, 'autotarget: the defaults: Assist with the mouse, Auto on the pad and on touch');
+  ok(AT.targetingOf({ touchAim: 1 }, 'touch') === TG.OFF && AT.targetingOf({ touchAim: 0 }, 'touch') === TG.AUTO && AT.targetingOf({ aimAssist: 0 }, 'pad') === TG.OFF && AT.targetingOf({ aimAssist: 0.7 }, 'pad') === TG.AUTO, "autotarget: the migration: the old touch Drag is Off, its Auto Auto; Aim assist 0 makes the pad Off");
+  ok(AT.targetingOf({ targetTouch: 1, touchAim: 1 }, 'touch') === TG.ASSIST && AT.targetingOf({ targetKbm: 2 }, 'kbm') === TG.AUTO && AT.targetingOf({ targetPad: 0 }, 'pad') === TG.OFF, 'autotarget: a saved choice wins over the old settings');
+  const mg = AT.migrateTargeting({ targetPad: 1, touchAim: 1 });
+  ok(mg.targetPad === undefined && mg.targetTouch === TG.OFF && mg.targetKbm === TG.ASSIST, 'autotarget: migrateTargeting fills only the missing keys');
+  ok([0, 1, 2].every(v => ['kbm', 'pad', 'touch'].every(d => AT.targetingHint(d, v).length > 20)), 'autotarget: every device and choice has its line under the Targeting row');
+  // the words (checkpoint 2): a skill's "cursor" in the words of the device and its Targeting
+  const W = (id, dev, mode, o = {}) => AT.aimWords(SKILLS[id]?.desc || o.text, id, { dev, mode, ...o });
+  ok(W('dig', 'kbm', TG.ASSIST) === SKILLS.dig.desc && W('dig', 'kbm', TG.OFF) === SKILLS.dig.desc, 'autotarget words: the mouse in Assist or Off keeps "the cursor"');
+  ok(/toward the biggest group/.test(W('dig', 'pad', TG.AUTO)) && /toward the biggest group/.test(W('dig', 'kbm', TG.AUTO)) && /after the biggest group/.test(W('moonbeam', 'touch', TG.AUTO)), 'autotarget words: in Auto a leap and a ground skill go at "the biggest group"');
+  ok(/away from your target/.test(W('substitution', 'pad', TG.AUTO)) && /where you're heading/.test(W('puddleHop', 'touch', TG.AUTO)), "autotarget words: a dash in Auto goes where you're heading (Substitution: or away from your target)");
+  ok(/your aim/.test(W('dig', 'pad', TG.ASSIST)) && /your aim/.test(W('substitution', 'touch', TG.OFF)), 'autotarget words: the pad and touch in Assist or Off say "your aim"');
+  ok(AT.aimWords('The spin-out drifts after your cursor at 2.5 m/s.', 'whirlpool', { dev: 'pad', mode: TG.AUTO, kind: 'target' }) === 'The spin-out drifts after your target at 2.5 m/s.', 'autotarget words: a charge perk\'s drift follows your target');
+  ok(Object.keys(SKILLS).every(id => !/cursor/.test(AT.aimWords(SKILLS[id].desc || '', id, { dev: 'pad', mode: TG.AUTO }))), 'autotarget words: no skill says "cursor" on the pad in Auto');
+  ok(AT.aimLine('whirl', { dev: 'pad', mode: TG.AUTO }) === '' && /biggest group/.test(AT.aimLine('meteor', { dev: 'pad', mode: TG.AUTO })) && /drag off/.test(AT.aimLine('meteor', { dev: 'touch', mode: TG.OFF })) && AT.aimLine('meteor', { dev: 'kbm', mode: TG.OFF }) === '', 'autotarget words: the tooltip line (none for a self skill, none with the mouse in Off)');
+  // the AoE marker by a drop: draped on the ground, faded where the ground drops, rises or is not walkable
+  {
+    const m = { geometry: AT.markerGeometry(), userData: {} }, W = { heightAt: (x, z) => x > 1.5 ? -3 : z > 1.5 ? 0.25 * (z - 1.5) : 0, walkable: (x, z) => !(x < -2) };
+    AT.drapeMarker(m, W, 0, 0, 0, 3, 0);
+    const P = m.geometry.attributes.position.array, C = m.geometry.attributes.color.array, n = P.length / 3, v = [];
+    for (let i = 0; i < n; i++) v.push({ x: P[i * 3], y: P[i * 3 + 1], z: P[i * 3 + 2], a: C[i * 4 + 3] });
+    const drop = v.filter(q => q.x > 1.6), wall = v.filter(q => q.x < -2.1), flat = v.filter(q => Math.abs(q.x) < 1.4 && q.z < 1.4), slope = v.filter(q => q.z > 2.2 && Math.abs(q.x) < 1.4);
+    ok(drop.length && drop.every(q => q.a === 0 && q.y === 0) && wall.length && wall.every(q => q.a === 0) && flat.every(q => q.a === 1 && q.y === 0), 'autotarget marker: over a 3 m drop and off walkable ground its edge fades out (and stays level); on flat ground it is whole');
+    ok(slope.length && slope.every(q => q.a > 0 && Math.abs(q.y - 0.25 * (q.z - 1.5)) < 1e-6), 'autotarget marker: on a gentle slope it lies on the ground (draped, not floating)');
+    const key = m.userData.key; AT.drapeMarker(m, W, 0.01, 0, 0, 3, 1); ok(m.userData.key === key, 'autotarget marker: the heights are sampled again only when the centre moves (the spin only turns the UVs)');
+  }
 }
 
 hr('DEBUG TOOLS: THE REGISTRY AND THE PASSWORD (docs/DEBUG.md, src/debug/registry.js)');

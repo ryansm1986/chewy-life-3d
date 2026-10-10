@@ -250,6 +250,44 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
   WASD stays direct. Collider changes are detected lazily (collision objects carry a `_nid`).
 - Input: a press released before the next frame stays down for exactly one frame, so every poller sees taps.
 
+## Shadow leads the way (src/actors/shadowLead.js, src/gfx/pawTrail.js, src/ui/leadUI.js — ROADMAP R-17)
+- **What he leads to**: `G.questTarget()`, the quest pointer's own objective, so the arrow, the minimap pin and Shadow
+  agree. Its result carries where it came from: `Tutorials.target()` adds `{ guide, step, lead }`, `Story.target(only)`
+  adds `{ quest, step, lead }` (`only`: that quest's objective). A step says `lead: true` (or `lead(G, q)`) when its text,
+  or its giver's line, says Shadow leads: the house tour's door, inside and garden steps, the Board guide's walk, the
+  nose guide's sniff, burrow1's first step when you go yourself (Rosie: "Shadow knows the way"), the four zone rescues
+  ("Shadow has her scent"). New step type **`reach { at, x, z, r?, floor? }`** (questSteps.js `destOf` / `reachIsHere`,
+  `Story.reachPos` / `reachTick`): walk to a spot at home, in a zone or on a dungeon floor; the pointer shows the way there.
+- **When**: Settings › *Shadow leads the way* (`ui.settings.shadowLead`): 0 Off (only when asked), 1 Quests (the default:
+  the `lead` steps), 2 Always (any objective). Asking works at any setting: **L**, the pad's **R3** on a clean short
+  click with no foe within 16 m (in a fight R3 is CT-8's Next target; never the L3 + R3 swap), a tap on the quest
+  tracker's quest, the Journal's **Follow Shadow** (that quest; `lead.focus` makes the pointer follow it). Asking again
+  stops him for that step (keys are per run of a step: a quest record, a guide run).
+- **The route**: one `nav.findPath` from the hero to the objective on the world's clearance grid (the village, a zone,
+  a dungeon floor, a house), kept until the objective moves (3 m; 1 m on a short route or with him sat by it), the hero
+  strays 6 m off it, or the world changes (`lead.stats.plans`). An objective that's cut off (across water, walled in:
+  the start's nav region can't reach within 4 m of it) is **no path**: he stays at heel and now and then turns and
+  barks "This way!" toward it; the quest arrow points. A long trek the search gave up on is led as far as it got.
+- **Leading** (`Lead.tick`, after his combat AI in `Companion.update`): 3.4 m ahead along the route (4.8 at a sprint),
+  his speed from the hero's; at a sharp turn (≥ 49°) he lets the hero close to 2.6 m before going round; the hero 6.4 m
+  behind: he stops, looks back, barks "This way!", sits after a while; the hero going another way (12 m, off the
+  route): at heel a moment, then a new route from where they are. At the objective he walks onto a spot round it
+  (reachable, near the route's end, the camera side, not hidden in the village), paws at it, a heart and a happy bark,
+  and sits facing the hero. Nose down to the trail now and then (`groundSniff`, lifePoses.js), tail up (the Animator's
+  `tailUp`), standing hidden in the village he steps further on into view. As the whelp he flies the route (no prints).
+- **Combat first**: `watch()` keeps a calm clock (his fight, being knocked out, an aggroed foe within 14 m of the hero,
+  the hero losing life): any of it drops the lead at once (state `fight`; his own AI fights), and he picks it up after
+  2 s of calm. **Packs**: every 0.3 s the route ahead (42 m) is checked against each living monster's notice radius
+  (`mode.alertR` or 9, plus 1.4 m) where the pack can see it (`mode.los`): he stops 1.3 m short, faces it and growls
+  ("Grrr… yokai ahead!", once a pack; the `growl` sound). A hero who walks on past that point has him at heel.
+- **Pauses** (state `off`, `lead.why`): build or decorate mode, dialogue, fishing, a dig, scenes (`controlLocked`,
+  `introFocus`, hero switches), a zone's celebration, transitions, his nose or a dig (the nose always comes first), being
+  staged, knocked out, or a Whelp Bond move. Indoors only a guide's objective points, so he leads only on the house tour.
+- **Readability**: the paw trail (`PawTrail`: ≤ 22 prints, 3.4 s each, an ink pad in a cream rim, one instanced draw a
+  world, never additive or bright), "This way!" floats over him (the HUD's `status` float in his blue), the tracker's paw
+  on the led quest (`.qt-list[data-lead]`). Debug: Cozy › *Shadow leads the way* (a test walk, the setting, the stats).
+- **QA**: `tools/qa/s39-shadow-leads.mjs` (in run-all); test-rpg's reach-step and rescue checks; shots `tools/qa/tmp/r17/`.
+
 ## Combat notes
 - `player.mouseSets` = [[LMB, RMB] sword set, [LMB, RMB] ball set]; the active pair is mirrored in `hotbar[0..1]`.
   `swapWeapons()` swaps pairs and emits `hotbar:changed {swap, set}`; actions `mouseSet`, `ensureMouseSets`, `setWeaponType`.
@@ -749,6 +787,14 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   the sticky soft lock in a cone (the combat grid's `inRadius`; Settings › Aim assist scales the cone), the aim point
   (`Actions.padAim`, also read by `charge.cursorGround` and Moonbeam), the target ring (one canvas-textured plane, in the
   scene only while locked), `pickInteract` (in front preferred), `foeNear`, and the rumble hooks.
+- **Auto targeting** `src/combat/autoTarget.js` (`G.autoAim`; CONTROLS §13, ROADMAP CT-8): Settings › Controls ›
+  Targeting Off / Assist / Auto per device (`targetingOf`, the migration), the `AIM` table (every active skill's aim
+  kind) and `aimSpec`, the pure picks (`scoreFoe`, `bestCluster`, `bestLine`, `bestCone`), the all-round lock
+  (`pickLock`, `ranked`, `nextAfter`: padAim.js calls them in Auto), `aimFor(id)` (where each skill goes in Auto: game.js
+  `padCast` / `slotAim`), `assist()` (the mouse's snap) and the AoE marker (`tick`, from game.js `handleInput`; draped
+  on the ground and faded at a drop: `markerGeometry` / `drapeMarker`). The words: `aimWords(text, id)` (a skill's
+  "the cursor" per device and Targeting; ui/rpg.js's `desc` getter and the charge perks use it) and `aimLine(id)` (the
+  skill tooltip's Targeting line). `steerPoint()` is what Moonbeam and the drift perks steer by after the cast.
 - **A** is context-sensitive (game.js): an interactable highlighted and no foe within 5 m → interact; else the basic
   attack at the lock (charge, short melee magnetism).
 - **Glyphs** `src/ui/padGlyphs.js` + `pad.css`: `padGlyph(token, style)` (Xbox / PlayStation SVG in the game's ink

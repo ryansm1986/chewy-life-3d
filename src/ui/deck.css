@@ -12,7 +12,7 @@
 .ui-root.deck-ui :is(
   .hud .ws-n, .hud .hsw-lv, .hud .loc-s, .hud .rci-h, .hud .rci-foot, .hud .mb-dot,
   .tab .tab-n, .p-decor .dc-tabs .tab .tab-n,
-  .chg-gate, .nd-hk, .chg-pn, .chg-dh span, .chg-foot, .sk-pts span, .rowl, .nd-lv, .chg-st span,
+  .chg-gate, .nd-hk, .chg-pn, .chg-dh span, .chg-foot, .sk-pts span, .rowl, .nd-lv, .chg-st span, .chg-pl, .chg-skn,
   .ck-t small, .ck-btext, .ck-tag, .cr-set, .cr-tags span,
   .tv-pin-n b, .gf-card small, .sp-card small, .hc-stars small, .rm-set small, .rm-o, .rm-auto, .to-h, .to-skip, .rl-hint,
   .cd-size, .cd-built, .rk-next, .rk-badge b, .rk-n, .ovl, .bd-side .bh-k, .bd-side .bd-stats small,

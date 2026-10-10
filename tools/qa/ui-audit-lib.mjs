@@ -65,3 +65,29 @@ export function guideOverlap() {
   }
   return out;
 }
+
+// R-16: page.evaluate(drawerFit) → [{ sel, rect, screen }]: the K panel's Charge drawer with each skill of each of the
+// hero's trees shown in turn (its skill strip picks them): the drawer (its tag to its foot) must sit on the screen inside
+// the safe area, and its strip must hold every skill on one row inside its tray. A phone's drawer is checked as the open
+// sheet (it scrolls inside the panel). Leaves the panel on its first tree, the drawer on that tree's pick.
+export async function drawerFit() {
+  const out = [], U = window.G?.ui, S = U?.panels?.skills;
+  if (!S?.isOpen || !S.chg) return out;
+  const C = S.chg, d = C.el, phone = U.root.classList.contains('m-phone'), sa = U.mobile?.sf || { t: 0, r: 0, b: 0, l: 0 };
+  if (phone) d.classList.add('m-open');
+  const frame = () => new Promise(r => requestAnimationFrame(() => r()));
+  const tabs = [...S.body.querySelectorAll('.sk-tabs .tab')].filter(t => !t.hidden).map(t => t.dataset.t), was = S.tree;
+  for (const t of tabs) {
+    S.setTree(t); await frame();
+    for (const id of [...d.querySelectorAll('.chg-pick .chg-sk')].map(b => b.dataset.k)) {
+      C.show(id); d.classList.remove('swap'); await frame();
+      const r = d.getBoundingClientRect(), g = d.querySelector('.chg-tag').getBoundingClientRect(), tray = d.querySelector('.chg-pick').getBoundingClientRect();
+      const top = phone ? r.top : Math.min(r.top, g.top), box = [r.left, top, r.right, r.bottom].map(Math.round);
+      if (top < sa.t - 1 || r.bottom > innerHeight - sa.b + 1 || r.left < sa.l - 1 || r.right > innerWidth - sa.r + 1) out.push({ sel: `drawer ${t}/${id}`, rect: box, screen: [innerWidth, innerHeight] });
+      const bs = [...d.querySelectorAll('.chg-pick .chg-sk')].map(b => b.getBoundingClientRect());
+      if (bs.some(b => b.left < tray.left - 1 || b.right > tray.right + 1 || Math.abs(b.top + b.bottom - bs[0].top - bs[0].bottom) > 8)) out.push({ sel: `strip ${t}/${id} (${bs.length} skills)`, rect: [tray.left, tray.top, tray.right, tray.bottom].map(Math.round), screen: [innerWidth, innerHeight] });
+    }
+  }
+  S.setTree(tabs.includes(was) ? was : tabs[0]); if (phone) d.classList.remove('m-open');
+  return out;
+}

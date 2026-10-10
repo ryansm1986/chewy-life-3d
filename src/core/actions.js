@@ -43,6 +43,8 @@ export const ACTIONS = {
   meal: { label: 'Quick meal', group: 'play', kbm: ['g'], pad: ['DUp'] },
   swap: { label: 'Swap weapons', group: 'play', kbm: ['x'], pad: ['L3+R3'] },
   hero: { label: 'Next hero · hold: the hero wheel', group: 'play', kbm: ['tab'], pad: ['LB'] },
+  nextTarget: { label: 'Next target (Auto targeting)', group: 'play', kbm: [], pad: ['R3'] }, // (CT-8, docs/CONTROLS.md §13.4: combat/padAim.js)
+  lead: { label: 'Shadow leads the way (out of a fight)', kbmLabel: 'Shadow leads the way', group: 'play', kbm: ['l'], pad: ['R3'] }, // (ROADMAP R-17, actors/shadowLead.js: R3 with no foe about; in a fight R3 is Next target)
   lootLabels: { label: 'Loot labels (hold)', group: 'play', kbm: ['z'], pad: ['DDown'] },
   home: { label: 'Go home (from a dungeon)', group: 'play', kbm: ['t'], pad: [] },
   reel: { label: 'Reel in (fishing)', group: 'play', kbm: [], pad: ['RT'], lock: 'kbm', kbmLabel: 'Reel in (fishing: F or LMB)' },
@@ -62,7 +64,7 @@ export const ACTIONS = {
 };
 export const ACTION_GROUPS = [['play', 'Play'], ['menus', 'Menus'], ['build', 'Build and decorate']];
 // actions that may share a button with each other (D-pad down: a tap interacts, a hold shows the loot labels)
-const SHARE = [['interact', 'lootLabels'], ['reel', 'skill3']];
+const SHARE = [['interact', 'lootLabels'], ['reel', 'skill3'], ['nextTarget', 'lead']]; // (R3: Next target in a fight, Shadow leads the way out of one)
 
 const KEY_NAMES = { space: 'Space', shift: 'Shift', escape: 'Esc', tab: 'Tab', alt: 'Alt', ctrl: 'Ctrl', enter: 'Enter', up: '↑', down: '↓', left: '←', right: '→', '`': '`', delete: 'Del', backspace: 'Bksp', mouse0: 'LMB', mouse1: 'MMB', mouse2: 'RMB', mouse3: 'Mouse 4', mouse4: 'Mouse 5', wasd: 'WASD', mouse: 'Mouse' };
 const PAD_NAMES = {

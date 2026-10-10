@@ -10,10 +10,18 @@
 //  - Interactables: the nearest one in front gets the A prompt (pickInteract).
 //  - Touch (CT-5) aims the same way: its drag-to-aim is the right stick (Actions.aim), its stick the left one, and a tap
 //    on a foe locks it on purpose (target(): kept while it lives and stays within reach, whatever the cone).
-// One per game (G.padAim); game.js calls update(dt) from handleInput while the pad or touch is the active device.
+//  - Targeting (CT-8, docs/CONTROLS.md §13: Settings › Controls › Targeting, per device): Off (the pad: no lock; touch:
+//    Drag, the drag's cone only), Assist (the cone soft lock above) or Auto: the best foe ALL ROUND the hero
+//    (combat/autoTarget.js AutoAim.pickLock: distance, sticky, threat, elite, sight), re-picked 10× a second. In Auto a
+//    held right stick (or a touch drag) aims by hand in the cone and its foe becomes the manual pick when it lets go;
+//    R3 cycles to the next foe; a touch flick of the stick picks the foe that way; a manual pick holds MANUAL_HOLD s
+//    (each cast at it keeps it MANUAL_CAST s more), or until it dies or is left behind.
+// One per game (G.padAim); game.js calls update(dt) from handleInput while the pad or touch is the active device, and
+// with the mouse in Auto (the ring then shows for the mouse too).
 import * as THREE from 'three';
 import { Actions } from '../core/actions.js';
 import { Events } from '../core/events.js';
+import { TARGETING, targetingOf, LOCK_RANGE, MANUAL_HOLD, MANUAL_CAST, REPICK, AIM } from './autoTarget.js';
 
 const RANGE = 11, CONE = 0.62, CONE_FULL = 0.24, STICKY = 1.45; // m; cone half-angles (rad) at full assist, and with the right stick at full tilt
 const _d = new THREE.Vector3(), _v = new THREE.Vector3();
@@ -24,6 +32,8 @@ export class PadAim {
     this.dir = new THREE.Vector3(0, 0, 1); this.point = new THREE.Vector3();
     this.lock = null; this.stick = false; this.t = 0; this.pulse = 0;
     this.ring = null; this.ringWorld = null;
+    this.mode = TARGETING.AUTO; this.manual = null; this.manualUntil = 0; this.handAim = false; this.autoT = 0; this.r3 = null; this.flick = null; // (CT-8)
+    Events.on('touch:flick', f => { this.flick = f; }); // (a quick flick of the touch stick: ui/touch.js; read in pickAuto)
     // rumble (Settings › Controls › Rumble; Actions.rumble only pulses the active pad): light ticks on hits, a bump when
     // the hero is hurt, a pulse per charge stage and a bigger one on a charged release
     let tickT = 0;
@@ -36,20 +46,26 @@ export class PadAim {
     Events.on('charge:release', p => { if (p?.ok && p.stage > 0) Actions.rumble(0.16 + 0.14 * p.stage, 0.3 + 0.15 * p.stage, 80 + 30 * p.stage); });
   }
   get strength() { const s = this.G.ui?.settings?.aimAssist; return s == null ? 0.7 : Math.max(0, Math.min(1, s)); }
+  /** Settings › Controls › Targeting for the device playing now (0 Off · 1 Assist · 2 Auto) */
+  targeting() { return targetingOf(this.G.ui?.settings, Actions.device); }
   /** per frame while the pad plays (game.js handleInput): direction, lock, aim point, ring */
   update(dt) {
     const G = this.G, P = G.player; if (!P) return;
     this.t += dt;
+    const mode = this.mode = this.targeting();
     const { f, r } = G.engine.rig.groundAxes();
     const rs = Actions.aim(), ls = Actions.move();
     if (rs.mag > 0) { this.dir.set(0, 0, 0).addScaledVector(r, rs.x).addScaledVector(f, rs.y).normalize(); this.stick = true; }
     else if (ls.mag > 0 && !(P.aimLock && G.skills?.charge?.charging)) { this.dir.set(0, 0, 0).addScaledVector(r, ls.x).addScaledVector(f, ls.y).normalize(); this.stick = false; } // (while charging the hero faces the aim: the left stick only walks)
     else if (!this.lock) { this.dir.set(Math.sin(P.facing), 0, Math.cos(P.facing)); this.stick = false; }
     const prev = this.lock;
-    this.lock = G.mode === 'interior' ? null : this.pick(rs.mag);
-    if (this.lock && this.lock !== prev) { this.pulse = 1; }
+    this.lock = G.mode === 'interior' ? null : mode === TARGETING.AUTO ? this.pickAuto(rs) : mode === TARGETING.OFF ? this.pickOff(rs) : this.pick(rs.mag);
+    this.flick = null; // (a touch flick only picks in Auto, and only the frame it lands)
+    if (this.lock && this.lock !== prev) { this.pulse = 1; if (mode === TARGETING.AUTO) this.tip(); }
     this.pulse = Math.max(0, this.pulse - dt * 4);
-    if (this.lock) this.point.copy(this.lock.pos);
+    const ch = G.skills?.channel, chAim = mode === TARGETING.AUTO && ch && AIM[ch.id]?.kind === 'ground' && G.autoAim; // (Moonbeam follows the best cluster)
+    if (chAim) this.point.copy(G.autoAim.aimFor(ch.id)[0]);
+    else if (this.lock) this.point.copy(this.lock.pos);
     else {
       const dist = rs.mag > 0 ? 2.5 + 6.5 * rs.mag : 6;
       this.point.copy(P.pos).addScaledVector(this.dir, dist);
@@ -57,6 +73,56 @@ export class PadAim {
     }
     Actions.padAim = this.point;
     this.drawRing(dt);
+  }
+  // ---------------------------------------------------------------- Auto (CT-8, docs/CONTROLS.md §13)
+  /** the Auto lock: a manual pick while it holds; the right stick (or a touch drag) aiming by hand; else the best foe all
+   *  round (re-picked every REPICK s, the current one checked every frame) */
+  pickAuto(rs) {
+    const G = this.G, P = G.player, AA = G.autoAim; if (!AA) return this.pick(rs.mag);
+    const fresh = e => e && this.ok(e) && e.team === 'enemy';
+    // R3 (nextTarget): the next foe in score order; its press only counts when it wasn't the L3 + R3 swap chord
+    if (Actions.pressed('nextTarget')) this.r3 = { t: this.t, chord: Actions.padDown('L3') };
+    if (this.r3) {
+      if (Actions.padDown('L3')) this.r3.chord = true;
+      if (!Actions.held('nextTarget')) { const r = this.r3; this.r3 = null; if (!r.chord && this.t - r.t < 0.6) { const n = AA.nextAfter(fresh(this.lock) ? this.lock : null); if (n) { this.setManual(n); return n; } } }
+    }
+    // a flick of the touch stick: the best foe within 45° of it, all round
+    const fl = this.flick; this.flick = null;
+    if (fl) {
+      const { f, r } = G.engine.rig.groundAxes(), d = new THREE.Vector3().addScaledVector(r, fl.x).addScaledVector(f, fl.y).setY(0);
+      if (d.lengthSq() > 1e-6) { const e = AA.pickLock(null, { range: LOCK_RANGE * 1.3, dir: d.normalize(), cone: Math.cos(Math.PI / 4) }); if (e) { this.setManual(e); return e; } }
+    }
+    if (rs.mag > 0) { this.handAim = true; this.manual = null; return this.pick(rs.mag); } // (aiming by hand: the cone round the stick, over any pick)
+    if (this.handAim) { this.handAim = false; if (fresh(this.lock)) { this.setManual(this.lock, true); return this.lock; } } // (let go on a foe: that's the pick)
+    const M = this.manual;
+    if (M) { if (fresh(M) && this.t < this.manualUntil && Math.hypot(M.pos.x - P.pos.x, M.pos.z - P.pos.z) < LOCK_RANGE * 1.6 + (M.radius || 0)) return M; this.manual = null; }
+    const L = fresh(this.lock) ? this.lock : null;
+    if (L && this.t < this.autoT && Math.hypot(L.pos.x - P.pos.x, L.pos.z - P.pos.z) < LOCK_RANGE + 2 + (L.radius || 0)) return L;
+    this.autoT = this.t + REPICK;
+    return AA.pickLock(L);
+  }
+  /** Off: no lock on the pad; touch's Drag snaps in its drag's cone (as CT-5); a foe tapped on purpose still locks */
+  pickOff(rs) {
+    const M = this.manual, P = this.G.player;
+    if (M) { if (this.ok(M) && Math.hypot(M.pos.x - P.pos.x, M.pos.z - P.pos.z) < RANGE * 1.6 + (M.radius || 0)) return M; this.manual = null; }
+    return Actions.device === 'touch' && rs.mag > 0 ? this.pick(rs.mag) : null;
+  }
+  /** a manual pick (a tap, a flick, R3, the right stick let go, the mouse's foe): held MANUAL_HOLD s in Auto */
+  setManual(e, quiet = false) {
+    if (!e || !this.ok(e)) return false;
+    if (this.manual !== e) this.manualUntil = this.t + MANUAL_HOLD; else this.manualUntil = Math.max(this.manualUntil, this.t + MANUAL_HOLD * (quiet ? 0.5 : 1));
+    this.manual = e;
+    if (this.lock !== e) { this.lock = e; this.pulse = quiet ? 0.5 : 1; }
+    return true;
+  }
+  /** a cast went at the manual pick: it stays picked a while longer */
+  extendManual() { if (this.manual) this.manualUntil = Math.max(this.manualUntil, this.t + MANUAL_CAST); }
+  /** Shadow's one-time tip at the first auto lock in a fight (QA sessions with every tip seen skip it) */
+  tip() {
+    const G = this.G, H = G.state?.flags?.hints;
+    if (G.mode !== 'dungeon' || !G.hint || H?.all || H?.autoLock || this.lock?.breakable) return;
+    const dev = Actions.device;
+    G.hint('autoLock', dev === 'touch' ? "*Yip!* See the ring? That's your target: skills go at it by themselves. Tap a monster or flick the stick to pick another." : dev === 'pad' ? "*Yip!* See the ring? That's your target: skills go at it by themselves. Flick the right stick or click R3 to pick another." : '*Yip!* See the ring? Skills go at it by themselves. Point at a monster to pick it instead.');
   }
   /** the best foe in the cone (sticky: the current lock is kept while it stays roughly in the cone and range) */
   pick(stickMag) {
@@ -83,7 +149,7 @@ export class PadAim {
   }
   ok(e) { return e.alive && !e.untargetable && e.life > 0 && e.pos && Number.isFinite(e.pos.x); }
   /** lock a foe on purpose (a touch tap on it): the ring pulses and the lock holds until it dies or is left behind */
-  target(e) { if (!e || !this.ok(e)) return false; this.manual = e; if (this.lock !== e) { this.lock = e; this.pulse = 1; } return true; }
+  target(e) { if (!e || !this.ok(e)) return false; this.manual = e; this.manualUntil = this.t + MANUAL_HOLD; if (this.lock !== e) { this.lock = e; this.pulse = 1; } return true; }
   /** any foe (not a pot) within r: A attacks instead of interacting (CONTROLS §2) */
   foeNear(r = 5) {
     const G = this.G, P = G.player, C = G.combat; if (!C?.inRadius || G.mode !== 'dungeon') return false;
@@ -106,7 +172,7 @@ export class PadAim {
   // ---------------------------------------------------------------- the target ring
   drawRing(dt) {
     const G = this.G, L = this.lock, W = G.world;
-    if (!L || Actions.device === 'kbm') { this.hideRing(); return; }
+    if (!L || (Actions.device === 'kbm' && this.mode !== TARGETING.AUTO)) { this.hideRing(); return; } // (the mouse sees it in Auto only)
     const ring = this.ring ||= makeRing();
     if (this.ringWorld !== W || ring.parent !== W.scene) { ring.removeFromParent(); W.scene.add(ring); this.ringWorld = W; }
     ring.visible = true;
@@ -118,7 +184,7 @@ export class PadAim {
   }
   hideRing() { if (this.ring?.parent) this.ring.removeFromParent(); this.ringWorld = null; }
   /** the mouse took over, a mode change, a hero switch: nothing locked, nothing drawn */
-  clear() { this.lock = null; this.manual = null; this.hideRing(); if (Actions.device === 'kbm') Actions.padAim = null; }
+  clear() { this.lock = null; this.manual = null; this.handAim = false; this.r3 = null; this.flick = null; this.hideRing(); if (Actions.device === 'kbm') Actions.padAim = null; }
 }
 
 // the ring: chunky cream band with an ink edge and four gold chevrons pointing in, drawn once on a canvas (one draw call;

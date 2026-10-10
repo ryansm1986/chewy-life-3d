@@ -153,8 +153,19 @@ body.touch-active .ch-pts .tt-dim { display: none; }
 .ui-root.m-touch .ctl-tabs button { min-height: 52px; padding: 0 16px; }
 .ui-root.m-touch .pw :is(.rm-o.chip, .rm-o.sw) { min-height: 52px; min-width: 52px; }
 .ui-root.m-touch .tut-dock .to-skip { padding: 10px 14px; margin: -10px -8px; }
+/* R-16: the drawer's skill strip and the nodes' ⚡ chips are 44 px to a finger (the strip's 52 design px at the menus'
+   0.86; the chip through a hit area reaching up into its node, not down into the row below). A tablet's drawer widens
+   for six of them; a phone's sheet is wider too, and its strip stays at the top while the sheet scrolls */
+.ui-root.m-touch .chg-pick { gap: 7px; }
+.ui-root.m-touch .chg-sk { width: 52px; height: 52px; border-radius: 13px; transform: none; } /* (unshrunk: a shrunk box is under 44 px to a finger) */
+.ui-root.m-touch .chg-sk.sel { transform: translateY(-1px); }
+.ui-root.m-touch .nd-chg::after { inset: -25px -3px -6px -22px; } /* (out to the left, clear of the node's middle: a tap there still learns) */
+.ui-root.m-touch:not(.m-phone) .chg-drawer { width: 410px; }
+.ui-root.m-phone .chg-drawer.m-open .chg-pick { position: sticky; top: -2px; z-index: 4; box-shadow: inset 0 2px 5px rgba(120, 80, 60, .18), 0 -40px 0 6px #fffaf2; } /* (the paper above it hides what scrolls under) */
+.ui-root.m-phone .chg-drawer.m-open :is(.chg-tag, .chg-pl) { z-index: 5; } /* (over that paper until they scroll away) */
+.ui-root.m-phone .chg-drawer.m-open { padding-top: 42px; } .ui-root.m-phone .chg-drawer .chg-pl { top: 13px; } /* (room for the tag's 52 px, clear of the strip) */
 /* the K panel's charge drawer: folded to its tag at the panel's top right, a sheet over the tree when opened */
-.ui-root.m-phone .chg-drawer { left: auto; right: 10px; top: 10px; width: min(380px, 74%); z-index: 6; border-left-width: 4px; border-radius: 22px; padding: 30px 14px 12px;
+.ui-root.m-phone .chg-drawer { left: auto; right: 10px; top: 10px; width: min(410px, 92%); z-index: 6; border-left-width: 4px; border-radius: 22px; padding: 30px 14px 12px;
   max-height: calc(100% - 20px); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
 .ui-root.m-phone .chg-drawer:not(.m-open) { width: auto; padding: 0; border: 0; background: none; box-shadow: none; overflow: visible; }
 .ui-root.m-phone .chg-drawer:not(.m-open) > :not(.chg-tag) { display: none !important; }

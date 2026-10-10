@@ -756,7 +756,9 @@ The code map is in [ARCHITECTURE.md](ARCHITECTURE.md) ("The cozy path, phase C")
   **Settings › Dig with Shadow › Tap** fill the ring by themselves (a good dig). Moving, a hit or leaving cancels with
   nothing lost. **Shadow's nose**: within 12 m (18 with the Bandana) of a hidden spot he lifts his nose and sniffs, trots
   to it, paws the ground and sits; the mound shows with a sparkle and a bark (`scavenge:found`), and phase B's minimaps
-  draw it as a paw (`mapMarks()`). Shadow's tips wait while you dig.
+  draw it as a paw (`mapMarks()`). Shadow's tips wait while you dig. The nose comes first while he leads the way (ROADMAP
+  R-17): the lead steps aside while he sniffs a spot out and digs, and picks up after; the nose guide's "Follow Shadow" step
+  is a lead step until he smells the spot.
 - **Quest digs**: an active zone quest's `find` item from that zone (Takumi's heartwood, Nami's sea glass…) turns up in
   one of the day's spots (gold sparkle), once a world day, and counts through `quest:find` with the step's own place.
 - **Pound Mochi** (`life/cooking.js`): a starter recipe, 2 rice → 2 Mochi (a material), at the stove or Rosie's oven, and

@@ -5,12 +5,12 @@
 import * as THREE from 'three';
 import { Events } from '../core/events.js';
 import { Input } from '../core/input.js';
-import { Actions } from '../core/actions.js';
 import { rand, TAU, clamp, dist } from '../core/util.js';
 import { spellFx, setSpellGame, PAL } from '../gfx/spellFx.js';
 import { DuckDecoy, SpiritRetriever } from './allies.js';
 import { STAFF_GRIP, setStaffGlow } from '../actors/heroGear.js';
 import { perkAt } from '../rpg/charge.js';
+import { steerPoint } from './autoTarget.js';
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _u = new THREE.Vector3(), _t = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
@@ -287,7 +287,7 @@ const M = {
     if (out) c.spinOut -= dt;
     if ((!held && !out) || G.playerDead || P.anim.action?.name !== 'beam') { if (c.R.charge && c.spinOut !== undefined && !G.playerDead) this.beamFinish(c); return this.endChannel(); }
     c.t += dt; c.acc += dt; c.hum -= dt;
-    const aim = this.aimOverride || (Actions.device !== 'kbm' && Actions.padAim) || G.engine.mouseGround(Input.mouse.nx, Input.mouse.ny, (x, z) => G.world.heightAt(x, z)); // (the pad or touch: its aim point, combat/padAim.js)
+    const aim = this.aimOverride || steerPoint() || G.engine.mouseGround(Input.mouse.nx, Input.mouse.ny, (x, z) => G.world.heightAt(x, z)); // (the pad or touch: its aim point, combat/padAim.js)
     const tgt = this.clampAim(aim, p.range), b = c.beam.pos;
     const dx = tgt.x - b.x, dz = tgt.z - b.z, d = Math.hypot(dx, dz), step = Math.min(d, p.follow * dt);
     if (d > 1e-3) { b.x += dx / d * step; b.z += dz / d * step; }

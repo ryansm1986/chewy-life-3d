@@ -310,7 +310,7 @@ export class BladeFX {
   // ------------------------------------------------------------------ Moonlit Blades: a blade of moonlight falls
   /** a giant spectral blade drops point-first into the ground at pos, rings it with moonlight, then fades */
   moonBlade(pos, { scale = 2.4, life = 0.75 } = {}) {
-    const m = this.take('moonBlade', () => { const o = new THREE.Mesh(spectralBladeGeo(), spectralMaterial('#f6f8ff', '#8fa8ff', 0.92)); o.renderOrder = 12; return o; });
+    const m = this.take('moonBlade', () => { const o = new THREE.Mesh(spectralBladeGeo('classic'), spectralMaterial('#f6f8ff', '#8fa8ff', 0.92)); o.renderOrder = 12; return o; }); // (pointed: samuraiProps.js)
     const U = m.material.uniforms, x = pos.x, y = pos.y || 0, z = pos.z, half = 0.46 * scale, a0 = rand(0, TAU);
     m.scale.setScalar(scale); m.rotation.set(Math.PI + rand(-0.12, 0.12), a0, rand(-0.12, 0.12));
     const sp = this.spell; let landed = false;

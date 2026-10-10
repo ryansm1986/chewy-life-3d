@@ -15,13 +15,15 @@
 //   debug row too) and every Controls tab (touch, keyboard, controller), from the game and from the title; and the same
 //   run works at a tablet's size (DEVICE=ipad: 1180×820 at DPR 2 with iPad Safari's agent, or W / H / DPR), where
 //   panels taller than the screen used to run off it (the phone's fit was phone-only).
+//   R-16: the K panel's Charge drawer, opened for each hero (charge-<hero>; a phone's is the sheet over the tree), with
+//   its skill strip's buttons and the tree's ⚡ chips among the tappables, and on the screen for every skill (drawerFit).
 //   usage: node tools/qa/mobile-ui.mjs [--report] [view…]   W=844 H=390 DPR=3 | DEVICE=ipad   SHOT_DIR (default tools/qa/tmp/mobile-ui)
 //   FLOOR=12 TAP=44. Exit 1 when a panel is cut off, or (without --report) text or a tappable is under.
 import fs from 'node:fs';
 import path from 'node:path';
 import { launchTouch, boot, sleep, waitMode, BASE, PHONE, IPAD } from './touch-lib.mjs';
 import { seedCozy, cozyScenes, quietUi } from './cozy-ui-lib.mjs';
-import { headerOutside, guideOverlap } from './ui-audit-lib.mjs';
+import { headerOutside, guideOverlap, drawerFit } from './ui-audit-lib.mjs';
 
 const OUT = process.env.SHOT_DIR || path.resolve('tools/qa/tmp/mobile-ui');
 const FLOOR = +(process.env.FLOOR || 12), TAP = +(process.env.TAP || 44), STRICT = !process.argv.includes('--report');
@@ -50,7 +52,7 @@ const audit = (name, scopes) => ev(([scopes, floor, tap]) => {
       const px = parseFloat(getComputedStyle(el).fontSize) * (el.currentCSSZoom ?? 1);
       if (px < floor) { const k = label(el), o = out.get(k) || { sel: k, px, n: 0, text: t.slice(0, 34) }; o.n++; if (px < o.px) { o.px = px; o.text = t.slice(0, 34); } out.set(k, o); }
     }
-    for (const el of root.querySelectorAll('button, .btn, .tab, .slot, .node:not(.lg), .sh-item, .seg button, .tog, .dch, .ph-x, .card, .tc-b, .belt, .lvb, .qt-tog, .ck-r, .cr-r, input[type=range]')) {
+    for (const el of root.querySelectorAll('button, .btn, .tab, .slot, .node:not(.lg), .nd-chg.on, .sh-item, .seg button, .tog, .dch, .ph-x, .card, .tc-b, .belt, .lvb, .qt-tog, .ck-r, .cr-r, input[type=range]')) { // (.nd-chg: the K panel's ⚡ chips, R-16)
       const r = el.getBoundingClientRect(); if (!onScreen(r) || !vis(el) || el.disabled) continue; // (.lg.node: the map legend's swatch, not a tappable)
       const m = Math.min(r.width, r.height); if (m >= tap) continue;
       // (a target may reach past its box: an ::after with negative insets, as the touch buttons and badges have)
@@ -99,6 +101,8 @@ const scene = async (name, open, scopes, close) => {
     await open(); await sleep(page, 700); await shot(name); await audit(name, scopes);
     // R-13: a header button (title-row button, tab or badge, or the skill trees' tab row) outside its panel's frame
     for (const o of await ev(headerOutside)) { console.log(`   CUT OFF ${o.sel} ${JSON.stringify(o.rect)} outside the frame ${JSON.stringify(o.frame)}`); clipped.push({ sel: o.sel, rect: o.rect, where: name }); }
+    // R-16: the K panel's Charge drawer (a phone's as the open sheet) on the screen for every skill, its strip on one row
+    if (/^(skills|charge)/.test(name)) for (const o of await ev(drawerFit)) { console.log(`   CUT OFF ${o.sel} ${JSON.stringify(o.rect)} on a ${JSON.stringify(o.screen)} screen`); clipped.push({ sel: o.sel, rect: o.rect, where: name }); }
     // R-14: the guide's objective card over the panel's tabs, buttons, ✕ or the spotlit target
     const phone = await ev(() => window.G.ui.root.classList.contains('m-phone'));
     for (const o of await ev(guideOverlap)) { console.log(`   ${phone ? 'COVERS' : '(tablet) covers'} ${o.sel} ${JSON.stringify(o.rect)} under the guide card ${JSON.stringify(o.card)}`); if (phone && o.panel) covered.push({ ...o, where: name }); }
@@ -122,6 +126,11 @@ try {
   for (const cls of ['moka', 'poe', 'shihtzu', 'golden']) // (the other heroes' trees: the panel draws the class on state.player; restored after)
     await scene('skills-' + cls, () => ev(c => { const p = window.G.state.player; window.__cls0 ??= p.cls; p.cls = c; window.G.ui.open('skills'); }, cls), ['.p-skills'],
       () => ev(() => { const U = window.G.ui; U.close('skills'); window.G.state.player.cls = window.__cls0; }));
+  // R-16: the Charge drawer opened (a phone's sheet over the tree) for each hero: its skill strip's buttons, the text
+  for (const cls of ['chewy', 'moka', 'poe', 'shihtzu', 'golden'])
+    await scene('charge-' + cls, async () => { await ev(c => { const p = window.G.state.player; window.__cls0 ??= p.cls; p.cls = c; window.G.ui.open('skills'); }, cls); await sleep(page, 900); // (a phone: a tap on the drawer's tag opens the sheet)
+      const t = await ev(() => { const e = window.G.ui.root.classList.contains('m-phone') && document.querySelector('.chg-drawer:not(.m-open) .chg-tag'); if (!e) return null; const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }); if (t) await F.tap(t[0], t[1]); }, ['.p-skills'],
+      () => ev(() => { const U = window.G.ui; document.querySelector('.chg-drawer')?.classList.remove('m-open'); U.close('skills'); window.G.state.player.cls = window.__cls0; }));
   await scene('quests', () => ev(() => window.G.ui.open('quests')), ['.p-quests']);
   await scene('map', () => ev(() => window.G.ui.open('map')), ['.p-map']);
   await scene('menu', () => ev(() => window.G.ui.open('menu')), ['.p-menu']);

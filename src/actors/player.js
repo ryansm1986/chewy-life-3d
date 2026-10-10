@@ -3,7 +3,8 @@
 // weapon visuals and grass bending.
 import * as THREE from 'three';
 import { Actor } from './actor.js';
-import { buildHumanoid, CAST, katanaGeo, katanaMaterial, KATANA, tennisBall, enableXray } from './charKit.js';
+import { buildHumanoid, CAST, katanaGeo, katanaMaterial, KATANA, tennisBall, enableXray, katanaVariant, setKatanaVariant, katanaSheathMaterial } from './charKit.js';
+import { registerDebug } from '../debug/registry.js';
 import { buildHeroModel, heroModelReady } from './heroModels.js';
 import { makeStaff, attachStaff, tickStaff, disposeStaff, STAFF_GRIP } from './heroGear.js';
 import { Animator } from './animator.js';
@@ -29,11 +30,20 @@ const STAFF_CASTS = new Set(['staffBolt', 'staffCast', 'skyCast', 'wetShake', 's
 const BUSY = new Set(['swing', 'swing2', 'throw', 'cast', 'bark', 'slam', 'pickup', 'drink', 'staffBolt', 'staffCast', 'skyCast', 'wetShake', 'summon', 'yank', 'puddleHop', 'surf', 'beam', 'duckCall', ...SAMURAI_ROOTED, ...POE_ROOTED, ...SHIHTZU_ROOTED, ...GOLDEN_ROOTED]);
 // the Bone Katana's geometry per item tint (charKit.js katanaGeo): shared by every rig the player ever gets
 const KATANAS = new Map();
-const katanaFor = (colors, hilt = false) => { const k = `${(colors || []).join(',')}|${hilt ? 'h' : 'b'}`; let g = KATANAS.get(k); if (!g) KATANAS.set(k, g = katanaGeo({ colors, hilt })); return g; };
+const katanaFor = (colors, hilt = false) => { const k = `${(colors || []).join(',')}|${hilt ? 'h' : 'b'}|${katanaVariant()}`; let g = KATANAS.get(k); if (!g) KATANAS.set(k, g = katanaGeo({ colors, hilt })); return g; };
+// R-15: the katana's looks (charKit.js katanaVariant: B, the bone blade, is the game's; the others for the QA; from boot
+// by ?katana=a|b|c|classic)
+const KATANA_LOOK_NAMES = { b: 'B Bone blade', a: 'A Bone tip', c: 'C Chew toy', '': 'Classic blade' };
+registerDebug('heroes', [{ id: 'katanaLook', group: 'Chewy', label: 'Katana look (R-15)', hint: "B, the bone blade, is the game's; the others for comparing (?katana=a|b|c|classic)", choices: [{ label: 'B Bone blade', value: 'b' }, { label: 'A Bone tip', value: 'a' }, { label: 'C Chew toy', value: 'c' }, { label: 'Classic blade', value: 'classic' }],
+  run: (G, v) => { setKatanaVariant(v); G.player?.tintSword?.(); return `Katana: ${KATANA_LOOK_NAMES[katanaVariant()]} (this session)`; } }]);
 const _grip = new THREE.Vector3(), _bd = new THREE.Vector3(), _be = new THREE.Vector3(), _bx = new THREE.Vector3(), _bz = new THREE.Vector3();
 const _bm = new THREE.Matrix4(), _bq = new THREE.Quaternion(), _bp = new THREE.Quaternion();
 const _np = new THREE.Vector3(), _nq = new THREE.Quaternion(), _ns = new THREE.Vector3(), _cp = new THREE.Vector3(), _cq = new THREE.Quaternion(), _cs = new THREE.Vector3();
-const _nm = new THREE.Matrix4(), _ni = new THREE.Matrix4();
+const _nm = new THREE.Matrix4(), _ni = new THREE.Matrix4(), _cn = new THREE.Vector3();
+// R-15 sheathClip: the box the blade is hidden in during the noto, as planes (normal, constant) in the saya's frame; the
+// intersection of their back sides is clipped: past the mouth (y > 0), within 9 cm of the saya's axis and 16 cm on the
+// side the blade curves to (+x, its back: the sori takes the tip's knobs 6 cm off the axis)
+const SHEATH_BOX = [[0, -1, 0, 0], [1, 0, 0, -0.16], [-1, 0, 0, -0.09], [0, 0, 1, -0.09], [0, 0, -1, -0.09]];
 const smooth01 = x => { x = clamp(x); return x * x * (3 - 2 * x); };
 
 export class Player extends Actor {
@@ -99,7 +109,7 @@ export class Player extends Actor {
     this.swordBack = new THREE.Mesh(katanaFor(cols, this.saya), mat); this.swordBack.castShadow = true;
     if (this.saya) { this.swordBack.position.set(0, -(0.064 + (rig.parts.saya.userData.out ?? 0.012)), 0); rig.parts.saya.add(this.swordBack); } // (the tsuba's blade face at the mouth: the hilt stands out of it)
     else { this.swordBack.scale.setScalar(0.8); this.swordBack.position.set(0.02, 0.06, -0.02); this.swordBack.rotation.set(0.1, 0, 2.5); rig.parts.back.add(this.swordBack); }
-    this.swordKey = cols.join(',');
+    this.swordKey = `${cols.join(',')}|${katanaVariant()}`;
     this._noto = false;
   }
   /** the equipped sword item's [blade, wrap, accent] (its icon colours: items.js), whichever hand it's in */
@@ -108,7 +118,7 @@ export class Player extends Actor {
     return it?.icon?.colors?.length ? it.icon.colors : ['#f4e8cf', '#c23b3b', '#f2e4c6'];
   }
   tintSword() {
-    const cols = this.swordColors(), key = cols.join(',');
+    const cols = this.swordColors(), key = `${cols.join(',')}|${katanaVariant()}`;
     if (key === this.swordKey) return;
     this.swordKey = key; this.sword.geometry = katanaFor(cols); this.swordBack.geometry = katanaFor(cols, this.saya);
   }
@@ -305,8 +315,20 @@ export class Player extends Actor {
       _nm.decompose(this.sword.position, this.sword.quaternion, _ns);
       this.sword.updateMatrixWorld(true);
     }
+    this.sheathClip(ns > 0);
     // two-handed: the free paw takes the hilt below the sword paw (armIK.js)
     if (w > 0.01) { const P = this.rig.parts; reach(P.armL, P.foreL, P.handL, this.sword.localToWorld(_grip.set(0, KATANA.leftGrip, 0)), Math.min(1, w)); }
+  }
+  /** R-15: the bone-shaped katana (charKit.js katanaVariant) hides its blade inside the saya while the noto slides it
+   *  home: the part in a box from the saya mouth down the scabbard is clipped (its knobs are twice the saya's width and
+   *  the blade runs ~7 cm past its end, so they'd poke through and out). The classic look (?katana=classic) is unclipped. */
+  sheathClip(on) {
+    const mat = on && katanaVariant() && this.rig.parts.saya ? katanaSheathMaterial() : katanaMaterial();
+    if (this.sword.material !== mat) this.sword.material = mat;
+    if (!mat.clippingPlanes?.length) return;
+    const r = this.G?.engine?.renderer; if (r && !r.localClippingEnabled) r.localClippingEnabled = true;
+    const M = this.rig.parts.saya.matrixWorld; // (the saya's frame: +Y down the scabbard from its mouth)
+    SHEATH_BOX.forEach(([x, y, z, d], i) => mat.clippingPlanes[i].set(_cn.set(x, y, z), d).applyMatrix4(M));
   }
   /** samurai poses point the katana in the hero's frame (A.bladeDir: x forward, y up, z his left), its edge toward
    *  A.bladeEdge (default: down and ahead), blended over the carry by w */

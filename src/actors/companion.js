@@ -1,4 +1,5 @@
-// Shadow the Boston terrier — follows Chewy, sniffs around, sits, barks, and fights in the Burrow.
+// Shadow the Boston terrier — follows Chewy, sniffs around, sits, barks, fights in the Burrow, and leads the way to the
+// objective (this.lead: actors/shadowLead.js).
 import * as THREE from 'three';
 import { Actor } from './actor.js';
 import { buildBoston, enableXray } from './charKit.js';
@@ -8,6 +9,7 @@ import { U } from '../gfx/materials.js';
 import { rand, chance, TAU } from '../core/util.js';
 import { navFor, PathFollow } from '../core/nav.js';
 import { Whelp } from './whelp.js';
+import { Lead } from './shadowLead.js';
 
 const _rc = new THREE.Raycaster(), _o = new THREE.Vector3(), _d = new THREE.Vector3(), _inv = new THREE.Vector3();
 const FLAT = new Set(['flowerBed', 'bridge', 'fence']); // too low to hide a dog (or walk-on)
@@ -31,6 +33,7 @@ export class Companion extends Actor {
     this.team = 'ally'; this.height = 0.6; this.res = {}; this.status = {};
     this.lifeMax = 80; this.life = 80; this.fainted = 0; this.biteCd = 0;
     this.whelp = new Whelp(this); // the dragon whelp outfit and flight while the dragoon is the active hero (actors/whelp.js)
+    this.lead = new Lead(this); // leading the way to the objective (actors/shadowLead.js, ROADMAP R-17)
   }
   recalc() {
     const G = this.G, lvl = G.state?.player?.lvl || 1;
@@ -83,6 +86,7 @@ export class Companion extends Actor {
     const p = this.G.player;
     if (!p) return super.update(dt);
     this.whelp.update(dt); // (the outfit on / off with the active hero; in flight, his height, pitch and wings)
+    this.lead.watch(dt, p); // (leading the way: the calm clock, the ask, the paw trail; actors/shadowLead.js)
     const dx = p.pos.x - this.pos.x, dz = p.pos.z - this.pos.z, d = Math.hypot(dx, dz);
     this.stateT += dt;
     if (d > 18) { // teleport-catch-up if lost
@@ -100,6 +104,7 @@ export class Companion extends Actor {
     this.combatBusy = !!this.combatUpdate?.(dt); // (the whelp flies lower to bite)
     if (this.whelp.steer(dt)) { U.uBenders.value[1].set(this.pos.x, this.pos.y, this.pos.z, 0); super.update(dt); return; } // (a Whelp Bond move: combat/goldenWhelp.js)
     if (this.combatBusy) { super.update(dt); return; }
+    if (this.lead.tick(dt, p)) { U.uBenders.value[1].set(this.pos.x, this.pos.y, this.pos.z, this.whelp.on && this.whelp.air > 0.3 ? 0 : 0.4); super.update(dt); return; } // (leading the way: after his fights, before the follow)
     if (this.whelp.airFollow(dt, p)) { this.barkTick(dt); U.uBenders.value[1].set(this.pos.x, this.pos.y, this.pos.z, 0); super.update(dt); return; } // (in the air: beside the hero across the view, actors/whelp.js)
     if (d > 2.6) {
       // run to a spot beside/behind Chewy (the first follow slot the camera can actually see)

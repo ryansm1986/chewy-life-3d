@@ -1,0 +1,16 @@
+/* Shadow leads the way (ROADMAP R-17, ui/leadUI.js): the quest tracker's rows ask him; the led quest wears a paw */
+.hud .qt-list .qt-q { cursor: pointer; border-radius: 10px; transition: background-color .2s; }
+.hud .qt-list .qt-q:hover { background: rgba(255, 216, 160, .32); }
+.hud .qt-list .qt-n { position: relative; }
+.hud .qt-list[data-lead="0"] > .qt-q:nth-child(1) .qt-n::after,
+.hud .qt-list[data-lead="1"] > .qt-q:nth-child(2) .qt-n::after,
+.hud .qt-list[data-lead="2"] > .qt-q:nth-child(3) .qt-n::after {
+  content: ''; display: inline-block; width: 15px; height: 15px; margin-left: 6px; vertical-align: -2px;
+  background: #4a8fd0; -webkit-mask: var(--lead-paw) center / contain no-repeat; mask: var(--lead-paw) center / contain no-repeat;
+  animation: leadPaw 1.4s ease-in-out infinite;
+}
+@keyframes leadPaw { 0%, 100% { transform: translateY(0) rotate(-8deg); } 50% { transform: translateY(-2px) rotate(8deg); } }
+/* the Journal's Follow Shadow (ui/map.js) */
+.p-quests .qd-lead { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+.p-quests .qd-lead .gl { width: 18px; height: 18px; }
+.p-quests .qd-lead.on { background: linear-gradient(#d8ecff, #a8d0f4); }

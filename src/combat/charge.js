@@ -15,10 +15,10 @@
 import * as THREE from 'three';
 import { Events } from '../core/events.js';
 import { Input } from '../core/input.js';
-import { Actions } from '../core/actions.js';
 import { CHARGE, GRACE, SLOW, stageTimes, stageAt, maxStage, chargeCost, perksOf, chargeable, chargeRuntime } from '../rpg/charge.js';
 import { getSkill, usable, skillRuntime } from '../rpg/skills.js';
 import { chargeFx } from '../gfx/chargeFx.js';
+import { steerPoint } from './autoTarget.js';
 
 export const CHARGE_MODE = { ON: 0, OFF: 1, TOGGLE: 2 };
 const SLOTS = 6;
@@ -279,7 +279,7 @@ export class ChargeController {
    *  allocations) → out, or null without a camera */
   cursorGround(out) {
     if (this.aimOverride) return out.copy(this.aimOverride);
-    if (Actions.device !== 'kbm' && Actions.padAim) return out.copy(Actions.padAim); // (the pad's or touch's aim)
+    const sp = steerPoint(); if (sp) return out.copy(sp); // (the pad's or touch's aim, or the mouse's in Auto: combat/autoTarget.js)
     const E = this.G.engine, W = this.G.world;
     if (!E?.raycaster || !E.camera) return null;
     E.raycaster.setFromCamera(_nv.set(Input.mouse.nx, Input.mouse.ny), E.camera);
