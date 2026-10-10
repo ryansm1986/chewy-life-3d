@@ -1,7 +1,7 @@
 {
   "name": "chewy-life-3d",
   "private": true,
-  "version": "0.6.4",
+  "version": "0.6.5",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,6 +10,7 @@
     "shot": "node tools/shot.mjs",
     "build:itch": "node tools/build-itch.mjs",
     "build:desktop": "node tools/desktop/build-desktop.mjs",
+    "release:desktop": "node tools/desktop/release-desktop.mjs",
     "desktop": "electron tools/desktop/main.cjs",
     "test:itch": "node tools/build-itch.mjs --test",
     "fonts": "python tools/fonts/build-fonts.py",

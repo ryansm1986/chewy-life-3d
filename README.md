@@ -20,7 +20,8 @@ latest is kept as a backup and loads by itself if the latest one is ever damaged
 `release/desktop/Pawhaven-<version>-win-x64.zip` / `-portable.exe` and `-linux-x64.AppImage` / `.tar.gz`. It opens
 full screen (F11 or Settings › *Full screen* for a window), plays with a controller and keeps its saves in its own folder.
 [docs/DESKTOP.md](docs/DESKTOP.md) has the Deck steps (Add a Non-Steam Game, the controller template, saves,
-troubleshooting).
+troubleshooting). From 0.6.5 the app updates itself from GitHub Releases: the title offers each new version, and
+Settings › About has *Check for updates*. `npm run release:desktop` publishes a release (`-- --dry-run` to try it).
 Sign-in, upload steps and page settings are in [docs/ITCH.md](docs/ITCH.md).
 
 **Debug tools** (for testing: unlock every hero and zone, jump the story, travel anywhere, spawn items, god mode…):

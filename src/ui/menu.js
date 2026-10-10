@@ -16,6 +16,7 @@ import { AUTOSAVE_LABELS } from '../core/autosave.js';
 import { LEAD_LABELS } from './leadUI.js'; // (Settings › Shadow leads the way: ROADMAP R-17)
 import { TARGET_KEYS, TARGET_LABELS, TARGETING, targetingOf, targetingHint } from '../combat/autoTarget.js';
 import { version as VERSION } from '../../package.json'; // (Settings › About; seven taps on it ask for the debug password: src/debug/access.js)
+import { UPD, updateHTML, updateAct, updateBack, updateClosed, checkFromSettings } from './desktopUpdate.js'; // (the desktop app's updates, CT-9: the 'update' view)
 
 const MOUSE_CAP = { mouse0: () => glyph('mouseL'), mouse2: () => glyph('mouseR') };
 // Settings › Controls › Touch: what each on-screen control does (ui/touch.js, docs/CONTROLS.md §12)
@@ -62,7 +63,7 @@ export class MenuPanel extends Panel {
         <div class="set-row"><div class="set-n">${glyph('star')}Show FPS</div><button class="tog" data-k="showFps"><i></i></button></div>${DESKTOP ? `
         <div class="set-row" title="Off: a window (F11 or Alt+Enter switch too)"><div class="set-n">${glyph('eye')}Full screen</div><button class="tog" data-k="fullscreen"><i></i></button></div>` : ''}
         <div class="set-row" title="Keys and controller buttons, rumble, aim assist"><div class="set-n">${glyph('question')}Controls</div><button class="btn sm" data-a="controls">Change…</button></div>
-        <div class="set-row mn-about" title="Pawhaven, a cozy adventure with Chewy and friends"><div class="set-n">${glyph('sakura')}About</div><button class="btn sm mn-ver" data-a="version">Pawhaven v${VERSION}</button></div>
+        <div class="set-row mn-about" title="Pawhaven, a cozy adventure with Chewy and friends"><div class="set-n">${glyph('sakura')}About</div>${UPD ? `<div class="mn-about-b"><button class="btn sm mn-ver" data-a="version">Pawhaven v${VERSION}</button><button class="btn sm mint" data-a="checkUpdate">Check for updates</button></div>` : `<button class="btn sm mn-ver" data-a="version">Pawhaven v${VERSION}</button>`}</div>
         <div class="set-row mn-debug" title="Testing tools: F10 or \` , the bug button, Select + Start on a pad"><div class="set-n">${glyph('key')}Debug tools: on</div><div class="mn-dbg-b"><button class="btn sm" data-a="debugOpen">Open</button><button class="btn sm pink" data-a="debugOff">Turn off</button></div></div>
         <div class="mn-foot"><button class="btn" data-a="back">${glyph('swap')}Back</button></div>
       </div>
@@ -89,7 +90,8 @@ export class MenuPanel extends Panel {
         <div class="ctl-list"></div>
         <div class="ctl-note"></div>
         <div class="mn-foot"><button class="btn" data-a="resetBinds">${glyph('sort')}Reset</button><button class="btn" data-a="back">${glyph('swap')}Back</button></div>
-      </div></div>`;
+      </div>${UPD ? `
+      <div class="mn-v mn-update"></div>` : ''}</div>`;
     this.dev = 'kbm';
     this.body.addEventListener('click', e => {
       const tab = e.target.closest('.ctl-tabs button'); if (tab) { this.cancelWait(); this.dev = tab.dataset.dev; this.ui.sfx('tab'); this.renderControls(); return; }
@@ -113,6 +115,9 @@ export class MenuPanel extends Panel {
     if (a === 'build') { this.ui.close('menu'); const B = this.ui.G?.build; if (B && !B.active && this.ui.G.mode === 'village') B.enter(); return; } // (the pad's way into build mode)
     if (a === 'decorate') { this.ui.close('menu'); const D = this.ui.G?.housing?.decor; if (D && !D.active && this.ui.G.mode === 'interior') D.enter(); return; }
     if (a === 'version') { this.ui.G?.debug?.versionTap(); return; } // (seven taps: the debug password prompt)
+    if (a === 'checkUpdate') { checkFromSettings(this); return; } // (the desktop app: ui/desktopUpdate.js)
+    if (a.startsWith('upd') && updateAct(this, a)) return;
+    if (a === 'back' && this.view === 'update') { updateBack(this); return; }
     if (a === 'debugOpen') { this.ui.G?.debug?.open(); return; }
     if (a === 'debugOff') { this.ui.G?.debug?.disable(); this.sync(); return; }
     if (a === 'resetBinds') { this.cancelWait(); Actions.resetBindings(this.dev); this.ui.saveBinds(); this.note(this.dev === 'pad' ? 'Controller buttons reset.' : 'Keys reset.'); this.renderControls(); return; }
@@ -129,7 +134,8 @@ export class MenuPanel extends Panel {
     if (v !== 'controls') this.cancelWait();
     this.view = v;
     this.panel.dataset.view = v;
-    this.setTitle(v === 'settings' ? 'Settings' : v === 'controls' ? 'Controls' : 'Paused', v === 'settings' ? '設定' : v === 'controls' ? '操作' : '一時停止');
+    this.setTitle(v === 'settings' ? 'Settings' : v === 'controls' ? 'Controls' : v === 'update' ? 'Update' : 'Paused', v === 'settings' ? '設定' : v === 'controls' ? '操作' : v === 'update' ? 'アップデート' : '一時停止');
+    if (v === 'update') { const u = this.body.querySelector('.mn-update'); if (u) u.innerHTML = updateHTML(); }
     const vv = this.body.querySelector('.mn-' + v);
     if (vv) replay(vv, 'enter', 500);
     this.sync();
@@ -161,7 +167,7 @@ export class MenuPanel extends Panel {
     show('home', mode === 'dungeon'); show('build', mode === 'village' && !this.ui.G?.build?.active); show('decorate', mode === 'interior' && !!this.ui.G?.housing?.canDecorate?.());
   }
   render() { this.sync(); if (this.view === 'controls') this.renderControls(); }
-  onClose() { this.cancelWait(); }
+  onClose() { this.cancelWait(); if (this.view === 'update') updateClosed(); }
 
   // ---------------------------------------------------------------- Controls: bindings per device, rebinding
   /** a binding's caps: keycaps / mouse glyphs, or pad glyphs */

@@ -1,6 +1,9 @@
 // The desktop app's side of the game (tools/desktop/preload.cjs gives window.pawhaven; docs/DESKTOP.md, ROADMAP CT-4):
 // Settings › Full screen (two ways with F11 / Alt+Enter) and the Quit buttons on the title and in the game menu. In a
-// browser DESKTOP is null and none of this shows. (Its Steam Deck flag is read by core/deck.js.)
+// browser DESKTOP is null and none of this shows. (Its Steam Deck flag is read by core/deck.js.) The in-app updates
+// (CT-9) are ui/desktopUpdate.js: the title's launch check and Settings › About › Check for updates.
+import { installUpdates } from './desktopUpdate.js';
+import { version as VERSION } from '../../package.json';
 export const DESKTOP = globalThis.pawhaven?.desktop ? globalThis.pawhaven : null;
 
 export function installDesktop(ui) {
@@ -9,6 +12,9 @@ export function installDesktop(ui) {
   ui.settings.fullscreen = !!DESKTOP.isFullscreen?.(); // (the window's state is the truth: the app remembers it)
   ui.onSetting((k, v) => { if (k === 'fullscreen' && !!v !== !!DESKTOP.isFullscreen?.()) DESKTOP.setFullscreen?.(!!v); });
   DESKTOP.onFullscreen?.(on => { ui.settings.fullscreen = !!on; if (ui.isOpen('menu')) ui.panels.menu?.sync?.(); });
+  // the title's footer names the version that is running (an update changes it: CT-9)
+  const foot = ui.titleScreen?.root?.querySelector('.ti-foot'); if (foot) foot.textContent = foot.textContent.replace(/^v[\d.]+/, `v${VERSION}`);
+  installUpdates(ui);
 }
 
 /** save, then close the app (the window's beforeunload saves again: harmless) */

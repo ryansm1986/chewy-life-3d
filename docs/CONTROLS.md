@@ -573,6 +573,20 @@ cached; `--win --dir` takes seconds.
 - Not run here: the Linux builds. The AppImage's SquashFS is verified by the independent reader, but it has not been
   started on a Linux machine or a Deck yet. That is the owner's first Deck test (DESKTOP.md walks through it).
 
+### 11.4 In-app updates (CT-9, 2026-10-10)
+The app updates itself from the repository's GitHub Releases, so the Deck never needs the file copied again. The
+design, the security rules, the release command and the owner's one-time Deck steps are in
+[DESKTOP.md](DESKTOP.md) "Updates from inside the app".
+- The title checks once per launch and opens a card ("Update available: vX.Y.Z", Install now / Later). The card is
+  the pause menu's `update` view, so the pad's focus ring and glyphs, touch and the mouse work as in any panel. B or
+  Esc means Later.
+- Settings › About › **Check for updates** checks by hand.
+- Most updates are content: a game zip served in place of the built-in game, on trial until `window.__ready`, and
+  rolled back otherwise. A shell update swaps the AppImage. On Windows, a shell update opens the release page.
+- Code: `tools/desktop/updater.cjs`, `main.cjs` (the IPC, the trial watchdog), `preload.cjs` (`pawhaven.update`),
+  `src/ui/desktopUpdate.js`, `tools/desktop/release-desktop.mjs`. QA: `tools/qa/desktop-updater-unit.mjs`,
+  `tools/qa/desktop-update.mjs`.
+
 ## 12. As built: CT-5, touch (2026-10-07)
 Phones and tablets in landscape. Checkpoint 1 was the touch device and the play controls (12.1, 12.2). Checkpoint 2 is
 the phone's HUD and hero wheel, the menus on touch, the mobile layout, build / decorate / the minigames by touch, and the

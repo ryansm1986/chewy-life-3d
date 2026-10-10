@@ -26,7 +26,8 @@ if (!fs.existsSync(EXE)) { console.log(`no app at ${EXE}: run npm run build:desk
 const UD = fs.mkdtempSync(path.join(os.tmpdir(), 'pawhaven-desktop-')), UD2 = fs.mkdtempSync(path.join(os.tmpdir(), 'pawhaven-deck-'));
 
 async function start(ud, env = {}) {
-  const app = await electron.launch({ executablePath: EXE, args: ['--windowed', `--user-data=${ud}`], env: { ...process.env, SteamDeck: '', ...env }, timeout: 90000 });
+  // (--no-updates: a real release never puts its card over the title here; tools/qa/desktop-update.mjs tests updates)
+  const app = await electron.launch({ executablePath: EXE, args: ['--windowed', `--user-data=${ud}`, '--no-updates'], env: { ...process.env, SteamDeck: '', ...env }, timeout: 90000 });
   const page = await app.firstWindow();
   page.on('pageerror', e => errors.push(`[pageerror] ${e.message}  ${(e.stack || '').split(/\r?\n/).slice(1, 4).map(l => l.trim()).join(' | ')}`));
   page.on('console', m => { if (m.type() === 'error' && !/favicon/.test(m.text())) errors.push(`[console.error] ${m.text()}`); });
