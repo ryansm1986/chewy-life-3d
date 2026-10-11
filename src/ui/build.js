@@ -1,8 +1,12 @@
 // Village build palette: bottom drawer with category tabs, building cards (cost + requirements), zone tools, bulldoze.
+// On the pad (CT-11, docs/CONTROLS.md §14.5; ui/padCursor.js drives it): LB / RB glyphs at the tab strip's ends, a Tools
+// tab with the zones, paths and the bulldozer as cards (their toolbar hides), a grid of compact cards, the focused piece
+// in the side card (padDetail: no tooltip over the world), and folded to the tab strip with the piece in hand (heldChip).
 import { el, esc, fmt, replay } from './dom.js';
 import { glyph, glyphURL, MATERIALS } from './glyphs.js';
 import { padGlyph } from './padGlyphs.js';
 import { Panel } from './panel.js';
+import { Actions } from '../core/actions.js';
 
 const CATS = {
   home: { name: 'Homes', jp: '家', g: 'home', c: '#8fe0c0' },
@@ -15,6 +19,18 @@ const CATS = {
 const ZONES = [['R', 'Homes zone', 'home', '#5ec79a'], ['C', 'Shops zone', 'shop', '#5aa8ff'], ['W', 'Workshop zone', 'craft', '#e8a92a']];
 const COVERS = { water: ['#5aaaff', 'Water'], light: ['#ffd24a', 'Light'], joy: ['#ff82be', 'Joy'], health: ['#5ed69a', 'Health'], learn: ['#a88cff', 'Learning'] };
 const OVERLAYS = [['', 'Zones'], ['water', 'Water'], ['light', 'Light'], ['joy', 'Joy'], ['health', 'Health'], ['learn', 'Learn']];
+// the pad's Tools tab: the toolbar's buttons as cards (data-z → the toolbar button it presses) · [z, name, glyph, colour, what it does]
+const TOOL_CARDS = [
+  ['R', 'Homes zone', 'home', '#5ec79a', 'Paint plots for homes: villagers move in when there is demand'],
+  ['C', 'Shops zone', 'shop', '#5aa8ff', 'Paint plots for shops: they open where villagers live nearby'],
+  ['W', 'Workshop zone', 'craft', '#e8a92a', 'Paint plots for workshops: they make materials for the village'],
+  ['zone0', 'Erase zones', 'x', '#ff8f7a', 'Clear zones you painted (built lots stay)'],
+  ['path', 'Lay paths', 'pth', '#c9a878', 'Stone paths: hold the button and move to lay them'],
+  ['path0', 'Remove paths', 'pth0', '#e8a090', 'Hold the button and move to lift paths'],
+  ['bulldoze', 'Bulldoze', 'shovel', '#ff8f7a', 'Remove a building: half its cost comes back'],
+];
+const toolCard = z => TOOL_CARDS.find(t => t[0] === z);
+const toolArt = (g, c) => (g === 'pth' || g === 'pth0' ? `<i class="pth"></i>${g === 'pth0' ? glyph('x', 'mini') : ''}` : g === 'home' || g === 'shop' || g === 'craft' ? `<b class="tz" style="--zc:${c}">${{ home: 'R', shop: 'C', craft: 'W' }[g]}</b>${glyph(g)}` : glyph(g));
 
 export class BuildPanel extends Panel {
   constructor(ui) { super(ui, { name: 'build', title: 'Build', jp: '建てる', side: 'bottom', cls: 'p-build', icon: 'hammer' }); this.cat = null; this.sel = null; this.tool = null; }
@@ -25,7 +41,7 @@ export class BuildPanel extends Panel {
     const img = this.$?.cards.querySelector(`.card[data-id="${id}"] .cd-art img`); if (img) { img.src = url; img.classList.remove('gi'); }
   }
   init() {
-    this.extra.innerHTML = `<div class="tabs bd-tabs"></div><div class="bd-tools">
+    this.extra.innerHTML = `<span class="bd-bump pad-only" data-pg="LB"></span><div class="tabs bd-tabs"></div><span class="bd-bump pad-only" data-pg="RB"></span><div class="bd-held pad-only"></div><div class="bd-tools">
         <span class="bd-tl">Zones</span>${ZONES.map(([z, n, g, c]) => `<button class="zone" data-z="${z}" style="--zc:${c}" title="${n}"><b>${z}</b>${glyph(g)}</button>`).join('')}
         <button class="zone erase" data-z="zone0" title="Erase zones">${glyph('x')}</button>
         <span class="bd-sep"></span>
@@ -38,18 +54,19 @@ export class BuildPanel extends Panel {
       <div class="bd-side">
         <div class="bd-stats"></div>
         <div class="bd-rank"></div>
+        <div class="bd-pd pad-only"></div>
         <div class="bd-ov">${OVERLAYS.map(([m, n]) => `<button class="ovl" data-m="${m}" style="--oc:${COVERS[m]?.[0] || '#ff8fb0'}">${n}</button>`).join('')}</div>
         <div class="bh-t">Pick a building or a tool</div>
         <div class="bh-k kbm-only"><span class="kc sm">${glyph('mouseL')}</span>place <span class="kc sm">R</span>rotate <span class="kc sm">Esc</span>cancel</div>
-        <div class="bh-k pad-only"><span class="kc sm pad">${padGlyph('A')}</span>place <span class="kc sm pad">${padGlyph('Y')}</span>rotate <span class="kc sm pad">${padGlyph('X')}</span>remove <span class="kc sm pad">${padGlyph('B')}</span>cancel</div>
+        <div class="bh-k pad-only"><span class="kc sm pad">${padGlyph('A')}</span>place <span class="kc sm pad">${padGlyph('LT')}</span><span class="kc sm pad">${padGlyph('RT')}</span>rotate <span class="kc sm pad">${padGlyph('X')}</span>remove <span class="kc sm pad">${padGlyph('Y')}</span>undo</div>
       </div></div>`;
-    this.$ = { tabs: this.extra.querySelector('.bd-tabs'), cards: this.body.querySelector('.bd-cards'), hint: this.body.querySelector('.bh-t'), tools: this.extra.querySelector('.bd-tools'), stats: this.body.querySelector('.bd-stats'), rank: this.body.querySelector('.bd-rank'), ov: this.body.querySelector('.bd-ov') };
+    this.$ = { tabs: this.extra.querySelector('.bd-tabs'), cards: this.body.querySelector('.bd-cards'), hint: this.body.querySelector('.bh-t'), tools: this.extra.querySelector('.bd-tools'), stats: this.body.querySelector('.bd-stats'), rank: this.body.querySelector('.bd-rank'), ov: this.body.querySelector('.bd-ov'), pd: this.body.querySelector('.bd-pd'), held: this.extra.querySelector('.bd-held'), bumps: [...this.extra.querySelectorAll('.bd-bump')] };
     this.$.ov.addEventListener('click', e => { const b = e.target.closest('.ovl'); if (!b) return; this.overlay = this.overlay === b.dataset.m ? '' : b.dataset.m; this.opts.onOverlay?.(this.overlay || null); this.markOverlay(); this.ui.sfx?.('tab'); });
     this.$.tabs.addEventListener('click', e => { const t = e.target.closest('.tab'); if (t) { this.cat = t.dataset.c; this.render(true); this.ui.sfx?.('tab'); } });
-    this.$.cards.addEventListener('click', e => { const c = e.target.closest('.card'); if (c) this.pick(c); });
+    this.$.cards.addEventListener('click', e => { const c = e.target.closest('.card'); if (c) { if (c.dataset.z) this.pickTool(c.dataset.z); else this.pick(c); } }); // (a Tools card presses its toolbar button)
     this.$.cards.addEventListener('wheel', e => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { this.$.cards.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
     this.$.cards.addEventListener('mouseover', e => {
-      const c = e.target.closest('.card'); if (!c || c === this._hov) return; this._hov = c;
+      const c = e.target.closest('.card'); if (!c || c === this._hov || Actions.device === 'pad') return; this._hov = c; // (the pad reads the side card: ui/padCursor.js)
       const it = this.find(c.dataset.id); if (!it) return;
       this.ui.tip.show(this.tip(it), '', c);
     });
@@ -136,8 +153,10 @@ export class BuildPanel extends Panel {
     this.ui.sfx?.('select');
     if (this.sel) this.opts.onSelect?.(it.id, it); else this.opts.onCancel?.();
   }
+  /** a Tools card (the pad): press its toolbar button (setTool and the game's callback) */
+  pickTool(z) { const b = this.$.tools.querySelector(`.zone[data-z="${z}"]`); if (b) b.click(); this.markSel(); }
   markSel() {
-    for (const c of this.$.cards.children) c.classList.toggle('sel', c.dataset.id === this.sel);
+    for (const c of this.$.cards.children) c.classList.toggle('sel', c.dataset.z ? c.dataset.z === this.tool : c.dataset.id === this.sel);
     this.setTool(this.tool);
   }
   // game can clear the selection after placing
@@ -149,13 +168,25 @@ export class BuildPanel extends Panel {
       b.style.display = (z === 'bulldoze' ? this.opts.onBulldoze : z.startsWith('path') ? this.opts.onPath : this.opts.onZone) ? '' : 'none';
     }
     for (const b of this.$.tools.querySelectorAll('.bd-sep')) b.style.display = this.opts.onPath ? '' : 'none';
-    if (!this.cat || !cats.find(c => c.id === this.cat)) this.cat = cats[0]?.id || null;
-    const tabsSig = cats.map(c => c.id + (c.items || []).length).join();
+    const tools = this.toolList(), pad = Actions.device === 'pad'; // (the Tools tab: the pad's; the mouse and touch use the toolbar)
+    if (!this.cat || (this.cat === 'tools' ? !pad || !tools.length : !cats.find(c => c.id === this.cat))) this.cat = cats[0]?.id || null;
+    const tabsSig = cats.map(c => c.id + (c.items || []).length).join() + '|' + tools.length;
     if (tabsSig !== this._tabsSig) {
       this._tabsSig = tabsSig;
-      this.$.tabs.innerHTML = cats.map(c => { const C = CATS[c.id] || { g: 'sparkle', c: '#ffcf4a' }; return `<button class="tab" data-c="${c.id}" style="--tc:${C.c}" title="${esc(C.jp || '')}">${glyph(C.g)}<span>${esc(c.name || C.name)}</span></button>`; }).join('');
+      this.$.tabs.innerHTML = cats.map(c => { const C = CATS[c.id] || { g: 'sparkle', c: '#ffcf4a' }; return `<button class="tab" data-c="${c.id}" style="--tc:${C.c}" title="${esc(C.jp || '')}">${glyph(C.g)}<span>${esc(c.name || C.name)}</span></button>`; }).join('')
+        + (tools.length ? `<button class="tab bd-tooltab pad-only" data-c="tools" style="--tc:#ff9a7a">${glyph('shovel')}<span>Tools</span></button>` : '');
     }
     for (const t of this.$.tabs.children) t.classList.toggle('on', t.dataset.c === this.cat);
+    if (this._pgStyle !== Actions.padStyle) { this._pgStyle = Actions.padStyle; for (const b of this.$.bumps) b.innerHTML = `<span class="kc pad">${padGlyph(b.dataset.pg)}</span>`; }
+    if (this.cat === 'tools') {
+      if (this._cardSig !== 'tools|' + tools.join()) {
+        this._cardSig = 'tools|' + tools.join();
+        this.$.cards.innerHTML = tools.map((z, i) => { const [, n, g, c] = toolCard(z); return `<div class="card tool" data-z="${z}" style="--i:${i};--cc:${c}"><div class="cd-art">${toolArt(g, c)}</div><div class="cd-n">${esc(n)}</div><div class="cd-cost cd-tl">${z === 'bulldoze' ? 'Half back' : 'Free'}</div></div>`; }).join('');
+        if (tabChanged) { this.$.cards.scrollTop = 0; replay(this.$.cards, 'swap', 400); }
+        this.markSel();
+      }
+      return;
+    }
     const cat = cats.find(c => c.id === this.cat);
     const C = CATS[this.cat] || { g: 'sparkle', c: '#ffcf4a' };
     const items = cat?.items || [];
@@ -174,9 +205,36 @@ export class BuildPanel extends Panel {
           ${built ? `<div class="cd-built">${glyph('check')}<span>Built</span></div>` : it.locked ? `<div class="cd-lock">${glyph('lock')}<span>${esc(typeof it.locked === 'string' ? it.locked : it.req || 'Locked')}</span></div>` : ''}
         </div>`;
       }).join('') : `<div class="bd-empty">${glyph('sakura')}Nothing here yet — keep growing the village!</div>`;
-      if (tabChanged) { this.$.cards.scrollLeft = 0; replay(this.$.cards, 'swap', 400); }
+      if (tabChanged) { this.$.cards.scrollLeft = 0; this.$.cards.scrollTop = 0; replay(this.$.cards, 'swap', 400); }
       this.markSel();
     }
+  }
+  /** the tools this village offers (the toolbar's buttons the game has callbacks for) */
+  toolList() { return TOOL_CARDS.map(t => t[0]).filter(z => (z === 'bulldoze' ? this.opts.onBulldoze : z.startsWith('path') ? this.opts.onPath : this.opts.onZone)); }
+  /** the pad's side card: the focused card's piece (its name, size, cost, what it gives, why it's locked) */
+  padDetail(c) {
+    const box = this.$?.pd; if (!box) return;
+    const z = c?.dataset?.z, it = z ? null : c?.dataset?.id ? this.find(c.dataset.id) : null;
+    let h = '';
+    if (z) {
+      const [, n, g, col, d] = toolCard(z);
+      h = `<div class="pd-h"><span class="pd-ic" style="--cc:${col}">${toolArt(g, col)}</span><b>${esc(n)}</b></div><div class="pd-d">${esc(d)}</div>`;
+    } else if (it) {
+      const built = it.locked === 'Already built', miss = Object.keys(this.afford(it.cost));
+      const gives = it.cover?.kind && COVERS[it.cover.kind] ? `<span style="color:${COVERS[it.cover.kind][0]}">● ${COVERS[it.cover.kind][1]} within ${it.cover.r || '?'} tiles</span>` : it.effect ? esc(it.effect) : esc(it.desc || '');
+      const why = built ? `<div class="pd-ok">${glyph('check')}Already built</div>` : it.locked ? `<div class="pd-bad">${glyph('lock')}${esc(typeof it.locked === 'string' ? it.locked : it.req || 'Locked')}</div>` : miss.length ? `<div class="pd-bad">Need more ${miss.map(k => esc(MATERIALS[k]?.name || k)).join(', ')}</div>` : '';
+      h = `<div class="pd-h"><b>${esc(it.name)}</b>${it.size ? `<span class="pd-sz">${it.size[0]}×${it.size[1]}</span>` : ''}</div>
+        ${built ? '' : `<div class="pd-cost">${this.costHTML(it.cost) || '<span class="cost">Free</span>'}</div>`}<div class="pd-d">${gives}</div>${why}`;
+    }
+    if (h !== this._pdH) { this._pdH = h; box.innerHTML = h; }
+  }
+  /** the folded palette's chip: the piece or tool in hand (null: none) */
+  heldChip(t) {
+    const box = this.$?.held; if (!box) return;
+    let h = '';
+    if (t?.kind === 'building') { const it = this.find(t.type); if (it) h = `<span class="bh-art">${it.icon ? `<img src="${it.icon}" alt="" draggable="false">` : glyph('home')}</span><b>${esc(it.name)}</b>${it.size ? `<span class="pd-sz">${it.size[0]}×${it.size[1]}</span>` : ''}<span class="bh-cost">${this.costHTML(it.cost)}</span>`; }
+    else if (t) { const z = t.kind === 'bulldoze' ? 'bulldoze' : t.kind === 'path' ? (t.erase ? 'path0' : 'path') : ({ 1: 'R', 2: 'C', 3: 'W' }[t.zone] || 'zone0'), T = toolCard(z); if (T) h = `<span class="bh-art" style="--cc:${T[3]}">${toolArt(T[2], T[3])}</span><b>${esc(T[1])}</b>`; }
+    if (h !== this._heldH) { this._heldH = h; box.innerHTML = h; box.classList.toggle('on', !!h); }
   }
 }
 

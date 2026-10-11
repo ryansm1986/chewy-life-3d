@@ -376,7 +376,7 @@ export class VillageSim {
   buildingAt(x, z) { const i = this.occ[Math.floor(z) * WORLD + Math.floor(x)]; return i >= 0 ? this.S.buildings.find(b => b.idx === i) : null; }
   // ------------------------------------------------------------------ mutations
   // plot: the id of the plot it goes on. Plot types (PLOT_TYPES) need one, on its spot; `force` skips every check.
-  place(type, x0, z0, rot = 0, { free = false, silent = false, force = false, level = 1, plot = null, seed = null } = {}) {
+  place(type, x0, z0, rot = 0, { free = false, silent = false, force = false, level = 1, plot = null, seed = null, noXp = false } = {}) { // (noXp: no homestead XP, as build mode's undo took back a placement that had paid it: world/buildMode.js)
     const def = BUILDINGS[type]; if (!def) return null;
     const pl = plot ? PLOT_BY_ID[plot] : null;
     let chk = pl || !this.needsPlot(type) ? this.canPlace(type, x0, z0, rot, level, -1, pl?.id || null) : { ok: false, why: 'Build it on a free plot' };
@@ -396,7 +396,7 @@ export class VillageSim {
     this.spawnModel(b, !silent);
     this.refreshTiles();
     if (!silent) { Events.emit('sfx', 'build_place'); Events.emit('village:changed'); this.simulate(true); this.paintOverlay(); }
-    Events.emit('building:placed', { id: b.id, type, free }); // (a building you paid for: homestead XP, cozy/homesteadXp.js; the town's own growth is free)
+    Events.emit('building:placed', { id: b.id, type, free: free || noXp }); // (a building you paid for: homestead XP, cozy/homesteadXp.js; the town's own growth is free)
     return b;
   }
   nextIdx() { let m = -1; for (const b of this.S.buildings) m = Math.max(m, b.idx ?? -1); return m + 1; }

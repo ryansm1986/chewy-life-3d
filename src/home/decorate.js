@@ -4,9 +4,9 @@
 // onto anything with a `surface`, rugs under furniture, ceiling lamps over the floor. Click a placed item to pick it
 // up (move it, or Store it back), Ctrl+Z undoes. Wallpaper and floors apply from the palette's last tab.
 // WASD pans the camera, the wheel zooms; the player stays where they are.
-// The gamepad (docs/CONTROLS.md §2, ROADMAP CT-2): the virtual cursor (ui/padCursor.js: the left stick, the right stick
-// pans, the triggers zoom, the D-pad picks from the palette); A places / picks up, B cancels, Y / RB rotate, X stores
-// the piece in hand, LB undoes.
+// The gamepad (docs/CONTROLS.md §14.6, ROADMAP CT-11): ui/padCursor.js owns the palette (the D-pad and the bumpers),
+// the cursor (the left stick), B and the zoom; here, once the world has the focus (Actions.vcursor.world), A places or
+// picks up, X stores (the piece in hand, or the one under the cursor), LT / RT rotate the piece in hand, and Y undoes.
 import * as THREE from 'three';
 import { Input } from '../core/input.js';
 import { Actions } from '../core/actions.js';
@@ -151,15 +151,20 @@ export class Decorator {
     this.H.clampFocus(this.focus, -1.2);
     if (Input.mouse.wheel) rig.zoom(Input.mouse.wheel);
     if (G.ui?.anyModal?.()) { this.cursor && (this.cursor.count = 0); return; }
-    // keys (and the pad's buttons while its virtual cursor is on)
-    const pad = Actions.vcursor.on, ph = t => pad && Actions.padHit(t) && (Actions.padConsume(t), true);
-    if ((Input.down('ctrl') && Input.hit('z')) || ph('LB')) { Input.consume('z'); this.undo(); }
-    if ((Input.hit('delete') || Input.hit('backspace') || (this.hold && ph('X'))) && this.hold) this.storeHeld();
-    if ((Input.mouseHit(2) || ((this.sel || this.hold) && ph('B'))) && (this.sel || this.hold)) { Input.consumeMouse(2); this.cancel(); } // (B with nothing in hand leaves: ui/padCursor.js)
+    // keys (and the pad's buttons while its virtual cursor is on: A, X and LT / RT only once the world has the focus)
+    const pad = Actions.vcursor.on, world = pad && Actions.vcursor.world, ph = t => pad && Actions.padHit(t) && (Actions.padConsume(t), true), pw = t => world && Actions.padHit(t) && (Actions.padConsume(t), true);
+    if ((Input.down('ctrl') && Input.hit('z')) || ph('Y')) { Input.consume('z'); this.undo(); }
+    if ((Input.hit('delete') || Input.hit('backspace')) && this.hold) this.storeHeld();
+    if (pw('X')) { if (this.hold) this.storeHeld(); else if (this.sel) this.cancel(); else this.storeAt(this.itemAtMouse()); } // (the pad: the piece in hand, or the one under the cursor)
+    if (Input.mouseHit(2) && (this.sel || this.hold)) { Input.consumeMouse(2); this.cancel(); } // (the pad's B: ui/padCursor.js)
     const overUI = pad ? false : Input.mouse.overUI;
     const id = this.hold?.it.id || this.sel;
     if (!id) { this.hover(overUI); return; }
-    if ((Input.hit('r') || ph('Y') || ph('RB')) && FURNITURE[id].mount !== 'wall') { this.rot = (this.rot + 1) % 4; Events.emit('sfx', 'ui_tab'); }
+    if (Input.hit('r') && FURNITURE[id].mount !== 'wall') { this.rot = (this.rot + 1) % 4; Events.emit('sfx', 'ui_tab'); }
+    if (world && (Actions.padHit('LT') || Actions.padHit('RT'))) { // (RT a quarter clockwise, LT back; a wall piece doesn't turn)
+      const d = Actions.padHit('RT') ? 1 : 3; Actions.padConsume('LT'); Actions.padConsume('RT');
+      if (FURNITURE[id].mount === 'wall') Events.emit('sfx', 'ui_error'); else { this.rot = (this.rot + d) % 4; Events.emit('sfx', 'ui_tab'); }
+    }
     const cand = overUI ? this.lastCand : this.candidate(id);
     if (!overUI) this.lastCand = cand;
     if (!cand) { this.ghost && (this.ghost.visible = false); this.cursor.count = 0; G.ui?.setInteract?.(FURNITURE[id].mount === 'wall' ? 'Point at a back wall' : FURNITURE[id].mount === 'table' ? 'Point at a table or a shelf' : 'Point at the floor', pad ? { key: null } : undefined); return; }
@@ -168,20 +173,32 @@ export class Decorator {
     const chk = canPlace(W.layout, this.items, cand, { skip: this.hold?.it || null, player: { x: pcx, z: pcz }, guests });
     this.showGhost(cand, chk.ok, dt);
     this.showCells(cand, chk.ok);
-    if (pad) G.ui?.setInteract?.(chk.ok ? `${this.hold ? 'Put down' : 'Place'} the ${FURNITURE[id].name}${FURNITURE[id].mount === 'wall' ? '' : ` · ${Actions.tokenName('Y', 'pad')} rotates`}` : chk.why, { key: chk.ok ? 'pad:interact' : null });
+    if (pad) G.ui?.setInteract?.(chk.ok ? `${this.hold ? 'Put down' : 'Place'} the ${FURNITURE[id].name}` : chk.why, { key: chk.ok ? 'pad:interact' : null }); // (the hint bar names the rest)
     else G.ui?.setInteract?.(chk.ok ? `Click to ${this.hold ? 'put down' : 'place'} the ${FURNITURE[id].name}${FURNITURE[id].mount === 'wall' ? '' : ' · R to rotate'}` : chk.why);
-    if ((Input.mouseHit(0) && !overUI) || ph('A')) {
+    if ((Input.mouseHit(0) && !overUI) || pw('A')) {
       Input.consumeMouse(0);
       if (chk.ok) this.place(cand); else { Events.emit('sfx', 'ui_error'); this.G.ui?.float?.(this.ghost.position.clone().setY(this.ghost.position.y + 1), chk.why, { kind: 'status', color: '#ffb0bc' }); }
     }
   }
   /** what's under the mouse when nothing is in hand: highlight it, and a click picks it up */
   hover(overUI) {
-    const G = this.G, it = overUI ? null : this.itemAtMouse(), pad = Actions.vcursor.on;
+    const G = this.G, pad = Actions.vcursor.on, world = !pad || Actions.vcursor.world, it = overUI || !world ? null : this.itemAtMouse();
     this.showHover(it);
-    if (pad) G.ui?.setInteract?.(it ? `Move the ${FURNITURE[it.id].name}` : 'Pick something with the D-pad · point at furniture to move it', { key: it ? 'pad:interact' : null });
+    if (pad) G.ui?.setInteract?.(it ? `Move the ${FURNITURE[it.id].name}` : null, { key: it ? 'pad:interact' : null }); // (the palette has the focus, or nothing is under the paw: the hint bar says the rest)
     else G.ui?.setInteract?.(it ? `Click to move the ${FURNITURE[it.id].name}` : 'Pick something from the palette · click furniture to move it');
     if (it && (Input.mouseHit(0) || (pad && Actions.padHit('A')))) { Input.consumeMouse(0); Actions.padConsume('A'); this.pickUp(it); }
+  }
+  /** the pad's X with nothing in hand: the piece under the cursor back to storage (with what stands on it; a villager's
+   *  own piece stays theirs) */
+  storeAt(it) {
+    if (!it) { Events.emit('sfx', 'ui_error'); return; }
+    const kids = it.mount === 'floor' || it.mount === 'table' ? this.items.filter(o => o.mount === 'table' && o.on === it.k) : [];
+    if ([it, ...kids].some(o => o.own)) {
+      const sp = poseOf(it, this.items), who = this.H.home?.owner ? this.H.nameOf(this.H.home.owner) : 'They';
+      this.G.ui?.float?.(new THREE.Vector3(ORIGIN + sp.x, sp.y + 0.9, ORIGIN + sp.z), `${who}'s — you can move it, not take it`, { kind: 'status', color: '#ffb0bc' });
+      Events.emit('sfx', 'ui_error'); return;
+    }
+    this.pickUp(it); this.storeHeld();
   }
   ray() { const G = this.G, m = Actions.pointer(); _rc.setFromCamera({ x: m.nx, y: m.ny }, G.engine.camera); return _rc.ray; } // (the mouse, or the pad's virtual cursor)
   itemAtMouse() {

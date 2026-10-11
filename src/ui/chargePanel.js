@@ -5,7 +5,8 @@
 // R-16: which skill it shows is picked on the drawer itself: a strip of the tree's chargeable skills at its top (learned
 // ones bright, unlearned dimmed but open to preview, the shown one raised with its points spent). The tree's active
 // nodes also carry a ⚡ chip (points spent; it glows when a perk can be bought) that picks it, learning or assigning a
-// skill picks it, the pad's LT / RT step through the strip, and each tree remembers its pick.
+// skill picks it, a flick of the pad's right stick steps through the strip (CT-11: LT / RT are the skill trees in the pad's
+// tabbed menu), and each tree remembers its pick.
 import { el, esc, replay } from './dom.js';
 import { glyph } from './glyphs.js';
 import { padGlyph } from './padGlyphs.js';
@@ -49,7 +50,7 @@ export class ChargeDrawer {
     this.sel = {}; // (each tree's pick: { [tree]: skillId })
     const d = this.el = el('div', 'chg-drawer');
     d.innerHTML = `<div class="chg-tag">${glyph('zap')}<span>Charge</span><i class="chg-jp">溜め</i></div>
-      <div class="chg-pl"><span class="chg-plt">${PICK_HTML}</span><i class="chg-plc"></i><span class="chg-plk pad-only"><span class="kc sm pad">${padGlyph('LT')}</span><span class="kc sm pad">${padGlyph('RT')}</span></span></div>
+      <div class="chg-pl"><span class="chg-plt">${PICK_HTML}</span><i class="chg-plc"></i><span class="chg-plk pad-only"><span class="kc sm pad">${padGlyph('RS')}</span></span></div>
       <div class="chg-pick" role="group" aria-label="${PICK_LABEL}"></div>
       <div class="chg-head"><div class="chg-ic"><img alt="" draggable="false"></div><div class="chg-ht"><b class="chg-name"></b><span class="chg-sub"></span></div></div>
       <div class="chg-blurb"></div>
@@ -92,7 +93,7 @@ export class ChargeDrawer {
     this.ui.tip?.hide();
     this.ui.sfx?.('tab');
   }
-  /** step through the shown tree's strip (the pad's LT / RT): d = ±1, wrapping */
+  /** step through the shown tree's strip (the pad's right-stick flick: ui/padNav.js): d = ±1, wrapping */
   cycle(d) {
     const ids = chargeSkillsOf(this.sp.tree); if (!ids.length) return;
     const i = ids.indexOf(this.id);

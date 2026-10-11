@@ -56,11 +56,15 @@ export const ACTIONS = {
   map: { label: 'Map', group: 'menus', kbm: ['m'], pad: ['View'] },
   build: { label: 'Build (village) · decorate (indoors)', group: 'menus', kbm: ['b'], pad: [] },
   menu: { label: 'Close · game menu', group: 'menus', kbm: ['escape'], pad: ['Menu'], fixed: true },
-  place: { label: 'Place · paint · pick up (build, decorate)', group: 'build', kbm: ['mouse0'], pad: ['A'], fixed: true },
-  rotate: { label: 'Rotate (build, decorate)', group: 'build', kbm: ['r'], pad: ['Y', 'RB'], fixed: true },
+  // build and decorate (CT-11, docs/CONTROLS.md §14.5: the pad's D-pad and bumpers drive the palette, the sticks the world)
+  category: { label: 'Category tabs (build, decorate)', group: 'build', kbm: [], pad: ['LB', 'RB'], fixed: true },
+  choose: { label: 'Choose a piece (build, decorate)', group: 'build', kbm: [], pad: ['DPad'], fixed: true },
+  place: { label: 'Pick up · place · paint (build, decorate)', group: 'build', kbm: ['mouse0'], pad: ['A'], fixed: true },
+  rotate: { label: 'Rotate (build, decorate)', group: 'build', kbm: ['r'], pad: ['LT', 'RT'], fixed: true },
   remove: { label: 'Remove (build) · store (decorate)', group: 'build', kbm: ['delete'], pad: ['X'], fixed: true },
-  camTurn: { label: 'Turn the camera (build) · zoom (decorate)', group: 'build', kbm: ['q', 'e'], pad: ['LT', 'RT'], fixed: true },
-  undo: { label: 'Undo (decorate)', group: 'build', kbm: ['ctrl+z'], pad: ['LB'], fixed: true },
+  camTurn: { label: 'With nothing in hand: turn the camera (build) · zoom (decorate)', kbmLabel: 'Turn the camera (build)', group: 'build', kbm: ['q', 'e'], pad: ['LT', 'RT'], fixed: true },
+  undo: { label: 'Undo (build, decorate)', group: 'build', kbm: ['ctrl+z'], pad: ['Y'], fixed: true },
+  buildBack: { label: 'Put it back · with nothing in hand: done', group: 'build', kbm: ['escape'], pad: ['B'], fixed: true },
 };
 export const ACTION_GROUPS = [['play', 'Play'], ['menus', 'Menus'], ['build', 'Build and decorate']];
 // actions that may share a button with each other (D-pad down: a tap interacts, a hold shows the loot labels)
@@ -68,8 +72,8 @@ const SHARE = [['interact', 'lootLabels'], ['reel', 'skill3'], ['nextTarget', 'l
 
 const KEY_NAMES = { space: 'Space', shift: 'Shift', escape: 'Esc', tab: 'Tab', alt: 'Alt', ctrl: 'Ctrl', enter: 'Enter', up: '↑', down: '↓', left: '←', right: '→', '`': '`', delete: 'Del', backspace: 'Bksp', mouse0: 'LMB', mouse1: 'MMB', mouse2: 'RMB', mouse3: 'Mouse 4', mouse4: 'Mouse 5', wasd: 'WASD', mouse: 'Mouse' };
 const PAD_NAMES = {
-  xbox: { A: 'A', B: 'B', X: 'X', Y: 'Y', LB: 'LB', RB: 'RB', LT: 'LT', RT: 'RT', View: 'View', Menu: 'Menu', L3: 'L3', R3: 'R3', DUp: 'D-pad ▲', DDown: 'D-pad ▼', DLeft: 'D-pad ◀', DRight: 'D-pad ▶', 'L3+R3': 'L3 + R3', LS: 'Left stick', RS: 'Right stick', Home: 'Home' },
-  ps: { A: '✕', B: '○', X: '□', Y: '△', LB: 'L1', RB: 'R1', LT: 'L2', RT: 'R2', View: 'Create', Menu: 'Options', L3: 'L3', R3: 'R3', DUp: 'D-pad ▲', DDown: 'D-pad ▼', DLeft: 'D-pad ◀', DRight: 'D-pad ▶', 'L3+R3': 'L3 + R3', LS: 'Left stick', RS: 'Right stick', Home: 'PS' },
+  xbox: { A: 'A', B: 'B', X: 'X', Y: 'Y', LB: 'LB', RB: 'RB', LT: 'LT', RT: 'RT', View: 'View', Menu: 'Menu', L3: 'L3', R3: 'R3', DUp: 'D-pad ▲', DDown: 'D-pad ▼', DLeft: 'D-pad ◀', DRight: 'D-pad ▶', DPad: 'D-pad', 'L3+R3': 'L3 + R3', LS: 'Left stick', RS: 'Right stick', Home: 'Home' },
+  ps: { A: '✕', B: '○', X: '□', Y: '△', LB: 'L1', RB: 'R1', LT: 'L2', RT: 'R2', View: 'Create', Menu: 'Options', L3: 'L3', R3: 'R3', DUp: 'D-pad ▲', DDown: 'D-pad ▼', DLeft: 'D-pad ◀', DRight: 'D-pad ▶', DPad: 'D-pad', 'L3+R3': 'L3 + R3', LS: 'Left stick', RS: 'Right stick', Home: 'PS' },
 };
 // panels (and Home) the pad reaches through the game menu: their text names the Menu button
 const VIA_MENU = new Set(['inventory', 'pantry', 'character', 'skills', 'quests', 'map', 'home']);
@@ -197,6 +201,11 @@ export const Actions = {
     this.nav = null;
     if (nd !== this._nav) { this._nav = nd; this._navT = 0.38; this.nav = nd; }
     else if (nd && (this._navT -= dt) <= 0) { this._navT = 0.11; this.nav = nd; }
+    // the D-pad alone, with the same repeat (build and decorate: the D-pad walks the palette, the stick the cursor; CT-11)
+    const dd = C.has('DUp') ? 'up' : C.has('DDown') ? 'down' : C.has('DLeft') ? 'left' : C.has('DRight') ? 'right' : null;
+    this.dnav = null;
+    if (dd !== this._dnav) { this._dnav = dd; this._dnavT = 0.38; this.dnav = dd; }
+    else if (dd && (this._dnavT -= dt) <= 0) { this._dnavT = 0.11; this.dnav = dd; }
     if (this.pPressed.size || lm > ACT_STICK || Math.hypot(rx, ry) > ACT_STICK) this.setDevice('pad');
     Touch.poll(dt); // (the touch buttons' edges and hold times: core/touch.js)
     const tm = Touch.stick.on ? Touch.stick.mag : 0; this.tsPush = tm > 0.6 && (this._tsM || 0) <= 0.6; this._tsM = tm;

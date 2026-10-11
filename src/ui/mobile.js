@@ -269,26 +269,11 @@ export class Mobile {
     if (this.touchy !== (this.ml || Actions.device === 'touch')) this.layout();
     if (this.phone) this.pairs();
     if (this.floorDirty && this.touchy) { this.floorDirty = false; this.floor(); }
-    if (this.touchy && !this.phone && this.ui._order.length && (this._fitN = (this._fitN || 0) + 1) % 3 === 0) this.fitTall();
     if (this.tipUntil && performance.now() > this.tipUntil) { this.tipUntil = 0; this.ui.tip.hide(); }
     // CT-6: the zoom and full screen, twice a second (the events cover most of it; this catches what they miss)
     if (this.touchy && (this._ct6 = (this._ct6 || 0) + 1) % 30 === 0) { this.zoomCheck(); if (this.fsPending || this.fsLike() !== this.fsNow) this.fsCheck(); }
   }
-  /** CT-7: a tablet's panel taller than the screen (Settings and Controls on an iPad; a foldable or a phone-sized tablet)
-   *  gets .m-fit: it sits between the safe area's margins with its body scrolling inside, as a phone's panels do
-   *  (mobile.css). A panel that fits keeps its own layout. Its natural height is its box plus what its body scrolls */
-  fitTall() {
-    const ui = this.ui, sf = this.sf || this.safe(), H = innerHeight;
-    for (const n of ui._order) {
-      const P = ui.panels[n], w = P?.wrap;
-      if (!w || !P.isOpen || P.side === 'bottom' || !P.panel || !P.body) continue;
-      const fit = w.classList.contains('m-fit'), z = P.panel.currentCSSZoom ?? this.pscale ?? 1;
-      const nat = (P.panel.offsetHeight + (fit ? P.body.scrollHeight - P.body.clientHeight : 0)) * z;
-      // where it would sit unfitted: centred 20 px (40 at the sides) above the middle (style.css .pw.side-*)
-      const cy = H / 2 - (P.side === 'center' ? 20 : 40) * z, over = cy - nat / 2 < sf.t + 8 || cy + nat / 2 > H - sf.b - 8;
-      if (over !== fit) w.classList.toggle('m-fit', over);
-    }
-  }
+  // (CT-7's fitTall(), a tablet's tall panel fitted between the safe area's margins, is ui/fit.js's now, for every screen: CT-10)
   /** raise any text the menus still draw under 12 px (after the scale and mobile.css): an inline size on its element */
   floor() {
     const scopes = this.ui.root.querySelectorAll(FLOOR_SCOPE);

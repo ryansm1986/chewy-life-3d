@@ -16,7 +16,7 @@
 .fl.k-status { font-size: 16px; text-transform: uppercase; letter-spacing: 1.2px; }
 
 /* toasts */
-.toasts { position: absolute; left: 18px; bottom: 26px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; pointer-events: none; }
+.toasts { position: absolute; left: 18px; bottom: 38px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; pointer-events: none; }
 .toast { position: relative; display: flex; align-items: center; gap: 10px; max-width: 350px; padding: 7px 16px 10px 7px; overflow: hidden; cursor: pointer; pointer-events: auto;
   background: var(--paper-noise), linear-gradient(#fffcf6, #fff0de); border: 3px solid var(--ink); border-radius: 18px; box-shadow: 0 4px 0 rgba(74, 44, 42, .35), 0 10px 20px rgba(40, 20, 40, .16);
   font: 600 15.5px/1.25 var(--font); animation: toastIn .6s var(--soft) both; }

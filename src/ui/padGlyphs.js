@@ -69,7 +69,7 @@ export function padGlyph(t, style = Actions.padStyle) {
   if (S[t]) out = svg(S[t]());
   else if (t === 'LB' || t === 'RB') out = svg(bumper(B[t], t === 'RB'));
   else if (t === 'LT' || t === 'RT') out = svg(trigger(B[t]));
-  else if (ARM[t]) out = svg(dpad(t));
+  else if (ARM[t] || t === 'DPad') out = svg(dpad(t)); // ('DPad': the whole D-pad, no arm lit: "the D-pad chooses")
   else if (t === 'LS' || t === 'RS') out = svg(stick(t[0], 16, 12.6, 12.5, true));
   else if (t === 'L3' || t === 'R3') out = svg(stick(t, 16, 12.6, 11));
   else if (t === 'L3+R3') out = svg(stick('L3', 11, 10, 9) + stick('R3', 37, 10, 9) + txt('+', 24, 15.6, 12, INK, 0), true);
@@ -109,6 +109,8 @@ export function keyHint(label) {
   if (Actions.device !== 'pad') return null;
   const v = /^(tap|hold|press|click|use) (.+)$/i.exec(String(label).trim()); // ("*Tap Tab*", "*hold Tab*")
   if (v) { const g = keyHint(v[2]); return g && `<b>${v[1]}</b> ${g}`; }
+  const p = /^pad:([A-Za-z0-9]+(?:\+[A-Za-z0-9]+)*)$/.exec(String(label).trim()); // ("*pad:A*", "*pad:LT+RT*": a pad button by name, in a line said only on the pad: CT-11)
+  if (p) return p[1].split('+').map(t => `<span class="kc sm pad inline">${padGlyph(t)}</span>`).join('');
   const a = Actions.forKey(label); if (!a) return null;
   const inner = capInner(a, 'pad'); if (!inner) return null;
   return `<span class="kc sm pad inline" data-act="${a}">${inner}</span>`;

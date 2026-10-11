@@ -205,7 +205,7 @@ const page1 = async (qs, o) => { const L = await launch(o || { w: 1600, h: 900 }
   await shot(page, 'phone-heroes');
   const audit = async () => page.evaluate(() => {
     const p = document.querySelector('.p-debug'), r = p.getBoundingClientRect(), small = [], tiny = [];
-    for (const b of p.querySelectorAll('button')) { const q = b.getBoundingClientRect(); if (!q.width) continue; if (q.height < 43.5 && !b.classList.contains('ph-x')) small.push(b.textContent.trim().slice(0, 20) + ':' + Math.round(q.height)); }
+    for (const b of p.querySelectorAll('button')) { const q = b.getBoundingClientRect(); if (!q.width) continue; if (q.height < 43.5 && !b.classList.contains('ph-x') && !b.classList.contains('fit-more')) small.push(b.textContent.trim().slice(0, 20) + ':' + Math.round(q.height)); }
     for (const e of p.querySelectorAll('*')) { if (!e.childNodes.length || ![...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue; const fs = parseFloat(getComputedStyle(e).fontSize); if (fs < 11.9 && !e.closest('.jp, .ph-jp')) tiny.push(e.textContent.trim().slice(0, 16) + ':' + fs); }
     const head = p.querySelector('.ph').getBoundingClientRect();
     return { fits: r.top >= -1 && r.bottom <= innerHeight + 1, titleAtBottom: head.top > r.top + r.height / 2, phone: window.G.ui.root.classList.contains('m-phone'), small: small.slice(0, 6), tiny: tiny.slice(0, 6) };

@@ -702,6 +702,7 @@ export async function boot() {
     if (urgent) return false;
     if (G.tutorials?.busy || ui?.tutorial?.offering) return true; // (a guide is talking: Shadow's tips wait)
     if (G.life?.fishing?.s || G.cozy?.scav?.busy) return true; // (a cast, a bite or a reel, or a dig: tips wait; on a phone a tip covers the reel bar / the dig ring)
+    if (G.build?.active || G.housing?.decor?.active) return true; // (building or decorating: a tip would cover the palette, CT-11)
     const now = performance.now();
     if (ui?.banners?.busy) hintBannerT = now; // (a beat of calm after a banner, e.g. the victory, before any tip)
     if (ui?.anyModal?.() || now - hintBannerT < 3000 || ui?.toasts?.busy) return true;

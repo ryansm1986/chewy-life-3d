@@ -49,16 +49,7 @@ body.touch-active .ch-pts .tt-dim { display: none; }
 .ui-root.m-phone .p-travel .tv-map { zoom: .76; }
 .ui-root.m-phone .p-travel .tv-side { max-height: 334px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; touch-action: pan-y; scrollbar-width: thin; scrollbar-color: rgba(74, 44, 42, .35) transparent; }
 .ui-root.m-phone .p-travel .tv-go { position: sticky; bottom: 0; z-index: 3; flex: none; }
-/* a tablet's panel taller than the screen (Settings and Controls on an iPad, a phone-sized tablet or a foldable: ROADMAP
-   CT-7) fits it the same way, between the safe area's margins with its body scrolling inside. ui/mobile.js fitTall()
-   sets .m-fit only on a panel that needs it, so the panels that already fit keep their own layout (title on top) */
-.ui-root.m-tablet .pw.m-fit:not(.side-bottom) { top: var(--m-top); bottom: var(--m-bot); display: flex; flex-direction: column; justify-content: center; translate: none !important; }
-.ui-root.m-tablet .pw.m-fit:is(.side-left, .side-right) { transform: none; }
-.ui-root.m-tablet .pw.m-fit.side-center { transform: translateX(-50%); }
-.ui-root.m-tablet .pw.m-fit:not(.side-bottom) > .panel { max-height: 100%; min-height: 0; display: flex; flex-direction: column; }
-.ui-root.m-tablet .pw.m-fit:not(.side-bottom) > .panel > .ph { flex: none; }
-.ui-root.m-tablet .pw.m-fit:not(.side-bottom) .pb { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; touch-action: pan-y;
-  scrollbar-width: thin; scrollbar-color: rgba(74, 44, 42, .35) transparent; padding-right: 2px; }
+/* a tablet's panel taller than the screen (CT-7) is fitted by ui/fit.js now, as on every screen but a phone (fit.css, CT-10) */
 /* a modal (the game menu) scrim covers the screen, whatever the panel's box */
 .ui-root.m-phone .pw .modal-bg { position: fixed; inset: -50vh -50vw; left: -50vw; top: -50vh; width: 200vw; height: 200vh; }
 

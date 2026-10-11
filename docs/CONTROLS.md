@@ -6,7 +6,10 @@ built through checkpoint 2 and in review: §12 (the touch device, the play contr
 mobile layout, the Mobile preset, perf and memory). The real-phone checks are in [ITCH.md](ITCH.md) ("Mobile").
 CT-6 and CT-7 (iPad and phone fixes) are §12.9 and §12.10. **CT-8, auto targeting**, is §13: designed and built,
 checkpoints 1 and 2 (all five heroes, the words, the marker by a drop; in review). As built: §13.9 and §13.10.
-Tracked in [ROADMAP.md](ROADMAP.md) as CT-1 to CT-8.
+**CT-11, controller menus on the bumpers** (the owner's Deck report), is §14: the design and the pad's binding map,
+build mode on the pad (checkpoint 1, approved), then decorate mode on the pad, the decorating guide in the pad's words
+and the tabbed main menu (§14.11, in review).
+Tracked in [ROADMAP.md](ROADMAP.md) as CT-1 to CT-11.
 
 The owner's goals:
 - **controller first**, in a **console ARPG** style (Diablo on console);
@@ -307,6 +310,7 @@ The default mapping uses Xbox names (the Deck's face buttons match):
 - **Title and dialogue**: the title's buttons and dialogue choices keep their small CT-1 handlers.
 
 ### 9.3 Build and decorate: the virtual cursor (`src/ui/padCursor.js`, `ui.padCursor`)
+CT-11 replaced the pad controls below for both modes with §14.5 and §14.6 (the bumpers, the grid, three states).
 - **The cursor**: a paw pointer that the left stick moves (820 px/s at full tilt, scaled by the UI scale). It is
   published as `Actions.vcursor`.
   - `Actions.pointer()` returns the mouse or the cursor. Build mode's `cursorTile` and inspect card, and decorate's
@@ -420,7 +424,7 @@ The default mapping uses Xbox names (the Deck's face buttons match):
 - **Toasts** move up above the hotbar row: at 1280 wide the health orb reached in under them.
 - **The glyph footer** (`padNav`) for a panel as tall as the screen (Settings) now sits beside the panel's bottom
   corner, not over its title. In the safe area it keeps 14 px from the edges. Build mode's hint bar drops below the
-  safe area's top.
+  safe area's top. (CT-10: that corner was on the hotbar; it keeps clear of the HUD now, §10.5.)
 - **Glyph caps never shrink** in a flex row (`.kc.pad { flex: none }`). In build mode's side panel the A / Y / X / B
   caps had been squeezed over the first letters of "place / rotate / remove / cancel" at 1280 wide.
 - On the pad, the number keys on the gift and seed cards are hidden. The Pantry's "Press F at your garden bed" shows
@@ -482,6 +486,106 @@ The default mapping uses Xbox names (the Deck's face buttons match):
   - fewer bloom mips;
   - SMAA at Medium;
   - a lower particle cap.
+
+### 10.5 As built: CT-10, the owner's Deck report (2026-10-10)
+The report, from the 0.6.5 AppImage on a real Deck in Game Mode: "The settings screen does not fit vertically on a Steam
+Deck" and "The skill bar and the system tooltips overlap in the bottom right part of the screen".
+- **Why Settings ran off the Deck.** Settings had grown to 17 rows (Shadow leads the way, Dig with Shadow, Fishing,
+  Autosave, About with Check for updates, the app's Full screen, the debug row) in one 470 px column: 972 px tall on an
+  800 px screen at the Deck's 0.92, from −99 to 873. Controls' Controller and Touch tabs ran off too. No panel had a fit
+  on the Deck: CT-7's (`Mobile.fitTall`) was for tablets only. Graphics' five presets and Autosave's four also ran past
+  the panel's side (the 1280×720 polish item: the same overflow at every size).
+- **Why the bottom right overlapped.** At the Deck's 1.15 UI the design canvas is 1391 px wide, not 1600. The hotbar's
+  group (the orbs and the dock, 889 px) is centred, and the bottom-right tray of seven buttons (with Demand and Build
+  above it) is anchored right, so the tray sat on the mana orb, 133 px into it. The pad's glyph footer ("A Select · B
+  Back") made it worse: beside a panel as tall as the screen it went to the panel's bottom corner, on the hotbar. The
+  toasts, raised above the hotbar for the Deck (§10.3), sat on the Stats badge. 125% UI on any 16:9 desktop is the same
+  1280-px canvas, so it had all of this too.
+- **Why the audits passed.** `deck-ui.mjs` wasn't in run-all, and nothing ran it after 0.6.4 added rows; run on 0.6.5 it
+  fails. It also compared panels with the bare screen (2 px of slack), never with the safe area, never checked a body's
+  content, the panel's sides or the HUD's pieces against each other, and a browser never shows the app's own rows. Its
+  bag, character and decorate views named classes that don't exist (`.p-inventory`, `.p-character`, `.p-decorate`), so
+  their text was never audited (s26 f had the same `.p-inventory`). desktop-ui only checked header buttons inside
+  their panels, so the K panel at 125% (top at −36 to −53 px) passed.
+- **Every panel fits now, on every screen** (`src/ui/fit.js`, `fit.css`; `ui.fit`).
+  - The room is the HUD layer's box (the safe area: the Deck's margins, a notch, CT-6's itch insets) less 8 px, and the
+    ✕'s 16 px over the top corner.
+  - A panel taller than the room gets `.m-fit`: it sits between the room's top and bottom, its title, tabs and ✕ in
+    place, and its body scrolls inside. A panel that fits but would cross the room where it sits (the K panel at 125%)
+    is moved in instead (`margin-top`). A drag is dropped when a panel is fitted.
+  - The K panel's Charge drawer (R-16) hangs down the panel's right edge and slides up it, as far as 16 px under the
+    panel's top, when it would run off the screen's foot (`chargePanel.js` `fit`). So the K panel's top must leave
+    room below for its tree's tallest drawer; where the room's 8 px margin is in the way, the margin gives way (never
+    the ✕: `--fit-up`), and the drawer re-places itself whenever the panel moves. At 1280×720 and 125% the K panel is
+    fitted from 16 px (its ✕ at the screen's top), its tree scrolling, and Whirlwind Stance's drawer ends at 717 of
+    720 (a first version had moved the K panel to 24 px and left that drawer's foot 5 px off the screen: s19 i caught
+    it).
+  - It runs when a panel opens (`UI.open`), on a view change (`menu.setView`), on a resize or UI size change, and every
+    fourth frame while a panel is open (the HUD's check twice a second). Phones keep their always-fitted layout
+    (mobile.css); CT-7's tablet fit is this one now.
+  - On a phone the body is the one thing that scrolls: Controls' list of bindings grows into it instead of scrolling
+    inside it. Elsewhere the list keeps its own scroll, so a panel's size never depends on whether it was fitted.
+  - A bar laid over the panels' top (CT-11's tab strip, say) marks itself `.fit-above`, and the room starts under it
+    (the audit's `panelFit` reads it too).
+  - **The scroll hint**: a body that scrolls fades at an edge with more beyond it, and a small chevron at its foot says
+    there's more below (a click or tap scrolls it down).
+  - **The pad** (`padNav`): the focus scrolls its row into view inside the body (`scrollIntoView`, with 14 px of room:
+    `scroll-margin-block`), and the ring hides while its row is scrolled out of view by a finger or the wheel.
+- **Settings in two columns** (`menu.js` `fitRoom`, `panels.css`): Picture & sound (Graphics, Frame cap, Show FPS, Full
+  screen, UI size, Music, Sound FX, Screen shake) and Play (Charge on hold, Sprint, Dig with Shadow, Shadow leads the
+  way, Fishing, Autosave, Controls, About, Debug), side by side where the room is 1160 px wide or more (the Deck, every
+  16:9 desktop up to 125%, an iPad). On the Deck all of it fits with no scrolling: 651 px tall, from 62 to 713. A
+  narrower room gets two compact columns (§12.11), and under 700 px one column, 620 px wide. A row whose control doesn't
+  fit beside its name wraps it under, to the right, in every menu view, so nothing runs past the side.
+- **The HUD's bottom row** (`Fit.hud`, `.hud-tight`): where the group and the tray would meet, the tray folds into two
+  rows (4 + 3) in the corner, and the group moves left until it clears it by 16 px (`--bc-dx`: none to 16 px on the
+  Deck, as wide as the belt is; 29 px at 125% on a 16:9 screen). At 100% on a 16:9 screen nothing changes: there the
+  tray just touches the orb's box (3 px), as designed, and the audit allows that much. Where the group's left orb
+  reaches under the toasts' column, the toasts rise above the level badges (`.hud-toasts-up`, 230 px). Touch is
+  untouched (its hotbar lives in the touch buttons).
+- **The saving glyph** moved under the toasts' column (8 px up; the desktop's toasts start at 38, from 26): an autosave
+  comes with a quest's or a level's toast, and the two met at 34 px (desktop-ui found it at 1280×720).
+- **With a panel open the toasts and banners draw under the panels** (`.has-panel`; build and decorate keep theirs over
+  the palette), so a toast never covers a menu's rows: Shadow's tips had sat over the iPad's Settings at the top centre,
+  and the Deck's toast column reaches into Settings' left column.
+- **The pad's glyph footer** keeps clear of the HUD (`Fit.hudRects`: the orbs, the dock, the tray, Demand, Build, the
+  badges, the minimap, the portrait, the quest tracker, the coins and clock, the toasts). It tries under the panel,
+  above it, beside it (right, then left) as low as is clear, then over the panel's bottom edge, else just inside its
+  bottom-right corner. The K panel's docked Charge drawer counts as the panel. Too wide for the room beside the panel,
+  it wraps to that room (the K panel's six hints in two rows). A toast that arrives moves it within 0.1 s. Build and
+  decorate's footer keeps between the portrait and the minimap (`--pc-max`).
+- **The text floor** gained what the audits now reach: the bag's slot names, the character sheet's Experience,
+  decorate's counts and tip, a toast's second line and a buff's seconds.
+- **Polish**: the web title's footer shows the version from package.json (it said "v0.1"; the desktop app already
+  showed its own). `npm run fonts` re-run: the woff2 subsets come out byte for byte the same, because neither Fredoka
+  nor M PLUS Rounded has ⚔ or 🧺 (they show in the system's symbol font, as before); `chars.txt` lists them now, so
+  build-itch's drift note is clean.
+- **The audits** (`tools/qa/ui-audit-lib.mjs`):
+  - `panelFit()`: every open panel inside the room top to bottom and side to side; its ✕, title-row buttons and tabs on
+    the screen; a body taller than its box must scroll, and scrolled to its foot (with any list scrolling inside it) its
+    last row must show; nothing past the panel's sides unless a sideways-scrolling row clips it.
+  - `hudOverlap()`: the HUD's pieces and what floats over the play area (toasts, the saving glyph, the level badges, the
+    crews and run chips, the prompt, the glyph footer, the FPS line, the touch buttons) must not overlap or leave the
+    screen. The orbs sit in the dock's ends by design; a HUD piece under an open panel is hidden there. deck-ui and
+    mobile-ui count an overlap when it is still there 0.4 s later (a toast sliding in, or pushing the stack up, moves
+    the glyph footer within 0.1 s).
+  - `panelFit()` also flags the title screen drawing over an open panel: the audits open Settings from the title with
+    the title's own Settings button, which tucks the title away (opening the menu directly, as they had, left the
+    title's logo and buttons over it).
+  - **`deck-ui.mjs`** runs both in every scene, as the desktop app on a Deck (a `window.pawhaven` stub: the Full screen
+    row, About's Check for updates, the update card with notes; `APP=0` for a plain browser), with Settings at its
+    tallest (the debug row) in every view (the menu, Settings, Controls' three tabs, the update card) from the game and
+    from the title. The pad walks Settings and Controls › Touch top to bottom: the ring on the screen and in the body's
+    view at every stop. The HUD is checked busy (both badges, three toasts, the saving glyph), in a Burrow fight with a
+    dozen foes and skills going off, and with the K panel and the bag open in it. Its scope names are fixed.
+  - **s26 g)** keeps the case in run-all: the app's Settings at its tallest fits in every view, and the busy HUD and the
+    K panel's footer keep apart. Run against 0.6.5's own build (`BASE=` its production server) the new s26 fails 7/10:
+    f (the bag's slot names under the floor, now its scope is right) and both g checks (Settings off the room with its
+    ✕ off the screen and Graphics past its side; the tray on the mana orb, a toast on the Stats badge, the glyph footer
+    on the left orb and the hotbar), as the owner's Deck showed.
+  - **desktop-ui** runs `panelFit` in every scene and the busy HUD at every size and UI size.
+  - `tools/qa/ct10-shots.mjs`: Settings in the packaged app as a Deck runs it, the phones and the iPad, each view at the
+    top of its body and at its foot, and the Deck's fight HUD before and after (`BEFORE_ROOT=`): `tools/qa/tmp/ct10/`.
 
 ## 11. As built: CT-4, the desktop app (2026-10-07)
 The player's guide (building, Windows, the Steam Deck step by step, saves, troubleshooting) is
@@ -586,6 +690,24 @@ design, the security rules, the release command and the owner's one-time Deck st
 - Code: `tools/desktop/updater.cjs`, `main.cjs` (the IPC, the trial watchdog), `preload.cjs` (`pawhaven.update`),
   `src/ui/desktopUpdate.js`, `tools/desktop/release-desktop.mjs`. QA: `tools/qa/desktop-updater-unit.mjs`,
   `tools/qa/desktop-update.mjs`.
+
+### 11.5 Steam's Game Mode and the log (CT-10, 2026-10-10)
+The owner's 0.6.5 AppImage showed only Steam's spinner in Game Mode until the launch options `--no-sandbox
+--ozone-platform=x11` were added. The shell does it by itself now; DESKTOP.md "Troubleshooting" is the player's side.
+- **Under Steam or gamescope on Linux** the shell adds `--ozone-platform=x11` and `--no-sandbox`. The signals are
+  `GAMESCOPE_WAYLAND_DISPLAY`, `XDG_CURRENT_DESKTOP` containing gamescope, `SteamDeck=1`, and `SteamGameId` or
+  `SteamAppId` set and not 0 (`tools/desktop/steamenv.cjs` `gameModeEnv()`). Game Mode only shows X11 windows, so a
+  Wayland window left Steam's spinner up. Windows and macOS never get them.
+- The AppImage's `AppRun` (`appimage.mjs` `appRunScript()`) passes them on the real command line from the first exec.
+  `main.cjs` appends them before ready, or relaunches a tar.gz `pawhaven` once when Chromium had already picked another
+  window system (`planSwitches()`). A switch is never added twice; `--no-x11` opts out, and the player's own
+  `--ozone-platform(-hint)=` wins.
+- The window shows at `ready-to-show`, or after 3 s anyway (once; the log says which).
+- **The log**, `userData/logs/main.log` (`tools/desktop/mainlog.cjs`; 1 MB, two old files kept): each start's version,
+  argv, the environment and the decision, the switches in force, the GPU (at the title, or 20 s after ready), the
+  window's events, the time to the title, `render-process-gone` and `child-process-gone`, page errors, the quit.
+- QA: `tools/qa/desktop-env-unit.mjs` (17 checks, the real AppRun under bash included), desktop-smoke f) (the log of
+  both starts; 6/6).
 
 ## 12. As built: CT-5, touch (2026-10-07)
 Phones and tablets in landscape. Checkpoint 1 was the touch device and the play controls (12.1, 12.2). Checkpoint 2 is
@@ -985,8 +1107,9 @@ left sometimes dragged the whole screen. Settings also lost two rows (below).
   - The Toybox cast never falls back to a Storybook model: a missing or still-loading Toybox rig plays its kit build
     (Toybox style), and the samurai Chewy falls back to the Toybox Chewy, then his kit.
   - `?chewymodel=toy|disney` and `?chewy=classic|disney` still work, for the QA and dev only.
-- **Panels that fit a tablet** (`Mobile.fitTall`, `mobile.css` `.m-fit`). CT-5's fit (between the safe area's margins,
-  the body scrolling inside) was phone-only (`.m-phone`).
+- **Panels that fit a tablet** (`Mobile.fitTall`, `mobile.css` `.m-fit`; since CT-10 `ui/fit.js`, for every screen
+  but a phone: §10.5). CT-5's fit (between the safe area's margins, the body scrolling inside) was phone-only
+  (`.m-phone`).
   - On a tablet, Settings (about 1,000 px tall at the menus' 0.86) and Controls › Touch ran off the top and bottom of an
     iPad: opened from the title, −109 to 895 px on a 1180×820 screen and −135 to 869 on a 1024×768 one; even the
     12.9" (1366×1024) lost a few px at the top.
@@ -1041,6 +1164,34 @@ left sometimes dragged the whole screen. Settings also lost two rows (below).
 - **Only a real iPad and phone can confirm**: Safari's own scroll chaining from the frame to itch's page (Chrome doesn't
   chain it, so the tests check the cancelled touchmoves instead); iPadOS element full screen inside itch's frame and
   the sizes it reports; Safari's toolbars over a phone's Settings; and the edge swipe for Back next to the stick.
+
+### 12.11 As built: CT-10, Settings on phones and the iPad (2026-10-10)
+The owner (with the Deck report, §10.5): "I think it also isn't working on mobile, as it doesn't fit vertically."
+- **What a phone showed.** Settings was fitted (CT-5: between the safe area's margins, its body scrolling), but in a
+  470 px panel on an 844 px screen every row with segments wrapped its control under its name, and the 52 px touch
+  targets made each row tall. The body held 1,383 px of rows in a 318 px window, so 4 of the 17 rows showed at once,
+  with nothing to say the rest was there (iOS hides a scroll bar until you scroll). The same in WebKit (Playwright's,
+  with an iPhone's agent): the layout is the same, so this is what the owner's phone did; it reads as "doesn't fit".
+- **Now** (`menu.js` `fitRoom`, `panels.css` `.set-cmp`): two compact columns as wide as the room (from 700 px of the
+  menus' own px: every phone in landscape, 667×375 included), with no row icons, 60 px segments, 124 px sliders and
+  tighter rows, so a row's control sits beside its name. On an 844×390 iPhone (its notch's insets included) Settings'
+  rows are 727 px tall now, from 1,383, in a 318 px window: half of them show at once (8 of 16, from 4), and a little
+  over one more window of scrolling reaches the rest. An iPad (1180×820) gets the full two columns: on the game's own
+  page all of Settings shows at once; in itch's frame (its buttons and the strip off the page kept clear) and in full
+  screen (the 24 px top edge kept clear) the last two or three rows scroll.
+- **The scroll hint** (§10.5) shows on phones too: the fade at the body's foot, and the chevron above the title bar (a
+  tap scrolls down; a 44 px target). On a phone the bottom fade is left off a body whose tabs stick to its foot.
+- **The top-right column** closes up its gaps on touch when the crews chip would meet the touch cluster's top skill
+  slot (`.hud-tr-tight`; 4 px apart on an 844×390 phone with crews out).
+- **QA**:
+  - `mobile-ui.mjs` runs `panelFit` and `hudOverlap` in every scene, opens Controls' three tabs from the title too, and
+    Settings must show at least a third of its rows at once (`SET_ROWS`). `DEVICE=iphone` is the phone with an
+    iPhone's Safari agent; `DEVICE=ipad` as before. Why it passed before: the panel did fit and its body did scroll, so
+    the cut-off checks were right, but nothing asked how much of it showed.
+  - `ct10-shots.mjs phone ipad`: Settings and Controls at the top and the foot on 844×390, 667×375 and 932×430 (an
+    iPhone's agent, DPR 3) from the pause menu and the title, and on the iPad in itch's frame and in full screen.
+- **Only a real phone can confirm** how Safari's own toolbars cut into the height (the room is the page's, so a shorter
+  page gets a shorter panel, scrolling).
 
 ## 13. Auto targeting (CT-8, design 2026-10-09)
 The owner's request (2026-10-09): "I would like an auto targeting mode to make targeting easier for tablet and mobile
@@ -1307,3 +1458,359 @@ All five heroes are verified in play, the skills' words follow Targeting, and th
     cost 0.017–0.034 ms a frame.
   - One spike seen in both runs (not gated, and not from targeting): Chewy's Burrow 150 spawn frame takes 98–110 ms
     (the first spawn of the horde).
+
+## 14. Controller menus on the bumpers (CT-11, design 2026-10-10)
+The owner's report, playing the 0.6.5 AppImage on a real Steam Deck: "Build and decorate menus are very difficult to
+navigate on controller. On controller the menu system should be tab based that can be switched between using L and R
+buttons." The owner's picks: both of these.
+- (a) Build mode and decorate mode become tab-based on the pad: LB / RB switch the category tabs, and the D-pad or
+  stick moves through the pieces; LT / RT rotate the held piece, A places or picks, B cancels or backs out, X stores or
+  removes, Y undoes. (§14.5 gives the pieces to the D-pad and the cursor to the stick.)
+- (b) The main menus become one console-style tabbed menu. LB / RB move between Bag · Character · Skills · Journal ·
+  Map · Settings, plus the others that fit.
+
+Keyboard, mouse and touch keep their own behaviour: the hotkeys (I, C, K, J, M…) still open single panels, and the
+palettes look as before for the mouse.
+
+### 14.1 What's hard today
+Played with the virtual pad at 1280×800, the Deck preset (UI 1.15, the safe area), in build mode and then decorate
+mode (`tools/qa/tmp/ct11/explore/`):
+1. **The left stick drives two things at once.** Past half tilt, `Actions.nav` also steps the palette, so moving the
+   cursor swaps the piece in hand. A 0.58 push to the right turned the Stone Lantern into the Pocket Park.
+2. **Landing on a card picks it.** ◀ ▶ build a ghost at every step, so browsing is holding. There is no way to read
+   a piece without picking it up.
+3. **The categories are on ▲ ▼**, with no glyph on the tabs.
+   - In build mode, the zone, path and bulldoze tools are a hidden lane above the first category (▲ from Landmarks).
+   - The lane leaks into decorate: after build's tools, ◀ ▶ do nothing in decorate until ▲ or ▼ is pressed.
+4. **The picked card's tooltip covers what you need**, for 2.6 s: the Water Tower's card over the middle of the
+   village, the futon's card over decorate's tabs.
+5. **The HUD prompt** that says why a piece can't go there sits behind the palette's top edge at 1280×800.
+6. **Menu does nothing** in build or decorate mode: `padCursor` takes the frame before `padInput` reads Menu. You
+   can't pause, and you can't reach a panel without leaving.
+7. **The buttons are scattered.**
+   - Rotate is on Y or RB.
+   - In build, LT / RT turn the camera; in decorate they zoom.
+   - Undo is LB, in decorate only. Build mode has no undo.
+   - Decorate's X stores only the piece in hand.
+   - The pad can't zoom in build mode.
+8. **The hint bar** has eight entries, with ◀ ▶ and ▲ ▼ pairs. The palette's side card repeats a second legend
+   ("place · rotate · remove · cancel") that disagrees with it (Y rotate, while the bar said Y or RB).
+9. **Shadow's tips** come up over the palette in build mode (the dig tip over the category tabs).
+
+### 14.2 The pad's bindings before CT-11
+| Where | Bindings |
+|---|---|
+| Play | LS move (L3 sprint) · RS aim (R3 next target, or Shadow leads) · A attack / interact · X the right-click skill · Y, RB, RT, LT skills 1–4 · B roll · LB tap the next hero, hold the wheel · D-pad ◀ ▶ potions, ▲ meal, ▼ interact (hold: the loot labels) · View the map · Menu the pause menu · L3 + R3 swap weapons |
+| Panels (`padNav`) | D-pad / LS focus · A select · B back · LB / RB the top panel's tabs · X / Y per element · ◀ ▶ a slider · LT / RT and RS the map's zoom · LT / RT the Charge drawer's skills (K panel, R-16) · Menu closes the top panel · View the map |
+| The pause menu | its quick row (Bag, Character, Skills, Journal, Map, Build, Decorate, Home, Crews) is the pad's only way to the panels and into build and decorate mode |
+| Dialogue | A advance / choose · D-pad the choices · B leave |
+| The hero wheel | LB held, RS picks |
+| Fishing | A cast, strike, hold to reel (or RT) · B, Menu or a fresh stick push stop |
+| Build (CT-2) | LS the cursor (and the palette, past half tilt) · RS pan · D-pad ◀ ▶ pick a card, ▲ ▼ the category and the tools lane · A build, paint or open a house · B drop the tool, else leave · Y / RB rotate · X remove (press twice) · LT / RT turn the camera · View the overlays · Menu nothing |
+| Decorate (CT-2) | LS the cursor (and the palette) · RS pan · D-pad ◀ ▶ pick, ▲ ▼ category · A place or pick up · B cancel, else leave · Y / RB rotate (Y uses a wallpaper) · X store the piece in hand · LB undo · LT / RT zoom · Menu nothing |
+| Title | D-pad / LS focus · A |
+
+LB and RB are free in build, decorate and every panel: `handleInput` returns before the hero switch (`heroes.tabInput`)
+while a panel is open or either mode is on. The skill buttons don't cast there either.
+
+### 14.3 The rule, everywhere on the pad
+| Button | Means |
+|---|---|
+| **LB / RB** | the big tabs: the menu's pages; build's and decorate's categories; a lone panel's own tabs (a shop's Buy / Sell, cooking's book / mix, the Spirit Lantern's tiers) |
+| **LT / RT** | inside a page: the page's own tabs in the tabbed menu (the Bag's Bag / Pantry / Furniture, the skill trees, the Journal's tabs, Settings' pages); in build and decorate, rotate the piece in hand (with nothing in hand: build turns the camera, decorate zooms); the map's zoom (it has no tabs) |
+| **A** | select, pick up, place |
+| **B** | back: a held item or piece first, then a popover, then the panel or menu. With nothing in hand in build or decorate: Done |
+| **X** | take away: drop or sell an item, remove a building, store a piece |
+| **Y** | the second action: equip or use an item; in build and decorate, undo |
+| **D-pad** | the focus (in build and decorate, through the pieces) |
+| **Sticks** | LS: the cursor in build and decorate; RS: the camera |
+| **Menu** | the tabbed menu, from anywhere (build and decorate too) |
+| **View** | the map in play; build mode's coverage overlays |
+
+### 14.4 The tabbed menu (the pad)
+- **Menu opens it** on the last tab used (the first time: Game, the pause page). LB / RB cycle the tabs, wrapping.
+- **A strip across the top** shows the LB and RB glyphs at its ends and the tabs between, with the current one raised.
+  The tabs:
+  - Bag · Character · Skills · Journal · Map;
+  - Game: the pause page (Resume, Build in the village, Decorate indoors, Home in a dungeon, Save, Quit, Quit game);
+  - Settings.
+  - No Crews tab: the Journal already has one (the crew log: who is out, every report, a row opens it on the board).
+    The Game page keeps its Crews button.
+  - No Home / Housing tab: furniture storage is the Bag's Furniture tab, and a house's card belongs to its mailbox.
+- **Each tab is the existing panel**, opened as the keys open it (`ui.open`), so no panel is rewritten. The strip is a
+  thin controller (`ui/padMenu.js`) over them. Switching tabs closes one panel and opens the next, and the focus
+  remembers its place in each (`padNav.last`). The strip marks itself `.fit-above`, so CT-10's fit (`ui/fit.js`) starts
+  the panels' room under it.
+- **Sub-tabs: LT / RT.** The Bag's Bag · Pantry · Furniture, the skill trees, the Journal's Active · Done · Fish Log ·
+  Guides · Crews. Settings' sub-tabs are its pages: General (the Settings rows) · Controller · Keyboard &
+  mouse · Touch (the Controls page per device). So Settings is one flat level.
+- **The Charge drawer** (R-16): LT / RT step the skill trees now. The drawer's skill strip steps with **RS ◀ ▶** (a
+  flick, one skill each). Its strip still takes the focus with the D-pad, and A shows that skill. s19's R-16 pad check
+  moves to RS.
+- **B** backs out of a held item or a popover first, then closes the whole menu.
+- **The game pauses** on the Game and Settings tabs (they are the pause menu). The other tabs behave as their panels
+  always have: input stops while they're up (`anyModal`), and nothing reaches the world.
+- **Keyboard, mouse and touch** are unchanged: their hotkeys and buttons open single panels. The strip shows only while
+  the pad plays. The pause page's row of panel buttons hides while the strip is up (Build, Decorate, Home and Crews
+  stay on it).
+
+### 14.5 Build mode (the pad)
+**Each input keeps to its own job.** The D-pad and the bumpers drive the palette; the sticks drive the world. A acts on
+whichever has the focus: the palette's card after a D-pad or bumper press, or what's under the cursor after a stick
+push. There are three states:
+- **Palette**: the palette is up, and the focus ring is on a card.
+- **Cursor**: the palette folds to its tab strip, and the paw cursor is bright. Nothing is in hand.
+- **Holding**: a building or a tool is in hand, and the palette is folded.
+
+| | Palette | Cursor | Holding |
+|---|---|---|---|
+| **LB / RB** | the category tabs | open the palette (on its tab) | put it back, open the palette |
+| **D-pad** | through the pieces (a grid) | nudge the cursor one tile | nudge the piece one tile |
+| **LS** | the cursor (the palette folds) | the cursor | move the piece (it snaps to the plot, as with the mouse) |
+| **RS** | pan | pan | pan |
+| **A** | pick it up | a house's card | build · paint (hold A and move) · bulldoze (press twice) |
+| **B** | Done (leave build mode) | Done | put it back (the palette opens on its card) |
+| **X** | — | remove the building under the cursor (press twice) | remove the building under the cursor (press twice) |
+| **Y** | undo | undo | undo (the piece stays in hand) |
+| **LT / RT** | turn the camera a quarter | turn the camera a quarter | rotate the piece left / right (off a plot; a plot sets the door's side) |
+| **View** | the coverage overlays | the overlays | the overlays |
+| **Menu** | the game menu | the game menu | the game menu |
+
+- **The palette on the pad.**
+  - Tabs: Landmarks · Services · Decor · **Tools**. Tools holds the zones, paths and bulldozer as cards: Homes zone,
+    Shops zone, Workshop zone, Erase zones, Lay paths, Remove paths, Bulldoze. Their tiny toolbar hides on the pad.
+  - The LB and RB glyphs sit at the ends of the tab strip.
+  - The pieces are a grid of compact cards, two rows at the Deck size. The grid scrolls to keep the focus in view.
+  - The side card shows the focused piece: its name, size, cost (what you have in red when short), what it gives, and
+    why it's locked. It replaces the tooltip, so nothing pops over the world. The village's stats and rank stay above
+    it. The overlay buttons and the key legend hide, because View and the hint bar say the same.
+- **Folded** (Cursor and Holding): only the tab strip shows, plus a chip with the piece in hand (its thumbnail, name,
+  size and cost). The HUD prompt (why it can't go there) is in view above it.
+- **Undo** (Y, and Ctrl+Z for the keyboard): build mode keeps a session stack (`buildMode.undoStack`, 40 deep) of
+  what you placed, removed, zoned and paved.
+  - Undoing a building you placed takes it away with its full cost back.
+  - Undoing a removal puts the same building back where it was and takes the refund back. When you've spent the refund
+    since, it says so and stops.
+  - Undoing a zone restores the zones of the tiles it painted (not where something has grown since).
+  - Undoing a path stroke restores the tiles of that stroke.
+- **Remove's confirm**: the first X (or the bulldozer's first A) tints the building red. The prompt then says "Press X
+  again to remove the Park Bench (half its cost back)". A second press within 1.8 s removes it; moving off cancels.
+- **The hint bar** (top centre) names only what works in the current state and under the cursor, up to eight entries.
+  For example:
+  - Palette: "LB RB Category · ✥ Choose · A Pick up · LS Cursor · Y Undo · LT RT Turn · View Overlay · B Done";
+  - Cursor: "LS Cursor · A Open its card (over a house) · X Remove (over a building that can go) · Y Undo · LB RB Palette ·
+    LT RT Turn · View Overlay · B Done";
+  - Holding: "LS Move · A Build · LT RT Rotate · X Remove · Y Undo · ✥ Nudge · B Put back".
+- **Shadow's tips** wait while build or decorate mode is on (`hintHold`), as they wait while fishing.
+
+### 14.6 Decorate mode (the pad)
+The same states and buttons. The differences:
+- The tabs are the palette's own: All · Furniture · Decor · Wall · Rugs · Tabletop · Wallpaper & Floors.
+- **A in the palette** takes a piece out of storage (Holding). On Wallpaper & Floors, A applies the swatch.
+- **A in the Cursor state** picks up the piece under the cursor, to move it (Holding).
+- **X stores**: the piece under the cursor (Cursor state), or the piece in hand (Holding). A villager's own piece stays
+  ("you can move it, not take it").
+- **Y undoes** (decorate's own stack; a piece in hand goes back first, as now).
+- **LT / RT**: rotate the piece in hand (not wall pieces). With nothing in hand, they zoom.
+- **The D-pad's nudge** steps one 0.5 m cell.
+- **B with a moved piece** puts it back where it was (the Cursor state).
+- View does nothing. Done is B with nothing in hand, or the side card's Done.
+- **The decorating guide** (R-13) and the Home Rating chip keep working. The guide's pad lines name these buttons
+  (`world/guides.js`, checked in s16 and the new s40).
+
+### 14.7 The Deck at 1280×800 (Deck UI scale 1.15)
+- **Everything fits**: the tab strip, the two-row grid and the side card within the safe area. The palette is about
+  270 px tall on the Deck (its top at 530 of 800; the mouse's is 245). Folded, it's the tab strip alone (55 px).
+- **The focus is always visible**: the ring on the card (it scrolls into view), the cursor bright in the Cursor and
+  Holding states and dimmed in the Palette.
+- **Shared files.** CT-10 is changing `deck.css`, `mobile.css`, `menu.js`, `ui.js`, `hud.js` and `padNav.js`. CT-11's
+  edits there are re-read first and kept small. The palette's pad styles go in `pad.css`, and the strip in a new
+  `padMenu.css`.
+
+### 14.8 What changes for the tests
+- **s25 g)**: the panels' LB / RB tab checks become LT / RT inside the tabbed menu (the bag's views, the skill trees,
+  the journal's tabs, Controls' devices). The shop keeps LB / RB (a lone panel). `quick()` reaches the panels through
+  the strip rather than the pause menu's row.
+- **s25 h)**: build's and decorate's walk becomes the bumpers and the grid. Rotate is RT, and undo is Y.
+- **s19 i)** (R-16): the drawer's LT / RT step becomes RS ◀ ▶.
+- **s26, deck-ui**: the build and decorate views are the new palette.
+- **The new `tools/qa/s40-pad-menus.mjs`** (a real virtual pad, the Deck preset at 1280×800):
+  - the tabbed menu: open it, LB / RB through every tab, the sub-tabs, B out;
+  - a full build session: the category, a piece, move, rotate, place, undo, remove;
+  - a full decorate session: the same, plus the decorating guide done on the pad;
+  - nothing reaching the world while a menu is open.
+
+  Added to run-all. The shots go in `tools/qa/tmp/ct11/`.
+
+### 14.9 Phases
+1. **Checkpoint 1**: this design, plus build mode on the pad (14.5) with shots.
+2. Decorate mode (14.6) and the guide.
+3. The tabbed menu (14.4), s40, the s25 / s19 updates, the Deck pass, the docs, run-all.
+
+### 14.10 As built: checkpoint 1 (2026-10-10)
+The design above (§14.1 to §14.9), and build mode on the pad (§14.5). Decorate mode and the tabbed menu are next.
+- **The code**:
+  - `src/ui/padCursor.js`:
+    - build mode's three states (`state`: `pal`, `cur`, `hold`);
+    - the grid walk (`gridStep`), the tabs (`tabStep`), putting back (`putBack`), the one-tile nudge (`nudge`);
+    - Menu opens the game menu over either mode. A menu or a dialogue only pauses the cursor (`pause`), so build mode
+      carries on as it was when it closes;
+    - decorate is still on CT-2's flow, but its tools-lane leak is fixed (a fresh state for each mode).
+  - `src/ui/build.js`:
+    - the Tools tab (`TOOL_CARDS`: the toolbar's buttons as cards) and the bumper glyphs;
+    - the side card's detail (`padDetail`) and the folded palette's chip (`heldChip`);
+    - no hover tooltip while the pad plays.
+  - `src/world/buildMode.js`:
+    - `padWorld`: A, X and LT / RT count only when the world has the focus;
+    - the undo stack (`push`, `undo`, `removeB`), and Ctrl+Z for the keyboard;
+    - LT / RT rotate the building in hand;
+    - the remove's confirm (`armed`) for X and for the bulldozer's A.
+  - `src/world/village.js`: `place({ noXp })`.
+  - `src/core/actions.js`:
+    - `Actions.dnav`: the D-pad alone, with the same repeat as `nav`;
+    - the build group's rows in Settings › Controls: Category (LB RB), Choose a piece (the D-pad), Pick up · place ·
+      paint (A), Rotate (LT RT), Remove · store (X), with nothing in hand turn the camera or zoom (LT RT), Undo (Y), Put
+      it back or Done (B);
+    - `DPad` as a glyph token (`padGlyphs.js`: the whole D-pad, no arm lit).
+  - `src/ui/pad.css`: the pad's palette (the grid, the Tools cards, the side card, folded, the dimmed cursor, the toasts
+    and the prompt clear of it).
+  - `src/ui/ui.js` `back()`: the menu closes first when it's up over build or decorate mode. Before, B with a tool in
+    hand cleared the palette's pick under the menu and left the menu up.
+  - `src/game.js` `hintHold`: Shadow's tips wait while build or decorate mode is on.
+  - `src/world/buildings/catalog.js`: the Arched Bridge's description had a code note in it ("Deck height:
+    bridgeDeckHeight(localZ)"). It reads "A vermilion taiko bridge: walk right over the river." now.
+- **Calls made while building**:
+  - **The D-pad walks the pieces and the left stick is the cursor.** The owner said "the D-pad or stick". Letting the
+    stick do both was the first thing that made the old palette hard (§14.1, 1). A stick push past 0.3 from the palette
+    folds it and takes the cursor; a lighter touch does nothing.
+  - **B with nothing in hand is Done**, which keeps CT-2's rule. So leaving takes one press from the palette or the
+    cursor, and two with a piece in hand.
+  - **LB / RB from the world**: the first press only opens the palette on its tab, so a bumper never skips a tab you
+    couldn't see.
+  - **LT / RT with nothing in hand** (or with a paint tool or the bulldozer) turn the camera, as CT-2's did. With a
+    building in hand they rotate it. On a plot, rotating gives a soft error sound, because the plot sets the door's side.
+  - **The D-pad's nudge** (new) moves the cursor one tile along the grid axis nearest that way on screen, for fine
+    placement.
+  - **View's overlay** is named in the hint bar ("Overlay: Water") rather than a toast for each press.
+  - **The undo** gives a placement's whole cost back. The next placement of that type pays no homestead XP, so a
+    place-and-undo loop can't farm it.
+- **QA**:
+  - `tools/qa/s40-pad-menus.mjs` a) (new, and in run-all; its build-mode section for now): 18/18 at 1280×800 with the
+    Deck preset (`tools/qa/tmp/ct11/logs/s40-pad-menus.log`), and 18/18 on the production bundle (built and served by `tools/qa/prod-server.mjs`, s40 run with `BASE=` it).
+  - s25 h) now walks build mode the new way: RB to Decor, the D-pad to the Park Bench, A, build, X twice, B puts it back
+    on its card, B leaves. 45/45.
+  - The keep-green runs, all PASS: s25 45/45, s27 62/62 (touch's build and decorate unchanged), s14 24/24, s26 10/10,
+    test-rpg ALL PASS, deck-ui's build and HUD views (no text under the floor, no overlaps), prod-smoke (31 cases, on the built bundle), s16 32/32, s17 37/37 and s19 54/55 (the one failure is not CT-11's: at 1280×720 and UI 125% the Charge drawer for Whirlwind Stance ends 5 px below the screen, now that CT-10's fit moves the K panel down from off the top; CT-11 doesn't touch the K panel) (its R-16 LT / RT drawer check untouched until the menu phase). Logs: `tools/qa/tmp/ct11/logs/`.
+  - The mouse's palette is unchanged: the toolbar, the card row, no Tools tab, no paw cursor (s40's mouse check, and
+    `mouse-build-1600.png`, `mouse-build-1280.png`).
+- **Shots** (`tools/qa/tmp/ct11/`, 1280×800, the Deck preset, looked at): `a1-palette`, `a2-grid-focus` (the ring, the
+  side card), `a3-holding` (folded, the chip, the prompt in view), `a4-built`, `a5-remove-confirm`, `a6-cursor`,
+  `a7-tools`, `a8-path`, `a9-zone`, `a10-menu` (the game menu over build mode, the palette kept). The CT-2 palette before
+  the change: `explore/` (`02-build-open`, `06-build-moved` with the swapped piece, `14-decor-held` with the tooltip over
+  the tabs).
+- **Open**:
+  - decorate (§14.6) and its guide. Until then decorate keeps CT-2's buttons (LB undo, Y or RB rotate), while Settings ›
+    Controls already lists the new ones (Y undo, LT / RT rotate) for both modes;
+  - the tabbed menu (§14.4), with s19's Charge drawer moving to RS;
+  - s40's other sections, then a full run-all.
+
+### 14.11 As built: decorate and the tabbed menu (2026-10-10)
+Checkpoint 1 was approved with every call in §14.10, and the menu's plan as §14.4 has it. This phase builds decorate on
+the pad (§14.6), the decorating guide in the pad's words, and the tabbed menu (§14.4).
+- **The code**:
+  - `src/ui/padMenu.js` and `padMenu.css` (new): the tabbed menu.
+    - `PadMenu.open / close / show / step / subTab`. `current()` reads the page from what's actually open each frame,
+      so a page closed by other means, a panel that isn't a page (the Crews board from the Game page), the title or
+      the mouse taking over all end it cleanly.
+    - The strip sits in the over layer at the UI scale and marks itself `.fit-above`. `rects()` lets padNav's glyph
+      footer keep off it.
+    - While the strip is up (`.ui-root.pm-on`), the pause page hides what the strip replaces: its row of panel buttons
+      and its Settings and Controls buttons; Settings' Back and Controls row; Controls' Back and device tabs.
+  - `src/ui/padNav.js` (CT-10's file, surgical):
+    - in the menu, LB / RB step the pages and LT / RT a page's own tabs (Settings' pages are the menu's);
+    - B closes the whole menu once a held item and the popover are dealt with;
+    - the K panel's Charge drawer steps with a right-stick flick;
+    - the hints say "LB RB Pages · LT RT Tabs · B Close", and the footer keeps clear of the strip.
+  - `src/ui/ui.js` (surgical): the `PadMenu`, its `update()` each frame. Menu routing: Menu opens the tabbed menu when
+    nothing is up and closes it when it's open; over a lone panel (a shop) it still backs out as Esc does.
+  - `src/ui/padCursor.js`:
+    - one three-state flow for both modes, with a small adapter for each mode's hand, putting back and leaving
+      (`handKey`, `putBack`, `exitMode`);
+    - decorate's D-pad nudge steps a 0.5 m cell, and its LT / RT zoom while nothing is in hand;
+    - View answers a guide's Got it! while either mode is on;
+    - the hint bar steps below a guide's dock (they both sat at the top centre).
+  - `src/home/decorate.js`:
+    - on the pad, A, X and LT / RT count only once the world has the focus;
+    - Y undoes from any state;
+    - X stores the piece in hand, puts back a piece taken from storage, or stores the piece under the cursor (`storeAt`;
+      a villager's own piece stays theirs);
+    - LT / RT turn the piece in hand (a wall piece gives a soft error sound);
+    - B is padCursor's;
+    - the prompt drops "Y rotates" (the hint bar names it).
+  - `src/ui/decorate.js`: the bumper glyphs, the side card's `padDetail` (the kind, size, set, tags, storage count and a
+    favourite's heart), and the folded chip `heldChip`.
+  - `src/ui/pad.css`:
+    - decorate's grid (shorter cards);
+    - its side card, keeping the house and the Home Rating;
+    - folded, the other tabs as icons and counts;
+    - while folded, the HUD's hotbar and button tray go (as build mode puts them), and decorate's prompt shows above
+      the strip.
+  - `src/ui/padGlyphs.js` `keyHint`: `*pad:A*`, `*pad:LT+RT*` in guide text are pad glyphs, for lines said only on
+    the pad.
+  - `src/world/guides.js` ("Make it home"):
+    - the pad's lines name its buttons: Menu, then Decorate on the Game page; the D-pad and A for the cushion; LT / RT
+      to turn it; LB / RB to Wallpaper & Floors; B when done;
+    - `decoBtn` spotlights the strip's Game tab while another page is open.
+  - `src/ui/chargePanel.js`: the drawer's pad hint is the right stick. `docs/CHARGE.md` says so. `src/ui/skills.js`:
+    the K panel's pad footer names LT / RT for the trees.
+  - `src/ui/tooltip.js`: while the pad plays, a hover tooltip from the real pointer comes up only if the pointer
+    moved. On the Deck, Steam maps the trackpad to the mouse, and its hidden pointer resting over a panel popped up
+    whatever came under it as the pages changed (found in the shots: an Energy tooltip over the Character page). The
+    focus's own tooltips come from padNav's untrusted events and are unaffected.
+- **Calls made while building**:
+  - **X on a piece just taken from storage puts it back.** There's nothing to store yet, so X matches B there.
+  - **B on a piece moved in the room** puts it back where it was and leaves the cursor in the room.
+  - **When the last of a piece is placed**, the palette opens on the same tab, on its first card. It doesn't jump to All.
+  - **LT / RT zoom while held** in decorate (as CT-2 had), and turn the camera a quarter per press in build.
+  - **The pages keep their panels' places** (the Bag on the right, the Character sheet, Skills and the Journal on the
+    left, the Map and the pause page in the middle). The strip is the constant; fit puts each panel under it.
+  - **A side page opened from build or decorate mode's menu** (the Bag, Character, Skills, the Journal) ends that mode,
+    which is the panels' own rule (`ui.open`). The Game, Settings and Map pages keep it.
+  - **The keyboard's caps in a panel's tabs** hide while the pad plays (the Bag's Pantry "P").
+- **The pad's bindings now** (the "before" table is §14.2):
+
+| Where | Bindings |
+|---|---|
+| Play | unchanged (§14.2), except that **Menu opens the tabbed menu** |
+| The tabbed menu | **LB / RB** the pages (wrapping) · **LT / RT** the page's own tabs (Settings: General · Controller · Keyboard & mouse · Touch) · D-pad / LS the focus · A select · X / Y per element · **B** a held item or the popover first, then closes it all · **Menu** closes it · RS ◀ ▶ flick: the K panel's Charge drawer · LT / RT and RS ▲ ▼: the Map's zoom |
+| A lone panel (a shop, the stash, cooking, the Travel Map, the Spirit Lantern, the Guild…) | as before: LB / RB its own tabs, B back, Menu backs out |
+| Build mode | **Palette**: LB / RB the tabs · D-pad the grid · A pick up · LS (a push) the cursor · Y undo · LT / RT turn the camera · View the overlays · B Done. **Cursor**: LS the cursor · D-pad nudge a tile · A a house's card · X remove (twice) · Y undo · LB / RB the palette · LT / RT turn · View · B Done. **Holding**: LS move · D-pad nudge · A build / paint / bulldoze (twice) · LT / RT rotate · X remove (twice) · Y undo · LB / RB or B put it back. Menu: the tabbed menu over it |
+| Decorate | the same three states. **Palette**: A takes a piece out (a wallpaper or floor goes up at once). **Cursor**: A picks up the piece under the paw · X stores it · LT / RT zoom. **Holding**: LT / RT rotate (not wall pieces) · X stores a moved piece, or puts back one from storage · D-pad nudge a 0.5 m cell · B puts it back (a moved piece where it was). View answers a guide's Got it! |
+| Dialogue, the hero wheel, fishing, the title | unchanged |
+
+- **QA**:
+  - `tools/qa/s40-pad-menus.mjs` now has four sections after the Deck profile check: a) build mode (17 checks), c) the
+    tabbed menu (7), b) decorate (6) and g) the decorating guide on the pad (1, end to end). **32/32** on the dev
+    server, and 32/32 again on a production bundle of the final code (`vite build`, then preview).
+  - **s25** (§14.8), 45/45:
+    - d) Menu opens the tabbed menu on its Game page, with seven pages;
+    - g) reaches the panels through the menu (`tabTo`), with the Bag's views, the skill trees and the Journal's tabs
+      on LT / RT, Settings' pages on RT, and B closing it all;
+    - h) decorate: browse, A, RT, A, Y, B.
+  - **s19** i): the drawer's step is a right-stick flick. `S19_ONLY=i` 19/19, and the whole of s19 55/55 in the run-all.
+  - The keep-green list: all green.
+    - In the run-all: s26 10/10, s27 62/62, s17 37/37, s14 24/24, s16 32/32.
+    - deck-ui PASS (nothing under the 12 px floor, no panel cut off, no HUD overlap), mobile-ui PASS, test-rpg all
+      pass, prod-smoke PASS (31 cases).
+  - **One full run-all**, detached: 37 of the 41 suites pass, s40 among them. The other four fail outside CT-11's code:
+    - s13: the round-trip texture check, by noise (+4 against an allowance of +2); run alone it passes 10/10.
+    - s39 c) and e): timing in Shadow's lead (`actors/shadowLead.js`; the Journal's button in `ui/map.js`).
+      The same code passes and fails when run alone.
+    - s32 e) and s35's phone audit count CT-10's scroll hint `.fit-more` (26 px tall, 22 px at the phone's scale) as
+      a small button. `ui-audit-lib` already leaves it out (`button:not(.fit-more)`); these two suites' own audits
+      don't. s35's phone bug-button check failed once in the run-all and passes alone.
+- **Shots** (`tools/qa/tmp/ct11/`, 1280×800, the Deck preset, looked at):
+  - `c-game`, `c-settings`, `c-inventory`, `c-character`, `c-skills`, `c-quests`, `c-map` (every page);
+  - `c-skills-drawer` and `c-settings-controller` (Settings' pages under the strip);
+  - decorate: `b1-palette`, `b2-holding`, `b3-placed`, `b4-cursor`, `b5-wallpaper`;
+  - the guide: `g1-place`, `g2-wrap`.

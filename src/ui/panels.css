@@ -332,8 +332,34 @@
 .mn-btns { display: flex; flex-direction: column; gap: 11px; padding: 0 20px 6px; }
 .mn-btns .btn { justify-content: center; width: 100%; }
 .set-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 6px; border-bottom: 2px dashed rgba(74, 44, 42, .12); }
+/* Settings (ROADMAP CT-10): two groups, Picture & sound and Play. Side by side where the room is wide enough (menu.js
+   fitRoom: the Deck, every 16:9 desktop up to 125%), so all of it fits the screen; else one column, 620 px wide, whose
+   body scrolls when the screen is short (ui/fit.js). A row whose control doesn't fit beside its name wraps it under,
+   to the right: nothing runs past the panel's side (Graphics' five presets, Autosave's four) */
+.p-menu[data-view="settings"] { width: 620px; }
+.p-menu[data-view="settings"].set-2c { width: var(--set-w, 1140px); }
+.set-cols { display: grid; grid-template-columns: minmax(0, 1fr); }
+.p-menu.set-2c .set-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 30px; }
+.set-h { display: flex; align-items: center; gap: 8px; margin: 0 6px 2px; padding-bottom: 6px; font: 700 15px/1.1 var(--font); color: var(--ink2); letter-spacing: .3px;
+  border-bottom: 3px solid rgba(74, 44, 42, .14); }
+.set-h .gl { width: 20px; height: 20px; color: var(--pink); }
+.set-col + .set-col .set-h { margin-top: 16px; }
+.p-menu.set-2c .set-col + .set-col .set-h { margin-top: 0; }
+.p-menu .set-row { flex-wrap: wrap; row-gap: 6px; } /* (Controls' rows too: the itch.io buttons' four ran past the side) */
+.p-menu .set-row > :last-child { margin-left: auto; }
+.mn-settings .set-col > .set-row:last-child { border-bottom: 0; }
 .set-n { display: flex; align-items: center; gap: 9px; font: 700 16px var(--font); }
 .set-n .gl { width: 26px; height: 26px; }
+/* Settings' two compact columns (a phone; menu.js fitRoom: as wide as the room, --set-w): no row icons, tighter rows,
+   segments 60 px a choice and shorter sliders, so a row's control still sits beside its name */
+.p-menu.set-cmp .set-cols { column-gap: 18px; }
+.p-menu.set-cmp .set-row { padding: 5px 4px; column-gap: 8px; }
+.p-menu.set-cmp .set-n { gap: 0; font-size: 15px; }
+.p-menu.set-cmp .set-n > .gl { display: none; }
+.p-menu.set-cmp .seg { --w: 60px !important; }
+.p-menu.set-cmp .sld { gap: 6px; }
+.p-menu.set-cmp .sld input[type=range] { width: 124px; }
+.p-menu.set-cmp .sld b { width: 40px; }
 .seg { position: relative; display: flex; padding: 3px; background: #f3e3cf; border: 3px solid var(--ink); border-radius: 14px; --w: 74px; }
 .seg button { position: relative; z-index: 1; width: var(--w); padding: 6px 0 7px; border: 0; background: none; font: 700 14px/1 var(--font); cursor: pointer; transition: color .2s; }
 .seg button.on { color: #fff; -webkit-text-stroke: 3.5px var(--ink); paint-order: stroke fill; }

@@ -5,7 +5,8 @@
 //   npm run build:desktop -- --dir        unpacked folders only (win-unpacked/, linux-unpacked/): quick, for the QA
 // 1. the game: a production build with relative URLs (base './', as itch) into dist-desktop/app/game/, plus the
 //    licences of what ships in it;
-// 2. the app: tools/desktop/main.cjs + preload.cjs + updater.cjs + icon.png and a small package.json next to the game
+// 2. the app: tools/desktop/main.cjs + preload.cjs + updater.cjs + steamenv.cjs + mainlog.cjs + icon.png and a small
+//    package.json next to the game
 //    (and game/content.json, the game's version, for the in-app updater: CT-9);
 // 3. electron-builder packs it with the Electron from devDependencies (asar, no node_modules: the app has no runtime
 //    dependencies), never publishes. It gets Electron already unpacked (Windows: node_modules/electron/dist; Linux: the
@@ -59,7 +60,7 @@ fs.writeFileSync(path.join(LIC, 'README.txt'), `Pawhaven ${pkg.version} (desktop
 fs.writeFileSync(path.join(APP, 'game/content.json'), JSON.stringify({ name: 'pawhaven-game', version: pkg.version }) + '\n');
 
 // ---- 2. the app around it
-for (const f of ['main.cjs', 'preload.cjs', 'updater.cjs', 'icon.png']) fs.copyFileSync(path.join(SRC, f), path.join(APP, f));
+for (const f of ['main.cjs', 'preload.cjs', 'updater.cjs', 'steamenv.cjs', 'mainlog.cjs', 'icon.png']) fs.copyFileSync(path.join(SRC, f), path.join(APP, f));
 fs.writeFileSync(path.join(APP, 'package.json'), JSON.stringify({ name: 'pawhaven', productName: 'Pawhaven', version: pkg.version, description: 'Pawhaven: a cozy blossom village adventure', author: 'Pawhaven', main: 'main.cjs', license: 'UNLICENSED' }, null, 2) + '\n');
 const gameFiles = walk(path.join(APP, 'game'));
 console.log(`   the game: ${gameFiles.length} files, ${MB(gameFiles.reduce((a, f) => a + fs.statSync(f).size, 0))}`);

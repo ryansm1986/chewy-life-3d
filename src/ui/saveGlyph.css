@@ -1,5 +1,6 @@
-/* The autosave's "saving…" glyph (ui/saveGlyph.js, ROADMAP R-11): bottom-left of the HUD layer, inside the safe area */
-.save-glyph { position: absolute; left: 14px; bottom: 34px; display: flex; align-items: center; gap: 5px; padding: 3px 10px 3px 6px;
+/* The autosave's "saving…" glyph (ui/saveGlyph.js, ROADMAP R-11): bottom-left of the HUD layer, inside the safe area,
+   under the toasts' column (CT-10: an autosave comes with a quest's or a level's toast, and the two met at 34 px) */
+.save-glyph { position: absolute; left: 14px; bottom: 8px; display: flex; align-items: center; gap: 5px; padding: 3px 10px 3px 6px;
   border-radius: 999px; background: var(--cream, #fff6e8); border: 2px solid var(--ink, #4a2c2a); box-shadow: 0 2px 0 rgba(74, 44, 42, .35);
   color: var(--ink, #4a2c2a); font: 700 13px/1 var(--font, sans-serif); letter-spacing: .02em; opacity: 0; transform: translateY(4px);
   transition: opacity .35s var(--soft, ease), transform .35s var(--soft, ease); pointer-events: none; z-index: 6; white-space: nowrap; }

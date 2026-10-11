@@ -170,7 +170,7 @@ if (want('e')) { // the phone
   await sleep(page, 900);
   const audit = await ev(page, () => {
     const p = document.querySelector('.p-sight'), r = p.getBoundingClientRect(), small = [], tiny = [];
-    for (const b of p.querySelectorAll('button')) { const q = b.getBoundingClientRect(); if (!q.width || getComputedStyle(b).visibility === 'hidden') continue; if (Math.min(q.height, q.width) < 43.5 && !b.classList.contains('ph-x')) small.push(b.className.split(' ')[0] + ':' + Math.round(q.height)); }
+    for (const b of p.querySelectorAll('button')) { const q = b.getBoundingClientRect(); if (!q.width || getComputedStyle(b).visibility === 'hidden') continue; if (Math.min(q.height, q.width) < 43.5 && !b.classList.contains('ph-x') && !b.classList.contains('fit-more')) small.push(b.className.split(' ')[0] + ':' + Math.round(q.height)); }
     for (const e of p.querySelectorAll('*')) { if (!e.offsetParent || !e.childNodes.length || ![...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue; const fs = parseFloat(getComputedStyle(e).fontSize) * (parseFloat(getComputedStyle(document.querySelector('.ui-root')).getPropertyValue('--m-pscale')) || 1); if (fs < 11.9 && !e.closest('.jp, .ph-jp')) tiny.push(e.className + ':' + e.textContent.trim().slice(0, 12) + ':' + fs.toFixed(1)); }
     return { phone: window.G.ui.root.classList.contains('m-phone'), fits: r.top >= -1 && r.bottom <= innerHeight + 1 && r.left >= -1 && r.right <= innerWidth + 1, cards: p.querySelectorAll('.sg-card').length, small: small.slice(0, 8), tiny: tiny.slice(0, 8) };
   });

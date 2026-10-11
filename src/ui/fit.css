@@ -1,0 +1,46 @@
+/* Fitting the UI to the screen on every device (ui/fit.js, ROADMAP CT-10; docs/CONTROLS.md §10.5, §12.11). Loaded after
+   deck.css, so its toasts rule wins there. */
+
+/* ---------------------------------------------------------------- a panel taller than the room (not a phone's: mobile.css)
+   it sits between the room's top and bottom (--fit-t / --fit-b: the safe area and an 8 px margin, in the panel layer's
+   own px; --fit-up: the K panel higher, its margin given up so its Charge drawer's foot stays on the screen), its
+   title, tabs and ✕ in place, and its body scrolls inside */
+.ui-root:not(.m-phone) .pw.m-fit:not(.side-bottom) { top: calc(var(--fit-t, 8px) + var(--fit-up, 0px)); bottom: var(--fit-b, 8px); display: flex; flex-direction: column; justify-content: center;
+  translate: none !important; margin-top: 0 !important; }
+.ui-root:not(.m-phone) .pw.m-fit:is(.side-left, .side-right) { transform: none; }
+.ui-root:not(.m-phone) .pw.m-fit.side-center { transform: translateX(-50%); }
+.ui-root:not(.m-phone) .pw.m-fit:not(.side-bottom) > .panel { max-height: 100%; min-height: 0; display: flex; flex-direction: column; }
+.ui-root:not(.m-phone) .pw.m-fit:not(.side-bottom) > .panel > .ph { flex: none; }
+.ui-root:not(.m-phone) .pw.m-fit:not(.side-bottom) .pb { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; touch-action: pan-y;
+  scrollbar-width: thin; scrollbar-color: rgba(74, 44, 42, .35) transparent; padding-right: 4px; }
+/* (the pad's focus ring scrolls a row into view with a little room round it: padNav focus() → scrollIntoView) */
+.pw .pb :is(button, input, .slot, .node, .card, .set-row, .ctl-row) { scroll-margin-block: 14px; }
+
+/* ---------------------------------------------------------------- the scroll hint: a fade where there's more, a chevron at the foot */
+.pw .pb.fit-down { -webkit-mask-image: linear-gradient(#000 calc(100% - 34px), rgba(0, 0, 0, .12)); mask-image: linear-gradient(#000 calc(100% - 34px), rgba(0, 0, 0, .12)); }
+.pw .pb.fit-up { -webkit-mask-image: linear-gradient(rgba(0, 0, 0, .12), #000 26px); mask-image: linear-gradient(rgba(0, 0, 0, .12), #000 26px); }
+.pw .pb.fit-up.fit-down { -webkit-mask-image: linear-gradient(rgba(0, 0, 0, .12), #000 26px, #000 calc(100% - 34px), rgba(0, 0, 0, .12)); mask-image: linear-gradient(rgba(0, 0, 0, .12), #000 26px, #000 calc(100% - 34px), rgba(0, 0, 0, .12)); }
+/* (a phone's tab band sticks to the body's foot: only the top fades there, the band has its own shadow) */
+.ui-root.m-phone .pw .pb:has(> .tabs).fit-down { -webkit-mask-image: none; mask-image: none; }
+.ui-root.m-phone .pw .pb:has(> .tabs).fit-up { -webkit-mask-image: linear-gradient(rgba(0, 0, 0, .12), #000 26px); mask-image: linear-gradient(rgba(0, 0, 0, .12), #000 26px); }
+.fit-more { position: absolute; left: 50%; z-index: 6; width: 44px; height: 26px; margin-left: -22px; padding: 0; display: none; place-items: center; cursor: pointer; pointer-events: auto;
+  border: 2.5px solid var(--ink); border-radius: 13px; background: linear-gradient(#fffdf8, #ffe6ee); color: var(--ink); box-shadow: 0 3px 0 rgba(74, 44, 42, .35); }
+.fit-more.on { display: grid; animation: fitBob 1.6s ease-in-out infinite; }
+.fit-more svg { width: 18px; height: 12px; }
+.fit-more::after { content: ''; position: absolute; inset: -14px -16px; } /* (a 44 px target on a phone: 54 of the menus' px at 0.86) */
+@keyframes fitBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
+@media (prefers-reduced-motion: reduce) { .fit-more.on { animation: none; } }
+
+/* ---------------------------------------------------------------- the HUD where the hotbar and the bottom-right buttons would meet */
+.ui-root .hud-bc { margin-left: var(--bc-dx, 0px); }
+.ui-root.hud-tight .hud .menubtns { display: grid; grid-template-columns: repeat(var(--mb-cols, 4), 44px); gap: 6px; }
+.ui-root.hud-toasts-up:not(.building):not(.dlg-open) .toasts { bottom: 230px; } /* (over the level badges: hud.css .lvl-badges, 170 px up the group, 8 more, and their height) */
+.ui-root .pad-hints.pc-hints { max-width: min(94vw, 980px, var(--pc-max, 980px)); } /* (build and decorate's footer, between the portrait and the minimap: ui/fit.js) */
+/* touch: the top-right column closes up when its chips would meet the touch cluster's top skill slot (ui/fit.js) */
+.ui-root.hud-tr-tight .hud-tr { gap: 0; }
+/* a phone's body is the one thing that scrolls: Controls' list of bindings grows into it rather than scrolling inside it
+   (elsewhere the list keeps its own scroll: a fitted panel's size must not depend on whether it was fitted) */
+.ui-root.m-phone .pw .ctl-list { max-height: none; overflow: visible; }
+/* with a panel open, the toasts and banners draw under the panels: a toast never covers a menu's rows (the iPad's top
+   centre over Settings, the Deck's bottom left over its two columns). Build and decorate keep theirs over the palette */
+.ui-root.has-panel:not(.building):not(.decorating) .l-msg { z-index: 2; }

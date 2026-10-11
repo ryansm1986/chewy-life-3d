@@ -230,8 +230,9 @@ const likes = G => G.housing?.tasteOf?.(G.housing.rec?.data)?.likesFurniture || 
 const favHave = G => { const id = G.housing?.ratingNow?.()?.has?.fav; return id && store(G)[id] > 0 ? id : null; };
 const favCard = G => { const id = favHave(G); if (!id) return null; const P = G.ui.panels.decorate; return P.tab !== 'all' && tabOf(FURNITURE[id]) !== P.tab ? '.p-decor .tab[data-t="all"]' : `.p-decor .card[data-id="${id}"]`; };
 const dev3 = (t, p, k) => () => (Actions.device === 'touch' ? t : Actions.device === 'pad' ? p : k); // (touch, pad, keys and mouse: said again when the device changes)
-/** the way into decorate mode: the HUD's Decorate button (mouse), or the menu's Decorate (touch: its menu button; the pad: Start) */
-const decoBtn = G => (Actions.device === 'touch' || Actions.device === 'pad' ? (G.ui?.isOpen?.('menu') ? '.p-menu [data-a="decorate"]' : touch() ? '.tc.on .tc-menu' : null) : '.home-tools .deco-btn');
+/** the way into decorate mode: the HUD's Decorate button (mouse), or the menu's Decorate (touch: its menu button; the pad:
+ *  Menu, then the tabbed menu's Game page: its tab while another is open, CT-11) */
+const decoBtn = G => (Actions.device === 'touch' || Actions.device === 'pad' ? (G.ui?.padMenu?.active && G.ui.padMenu.current() !== 'game' ? '.pm-strip .pm-tab[data-k="game"]' : G.ui?.isOpen?.('menu') ? '.p-menu [data-a="decorate"]' : touch() ? '.tc.on .tc-menu' : null) : '.home-tools .deco-btn');
 const favLine = (G, id) => `Your *${FURNITURE[id].name}* is one of your favourites: see the heart on its card? ${touch() ? 'Tap it' : 'Pick it'}, then ${FURNITURE[id].mount === 'wall' ? 'hang it on a wall' : 'put it down'}${touch() ? ' with *Set down*' : ''}!`;
 const makeHome = {
   title: 'Make it home', narrator: 'shadow', color: '#ff8fb0', priority: 3, indoors: true,
@@ -252,18 +253,18 @@ const makeHome = {
       done: (G, T) => T.cur.t > 6.6 },
     // (R-13: every line in the device's words; touch and the pad reach Decorate through the menu, the HUD's button is
     //  the mouse's. The rating step's tip is one you can follow: the favourite it names, hung or put down)
-    { id: 'decorate', say: dev3('Tap the menu button, then *Decorate*!', 'Open the menu (*Esc*) and pick *Decorate*!', 'Press *B* — or the *Decorate* button — to decorate!'),
-      objective: dev3('Menu → *Decorate*', 'Menu (*Esc*) → *Decorate*', 'Press *B* to decorate'), allow: { interior: true, panels: ['decorate', 'menu'] },
+    { id: 'decorate', say: dev3('Tap the menu button, then *Decorate*!', 'Press *pad:Menu*, then pick *Decorate* on the *Game* page (*pad:LB* *pad:RB* to get there)!', 'Press *B* — or the *Decorate* button — to decorate!'),
+      objective: dev3('Menu → *Decorate*', '*pad:Menu* → Game → *Decorate*', 'Press *B* to decorate'), allow: { interior: true, panels: ['decorate', 'menu'] },
       highlight: G => (decoOpen(G) ? null : decoBtn(G)), done: G => decoOpen(G) },
-    { id: 'place', resumeAt: 'decorate', say: dev3('This is your storage. Tap the cushion, slide it where you like it, then tap *Set down*.', 'This is your storage. Pick the cushion, move the paw over the floor and press *F* to put it down.', 'This is your storage. Pick the cushion, then click the floor to put it down.'),
+    { id: 'place', resumeAt: 'decorate', say: dev3('This is your storage. Tap the cushion, slide it where you like it, then tap *Set down*.', 'This is your storage. Choose the cushion with the *pad:DPad* and press *pad:A*, move it with the stick, then press *pad:A* to put it down.', 'This is your storage. Pick the cushion, then click the floor to put it down.'),
       objective: 'Place the cushion on the floor', allow: { interior: true, panels: ['decorate', 'menu'] },
       onEnter: G => { if (!(store(G).zabutonBlue > 0) && !(store(G).zabutonPink > 0)) G.actions.addFurniture('zabutonBlue', 1, { src: 'gift' }); },
       highlight: G => (!decoOpen(G) ? decoBtn(G) : G.housing.decor.sel ? (touch() ? '.tc-place' : null) : `.p-decor .card[data-id="${cushionId(G)}"]`),
       waitFor: { event: 'decor:place', test: p => FURNITURE[p.id]?.mount !== 'wall' } },
-    { id: 'move', resumeAt: 'decorate', say: dev3('Woof! Now tap it to pick it up, *Turn* it, slide it somewhere new and tap *Set down*.', 'Woof! Now press *F* on it to pick it up, turn it with *Y*, and press *F* again somewhere new.', 'Woof! Now click it to pick it up, press *R* to turn it, and click again to put it down somewhere new.'),
-      objective: dev3('Pick it up, *Turn* it, *Set down*', 'Pick it up, turn it (*Y*), put it down', 'Pick it up, turn it (*R*), put it down'), allow: { interior: true, panels: ['decorate', 'menu'] },
+    { id: 'move', resumeAt: 'decorate', say: dev3('Woof! Now tap it to pick it up, *Turn* it, slide it somewhere new and tap *Set down*.', 'Woof! Now move the paw onto it with the stick and press *pad:A* to pick it up, turn it with *pad:LT+RT*, and press *pad:A* again somewhere new.', 'Woof! Now click it to pick it up, press *R* to turn it, and click again to put it down somewhere new.'),
+      objective: dev3('Pick it up, *Turn* it, *Set down*', 'Pick it up, turn it (*pad:LT+RT*), put it down', 'Pick it up, turn it (*R*), put it down'), allow: { interior: true, panels: ['decorate', 'menu'] },
       highlight: G => (!decoOpen(G) ? decoBtn(G) : touch() && G.housing.decor.hold ? ['.tc-rot', '.tc-place'] : null), waitFor: 'decor:move' },
-    { id: 'wallpaper', resumeAt: 'decorate', say: 'Ooh, and new wallpaper! Open *Wallpaper & Floors* and pick one.', objective: 'Change the wallpaper', allow: { interior: true, panels: ['decorate', 'menu'] },
+    { id: 'wallpaper', resumeAt: 'decorate', say: dev3('Ooh, and new wallpaper! Open *Wallpaper & Floors* and pick one.', 'Ooh, and new wallpaper! *pad:LB* *pad:RB* to *Wallpaper & Floors*, then *pad:A* on one.', 'Ooh, and new wallpaper! Open *Wallpaper & Floors* and pick one.'), objective: 'Change the wallpaper', allow: { interior: true, panels: ['decorate', 'menu'] },
       onEnter: G => { if (!wallpaperId(G)) G.actions.addFurniture('wp_dots', 1, { src: 'gift' }); },
       highlight: G => { if (!decoOpen(G)) return decoBtn(G); const P = G.ui.panels.decorate; if (P.tab !== 'surface') return '.p-decor .tab[data-t="surface"]'; const w = wallpaperId(G); return w ? `.p-decor .card[data-id="${w}"]` : null; },
       waitFor: { event: 'decor:surface', test: p => p.kind === 'wall' } },
@@ -274,7 +275,7 @@ const makeHome = {
       objective: G => { const id = favHave(G); return id ? `Try the tip: ${FURNITURE[id].mount === 'wall' ? 'hang' : 'place'} the ${FURNITURE[id].name}` : 'The Home Rating'; },
       highlight: G => { if (!decoOpen(G)) return decoBtn(G); const c = !G.housing.decor.sel && !G.housing.decor.hold && favCard(G); return c ? [c, '.p-decor .dc-rate'] : touch() && G.housing.decor.sel ? ['.tc-place', '.p-decor .dc-rate'] : '.p-decor .dc-rate'; },
       waitFor: { event: 'decor:place', test: (p, G) => likes(G).includes(p.id) } }, // (or Got it!)
-    { id: 'wrap', say: dev3("Tanu sells furniture at his stall on Market Street, the workbench makes it, and the villagers love help decorating their homes — ask them \"Need any help?\". Tap *Done* when you're done!", "Tanu sells furniture at his stall on Market Street, the workbench makes it, and the villagers love help decorating their homes — ask them \"Need any help?\". Press *B* when you're done!", "Tanu sells furniture at his stall on Market Street, the workbench makes it, and the villagers love help decorating their homes — ask them \"Need any help?\". Press *B* when you're done!"),
+    { id: 'wrap', say: dev3("Tanu sells furniture at his stall on Market Street, the workbench makes it, and the villagers love help decorating their homes — ask them \"Need any help?\". Tap *Done* when you're done!", "Tanu sells furniture at his stall on Market Street, the workbench makes it, and the villagers love help decorating their homes — ask them \"Need any help?\". Press *pad:B* when you're done!", "Tanu sells furniture at his stall on Market Street, the workbench makes it, and the villagers love help decorating their homes — ask them \"Need any help?\". Press *B* when you're done!"),
       objective: 'More furniture: Tanu, the workbench, finds', allow: { interior: true, panels: ['decorate', 'menu'] }, ack: true },
   ],
 };

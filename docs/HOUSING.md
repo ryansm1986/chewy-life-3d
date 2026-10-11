@@ -623,3 +623,24 @@ A short **"Remodel"** step comes the first time the player opens the mailbox. Us
   | the same remodel again (cached) | 1.5 ms |
   | a styled template's build alone | 38-43 ms |
   | 40 different looks in a row | the styled cache holds at 24 (the cap); 7-8 geometries left over (live models) |
+
+### Decorating with a controller (CT-11, 2026-10-10)
+The pad's decorate mode is in [CONTROLS.md](CONTROLS.md) §14.6, the same three states as build mode (the palette, the
+cursor, a piece in hand). What it changes here:
+- **The palette** on the pad: LB / RB glyphs at the tab strip's ends, a grid of cards, and the side card shows the
+  focused piece (its kind, size, set, tags, how many are in storage, a heart for a favourite) under the house's name and
+  its Home Rating. The Store / Undo / Done buttons and the key legend hide, because the hint bar names the buttons.
+  Folded (the cursor, a piece in hand), only the tab strip shows: the other tabs as icons with their counts, and a chip
+  with the piece in hand.
+- **Taking a piece out**: the D-pad to its card, A. Wallpaper and floors go up at once with A (the palette stays).
+- **From the room**: the stick moves the paw onto a placed piece. A picks it up to move it, and B puts it back where it
+  was. X stores the piece under the paw (with what stands on it); a villager's own piece stays theirs.
+- **In hand**: LT / RT turn it (wall pieces don't turn), A puts it down, X stores it (a moved piece) or puts it back (one
+  from storage), and the D-pad nudges it one 0.5 m cell.
+- **Y undoes** (decorate's own stack), from any state. With nothing in hand, LT / RT zoom.
+- **B** with nothing in hand leaves (Done). Menu opens the pad's tabbed menu over the room, and decorate carries on
+  when it closes.
+- **The decorating guide** ("Make it home", R-13) speaks the pad's buttons as glyphs: `*pad:A*`-style tokens in
+  `world/guides.js` (`ui/padGlyphs.js keyHint`). Its way in is Menu, then Decorate on the Game page, and the Game tab is
+  spotlit while another page is open. View answers its Got it! during decorate mode too. s40 g) plays it end to end on
+  the pad.

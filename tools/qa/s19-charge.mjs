@@ -13,10 +13,10 @@
 //  i) R-16, the drawer's skill strip by every input: the mouse, a phone's and an iPad's fingers and the pad each switch
 //     the drawer to a skill that isn't the tree's default and buy a perk there; hover names, unlearned previews, each
 //     tree's memory, learn and assign pick, the chip (its tooltip steps aside; 44 px to a finger; a double-tap learns
-//     once), LT / RT, and the drawer on the screen at 1280×720 and UI 125 %. S19_ONLY=i runs just this
+//     once), a right-stick flick (CT-11; it was LT / RT), and the drawer on the screen at 1280×720 and UI 125 %. S19_ONLY=i runs just this
 import { launch, boot, waitMode, sleep, makeReport, BASE } from './lib.mjs';
 import { launchTouch, PHONE, IPAD } from './touch-lib.mjs';
-import { installPad, padTap, padReset } from './pad-lib.mjs';
+import { installPad, padTap, padReset, padStick } from './pad-lib.mjs';
 
 const R = makeReport('S19 charged abilities: hold, perks, channels, every skill, K panel, dash bounds, guide, perf');
 const { browser, page, errors, warns } = await launch({ w: 1280, h: 720 });
@@ -421,15 +421,17 @@ try {
   await ev(() => window.G.ui.open('skills')); await settled(); await until(() => !!window.G.ui.padNav.cur);
   await ev(() => window.G.ui.panels.skills.chg.show('chomp'));
   const p0 = await drawer();
-  await padTap(page, 'RT'); await until(() => window.G.ui.panels.skills.chg.id !== 'chomp');
+  // (CT-11: a right-stick flick steps the strip; LT / RT are the skill trees in the pad's tabbed menu)
+  const flick = async x => { await padStick(page, 'right', x, 0); await until(() => Math.abs(window.G.controls.axes[2]) > 0.5); await padStick(page, 'right', 0, 0); };
+  await flick(0.9); await until(() => window.G.ui.panels.skills.chg.id !== 'chomp');
   const pR = (await drawer()).id;
-  await padTap(page, 'LT'); await until(() => window.G.ui.panels.skills.chg.id === 'chomp');
+  await flick(-0.9); await until(() => window.G.ui.panels.skills.chg.id === 'chomp');
   const pL = (await drawer()).id;
-  await padTap(page, 'LT'); await until(() => window.G.ui.panels.skills.chg.id === 'bonestorm');
+  await flick(-0.9); await until(() => window.G.ui.panels.skills.chg.id === 'bonestorm');
   const pW = (await drawer()).id;
   const pHint = await ev(() => window.G.ui.padNav.hintsEl.textContent.replace(/\s+/g, ' '));
   const pCast = await ev(() => ({ charge: !!window.G.skills.charge.active, anim: window.G.player.anim.action?.name || null }));
-  R.check('R-16 pad: RT / LT step the drawer through the strip (Crescent Chomp → Whirlwind Stance, back, and round to Sakura Storm); the hints say so; nothing casts', p0.id === 'chomp' && pR === 'whirl' && pL === 'chomp' && pW === 'bonestorm' && /Charge skill/.test(pHint) && !pCast.charge, JSON.stringify({ p0: p0.id, pR, pL, pW, pHint, pCast }));
+  R.check('R-16 pad: a right-stick flick steps the drawer through the strip (Crescent Chomp → Whirlwind Stance, back, and round to Sakura Storm); the hints say so; nothing casts', p0.id === 'chomp' && pR === 'whirl' && pL === 'chomp' && pW === 'bonestorm' && /Charge skill/.test(pHint) && !pCast.charge, JSON.stringify({ p0: p0.id, pR, pL, pW, pHint, pCast }));
   const navTo = async (sel, max = 40) => {
     for (let i = 0; i < max; i++) {
       const s = await ev(sel => {

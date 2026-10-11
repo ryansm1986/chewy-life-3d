@@ -3,8 +3,9 @@
 //   packGame(gameDir, outZip)   the production game folder (dist-desktop/app/game) → a zip the app's updater unpacks
 //                               (tools/desktop/updater.cjs extractZip): plain files, sorted, UTF-8 names, one fixed
 //                               timestamp (the same files give the same bytes and hash), deflated unless that's bigger
-//   shellFingerprint(root)      a hash of what makes the shell: main.cjs, preload.cjs, updater.cjs and the Electron
-//                               version. A changed fingerprint means older apps need a shell update (update.json minShell)
+//   shellFingerprint(root)      a hash of what makes the shell: main.cjs, preload.cjs, updater.cjs, steamenv.cjs,
+//                               mainlog.cjs and the Electron version. A changed fingerprint means older apps need a shell
+//                               update (update.json minShell)
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -50,10 +51,10 @@ export function packGame(gameDir, outZip) {
 
 export function sha256Of(file) { return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'); }
 
-/** the shell's identity: its three scripts (line endings normalised) and the Electron version */
+/** the shell's identity: its scripts (line endings normalised) and the Electron version */
 export function shellFingerprint(root) {
   const h = crypto.createHash('sha256');
-  for (const f of ['main.cjs', 'preload.cjs', 'updater.cjs']) h.update(f + '\0' + fs.readFileSync(path.join(root, 'tools/desktop', f), 'utf8').replace(/\r\n/g, '\n') + '\0');
+  for (const f of ['main.cjs', 'preload.cjs', 'updater.cjs', 'steamenv.cjs', 'mainlog.cjs']) h.update(f + '\0' + fs.readFileSync(path.join(root, 'tools/desktop', f), 'utf8').replace(/\r\n/g, '\n') + '\0');
   h.update('electron\0' + JSON.parse(fs.readFileSync(path.join(root, 'node_modules/electron/package.json'), 'utf8')).version);
   return h.digest('hex').slice(0, 32);
 }

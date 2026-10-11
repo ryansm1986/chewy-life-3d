@@ -100,7 +100,9 @@ Optional, in **Properties → General → Launch Options**:
 |---|---|
 | `--windowed` | Start in a window this time. |
 | `--deck` / `--no-deck` | Treat the machine as a Deck, or not, whatever Steam says. |
-| `--no-sandbox` | Only if it won't start (see Troubleshooting). |
+| `--no-sandbox` | Not needed any more: under Steam the app adds it itself (see Troubleshooting). Harmless to leave. |
+| `--ozone-platform=x11` | Not needed any more either: under Steam or Game Mode the app adds it. Harmless to leave. |
+| `--no-x11` | Don't add `--ozone-platform=x11` under Steam (Chromium picks the window system). |
 
 ### 6. Play in Game Mode
 Return to Gaming Mode (the **Return to Gaming Mode** icon on the desktop). Pawhaven is in the Library under
@@ -149,8 +151,8 @@ over again. Tracked as CT-9 in [ROADMAP.md](ROADMAP.md).
 - The browser and itch builds never show any of this. The card needs the desktop app's `window.pawhaven.update`.
 
 ### Two kinds of update
-Most releases change only the game. The Electron shell around it (`main.cjs`, `preload.cjs`, `updater.cjs` and
-Electron itself) rarely changes.
+Most releases change only the game. The Electron shell around it (`main.cjs`, `preload.cjs`, `updater.cjs`,
+`steamenv.cjs`, `mainlog.cjs` and Electron itself) rarely changes.
 
 1. **A content update (the usual kind).**
    - Every release publishes the game's production build as a zip, `pawhaven-game-<version>.zip` (about 35 MB:
@@ -237,7 +239,8 @@ npm run release:desktop -- --no-build     # reuse the last full build:desktop (r
      `update.json`, then publishes it as the latest.
    - Clients only see a release once it is published, so they never find a half-uploaded one.
 4. **`minShell` is worked out for you.**
-   - The script fingerprints the shell (`main.cjs`, `preload.cjs`, `updater.cjs` and the Electron version) and
+   - The script fingerprints the shell (`main.cjs`, `preload.cjs`, `updater.cjs`, `steamenv.cjs`, `mainlog.cjs` and the
+     Electron version) and
      compares it with the last release's `update.json`.
    - The same fingerprint keeps the last `minShell`, so every installed app takes the update as content.
    - A changed shell sets `minShell` to this version, so older apps get a shell update.
@@ -306,13 +309,56 @@ The Windows QA covers content updates end to end (`tools/qa/desktop-update.mjs`)
 
 ## Troubleshooting
 
-**A black screen, or the window never appears.** Run it from Konsole in Desktop Mode to see its messages:
-`~/Games/Pawhaven/Pawhaven-*.AppImage`. Then:
-- *"The SUID sandbox helper binary was found, but is not configured correctly"* or *"No usable sandbox"*: add
-  `--no-sandbox` to the launch options. The AppImage adds it by itself when the system has no user namespaces. The
-  tar.gz's `pawhaven` doesn't.
-- *A GPU or GL error*: try `--disable-gpu-sandbox`. If that doesn't help, try `--ozone-platform=x11`.
-- *"AppImages require FUSE to run"*: SteamOS has FUSE, but another Linux may not. Use the tar.gz instead.
+**Game Mode: the switches the app adds by itself (CT-10).** The 0.6.5 AppImage showed only Steam's loading spinner in
+Game Mode until the launch options `--no-sandbox --ozone-platform=x11` were added. The app now adds both itself
+whenever Steam or gamescope starts it on Linux:
+- `--ozone-platform=x11`: the window goes through X11. Game Mode only puts X11 windows on the screen.
+- `--no-sandbox`: Chromium's sandbox is off, as the Deck needed.
+
+So the launch options can go. Leaving them is harmless: the app never adds a switch that is already there.
+- It knows from the environment: `GAMESCOPE_WAYLAND_DISPLAY` is set, `XDG_CURRENT_DESKTOP` contains `gamescope`,
+  `SteamDeck=1`, or `SteamGameId` or `SteamAppId` is set and not 0. A desktop started through Steam counts too.
+- Windows and macOS never get these switches.
+- The AppImage's launcher (`AppRun`) puts them on the command line before the app starts. The tar.gz's `pawhaven`
+  adds them itself. If its browser engine had already picked another window system, it restarts itself once with
+  them (the log says "relaunching").
+- **To opt out of X11**, add `--no-x11` to the launch options. The browser engine then picks for itself (Wayland,
+  under gamescope). A `--ozone-platform=…` or `--ozone-platform-hint=…` of your own always wins.
+
+**The log.** The app writes what it does to a log file in its folder:
+
+| System | Log |
+|---|---|
+| Linux, Steam Deck | `~/.config/Pawhaven/logs/main.log` |
+| Windows | `%APPDATA%\Pawhaven\logs\main.log` |
+
+- Each start adds a block beginning `[app] ---- Pawhaven <version>`. It records:
+  - the system, the command line, the Steam decision and the switches in use;
+  - the GPU and what the browser engine enabled on it, once the title is up (or 20 seconds in, if it never is);
+  - the window: created, shown (at its first frame, or by the 3-second fallback), loaded, and the game reaching its
+    title, with the WebGL renderer it got;
+  - crashed processes, errors on the page, and the quit.
+- Over 1 MB it becomes `main.1.log`, and the one before becomes `main.2.log`. Older logs are deleted.
+- On the Deck, read it in Desktop Mode: in Dolphin, type `~/.config/Pawhaven/logs/` in the address bar (`.config` is
+  hidden; Ctrl+H shows hidden folders), or `cat ~/.config/Pawhaven/logs/main.log` in Konsole.
+- With `--user-data=<dir>` the log is in `<dir>/logs/`.
+
+**Reporting a problem.** Send:
+1. `main.log`, and `main.1.log` if there is one. Copy them after the problem: start the game, let it go wrong, then
+   quit it (or exit it through Steam).
+2. What you did and what you saw (a photo of the screen helps), and whether it was Game Mode or Desktop Mode.
+3. The version (the title screen's footer, or Settings › About) and any launch options.
+4. If no window ever appeared: the messages from starting it in Konsole (below).
+
+**A black screen, or the window never appears.**
+- The window shows at its first frame, or after 3 seconds anyway. The log says which: `[window] shown (…)`.
+- Look in the log for `[crash]`, `[page]` and `did-fail-load` lines, and for "the game reached its title".
+- Run it from Konsole in Desktop Mode to see its messages: `~/Games/Pawhaven/Pawhaven.AppImage`. Then:
+  - *"The SUID sandbox helper binary was found, but is not configured correctly"* or *"No usable sandbox"*: add
+    `--no-sandbox` to the launch options. The AppImage adds it by itself under Steam and when the system has no user
+    namespaces. The tar.gz's `pawhaven` can't add it early enough for this error, so add it yourself.
+  - *A GPU or GL error*: try `--disable-gpu-sandbox`. Outside Steam, also try `--ozone-platform=x11`.
+  - *"AppImages require FUSE to run"*: SteamOS has FUSE, but another Linux may not. Use the tar.gz instead.
 - Only in Game Mode: open the Quick Access menu → Performance, check nothing forces a very low resolution, and
   restart Steam.
 
@@ -320,7 +366,7 @@ The Windows QA covers content updates end to end (`tools/qa/desktop-update.mjs`)
 - The card's message says why: GitHub can't be reached, the download failed its safety check (it is thrown away and
   can be retried), not enough free space, or "can't write next to the app". For the last one, move the AppImage to a
   folder you own, such as `~/Games/Pawhaven/`.
-- Started from Konsole, the app prints what it does on lines starting with `[updates]`.
+- The app notes what it does on lines starting with `[updates]`, in the log and in Konsole.
 - The launch check runs once a launch and stays quiet when offline. Settings › About › Check for updates always
   answers.
 - To go back to the game built into the app, delete `~/.config/Pawhaven/updates/` (`%APPDATA%\Pawhaven\updates\` on
@@ -346,7 +392,9 @@ The Windows QA covers content updates end to end (`tools/qa/desktop-update.mjs`)
 | `tools/desktop/preload.cjs` | The bridge: `window.pawhaven = { desktop, deck, platform, version, isFullscreen(), setFullscreen(on), onFullscreen(fn), quit(), update }`. `update` is `{ info, check, install, cancel, later, openPage, onProgress }`, or null with updates off. `deck` comes from Steam's `SteamDeck=1`, or `--deck` / `--no-deck`. |
 | `src/ui/desktop.js` | The game's side: Settings › Full screen, the Quit buttons, the running version in the title's footer, and the updates' set-up (`desktopUpdate.js`). In a browser it's inert. `src/core/deck.js` reads `pawhaven.deck`. |
 | `tools/desktop/build-desktop.mjs` | `npm run build:desktop`: the game build, electron-builder (with Electron already unpacked: on Windows its own unzip-then-rename trips over Defender), the AppImage and the tar.gz. |
-| `tools/desktop/appimage.mjs` | Writes the AppImage on any OS. It joins the type-2 static runtime from electron-builder's pinned toolset to a SquashFS this module builds itself (gzip, no fragments). Its `AppRun` adds `--no-sandbox` only where user namespaces are missing. |
+| `tools/desktop/appimage.mjs` | Writes the AppImage on any OS. It joins the type-2 static runtime from electron-builder's pinned toolset to a SquashFS this module builds itself (gzip, no fragments). Its `AppRun` (`appRunScript()`) adds `--ozone-platform=x11` and `--no-sandbox` under Steam or gamescope (as `steamenv.cjs` decides), and elsewhere `--no-sandbox` only where user namespaces are missing. |
+| `tools/desktop/steamenv.cjs` | CT-10: `gameModeEnv()` reads the Steam and gamescope signals and decides the Game Mode switches (Linux only); `planSwitches()` appends them or relaunches a tar.gz `pawhaven` once. Tested by `tools/qa/desktop-env-unit.mjs`. |
+| `tools/desktop/mainlog.cjs` | CT-10: the log, `userData/logs/main.log` (the console, the window's events, crashed processes, the GPU at the title), rotated at 1 MB with two old files kept. |
 | `tools/desktop/verify-squashfs.py` | Reads an AppImage back with an independent SquashFS reader (`pip install PySquashfsImage`) and compares every file with `linux-unpacked/`. |
 | `tools/desktop/make-icon.mjs` | Renders `icon.png` (the title's Chewy badge) from the dev server. |
 | `tools/qa/desktop-smoke.mjs` | Boots the packaged Windows app through Playwright's Electron support and checks it. |
@@ -362,7 +410,8 @@ Switches for testing:
 | Switch | Effect |
 |---|---|
 | `--windowed`, `--fullscreen` | Start that way this time. |
-| `--user-data=<dir>` | A separate save folder. |
+| `--no-x11` | Under Steam or gamescope on Linux: don't add `--ozone-platform=x11`. |
+| `--user-data=<dir>` | A separate save folder (its `logs/main.log` too). |
 | `--query=<qs>` | Open with a query string, e.g. `fresh&nointro`. |
 | `--url=<url>` | Load the dev server instead of the packaged build: `npm run desktop -- --url=http://localhost:5173`. |
 | `--game-dir=<dir>` | Serve the game from another folder (updates off). |

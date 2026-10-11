@@ -45,11 +45,13 @@ import { normKey } from '../core/input.js';
 import { installPadGlyphs, touchWording } from './padGlyphs.js';
 import { PadNav } from './padNav.js';
 import { PadCursor } from './padCursor.js';
+import { PadMenu } from './padMenu.js';
 import { deckLike, mobileLike, DECK } from '../core/deck.js';
 import { installDesktop } from './desktop.js';
 import { TouchControls } from './touch.js';
 import { Mobile } from './mobile.js';
 import './deck.css'; // (last: the Deck's text floor outranks the panels' own sizes)
+import { Fit } from './fit.js'; // (CT-10: panels and the HUD fitted to any screen; its CSS after deck.css)
 import { Vector3 } from 'three';
 
 const SETTINGS_KEY = 'chewy3d.settings';
@@ -143,8 +145,10 @@ export const UI = {
     installDesktop(this); // (the desktop app: Settings › Full screen; nothing in a browser — ui/desktop.js)
     this.refreshCaps = installPadGlyphs(this); // (keycaps ⇄ gamepad glyphs when the device changes: ui/padGlyphs.js)
     this.padNav = new PadNav(this); this.padCursor = new PadCursor(this); // (the gamepad in panels; in build and decorate mode: docs/CONTROLS.md §3)
+    this.padMenu = new PadMenu(this); // (the pad's tabbed menu: Menu, then LB / RB through Bag … Settings: docs/CONTROLS.md §14.4)
     this.mobile = new Mobile(this); // (phones and tablets: the layout, the menus on touch, rotate, full screen: ui/mobile.js)
     this.touch = new TouchControls(this); // (the on-screen controls while touch plays: ui/touch.js, docs/CONTROLS.md §12)
+    this.fit = new Fit(this); // (every panel fitted to the screen, its body scrolling when taller; the HUD's bottom row kept apart: ui/fit.js, CT-10)
     this.setMode(G?.mode && G.mode !== 'title' ? G.mode : this.mode);
     this.ready = true;
     (this.prewarm = new Prewarm(this)).start(); // the menus' lazy setup, done ahead in idle time after boot (ui/prewarm.js)
@@ -184,13 +188,14 @@ export const UI = {
     if (!this.ready) return;
     const cam = this.G?.engine?.camera;
     this.padInput(); // (the gamepad in menus and dialogue)
+    this.padMenu?.update(); // (the tabbed menu's strip: ends itself when its page closes or the pad stops)
     this.floats.update(dt, cam, this.scale);
     this.labels.update(dt, cam, this.scale);
     if (this.mode !== 'title') this.hud.update(dt);
     this.qarrow.update(dt, cam);
     this.tutorial?.update(dt);
     if (this.mode !== 'title') this.chargeHud?.update(dt);
-    this.mobile?.update(dt); this.touch?.update(dt);
+    this.mobile?.update(dt); this.touch?.update(dt); this.fit?.update(dt);
     this.panels.map.update?.(dt);
     if (this.settings.showFps) {
       this._fpsAcc += dt; this._fpsN++;
@@ -237,6 +242,7 @@ export const UI = {
     this.root.classList.toggle('paused', this.isOpen('menu'));
     this.root.classList.toggle('has-panel', this._order.some(n => this.panels[n]?.isOpen));
     if (name === 'inventory' || name === 'shop' || name === 'stash') this.panels.inventory.refresh();
+    this.fit?.now(); // (CT-10: fitted before its first frame)
     this.G?.events?.emit?.('ui:open', { name });
   },
   close(name, silent) {
@@ -337,8 +343,9 @@ export const UI = {
   back() {
     if (this.pop.classList.contains('show')) { this.hidePopover(); return; }
     if (this.drag.held) { this.drag.cancel(); return; }
-    if (this.isOpen('build') && (this.panels.build.sel || this.panels.build.tool)) { this.panels.build.clearSelection(); this.panels.build.opts.onCancel?.(); return; }
-    if (this.isOpen('decorate') && this.G?.housing?.decor?.onEscape?.()) return; // (decorating: Esc drops what's in hand first)
+    const menu = this.isOpen('menu'); // (the menu over build or decorate mode closes first: CT-11)
+    if (!menu && this.isOpen('build') && (this.panels.build.sel || this.panels.build.tool)) { this.panels.build.clearSelection(); this.panels.build.opts.onCancel?.(); return; }
+    if (!menu && this.isOpen('decorate') && this.G?.housing?.decor?.onEscape?.()) return; // (decorating: Esc drops what's in hand first)
     const top = [...this._order].reverse().find(n => this.panels[n]?.isOpen);
     this._user = true; try { if (top) this.close(top); else this.open('menu'); } finally { this._user = false; }
   },
@@ -361,7 +368,14 @@ export const UI = {
     const mapOk = !this._order.some(n => n !== 'map' && this.panels[n]?.isOpen && !NON_BLOCKING.has(n));
     if (A.pressed('map', 'pad') && this.tutorial?.root.classList.contains('on') && this.tutorial.$.obj.classList.contains('ack') && !this.anyModal()) { A.consume('map', 'pad'); this.tutorial.onAck?.(); return; }
     if (A.pressed('map', 'pad') && mapOk && !this.isOpen('menu')) { A.consume('map', 'pad'); this._user = true; try { this.toggle('map'); } finally { this._user = false; } return; }
-    if (A.pressed('menu', 'pad')) { A.consume('menu', 'pad'); if (this.tutorial?.offering) this.tutorial.answerOffer(false); else this.back(); return; }
+    if (A.pressed('menu', 'pad')) { // (CT-11: the tabbed menu when nothing is up, Menu again closes it; over a lone panel it backs out as Esc does)
+      A.consume('menu', 'pad');
+      if (this.tutorial?.offering) this.tutorial.answerOffer(false);
+      else if (this.padMenu?.active) this.padMenu.close();
+      else if (this.padMenu && !this.drag.held && !this.pop.classList.contains('show') && !this._order.some(n => this.panels[n]?.isOpen && !NON_BLOCKING.has(n))) this.padMenu.open();
+      else this.back();
+      return;
+    }
     if (this.tutorial?.offering && A.padHit('B')) { A.padConsume('B'); this.tutorial.answerOffer(false); return; }
     if (this.padNav?.update()) return; // a panel, the popover or the guide's offer: spatial focus navigation (ui/padNav.js)
     if (!this.anyModal()) {
@@ -431,6 +445,7 @@ export const UI = {
     const s = clamp(Math.min(innerWidth / 1600, innerHeight / 900) * (this.settings.uiScale || 1), 0.62, 1.6);
     this.scale = s;
     this.root?.style.setProperty('--ui-scale', s.toFixed(4));
+    if (this.fit) { this.fit.hudSig = ''; this.fit.now(); } // (CT-10: Settings › UI size changes the room)
   },
   onTitle(h) { this._titleH = h || {}; this.titleScreen?.sync(); },
   onMenu(h) { this._menuH = h || {}; },

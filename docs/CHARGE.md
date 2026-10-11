@@ -420,7 +420,8 @@ All numbers at skill level 10 with no gear, read from `src/rpg/charge.js` (regen
     content below the strip, so the strip holds still under the pointer.
   - **Picks**: a strip button, a node's ⚡ chip (the node's tooltip steps aside while the pointer is on it), learning a
     skill, assigning one (the popover, a drag, 1–4 while hovering, the hotbar's slot chooser), the pad's X on a node and
-    LT / RT (`cycle`, wrapping). Each tree remembers its pick (`sel[tree]`) for the session, closing K included.
+    a flick of the right stick (`cycle`, wrapping; it was LT / RT until CT-11 gave them to the skill trees in the pad's
+    tabbed menu: CONTROLS §14.4). Each tree remembers its pick (`sel[tree]`) for the session, closing K included.
   - **Touch**: the strip's buttons are 52 design px (44.7 on a phone's 0.86); the chip's hit area is 52 px through an
     `::after` reaching left and up into its node, clear of the node's middle (a tap there still learns); a phone's
     sheet is wider (410 px), its strip sticks to its top while it scrolls, and its tag clears the strip. A double-tap

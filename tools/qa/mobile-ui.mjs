@@ -17,24 +17,33 @@
 //   panels taller than the screen used to run off it (the phone's fit was phone-only).
 //   R-16: the K panel's Charge drawer, opened for each hero (charge-<hero>; a phone's is the sheet over the tree), with
 //   its skill strip's buttons and the tree's ⚡ chips among the tappables, and on the screen for every skill (drawerFit).
-//   usage: node tools/qa/mobile-ui.mjs [--report] [view…]   W=844 H=390 DPR=3 | DEVICE=ipad   SHOT_DIR (default tools/qa/tmp/mobile-ui)
+//   CT-10 (the owner: Settings "doesn't fit vertically" on a phone, nor on the Deck): every scene is also checked with
+//   the shared panelFit (each panel inside the safe area, its ✕ and tabs on the screen, its body scrolling with the last
+//   row in reach, nothing past its sides) and hudOverlap (no two HUD pieces, touch buttons, toasts or chips
+//   overlapping; ui-audit-lib.mjs), Settings and Controls are opened from the title in every view too, and Settings
+//   must show at least SET_ROWS of its rows (a third, default 0.33) on the screen at once: the phone's had shown 4 of 17,
+//   one wrapped row under another in a 470 px panel, which the cut-off checks passed because the body scrolled.
+//   DEVICE=iphone is the phone with an iPhone's Safari agent.
+//   usage: node tools/qa/mobile-ui.mjs [--report] [view…]   W=844 H=390 DPR=3 | DEVICE=ipad | iphone   SHOT_DIR (default tools/qa/tmp/mobile-ui)
 //   FLOOR=12 TAP=44. Exit 1 when a panel is cut off, or (without --report) text or a tappable is under.
 import fs from 'node:fs';
 import path from 'node:path';
 import { launchTouch, boot, sleep, waitMode, BASE, PHONE, IPAD } from './touch-lib.mjs';
 import { seedCozy, cozyScenes, quietUi } from './cozy-ui-lib.mjs';
-import { headerOutside, guideOverlap, drawerFit } from './ui-audit-lib.mjs';
+import { headerOutside, guideOverlap, drawerFit, panelFit, hudOverlap } from './ui-audit-lib.mjs';
 
 const OUT = process.env.SHOT_DIR || path.resolve('tools/qa/tmp/mobile-ui');
 const FLOOR = +(process.env.FLOOR || 12), TAP = +(process.env.TAP || 44), STRICT = !process.argv.includes('--report');
 const ONLY = new Set(process.argv.slice(2).filter(a => !a.startsWith('--')));
-const DEV = process.env.DEVICE === 'ipad' ? IPAD : PHONE;
+const IPHONE = { ...PHONE, ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1' };
+const DEV = process.env.DEVICE === 'ipad' ? IPAD : process.env.DEVICE === 'iphone' ? IPHONE : PHONE;
+const SET_ROWS = +(process.env.SET_ROWS || 0.33);
 const W = +(process.env.W || DEV.w), H = +(process.env.H || DEV.h), DPR = +(process.env.DPR || DEV.dpr);
 fs.mkdirSync(OUT, { recursive: true });
 const { browser, page, errors, F } = await launchTouch({ w: W, h: H, dpr: DPR, ua: DEV.ua });
 const ev = (f, a) => page.evaluate(f, a);
 let bad = 0;
-const small = [], tiny = [], clipped = [], covered = [];
+const small = [], tiny = [], clipped = [], covered = [], overlaps = [];
 const DECOR = /\.jp\b|mm-n > span|pc-lv > small|chg-jp|ph-jp|\.kc\b/; // (key caps are glyph art: ui/mobile.js's text floor skips them too)
 
 const audit = (name, scopes) => ev(([scopes, floor, tap]) => {
@@ -95,11 +104,23 @@ const audit = (name, scopes) => ev(([scopes, floor, tap]) => {
   return r;
 });
 const shot = name => page.screenshot({ path: path.join(OUT, name + '.png') });
+// the HUD's overlaps that last: a toast sliding in, or one pushing the stack up, moves the pad's footer within 0.1 s
+// (ui/fit.js hudRects), so an overlap is counted when it is still there 0.4 s later
+const stillOver = async () => { const k = o => `${o.a}|${o.b}`, a = await ev(hudOverlap); if (!a.length) return a; await sleep(page, 400); const b = new Set((await ev(hudOverlap)).map(k)); return a.filter(o => b.has(k(o))); };
 const scene = async (name, open, scopes, close) => {
   if (ONLY.size && !ONLY.has(name)) return;
   try {
     await open(); await sleep(page, 700); await shot(name); await audit(name, scopes);
     // R-13: a header button (title-row button, tab or badge, or the skill trees' tab row) outside its panel's frame
+    // CT-10: every panel fits the safe area (its body scrolling, the last row in reach); the HUD's pieces keep apart
+    for (const o of await ev(panelFit)) { console.log(`   CUT OFF ${o.sel} ${JSON.stringify(o.rect)}: ${o.why}`); clipped.push({ ...o, where: name }); }
+    for (const o of await stillOver()) { console.log(`   OVERLAP ${o.a} ${JSON.stringify(o.ra)} × ${o.b} ${JSON.stringify(o.rb)}`); overlaps.push({ ...o, where: name }); }
+    // Settings shows a fair share of its rows at once (rows wholly on the screen, inside the body's view)
+    if (/settings$/.test(name)) {
+      const v = await ev(() => { const b = document.querySelector('.p-menu .pb'), br = b.getBoundingClientRect(), rows = [...b.querySelectorAll('.mn-settings .set-row')].filter(r => r.offsetParent); const n = rows.filter(r => { const q = r.getBoundingClientRect(); return q.top >= br.top - 1 && q.bottom <= br.bottom + 1 && q.bottom <= innerHeight; }).length; return { n, of: rows.length }; });
+      console.log(`   Settings shows ${v.n} of its ${v.of} rows at once`);
+      if (v.n < Math.ceil(v.of * SET_ROWS)) { console.log(`   CUT OFF Settings: only ${v.n} of ${v.of} rows on the screen at once (want ${Math.ceil(v.of * SET_ROWS)})`); clipped.push({ sel: 'settings rows', rect: [v.n, v.of], where: name }); }
+    }
     for (const o of await ev(headerOutside)) { console.log(`   CUT OFF ${o.sel} ${JSON.stringify(o.rect)} outside the frame ${JSON.stringify(o.frame)}`); clipped.push({ sel: o.sel, rect: o.rect, where: name }); }
     // R-16: the K panel's Charge drawer (a phone's as the open sheet) on the screen for every skill, its strip on one row
     if (/^(skills|charge)/.test(name)) for (const o of await ev(drawerFit)) { console.log(`   CUT OFF ${o.sel} ${JSON.stringify(o.rect)} on a ${JSON.stringify(o.screen)} screen`); clipped.push({ sel: o.sel, rect: o.rect, where: name }); }
@@ -187,12 +208,14 @@ try {
   await scene('portrait', async () => { await page.setViewportSize({ width: H, height: W }); await sleep(page, 500); }, ['.m-rotate'], async () => { await page.setViewportSize({ width: W, height: H }); await sleep(page, 500); });
   await scene('title', async () => { await ev(() => { window.G.housing?.decor?.active && window.G.housing.decor.exit?.(); window.G.save(); }); await page.goto(`${BASE}/`, { waitUntil: 'load' }); await page.waitForFunction(() => window.__ready === true && window.G?.titleActive, null, { timeout: 60000 }); await sleep(page, 2500); }, ['.l-title', '.ti'], async () => {});
   // Settings from the title (its Settings button: no game menu behind it)
-  await scene('title-settings', () => ev(() => window.G.ui.open('menu', { view: 'settings', from: 'title' })), ['.p-menu']);
+  await scene('title-settings', () => ev(() => document.querySelector('.l-title [data-a="settings"]').click()), ['.p-menu']); // (its own button: it tucks the title away, CT-10)
+  for (const dev of ['touch', 'kbm', 'pad']) // (CT-10: Controls from the title, each tab)
+    await scene('title-controls-' + dev, () => ev(d => { const U = window.G.ui, M = U.panels.menu; if (!U.isOpen('menu')) document.querySelector('.l-title [data-a="settings"]').click(); M.setView('controls'); M.dev = d; M.renderControls(); }, dev), ['.p-menu']);
 } catch (e) { console.log('!! run:', e.message); bad++; }
 
-console.log(`\n${small.length} text groups under ${FLOOR} px; ${tiny.length} tappable groups under ${TAP} px; ${clipped.length} panels cut off; ${covered.length} things under a guide card. Shots: ${OUT}`);
+console.log(`\n${small.length} text groups under ${FLOOR} px; ${tiny.length} tappable groups under ${TAP} px; ${clipped.length} panels cut off; ${overlaps.length} HUD overlaps; ${covered.length} things under a guide card. Shots: ${OUT}`);
 if (errors.length) { console.log('page errors:', [...new Set(errors)].slice(0, 6).join('\n')); bad++; }
 await browser.close();
-const fail = bad || clipped.length || covered.length || (STRICT && (small.length || tiny.length));
+const fail = bad || clipped.length || overlaps.length || covered.length || (STRICT && (small.length || tiny.length));
 console.log(fail ? 'FAIL mobile-ui' : 'PASS mobile-ui');
 process.exit(fail ? 1 : 0);

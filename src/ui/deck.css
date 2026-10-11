@@ -16,6 +16,8 @@
   .ck-t small, .ck-btext, .ck-tag, .cr-set, .cr-tags span,
   .tv-pin-n b, .gf-card small, .sp-card small, .hc-stars small, .rm-set small, .rm-o, .rm-auto, .to-h, .to-skip, .rl-hint,
   .cd-size, .cd-built, .rk-next, .rk-badge b, .rk-n, .ovl, .bd-side .bh-k, .bd-side .bd-stats small,
+  .p-inv .eq-l, .p-char .ch-xpl > span, .p-decor .dc-n, .p-decor .dc-tip, /* (CT-10: deck-ui never audited the bag, the character sheet or decorate: their scope names were wrong) */
+  .toasts .t-tx small, .hud .buff > i, /* (CT-10: a toast's second line, a buff's seconds: the busy HUD and the fight, audited now) */
   .kc.sm:not(.pad)
 ) { font-size: 12px; }
 

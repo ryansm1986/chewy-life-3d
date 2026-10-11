@@ -1,0 +1,32 @@
+/* The pad's tabbed menu (ui/padMenu.js, docs/CONTROLS.md §14.4): the strip of pages across the top, LB / RB at its ends,
+   and Settings' own pages (LT / RT) under it. In the unscaled over layer, zoomed to the UI scale like a panel. */
+.pm-strip { position: fixed; left: 50%; top: calc(var(--safe-y, 0px) + 10px); z-index: 58; zoom: var(--ui-scale, 1); transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; visibility: hidden; opacity: 0; transition: opacity .16s; }
+body.pad-active .pm-strip.on { visibility: visible; opacity: 1; }
+.pm-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; pointer-events: auto;
+  background: var(--paper-noise, none), linear-gradient(#fffdf8, #fff1e0); border: 3px solid var(--ink, #4a2c2a); border-radius: 999px;
+  box-shadow: 0 4px 0 var(--ink, #4a2c2a), 0 10px 24px rgba(40, 18, 30, .28), inset 0 0 0 3px #fff; }
+.pm-strip .kc.pad.pm-b { height: 32px; flex: none; }
+.pm-strip .kc.pad.pm-b .pg { width: 32px; height: 32px; }
+.pm-tabs { display: flex; align-items: center; gap: 5px; }
+.pm-tab { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px 7px 9px; border: 2.5px solid transparent; border-radius: 999px; background: none; cursor: pointer;
+  font: 700 15px/1 var(--font); color: var(--ink2, #7a5a50); white-space: nowrap; transition: transform .2s var(--spring), background .2s; }
+.pm-tab .gl { width: 20px; height: 20px; opacity: .75; }
+.pm-tab.on { color: #fff; -webkit-text-stroke: 4px var(--ink, #4a2c2a); paint-order: stroke fill; border-color: var(--ink, #4a2c2a);
+  background: linear-gradient(#ffc6d8, #ff8fb0); box-shadow: 0 3px 0 var(--ink, #4a2c2a); transform: translateY(-2px) scale(1.05); }
+.pm-tab.on .gl { opacity: 1; filter: drop-shadow(0 1px 0 var(--ink, #4a2c2a)); }
+.pm-sub { display: flex; align-items: center; gap: 7px; padding: 4px 10px; background: rgba(255, 250, 242, .96); border: 2.5px solid var(--ink, #4a2c2a); border-radius: 999px;
+  box-shadow: 0 3px 0 var(--ink, #4a2c2a); font: 700 13.5px/1 var(--font); color: var(--ink2, #7a5a50); }
+.pm-sub .kc.pad.pm-b { height: 26px; }
+.pm-sub .kc.pad.pm-b .pg { width: 26px; height: 26px; }
+.pm-st { padding: 3px 8px 4px; border-radius: 999px; white-space: nowrap; }
+.pm-st.on { color: var(--ink, #4a2c2a); background: #ffe0ea; box-shadow: inset 0 0 0 2px #ff8fb0; }
+.pm-dot { width: 4px; height: 4px; border-radius: 50%; background: rgba(74, 44, 42, .3); }
+/* while it's up: the pause page's row of panel buttons and its Settings / Controls buttons are the strip's pages now; the
+   Settings pages' Back is B (the Controls page keeps Reset) */
+.ui-root.pm-on .p-menu .mn-quick [data-a^="open:"], .ui-root.pm-on .p-menu .mn-btns :is([data-a="settings"], [data-a="controls"]),
+.ui-root.pm-on .p-menu .mn-settings .mn-foot, .ui-root.pm-on .p-menu .mn-controls .mn-foot [data-a="back"] { display: none !important; }
+.ui-root.pm-on .p-menu .mn-settings .set-row:has([data-a="controls"]) { display: none; } /* (Controls is the strip's next page) */
+.ui-root.pm-on .p-menu .mn-controls .ctl-tabs { display: none; } /* (the strip's LT / RT pages name the device) */
+/* the panels' tabs: the keyboard's caps (Pantry's P) mean nothing on the pad (LT / RT step them in the menu) */
+body.pad-active .tab > .kc:not(.pad) { display: none; }

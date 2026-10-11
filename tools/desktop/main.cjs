@@ -6,8 +6,11 @@
 // docs/DESKTOP.md "Updates from inside the app", tools/desktop/updater.cjs): the game asks it to check GitHub's latest
 // release, then to install a content update (a game zip into userData/updates/, served in place of the built-in game,
 // on trial until the title comes up, rolled back if it doesn't) or a shell update (a new AppImage swapped in).
+// Under Steam or gamescope on Linux it adds --ozone-platform=x11 and --no-sandbox by itself (CT-10, steamenv.cjs: Game
+// Mode only shows X11 windows), and it keeps a log, userData/logs/main.log (mainlog.cjs), for a window that never shows.
 //
 // Switches (for testing; the packaged app needs none):
+//   --no-x11                      under Steam / gamescope on Linux: don't add --ozone-platform=x11 (Chromium picks)
 //   --windowed / --fullscreen     start that way this time (not remembered)
 //   --deck / --no-deck            report a Steam Deck to the game (else Steam's SteamDeck=1 decides)
 //   --user-data=<dir>             keep saves and window state there instead of the app's userData
@@ -19,13 +22,55 @@
 //   --update-boot-timeout=<s>     the QA (with --update-url): how long a fresh update may take to reach the title
 const { app, BrowserWindow, Menu, ipcMain, protocol, shell } = require('electron');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const U = require('./updater.cjs');
+const E = require('./steamenv.cjs');
+const ML = require('./mainlog.cjs');
 
 const arg = (name) => { const a = process.argv.find(x => x === `--${name}` || x.startsWith(`--${name}=`)); return a == null ? null : a.includes('=') ? a.slice(a.indexOf('=') + 1) : true; };
 const userData = arg('user-data');
 if (typeof userData === 'string') app.setPath('userData', path.resolve(userData));
 app.setAppUserModelId?.('com.holiestdiver.pawhaven');
+const PRIMARY = app.requestSingleInstanceLock(); // (a second launch only focuses the first window: see 'second-instance')
+if (!PRIMARY) app.quit();
+
+// ---------------------------------------------------------------- the log (CT-10): userData/logs/main.log
+// (after --user-data= has moved userData; only the first instance writes it. The console still prints as before.)
+const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(1);
+if (PRIMARY) {
+  ML.wrapConsole(console, ML.openLog({ dir: path.join(app.getPath('userData'), 'logs') }));
+  console.log(`[app] ---- Pawhaven ${app.getVersion()} (Electron ${process.versions.electron}, Chrome ${process.versions.chrome}), pid ${process.pid}`);
+  console.log(`[app] ${process.platform} ${process.arch} ${os.release()}, ${app.isPackaged ? 'packaged' : 'unpackaged'}${process.env.APPIMAGE ? `, AppImage ${process.env.APPIMAGE}` : ''}`);
+  console.log('[app] argv:', JSON.stringify(process.argv));
+  console.log('[app] userData:', app.getPath('userData'));
+}
+app.on('render-process-gone', (e, wc, d) => console.error(`[crash] the game's page process is gone: ${d.reason}, exit code ${d.exitCode}`));
+app.on('child-process-gone', (e, d) => console.error(`[crash] a child process is gone: ${d.type}${d.name ? ` "${d.name}"` : ''}${d.serviceName ? ` (${d.serviceName})` : ''}: ${d.reason}, exit code ${d.exitCode}`));
+process.on('uncaughtExceptionMonitor', (err, origin) => console.error(`[app] ${origin} in the main process:`, err)); // (a monitor: Electron still reports it as before)
+
+// ---------------------------------------------------------------- Steam's Game Mode on Linux (CT-10, steamenv.cjs)
+// gamescope only puts X11 windows on screen, and the owner's Deck needed --no-sandbox too. The AppImage's AppRun passes
+// both on the real command line; here they reach the child processes, and a pawhaven started straight from Steam (the
+// tar.gz) on another window system relaunches itself once with them.
+const ENV = E.gameModeEnv({ env: process.env, argv: process.argv, platform: process.platform });
+const PLAN = E.planSwitches(ENV, { ozoneNow: app.commandLine.getSwitchValue('ozone-platform'), relaunched: process.env.PAWHAVEN_RELAUNCHED === '1' });
+const RELAUNCHING = PRIMARY && !!PLAN.relaunch;
+if (PRIMARY) {
+  console.log('[env]', E.loggedEnv(process.env));
+  console.log('[env]', ENV.summary);
+  if (process.env.PAWHAVEN_APPRUN_ADDED != null) console.log('[env] the AppImage launcher added:', process.env.PAWHAVEN_APPRUN_ADDED || 'nothing');
+  console.log('[env]', PLAN.note);
+}
+if (RELAUNCHING) {
+  process.env.PAWHAVEN_RELAUNCHED = '1';
+  app.releaseSingleInstanceLock();
+  app.relaunch(process.env.APPIMAGE ? { execPath: process.env.APPIMAGE, args: [...U.relaunchArgs(process.argv), ...PLAN.relaunch] } : { args: [...process.argv.slice(1), ...PLAN.relaunch] });
+  app.exit(0);
+}
+for (const s of PLAN.append) { if (s.value == null) app.commandLine.appendSwitch(s.name); else app.commandLine.appendSwitch(s.name, s.value); }
+if (PRIMARY) console.log(`[env] switches: ozone-platform ${app.commandLine.getSwitchValue('ozone-platform') || '(not set)'}, no-sandbox ${app.commandLine.hasSwitch('no-sandbox') ? 'on' : 'off'}`);
+
 // the GPU: WebGL2 on every driver Chromium might blocklist (the Deck's Mesa / RADV included), as the QA browsers run
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required'); // (the music starts on the title, no click needed)
@@ -60,8 +105,6 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 // app://pawhaven/… → the game's files: a standard, secure origin (localStorage, fetch, module scripts, the Gamepad API)
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true, codeCache: true } }]);
 
-const PRIMARY = app.requestSingleInstanceLock(); // (a second launch only focuses the first window: see 'second-instance')
-if (!PRIMARY) app.quit();
 let win = null;
 
 function serve() {
@@ -97,7 +140,29 @@ function createWindow() {
   win.on('enter-full-screen', () => { tell(true); save(true); });
   win.on('leave-full-screen', () => { tell(false); save(false); });
   win.on('close', () => save());
-  win.once('ready-to-show', () => { win.show(); win.focus(); });
+  // shown at its first frame (ready-to-show), or after 3 s anyway: a compositor that never reports a frame must not
+  // leave the window hidden behind Steam's spinner (CT-10)
+  const w = win, wc = w.webContents, born = Date.now();
+  let shown = false, fallback = null;
+  const reveal = how => {
+    if (shown || w.isDestroyed()) return;
+    shown = true; clearTimeout(fallback);
+    if (!w.isVisible()) { w.show(); w.focus(); }
+    console.log(`[window] shown (${how}) after ${Date.now() - born} ms`);
+  };
+  w.once('ready-to-show', () => { if (shown) console.log(`[window] ready-to-show came late, after ${Date.now() - born} ms`); reveal('ready-to-show'); });
+  fallback = setTimeout(() => { if (!w.isDestroyed() && !w.isVisible()) reveal('the fallback: no ready-to-show within 3 s'); }, 3000);
+  console.log(`[window] created ${full ? 'full screen' : 'windowed'}, ${w.getBounds().width}x${w.getBounds().height}`);
+  // what a blank window needs explained, in the log
+  wc.on('did-fail-load', (e, code, desc, url, main) => console.warn(`[window] did-fail-load ${code} ${desc}: ${url}${main ? '' : ' (a subframe)'}`));
+  wc.on('did-finish-load', () => { console.log(`[window] did-finish-load ${wc.getURL()} after ${Date.now() - born} ms`); watchTitle(wc); });
+  wc.on('preload-error', (e, p, err) => console.error(`[window] the preload failed (${p}):`, err));
+  w.on('unresponsive', () => console.warn(`[window] unresponsive (${secs()} s after start)`));
+  w.on('responsive', () => console.log('[window] responsive again'));
+  let pageErrors = 0;
+  wc.on('console-message', (e) => {
+    if (e.level === 'error' && pageErrors++ < 30) console.warn(`[page] ${e.message} (${e.sourceId}:${e.lineNumber})${pageErrors === 30 ? ' (no more page errors are logged this session)' : ''}`);
+  });
   // F11 and Alt+Enter toggle full screen (the game never sees them)
   win.webContents.on('before-input-event', (e, input) => {
     if (input.type !== 'keyDown') return;
@@ -108,9 +173,38 @@ function createWindow() {
   win.webContents.on('will-navigate', (e, url) => { if (!url.startsWith('app://pawhaven/') && !(typeof arg('url') === 'string' && url.startsWith(new URL(arg('url')).origin))) e.preventDefault(); });
   const url = arg('url');
   win.loadURL(typeof url === 'string' ? url : GAME_URL());
-  win.on('closed', () => { win = null; });
+  win.on('closed', () => { clearTimeout(fallback); win = null; console.log('[window] closed'); });
 }
 const GAME_URL = () => { const q = arg('query'); return `app://pawhaven/index.html${typeof q === 'string' && q ? '?' + q : ''}`; };
+/** the log's "the game reached its title" line (window.__ready), with the WebGL renderer it got: once per page load */
+let titleWatch = 0;
+const TITLE_PROBE = `(() => { if (window.__ready !== true) return null; let gl = ''; try { const c = window.G.engine.renderer.getContext(), x = c.getExtension('WEBGL_debug_renderer_info'); gl = x ? c.getParameter(x.UNMASKED_RENDERER_WEBGL) : c.getParameter(c.RENDERER); } catch (e) { /* */ } return { gl, preset: window.G?.engine?.preset ?? null }; })()`;
+function watchTitle(wc) {
+  const id = ++titleWatch, t = Date.now();
+  const tick = () => {
+    if (id !== titleWatch || wc.isDestroyed()) return;
+    if (Date.now() - t > 120000) { console.warn('[window] the game has not reached its title 120 s after its page loaded'); return; }
+    wc.executeJavaScript(TITLE_PROBE).then(r => {
+      if (id !== titleWatch) return;
+      if (r) { console.log(`[window] the game reached its title ${((Date.now() - t) / 1000).toFixed(1)} s after its page loaded (${secs()} s after start); WebGL: ${r.gl || 'unknown'}, preset ${r.preset}`); logGpu('at the title'); }
+      else setTimeout(tick, 1000);
+    }, () => { if (id === titleWatch) setTimeout(tick, 1000); });
+  };
+  setTimeout(tick, 500);
+}
+/** the GPU, once, when it is really up: at the title, or 20 s after ready at the latest (at ready itself Chromium
+ *  still reports the state before its GPU process has started: everything in software, no GL) */
+let gpuLogged = false;
+const GL_KEYS = ['glRenderer', 'glVendor', 'glVersion', 'glImplementationParts', 'displayType', 'skiaBackendType', 'sandboxed', 'inProcessGpu', 'initializationTime'];
+function logGpu(when) {
+  if (gpuLogged) return; gpuLogged = true;
+  try { console.log('[gpu] features', JSON.stringify(app.getGPUFeatureStatus()), `(${when})`); } catch (e) { console.warn('[gpu] no feature status:', e?.message || e); }
+  app.getGPUInfo('complete').then(i => {
+    const devices = (i?.gpuDevice || []).map(d => ({ name: d.deviceString || `${(d.vendorId >>> 0).toString(16)}:${(d.deviceId >>> 0).toString(16)}`, active: !!d.active, driver: [d.driverVendor, d.driverVersion].filter(Boolean).join(' ') }));
+    const a = i?.auxAttributes || {};
+    console.log('[gpu] info', JSON.stringify({ devices, ...Object.fromEntries(GL_KEYS.filter(k => a[k] != null && a[k] !== '').map(k => [k, a[k]])) }));
+  }, e => console.warn('[gpu] no GPU info:', e?.message || e));
+}
 
 ipcMain.on('pawhaven:quit', () => { if (win && !win.isDestroyed()) win.close(); else app.quit(); }); // (close: the game's beforeunload saves first)
 ipcMain.on('pawhaven:fullscreen', (e, on) => { if (win && !win.isDestroyed()) win.setFullScreen(!!on); });
@@ -235,9 +329,12 @@ ipcMain.handle('pawhaven:update', async (e, op, o) => {
 });
 
 Menu.setApplicationMenu(null);
-app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
+app.on('second-instance', () => { console.log('[app] started again: focusing this window'); if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
+app.on('quit', (e, code) => console.log(`[app] quit, exit code ${code}, after ${secs()} s`));
 app.whenReady().then(() => {
-  if (!PRIMARY) return;
+  if (!PRIMARY || RELAUNCHING) return;
+  console.log(`[app] ready after ${secs()} s`);
+  setTimeout(() => logGpu('20 s after ready, before the title'), 20000);
   if (UPDATES) {
     try {
       const builtIn = U.gameVersionOf(BUILTIN) || app.getVersion();

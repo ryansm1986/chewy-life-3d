@@ -100,3 +100,83 @@ body.pad-active .mn-quick { display: flex; }
 .pad-cursor .pc-paw::before { content: ''; position: absolute; left: 50%; top: 58%; width: 11px; height: 9px; margin: -4.5px 0 0 -5.5px; border-radius: 50% 50% 45% 45%; background: #fff6e8; }
 .pad-cursor .pc-paw::after { content: ''; position: absolute; left: 4px; top: 3px; width: 4.5px; height: 4.5px; border-radius: 50%; background: #fff6e8; box-shadow: 5.6px -2px 0 #fff6e8, 11.2px 0 0 #fff6e8; }
 .pad-hints.pc-hints { max-width: min(94vw, 980px); }
+
+/* ---- CT-11: build mode on the pad (ui/padCursor.js drives ui/build.js; docs/CONTROLS.md §14.5). .pc-pal: the pad's
+   palette (a grid, the side card's detail, the Tools tab); .pc-fold: folded to the tab strip (the cursor, or a piece in
+   hand: the .bd-held chip); on the UI root .pc-up / .pc-folded keep the toasts and the prompt clear of it */
+.bd-bump { display: inline-flex; flex: none; align-items: center; }
+.bd-bump .kc.pad { height: 30px; }
+.bd-bump .kc.pad .pg { width: 30px; height: 30px; }
+body.pad-active .p-build.pc-pal .bd-tools { display: none; }
+body.pad-active .p-build.pc-pal .bd-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); grid-auto-rows: 106px; gap: 9px 8px; align-content: start;
+  overflow: hidden auto; height: 241px; padding: 10px 8px 10px; margin: 0; -webkit-mask-image: none; mask-image: none; scrollbar-width: thin; scroll-padding: 10px 0; }
+body.pad-active .p-build.pc-pal .card { flex: none; min-width: 0; padding: 4px 4px 5px; border-radius: 16px; animation-duration: .32s; animation-delay: calc(var(--i) * 18ms); }
+body.pad-active .p-build.pc-pal .card:hover { transform: none; box-shadow: 0 4px 0 var(--ink); }
+body.pad-active .p-build.pc-pal .card:hover .cd-art img { transform: none; }
+body.pad-active .p-build.pc-pal .card .cd-art { height: 54px; margin-bottom: 2px; border-radius: 11px; }
+body.pad-active .p-build.pc-pal .card .cd-art img:not(.gi) { width: 60px; height: 60px; }
+body.pad-active .p-build.pc-pal .card .cd-n { display: block; min-height: 0; font-size: 12.5px; line-height: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.pad-active .p-build.pc-pal .card .cd-cost { flex-wrap: nowrap; overflow: hidden; gap: 0 6px; margin-top: 1px; }
+body.pad-active .p-build.pc-pal .card .cost { font-size: 12px; }
+body.pad-active .p-build.pc-pal .card .cost .gl { width: 15px; height: 15px; }
+body.pad-active .p-build.pc-pal .card .cd-lock { padding: 4px; gap: 2px; font-size: 12px; border-radius: 13px; }
+body.pad-active .p-build.pc-pal .card .cd-lock .gl { width: 24px; height: 24px; }
+body.pad-active .p-build.pc-pal .card .cd-built { top: 4px; right: 4px; }
+body.pad-active .p-build.pc-pal .card.sel { transform: none; }
+body.pad-active .p-build.pc-pal .card.pc-f { transform: translateY(-3px); background: linear-gradient(#fff, #fff4e4); }
+/* the Tools tab's cards (the toolbar's zones, paths and bulldozer) */
+.card.tool .cd-art { display: flex; align-items: center; justify-content: center; gap: 3px; }
+.card.tool .cd-art .gl, .pd-ic .gl, .bh-art .gl { width: 30px; height: 30px; }
+.card.tool .tz, .pd-ic .tz, .bh-art .tz { font: 700 22px/1 var(--font); color: var(--zc); -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; }
+.card.tool .pth, .pd-ic .pth, .bh-art .pth { display: block; width: 36px; height: 22px; border-radius: 6px; border: 2.5px solid var(--ink); background: repeating-linear-gradient(90deg, #efe1c8 0 7px, #d8c4a0 7px 8px); transform: rotate(-12deg); }
+.card.tool .gl.mini, .pd-ic .gl.mini, .bh-art .gl.mini { position: absolute; right: 22%; bottom: 8%; width: 18px; height: 18px; color: #e8506e; }
+.card.tool .cd-tl { justify-content: center; font: 700 12px/17px var(--font); color: var(--ink2); }
+/* the side card: the focused piece (its tooltip would cover the world); the overlay buttons and the key legend hide (View and the hint bar) */
+body.pad-active .p-build.pc-pal:not(.p-decor) .bd-side :is(.bd-ov, .bh-t, .bh-k) { display: none; }
+body.pad-active .p-build.pc-pal:not(.p-decor) .bd-side { justify-content: flex-start; gap: 6px; }
+.bd-pd { display: grid; gap: 4px; justify-items: center; text-align: center; padding-top: 6px; border-top: 2px dashed rgba(74, 44, 42, .14); }
+.bd-pd:empty { display: none; }
+.bd-pd .pd-h { display: flex; align-items: center; justify-content: center; gap: 6px; max-width: 100%; }
+.bd-pd .pd-h > b { font: 700 16px/1.15 var(--font); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pd-sz { flex: none; font: 700 12px/1.35 var(--font); color: var(--ink); background: #fff; border: 2px solid var(--ink); border-radius: 7px; padding: 0 5px; }
+.bd-pd .pd-cost { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 9px; }
+.bd-pd .pd-cost .cost { font-size: 13.5px; }
+.bd-pd .pd-cost .cost .gl { width: 18px; height: 18px; }
+.bd-pd .pd-d { font: 600 12px/1.3 var(--font); color: var(--ink2); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.bd-pd :is(.pd-bad, .pd-ok) { display: inline-flex; align-items: center; gap: 4px; font: 700 12.5px/1.2 var(--font); color: var(--rose); }
+.bd-pd .pd-ok { color: #3d9a68; }
+.bd-pd :is(.pd-bad, .pd-ok) .gl { width: 16px; height: 16px; }
+.pd-ic { position: relative; flex: none; width: 40px; height: 32px; display: inline-flex; align-items: center; justify-content: center; gap: 1px; }
+/* folded: the tab strip alone, with the piece in hand */
+body.pad-active .p-build.pc-pal.pc-fold .pb { display: none; }
+body.pad-active .pw.side-bottom .panel.p-build.pc-pal.pc-fold { padding-bottom: 10px; }
+.bd-held { display: none; align-items: center; gap: 7px; flex: none; margin-left: 10px; padding: 3px 13px 3px 4px; border: 3px solid var(--ink); border-radius: 999px;
+  background: linear-gradient(#fffbe4, #ffe99a); box-shadow: 0 3px 0 var(--ink), 0 0 0 3px #fff, 0 0 0 6px var(--gold, #ffcf4a); font: 700 14.5px/1 var(--font); color: var(--ink); white-space: nowrap; }
+body.pad-active .p-build.pc-fold.pc-hold .bd-held.on { display: inline-flex; }
+.bd-held .bh-art { position: relative; width: 36px; height: 36px; flex: none; border-radius: 50%; background: #fff; border: 2.5px solid var(--ink); display: inline-flex; align-items: center; justify-content: center; overflow: hidden; }
+.bd-held .bh-art img { width: 46px; height: 46px; object-fit: contain; }
+.bd-held .bh-art .gl { width: 24px; height: 24px; }
+.bd-held .bh-art .tz { font-size: 16px; -webkit-text-stroke: 3px var(--ink); }
+.bd-held .bh-art .pth { width: 24px; height: 15px; border-width: 2px; }
+.bd-held .bh-cost { display: inline-flex; gap: 7px; }
+/* decorate (§14.6): shorter cards (no cost row), the side card's legend, buttons and hint give way to the focused piece
+   (the house and its Home Rating stay); folded, the tabs other than the open one show their icon and count only */
+body.pad-active .p-build.p-decor.pc-pal .bd-cards { grid-auto-rows: 92px; height: 213px; }
+body.pad-active .p-build.p-decor.pc-pal .card .dc-n { font-size: 12px; }
+body.pad-active .p-build.p-decor.pc-pal .bd-side :is(.dc-hint, .dc-keys, .dc-btns) { display: none; }
+body.pad-active .p-build.p-decor.pc-pal .bd-side { justify-content: flex-start; gap: 6px; }
+body.pad-active .p-build.p-decor.pc-fold .dc-tabs .tab:not(.on) > span:not(.tab-n) { display: none; }
+.bd-pd .fu-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; }
+.bd-pd .fu-tags span { font: 700 12px/1.3 var(--font); padding: 0 6px; border-radius: 999px; background: #fff3e0; border: 1.5px solid rgba(74, 44, 42, .18); color: var(--ink); }
+/* the cursor waits, dimmed, while the palette has the focus */
+.pad-cursor.on.dim { opacity: .38; }
+/* the toasts above the pad's taller palette; folded, the HUD prompt (why a piece can't go there) sits just above the tab strip */
+body.pad-active .ui-root.building.pc-up .toasts { bottom: 300px; }
+body.pad-active .ui-root.building.pc-folded .toasts { bottom: 136px; }
+body.pad-active .ui-root.building.pc-folded .hud .prompt { bottom: 74px; }
+body.pad-active .ui-root.decorating.pc-up .toasts { bottom: 290px; }
+body.pad-active .ui-root.decorating.pc-folded .toasts { bottom: 136px; }
+/* (folded while decorating, the hotbar and the button tray would show under the strip: away, as build mode puts them) */
+body.pad-active .ui-root.decorating.pc-folded .hud-bc { transform: translate(-50%, 110%); opacity: 0; }
+body.pad-active .ui-root.decorating.pc-folded .hud-br .menubtns { transform: translateY(180%); opacity: 0; }
+body.pad-active .ui-root.decorating.pc-folded .hud .prompt { opacity: 1; bottom: 74px; } /* (decorate's prompt: what goes there, or why it can't; hidden behind the mouse's tall palette) */

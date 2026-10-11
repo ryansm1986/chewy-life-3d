@@ -1,4 +1,7 @@
-// Build mode: palette (via UI), ghost preview on the grid, zone/path painting, bulldozer, coverage overlays.
+// Build mode: palette (via UI), ghost preview on the grid, zone/path painting, bulldozer, coverage overlays, and a
+// session undo (Y on the pad, Ctrl+Z: what you placed, removed, zoned and paved; docs/CONTROLS.md §14.5).
+// The pad (CT-11): ui/padCursor.js owns the palette (the D-pad and the bumpers) and B; this file takes A, X, Y and LT / RT
+// once the world has the focus (Actions.vcursor.world: the cursor or a piece in hand, not the palette).
 import * as THREE from 'three';
 import { BUILDINGS, CATEGORIES, buildModel, sizeOf } from './buildings/index.js';
 import { ZONES, RANK_POP } from './village.js';
@@ -33,6 +36,8 @@ export class BuildMode {
     this.view = 0; // 0..1 build-view blend (grass shrink)
     this.lastCur = null;
     this.stakes = null; // InstancedMesh of lot markers (built on first use)
+    this.undoStack = []; // this session's undo (cleared on exit): { kind: 'place' | 'remove' | 'zone' | 'path', ... }
+    this.undoneXp = {}; // building type → placements undone this run (their homestead XP was paid: the next one pays none)
     Events.on('village:changed', () => { if (this.active) this.refreshStakes(); });
   }
   // stakes on the corners of every free, open plot (Build mode only)
@@ -113,7 +118,7 @@ export class BuildMode {
   }
   exit() {
     if (!this.active) return;
-    this.active = false; this.G.buildMode = false; this.setTool(null);
+    this.active = false; this.G.buildMode = false; this.setTool(null); this.undoStack.length = 0; this._rm = null;
     this.sim.showNeedIcons?.(false); this.inspectAt(null);
     this.G.engine.rig.distTarget = this.prevDist;
     this.G.engine.rig.yawTarget = Math.round((this.G.engine.rig.yawTarget - Math.PI / 4) / (Math.PI / 2)) * (Math.PI / 2) + Math.PI / 4;
@@ -157,10 +162,12 @@ export class BuildMode {
     const p = G.engine.mouseGround(m.nx, m.ny, (x, z) => this.sim.world.heightAt(x, z));
     return { x: Math.floor(p.x), z: Math.floor(p.z), p };
   }
-  // the pad (docs/CONTROLS.md §2): A is the click, B cancels, Y / RB rotate, X removes (the virtual cursor is on)
+  // the pad (docs/CONTROLS.md §14.5): A is the click, X removes (press twice), Y undoes, LT / RT rotate; B and the
+  // palette are ui/padCursor.js's. padWorld: the cursor or a piece in hand has the focus (not the palette)
   get pad() { return Actions.vcursor.on; }
-  hitA() { if (Input.mouseHit(0)) return true; if (this.pad && Actions.padHit('A')) { Actions.padConsume('A'); return true; } return false; }
-  downA() { return Input.mouseDown(0) || (this.pad && Actions.padDown('A')); }
+  get padWorld() { return Actions.vcursor.on && Actions.vcursor.world; }
+  hitA() { if (Input.mouseHit(0)) return true; if (this.padWorld && Actions.padHit('A')) { Actions.padConsume('A'); return true; } return false; }
+  downA() { return Input.mouseDown(0) || (this.padWorld && Actions.padDown('A')); }
   /** a hint for the prompt: the pad's wording (and its A glyph when A does it) */
   say(mouse, pad, act = true) { if (this.pad) this.G.ui?.setInteract?.(pad, { key: act ? 'pad:interact' : null }); else this.G.ui?.setInteract?.(mouse); }
   /** why a building can't be bulldozed ('' if it can): the landmarks stay; the Guild stays while hires live there (cozy/guildRun.js) */
@@ -169,15 +176,60 @@ export class BuildMode {
     if (b.type === 'guild' && this.G.state.cozy?.guild?.hires?.length) return "The Guild's hires live here: say goodbye to them first";
     return '';
   }
-  /** X on the pad: remove the building under the cursor (press twice; the landmarks stay) */
-  padRemove(cur) {
+  /** X on the pad (or the bulldozer's A): remove the building under the cursor, on a second press within 1.8 s (the
+   *  first tints it red and the prompt asks again); the landmarks stay */
+  padRemove(cur, btn = 'X') {
     const sim = this.sim, b = sim.buildingAt(cur.x, cur.z), G = this.G;
     if (!b) { Events.emit('sfx', 'ui_error'); return; }
-    const keep = this.keepWhy(b); if (keep) { G.ui?.toast?.(keep, { color: '#ffb0bc' }); return; }
+    const keep = this.keepWhy(b); if (keep) { G.ui?.toast?.(keep, { color: '#ffb0bc' }); Events.emit('sfx', 'ui_error'); return; }
     const now = performance.now();
-    if (this._rm?.b === b && now - this._rm.t < 1800) { this._rm = null; sim.remove(b); return; }
-    this._rm = { b, t: now };
-    G.ui?.toast?.(`Press ${Actions.tokenName('X', 'pad')} again to remove the ${BUILDINGS[b.type].name} (50% refund)`, { color: '#ffd8a8', duration: 1.8 });
+    if (this._rm?.b === b && now - this._rm.t < 1800) { this._rm = null; this.removeB(b); return; }
+    this._rm = { b, t: now, btn };
+    Events.emit('sfx', 'ui_click');
+  }
+  /** the remove's confirm, while it waits: the building under the cursor, armed (null once it has timed out or moved off) */
+  armed(cur) { const R = this._rm; if (!R) return null; if (performance.now() - R.t > 1800 || this.sim.buildingAt(cur.x, cur.z) !== R.b) { this._rm = null; return null; } return R; }
+  /** a building removed by the player (the bulldozer, X): half its cost back, and on the undo stack */
+  removeB(b) {
+    const c = BUILDINGS[b.type].cost || {}, refund = {}; for (const k in c) if (Math.floor(c[k] / 2) > 0) refund[k] = Math.floor(c[k] / 2);
+    this.push({ kind: 'remove', b, refund });
+    this.sim.remove(b);
+  }
+  // ---------------------------------------------------------------- undo (this session: Y on the pad, Ctrl+Z)
+  push(e) { this.undoStack.push(e); if (this.undoStack.length > 40) this.undoStack.shift(); }
+  /** take back the last thing placed, removed, zoned or paved → true when something was undone */
+  undo() {
+    const G = this.G, sim = this.sim, A = G.actions, e = this.undoStack.pop();
+    const no = why => { if (why) G.ui?.toast?.(why, { color: '#ffb0bc' }); Events.emit('sfx', 'ui_error'); return false; };
+    if (!e) return no('Nothing to undo');
+    const name = b => BUILDINGS[b.type]?.name || 'building';
+    if (e.kind === 'place') {
+      if (sim.S.buildings.indexOf(e.b) < 0) return this.undo(); // (gone since: the next one)
+      sim.remove(e.b, false);
+      for (const [k, v] of Object.entries(e.cost || {})) if (v > 0) { if (k === 'coins') A.addCoins(v); else A.addMaterial(k, v); } // (its whole cost back)
+      this.undoneXp[e.b.type] = (this.undoneXp[e.b.type] || 0) + 1;
+      G.ui?.toast?.(`Undid the ${name(e.b)} (its cost back)`, { color: '#ffd8a8', duration: 1.6 });
+    } else if (e.kind === 'remove') {
+      const b = e.b, [w, d] = sim.dims(b.type, b.rot, b.level);
+      for (let z = b.z; z < b.z + d; z++) for (let x = b.x; x < b.x + w; x++) if (sim.occ[z * WORLD + x] >= 0) return no(`Something stands where the ${name(b)} was`);
+      if (b.plot && !sim.plotFree(PLOTS.find(p => p.id === b.plot) || { id: b.plot })) return no(`That plot is taken now`);
+      if (!A.hasMaterials(e.refund)) { this.push(e); return no(`You spent the ${name(b)}'s refund: it can't come back`); }
+      A.spendMaterials(e.refund);
+      sim.S.buildings.push(b); sim.spawnModel(b, true);
+      sim.refreshTiles(); sim.simulate(true); sim.paintOverlay();
+      Events.emit('sfx', 'build_place'); Events.emit('village:changed');
+      G.ui?.toast?.(`The ${name(b)} is back`, { color: '#ffd8a8', duration: 1.6 });
+    } else if (e.kind === 'zone') {
+      for (const [i, t] of e.cells) if (sim.occ[i] < 0) sim.zone[i] = t; // (not where something has grown since)
+      sim.syncZones(); sim.paintOverlay();
+      G.ui?.toast?.('Undid the zone', { color: '#ffd8a8', duration: 1.4 });
+    } else if (e.kind === 'path') {
+      for (const [x, z] of e.tiles) sim.paintPath(x, z, !e.on);
+      sim.refreshTiles();
+      G.ui?.toast?.(e.on ? 'Undid the path' : 'The path is back', { color: '#ffd8a8', duration: 1.4 });
+    }
+    Events.emit('sfx', 'ui_tab'); Events.emit('build:undo', { kind: e.kind });
+    return true;
   }
   update(dt) {
     // grass shrinks in build view so zones and overlays read clearly (eases in and out)
@@ -191,27 +243,33 @@ export class BuildMode {
     if (!overUI) this.lastCur = cur;
     if (Input.hit('escape')) { if (this.tool) { this.setTool(null); Input.consume('escape'); } }
     if (Input.mouseHit(2) && this.tool) this.setTool(null);
-    if (this.pad && Actions.padHit('B') && this.tool) { Actions.padConsume('B'); this.setTool(null); } // (B with nothing in hand leaves build mode: ui/padCursor.js)
-    if (this.pad && Actions.padHit('X')) { Actions.padConsume('X'); this.padRemove(cur); }
+    // (the pad's B: ui/padCursor.js puts the piece back, or with nothing in hand leaves build mode)
+    if (this.padWorld && Actions.padHit('X')) { Actions.padConsume('X'); this.padRemove(cur); }
+    if ((this.pad && Actions.padHit('Y')) || (Input.down('ctrl') && Input.hit('z'))) { Actions.padConsume('Y'); Input.consume('z'); this.undo(); }
+    const rm = this.pad ? this.armed(cur) : null; // (X pressed once: the building waits for the second press, tinted red)
     // info card for the hovered lot / building (only while browsing or painting zones, never over the palette)
-    const inspecting = !overUI && (!this.tool || (this.tool.kind === 'zone' && !this.drag));
+    const inspecting = !overUI && (!this.pad || this.padWorld) && (!this.tool || (this.tool.kind === 'zone' && !this.drag));
     const ins = this.inspectAt(inspecting ? cur : null, dt);
     if (!this.tool) {
       const hb = ins?.kind === 'building' ? sim.buildingAt(cur.x, cur.z) : null;
-      if (hb) { const [w, d] = sim.dims(hb.type, hb.rot, hb.level); U.uCursor.value.set(hb.x + w / 2, hb.z + d / 2, w, d); this.cursorCol(ins.ok ? '#bff5da' : '#ffb0bc', 0.16); }
+      if (hb) { const [w, d] = sim.dims(hb.type, hb.rot, hb.level); U.uCursor.value.set(hb.x + w / 2, hb.z + d / 2, w, d); this.cursorCol(rm?.b === hb ? '#ff6f86' : ins.ok ? '#bff5da' : '#ffb0bc', rm?.b === hb ? 0.34 : 0.16); }
       // a click on a house (no tool): its card — Upgrade / Remodel / Enter (docs/HOUSING.md §5)
-      if (this.pad) this.say('', hb ? (G.housing?.isHouse?.(hb) ? `Open the ${BUILDINGS[hb.type]?.name || 'house'}'s card` : BUILDINGS[hb.type]?.name || '') : 'Pick a building or a tool with the D-pad', !!(hb && G.housing?.isHouse?.(hb)));
+      if (this.pad) {
+        if (!this.padWorld) G.ui?.setInteract?.(null); // (the palette has the focus: its side card says it all)
+        else if (rm) this.say('', `Press ${Actions.tokenName(rm.btn, 'pad')} again to remove the ${BUILDINGS[rm.b.type].name} (half its cost back)`, false);
+        else this.say('', hb ? (G.housing?.isHouse?.(hb) ? `Open the ${BUILDINGS[hb.type]?.name || 'house'}'s card` : BUILDINGS[hb.type]?.name || '') : '', !!(hb && G.housing?.isHouse?.(hb)));
+      }
       if (hb && !overUI && G.housing?.isHouse?.(hb) && this.hitA()) { const rec = sim.list.find(r => r.data === hb); if (rec) G.housing.openHouseCard(rec); }
-      else { U.uCursor.value.set(cur.x + 0.5, cur.z + 0.5, 1, 1); this.cursorCol('#fff8d8', 0.1); }
+      else if (!hb) { U.uCursor.value.set(cur.x + 0.5, cur.z + 0.5, 1, 1); this.cursorCol('#fff8d8', 0.1); }
       return;
     }
     if (this.tool.kind === 'zone' || this.tool.kind === 'path') {
-      if (!overUI && this.hitA()) this.drag = { x: cur.x, z: cur.z };
+      if (!overUI && this.hitA()) this.drag = { x: cur.x, z: cur.z, tiles: [] };
       const a = this.drag || cur;
       const x0 = Math.min(a.x, cur.x), x1 = Math.max(a.x, cur.x), z0 = Math.min(a.z, cur.z), z1 = Math.max(a.z, cur.z);
       const zc = { 1: '#7adc7a', 2: '#6eaaff', 3: '#ffc45a', 0: '#ff8a8a' }[this.tool.zone ?? 0];
       if (this.tool.kind === 'path' && this.drag) { // paths paint as you drag
-        if (!overUI && sim.paintPath(cur.x, cur.z, !this.tool.erase)) Events.emit('sfx', 'build_place', { vol: 0.3 });
+        if (!overUI && sim.paintPath(cur.x, cur.z, !this.tool.erase)) { this.drag.tiles.push([cur.x, cur.z]); Events.emit('sfx', 'build_place', { vol: 0.3 }); }
         U.uCursor.value.set(cur.x + 0.5, cur.z + 0.5, 1, 1); this.cursorCol(this.tool.erase ? '#ff8a8a' : '#f4e2c4', 0.35);
       } else {
         U.uCursor.value.set((x0 + x1 + 1) / 2, (z0 + z1 + 1) / 2, x1 - x0 + 1, z1 - z0 + 1);
@@ -233,13 +291,16 @@ export class BuildMode {
       else G.ui?.setInteract?.(hint);
       if (!this.downA() && this.drag) { // finish on mouse-up even if released over the palette
         if (this.tool.kind === 'zone') {
+          const before = sim.zone.slice();
           const k = sim.paintZone(x0, z0, x1, z1, this.tool.zone);
+          const cells = []; for (let i = 0; i < before.length; i++) if (before[i] !== sim.zone[i]) cells.push([i, before[i]]);
+          if (cells.length) this.push({ kind: 'zone', cells });
           if (!sim.lastZoneHits && this.tool.zone) G.ui?.toast?.('Zones only grow on plots: paint over the marked lots', { color: '#ffb0bc' });
           if (k) {
             Events.emit('sfx', 'build_place', { vol: 0.5 });
             G.vfx.sparkle(new THREE.Vector3((x0 + x1 + 1) / 2, sim.terrain.heightAt(x0, z0) + 0.3, (z0 + z1 + 1) / 2), { n: 10 + Math.min(20, k), r: Math.min(4, (x1 - x0) / 2 + 0.5), color: zc });
           }
-        } else sim.refreshTiles();
+        } else { sim.refreshTiles(); if (this.drag.tiles.length) this.push({ kind: 'path', on: !this.tool.erase, tiles: this.drag.tiles }); }
         this.drag = null;
       }
       return;
@@ -249,7 +310,11 @@ export class BuildMode {
       const type = this.tool.type, pl = sim.plotOf(cur.p.x, cur.p.z);
       // on a plot that allows it: the building snaps to the plot, its door to the street (no free rotation)
       const snap = pl && !pl.fixed && pl.allows.includes(type) ? sim.spotFor(pl, type, 1) : null;
-      if (!snap && (Input.hit('r') || (this.pad && (Actions.padHit('Y') || Actions.padHit('RB'))))) { this.rot = (this.rot + 1) % 4; Events.emit('sfx', 'ui_click'); }
+      if (!snap && Input.hit('r')) { this.rot = (this.rot + 1) % 4; Events.emit('sfx', 'ui_click'); }
+      if (this.padWorld && (Actions.padHit('LT') || Actions.padHit('RT'))) { // (RT a quarter clockwise, LT back; a plot sets the door's side)
+        const d = Actions.padHit('RT') ? 1 : 3; Actions.padConsume('LT'); Actions.padConsume('RT');
+        if (snap) Events.emit('sfx', 'ui_error'); else { this.rot = (this.rot + d) % 4; Events.emit('sfx', 'ui_click'); }
+      }
       const rot = snap ? snap.rot : this.rot;
       const [w, d] = sim.dims(type, rot);
       const x0 = snap ? snap.x : Math.round(cur.p.x - w / 2), z0 = snap ? snap.z : Math.round(cur.p.z - d / 2);
@@ -265,20 +330,25 @@ export class BuildMode {
       this.ghost.position.y = target.y + Math.abs(Math.sin(G.engine.time * 4)) * 0.08;
       this.ghost.rotation.y = damp(this.ghost.rotation.y, -rot * Math.PI / 2, 16, dt);
       if (ok !== this.ghostOk) { this.ghostOk = ok; this.ghost.traverse(o => { if (o.isMesh) { o.material = ok ? this.okMat : this.badMat; o.renderOrder = ok ? 0 : 20; } }); }
-      if (this.pad) this.say('', ok ? (snap ? `Build on this ${DISTRICTS[pl.district]?.name || ''} plot` : `Build here · ${Actions.tokenName('Y', 'pad')} rotates`) : (!chk.ok ? chk.why : 'Not enough materials'), ok);
+      if (this.pad) this.say('', rm ? `Press ${Actions.tokenName(rm.btn, 'pad')} again to remove the ${BUILDINGS[rm.b.type].name} (half its cost back)` : ok ? (snap ? `Build on this ${DISTRICTS[pl.district]?.name || ''} plot` : 'Build here') : (!chk.ok ? chk.why : 'Not enough materials'), ok && !rm);
       else G.ui?.setInteract?.(ok ? (snap ? `Click to build on this ${DISTRICTS[pl.district]?.name || ''} plot` : 'Click to build · R to rotate') : (!chk.ok ? chk.why : 'Not enough materials'));
       if (this.hitA()) {
-        const b = sim.place(type, x0, z0, rot, snap ? { plot: pl.id } : {});
-        if (b) { G.vfx.sparkle(target.clone().setY(target.y + 1), { n: 20, r: 1.2 }); if (BUILDINGS[this.tool.type].unique) this.setTool(null); }
+        const noXp = (this.undoneXp[type] || 0) > 0;
+        const b = sim.place(type, x0, z0, rot, snap ? { plot: pl.id, noXp } : { noXp });
+        if (b) {
+          if (noXp) this.undoneXp[type]--;
+          this.push({ kind: 'place', b, cost: { ...(BUILDINGS[type].cost || {}) } });
+          G.vfx.sparkle(target.clone().setY(target.y + 1), { n: 20, r: 1.2 }); if (BUILDINGS[this.tool.type].unique) this.setTool(null);
+        }
       }
     } else if (this.tool.kind === 'bulldoze') {
       const b = sim.buildingAt(cur.x, cur.z);
       U.uCursor.value.set(cur.x + 0.5, cur.z + 0.5, 1, 1); this.cursorCol('#ff7a8a', 0.25);
       const keep = b ? this.keepWhy(b) : '';
-      if (this.pad) this.say('', b ? (keep || `Remove ${BUILDINGS[b.type].name} (50% refund)`) : 'Point at a building to remove it', !!b && !keep);
+      if (this.pad) this.say('', b ? (keep || (rm?.b === b ? `Press ${Actions.tokenName(rm.btn, 'pad')} again to remove the ${BUILDINGS[b.type].name} (half its cost back)` : `Remove the ${BUILDINGS[b.type].name} (half its cost back)`)) : 'Point at a building to remove it', !!b && !keep && rm?.b !== b);
       else G.ui?.setInteract?.(b ? (keep || `Click to remove ${BUILDINGS[b.type].name} (50% refund)`) : 'Click a building to remove it');
-      if (b) { const [w, d] = sim.dims(b.type, b.rot, b.level); U.uCursor.value.set(b.x + w / 2, b.z + d / 2, w, d); }
-      if (b && !keep && this.hitA()) sim.remove(b);
+      if (b) { const [w, d] = sim.dims(b.type, b.rot, b.level); U.uCursor.value.set(b.x + w / 2, b.z + d / 2, w, d); if (rm?.b === b) this.cursorCol('#ff6f86', 0.4); }
+      if (b && !keep && this.hitA()) { if (this.pad) this.padRemove(cur, 'A'); else this.removeB(b); }
     }
   }
 }

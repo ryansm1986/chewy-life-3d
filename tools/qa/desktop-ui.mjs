@@ -7,12 +7,17 @@
 // the K panel's docked Charge drawer are by design). R-16: in the K panel scenes the Charge drawer, with each skill of
 // each tree shown from its skill strip, must sit on the screen (tag to foot) with the strip on one row inside its tray
 // (ui-audit-lib drawerFit). Screenshots: the K panel for each hero at 100 %, and every failure.
+// CT-10: every scene is also checked with panelFit (the panel inside the screen top to bottom and side to side, its ✕
+// and tabs on it, a body that scrolls with its last row in reach, nothing past the panel's sides: the K panel at 125%
+// had run 36 to 53 px off the top, and Settings' Graphics and Autosave rows past its side), and the HUD at its busiest
+// (both level badges, three toasts, the saving glyph) with hudOverlap, at every size and UI size (at 125% the
+// bottom-right buttons had reached the mana orb, as on the Deck).
 //   usage: node tools/qa/desktop-ui.mjs [view…]   SIZES=1280x720,1600x900,1920x1080 SCALES=0.8,1,1.25 COZY=0 (skip the
 //   cozy seed) SHOT_DIR (default tools/qa/tmp/desktop-ui). Dev server only (the cozy seed imports the debug registry).
 import fs from 'node:fs';
 import path from 'node:path';
 import { launch, boot, sleep, waitMode } from './lib.mjs';
-import { headerOutside, drawerFit } from './ui-audit-lib.mjs';
+import { headerOutside, drawerFit, panelFit, hudOverlap } from './ui-audit-lib.mjs';
 import { seedCozy, quietUi } from './cozy-ui-lib.mjs';
 
 const OUT = process.env.SHOT_DIR || path.resolve('tools/qa/tmp/desktop-ui');
@@ -35,6 +40,7 @@ for (const [W, H] of SIZES) {
     try {
       await open(); await sleep(page, 650);
       const out = await ev(headerOutside); checked++;
+      for (const o of await ev(panelFit)) out.push({ ...o, sel: `${o.sel} (${o.why})` }); // (CT-10)
       if (name.startsWith('skills-')) out.push(...await ev(drawerFit)); // (R-16: the Charge drawer on the screen for every skill)
       if (out.length) { for (const o of out) { console.log(`   OUTSIDE ${tag} ${name}: ${o.sel} ${JSON.stringify(o.rect)} ${o.frame ? 'frame ' + JSON.stringify(o.frame) : 'screen ' + JSON.stringify(o.screen)}`); fails.push({ where: `${tag} ${name}`, ...o }); } await shot(`fail-${tag}-${name}`); }
       else if (name.startsWith('skills-') && /@1$/.test(tag)) await shot(`${tag.replace('@', '-ui')}-${name}`);
@@ -49,6 +55,15 @@ for (const [W, H] of SIZES) {
       tag = `${W}x${H}@${sc}`;
       await ev(s => window.G.ui.setSetting('uiScale', s), sc); await sleep(page, 200);
       console.log(`== ${tag} (UI ×${await ev(() => window.G.ui.scale.toFixed(3))})`);
+      // CT-10: the HUD at its busiest, every piece apart
+      await scene('hud', async () => {
+        await ev(() => { const G = window.G; G.state.player.statPts = 2; G.state.player.skillPts = 3; G.ui.toasts?.retire?.(9);
+          G.ui.toast("The Wayfarer's Post by the bamboo points to new lands! Walk the west trail to find it.", { icon: 'map' }); G.ui.toast('Blossom Visage · Rare find! +2 more', { icon: 'star' }); G.ui.toast('Quest updated: Say hi to Rosie', { icon: 'book' });
+          document.querySelector('.save-glyph')?.classList.add('on'); G.ui.fit?.now(); });
+        await sleep(page, 1100);
+        const ov = await ev(hudOverlap); if (ov.length) { for (const o of ov) { console.log(`   OVERLAP ${tag} hud: ${o.a} ${JSON.stringify(o.ra)} × ${o.b} ${JSON.stringify(o.rb)}`); fails.push({ where: `${tag} hud`, sel: `${o.a} × ${o.b}` }); } await shot(`fail-${tag}-hud`); }
+        else if (/@1\.25$/.test(tag)) await shot(`${tag.replace('@', '-ui')}-hud`);
+      }, () => ev(() => { document.querySelector('.save-glyph')?.classList.remove('on'); window.G.ui.toasts?.retire?.(9); }));
       for (const v of ['bag', 'pantry', 'furniture']) await scene('bag-' + v, () => ev(v => window.G.ui.open('inventory', { view: v }), v));
       await scene('character', () => ev(() => window.G.ui.open('character')));
       for (const c of HEROES) // (each hero's trees: the panel draws state.player's class; restored after)

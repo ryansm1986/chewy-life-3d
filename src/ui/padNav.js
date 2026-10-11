@@ -5,6 +5,8 @@
 //   - A selects (a click, or the element's own action: HANDLERS), B goes back (ui.back: a held item, the popover, the
 //     top panel), LB / RB switch the panel's tabs, X / Y act per element (drop / sell / stash, equip / use, assign,
 //     charge perks, eat, sell all…);
+//   - in the pad's tabbed menu (CT-11, ui/padMenu.js): LB / RB its pages, LT / RT the page's own tabs, B closes it all;
+//     the K panel's Charge drawer steps with a right-stick flick;
 //   - the tooltip follows the focus (the element's own hover tooltip, anchored to it), a slider takes ◀ ▶, a scrolled
 //     list scrolls the focus into view, and a footer of glyph hints names what each button does here;
 //   - the last focus of each panel is remembered for the next time it opens.
@@ -84,16 +86,21 @@ export class PadNav {
       if (cur?.matches('input[type=range]') && (A.nav === 'left' || A.nav === 'right')) this.slide(cur, A.nav === 'right' ? 1 : -1);
       else { const n = this.step(cands, A.nav); if (n) { this.focus(n, cands); this.ui.sfx('hover'); } else this.bump(); }
     }
-    if (A.padHit('LB') || A.padHit('RB')) { this.tab(S, A.padHit('RB') ? 1 : -1); A.padConsume('LB'); A.padConsume('RB'); }
-    // the K panel: LT / RT step the Charge drawer through the tree's skills (R-16; the focus stays where it is)
-    if (S.top?.name === 'skills' && (A.padHit('LT') || A.padHit('RT'))) { const R = A.padHit('RT'); A.padConsume('LT'); A.padConsume('RT'); S.top.chg.cycle(R ? 1 : -1); }
+    // LB / RB: the tabbed menu's pages (CT-11: ui/padMenu.js), else the top panel's tabs; LT / RT in the tabbed menu: the
+    // page's own tabs (Settings' pages are the menu's); the map keeps LT / RT for its zoom
+    const PM = this.ui.padMenu?.active ? this.ui.padMenu : null;
+    if (A.padHit('LB') || A.padHit('RB')) { const d = A.padHit('RB') ? 1 : -1; A.padConsume('LB'); A.padConsume('RB'); if (PM) { this.blur(); this.cur = null; PM.step(d); } else this.tab(S, d); }
+    if (PM && S.top?.name !== 'map' && (A.padHit('LT') || A.padHit('RT'))) { const d = A.padHit('RT') ? 1 : -1; A.padConsume('LT'); A.padConsume('RT'); if (!PM.subTab(d)) this.tab(S, d); else { this.blur(); this.cur = null; } }
+    // the K panel: a right-stick flick steps the Charge drawer through the tree's skills (R-16; the focus stays where it is)
+    if (S.top?.name === 'skills') { const ax = A.aim().x, fl = Math.abs(ax) > 0.6 ? Math.sign(ax) : Math.abs(ax) < 0.3 ? 0 : this._flick || 0; if (fl && fl !== this._flick) S.top.chg.cycle(fl); this._flick = fl; }
     if (A.padHit('A') && this.cur) { A.padConsume('A'); this.armed = null; this.press(this.cur); }
     if (A.padHit('X') && this.cur) { A.padConsume('X'); h?.x?.(this.cur, this); }
     if (A.padHit('Y') && this.cur) { A.padConsume('Y'); this.armed = null; h?.y?.(this.cur, this); }
-    if (A.padHit('B')) { // back: out of the menu's Settings / Controls to its main page first, else ui.back (a held item, the popover, the top panel)
+    if (A.padHit('B')) { // back: in the tabbed menu a held item or the popover first, then the whole menu; else out of the menu's Settings / Controls to its main page first, else ui.back (a held item, the popover, the top panel)
       A.padConsume('B'); this.armed = null;
       const M = this.ui.panels.menu;
-      if (S.top === M && M.view !== 'main' && !M.wait) { this.blur(); M.act('back'); this.cur = null; } else this.ui.back();
+      if (PM && !this.ui.pop?.classList.contains('show') && !this.ui.drag?.held && !M.wait) { this.blur(); this.cur = null; PM.close(); }
+      else if (S.top === M && M.view !== 'main' && !M.wait) { this.blur(); M.act('back'); this.cur = null; } else this.ui.back();
     }
     this.draw(S);
     return true;
@@ -207,6 +214,9 @@ export class PadNav {
     const e = this.cur, R = this.ring;
     if (!e || !e.isConnected) { R.classList.remove('on'); R._for = null; this.hints(S, null); return; } // (a panel with nothing to focus, the map: its hints only)
     const r = e.getBoundingClientRect(), pad = 4;
+    // (a row scrolled out of a panel's body, by a finger or the wheel: no ring floating over the panel's frame)
+    const sb = e.closest('.pb'), sr = sb && sb.scrollHeight > sb.clientHeight + 2 ? sb.getBoundingClientRect() : null;
+    if (sr && (r.bottom < sr.top + 4 || r.top > sr.bottom - 4)) { R.classList.remove('on'); this.hints(S, e, r); return; }
     R.style.transform = `translate(${(r.left - pad).toFixed(1)}px,${(r.top - pad).toFixed(1)}px)`;
     R.style.width = `${(r.width + pad * 2).toFixed(1)}px`; R.style.height = `${(r.height + pad * 2).toFixed(1)}px`;
     if (R._for !== e) { R._for = e; const br = parseFloat(getComputedStyle(e).borderTopLeftRadius) || 8; R.style.borderRadius = `${Math.min(r.height / 2 + pad, br + pad)}px`; }
@@ -219,34 +229,48 @@ export class PadNav {
     if (e) list.push(['A', (a && a.a != null ? a.a : null) ?? (e.matches('input[type=range]') ? '' : e.matches('.tab') ? 'Open' : 'Select')]);
     if (a?.x) list.push(['X', a.x]);
     if (a?.y) list.push(['Y', a.y]);
-    const root = S.top?.panel;
-    if (root && [...root.querySelectorAll('.tabs .tab, .ctl-tabs button')].filter(visible).length > 1) list.push(['LB+RB', 'Tabs']);
+    const root = S.top?.panel, PM = this.ui.padMenu?.active, tabs = !!root && [...root.querySelectorAll('.tabs .tab, .ctl-tabs button')].filter(visible).length > 1;
+    if (PM) { list.push(['LB+RB', 'Pages']); if (tabs || this.ui.padMenu.current() === 'settings') list.push(['LT+RT', 'Tabs']); } // (the tabbed menu: CT-11)
+    else if (tabs) list.push(['LB+RB', 'Tabs']);
     if (e?.matches('input[type=range]')) list.push(['DLeft+DRight', 'Adjust']);
     if (S.top?.name === 'map') list.push(['LT+RT', 'Zoom']);
-    if (S.top?.name === 'skills' && !S.top.chg?.el.hidden) list.push(['LT+RT', 'Charge skill']);
-    list.push(['B', this.ui.drag?.held ? 'Cancel' : S.key === 'pop' ? 'Close' : 'Back']);
+    if (S.top?.name === 'skills' && !S.top.chg?.el.hidden) list.push(['RS', 'Charge skill']);
+    list.push(['B', this.ui.drag?.held ? 'Cancel' : S.key === 'pop' ? 'Close' : PM ? 'Close' : 'Back']);
     const sig = list.map(x => x.join(':')).join('|') + Actions.padStyle;
     if (sig !== this._hsig) {
       this._hsig = sig;
       this.hintsEl.innerHTML = list.filter(x => x[1]).map(([b, t]) => `<span class="ph-i">${b.split('+').map(t2 => `<span class="kc pad">${padGlyph(t2)}</span>`).join('')}<b>${t}</b></span>`).join('');
     }
-    // under the top panel, centred on it; above it when there's no room; beside a panel as tall as the screen (its
-    // bottom corner, right side first); else over its bottom edge. M: the margin (the Deck's safe area: deck.css)
-    const box = (S.top?.panel || S.roots[0])?.getBoundingClientRect(); if (!box) return;
+    // where it goes, the first spot on the screen that keeps clear of the HUD's bars (the orbs, the hotbar, the
+    // bottom-right buttons, the minimap: ui/fit.js hudRects; CT-10: beside a tall panel it sat on the Deck's hotbar):
+    // under the top panel, centred on it; above it; beside it (right, then left), as low as is clear; over its bottom
+    // edge (at the right, then the middle); else just inside its bottom-right corner (clear of a centred Back or OK).
+    // M: the margin (the Deck's safe area: deck.css)
+    const P = S.top?.panel || S.roots[0], pr = P?.getBoundingClientRect(); if (!pr) return;
+    const dk = P.querySelector(':scope > .chg-drawer:not([hidden])'), dr = dk && dk.offsetParent ? dk.getBoundingClientRect() : null; // (the K panel's docked Charge drawer counts as the panel)
+    const box = dr && dr.width > 2 ? { left: Math.min(pr.left, dr.left), top: Math.min(pr.top, dr.top), right: Math.max(pr.right, dr.right), bottom: Math.max(pr.bottom, dr.bottom) } : pr;
+    if (box !== pr) box.width = box.right - box.left;
     const H = this.hintsEl; H.classList.add('on');
-    const w = H.offsetWidth, hh = H.offsetHeight, M = this.ui.root?.classList.contains('deck-ui') ? 14 : 6;
-    let x = box.left + box.width / 2 - w / 2, y = box.bottom + 10;
-    if (y + hh > innerHeight - M) {
-      y = box.top - hh - 10;
-      if (y < M) {
-        y = Math.min(innerHeight - M - hh, box.bottom - hh);
-        if (box.right + 12 + w <= innerWidth - M) x = box.right + 12;
-        else if (box.left - 12 - w >= M) x = box.left - 12 - w;
-        else y = Math.min(innerHeight - M - hh, box.bottom - hh / 2);
-      }
+    const keep = [...(this.ui.fit?.hudRects?.() || []), ...(this.ui.padMenu?.rects?.() || [])], M = this.ui.root?.classList.contains('deck-ui') ? 14 : 6; // (+ the tabbed menu's strip: CT-11)
+    const key = `${this._hsig}|${[box.left, box.top, box.right, box.bottom].map(Math.round)}|${keep.map(k => Math.round(k.r.left) + ',' + Math.round(k.r.top)).join(';')}|${innerWidth}x${innerHeight}`;
+    if (key === H._key && performance.now() - (H._keyT || 0) < 500) return; // (placed: the same hints, panel and HUD)
+    H._key = key; H._keyT = performance.now();
+    const clear = (x, y, w, hh) => keep.every(({ r }) => x + w <= r.left || x >= r.right || y + hh <= r.top || y >= r.bottom);
+    const on = (x, y, w, hh) => x >= M && x + w <= innerWidth - M && y >= M && y + hh <= innerHeight - M;
+    const size = mw => { H.style.maxWidth = mw ? mw.toFixed(0) + 'px' : ''; return [H.offsetWidth, H.offsetHeight]; };
+    const beside = (right, w, hh) => { const out = [], by = Math.min(innerHeight - M - hh, box.bottom - hh); for (let yy = by; yy >= Math.max(M, box.top + 40); yy -= 24) out.push([right ? box.right + 12 : box.left - 12 - w, yy]); return out; };
+    let [w, hh] = size(0), pick = null;
+    const cx = box.left + box.width / 2 - w / 2, rx = box.right - w - 34;
+    pick = [[cx, box.bottom + 10], [cx, box.top - hh - 10], ...beside(true, w, hh), ...beside(false, w, hh), [rx, box.bottom - hh / 2], [cx, box.bottom - hh / 2]].find(([x, y]) => on(x, y, w, hh) && clear(x, y, w, hh));
+    // too wide for the room beside the panel: wrapped to the room there, right side first (the K panel's long footer)
+    for (const right of [true, false]) {
+      if (pick) break;
+      const room = Math.floor(right ? innerWidth - M - box.right - 12 : box.left - 12 - M) - 2; if (room < 200 || room >= w) continue;
+      const [w2, h2] = size(room); pick = beside(right, w2, h2).find(([x, y]) => on(x, y, w2, h2) && clear(x, y, w2, h2)); if (pick) { w = w2; hh = h2; } else [w, hh] = size(0);
     }
-    x = Math.max(M + 2, Math.min(innerWidth - w - M - 2, x));
-    H.style.transform = `translate(${x.toFixed(0)}px,${y.toFixed(0)}px)`;
+    let [x, y] = pick || [box.right - w - 34, box.bottom - hh - 18]; // (else just inside the panel's bottom-right corner)
+    x = Math.max(M + 2, Math.min(innerWidth - w - M - 2, x)); y = Math.max(M, Math.min(innerHeight - M - hh, y));
+    if (H._x !== x || H._y !== y) { H._x = x; H._y = y; H.style.transform = `translate(${x.toFixed(0)}px,${y.toFixed(0)}px)`; }
   }
   hide() { this.ring.classList.remove('on'); this.hintsEl.classList.remove('on'); this.ring._for = null; if (!this.scope()) { this.cur = null; this.scopeKey = ''; } }
   /** an action that wants a second press to confirm (dropping an item): true on the second press within 1.6 s */

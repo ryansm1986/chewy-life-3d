@@ -3,6 +3,7 @@ import { el, esc, rarityColor, RARITY_JP, cap } from './dom.js';
 import { glyph } from './glyphs.js';
 import { itemName, baseName, meetsReq, rpgItemTooltip, equipSlotsFor } from './rpg.js';
 import { padWording } from './padGlyphs.js';
+import { Actions } from '../core/actions.js';
 
 export class Tooltip {
   constructor(layer) {
@@ -11,11 +12,16 @@ export class Tooltip {
     this.wrap.appendChild(this.box);
     layer.appendChild(this.wrap);
     this.on = false; this.x = 0; this.y = 0; this.w = 0; this.h = 0; this.owner = null;
-    addEventListener('mousemove', e => { this.x = e.clientX; this.y = e.clientY; if (this.on) this.place(); }, { passive: true });
+    addEventListener('mousemove', e => { this.x = this._px = e.clientX; this.y = this._py = e.clientY; if (this.on) this.place(); }, { passive: true }); // (_px / _py: where the real pointer last was)
   }
   show(html, cls = '', owner = null) {
     if (this.muted) return; // (a background panel build or render: ui/prewarm.js)
     if (!html) return this.hide();
+    // (while the pad plays, a hidden pointer resting on a panel (the Deck's trackpad) brings up no hover tooltip as the
+    // panels change under it; the focus's own come from padNav's untrusted events, and a pointer really moving shows its
+    // own as before: CT-11)
+    const ev = typeof window !== 'undefined' ? window.event : null;
+    if (Actions.device === 'pad' && ev?.isTrusted && /^(mouse|pointer)(over|enter|move)$/.test(ev.type) && ev.clientX === this._px && ev.clientY === this._py) return; // (the same spot as its last move: it didn't move)
     html = padWording(html); // (while the pad plays: its buttons instead of the mouse's, ui/padGlyphs.js)
     this.owner = owner;
     this.box.className = 'tt ' + cls;

@@ -23,6 +23,7 @@ const MOUSE_CAP = { mouse0: () => glyph('mouseL'), mouse2: () => glyph('mouseR')
 const TOUCH_HELP = [['Move', 'The stick: put a thumb down on the left (the right, left-handed)'], ['Sprint', 'Push the stick out to its glowing ring'], ['Attack · talk · use', 'The big button (it shows a paw when it will talk or use)'], ['Skills', 'The buttons round it: tap to cast, hold to charge'], ['Aim', 'Auto: the nearest foe, else where you face. Drag: drag off a skill, back onto it to cancel'], ['Target', 'Tap a monster'], ['Walk · talk · open', 'Tap the ground, a friend or a door'], ['Roll', 'The mint button'], ['Potions · meal', 'The belt between the orbs'], ['Swap weapons', 'The small badge by the big button'], ['Hero', 'Tap the portrait: the next hero. Hold it: the hero wheel'], ['Zoom', 'Pinch with two fingers'], ['Map · bag · menu', 'Tap the minimap; the buttons beside it']];
 // Settings › Controls › Targeting (CT-8, docs/CONTROLS.md §13): one row per device tab, its own key, and a line under it
 const TGT_ROW = dev => `<div class="set-row ctl-tgt" title="Off: you aim. Assist: a light snap onto foes near your aim. Auto: skills pick the best foe or group all round you."><div class="set-n">${glyph('pin')}Targeting</div><div class="seg" data-k="${TARGET_KEYS[dev]}" style="--w:78px">${TARGET_LABELS.map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div><div class="ctl-tgt-h" data-tgt="${dev}" style="margin:-2px 6px 6px;font:500 12.5px var(--font);opacity:.72"></div>`;
+const SET_2C = 1160, SET_2C_MIN = 700; // (Settings' two columns: the panel's 1140 px and a margin; compact ones from 700: a phone. The menus' own px; panels.css .set-2c, .set-cmp)
 const QUICK = [['inventory', 'bag', 'Bag'], ['character', 'star', 'Character'], ['skills', 'sparkle', 'Skills'], ['quests', 'book', 'Journal'], ['map', 'map', 'Map']];
 
 export class MenuPanel extends Panel {
@@ -48,23 +49,29 @@ export class MenuPanel extends Panel {
         </div>
       </div>
       <div class="mn-v mn-settings">
-        <div class="set-row" title="Deck: tuned for the Steam Deck. Mobile: for phones and tablets (a lighter picture, smaller shadows, fewer particles). Grass and scenery detail change at the next start."><div class="set-n">${glyph('eye')}Graphics</div><div class="seg" data-k="quality">${PRESET_NAMES.map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
-        <div class="set-row" title="Caps the frame rate: 40 is a steady fallback on the Steam Deck, 30 saves a phone's battery"><div class="set-n">${glyph('play')}Frame cap</div><div class="seg" data-k="fpsCap">${['Off', '60', '40', '30'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
-        <div class="set-row"><div class="set-n">${glyph('music')}Music</div><div class="sld"><input type="range" min="0" max="100" data-k="music"><b></b></div></div>
-        <div class="set-row"><div class="set-n">${glyph('sound')}Sound FX</div><div class="sld"><input type="range" min="0" max="100" data-k="sfx"><b></b></div></div>
-        <div class="set-row"><div class="set-n">${glyph('sparkle')}UI size</div><div class="sld"><input type="range" min="80" max="125" data-k="uiScale"><b></b></div></div>
-        <div class="set-row"><div class="set-n">${glyph('bolt')}Screen shake</div><button class="tog" data-k="shake"><i></i></button></div>
-        <div class="set-row" title="Hold a skill's button to charge it. Toggle: press once to start charging, again to release. Off: holding repeats the skill."><div class="set-n">${glyph('zap')}Charge on hold</div><div class="seg" data-k="chargeMode">${['On', 'Off', 'Toggle'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
-        <div class="set-row" title="Hold Shift while moving to sprint (+40% speed). Toggle: tap Shift to start sprinting; tap it again, or stop, to walk."><div class="set-n">${glyph('boots')}Sprint (Shift)</div><div class="seg" data-k="sprintMode">${['Hold', 'Toggle'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
-        <div class="set-row" title="Digging with Shadow. Hold: hold the button and let go in the golden band for a Perfect dig. Tap: one press digs by itself (a normal find)."><div class="set-n">${glyph('paw')}Dig with Shadow</div><div class="seg" data-k="digMode">${['Hold', 'Tap'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
-        <div class="set-row" title="Shadow walks ahead to the objective on a real path, waits for you, and stops short of yokai (a fight always comes first). Quests: on the steps that say he leads the way. Always: to the active objective. Off: only when you ask him (L, R3 out of a fight, a tap on the quest tracker, or the Journal's Follow Shadow)."><div class="set-n">${glyph('paw')}Shadow leads the way</div><div class="seg" data-k="shadowLead" style="--w:78px">${LEAD_LABELS.map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
-        <div class="set-row" title="The reel. Relaxed: a wider catch zone, half the drain, a longer bite and early presses forgiven. Auto: Relaxed on a touch screen, Normal with keys or a controller."><div class="set-n">${glyph('wave')}Fishing</div><div class="seg" data-k="fishMode" style="--w:78px">${['Auto', 'Normal', 'Relaxed'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
-        <div class="set-row" title="Saves on its own every few minutes of play, and after quests, level ups, building and big finds. Off: only those milestones, and when you leave."><div class="set-n">${glyph('save')}Autosave</div><div class="seg" data-k="autosave">${AUTOSAVE_LABELS.map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
-        <div class="set-row"><div class="set-n">${glyph('star')}Show FPS</div><button class="tog" data-k="showFps"><i></i></button></div>${DESKTOP ? `
-        <div class="set-row" title="Off: a window (F11 or Alt+Enter switch too)"><div class="set-n">${glyph('eye')}Full screen</div><button class="tog" data-k="fullscreen"><i></i></button></div>` : ''}
-        <div class="set-row" title="Keys and controller buttons, rumble, aim assist"><div class="set-n">${glyph('question')}Controls</div><button class="btn sm" data-a="controls">Change…</button></div>
-        <div class="set-row mn-about" title="Pawhaven, a cozy adventure with Chewy and friends"><div class="set-n">${glyph('sakura')}About</div>${UPD ? `<div class="mn-about-b"><button class="btn sm mn-ver" data-a="version">Pawhaven v${VERSION}</button><button class="btn sm mint" data-a="checkUpdate">Check for updates</button></div>` : `<button class="btn sm mn-ver" data-a="version">Pawhaven v${VERSION}</button>`}</div>
-        <div class="set-row mn-debug" title="Testing tools: F10 or \` , the bug button, Select + Start on a pad"><div class="set-n">${glyph('key')}Debug tools: on</div><div class="mn-dbg-b"><button class="btn sm" data-a="debugOpen">Open</button><button class="btn sm pink" data-a="debugOff">Turn off</button></div></div>
+        <div class="set-cols">
+          <div class="set-col"><div class="set-h">${glyph('eye')}<span>Picture &amp; sound</span></div>
+          <div class="set-row" title="Deck: tuned for the Steam Deck. Mobile: for phones and tablets (a lighter picture, smaller shadows, fewer particles). Grass and scenery detail change at the next start."><div class="set-n">${glyph('eye')}Graphics</div><div class="seg" data-k="quality">${PRESET_NAMES.map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+          <div class="set-row" title="Caps the frame rate: 40 is a steady fallback on the Steam Deck, 30 saves a phone's battery"><div class="set-n">${glyph('play')}Frame cap</div><div class="seg" data-k="fpsCap">${['Off', '60', '40', '30'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+          <div class="set-row"><div class="set-n">${glyph('star')}Show FPS</div><button class="tog" data-k="showFps"><i></i></button></div>${DESKTOP ? `
+          <div class="set-row" title="Off: a window (F11 or Alt+Enter switch too)"><div class="set-n">${glyph('eye')}Full screen</div><button class="tog" data-k="fullscreen"><i></i></button></div>` : ''}
+          <div class="set-row"><div class="set-n">${glyph('sparkle')}UI size</div><div class="sld"><input type="range" min="80" max="125" data-k="uiScale"><b></b></div></div>
+          <div class="set-row"><div class="set-n">${glyph('music')}Music</div><div class="sld"><input type="range" min="0" max="100" data-k="music"><b></b></div></div>
+          <div class="set-row"><div class="set-n">${glyph('sound')}Sound FX</div><div class="sld"><input type="range" min="0" max="100" data-k="sfx"><b></b></div></div>
+          <div class="set-row"><div class="set-n">${glyph('bolt')}Screen shake</div><button class="tog" data-k="shake"><i></i></button></div>
+          </div>
+          <div class="set-col"><div class="set-h">${glyph('paw')}<span>Play</span></div>
+          <div class="set-row" title="Hold a skill's button to charge it. Toggle: press once to start charging, again to release. Off: holding repeats the skill."><div class="set-n">${glyph('zap')}Charge on hold</div><div class="seg" data-k="chargeMode">${['On', 'Off', 'Toggle'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+          <div class="set-row" title="Hold Shift while moving to sprint (+40% speed). Toggle: tap Shift to start sprinting; tap it again, or stop, to walk."><div class="set-n">${glyph('boots')}Sprint (Shift)</div><div class="seg" data-k="sprintMode">${['Hold', 'Toggle'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+          <div class="set-row" title="Digging with Shadow. Hold: hold the button and let go in the golden band for a Perfect dig. Tap: one press digs by itself (a normal find)."><div class="set-n">${glyph('paw')}Dig with Shadow</div><div class="seg" data-k="digMode">${['Hold', 'Tap'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+          <div class="set-row" title="Shadow walks ahead to the objective on a real path, waits for you, and stops short of yokai (a fight always comes first). Quests: on the steps that say he leads the way. Always: to the active objective. Off: only when you ask him (L, R3 out of a fight, a tap on the quest tracker, or the Journal's Follow Shadow)."><div class="set-n">${glyph('paw')}Shadow leads the way</div><div class="seg" data-k="shadowLead" style="--w:78px">${LEAD_LABELS.map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+          <div class="set-row" title="The reel. Relaxed: a wider catch zone, half the drain, a longer bite and early presses forgiven. Auto: Relaxed on a touch screen, Normal with keys or a controller."><div class="set-n">${glyph('wave')}Fishing</div><div class="seg" data-k="fishMode" style="--w:78px">${['Auto', 'Normal', 'Relaxed'].map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+          <div class="set-row" title="Saves on its own every few minutes of play, and after quests, level ups, building and big finds. Off: only those milestones, and when you leave."><div class="set-n">${glyph('save')}Autosave</div><div class="seg" data-k="autosave">${AUTOSAVE_LABELS.map((n, i) => `<button data-v="${i}">${n}</button>`).join('')}<i class="seg-pill"></i></div></div>
+          <div class="set-row" title="Keys and controller buttons, rumble, aim assist"><div class="set-n">${glyph('question')}Controls</div><button class="btn sm" data-a="controls">Change…</button></div>
+          <div class="set-row mn-about" title="Pawhaven, a cozy adventure with Chewy and friends"><div class="set-n">${glyph('sakura')}About</div>${UPD ? `<div class="mn-about-b"><button class="btn sm mn-ver" data-a="version">Pawhaven v${VERSION}</button><button class="btn sm mint" data-a="checkUpdate">Check for updates</button></div>` : `<button class="btn sm mn-ver" data-a="version">Pawhaven v${VERSION}</button>`}</div>
+          <div class="set-row mn-debug" title="Testing tools: F10 or \` , the bug button, Select + Start on a pad"><div class="set-n">${glyph('key')}Debug tools: on</div><div class="mn-dbg-b"><button class="btn sm" data-a="debugOpen">Open</button><button class="btn sm pink" data-a="debugOff">Turn off</button></div></div>
+          </div>
+        </div>
         <div class="mn-foot"><button class="btn" data-a="back">${glyph('swap')}Back</button></div>
       </div>
       <div class="mn-v mn-controls">
@@ -138,7 +145,19 @@ export class MenuPanel extends Panel {
     if (v === 'update') { const u = this.body.querySelector('.mn-update'); if (u) u.innerHTML = updateHTML(); }
     const vv = this.body.querySelector('.mn-' + v);
     if (vv) replay(vv, 'enter', 500);
+    this.body.scrollTop = 0; // (a fitted body that scrolls starts each view at its top)
     this.sync();
+    this.ui.fit?.now(); // (CT-10: lay the new view out for the screen at once: Settings' columns, the fit)
+  }
+  /** CT-10 (ui/fit.js, before it measures): Settings in two columns where the room is wide enough (the Deck, every
+   *  16:9 desktop up to 125%, an iPad); two compact ones, as wide as the room, on a narrower screen (a phone: no row
+   *  icons, narrower segments and sliders); else one. w is the room's width in the panel's own px */
+  fitRoom(w) {
+    const s = this.view === 'settings', two = s && w >= SET_2C_MIN, cmp = two && w < SET_2C, P = this.panel;
+    if (two !== P.classList.contains('set-2c')) P.classList.toggle('set-2c', two);
+    if (cmp !== P.classList.contains('set-cmp')) P.classList.toggle('set-cmp', cmp);
+    const sw = cmp ? Math.floor(w - 4) + 'px' : '';
+    if (P.style.getPropertyValue('--set-w') !== sw) { if (sw) P.style.setProperty('--set-w', sw); else P.style.removeProperty('--set-w'); }
   }
   onOpen() {
     const who = this.panel.querySelector('.mn-who'); if (who) who.textContent = this.ui.G?.state?.player?.name || 'Chewy'; // whoever is being played

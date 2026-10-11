@@ -7,7 +7,9 @@
 //   c) it plays: New Game, the village; the Gamepad API is there and the window has focus; a virtual pad (as
 //      tools/qa/pad-lib.mjs) walks the hero, the glyphs show and a panel takes the focus ring;
 //   d) Quit game saves and closes the app; a relaunch finds the save (Continue) and the remembered window state;
-//   e) SteamDeck=1 in the environment (as Steam sets on a Deck): window.pawhaven.deck and the Deck preset.
+//   e) SteamDeck=1 in the environment (as Steam sets on a Deck): window.pawhaven.deck and the Deck preset;
+//   f) the main process's log, userData/logs/main.log (CT-10): each start, the Steam decision (no switches on Windows,
+//      even with SteamDeck=1), the GPU, the window shown, the title reached, the quit.
 // Screenshots go to SHOT_DIR (default tools/qa/tmp/desktop).   usage: node tools/qa/desktop-smoke.mjs
 import fs from 'node:fs';
 import os from 'node:os';
@@ -107,6 +109,15 @@ try {
   const e = await page.evaluate(() => ({ deck: window.pawhaven.deck, preset: window.G.engine.preset, engineDeck: window.G.engine.deck, settingsQ: window.G.ui.settings.quality }));
   R.check('e) with SteamDeck=1 the app reports a Deck and a first start picks the Deck preset', e.deck === true && e.preset === 3 && e.engineDeck && e.settingsQ === 3, JSON.stringify(e));
   await app.close();
+
+  // ---------------------------------------------------------------- f) the main process's log (CT-10)
+  const logOf = d => { try { return fs.readFileSync(path.join(d, 'logs/main.log'), 'utf8'); } catch (err) { return ''; } };
+  const l1 = logOf(UD), l2 = logOf(UD2);
+  const f = { starts: (l1.match(/ \[app\] ---- Pawhaven \d/g) || []).length, env: /\[env\] not under Steam or gamescope: no switches/.test(l1), gpu: /\[gpu\] info \{/.test(l1) && /\[gpu\] features \{/.test(l1),
+    shown: (l1.match(/\[window\] shown \(([^)]*)\)/) || [])[1] || null, title: /\[window\] the game reached its title/.test(l1), quit: /\[app\] quit, exit code 0/.test(l1),
+    deck: /\[env\] Steam \/ gamescope \(SteamDeck=1\) on win32: switches are for Linux only, none added/.test(l2) && /\[env\] switches: ozone-platform \(not set\), no-sandbox off/.test(l2), bytes: l1.length };
+  R.check('f) the main process logs to userData/logs/main.log (under --user-data=): both starts, the Steam decision (none on Windows, even with SteamDeck=1), the GPU, the window shown at ready-to-show, the title reached, a clean quit',
+    f.starts === 2 && f.env && f.gpu && f.shown === 'ready-to-show' && f.title && f.quit && f.deck, JSON.stringify(f));
 } catch (err) { R.check('the run finished', false, String(err.message || err).split('\n')[0]); }
 
 for (const d of [UD, UD2]) { try { fs.rmSync(d, { recursive: true, force: true }); } catch (e) { /* (Chromium may still hold a file a moment) */ } }

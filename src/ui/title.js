@@ -3,6 +3,7 @@ import { el, esc } from './dom.js';
 import { glyph } from './glyphs.js';
 import { DESKTOP, quitGame } from './desktop.js';
 import { portrait } from './portraits.js';
+import { version as VERSION } from '../../package.json'; // (the footer names the running version, as the desktop app's does: CT-10)
 
 const LETTER_COLORS = ['#fff6e8', '#ffc4d6', '#ffe79a', '#c9f5e4', '#cfeaff', '#e4dcff'];
 
@@ -34,7 +35,7 @@ export class Title {
           <button class="btn big" data-a="quit">${glyph('door')}Quit</button>` : ''}
         </div>
       </div>
-      <div class="ti-foot">v0.1 · made with love for Chewy &amp; Shadow ♡</div>`;
+      <div class="ti-foot">v${VERSION} · made with love for Chewy &amp; Shadow ♡</div>`;
     ui.layers.title.appendChild(r);
     r.addEventListener('click', e => {
       const b = e.target.closest('[data-a]'); if (!b || b.disabled) return;

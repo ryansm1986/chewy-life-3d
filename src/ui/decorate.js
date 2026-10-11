@@ -1,10 +1,14 @@
 // Decorate mode UI (docs/HOUSING.md §2): the bottom palette (your furniture storage by tab, with counts and 3D
 // thumbnails; wallpapers and floors on the last tab) and, indoors, the HUD's Decorate button. The game side is
 // home/decorate.js (opts: house(), state(), onSelect, onSurface, onStore, onUndo, onCancel, onClose).
+// On the pad (CT-11, docs/CONTROLS.md §14.6; ui/padCursor.js drives it, as build mode's palette): LB / RB glyphs at the
+// tab strip's ends, a grid of cards (pad.css), the focused piece in the side card (padDetail), and folded to the tab
+// strip with the piece in hand (heldChip).
 import { el, esc, replay } from './dom.js';
 import { glyph, glyphURL } from './glyphs.js';
 import { padGlyph } from './padGlyphs.js';
 import { Panel } from './panel.js';
+import { Actions } from '../core/actions.js';
 import { FURNITURE, SURFACES, SURFACE_IDS, TABS, SETS, CATS, CELL, storageList, tabOf } from '../home/furniture.js';
 import { furnitureGroup } from '../home/furnitureMesh.js';
 import { surfaceSwatch } from '../home/surfaces.js';
@@ -36,17 +40,18 @@ export function furnitureTipHTML(id, n = null, fav = null) { // fav: 'your' | 't
 export class DecoratePanel extends Panel {
   constructor(ui) { super(ui, { name: 'decorate', title: 'Decorate', jp: '模様替え', side: 'bottom', cls: 'p-build p-decor', icon: 'home' }); this.tab = 'all'; this.queue = []; }
   init() {
-    this.extra.innerHTML = `<div class="tabs bd-tabs dc-tabs">${TABS.map(t => `<button class="tab" data-t="${t.id}" style="--tc:${t.color}">${glyph(t.glyph)}<span>${esc(t.name)}</span><span class="tab-n">0</span></button>`).join('')}</div>`;
+    this.extra.innerHTML = `<span class="bd-bump pad-only" data-pg="LB"></span><div class="tabs bd-tabs dc-tabs">${TABS.map(t => `<button class="tab" data-t="${t.id}" style="--tc:${t.color}">${glyph(t.glyph)}<span>${esc(t.name)}</span><span class="tab-n">0</span></button>`).join('')}</div><span class="bd-bump pad-only" data-pg="RB"></span><div class="bd-held pad-only"></div>`;
     this.body.innerHTML = `<div class="bd-main"><div class="bd-cards dc-cards"></div>
       <div class="bd-side dc-side">
         <div class="dc-house"><b class="dc-name"></b><span class="dc-surf"></span></div>
         <div class="dc-rate" title="Home Rating"><span class="dc-stars"></span><small class="dc-tip"></small></div>
+        <div class="bd-pd pad-only"></div>
         <div class="bh-t dc-hint">Pick something to place</div>
         <div class="dc-btns"><button class="btn sm dc-store" title="Put it back in storage (Delete)">${glyph('chest')}Store</button><button class="btn sm dc-undo" title="Undo (Ctrl+Z)">${glyph('swap')}Undo</button><button class="btn sm pink dc-done" title="Done (B)">${glyph('check')}Done</button></div>
         <div class="bh-k dc-keys kbm-only"><span><span class="kc sm">${glyph('mouseL')}</span>place</span><span><span class="kc sm">R</span>rotate</span><span><span class="kc sm">Esc</span>cancel</span></div>
         <div class="bh-k dc-keys pad-only"><span><span class="kc sm pad">${padGlyph('A')}</span>place</span><span><span class="kc sm pad">${padGlyph('Y')}</span>rotate</span><span><span class="kc sm pad">${padGlyph('X')}</span>store</span><span><span class="kc sm pad">${padGlyph('B')}</span>cancel</span></div>
       </div></div>`;
-    this.$ = { tabs: this.extra.querySelector('.dc-tabs'), cards: this.body.querySelector('.dc-cards'), name: this.body.querySelector('.dc-name'), surf: this.body.querySelector('.dc-surf'), rate: this.body.querySelector('.dc-rate'), stars: this.body.querySelector('.dc-stars'), tip: this.body.querySelector('.dc-tip'), hint: this.body.querySelector('.dc-hint'), store: this.body.querySelector('.dc-store'), undo: this.body.querySelector('.dc-undo'), done: this.body.querySelector('.dc-done') };
+    this.$ = { pd: this.body.querySelector('.bd-pd'), held: this.extra.querySelector('.bd-held'), bumps: [...this.extra.querySelectorAll('.bd-bump')], tabs: this.extra.querySelector('.dc-tabs'), cards: this.body.querySelector('.dc-cards'), name: this.body.querySelector('.dc-name'), surf: this.body.querySelector('.dc-surf'), rate: this.body.querySelector('.dc-rate'), stars: this.body.querySelector('.dc-stars'), tip: this.body.querySelector('.dc-tip'), hint: this.body.querySelector('.dc-hint'), store: this.body.querySelector('.dc-store'), undo: this.body.querySelector('.dc-undo'), done: this.body.querySelector('.dc-done') };
     this.$.tabs.addEventListener('click', e => { const t = e.target.closest('.tab'); if (t && t.dataset.t !== this.tab) { this.tab = t.dataset.t; this._sig = null; this.render(); replay(this.$.cards, 'swap', 400); this.ui.sfx?.('tab'); } });
     this.$.cards.addEventListener('click', e => {
       const c = e.target.closest('.card'); if (!c) return;
@@ -55,7 +60,7 @@ export class DecoratePanel extends Panel {
       else { this.opts.onSelect?.(id); replay(c, 'picked', 500); }
     });
     this.$.cards.addEventListener('wheel', e => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { this.$.cards.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
-    this.$.cards.addEventListener('mouseover', e => { const c = e.target.closest('.card'); if (!c || c === this._hov) return; this._hov = c; const h = this.opts.house?.() || {}; this.ui.tip.show(furnitureTipHTML(c.dataset.id, this.st.furniture?.[c.dataset.id] || 0, (h.likes || []).includes(c.dataset.id) ? (h.owner ? 'their' : 'your') : null), '', c); });
+    this.$.cards.addEventListener('mouseover', e => { const c = e.target.closest('.card'); if (!c || c === this._hov || Actions.device === 'pad') return; /* (the pad reads the side card) */ this._hov = c; const h = this.opts.house?.() || {}; this.ui.tip.show(furnitureTipHTML(c.dataset.id, this.st.furniture?.[c.dataset.id] || 0, (h.likes || []).includes(c.dataset.id) ? (h.owner ? 'their' : 'your') : null), '', c); });
     this.$.cards.addEventListener('mouseout', e => { const c = e.target.closest('.card'); if (c && !c.contains(e.relatedTarget)) { this._hov = null; this.ui.tip.hide(c); } });
     this.$.store.addEventListener('click', () => { this.opts.onStore?.(); this.ui.sfx?.('click'); });
     this.$.undo.addEventListener('click', () => { this.opts.onUndo?.(); this.ui.sfx?.('click'); });
@@ -74,6 +79,7 @@ export class DecoratePanel extends Panel {
   render() {
     if (!this.built) return;
     const st = this.st, h = this.opts.house?.() || {}, s = this.opts.state?.() || {};
+    if (this._pgStyle !== Actions.padStyle) { this._pgStyle = Actions.padStyle; for (const b of this.$.bumps) b.innerHTML = `<span class="kc pad">${padGlyph(b.dataset.pg)}</span>`; } // (the pad's LB / RB at the tabs' ends)
     // tabs with counts
     const all = storageList(st);
     for (const t of this.$.tabs.children) {
@@ -113,6 +119,32 @@ export class DecoratePanel extends Panel {
         ${e.on ? `<div class="cd-built">${glyph('check')}<span>On</span></div>` : ''}</div>`;
     }).join('') : `<div class="bd-empty">${glyph('sakura')}${this.tab === 'surface' ? 'No wallpapers or floors in storage yet.' : 'Nothing in storage here yet.'}</div>`;
     this.pump();
+  }
+  /** the pad's side card: the focused card's piece (its name, kind, size, set, tags, how many are in storage) */
+  padDetail(c) {
+    const box = this.$?.pd; if (!box) return;
+    const id = c?.dataset?.id, d = id && (FURNITURE[id] || SURFACES[id]);
+    let h = '';
+    if (d) {
+      const surf = !!SURFACES[id], hs = this.opts.house?.() || {}, set = SETS[d.set], n = this.st.furniture?.[id] || 0;
+      const kind = surf ? (d.kind === 'wall' ? 'Wallpaper' : 'Floor') : CATS[d.cat]?.name || '';
+      const size = surf ? '' : `${d.size[0] * CELL}×${d.size[1] * CELL} m`;
+      const on = surf && (id === hs.wall || id === hs.floor), fav = !surf && (hs.likes || []).includes(id);
+      const count = surf ? (on ? (d.kind === 'wall' ? 'On the walls now' : 'On the floor now') : d.free || (hs.own || []).includes(id) ? 'Free to use' : `${n} in storage · uses one`) : `${n} in storage`;
+      h = `<div class="pd-h"><b>${esc(d.name)}</b>${size ? `<span class="pd-sz">${size}</span>` : ''}</div>
+        <div class="pd-d">${esc(kind)}${set ? ` · <b style="color:${set.color}">${esc(set.name)}</b>` : ''}</div>
+        ${(d.tags || []).length ? `<div class="pd-d fu-tags">${d.tags.slice(0, 3).map(t => `<span>${TAG_NAME[t] || t}</span>`).join('')}</div>` : ''}
+        <div class="pd-d">${esc(count)}</div>${fav ? `<div class="pd-ok">${glyph('heart')}${hs.owner ? 'One of their favourites' : 'One of your favourites'}</div>` : ''}`;
+    }
+    if (h !== this._pdH) { this._pdH = h; box.innerHTML = h; }
+  }
+  /** the folded palette's chip: the piece in hand (s: { sel, holding }) */
+  heldChip(s) {
+    const box = this.$?.held; if (!box) return;
+    const id = s?.holding || s?.sel, d = id && FURNITURE[id];
+    let h = '';
+    if (d) { const u = furnitureThumb(this.G, id, false); h = `<span class="bh-art">${u ? `<img src="${u}" alt="" draggable="false">` : glyph('home')}</span><b>${s.holding ? 'Moving the ' : ''}${esc(d.name)}</b><span class="pd-sz">${d.size[0] * CELL}×${d.size[1] * CELL} m</span>`; }
+    if (h !== this._heldH) { this._heldH = h; box.innerHTML = h; box.classList.toggle('on', !!h); }
   }
   // render missing thumbnails a few per frame (no hitch when the palette opens)
   pump() {

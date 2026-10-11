@@ -7,15 +7,17 @@
 //  c) a Burrow fight: the soft lock (in the cone, its ring; Aim assist 0 = none), A attacks the lock, X / Y / RB / RT /
 //     LT cast hotbar slots 1–5, a held Y charges and releases at Stage Ⅰ+ (rumble on, then off), D-pad ◀ / ▶ drink
 //  d) the village: the A prompt and A talks (the dialogue: A advances, the D-pad picks, B leaves), D-pad ▼ interacts,
-//     D-pad ▲ eats the quick meal, View opens the map and B closes it, Menu opens the game menu and its panel row
+//     D-pad ▲ eats the quick meal, View opens the map and B closes it, Menu opens the tabbed menu (CT-11) on its Game page
 //  e) heroes: LB tapped switches to the next hero, LB held opens the wheel and the right stick picks; Moka's Moonbeam
 //     channels while held; Poe's fūma throw and Shadow Step blink go at the lock
-//  g) CT-2, every panel with the pad: the bag (pick up / put down, equip, drop, compare tooltips, tabs), the character
+//  g) CT-2, every panel with the pad, reached through the tabbed menu (CT-11: LB / RB its pages, LT / RT a page's tabs, B
+//     closes it): the bag (pick up / put down, equip, drop, compare tooltips, tabs), the character
 //     sheet, the skill trees (learn, assign through the popover, charge perks), the journal's tabs, the map's zoom,
 //     settings (a slider, a toggle, back), Rosie's shop (buy, sell), the stash, cooking, the workbench, the Travel Map,
 //     the gift picker
-//  h) CT-2, build mode and decorate mode with the virtual cursor (pick, place, rotate, remove / undo, leave), and
-//     fishing end to end on the pad
+//  h) build mode on the pad (CT-11, docs/CONTROLS.md §14.5: LB / RB the category, the D-pad the grid, A pick up, the
+//     stick moves it, A builds, X twice removes it, B puts it back, B leaves), decorate mode the same way (§14.6: browse,
+//     A picks up, RT turns, A places, Y undoes, B leaves), and fishing end to end on the pad
 //  f) back to the mouse and keyboard: a mouse move switches back (cursor, key caps), the keys still play
 import { launch, boot, waitMode, sleep, makeReport } from './lib.mjs';
 import { installPad, padDown, padUp, padTap, padStick, padReset } from './pad-lib.mjs';
@@ -229,12 +231,12 @@ try {
   await padTap(page, 'B'); await sleep(page, 300);
   const m2 = await ev(() => window.G.ui.isOpen('map'));
   await padTap(page, 'Menu'); await sleep(page, 350);
-  const mm = await ev(() => ({ menu: window.G.ui.isOpen('menu'), quick: getComputedStyle(document.querySelector('.p-menu .mn-quick')).display, btns: [...document.querySelectorAll('.p-menu .mn-quick .btn')].filter(b => b.offsetParent).length }));
+  const mm = await ev(() => ({ menu: window.G.ui.isOpen('menu'), pm: window.G.ui.padMenu.active, page: window.G.ui.padMenu.current(), pages: [...document.querySelectorAll('.pm-strip .pm-tab')].length })); // (CT-11: the tabbed menu, the pause page first)
   await ev(() => window.G.ui.panels.menu.act('open:skills')); await sleep(page, 300);
   const mk = await ev(() => ({ skills: window.G.ui.isOpen('skills'), menu: window.G.ui.isOpen('menu') }));
   await padTap(page, 'Menu'); await sleep(page, 300);
   const mk2 = await ev(() => ({ skills: window.G.ui.isOpen('skills'), menu: window.G.ui.isOpen('menu') }));
-  R.check('View opens the map and B closes it; Menu opens the game menu (its panel row: Bag … Map), a panel from it, Menu backs out', m1 && !m2 && mm.menu && mm.quick === 'flex' && mm.btns >= 5 && mk.skills && !mk.menu && !mk2.skills, JSON.stringify({ m1, m2, mm, mk, mk2 }));
+  R.check('View opens the map and B closes it; Menu opens the tabbed menu (its strip of seven pages, on the Game page), a panel from it, Menu closes it', m1 && !m2 && mm.menu && mm.pm && mm.page === 'game' && mm.pages === 7 && mk.skills && !mk.menu && !mk2.skills, JSON.stringify({ m1, m2, mm, mk, mk2 }));
   // the Controls panel: per device, the pad's options
   await ev(() => { window.G.ui.open('menu'); window.G.ui.panels.menu.setView('controls'); }); await sleep(page, 300);
   const cp = await ev(() => { const P = document.querySelector('.p-menu'); return { dev: P.dataset.dev, rows: P.querySelectorAll('.ctl-row').length, glyphs: P.querySelectorAll('.ctl-row .kc.pad svg').length, opts: getComputedStyle(P.querySelector('.ctl-opts')).display }; });
@@ -327,7 +329,13 @@ try {
     return false;
   };
   const press = async (b, ms = 40) => { await padTap(page, b, ms); await sleep(page, 220); };
-  const quick = async (a) => { await press('Menu'); const m = await NAV(); const ok = await navTo(`.p-menu [data-a="${a}"]`); await press('A'); if (!ok) console.log('  ....  quick', a, 'missed', JSON.stringify(m), JSON.stringify(await NAV())); return ok; };
+  // (CT-11) the tabbed menu: Menu opens it, RB walks its pages; the pause page's buttons (Build, Decorate) are on Game
+  const page_ = () => ev(() => window.G.ui.padMenu.current());
+  const tabTo = async (k) => { if (!(await ev(() => window.G.ui.padMenu.active))) await press('Menu'); for (let i = 0; i < 8 && (await page_()) !== k; i++) await press('RB'); return (await page_()) === k; };
+  const quick = async (a) => {
+    if (a.startsWith('open:')) { const ok = await tabTo(a.slice(5)); if (!ok) console.log('  ....  quick', a, 'missed', JSON.stringify(await NAV())); return ok; }
+    const m = await tabTo('game') && await NAV(); const ok = !!m && await navTo(`.p-menu [data-a="${a}"]`); await press('A'); if (!ok) console.log('  ....  quick', a, 'missed', JSON.stringify(m), JSON.stringify(await NAV())); return ok;
+  };
   const P = {};
   // the bag: A picks up and puts down (the item rides the focus), Y equips, X drops (press twice); compare tooltips
   await ev(async () => { const G = window.G, I = await import('/src/rpg/items.js'); for (const o of [{ ilvl: 3, rarity: 'magic', slot: 'hat' }, { ilvl: 3, rarity: 'normal', slot: 'boots' }, { ilvl: 2, rarity: 'normal', slot: 'charm' }]) G.actions.pickup(I.generateItem(o)); G.state.equipment.hat = null; G.actions.recompute(); });
@@ -350,10 +358,10 @@ try {
   const n2 = await ev(() => window.G.state.inventory.filter(Boolean).length);
   P.bag = { bagOpen: P.bagOpen, tipCmp, held: !!heldIt, moved, eq, drop: [n0, n1, n2] };
   R.check('the bag with the pad: focus on a slot with its compare tooltip, A picks up / A puts down elsewhere, Y equips, X drops (on the second press)', P.bagOpen && tipCmp && heldIt && moved.at12 && !moved.held && eq.worn && !eq.at12 && n1 === n0 && n2 === n0 - 1, JSON.stringify(P.bag));
-  // LB / RB: the bag's views (Bag → Pantry → Furniture); B closes
-  await press('RB'); const v1 = await ev(() => window.G.ui.panels.inventory.view); await press('LB'); const v2 = await ev(() => window.G.ui.panels.inventory.view);
-  await press('B'); const c1 = await ev(() => window.G.ui.isOpen('inventory'));
-  R.check('LB / RB switch the bag\'s tabs (Bag ⇄ Pantry); B closes it', v1 === 'pantry' && v2 === 'bag' && !c1, JSON.stringify({ v1, v2, c1 }));
+  // LT / RT: the bag's views (Bag → Pantry → Furniture) inside the tabbed menu (CT-11: LB / RB are its pages); B closes it all
+  await press('RT'); const v1 = await ev(() => window.G.ui.panels.inventory.view); await press('LT'); const v2 = await ev(() => window.G.ui.panels.inventory.view);
+  await press('B'); const c1 = await ev(() => window.G.ui.isOpen('inventory') || window.G.ui.padMenu.active);
+  R.check('in the tabbed menu LT / RT switch the bag\'s tabs (Bag ⇄ Pantry); B closes the menu', v1 === 'pantry' && v2 === 'bag' && !c1, JSON.stringify({ v1, v2, c1 }));
   // character: A adds a stat point
   await ev(() => { const G = window.G; G.state.player.statPts = 2; G.actions.recompute(); });
   await quick('open:character'); await sleep(page, 300);
@@ -377,28 +385,29 @@ try {
   const pk0 = await ev(() => JSON.stringify(window.G.state.player.chargePerks || {}));
   const onPerk = await navTo('.chg-pk.can, .chg-pk.avail, .chg-pk:not(.locked):not(.owned):not(.maxed)'); await press('A');
   const pk1 = await ev(() => JSON.stringify(window.G.state.player.chargePerks || {}));
-  await press('RB'); const tree = await ev(() => window.G.ui.panels.skills.tree);
+  await press('RT'); const tree = await ev(() => window.G.ui.panels.skills.tree);
   await press('B');
-  R.check('the skill trees: A learns Crescent Chomp, Y opens the slot popover and A assigns it to slot 4, X opens its charge perks and A buys one, RB the next tree', onNode && sk1 === (sk0.chomp || 0) + 1 && pop && onSlot && hb5 === 'chomp' && onPerk && pk1 !== pk0 && tree !== 'bone', JSON.stringify({ sk0: sk0.chomp, sk1, pop, onSlot, hb5, onPerk, pk0, pk1, tree }));
+  R.check('the skill trees: A learns Crescent Chomp, Y opens the slot popover and A assigns it to slot 4, X opens its charge perks and A buys one, RT the next tree (the menu\'s LT / RT tabs)', onNode && sk1 === (sk0.chomp || 0) + 1 && pop && onSlot && hb5 === 'chomp' && onPerk && pk1 !== pk0 && tree !== 'bone', JSON.stringify({ sk0: sk0.chomp, sk1, pop, onSlot, hb5, onPerk, pk0, pk1, tree }));
   // the journal: LB / RB through Quests / Fish Log / Guides; the guides' Play buttons take the focus
   await quick('open:quests'); await sleep(page, 300);
-  const q0 = await ev(() => window.G.ui.panels.quests.tab); await press('RB'); const q1 = await ev(() => window.G.ui.panels.quests.tab); await press('RB'); const q2 = await ev(() => window.G.ui.panels.quests.tab);
+  const q0 = await ev(() => window.G.ui.panels.quests.tab); await press('RT'); const q1 = await ev(() => window.G.ui.panels.quests.tab); await press('RT'); const q2 = await ev(() => window.G.ui.panels.quests.tab);
   const qn = await NAV(); await press('B');
-  R.check('the journal: RB walks its tabs (quests → fish log → guides), the focus lands in each', q0 !== q1 && q1 !== q2 && !!qn.cur, JSON.stringify({ q0, q1, q2, cur: qn.cur }));
+  R.check('the journal: RT walks its tabs (quests → fish log → guides), the focus lands in each', q0 !== q1 && q1 !== q2 && !!qn.cur, JSON.stringify({ q0, q1, q2, cur: qn.cur }));
   // the map: View opens, RT zooms in, B closes
   await press('View'); const z0 = await ev(() => window.G.ui.panels.map.zoom); await padDown(page, 'RT'); await sleep(page, 500); await padUp(page, 'RT');
   const z1 = await ev(() => window.G.ui.panels.map.zoom), mh = (await NAV()).hints; await press('B');
   R.check('the map: View opens it, RT zooms, B closes (its hints name both)', z1 > z0 * 1.2 && /Zoom/.test(mh) && !(await ev(() => window.G.ui.isOpen('map'))), JSON.stringify({ z0, z1, mh }));
-  // settings: a slider takes ◀ ▶, a toggle takes A, B goes back to the menu's main page, Controls' LB / RB switch devices
-  await press('Menu'); await navTo('.p-menu [data-a="settings"]'); await press('A');
+  // settings (the tabbed menu's Settings page): a slider takes ◀ ▶, a toggle takes A, RT steps its pages (General →
+  // Controller → Keyboard & mouse: the Controls devices), B closes the menu
+  await tabTo('settings');
   const mu0 = await ev(() => window.G.ui.settings.music);
   await navTo('.p-menu input[data-k="music"]'); await press('DRight'); await press('DRight');
   const mu1 = await ev(() => window.G.ui.settings.music);
   const onShake = await navTo('.p-menu .tog[data-k="shake"]'); await press('A'); const sh = await ev(() => window.G.ui.settings.shake);
-  await press('A'); await press('B'); const vw = await ev(() => window.G.ui.panels.menu.view);
-  await navTo('.p-menu [data-a="controls"]'); await press('A'); const d0 = await ev(() => document.querySelector('.p-menu').dataset.dev); await press('RB'); const d1 = await ev(() => document.querySelector('.p-menu').dataset.dev);
-  await press('B'); await press('B');
-  R.check('settings with the pad: ▶ raises the music slider, A flips a toggle, B backs to the menu page, Controls\' RB switches the device tab', mu1 > mu0 && sh === false && vw === 'main' && d0 !== d1 && !(await ev(() => window.G.ui.isOpen('menu'))), JSON.stringify({ mu0, mu1, onShake, sh, vw, d0, d1 }));
+  await press('A'); const vw = await ev(() => window.G.ui.panels.menu.view);
+  await press('RT'); const d0 = await ev(() => ({ view: window.G.ui.panels.menu.view, dev: document.querySelector('.p-menu').dataset.dev })); await press('RT'); const d1 = await ev(() => document.querySelector('.p-menu').dataset.dev);
+  await press('B');
+  R.check('settings with the pad: ▶ raises the music slider, A flips a toggle, RT steps Settings\' pages to Controls (Controller, then Keyboard & mouse), B closes the menu', mu1 > mu0 && sh === false && vw === 'settings' && d0.view === 'controls' && d0.dev === 'pad' && d1 === 'kbm' && !(await ev(() => window.G.ui.isOpen('menu'))), JSON.stringify({ mu0, mu1, onShake, sh, vw, d0, d1 }));
   // Rosie's shop: A buys; on the bag side X sells
   await ev(() => { const G = window.G; G.state.coins = 2000; G.ui.toasts?.retire?.(0); G.openShop(); }); await sleep(page, 600);
   const sh0 = await ev(() => ({ coins: window.G.state.coins, cur: window.G.ui.padNav.cur?.className || '' }));
@@ -438,44 +447,49 @@ try {
   await sleep(page, 300);
 
   // ================================================================ h) CT-2: build and decorate with the virtual cursor, fishing end to end
-  // build mode from the game menu: the D-pad picks the Park Bench, the stick moves the cursor, A builds it, X twice removes it
+  // build mode from the game menu (CT-11): RB to the Decor tab, the D-pad to the Park Bench, A picks it up, the stick
+  // moves it, A builds it, X twice removes it, B puts it back (the palette opens on its card), B leaves
   await openSpot(); await calm();
   await ev(() => { const G = window.G; G.state.coins = 2000; G.state.materials.wood = 99; G.ui.toasts?.retire?.(0); });
   await quick('build'); await sleep(page, 600);
-  const bm = await ev(() => ({ on: window.G.build.active, vc: window.G.controls.vcursor.on }));
-  for (let i = 0; i < 8 && (await ev(() => document.querySelector('.p-build .bd-tabs .tab.on')?.dataset.c)) !== 'decor'; i++) await press('DDown', 30);
-  for (let i = 0; i < 12 && (await ev(() => window.G.build.tool?.type)) !== 'bench'; i++) await press('DRight', 30);
-  const tool = await ev(() => window.G.build.tool?.type);
-  const b0 = await ev(() => window.G.sim.S.buildings.length);
+  const bm = await ev(() => ({ on: window.G.build.active, vc: window.G.controls.vcursor.on, st: window.G.ui.padCursor.state }));
+  for (let i = 0; i < 6 && (await ev(() => window.G.ui.panels.build.cat)) !== 'decor'; i++) await press('RB', 30);
+  for (let i = 0; i < 14 && (await ev(() => window.G.ui.padCursor.cur?.dataset.id)) !== 'bench'; i++) await press('DRight', 30);
+  const browse = await ev(() => ({ cur: window.G.ui.padCursor.cur?.dataset.id, tool: window.G.build.tool, side: document.querySelector('.p-build .bd-pd')?.textContent || '' }));
+  await press('A'); const tool = await ev(() => window.G.build.tool?.type);
+  const b0 = await ev(() => window.G.build.undoStack.length);
   let placedB = false;
   for (const [x, y] of [[0, 0], [0.6, 0], [-0.6, 0], [0, 0.6], [0, -0.6], [0.6, 0.6]]) {
     if (x || y) { await padStick(page, 'left', x, y); await sleep(page, 180); await padStick(page, 'left', 0, 0); }
     await sleep(page, 150);
-    if (await ev(() => window.G.build.ghostOk)) { await press('A'); placedB = (await ev(() => window.G.sim.S.buildings.length)) === b0 + 1; if (placedB) break; }
+    if (await ev(() => window.G.build.ghostOk)) { await press('A'); placedB = (await ev(() => window.G.build.undoStack.at(-1)?.kind)) === 'place'; if (placedB) break; }
   }
-  const cursorMoved = await ev(() => Math.abs(window.G.controls.vcursor.x - innerWidth / 2) > 20 || Math.abs(window.G.controls.vcursor.y - innerHeight * 0.46) > 20);
-  await press('B'); const tool2 = await ev(() => window.G.build.tool);
-  await press('X'); await press('X'); const b2 = await ev(() => window.G.sim.S.buildings.length);
+  const benchB = await ev(() => { const b = window.G.build.undoStack.at(-1)?.b; return b ? b.id : null; });
+  const cursorMoved = await ev(() => Math.abs(window.G.controls.vcursor.x - innerWidth / 2) > 20 || Math.abs(window.G.controls.vcursor.y - innerHeight * 0.4) > 20);
+  await press('X'); await press('X'); const gone = await ev(id => !window.G.sim.S.buildings.some(b => b.id === id), benchB);
   const hintsB = await ev(() => document.querySelector('.pc-hints')?.textContent || '');
+  await press('B'); const back = await ev(() => ({ tool: window.G.build.tool, st: window.G.ui.padCursor.state, cur: window.G.ui.padCursor.cur?.dataset.id }));
   await press('B'); const bmOff = await ev(() => !window.G.build.active && !window.G.controls.vcursor.on);
-  R.check('build mode with the pad: the game menu enters it, the D-pad picks the Park Bench, the stick moves the cursor, A builds, B drops the tool, X twice removes it, B leaves', bm.on && bm.vc && tool === 'bench' && placedB && tool2 === null && b2 === b0 && /Build|Remove/.test(hintsB) && bmOff, JSON.stringify({ bm, tool, placedB, cursorMoved, tool2, b0, b2, bmOff }));
-  // decorate: in the cottage, the game menu's Decorate, the D-pad picks a piece, A places it, Y rotates, X stores, LB undoes
+  R.check('build mode with the pad: the game menu enters it on the palette, RB to Decor, the D-pad browses (nothing in hand) to the Park Bench, A picks it up, A builds (the stick moving it where needed), X twice removes it, B puts it back on its card, B leaves', bm.on && bm.vc && bm.st === 'pal' && browse.cur === 'bench' && !browse.tool && /Park Bench/.test(browse.side) && tool === 'bench' && placedB && gone && /Build|Remove/.test(hintsB) && back.tool === null && back.st === 'pal' && back.cur === 'bench' && bmOff, JSON.stringify({ bm, browse, tool, placedB, cursorMoved, gone, back, bmOff }));
+  // decorate (CT-11): in the cottage, the Game page's Decorate, the D-pad to a piece, A picks it up, RT turns it, A places
+  // it under the cursor, Y undoes, B leaves
   await ev(() => { const G = window.G; G.ui.toasts?.retire?.(0); }); await ev(() => window.G.openHome()); await waitMode(page, 'interior'); await sleep(page, 900);
   const fid = await ev(async () => { const F = (await import('/src/home/furniture.js')).FURNITURE; const id = Object.keys(F).find(k => F[k].mount === 'floor' && F[k].size?.[0] === 1 && (F[k].size?.[1] ?? 1) <= 1 && !F[k].own) || Object.keys(F).find(k => F[k].mount === 'floor'); window.G.actions.addFurniture(id, 2); return id; });
   await quick('decorate'); await sleep(page, 700);
   const dc = await ev(() => ({ on: !!window.G.housing.decor.active, vc: window.G.controls.vcursor.on }));
-  for (let i = 0; i < 6 && !(await ev(() => window.G.housing.decor.sel)); i++) await press('DRight', 30);
-  const dsel = await ev(() => window.G.housing.decor.sel);
+  for (let i = 0; i < 40 && (await ev(() => window.G.ui.padCursor.cur?.dataset.id)) !== fid; i++) await press('DRight', 30);
+  const browsed = await ev(() => !window.G.housing.decor.sel); // (the D-pad only browses)
+  await press('A'); const dsel = await ev(() => window.G.housing.decor.sel);
   const i0 = await ev(() => window.G.housing.decor.items.length);
   let placedD = false;
   for (const [x, y] of [[0, 0], [0, -0.5], [0.5, 0], [-0.5, 0], [0, 0.5], [0.5, -0.5]]) {
     if (x || y) { await padStick(page, 'left', x, y); await sleep(page, 160); await padStick(page, 'left', 0, 0); }
     await sleep(page, 150);
-    if (await ev(() => window.G.housing.decor.ghostOk)) { await press('Y'); await press('A'); placedD = (await ev(() => window.G.housing.decor.items.length)) === i0 + 1; if (placedD) break; }
+    if (await ev(() => window.G.housing.decor.ghostOk)) { await press('RT'); await press('A'); placedD = (await ev(() => window.G.housing.decor.items.length)) === i0 + 1; if (placedD) break; }
   }
-  await press('LB'); const undone = (await ev(() => window.G.housing.decor.items.length)) === i0;
-  await press('B'); await press('B'); const dcOff = await ev(() => !window.G.housing.decor.active);
-  R.check('decorate with the pad: the game menu enters it, the D-pad picks a piece, Y rotates and A places it under the cursor, LB undoes, B leaves', dc.on && dc.vc && !!dsel && placedD && undone && dcOff, JSON.stringify({ fid, dc, dsel, i0, placedD, undone, dcOff }));
+  await press('Y'); const undone = (await ev(() => window.G.housing.decor.items.length)) === i0;
+  await press('B'); if (await ev(() => window.G.housing.decor.active)) await press('B'); const dcOff = await ev(() => !window.G.housing.decor.active);
+  R.check('decorate with the pad: the Game page enters it, the D-pad browses to a piece, A picks it up, RT turns it and A places it under the cursor, Y undoes, B leaves', dc.on && dc.vc && browsed && dsel === fid && placedD && undone && dcOff, JSON.stringify({ fid, dc, browsed, dsel, i0, placedD, undone, dcOff }));
   await ev(() => window.G.housing.exit?.()); await waitMode(page, 'village'); await sleep(page, 500);
   // fishing end to end on the pad: A casts at the pond, A strikes on the bite, A held through the reel lands the fish
   const fishOk = await ev(() => { const G = window.G, F = G.life.fishing; G.state.fishing = { ...(G.state.fishing || {}), rod: 1, gotRod: true }; const spot = F.spots?.()?.[0] || null; return { spot: !!spot, has: !!F }; });

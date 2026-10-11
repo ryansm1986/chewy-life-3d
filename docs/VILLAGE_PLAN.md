@@ -282,3 +282,16 @@ How:
   - texture uploads per frame 51 → 38.
   - If the p50 needs trimming, the next lever is the in-town grass density (44 blades/m²), a look decision.
 
+
+## 13. Build mode on a controller (CT-11, 2026-10-10)
+The pad's build mode is in [CONTROLS.md](CONTROLS.md) §14.5. What it changes here:
+- **The palette** gets a Tools tab on the pad, with the zones, paths and bulldozer as cards. Its cards are a grid, and
+  the side card shows the focused building (the cost, the size, what it covers, why it's locked).
+- **Plot snapping** is unchanged. A building in hand still snaps to the plot under the cursor. Its rotation (LT / RT)
+  only applies off a plot, because a plot sets which side the door faces.
+- **Undo** (Y, or Ctrl+Z) is new, a session stack in `world/buildMode.js`:
+  - a placement comes back with its whole cost, and the next one of that type pays no homestead XP (`place({ noXp })`,
+    so a place-and-undo loop can't farm it);
+  - a removal comes back as the same building, with the refund taken back;
+  - a zone and a path stroke restore the tiles they changed.
+- **Remove** on the pad asks twice (X, or the bulldozer's A): the building turns red and the prompt asks again.

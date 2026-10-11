@@ -123,24 +123,53 @@ const file = (name, data, mode = 0o644) => ({ name, mode, data: Buffer.isBuffer(
 const dirNode = (name, kids = []) => ({ name, mode: 0o755, children: new Map(kids.map(k => [k.name, k])) });
 
 /**
+ * AppRun, the AppImage's entry point (bash). Before it starts the app it adds these switches, never twice and never over
+ * the player's own:
+ *   - under Steam or gamescope (the Deck's Game Mode), the decision tools/desktop/steamenv.cjs makes in main.cjs:
+ *     --ozone-platform=x11 (unless --ozone-platform, --ozone-platform-hint or --no-x11 is given: gamescope shows only
+ *     X11 windows) and --no-sandbox;
+ *   - otherwise --no-sandbox only where Chromium's namespace sandbox can't work (no unprivileged user namespaces): the
+ *     setuid helper can't be setuid inside a FUSE mount.
+ * Here they are on Chromium's real command line from the first exec (it reads both very early). PAWHAVEN_APPRUN_ADDED
+ * tells the app's log what was added. tools/qa/desktop-env-unit.mjs runs this script against steamenv.cjs.
+ */
+export function appRunScript({ name = 'Pawhaven', exe = 'pawhaven' } = {}) {
+  return `#!/usr/bin/env bash
+# ${name}'s AppImage launcher (tools/desktop/appimage.mjs)
+HERE="\${APPDIR:-$(dirname "$(readlink -f "$0")")}"
+export PATH="$HERE\${PATH:+:$PATH}"
+export LD_LIBRARY_PATH="$HERE/usr/lib\${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export XDG_DATA_DIRS="$HERE/usr/share\${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}:/usr/local/share:/usr/share"
+# has <switch> <args...>: the switch is among the args, as --switch or --switch=...
+has() { local s="$1" a; shift; for a in "$@"; do case "$a" in "$s"|"$s"=*) return 0 ;; esac; done; return 1; }
+# under Steam or gamescope (Game Mode): X11, as gamescope shows only X11 windows, and no sandbox (tools/desktop/steamenv.cjs)
+STEAM=
+[ -n "$GAMESCOPE_WAYLAND_DISPLAY" ] && STEAM=1
+case "\${XDG_CURRENT_DESKTOP,,}" in *gamescope*) STEAM=1 ;; esac
+[ "$SteamDeck" = 1 ] && STEAM=1
+case "$SteamGameId" in ''|0) ;; *) STEAM=1 ;; esac
+case "$SteamAppId" in ''|0) ;; *) STEAM=1 ;; esac
+ADD=()
+if [ -n "$STEAM" ]; then
+  has --no-x11 "$@" || has --ozone-platform "$@" || has --ozone-platform-hint "$@" || ADD+=(--ozone-platform=x11)
+  has --no-sandbox "$@" || ADD+=(--no-sandbox)
+# elsewhere: no unprivileged user namespaces means Chromium's sandbox can't start
+elif ! has --no-sandbox "$@"; then
+  unshare -Ur true 2>/dev/null || ADD+=(--no-sandbox)
+fi
+export PAWHAVEN_APPRUN_ADDED="\${ADD[*]}"
+exec "$HERE/${exe}" "\${ADD[@]}" "$@"
+`;
+}
+
+/**
  * Write an AppImage: the app folder (linux-unpacked) plus AppRun, the .desktop entry and the icon, behind the runtime.
  * o: { appDir, out, runtime (path), exe ('pawhaven'), name ('Pawhaven'), version, icon (png path), isExec, comment }
  */
 export function buildAppImage(o) {
   const root = treeFromDir(o.appDir, o.isExec); root.name = '';
   const png = fs.readFileSync(o.icon);
-  // AppRun: the AppImage's entry point. It adds --no-sandbox only where Chromium's namespace sandbox can't work (no
-  // unprivileged user namespaces): the setuid helper can't be setuid inside a FUSE mount
-  const appRun = `#!/usr/bin/env bash
-# ${o.name}'s AppImage launcher (tools/desktop/appimage.mjs)
-HERE="\${APPDIR:-$(dirname "$(readlink -f "$0")")}"
-export PATH="$HERE\${PATH:+:$PATH}"
-export LD_LIBRARY_PATH="$HERE/usr/lib\${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-export XDG_DATA_DIRS="$HERE/usr/share\${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}:/usr/local/share:/usr/share"
-NO_SANDBOX=()
-case " $* " in *" --no-sandbox "*) ;; *) unshare -Ur true 2>/dev/null || NO_SANDBOX=(--no-sandbox) ;; esac
-exec "$HERE/${o.exe}" "\${NO_SANDBOX[@]}" "$@"
-`;
+  const appRun = appRunScript({ name: o.name, exe: o.exe });
   const desktop = `[Desktop Entry]
 Name=${o.name}
 Comment=${o.comment || o.name}

@@ -9,8 +9,15 @@
 //   e) Settings › Frame cap: 40 draws ~40 frames a second and 60 ~60, Off every display refresh
 //   f) the text floor: the HUD, the bag, the skill trees and build mode at 1280×800 have no text under 11 px (the full
 //      sweep of every panel, with screenshots, is tools/qa/deck-ui.mjs)
+//   g) CT-10, the owner's Deck: as the desktop app on a Deck runs it (a window.pawhaven stub: Settings' Full screen row,
+//      About's Check for updates) with the debug row shown, the menu, Settings and Controls' three tabs each fit the
+//      safe area (the body scrolling, the last row in reach: ui-audit-lib panelFit); the HUD at its busiest, and with
+//      the K panel open on the pad, keeps its pieces and the glyph footer apart (hudOverlap). deck-ui.mjs is the full
+//      sweep; this keeps the case in run-all.
 import { chromium } from 'playwright-core';
 import { BASE, makeReport, sleep } from './lib.mjs';
+import { panelFit, hudOverlap } from './ui-audit-lib.mjs';
+import { installPad, padStick, padTap } from './pad-lib.mjs';
 
 const R = makeReport('s26-deck');
 const browser = await chromium.launch({ executablePath: process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true, args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
@@ -47,7 +54,7 @@ try {
     const G = window.G, out = [], wait = ms => new Promise(r => setTimeout(r, ms));
     const audit = (where, sel) => { for (const root of document.querySelectorAll(sel)) { const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); for (let n = w.nextNode(); n; n = w.nextNode()) { const t = n.textContent.trim(), el = n.parentElement; if (!t || !el || el.closest('svg, .jp, .chg-jp') || el.matches('.mm-n > span, .pc-lv > small')) continue; const r = el.getBoundingClientRect(); if (r.width < 1 || r.bottom < 0 || r.top > innerHeight) continue; let vis = true; for (let e = el; e && e !== document.body; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity < 0.05) { vis = false; break; } } if (!vis) continue; const px = parseFloat(getComputedStyle(el).fontSize) * (el.currentCSSZoom ?? 1); if (px < 11) out.push(`${where}: ${el.className || el.tagName} ${px.toFixed(1)}px "${t.slice(0, 24)}"`); } } };
     audit('hud', '.l-hud');
-    G.ui.open('inventory', { view: 'bag' }); await wait(500); audit('bag', '.p-inventory'); G.ui.close('inventory');
+    G.ui.open('inventory', { view: 'bag' }); await wait(500); audit('bag', '.p-inv'); G.ui.close('inventory');
     G.ui.open('skills'); await wait(500); audit('skills', '.p-skills'); G.ui.close('skills');
     G.build.enter(); await wait(700); audit('build', '.p-build'); G.build.exit(); await wait(300);
     return out;
@@ -76,6 +83,31 @@ try {
   });
   R.check('e) Settings › Frame cap: 40 draws ~40 frames a second and 60 ~60 (headless Chrome refreshes faster), Off all of them', cap.c40 >= 34 && cap.c40 <= 44 && cap.c60 >= 50 && cap.c60 <= 66 && cap.off >= Math.min(cap.raf * 0.8, 58), JSON.stringify(cap));
   await D.context.close();
+
+  // ---------------------------------------------------------------- g) CT-10: the app on a Deck, Settings at its tallest, the HUD apart
+  const A = await open(1280, 800);
+  await A.page.addInitScript(() => {
+    const update = { info: async () => ({ shell: '0.6.5', game: '0.6.5' }), check: async () => ({ status: 'none' }), install: async () => ({ ok: false }), cancel: async () => {}, later: async () => {}, openPage: async () => {}, onProgress: () => () => {} };
+    window.pawhaven = { desktop: true, deck: true, platform: 'linux', version: '0.6.5', isFullscreen: () => true, setFullscreen() {}, onFullscreen() {}, quit() {}, update };
+  });
+  await go(A.page, 'fresh&nointro&notut&hour=10');
+  await installPad(A.page); await padStick(A.page, 'left', 0, -0.5); await sleep(A.page, 250); await padStick(A.page, 'left', 0, 0);
+  const fits = [];
+  for (const [v, dev] of [['main'], ['settings'], ['controls', 'pad'], ['controls', 'touch'], ['controls', 'kbm']]) {
+    await A.page.evaluate(([v, dev]) => { const G = window.G, U = G.ui, M = U.panels.menu; if (G.debug && !G.__dbgOn) { G.__dbgOn = true; Object.defineProperty(G.debug, 'on', { get: () => true, configurable: true }); } U.open('menu'); if (v === 'controls') { M.setView('controls'); M.dev = dev; M.renderControls(); } else M.setView(v); }, [v, dev]);
+    await sleep(A.page, 700);
+    const rows = await A.page.evaluate(() => document.querySelectorAll('.p-menu .mn-settings .set-row').length);
+    fits.push({ v: v + (dev ? ':' + dev : ''), rows, out: (await A.page.evaluate(panelFit)).map(o => `${o.sel}: ${o.why}`) });
+    await A.page.evaluate(() => window.G.ui.close('menu')); await sleep(A.page, 300);
+  }
+  R.check('g) CT-10: the app on a Deck, Settings with every row (the app\'s and the debug row): the menu, Settings and Controls\' three tabs fit the safe area, scrolling where taller, the last row in reach', fits.every(f => !f.out.length) && fits[1].rows >= 17, JSON.stringify(fits.filter(f => f.out.length).concat(fits.length ? [{ settingsRows: fits[1].rows }] : [])));
+  await A.page.evaluate(() => { const G = window.G; G.state.player.lvl = 20; G.state.player.statPts = 2; G.state.player.skillPts = 3; G.ui.toast("The Wayfarer's Post by the bamboo points to new lands! Walk the west trail to find it.", { icon: 'map' }); G.ui.toast('Blossom Visage · Rare find! +2 more', { icon: 'star' }); document.querySelector('.save-glyph')?.classList.add('on'); });
+  await sleep(A.page, 1200);
+  const hud = await A.page.evaluate(hudOverlap), tight = await A.page.evaluate(() => window.G.ui.root.classList.contains('hud-tight'));
+  await A.page.evaluate(() => window.G.ui.open('skills')); await sleep(A.page, 400); await padTap(A.page, 'DRight'); await sleep(A.page, 900);
+  const hudK = await A.page.evaluate(hudOverlap);
+  R.check('g) CT-10: the Deck\'s HUD at its busiest keeps apart (the bottom-right buttons fold beside the mana orb), and with the K panel open the pad\'s glyph footer keeps off the HUD', !hud.length && !hudK.length && tight, JSON.stringify({ tight, hud: hud.slice(0, 4), hudK: hudK.slice(0, 4) }));
+  await A.context.close();
 
   // ---------------------------------------------------------------- b) not a Deck
   const N = await open(1280, 720);
