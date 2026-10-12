@@ -16,11 +16,14 @@
 // cleared → zones[id].regionBoss, visits → zones[id].visits. Afterwards state.regions is a live, unsaved view of
 // state.zones in that old shape, so region code, the Travel Map and QA keep reading and writing it unchanged.
 import { DUNGEONS } from '../dungeon/defs.js';
+import { migrateBurrowDens, denCleared } from './dens.js';
 
 export const ZONE_IDS = ['bamboo', 'maple', 'tidepool', 'onsen'];
 export const TIER_MAX = 5;
-/** the Deep Burrow's story clear: Tamamo on Burrow floor 20 (state.dungeon.deepest past 20 means she fell) */
+/** the Deep Burrow's story clear: Tamamo beaten in the Moonlit Sanctum (rpg/dens.js; an old save: the endless Burrow's
+ *  state.dungeon.deepest past 20 means she fell) */
 export const DEEP_STORY_FLOOR = 21;
+const deepStoryClear = state => (state.dungeon?.deepest || 0) >= DEEP_STORY_FLOOR || denCleared(state, 'moonSanctum');
 
 const obj = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
 /** a zone record with every field present and of the right type (missing ones at their fresh values) */
@@ -100,7 +103,7 @@ export function normalizeZones(state) {
   const own = Object.getOwnPropertyDescriptor(state, 'regions');
   if (own && !own.get) { delete state.regions; mergeRegions(state, own.value); } // (an old save's plain state.regions)
   if (!own || !own.get) Object.defineProperty(state, 'regions', { configurable: true, enumerable: false, get: () => regionsView(state), set: v => mergeRegions(state, v) });
-  if (obj(state.dungeon)) tierRecord(state, 'burrowDeep'); // (the Deep Burrow's record, migrated from the Burrow's deepest floor)
+  if (obj(state.dungeon)) { migrateBurrowDens(state); tierRecord(state, 'burrowDeep'); } // (the Burrow's four dens, migrated from the endless Burrow's deepest floor: rpg/dens.js; then the Deep Burrow's record, which follows the Moonlit Sanctum)
   return state;
 }
 /** state.zones[id], made whole (and created when new) */
@@ -113,13 +116,13 @@ export function zoneOf(state, id) {
 export function noteFloor(state, id, floor) { const d = zoneOf(state, id).dungeon; d.bestFloor = Math.max(d.bestFloor, floor || 0); return d.bestFloor; }
 // ------------------------------------------------------------------ tiers and the Spirit endgame (docs/ZONES.md §5.1)
 /** The tier record of a dungeon: a zone ('bamboo'), its dungeon ('bambooDepths'), or the Deep Burrow ('burrowDeep': kept
- *  in state.dungeon.deep; its story clear is Tamamo on Burrow floor 20). → fillTiers' record, or null */
+ *  in state.dungeon.deep; its story clear is Tamamo in the Moonlit Sanctum). → fillTiers' record, or null */
 export function tierRecord(state, id) {
   if (!state) return null;
   if (ZONE_IDS.includes(id) || (obj(state.zones) && obj(state.zones[id]) && !DUNGEONS[id])) return zoneOf(state, id).dungeon;
   const def = DUNGEONS[id];
   if (def?.zone) return zoneOf(state, def.zone).dungeon;
-  if (def?.kind === 'deep') { const D = state.dungeon = obj(state.dungeon) || { deepest: 0, waypoints: [1] }; return (D.deep = fillTiers(D.deep, (D.deepest || 0) >= DEEP_STORY_FLOOR)); }
+  if (def?.kind === 'deep') { const D = state.dungeon = obj(state.dungeon) || { deepest: 0, waypoints: [1] }; return (D.deep = fillTiers(D.deep, deepStoryClear(state))); }
   return null;
 }
 /** the dungeons with tier runs: the four zone dungeons and the Deep Burrow */

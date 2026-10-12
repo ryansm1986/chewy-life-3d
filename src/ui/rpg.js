@@ -30,6 +30,12 @@ export function itemIconURL(item) {
   else if (kind === 'material') g = item.base in MATERIAL_G ? MATERIAL_G[item.base] : 'petal';
   return glyphURL(g);
 }
+/** an item's icon drawn into its footprint (w x h cells, rpg/grid.js): rpg/icons.js itemIconSized; else the square one */
+export function itemIconSizedURL(item, w = 1, h = 1) {
+  const f = rpg.icons.itemIconSized;
+  if (f && (w > 1 || h > 1)) { try { const u = f(item, w, h); if (u) return u; } catch (e) { /* fall through */ } }
+  return itemIconURL(item);
+}
 const MATERIAL_G = { wood: 'wood', stone: 'stone', petal: 'petal', crystal: 'crystal', bone: 'bone', mochi: 'mochi', silk: 'silk', lantern: 'lantern' };
 export const rarityTint = r => RARE_TINT[r] || RARE_TINT.normal;
 

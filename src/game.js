@@ -32,6 +32,8 @@ import { normRun, dungeonDef } from './dungeon/defs.js';
 import { normalizeZones, recordDungeonClear, TIER_DUNGEONS } from './rpg/zones.js';
 import { installTierDebug } from './dungeon/tierRun.js';
 import { installLanternApi, installBurrowLantern } from './regions/spiritLantern.js';
+import { installBurrowDoor } from './world/burrowDoor.js';
+import { installTownPortal } from './dungeon/townPortal.js';
 import { villageReady, VILLAGES } from './regions/village/data.js';
 import { zoneNpcRig } from './actors/zoneVillagers.js';
 import { soakChip } from './rpg/zoneBuffs.js';
@@ -54,6 +56,7 @@ import { BuildingThumbs } from './gfx/thumbs.js';
 import { installServices } from './world/services.js';
 import { Waterfall } from './world/waterfall.js';
 import { VillageMinimap, DungeonMinimap, RegionMinimap } from './world/minimap.js';
+import { installMapPin } from './world/mapPin.js';
 import { prewarmWorld } from './world/prewarm.js';
 import { WORLD } from './world/layout.js';
 import { installLife } from './life/index.js';
@@ -346,6 +349,8 @@ export async function boot() {
       requestAnimationFrame(pupOut);
       const s = dungeon.startPos;
       player.setPos(s.x, s.z); player.moveTarget = null; shadow.setPos(s.x + 0.8, s.z + 0.8);
+      const rp = G.townPortal?.arrive?.(dungeon, buildArg); // (back through a Town Portal: the floor as it was left, and the hero where they stood)
+      if (rp) { player.setPos(rp.x, rp.z); player.facing = player.faceTarget = rp.face ?? player.facing; shadow.setPos(rp.x + 0.8, rp.z + 0.8); }
       combat.add(shadow); shadow.recalc();
       rig.distTarget = region ? 24 : 27; rig.focus.copy(player.pos); rig.snap();
       G.ui?.setMode?.('dungeon');
@@ -363,7 +368,7 @@ export async function boot() {
   // G.enterDungeon(n), the Burrow's floor n as before
   G.enterDungeon = (arg = 1) => {
     const run = normRun(arg), def = dungeonDef(run.id);
-    enterCombatWorld(() => new DungeonMode(G), run, { location: () => (def.kind !== 'burrow' ? def.name : dungeon.theme.name), sub: `B${run.floor}F`, floor: run.floor });
+    enterCombatWorld(() => new DungeonMode(G), run, { location: () => def.name, sub: `B${run.floor}F`, floor: run.floor }); // (a Burrow den by its own name: docs/ZONES.md §4.1)
   };
   G.enterRegion = (id) => {
     const def = REGIONS[id]; if (!def) return;
@@ -403,8 +408,9 @@ export async function boot() {
       swapWorld(village, vVfx, vCombat);
       disposeDungeon(old);
       G.mode = 'village';
-      const home = dead ? { x: L.chewyHouse.x + 2.2, z: L.chewyHouse.z } : fromRegion && L.travel ? { x: L.travel.x + 1.6, z: L.travel.z + 1.2 } : { x: L.dungeon.x, z: L.dungeon.z + 3.2 };
-      player.setPos(home.x, home.z); shadow.setPos(home.x + 0.8, home.z + 0.6);
+      const ph = !dead && G._portalHome; G._portalHome = null; // (through a Town Portal: out by its other end on the plaza, dungeon/townPortal.js)
+      const home = ph || (dead ? { x: L.chewyHouse.x + 2.2, z: L.chewyHouse.z } : fromRegion && L.travel ? { x: L.travel.x + 1.6, z: L.travel.z + 1.2 } : { x: L.dungeon.x, z: L.dungeon.z + 3.2 });
+      player.setPos(home.x, home.z); shadow.setPos(home.x + 0.8, home.z + 0.6); if (ph) player.facing = player.faceTarget = ph.face;
       player.anim.stop(); G.playerDead = false; G.actions.restoreAll(); shadow.fainted = 0; shadow.untargetable = false; shadow.anim.stop(); shadow.recalc(); shadow.life = shadow.lifeMax;
       G.ui?.lootLabel?.clear?.();
       rig.distTarget = 22; rig.focus.copy(player.pos); rig.snap();
@@ -418,18 +424,8 @@ export async function boot() {
     };
     if (G.ui?.transition) G.ui.transition(go); else go();
   };
-  G.openBurrowMenu = () => {
-    const wps = [...(G.state.dungeon.waypoints || [1])].sort((a, b) => a - b);
-    if (!G.ui?.dialogue || wps.length <= 1) return G.enterDungeon(wps[wps.length - 1] || 1);
-    G.ui.dialogue({ speaker: 'The Burrow', lines: ['A warm breeze drifts up from the burrow… Shadow wiggles with excitement!'], choices: wps.map(f => ({ text: `Floor ${f}` })).concat([{ text: 'Not yet' }]) })
-      .then(i => { if (i != null && i < wps.length) G.enterDungeon(wps[i]); });
-  };
-  G.openWaypoints = () => {
-    const wps = [...(G.state.dungeon.waypoints || [1])].sort((a, b) => a - b);
-    if (!G.ui?.dialogue) return;
-    G.ui.dialogue({ speaker: 'Waypoint', lines: ['The paw rune hums softly. Where to?'], choices: wps.map(f => ({ text: `Floor ${f}` })).concat([{ text: 'Blossom Hollow' }, { text: 'Stay' }]) })
-      .then(i => { if (i == null) return; if (i < wps.length) G.enterDungeon(wps[i]); else if (i === wps.length) G.returnToVillage(); });
-  };
+  // the Burrow door: pick one of its four dens (world/burrowDoor.js G.burrow, the panel ui/dens.js; docs/ZONES.md §4.1)
+  G.openBurrowMenu = (opts = {}) => G.burrow?.open(opts);
   function onPlayerDeath() {
     if (G.playerDead) return;
     G.playerDead = true; skills.clearAll();
@@ -454,6 +450,8 @@ export async function boot() {
   installGateDebug(G, P); // (?villagesaved=1 | =bamboo,…; G.zoneDebug.saveVillage(zone): the zone dungeon gates, regions/dungeonGate.js)
   installTierDebug(G, P, { recordDungeonClear, TIER_DUNGEONS }); // (?run=bambooDepths:5:swarming,teeming; G.tierDebug: the tier runs, dungeon/tierRun.js)
   installLanternApi(G); installBurrowLantern(G, village, { x: L.dungeon.x + 3.1, z: L.dungeon.z + 2.2, yaw: 0 }); // (the Spirit Lanterns: regions/spiritLantern.js, the panel ui/lantern.js)
+  installBurrowDoor(G, village); // (the Burrow door's four dens: G.burrow, the picker ui/dens.js, the debug rows — world/burrowDoor.js, docs/ZONES.md §4.1)
+  installTownPortal(G, village); // (the Town Portal: T / the Game page / touch on a dungeon floor, its return portal by the plaza, the floor snapshot — dungeon/townPortal.js, docs/ZONES.md §4.2)
   G.ui?.setQuestProvider?.(() => G.story.uiList());
   G.questTarget = () => (G.titleActive || G.playerDead ? null : G.tutorials?.target() || (G.mode === 'interior' ? null : G.story.target())); // (a guide's pointer first; indoors only a guide points)
   installServices(G);
@@ -472,6 +470,7 @@ export async function boot() {
     G.tutorials = new Tutorials(G, { enabled: !off });
   }
   installShadowLead(G); // Shadow leads the way to the objective: the pointer follows a quest he was asked to follow, the tracker's tap (actors/shadowLead.js, ROADMAP R-17)
+  installMapPin(G); // the map pin: a person or place picked on the big map is what the pointer, the minimap and Shadow point at (world/mapPin.js, ROADMAP UX-1)
   installCozyGuide(G); // the cozy path's tutorial moments: Rosie's burrow1 question, the Board guide offered to a fighter, the Peaceful paths tip (cozy/cozyGuide.js, docs/COZY.md §11)
   installDebugAccess(G); // debug tools: off by default; the password prompt, F10 / ` / the bug / Select+Start, the lazy menu (src/debug, docs/DEBUG.md)
   const vMap = G.villageMinimap = new VillageMinimap(G);
@@ -667,7 +666,7 @@ export async function boot() {
     if (Actions.pressed('potionR')) usePotion('rejuv');
     if (Actions.pressed('meal')) G.life?.kitchen?.quickEat(); // the quick meal (docs/HOMESTEAD.md §4)
     if (Actions.pressed('swap')) { G.actions.swapWeapons(); player.setWeapon(G.derived.weaponType || 'sword'); G.audio?.play?.('ui_equip'); G.vfx.sparkle(player.pos.clone().setY(0.8), { n: 6 }); }
-    if (Actions.pressed('home') && G.mode === 'dungeon') G.returnToVillage();
+    if (Actions.pressed('home') && G.mode === 'dungeon' && !G.townPortal?.press?.()) G.returnToVillage(); // (T: a Town Portal on a dungeon floor; home at once from a zone)
     const it = pad ? padIt : nearestInteract();
     G.ui?.setInteract?.(it ? it.label : null, dev === 'touch' && it ? { key: null } : pad && it ? { act: aCtx ? 'interact' : 'interactAlt' } : undefined); // (the pad's prompt: A, or the D-pad when A would swing; touch: no key, the prompt is tapped: ui/touch.js)
     if (it && Actions.pressed('interact') && performance.now() > (G.interactCooldown || 0)) it.onInteract();
@@ -887,6 +886,7 @@ export async function boot() {
     player.update(dt);
     G.life?.update(dt);
     G.tutorials?.update(rdt);
+    G.mapPin?.tick(rdt); // (the map pin: you got there)
     shadow.update(dt);
     skills.update(dt, skillInput);
     G.combat.update(dt);
@@ -917,6 +917,7 @@ export async function boot() {
       if (Math.hypot(player.pos.x - L.waterfall.x, player.pos.z - L.waterfall.z) < 70) waterfall.update(dt, engine.time, day); // (mist + spray only nearby)
       villageAmbience(dt);
       G.burrowLantern?.update(dt, engine.time, vVfx, player.pos); // (the Deep Burrow's Spirit Lantern by the Burrow door)
+      G.townPortal?.update(dt, engine.time, vVfx); // (the Town Portal's other end by the plaza, while one is open)
       vLoot.update(dt);
       updateMarkers(rdt);
     } else if (G.mode === 'interior') {

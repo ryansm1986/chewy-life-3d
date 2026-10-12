@@ -113,6 +113,13 @@ body.touch-active .kbm-only, body.touch-active .pad-only { display: none !import
   border: 2px solid var(--ink); display: none; place-items: center; animation: pulse 1.2s ease-in-out infinite; }
 .tc-dot.on { display: grid; }
 .tc-bag.gulp { animation: gulp .55s var(--pop); }
+/* the Town Portal (a dungeon floor): a moon gate on a sky-tinted key; dimmed mid boss fight, a soft glow while it opens */
+.tc-portal { background: linear-gradient(#fff, #e6f4ff); }
+.tc-portal[hidden] { display: none; }
+.tc-portal.locked > .gl { filter: saturate(.3) brightness(.9); opacity: .7; }
+.tc-portal.casting { box-shadow: 0 calc(3px * var(--u)) 0 var(--ink), 0 0 0 calc(4px * var(--u)) rgba(159, 216, 255, .55), 0 6px 12px rgba(50, 22, 34, .22); }
+.tc-portal.casting > .gl { animation: tcPortal .9s ease-in-out infinite; }
+@keyframes tcPortal { 50% { transform: scale(1.1); } }
 .tc-hero { border-radius: 50%; }
 .tc-hero .tc-hface { position: absolute; inset: 3px; border-radius: 50%; overflow: hidden; border: calc(3px * var(--u)) solid var(--ink); background: radial-gradient(circle at 50% 30%, #fff 0, #e4fbf6 55%, #b8ece2 100%); box-shadow: 0 3px 0 rgba(74, 44, 42, .35); }
 .tc-hero .tc-hface .p3d, .tc-hero .tc-hface .portrait { position: absolute; left: -8%; top: 4%; width: 116% !important; height: 116% !important; }

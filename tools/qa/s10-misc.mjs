@@ -100,7 +100,7 @@ try {
     if (G.derived.weaponType !== 'sword') G.actions.swapWeapons();
     G.skills.cds = {}; G.player.anim.stop();
     G.input.keys.add('1'); await new Promise(r => setTimeout(r, 300));
-    G.enterDungeon(G.dungeon.floor + 1);
+    G.enterDungeon(G.dungeon.nextRun()); // (the stairs' own way: the den's next floor)
     await new Promise(r => setTimeout(r, 1500)); G.input.keys.delete('1'); // still holding when the iris swaps floors (~760 ms)
     return true;
   });

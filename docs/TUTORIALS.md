@@ -220,6 +220,9 @@ Status: **built** (2026-10-03; the cozy path's three guides 2026-10-09). The gui
     5. A crew of two (skippable). 6. Wages in the morning banner (Got it).
   - **Peaceful paths** (a tip, not a guide: `cozy/cozyGuide.js`): on the first visit to a saved zone, `G.hint('peaceful')`
     and the minimap spotlit for 3 s with a callout on the violet rings (the spotlight only while guides run).
+  - **The Town Portal** (a tip, not a guide: `dungeon/townPortal.js`, ROADMAP Z-H2): 9 s into a dungeon floor, once,
+    `G.hint('portal')` in the device's words: "Press T for a Town Portal home", the pad's "pick Town Portal" in the
+    menu, touch's "Tap the portal button by the map".
   - On a phone with a panel up the speech card steps aside (as before); the objective card sits in the panel's title
     band, or along the top with the panel moved down (R-14: "A phone with a panel up" above; CZ-11's `.tut.low` moved it
     only when the spotlit element sat under it, and the Board's tabs stayed covered).

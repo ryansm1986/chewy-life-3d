@@ -107,6 +107,7 @@ export class TouchControls {
       <div class="tc-belt"></div>
       <div class="tc-top">
         <div class="tc-b tc-hero" hidden><div class="tc-hface"></div><svg class="tc-hcd" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17.5"/></svg><span class="tc-hlv"></span><span class="tc-hsw">${glyph('swap')}</span></div>
+        <div class="tc-b tc-sq tc-portal" hidden title="Town Portal: home and back">${glyph('portal')}</div>
         <div class="tc-b tc-sq tc-bag">${glyph('bag')}</div>
         <div class="tc-b tc-sq tc-menu">${glyph('gear')}<span class="tc-dot"></span></div>
       </div>
@@ -124,7 +125,7 @@ export class TouchControls {
     this.$ = {
       stick: q('.tc-stick'), base: q('.tc-base'), knob: q('.tc-knob'), cluster: q('.tc-cluster'),
       slots: [...this.root.querySelectorAll('.tc-slot')], roll: q('.tc-roll'), swap: q('.tc-swap'), belt: q('.tc-belt'),
-      hero: q('.tc-hero'), hface: q('.tc-hface'), hcd: q('.tc-hcd circle'), hlv: q('.tc-hlv'), bag: q('.tc-bag'), menu: q('.tc-menu'), dot: q('.tc-dot'),
+      hero: q('.tc-hero'), hface: q('.tc-hface'), hcd: q('.tc-hcd circle'), hlv: q('.tc-hlv'), bag: q('.tc-bag'), menu: q('.tc-menu'), dot: q('.tc-dot'), portal: q('.tc-portal'),
       pings: q('.tc-pings'), safe: q('.tc-safe'), edit: q('.tc-edit'), eb: Object.fromEntries([...this.root.querySelectorAll('.tc-eb')].map(e => [e.dataset.e, e])),
     };
     for (const [k, e] of Object.entries(this.$.eb)) this.bind(e, { up: (p, c) => { if (!c && p.moved < 40) this.editAct(k); } });
@@ -133,6 +134,7 @@ export class TouchControls {
     this.bind(this.$.swap, { down: () => Touch.pulse('swap') });
     this.bind(this.$.hero, this.heroH());
     this.bind(this.$.bag, { up: (p, c) => { if (!c && p.moved < 40) this.openPanel('inventory', { view: 'bag' }); } });
+    this.bind(this.$.portal, { up: (p, c) => { if (!c && p.moved < 40) this.G?.townPortal?.press?.(); } }); // (a dungeon floor's Town Portal: dungeon/townPortal.js)
     this.bind(this.$.menu, { up: (p, c) => { if (!c && p.moved < 40) { this.ui._user = true; try { this.ui.back(); } finally { this.ui._user = false; } } } });
   }
   openPanel(n, o) { const ui = this.ui; ui._user = true; try { ui.toggle(n, o); } finally { ui._user = false; } }
@@ -223,7 +225,7 @@ export class TouchControls {
     // the top row: left of the minimap
     const mm = this.ui.hud.root.querySelector('.mm-wrap')?.getBoundingClientRect();
     const tw = LAY.top * u, tg = LAY.gap * u, right = mm && mm.width ? mm.left - 10 : W - sf.r - 150, top = Math.max(sf.t, mm?.top || 0) + 8 + tw / 2;
-    [$.menu, $.bag, $.hero].forEach((e, i) => { e.style.left = (right - tw / 2 - i * (tw + tg)).toFixed(1) + 'px'; e.style.top = top.toFixed(1) + 'px'; });
+    [$.menu, $.bag, ...($.portal.hidden ? [] : [$.portal]), $.hero].forEach((e, i) => { e.style.left = (right - tw / 2 - i * (tw + tg)).toFixed(1) + 'px'; e.style.top = top.toFixed(1) + 'px'; });
     // the stick's resting place
     this.rest = { x: mir ? W - sf.r - STICK.rest[0] * u : sf.l + STICK.rest[0] * u, y: H - sf.b - STICK.rest[1] * u };
     $.stick.style.setProperty('--r', (STICK.r * u).toFixed(1) + 'px');
@@ -232,7 +234,7 @@ export class TouchControls {
     this.layoutBelt();
     // what the quest arrow keeps out of (ui/questArrow.js avoid): the top-left card, the top-right column, the cluster
     const hs = this.ui.scale || 1, bb = els => els.reduce((b, e) => { const r = e.getBoundingClientRect(); return r.width ? [Math.min(b[0], r.left), Math.min(b[1], r.top), Math.max(b[2], r.right), Math.max(b[3], r.bottom)] : b; }, [1e9, 1e9, -1e9, -1e9]);
-    const cl = bb([...$.slots, $.roll, $.swap]), tr = bb([this.ui.hud.$.tr, $.menu, $.bag, $.hero]);
+    const cl = bb([...$.slots, $.roll, $.swap]), tr = bb([this.ui.hud.$.tr, $.menu, $.bag, $.portal, $.hero]);
     this.boxes = [[0, 0, 300 * hs, 250 * hs], [tr[0] - 8, 0, W, tr[3] + 8], [cl[0] - 10, cl[1] - 10, cl[2] + 10, H]];
     // the free band along the top, between the top-left card and hero / bag / menu: a guide's dock sits in it on a phone (mobile.css)
     const tl = this.ui.hud.root.querySelector('.hud-tl')?.getBoundingClientRect(), bl = Math.min(tl?.width ? tl.right : 1e9, 300 * hs) + 8;
@@ -289,6 +291,10 @@ export class TouchControls {
       if (f !== c.hcd) { c.hcd = f; $.hcd.style.strokeDashoffset = String((1 - f) * 110); setCls($.hero, 'cooling', f > 0); }
       const lv = G.state.heroes?.[nx]?.player?.lvl || 1; if (lv !== c.hlv) { c.hlv = lv; $.hlv.textContent = String(lv); }
     }
+    // the Town Portal on a dungeon floor (left of the bag): dimmed while it can't be cast (a boss fight), glowing while it opens
+    const TP = G.townPortal, pv = !!TP && G.mode === 'dungeon' && !!G.dungeon && !G.dungeon.isRegion;
+    if (pv !== c.pv) { c.pv = pv; $.portal.hidden = !pv; this.layoutT = 0; }
+    if (pv) { const lk = !!TP.can(), cs = TP.casting; if (lk !== c.plk) { c.plk = lk; setCls($.portal, 'locked', lk); } if (cs !== c.pcs) { c.pcs = cs; setCls($.portal, 'casting', cs); } }
     // the menu's dot: skill and stat points to spend
     const p = G.state.player, pts = (p.skillPts || 0) + (p.statPts || 0);
     if (pts !== c.pts) { c.pts = pts; $.dot.textContent = pts > 0 ? String(pts) : ''; setCls($.dot, 'on', pts > 0); }

@@ -98,6 +98,8 @@ export function buildModel(id, { level = 1, seed = 0, style = null } = {}) {
     door: tpl.door.clone(), footprint: [...tpl.footprint], height: tpl.height,
     glow: inst.glow, smoke: tpl.smoke.map(p => p.clone()), tris: tpl.tris,
     update: parts.length ? (dt, t) => animate(parts, t) : null,
+    // (a 'lid' part, the Stash Chest's: pops open and settles shut with a bounce on its next frames, buildings/stashChest.js)
+    kick: parts.some(p => p.a.kind === 'lid') ? () => { for (const p of parts) if (p.a.kind === 'lid') p.node.userData.kick = true; } : null,
   };
   inst.group.userData.building = model;
   return model;
@@ -111,7 +113,17 @@ function animate(parts, t) {
     else if (a.kind === 'spin') node.quaternion.setFromAxisAngle(a.axis, ph);
     else if (a.kind === 'bob') node.position.set(a.pivot.x, a.pivot.y + Math.sin(ph) * a.amp, a.pivot.z);
     else if (a.kind === 'pulse') { const s = 1 + Math.sin(ph) * a.amp; node.scale.set(1 / Math.sqrt(s), s, 1 / Math.sqrt(s)); }
+    else if (a.kind === 'lid') { const u = node.userData; if (u.kick) { u.kick = false; u.t0 = t; } node.quaternion.setFromAxisAngle(a.axis, -a.amp * lidCurve(u.t0 == null ? 9 : t - u.t0)); }
   }
+}
+/** a lid's opening (0 shut … 1 open) k seconds after a kick: it pops up, rests a moment, then falls shut with a bounce */
+export function lidCurve(k) {
+  if (!(k > 0) || k >= 1.2) return 0;
+  if (k < 0.16) return Math.sin(k / 0.16 * Math.PI / 2) * 1.06;
+  if (k < 0.52) return 1 + 0.06 * Math.cos((k - 0.16) / 0.36 * Math.PI);
+  const c = (k - 0.52) / 0.68;
+  if (c < 0.5) return 0.94 * (1 - (c / 0.5) ** 2);
+  return 0.13 * Math.sin((c - 0.5) / 0.5 * Math.PI);
 }
 
 // Glow materials are shared between all buildings, so this is idempotent per frame.

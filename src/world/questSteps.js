@@ -6,8 +6,11 @@
 //   boss { id?, dungeon?, zone? }                         that boss (and, if given, where it fell: boss:dead)
 //   find { item, n?, dungeon?, zone?, floor? }            quest items picked up ('quest:find' { item, n, zone, dungeon, floor })
 //   rescue { npc, dungeon?, zone?, floor? }               a captive freed ('villager:rescued' { npc, zone, dungeon, floor })
-//   dungeonFloor { dungeon, n }                           reach floor n (the Burrow: state.dungeon.deepest; a zone
+//   dungeonFloor { dungeon, n }                           reach floor n (a Burrow den: its record, rpg/dens.js; a zone
 //                                                         dungeon: zones[zone].dungeon.bestFloor)
+//   floor { den, n }                                      the Burrow's own step (story.js): reach floor n of that den.
+//                                                         An old step without a den is an old Burrow floor number, read
+//                                                         as the den that holds it now (defs.js legacyFloor)
 //   tier { dungeon, n }                                   clear that dungeon (a zone dungeon or the Deep Burrow) at tier n
 //                                                         or higher
 //   villageSaved { zone }                                 the zone's village is saved
@@ -16,8 +19,9 @@
 //                                                         The pointer shows the spot in its world, the way there elsewhere
 //                                                         (ROADMAP R-17: "Follow Shadow to …" steps, lead: true)
 // The filters are optional: the old steps (an unfiltered kill, boss { id }) count exactly as before.
-import { DUNGEONS } from '../dungeon/defs.js';
+import { DUNGEONS, BURROW, DEN_OF_BOSS, legacyFloor } from '../dungeon/defs.js';
 import { zoneOf, tierCleared, villageSaved } from '../rpg/zones.js';
+import { denRecord, legacyDepth } from '../rpg/dens.js';
 
 export const ZONE_STEP_TYPES = ['find', 'rescue', 'dungeonFloor', 'tier', 'villageSaved'];
 /** how near (m) the hero must come to a reach step's spot */
@@ -37,12 +41,20 @@ export function stepGain(s, kind, e = {}) {
   if (kind === 'rescue') return s.type === 'rescue' && (!s.npc || s.npc === e.npc) && matchesWhere(s, e) ? 'set' : 0;
   return 0;
 }
-/** the deepest floor reached in a dungeon */
+/** the deepest floor reached in a dungeon (a den: its record; 'burrow', the Burrow as a whole: the old floor its dens
+ *  stand for, rpg/dens.js legacyDepth) */
 export function bestFloorOf(state, id) {
-  const def = DUNGEONS[id];
-  if (!def || def.kind === 'burrow') return state.dungeon?.deepest || 0;
+  if (id === BURROW) return legacyDepth(state);
+  const def = DUNGEONS[id]; if (!def) return 0;
+  if (def.kind === 'burrow') return denRecord(state, id).bestFloor;
   return def.zone ? zoneOf(state, def.zone).dungeon.bestFloor : 0;
 }
+/** a floor step's den and floor: { den, n } as given, or an old Burrow floor number's den and floor there */
+export function floorStepAt(s) { return s?.den ? { den: s.den, n: s.n || 1 } : (({ id, floor }) => ({ den: id, n: floor }))(legacyFloor(s?.n)); }
+/** the Burrow's floor step: has that den's floor been reached? */
+export const floorStepDone = (s, state) => { const a = floorStepAt(s); return bestFloorOf(state, a.den) >= a.n; };
+/** …and the tracker's "have" for it (of n) */
+export const floorStepHave = (s, state) => { const a = floorStepAt(s); return Math.min(a.n, bestFloorOf(state, a.den)); };
 /** the state-derived steps: done? (null: not one of them) */
 export function zoneStepDone(s, state) {
   if (s.type === 'dungeonFloor') return bestFloorOf(state, s.dungeon) >= (s.n || 1);
@@ -57,17 +69,18 @@ export function zoneStepHave(s, state) {
   return null;
 }
 /** Where a step's objective is: { dungeon?, zone?, floor?, boss?, village? } — what the quest pointer heads for (the zone's
- *  gate, the stairs to a floor, the boss…) — or null when it isn't somewhere you travel to. Unfiltered kills, floors and
- *  bosses and the Mochi Jelly are the Burrow's, as before. */
+ *  gate, the stairs to a floor, the boss…) — or null when it isn't somewhere you travel to. Unfiltered kills and the
+ *  Mochi Jelly are the Burrow's as a whole (dungeon: 'burrow': any den); a floor step is its den's floor; a den boss is
+ *  in its den's last floor (the others, unfiltered, the Burrow as a whole, as before). */
 export function destOf(s) {
   if (!s) return null;
   const inD = (id, extra = {}) => { const d = DUNGEONS[id]; return d ? { dungeon: d.id, zone: d.zone || null, ...extra } : null; };
   const last = id => (Number.isFinite(DUNGEONS[id]?.floors) ? DUNGEONS[id].floors : null);
   switch (s.type) {
-    case 'kill': return s.dungeon ? inD(s.dungeon, { floor: s.floor ?? null }) : s.zone ? { zone: s.zone } : { dungeon: 'burrow', zone: null };
-    case 'floor': return { dungeon: 'burrow', zone: null, floor: s.n };
-    case 'boss': return s.dungeon ? inD(s.dungeon, { floor: last(s.dungeon), boss: true }) : s.zone ? { zone: s.zone, boss: true } : { dungeon: 'burrow', zone: null, boss: true };
-    case 'collect': return s.mat === 'mochi' ? { dungeon: 'burrow', zone: null } : null;
+    case 'kill': return s.dungeon ? inD(s.dungeon, { floor: s.floor ?? null }) : s.zone ? { zone: s.zone } : { dungeon: BURROW, zone: null };
+    case 'floor': { const a = floorStepAt(s); return { dungeon: a.den, zone: null, floor: a.n }; }
+    case 'boss': return s.dungeon ? inD(s.dungeon, { floor: last(s.dungeon), boss: true }) : s.zone ? { zone: s.zone, boss: true } : DEN_OF_BOSS[s.id] ? inD(DEN_OF_BOSS[s.id], { floor: last(DEN_OF_BOSS[s.id]), boss: true }) : { dungeon: BURROW, zone: null, boss: true };
+    case 'collect': return s.mat === 'mochi' ? { dungeon: BURROW, zone: null } : null;
     case 'find': case 'rescue': return s.dungeon ? inD(s.dungeon, { floor: s.floor ?? null, mark: true }) : s.zone ? { zone: s.zone, mark: true } : null;
     case 'dungeonFloor': return inD(s.dungeon, { floor: s.n || 1 });
     case 'tier': return inD(s.dungeon, { floor: last(s.dungeon), boss: true });

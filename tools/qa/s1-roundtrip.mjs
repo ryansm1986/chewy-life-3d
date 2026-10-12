@@ -90,14 +90,15 @@ try {
   R.check('window event listeners do not multiply', wl1.n <= wl0.n, `${wl0.n} -> ${wl1.n} ${JSON.stringify(wl1.by)}`);
   R.check('controls unlocked after every return', hist.every(h => !h.locked), hist.map(h => h.locked + ':' + h.st).join(' '));
 
-  // stairs chain: floor 1 -> 2 -> 3 via G.enterDungeon while already in the dungeon (the "burrow deeper" path)
-  await page.evaluate(() => window.G.enterDungeon(1));
+  // stairs chain while already in the dungeon (the "burrow deeper" path; the Burrow's dens are two floors each, ROADMAP
+  // Z-H1): the Mossy Burrow floor 1 → its stairs → floor 2 → straight back into floor 1 → its stairs → floor 2 again
+  await page.evaluate(() => window.G.enterDungeon({ id: 'mossyBurrow', floor: 1 }));
   await waitMode(page, 'dungeon');
   const c0 = await page.evaluate(() => ({ geo: window.G.engine.renderer.info.memory.geometries, tex: window.G.engine.renderer.info.memory.textures }));
   const chain = [];
-  for (let f = 2; f <= 4; f++) {
-    await page.evaluate(ff => { const G = window.G; const it = G.world.interactables.find(x => /Burrow deeper/.test(x.label)); it ? it.onInteract() : G.enterDungeon(ff); }, f);
-    await page.waitForFunction(ff => window.G.dungeon?.floor === ff && !window.G.ui.iris.active, f, { timeout: 20000 });
+  for (const [id, f] of [['mossyBurrow', 2], ['mossyBurrow', 1], ['mossyBurrow', 2]]) {
+    await page.evaluate(({ id, f }) => { const G = window.G; const it = f === 2 && G.world.interactables.find(x => /Burrow deeper/.test(x.label)); it ? it.onInteract() : G.enterDungeon({ id, floor: f }); }, { id, f });
+    await page.waitForFunction(({ id, f }) => window.G.dungeon?.def?.id === id && window.G.dungeon.floor === f && !window.G.ui.iris.active, { id, f }, { timeout: 20000 });
     await sleep(page, 500);
     chain.push(await page.evaluate(() => ({ geo: window.G.engine.renderer.info.memory.geometries, tex: window.G.engine.renderer.info.memory.textures, sources: window.G.world.lightPool.sources.size, children: window.G.world.scene.children.length })));
   }

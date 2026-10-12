@@ -46,7 +46,7 @@ export const ACTIONS = {
   nextTarget: { label: 'Next target (Auto targeting)', group: 'play', kbm: [], pad: ['R3'] }, // (CT-8, docs/CONTROLS.md §13.4: combat/padAim.js)
   lead: { label: 'Shadow leads the way (out of a fight)', kbmLabel: 'Shadow leads the way', group: 'play', kbm: ['l'], pad: ['R3'] }, // (ROADMAP R-17, actors/shadowLead.js: R3 with no foe about; in a fight R3 is Next target)
   lootLabels: { label: 'Loot labels (hold)', group: 'play', kbm: ['z'], pad: ['DDown'] },
-  home: { label: 'Go home (from a dungeon)', group: 'play', kbm: ['t'], pad: [] },
+  home: { label: 'Town Portal (a dungeon) · go home (a zone)', group: 'play', kbm: ['t'], pad: [] }, // (dungeon/townPortal.js; the pad: the Game page's Town Portal)
   reel: { label: 'Reel in (fishing)', group: 'play', kbm: [], pad: ['RT'], lock: 'kbm', kbmLabel: 'Reel in (fishing: F or LMB)' },
   inventory: { label: 'Bag', group: 'menus', kbm: ['i'], pad: [] },
   pantry: { label: 'Pantry', group: 'menus', kbm: ['p'], pad: [] },
@@ -78,7 +78,7 @@ const PAD_NAMES = {
 // panels (and Home) the pad reaches through the game menu: their text names the Menu button
 const VIA_MENU = new Set(['inventory', 'pantry', 'character', 'skills', 'quests', 'map', 'home']);
 // what text calls an action's on-screen control while touch plays (ui/touch.js); the panels are in the menu
-const TOUCH_NAMES = { move: 'the stick', aim: 'a drag off a skill', attack: 'the attack button', skillAlt: 'the skill button', skill1: 'skill button 1', skill2: 'skill button 2', skill3: 'skill button 3', skill4: 'skill button 4', roll: 'the roll button', sprint: 'the stick out to its edge', interact: 'the attack button', potionHeart: 'the heart potion', potionZoom: 'the zoom potion', potionR: 'the rejuv potion', meal: 'the meal button', swap: 'the swap badge', hero: 'the hero button', menu: 'the menu button', inventory: 'the bag button', build: 'Build in the menu', pantry: 'Pantry in the bag', character: 'Character in the menu', skills: 'Skills in the menu', quests: 'Journal in the menu', map: 'the minimap', home: 'Home in the menu' };
+const TOUCH_NAMES = { move: 'the stick', aim: 'a drag off a skill', attack: 'the attack button', skillAlt: 'the skill button', skill1: 'skill button 1', skill2: 'skill button 2', skill3: 'skill button 3', skill4: 'skill button 4', roll: 'the roll button', sprint: 'the stick out to its edge', interact: 'the attack button', potionHeart: 'the heart potion', potionZoom: 'the zoom potion', potionR: 'the rejuv potion', meal: 'the meal button', swap: 'the swap badge', hero: 'the hero button', menu: 'the menu button', inventory: 'the bag button', build: 'Build in the menu', pantry: 'Pantry in the bag', character: 'Character in the menu', skills: 'Skills in the menu', quests: 'Journal in the menu', map: 'the minimap', home: 'the portal button' };
 // key names as old text writes them → actions (resolve(), ui/padGlyphs.js keyHint)
 const TEXT_KEYS = { wasd: 'move', 'w a s d': 'move', click: 'attack', lmb: 'attack', 'left-click': 'attack', 'right-click': 'skillAlt', rmb: 'skillAlt', esc: 'menu', escape: 'menu' };
 export const keyName = t => KEY_NAMES[t] || (t.includes('+') ? t.split('+').map(keyName).join('+') : t.length === 1 ? t.toUpperCase() : t.replace(/^key/, '').replace(/^digit/, '').replace(/^numpad/, 'Num ').toUpperCase());

@@ -84,12 +84,28 @@ Every action is one tap and says what it did in a toast. The ones that travel cl
 - *Save every village*: each zone village's siege is over and its buildings reopen (`G.zoneDebug.saveVillage`). If you're
   in a zone, leave and come back to see it.
 - *Clear every dungeon*: the four zone dungeons' first clears (each opens the next zone and its Lantern's T1) and the
-  Burrow down to floor 20 with Tamamo (its waypoints, and the Deep Burrow's Lantern).
+  Burrow's four dens (each beaten once; the Moonlit Sanctum wakes the Deep Burrow's Lantern).
 - *Jump to chapter*: the main story (Welcome Home … Nine Tails of Moonlight, or all done): the chapters before it are
   done, it starts at its first step. *Next quest step*, *Complete the quest* (rewards and all).
 - *Play again* (joining scenes): a hero isn't joined any more (level and gear kept), so their scene and rumour play
   again. Not the hero you're playing.
 - *Reset every guide* / *Mark every guide done*.
+
+**Dens** (the Burrow's four dens: docs/ZONES.md §4.1; registered by world/burrowDoor.js)
+- *Clear the dens up to*: the Mossy Burrow … the Moonlit Sanctum: each den up to it beaten once, so the next opens (the
+  Moonlit Sanctum also wakes the Deep Burrow's Lantern).
+- *Reset the dens* (asks twice): only the Mossy Burrow open, nothing cleared; the quests stay as they are.
+- *Migrate an old save*: floor 3 / 5 / 6 / 9 / 12 / 15 / 20 / 21 / 25: resets the dens, sets the endless Burrow's old deepest floor
+  and runs the migration (`rpg/dens.js migrateBurrowDens`); the toast lists each den's state.
+- *The door's picker*: the Burrow door's den picker (in Blossom Hollow).
+- A note maps the old floors to the dens (a den is cleared once the save got past its boss floor, 6 / 11 / 16 / 21, or its
+  quest is done).
+
+**The Town Portal** (in the Dens tab; docs/ZONES.md §4.2; registered by dungeon/townPortal.js)
+- *Cast it now*: on a dungeon floor, through at once (no cast time; still refused mid boss fight, with the reason).
+- *Close the portal*: the open portal closes (its toast says "closed by debug").
+- *The snapshot*: what a portal would save here (or the open one): the place, monsters standing and beaten, chests open,
+  finds on the ground, its size in KB.
 
 **Tiers**
 - *Open T1–T5 everywhere*: every Spirit Lantern (the four zone dungeons and the Deep Burrow).
@@ -100,7 +116,8 @@ Every action is one tap and says what it did in a toast. The ones that travel cl
 **Travel** (closes the menu; waits for the arrival)
 - Blossom Hollow; *Chewy's Cottage* (inside).
 - Each zone: its trail, its village, its dungeon gate, and its wild areas once the cozy path adds them (CZ-3).
-- The Burrow B1–B20; each zone dungeon's floor 1, floor 2 or the boss arena; the Deep Burrow's floors (tier 1).
+- Each of the Burrow's four dens, floor 1 or 2 (a sealed den too); each zone dungeon's floor 1, floor 2 or the boss
+  arena; the Deep Burrow's floors (tier 1).
 
 **Village**
 - *Coins* +1k / +100k, *Every material* +100 / +999.
@@ -110,11 +127,16 @@ Every action is one tap and says what it did in a toast. The ones that travel cl
   open at once, even on day 1.
 - *All furniture and decor*: two of every piece, one of every wallpaper and floor, in storage.
 - *Pantry*: everything (seeds, crops, fish and forage ×20, meals ×10), only seeds, or only meals.
+- *The stash (R-18, R-19, docs/HOUSING.md §10)*: *Unlock all stash tabs* (each bought at its price, the price given
+  first), *Place a stash by me* (a free Stash Chest on the nearest open ground, facing you), *Fill the stash* (10, 60
+  or 200 rolled items, tab 1 first; `ui/stash.js`).
+- *The maps (UX-1, docs/MAP.md)*: *Pin Rosie*, *Pin the farthest place* (the minimap's edge pin), *Clear the pin*,
+  *Repaint the village map* (its terrain and composite timings), *Map timings* (the HUD disc's draws).
 
 **Items**
 - *Gear set*: a level and a rarity (magic, rare, unique, set): a full set equipped on the active hero, the old gear to
   the bag.
-- *Potions* (a full belt), *Gems* (three perfect ones of each kind).
+- *Potions* (a full belt), *Treats* (three gourmet ones of each kind; ROADMAP R-22: the player's word for gems).
 - *Uniques*: any of them to the bag, in three rows: the endgame and pinnacle ones, the zone bosses', and the rest.
 - *Identify all* has nothing to do: Pawhaven has no unidentified items.
 

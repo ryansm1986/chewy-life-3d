@@ -357,7 +357,7 @@ export class VillageSim {
       if (type !== 'bridge' && (t === T.WATER || t === T.SAND)) return { ok: false, why: 'Too wet!' };
       if (t === T.ROCK) return { ok: false, why: 'Too rocky' };
       if (t === T.PATH && BUILDINGS[type].cat !== 'decor' && BUILDINGS[type].cat !== 'service') return { ok: false, why: 'Keep the paths clear' };
-      if (t === T.PLAZA && !['fountain', 'bench', 'flowerBed', 'sakuraPlanter', 'stoneLantern', 'streetLamp', 'bulletinBoard', 'koiStatue', 'chewyStatue', 'lanternString'].includes(type)) return { ok: false, why: 'The plaza is for decorations' };
+      if (t === T.PLAZA && !['fountain', 'bench', 'flowerBed', 'sakuraPlanter', 'stoneLantern', 'streetLamp', 'bulletinBoard', 'koiStatue', 'chewyStatue', 'lanternString', 'stashChest'].includes(type)) return { ok: false, why: 'The plaza is for decorations' };
       const h = tr.heightAt(x + 0.5, z + 0.5); hMin = Math.min(hMin, h); hMax = Math.max(hMax, h);
     }
     if (type !== 'bridge' && hMax - hMin > 0.7) return { ok: false, why: 'Ground is too bumpy' };
@@ -528,6 +528,7 @@ export class VillageSim {
       case 'fishingHut': return mk("Kero's Fishing Hut", () => G.openFishHut?.()); // (rods, and fish sell best here: docs/HOMESTEAD.md)
       case 'lumber': return mk('Use the workbench 🔨', () => G.openWorkbench?.('lumber')); // (furniture crafting: docs/HOUSING.md §3)
       case 'guild': return mk("Enter the Adventurers' Guild", () => G.cozy?.guild?.open?.(), 1.5); // (Old Hachi's lodge: the hires, the Board, the Sightings — cozy/guildRun.js, docs/COZY.md §5)
+      case 'stashChest': return mk('Open the stash', () => G.openStash?.(b), 1.25); // (any Stash Chest opens the one shared stash: ROADMAP R-18, world/services.js)
       default: return G.housing?.doorInter?.(b, door) || null; // (a named villager's home: visit / knock — home/housing.js)
     }
   }

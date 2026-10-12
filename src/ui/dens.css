@@ -1,0 +1,33 @@
+/* The Burrow door's den picker (ui/dens.js; docs/ZONES.md §4.1). It wears the Travel Map's look (.tv-* in panels.css):
+   these are only its own touches. Phones (.m-phone): the art at 0.76 beside the card, which scrolls, the way in always
+   in sight (as the Travel Map). */
+.p-burrow { width: 920px; }
+.dn-map { background: #c49a70; }
+.dn-hill { position: absolute; left: 10px; top: 8px; pointer-events: none; }
+.dn-hill b { display: flex; align-items: center; gap: 4px; font: 700 13px var(--font); color: #fff; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; }
+.dn-hill .gl { width: 22px; height: 22px; -webkit-text-stroke: 0; }
+/* a den's pin: its colour in the ring; the label under it reads on the dark earth */
+.dn-pin .tv-pin-n { font-size: 14px; }
+.dn-pin.locked .tv-pin-ic { background: radial-gradient(circle at 40% 30%, #fff, #c8c0d0); }
+.dn-pin .dn-q { position: absolute; left: -10px; top: -10px; width: 22px; height: 22px; border-radius: 50%; background: #ffd84a; border: 3px solid var(--ink);
+  font: 700 14px/16px var(--font); color: var(--ink); text-align: center; box-shadow: 0 2px 0 rgba(0, 0, 0, .25); animation: tvHop 1.2s ease-in-out infinite; }
+/* the card */
+.dn-card .tv-rows b em.tv-beat { margin-left: 2px; }
+.dn-card .dn-yokai b, .dn-card .dn-qrow b, .dn-card .dn-deep b { font-weight: 600; font-size: 13.5px; line-height: 1.25; }
+.dn-card .dn-qrow b { color: #8a5a10; }
+.dn-card .dn-deep b { color: #6a58c8; }
+.dn-card .tv-st.locked span { line-height: 1.25; }
+.dn-go { gap: 8px; }
+.dn-go > .gl { width: 28px; height: 28px; flex: none; }
+.dn-go.long { font-size: 17px; }
+.dn-go span { white-space: normal; text-align: center; line-height: 1.1; }
+.dn-card .dn-prow b { color: #3a8a5a; } /* (your progress in a den not yet cleared) */
+/* phones: as the Travel Map */
+.ui-root.m-phone .p-burrow .tv-map { zoom: .76; }
+.ui-root.m-phone .p-burrow .tv-side { max-height: 334px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; touch-action: pan-y; scrollbar-width: thin; scrollbar-color: rgba(74, 44, 42, .35) transparent; }
+.ui-root.m-phone .p-burrow .tv-go { position: sticky; bottom: 0; z-index: 3; flex: none; }
+.ui-root.m-phone .p-burrow .dn-go { min-height: 56px; } /* (the phone zooms panels down: the way in stays a 44 px target) */
+.ui-root.m-phone .p-burrow .dn-pin { padding: 4px 8px; } /* (and each pin, its name and icon, a little more to tap) */
+.ui-root.m-phone .p-burrow .tv-st.locked { position: sticky; bottom: 0; z-index: 3; flex: none; background: #fbf3ea; border-style: solid; } /* (a sealed den: what opens it, always in sight) */
+/* the Deck's 12 px text floor (deck.css): the pins' numbers */
+.ui-root.deck-ui .p-burrow .tv-pin-n b { font-size: 12px; }

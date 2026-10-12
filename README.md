@@ -135,9 +135,9 @@ its own (on itch, use itch's full-screen view).
 - **The Pantry** (P) holds it all. Villagers love their favourite dishes as gifts, ask for crops, fish and dishes, and the shops buy them: Rosie dishes, Kero fish, Usagi crops.
 
 **The Burrow (the dungeon)**
-- Procedurally generated floors across four biomes — Mossy Burrow, Crystal Grotto, Fox Shrine Tunnels, Oni's Kitchen — with torches, glowing mushrooms and crystals, light shafts, breakable pots, chests, shrines, waypoints and stairs down.
+- **Four dens**, picked at the Burrow door: the **Mossy Burrow**, the **Fox Shrine**, **Oni's Kitchen** and the **Moonlit Sanctum** (the Crystal Grotto, then a moonlit fox shrine). Each is two procedurally generated floors and its boss's chamber, with torches, glowing mushrooms and crystals, light shafts, breakable pots, chests, shrines and stairs down; each opens when the den before it is cleared.
 - Cute yokai monsters (mochi slimes, dust bunnies, kinoko, lantern ghosts, kasa-obake, fox-fire wisps, oni imps, tanuki bandits) in packs led by **champions** and **uniques** with D2-style modifiers (fire enchanted, frosty aura, teleporting, vampiric…).
-- Bosses every 5 floors: **King Mochi**, **Lord Karakasa**, **Oni Chef Gorobei**, **Tamamo the Nine-Tailed**.
+- A boss at the end of each den: **King Mochi**, **Lord Karakasa**, **Oni Chef Gorobei**, **Tamamo the Nine-Tailed**.
 - **Three skill trees × 7 skills** (Bone Blade, Fetch Mastery, Pack Spirit) with synergies, 60 levels, stat points.
 - **Chewy the samurai**: a black-and-gold haori and hakama, and a Bone Katana drawn from the saya at his hip for quick-draw cuts, two-handed swings, stances and battle cries; a combo ends with the katana slid home into its saya.
 - **Poe the pug ninja**, the third hero: met in the Whispering Bamboo Grove, where she "stealthily" tails you (snorting) until a sneeze gives her away. A giant bone fūma shuriken thrown out and back, and three trees — Shuriken Arts (kunai fans, buzz-saws, shuriken rain), Ninjutsu (smoke bombs, shadow clones, a fire puff ball, thunder paw, a smoke dragon) and Shadow Step (backstabs, afterimage dashes, vanish, caltrops, bullseye marks) — all 18 actives chargeable (docs/POE.md).

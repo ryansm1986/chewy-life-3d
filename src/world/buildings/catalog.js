@@ -91,6 +91,9 @@ export const BUILDINGS = {
   onsen: { name: 'Hot Spring', cat: 'service', size: [4, 4], levels: 1, cost: { coins: 400, wood: 16, stone: 24, crystal: 2 }, ...cov(['joy', 10], ['health', 10]), jobs: [2], desc: 'Steamy, cozy and good for sore paws. Bamboo walls for privacy!' },
   clinic: { name: 'Paw Clinic', cat: 'service', size: [3, 3], levels: 1, cost: { coins: 320, wood: 18, stone: 10, mochi: 3 }, ...cov(['health', 10]), jobs: [2], desc: 'Bandages, warm tea and gentle hugs for every villager.' },
   school: { name: 'Village School', cat: 'service', size: [4, 3], levels: 1, cost: { coins: 380, wood: 26, stone: 10, silk: 2 }, ...cov(['learn', 12]), jobs: [2], desc: 'Reading, writing and advanced napping. The bell tower rings at noon.' },
+  // the outdoor stash (ROADMAP R-18; docs/HOUSING.md "The stash"): build as many as you like, every one opens the same
+  // shared stash (world/village.js interactionFor, G.openStash). The model: buildings/stashChest.js
+  stashChest: { name: 'Stash Chest', jp: '宝箱', cat: 'service', size: [2, 1], levels: 1, cost: { coins: 150, wood: 10, stone: 6 }, desc: 'The pack\'s gold-banded chest under its own little roof. It opens the same stash as the one at home.' },
   // ------------------------------------------------------------------ decor
   bench: { name: 'Park Bench', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 15, wood: 3 }, ...cov(['joy', 3]), desc: 'Perfect for sitting, snacking and people-watching.' },
   flowerBed: { name: 'Flower Bed', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 12, petal: 2 }, ...cov(['joy', 3]), desc: 'A tidy burst of colour. Bees approve.' },

@@ -4,11 +4,12 @@
 //     Shadow keeps up without teleporting
 //  b) Alt+LMB attacks in place in the Burrow; Shift+LMB and Ctrl+LMB walk; Alt never reaches the browser or sticks;
 //     the loot labels on a held Z
-//  c) DungeonDef: G.enterDungeon(n) and G.enterDungeon({ id, floor }) give the same Burrow; a zone dungeon (the Bamboo
-//     Depths) runs floor 1 → stairs → floor 2 (its boss), no Burrow waypoints / deepest
+//  c) DungeonDef: G.enterDungeon(n) (an old Burrow floor number) and G.enterDungeon({ id, floor }) give the same den
+//     floor (the Burrow is four 2-floor dens: ROADMAP Z-H1); a zone dungeon (the Bamboo Depths) runs floor 1 → stairs →
+//     floor 2 (its boss), no Burrow waypoints / deepest
 //  d) seeds: a pinned ?dseed gives the old layouts; without it each entry rerolls (state.dungeon.runs)
 //  e) state.zones: an old save's state.regions migrates; the regions view still reads and writes; events carry
-//     { zone, dungeon, floor, tier }; dungeon:cleared on a Burrow boss
+//     { zone, dungeon, floor, tier }; dungeon:cleared on a den's boss (and the next den opens)
 //  f) quest steps in the game: a kill step filtered to the Burrow, a dungeonFloor step, the quest pointer to the stairs
 import { launch, boot, waitMode, sleep, makeReport, BASE } from './lib.mjs';
 
@@ -109,9 +110,14 @@ try {
   await ev(() => window.G.enterDungeon(1));
   await waitMode(page, 'dungeon'); await sleep(page, 500);
   await ev(() => { for (const m of window.G.dungeon.monsters) { m.status.stun = 9999; m.aggro = false; } });
-  // a clear spot: the start, aim 3 m to the side where no monster is
+  // a clear spot: the start, aim 3 m to the side where no monster is: the first way from the start (+x first) with 4.8 m
+  // of open, prop-free floor, away from the exit portal (each den floor lays out its own arrival: ROADMAP Z-H1)
+  await ev(() => { const G = window.G, D = G.dungeon, s = D.startPos, W = G.world; let best = null;
+    for (let k = 0; k < 16 && !best; k++) { const a = k / 16 * Math.PI * 2, ux = Math.cos(a), uz = Math.sin(a); let ok = true; for (let d = 0.6; d <= 4.8 && ok; d += 0.3) { const x = s.x + ux * d, z = s.z + uz * d; if (!W.walkable(x, z) || W.collision.solidAt(x, z, 0.5) || Math.hypot(D.exitPos.x - x, D.exitPos.z - z) < 1.8 || D.monsters.some(m => Math.hypot(m.pos.x - x, m.pos.z - z) < 2)) ok = false; } if (ok) best = [ux, uz]; }
+    window.__dir = best || [1, 0]; });
   const aimAt = (dx, dz) => ev(([dx, dz]) => {
-    const G = window.G, P = G.player, cam = G.engine.camera, p = new G.THREE.Vector3(P.pos.x + dx, P.pos.y, P.pos.z + dz).project(cam);
+    const G = window.G, P = G.player, cam = G.engine.camera, [ux, uz] = window.__dir || [1, 0]; [dx, dz] = [ux * dx - uz * dz, uz * dx + ux * dz];
+    const p = new G.THREE.Vector3(P.pos.x + dx, P.pos.y, P.pos.z + dz).project(cam);
     return { x: (p.x * 0.5 + 0.5) * innerWidth, y: (-p.y * 0.5 + 0.5) * innerHeight };
   }, [dx, dz]);
   const startAt = () => ev(() => { const G = window.G, s = G.dungeon.startPos; G.player.setPos(s.x, s.z); G.player.moveTarget = null; G.player.anim.stop(); G.skills.cds = {}; });
@@ -205,24 +211,25 @@ try {
   const killOne = (boss = false) => ev(b => { const G = window.G, D = G.dungeon, m = b ? D.boss : D.monsters.find(x => x.alive && !x.breakable && x !== D.boss); if (!m) return null; m.life = 1; G.combat.hitMonster(m, { dmgPct: 500 }); return m.id; }, boss);
   const sig = () => ev(() => { const L = window.G.dungeon.layout; return JSON.stringify([L.W, L.rooms.map(r => [r.x, r.y, r.w, r.h]), L.spawns.map(s => [s.x, s.y, s.rank, s.count])]); });
   await enter(3);
-  const b3 = await ev(async () => { const G = window.G, D = G.dungeon, { generate } = await import('/src/dungeon/gen.js'), old = generate({ floor: 3, seed: 1 + 3 * 17 }), L = D.layout; return { kind: D.kind, def: D.def.id, floor: D.floor, same: JSON.stringify(old.spawns) === JSON.stringify(L.spawns) && old.theme === L.theme && old.mlvl === L.mlvl, deepest: G.state.dungeon.deepest, stairs: !!D.stairsPos, label: D.world.interactables.find(i => /deeper/.test(i.label))?.label }; });
+  const b3 = await ev(async () => { const G = window.G, D = G.dungeon, { generate } = await import('/src/dungeon/gen.js'), { floorPlan } = await import('/src/dungeon/defs.js'), L = D.layout, again = generate({ floor: D.floor, seed: D.run.seed, plan: floorPlan(D.def, D.floor, { heroLvl: G.state.player.lvl }) });
+    return { kind: D.kind, def: D.def.id, floor: D.floor, same: JSON.stringify(again.spawns) === JSON.stringify(L.spawns) && again.theme === L.theme && again.mlvl === L.mlvl, theme: L.theme, best: G.state.dungeon.dens?.mossyBurrow?.bestFloor, deepest: G.state.dungeon.deepest || 0, stairs: !!D.stairsPos, label: D.world.interactables.find(i => /deeper/.test(i.label))?.label, loc: G.ui?.hud?.cache?.loc?.name || null }; });
   const s3a = await sig();
-  await enter({ id: 'burrow', floor: 3 });
+  await enter({ id: 'mossyBurrow', floor: 1 });
   const s3b = await sig();
-  R.check('the Burrow is DUNGEONS.burrow: G.enterDungeon(3) is the old floor 3 (dseed=1), and { id, floor } gives the same floor', b3.kind === 'burrow' && b3.def === 'burrow' && b3.floor === 3 && b3.same && b3.deepest >= 3 && b3.stairs && /Burrow deeper \(Floor 4\)/.test(b3.label) && s3a === s3b, JSON.stringify(b3));
+  R.check('the Burrow is four dens: G.enterDungeon(3), an old floor number, is the Mossy Burrow floor 1 (its run reproduces from its seed and plan), the same floor as { id, floor } (dseed=1); its record noted, deepest untouched; its stairs go to floor 2', b3.kind === 'burrow' && b3.def === 'mossyBurrow' && b3.floor === 1 && b3.same && b3.theme === 'burrow' && b3.best >= 1 && b3.deepest === 0 && b3.stairs && /Burrow deeper \(Floor 2\)/.test(b3.label) && s3a === s3b && b3.loc === 'Mossy Burrow', JSON.stringify(b3));
   // a Burrow kill carries where it happened
   await ev(() => { window.__ev.length = 0; });
   await killOne(); await sleep(page, 200);
   const kb = await ev(() => window.__ev.find(e => e[0] === 'monster:killed')?.[1] || null);
-  R.check('monster:killed carries { zone, dungeon, floor, tier } (the Burrow: zone null, dungeon burrow)', kb && kb.dungeon === 'burrow' && kb.zone === null && kb.floor === 3 && kb.tier === 0, JSON.stringify(kb));
-  // a Burrow boss: dungeon:cleared
-  await enter(5); await ev(() => { window.__ev.length = 0; });
+  R.check('monster:killed carries { zone, dungeon, floor, tier } (a den: zone null, dungeon mossyBurrow)', kb && kb.dungeon === 'mossyBurrow' && kb.zone === null && kb.floor === 1 && kb.tier === 0, JSON.stringify(kb));
+  // a den's boss: dungeon:cleared, and the next den opens
+  await enter(5); await ev(() => { window.__ev.length = 0; window.__fox0 = window.G.burrow.list().find(d => d.id === 'foxShrine').open; });
   await killOne(true); await page.waitForFunction(() => window.__ev.some(e => e[0] === 'dungeon:cleared'), null, { timeout: 5000 }).catch(() => {});
-  const bc = await ev(() => ({ boss: window.__ev.find(e => e[0] === 'boss:dead')?.[1] || null, clear: window.__ev.find(e => e[0] === 'dungeon:cleared')?.[1] || null }));
-  R.check('a Burrow boss: boss:dead { …, dungeon: burrow } and dungeon:cleared { id: burrow, tier: 0, floor: 5 }', bc.boss?.dungeon === 'burrow' && bc.clear?.id === 'burrow' && bc.clear.tier === 0 && bc.clear.floor === 5, JSON.stringify(bc));
-  await page.waitForFunction(() => window.G.world.interactables.some(i => /deeper/.test(i.label)), null, { timeout: 5000 }).catch(() => {});
-  const bstairs = await ev(() => window.G.world.interactables.some(i => /Burrow deeper \(Floor 6\)/.test(i.label)));
-  R.check('…and its stairs down still appear (the Burrow never ends)', bstairs, String(bstairs));
+  const bc = await ev(() => ({ floor: window.G.dungeon.floor, boss: window.__ev.find(e => e[0] === 'boss:dead')?.[1] || null, clear: window.__ev.find(e => e[0] === 'dungeon:cleared')?.[1] || null, fox0: window.__fox0, fox: window.G.burrow.list().find(d => d.id === 'foxShrine').open }));
+  R.check('a den\'s boss (G.enterDungeon(5) = the Mossy Burrow floor 2): boss:dead { …, dungeon: mossyBurrow } and dungeon:cleared { id: mossyBurrow, tier: 0, floor: 2, first, opened: foxShrine }; the Fox Shrine opens', bc.floor === 2 && bc.boss?.dungeon === 'mossyBurrow' && bc.clear?.id === 'mossyBurrow' && bc.clear.kind === 'burrow' && bc.clear.tier === 0 && bc.clear.floor === 2 && bc.clear.first === true && bc.clear.opened === 'foxShrine' && !bc.fox0 && bc.fox, JSON.stringify(bc));
+  await page.waitForFunction(() => window.G.world.interactables.some(i => /Return to Blossom/.test(i.label) && i.pos.distanceTo(window.G.dungeon.exitPos) > 3), null, { timeout: 5000 }).catch(() => {});
+  const bstairs = await ev(() => ({ stairs: window.G.world.interactables.some(i => /deeper/.test(i.label)), portals: window.G.world.interactables.filter(i => /Return to Blossom/.test(i.label)).length }));
+  R.check('…and the den ends there: a portal home where the boss fell, no stairs', !bstairs.stairs && bstairs.portals === 2, JSON.stringify(bstairs));
   // a zone dungeon: floor 1 (its own roster, the bamboo cave kit) → stairs → floor 2 (its boss), no Burrow records
   await ev(() => { const G = window.G; G.state.quests.active = []; G.state.quests.requests.req_s21 = { def: { title: 'S21', giver: 'rosie', desc: '', steps: [{ type: 'kill', n: 2, dungeon: 'bambooDepths', text: 'Defeat 2 yokai in the Bamboo Depths' }, { type: 'dungeonFloor', dungeon: 'bambooDepths', n: 2, text: 'Reach floor 2 of the Bamboo Depths' }, { type: 'boss', dungeon: 'bambooDepths', text: 'Defeat its boss' }], reward: { coins: 1 }, request: true, next: null } }; G.story.start('req_s21', true); });
   await ev(() => { window.__ev.length = 0; window.__deep = window.G.state.dungeon.deepest; window.__wps = window.G.state.dungeon.waypoints.length; });
@@ -243,8 +250,8 @@ try {
   R.check('its boss: dungeon:cleared { id: bambooDepths, first: true }, tier:unlocked { tier: 1 }, zones.bamboo.dungeon cleared 1 / T1 open; the boss step completes; a portal back out to the grove and no stairs', zc.clear?.id === 'bambooDepths' && zc.clear.first === true && zc.clear.zone === 'bamboo' && zc.tier?.tier === 1 && zc.Z.cleared === 1 && zc.Z.tier.unlocked === 1 && zc.Z.tier.cleared.includes(0) && !zc.quest && !zc.stairs && zc.portal, JSON.stringify(zc));
   await ev(() => window.G.returnToVillage()); await waitMode(page, 'village');
   // the pointer from the village: a zone step → the Wayfarer's Post; a Burrow step → the Burrow
-  const ptrs = await ev(() => { const G = window.G, S = G.story; return { zone: S.placeFor({ type: 'dungeonFloor', dungeon: 'mapleRoots', n: 2 }, { dungeon: 'mapleRoots', zone: 'maple', floor: 2 })?.label || null, burrow: S.placeFor({ type: 'floor', n: 9 }, { dungeon: 'burrow', floor: 9 })?.label || null }; });
-  R.check('the quest pointer from the village: a zone dungeon step → the Wayfarer\'s Post, a Burrow step → the Burrow', ptrs.zone === "The Wayfarer's Post" && ptrs.burrow === 'The Burrow', JSON.stringify(ptrs));
+  const ptrs = await ev(() => { const G = window.G, S = G.story; return { zone: S.placeFor({ type: 'dungeonFloor', dungeon: 'mapleRoots', n: 2 }, { dungeon: 'mapleRoots', zone: 'maple', floor: 2 })?.label || null, burrow: S.placeFor({ type: 'kill', n: 9 }, { dungeon: 'burrow', zone: null })?.label || null, den: S.placeFor({ type: 'floor', den: 'foxShrine', n: 2 }, { dungeon: 'foxShrine', zone: null, floor: 2 })?.label || null }; });
+  R.check('the quest pointer from the village: a zone dungeon step → the Wayfarer\'s Post, a Burrow step → the Burrow, a den\'s step → the Burrow, naming the den', ptrs.zone === "The Wayfarer's Post" && ptrs.burrow === 'The Burrow' && ptrs.den === 'The Burrow: Fox Shrine', JSON.stringify(ptrs));
 
   // ---------------------------------------------------------------- d) seeds reroll per entry (unpinned); pinned stays put
   await page.goto(`${BASE}/?fresh&nointro&notut&hour=11&dseed=off`, { waitUntil: 'load' });

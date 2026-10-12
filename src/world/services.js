@@ -48,6 +48,32 @@ export function installServices(G) {
     };
     if (ui()?.transition) ui().transition(go); else go();
   };
+  // ---------------------------------------------------------------- the Stash Chest (ROADMAP R-18)
+  // Any Stash Chest built in the village opens the one shared stash, as the cottage's Treasure Chest does (with the bag
+  // beside it): its lid pops (buildings/index.js 'lid') and the chest sound plays.
+  G.openStash = (b) => {
+    const rec = b && G.sim?.list?.find(r => r.data === b);
+    if (rec) { G.player?.faceTo?.(rec.group.position.x, rec.group.position.z); rec.model?.kick?.(); }
+    Events.emit('sfx', 'chest_open', { vol: 0.7 });
+    ui()?.open?.('stash');
+    Events.emit('stash:open', { at: b ? 'village' : 'home', id: b?.id || null });
+  };
+  /** the debug menu's "Place a stash by me" (ui/stash.js) and the QA: a free Stash Chest on the nearest open ground,
+   *  facing you → { x, z, b } or null */
+  G.stashDebug = {
+    placeNear(r0 = 2, forceRot = null) {
+      const sim = G.sim, P = G.player?.pos; if (!sim || !P || G.mode !== 'village') return null;
+      for (let r = r0; r <= 12; r++) for (let k = 0; k < 8 * r; k++) {
+        const a = k / (8 * r) * Math.PI * 2, cx = P.x + Math.cos(a) * r, cz = P.z + Math.sin(a) * r;
+        const dx = P.x - cx, dz = P.z - cz, rot = forceRot ?? (Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? 3 : 1) : (dz > 0 ? 0 : 2)); // (its front toward you: rot 0 faces +z, 1 -x, 2 -z, 3 +x)
+        const [w, d] = sim.dims('stashChest', rot), x = Math.round(cx - w / 2), z = Math.round(cz - d / 2);
+        if (!sim.canPlace('stashChest', x, z, rot).ok) continue;
+        const b = sim.place('stashChest', x, z, rot, { free: true, silent: true });
+        if (b) { Events.emit('village:changed'); return { x, z, b }; }
+      }
+      return null;
+    },
+  };
   // ---------------------------------------------------------------- Blossom Hall
   G.openTownHall = () => lock(async () => {
     const S = G.sim.stats, D = G.sim.demand, inc = G.state.village.income?.[0];

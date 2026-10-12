@@ -15,6 +15,7 @@
 import { HeroWheel } from './heroWheel.js';
 import { skillList, skillIconURL, hotbarIconURL, itemIconURL, potionIconURL } from './rpg.js';
 import { BUILDINGS, CATEGORIES } from '../world/buildings/index.js';
+import { tabItems } from '../rpg/stash.js';
 
 const OFF = typeof location !== 'undefined' && /[?&]noprewarm\b/.test(location.search);
 const BUDGET = 18, TITLE_BUDGET = 40, TICK = 80; // (ms of steps per tick in a hidden moment, the tick interval)
@@ -100,7 +101,7 @@ export class Prewarm {
     // 2. the HUD keys' panels: I, C, K, J, M, Esc
     for (const n of ['inventory', 'character', 'skills', 'quests', 'map', 'menu']) panel(n);
     // 3. the stash and Rosie's shelf, the travel map, the hero wheel's cards (their 3D busts are rendered at boot)
-    const shelf = []; for (const it of st.stash || []) if (it) shelf.push(it);
+    const shelf = st.stash ? tabItems(st, 0) : []; // (the stash's first tab: the others draw their icons as they're opened, rpg/stash.js)
     try { for (const it of G?.shopStock?.() || []) if (it) shelf.push(it); } catch (e) { /* (no shop yet) */ }
     icons('icons:shelf', shelf, itemIconURL, 2);
     for (const n of ['shop', 'stash', 'travel']) panel(n);

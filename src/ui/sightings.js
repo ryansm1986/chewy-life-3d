@@ -34,7 +34,7 @@ export class SightingsPanel extends Panel {
       return `<div class="sg-card${s.done ? ' done' : ''}" style="--pc:${Z[1]};--i:${i}" data-id="${esc(s.id)}">
         <div class="sg-kind" data-k="${s.kind}">${glyph(KIND_IC[s.kind] || 'oni')}<span>${esc(K.label)}</span></div>
         <div class="sg-t"><b>${esc(s.name)}</b><span>${esc(s.line)}.</span><em>${glyph('pin')}${esc(s.areaName.replace(/^the /, 'The '))} · ${esc(Z[0])} · Lv ${s.lvl}</em></div>
-        <div class="sg-bounty"><span class="sg-bh">Bounty</span><span class="sg-chip coin">${glyph('coin')}${fmt(B.coins || 0)}</span>${mats}${B.gem ? `<span class="sg-chip gem">${glyph('gem')}a gem</span>` : ''}<span class="sg-chip ren">${glyph('star')}+${s.renown}</span></div>
+        <div class="sg-bounty"><span class="sg-bh">Bounty</span><span class="sg-chip coin">${glyph('coin')}${fmt(B.coins || 0)}</span>${mats}${B.gem ? `<span class="sg-chip gem">${glyph('treat')}a treat</span>` : ''}<span class="sg-chip ren">${glyph('star')}+${s.renown}</span></div>
         <div class="sg-act">${act}</div></div>`;
     };
     const left = Math.max(0, P.hoursLeft()), nx = R.next;

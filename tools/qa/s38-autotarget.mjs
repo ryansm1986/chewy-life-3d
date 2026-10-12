@@ -52,13 +52,18 @@ async function install(page) {
     T.freeze = m => { m.lifeMax = m.life = 1e7; m.status = { stun: 999 }; m.speed = 0; m.aggro = false; m.state = 'idle'; m.rank = m.def?.boss ? 'boss' : 'normal'; m.knock?.set?.(0, 0, 0); };
     // an open spot near the floor's start: walkable, no rock, ±r all round
     T.spot = (r = 6) => {
-      const W = G.world, s = G.dungeon.startPos;
-      const open = (x, z) => W.walkable(x, z) && !W.collision?.solidAt?.(x, z, 0.6);
-      for (let k = 0; k < 30; k += 1) for (let a = 0; a < 12; a++) {
-        const x = s.x + Math.cos(a / 6 * Math.PI) * k, z = s.z + Math.sin(a / 6 * Math.PI) * k; let ok = true;
-        for (let i = -r; i <= r && ok; i += 1) for (let j = -r; j <= r && ok; j += 1) if (i * i + j * j <= r * r && !open(x + i, z + j)) ok = false;
-        if (ok) return { x, z };
-      }
+      const W = G.world, s = G.dungeon.startPos, L = G.dungeon.layout;
+      // open: walkable and clear; strict: floor in the layout's 2 m cells too (DungeonMode.los runs on them, and the walkable
+      // mask reaches a little past a room's edge, so a foe placed there is out of sight and the picks score it ×2.2)
+      const open = (x, z, strict) => W.walkable(x, z) && !W.collision?.solidAt?.(x, z, 0.6) && (!strict || !L?.at || !!L.at(Math.floor(x / 2), Math.floor(z / 2)));
+      const disc = (x, z, rr, st) => { for (let i = -rr; i <= rr; i += 1) for (let j = -rr; j <= rr; j += 1) if (i * i + j * j <= rr * rr && !open(x + i, z + j, st)) return false; return true; };
+      const scan = (rr, st) => {
+        for (let k = 0; k < 30; k += 1) for (let a = 0; a < 12; a++) { const x = s.x + Math.cos(a / 6 * Math.PI) * k, z = s.z + Math.sin(a / 6 * Math.PI) * k; if (disc(x, z, rr, st)) return { x, z }; }
+        // none that near: anywhere on the floor (each floor lays out its own arrival room: the Burrow's dens, ROADMAP Z-H1)
+        for (let z = 0; z < L.H * 2; z += 1) for (let x = 0; x < L.W * 2; x += 1) if (open(x, z, st) && disc(x, z, rr, st)) return { x, z };
+        return null;
+      };
+      for (const [rr, st] of [[r, true], [r - 1, true], [r - 2, true], [r, false]]) { const p = rr > 0 && scan(rr, st); if (p) return p; }
       return { x: s.x, z: s.z };
     };
     // a lane: a spot and a yaw with a clear, walkable straight line len m long from it (the walk-up case)

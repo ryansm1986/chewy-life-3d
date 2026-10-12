@@ -22,11 +22,13 @@ const SKIP = '.ph-x, .pad-skip';
 const START = {
   menu: '[data-a="resume"], .ctl-b:not(.locked), .seg button.on, .tog',
   inventory: '.slot[data-c="inv"].has, .slot[data-c="inv"], .pslot[data-id]',
-  stash: '.slot[data-c="stash"]', shop: '.sh-item', skills: '.node.can, .node.learned, .node', character: '.at-plus:not([disabled]), .attr .at-plus, .dr',
+  stash: '.slot[data-c="stash"], .slot[data-c="lost"]', shop: '.sh-item', skills: '.node.can, .node.learned, .node', character: '.at-plus:not([disabled]), .attr .at-plus, .dr',
   quests: '.q-item, .gd-card .btn, .fl-card', cook: '.ck-row.sel, .ck-row', craft: '.ck-row.sel, .ck-row', travel: '.tv-pin.sel, .tv-pin.here, .tv-pin', gift: '.gf-card', seeds: '.sp-card',
   houseCard: '.btn.pink, .btn', remodel: '.rm-set.on, .rm-set', lantern: '.ln-go',
+  burrow: '.dn-go, .dn-pin.sel', // (the Burrow door's den picker: docs/ZONES.md §4.1)
   expeditions: '.ex-go:not([disabled]), .ex-mem.can, .ex-obj.sel, .ex-recall, .ex-obj', awayCard: '.aw-ok', // (the cozy path: docs/COZY.md §10)
   sightings: '.sg-go:not([disabled])', // (the Sightings board: docs/COZY.md §6.3)
+  map: '.mp-row.sel, .mp-row', // (the big map's directory: ROADMAP UX-1)
   guild: '.gd-sign:not([disabled]), .gd-up:not([disabled]), .gd-pay, .gd-buy:not([disabled]), .gd-board', // (the Adventurers' Guild: docs/COZY.md §5)
 };
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
@@ -79,18 +81,24 @@ export class PadNav {
       this.focus(keep || this.remembered(S, cands) || this.start(S, cands, prev), cands);
     }
     const cur = this.cur, h = handlerFor(cur), now = performance.now(), dt = Math.min(0.05, (now - (this._t || now)) / 1000); this._t = now;
-    // the map: the triggers or the right stick zoom
-    if (S.top?.name === 'map') { const z = (A.padDown('RT') ? 1 : 0) - (A.padDown('LT') ? 1 : 0) + A.aim().y; if (Math.abs(z) > 0.1) { const M = S.top; M.zoom = Math.max(0.5, Math.min(3, M.zoom * (1 + z * dt * 1.6))); M.draw(); } }
+    // the map (ui/map.js padFrame): the left stick moves it under its crosshair (A there pins the mark), the triggers or the
+    // right stick zoom, R3 goes back to you; so only the D-pad walks the focus there (the directory's rows: UX-1)
+    const onMap = S.top?.name === 'map', nav = onMap && S.top.pans?.() ? A.dnav : A.nav;
+    if (onMap) S.top.padFrame?.(dt, A);
     // the pad's buttons
-    if (A.nav) {
-      if (cur?.matches('input[type=range]') && (A.nav === 'left' || A.nav === 'right')) this.slide(cur, A.nav === 'right' ? 1 : -1);
-      else { const n = this.step(cands, A.nav); if (n) { this.focus(n, cands); this.ui.sfx('hover'); } else this.bump(); }
+    if (nav) {
+      if (cur?.matches('input[type=range]') && (nav === 'left' || nav === 'right')) this.slide(cur, nav === 'right' ? 1 : -1);
+      else { const n = this.step(cands, nav); if (n) { this.focus(n, cands); this.ui.sfx('hover'); } else this.bump(); }
     }
     // LB / RB: the tabbed menu's pages (CT-11: ui/padMenu.js), else the top panel's tabs; LT / RT in the tabbed menu: the
     // page's own tabs (Settings' pages are the menu's); the map keeps LT / RT for its zoom
     const PM = this.ui.padMenu?.active ? this.ui.padMenu : null;
-    if (A.padHit('LB') || A.padHit('RB')) { const d = A.padHit('RB') ? 1 : -1; A.padConsume('LB'); A.padConsume('RB'); if (PM) { this.blur(); this.cur = null; PM.step(d); } else this.tab(S, d); }
+    const SP = !PM && S.key !== 'pop' && this.ui.isOpen('stash') ? this.ui.panels.stash : null; // (the stash's tabs: LT / RT, and LB / RB as a lone panel's own tabs; ROADMAP R-19, ui/stash.js)
+    if (A.padHit('LB') || A.padHit('RB')) { const d = A.padHit('RB') ? 1 : -1; A.padConsume('LB'); A.padConsume('RB'); if (PM) { this.blur(); this.cur = null; PM.step(d); } else if (SP) this.stashTab(SP, d); else this.tab(S, d); }
     if (PM && S.top?.name !== 'map' && (A.padHit('LT') || A.padHit('RT'))) { const d = A.padHit('RT') ? 1 : -1; A.padConsume('LT'); A.padConsume('RT'); if (!PM.subTab(d)) this.tab(S, d); else { this.blur(); this.cur = null; } }
+    if (SP && (A.padHit('LT') || A.padHit('RT'))) { const d = A.padHit('RT') ? 1 : -1; A.padConsume('LT'); A.padConsume('RT'); this.stashTab(SP, d); }
+    // R3 in the bag or the stash: Sort the grid the focus is in (the bag, or the stash's open tab: docs/INVENTORY.md)
+    if (A.padHit('R3') && this.cur && !this.ui.drag?.held) { const P = this.cur.closest('.p-stash') ? this.ui.panels.stash : this.cur.closest('.p-inv') ? this.ui.panels.inventory : null; if (P?.sort) { A.padConsume('R3'); P.sort(); this.refocus(this.cur); } }
     // the K panel: a right-stick flick steps the Charge drawer through the tree's skills (R-16; the focus stays where it is)
     if (S.top?.name === 'skills') { const ax = A.aim().x, fl = Math.abs(ax) > 0.6 ? Math.sign(ax) : Math.abs(ax) < 0.3 ? 0 : this._flick || 0; if (fl && fl !== this._flick) S.top.chg.cycle(fl); this._flick = fl; }
     if (A.padHit('A') && this.cur) { A.padConsume('A'); this.armed = null; this.press(this.cur); }
@@ -129,14 +137,17 @@ export class PadNav {
     T.x = Math.min(innerWidth - 20, r.right - 4); T.y = r.top + 10;
     fire(e, 'pointerover'); fire(e, 'mouseover'); fire(e, 'mouseenter', false); fire(e, 'pointerenter', false);
     if (T.on) T.place();
-    if (this.ui.drag?.held) this.ghostTo(e); // (a held item rides the focus)
+    if (this.ui.drag?.held) this.ghostTo(e); // (a held item rides the focus, its footprint under it)
     void cands;
   }
   ghostTo(e) {
-    const D = this.ui.drag; if (!D?.held) return;
+    const D = this.ui.drag; if (!D?.held || !e) return;
     const r = e.getBoundingClientRect();
     D.mx = r.left + r.width * 0.7; D.my = r.top + r.height * 0.7;
     D.ghost.style.transform = `translate3d(${D.mx}px,${D.my}px,0)`;
+    // the held item's footprint at the focused cell (its top-left there, kept on the grid): green, gold (a swap) or red
+    const a = e.matches?.('.slot[data-c]') ? slotAddr(e) : null;
+    if (a && a.c !== 'equip' && a.c !== 'shop') D.preview?.(0, 0, D.clampTo(a, D.get(D.held))); else D.hidePreview?.();
   }
   blur() {
     const e = this.cur; if (!e) return;
@@ -199,6 +210,8 @@ export class PadNav {
     if (v === +inp.value) return this.bump();
     inp.value = v; inp.dispatchEvent(new Event('input', { bubbles: true })); this.ui.sfx('tick');
   }
+  /** the stash's tabs (LT / RT): the focus stays on its slot, which now shows the new tab's item (its tooltip too) */
+  stashTab(SP, d) { if (!SP.step(d)) return; const e = this.cur; if (e?.closest('.p-stash')) { this.blur(); this.cur = null; if (e.isConnected) this.focus(e, this._cands || []); } }
   /** LB / RB: the top panel's tabs (the inventory views, the skill trees, the shop's Buy / Sell, the Controls devices…) */
   tab(S, d) {
     const root = S.top?.panel; if (!root) return;
@@ -230,10 +243,12 @@ export class PadNav {
     if (a?.x) list.push(['X', a.x]);
     if (a?.y) list.push(['Y', a.y]);
     const root = S.top?.panel, PM = this.ui.padMenu?.active, tabs = !!root && [...root.querySelectorAll('.tabs .tab, .ctl-tabs button')].filter(visible).length > 1;
+    if (e?.matches('.p-inv .slot[data-c="inv"], .p-stash .slot[data-c="stash"]') && !this.ui.drag?.held) list.push(['R3', 'Sort']); // (docs/INVENTORY.md)
     if (PM) { list.push(['LB+RB', 'Pages']); if (tabs || this.ui.padMenu.current() === 'settings') list.push(['LT+RT', 'Tabs']); } // (the tabbed menu: CT-11)
     else if (tabs) list.push(['LB+RB', 'Tabs']);
+    if (!PM && S.key !== 'pop' && this.ui.isOpen('stash') && (this.ui.G?.state?.stashTabs?.length || 1) > 1) list.push(['LT+RT', 'Stash tabs']);
     if (e?.matches('input[type=range]')) list.push(['DLeft+DRight', 'Adjust']);
-    if (S.top?.name === 'map') list.push(['LT+RT', 'Zoom']);
+    if (S.top?.name === 'map') list.push(...(S.top.padHints?.() || [['LT+RT', 'Zoom']]));
     if (S.top?.name === 'skills' && !S.top.chg?.el.hidden) list.push(['RS', 'Charge skill']);
     list.push(['B', this.ui.drag?.held ? 'Cancel' : S.key === 'pop' ? 'Close' : PM ? 'Close' : 'Back']);
     const sig = list.map(x => x.join(':')).join('|') + Actions.padStyle;
@@ -289,26 +304,47 @@ export class PadNav {
 const shopOpen = nav => nav.ui.isOpen('shop'), stashOpen = nav => nav.ui.isOpen('stash');
 const slotAddr = e => ({ c: e.dataset.c, i: e.dataset.c === 'equip' ? e.dataset.i : +e.dataset.i });
 const HANDLERS = [
-  { // bag, stash and the paper doll: A picks up / puts down (the item rides the focus), Y equips / uses / unequips, X sells, stashes or drops
-    match: '.slot[data-c="inv"], .slot[data-c="stash"], .slot[data-c="equip"]',
+  { // bag, stash, Lost & Found and the paper doll: A picks up / puts down (the item rides the focus, its footprint under
+    // it; onto one item you then hold that one), Y equips / uses / unequips, X sells, stashes or drops
+    match: '.slot[data-c="inv"], .slot[data-c="stash"], .slot[data-c="lost"], .slot[data-c="equip"]',
     a(e, nav) {
       const D = nav.ui.drag, a = slotAddr(e);
       if (D.held) { D.place(D.held, a); return; }
-      if (!D.get(a)) return;
+      if (!D.get(a) || e.classList.contains('dim')) { nav.bump(); return; } // (faded by the stash's filter: it stays put)
       D.lift(a, e); nav.ghostTo(e);
     },
     y(e, nav) { const D = nav.ui.drag; if (D.held) return; if (D.get(slotAddr(e))) D.context(e, { shiftKey: false }); },
     x(e, nav) {
       const D = nav.ui.drag, a = slotAddr(e), it = D.get(a); if (!it || D.held) return;
       if (a.c === 'inv' && shopOpen(nav)) { D.sell(a); return; }
-      if ((a.c === 'inv' && stashOpen(nav)) || a.c === 'stash') { D.quickMove(a, it); return; }
+      if ((a.c === 'inv' && stashOpen(nav)) || a.c === 'stash' || a.c === 'lost') { if (!e.classList.contains('dim')) D.quickMove(a, it); return; }
       if (a.c === 'inv' && nav.confirm(e, 'drop it')) D.dropToGround(a);
     },
     label(e, nav) {
       const D = nav.ui.drag, a = slotAddr(e), it = D.get(a);
       if (D.held) return { a: 'Place' };
       if (!it) return { a: '' };
-      return { a: 'Pick up', y: a.c === 'equip' ? 'Unequip' : a.c === 'stash' ? 'To bag' : it.kind === 'gear' ? 'Equip' : it.kind !== 'material' ? 'Use' : '', x: a.c === 'equip' ? '' : a.c === 'inv' && shopOpen(nav) ? 'Sell' : (a.c === 'inv' && stashOpen(nav)) ? 'Stash' : a.c === 'stash' ? '' : 'Drop' };
+      if (e.classList.contains('dim')) return { a: '' };
+      const box = a.c === 'stash' || a.c === 'lost';
+      return { a: 'Pick up', y: a.c === 'equip' ? 'Unequip' : box ? 'To bag' : it.kind === 'gear' ? 'Equip' : it.kind !== 'material' ? 'Use' : '', x: a.c === 'equip' ? '' : a.c === 'inv' && shopOpen(nav) ? 'Sell' : (a.c === 'inv' && stashOpen(nav)) ? 'Stash' : box ? '' : 'Drop' };
+    },
+  },
+  { // the stash's tabs (ui/stash.js, ROADMAP R-19): A opens one (or puts the held item in it), A on the open one or Y renames
+    // it and picks its colour; the "+" tab buys the next one
+    match: '.p-stash .st-tab',
+    a(e, nav) {
+      const D = nav.ui.drag, P = nav.ui.panels.stash;
+      if (e.dataset.buy) { P.openBuy(e); return; }
+      const t = e.dataset.t === 'lost' ? -1 : +e.dataset.t;
+      if (D.held) { D.toTab(D.held, t); return; }
+      if (t === P.tab) { if (t >= 0) P.openEdit(t, e); } else { P.setTab(t); nav.ui.sfx('tab'); }
+    },
+    y(e, nav) { if (e.dataset.buy || e.dataset.t === 'lost' || nav.ui.drag.held) return; const P = nav.ui.panels.stash, t = +e.dataset.t; if (t !== P.tab) P.setTab(t); P.openEdit(t, P.tabEl(t) || e); },
+    label(e, nav) {
+      if (e.dataset.buy) return { a: 'Buy a tab' };
+      const lost = e.dataset.t === 'lost', on = (lost ? -1 : +e.dataset.t) === nav.ui.panels.stash.tab;
+      if (nav.ui.drag?.held) return { a: lost ? '' : 'Put it in here' };
+      return { a: on ? (lost ? '' : 'Rename') : 'Open', y: lost ? '' : 'Rename' };
     },
   },
   { // the skill trees: A learns, Y assigns to the hotbar (the slot popover), X opens the charge perks
@@ -328,6 +364,14 @@ const HANDLERS = [
     y(e) { e.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2 })); },
     label(e, nav) { const p = nav.ui.panels.inventory; return { a: 'Choose', y: p?.view === 'pantry' && e.closest('.pv, .p-inv') ? 'Eat' : '' }; },
   },
+  { // the big map's People and Places (ui/mapDir.js): A pins (the map centres on them), Y Shadow takes you there, X unpins
+    match: '.mp-row',
+    y(e, nav) { const M = nav.ui.panels.map; M.select(e.dataset.key, { pin: true, centre: true }); M.takeMeThere(); },
+    x(e, nav) { const G = nav.ui.G; if (G?.mapPin?.is(e.dataset.key)) { G.mapPin.clear('unpin'); nav.ui.panels.map.dir.render(true); } },
+    label(e, nav) { const G = nav.ui.G, away = e.classList.contains('away'); return { a: away ? 'Show' : 'Pin', y: !away && G?.lead ? 'Take me there' : '', x: G?.mapPin?.is(e.dataset.key) ? 'Unpin' : '' }; },
+  },
+  { match: '.p-stash .st-chip', label(e) { return { a: e.classList.contains('on') ? '' : 'Show only these' }; } }, // (the stash's filter chips)
+  { match: '.mp-chip', label(e) { return { a: e.classList.contains('on') ? 'Hide' : 'Show' }; } }, // (the map's filter chips)
   { match: '.chg-pk', label() { return { a: 'Learn' }; } },
   { match: '.chg-sk', label(e) { return { a: e.classList.contains('sel') ? '' : 'Show its perks' }; } }, // (the Charge drawer's skill strip, R-16)
   { match: '.ck-row', label() { return { a: 'Choose' }; } },

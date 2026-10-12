@@ -230,7 +230,7 @@ for (const [label, dev, qs, name] of [['phone, notch on the left', PHONE, 'safe=
     await run('Join every hero'); await run('Open every zone'); await run('Save every village'); await run('Clear every dungeon');
     await run('Open T1–T5 everywhere'); await run('Spirit tier', 20); await run('Coins', 100000); await run('Every material', 999);
     await run('Unlock every building and recipe'); await run('Village rank', 5); await run('All furniture and decor'); await run('Pantry', 'all');
-    await run('Set level', { hero: 'all', lvl: 60 }); await run('Gems'); await run('Potions');
+    await run('Set level', { hero: 'all', lvl: 60 }); await run('Treats'); await run('Potions');
     for (const s of secs) for (const a of s.actions) if (a.group?.startsWith('Uniques') || ['Zone bosses', 'Everything else'].includes(a.label)) for (const c of (typeof a.choices === 'function' ? a.choices() : a.choices || [])) { try { await a.run(G, c.value); } catch (e) { /* */ } }
     G.ui.close('debug');
     return done;

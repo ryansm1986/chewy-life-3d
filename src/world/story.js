@@ -11,13 +11,14 @@ import { MATERIALS } from '../ui/glyphs.js';
 import { pantryIcon } from '../life/pantryIcons.js';
 import { meetsNeed, homeRating, starText } from '../home/rating.js';
 import { FURNITURE } from '../home/furniture.js';
-import { stepGain, zoneStepDone, zoneStepHave, destOf, reachIsHere, REACH_R } from './questSteps.js';
-import { DUNGEONS } from '../dungeon/defs.js';
+import { stepGain, zoneStepDone, zoneStepHave, destOf, reachIsHere, REACH_R, floorStepDone, floorStepHave } from './questSteps.js';
+import { DUNGEONS, BURROW, isBurrow } from '../dungeon/defs.js';
 import { ZONE_QUESTS, dungeonObjectives as zoneObjectives, offersFor } from './zoneQuests.js'; // (zone villagers' quests: docs/ZONES.md §3)
 import { ZONE_NPCS } from '../regions/village/data.js';
 import { storyObjectives, villageObjectives, CREW_STEP_TYPES } from '../cozy/objectives.js'; // (the cozy path's crew routes: docs/COZY.md §3)
 
-// step types: talk(npc) | collect(material,n) | kill(monster?,n) | boss(id) | floor(n) | build(type,n) | pop(n) | zone(n)
+// step types: talk(npc) | collect(material,n) | kill(monster?,n) | boss(id) | floor(den,n) (reach floor n of one of the
+//   Burrow's dens: docs/ZONES.md §4.1) | build(type,n) | pop(n) | zone(n)
 //   | fish(n) (catch n fish: life/fishing.js 'fish:caught') | plant(n) / harvest(n) (life/garden.js) | cook(n) dishes
 //   | deliver(npc, mat, n, pantry?) (a material, or with pantry: true a pantry good — crops, fish, dishes)
 //   | decorate(npc, need) (decorate their home: need = { tag?, n?, rug?, light?, stars?, ids? } — home/rating.js
@@ -32,17 +33,17 @@ export const QUESTS = {
   burrow1: { title: 'Something Squishy', giver: 'rosie', desc: 'Strange squeaks echo from the Burrow on the shrine hill. Go take a peek!', steps: [{ type: 'kill', n: 8, text: 'Defeat yokai in the Burrow', lead: (G, q) => G.state.flags?.burrowChoice === 'self' && !(q.prog > 0) }, { type: 'collect', mat: 'mochi', n: 3, text: 'Bring back Mochi Jelly' }], reward: { coins: 120, xp: 80, potions: { heart: 3 } }, next: 'homes' },
   homes: { title: 'A Home for Everyone', giver: 'rosie', desc: 'New friends want to move in! Paint a homes zone (B → Zones) next to a path and let the village grow.', steps: [{ type: 'build', btype: 'home', n: 9, text: 'Grow the village to 9 homes' }], reward: { coins: 200, xp: 120, mats: { wood: 20, stone: 10 } }, next: 'lights' },
   lights: { title: 'Lights of Blossom Hollow', giver: 'rosie', desc: 'Nights are a little spooky. Place lanterns so everyone can find their way home.', steps: [{ type: 'buildAny', btypes: ['stoneLantern', 'streetLamp', 'lanternString'], n: 3, text: 'Build 3 more lanterns' }], reward: { coins: 150, xp: 150, mats: { lantern: 3 } }, next: 'king' },
-  king: { title: 'The King of Squish', giver: 'rosie', desc: 'A giant mochi with a crown is hogging Floor 5. Time to deflate that ego!', steps: [{ type: 'floor', n: 5, text: 'Reach Floor 5' }, { type: 'boss', id: 'mochiKing', text: 'Defeat King Mochi' }], reward: { coins: 500, xp: 600, skillPts: 1, unique: true }, next: 'shrine' },
+  king: { title: 'The King of Squish', giver: 'rosie', desc: 'A giant mochi with a crown is hogging the deepest chamber of the Mossy Burrow. Time to deflate that ego!', steps: [{ type: 'floor', den: 'mossyBurrow', n: 2, text: "Reach the Mossy Burrow's second floor" }, { type: 'boss', id: 'mochiKing', text: 'Defeat King Mochi' }], reward: { coins: 500, xp: 600, skillPts: 1, unique: true }, next: 'shrine' },
   shrine: { title: 'A Shrine for Wishes', giver: 'kitsune', desc: 'Kitsune says a shrine would make the whole village happier. (Needs village rank 2.)', steps: [{ type: 'build', btype: 'shrine', n: 1, text: 'Build a Blossom Shrine' }], reward: { coins: 300, xp: 400 }, next: 'umbrella' },
-  umbrella: { title: 'Umbrella Trouble', giver: 'rosie', desc: 'Umbrellas keep hopping out of the Burrow at night. Their lord waits on Floor 10.', steps: [{ type: 'floor', n: 10, text: 'Reach Floor 10' }, { type: 'boss', id: 'kasaLord', text: 'Defeat Lord Karakasa' }], reward: { coins: 1200, xp: 2500, skillPts: 1, unique: true }, next: 'onsen' },
+  umbrella: { title: 'Umbrella Trouble', giver: 'rosie', desc: 'Umbrellas keep hopping out of the Burrow at night. Their lord waits deep in the Fox Shrine.', steps: [{ type: 'floor', den: 'foxShrine', n: 2, text: "Reach the Fox Shrine's second floor" }, { type: 'boss', id: 'kasaLord', text: 'Defeat Lord Karakasa' }], reward: { coins: 1200, xp: 2500, skillPts: 1, unique: true }, next: 'onsen' },
   onsen: { title: 'Hot Spring Dreams', giver: 'kuma', desc: 'Kuma dreams of a steamy hot spring for sore paws. (Needs village rank 3.)', steps: [{ type: 'build', btype: 'onsen', n: 1, text: 'Build a Hot Spring' }, { type: 'pop', n: 30, text: 'Reach 30 villagers' }], reward: { coins: 800, xp: 3000 }, next: 'oni' },
-  oni: { title: "Oni's Kitchen Nightmare", giver: 'rosie', desc: 'Someone is stealing all the dumplings. The trail leads to Floor 15.', steps: [{ type: 'floor', n: 15, text: 'Reach Floor 15' }, { type: 'boss', id: 'oniChef', text: 'Defeat Oni Chef Gorobei' }], reward: { coins: 3000, xp: 12000, skillPts: 1, unique: true }, next: 'tails' },
+  oni: { title: "Oni's Kitchen Nightmare", giver: 'rosie', desc: "Someone is stealing all the dumplings. The trail leads down to Oni's Kitchen.", steps: [{ type: 'floor', den: 'oniKitchen', n: 2, text: "Reach the second floor of Oni's Kitchen" }, { type: 'boss', id: 'oniChef', text: 'Defeat Oni Chef Gorobei' }], reward: { coins: 3000, xp: 12000, skillPts: 1, unique: true }, next: 'tails' },
   // the homestead (docs/HOMESTEAD.md): offered from day 2 (life/fishSocial.js); Kero hands over the rod at the talk step
   keroRod: { title: "Pond Guardian's Apprentice", giver: 'kero', desc: 'Kero the pond guardian has a spare fishing rod — and opinions about floats. Go and find him.', steps: [{ type: 'talk', npc: 'kero', text: 'Visit Kero, the pond guardian' }, { type: 'fish', n: 3, text: 'Catch 3 fish' }], reward: { coins: 150, xp: 60, hearts: 10 }, next: null },
   // Usagi's starter-pack quest (offered with the starter seeds, life/index.js) leads into Rosie's taste test
   firstSprouts: { title: 'First Sprouts', giver: 'usagi', desc: 'Usagi can\'t wait to see your first harvest! Plant seeds in your garden bed (F), water them every day and pick what grows.', steps: [{ type: 'plant', n: 3, text: 'Plant 3 seeds' }, { type: 'harvest', n: 3, text: 'Harvest 3 crops' }], reward: { coins: 120, xp: 50, hearts: 10, recipe: 'carrotSoup', pantry: { strawberrySeed: 2 } }, next: 'tasteTest' },
   tasteTest: { title: 'Taste Test', giver: 'rosie', desc: 'Rosie wants to taste your cooking! Cook at home (your cottage), at a campfire in the Burrow, or bake with her at the shop.', steps: [{ type: 'cook', n: 3, text: 'Cook 3 dishes' }, { type: 'talk', npc: 'rosie', text: 'Let Rosie have a taste' }], reward: { coins: 200, xp: 80, hearts: 10, recipe: 'strawberryMochi', mats: { mochi: 2 } }, next: null },
-  tails: { title: 'Nine Tails of Moonlight', giver: 'kitsune', desc: 'The old fox spirit Tamamo stirs on Floor 20. Kitsune believes only a good boy can calm her.', steps: [{ type: 'floor', n: 20, text: 'Reach Floor 20' }, { type: 'boss', id: 'nineTails', text: 'Calm Tamamo, the Nine-Tailed' }], reward: { coins: 10000, xp: 40000, skillPts: 2, unique: true }, next: null },
+  tails: { title: 'Nine Tails of Moonlight', giver: 'kitsune', desc: "The old fox spirit Tamamo stirs in the Moonlit Sanctum, the Burrow's deepest den. Kitsune believes only a good boy can calm her.", steps: [{ type: 'floor', den: 'moonSanctum', n: 2, text: "Reach the Moonlit Sanctum's second floor" }, { type: 'boss', id: 'nineTails', text: 'Calm Tamamo, the Nine-Tailed' }], reward: { coins: 10000, xp: 40000, skillPts: 2, unique: true }, next: null },
 };
 
 const CHAT = {
@@ -130,7 +131,7 @@ export class Story {
       case 'build': return st.village.buildings.filter(b => b.type === s.btype).length >= s.n + (q.base || 0);
       case 'buildAny': return st.village.buildings.filter(b => s.btypes.includes(b.type)).length >= s.n + (q.base || 0);
       case 'pop': return (G.sim?.stats.population || 0) >= s.n;
-      case 'floor': return (st.dungeon.deepest || 0) >= s.n;
+      case 'floor': return floorStepDone(s, st); // (that den's floor: rpg/dens.js)
       case 'dungeonFloor': case 'tier': case 'villageSaved': return zoneStepDone(s, st);
       default: return q.prog >= (s.n || 1);
     }
@@ -244,12 +245,14 @@ export class Story {
     if (this.Q.active.some(q => { const d = this.def(q.id); return d && d.giver === id && !d.request; })) return '?';
     return null;
   }
-  // put a reward item in the bag; if it's full, into the stash; if that's full too, at Chewy's feet
+  // put a reward item in the bag; if it's full, into the stash; if that's full too, the stash's Lost & Found (items take
+  // up space, docs/INVENTORY.md: actions.stowItem, so it's never lost); at Chewy's feet only without it
   giveItem(item) {
     const G = this.G;
     if (G.actions.pickup(item)) return true;
-    const st = G.state.stash, i = st.indexOf(null);
-    if (i >= 0) { st[i] = item; Events.emit('inv:changed', { c: 'stash' }); G.ui?.toast?.(`Bag full — ${item.name} was sent to your stash at home`, { color: '#ffd84a' }); return true; }
+    const r = G.actions.stowItem?.(item, { bag: false });
+    if (r?.c === 'stash') { G.ui?.toast?.(`Bag full — ${item.name} was sent to your stash`, { color: '#ffd84a' }); return true; }
+    if (r?.c === 'lost') { G.ui?.toast?.(`Bag and stash full — ${item.name} waits in the stash's Lost & Found`, { color: '#ffd84a' }); return true; }
     const loot = G.mode === 'dungeon' ? G.dungeon?.loot : G.villageLoot;
     loot?.drop(G.player.pos.clone(), [{ type: 'item', item }]);
     G.ui?.toast?.(`Bag and stash full — ${item.name} is on the ground`, { color: '#ffd84a' });
@@ -295,17 +298,18 @@ export class Story {
     return null;
   }
   /** The pointer for a step that's somewhere you travel to (world/questSteps.js destOf): from the village, the Burrow's
-   *  gate or the Wayfarer's Post for a zone; in a zone's region, its dungeon gate (phase C: mode.gatePos) or its village
-   *  (phase D: mode.villagePos); in the right dungeon, the stairs until the floor, then the boss or the objective's mark
-   *  (phase D: mode.questMark(step)); anywhere else, the way out. Burrow quests point nowhere in an outdoor region. */
+   *  gate (a den's step names its den) or the Wayfarer's Post for a zone; in a zone's region, its dungeon gate (phase C:
+   *  mode.gatePos) or its village (phase D: mode.villagePos); in the right dungeon, the stairs until the floor, then the
+   *  boss or the objective's mark (phase D: mode.questMark(step)); in another den, the way out (back to the door);
+   *  anywhere else, the way out. Burrow quests point nowhere in an outdoor region. */
   placeFor(s, dest) {
     const G = this.G, D = G.mode === 'dungeon' ? G.dungeon : null;
     if (!dest || (G.mode !== 'village' && !D)) return null;
     const at = (pos, label) => (pos ? { pos, label, kind: 'place' } : null);
-    const zone = dest.zone || null, burrow = dest.dungeon === 'burrow';
+    const zone = dest.zone || null, burrow = isBurrow(dest.dungeon), den = burrow && dest.dungeon !== BURROW ? DUNGEONS[dest.dungeon] : null;
     if (G.mode === 'village') {
       if (dest.home) return dest.reach ? at(this.reachPos(s), s.label || s.text) : null; // (a reach step at home: its spot)
-      if (burrow) { const gate = G.sim?.list.find(r => r.data.type === 'dungeonGate'); return gate ? at(gate.door, 'The Burrow') : null; }
+      if (burrow) { const gate = G.sim?.list.find(r => r.data.type === 'dungeonGate'); return gate ? at(gate.door, den ? `The Burrow: ${den.name}` : 'The Burrow') : null; }
       const tp = zone && G.world.landmarks?.travel; if (!tp) return null;
       const p = this._postPos ||= { x: tp.x, y: G.world.heightAt?.(tp.x, tp.z) || 0, z: tp.z };
       return at(p, "The Wayfarer's Post");
@@ -320,7 +324,8 @@ export class Story {
       if (dest.mark) return at(D.questMark?.(s), s.text);
       return null;
     }
-    if (burrow) return null; // (a Burrow step: nothing to point at in a region / a zone dungeon, as before)
+    if (den && D.kind === 'burrow') return at(D.exitPos, 'The way out'); // (another den's step: back out to the door)
+    if (burrow) return null; // (a Burrow step: nothing to point at in a region / a zone dungeon, nor anywhere for the Burrow as a whole)
     if (D.kind === 'region' && D.zoneId === zone) { // the step's zone, outdoors
       if (dest.reach && !dest.dungeon) return at(this.reachPos(s), s.label || s.text);
       if (dest.village) return at(D.villagePos, 'The village');
@@ -366,7 +371,7 @@ export class Story {
         else if (s.type === 'build') have = st.village.buildings.filter(b => b.type === s.btype).length;
         else if (s.type === 'buildAny') have = st.village.buildings.filter(b => s.btypes.includes(b.type)).length - (q.base || 0);
         else if (s.type === 'pop') have = G.sim?.stats.population || 0;
-        else if (s.type === 'floor') have = Math.min(s.n, st.dungeon.deepest || 0);
+        else if (s.type === 'floor') have = floorStepHave(s, st);
         else have = zoneStepHave(s, st) ?? (q.prog || 0);
       }
       const crew = done && q.crewSteps?.includes(i) && q.crewBy; // (done by a crew: docs/COZY.md §4.10)

@@ -1,4 +1,4 @@
-// Big map (uses the same provider as the minimap) and the quest journal.
+// Big map (the same provider as the minimap), its People and Places directories (ui/mapDir.js), and the quest journal.
 import { el, esc, fmt } from './dom.js';
 import { glyph } from './glyphs.js';
 import { padGlyph } from './padGlyphs.js';
@@ -9,62 +9,303 @@ import { GuidesView } from './tutorial.js';
 import { CrewLogView } from './crewLog.js';
 import { cozyIcon } from './cozyIcons.js';
 import { pantryIcon } from '../life/pantryIcons.js';
+import { simpleTip } from './tooltip.js';
+import { MapDirectory } from './mapDir.js';
+import { people, places, tipFor, CAT_COLOR } from '../world/mapData.js';
+import { iconSVG } from '../world/mapArt.js';
+import { mapRot } from '../world/minimap.js';
+import { Actions } from '../core/actions.js';
+import './map.css';
 
-const LEGEND_VILLAGE = [['you', 'Chewy'], ['shop', 'Shops'], ['home', 'Homes'], ['craft', 'Workshops'], ['quest', 'Quest'], ['gate', 'Burrow gate'], ['dig', "Shadow's dig spot"], ['node', 'Gather spot']];
-// an outdoor zone (docs/COZY.md §6.2–§7): the wild areas, today's sightings, the scavenging marks (the swatches: ui/sightings.css)
-const LEGEND_REGION = [['you', 'Chewy'], ['mon', 'Monsters'], ['elite', 'Elites'], ['wild', 'Wild area'], ['sight', 'Sighting'], ['dig', "Shadow's dig spot"], ['node', 'Gather spot'], ['portal', "Wayfarer's Stone"], ['quest', 'Quest']];
-const LEGEND_DUNGEON = [['you', 'Chewy'], ['mon', 'Monsters'], ['elite', 'Elites'], ['boss', 'Boss'], ['stairs', 'Stairs down'], ['portal', 'Portal home'], ['wp', 'Waypoint'], ['quest', 'Quest']];
-const LEGEND_HOME = [['you', 'You'], ['furn', 'Furniture'], ['rugs', 'Rugs'], ['door', 'The door'], ['pup', 'Shadow']]; // (indoors: docs/HOUSING.md)
+// Each area's key (UX-1): [text, swatch] (ui/mapDir.js drawSwatch draws each with the maps' own art; '|' parts)
+const C = CAT_COLOR;
+const KEY_PEOPLE = [['You', 'you'], ['Shadow', 'shadow'], ['Someone (their initial)', 'pip|#f78fb6|M'], ['Has something for you', 'flag|!'], ['On their quest', 'flag|?']];
+const KEY_MARKS = [['Your pin', 'pin'], ['Quest objective', 'star'], ['Off the minimap: this way', 'edge']];
+const KEY_VILLAGE = [
+  ...KEY_PEOPLE, ['A friendship gift', 'flag|gift'], ['Townsfolk and hires', 'pip|#8fd0ff||4.6'], ...KEY_MARKS,
+  ['Your cottage', 'badge|home|#ff5c8a'], ['Shops and stalls', `badge|shop|${C.shop}`], ['Services', `badge|special|${C.service}`], ['A Stash Chest (each opens the shared stash)', `badge|chest|${C.service}`], ['Boards', `badge|scroll|${C.board}`],
+  ["A villager's home", `badge|home|${C.home}`], ['Workshops and gathering', `badge|leaf|${C.gather}`], ['Gates and regions', `badge|map|${C.gate}`], ['The Town Portal (while one is open)', 'badge|portal|#9b7be6'],
+  ["Shadow's dig spot", 'dig'], ['Gather spot', 'node'], ['Buildings (their roofs)', 'roof'], ['Paths and plazas', 'path'], ['Trees', 'tree'], ['Districts', 'district'],
+];
+// an outdoor zone (docs/COZY.md §6.2–§7): the wild areas, today's sightings, the scavenging marks
+const KEY_REGION = [
+  ...KEY_PEOPLE, ...KEY_MARKS, ['Wild area', 'wild'], ['Sighting', 'sight'], ['Monsters', 'mon'], ['Elites', 'elite'],
+  ['The village', `badge|home|${C.landmark}`], ['Shops', `badge|shop|${C.shop}`], ['Services and shrines', `badge|sparkle|${C.service}`], ['Chest', `badge|chest|${C.gather}`],
+  ["Wayfarer's Stone, the dungeon", `badge|map|${C.gate}`], ["The boss's clearing", 'badge|skull|#e8506e'], ["Shadow's dig spot", 'dig'], ['Gather spot', 'node'], ['The trail', 'trail'], ['Thicket', 'thicket'],
+];
+const KEY_DUNGEON = [
+  ['You', 'you'], ['Shadow', 'shadow'], ...KEY_MARKS, ['Monsters', 'mon'], ['Elites', 'elite'], ['Boss', 'boss'],
+  ['Stairs down', `badge|draw:stairs|${C.gate}`], ['Portal home', `badge|draw:portal|${C.gate}`], ['Chest', `badge|chest|${C.gather}`], ['Shrine', `badge|sparkle|${C.service}`], ['Opened, or its blessing used', 'badge|chest|#a89c94|dim'],
+  ['Waypoint', 'badge|torii|#5ec8b0'], ["The boss's room", 'badge|skull|#e8506e'], ['Not explored yet', 'fog'], ["Shadow's dig spot", 'dig'],
+];
+const KEY_HOME = [
+  ['You', 'you'], ['Shadow', 'shadow'], ['A guest', 'pip|#f78fb6|M'], ...KEY_MARKS.slice(0, 1),
+  ['The bed', `badge|moon|${C.service}`], ['The stash', `badge|chest|${C.service}`], ['The kitchen', `badge|fire|${C.service}`], ['The workbench', `badge|craft|${C.service}`], ['The door', `badge|door|${C.gate}`],
+  ['Furniture', 'furn'], ['Rugs', 'rug'],
+];
+// the filter chips: the marks' layers on both maps (Settings' mapLayers; homes, landmarks and gates always show)
+const CHIPS = [['people', 'People', 'chat'], ['shops', 'Shops', 'shop'], ['services', 'Services', 'special'], ['quests', 'Quests', 'scroll'], ['gather', 'Gathering', 'leaf'], ['wild', 'Wild', 'draw:claw']];
+const ZMIN = 0.8, ZMAX = 6;
 export class MapPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'map', title: 'Map', jp: '地図', side: 'center', cls: 'p-map', icon: 'map' }); }
+  constructor(ui) { super(ui, { name: 'map', title: 'Map', jp: '地図', side: 'center', cls: 'p-map', icon: 'map' }); this.sel = null; this.hover = null; this.view = null; this.areaKey = ''; this.ptrs = new Map(); }
   init() {
-    this.body.innerHTML = `<div class="mp-wrap"><div class="mp-frame"><canvas class="mp-cv"></canvas><div class="mp-compass">${glyph('sakura')}<b>N</b></div><div class="mp-vig"></div></div>
-      <div class="mp-side"><div class="mp-loc"><b class="mp-name">Blossom Hollow</b><span class="jp mp-jp">さくら村</span></div>
-        <div class="mp-legend"></div>
-        <div class="mp-tip kbm-only">${glyph('paw')}Scroll the mouse wheel to zoom the map</div><div class="mp-tip pad-only">${glyph('paw')}<span class="kc sm pad">${padGlyph('LT')}</span><span class="kc sm pad">${padGlyph('RT')}</span> zoom the map</div>
-      </div></div>`;
-    this.cv = this.body.querySelector('.mp-cv');
-    this.zoom = 1;
-    this.cv.addEventListener('wheel', e => { e.preventDefault(); this.zoom = Math.max(0.5, Math.min(3, this.zoom * (e.deltaY > 0 ? 0.9 : 1.1))); this.draw(); }, { passive: false });
+    this.body.innerHTML = `<div class="mp-wrap"><div class="mp-frame"><canvas class="mp-cv"></canvas><div class="mp-vig"></div><div class="mp-compass"><i class="mp-rose">${glyph('sakura')}</i><b>N</b></div>
+        <div class="mp-cross pad-only"></div>
+        <div class="mp-ctl"><button class="mp-b mp-zin" title="Zoom in">${glyph('plus')}</button><button class="mp-b mp-zout" title="Zoom out"><i class="mp-minus"></i></button><button class="mp-b mp-me" title="Back to you">${glyph('paw')}</button></div>
+        <div class="mp-chips">${CHIPS.map(([k, n, ic]) => `<button class="mp-chip on" data-l="${k}" title="Show or hide: ${n}">${iconSVG(ic)}<span>${n}</span></button>`).join('')}</div>
+        <div class="mp-tip kbm-only">${glyph('paw')}Drag to move · the wheel zooms · click someone to pin them</div><div class="mp-tip touch-only">${glyph('paw')}Drag to move · pinch to zoom · tap someone to pin them</div><div class="mp-tip pad-only"><span class="kc sm pad">${padGlyph('LS')}</span>move <span class="kc sm pad">${padGlyph('LT')}</span><span class="kc sm pad">${padGlyph('RT')}</span>zoom <span class="kc sm pad">${padGlyph('A')}</span>pin</div></div>
+      <div class="mp-side"><div class="mp-loc"><b class="mp-name">Blossom Hollow</b><span class="jp mp-jp">さくら村</span></div><div class="mp-dir"></div></div></div>`;
+    const q = s => this.body.querySelector(s);
+    this.cv = q('.mp-cv'); this.frame = q('.mp-frame'); this.rose = q('.mp-compass');
+    this.dir = new MapDirectory(this, q('.mp-dir'));
+    this.dir.demo = () => this.demo('people'); this.dir.demoPlaces = () => this.demo('places'); // (tools/qa/map-shots.mjs)
+    this.chips = [...this.body.querySelectorAll('.mp-chip')];
+    q('.mp-chips').addEventListener('click', e => { const b = e.target.closest('.mp-chip'); if (b) this.toggleLayer(b.dataset.l); });
+    this.paintChips();
+    q('.mp-zin').addEventListener('click', () => this.zoomBy(1.4));
+    q('.mp-zout').addEventListener('click', () => this.zoomBy(1 / 1.4));
+    q('.mp-me').addEventListener('click', () => this.centreOnYou());
+    const cv = this.cv;
+    cv.addEventListener('wheel', e => { e.preventDefault(); const [x, y] = this.local(e); this.zoomBy(e.deltaY > 0 ? 1 / 1.15 : 1.15, x, y); }, { passive: false });
+    cv.addEventListener('dblclick', e => { const [x, y] = this.local(e); this.zoomBy(1.6, x, y); });
+    cv.addEventListener('pointerdown', e => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      try { cv.setPointerCapture(e.pointerId); } catch (x) { /* */ }
+      const [x, y] = this.local(e);
+      this.ptrs.set(e.pointerId, { x, y, x0: x, y0: y });
+      this.moved = this.ptrs.size > 1 ? true : 0;
+      if (this.ptrs.size === 2) { const [a, b] = [...this.ptrs.values()]; this.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, span: this.view?.span || 1, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 }; }
+    });
+    cv.addEventListener('pointermove', e => {
+      const [x, y] = this.local(e), p = this.ptrs.get(e.pointerId);
+      if (!p) { if (e.pointerType === 'mouse') this.hoverAt(x, y, e); return; }
+      const dx = x - p.x, dy = y - p.y; p.x = x; p.y = y;
+      if (this.ptrs.size >= 2 && this.pinch) {
+        const [a, b] = [...this.ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y) || 1, mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        this.panBy(mx - this.pinch.mx, my - this.pinch.my); this.pinch.mx = mx; this.pinch.my = my;
+        this.setSpan(this.pinch.span * this.pinch.d / d, mx, my); return;
+      }
+      if (this.moved !== true && Math.hypot(x - p.x0, y - p.y0) > 5) { this.moved = true; this.frame.classList.add('grab'); this.ui.tip.hide(cv); }
+      if (this.moved === true) this.panBy(dx, dy);
+    });
+    const up = e => {
+      const p = this.ptrs.get(e.pointerId); if (!p) return;
+      this.ptrs.delete(e.pointerId); if (this.ptrs.size < 2) this.pinch = null;
+      if (!this.ptrs.size) { this.frame.classList.remove('grab'); if (this.moved !== true && e.type === 'pointerup') this.tapAt(p.x, p.y); this.moved = 0; }
+    };
+    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+    cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { this.hover = null; this.ui.tip.hide(cv); } });
   }
-  onOpen() { this.acc = 0; this.draw(); }
-  render() {
-    const dun = this.ui.mode === 'dungeon', home = this.ui.mode === 'interior', region = dun && !!this.ui.G?.dungeon?.isRegion;
-    const lg = region ? 'region' : this.ui.mode;
-    if (this._lgMode !== lg) {
-      this._lgMode = lg;
-      this.body.querySelector('.mp-legend').innerHTML = (region ? LEGEND_REGION : dun ? LEGEND_DUNGEON : home ? LEGEND_HOME : LEGEND_VILLAGE).map(([c, t]) => `<div><i class="lg ${c}"></i>${t}</div>`).join('');
+  get G() { return this.ui.G; }
+  /** the filter chips: a layer on or off on both maps (Settings' mapLayers) */
+  toggleLayer(k) {
+    const L = { ...(this.ui.settings.mapLayers || {}) }; L[k] = L[k] === false; this.ui.setSetting('mapLayers', L);
+    this.paintChips(); this.dirty = true; this.ui.minimap.redraw(); this.ui.sfx?.('tick');
+  }
+  /** the chips: on or off (Settings' mapLayers), greyed and disabled where this map has nothing of their kind */
+  paintChips() {
+    const L = this.ui.settings.mapLayers || {}, n = this.provider()?.layerCounts || null;
+    for (const b of this.chips || []) {
+      const on = L[b.dataset.l] !== false, none = !!n && !n[b.dataset.l];
+      b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
+      if (b.disabled !== none) { b.disabled = none; b.classList.toggle('none', none); b.title = none ? `${b.textContent.trim()}: nothing on this map` : `Show or hide: ${b.textContent.trim()}`; }
     }
-    const loc = this.ui.hud?.cache.loc;
-    const name = dun ? (loc?.name || 'The Burrow') : home ? (loc?.name || 'Home') : 'Blossom Hollow';
-    this.body.querySelector('.mp-name').textContent = name;
-    this.body.querySelector('.mp-jp').textContent = dun ? (loc?.sub || '地下') : home ? 'おうち' : 'さくら村';
   }
-  update(dt) { if (!this.isOpen) return; this.acc = (this.acc || 0) + dt; if (this.acc > 0.1) { this.acc = 0; this.draw(); } }
+  provider() { return this.ui.hud?.mm?.provider || null; }
+  /** the People list's heading for the area's own people (a zone's village, the room, the floor) */
+  areaName() { return this.provider()?.areaName?.() || 'Here'; }
+  /** a provider that takes a view (pan and zoom): the village's; the zones', dungeons' and rooms' still zoom only */
+  pans() { return !!this.provider()?.views; }
+  /** the people and places (the village provider's cache, else this panel's own) */
+  lists() {
+    const P = this.provider(); if (P?.lists) return P.lists();
+    const now = performance.now();
+    if (!this._L || now - this._LT > 250) { try { this._L = { people: people(this.G), places: places(this.G) }; } catch (e) { this._L = { people: [], places: [] }; } this._LT = now; }
+    return this._L;
+  }
+  entry(key) { if (!key) return null; const L = this.lists(); return L.people.find(e => e.key === key) || L.places.find(e => e.key === key) || null; }
+  size() { return Math.max(200, Math.round(this.frame?.clientWidth || 560)); }
+  local(e) { const r = this.cv.getBoundingClientRect(), s = this.size() / (r.width || 1); return [(e.clientX - r.left) * s, (e.clientY - r.top) * s]; }
+  // ---- the view (world centre, metres across) and the zoom the pad and the QA read (1 = the whole island)
+  homeSpan() { return this.provider()?.homeView?.().span || 224; }
+  get zoom() { return this.pans() ? this.homeSpan() / (this.view?.span || this.homeSpan()) : this._zoom || 1; }
+  set zoom(z) { if (this.pans()) this.setSpan(this.homeSpan() / z); else this._zoom = Math.max(0.5, Math.min(3, z)); }
+  rot() { const P = this.provider(); return P?.rot ? P.rot() : mapRot(this.G.engine.rig.yaw); }
+  /** the farthest out: 0.8, or a fitted view's own (fitFree) */
+  zMin() { return Math.min(ZMIN, this._zFit || ZMIN); }
+  /** screen (canvas CSS px) ⇄ world */
+  toWorld(sx, sy) { const v = this.view, n = this.size(), k = n / v.span, r = this.rot(), c = Math.cos(r), s = Math.sin(r), dx = (sx - n / 2) / k, dy = (sy - n / 2) / k; return [v.cx + dx * c + dy * s, v.cz - dx * s + dy * c]; }
+  clampView() {
+    const v = this.view, b = this.provider()?.bounds?.() || { x0: 0, z0: 0, x1: 224, z1: 224 }, hs = this.homeSpan();
+    v.span = Math.max(hs / ZMAX, Math.min(hs / this.zMin(), v.span));
+    const m = v.span * 0.3, fit = (c, a0, a1) => { const lo = a0 + v.span / 2 - m, hi = a1 - v.span / 2 + m; return lo > hi ? (a0 + a1) / 2 : Math.max(lo, Math.min(hi, c)); };
+    v.cx = fit(v.cx, b.x0, b.x1); v.cz = fit(v.cz, b.z0, b.z1);
+  }
+  /** a new span, keeping the world spot under (sx, sy) where it is (the middle when none) */
+  setSpan(span, sx = null, sy = null) {
+    if (!this.pans()) { this._zoom = Math.max(0.5, Math.min(3, this.homeSpan() / span)); this.dirty = true; return; }
+    const v = this.view; if (!v) return;
+    const hs = this.homeSpan(), ns = Math.max(hs / ZMAX, Math.min(hs / this.zMin(), span)), [wx, wz] = sx == null ? [v.cx, v.cz] : this.toWorld(sx, sy), f = ns / v.span;
+    v.cx = wx + (v.cx - wx) * f; v.cz = wz + (v.cz - wz) * f; v.span = ns; this.clampView();
+    this.dirty = true;
+  }
+  zoomBy(f, sx = null, sy = null) { if (!this.pans()) { this._zoom = Math.max(0.5, Math.min(3, (this._zoom || 1) * f)); this.dirty = true; return; } this.setSpan((this.view?.span || this.homeSpan()) / f, sx, sy); }
+  panBy(dx, dy) {
+    if (!this.pans() || !this.view) return;
+    const v = this.view, k = this.size() / v.span, r = this.rot(), c = Math.cos(r), s = Math.sin(r);
+    v.cx -= (dx * c + dy * s) / k; v.cz -= (-dx * s + dy * c) / k; this.clampView(); this.dirty = true;
+  }
+  /** glide the view to a spot (the pick's centring, Back to you) */
+  glideTo(x, z, span = null) { this.glide = { x, z, span: span ?? this.view.span, t: 0 }; this.dirty = true; }
+  centreOnYou() { const p = this.G.player?.pos; if (!p || !this.pans()) return; this.glideTo(p.x, p.z, Math.min(this.view.span, this.homeSpan() / 2.4)); this.ui.sfx?.('tick'); }
+  centreOn(key, zoomIn = false) {
+    const e = this.entry(key); if (!e?.pos || !this.pans()) return false;
+    if (e.kind === 'person' && !e.visible && !e.you && !e.shadow && !e.npc) return false;
+    const p = e.kind === 'person' && e.npc && e.npc.visible === false ? (e.npc.homeRec?.door || e.pos) : e.pos;
+    if (this.G.mode !== 'village' && this.G.mode !== 'interior' && e.kind) { /* (another area's: nothing to centre on here) */ }
+    this.glideTo(p.x, p.z, zoomIn ? Math.min(this.view.span, this.homeSpan() / 3) : Math.min(this.view.span, this.homeSpan() / 1.8));
+    return true;
+  }
+  /** pick a person or place: the map centres on them, their mark pulses, and (pin) they're pinned */
+  select(key, { pin = false, centre = true } = {}) {
+    const e = this.entry(key); if (!e) return;
+    this.sel = key;
+    if (centre && this.G.mode === 'village') this.centreOn(key);
+    if (pin && !e.you && !e.shadow && !e.away && this.G.mapPin) { this.G.mapPin.set(e); this.ui.sfx?.('select'); }
+    this.dir.render(true); this.dirty = true;
+  }
+  /** "Shadow, take me there": pinned, and he leads the way (the map closes so you can follow him) */
+  takeMeThere() {
+    const e = this.entry(this.sel); if (!e) return;
+    const G = this.G; if (!G.mapPin?.is(e.key)) G.mapPin?.set(e);
+    const ok = G.mapPin?.lead?.();
+    this.ui.sfx?.('click');
+    if (ok) this.ui.close('map'); else this.dir.render(true);
+  }
+  hitAt(x, y) {
+    const P = this.provider(), H = (P?.bigHits || P?.hits) || []; let best = null, bd = 1e9; // (the big map's own marks: the disc keeps its own)
+    for (const h of H) { if (!h.e) continue; const d = Math.hypot(h.x - x, h.y - y); if (d < h.r + 4 && d < bd) { bd = d; best = h; } }
+    return best;
+  }
+  hoverAt(x, y, ev) {
+    const h = this.hitAt(x, y), key = h?.e?.key || null;
+    if (key !== this.hover) { this.hover = key; this.dirty = true; }
+    this.frame.classList.toggle('over', !!h);
+    if (!h) { this.ui.tip.hide(this.cv); return; }
+    const t = tipFor(this.G, h.e, this.lists().places); if (!t) return;
+    if (ev) { this.ui.tip.x = ev.clientX; this.ui.tip.y = ev.clientY; }
+    this.ui.tip.show(simpleTip(esc(t.title), t.text), 'tt-map', this.cv);
+  }
+  tapAt(x, y) {
+    const h = this.hitAt(x, y);
+    if (h?.e?.key) { this.select(h.e.key, { pin: true, centre: false }); if (h.e.kind === 'person') this.dir.tab = 'people'; else if (h.e.kind === 'place') this.dir.tab = 'places'; this.dir.render(true); this.scrollToSel(); }
+    else if (h?.e && Actions.device === 'touch') { const t = tipFor(this.G, h.e, this.lists().places); if (t) this.ui.toast?.(`${t.title}`, { icon: 'pin' }); }
+  }
+  scrollToSel() { const r = this.dir.$.list.querySelector('.mp-row.sel'); try { r?.scrollIntoView({ block: 'nearest' }); } catch (e) { /* */ } }
+  /** a fitted home view (a floor's: what you've seen) moved into the part of the map the zoom buttons (left) and the
+   *  chips (the foot) leave free, so nothing seen sits under them (a phone's buttons take a fifth of its map) */
+  fitFree(size) {
+    const c = this.cv.getBoundingClientRect(), z = this.cv.offsetWidth ? c.width / this.cv.offsetWidth : 1, q = s => this.body.querySelector(s)?.getBoundingClientRect();
+    const ctl = q('.mp-ctl'), chips = q('.mp-chips');
+    const L = ctl?.width ? Math.max(0, (ctl.right - c.left) / z) : 0, B = chips?.width ? Math.max(0, (c.bottom - chips.top) / z) : 0;
+    const fw = size - L - 4, fh = size - B - 4; if (fw < size * 0.5 || fh < size * 0.5) return;
+    const v = this.view; v.span *= size / Math.min(fw, fh); this._zFit = this.homeSpan() / v.span;
+    const k = size / v.span, ox = L / 2, oy = -B / 2, r = this.rot(), cs = Math.cos(r), sn = Math.sin(r);
+    v.cx -= (ox * cs + oy * sn) / k; v.cz -= (-ox * sn + oy * cs) / k;
+  }
+  // ---- open, render, draw
+  onOpen() {
+    const ak = this.G?.mode === 'dungeon' ? `d:${this.G.dungeon?.def?.id || this.G.dungeon?.region?.id || ''}:${this.G.dungeon?.floor ?? ''}` : this.G?.mode || '';
+    if (ak !== this.areaKey || !this.view) { this.areaKey = ak; const h = this.provider()?.homeView?.(); this.view = h ? { cx: h.cx, cz: h.cz, span: h.span } : { cx: 112, cz: 112, span: 224 }; this._zoom = 1; this.sel = null; this.hover = null; this._fit = !!this.provider()?.fitFree; this._zFit = 0; }
+    if (this.G?.mapPin?.cur && !this.sel) this.sel = this.G.mapPin.cur.key;
+    const f = this.opts?.focus;
+    if (f && this.entry(f)) { this.sel = f; this.centreOn(f, true); const e = this.entry(f); this.dir.tab = e.kind === 'place' ? 'places' : 'people'; }
+    this.acc = 0; this.listAcc = 0; this.dir.render(true); this.draw(); this.paintChips(); this.scrollToSel();
+  }
+  onClose() { this.ui.tip.hide(this.cv); this.glide = null; this.ptrs.clear(); this.pinch = null; }
+  keyMode() { const dun = this.ui.mode === 'dungeon', region = dun && !!this.G?.dungeon?.isRegion; return region ? 'region' : this.ui.mode; }
+  legendRows() { const m = this.keyMode(); return m === 'village' ? KEY_VILLAGE : m === 'region' ? KEY_REGION : m === 'dungeon' ? KEY_DUNGEON : KEY_HOME; }
+  render() {
+    const dun = this.ui.mode === 'dungeon', home = this.ui.mode === 'interior';
+    const loc = this.ui.hud?.cache.loc;
+    this.body.querySelector('.mp-name').textContent = dun ? (loc?.name || this.G?.dungeon?.def?.name || 'Down below') : home ? (loc?.name || 'Home') : 'Blossom Hollow'; // (the floor's name from its mode: the HUD's, else its dungeon's)
+    this.body.querySelector('.mp-jp').textContent = dun ? (loc?.sub || '地下') : home ? 'おうち' : 'さくら村';
+    this.frame.classList.toggle('pans', this.pans());
+    this.dir?.render(true);
+  }
+  /** the pad on the map (ui/padNav.js, while the map is the top panel): LS moves the map under the crosshair, which
+   *  snaps to the mark nearest it; A there pins it (once the stick has moved the map); LT / RT and RS zoom; R3 back to you */
+  padFrame(dt, A) {
+    const z = (A.padDown('RT') ? 1 : 0) - (A.padDown('LT') ? 1 : 0) + A.aim().y;
+    if (Math.abs(z) > 0.1) this.zoomBy(1 + z * dt * 1.6);
+    const lx = A.axes[0] || 0, ly = A.axes[1] || 0, m = Math.hypot(lx, ly);
+    if (m > 0.18 && this.pans()) { const s = Math.min(1, (m - 0.18) / 0.72), sp = 340 * s * s * dt; this.panBy(-lx / m * sp, -ly / m * sp); this.stickT = performance.now(); this.glide = null; }
+    if (A.padHit('R3')) { A.padConsume('R3'); this.centreOnYou(); }
+    if (A.dnav) this.stickT = -1e9; // (the D-pad: the focus is the list's again, so is A)
+    // the crosshair: the mark nearest the map's middle
+    const n = this.size(), mid = this.hitAt(n / 2, n / 2), recent = performance.now() - (this.stickT || -1e9) < 2500;
+    this.frame.classList.toggle('aiming', recent);
+    if (recent) {
+      const key = mid?.e?.key || null;
+      if (key !== this.hover) { this.hover = key; this.dirty = true; if (mid) { const r = this.cv.getBoundingClientRect(); this.ui.tip.x = r.left + r.width / 2; this.ui.tip.y = r.top + r.height / 2; const t = tipFor(this.G, mid.e, this.lists().places); if (t) this.ui.tip.show(simpleTip(esc(t.title), t.text), 'tt-map', this.cv); } else this.ui.tip.hide(this.cv); }
+      if (key && A.padHit('A')) { A.padConsume('A'); this.select(key, { pin: true, centre: false }); this.dir.tab = mid.e.kind === 'place' ? 'places' : 'people'; this.dir.render(true); this.scrollToSel(); return true; }
+    }
+    if (recent && A.padHit('Y') && this.sel && this.entry(this.sel)) { A.padConsume('Y'); this.takeMeThere(); return true; } // (else Y is the focused row's: ui/padNav.js)
+    return false;
+  }
+  padHints() { return this.pans() ? [['LS', 'Move'], ['LT+RT', 'Zoom'], ['R3', 'To you']] : [['LT+RT', 'Zoom']]; }
+  update(dt) {
+    if (!this.isOpen) return;
+    if (this.glide && this.view) { // (an eased glide to a pick)
+      const g = this.glide, v = this.view, k = 1 - Math.exp(-dt * 9); g.t += dt;
+      v.cx += (g.x - v.cx) * k; v.cz += (g.z - v.cz) * k; v.span += (g.span - v.span) * k; this.clampView();
+      if (g.t > 1.2 || (Math.hypot(g.x - v.cx, g.z - v.cz) < 0.05 && Math.abs(g.span - v.span) < 0.05)) this.glide = null;
+      this.dirty = true;
+    }
+    this.acc = (this.acc || 0) + dt; this.listAcc = (this.listAcc || 0) + dt;
+    if (this.dirty || this.acc > 1 / 20) { this.acc = 0; this.dirty = false; this.draw(); }
+    if (this.listAcc > 0.5) { this.listAcc = 0; this.dir.render(false); this.paintChips(); }
+  }
   draw() {
-    const cv = this.cv, size = 560, dpr = Math.min(2, devicePixelRatio || 1);
+    const cv = this.cv, size = this.size(), dpr = Math.min(2.5, (devicePixelRatio || 1) * (cv.currentCSSZoom || 1)); // (the UI's zoom too: sharp on the Deck)
     if (cv.width !== Math.round(size * dpr)) { cv.width = cv.height = Math.round(size * dpr); }
     const g = cv.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, size, size);
     const pp = this.ui.hud.playerPos();
-    const P = this.ui.hud.mm.provider;
+    const P = this.provider(), t = this.G?.engine?.time ?? performance.now() / 1000;
+    if (this._fit && this.view) { this._fit = false; this.fitFree(size); }
     g.save();
     try {
-      if (P?.drawBig) P.drawBig(g, size, pp, { zoom: this.zoom });
+      if (P?.views && this.view) P.drawMap(g, size, { ...this.view, rot: this.rot() }, { big: true, time: t, sel: this.sel, hover: this.hover });
+      else if (P?.drawBig) P.drawBig(g, size, pp, { zoom: this.zoom });
       else if (P?.draw) P.draw(g, size, pp, { big: true, zoom: this.zoom });
       else drawPlaceholderMap(g, size, pp, this.ui.mode);
-    } catch (e) { console.warn('[ui] map provider', e); }
+    } catch (e) { if (!this._err) { this._err = 1; console.warn('[ui] map provider', e); } }
     g.restore();
-    const facing = this.ui.G?.player?.facing ?? 0;
-    g.save(); g.translate(size / 2, size / 2);
-    const pulse = 1 + Math.sin(performance.now() / 250) * 0.15;
-    g.fillStyle = 'rgba(255,143,176,.25)'; g.beginPath(); g.arc(0, 0, 18 * pulse, 0, Math.PI * 2); g.fill();
-    g.rotate(Math.PI - facing);
-    g.beginPath(); g.moveTo(0, -12); g.lineTo(9, 9); g.lineTo(0, 4.5); g.lineTo(-9, 9); g.closePath();
-    g.fillStyle = '#ff5c8a'; g.strokeStyle = '#fff'; g.lineWidth = 4; g.lineJoin = 'round'; g.stroke(); g.fill();
-    g.strokeStyle = '#4a2c2a'; g.lineWidth = 1.6; g.stroke();
-    g.restore();
+    if (!P?.ownHud) { // (the old providers: the pink arrow in the middle)
+      const facing = this.G?.player?.facing ?? 0;
+      g.save(); g.translate(size / 2, size / 2);
+      const pulse = 1 + Math.sin(performance.now() / 250) * 0.15;
+      g.fillStyle = 'rgba(255,143,176,.25)'; g.beginPath(); g.arc(0, 0, 18 * pulse, 0, Math.PI * 2); g.fill();
+      g.rotate(Math.PI - facing);
+      g.beginPath(); g.moveTo(0, -12); g.lineTo(9, 9); g.lineTo(0, 4.5); g.lineTo(-9, 9); g.closePath();
+      g.fillStyle = '#ff5c8a'; g.strokeStyle = '#fff'; g.lineWidth = 4; g.lineJoin = 'round'; g.stroke(); g.fill();
+      g.strokeStyle = '#4a2c2a'; g.lineWidth = 1.6; g.stroke();
+      g.restore();
+    }
+    // the compass: north where it is (the map turns with the camera)
+    const turns = P?.ownHud ? !this.ui.settings.mmNorth : true, a = turns ? (P?.rot ? P.rot() : mapRot(this.G.engine.rig.yaw)) : 0;
+    if (this.rose && Math.abs((this._roseA ?? 99) - a) > 0.003) { this._roseA = a; this.rose.style.setProperty('--rot', `${(a * 180 / Math.PI).toFixed(1)}deg`); }
+  }
+  /** QA (tools/qa/map-shots.mjs): pick Rosie (or the first with something for you), or Rosie's Treats */
+  demo(tab) {
+    this.dir.tab = tab;
+    const L = this.lists();
+    const e = tab === 'people' ? (L.people.find(p => p.id === 'rosie') || L.people.find(p => p.visible && !p.you && !p.shadow)) : (L.places.find(p => p.id === 'rosieShop') || L.places[0]);
+    if (!e) return false;
+    this.select(e.key, { pin: true, centre: true }); this.scrollToSel();
+    return true;
   }
 }
 

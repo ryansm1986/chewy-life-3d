@@ -44,12 +44,13 @@ function generateFloor({ floor = 1, seed = 1, plan = null } = {}) {
   if (P.layout === 'zone') return generateZone({ floor, seed, plan: { ...P, theme }, TH }); // a zone dungeon's floor (zoneGen.js)
   // built biomes (shrine / kitchen) get cleaner rooms and straight corridors so fences & brick walls read as architecture
   const wob = TH.wobble ?? 0.9, built = !!TH.built, cr = built ? 1.4 : 2.2;
-  const W = boss ? 56 : 64 + Math.min(16, depth * 2), H = W;
+  // (a den's plan, dungeon/defs.js floorPlan, may size its floor and count its rooms; without a plan, the old floor)
+  const W = P.size || (boss ? 56 : 64 + Math.min(16, depth * 2)), H = W;
   const grid = new Uint8Array(W * H); // 0 wall, 1 floor
   const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? 0 : grid[y * W + x];
   const set = (x, y, v = 1) => { if (x > 1 && y > 1 && x < W - 2 && y < H - 2) grid[y * W + x] = v; };
   const rooms = [];
-  const want = boss ? 6 : 9 + Math.min(6, Math.floor(depth / 2));
+  const want = P.rooms || (boss ? 6 : 9 + Math.min(6, Math.floor(depth / 2)));
   let tries = 0;
   while (rooms.length < want && tries++ < 600) {
     const big = rooms.length === 1 && boss;
@@ -57,6 +58,13 @@ function generateFloor({ floor = 1, seed = 1, plan = null } = {}) {
     const x = rng.int(3, W - w - 4), y = rng.int(3, H - h - 4);
     if (rooms.some(r => x < r.x + r.w + 3 && x + w + 3 > r.x && y < r.y + r.h + 3 && y + h + 3 > r.y)) continue;
     rooms.push({ x, y, w, h, cx: Math.floor(x + w / 2), cy: Math.floor(y + h / 2), kind: 'normal' });
+  }
+  // a den's last floor (plan.bigBoss): the big room is the boss's chamber, and the arrival is the room farthest from it
+  const bigRoom = P.bigBoss && boss && rooms.length > 2 ? rooms[1] : null;
+  if (bigRoom) {
+    let fi = 0, fd2 = -1;
+    rooms.forEach((r, i) => { if (r === bigRoom) return; const d = Math.hypot(r.cx - bigRoom.cx, r.cy - bigRoom.cy); if (d > fd2) { fd2 = d; fi = i; } });
+    [rooms[0], rooms[fi]] = [rooms[fi], rooms[0]];
   }
   // carve organic rooms (rounded rect with noisy edge)
   for (const r of rooms) {
@@ -105,11 +113,12 @@ function generateFloor({ floor = 1, seed = 1, plan = null } = {}) {
   // assign room roles: start = room 0, stairs/boss = farthest room
   const start = rooms[0]; start.kind = 'start';
   let far = rooms[1], fd = 0;
-  for (const r of rooms) { const d = Math.hypot(r.cx - start.cx, r.cy - start.cy); if (d > fd && r !== start) { fd = d; far = r; } }
+  if (bigRoom) far = bigRoom;
+  else for (const r of rooms) { const d = Math.hypot(r.cx - start.cx, r.cy - start.cy); if (d > fd && r !== start) { fd = d; far = r; } }
   far.kind = boss ? 'boss' : 'stairs';
   const others = rooms.filter(r => r.kind === 'normal');
   rng.shuffle(others);
-  if (others[0] && !boss) others[0].kind = 'treasure';
+  if (others[0] && (!boss || P.treasure)) others[0].kind = 'treasure'; // (a den's boss floor keeps its treasure room)
   if (others[1] && rng.chance(0.7)) others[1].kind = 'shrine';
   // free floor cells helper
   const occupied = new Set();

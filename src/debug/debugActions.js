@@ -13,7 +13,8 @@ import { MATERIAL_KEYS } from '../rpg/loot.js';
 import { ZONE_IDS, zoneOf, tierRecord, recordDungeonClear, TIER_DUNGEONS, spiritMax, spiritOpen } from '../rpg/zones.js';
 import { zoneUnlockOnClear } from '../rpg/zoneProgress.js';
 import { ZONE_MODS, MOD_IDS } from '../rpg/zoneMods.js';
-import { DUNGEONS, ZONE_DUNGEON } from '../dungeon/defs.js';
+import { DUNGEONS, ZONE_DUNGEON, DEN_IDS, theDen } from '../dungeon/defs.js';
+import { denCleared, recordDenClear } from '../rpg/dens.js';
 import { MONSTERS } from '../dungeon/monsters.js';
 import { Monster } from '../dungeon/monster.js';
 import { REGIONS } from '../regions/index.js';
@@ -112,10 +113,8 @@ function clearDungeons(G) {
     if (d.cleared === 0) { recordDungeonClear(st, id, 0); out.push(DUNGEONS[id].name); }
     zoneUnlockOnClear(st, zone);
   }
-  const D = st.dungeon ||= { deepest: 0, waypoints: [1] };
-  if ((D.deepest || 0) < 21) { D.deepest = 21; out.push('the Burrow (floor 20, Tamamo)'); }
-  D.waypoints = [...new Set([...(D.waypoints || [1]), 1, 6, 11, 16])].sort((a, b) => a - b);
-  tierRecord(st, 'burrowDeep'); // (the Deep Burrow's Lantern wakes: its T1 opens)
+  for (const id of DEN_IDS) if (!denCleared(st, id)) { recordDenClear(st, id); out.push(theDen(id)); } // (the Burrow's four dens: rpg/dens.js)
+  tierRecord(st, 'burrowDeep'); G.burrowLantern?.refresh?.(); // (the Deep Burrow's Lantern wakes with the Moonlit Sanctum: its T1 opens)
   Events.emit('quest:update');
   return out.length ? `Cleared: ${out.join(', ')}` : 'Everything is cleared already';
 }
@@ -193,15 +192,15 @@ async function toDungeon(G, run, arena = false) {
   if (G.mode === 'interior') await toVillage(G);
   G.state.flags.burrowTut = true; // (no first-visit tip over the test)
   G.enterDungeon(run);
-  const id = typeof run === 'object' ? run.id : 'burrow', floor = typeof run === 'object' ? run.floor : run;
-  const here = () => G.mode === 'dungeon' && !G.dungeon?.isRegion && (G.dungeon?.def?.id || 'burrow') === id && G.dungeon.floor === floor && idle(G);
+  const id = run.id, floor = run.floor;
+  const here = () => G.mode === 'dungeon' && !G.dungeon?.isRegion && G.dungeon?.def?.id === id && G.dungeon.floor === floor && idle(G);
   if (!(await when(here, null, 60000))) return `Couldn't reach ${DUNGEONS[id]?.name || id}`;
   if (arena) {
     const L = G.dungeon.layout, A = L.arena, m = L.arenaMouth;
     if (m) teleport(G, m.x - (m.ux || 0) * 3, m.z - (m.uz || 0) * 3); else if (A) teleport(G, A.x, A.z + (A.r || 8) * 0.6);
     return `${DUNGEONS[id].name}: the boss arena`;
   }
-  return `${DUNGEONS[id]?.name || 'The Burrow'} floor ${floor}`;
+  return `${DUNGEONS[id]?.name || id} floor ${floor}`;
 }
 
 // ------------------------------------------------------------------ village and economy
@@ -323,7 +322,7 @@ export function registerCoreSections(G, api) {
   registerDebug('world', [
     { label: 'Open every zone', hint: 'All the Travel Map', run: unlockZones },
     { label: 'Save every village', hint: 'Sieges done, buildings open', run: saveVillages },
-    { label: 'Clear every dungeon', hint: 'The four zone dungeons and the Burrow to floor 20', run: clearDungeons },
+    { label: 'Clear every dungeon', hint: 'The four zone dungeons and the Burrow\'s four dens', run: clearDungeons },
     { group: 'Story', label: 'Jump to chapter', choices: () => [...CHAIN.map((id, i) => ({ label: `${i + 1}. ${QUESTS[id].title}`, value: id })), { label: 'All done', value: 'done' }], run: storyTo },
     { label: 'Next quest step', run: nextStep },
     { label: 'Complete the quest', hint: 'The story quest running now, rewards and all', run: completeQuest },
@@ -357,8 +356,8 @@ export function registerCoreSections(G, api) {
     { label: "Chewy's Cottage", hint: 'The house, inside', closes: true, run: toHome },
     { group: 'Zones', note: 'The wild areas join these rows once the cozy path adds them (ROADMAP CZ-3).' },
     ...zoneRows,
-    { group: 'Dungeons', label: 'The Burrow', closes: true, choices: Array.from({ length: 20 }, (_, i) => ({ label: `B${i + 1}`, value: i + 1 })), run: (G, f) => toDungeon(G, f) },
-    ...Object.values(DUNGEONS).filter(d => d.kind === 'zone').map(d => ({ label: d.name, closes: true, choices: [{ label: 'Floor 1', value: 1 }, { label: 'Floor 2', value: 2 }, { label: 'Boss arena', value: 'arena' }],
+    ...DEN_IDS.map((id, k) => ({ ...(k ? {} : { group: 'The Burrow\'s dens (a locked one too)' }), label: DUNGEONS[id].name, closes: true, choices: [{ label: 'Floor 1', value: 1 }, { label: 'Floor 2', value: 2 }], run: (G, f) => toDungeon(G, { id, floor: f }) })),
+    ...Object.values(DUNGEONS).filter(d => d.kind === 'zone').map((d, k) => ({ ...(k ? {} : { group: 'Zone dungeons' }), label: d.name, closes: true, choices: [{ label: 'Floor 1', value: 1 }, { label: 'Floor 2', value: 2 }, { label: 'Boss arena', value: 'arena' }],
       run: (G, f) => toDungeon(G, { id: d.id, floor: f === 'arena' ? 2 : f }, f === 'arena') })),
     { label: 'The Deep Burrow', hint: 'Tier 1', closes: true, choices: [{ label: 'Floor 1', value: 1 }, { label: 'Floor 2', value: 2 }], run: (G, f) => toDungeon(G, { id: 'burrowDeep', floor: f, tier: 1 }) },
   ], { title: 'Travel', icon: 'torii', order: 40 });
@@ -378,7 +377,7 @@ export function registerCoreSections(G, api) {
   registerDebug('items', [
     { label: 'Gear set', hint: 'Equipped on the active hero', fields: [{ key: 'lvl', label: 'Level', choices: [1, 10, 20, 30, 45, 60], value: 30 }, { key: 'rarity', label: 'Rarity', choices: ['magic', 'rare', 'unique', 'set'].map(r => ({ label: r[0].toUpperCase() + r.slice(1), value: r })), value: 'rare' }], go: 'Equip', run: (G, v) => gearSet(G, v.lvl, v.rarity) },
     { label: 'Potions', hint: 'A full belt', run: G => { for (const k in POTION_CAP) G.actions.addPotion(k, POTION_CAP[k]); return 'The belt is full'; } },
-    { label: 'Gems', hint: 'Three of each kind, perfect', run: G => { for (const t of GEM_TYPES) { const g = makeGem(t, 2); g.qty = 3; give(G, g); } return `${GEM_TYPES.length} kinds of perfect gems ×3 → the bag`; } },
+    { label: 'Treats', hint: 'Three of each kind, gourmet', run: G => { for (const t of GEM_TYPES) { const g = makeGem(t, 2); g.qty = 3; give(G, g); } return `${GEM_TYPES.length} kinds of gourmet treats ×3 → the bag`; } },
     { note: 'Identify all: nothing to do. Pawhaven has no unidentified items; every drop shows its stats.' },
     { group: 'Uniques (to the bag)', label: 'Endgame and pinnacle', wide: true, choices: spiritU.map(U), run: uniq },
     { label: 'Zone bosses', wide: true, choices: zoneU.map(U), run: uniq },

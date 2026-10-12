@@ -11,11 +11,11 @@ try {
   const fill = await page.evaluate(() => {
     const G = window.G, A = G.actions, gen = window.QA.items.generateItem;
     let ok = 0; const t0 = window.QA.toasts.length;
-    for (let i = 0; i < 40; i++) if (A.pickup(gen({ ilvl: 5, rarity: 'magic' }))) ok++;
+    for (let i = 0; i < 40; i++) if (A.pickup(gen({ ilvl: 5, rarity: 'magic', slot: 'charm' }))) ok++; // (1 x 1 charms: items take up space, R-20)
     const over = A.pickup(gen({ ilvl: 5, rarity: 'rare' }));
     return { ok, over, full: G.state.inventory.every(Boolean), toasts: window.QA.toasts.slice(t0) };
   });
-  R.check('bag holds exactly 40 items, 41st pickup refused with a toast', fill.ok === 40 && fill.over === false && fill.full && fill.toasts.includes('Bag is full!'), JSON.stringify({ ...fill, toasts: fill.toasts.slice(-2) }));
+  R.check('the bag holds exactly 40 1x1 items, the 41st pickup refused with "No room in your bag"', fill.ok === 40 && fill.over === false && fill.full && fill.toasts.includes('No room in your bag'), JSON.stringify({ ...fill, toasts: fill.toasts.slice(-2) }));
   const buyFull = await page.evaluate(() => { const G = window.G, c0 = G.state.coins = 500; const r = G.actions.buyItem(window.QA.items.generateItem({ ilvl: 3, rarity: 'normal' }), 50); return { r, coins: G.state.coins, c0 }; });
   R.check('buying with a full bag is refused and costs nothing', buyFull.r === false && buyFull.coins === buyFull.c0, JSON.stringify(buyFull));
 
@@ -29,7 +29,7 @@ try {
     await new Promise(r => setTimeout(r, 1500));
     return { onGround: L.list.length - n0, toasts: window.QA.toasts.slice(t0) };
   });
-  R.check('walking over an item with a full bag: item stays on the ground, one toast', ground.onGround === 1 && ground.toasts.filter(t => t === 'Bag is full!').length <= 1, JSON.stringify(ground));
+  R.check('walking over an item with a full bag: item stays on the ground, one toast', ground.onGround === 1 && ground.toasts.filter(t => t === 'No room in your bag').length <= 1, JSON.stringify(ground));
   const belt = await page.evaluate(async () => {
     const G = window.G, P = G.player, L = G.dungeon.loot, V = G.THREE.Vector3;
     G.state.potions.heart = 15;

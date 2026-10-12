@@ -188,7 +188,7 @@ export function installAutosave(G, { indicator } = {}) {
   const flag = name => () => A.flag(name);
   for (const n of ['quest:update', 'player:levelup', 'hero:levelup', 'village:changed', 'building:levelup', 'house:upgraded', 'hero:joined',
     'village:saved', 'villager:rescued', 'village:campCleared', 'dungeon:cleared', 'region:cleared', 'pinnacle:cleared', 'tier:unlocked',
-    'spirit:unlocked', 'expedition:sent', 'expedition:back', 'sighting:cleared', 'village:celebrate']) Events.on(n, flag(n)); // (sighting:cleared: a bounty paid, cozy/peacefulRun.js)
+    'spirit:unlocked', 'expedition:sent', 'expedition:back', 'sighting:cleared', 'village:celebrate', 'stash:tab', 'portal:opened']) Events.on(n, flag(n)); // (sighting:cleared: a bounty paid, cozy/peacefulRun.js; stash:tab: one bought, renamed or recoloured, rpg/actions.js; portal:opened: a Town Portal's floor to come back to, dungeon/townPortal.js)
   Events.on('item:pickup', e => { if (BIG_LOOT.has(e?.item?.rarity)) A.flag('item:pickup'); });
   Events.on('coins:changed', e => { if (e?.delta <= -BIG_BUY) A.flag('purchase'); });
   Events.on('scavenge:dig', e => { if (e?.find) A.flag('scavenge:dig'); }); // (a dig that turned up furniture: cozy/scavengeWorld.js)

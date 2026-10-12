@@ -29,6 +29,10 @@ import { FURNITURE, FURNITURE_IDS, SURFACES, SURFACE_IDS, SETS as FSETS, CATS as
 import { LAYOUTS, shellOf, layoutFor, isBack, WALL_H } from '../src/home/rooms.js';
 import { canPlace, poseOf, boxOf, cellsOf, wallSpan, frontCell, nextK } from '../src/home/placement.js';
 import { defaultInterior } from '../src/home/defaults.js';
+import { migrateStash, nextTabPrice, TAB_PRICES as STASH_PRICES, tabCount, stashPut, stashSpot, tabGrid, cleanTabName, STASH_MAX_TABS } from '../src/rpg/stash.js';
+import { cover, fitsAt, findSpot, placed, freeCells, gridProblems, bagGrid, itemSize, TAB_CELLS, packGrid, packOrder, sortGroup, WEAPON_SIZE, SLOT_SIZE } from '../src/rpg/grid.js';
+import { packSave, stow, lostItems, lostGrid, lostTidy } from '../src/rpg/stash.js';
+import { renameTreat, treatName, GEM_TIERS } from '../src/rpg/items.js';
 
 const quiet = process.argv.includes('--quiet');
 let fails = 0, checks = 0;
@@ -348,16 +352,18 @@ hr('ACTIONS');
   // pickup & stacking
   const hat = generateItem({ ilvl: 1, slot: 'hat', rarity: 'magic', rng });
   ok(A.pickup(hat) && S.inventory[0] === hat, 'pickup gear');
+  ok(itemSize(hat).join('x') === '2x1' && !S.inventory[1], 'pickup gear: a hat takes two cells (its anchor and the one beside it)');
   ok(A.pickup({ type: 'gem', item: makeGem('ruby', 0) }) && A.pickup(makeGem('ruby', 0)), 'pickup gems');
-  ok(S.inventory[1].qty === 2 && !S.inventory[2], 'gems stack');
+  const rubyAt = S.inventory.findIndex(x => x?.kind === 'gem');
+  ok(rubyAt === 2 && S.inventory[2].qty === 2 && S.inventory.filter(x => x?.kind === 'gem').length === 1, 'gems stack (after the hat: cell 2)');
   A.pickup(makeGem('ruby', 1));
-  ok(S.inventory[2] && S.inventory[2].gemTier === 1, 'different tier does not stack');
+  ok(S.inventory[3] && S.inventory[3].gemTier === 1, 'different tier does not stack');
   const c0 = S.coins; A.pickup({ type: 'coins', n: 33 }); ok(S.coins === c0 + 33, 'pickup coins');
   { const s0 = S.materials.silk || 0; A.pickup({ type: 'material', key: 'silk', n: 3 }); ok(S.materials.silk === s0 + 3, 'pickup material'); }
   A.pickup({ type: 'potion', key: 'rejuv' }); ok(S.potions.rejuv === 1, 'pickup potion');
   // equip
   const lifeBefore = G.derived.lifeMax;
-  ok(A.equip(0) && S.equipment.hat === hat && !S.inventory[0], 'equip hat');
+  ok(A.equip(S.inventory.indexOf(hat)) && S.equipment.hat === hat && !S.inventory[0], 'equip hat');
   ok(evs['equip:changed'] > 0 && evs['stats:changed'] > 0, 'equip events');
   ok(A.unequip('hat') && S.inventory[0] === hat, 'unequip hat');
   ok(G.derived.lifeMax === lifeBefore, 'stats restored after unequip');
@@ -368,6 +374,23 @@ hr('ACTIONS');
   ok(!A.equip(bi) && toasts.some(t => /Requires/.test(t)), 'req blocks equip');
   // moveItem
   ok(A.moveItem({ c: 'inv', i: bi }, { c: 'stash', i: 5 }) && S.stash[5] === big, 'move to stash');
+  { // the stash's tabs (ROADMAP R-19, rpg/stash.js): prices, the quick-move order, only owned tabs
+    ok(S.stashTabs.length === 1 && S.stashTabs[0].name === 'Tab 1' && S.stashTabs[0].color === 'pink', 'stash tabs: a new game has one, "Tab 1" in pink');
+    const m0 = { ...S.materials }, c0 = S.coins; S.coins = 0;
+    ok(A.buyStashTab() === false && S.stashTabs.length === 1 && S.stash.length === 60, 'stash tabs: poor, the next tab is refused and nothing changes');
+    S.coins = 60000; Object.assign(S.materials, { wood: 400, stone: 400, silk: 40, crystal: 40, lantern: 40 });
+    const paid = [];
+    for (let t = 1; t < 6; t++) { const b0 = { coins: S.coins, ...S.materials }; ok(A.buyStashTab() === t, `stash tabs: tab ${t + 1} bought`); const d = { coins: b0.coins - S.coins }; for (const k of ['wood', 'stone', 'silk', 'crystal', 'lantern']) if (b0[k] - S.materials[k]) d[k] = b0[k] - S.materials[k]; paid.push(d); }
+    ok(JSON.stringify(paid.map(p => p.coins)) === '[500,1500,4000,10000,25000]' && JSON.stringify(paid.map((p, k) => JSON.stringify(p) === JSON.stringify(STASH_PRICES[k + 1]))) === '[true,true,true,true,true]', 'stash tabs: each at its price (500 / 1,500 / 4,000 / 10,000 / 25,000 coins and the table\'s materials)');
+    ok(S.stashTabs.length === 6 && S.stash.length === 360 && A.buyStashTab() === false && nextTabPrice(S) === null, 'stash tabs: six at most, 360 slots');
+    ok(A.renameStashTab(1, '  Gems  &  charms  ') && S.stashTabs[1].name === 'Gems & charms' && A.colorStashTab(1, 'mint') && S.stashTabs[1].color === 'mint' && !A.colorStashTab(1, 'plaid') && !A.renameStashTab(9, 'x'), 'stash tabs: renamed (tidied) and coloured; a colour off the palette or a tab you don\'t own is refused');
+    const big2 = generateItem({ ilvl: 3, rarity: 'normal', rng });
+    ok(A.stashPut(big2, 3) === 180 && S.stash[180] === big2, 'stashPut: into the tab asked for, top-left first');
+    for (let k = 180; k < 240; k++) S.stash[k] = S.stash[k] || generateItem({ ilvl: 2, rng });
+    const nx = generateItem({ ilvl: 3, rng }); ok(A.stashPut(nx, 3) === 0, 'stashPut: that tab full, the first tab with room');
+    ok(!A.moveItem({ c: 'stash', i: 5 }, { c: 'stash', i: 360 }) && S.stash.length === 360, 'moveItem: never past the tabs you own');
+    S.stash.length = 60; S.stashTabs.length = 1; for (let k = 0; k < 60; k++) if (k !== 5) S.stash[k] = null; S.coins = c0; Object.assign(S.materials, m0);
+  }
   ok(!A.moveItem({ c: 'inv', i: 0 }, { c: 'equip', i: 'boots' }), 'hat cannot go in boots');
   ok(A.moveItem({ c: 'inv', i: 0 }, { c: 'equip', i: 'hat' }) && S.equipment.hat === hat, 'move to equip slot');
   ok(A.moveItem({ c: 'equip', i: 'hat' }, { c: 'inv', i: 10 }) && S.inventory[10] === hat, 'move equip → inv');
@@ -383,7 +406,7 @@ hr('ACTIONS');
   // drop & sell
   const dropped = A.dropItem({ c: 'inv', i: 10 });
   ok(dropped === hat && evs['item:drop'] > 0, 'dropItem');
-  const cBefore = S.coins; const sv = A.sellItem({ c: 'inv', i: 1 });
+  const cBefore = S.coins; const sv = A.sellItem({ c: 'inv', i: rubyAt });
   ok(sv > 0 && S.coins === cBefore + sv, 'sellItem stack');
   // buy
   const shop = shopStock(5, 3);
@@ -391,10 +414,10 @@ hr('ACTIONS');
   ok(A.buyItem(shop[0], shop[0].price) && S.coins === 99999 - shop[0].price, 'buyItem');
   ok(A.buyItem({ kind: 'potion', key: 'heart' }, 25) && S.potions.heart === 4, 'buy potion');
   S.coins = 3; ok(!A.buyItem(shop[1], shop[1].price) && toasts.includes('Not enough coins!'), 'buy needs coins'); S.coins = cb;
-  // bag full
-  for (let i = 0; i < 45; i++) A.pickup(generateItem({ ilvl: 5, rarity: 'normal', rng }));
-  ok(S.inventory.every(Boolean), 'bag filled');
-  ok(!A.pickup(generateItem({ ilvl: 5, rng })) && toasts.includes('Bag is full!'), 'bag full → false + toast');
+  // bag full (1 x 1 charms fill every cell)
+  for (let i = 0; i < 45; i++) A.pickup(generateItem({ ilvl: 5, slot: 'charm', rarity: 'magic', rng }));
+  ok(A.firstFree('inv') < 0, 'bag filled (no free cell)');
+  ok(!A.pickup(generateItem({ ilvl: 5, rng })) && toasts.includes('No room in your bag'), 'bag full: false and "No room in your bag"');
   // potions & regen
   ok(A.usePotion('heart') === null && toasts.some(t => /Already/.test(t)), 'no potion at full life');
   A.damage(G.derived.lifeMax * 0.6);
@@ -1178,16 +1201,15 @@ hr('ZONES: DUNGEON DEFS, SEEDS, STATE, QUEST STEPS');
 {
   const D = await import('../src/dungeon/defs.js'), Gn = await import('../src/dungeon/gen.js'), Z = await import('../src/rpg/zones.js'), Q = await import('../src/world/questSteps.js');
   const { REGION_IDS, REGIONS } = await import('../src/regions/index.js');
-  // ---- DungeonDef: the Burrow is unchanged
-  const B = D.DUNGEONS.burrow;
-  ok(B.kind === 'burrow' && B.floors === Infinity && B.waypoints, 'defs: DUNGEONS.burrow is endless with waypoints');
+  // ---- DungeonDef: the endless Burrow is four 2-floor dens now (ROADMAP Z-H1: the dens' own checks are "BURROW DENS"
+  // below). generate() without a plan is still the old floor, and a plan with the old floor's own numbers gives it exactly
+  ok(!D.DUNGEONS.burrow && D.DEN_IDS.join() === 'mossyBurrow,foxShrine,oniKitchen,moonSanctum' && D.DEN_IDS.every(id => D.DUNGEONS[id].kind === 'burrow' && D.DUNGEONS[id].floors === 2 && !D.DUNGEONS[id].waypoints), 'defs: no endless Burrow any more: four 2-floor dens in order, no waypoints');
   let same = true;
   for (let f = 1; f <= 40; f++) {
-    const p = D.floorPlan(B, f);
-    if (p.theme !== Gn.themeFor(f) || p.boss !== Gn.bossFor(f) || p.mlvl !== f + 1 || p.waypoint !== (f % 5 === 1 && f > 1)) same = false;
+    const p = { theme: Gn.themeFor(f), boss: Gn.bossFor(f), mlvl: f + 1, waypoint: f % 5 === 1 && f > 1, depth: f };
     for (const seed of [1 + f * 17, 4242 + f]) { const a = Gn.generate({ floor: f, seed }), b = Gn.generate({ floor: f, seed, plan: p }); if (JSON.stringify([a.rooms, a.spawns, a.chests, a.waypoint, a.stairs, a.theme, a.mlvl, a.boss]) !== JSON.stringify([b.rooms, b.spawns, b.chests, b.waypoint, b.stairs, b.theme, b.mlvl, b.boss])) same = false; }
   }
-  ok(same, 'defs: the Burrow plan reproduces the old generator floor for floor (theme every 20, bosses every 5, mlvl floor + 1, waypoints)');
+  ok(same, 'gen: generate() without a plan is the old floor exactly, and a plan with that floor\'s own numbers reproduces it (theme every 20, bosses every 5, mlvl floor + 1, waypoints)');
   // the four zone dungeons: stubs, 2 floors, the zone's own monsters and boss
   ok(Object.keys(D.ZONE_DUNGEON).join() === REGION_IDS.join() && Object.values(D.ZONE_DUNGEON).join() === 'bambooDepths,mapleRoots,tideCaves,onsenCaverns', 'defs: one zone dungeon per zone (bambooDepths, mapleRoots, tideCaves, onsenCaverns)');
   for (const id of Object.values(D.ZONE_DUNGEON)) {
@@ -1203,17 +1225,21 @@ hr('ZONES: DUNGEON DEFS, SEEDS, STATE, QUEST STEPS');
     ok(!bad, `defs: ${id} generates (60 seeds × 2 floors): stairs on floor 1, the boss room on floor 2, never a waypoint (${bad} bad)`);
   }
   // normRun: the old numeric API, clamping
-  const n1 = D.normRun(7), n2 = D.normRun({ id: 'mapleRoots', floor: 9, tier: 2, mods: ['swarming'] }), n3 = D.normRun({ id: 'nope', floor: 0 });
-  ok(n1.id === 'burrow' && n1.floor === 7 && n1.tier === 0 && n2.id === 'mapleRoots' && n2.floor === 2 && n2.tier === 2 && n2.mods[0] === 'swarming' && n3.id === 'burrow' && n3.floor === 1, 'defs: normRun takes a Burrow floor number or { id, floor, tier, mods } (floors clamped, unknown ids → the Burrow)');
-  // ---- seeds: pinned = the old formula; unpinned rerolls per entry
+  const n1 = D.normRun(7), n2 = D.normRun({ id: 'mapleRoots', floor: 9, tier: 2, mods: ['swarming'] }), n3 = D.normRun({ id: 'nope', floor: 0 }), n4 = D.normRun(20), n5 = D.normRun({ id: 'burrow', floor: 15 }), n6 = D.normRun('foxShrine');
+  ok(n1.id === 'foxShrine' && n1.floor === 1 && n1.tier === 0 && n2.id === 'mapleRoots' && n2.floor === 2 && n2.tier === 2 && n2.mods[0] === 'swarming' && n3.id === 'mossyBurrow' && n3.floor === 1 && n4.id === 'moonSanctum' && n4.floor === 2 && n5.id === 'oniKitchen' && n5.floor === 2 && n6.id === 'foxShrine' && n6.floor === 1, 'defs: normRun takes an old Burrow floor number (its den now: 7 → the Fox Shrine floor 1, 20 → the Moonlit Sanctum floor 2), a den id, or { id, floor, tier, mods } (floors clamped, unknown ids → the Mossy Burrow)');
+  // ---- seeds: pinned = one fixed layout per dungeon floor; unpinned rerolls per entry
   const st0 = { dungeon: { deepest: 0, waypoints: [1] } };
-  const pinned = [1, 5, 12].map(f => D.beginRun(st0, f, { fixedSeed: 1 }));
-  ok(pinned.every(r => r.seed === 1 + r.floor * 17 && r.packSeed === r.floor * 999) && !st0.dungeon.runs, 'seeds: ?dseed=1 is exactly the old (seed || 1) + floor * 17, packs floor * 999, and leaves runs alone');
+  const pinned = [1, 5, 12].map(f => D.beginRun(st0, f, { fixedSeed: 1 })), pinned2 = [1, 5, 12].map(f => D.beginRun(st0, f, { fixedSeed: 1 }));
+  ok(pinned.every((r, i) => r.seed === pinned2[i].seed && r.packSeed === pinned2[i].packSeed) && new Set(pinned.map(r => r.seed)).size === 3 && !st0.dungeon.runs, 'seeds: ?dseed=1 pins one layout per dungeon floor (the same every entry), and leaves runs alone');
   const rr = new RNG(9), rolls = [0, 1, 2, 3].map(() => D.beginRun(st0, 1, { rand: () => rr.next() }));
   ok(st0.dungeon.runs === 4 && st0.dungeon.seed > 0 && new Set(rolls.map(r => r.seed)).size === 4 && new Set(rolls.map(r => r.packSeed)).size === 4, 'seeds: each unpinned entry bumps state.dungeon.runs and gets its own layout and pack seeds');
   const lays = new Set(rolls.map(r => JSON.stringify(Gn.generate({ floor: 1, seed: r.seed }).rooms)));
   ok(lays.size === 4, 'seeds: …so the same floor lays out differently each visit');
   ok(D.beginRun(st0, { id: 'burrow', floor: 3, seed: 77 }).seed === 77 && D.beginRun({}, { id: 'tideCaves', floor: 1 }, { fixedSeed: 1 }).seed !== D.beginRun({}, 1, { fixedSeed: 1 }).seed, 'seeds: an explicit seed wins; each dungeon has its own layouts for the same pin');
+  // (a Town Portal's way back, ROADMAP Z-H2: the run it saved builds the same floor: its seeds, the hero level its monsters
+  //  were sized for and the snapshot ride through normRun and beginRun; a plain entry carries none of them)
+  { const snap = { v: 1, alive: [] }, back = D.beginRun(st0, { id: 'foxShrine', floor: 2, tier: 0, seed: 4242, packSeed: 777, heroLvl: 9, resume: snap }, { fixedSeed: 1 }), plain = D.beginRun(st0, { id: 'foxShrine', floor: 2 }, { fixedSeed: 1 });
+    ok(back.id === 'foxShrine' && back.floor === 2 && back.seed === 4242 && back.packSeed === 777 && back.heroLvl === 9 && back.resume === snap && !('resume' in plain) && !('heroLvl' in plain) && D.beginRun(st0, { id: 'foxShrine', floor: 2, seed: 4242 }).packSeed === 4242 * 31 + 2, 'the Town Portal: a saved run comes back with its seed, pack seed, hero level and snapshot; a plain entry has none'); }
   // ---- state.zones and the migration from state.regions
   const fresh = Z.normalizeZones({});
   ok(Z.ZONE_IDS.join() === REGION_IDS.join() && Z.ZONE_IDS.every(id => { const z = fresh.zones[id]; return z.unlocked === false && z.visits === 0 && z.regionBoss === 0 && z.village === 'besieged' && Array.isArray(z.siegeCamps) && z.dungeon.cleared === 0 && z.dungeon.bestFloor === 0 && z.dungeon.tier.unlocked === 0 && z.dungeon.tier.cleared.length === 0 && z.dungeon.spirit.best === 0 && typeof z.quests === 'object'; }), 'zones: a fresh state gets the §8 record for all four zones');
@@ -1246,19 +1272,20 @@ hr('ZONES: DUNGEON DEFS, SEEDS, STATE, QUEST STEPS');
   ok(Z.noteFloor(ts, 'onsen', 2) === 2 && Z.noteFloor(ts, 'onsen', 1) === 2, 'zones: noteFloor keeps the best floor');
   // ---- quest steps: filters and the new types
   const kill = (s, e) => Q.stepGain(s, 'kill', e);
-  const eB = { id: 'mochi', floor: 3, zone: null, dungeon: 'burrow', tier: 0 }, eZ = { id: 'kodama', floor: 1, zone: 'bamboo', dungeon: 'bambooDepths', tier: 2 }, eR = { id: 'kodama', floor: 0, zone: 'bamboo', dungeon: null, tier: 0 };
+  const eB = { id: 'mochi', floor: 1, zone: null, dungeon: 'mossyBurrow', tier: 0 }, eZ = { id: 'kodama', floor: 1, zone: 'bamboo', dungeon: 'bambooDepths', tier: 2 }, eR = { id: 'kodama', floor: 0, zone: 'bamboo', dungeon: null, tier: 0 };
   ok(kill({ type: 'kill', n: 8 }, eB) === 1 && kill({ type: 'kill', n: 8 }, eZ) === 1 && kill({ type: 'kill', n: 8 }, eR) === 1 && kill({ type: 'kill', monster: 'mochi' }, eZ) === 0, 'steps: an unfiltered kill counts anywhere (as before); monster filters still work');
   ok(kill({ type: 'kill', dungeon: 'bambooDepths' }, eZ) === 1 && kill({ type: 'kill', dungeon: 'bambooDepths' }, eR) === 0 && kill({ type: 'kill', dungeon: 'bambooDepths' }, eB) === 0 && kill({ type: 'kill', zone: 'bamboo' }, eR) === 1 && kill({ type: 'kill', zone: 'bamboo' }, eZ) === 1 && kill({ type: 'kill', zone: 'maple' }, eZ) === 0, 'steps: kill with a dungeon filter counts only there; a zone filter counts in the zone and its dungeon');
   ok(kill({ type: 'kill', dungeon: 'bambooDepths', floor: 1 }, eZ) === 1 && kill({ type: 'kill', dungeon: 'bambooDepths', floor: 2 }, eZ) === 0 && kill({ type: 'kill', tier: 2 }, eZ) === 1 && kill({ type: 'kill', tier: 3 }, eZ) === 0, 'steps: floor (exact) and tier (at least) filters');
-  ok(Q.stepGain({ type: 'boss', id: 'mochiKing' }, 'boss', { id: 'mochiKing', dungeon: 'burrow' }) === 'set' && Q.stepGain({ type: 'boss', id: 'mochiKing' }, 'boss', { id: 'kasaLord' }) === 0 && Q.stepGain({ type: 'boss', dungeon: 'bambooDepths' }, 'boss', { id: 'tenguMaster', dungeon: 'bambooDepths' }) === 'set' && Q.stepGain({ type: 'boss', dungeon: 'bambooDepths' }, 'boss', { id: 'tenguMaster', dungeon: null, zone: 'bamboo' }) === 0 && Q.stepGain({ type: 'boss' }, 'boss', { id: 'x' }) === 0, 'steps: boss by id (as before) or by dungeon; an empty boss step matches nothing');
-  ok(Q.stepGain({ type: 'find', item: 'lostBell', dungeon: 'mapleRoots' }, 'find', { item: 'lostBell', n: 2, dungeon: 'mapleRoots' }) === 2 && Q.stepGain({ type: 'find', item: 'lostBell' }, 'find', { item: 'other' }) === 0 && Q.stepGain({ type: 'find', item: 'lostBell', dungeon: 'mapleRoots' }, 'find', { item: 'lostBell', dungeon: 'burrow' }) === 0, 'steps: find counts the right item (n at a time) where its filters say');
+  ok(Q.stepGain({ type: 'boss', id: 'mochiKing' }, 'boss', { id: 'mochiKing', dungeon: 'mossyBurrow' }) === 'set' && Q.stepGain({ type: 'boss', id: 'mochiKing' }, 'boss', { id: 'kasaLord' }) === 0 && Q.stepGain({ type: 'boss', dungeon: 'bambooDepths' }, 'boss', { id: 'tenguMaster', dungeon: 'bambooDepths' }) === 'set' && Q.stepGain({ type: 'boss', dungeon: 'bambooDepths' }, 'boss', { id: 'tenguMaster', dungeon: null, zone: 'bamboo' }) === 0 && Q.stepGain({ type: 'boss' }, 'boss', { id: 'x' }) === 0, 'steps: boss by id (as before) or by dungeon; an empty boss step matches nothing');
+  ok(Q.stepGain({ type: 'find', item: 'lostBell', dungeon: 'mapleRoots' }, 'find', { item: 'lostBell', n: 2, dungeon: 'mapleRoots' }) === 2 && Q.stepGain({ type: 'find', item: 'lostBell' }, 'find', { item: 'other' }) === 0 && Q.stepGain({ type: 'find', item: 'lostBell', dungeon: 'mapleRoots' }, 'find', { item: 'lostBell', dungeon: 'mossyBurrow' }) === 0, 'steps: find counts the right item (n at a time) where its filters say');
   ok(Q.stepGain({ type: 'rescue', npc: 'hana' }, 'rescue', { npc: 'hana', dungeon: 'tideCaves' }) === 'set' && Q.stepGain({ type: 'rescue', npc: 'hana' }, 'rescue', { npc: 'ken' }) === 0 && Q.stepGain({ type: 'kill' }, 'rescue', { npc: 'hana' }) === 0, 'steps: rescue completes on that captive');
   const qs = Z.normalizeZones({ dungeon: { deepest: 12 } });
-  ok(Q.zoneStepDone({ type: 'dungeonFloor', dungeon: 'burrow', n: 10 }, qs) && !Q.zoneStepDone({ type: 'dungeonFloor', dungeon: 'bambooDepths', n: 2 }, qs) && (Z.noteFloor(qs, 'bamboo', 2), Q.zoneStepDone({ type: 'dungeonFloor', dungeon: 'bambooDepths', n: 2 }, qs)) && Q.zoneStepHave({ type: 'dungeonFloor', dungeon: 'burrow', n: 20 }, qs) === 12, 'steps: dungeonFloor reads the Burrow\'s deepest or the zone dungeon\'s best floor');
+  ok(Q.zoneStepDone({ type: 'dungeonFloor', dungeon: 'burrow', n: 10 }, qs) && !Q.zoneStepDone({ type: 'dungeonFloor', dungeon: 'bambooDepths', n: 2 }, qs) && (Z.noteFloor(qs, 'bamboo', 2), Q.zoneStepDone({ type: 'dungeonFloor', dungeon: 'bambooDepths', n: 2 }, qs)) && Q.zoneStepHave({ type: 'dungeonFloor', dungeon: 'burrow', n: 20 }, qs) === 12
+    && Q.zoneStepDone({ type: 'dungeonFloor', dungeon: 'oniKitchen', n: 1 }, qs) && !Q.zoneStepDone({ type: 'dungeonFloor', dungeon: 'oniKitchen', n: 2 }, qs) && Q.zoneStepDone({ type: 'dungeonFloor', dungeon: 'foxShrine', n: 2 }, qs), 'steps: dungeonFloor reads a den\'s best floor (an old save at floor 12: the Fox Shrine done, Oni\'s Kitchen floor 1), the Burrow as a whole in old floor numbers, or a zone dungeon\'s best floor');
   ok(!Q.zoneStepDone({ type: 'tier', dungeon: 'tideCaves', n: 1 }, qs) && (Z.recordDungeonClear(qs, 'tidepool', 1), Q.zoneStepDone({ type: 'tier', dungeon: 'tideCaves', n: 1 }, qs)) && !Q.zoneStepDone({ type: 'tier', dungeon: 'tideCaves', n: 2 }, qs), 'steps: tier n is done by a clear at tier n or higher');
   ok(!Q.zoneStepDone({ type: 'villageSaved', zone: 'onsen' }, qs) && (Z.saveVillage(qs, 'onsen'), Q.zoneStepDone({ type: 'villageSaved', zone: 'onsen' }, qs)) && Q.zoneStepDone({ type: 'kill' }, qs) === null, 'steps: villageSaved follows the zone; other types are not state steps');
   const dst = s => JSON.stringify(Q.destOf(s));
-  ok(dst({ type: 'kill', n: 3 }) === JSON.stringify({ dungeon: 'burrow', zone: null }) && dst({ type: 'floor', n: 5 }) === JSON.stringify({ dungeon: 'burrow', zone: null, floor: 5 }) && Q.destOf({ type: 'collect', mat: 'wood' }) === null && Q.destOf({ type: 'collect', mat: 'mochi' }).dungeon === 'burrow', 'steps: destOf keeps the old Burrow targets (kills, floors, bosses, Mochi Jelly)');
+  ok(dst({ type: 'kill', n: 3 }) === JSON.stringify({ dungeon: 'burrow', zone: null }) && dst({ type: 'floor', n: 5 }) === JSON.stringify({ dungeon: 'mossyBurrow', zone: null, floor: 2 }) && dst({ type: 'floor', den: 'oniKitchen', n: 2 }) === JSON.stringify({ dungeon: 'oniKitchen', zone: null, floor: 2 }) && dst({ type: 'boss', id: 'kasaLord' }) === JSON.stringify({ dungeon: 'foxShrine', zone: null, floor: 2, boss: true }) && Q.destOf({ type: 'collect', mat: 'wood' }) === null && Q.destOf({ type: 'collect', mat: 'mochi' }).dungeon === 'burrow', 'steps: destOf: unfiltered kills and the Mochi Jelly are the Burrow as a whole; a floor step its den\'s floor (an old floor number its den now); a den boss its den\'s floor 2');
   const dF = Q.destOf({ type: 'dungeonFloor', dungeon: 'mapleRoots', n: 2 }), dT = Q.destOf({ type: 'tier', dungeon: 'onsenCaverns', n: 3 }), dV = Q.destOf({ type: 'villageSaved', zone: 'tidepool' }), dK = Q.destOf({ type: 'kill', zone: 'bamboo' });
   ok(dF.dungeon === 'mapleRoots' && dF.zone === 'maple' && dF.floor === 2 && dT.floor === 2 && dT.boss && dV.zone === 'tidepool' && dV.village && dK.zone === 'bamboo' && !dK.dungeon, 'steps: destOf points zone steps at the zone, its gate, a floor or its boss');
   // the reach step (ROADMAP R-17: "Follow Shadow to …", polled by Story.reachTick): where it points and when it's here
@@ -1267,6 +1294,73 @@ hr('ZONES: DUNGEON DEFS, SEEDS, STATE, QUEST STEPS');
   const here = (s, w) => Q.reachIsHere({ type: 'reach', x: 0, z: 0, ...s }, w);
   ok(here({ at: 'home' }, { home: true }) && !here({ at: 'home' }, { zone: 'bamboo' }) && here({ at: 'bamboo' }, { zone: 'bamboo', dungeon: null }) && !here({ at: 'bamboo' }, { zone: 'bamboo', dungeon: 'bambooDepths', floor: 1 })
     && here({ at: 'bambooDepths', floor: 2 }, { zone: 'bamboo', dungeon: 'bambooDepths', floor: 2 }) && !here({ at: 'bambooDepths', floor: 2 }, { zone: 'bamboo', dungeon: 'bambooDepths', floor: 1 }) && !Q.reachIsHere({ type: 'kill' }, { home: true }), 'steps: a reach step is "here" only in its own world (home, the zone outdoors, that floor)');
+}
+
+// ------------------------------------------------------------------ the Burrow's four dens (docs/ZONES.md §4.1; ROADMAP Z-H1)
+hr('BURROW DENS: DEFS, FLOORS, RECORDS, THE MIGRATION, STEPS, ERRANDS');
+{
+  const D = await import('../src/dungeon/defs.js'), Gn = await import('../src/dungeon/gen.js'), Dn = await import('../src/rpg/dens.js'), Z = await import('../src/rpg/zones.js'), Q = await import('../src/world/questSteps.js'), O = await import('../src/cozy/objectives.js');
+  // ---- the four dens: themes, bosses, bands
+  const want = { mossyBurrow: [['burrow', 'burrow'], 'mochiKing', [2, 5]], foxShrine: [['shrine', 'shrine'], 'kasaLord', [7, 10]], oniKitchen: [['kitchen', 'kitchen'], 'oniChef', [12, 15]], moonSanctum: [['crystal', 'moon'], 'nineTails', [17, 20]] };
+  ok(D.DEN_IDS.every((id, k) => { const d = D.DUNGEONS[id], [th, b, lv] = want[id]; return d.den === k && d.themes.join() === th.join() && d.boss === b && d.levels.join() === lv.join() && d.floors === 2 && Gn.THEMES[th[0]] && Gn.THEMES[th[1]]; }), 'dens: the Mossy Burrow (King Mochi), the Fox Shrine (Lord Karakasa), Oni\'s Kitchen (Oni Chef) and the Moonlit Sanctum (the Crystal Grotto, then the Moon Sanctum; Tamamo), two floors each');
+  ok(D.DEN_IDS.every(id => D.DEN_OF_BOSS[D.DUNGEONS[id].boss] === id) && D.isBurrow('burrow') && D.isBurrow('oniKitchen') && !D.isBurrow('bambooDepths') && !D.isBurrow('burrowDeep') && D.theDen('foxShrine') === 'the Fox Shrine' && D.theDen('oniKitchen', true) === "Oni's Kitchen" && D.theDen('moonSanctum', true) === 'The Moonlit Sanctum', 'dens: each boss names its den; isBurrow and the den names in a sentence');
+  // levels: the old floors' 2–6, 7–11, 12–16, 17–21 (floor 1 at the band with the hero clamped, floor 2 one more)
+  const lv = id => [1, 99].flatMap(h => [1, 2].map(f => D.floorPlan(D.DUNGEONS[id], f, { heroLvl: h }).mlvl));
+  ok(lv('mossyBurrow').join() === '2,3,5,6' && lv('foxShrine').join() === '7,8,10,11' && lv('oniKitchen').join() === '12,13,15,16' && lv('moonSanctum').join() === '17,18,20,21' && D.floorPlan(D.DUNGEONS.foxShrine, 1, { heroLvl: 9 }).mlvl === 9, 'dens: monster levels keep the old floors\' bands (2–6, 7–11, 12–16, 17–21), the hero clamped to each');
+  // the legacy floor numbers
+  const lf = n => { const r = D.legacyFloor(n); return `${r.id}:${r.floor}`; };
+  ok(lf(1) === 'mossyBurrow:1' && lf(4) === 'mossyBurrow:1' && lf(5) === 'mossyBurrow:2' && lf(6) === 'foxShrine:1' && lf(10) === 'foxShrine:2' && lf(12) === 'oniKitchen:1' && lf(15) === 'oniKitchen:2' && lf(16) === 'moonSanctum:1' && lf(20) === 'moonSanctum:2' && lf(25) === 'moonSanctum:1' && lf(0) === 'mossyBurrow:1', 'dens: an old floor number is its den now (1–5, 6–10, 11–15, 16+), a boss floor its den\'s floor 2');
+  // ---- the floors: 60 seeds × 2 floors × 4 dens
+  let bad = [], f2rooms = 0, f1rooms = 0, mons = [0, 0], bigOK = 0, n2 = 0;
+  for (const id of D.DEN_IDS) for (let s = 1; s <= 60; s++) for (const f of [1, 2]) {
+    const def = D.DUNGEONS[id], p = D.floorPlan(def, f, { heroLvl: 10 }), L = Gn.generate({ floor: f, seed: s * 13 + f, plan: p });
+    const why = L.theme !== def.themes[f - 1] ? 'theme' : L.waypoint ? 'waypoint' : f === 1 ? (!L.stairs || L.boss ? 'f1' : null) : (L.stairs || L.boss !== def.boss || !L.bossRoom ? 'f2' : null);
+    if (why) bad.push(`${id} ${s} f${f} ${why}`);
+    const m = L.spawns.filter(x => !x.boss).reduce((a, x) => a + x.count, 0); mons[f - 1] += m;
+    if (f === 1) f1rooms += L.rooms.length; else {
+      f2rooms += L.rooms.length; n2++;
+      const B = L.bossRoom, S = L.rooms.find(r => r.kind === 'start');
+      const farthest = L.rooms.filter(r => r !== B).every(r => Math.hypot(r.cx - B.cx, r.cy - B.cy) <= Math.hypot(S.cx - B.cx, S.cy - B.cy) + 1e-6);
+      if (Math.min(B.w, B.h) >= 15 && farthest && L.rooms.some(r => r.kind === 'treasure') && L.chests.some(c => c.quality === 'gold')) bigOK++;
+    }
+  }
+  ok(!bad.length, `dens: every den floor generates (240 × 2): its theme, stairs on floor 1, the boss's room on floor 2, never a waypoint (${bad.length} bad${bad.length ? ': ' + bad.slice(0, 3).join(', ') : ''})`);
+  ok(bigOK === n2, `dens: floor 2 is a full floor: the big room (30 m) is the boss's chamber, the arrival the room farthest from it, a treasure room with its golden chest (${bigOK}/${n2}; ~${(f2rooms / n2).toFixed(1)} rooms, ~${(mons[1] / n2).toFixed(0)} monsters; floor 1 ~${(f1rooms / n2).toFixed(1)} rooms, ~${(mons[0] / n2).toFixed(0)} monsters)`);
+  ok(f2rooms / n2 >= 10 && mons[1] / n2 >= 45 && mons[0] / n2 >= 70, `dens: both floors are worth fighting through (floor 2: 9–12 rooms, ~${(mons[1] / n2).toFixed(0)} monsters before the boss on average; floor 1 ~${(mons[0] / n2).toFixed(0)})`);
+  // ---- the records and the rule
+  const s0 = Z.normalizeZones({ dungeon: { deepest: 0, waypoints: [1] }, quests: { active: [], done: [] } });
+  ok(Dn.openDens(s0).join() === 'mossyBurrow' && D.DEN_IDS.every(id => Dn.denRecord(s0, id).cleared === 0 && Dn.denRecord(s0, id).bestFloor === 0) && Dn.denRecord(s0, 'bambooDepths') === null, 'records: a new save has every den fresh and only the Mossy Burrow open');
+  ok(Dn.noteDenFloor(s0, 'mossyBurrow', 1) === 1 && Dn.noteDenFloor(s0, 'mossyBurrow', 2) === 2 && Dn.noteDenFloor(s0, 'mossyBurrow', 1) === 2 && Dn.noteDenFloor(s0, 'mossyBurrow', 9) === 2, 'records: a den keeps its best floor (at most its last)');
+  const c1 = Dn.recordDenClear(s0, 'mossyBurrow'), c2 = Dn.recordDenClear(s0, 'mossyBurrow');
+  ok(c1.first && c1.opened === 'foxShrine' && !c2.first && c2.opened === null && Dn.openDens(s0).join() === 'mossyBurrow,foxShrine' && Dn.denRecord(s0, 'mossyBurrow').cleared === 2, 'records: the first clear of a den opens the next (once); repeats count');
+  const cc = Dn.recordDenCrewClear(s0, 'foxShrine');
+  ok(cc.opened === 'oniKitchen' && Dn.denRecord(s0, 'foxShrine').crew === 1 && Dn.denRecord(s0, 'foxShrine').cleared === 0 && Dn.denOpen(s0, 'oniKitchen') && !Dn.denOpen(s0, 'moonSanctum'), 'records: a crew\'s win opens the next den too (counted apart from yours)');
+  ok(Dn.recordDenClear(s0, 'moonSanctum').opened === null && Dn.nextDen('moonSanctum') === null && Dn.prevDen('mossyBurrow') === null, 'records: the last den opens nothing after it');
+  const sd = Z.normalizeZones({ dungeon: { deepest: 0 }, quests: { done: [] } }); Dn.recordDenClear(sd, 'moonSanctum');
+  ok(Z.tierOpen(sd, 'burrowDeep') === 1 && Z.tierCleared(sd, 'burrowDeep', 0), 'records: Tamamo beaten in the Moonlit Sanctum opens the Deep Burrow\'s T1');
+  // ---- the migration from the endless Burrow (deepest), at several depths
+  const mig = (deepest, done = []) => { const st = Z.normalizeZones({ dungeon: { deepest, waypoints: [1, 6] }, quests: { active: [], done } }); return D.DEN_IDS.map(id => { const r = Dn.denRecord(st, id); return `${r.cleared ? 'C' : r.crew ? 'K' : Dn.denOpen(st, id) ? 'o' : '-'}${r.bestFloor}`; }).join(' ') + ` T${Z.tierOpen(st, 'burrowDeep')}`; };
+  const table = { 0: 'o0 -0 -0 -0 T0', 3: 'o1 -0 -0 -0 T0', 4: 'o1 -0 -0 -0 T0', 5: 'o2 -0 -0 -0 T0', 6: 'C2 o1 -0 -0 T0', 9: 'C2 o1 -0 -0 T0', 10: 'C2 o2 -0 -0 T0', 11: 'C2 C2 o1 -0 T0', 12: 'C2 C2 o1 -0 T0', 15: 'C2 C2 o2 -0 T0', 16: 'C2 C2 C2 o1 T0', 20: 'C2 C2 C2 o2 T0', 21: 'C2 C2 C2 C2 T1', 25: 'C2 C2 C2 C2 T1' };
+  const got = Object.fromEntries(Object.keys(table).map(d => [d, mig(+d)])), off = Object.keys(table).filter(d => got[d] !== table[d]);
+  ok(!off.length, `migration: a den is cleared once its boss fell (deepest past its boss floor: 6, 11, 16, 21), and the next opens; deepest at the boss floor (5, 10, 15, 20) is floor 2 reached, the boss still to beat; a den got into has floor 1 (${off.map(d => `${d}: ${got[d]} (want ${table[d]})`).join('; ') || Object.entries(got).map(([d, v]) => `${d} → ${v}`).join(' · ')})`);
+  ok(mig(0, ['welcome', 'burrow1', 'homes', 'lights', 'king', 'shrine', 'umbrella']) === 'K2 K2 o0 -0 T0' && mig(7, ['king', 'umbrella']) === 'C2 K2 o0 -0 T0', 'migration: a story quest done without getting that deep (the cozy path: a crew) clears its den as a crew\'s win');
+  const migO = (deepest, done, owed, deep) => { const st = Z.normalizeZones({ dungeon: { deepest, waypoints: [1], ...(deep ? { deep } : {}) }, quests: { active: [], done, owed } }); return D.DEN_IDS.map(id => { const r = Dn.denRecord(st, id); return `${r.cleared ? 'C' : r.crew ? 'K' : Dn.denOpen(st, id) ? 'o' : '-'}${r.bestFloor}`; }).join(' ') + ` T${Z.tierOpen(st, 'burrowDeep')}`; };
+  ok(migO(5, ['king'], {}) === 'C2 o0 -0 -0 T0' && migO(5, ['king'], { mochiKing: { quest: 'king' } }) === 'K2 o0 -0 -0 T0' && migO(20, ['king', 'umbrella', 'oni', 'tails'], {}) === 'C2 C2 C2 C2 T1', 'migration: at the boss floor with its quest done the boss fell to you (a crew\'s win still owed to you: the crew\'s); Tamamo\'s quest done at floor 20 opens the Deep Burrow');
+  ok(migO(0, ['king', 'umbrella', 'oni'], {}, { crew: 1, tier: { unlocked: 1, cleared: [0] } }) === 'K2 K2 K2 K2 T1' && migO(3, [], {}, { cleared: 0, tier: { unlocked: 0, cleared: [] } }) === 'o1 -0 -0 -0 T0', 'migration: the Deep Burrow\'s own record of Tamamo\'s story clear (a crew\'s) clears the Moonlit Sanctum; an empty one doesn\'t');
+  const old = { dungeon: { deepest: 12, waypoints: [1, 6, 11] }, quests: { active: [{ id: 'oni', step: 0, prog: 0 }], done: ['king', 'umbrella'] } };
+  const m1 = Z.normalizeZones(JSON.parse(JSON.stringify(old))), once = JSON.stringify(m1.dungeon), twice = JSON.stringify(Z.normalizeZones(Z.normalizeZones(JSON.parse(JSON.stringify(m1)))).dungeon);
+  ok(once === twice && m1.dungeon.deepest === 12 && m1.quests.active[0].step === 0, 'migration: idempotent (a reloaded, migrated save migrates to the same records; deepest and the quests stay as they were)');
+  const keep = Z.normalizeZones({ dungeon: { deepest: 3, dens: { mossyBurrow: { cleared: 4, bestFloor: 2 }, foxShrine: { bestFloor: 2 } } }, quests: { done: [] } });
+  ok(Dn.denRecord(keep, 'mossyBurrow').cleared === 4 && Dn.denRecord(keep, 'foxShrine').bestFloor === 2, 'migration: a max-merge: newer den progress is never lost');
+  // ---- quest steps on dens (world/questSteps.js; story.js QUESTS use { type: 'floor', den, n: 2 })
+  const qs = Z.normalizeZones({ dungeon: { deepest: 12 }, quests: { done: [] } });
+  ok(Q.floorStepDone({ type: 'floor', den: 'foxShrine', n: 2 }, qs) && Q.floorStepDone({ type: 'floor', den: 'oniKitchen', n: 1 }, qs) && !Q.floorStepDone({ type: 'floor', den: 'oniKitchen', n: 2 }, qs) && Q.floorStepHave({ type: 'floor', den: 'oniKitchen', n: 2 }, qs) === 1 && Q.floorStepDone({ type: 'floor', n: 10 }, qs) && !Q.floorStepDone({ type: 'floor', n: 15 }, qs), 'steps: a floor step reads its den\'s best floor; an old one (n: 10) its den now');
+  // ---- the errands (cozy/objectives.js): the den the story has reached
+  const er = st => O.objective(st, O.errandIds('burrow', 4).map(i => i.replace(/:[a-z]+$/, ':patrol'))[0]);
+  const e0 = er(Z.normalizeZones({ dungeon: { deepest: 0 }, quests: { done: [] } })), e1 = er(Z.normalizeZones({ dungeon: { deepest: 12 }, quests: { done: [] } })), e2 = er(Z.normalizeZones({ dungeon: { deepest: 0 }, quests: { done: ['king'] } }));
+  ok(e0.name === 'Burrow patrol: the Mossy Burrow' && e0.level === 4 && e1.name === "Burrow patrol: Oni's Kitchen" && e1.level === 12 && e2.name === 'Burrow patrol: the Fox Shrine' && e2.level === 7 && /Burrow: the Fox Shrine/.test(e2.place.label), `errands: the Burrow's errands go to the den the story has opened (${e0.name}, ${e1.name}, ${e2.name})`);
+  const kq = O.objective({ ...Z.normalizeZones({ dungeon: { deepest: 0 }, quests: { done: [] } }), quests: { active: [{ id: 'oni', step: 0, prog: 0 }], done: [] } }, 'quest:oni');
+  ok(kq.den === 'oniKitchen' && kq.place.dungeon === 'oniKitchen' && /Oni's Kitchen/.test(kq.place.label) && kq.level === 15 && kq.power === 180, 'routes: a Burrow boss\'s crew route names its den (level and power as tuned)');
 }
 
 hr('HORDES: THE CROWD GRID (ROADMAP Z-B3)');
@@ -1495,7 +1589,7 @@ hr('ZONE TIERS: SCALING, MODIFIERS, REWARDS, SAVE');
   ok(mods.every(id => { const m = ZM.ZONE_MODS[id]; return m.name && m.desc && m.icon && m.color && m.jp && Number.isFinite(m.risk) && (m.layout || m.monster || m.run || m.boss) && Object.keys(m.reward).every(k => ZM.REWARD_KEYS.includes(k)); }), 'mods: each has a name, kanji, icon, colour, effect text, risk, a hook and a reward');
   ok(ZM.cleanMods(['swarming', 'swarming', 'nope', 'elementalFire', 'elementalZap', 'stout', 'quick'], { tier: 5 }).join() === 'swarming,elementalFire,stout' && ZM.cleanMods(['haunted', 'stout'], { tier: 1 }).join() === 'haunted' && ZM.cleanMods(['haunted'], { tier: 0 }).length === 0 && ZM.cleanMods(mods, { spirit: 10 }).length === 6, 'mods: cleaned to known ids, no repeats, one Elemental, at most the run\'s slots (T0 none)');
   const n5 = D.normRun({ id: 'tideCaves', floor: 2, tier: 9, mods: ['fierce', 'quick', 'stout', 'warded'] }), nS = D.normRun({ id: 'mapleRoots', tier: 2, spirit: 4, mods: mods }), nB = D.normRun({ id: 'burrow', floor: 3, tier: 3, mods: ['fierce'] });
-  ok(n5.tier === 5 && n5.mods.length === 3 && nS.tier === 5 && nS.spirit === 4 && nS.mods.length === 4 && nB.tier === 0 && nB.spirit === 0 && nB.mods.length === 0, 'runs: normRun caps the tier at 5, a Spirit run is T5, the endless Burrow has no tiers (its tier runs are the Deep Burrow\'s)');
+  ok(n5.tier === 5 && n5.mods.length === 3 && nS.tier === 5 && nS.spirit === 4 && nS.mods.length === 4 && nB.tier === 0 && nB.spirit === 0 && nB.mods.length === 0, 'runs: normRun caps the tier at 5, a Spirit run is T5, the Burrow\'s dens have no tiers (their tier runs are the Deep Burrow\'s)');
   // ---- the rewards, summed
   const rw = ZM.rewardTotals({ tier: 3, mods: ['swarming', 'haunted'] }), rwB = ZM.rewardTotals({ tier: 5, mods: ['bossWrath', 'rally', 'treasureTrove'] }), rw0 = ZM.rewardTotals({});
   ok(rw.qty === 0.57 && rw.rarity === 0.18 && rw.xp === 0.34 && rw.boss === 0 && rwB.boss === 0.2 && rwB.rarity === 0.4 && rwB.qty === 0.5 && rw0.qty === 0 && rw0.xp === 0, 'rewards: the tier\'s bonus plus every modifier\'s, summed (T3 + Swarming + Haunted: +57% quantity, +18% rarity, +34% xp)');
@@ -1546,7 +1640,7 @@ hr('ZONE TIERS: SCALING, MODIFIERS, REWARDS, SAVE');
   // ---- the save: records, the migration, clears, Spirit
   const sv = Z.normalizeZones({ dungeon: { deepest: 25, waypoints: [1] }, zones: { maple: { dungeon: { cleared: 2, tier: { unlocked: 0, cleared: [] } } }, tidepool: { dungeon: { cleared: 0 } } } });
   ok(sv.zones.maple.dungeon.tier.unlocked === 1 && sv.zones.maple.dungeon.tier.cleared.join() === '0' && sv.zones.tidepool.dungeon.tier.unlocked === 0 && sv.dungeon.deep.tier.unlocked === 1 && sv.dungeon.deep.tier.cleared.join() === '0' && Z.normalizeZones({ dungeon: { deepest: 12, waypoints: [1] } }).dungeon.deep.tier.unlocked === 0, 'save: old saves start at T0 cleared where the story clear exists (a zone dungeon beaten; the Burrow past floor 20) and T1 opens');
-  ok(Z.tierRecord(sv, 'maple') === Z.tierRecord(sv, 'mapleRoots') && Z.tierRecord(sv, 'burrowDeep') === sv.dungeon.deep && Z.tierRecord(sv, 'burrow') === null && Z.tierOpen(sv, 'mapleRoots') === 1, 'save: a tier record by zone or dungeon id; the Deep Burrow keeps its own; the endless Burrow has none');
+  ok(Z.tierRecord(sv, 'maple') === Z.tierRecord(sv, 'mapleRoots') && Z.tierRecord(sv, 'burrowDeep') === sv.dungeon.deep && Z.tierRecord(sv, 'burrow') === null && Z.tierOpen(sv, 'mapleRoots') === 1, 'save: a tier record by zone or dungeon id; the Deep Burrow keeps its own; the Burrow\'s dens have none');
   const again2 = Z.normalizeZones(JSON.parse(JSON.stringify(sv)));
   ok(again2.zones.maple.dungeon.tier.unlocked === 1 && again2.dungeon.deep.tier.unlocked === 1 && Z.fillTiers({ tier: { cleared: [3, 3, 9, -1, 'x'] }, lantern: { tier: 2, mods: ['swarming', 7] } }).tier.cleared.join() === '3' && Z.fillTiers({ lantern: { tier: 2, mods: ['swarming', 7] } }).lantern.mods.join() === 'swarming', 'save: normalizing is idempotent; a damaged record is repaired (tiers deduped and in range; the Lantern\'s memory cleaned)');
   const sp = Z.normalizeZones({ dungeon: { deepest: 0, waypoints: [1] } });
@@ -2293,6 +2387,91 @@ hr('COZY: THE STORY REROUTED (docs/COZY.md §3, ROADMAP CZ-9)');
     ok(F.TROPHY_IDS.length === 12 && F.TROPHY_IDS.every(id => F.FURNITURE[id].shop === false && F.FURNITURE[id].set === 'trophy' && F.shopRank(F.FURNITURE[id]) === 0 && F.storable(id)), 'trophies: 12 keepsakes (4 Burrow bosses, 4 zone bosses, 4 captains), never sold, kept in storage like furniture');
   }
 }
+
+hr('STASH AND GRIDS (ROADMAP R-18 to R-20: rpg/stash.js, rpg/grid.js)');
+{
+  const it = n => ({ uid: 'g' + n, kind: 'gear', name: 'x' + n });
+  // the grid helpers (every item 1 x 1 until R-20's footprints switch on)
+  const g = { cells: Array(60).fill(null), off: 0, w: 10, h: 6 };
+  ok(itemSize(it(1)).join('x') === '1x1' && findSpot(g, it(1)) === 0, 'grid: a 1 x 1 item, the first spot top-left');
+  g.cells[0] = it(1); g.cells[1] = it(2); g.cells[10] = it(3);
+  ok(findSpot(g, it(4)) === 2 && freeCells(g) === 57 && placed(g).map(p => `${p.x},${p.y}`).join(' ') === '0,0 1,0 0,1', 'grid: placed lists anchors; free cells counted; the next spot after them');
+  ok(!fitsAt(g, it(5), 1, 0).ok && fitsAt(g, it(5), 1, 0).under.join() === '1' && fitsAt(g, it(5), 1, 0, 1).ok && !fitsAt(g, it(5), 10, 0).ok && fitsAt(g, it(5), 10, 0).out, 'grid: fitsAt names what is in the way, ignores the item being moved, and refuses off the grid');
+  ok(cover(g)[0] === 0 && cover(g)[2] === -1 && gridProblems(g).length === 0, 'grid: cover maps cells to anchors; a healthy grid has no problems');
+  const tg = { cells: Array(120).fill(null), off: 60, w: 10, h: 6 }; tg.cells[60] = it(9);
+  ok(findSpot(tg, it(8)) === 61 && placed(tg)[0].i === 60 && placed(tg)[0].x === 0, 'grid: a view at an offset (tab 2) answers in absolute indices');
+  ok(bagGrid({ inventory: Array(40).fill(null) }).w === 10 && bagGrid({ inventory: [] }).h === 4 && TAB_CELLS === 60, 'grid: the bag is 10 x 4, a stash tab 10 x 6');
+  // the migration: the old flat 60-slot stash becomes tab 1, items in the same slots; idempotent; never loses an item
+  const old = { stash: Array(60).fill(null) }; old.stash[0] = it('a'); old.stash[37] = it('b'); old.stash[59] = it('c');
+  migrateStash(old);
+  ok(old.stashTabs.length === 1 && old.stashTabs[0].name === 'Tab 1' && old.stash.length === 60 && old.stash[0].uid === 'ga' && old.stash[37].uid === 'gb' && old.stash[59].uid === 'gc', 'migration: an old flat stash is tab 1, every item in its slot');
+  const j1 = JSON.stringify(old); migrateStash(old); ok(JSON.stringify(old) === j1, 'migration: idempotent (a second run changes nothing)');
+  const none = {}; migrateStash(none); ok(none.stash.length === 60 && none.stashTabs.length === 1 && tabCount(none) === 1, 'migration: a save with no stash gets one empty tab');
+  const short = { stash: [it('s'), undefined, 0, false] }; migrateStash(short); ok(short.stash.length === 60 && short.stash[0].uid === 'gs' && short.stash.slice(1).every(x => x === null), 'migration: a short stash is padded and its holes cleared');
+  const fat = { stash: Array(150).fill(null) }; fat.stash[149] = it('f'); migrateStash(fat); ok(fat.stashTabs.length === 3 && fat.stash.length === 180 && fat.stash[149].uid === 'gf', 'migration: items stored past tab 1 keep their tabs (never dropped)');
+  const odd = { stash: Array(120).fill(null), stashTabs: [{ name: '', color: 'plaid' }, { name: 'Gear', color: 'sky' }, null] }; migrateStash(odd); ok(odd.stashTabs.length === 2 && odd.stashTabs[0].name === 'Tab 1' && odd.stashTabs[0].color === 'pink' && odd.stashTabs[1].name === 'Gear' && odd.stash.length === 120, 'migration: tabs tidied (blank names and colours off the palette fixed, junk dropped)');
+  ok(cleanTabName('  <b>Hi</b>\u0007  there ', 1) === 'bHi/b there' && cleanTabName('', 4) === 'Tab 5' && [...cleanTabName('x'.repeat(40))].length === 16, 'tab names: tidied, 16 characters at most, blank gives the default');
+  // stashSpot's order: the tab asked for, then the others from the first
+  const st = { stash: Array(180).fill(null), stashTabs: [{}, {}, {}] }; migrateStash(st);
+  for (let k = 120; k < 180; k++) st.stash[k] = it('t' + k);
+  ok(stashSpot(st, it('q'), 2) === 0 && stashSpot(st, it('q'), 1) === 60 && stashPut(st, it('q'), 1) === 60 && tabGrid(st, 1).off === 60, 'stashSpot: the open tab first, then the first tab with room');
+  ok(TAB_PRICES_OK(), 'stash prices: the coins rise 500 → 25,000; wood, stone, crystals and lanterns never drop (silk sits out tab 5)');
+  ok(STASH_MAX_TABS === 6 && STASH_PRICES.length === 6 && STASH_PRICES[0] === null, 'stash prices: five to buy, six tabs at most');
+}
+hr('ITEM SIZES, SORT, LOST & FOUND, TREATS (ROADMAP R-20 to R-22: rpg/grid.js, rpg/stash.js, docs/INVENTORY.md)');
+{
+  const gear = (slot, wtype, o = {}) => ({ uid: 'u' + Math.random().toString(36).slice(2), kind: 'gear', slot, wtype, rarity: 'magic', ilvl: 5, name: slot + (wtype || ''), ...o });
+  // the footprints
+  const SZ = { sword: '1x2', ball: '1x1', staff: '1x3', fuma: '2x2', flail: '1x2', lance: '1x3' };
+  for (const [w, want] of Object.entries(SZ)) ok(itemSize(gear('weapon', w)).join('x') === want, `size: a ${w} is ${want}`);
+  for (const [sl, want] of Object.entries({ hat: '2x1', outfit: '2x2', boots: '2x1', paws: '2x1', collar: '1x1', charm: '1x1' })) ok(itemSize(gear(sl)).join('x') === want, `size: ${sl} is ${want}`);
+  ok(itemSize(makeGem('ruby', 1)).join('x') === '1x1' && itemSize({ kind: 'key' }).join('x') === '1x1', 'size: treats and the rest are 1x1');
+  ok([...Object.values(WEAPON_SIZE), ...Object.values(SLOT_SIZE)].every(([w, h]) => w * h <= 4), 'size: nothing over 4 cells');
+  for (const id of GEAR_BASE_IDS) { const b = ITEM_BASES[id]; const [w, h] = itemSize({ kind: 'gear', slot: b.slot, wtype: b.wtype }); if (!(w * h <= 4 && w >= 1 && h >= 1)) ok(false, `size: base ${id}`); }
+  // footprints on a grid: a 2x2 onto one item swaps, onto two refuses
+  const g = { cells: Array(40).fill(null), off: 0, w: 10, h: 4 };
+  const sw = gear('weapon', 'sword'), ch = gear('charm'), ou = gear('outfit');
+  g.cells[0] = sw; g.cells[2] = ch;
+  ok(cover(g)[10] === 0 && findSpot(g, ou) === 3, 'grid: a sword covers the cell below it; a 2x2 goes to the first spot it fits (after the charm)');
+  ok(fitsAt(g, ou, 1, 0).under.join() === '2' && fitsAt(g, ou, 0, 0).under.sort().join() === '0' && fitsAt(g, ou, 1, 0, -1).under.length === 1 && fitsAt(g, ou, 0, 0).under.length === 1, 'grid: what a 2x2 would cover');
+  g.cells[11] = gear('charm');
+  ok(fitsAt(g, ou, 0, 0).under.length === 2 && fitsAt(g, ou, 9, 0).out && fitsAt(g, ou, 8, 3).out, 'grid: over two items, or off the edge: refused');
+  // the packer: Sort's order, deterministic, idempotent, nothing lost
+  const mixed = [gear('charm', null, { rarity: 'rare' }), makeGem('lemon', 1), gear('weapon', 'staff', { rarity: 'unique' }), gear('hat'), gear('weapon', 'sword', { ilvl: 9 }), gear('weapon', 'sword', { ilvl: 3 }), gear('outfit'), gear('boots'), gear('weapon', 'fuma'), gear('weapon', 'ball')];
+  const ord = packOrder(mixed).map(sortGroup);
+  ok(ord.join() === 'weapon,weapon,weapon,weapon,weapon,outfit,hat,feet,jewel,treat', `sort: weapons, outfits, hats, paws and boots, collars and charms, treats (${ord})`);
+  const po = packOrder(mixed).filter(x => x.wtype === 'sword'); ok(po[0].ilvl === 9, 'sort: the higher item level first among equals');
+  ok(packOrder(mixed)[0].wtype === 'fuma' && packOrder(mixed)[1].wtype === 'staff', 'sort: the biggest first within a type (a 2x2 fuma, then the 1x3 staff)');
+  const p1 = packGrid(mixed, 10, 4), p2 = packGrid(p1.cells.filter(Boolean), 10, 4);
+  ok(!p1.left.length && p1.cells.filter(Boolean).length === mixed.length && p1.cells.map(x => x?.uid || '').join() === p2.cells.map(x => x?.uid || '').join() && !gridProblems({ cells: p1.cells, off: 0, w: 10, h: 4 }).length, 'sort: packs everything, no overlaps; sorting the sorted gives the same layout');
+  ok(packGrid(Array.from({ length: 30 }, () => gear('outfit')), 10, 4).left.length === 20, 'sort: what can\'t fit is handed back (never dropped)');
+  // Lost & Found and stow: an item is never lost
+  const full = { inventory: Array(40).fill(null).map(() => gear('charm')), stash: Array(60).fill(null).map(() => gear('charm')), stashTabs: [{ name: 'Tab 1', color: 'pink' }] };
+  const r1 = stow(full, gear('weapon', 'staff'));
+  ok(r1.c === 'lost' && full.lostFound.length === 60 && lostItems(full).length === 1, 'stow: the bag and the stash full, Lost & Found takes it (a page of 10x6)');
+  for (let i = 0; i < 25; i++) stow(full, gear('outfit'));
+  ok(lostItems(full).length === 26 && full.lostFound.length === 120 && !gridProblems(lostGrid(full)).length, 'Lost & Found: it grows a page when it fills');
+  full.lostFound.fill(null); lostTidy(full);
+  ok(!full.lostFound, 'Lost & Found: gone once it\'s empty');
+  // the save migration: pack once in Sort's order, overflow to the stash then Lost & Found; counts exact; idempotent
+  const old = { inventory: Array(40).fill(null), stash: Array(60).fill(null) };
+  const items = []; for (let i = 0; i < 40; i++) { const it = [gear('outfit'), gear('weapon', 'staff'), gear('hat'), makeGem('ruby', 0)][i % 4]; old.inventory[i] = it; items.push(it); }
+  for (let i = 0; i < 60; i += 2) { const it = gear('weapon', 'lance'); old.stash[i] = it; items.push(it); }
+  const n0 = items.length, r2 = packSave(old), after = [...old.inventory, ...old.stash, ...(old.lostFound || [])].filter(Boolean);
+  ok(after.length === n0 && new Set(after.map(x => x.uid)).size === n0 && items.every(x => after.includes(x)), `migration (sizes): every item kept (${n0} before, ${after.length} after; ${r2.lost} to Lost & Found)`);
+  ok(!gridProblems(bagGrid(old)).length && !gridProblems({ cells: old.stash, off: 0, w: 10, h: 6 }).length && old.gridV === 1 && r2.lost > 0, 'migration (sizes): no footprint overlaps or hangs off; the overflow went on to Lost & Found');
+  const j = JSON.stringify(old); packSave(old); ok(JSON.stringify(old) === j, 'migration (sizes): idempotent');
+  // Treats (R-22): names, tiers, the rename of an old save's gems (in the bag and socketed)
+  ok(GEM_TIERS.join() === 'Crumbly,,Gourmet' && makeGem('blueberry', 0).name === 'Crumbly Blueberry Bite' && makeGem('topaz', 2).name === 'Gourmet Honey Chew' && makeGem('ruby', 1).name === 'Ruby Jerky', 'treats: Crumbly / plain / Gourmet; Blueberry Bite, Honey Chew');
+  const og = { ...makeGem('blueberry', 0), name: 'Chipped Blueberry Gem' }, os = gear('weapon', 'sword', { gems: [{ type: 'topaz', tier: 2, name: 'Perfect Honeycomb Topaz' }] });
+  renameTreat(og); renameTreat(os);
+  ok(og.name === 'Crumbly Blueberry Bite' && os.gems[0].name === 'Gourmet Honey Chew' && treatName('lemon', 1) === 'Lemon Drop', 'treats: an old save\'s gem names follow, socketed ones too');
+  const jj = JSON.stringify([og, os]); renameTreat(og); renameTreat(os); ok(JSON.stringify([og, os]) === jj, 'treats: the rename is idempotent');
+  const st2 = newGameState(); st2.inventory[0] = { ...makeGem('cheese', 2), name: 'Perfect Stinky Cheese' }; st2.heroes.chewy.equipment.hat = gear('hat', null, { gems: [{ type: 'diamond', tier: 0, name: 'Chipped Diamond Biscuit' }] });
+  normalizeHeroes(st2);
+  ok(st2.inventory[0].name === 'Gourmet Stinky Cheese' && st2.heroes.chewy.equipment.hat.gems[0].name === 'Crumbly Diamond Biscuit', 'treats: renamed on load (normalizeHeroes): the bag, and socketed in equipped gear');
+}
+function TAB_PRICES_OK() { const P = STASH_PRICES.slice(1); return P.every((p, k) => !k || (p.coins > P[k - 1].coins && Object.keys(P[k - 1]).every(m => (p[m] || 0) >= P[k - 1][m] || m === 'silk'))); }
 
 hr('RESULT');
 if (fails) {

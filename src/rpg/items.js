@@ -95,6 +95,16 @@ sword('kaijuFemur', 'Kaiju Femur', 2, 50, [42, 84], 0.95, { str: 110 }, 3, 'kaij
 sword('starboneOdachi', 'Starbone Odachi', 2, 55, [40, 78], 1.2, { str: 95, dex: 75 }, 3, 'odachi', ['#fff8e8', '#5a3a8a', '#ffcf4a']);
 // saves made before the re-flavour keep the old base names on their items: normalizeHeroes (actions.js) renames them
 const RENAMED = { boneSword: ['Bone Sword', 'Bone Katana'], ribSabre: ['Rib Sabre', 'Rib Wakizashi'], sharkToothSaber: ['Shark Tooth Saber', 'Shark Tooth Tachi'] };
+/** a treat's name from its type and tier ("Crumbly Blueberry Bite") */
+export const treatName = (type, tier) => (GEMS[type] ? (GEM_TIERS[tier] ? GEM_TIERS[tier] + ' ' : '') + GEMS[type].name : null);
+/** Treats (R-22): an item from a save before them carries its gem's old name ("Chipped Blueberry Gem"), and so does every
+ *  treat socketed in gear (item.gems): both take the new one. Idempotent: the name is made from the type and tier. */
+export function renameTreat(it) {
+  if (!it || typeof it !== 'object') return it;
+  if (it.kind === 'gem' && GEMS[it.gemType]) { const n = treatName(it.gemType, it.gemTier | 0); if (n) it.name = n; }
+  if (Array.isArray(it.gems)) for (const g of it.gems) if (g && GEMS[g.type]) g.name = treatName(g.type, g.tier | 0);
+  return it;
+}
 /** an item from an older save: its base's new name (normal and magic items carry the base name in theirs) */
 export function renameLegacyItem(it) {
   const r = it && RENAMED[it.base];
@@ -226,20 +236,21 @@ armor('paws', 'kitsuneGauntlets', 'Kitsune Gauntlets', 2, 51, [25, 33], { dex: 8
 
 export const GEAR_BASE_IDS = Object.keys(ITEM_BASES);
 
-// ================================================================== treat gems
-export const GEM_TIERS = ['Chipped', '', 'Perfect'];
+// ================================================================== treats (the code says gem: kind 'gem', GEMS, makeGem; the
+// player reads Treats, ROADMAP R-22). Their tiers: Crumbly (a broken piece), plain, Gourmet (a gold ribbon).
+export const GEM_TIERS = ['Crumbly', '', 'Gourmet'];
 export const GEM_TIER_LVL = [1, 12, 30];
 export const GEMS = {
   ruby: { name: 'Ruby Jerky', colors: ['#e8364a', '#ff9aa8', '#8a1a2a'], weapon: { stat: 'fireDmg', v: [[2, 5], [5, 11], [10, 22]] }, armor: { stat: 'lifeMax', v: [10, 20, 35] } },
-  blueberry: { name: 'Blueberry Gem', colors: ['#4a6ae8', '#a8c0ff', '#22307a'], weapon: { stat: 'frostDmg', v: [[1, 4], [4, 9], [8, 18]] }, armor: { stat: 'zoomMax', v: [10, 20, 35] } },
+  blueberry: { name: 'Blueberry Bite', colors: ['#4a6ae8', '#a8c0ff', '#22307a'], weapon: { stat: 'frostDmg', v: [[1, 4], [4, 9], [8, 18]] }, armor: { stat: 'zoomMax', v: [10, 20, 35] } },
   lemon: { name: 'Lemon Drop', colors: ['#ffd83a', '#fff6b0', '#c89a10'], weapon: { stat: 'zapDmg', v: [[1, 8], [1, 16], [1, 32]] }, armor: { stat: 'dex', v: [3, 6, 10] } },
   cheese: { name: 'Stinky Cheese', colors: ['#ffc83a', '#fff0a0', '#b88a1a'], weapon: { stat: 'stinkDmg', v: [[2, 6], [5, 12], [10, 24]] }, armor: { stat: 'thorns', v: [4, 8, 15] } },
   diamond: { name: 'Diamond Biscuit', colors: ['#e8f4ff', '#ffffff', '#9ab8d8'], weapon: { stat: 'dmgPct', v: [8, 14, 22] }, armor: { stat: 'resAll', v: [5, 8, 12] } },
-  topaz: { name: 'Honeycomb Topaz', colors: ['#ffa82a', '#ffe08a', '#b86a10'], weapon: { stat: 'gf', v: [15, 25, 40] }, armor: { stat: 'mf', v: [8, 16, 24] } },
+  topaz: { name: 'Honey Chew', colors: ['#ffa82a', '#ffe08a', '#b86a10'], weapon: { stat: 'gf', v: [15, 25, 40] }, armor: { stat: 'mf', v: [8, 16, 24] } },
 };
 export const GEM_TYPES = Object.keys(GEMS);
 for (const t of GEM_TYPES) ITEM_BASES[t] = { id: t, kind: 'gem', name: GEMS[t].name, slot: null, tier: 0, lvl: 1, req: { lvl: 1 }, sockets: 0, icon: { shape: 'gem', variant: t, colors: GEMS[t].colors } };
-/** Gems only socket into weapons, hats and outfits (D2 style). */
+/** Treats only socket into weapons, hats and outfits (D2 style). */
 export const SOCKETABLE_SLOTS = ['weapon', 'hat', 'outfit'];
 
 // ================================================================== stat text
@@ -670,7 +681,7 @@ export function makeSetItem(id, rng, ilvl) {
   return it;
 }
 
-/** A treat gem. type: ruby|blueberry|lemon|cheese|diamond|topaz, tier 0 chipped / 1 normal / 2 perfect. */
+/** A treat (kind 'gem'). type: ruby|blueberry|lemon|cheese|diamond|topaz, tier 0 crumbly / 1 plain / 2 gourmet. */
 export function makeGem(type, tier = 0) {
   const g = GEMS[type];
   if (!g) throw new Error('makeGem: unknown ' + type);
@@ -693,7 +704,7 @@ export function gemEffect(type, tier, slot) {
 /** Socket a gem into gear (mutates item). Consumes nothing — the caller removes one gem from its stack. → {ok, why} */
 export function socketGem(item, gem) {
   if (!item || item.kind !== 'gear') return { ok: false, why: 'Only gear has sockets' };
-  if (!gem || gem.kind !== 'gem') return { ok: false, why: 'That is not a gem' };
+  if (!gem || gem.kind !== 'gem') return { ok: false, why: "That isn't a treat" };
   if (!item.sockets) return { ok: false, why: 'No sockets' };
   if ((item.gems || []).length >= item.sockets) return { ok: false, why: 'All sockets are full' };
   const e = gemEffect(gem.gemType, gem.gemTier, item.slot);
@@ -787,7 +798,7 @@ export function itemDamage(it) {
   return [lo, Math.max(lo + 1, hi), pct || mn || mx];
 }
 export function itemKindName(it) {
-  if (it.kind === 'gem') return 'Treat Gem';
+  if (it.kind === 'gem') return 'Treat';
   if (it.wtype === 'sword') return 'Bone Katana';
   if (it.wtype === 'ball') return 'Ball';
   if (it.wtype === 'staff') return 'Staff';
@@ -867,7 +878,7 @@ export function itemTooltip(it, state, derived) {
     L('Hat / Outfit: ' + statText(a.stat, a.value, null, { slot: 'hat' }), C.blue);
     if (it.qty > 1) L(`Stack: ${it.qty}`, C.grey);
     L(`Sell value: ${it.value} coins`, C.grey, { gap: true });
-    return { title: it.name, titleColor: g.colors[1] === '#ffffff' ? '#dff0ff' : g.colors[0], subtitle: 'Treat Gem', lines, req: reqLines(it, state, derived), compare: [] };
+    return { title: it.name, titleColor: g.colors[1] === '#ffffff' ? '#dff0ff' : g.colors[0], subtitle: GEM_TIERS[it.gemTier] ? `${GEM_TIERS[it.gemTier]} Treat` : 'Treat', lines, req: reqLines(it, state, derived), compare: [] };
   }
   if (it.kind !== 'gear') {
     if (it.desc) L(it.desc, C.grey);

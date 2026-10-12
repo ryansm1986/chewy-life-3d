@@ -295,3 +295,22 @@ The pad's build mode is in [CONTROLS.md](CONTROLS.md) §14.5. What it changes he
   - a removal comes back as the same building, with the refund taken back;
   - a zone and a path stroke restore the tiles they changed.
 - **Remove** on the pad asks twice (X, or the bulldozer's A): the building turns red and the prompt asks again.
+
+## 14. The Stash Chest: the stash outside (ROADMAP R-18, 2026-10-11)
+The owner: "I'd also like to be able to place a stash outside using build so I don't have to go inside to stash items."
+- **The catalog** (`stashChest`, buildings/catalog.js): Services, **2 × 1**, 150 coins, 10 wood and 6 stone, no rank,
+  not unique: build as many as you like. It is a free building (no plot, `PLOT_TYPES` leaves it out), and it may stand on
+  the plaza's paving too (the plaza's decorations list), so one by the fountain is a step from the town portal's
+  arrival. Removed, it gives half back like any building, and the stash itself is untouched.
+- **What it does**: walking up shows "Open the stash" (F, the pad's A or interact, the touch attack button), and it
+  opens the one shared stash with the bag beside it, as the cottage's Treasure Chest does (`G.openStash(b)`,
+  world/services.js; the 'stash:open' event). The tabs: docs/HOUSING.md §10.
+- **The model** (buildings/stashChest.js, Toybox kit, about 9.4k triangles): the cottage chest grown up for the village
+  (gold bands, the paw lock and hasp, corner caps, ring handles, a red bow on the lid) on a mossy stone plinth under a
+  small slate-tiled gable on four posts, with onigawara, a straw shimenawa with paper streamers along the front beam, the
+  pack's paw crest on both gable ends, a red chochin on an iron bracket (a small night-only light), a potted flower, a
+  tuft and a pebble. The lid is its own part (`B.anim` kind `'lid'`, buildings/index.js `lidCurve`): `model.kick()` pops
+  it open (about 30°) and lets it fall shut with a bounce in 1.2 s, showing a dark hollow with a glint of gold coins.
+- **On the map**: the places list comes from `world/mapData.js` (the UX-1 map agent's file); it names a building only
+  when `B_ICON` lists its type. The change it needs is in ROADMAP R-18's row.
+- **Shots**: `tools/qa/stash-shots.mjs village` (day and night, both 45° yaws, close, the lid's pop, the palette card).

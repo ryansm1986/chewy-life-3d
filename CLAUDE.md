@@ -15,7 +15,15 @@ A cozy 3D browser action-RPG and village sim (Three.js + Vite), starring Chewy, 
     [HOUSING](docs/HOUSING.md), [HOMESTEAD](docs/HOMESTEAD.md), [TUTORIALS](docs/TUTORIALS.md),
     [VILLAGE_PLAN](docs/VILLAGE_PLAN.md), [ITCH](docs/ITCH.md), [MULTIPLAYER](docs/MULTIPLAYER.md),
     [DEBUG](docs/DEBUG.md): the password-gated debug menu (`?debug`, or seven taps on the version); new features add
-    their actions with `registerDebug` (`src/debug/registry.js`).
+    their actions with `registerDebug` (`src/debug/registry.js`);
+  - [COZY](docs/COZY.md): the no-combat story path (expeditions, the Guild, scavenging);
+  - [MAP](docs/MAP.md): the map and minimap (layers, markers, People and Places, the pin);
+  - [INVENTORY](docs/INVENTORY.md): the bag and stash grids, stash tabs, item sizes, sort and filter;
+  - [DESKTOP](docs/DESKTOP.md): the Electron app for Windows and the Deck, and its in-app updates.
+- Releases:
+  - itch: `node tools/push-itch.mjs`;
+  - the desktop app on GitHub Releases, which the Deck updates from inside the game: `npm run release:desktop`.
+  - Both need a committed, pushed tree. Publish only when the owner asks.
 - Run it: `npm run dev` (port 5173).
 
 ## How the owner wants work done

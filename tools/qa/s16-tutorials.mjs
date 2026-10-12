@@ -270,6 +270,10 @@ try {
     await snap('cozy_board_send');
     await page.click('.p-exp .ex-go');
     await stepIs('board', 'away', 6000); await sleep(page, 600);
+    // the trip's roll pinned to a success: Moka at level 1 with Rosie's lunch is "Good odds" (r ≈ 0.89, p ≈ 0.65, the same
+    // on HEAD), so the roll is a coin flip; this guide's wrap-up (Rosie's thank-you) is the success path, so the trip's
+    // seed is set to one whose first draw (the roll: cozy/expeditionRun.js complete) is well under its odds
+    await G(async () => { const { mulberry32 } = await import('/src/core/util.js'), e = window.G.cozy.exp.list().find(x => x.obj === 'quest:burrow1'); if (!e) return; let s = 1; while (mulberry32(s)() > 0.25) s++; e.seed = s; });
     const a1 = await G(() => ({ out: window.G.cozy.exp.list().map(e => [e.obj, e.crew.join()]), view: window.G.ui.panels.expeditions.view }));
     await snap('cozy_board_away');
     R.check("g) Moka's card spotlit and picked, Send off! spotlit and sent; the Away view", c1.ring && /Moka/.test(c1.obj) && s1.ring && s1.ok && a1.out.length === 1 && a1.out[0][0] === 'quest:burrow1' && a1.out[0][1] === 'hero:moka' && a1.view === 'away', JSON.stringify({ c1, s1, a1 }));

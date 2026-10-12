@@ -644,3 +644,83 @@ cursor, a piece in hand). What it changes here:
   `world/guides.js` (`ui/padGlyphs.js keyHint`). Its way in is Menu, then Decorate on the Game page, and the Game tab is
   spotlit while another page is open. View answers its Got it! during decorate mode too. s40 g) plays it end to end on
   the pad.
+
+## 10. The stash: tabs, and a Stash Chest outside (ROADMAP R-18, R-19; 2026-10-11)
+The owner's requests: "I'd also like to be able to place a stash outside using build so I don't have to go inside to
+stash items." and "I'd also like to be able to upgrade to more stash tabs." The owner's pick for the tabs: buy them on
+the stash. As built (checkpoint 1); R-20's item sizes and R-21's sort and filter build on it (docs/INVENTORY.md).
+
+### One stash, opened anywhere it has a chest
+- The stash stays one shared store for the whole pack. It opens at the cottage's **Treasure Chest** (as before) and at
+  any **Stash Chest** built in Blossom Hollow (docs/VILLAGE_PLAN.md §14). Every chest opens the same stash, with the
+  bag beside it.
+- A Stash Chest's lid pops open and settles shut with a little bounce, and the chest sound plays (`chest_open`).
+
+### The tabs
+- **Up to 6 tabs of 60 slots** (10 × 6 each). A new game, and every old save, starts with one.
+- **The "+" tab** at the end of the strip buys the next one. It shows the coin price, greyed while you're short. A
+  click, a tap or the pad's A opens its card: the tab's number ("Tab 3 of 6"), "60 more slots, named and coloured your
+  way", the price as chips (the ones you're short of in red, with what you have), "You need 240 more coins", and
+  **Buy it** (off while you're short) / **Not now**. Bought, the new tab opens with a little burst.
+- **The prices** (`TAB_PRICES`, rpg/stash.js). Coins rise as asked; the materials come from both paths' economy (wood
+  and stone from the village and the scavenging; silk from level 10 drops, the cozy errands and the mulberries;
+  lanterns and crystals from level 15-20 drops, the beachcombing and sea-glass errands, digs and the Guild's routes):
+
+  | Tab | Coins | Wood | Stone | Silk | Crystals | Lanterns |
+  |---|---|---|---|---|---|---|
+  | 1 | (free) | | | | | |
+  | 2 | 500 | 12 | 8 | | | |
+  | 3 | 1,500 | 25 | 15 | 3 | | |
+  | 4 | 4,000 | 40 | 25 | 5 | | 2 |
+  | 5 | 10,000 | 60 | 40 | | 4 | 4 |
+  | 6 | 25,000 | 90 | 60 | 6 | 8 | 6 |
+
+  A purchase autosaves (the 'stash:tab' event, and a spend of 300+ coins is a "big purchase" anyway).
+- **Names and colours.** The open tab carries a pencil: a click (or Y on the pad) opens its popover, a name field (16
+  characters, tidied; blank gives "Tab 3") and eight colours from the UI's palette (sakura pink, peach, honey gold, leaf
+  green, mint, sky blue, lavender, rose). The header and the drawer's top band take the colour at once.
+- **The strip**: folder tabs on top of the drawer. The open one stands taller in its colour, joined to the drawer by a
+  band of it; the others show a dot of their colour, their name (it gives way first when room is short) and how many
+  items they hold in a corner badge. The footer: the open tab's count ("14 / 60"), the move hint, "Shared by the whole
+  pack".
+
+### Moving items
+- **The quick move** (Ctrl+Click, the pad's X, touch's drag wording) from the bag goes to **the open tab**, then to the
+  first tab with room; a full stash says so. From the stash it goes to the bag's first free spot.
+- **A drop on a tab's header** files the item in that tab (its first spot with room, top-left first): a mouse drag
+  released over the header, an item click-held (or tapped up on touch) and put down on a header, or the pad's A on a
+  header with an item held. The view stays where it is and that tab's badge pops. A full tab refuses ("Gear is
+  full!") and the item goes back where it was.
+- **The pad**: LT / RT step the tabs (wrapping), as a page's own tabs do in CT-11's scheme; LB / RB do the same (a lone
+  panel's own tabs). The D-pad reaches the headers: A opens one (or files the held item), A on the open one or Y renames
+  it. The hint bar says "LT RT Stash tabs", and "Put it in here" on a header with an item held.
+- **Touch**: a tap opens a tab; the headers are 44 px or more on the screen.
+
+### The save
+- `state.stash` stays one flat array: tab t is indices `[t * 60, t * 60 + 60)`. `state.stashTabs = [{ name, color }]`
+  lists the tabs owned. Every reader that walks the array (a quest reward's overflow, the tests) keeps working.
+- **The migration** (`migrateStash`, rpg/stash.js, called by `normalizeHeroes` on every load): an old save's flat
+  60-slot stash becomes tab 1, every item in the same slot. It also tidies any save: one tab at least, enough tabs to
+  hold every item already stored (never drops one), 60 cells per tab, names and colours made valid. It is idempotent.
+  s44 h) loads a real 0.5.1 save (tools/qa/fixtures/precozy-0.5.1.json) with items in its old stash.
+
+### Code
+- `src/rpg/stash.js` (pure): the shape, `TAB_PRICES`, `TAB_COLORS`, `migrateStash`, `stashSpot` / `stashPut`,
+  `tabGrid`, `tabItems`, `stashItems`, `cleanTabName`. `src/rpg/grid.js` (pure): the grids by anchor and the
+  footprint helpers R-20 uses (every item is 1 × 1 until then).
+- `G.actions`: `buyStashTab`, `renameStashTab`, `colorStashTab`, `stashPut`; `moveItem` refuses an index past the tabs
+  owned.
+- `src/ui/stash.js` + `stash.css`: the panel (moved out of ui/inventory.js), the popovers (the UI's shared popover, so
+  Esc, B and a tap outside close them), and the debug actions. `ui/inventory.js` `ItemDrag.quickMove` and `toTab`;
+  `ui/padNav.js`: the tabs on LT / RT, the headers' A / Y.
+- QA: `tools/qa/s44-stash.mjs` (in run-all), test-rpg's "STASH AND GRIDS" checks, `tools/qa/stash-shots.mjs`
+  (the Stash Chest in the village and the panel on the desktop, the Deck, a phone and an iPad).
+
+### The stash in checkpoint 2 (R-20, R-21, R-22; docs/INVENTORY.md)
+- Items take up space in the stash's tabs as in the bag (a katana 1 × 2, an outfit 2 × 2…); the old 60-slot stash is
+  packed in Sort's order on its first load (every item kept).
+- **Sort** under the drawer packs the open tab; the **filter chips** (All, Weapons, Armour, Jewellery, Treats, Other)
+  fade what doesn't match, and each header counts its matches.
+- **Lost & Found**: an amber tab after the bought ones while it holds rewards and finds that found no room. It only gives
+  back and goes once it's empty. It doesn't count against the six.
+- The buy card's short chips read "4,000 · you have 2,600" (the director's note).

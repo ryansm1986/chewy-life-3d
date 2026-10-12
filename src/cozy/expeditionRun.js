@@ -30,7 +30,8 @@ import { CLASSES, HERO_IDS } from '../rpg/classes.js';
 import { zoneOf, saveVillage, recordCrewClear, noteFloor } from '../rpg/zones.js';
 import { zoneUnlockOnClear } from '../rpg/zoneProgress.js';
 import { REGIONS } from '../regions/index.js';
-import { DUNGEONS, ZONE_DUNGEON } from '../dungeon/defs.js';
+import { DUNGEONS, ZONE_DUNGEON, theDen } from '../dungeon/defs.js';
+import { recordDenCrewClear, noteDenFloor } from '../rpg/dens.js';
 import { MONSTERS } from '../dungeon/monsters.js';
 import { pickFind } from '../home/finds.js';
 import { VILLAGES, ZONE_NPCS } from '../regions/village/data.js';
@@ -289,7 +290,7 @@ class CozyRun {
     const items = loot.items.map(x => generateItem({ ilvl: x.ilvl, rarity: x.rarity, rng }));
     const waiting = items.filter(it => !A.pickup(it));
     // the world: a siege's relief or its broken camps
-    let saved = null, story = null, cleared = null, deep = null;
+    let saved = null, story = null, cleared = null, deep = null, den = null;
     if (o?.kind === 'siege') {
       if (result === 'success') saved = this.relieve(o.binds.village, e, quiet);
       else if (result === 'partial' && progress?.camps) this.breakCamps(o.binds.village, progress.camps);
@@ -299,8 +300,10 @@ class CozyRun {
       const at = result === 'partial' ? G.story?.def?.(o.binds.quest)?.steps?.[st.quests.active.find(q => q.id === o.binds.quest)?.step ?? -1] : null;
       story = G.story?.crewResult?.(o.binds.quest, result, { crew: label }) || null;
       if (story && o.boss) story.owed = result === 'success' && !!st.quests.owed?.[o.boss];
-      if (result === 'partial') note = at?.type === 'kill' ? 'They chased off half of the yokai. The rest are hiding: you, or another crew, can finish it.' : at?.type === 'floor' ? `They made it down to floor ${o.level}. ${MONSTERS[o.boss]?.name || 'The boss'} is still there, waiting.` : `They found ${MONSTERS[o.boss]?.name || 'the boss'}, but not the way past. Next time!`;
+      if (result === 'partial') note = at?.type === 'kill' ? 'They chased off half of the yokai. The rest are hiding: you, or another crew, can finish it.' : at?.type === 'floor' ? `They made it down to the second floor of ${o.den ? theDen(o.den) : 'the Burrow'}. ${MONSTERS[o.boss]?.name || 'The boss'} is still there, waiting.` : `They found ${MONSTERS[o.boss]?.name || 'the boss'}, but not the way past. Next time!`;
+      if (result === 'partial' && at?.type === 'floor' && o.den) noteDenFloor(st, o.den, 2); // (the den's floor 2 reached: docs/ZONES.md §4.1)
       if (result === 'success' && o.deep) deep = this.wakeDeep();
+      if (result === 'success' && o.kind === 'burrowBoss' && o.den) den = this.denCrewClear(o.den); // (after wakeDeep: the Deep Burrow's record follows the Moonlit Sanctum's)
     }
     if (o?.binds?.zq && (result === 'success' || result === 'partial')) { // a zone villager's quest step (COZY §3.2)
       story = this.zoneQuestResult(o, result, label);
@@ -319,6 +322,7 @@ class CozyRun {
     if (story) rep.quest = story; // (the story news: the quest done, or what's left; the Journal names the crew)
     if (cleared) rep.cleared = cleared;
     if (deep) rep.deep = deep;
+    if (den) rep.den = den; // (a Burrow den's boss beaten: the next den opens)
     rep.place = e.place || o?.place || null;
     if (o?.desc && o.kind === 'errand') rep.desc = o.desc; // (the errand's own line, under the report's header)
     if (forced === 'broken') for (const k of e.crew) delete expOf(st).tired[k]; // (no rest after a trip cut short)
@@ -402,6 +406,12 @@ class CozyRun {
     G.story?.progress?.('any');
     if (G.mode === 'dungeon' && G.dungeon?.kind === 'region' && G.dungeon.zoneId === zone) G.dungeon.gate?.lantern?.refresh?.(); // (standing by its gate: the Lantern lights live)
     return { dungeon: D.name, zone, opened: opened ? REGIONS[opened]?.name || opened : null, openedId: opened || null, lantern: !!r?.tierUnlocked, boss: MONSTERS[D.boss]?.name || 'the boss' };
+  }
+  /** a crew beat a Burrow den's boss (docs/ZONES.md §4.1): the den counts it, and the next den opens → { den, opened } */
+  denCrewClear(id) {
+    const r = recordDenCrewClear(this.st, id); if (!r) return null;
+    if (r.opened) Events.emit('den:opened', { id: r.opened, by: id, crew: true });
+    return { den: DUNGEONS[id]?.name || id, opened: r.opened ? theDen(r.opened) : null, openedId: r.opened }; // (opened: "the Fox Shrine", "Oni's Kitchen")
   }
   /** a crew calmed Tamamo: the Spirit Lantern by the Burrow door wakes (the Deep Burrow's T1, COZY §3.1) */
   wakeDeep() {

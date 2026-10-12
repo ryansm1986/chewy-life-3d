@@ -73,7 +73,48 @@ function questGeo() {
     return merge([roll, ...ends, cord, seal]);
   });
 }
-function gemGeo() { return geo('gem', () => { const g = new THREE.OctahedronGeometry(0.11, 0); g.scale(1, 1.2, 1); g.translate(0, 0.14, 0); return paint(g, (p, n, o) => o.set('#ffffff').lerp(new THREE.Color('#dddddd'), 0.2)); }); }
+// a dropped treat (the code's gem: ROADMAP R-22), the icon's treat in 3D: a jerky strip, a blueberry bite with its crown,
+// a wrapped lemon drop, a cheese wedge, a bone biscuit with a sugar diamond, a honey chew; a Crumbly one is smaller
+const C3 = h => new THREE.Color(h);
+function treatGeo(type, tier = 1) {
+  return geo(`treat:${type}:${tier}`, () => {
+    const parts = [];
+    const add = (g, f) => { parts.push(paint(g, typeof f === 'function' ? f : (p, n, o) => o.set(f))); return g; };
+    if (type === 'ruby') { // a wavy jerky strip: rippled along its length, a little twist, deep red with pale fat streaks
+      const g = new THREE.BoxGeometry(0.34, 0.035, 0.12, 22, 1, 3), P = g.attributes.position;
+      for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), tw = x * 2.2; P.setXYZ(i, x, y + Math.sin(x * 26) * 0.032 + z * Math.sin(tw) * 0.5, z * Math.cos(tw) * (1 + Math.sin(x * 17 + 1) * 0.14)); }
+      g.computeVertexNormals(); g.rotateY(0.5); g.rotateX(-0.42); g.translate(0, 0.11, 0); // (tipped up a little toward the camera)
+      add(g, (p, n, o) => { o.set('#b8202e'); const f = Math.sin(p.x * 46 + p.z * 31) * Math.sin(p.x * 13 - p.z * 21); if (f > 0.55) o.set('#ff9aa4'); else if (f > 0.25) o.lerp(C3('#e85060'), 0.6); if (Math.abs(n.y) < 0.4) o.multiplyScalar(0.72); });
+    } else if (type === 'blueberry') { // a plump berry bite and its crown
+      const b = new THREE.SphereGeometry(0.11, 14, 10); b.translate(0, 0.12, 0); add(b, (p, n, o) => o.set('#3a5ad8').lerp(C3('#a8c0ff'), Math.max(0, n.x * -0.5 + n.y * 0.4) * 0.35));
+      const c = new THREE.ConeGeometry(0.045, 0.04, 5); c.translate(0, 0.235, 0); add(c, '#22307a');
+      const l = new THREE.SphereGeometry(0.03, 6, 4); l.scale(1.4, 0.4, 0.8); l.translate(0.04, 0.245, 0); add(l, '#6ab840');
+    } else if (type === 'lemon') { // a glossy drop in cellophane twists
+      const d = new THREE.SphereGeometry(0.1, 14, 10); d.scale(1.25, 0.95, 1); d.translate(0, 0.11, 0); add(d, (p, n, o) => o.set('#ffd23a').lerp(C3('#fff6b0'), Math.max(0, n.y) * 0.4));
+      for (const s2 of [-1, 1]) { const w = new THREE.ConeGeometry(0.075, 0.1, 8, 1); w.rotateZ(s2 * Math.PI / 2); w.translate(s2 * 0.17, 0.11, 0); add(w, (p, n, o) => o.set('#fff3c8').lerp(C3('#ffffff'), Math.max(0, n.y) * 0.6)); } // (the cellophane twists: closed, pale, so they never read as dark holes)
+    } else if (type === 'cheese') { // a wedge with holes
+      const sh = new THREE.Shape(); sh.moveTo(-0.15, -0.06); sh.lineTo(0.15, -0.06); sh.lineTo(0.15, 0.08); sh.closePath();
+      const g = new THREE.ExtrudeGeometry(sh, { depth: 0.12, bevelEnabled: true, bevelSize: 0.012, bevelThickness: 0.012, bevelSegments: 1 }); g.translate(0, 0.07, -0.06);
+      add(g, (p, n, o) => o.set(n.y > 0.5 ? '#ffe27a' : Math.abs(n.z) > 0.7 ? '#ffd24a' : '#f0b030'));
+      for (const [x, y, z, r] of [[-0.06, 0.035, 0.068, 0.022], [0.06, 0.06, 0.068, 0.018], [0.09, 0.02, 0.068, 0.014], [-0.03, 0.06, -0.068, 0.02], [0.1, 0.09, 0.0, 0.016], [-0.1, 0.03, 0.0, 0.015]]) { const h = new THREE.SphereGeometry(r, 8, 6); h.translate(x, y, z); add(h, '#b8801a'); }
+    } else if (type === 'diamond') { // a baked bone biscuit, a sugar diamond on top
+      const sh = new THREE.CapsuleGeometry(0.035, 0.18, 4, 8); sh.rotateZ(Math.PI / 2); sh.translate(0, 0.06, 0); add(sh, '#e8b878');
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const k = new THREE.SphereGeometry(0.045, 8, 6); k.translate(sx * 0.12, 0.06, sz * 0.03); add(k, '#e8b878'); }
+      const ic = new THREE.CapsuleGeometry(0.022, 0.12, 3, 6); ic.rotateZ(Math.PI / 2); ic.translate(0, 0.09, 0); add(ic, '#dff0ff');
+      const dm = new THREE.OctahedronGeometry(0.068, 0); dm.scale(1, 1.3, 1); dm.translate(0, 0.17, 0); add(dm, (p, n, o) => o.set('#ffffff').lerp(C3('#8fc8ff'), 0.25 + Math.max(0, -n.y) * 0.5));
+    } else { // topaz: a honey chew, amber, a drip off one corner
+      const g = new THREE.BoxGeometry(0.24, 0.09, 0.16, 4, 2, 3), P = g.attributes.position, v = new THREE.Vector3();
+      for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i); const k = 1 - 0.18 * (Math.abs(v.x) / 0.12) * (Math.abs(v.y) / 0.045); P.setXYZ(i, v.x, v.y, v.z * k); }
+      g.computeVertexNormals(); g.translate(0, 0.075, 0); add(g, (p, n, o) => o.set('#f09a20').lerp(C3('#ffe08a'), Math.max(0, n.y) * 0.45));
+      const dr = new THREE.SphereGeometry(0.028, 8, 6); dr.scale(1, 1.4, 1); dr.translate(-0.1, 0.035, 0.07); add(dr, '#f09a20');
+    }
+    const g = merge(parts);
+    // the game camera is 20+ m away: a treat drops at about 1.4x life size (like the other loot) so it reads as the icon's
+    const k = 1.4 * (tier === 0 ? 0.82 : tier === 2 ? 1.12 : 1);
+    g.scale(k, k, k);
+    return g;
+  });
+}
 function bundleGeo() {
   return geo('bundle', () => {
     const b = new THREE.SphereGeometry(0.17, 14, 10); b.scale(1, 0.8, 1); b.translate(0, 0.14, 0);
@@ -161,7 +202,7 @@ export class GroundLoot {
     else if (d.type === 'material') { mesh = new THREE.Mesh(matGeo(d.key), makeToon({ vertexColors: true, rim: 0.6 })); }
     else if (d.type === 'pantry') { mesh = new THREE.Mesh(pantryGeo(d.key), makeToon({ vertexColors: true, rim: 0.6, emissive: '#fff0c0', emissiveIntensity: 0.15 })); color = '#8fe0a0'; }
     else if (d.type === 'furniture') { const fd = itemDef(d.key); if (!fd) return; mesh = furnitureLoot(d.key); color = FSETS[fd.set]?.color || '#ffcf4a'; label = fd.name; beam = this.G.vfx.pillar(to, { color, persistent: true, r: 0.3, h: 4, opacity: 0.4 }); Events.emit('sfx', 'pickup_rare'); }
-    else if (d.type === 'gem') { const gc = d.item?.color || d.item?.icon?.colors?.[0] || '#ff6a8a'; mesh = new THREE.Mesh(gemGeo(), makeToon({ vertexColors: true, color: gc, rim: 0.8, emissive: gc, emissiveIntensity: 0.6 })); color = gc; label = d.item?.name; }
+    else if (d.type === 'gem') { const gc = d.item?.color || d.item?.icon?.colors?.[0] || '#ff6a8a', tr = d.item?.gemTier ?? 1; mesh = new THREE.Mesh(treatGeo(d.item?.gemType || 'ruby', tr), makeToon({ vertexColors: true, rim: 0.75, emissive: gc, emissiveIntensity: tr === 2 ? 0.42 : 0.22 })); color = gc; label = d.item?.name; } // (a treat: treatGeo)
     else if (d.type === 'item') {
       const it = d.item; color = RCOL[it.rarity] || '#ffffff';
       if (it.slot === 'weapon' && it.wtype === 'sword') { const kc = it.icon?.colors?.length ? it.icon.colors : null; mesh = new THREE.Mesh(geo(`lootKatana:${kc || ''}|${katanaVariant()}`, () => katanaGeo({ colors: kc })), makeToon({ vertexColors: true, rim: 0.6, emissive: color, emissiveIntensity: it.rarity === 'normal' ? 0 : 0.25 })); mesh.scale.setScalar(0.7); mesh.rotation.z = Math.PI / 2; }
@@ -249,6 +290,7 @@ export class GroundLoot {
         e.mesh.position.set(e.to.x, e.to.y + Math.abs(Math.sin((e.t - e.fly) * 9)) * 0.15 * b + 0.02, e.to.z);
         e.mesh.rotation.y += dt * e.spin * 0.3;
         if (Math.random() < dt * 1.5 && e.d.type === 'coins') G.vfx.sparkle(e.mesh.position, { n: 1, color: '#ffe070', r: 0.2 });
+        if (e.d.type === 'gem' && Math.random() < dt * (e.d.item?.gemTier === 2 ? 2.4 : 0.9)) G.vfx.sparkle(e.mesh.position.clone().setY(e.mesh.position.y + 0.22), { n: 1, color: Math.random() < 0.5 ? e.color : '#fff6c0', r: 0.22 }); // (a treat's glint: R-22)
         if (e.d.type === 'furniture') { // a find floats over its glow, turning slowly, with sparkles
           const h = Math.min(1, (e.t - e.fly) * 2), U = e.mesh.userData, lift = h * (0.32 + Math.sin(e.t * 2.4) * 0.07);
           U.piece.position.y = (U.py ??= U.piece.position.y) + lift; U.glow.position.y = 0.03 - (e.mesh.position.y - e.to.y);

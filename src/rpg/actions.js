@@ -11,7 +11,11 @@
 //   • Potions are not used when the relevant bar is already full (toast instead), like a considerate good boy.
 //   • Belt caps: POTION_CAP (heart 15, zoom 15, rejuv 8).
 //
-// Container refs for moveItem/dropItem/sellItem: { c:'inv'|'stash', i:index } or { c:'equip', i:'weapon'|'weaponAlt'|'hat'|… }.
+// Container refs for moveItem/dropItem/sellItem: { c:'inv'|'stash'|'lost', i:index } or { c:'equip', i:'weapon'|'weaponAlt'|'hat'|… }.
+// The bag, each stash tab and Lost & Found are grids of placed items (rpg/grid.js, docs/INVENTORY.md): a grid ref's i is
+// the anchor (top-left cell) the item goes to, and the item's footprint must fit there. moveItem onto exactly one item
+// swaps (it goes back where the first came from, else the first spot with room: the result says where, { swap: ref });
+// onto two or more it refuses.
 // pickup(x) accepts an Item OR any drop entry from loot.js ({type:'coins'|'item'|'potion'|'material'|'gem', …}).
 // buyItem(item, price) accepts an Item or a potion descriptor { kind:'potion', key }.
 // addXp emits ONE 'player:levelup' {lvl, from, gained} per call even on multi-level-ups (lvl = the new level).
@@ -24,13 +28,15 @@ import { Events } from '../core/events.js';
 import { computeStats, xpToNext, LEVEL_CAP } from './stats.js';
 import { SKILLS, canLearn } from './skills.js';
 import { learnPerk as learnPerkIn, perkPoints } from './charge.js';
-import { starterItems, starterStaff, starterFuma, starterFlail, starterLance, generateItem, EQUIP_SLOT_ITEM, meetsReq, socketGem, POTIONS, targetSlot, SET_ITEMS, renameLegacyItem } from './items.js';
+import { starterItems, starterStaff, starterFuma, starterFlail, starterLance, generateItem, EQUIP_SLOT_ITEM, meetsReq, socketGem, POTIONS, targetSlot, SET_ITEMS, renameLegacyItem, renameTreat } from './items.js';
 import { CLASSES, HERO_IDS, canWield, WEAPON_CLASS } from './classes.js';
 import { uid as rid } from '../core/util.js';
 import { PANTRY, pantryOf, pantryHas, sellPrice as pantrySellPrice } from '../life/pantry.js';
 import { RECIPES, cookbookOf, spendFor, learn as learnRecipeIn } from '../life/cooking.js';
 import { mealFor, mealActive } from '../life/meals.js';
 import { storable, furnitureOf } from '../home/furniture.js';
+import { migrateStash, defaultTab, nextTabPrice, addTab, setTabName, setTabColor, stashPut as stashPutIn, tabGrid, tabOf, lostGrid, lostTidy, stow, packSave, stashSpot } from './stash.js';
+import { bagGrid, findSpot, fitsAt, packGrid, packOrder, itemArea } from './grid.js';
 
 export const INV_SIZE = 40;
 export const STASH_SIZE = 60;
@@ -77,6 +83,8 @@ export function newGameState() {
     potions: { heart: 3, zoom: 2, rejuv: 0 },
     inventory: Array(INV_SIZE).fill(null),
     stash: Array(STASH_SIZE).fill(null),
+    stashTabs: [defaultTab(0)], // (the stash's tabs, bought on the stash: rpg/stash.js, docs/HOUSING.md)
+    gridV: 1, // (items take up space: rpg/grid.js; an older save is packed once, rpg/stash.js packSave)
     quests: { active: [], done: [] },
     friends: {},
     village: {},
@@ -107,6 +115,11 @@ export function normalizeHeroes(st) {
   for (const id in st.heroes) for (const k in st.heroes[id].equipment) renameLegacyItem(st.heroes[id].equipment[k]);
   for (const it of st.inventory || []) renameLegacyItem(it);
   for (const it of st.stash || []) renameLegacyItem(it);
+  // gems became Treats (R-22): the old names follow, in every container and socketed in every hero's gear (items.js)
+  for (const id in st.heroes) for (const k in st.heroes[id].equipment) renameTreat(st.heroes[id].equipment[k]);
+  for (const list of [st.inventory, st.stash, st.lostFound]) for (const it of list || []) renameTreat(it);
+  migrateStash(st); // (the stash tabs, R-19: an old 60-slot stash is tab 1; rpg/stash.js)
+  packSave(st); // (items take up space, R-20: an older save's bag and stash are packed once; rpg/stash.js)
   return st;
 }
 /** What goes into localStorage: everything except the live player/equipment aliases (they live in heroes). */
@@ -124,8 +137,12 @@ export function createActions(G) {
   const toast = (text, color = '#ff8fb0', icon) => emit('toast', { text, icon, color });
   const hots = []; // transient potion heal-over-time effects
 
-  // ------------------------------------------------------------ containers
-  const arr = c => (c === 'inv' ? S().inventory : c === 'stash' ? S().stash : null);
+  // ------------------------------------------------------------ containers (grids of placed items: rpg/grid.js)
+  const arr = c => (c === 'inv' ? S().inventory : c === 'stash' ? S().stash : c === 'lost' ? (S().lostFound || []) : null);
+  /** the grid view a grid ref is in: the bag, its stash tab, Lost & Found */
+  const gridOf = ref => (ref.c === 'inv' ? bagGrid(S()) : ref.c === 'stash' ? tabGrid(S(), tabOf(ref.i)) : ref.c === 'lost' ? lostGrid(S()) : null);
+  const isGrid = ref => !!ref && (ref.c === 'inv' || ref.c === 'stash' || ref.c === 'lost');
+  const inRange = ref => !isGrid(ref) || (Number.isInteger(ref.i) && ref.i >= 0 && ref.i < arr(ref.c).length);
   function getItem(ref) {
     if (!ref) return null;
     if (ref.c === 'equip') return S().equipment[ref.i] || null;
@@ -134,9 +151,24 @@ export function createActions(G) {
   }
   function setItem(ref, it) {
     if (ref.c === 'equip') S().equipment[ref.i] = it || null;
-    else arr(ref.c)[ref.i] = it || null;
+    else { arr(ref.c)[ref.i] = it || null; if (ref.c === 'lost' && !it) lostTidy(S()); }
   }
-  const firstFree = (c = 'inv') => arr(c).findIndex(x => !x);
+  const PROBE = { kind: 'probe' }; // (a 1 x 1 footprint)
+  /** the first spot in a container where `item` (else a 1 x 1) fits: an index, or -1 (the stash: any tab, the first first) */
+  const firstFree = (c = 'inv', item = null) => (c === 'stash' ? stashSpot(S(), item || PROBE, 0) : findSpot(c === 'inv' ? bagGrid(S()) : lostGrid(S()), item || PROBE));
+  /** the first spot in the bag for an item: an index, or -1 */
+  const bagSpot = it => findSpot(bagGrid(S()), it);
+  /** where an item goes back to after a swap or an equip: its own anchor if it fits there, else the first spot in that
+   *  container, else (from the stash or Lost & Found) the bag; a ref, or null */
+  function homeFor(it, ref) {
+    if (!isGrid(ref)) return null;
+    const g = gridOf(ref), k = ref.i - g.off;
+    if (fitsAt(g, it, k % g.w, (k / g.w) | 0).ok) return { c: ref.c, i: ref.i };
+    const j = ref.c === 'stash' ? stashSpot(S(), it, tabOf(ref.i)) : findSpot(g, it);
+    if (j >= 0) return { c: ref.c, i: j };
+    if (ref.c !== 'inv') { const i = bagSpot(it); if (i >= 0) return { c: 'inv', i }; }
+    return null;
+  }
   const d = () => G.derived || recompute(true);
 
   function recompute(silent) {
@@ -172,8 +204,11 @@ export function createActions(G) {
     const why = equipProblem(it, slot);
     if (why) { toast(why, '#ff6a5a'); return false; }
     const old = S().equipment[slot];
+    inv[invIdx] = null; // (the old piece goes where this one was if it fits, else the first spot with room)
+    const home = old ? homeFor(old, { c: 'inv', i: invIdx }) : null;
+    if (old && (!home || home.c !== 'inv')) { inv[invIdx] = it; toast(`No room in your bag for your ${old.name}`, '#ff6a5a'); return false; }
     S().equipment[slot] = it;
-    inv[invIdx] = old || null;
+    if (old) inv[home.i] = old;
     emit('inv:changed', { c: 'inv' });
     emit('equip:changed', { slot, item: it, old: old || null });
     recompute();
@@ -183,8 +218,8 @@ export function createActions(G) {
   function unequip(slot) {
     const it = S().equipment[slot];
     if (!it) return false;
-    const idx = firstFree('inv');
-    if (idx < 0) { toast('Bag is full!', '#ff6a5a'); return false; }
+    const idx = bagSpot(it);
+    if (idx < 0) { toast('No room in your bag', '#ff6a5a'); return false; }
     S().inventory[idx] = it;
     S().equipment[slot] = null;
     emit('inv:changed', { c: 'inv' });
@@ -269,23 +304,69 @@ export function createActions(G) {
     return G.derived.weaponType;
   }
 
+  /** Move the item at `from` to `to`: a grid ref's i is the anchor (its top-left cell). Onto nothing: it goes there.
+   *  Onto exactly one item: a stack of the same joins it, else the two swap (the other goes back where the first came
+   *  from, else the first spot with room): { swap: the other's new ref }. Onto two or more, off the grid, into Lost &
+   *  Found, or an item that can't go in that equip slot: false. */
   function moveItem(from, to) {
     if (!from || !to) return false;
     if (from.c === to.c && from.i === to.i) return true;
-    const a = getItem(from), b = getItem(to);
+    if (!inRange(from) || !inRange(to)) return false; // (only the tabs you own)
+    if (to.c === 'lost') return false; // (Lost & Found only gives back)
+    const a = getItem(from);
     if (!a) return false;
-    if (to.c === 'equip') { const why = equipProblem(a, to.i); if (why) { toast(why, '#ff6a5a'); return false; } }
-    if (from.c === 'equip' && b) { const why = equipProblem(b, from.i); if (why) { toast(why, '#ff6a5a'); return false; } }
-    if (to.c !== 'equip' && from.c !== 'equip' && sameStack(a, b)) {
-      b.qty = (b.qty || 1) + (a.qty || 1);
-      setItem(from, null);
+    let b = null, bRef = null;
+    if (to.c === 'equip') {
+      const why = equipProblem(a, to.i); if (why) { toast(why, '#ff6a5a'); return false; }
+      b = getItem(to); bRef = b ? { c: 'equip', i: to.i } : null;
     } else {
-      setItem(to, a);
-      setItem(from, b);
+      const g = gridOf(to), k = to.i - g.off;
+      const fit = fitsAt(g, a, k % g.w, (k / g.w) | 0, from.c === to.c ? from.i : -1);
+      if (fit.out || fit.under.length > 1) return false;
+      if (fit.under.length === 1) { bRef = { c: to.c, i: fit.under[0] }; b = getItem(bRef); }
     }
+    if (b && isGrid(to) && from.c !== 'equip' && sameStack(a, b)) { // (a stack joins its own kind)
+      b.qty = (b.qty || 1) + (a.qty || 1); setItem(from, null);
+      emit('inv:changed', { c: to.c }); return true;
+    }
+    let swap = null;
+    if (b) {
+      if (from.c === 'equip') { const why = equipProblem(b, from.i); if (why) { toast(why, '#ff6a5a'); return false; } }
+      setItem(bRef, null); setItem(from, null);
+      setItem(to, a);
+      const home = from.c === 'equip' ? { c: 'equip', i: from.i } : homeFor(b, from) || homeFor(b, to);
+      if (!home) { setItem(to, null); setItem(from, a); setItem(bRef, b); toast('No room to swap those', '#ff6a5a'); return false; }
+      setItem(home, b); swap = home;
+    } else { setItem(from, null); setItem(to, a); }
     const touchesEquip = from.c === 'equip' || to.c === 'equip';
     emit('inv:changed', { c: to.c });
     if (touchesEquip) { emit('equip:changed', { slot: to.c === 'equip' ? to.i : from.i }); recompute(); if ([from.i, to.i].some(k => k === 'weapon' || k === 'weaponAlt')) refitSets(); }
+    return swap ? { swap } : true;
+  }
+  /** an item that must not be lost (a reward, a find, a bought or crafted thing with no room): the bag, then the stash,
+   *  then Lost & Found (rpg/stash.js stow): { c, i } */
+  function stowItem(it, o = {}) {
+    if (!it) return null;
+    if (it.kind === 'material' || it.kind === 'potion') { pickup(it); return { c: it.kind }; }
+    const r = stow(S(), it, o);
+    emit('inv:changed', { c: r.c }); emit('item:stowed', { item: it, to: r.c });
+    return r;
+  }
+  /** Sort the bag (c 'inv') or a stash tab (c 'stash', tab): by type, the biggest first, the rarest, the highest level,
+   *  packed top-left (rpg/grid.js packOrder). A layout that can't be packed (it shouldn't happen) is left as it was.
+   *  Run twice it gives the same layout: true, or false (nothing moved) */
+  function sortContainer(c = 'inv', tab = 0) {
+    const g = c === 'inv' ? bagGrid(S()) : c === 'stash' ? tabGrid(S(), tab) : null; if (!g) return false;
+    const items = []; for (let k = 0; k < g.w * g.h; k++) if (g.cells[g.off + k]) items.push(g.cells[g.off + k]);
+    let r = packGrid(items, g.w, g.h);
+    if (r.left.length) { // (the type groups left gaps that couldn't be filled: the biggest first, whatever the type)
+      const big = { cells: Array(g.w * g.h).fill(null), off: 0, w: g.w, h: g.h }, left = [];
+      for (const it of packOrder(items).sort((x, y) => itemArea(y) - itemArea(x))) { const i = findSpot(big, it); if (i >= 0) big.cells[i] = it; else left.push(it); }
+      r = { cells: big.cells, left };
+    }
+    if (r.left.length) { toast("It's too full to sort tidily: nothing moved", '#ff8a8a'); return false; }
+    for (let k = 0; k < g.w * g.h; k++) g.cells[g.off + k] = r.cells[k];
+    emit('inv:changed', { c, sorted: true });
     return true;
   }
   function dropItem(from) {
@@ -328,8 +409,8 @@ export function createActions(G) {
       const same = inv.find(o => sameStack(o, it));
       if (same) { same.qty = (same.qty || 1) + (it.qty || 1); emit('item:pickup', { item: it }); emit('inv:changed', { c: 'inv' }); return true; }
     }
-    const idx = firstFree('inv');
-    if (idx < 0) { toast('Bag is full!', '#ff6a5a'); return false; }
+    const idx = bagSpot(it);
+    if (idx < 0) { toast('No room in your bag', '#ff6a5a'); return false; }
     inv[idx] = it;
     emit('item:pickup', { item: it });
     emit('inv:changed', { c: 'inv' });
@@ -430,7 +511,7 @@ export function createActions(G) {
       return addPotion(key, 1);
     }
     const inv = S().inventory;
-    if (firstFree('inv') < 0 && !(item.stack && inv.some(o => sameStack(o, item)))) { toast('Bag is full!', '#ff6a5a'); return false; }
+    if (bagSpot(item) < 0 && !(item.stack && inv.some(o => sameStack(o, item)))) { toast('No room in your bag', '#ff6a5a'); return false; }
     if (!spendCoins(price)) return false;
     const it = clone(item);
     delete it.price;
@@ -770,6 +851,23 @@ export function createActions(G) {
     return P.lvl;
   }
 
+  // ------------------------------------------------------------ the stash's tabs (docs/HOUSING.md; ROADMAP R-19)
+  /** buy the next tab at its price (rpg/stash.js TAB_PRICES) → its index, or false (all open, or not enough) */
+  function buyStashTab() {
+    const cost = nextTabPrice(S());
+    if (!cost) { toast('Every stash tab is open!', '#ffd84a'); return false; }
+    if (!hasMaterials(cost)) { toast('Not enough for a new tab yet', '#ff6a5a'); return false; }
+    spendMaterials(cost);
+    const t = addTab(S());
+    emit('stash:tab', { bought: t, cost });
+    emit('inv:changed', { c: 'stash' });
+    return t;
+  }
+  function renameStashTab(t, name) { if (!setTabName(S(), t, name)) return false; emit('stash:tab', { renamed: t }); return true; }
+  function colorStashTab(t, color) { if (!setTabColor(S(), t, color)) return false; emit('stash:tab', { colored: t }); return true; }
+  /** put an item in the stash (tab `prefer` first, then the first with room) → its index, or -1 when it's all full */
+  function stashPut(item, prefer = 0) { const i = stashPutIn(S(), item, prefer); if (i >= 0) emit('inv:changed', { c: 'stash' }); return i; }
+
   const api = {
     // contract
     equip, unequip, swapWeapons, moveItem, dropItem, pickup, usePotion, sellItem, buyItem, learnSkill, addStat,
@@ -783,6 +881,10 @@ export function createActions(G) {
     addPantry, hasPantry, spendPantry, sellPantry, buyPantry, eat, pantryCount, tickMeal, cook, spendMix, learnRecipe,
     // furniture storage (docs/HOUSING.md)
     addFurniture, hasFurniture, spendFurniture, furnitureCount,
+    // the stash's tabs (docs/HOUSING.md, rpg/stash.js)
+    buyStashTab, renameStashTab, colorStashTab, stashPut,
+    // the grids (docs/INVENTORY.md): rewards and finds with no room, Sort
+    stowItem, sortContainer, bagSpot,
   };
   if (G.state) { normalizeHeroes(G.state); ensureMouseSets(); migrateStarterSkills(); recompute(true); }
   return api;

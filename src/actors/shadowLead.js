@@ -98,7 +98,7 @@ export class Lead {
     // out, a Bond move, a fight): the state says so at once
     const pz = this.pauseWhy(p);
     if (pz) { this.intent = null; if (this.state !== 'off') this.stop(pz); }
-    else if (this.calmT < CALM && this.active) { this.setState('fight'); this.block = null; }
+    else if (this.calmT < CALM && (this.active || this.state === 'heel')) { this.setState('fight'); this.block = null; } // (at heel too: the hero walked on past his stop into the pack, and his combat AI runs instead of tick)
     this.stT += dt;
     if (this.active) this.stats.leadT += dt;
     // tail up while he leads (the Animator's poseQuad: tailUp)
@@ -131,6 +131,7 @@ export class Lead {
   }
   keyOf(t) {
     const G = this.G;
+    if (t.pin) return `m:${t.pin}`; // (the map pin: world/mapPin.js, ROADMAP UX-1)
     if (t.guide) return `g:${t.guide}:${t.step}:${inst(G.tutorials?.cur)}`;
     if (t.quest) return `q:${t.quest}:${t.step}:${inst(G.state.quests.active.find(x => x.id === t.quest))}`;
     return `p:${t.label || ''}`;
@@ -138,6 +139,7 @@ export class Lead {
   /** is the step behind a key still the current one? */
   current(key) {
     if (!key) return false;
+    if (key.startsWith('m:')) return !!this.G.mapPin?.cur && `m:${this.G.mapPin.cur.key}` === key; // (the map pin: while it's pinned)
     const G = this.G, [k, a, b, n] = key.split(':');
     if (k === 'g') { const c = G.tutorials?.cur; return !!c && c.id === a && c.step?.id === b && String(inst(c)) === n; }
     if (k === 'q') { const q = G.state.quests.active.find(x => x.id === a); return !!q && String(q.step) === b && String(inst(q)) === n; }
@@ -182,9 +184,22 @@ export class Lead {
       Events.emit('lead:stop', { why: 'asked' });
       return false;
     }
-    if (quest) { const q = G.state.quests.active.find(x => x.id === quest); this.focus = q ? { quest, step: q.step } : null; }
+    if (quest) { const q = G.state.quests.active.find(x => x.id === quest); this.focus = q ? { quest, step: q.step } : null; G.mapPin?.clear?.('quest'); } // (a quest asked for by name: the map pin gives way)
     const t = G.questTarget?.();
     if (!t?.pos) { this.focus = null; this.say(G.mode === 'interior' ? 'The way is outside!' : 'Hmm… nowhere to go?', '?', false); return false; }
+    return this.askNow(t);
+  }
+  /** the map's "Shadow, take me there" (world/mapPin.js, ROADMAP UX-1): lead to the map pin now, at any setting; already
+   *  on it: he carries on (it never stops him) → true when he's leading after it */
+  toPin() {
+    const t = this.G.questTarget?.(); if (!t?.pos || !t.pin) return false;
+    if (this.intent?.key === this.keyOf(t) && this.active) return true;
+    this.focus = null;
+    return this.askNow(t);
+  }
+  /** ask for this objective (toggle, toPin) */
+  askNow(t) {
+    const G = this.G, P = G.player;
     const key = this.keyOf(t);
     this.ask = key; this.dismiss = null; this.stats.asks++;
     if (Math.hypot(P.pos.x - t.pos.x, P.pos.z - t.pos.z) < NEAR) { this.say("We're here!", 'heart'); return true; }

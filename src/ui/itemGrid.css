@@ -1,0 +1,28 @@
+/* The item grids (docs/INVENTORY.md; ROADMAP R-20, R-21): items take up space. ui/inventory.js layoutGrid places each
+   item's anchor cell across its footprint and hides the cells it covers; ItemDrag shows the held item's footprint. */
+
+.grid.g10[data-g] { grid-auto-rows: 52px; position: relative; }
+.grid.g10[data-g] > .slot.cov { display: none; }
+.grid.g10[data-g] > .slot.span { width: auto; height: auto; border-radius: 15px; }
+.grid.g10[data-g] > .slot.span img { width: 94%; height: 94%; }
+.grid.g10[data-g] > .slot.span:hover { transform: translateY(-2px) scale(1.035); }
+.grid.g10[data-g] > .slot.span.has:hover img { transform: rotate(-3deg) scale(1.04); }
+.grid.g10[data-g] > .slot.span .socks { top: 5px; }
+/* the stash's filter: an item that doesn't match fades back, keeps its place, and takes no hover or pick-up */
+.grid.g10[data-g] > .slot.dim { opacity: .17; filter: grayscale(.85); pointer-events: none; box-shadow: none; }
+.grid.g10[data-g] > .slot.dim::after { display: none; }
+.grid.g10[data-g].g-sorted > .slot.has { animation: gSorted .5s var(--pop) both; animation-delay: calc(var(--i, 0) * 5ms); }
+@keyframes gSorted { 0% { transform: scale(.7); opacity: .3; } 60% { transform: scale(1.06); } }
+
+/* the held item's footprint over the grid: green where it can go, gold onto one item (you then hold that one), red not */
+.g-fp { position: absolute; left: 0; top: 0; z-index: 6; pointer-events: none; border-radius: 15px; display: none; }
+.g-fp.on { display: block; }
+.g-fp.ok { background: rgba(96, 214, 150, .46); box-shadow: inset 0 0 0 4px #3fb87c, 0 0 0 2px #fff, 0 0 16px rgba(63, 184, 124, .7); }
+.g-fp.swap { background: rgba(255, 206, 84, .44); box-shadow: inset 0 0 0 4px #eaa820, 0 0 0 2px #fff, 0 0 16px rgba(234, 168, 32, .7); }
+.g-fp.bad { background: rgba(255, 92, 116, .44); box-shadow: inset 0 0 0 4px #f0506a, 0 0 0 2px #fff, 0 0 14px rgba(240, 80, 106, .6); }
+
+/* the held item rides the cursor at its footprint's size */
+.cursor-item .ci-in { width: calc((52px * var(--gw, 1) + 6px * (var(--gw, 1) - 1) + 8px) * var(--ui-scale)); height: calc((52px * var(--gh, 1) + 6px * (var(--gh, 1) - 1) + 8px) * var(--ui-scale)); }
+
+/* the socket dots wear their treat's colour */
+.slot .socks i.on { background: var(--gc, #ff8fd0); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6); }

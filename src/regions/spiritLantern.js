@@ -187,7 +187,7 @@ export function installLanternApi(G) {
     open(id) {
       const def = DUNGEONS[id];
       if (!(tierOpen(G.state, id) > 0)) {
-        G.ui?.toast?.(def?.kind === 'deep' ? 'The Spirit Lantern sleeps. Beat Tamamo on Burrow floor 20 to wake it.' : `The Spirit Lantern sleeps. Clear the ${def?.name || 'dungeon'} once to wake it.`, { icon: 'lantern', color: '#c8b8ff' });
+        G.ui?.toast?.(def?.kind === 'deep' ? 'The Spirit Lantern sleeps. Calm Tamamo in the Moonlit Sanctum to wake it.' : `The Spirit Lantern sleeps. Clear the ${def?.name || 'dungeon'} once to wake it.`, { icon: 'lantern', color: '#c8b8ff' });
         Events.emit('sfx', 'ui_deny'); return false;
       }
       if (G.ui?.open) { G.ui._user = true; try { G.ui.open('lantern', { dungeon: id }); } finally { G.ui._user = false; } }

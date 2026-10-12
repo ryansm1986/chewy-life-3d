@@ -25,7 +25,8 @@ import { VILLAGES } from '../regions/village/data.js';
 import { REGIONS, regionUnlocked } from '../regions/index.js';
 import { zoneOf } from '../rpg/zones.js';
 import { ZONE_ORDER } from '../rpg/zoneProgress.js';
-import { DUNGEONS, ZONE_DUNGEON } from '../dungeon/defs.js';
+import { DUNGEONS, ZONE_DUNGEON, DEN_IDS, theDen, legacyFloor } from '../dungeon/defs.js';
+import { denCleared } from '../rpg/dens.js';
 import { ZONE_QUESTS, questItemName } from '../world/zoneQuests.js';
 import { ZONE_NPCS } from '../regions/village/data.js';
 
@@ -40,7 +41,7 @@ export const killXp = L => Math.round(8 * Math.pow(Math.max(1, L), 1.35) + 4);
 // level: the content's level; find: the furniture table its finds come from (home/finds.js)
 export const AREAS = {
   home: { label: "Blossom Hollow's outskirts", short: 'Blossom Hollow', jp: 'さくら村', color: '#ff8fb0', level: 2, find: 'burrow' },
-  burrow: { label: "The Burrow's upper floors", short: 'The Burrow', jp: '巣穴', color: '#c9925a', level: 4, find: 'burrow' },
+  burrow: { label: 'The Burrow: the Mossy Burrow', short: 'The Burrow', jp: '巣穴', color: '#c9925a', level: 4, find: 'burrow' },
   bamboo: { zone: 'bamboo', find: 'bamboo' }, maple: { zone: 'maple', find: 'maple' }, tidepool: { zone: 'tidepool', find: 'tidepool' }, onsen: { zone: 'onsen', find: 'onsen' },
 };
 export function areaInfo(area) {
@@ -58,10 +59,10 @@ export const ERRANDS = {
     { id: 'mulberry', name: 'The old mulberry by the farms', mats: { silk: 1, wood: 2 }, line: 'The silk-moths were very polite about it.' },
     { id: 'shells', name: 'A beachcomb on the south shore', mats: { stone: 2, crystal: 0.35, wood: 1 }, line: 'A crab guarded the best shell. We negotiated.' },
   ],
-  burrow: [
-    { id: 'patrol', name: 'Burrow patrol: floors {lo}–{hi}', mats: { bone: 3, mochi: 2 }, line: 'The mochi slimes were mostly bluffing.' },
-    { id: 'mushrooms', name: 'A mushroom hunt on floor {mid}', mats: { mochi: 2, petal: 1 }, pantry: ['shiitake'], line: 'The kinoko were very rude. The shiitake were delicious.' },
-    { id: 'lanterns', name: 'Lost lanterns of the upper floors', mats: { lantern: 1, bone: 2 }, line: 'Somebody had been using them as hats.' },
+  burrow: [ // ({den}: the den the errand goes to, burrowErrandDen: "the Fox Shrine", "Oni's Kitchen")
+    { id: 'patrol', name: 'Burrow patrol: {den}', mats: { bone: 3, mochi: 2 }, line: 'The mochi slimes were mostly bluffing.' },
+    { id: 'mushrooms', name: 'A mushroom hunt in {den}', mats: { mochi: 2, petal: 1 }, pantry: ['shiitake'], line: 'The kinoko were very rude. The shiitake were delicious.' },
+    { id: 'lanterns', name: 'Lost lanterns of {den}', mats: { lantern: 1, bone: 2 }, line: 'Somebody had been using them as hats.' },
     { id: 'jelly', name: 'Mochi jelly for Rosie', mats: { mochi: 3, bone: 0.5 }, line: 'Rosie said it was for baking. Shadow said it was for him.' },
   ],
   bamboo: [
@@ -120,38 +121,40 @@ function reliefObjective(zone) {
 
 // ------------------------------------------------------------------ the Blossom Hollow story's fights (COZY §3.1)
 // One crew route per quest whose steps need a fight. The quest data (world/story.js QUESTS) is untouched: the route
-// names the quest; a crew that brings it home completes its fight steps (Story.crewResult). floor: the Burrow floor it's
-// set on (its level); power: an explicit need (burrow1: Moka L1 alone with Rosie's lunch is good odds); trophy: the
-// boss's keepsake (home/furniture.js); boss: whose quest unique waits for your own first win (Story owes it).
+// names the quest; a crew that brings it home completes its fight steps (Story.crewResult). den: the Burrow den it's set
+// in (docs/ZONES.md §4.1: a win over its boss opens the next den, cozy/expeditionRun.js); level: the content's level
+// (the old Burrow floor it stood for: the crew balance is as tuned); power: an explicit need (burrow1: Moka L1 alone with
+// Rosie's lunch is good odds); trophy: the boss's keepsake (home/furniture.js); boss: whose quest unique waits for your
+// own first win (Story owes it).
 const FLOOR_BOSS = [{ type: 'floor' }, { type: 'boss' }];
 const BURROW_PLACE = { area: 'burrow', zone: null, jp: '巣穴', color: '#c9925a' };
 export const BURROW_ROUTES = {
-  burrow1: { name: 'Peek into the Burrow', title: 'Something Squishy', giver: 'rosie', floor: 2, power: 12, hours: 2, kind: 'quest', freeLunch: true, mochi: 3, gates: [], trophy: null, boss: null, steps: [{ type: 'kill', n: 8 }, { type: 'collect', mat: 'mochi', n: 3 }],
+  burrow1: { name: 'Peek into the Burrow', title: 'Something Squishy', giver: 'rosie', den: 'mossyBurrow', level: 2, power: 12, hours: 2, kind: 'quest', freeLunch: true, mochi: 3, gates: [], trophy: null, boss: null, steps: [{ type: 'kill', n: 8 }, { type: 'collect', mat: 'mochi', n: 3 }],
     desc: 'Strange squeaks from the Burrow on the shrine hill. A friend can take a peek for you (Rosie packs the lunch), and bring back the Mochi Jelly she wants.' },
-  king: { name: 'The King of Squish', title: 'The King of Squish', giver: 'rosie', floor: 5, hours: 6, kind: 'burrowBoss', steps: FLOOR_BOSS, gates: [{ kind: 'quest', id: 'homes', label: 'A Home for Everyone done (9 homes)' }], trophy: 'trophyMochiCrown', boss: 'mochiKing',
-    desc: 'A giant mochi with a crown is hogging floor 5. A crew can go down, deflate his ego and bring his crown cushion home.' },
-  umbrella: { name: 'Umbrella Trouble', title: 'Umbrella Trouble', giver: 'rosie', floor: 10, hours: 6, kind: 'burrowBoss', steps: FLOOR_BOSS, gates: [{ kind: 'built', type: 'shrine', label: 'A Blossom Shrine built' }], trophy: 'trophyKasaStand', boss: 'kasaLord',
-    desc: 'Umbrellas keep hopping out of the Burrow at night. Their lord, Karakasa, waits on floor 10. A crew can fold him up.' },
-  oni: { name: "Oni's Kitchen Nightmare", title: "Oni's Kitchen Nightmare", giver: 'rosie', floor: 15, hours: 8, kind: 'burrowBoss', steps: FLOOR_BOSS, gates: [{ kind: 'built', type: 'onsen', label: 'A Hot Spring built' }, { kind: 'pop', n: 30 }], trophy: 'trophyOniCleaver', boss: 'oniChef',
-    desc: 'Someone is stealing all the dumplings. The trail leads to Gorobei\'s kitchen on floor 15. A crew can take his cleaver away.' },
-  tails: { name: 'Nine Tails of Moonlight', title: 'Nine Tails of Moonlight', giver: 'kitsune', floor: 20, hours: 10, kind: 'burrowBoss', steps: FLOOR_BOSS, gates: [{ kind: 'guild', n: 2 }, { kind: 'rank', n: 4 }], trophy: 'trophyMoonLantern', boss: 'nineTails', deep: true,
-    desc: 'The old fox spirit Tamamo stirs on floor 20. A patient crew can calm her, and her moon lantern will wake the Spirit Lantern by the Burrow door.' },
+  king: { name: 'The King of Squish', title: 'The King of Squish', giver: 'rosie', den: 'mossyBurrow', level: 5, hours: 6, kind: 'burrowBoss', steps: FLOOR_BOSS, gates: [{ kind: 'quest', id: 'homes', label: 'A Home for Everyone done (9 homes)' }], trophy: 'trophyMochiCrown', boss: 'mochiKing',
+    desc: 'A giant mochi with a crown is hogging the Mossy Burrow\'s deepest chamber. A crew can go down, deflate his ego and bring his crown cushion home.' },
+  umbrella: { name: 'Umbrella Trouble', title: 'Umbrella Trouble', giver: 'rosie', den: 'foxShrine', level: 10, hours: 6, kind: 'burrowBoss', steps: FLOOR_BOSS, gates: [{ kind: 'built', type: 'shrine', label: 'A Blossom Shrine built' }], trophy: 'trophyKasaStand', boss: 'kasaLord',
+    desc: 'Umbrellas keep hopping out of the Burrow at night. Their lord, Karakasa, waits deep in the Fox Shrine. A crew can fold him up.' },
+  oni: { name: "Oni's Kitchen Nightmare", title: "Oni's Kitchen Nightmare", giver: 'rosie', den: 'oniKitchen', level: 15, hours: 8, kind: 'burrowBoss', steps: FLOOR_BOSS, gates: [{ kind: 'built', type: 'onsen', label: 'A Hot Spring built' }, { kind: 'pop', n: 30 }], trophy: 'trophyOniCleaver', boss: 'oniChef',
+    desc: 'Someone is stealing all the dumplings. The trail leads to Gorobei\'s own kitchen, down in Oni\'s Kitchen. A crew can take his cleaver away.' },
+  tails: { name: 'Nine Tails of Moonlight', title: 'Nine Tails of Moonlight', giver: 'kitsune', den: 'moonSanctum', level: 20, hours: 10, kind: 'burrowBoss', steps: FLOOR_BOSS, gates: [{ kind: 'guild', n: 2 }, { kind: 'rank', n: 4 }], trophy: 'trophyMoonLantern', boss: 'nineTails', deep: true,
+    desc: 'The old fox spirit Tamamo stirs in the Moonlit Sanctum, the Burrow\'s deepest den. A patient crew can calm her, and her moon lantern will wake the Spirit Lantern by the Burrow door.' },
 };
 /** the steps of a quest a crew can do: the fights (and burrow1's Mochi Jelly, which they bring home) */
 export const CREW_STEP_TYPES = new Set(['kill', 'floor', 'boss', 'collect']);
-const killsOfFloor = f => Math.round(0.6 * (f * 10 + 20)); // (~60% of a hands-on run down to the boss, COZY §4.6)
+const killsOfFloor = f => Math.round(0.6 * (f * 10 + 20)); // (~60% of a hands-on run down to the boss, COZY §4.6; f: the route's level, the old floor it stood for)
 function burrowObjective(state, qid) {
   const B = BURROW_ROUTES[qid]; if (!B) return null;
-  const level = B.floor, kind = B.kind, power = B.power || level * KIND_FACTOR[kind];
+  const level = B.level, kind = B.kind, power = B.power || level * KIND_FACTOR[kind];
   const boss = kind === 'burrowBoss';
   return {
-    id: `quest:${qid}`, kind, story: true, name: B.name, jp: '巣穴', desc: B.desc, quest: qid, questTitle: B.title, giver: B.giver,
-    place: { ...BURROW_PLACE, label: `The Burrow, floor ${B.floor}` },
+    id: `quest:${qid}`, kind, story: true, name: B.name, jp: DUNGEONS[B.den]?.jp || '巣穴', desc: B.desc, quest: qid, questTitle: B.title, giver: B.giver,
+    place: { ...BURROW_PLACE, dungeon: B.den, label: `The Burrow: ${theDen(B.den)}` },
     level, power, hours: B.hours,
     gates: B.gates, supplies: boss ? { meals: 1, potions: 3 } : { meals: 0, potions: 0, freeLunch: !!B.freeLunch },
-    binds: { quest: qid }, boss: B.boss, deep: !!B.deep,
+    binds: { quest: qid }, boss: B.boss, den: B.den, deep: !!B.deep,
     rewards: boss
-      ? { kills: killsOfFloor(B.floor), coins: [Math.round(0.6 * (40 + 30 * level)), Math.round(0.6 * (60 + 40 * level))], items: ['magic', 'magic', 'rare'],
+      ? { kills: killsOfFloor(B.level), coins:[Math.round(0.6 * (40 + 30 * level)), Math.round(0.6 * (60 + 40 * level))], items: ['magic', 'magic', 'rare'],
         mats: { n: [16, 30], pool: { bone: 3, mochi: 2, wood: 1, stone: 1, ...(level >= 10 ? { silk: 1 } : {}), ...(level >= 15 ? { crystal: 1 } : {}), ...(level >= 20 ? { lantern: 1 } : {}) } }, trophy: B.trophy }
       : { kills: 10, coins: [12, 24], items: [], itemChance: { magic: 0.15 }, mats: { n: [3, 6], pool: { bone: 2, petal: 1, wood: 1 } }, mochi: B.mochi || 0 },
     tags: boss ? ['story', 'burrow', 'dungeon'] : ['story', 'burrow'],
@@ -212,20 +215,25 @@ export function errandIds(area, day) {
   while (out.length < n) out.push(pool.splice(Math.floor(r() * pool.length), 1)[0]);
   return out.map(t => `errand:${day}:${area}:${t}`);
 }
-/** The Burrow's errands go as deep as the story has (CZ-9): the upper floors (level 4) until King Mochi is gone, then the
- *  floors under each Burrow boss beaten (by you or a crew): a crew levels on errands near its own level all along. */
+/** The Burrow's errands go as deep as the story has (CZ-9): the Mossy Burrow (level 4) until King Mochi is gone, then
+ *  the den under each Burrow boss beaten (by you or a crew; docs/ZONES.md §4.1): a crew levels on errands near its own
+ *  level all along. The level is the old floor's (a beaten boss's floor + 2, as tuned). */
 export function burrowErrandLevel(state) {
-  const done = new Set(state?.quests?.done || []), deepest = state?.dungeon?.deepest || 0;
+  const done = new Set(state?.quests?.done || []);
   let f = 0; for (const [q, fl] of [['king', 5], ['umbrella', 10], ['oni', 15], ['tails', 20]]) if (done.has(q)) f = fl;
-  return Math.max(AREAS.burrow.level, f + 2, Math.min(20, deepest - 1));
+  DEN_IDS.forEach((id, k) => { if (state && denCleared(state, id)) f = Math.max(f, 5 * k + 5); }); // (a den cleared opens the next: the errands go there)
+  return Math.max(AREAS.burrow.level, Math.min(22, f + 2));
 }
+/** the den a Burrow errand of that level goes to (the old floors' dens: legacyFloor) */
+export const burrowErrandDen = level => legacyFloor(Math.max(1, level - 1)).id;
 function errandObjective(id, state = null) {
   const [, d, area, tid] = id.split(':'), day = +d;
   const A = areaInfo(area), t = ERRANDS[area]?.find(x => x.id === tid);
   if (!A || !t || !(day >= 0)) return null;
   const r = mulberry32(hashStr(id)), level = area === 'burrow' ? burrowErrandLevel(state) : A.level, hours = r() < 0.5 ? 2 : 3;
-  const name = t.name.replace('{lo}', Math.max(1, level - 3)).replace('{hi}', level).replace('{mid}', Math.max(1, level - 1));
-  const label = area === 'burrow' && level > AREAS.burrow.level ? `The Burrow, floors ${Math.max(1, level - 3)}–${level}` : A.label;
+  const den = area === 'burrow' ? burrowErrandDen(level) : null;
+  const name = t.name.replace('{den}', den ? theDen(den) : '');
+  const label = den ? `The Burrow: ${theDen(den)}` : A.label;
   return {
     id, kind: 'errand', story: false, name, jp: A.jp, desc: t.line, day,
     place: { area, zone: A.zone || null, label, jp: A.jp, color: A.color },

@@ -638,7 +638,7 @@ export class Hud {
   // ---------------------------------------------------------------- minimap
   drawMinimap() {
     const cv = this.$.mmCv, g = this.mmCtx;
-    const size = 180, dpr = Math.min(2, devicePixelRatio || 1);
+    const size = 180, dpr = Math.min(2, (devicePixelRatio || 1) * (cv.currentCSSZoom || 1)); // (the UI's zoom too: sharp on the Deck)
     if (cv.width !== Math.round(size * dpr)) { cv.width = cv.height = Math.round(size * dpr); }
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     const pp = this.playerPos();
@@ -648,6 +648,7 @@ export class Hud {
       try { this.mm.provider.draw(g, size, pp, { big: false, time: this.G.engine?.time || 0 }); } catch (e) { if (!this._mmErr) { this._mmErr = 1; console.warn('[ui] minimap provider', e); } }
       g.restore();
     } else drawPlaceholderMap(g, size, pp, this.mode);
+    if (this.mm.provider?.ownHud) return; // (the village's draws its own cone and arrow, turned or north up: world/minimap.js, docs/MAP.md)
     // camera view cone
     const yaw = this.G.engine?.rig?.yaw;
     if (yaw != null) {

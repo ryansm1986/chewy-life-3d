@@ -34,6 +34,13 @@ const dummies = (far = false) => ev(far => {
   const G = window.G, P = G.player;
   for (const m of G.dungeon.monsters) { m.status.stun = 999; m.pos.set(-999, 0, -999); }
   const { r } = G.engine.rig.groundAxes(), n0 = G.dungeon.monsters.length;
+  // the line needs open floor: 2 m behind the hero to 9.5 m out along camera-right, 2.5 m either side of it (a split
+  // shot's fan and its way back; no campfire on it). Each floor lays out its own arrival (the Burrow's dens: ROADMAP Z-H1), so when the hero's spot
+  // hasn't that room, find a spot that has
+  G.life?.kitchen?.ensureCamp?.(); // (the homestead's campfire camp rises by the arrival a beat after the floor starts: its collider must be there to be seen)
+  { const W = G.world, L = G.dungeon.layout, f = { x: -r.z, z: r.x };
+    const open = (x, z) => { for (let d = -2; d <= 9.5; d += 0.5) for (const s of [-2.5, -1.25, 0, 1.25, 2.5]) { const px = x + r.x * d + f.x * s, pz = z + r.z * d + f.z * s; if (!W.walkable(px, pz) || W.collision.solidAt(px, pz, 0.5) || !L.at(Math.floor(px / 2), Math.floor(pz / 2))) return false; } return true; }; // (and floor in the layout's 2 m cells: the line of sight and the auto aim run on them)
+    if (!open(P.pos.x, P.pos.z)) { let best = null; for (let cy = 2; cy < L.H - 2 && !best; cy++) for (let cx = 2; cx < L.W - 2; cx++) { const x = (cx + 0.5) * 2, z = (cy + 0.5) * 2; if (L.at(cx, cy) && open(x, z)) { best = { x, z }; break; } } if (best) { P.setPos(best.x, best.z); G.engine.rig.focus.copy(P.pos); G.engine.rig.snap(); G.engine.rig.update(0); G.engine.camera.updateMatrixWorld(); } } } // (update(0): the camera itself moves now, so the aim point below projects from where it will be)
   G.dungeon.summonAround({ pos: P.pos }, 'mochi', 4);
   const ring = G.dungeon.monsters.slice(n0);
   ring.forEach((m, i) => { m.pos.set(P.pos.x + r.x * (2.4 + i * 1.6), 0, P.pos.z + r.z * (2.4 + i * 1.6)); m.lifeMax = m.life = 1e7; m.status.stun = 999; m.speed = 0; });
@@ -164,6 +171,10 @@ try {
 
   // ================================================================ c) the channels
   await fight('chewy', 2); await learn({ skills: { whirl: 10 }, hotbar: [null, null, 'whirl'] });
+  await ev(() => { // (the ring needs open floor 5 m round the hero: each den lays out its own arrival, ROADMAP Z-H1; if not here, the first spot that has it)
+    const G = window.G, P = G.player, W = G.world, L = G.dungeon.layout, open = (x, z) => { for (let a = 0; a < 16; a++) for (const d of [1, 2.5, 4, 5]) { const px = x + Math.cos(a / 16 * Math.PI * 2) * d, pz = z + Math.sin(a / 16 * Math.PI * 2) * d; if (!W.walkable(px, pz) || W.collision.solidAt(px, pz, 0.5)) return false; } return true; };
+    if (open(P.pos.x, P.pos.z)) return; for (let cy = 2; cy < L.H - 2; cy++) for (let cx = 2; cx < L.W - 2; cx++) { const x = (cx + 0.5) * 2, z = (cy + 0.5) * 2; if (L.at(cx, cy) && open(x, z)) { P.setPos(x, z); G.engine.rig.focus.copy(P.pos); G.engine.rig.snap(); G.engine.camera.updateMatrixWorld(); return; } }
+  });
   await ev(() => { const G = window.G, P = G.player; for (const m of G.dungeon.monsters) { m.status.stun = 999; m.pos.set(-999, 0, -999); } const n0 = G.dungeon.monsters.length; G.dungeon.summonAround({ pos: P.pos }, 'mochi', 4); window.__ring = G.dungeon.monsters.slice(n0); window.__ring.forEach((m, i) => { const a = i / 4 * Math.PI * 2; m.pos.set(P.pos.x + Math.cos(a) * 3.2, 0, P.pos.z + Math.sin(a) * 3.2); m.lifeMax = m.life = 1e7; m.status.stun = 999; m.speed = 0; }); window.__ev = []; for (const n of ['charge:spinout']) G.events.on(n, p => window.__ev.push([n, p.stage])); window.__h = 0; const raw = G.combat.hitMonster.bind(G.combat); G.combat.hitMonster = (m, o) => { window.__h++; return raw(m, o); }; });
   await page.keyboard.down('1');
   await page.waitForFunction(() => window.G.skills.charge.active?.id === 'whirl' || window.G.skills.channel, null, { timeout: 4000 }).catch(() => {}); // (game time, not wall time: a busy machine runs the game slow)

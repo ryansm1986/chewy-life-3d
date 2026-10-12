@@ -277,7 +277,7 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
   `tailUp`), standing hidden in the village he steps further on into view. As the whelp he flies the route (no prints).
 - **Combat first**: `watch()` keeps a calm clock (his fight, being knocked out, an aggroed foe within 14 m of the hero,
   the hero losing life): any of it drops the lead at once (state `fight`; his own AI fights), and he picks it up after
-  2 s of calm. **Packs**: every 0.3 s the route ahead (42 m) is checked against each living monster's notice radius
+  2 s of calm (from `heel` too: a hero who walked on past his stop into the pack, UX-1's s39 e) fix). **Packs**: every 0.3 s the route ahead (42 m) is checked against each living monster's notice radius
   (`mode.alertR` or 9, plus 1.4 m) where the pack can see it (`mode.los`): he stops 1.3 m short, faces it and growls
   ("Grrr… yokai ahead!", once a pack; the `growl` sound). A hero who walks on past that point has him at heel.
 - **Pauses** (state `off`, `lead.why`): build or decorate mode, dialogue, fishing, a dig, scenes (`controlLocked`,
@@ -287,6 +287,28 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
   world, never additive or bright), "This way!" floats over him (the HUD's `status` float in his blue), the tracker's paw
   on the led quest (`.qt-list[data-lead]`). Debug: Cozy › *Shadow leads the way* (a test walk, the setting, the stats).
 - **QA**: `tools/qa/s39-shadow-leads.mjs` (in run-all); test-rpg's reach-step and rescue checks; shots `tools/qa/tmp/r17/`.
+
+## The maps (src/world/mapArt.js, mapData.js, mapPin.js, minimap.js; src/ui/map.js, mapDir.js, minimapUI.js — design: docs/MAP.md, ROADMAP UX-1)
+- **Providers** (`ui.minimap.setProvider`): one shared renderer, `ArtMap` (world/minimap.js), under every area's:
+  `VillageMinimap`, `RegionMinimap`, `DungeonMinimap`, `InteriorMinimap` (home/interiorMap.js). Each has its art (a cached
+  painted base: `VillageArt` (+ a far copy with softer trees), `RegionArt`, `DungeonArt` (+ its outline `path` for the
+  flagstone pattern `floorTile()`) under the provider's fog (a flood reveal over the walkable cells, painted at four
+  pixels a cell, repainted only where it changed), `InteriorArt`), its
+  `makeLists()` and hooks (`under`, `over`, `labels`); the contract: `drawMap(ctx, size, { cx, cz, span, rot }, o)`,
+  `homeView`, `bounds`, `rot`, `hits` (the disc's) / `bigHits` (the big map's), `edges`, `lists`, `areaName`, `ownHud`.
+- **Art**: `VillageArt` paints the island once into cached canvases (the terrain per pixel, again only when the land's
+  tiles change; the composite of paving, woods, trees and roofs again on `village:changed`); each frame draws only the
+  marks (pre-rendered badges, pips, the pin, the star, Shadow, you). Icons are the game's glyphs (`iconSVG`, `cozy:` keys).
+- **People and places**: `people(G)` / `places(G)` (the village), `zonePeople` / `herePlaces` (a zone, a floor, a room:
+  the world's interactables by their label), `personWhere` / `tipFor`, `areaKey(G)` (every entry's `area`), cached 250 ms
+  by the provider. The filter chips' layers: Settings' `mapLayers`; the provider's `layerCounts` grey a chip with nothing
+  on that map. Names dodge the marks drawn over them (`nameQA` for the QA).
+- **The pin**: `G.mapPin` (mapPin.js, `installMapPin` after `installShadowLead`): `G.questTarget` answers with it after a
+  guide's step (`G.questTarget.base` is the objective underneath), so the quest arrow, the minimap and Shadow agree;
+  "Shadow, take me there" is `Lead.toPin()` (lead key `m:<entry key>`). It clears on arrival, Unpin, or a quest asked by name.
+- **Settings**: `mmNorth` (Settings › Minimap: Turns / North up), `mmZoom` (the minimap's lens chip: 28 · 40 · 64 m).
+- **QA**: `tools/qa/s41-maps.mjs` (in run-all: the village's markers, directory, pin, lead, mouse, pad, touch, settings,
+  perf; checkpoint 2 adds the zones, dungeons, rooms and filters), `tools/qa/map-shots.mjs` (the look review, before / after).
 
 ## Combat notes
 - `player.mouseSets` = [[LMB, RMB] sword set, [LMB, RMB] ball set]; the active pair is mirrored in `hotbar[0..1]`.
@@ -441,8 +463,9 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   s13 checks round trips for texture/geometry growth.
 
 ## Zones, phase A (src/dungeon/defs.js, src/rpg/zones.js, src/rpg/zoneMods.js, src/world/questSteps.js — design: docs/ZONES.md §8.1)
-- **DungeonDef** `DUNGEONS` (defs.js, pure): `burrow` (endless, the old rotation) and the four 2-floor zone dungeon
-  stubs. `G.enterDungeon({ id, floor, tier, mods })` (or a Burrow floor number) → `DungeonMode.build(arg)` →
+- **DungeonDef** `DUNGEONS` (defs.js, pure): the Burrow's four dens (kind `burrow`: "The Burrow's dens" below; the
+  endless `burrow` def is gone), the four 2-floor zone dungeons and the Deep Burrow. `G.enterDungeon({ id, floor, tier,
+  mods })` (or an old Burrow floor number: the den that holds it, `legacyFloor`) → `DungeonMode.build(arg)` →
   `beginRun` (the def, the clamped floor, the entry's seeds) → `generate({ floor, seed, plan: floorPlan(...) })`. The
   mode has `def`, `kind`, `zoneId`, `tier`, `mods`, `where()`, `nextRun()`, `hasDeeper()`, `exitPos`, `stairsPos`.
 - **Seeds** reroll per entry (`state.dungeon.runs`, `state.dungeon.seed`); `?dseed=N` pins them for the tab (`G.dseed`).
@@ -453,6 +476,81 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   (questSteps.js); `Story.placeFor` points at the Post, the gate, the stairs, the boss or the way out.
 - **Sprint** (`src/actors/sprint.js`, docs/ZONES.md §9.1): Shift, +40%, `player.sprint` → `speedMul`, `anim.sprint`;
   Shadow paces on `player.anim.speed`; Settings › Sprint (`ui.settings.sprintMode`).
+
+## The Burrow's dens (src/dungeon/defs.js, src/rpg/dens.js, src/world/burrowDoor.js, src/ui/dens.js — design and as-built: docs/ZONES.md §4.1; ROADMAP Z-H1)
+- **The defs** (`defs.js`, pure): `mossyBurrow`, `foxShrine`, `oniKitchen`, `moonSanctum` (kind `burrow`, `den` 0–3,
+  `themes` per floor, `boss`, `levels`, `floors: 2`, `quest`); `DEN_IDS`, `BURROW` ('burrow': the Burrow as a whole),
+  `isBurrow`, `DEN_OF_BOSS`, `theDen(id, cap)` ("the Fox Shrine", "Oni's Kitchen"), `legacyFloor(n)` (an old floor
+  number → its den and floor; `normRun` uses it for numbers and `{ id: 'burrow' }`). `floorPlan` gives a den's floor 1
+  `depth` 3 / 8 / 13 / 18 and its floor 2 `rooms`, `size`, `bigBoss`, `treasure`; `gen.js generateFloor` reads those
+  plan fields (a plan without them, or no plan, is the old floor exactly): `bigBoss` makes the big room the boss's
+  chamber and swaps the room farthest from it to the arrival.
+- **The records** (`rpg/dens.js`, pure): `state.dungeon.dens[id] = { cleared, crew, bestFloor }`; `denRecord`,
+  `denCleared`, `denOpen` (the first, or the den before cleared), `openDens`, `deepestOpenDen`, `prevDen` / `nextDen`,
+  `noteDenFloor` (DungeonMode.start), `recordDenClear` (DungeonMode.clearDungeon: `{ first, cleared, opened }`),
+  `recordDenCrewClear` (cozy/expeditionRun.js `denCrewClear`), `denSummary`, `legacyDepth` (the dens as an old floor
+  number: questSteps `bestFloorOf('burrow')`), `migrateBurrowDens` (old saves, from `normalizeZones`; `OLD_BOSS_FLOOR`).
+  `zones.js tierRecord('burrowDeep')`'s story clear is `deepest` ≥ 21 or the Moonlit Sanctum cleared.
+- **The run** (`dungeonMode.js`): a den's banner is "Floor n of 2 · <den>" (the Moonlit Sanctum's floors add their own
+  names, `def.sub`); `start` notes the den's floor; `clearDungeon` records the clear, fires `dungeon:cleared { id, kind:
+  'burrow', first, opened }` and `den:opened`, toasts the next den, and on Tamamo opens the Deep Burrow's T1 (its record
+  read before the den's clear); the bosses' title lines are by boss id (`DEN_BOSS_LINES`). The HUD's location is the
+  den's name (game.js). The stairs say "Burrow deeper (Floor 2)".
+- **The door** (`world/burrowDoor.js`, `installBurrowDoor(G)` from game.js): `G.burrow.list()` (one card per den: name,
+  jp, blurb, icon, levels, the hero's fit, the boss, up to four yokai, the theme's colours for the art, open / cleared /
+  crew / bestFloor, why it's sealed, the story quest step that points there, the Deep Burrow's note), `pick()` (the den
+  to show first), `open(opts)` (`ui.open('burrow', { select })`; `G.openBurrowMenu` is it), `enter(id)` (an open den's
+  floor 1). The Dens debug tab is registered here (`registerDebug('dens', …)`); its Travel rows are in
+  debug/debugActions.js.
+- **The picker** (`ui/dens.js` `DenPanel`, 'burrow', `.p-burrow`; `dens.css`): the Travel Map's `.tv-*` look and
+  controls; `drawArt()` paints the hill (a canvas, once per open / refresh), `drawDen()` each den's domed cave
+  (its theme's colours from the card, its motifs, a sealed den dimmed with its stone plug); the pins and the card are
+  HTML. padNav: START `burrow: '.dn-go, .dn-pin.sel'` (ui/padNav.js). Refreshed on `den:opened`.
+- **Quests and the pointer**: `story.js` QUESTS' floor steps `{ type: 'floor', den, n: 2 }`; `questSteps.js`
+  `floorStepAt` / `floorStepDone` / `floorStepHave`, `destOf` (a floor step → its den's floor; a den boss → its den's
+  floor 2; unfiltered kills and the Mochi Jelly → `BURROW`); `Story.placeFor` (`isBurrow`: the door from the village,
+  "The Burrow: <den>"; another den's step from a den → the way out).
+- **The cozy path**: `cozy/objectives.js` `BURROW_ROUTES[q].den` / `.level`, the place label, `burrowErrandLevel` (the
+  dens cleared count too), `burrowErrandDen`, the errands' `{den}`; `cozy/expeditionRun.js` `denCrewClear`, the report's
+  `rep.den` (ui/expeditions.js shows "… opens at the Burrow door").
+- **QA**: s42-burrow-dens, s3-bosses, s21 c), test-rpg "BURROW DENS", gen-fuzz, prod-smoke `dens`; look review
+  `tools/qa/dens-shots.mjs`.
+
+## The Town Portal (src/dungeon/townPortal.js, src/dungeon/portalModel.js — design and as-built: docs/ZONES.md §4.2; ROADMAP Z-H2)
+- **The API** (`installTownPortal(G, village)` from game.js, after the door): `G.townPortal` = `press()` (T, the menu,
+  touch: true when it handled the press on a dungeon floor; false in an outdoor zone, where game.js and the menu go home
+  at once), `can()` (null, '' to ignore quietly, or the refusal's text), `casting`, `open` (the snapshot in
+  `state.portal`, or null), `village` (the return portal's `{ x, z, pos, label }`), `resume()`, `close(why, quiet)`,
+  `arrive(D, run)`, `update(dt, t, vfx)` (the village frame), `snapshot()` (QA, debug).
+- **The cast** rides the floor's `DungeonMode.spinners` (`tickCast`): `gateSpot` puts the gate 1.7 m from the hero on
+  the far side from the camera (open floor, a clear line, not on an interactable); the gate's `open(k)`, a light from the
+  floor's lightPool, motes; a cast cut short by leaving the floor is forgotten (`arrive`, `mode:changed`); the first cast
+  marks Shadow's tip seen; through, `snapshotFloor` goes into the save, the return portal is shown, `G._portalHome` is the
+  arrival spot that `returnToVillage` uses (then clears).
+- **The snapshot** (`snapshotFloor`, pure data): `run` (id, floor, tier, spirit, mods, seed, packSeed, heroLvl: what
+  `normRun` / `beginRun` / `floorPlan` take back, so the same layout and packs build), monsters `alive` [sid, kind, x, z,
+  life fraction] and `dead` [sid, kind], `chests.opened` (layout indices) and `chests.late`, `pots`, `shrines`, `loot`
+  (its drop data; a zone quest item's objective by index `qi`), `cleared`, `boss` (dead, where it fell), `zr` (a zone
+  dungeon's objectives as built, cages open, drops dropped / taken), `hero`.
+- **The rebuild**: `G.enterDungeon({ ...run, resume: S })` → `normRun` keeps `resume` → `ZoneRun.build` takes `run.resume.zr.obj`
+  over the story's list → game.js `enterCombatWorld`, after `start()` and the arrival, calls `arrive(D, run)` →
+  `restoreFloor`: `DungeonMode.dropSilently(m)` (gone without a death), positions and life, `chest.markOpened()` (by
+  `chest.layoutIdx`), `makeChest` for the late ones, `pot.smash()`, `shrine.spend()`, `ZoneRun.restore(zr)`,
+  `DungeonMode.placeLoot(d, x, z)` (landed, no flight; the drop sounds muted), `restoreVictory(p)` (the boss gone, the
+  sigil calm, `victoryExits(p)`: the stairs and the way home where it fell, no clear again). DungeonMode keeps for it:
+  `spawned`, `spawnKinds`, `m._sid` and `bossSid` (after the spawns in `start`), `chests` (every chest), `shrines`,
+  `victoryAt`, `run.heroLvl`.
+- **The look** (`portalModel({ colors, frame, light })` → `{ group, disc, open(k), openness, setColors, update, dispose }`):
+  the stone ring, plinth, rope, shide and bell are one shared geometry pair (built once); the swirl is a small
+  ShaderMaterial (three bands of the place's colours, a heart, a rim; normal alpha, `toneMapped: false`, colours × 0.86);
+  a ground glow plane; motes on `vfx.spark`.
+- **Closing**: `G.enterDungeon` is wrapped (any entry without `resume` closes the open portal, its toast naming the den,
+  the dungeon or the tier run); `expedition:sent` closes it when the crew's objective is that dungeon.
+- **Controls**: `core/actions.js` `home` (T; the label "Town Portal (a dungeon) · go home (a zone)"; TOUCH_NAMES "the
+  portal button"); `ui/menu.js` `syncHome` (the Game page's Home: "Town Portal" with the `portal` glyph on a floor,
+  `.dim` and the reason as its title mid boss fight); `ui/touch.js` `.tc-portal` in the top row left of the bag (shown on
+  a floor, `.locked`, `.casting`; touch.css); `ui/glyphs.js` `portal`.
+- **QA**: s43-town-portal, prod-smoke `portal`.
 
 ## Zone villages (src/regions/village/, src/actors/zoneVillagers.js, src/world/zoneQuests.js, src/rpg/zoneBuffs.js — design and as-built: docs/ZONES.md §2, §2.1, §2.2)
 - **Data** `village/data.js` (pure): `VILLAGES[zone]` (names, buildings in screen-polar slots `{ a, d }` round the square,
@@ -776,6 +874,13 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
 - QA: s17 (interiors, decorating, homes, ratings, requests, upgrades, remodels, the housing guides, leak cycles), s18
   (Tanu, the workbench, finds); `housing-perf.mjs`; test pages `/?test=furniture`, `furnsheet`, `stall`, `upgrade`,
   `buildings&style=`.
+- **The stash** (ROADMAP R-18, R-19; docs/HOUSING.md "The stash"): one shared stash in tabs (rpg/stash.js: the shape,
+  the prices, `migrateStash`, called by `normalizeHeroes`), its panel ui/stash.js + stash.css (the tab strip, the "+"
+  and rename popovers, `step(d)` for the pad's LT / RT), opened at the cottage's Treasure Chest (home/housing.js) or at
+  any Stash Chest built in the village (catalog `stashChest`, buildings/stashChest.js, `G.openStash(b)` in
+  world/services.js; its lid is an anim part of kind `'lid'` that `model.kick()` pops, buildings/index.js). The bag's
+  quick move and a drop on a tab's header: ui/inventory.js `ItemDrag.quickMove` / `toTab`. QA: s44;
+  `tools/qa/stash-shots.mjs`.
 
 ## Controls: gamepad and glyphs (design and as-built: docs/CONTROLS.md; ROADMAP CT-1)
 - **The action layer** `src/core/actions.js` (see Core modules). Every gameplay read goes through it: game.js
@@ -1092,14 +1197,18 @@ state = {
   coins: 120,
   materials: { wood:20, stone:10, petal:0, crystal:0, bone:0, mochi:0, silk:0, lantern:0 },
   potions: { heart:3, zoom:2, rejuv:0 },                      // belt counters: Q = heart, E = zoom
-  inventory: Array(40).fill(null),                            // 10x4 grid, one item per cell (uniform cells)
+  inventory: Array(40).fill(null),                            // a 10x4 grid stored by anchor: [y*10+x] holds the item whose top-left cell that is (rpg/grid.js, docs/INVENTORY.md)
+  lostFound: [/* 10-wide pages of 60, by anchor */],          // rewards and finds with no room (rpg/stash.js stow; absent when empty; it only gives back)
+  gridV: 1,                                                   // items take up space (rpg/grid.js itemSize); an older save is packed once (rpg/stash.js packSave)
   equipment: { weapon:null, weaponAlt:null, hat:null, outfit:null, collar:null, charm1:null, charm2:null, boots:null, paws:null },
-  stash: Array(60).fill(null),
+  stash: Array(60 * tabs).fill(null),                         // one 10x6 grid per tab, tab t at [t*60, t*60+60), stored by anchor (rpg/stash.js)
+  stashTabs: [{ name:'Tab 1', color:'pink' }],                // the tabs owned (1–6, bought on the stash; migrateStash makes an old 60-slot stash tab 1)
   quests: { active:[], done:[] }, friends: { /* villagerId: {hearts, talkedDay, gifts} */ },
   village: { layoutVersion:2, ringRank:1, seed, buildings:[{ id, idx, type, x, z, rot, level, seed, residents, built, plot? }],
              zones:[[x,z,t]], paths:[[x,z]], day, income, stats, migrationNote? },   // (owned by the village sim)
-  dungeon: { deepest:0, waypoints:[1], seed, runs },          // the Burrow (seed / runs: per-entry rerolls, dungeon/defs.js)
+  dungeon: { dens: { <den>: { cleared, crew, bestFloor } }, seed, runs, deep, deepest, waypoints }, // the Burrow's four dens (rpg/dens.js; deepest / waypoints: the endless Burrow's, read only by the migration); seed / runs: per-entry rerolls (dungeon/defs.js); deep: the Deep Burrow's tier record
   zones: { bamboo: { unlocked, visits, regionBoss, village, siegeCamps, dungeon: { cleared, bestFloor, tier, spirit }, quests }, … },
+  portal?: { v, place, theme, run, hero, alive, dead, chests, loot, pots, shrines, cleared, boss, zr }, // an open Town Portal: the floor to rebuild (dungeon/townPortal.js, ZONES §4.2)
   // regions: { unlocked, cleared, visits } = a live view of zones (not saved; rpg/zones.js)
   day: 1, hour: 8.5, flags: {},
   // the homestead (docs/HOMESTEAD.md; household, lazy-init: old saves load with empty ones)
@@ -1173,6 +1282,15 @@ Rarity colours: normal `#f4efe6`, magic `#6ea8ff`, rare `#ffd84a`, unique `#ff9a
 `equip(invIdx)`, `unequip(slot)`, `swapWeapons()`, `moveItem(from:{c:'inv'|'stash'|'equip', i}, to:{c,i})`, `dropItem(from)`,
 `pickup(item)→bool`, `usePotion('heart'|'zoom'|'rejuv')`, `sellItem(from)`, `buyItem(item, price)`, `learnSkill(id)`, `addStat(key)`,
 `setHotbar(slot, skillId)`, `learnPerk(skillId, perkId)`, `addXp(n)`, `addCoins(n)`, `spendCoins(n)→bool`, `addMaterial(k,n)`, `hasMaterials(cost)`, `spendMaterials(cost)→bool`, `recompute()`.
+The stash (ROADMAP R-19, rpg/stash.js): `buyStashTab()→tab|false` (its price from `TAB_PRICES`; 'stash:tab'),
+`renameStashTab(t, name)`, `colorStashTab(t, color)`, `stashPut(item, preferTab)→index|-1` (the tab asked for, then the
+first with room). Readers go through rpg/stash.js (`stashItems`, `tabItems`, `tabGrid`, `stashSpot`) and rpg/grid.js
+(`findSpot`, `fitsAt`, `placed`). Items take up space (R-20, docs/INVENTORY.md): `moveItem` onto one item swaps
+(`{ swap: ref }`), onto two refuses; `stowItem(item)` (a reward or find: the bag, the stash, Lost & Found: never lost);
+`sortContainer('inv' | 'stash', tab)` (Sort, rpg/grid.js `packOrder` / `packGrid`); `bagSpot(item)`. Treats (R-22): the
+player's word for gems; `renameTreat` (items.js) renames old saves' on load. The grid UI: ui/inventory.js `layoutGrid`
+and ItemDrag's footprint preview (ui/itemGrid.css); sized icons rpg/icons.js `itemIconSized`; dropped treats
+combat/groundLoot.js `treatGeo`. QA: s45.
 Homestead: `addPantry(id,n)`, `hasPantry(req)`, `spendPantry(req)→bool`, `sellPantry(id,n,buyer)→coins`, `buyPantry(id,price,n)`,
 `pantryCount(id)`, `eat(id)→{heal,meal}`, `cook(recipe,n,{picks,learn})`, `spendMix(picks)`, `learnRecipe(id)`, `tickMeal(dt)`.
 

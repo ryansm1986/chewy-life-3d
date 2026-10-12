@@ -71,10 +71,11 @@ export class QuestArrow {
     this.setMode(mode);
     if (!mode) return;
     // label (only rebuilt when it changes)
-    const sig = (tgt.label || '') + '|' + (tgt.kind || '');
+    const sig = (tgt.label || '') + '|' + (tgt.kind || '') + '|' + (tgt.icon || '');
     if (sig !== this.sig) {
       this.sig = sig;
-      this.$.ic.innerHTML = glyph(ICON[tgt.kind] || 'scroll');
+      this.$.ic.innerHTML = glyph(tgt.icon || ICON[tgt.kind] || 'scroll'); // (icon: the map pin's own, world/mapPin.js)
+      this.root.classList.toggle('pinned', !!tgt.pin);
       this.$.n.textContent = tgt.label || 'Quest'; this.lw = 0;
       this.root.dataset.kind = tgt.kind || 'place';
       this.root.classList.remove('pop'); void this.root.offsetWidth; this.root.classList.add('pop');

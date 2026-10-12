@@ -1,6 +1,6 @@
 # Zones: rescue the village, clear its dungeon, then push tiers (design)
 
-Status: **phases A–D built** (designed 2026-10-05; sprint and the foundations §8.1, §9.1; the dungeons §8.2; the villages §2.1, §2.2); **phase E built: tiers, modifiers, the Spirit Lantern, the Spirit endgame and its pinnacle** (§5.1, §5.2, §5.3). The work is tracked in [ROADMAP.md](ROADMAP.md); this file is the design.
+Status: **phases A–D built** (designed 2026-10-05; sprint and the foundations §8.1, §9.1; the dungeons §8.2; the villages §2.1, §2.2); **phase E built: tiers, modifiers, the Spirit Lantern, the Spirit endgame and its pinnacle** (§5.1, §5.2, §5.3); **the Burrow as four 2-floor dens** (§4.1, ROADMAP Z-H1); **the Town Portal** (§4.2, ROADMAP Z-H2). The work is tracked in [ROADMAP.md](ROADMAP.md); this file is the design.
 
 The owner's direction (2026-10-05):
 - Every zone has **a village to save** from monsters.
@@ -293,6 +293,146 @@ services in `talk.js`, the quests in `world/zoneQuests.js`.
   plus magic and rare packs. That depends on the performance work in §7.
 - **Rewards**: the first clear gives the zone unique and a guaranteed rare; repeats give normal loot.
 
+### 4.1 As built: the Burrow's four dens (ROADMAP Z-H1; 2026-10-11)
+The owner (2026-10-11): "I'd like the dungeons to be 2 floors and a boss. The Burrow doesn't do that." The pick: **four
+2-floor dens**, one per Burrow boss. The endless Burrow (a boss every 5th floor, waypoints every 5th) is gone from the
+game; its themes, monsters and bosses live on in the dens. Code map: ARCHITECTURE.md "The Burrow's dens".
+- **The dens** (`dungeon/defs.js`, kind `'burrow'`, `den` 0–3; `DEN_IDS`, `isBurrow`, `theDen`, `DEN_OF_BOSS`):
+
+  | Den | id | Floor 1 | Floor 2 | Boss | `levels` | Monsters (floor 1 / 2) | Boss level |
+  |---|---|---|---|---|---|---|---|
+  | Mossy Burrow (苔の巣穴) | `mossyBurrow` | Mossy Burrow | Mossy Burrow | King Mochi | [2, 5] | 2–5 / 3–6 | 5–8 |
+  | Fox Shrine (狐の社) | `foxShrine` | Fox Shrine Tunnels | Fox Shrine Tunnels | Lord Karakasa | [7, 10] | 7–10 / 8–11 | 10–13 |
+  | Oni's Kitchen (鬼の台所) | `oniKitchen` | Oni's Kitchen | Oni's Kitchen | Oni Chef Gorobei | [12, 15] | 12–15 / 13–16 | 15–18 |
+  | Moonlit Sanctum (月の社) | `moonSanctum` | Crystal Grotto | Moonlit Fox Sanctum | Tamamo | [17, 20] | 17–20 / 18–21 | 20–23 |
+
+- **Levels** (a design call): the bands keep the old floors' monster levels (floor + 1: 2–6, 7–11, 12–16, 17–21), fitted
+  the zone dungeons' way: floor 1 is the hero's level clamped to `[lo, hi]`, floor 2 one more, the boss two over that
+  (`tiers.runLevel`). A hero past a band meets its top (the Mossy Burrow at level 30: 5 / 6, King Mochi 8); a hero under
+  it meets its bottom. The picker says "A bit tough", "Just right" or "An easy stroll" from the hero's level.
+- **Floors** (`floorPlan` → `gen.js generate`, the Burrow's own rooms and corridors and its kits):
+  - floor 1: the size of the old floor under its boss (`depth` 3 / 8 / 13 / 18): 10–15 rooms, ~60–100 monsters, a
+    treasure room, a shrine (70%), the stairs in the room farthest from the arrival;
+  - floor 2 (`plan.rooms` 9 + den, `plan.size` 70 + 3·den, `plan.bigBoss`, `plan.treasure`): 9–12 rooms, ~50–70 monsters
+    before the boss, a treasure room with its golden chest; the boss's chamber is the floor's **big room** (15 × 15 cells,
+    30 m: the arena sigil about 12.6 m across), and the arrival is the room farthest from it (80–110 m away). No stairs;
+    the boss's fall opens a portal home where it fell (`openSpotNear`: never in rock).
+  - No waypoints (two floors need none). `generate()` without a plan is still the old endless floor exactly (the
+    `?test=dungeon` page; gen-fuzz keeps its 40 floors), and a plan with that floor's own numbers reproduces it.
+- **The order**: the Mossy Burrow is open from the start; each next den opens once the den before it is cleared, by you
+  or a crew (`rpg/dens.js denOpen`). A clear fires `dungeon:cleared { id: <den>, kind: 'burrow', tier: 0, floor: 2, boss,
+  first, opened }` and, the first time, `den:opened { id, by }` and a toast ("The Fox Shrine is open! Pick it at the
+  Burrow door"). Tamamo's fall in the Moonlit Sanctum is the Deep Burrow's story clear: its T1 opens (§5.1).
+- **The record** (`rpg/dens.js`): `state.dungeon.dens[id] = { cleared, crew, bestFloor }` (your wins, a crew's wins, the
+  deepest floor reached). `state.dungeon.deepest` is no longer written; `waypoints` is left in old saves, unused.
+- **The picker at the Burrow door** (`world/burrowDoor.js` `G.burrow`, the panel `ui/dens.js` + `dens.css`): F at the door
+  (`G.openBurrowMenu` → `G.burrow.open`) opens a painted cut-through of Shrine Hill at dusk: the torii and the Burrow's
+  mouth on the grassy brow, the Spirit Lantern beside them (lit once Tamamo is calmed), the earth in bands growing cooler
+  and darker with depth, and the tunnel winding down past the four dens, each a domed, lit cave in its own colours (moss
+  and mushrooms and a little mochi; vermilion torii and paper lanterns; pots on the boil; crystals and a crescent moon);
+  a sealed den is dim behind a stone plug and the tunnel past the last open den is a crumbled dotted line. Each den has
+  a pin (its number, name, the 踏破 stamp when you've cleared it, 救 for a crew's win, a "!" when a story quest leads
+  there). The card beside it: name, blurb, floors, the band and the fit for your level, the boss (beaten ×n, or the
+  floor reached), up to four of its yokai, the quest step that points there, the Deep Burrow's note on the last, and the
+  way in ("Into the Fox Shrine!") or what opens it ("Beat King Mochi in the Mossy Burrow to open it"). It opens on the
+  den a quest points into, else the deepest open den not yet cleared. The Travel Map's look and controls: 1–4 choose and
+  Enter sets off; a pad's D-pad walks the pins and the card, A picks, A on the way in sets off, B closes; a tap picks and
+  taps in; on a phone the art sits at 0.76 beside the card, which scrolls with the way in always in sight.
+- **The story quests** (`world/story.js`): the step indexes are unchanged; the floor steps are `{ type: 'floor', den, n: 2 }`
+  (`questSteps.js floorStepDone`, `floorStepHave`): "Reach the Mossy Burrow's second floor", "Reach the Fox Shrine's
+  second floor", "Reach the second floor of Oni's Kitchen", "Reach the Moonlit Sanctum's second floor", then the boss as
+  before. The descriptions name the dens. The pointer (`Story.placeFor`, `destOf`): from the village the Burrow door
+  ("The Burrow: Fox Shrine"); in another den the way out; in the den, the stairs, then the boss. An unfiltered kill and
+  the Mochi Jelly are the Burrow as a whole (`dungeon: 'burrow'`: the door, nothing to point at inside). An old floor step
+  without a den reads its old floor as the den that holds it.
+- **The cozy path** (`cozy/objectives.js`, `expeditionRun.js`): each Burrow quest's crew route names its den
+  (`BURROW_ROUTES[q].den`, place "The Burrow: the Fox Shrine"); its `level` (5 / 10 / 15 / 20) and power are as tuned. A
+  crew's win counts in the den's `crew` and opens the next den (`denCrewClear`; the report adds "the Fox Shrine opens at
+  the Burrow door"); a partial notes the den's floor 2. The Burrow's errands go to the den the story has opened (the
+  level as before: a beaten boss's old floor + 2): "Burrow patrol: the Fox Shrine", "A mushroom hunt in Oni's Kitchen",
+  "Lost lanterns of the Moonlit Sanctum".
+- **Rewards** (a design call): as before. Each boss's story quest pays its reward and unique (owed to a crew's win until
+  your own, docs/COZY.md); the boss's hoard, the floor-cleared cache and the chests as on the old floors; floor 2 now
+  has its own treasure room. No separate den first-clear unique: the quest is that.
+- **Old saves** (`rpg/dens.js migrateBurrowDens`, run by `normalizeZones` at every load; idempotent, a max-merge). A den
+  counts as **cleared only when its boss fell** (the director's rule, 2026-10-11 review):
+  - `deepest` **past** its boss floor (≥ 6, 11, 16, 21): on the endless Burrow the stairs off a boss floor only appeared
+    where the boss fell, so reaching the next floor proves it;
+  - or its story quest done (`king`, `umbrella`, `oni`, `tails`), or for the Moonlit Sanctum the Deep Burrow's own record
+    of Tamamo's story clear (`state.dungeon.deep`): your win when you'd reached that boss floor and no crew's win left the
+    quest's unique owed to you (`state.quests.owed`), else a crew's (the cozy path never set `deepest`);
+  - `deepest` **at** the boss floor (5, 10, 15, 20) is the den open with floor 2 reached but **not cleared**: the next den
+    stays sealed until you beat that boss (a save that stood before King Mochi meets him again; its `king` quest is at
+    "Defeat King Mochi");
+  - a den got into (`deepest` past the den before's boss floor) has floor 1;
+  - `deepest` stays as it was, so every load merges to the same records; the Deep Burrow's T1 follows a cleared
+    Moonlit Sanctum (an old save at floor 20 keeps it asleep until Tamamo falls). The quests keep their records: a floor
+    step the dens now hold moves on by itself (an old save at floor 15 with the Oni quest begun is at "Defeat Oni Chef
+    Gorobei").
+- **The old numeric API** (`normRun`, `defs.js legacyFloor`): `G.enterDungeon(n)`, `{ id: 'burrow', floor: n }` and
+  `?floor=n` are the den that holds old floor n: 1–5 the Mossy Burrow, 6–10 the Fox Shrine, 11–15 Oni's Kitchen, 16 and
+  deeper the Moonlit Sanctum; a boss floor (5, 10, 15, 20) is its den's floor 2, the others floor 1. A den's id alone is
+  its floor 1.
+- **Debug** (docs/DEBUG.md): the Dens tab (clear the dens up to one, reset them, migrate an old save from floor 3–25,
+  the door's picker); Travel's rows for each den's floors (a sealed den too).
+- **QA**: `tools/qa/s42-burrow-dens.mjs` (the picker on the keyboard, the pad and a phone; every den end to end; the
+  unlocks; the quests and the pointer; old saves at floor 3, 5, 6, 12, 15, 20, 21 and a cozy save; a crew's win); s3 (the four
+  bosses: summons, the portal, the quest, the next den); s21 c); test-rpg "BURROW DENS"; gen-fuzz (the dens' floors and
+  their boss-floor invariants); prod-smoke `dens`. Look review: `tools/qa/dens-shots.mjs` (the door, the picker, every
+  den's floors and boss at the game camera on the desktop, the Deck and a phone).
+
+### 4.2 As built: the Town Portal (ROADMAP Z-H2; 2026-10-11)
+The owner (2026-10-11): "a way to tp back to town and back to the same spot in the dungeon". The pick: **free, any
+time**, in every dungeon: the Burrow's dens, the zone dungeons and the Deep Burrow's tier and Spirit runs (not the
+outdoor zones: there T still goes home at once). Code: `dungeon/townPortal.js` (G.townPortal), its look
+`dungeon/portalModel.js`.
+- **Casting**: T (the old "go home" key, kept), the pad's Game page (its Home reads **Town Portal** on a floor; every pad
+  button is taken, so no quick binding), or touch's portal button (the moon gate left of the bag, on a floor only). A
+  1 s cast: a stone moon gate (a ring about 2 m high) with a shimenawa rope grows 1.7 m from the hero on the far side
+  from the camera, so the hero stands before it in view, with Blossom Hollow's sakura and sky turning in its ring. Then
+  the hero and Shadow step through. Moving, rolling or a knock that shifts the hero cancels it ("The portal
+  fizzled: hold still while it opens"). The swirl is a normal alpha-blended disc with its colours under the bloom's
+  knee, a faint ground glow, a few motes and a soft light: no additive glare, no screen flash.
+- **Not mid-fight**: while the floor's boss is engaged (its aggro, its intro, a blow traded) until it falls, T says
+  "No portal mid-fight: King Mochi won't let you slip away!" (the pinnacle: "the Four Seasons are still stirring");
+  the pad's Town Portal is dimmed with that reason, touch's button dimmed.
+- **The other end**: a twin moon gate on the plaza's paving east of the fountain (117.3, 121.6), a sakura planter
+  behind it. It faces south-east, to the game camera and the spawn. Its swirl is the portals' sky blue with the floor's
+  own accent and a pale heart of its floor. The hero arrives 2 m in front of it. Its
+  interactable is **"Step into the Town Portal (<place>)"**, e.g. "Step into the Town Portal (the Fox Shrine, floor 2)",
+  "… (the Bamboo Depths, floor 1 (Tier 3))"; `G.townPortal.village` gives `{ x, z, pos, label }` for the map, the
+  minimap and the pointer (their rows are UX-1's: world/mapData.js SPOTS). The floor's own cast gate leaves no lasting
+  interactable: it closes behind you.
+- **Stepping back in rebuilds the floor**, not kept alive in memory (the phone's memory diet). The cast saves the run
+  (dungeon, floor, tier, Spirit, modifiers, the seeds and the hero level the floor was sized for) and a snapshot of what
+  changed into the save (`state.portal`, a few KB):
+  - the monsters by spawn order (`DungeonMode._sid`): the beaten ones stay gone (no death, drop or event again), the
+    rest stand where they stood (one saved pressed against a wall's edge goes on the open floor beside it), as hurt as
+    they were;
+  - the chests (by layout index) stay open; the late ones (the boss's treasure chest, a tier run's Lantern chest) come
+    back where they rose, open or shut;
+  - the broken pots stay broken, the spent shrines spent, the floor-cleared cache isn't paid twice;
+  - the loot on the ground lies where it lay (a zone's quest item still points at its objective);
+  - a fallen boss stays fallen: the way home and the stairs back where it fell, the seal open, no banner or reward again;
+  - a zone dungeon's objectives come back as they were built (the list the floor was made with, so the cages and marked
+    packs stand where they stood and the packs' dice roll the same, even when the story moved on); a freed cage stays
+    open and empty; quest items keep whether they dropped and were picked up;
+  - the hero (and Shadow beside them) where they stood. A toast: "Back in the Fox Shrine, floor 2, just as you left it".
+  Not kept: a Haunted run's risen ghosts and a fight's summoned adds (a portal can't be cast mid boss fight anyway).
+- **One at a time**: a new portal replaces an old one. Setting off into any dungeon another way (a den from the door,
+  a zone gate, a tier run, debug travel) or sending a crew into that dungeon closes it with a toast ("The Town Portal to
+  the Fox Shrine, floor 2 closed: you set off on a tier run"). It survives a save and a reload. Only the portal's round
+  trip resumes a floor: the floor's own way home ends the run, as before.
+- **Shadow's tip**, once, a little after a dungeon floor starts: "Need a break? Press T for a Town Portal home. It
+  brings you right back here!" (the pad: "Open the menu (Menu) and pick Town Portal"; touch: "Tap the portal button by
+  the map").
+- **Events**: `portal:cast`, `portal:fizzled`, `portal:refused`, `portal:opened`, `portal:replaced`, `portal:resumed`,
+  `portal:closed`, `portal:village` { on }.
+- **Debug** (docs/DEBUG.md, the Dens tab): Cast it now (no cast time), Close the portal, The snapshot.
+- **QA**: `tools/qa/s43-town-portal.mjs` (a den's round trip by T; a fizzle; the boss-fight refusal and a fallen boss
+  kept; a zone dungeon's cages; closing by a den, a tier run and a crew; replacing; a save and reload; the floor's own
+  way home; T in a zone; the pad's Game page; a phone's button and the tip); prod-smoke `portal`.
+
 ## 5. Tiers, the endgame and modifiers (PoE maps, player-picked)
 **The owner's decisions (2026-10-07):**
 - **The Burrow gets tiers and modifiers too**, at its own Spirit Lantern by the Burrow door: the **Deep Burrow** tier run
@@ -359,8 +499,8 @@ Code map: `src/rpg/tiers.js` (the numbers), `src/rpg/zoneMods.js` (the catalogue
 (the Haunted ghost); ARCHITECTURE.md "Tier runs".
 - **A run** is `{ tier, spirit, mods }` on top of a `DungeonDef` (`G.enterDungeon({ id, floor, tier, spirit, mods })`).
   A Spirit run carries tier 5 (so quest filters "tier ≥ n" and the events treat it as at least T5). `normRun` caps the
-  tier at 5 and cleans the mods (known ids, no repeats, one Elemental, at most the run's slots); the endless Burrow has
-  no tiers (its tier runs are the Deep Burrow's).
+  tier at 5 and cleans the mods (known ids, no repeats, one Elemental, at most the run's slots); the Burrow's dens
+  have no tiers (their tier runs are the Deep Burrow's).
 - **The tier table** (`TIERS`; monster level = the band with the hero clamped to it, +1 a floor, +4 a tier, cap 60):
 
   | Tier | Levels (Bamboo, hero 8) | Pack size | Champion chance | Quantity | Rarity | XP | Slots |
@@ -405,7 +545,8 @@ Code map: `src/rpg/tiers.js` (the numbers), `src/rpg/zoneMods.js` (the catalogue
   Two floors on its deepest themes — floor 1 the **Crystal Grotto**, floor 2 the **Moonlit Fox Sanctum** with **Tamamo**
   in the Burrow's boss room — in the Burrow's own rooms-and-corridors layouts (gen.js), at the band of its floors 16–20
   (levels 17–21, the hero clamped to it) +4 a tier: T5 is 37–41, Spirit 60. Its T0 is the story Burrow: **Tamamo beaten
-  on floor 20** opens T1 (live: a toast; old saves: `state.dungeon.deepest` past 20). Tier runs only (no T0 entry from
+  in the Moonlit Sanctum** (§4.1; until Z-H1, on floor 20 of the endless Burrow) opens T1 (live: a toast; old saves:
+  `state.dungeon.deepest` past 20, or the Moonlit Sanctum migrated as cleared: §4.1). Tier runs only (no T0 entry from
   its Lantern), no waypoints, no Burrow records; its portals lead home to Blossom Hollow, next to its Lantern by the
   Burrow door. Its record is `state.dungeon.deep`, the same shape as a zone dungeon's.
 - **Each modifier's hook and numbers** (`ZONE_MODS`; `layout` = `gen.js generate → layoutMods`, deterministic from the
@@ -434,8 +575,8 @@ Code map: `src/rpg/tiers.js` (the numbers), `src/rpg/zoneMods.js` (the catalogue
   Spirit 10 kitchen sink at ~300–340.
 - **Save** (`zones.js`): every tier dungeon's record is `{ cleared, bestFloor, tier: { unlocked, cleared }, spirit: { best },
   lantern: { tier, spirit, mods } }` (`tierRecord(state, zone | dungeon id | 'burrowDeep')`). **Migration** (`fillTiers`,
-  idempotent): a zone dungeon with a clear but no tier record, and a Burrow past floor 20, start with T0 cleared and T1
-  open. `recordDungeonClear(state, id, tier, spirit)` → `{ first, cleared, tierUnlocked, firstTier, spirit }`;
+  idempotent): a zone dungeon with a clear but no tier record, and a Moonlit Sanctum cleared (or an old Burrow past floor 20),
+  start with T0 cleared and T1 open. `recordDungeonClear(state, id, tier, spirit)` → `{ first, cleared, tierUnlocked, firstTier, spirit }`;
   `tierCleared` (a Spirit clear counts as T5), `tierOpen`, `spiritOpen` (all four zone dungeons at T5), `spiritBest`,
   `spiritMax`, `rememberSetup` / `lastSetup` (the Lantern's memory).
 - **Events**: `dungeon:cleared { id, kind: 'zone' | 'deep', tier, spirit, floor, zone, boss, first, firstTier }`,
@@ -489,7 +630,7 @@ Code map: `src/rpg/tiers.js` (the numbers), `src/rpg/zoneMods.js` (the catalogue
     (`look.spirit`, `look.spiritI`: the onsen gate puts it left of the torii, the hot spring being on the right).
   - **At the Burrow door** in Blossom Hollow (`installBurrowLantern`): the Deep Burrow's, lit when Tamamo has fallen
     (live on `tier:unlocked`).
-  - F: lit → the panel; asleep → a toast ("Clear the Bamboo Depths once to wake it" / "Beat Tamamo on Burrow floor 20").
+  - F: lit → the panel; asleep → a toast ("Clear the Bamboo Depths once to wake it" / "Calm Tamamo in the Moonlit Sanctum to wake it").
 - **`G.lantern`** (`installLanternApi`): `info(id)` (the open tier, tiers cleared, Spirit open / max / best, the last
   setup, the level per run), `open(id)`, `enter(id, run)` (cleans the run to what's open, remembers it per dungeon,
   enters floor 1). The panel never imports world code.
@@ -751,7 +892,7 @@ endgame uniques in `src/rpg/items.js`; ARCHITECTURE.md "Tier runs".
 - **`DungeonDef`** (`src/dungeon/defs.js`, pure): `DUNGEONS[id] = { id, kind, name, zone, theme, monsters, boss, levels,
   floors, waypoints, stub }`.
   - `burrow`: `theme` and `boss` are `null` (the old rotation by floor: `themeFor`, `bossFor`), `floors: Infinity`,
-    waypoints on.
+    waypoints on. (Since Z-H1 the Burrow is four 2-floor dens instead: §4.1.)
   - The four zone dungeons (`bambooDepths`, `mapleRoots`, `tideCaves`, `onsenCaverns`) are **stubs**:
     - 2 floors; the zone's 3 monsters and its region boss on floor 2; the region's level band;
     - Burrow themes stand in for their kits (`TODO(Z-C1)`), and the boss fights in the Burrow's boss room.
@@ -759,11 +900,11 @@ endgame uniques in `src/rpg/items.js`; ARCHITECTURE.md "Tier runs".
   - `floorPlan(def, floor, { tier, heroLvl })` gives gen.js `{ theme, boss, mlvl, waypoint, depth }`;
     `generate({ floor, seed, plan })` without a plan is the old Burrow floor exactly.
   - Zone levels: the hero clamped to the band, +1 per floor, +4 per tier, capped at 60.
-- **Entering**: `G.enterDungeon({ id, floor, tier, mods })`; a number is still the Burrow floor.
+- **Entering**: `G.enterDungeon({ id, floor, tier, mods })`; a number is still the Burrow floor (since Z-H1: the den that holds that old floor, §4.1).
   - `DungeonMode.build(arg)` takes either. The mode carries `def`, `kind` ('burrow' | 'zone'; RegionMode is
     'region'), `zoneId`, `tier`, `mods`, `run`, and `where()`, `nextRun()`, `hasDeeper()`.
   - The stairs go to `nextRun()` ("Go deeper" in a zone dungeon). Its last floor has no stairs after the boss.
-  - Only the Burrow writes `state.dungeon.deepest` and waypoints. A zone dungeon writes `zones[zone].dungeon.bestFloor`.
+  - Only the Burrow writes `state.dungeon.deepest` and waypoints (since Z-H1 neither: a den keeps `state.dungeon.dens`, §4.1). A zone dungeon writes `zones[zone].dungeon.bestFloor`.
   - Region and zone-dungeon kills and chests drop the zone's forage (`mode.zoneId`).
 - **Seeds**: `beginRun` rerolls every entry.
   - `state.dungeon.runs` goes up by 1, and `state.dungeon.seed` is a random number set once per save.

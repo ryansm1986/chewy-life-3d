@@ -5,6 +5,8 @@ import { generate, CELL, THEMES } from './gen.js';
 import { beginRun, floorPlan } from './defs.js';
 import { packMods, monsterMods, resolveRun } from '../rpg/zoneMods.js';
 import { noteFloor, recordDungeonClear, tierRecord, spiritOpen } from '../rpg/zones.js';
+import { noteDenFloor, recordDenClear } from '../rpg/dens.js';
+import { theDen } from './defs.js';
 import { TierRun } from './tierRun.js';
 import { DungeonWorld, propCutMat } from './dungeonWorld.js';
 import { chestGeometry, potGeometry, potColor } from './lootModels.js';
@@ -27,6 +29,8 @@ import { rand, randInt, TAU, dist, RNG, clamp, pick } from '../core/util.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]], N8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]; // (flow-field neighbours)
+// the Burrow bosses' title-card lines (a boss's own def.subtitle wins)
+const DEN_BOSS_LINES = { mochiKing: 'The squishiest royal in the Burrow!', kasaLord: 'Rain or shine, he hops to fight!', oniChef: 'Something smells delicious… and dangerous!', nineTails: 'Nine tails, one very bad mood.' };
 
 export class DungeonMode {
   constructor(G) { this.G = G; this.monsters = []; }
@@ -38,7 +42,8 @@ export class DungeonMode {
     this.kind = def.kind; this.zoneId = def.zone || null; this.tier = run.tier; this.spirit = run.spirit || 0; this.mods = run.mods;
     this.runMods = resolveRun(run); // (a tier / Spirit / modded run's effects, merged once: rpg/zoneMods.js; monsterMods reads it)
     const floor = this.floor = run.floor;
-    const layout = this.layout = generate({ floor, seed: run.seed, plan: floorPlan(def, floor, { tier: run.tier, spirit: this.spirit, mods: run.mods, heroLvl: G.state.player?.lvl }) });
+    run.heroLvl = arg?.heroLvl ?? G.state.player?.lvl; // (the level the floor's monsters are sized for: a Town Portal's way back rebuilds them the same, dungeon/townPortal.js)
+    const layout = this.layout = generate({ floor, seed: run.seed, plan: floorPlan(def, floor, { tier: run.tier, spirit: this.spirit, mods: run.mods, heroLvl: run.heroLvl }) });
     if (layout.boss && !MONSTERS[layout.boss]) for (const sp of layout.spawns) if (sp.boss) sp.boss = layout.boss = 'mochiKing'; // (a zone boss not registered yet)
     const world = this.world = new DungeonWorld(G.engine, layout);
     const TH = THEMES[layout.theme], own = def.monsters?.filter(id => MONSTERS[id]);
@@ -61,15 +66,18 @@ export class DungeonMode {
     this.startPos = s;
     // monsters
     for (const sp of L.spawns) this.spawnPack(sp);
+    // (the spawn order is fixed by the floor's seeds: a Town Portal's snapshot names each monster by it, dungeon/townPortal.js)
+    this.spawned = this.monsters.length; this.spawnKinds = this.monsters.map((m, i) => { m._sid = i; return m.id; }); this.bossSid = this.boss?._sid ?? null;
     // player light (warm lantern glow that follows the hero). It hangs 4 m up (lift), stronger to match: at 1.8 m it sat
     // 0.2-0.5 m over the toybox heroes' heads and helms, and its falloff (decay 1.6, core/engine.js LightPool) lit their
     // heads, backs and shoulders 10-40x the floor's key light, so the tone map and the bloom blew their colours out to
     // mint and peach on every floor (ROADMAP R-9). Up here it lights the floor round them about as before.
     this.playerLight = this.world.lightPool.addSource({ pos: new THREE.Vector3(), color: new THREE.Color('#ffd8a8'), intensity: 16, radius: 11, priority: 10, lift: 4 });
-    G.ui?.banner?.(`Floor ${this.floor}`, `${this.def.name}${this.tr ? ' · ' + this.tr.label : ''} — ${this.theme.name}`, { style: 'area' });
+    const den = this.kind === 'burrow', sub = den ? this.def.sub?.[this.floor - 1] : this.theme.name; // (a den is its own name; the Moonlit Sanctum's floors have theirs: dungeon/defs.js)
+    G.ui?.banner?.(`Floor ${this.floor}${den ? ` of ${this.def.floors}` : ''}`, `${this.def.name}${this.tr ? ' · ' + this.tr.label : ''}${sub ? ' — ' + sub : ''}`, { style: 'area' });
     // boss floors: a small heads-up toast (the big boss banner is saved for the actual encounter)
     if (L.boss && !L.pinnacle) setTimeout(() => { if (G.dungeon === this && this.boss?.alive && !this.boss.introDone) G.ui?.toast?.(`${MONSTERS[L.boss].name} lurks in the deepest chamber…`, { icon: 'oni', color: '#ff8a9a' }); }, 2600);
-    if (this.kind === 'burrow') G.state.dungeon.deepest = Math.max(G.state.dungeon.deepest || 0, this.floor); // (the Burrow's record; a zone dungeon keeps its own)
+    if (this.kind === 'burrow') noteDenFloor(G.state, this.def.id, this.floor); // (the den's record: rpg/dens.js; a zone dungeon keeps its own)
     else if (this.zoneId) noteFloor(G.state, this.zoneId, this.floor);
     // dungeon colour grade (the village day/night grade doesn't run down here)
     const post = G.engine.post, gr = post.grade.uniforms;
@@ -126,7 +134,7 @@ export class DungeonMode {
     // short title card kept off Chewy and the boss's face: solve the reveal's two-shot now (where both will stand on
     // screen once the camera has swung over) and slide the card into the emptiest strip of the band between them.
     // It leaves early once blows are exchanged.
-    G.ui?.banner?.(b.name, b.def.subtitle || ['The squishiest royal in the Burrow!', 'Rain or shine, he hops to fight!', 'Something smells delicious… and dangerous!', 'Nine tails, one very bad mood.'][[5, 10, 15, 20].indexOf(this.floor % 20 || 20)] || 'appears!', { style: 'boss', duration: 1.7, top: this.titleCardTop(b) });
+    G.ui?.banner?.(b.name, b.def.subtitle || DEN_BOSS_LINES[b.id] || 'appears!', { style: 'boss', duration: 1.7, top: this.titleCardTop(b) });
     if (b.engaged) setTimeout(() => this.bossEngaged(b), 0);
     setTimeout(() => { E.timeScale = 1; b.anim.wind = 0; }, 900);
     this.introUntil = performance.now() + 2200; // the reveal: a quick, tight two-shot (it may push in); the roomier fight framing follows
@@ -311,12 +319,12 @@ export class DungeonMode {
       const wps = G.state.dungeon.waypoints; if (!wps.includes(this.floor)) { wps.push(this.floor); setTimeout(() => G.ui?.toast?.(`Waypoint unlocked: Floor ${this.floor}`, { color: '#8fd0ff' }), 3000); }
     }
     // chests
-    for (const c of L.chests) {
-      const p = W.cellToWorld(c.x, c.y); const chest = this.makeChest(p, c.quality); chest.rec = c;
-      const it = { pos: p, radius: 1.2, label: c.quality === 'gold' ? 'Open golden chest' : 'Open chest', onInteract: () => { if (chest.opened) return; chest.open(); inter.splice(inter.indexOf(it), 1); } };
+    L.chests.forEach((c, ci) => {
+      const p = W.cellToWorld(c.x, c.y); const chest = this.makeChest(p, c.quality); chest.rec = c; chest.layoutIdx = ci;
+      const it = chest.it = { pos: p, radius: 1.2, label: c.quality === 'gold' ? 'Open golden chest' : 'Open chest', onInteract: () => { if (chest.opened) return; chest.open(); inter.splice(inter.indexOf(it), 1); } };
       inter.push(it);
       W.collision.addCircle(p.x, p.z, 0.5);
-    }
+    });
     // pots (breakable entities)
     this.pots = [];
     for (const c of L.pots) {
@@ -324,10 +332,12 @@ export class DungeonMode {
       this.pots.push(this.makePot(p));
     }
     // shrines
+    this.shrines = [];
     for (const c of L.shrines) {
       const p = W.cellToWorld(c.x, c.y); const sh = this.makeShrine(p, c.type);
-      const it = { pos: p, radius: 1.3, label: `Touch ${sh.name}`, onInteract: () => { if (sh.used) return; sh.use(); inter.splice(inter.indexOf(it), 1); } };
+      const it = sh.it = { pos: p, radius: 1.3, label: `Touch ${sh.name}`, onInteract: () => { if (sh.used) return; sh.use(); inter.splice(inter.indexOf(it), 1); } };
       inter.push(it); W.collision.addCircle(p.x, p.z, 0.45);
+      this.shrines.push(sh);
     }
   }
   makePortal(p, color) {
@@ -369,7 +379,9 @@ export class DungeonMode {
     const g = new THREE.Group(); const b = new THREE.Mesh(body, mat); const lid = new THREE.Mesh(lidG, mat); lid.position.set(0, 0.5, -0.31);
     b.castShadow = lid.castShadow = true; g.add(b, lid); g.position.copy(p); g.rotation.y = rand(-0.5, 0.5) + Math.PI / 4;
     W.scene.add(g);
-    const chest = { opened: false, open: () => {
+    const chest = { opened: false, pos: p.clone(), quality, markOpened: () => { // (a Town Portal's floor coming back: open already, nothing to drop; dungeon/townPortal.js)
+      chest.opened = true; lid.rotation.x = -1.9; const it = chest.it, i = it ? W.interactables.indexOf(it) : -1; if (i >= 0) W.interactables.splice(i, 1);
+    }, open: () => {
       chest.opened = true; Events.emit('sfx', 'chest_open');
       let t = 0; (this.spinners ||= []).push((dt) => { t += dt; lid.rotation.x = -Math.min(1.9, t * 7); });
       G.vfx.sparkle(p.clone().setY(0.7), { n: 20, color: gold ? '#ffe070' : '#fff4d8', r: 0.5 }); G.vfx.light(p.clone().setY(1), '#ffe0a0', 10, 6, 0.8);
@@ -381,6 +393,7 @@ export class DungeonMode {
       this.tr?.onChest(chest, drops); // (a tier run: the quantity bonus, and the Lantern chest's hoard)
       setTimeout(() => this.loot.drop(p.clone().setY(0.5), drops), 250);
     } };
+    (this.chests ||= []).push(chest); // (every chest of the floor, the boss's treasure and Lantern chests too: a Town Portal's snapshot)
     return chest;
   }
   makePot(p) {
@@ -400,7 +413,9 @@ export class DungeonMode {
         const r = Math.random();
         if (r < 0.35) this.loot.drop(p, [{ type: 'coins', n: randInt(1, 4) * this.layout.mlvl }]);
         else if (r < 0.5) this.loot.drop(p, [{ type: 'potion', key: Math.random() < 0.6 ? 'heart' : 'zoom' }]);
-      }, applyStatus() {}, heal() {} };
+      }, applyStatus() {}, heal() {},
+      smash: () => { if (!pot.alive) return; pot.alive = false; this.combat.remove(pot); W.collision.remove(col); mesh.parent?.remove(mesh); g.dispose(); }, // (broken before a Town Portal: gone, quietly)
+    };
     this.combat.add(pot);
     return pot;
   }
@@ -419,7 +434,9 @@ export class DungeonMode {
     const mesh = new THREE.Mesh(sg, propCutMat({ vertexColors: true, rim: 0.4 })); mesh.position.copy(p); mesh.castShadow = true; W.scene.add(mesh);
     const orb = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12), makeToon({ color: INFO.color, emissive: INFO.color, emissiveIntensity: 1.5 })); orb.position.copy(p).add(V(0, 0.8, 0.42)); W.scene.add(orb);
     const light = W.lightPool.addSource({ pos: orb.position.clone(), color: new THREE.Color(INFO.color), intensity: 5, radius: 5, flicker: 0.3 });
-    const sh = { ...INFO, used: false, use: () => {
+    const sh = { ...INFO, used: false, spend: () => { // (touched before a Town Portal: spent, quietly)
+      sh.used = true; orb.material.emissiveIntensity = 0.1; W.lightPool.removeSource(light); const i = sh.it ? W.interactables.indexOf(sh.it) : -1; if (i >= 0) W.interactables.splice(i, 1);
+    }, use: () => {
       sh.used = true; orb.material.emissiveIntensity = 0.1; W.lightPool.removeSource(light);
       G.vfx.pillar(p, { color: INFO.color, life: 1.4, r: 0.8, h: 6 }); G.vfx.sparkle(p.clone().setY(1), { n: 30, color: INFO.color, r: 1 });
       Events.emit('sfx', 'buff'); G.ui?.banner?.(INFO.name, INFO.text, { style: 'quest' });
@@ -526,31 +543,59 @@ export class DungeonMode {
     this.tr?.onBossDefeated(b, this.lastClear); // (a tier / Spirit run's clear: the Lantern chest, the banner)
     Events.emit('sfx', 'ui_levelup');
     // stairs appear where the boss fell + a return portal
-    const p = b.pos.clone();
-    setTimeout(() => {
-      if (G.dungeon !== this) return;
-      // stairs and portal go to open floor near where the boss fell (never inside rock, even against a wall)
-      const sp = this.openSpotNear(p, 2, 1.3), pp = this.openSpotNear(p, 2, 1.2, sp);
-      if (this.hasDeeper()) { // (an outdoor region, or a zone dungeon's last floor: just the way home)
-        this.makeStairs(sp);
-        this.world.interactables.push({ pos: sp, radius: 1.3, label: `${this.kind === 'burrow' ? 'Burrow' : 'Go'} deeper (Floor ${this.floor + 1})`, onInteract: () => G.enterDungeon(this.nextRun()) });
-      }
-      this.makePortal(pp, '#ffe070');
-      const ex = this.zr?.exit();
-      this.world.interactables.push({ pos: pp, radius: 1.2, label: ex?.label || 'Return to Blossom Hollow', onInteract: () => (ex ? ex.go() : G.returnToVillage()) });
-    }, 1500);
+    const p = this.victoryAt = b.pos.clone(); // (kept: a Town Portal's snapshot puts the way home back here)
+    setTimeout(() => { if (G.dungeon === this) this.victoryExits(p); }, 1500);
     this.boss = null;
   }
-  // a boss down: 'dungeon:cleared' { id, kind, tier, floor, zone, boss, first } for every Burrow boss (floors 5, 10, …) and
-  // a zone dungeon's last-floor boss (its clear count and tiers: rpg/zones.js; a newly opened tier also fires
-  // 'tier:unlocked' { id, zone, tier }). An outdoor region reports its own boss (regionMode.js).
-  // The Deep Burrow (kind 'deep', docs/ZONES.md §5.1) records the same way; Tamamo on a Burrow floor is its story clear
-  // (its T1 opens). A Spirit clear also fires 'spirit:unlocked' when it's the clear that opened the endgame.
+  /** the stairs (when there's a floor below) and the portal home on open floor where the boss fell (never inside rock, even
+   *  against a wall); also a Town Portal's floor coming back with its boss beaten */
+  victoryExits(p) {
+    const G = this.G;
+    const sp = this.openSpotNear(p, 2, 1.3), pp = this.openSpotNear(p, 2, 1.2, sp);
+    if (this.hasDeeper()) { // (an outdoor region, or a zone dungeon's last floor: just the way home)
+      this.makeStairs(sp);
+      this.world.interactables.push({ pos: sp, radius: 1.3, label: `${this.kind === 'burrow' ? 'Burrow' : 'Go'} deeper (Floor ${this.floor + 1})`, onInteract: () => G.enterDungeon(this.nextRun()) });
+    }
+    this.makePortal(pp, '#ffe070');
+    const ex = this.zr?.exit();
+    this.world.interactables.push({ pos: pp, radius: 1.2, label: ex?.label || 'Return to Blossom Hollow', onInteract: () => (ex ? ex.go() : G.returnToVillage()) });
+  }
+  // ------------------------------------------------------------------ a Town Portal's floor coming back (dungeon/townPortal.js)
+  /** a monster beaten before the portal: gone, without a death, a drop or an event */
+  dropSilently(m) {
+    if (!m) return;
+    m.alive = false; m.life = 0;
+    const i = this.monsters.indexOf(m); if (i >= 0) this.monsters.splice(i, 1);
+    this.combat.remove(m);
+    if (m === this.boss) this.boss = null;
+    m.dispose();
+  }
+  /** a drop that lay on the ground, back where it lay (no flight) */
+  placeLoot(d, x, z) {
+    const to = V(x, this.world.heightAt?.(x, z) || 0, z), n = this.loot.list.length;
+    this.loot.spawn(d, to.clone(), to);
+    const e = this.loot.list[n]; if (e) e.t = e.fly;
+  }
+  /** the floor's boss fell before the portal: the fight's over (the seal open, the sigil calm), the way home and the stairs
+   *  where it fell; no rewards, banners or events again */
+  restoreVictory(p) {
+    this.boss = null; this.sigilCalm = true; this.victoryAt = p.clone();
+    if (this.tr) { this.tr.wrath = null; if (this.tr.pin) this.tr.pin.done = true; }
+    this.victoryExits(p);
+  }
+  // a boss down: 'dungeon:cleared' { id, kind, tier, floor, zone, boss, first } for every Burrow den's boss (its record:
+  // rpg/dens.js; `opened`, the den its first clear opened) and a zone dungeon's last-floor boss (its clear count and
+  // tiers: rpg/zones.js; a newly opened tier also fires 'tier:unlocked' { id, zone, tier }). An outdoor region reports
+  // its own boss (regionMode.js).
+  // The Deep Burrow (kind 'deep', docs/ZONES.md §5.1) records the same way; Tamamo in the Moonlit Sanctum is its story
+  // clear (its T1 opens). A Spirit clear also fires 'spirit:unlocked' when it's the clear that opened the endgame.
   clearDungeon(b) {
     const G = this.G;
     if (this.kind === 'burrow') {
-      Events.emit('dungeon:cleared', { id: 'burrow', kind: 'burrow', tier: 0, floor: this.floor, zone: null, boss: b.id, first: false });
-      const d = b.id === 'nineTails' ? tierRecord(G.state, 'burrowDeep') : null;
+      const d = b.id === 'nineTails' ? tierRecord(G.state, 'burrowDeep') : null; // (read before the den's clear: the Deep Burrow's record follows the Moonlit Sanctum's)
+      const r = this.lastClear = recordDenClear(G.state, this.def.id) || { first: false, opened: null };
+      Events.emit('dungeon:cleared', { id: this.def.id, kind: 'burrow', tier: 0, floor: this.floor, zone: null, boss: b.id, first: r.first, opened: r.opened });
+      if (r.opened) { Events.emit('den:opened', { id: r.opened, by: this.def.id }); setTimeout(() => { if (G.dungeon === this) G.ui?.toast?.(`${theDen(r.opened, true)} is open! Pick it at the Burrow door`, { icon: 'torii', color: '#ffd88a', duration: 5 }); }, 3600); }
       if (d && !d.tier.cleared.includes(0)) { d.tier.cleared.unshift(0); if (d.tier.unlocked < 1) { d.tier.unlocked = 1; Events.emit('tier:unlocked', { id: 'burrowDeep', zone: null, tier: 1 }); setTimeout(() => { if (G.dungeon === this) G.ui?.toast?.('The Spirit Lantern by the Burrow door glows: the Deep Burrow\'s Tier 1 is open', { icon: 'lantern', color: '#ffd88a' }); }, 5200); } }
       return;
     }

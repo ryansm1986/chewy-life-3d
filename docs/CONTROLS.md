@@ -786,6 +786,7 @@ inside the safe area (`env(safe-area-inset-*)`).
     it too; a tap elsewhere closes it. It works for any number of heroes.
   - the **bag** and the **menu** (its dot counts skill and stat points). The pause menu's quick row (Bag, Character,
     Skills, Journal, Map, Build, Decorate, Home) shows on touch too.
+  - on a dungeon floor, the **portal button** left of the bag: the Town Portal (§14.14).
   - The minimap opens the map.
 - **The world**: a tap on a monster locks it (`padAim.target`: kept while it lives and stays within 1.6 × the lock's
   range, whatever the cone; the ring and the target frame show). A tap on a villager, a door or anything usable walks
@@ -1814,3 +1815,59 @@ the pad (§14.6), the decorating guide in the pad's words, and the tabbed menu (
   - `c-skills-drawer` and `c-settings-controller` (Settings' pages under the strip);
   - decorate: `b1-palette`, `b2-holding`, `b3-placed`, `b4-cursor`, `b5-wallpaper`;
   - the guide: `g1-place`, `g2-wrap`.
+
+### 14.12 The map page (UX-1, 2026-10-10; docs/MAP.md §6)
+The big map pans now, so on the pad its left stick is the map's: it moves the map under a crosshair in the middle, and
+only the D-pad walks the focus there (the directory's rows and its People · Places · Key tabs). A pins the mark under the
+crosshair once the stick has moved the map, else the focused row; Y is "Shadow, take me there"; X unpins; LT / RT (and
+the right stick) zoom as before; R3 goes back to you; LB / RB stay the tabbed menu's pages (the map opened alone with
+View: its three tabs). The mouse drags and wheels, touch drags and pinches; a tap or click picks a mark. The filter chips
+along the map's foot (checkpoint 2) are buttons: the D-pad reaches them and A shows or hides a layer (touch: 48 px icon
+chips with a 44 px reach on a phone).
+
+### 14.13 The stash's tabs (ROADMAP R-19, 2026-10-11; docs/HOUSING.md §10)
+The stash is a lone panel with the bag beside it, now with up to six tabs along its top.
+- **The pad**: **LT / RT** step the stash's tabs (wrapping), the convention for a page's own tabs; **LB / RB** do the
+  same, as a lone panel's own tabs (so either pair works; nothing else used them with the stash open). The focus stays
+  on its slot, which shows the new tab's item. The D-pad reaches the headers and the "+" tab: **A** opens a tab, files
+  the item in hand there, or (on the open tab) renames it; **Y** renames it; A on "+" opens the buy card (Buy it is off,
+  so skipped, while you're short; B closes the card). The rename card: A on the name field focuses it (on the Deck,
+  Steam + X brings up its keyboard), the D-pad walks the eight colours, A picks one. **X** on a bag item stashes it into
+  the open tab, then the first tab with room. The hint bar adds "LT RT Stash tabs", and "A Put it in here" on a header
+  with an item in hand.
+- **Touch**: a tap opens a tab or the "+" card; a tapped-up item tapped onto a header goes into that tab. The headers
+  are at least 44 px on the screen (54 px CSS on a phone, whose panels are zoomed down); the rename card's colours
+  are four to a row there.
+- **The mouse and keyboard**: a click opens a tab; a click on the open tab (its pencil) renames it; a drag (or a
+  click-held item) dropped on a header files it there; Ctrl+Click from the bag fills the open tab first. In the name
+  field Enter or Esc closes the card.
+
+### 14.14 The Town Portal (ROADMAP Z-H2, 2026-10-11; docs/ZONES.md §4.2)
+On a dungeon floor (a Burrow den, a zone dungeon, a tier or Spirit run) the Town Portal goes home to Blossom Hollow and
+back to the same spot. In an outdoor zone the same controls still go home at once.
+- **The keyboard**: **T** (the `home` action, "Town Portal (a dungeon) · go home (a zone)"; rebindable in Settings ›
+  Controls). Shadow's one-time tip on a floor says "Press T for a Town Portal home".
+- **The pad**: every pad button is already bound, so it has no quick button. The Game page's quick-row **Home** reads
+  **Town Portal** (the moon-gate glyph) on a floor, and **A** on it casts. It is dimmed in a boss fight, and its
+  tooltip gives the reason. The tip says "Open the menu (Menu) and pick Town Portal".
+- **Touch**: a **portal button** (a moon gate on a sky-tinted key, 48 px × the touch size) stands in the top row, left of
+  the bag. It shows on a dungeon floor only, so the village and the zones keep the old row, and the row lays out again
+  when it comes or goes. It is dimmed in a boss fight and glows while the portal opens. A tap casts. The touch Controls
+  page has a "Town Portal" row. The tip says "Tap the portal button by the map". On a phone it sits in the top row
+  with the hero button, the bag and the menu, clear of the minimap and the guide's band (the deck-ui and mobile-ui
+  audits cover it).
+- **The cast**: hold still for about a second. Moving the stick or the keys past a third, a roll, or a knock that
+  shifts the hero 0.45 m cancels it.
+- **The return portal**: walk up to it by the plaza and interact (F, A, or a tap). Its label is "Step into the Town
+  Portal (the Fox Shrine, floor 2)".
+
+### 14.14 Items take up space, Sort and the filter (ROADMAP R-20 to R-22, 2026-10-11; docs/INVENTORY.md)
+- **The pad**: the focus walks the bag and the stash by cell, and an item is one stop however many cells it covers (the
+  slot elements are the items). With an item in hand its footprint follows the focus (its top-left at the focused cell,
+  kept on the grid): green where it can go, gold onto one item (A swaps, and you then hold that one), red where it can't.
+  **R3 sorts** the grid the focus is in (the bag, or the stash's open tab); the hint bar says "R3 Sort". The stash's
+  filter chips are buttons the D-pad reaches; A picks one. A on a faded item does nothing (a bump).
+- **Touch**: a tap picks an item up; a press over the grid shows its footprint under the finger, and lifting puts it
+  down there; a long press shows the tooltip. Sort is the button; the filter chips are icons on a phone (44 px).
+- **The mouse**: the footprint shows under the pointer while you carry an item (a drag or a click-held one); a click
+  or the release puts it there. Ctrl+Click and right-click go to the first spot that fits.

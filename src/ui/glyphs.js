@@ -94,6 +94,8 @@ export const GLYPHS = {
   gift: ol('<rect x="5" y="13" width="22" height="14" rx="2.5"/><rect x="3.5" y="9" width="25" height="5.5" rx="2"/>', '#ff8fb0') + '<path d="M16 9v18" stroke="#ffcf4a" stroke-width="4"/><path d="M16 9v18" stroke="#4a2c2a" stroke-width="1" opacity=".2"/>' + st('M16 9c-3-5-8-5-7-2 .6 1.6 4 2.2 7 2 3 .2 6.4-.4 7-2 1-3-4-3-7 2z', '#ffcf4a', 1.8),
   key: ol('<circle cx="10" cy="11" r="6.5"/><rect x="13" y="9.4" width="15" height="4" rx="1.6"/><rect x="22" y="12" width="3.4" height="5" rx="1"/><rect x="17" y="12" width="3" height="4" rx="1"/>', '#ffcf4a') + '<circle cx="10" cy="11" r="2.4" fill="#4a2c2a"/>',
   gem: st('M8.5 6h15l5 7L16 28 3.5 13z', '#ff8fd0') + '<path d="M3.5 13h25M8.5 6l3.5 7 4 15M23.5 6l-3.5 7-4 15M12 13l4-7 4 7" fill="none" stroke="#4a2c2a" stroke-width="1.3" opacity=".5"/><path d="M5.5 13l2.8-6 3.5 6z" fill="#fff" opacity=".5"/>',
+  // a treat (ROADMAP R-22: the player's word for the code's gems): a wrapped candy
+  treat: st('M10 16 3.6 10.6v10.8z', '#ff8fb0', 2) + st('M22 16l6.4-5.4v10.8z', '#ff8fb0', 2) + ol('<ellipse cx="16" cy="16" rx="7.4" ry="6.6"/>', '#ffd24a', 3.6) + line('M12.6 13c1.1-1 2.8-1.4 4.3-1.1', '#fff', 1.8) + line('M12.4 18.6c2 1.6 5.2 1.6 7.2 0', '#e0901a', 1.4),
   bolt: st('M18.5 3L7 18h7.5L12 29l13-16h-8z', '#8fd0ff') + '<path d="M16 7l-5.5 8" stroke="#fff" stroke-width="1.6" opacity=".7" stroke-linecap="round"/>',
   leaf: st('M6 26C5 15 12 6 27 5c0 14-8 22-21 21z', '#8fe0a0') + line('M6 26C11 19 16 14 22 10', '#4f9a5a', 1.6),
   // regions (Travel Map): bamboo stalks, a maple leaf, a wave, a snowflake, a torii
@@ -102,6 +104,17 @@ export const GLYPHS = {
   wave: ol('<path d="M3 20c3-8 9-11 14-9-3 1-4 4-2 6 3 3 8 1 11-3 2 8-4 14-12 14-6 0-10-3-11-8z"/>', '#5cd4e0') + line('M8 22c3 2 7 2 10 0', '#fff', 1.8) + shine(12, 14, 1.6, 1),
   snowflake: line('M16 3v26M4.7 9.5l22.6 13M4.7 22.5l22.6-13', '#4a2c2a', 5.4) + line('M16 3v26M4.7 9.5l22.6 13M4.7 22.5l22.6-13', '#dff0ff', 2.8) + line('M12.5 5.5L16 8l3.5-2.5M12.5 26.5L16 24l3.5 2.5', '#dff0ff', 2) + '<circle cx="16" cy="16" r="3.2" fill="#fff" stroke="#4a2c2a" stroke-width="1.8"/>',
   torii: ol('<rect x="3" y="6" width="26" height="4" rx="2"/><rect x="6" y="12" width="20" height="3" rx="1.2"/><rect x="8" y="9" width="3.6" height="20" rx="1.2"/><rect x="20.4" y="9" width="3.6" height="20" rx="1.2"/>', '#e8503a') + line('M14 10v5M18 10v5', '#b83a2a', 1.6),
+  // the Town Portal (dungeon/portalModel.js): a stone moon gate on its plinth, a sakura-pink swirl turning in its sky-blue
+  // ring, the shimenawa rope with its paper shide across the top, two little sparkles (so it never reads as a lens)
+  portal: ol('<circle cx="16" cy="14.6" r="10.6"/><rect x="5" y="24.6" width="22" height="4.8" rx="2.3"/>', '#bdb3a6')
+    + '<circle cx="16" cy="14.6" r="7.4" fill="#a8dcff" stroke="#4a2c2a" stroke-width="1.7"/>'
+    + line('M16.7 14.6 L16.9 14.9 L17.0 15.3 L16.9 15.8 L16.6 16.2 L16.1 16.6 L15.5 16.8 L14.7 16.8 L14.0 16.5 L13.3 15.9 L12.8 15.1 L12.5 14.0 L12.6 12.9 L13.1 11.8 L13.9 10.8 L15.0 10.1 L16.4 9.8 L17.9 9.9 L19.4 10.5 L20.7 11.5 L21.6 13.0 L22.1 14.7', '#ff7fb0', 1.9)
+    + line('M15.3 14.6 L15.1 14.3 L15.0 13.9 L15.1 13.4 L15.4 13.0 L15.9 12.6 L16.5 12.4 L17.3 12.4 L18.0 12.7 L18.7 13.3 L19.2 14.1 L19.5 15.2 L19.4 16.3 L18.9 17.4 L18.1 18.4 L17.0 19.1 L15.6 19.4 L14.1 19.3 L12.6 18.7 L11.3 17.7 L10.4 16.2 L9.9 14.5', '#b08cff', 1.7)
+    + '<circle cx="16" cy="14.6" r="1.1" fill="#fff8fc"/>'
+    + line('M7.4 7.6q8.6 3.6 17.2 0', '#4a2c2a', 3.4) + line('M7.4 7.6q8.6 3.6 17.2 0', '#e6c77e', 1.9)
+    + st('M12.4 9.3l-.8 1.9 1.4-.3-.7 1.8', 'none', 1.1) + st('M19.6 9.3l.8 1.9-1.4-.3.7 1.8', 'none', 1.1)
+    + '<path d="M27.6 1.6q.5 2.3 2.8 2.8-2.3.5-2.8 2.8-.5-2.3-2.8-2.8 2.3-.5 2.8-2.8z" fill="#ffe36a" stroke="#4a2c2a" stroke-width="1"/>'
+    + '<path d="M4 3.6q.35 1.5 1.8 1.8-1.45.35-1.8 1.8-.35-1.45-1.8-1.8 1.45-.35 1.8-1.8z" fill="#fff6c0" stroke="#4a2c2a" stroke-width=".9"/>',
   chat: st('M5 7h22a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H14l-6 5v-5H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z', '#fff6e8') + '<circle cx="11" cy="15" r="1.7" fill="#ff8fb0"/><circle cx="16" cy="15" r="1.7" fill="#ff8fb0"/><circle cx="21" cy="15" r="1.7" fill="#ff8fb0"/>',
   pin: st('M16 29s-9-8.5-9-15a9 9 0 0 1 18 0c0 6.5-9 15-9 15z', '#ff8fb0') + '<circle cx="16" cy="14" r="3.5" fill="#fff6e8" stroke="#4a2c2a" stroke-width="1.8"/>',
   sort: '<path d="M10 6v20M10 26l-4-4M10 26l4-4M22 26V6M22 6l-4 4M22 6l4 4" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>',

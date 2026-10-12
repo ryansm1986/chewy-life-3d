@@ -54,7 +54,9 @@ export class ZoneRun {
   build() {
     const G = this.G, M = this.mode, L = this.L, W = M.world;
     let list = [];
-    try { list = G.story?.dungeonObjectives?.({ dungeon: this.def.id, floor: M.floor, zone: this.zone, tier: M.tier || 0 }) || []; }
+    const kept = M.run?.resume?.zr?.obj; // (a Town Portal's floor coming back: the objectives it was built with, so its cages and marked packs stand where they stood: dungeon/townPortal.js)
+    if (Array.isArray(kept)) list = kept.map(o => ({ ...o }));
+    else try { list = G.story?.dungeonObjectives?.({ dungeon: this.def.id, floor: M.floor, zone: this.zone, tier: M.tier || 0 }) || []; }
     catch (e) { console.warn('[zone] dungeonObjectives failed', e); }
     if (!Array.isArray(list)) list = [];
     const slots = (L.slots || []).slice();
@@ -194,6 +196,18 @@ export class ZoneRun {
     const zr = this, it = { pos: p.clone(), radius: 1.4, get label() { return cage.open ? '' : zr.guarded(cage) ? `${name} is locked in (defeat the guards!)` : `Free ${name}`; }, onInteract: () => this.openCage(cage, it) };
     W.interactables.push(it); cage.it = it;
     return cage;
+  }
+  /** a Town Portal's floor coming back (dungeon/townPortal.js): the cages freed before stay open and empty (no thanks,
+   *  no rescue event again); the quest items keep whether they dropped and were picked up */
+  restore(Z) {
+    const W = this.mode.world;
+    (Z.cages || []).forEach((open, i) => {
+      const c = this.cages[i]; if (!open || !c || c.open) return;
+      c.open = true; c.left = true; c.t = 9; c.door.rotation.y = -1.9; c.rig.root.visible = false;
+      if (c.light) { W.lightPool.removeSource(c.light); c.light = null; }
+      const k = W.interactables.indexOf(c.it); if (k >= 0) W.interactables.splice(k, 1);
+    });
+    (Z.drops || []).forEach((s, i) => { const q = this.drops[i]; if (q && s) { q.dropped = !!s.dropped; q.taken = !!s.taken; } });
   }
   /** is the cage's guard pack (its slot's spawn) still standing? */
   guarded(c) { if (c.guard < 0) return false; const pk = this.packs.find(q => q.index === c.guard); return !!pk && pk.members.some(m => m.alive); }

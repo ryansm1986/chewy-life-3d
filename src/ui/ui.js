@@ -11,7 +11,8 @@ import { glyph } from './glyphs.js';
 import { Tooltip } from './tooltip.js';
 import { Hud } from './hud.js';
 import { Floats, Toasts, Banners, LootLabels, Iris, burst, flyToBag } from './fx.js';
-import { ItemDrag, InventoryPanel, StashPanel } from './inventory.js';
+import { ItemDrag, InventoryPanel } from './inventory.js';
+import { StashPanel } from './stash.js'; // (the stash's tabs: ROADMAP R-19)
 import { CharacterPanel } from './character.js';
 import { SkillsPanel } from './skills.js';
 import { Dialogue } from './dialogue.js';
@@ -23,6 +24,7 @@ import { ShopPanel } from './shop.js';
 import { MapPanel, QuestPanel, normQuest } from './map.js';
 import { TravelPanel } from './travel.js';
 import { LanternPanel } from './lantern.js';
+import { DenPanel } from './dens.js';
 import { RunChip } from './runChip.js';
 import { ExpeditionPanel } from './expeditions.js';
 import { AwayCardPanel } from './awayCard.js';
@@ -52,10 +54,11 @@ import { TouchControls } from './touch.js';
 import { Mobile } from './mobile.js';
 import './deck.css'; // (last: the Deck's text floor outranks the panels' own sizes)
 import { Fit } from './fit.js'; // (CT-10: panels and the HUD fitted to any screen; its CSS after deck.css)
+import { installMinimapUI } from './minimapUI.js';
 import { Vector3 } from 'three';
 
 const SETTINGS_KEY = 'chewy3d.settings';
-const DEFAULT_SETTINGS = { quality: 2, music: 0.7, sfx: 0.8, uiScale: 1, shake: true, showFps: false, chargeMode: 0, sprintMode: 0, rumble: true, aimAssist: 0.7, padGlyphs: 0, binds: null, fpsCap: 0, touchSize: 1, touchOpacity: 0.85, touchLeft: false, touchAim: 0, haptics: true, shadowLead: 1 }; // shadowLead: Settings › Shadow leads the way, 0 off · 1 when a quest says so · 2 always (actors/shadowLead.js); touch*: Settings › Controls › Touch (ui/touch.js: button size, opacity, left-handed, aim 0 auto · 1 drag), haptics; chargeMode: 0 hold to charge · 1 off · 2 toggle (docs/CHARGE.md); sprintMode: 0 hold Shift · 1 toggle (actors/sprint.js); rumble, aimAssist (0..1), padGlyphs (0 auto · 1 Xbox · 2 PlayStation), binds ({ kbm, pad } overrides): Settings › Controls (core/actions.js, docs/CONTROLS.md); quality 3 is the Steam Deck preset, fpsCap 0 off · 1 60 · 2 40 (core/deck.js)
+const DEFAULT_SETTINGS = { quality: 2, music: 0.7, sfx: 0.8, uiScale: 1, shake: true, showFps: false, chargeMode: 0, sprintMode: 0, rumble: true, aimAssist: 0.7, padGlyphs: 0, binds: null, fpsCap: 0, touchSize: 1, touchOpacity: 0.85, touchLeft: false, touchAim: 0, haptics: true, shadowLead: 1, mmZoom: 1, mmNorth: 0 }; // shadowLead: Settings › Shadow leads the way, 0 off · 1 when a quest says so · 2 always (actors/shadowLead.js); touch*: Settings › Controls › Touch (ui/touch.js: button size, opacity, left-handed, aim 0 auto · 1 drag), haptics; chargeMode: 0 hold to charge · 1 off · 2 toggle (docs/CHARGE.md); sprintMode: 0 hold Shift · 1 toggle (actors/sprint.js); rumble, aimAssist (0..1), padGlyphs (0 auto · 1 Xbox · 2 PlayStation), binds ({ kbm, pad } overrides): Settings › Controls (core/actions.js, docs/CONTROLS.md); quality 3 is the Steam Deck preset, fpsCap 0 off · 1 60 · 2 40 (core/deck.js)
 const CONTROL_SETTINGS = new Set(['rumble', 'padGlyphs', 'binds']);
 const PAD_SLOTS = ['attack', 'skillAlt', 'skill1', 'skill2', 'skill3', 'skill4'];
 const NON_BLOCKING = new Set(['build', 'decorate']); // panels that don't pause gameplay input
@@ -89,6 +92,7 @@ export const UI = {
     this.layers = { world: L('world'), hud: L('hud'), panels: L('panels'), dlg: L('dlg'), msg: L('msg'), title: L('title'), fx: L('fx'), over: L('over'), iris: L('iris') };
     this.tip = new Tooltip(this.layers.over);
     this.hud = new Hud(this, this.layers.hud);
+    this.mmUI = installMinimapUI(this); // (the minimap's zoom chip, its N, tooltips and click: ui/minimapUI.js, ROADMAP UX-1)
     this.floats = new Floats(this.layers.world);
     this.labels = new LootLabels(this.layers.world);
     this.toasts = new Toasts(this.layers.msg);
@@ -111,6 +115,7 @@ export const UI = {
       craft: new CraftPanel(this), // (the workbench: docs/HOUSING.md §3)
       houseCard: new HouseCardPanel(this), remodel: new RemodelPanel(this), // (a house's mailbox: Upgrade / Remodel / Enter — docs/HOUSING.md §5-6)
       lantern: new LanternPanel(this), // (the Spirit Lantern: a dungeon's tiers and modifiers — docs/ZONES.md §5.2)
+      burrow: new DenPanel(this), // (the Burrow door: pick one of its four dens — docs/ZONES.md §4.1)
       expeditions: new ExpeditionPanel(this), awayCard: new AwayCardPanel(this), // (the cozy path: the Expedition Board, "While you were away…" — docs/COZY.md §4)
       sightings: new SightingsPanel(this), // (the Sightings board: the wild areas' daily bounties — docs/COZY.md §6.3)
       guild: new GuildPanel(this), // (the Adventurers' Guild: hires, the roster, upgrades and tools — docs/COZY.md §5)
@@ -192,6 +197,7 @@ export const UI = {
     this.floats.update(dt, cam, this.scale);
     this.labels.update(dt, cam, this.scale);
     if (this.mode !== 'title') this.hud.update(dt);
+    this.mmUI?.update(dt);
     this.qarrow.update(dt, cam);
     this.tutorial?.update(dt);
     if (this.mode !== 'title') this.chargeHud?.update(dt);

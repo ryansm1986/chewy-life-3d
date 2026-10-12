@@ -20,9 +20,9 @@ export function clearIconCache() { cache.clear(); }
 // ================================================================== primitives
 const L = (c, t = 0.4) => mixHex(c, '#ffffff', t);
 const D = (c, t = 0.3) => mixHex(c, '#3a1c22', t);
-function newCanvas() {
+function newCanvas(w = ICON_SIZE, h = w) {
   const c = document.createElement('canvas');
-  c.width = c.height = ICON_SIZE * ICON_RES;
+  c.width = Math.round(w * ICON_RES); c.height = Math.round(h * ICON_RES);
   // (a CPU-backed canvas: every icon ends in toDataURL, and on a GPU-backed one that read-back waits for the GPU, busy
   //  with the game: 20-70 ms an icon instead of a few — ROADMAP R-8)
   const g = c.getContext('2d', { willReadFrequently: true });
@@ -143,6 +143,41 @@ function compose(draw, { rarity, bg } = {}) {
   g.drawImage(art.c, 0, 0);
   g.restore();
   rarityFront(g, rarity);
+  return out.c;
+}
+/** The same art drawn into an item's footprint (w x h cells: a 64w x 64h canvas, rpg/grid.js itemSize): turned by `rot`
+ *  (a long weapon stands upright in a tall footprint) and scaled to fill it, its own bounds measured first; the same
+ *  cream sticker rim and rarity glow as compose. Its ground shadow and glows are left out (they'd turn with it). */
+function composeSized(draw, { rarity } = {}, w = 1, h = 1, rot = 0) {
+  const W = ICON_SIZE * w, H = ICON_SIZE * h, P = 3 * ICON_SIZE;
+  const sink = newCanvas(8, 8);
+  const meas = newCanvas(P, P);
+  FX = sink.g;
+  try { meas.g.save(); meas.g.translate(P / 2, P / 2); meas.g.rotate(rot); draw(meas.g); meas.g.restore(); } finally { FX = null; }
+  const px = meas.g.getImageData(0, 0, meas.c.width, meas.c.height).data, R = ICON_RES, CW = meas.c.width;
+  let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+  for (let y = 0; y < meas.c.height; y++) for (let x = 0; x < CW; x++) if (px[(y * CW + x) * 4 + 3] > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 < 0) return compose(draw, { rarity });
+  const bw = (x1 - x0 + 1) / R, bh = (y1 - y0 + 1) / R, cx = (x0 + x1 + 1) / 2 / R - P / 2, cy = (y0 + y1 + 1) / 2 / R - P / 2;
+  const pad = 9, k = Math.min((W - pad * 2) / bw, (H - pad * 2) / bh, 2.6);
+  const art = newCanvas(W, H);
+  FX = sink.g;
+  try { art.g.save(); art.g.translate(W / 2, H / 2); art.g.scale(k, k); art.g.translate(-cx, -cy); art.g.rotate(rot); draw(art.g); art.g.restore(); } finally { FX = null; }
+  const out = newCanvas(W, H), g = out.g;
+  const col = RARITY_GLOW[rarity];
+  if (col) { g.save(); g.translate(W / 2, H / 2 + 2); g.scale(W / 64, H / 64); g.fillStyle = rad(g, 0, 0, 30, [[0, hexA(col, 0.55)], [0.55, hexA(col, 0.22)], [1, hexA(col, 0)]]); g.fillRect(-32, -32, 64, 64); g.restore(); }
+  const rim = newCanvas(W, H);
+  rim.g.setTransform(1, 0, 0, 1, 0, 0);
+  const RR = 1.6 * ICON_RES;
+  for (let i = 0; i < 12; i++) { const a = (i / 12) * TAU; rim.g.drawImage(art.c, Math.cos(a) * RR, Math.sin(a) * RR); }
+  rim.g.globalCompositeOperation = 'source-in';
+  rim.g.fillStyle = 'rgba(255,250,240,0.92)';
+  rim.g.fillRect(0, 0, rim.c.width, rim.c.height);
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(rim.c, 0, 0); g.drawImage(art.c, 0, 0); g.restore();
+  if (rarity === 'unique' || rarity === 'set') {
+    const c2 = rarity === 'unique' ? '#fff0b0' : '#e0ffe8';
+    sparkle(g, W - 11, 11, 4.2, c2); sparkle(g, 9, H - 14, 3, c2, 0.9); sparkle(g, W - 8, H - 12, 2.2, c2, 0.8);
+  } else if (rarity === 'rare') { sparkle(g, W - 10, 10, 3.4, '#fff6c0'); sparkle(g, 9, H - 12, 2.2, '#fff6c0', 0.8); }
   return out.c;
 }
 function cached(key, make) {
@@ -678,74 +713,118 @@ function drawPaws(g, v, cols) {
   });
 }
 
-// ================================================================== gems
-function drawGem(g, type, tier, cols) {
+// ================================================================== treats (the code's gems: ROADMAP R-22)
+// Six treats, each in its own colour: Ruby Jerky (a jerky strip), Blueberry Bite (a plump berry bite with its crown),
+// Lemon Drop (a wrapped candy), Stinky Cheese (a wedge, and its whiff), Diamond Biscuit (a bone biscuit with a sugar
+// diamond), Honey Chew (an amber chew with a drip). The tier shows on the treat: Crumbly is a broken piece with crumbs,
+// plain is whole, Gourmet is whole with a gold ribbon, sparkles and a glow.
+function drawTreat(g, type, cols) {
   const [main, hi, lo] = cols;
-  const s = [0.72, 0.9, 1.06][tier] || 0.9;
-  shadow(g, 20 * s + 4, 14 * s, 3);
-  if (tier === 2) glow(g, 0, 0, 28, main, 0.5);
-  g.save(); g.scale(s, s);
   switch (type) {
-    case 'ruby': {
-      // faceted jerky strip
-      g.save(); g.rotate(-0.35);
-      g.beginPath(); g.moveTo(-18, -7); g.quadraticCurveTo(-9, -12, 0, -7); g.quadraticCurveTo(9, -2, 18, -7); g.lineTo(19, 6); g.quadraticCurveTo(9, 11, 0, 6); g.quadraticCurveTo(-9, 1, -18, 6); g.closePath();
-      paint(g, vol(g, main, -18, -10, 18, 8, 0.45, 0.35), 2);
-      g.strokeStyle = hexA(hi, 0.8); g.lineWidth = 1.1; g.beginPath(); g.moveTo(-18, -1); g.quadraticCurveTo(-9, -6, 0, -1); g.quadraticCurveTo(9, 4, 18, -1); g.stroke();
-      g.strokeStyle = hexA(lo, 0.6); for (const x of [-10, 0, 10]) { g.beginPath(); g.moveTo(x, -8 + Math.sin(x) * 2); g.lineTo(x + 3, 6); g.stroke(); }
-      shine(g, -9, -6, 4, 1.4, -0.3, 0.85);
+    case 'ruby': { // a jerky strip: wavy, marbled, glossy
+      g.save(); g.rotate(-0.42);
+      const strip = () => { g.beginPath(); g.moveTo(-19, -6); g.bezierCurveTo(-12, -12, -6, -3, 0, -7); g.bezierCurveTo(6, -11, 12, -3, 19, -8); g.lineTo(20, 4); g.bezierCurveTo(13, 9, 7, 1, 1, 5); g.bezierCurveTo(-5, 9, -12, 1, -19, 6); g.closePath(); };
+      strip(); paint(g, vol(g, main, -18, -12, 18, 9, 0.35, 0.42), 2.1);
+      g.save(); strip(); g.clip();
+      g.strokeStyle = hexA(lo, 0.55); g.lineWidth = 1.3; for (const x of [-13, -6, 1, 8, 14]) { g.beginPath(); g.moveTo(x - 1, -9); g.quadraticCurveTo(x + 2, -1, x, 8); g.stroke(); }
+      g.strokeStyle = hexA(hi, 0.55); g.lineWidth = 1.6; g.beginPath(); g.moveTo(-17, 0); g.bezierCurveTo(-10, -5, -5, 3, 1, -1); g.bezierCurveTo(7, -5, 12, 2, 18, -2); g.stroke();
+      for (const [x, y] of [[-9, -4], [5, -6], [12, 2], [-3, 4]]) { ell(g, x, y, 1.4, 0.8, 0.4); g.fillStyle = hexA('#fff4e8', 0.75); g.fill(); }
+      g.restore();
+      shine(g, -11, -6, 4.2, 1.3, -0.35, 0.85);
       g.restore(); break;
     }
-    case 'blueberry': {
-      circ(g, 0, 2, 16); paint(g, volR(g, main, 0, 2, 16, 0.45, 0.4), 2);
-      g.fillStyle = hexA(hi, 0.25); for (const [x, y] of [[-6, 6], [6, 8], [2, -2], [-8, -3]]) { circ(g, x, y, 3); g.fill(); }
-      roundStar(g, 0, -12, 6.5, 3, 5); paint(g, vol(g, lo, -6, -18, 6, -6, 0.25, 0.2), 1.6);
-      circ(g, 0, -12, 1.8); g.fillStyle = D(lo, 0.4); g.fill();
-      shine(g, -6, -3, 4.5, 2.4, -0.6, 0.85); circ(g, 4, -4, 1); g.fillStyle = '#fff'; g.fill();
+    case 'blueberry': { // a plump blueberry bite: bloom speckles, a starry crown, a soft shine
+      circ(g, 0, 3, 15.5); paint(g, volR(g, main, 0, 3, 15.5, 0.5, 0.42), 2.1);
+      g.save(); circ(g, 0, 3, 15.5); g.clip();
+      g.fillStyle = hexA(hi, 0.22); for (const [x, y, r] of [[-7, 9, 3.2], [6, 10, 2.6], [8, 0, 2.2], [-9, -1, 2], [1, 13, 2]]) { circ(g, x, y, r); g.fill(); }
+      g.fillStyle = hexA(lo, 0.35); circ(g, 4, 12, 9); g.fill();
+      g.restore();
+      roundStar(g, 0, -11, 6.8, 3.2, 5); paint(g, vol(g, lo, -7, -17, 7, -5, 0.3, 0.2), 1.7);
+      circ(g, 0, -11, 1.9); g.fillStyle = D(lo, 0.45); g.fill();
+      g.beginPath(); g.moveTo(3, -16); g.quadraticCurveTo(7, -22, 12, -20); g.quadraticCurveTo(8, -15, 3, -16); paint(g, vol(g, '#7cc45a', 3, -22, 12, -15, 0.3, 0.2), 1.5);
+      shine(g, -6, -2, 4.6, 2.4, -0.6, 0.85); circ(g, 4, -3, 1.1); g.fillStyle = '#fff'; g.fill();
       break;
     }
-    case 'lemon': {
-      g.beginPath(); g.moveTo(-19, 0); g.quadraticCurveTo(-16, -14, 0, -14); g.quadraticCurveTo(16, -14, 19, 0); g.quadraticCurveTo(16, 14, 0, 14); g.quadraticCurveTo(-16, 14, -19, 0); g.closePath();
-      paint(g, volR(g, main, 0, 0, 18, 0.55, 0.3), 2);
-      circ(g, -20, 0, 2.6); paint(g, main, 1.5); circ(g, 20, 0, 2.6); paint(g, main, 1.5);
-      g.fillStyle = hexA('#ffffff', 0.8); for (const [x, y] of [[-6, 5], [5, -6], [9, 5], [-2, -8], [-11, -2], [13, -1]]) { g.fillRect(x, y, 1.6, 1.6); }
-      g.fillStyle = rad(g, 2, 2, 10, [[0, hexA(hi, 0.7)], [1, hexA(hi, 0)]]); circ(g, 2, 2, 10); g.fill();
-      shine(g, -7, -6, 5, 2.2, -0.3, 0.85);
+    case 'lemon': { // a wrapped lemon drop: a glossy oval in cellophane twists
+      for (const sx of [-1, 1]) {
+        g.beginPath(); g.moveTo(sx * 12, -3); g.lineTo(sx * 21, -10); g.quadraticCurveTo(sx * 23, 0, sx * 21, 10); g.lineTo(sx * 12, 3); g.closePath();
+        paint(g, lin(g, sx * 12, -10, sx * 22, 10, [[0, 'rgba(255,255,255,0.85)'], [0.5, hexA(hi, 0.7)], [1, 'rgba(230,240,255,0.8)']]), 1.7);
+        g.strokeStyle = hexA('#ffffff', 0.9); g.lineWidth = 1; g.beginPath(); g.moveTo(sx * 15, -4); g.lineTo(sx * 20, -7); g.moveTo(sx * 15, 4); g.lineTo(sx * 20, 7); g.stroke();
+      }
+      ell(g, 0, 0, 13.5, 11); paint(g, volR(g, main, 0, 0, 13, 0.55, 0.3), 2.1);
+      g.save(); ell(g, 0, 0, 13.5, 11); g.clip(); g.fillStyle = rad(g, 3, 3, 10, [[0, hexA(hi, 0.7)], [1, hexA(hi, 0)]]); g.fillRect(-14, -12, 28, 24);
+      g.fillStyle = hexA('#ffffff', 0.85); for (const [x, y] of [[-5, 4], [4, -5], [7, 4], [-1, -7], [-8, -2], [9, -1], [1, 6]]) g.fillRect(x, y, 1.5, 1.5);
+      g.restore();
+      shine(g, -5, -5, 4.4, 2, -0.35, 0.9);
       break;
     }
-    case 'cheese': {
-      g.save(); for (const [x, y, r, a] of [[-10, -14, 5, 0.55], [-3, -19, 6, 0.5], [6, -15, 4.5, 0.45]]) { circ(g, x, y, r); g.fillStyle = hexA('#9ee05a', a); g.fill(); } g.restore();
-      g.strokeStyle = hexA('#7ac04a', 0.9); g.lineWidth = 1.6; for (const x of [-10, -2, 6]) { g.beginPath(); g.moveTo(x, -8); g.bezierCurveTo(x - 4, -12, x + 4, -15, x, -21); g.stroke(); }
-      g.beginPath(); g.moveTo(-19, 4); g.lineTo(15, -8); g.lineTo(19, 10); g.lineTo(-17, 14); g.closePath(); paint(g, vol(g, main, -19, -8, 19, 14, 0.35, 0.25), 2);
+    case 'cheese': { // a wedge of stinky cheese, holes and a green whiff
+      g.save(); for (const [x, y, r, a] of [[-9, -15, 4.6, 0.5], [-2, -20, 5.4, 0.45], [6, -16, 4.2, 0.4]]) { circ(g, x, y, r); g.fillStyle = hexA('#9ee05a', a); g.fill(); } g.restore();
+      g.strokeStyle = hexA('#6ab840', 0.9); g.lineWidth = 1.6; for (const x of [-9, -1, 6]) { g.beginPath(); g.moveTo(x, -8); g.bezierCurveTo(x - 4, -12, x + 4, -15, x, -21); g.stroke(); }
+      g.beginPath(); g.moveTo(-19, 4); g.lineTo(15, -8); g.lineTo(19, 10); g.lineTo(-17, 14); g.closePath(); paint(g, vol(g, main, -19, -8, 19, 14, 0.35, 0.25), 2.1);
       g.beginPath(); g.moveTo(-19, 4); g.lineTo(15, -8); g.lineTo(17, 0); g.lineTo(-17, 8); g.closePath(); paint(g, vol(g, hi, -19, -8, 17, 8, 0.2, 0.1), 1.6);
-      for (const [x, y, r] of [[-6, 11, 2.2], [6, 7, 1.8], [12, 12, 1.5], [-2, 2, 1.6], [7, -3, 1.3]]) { ell(g, x, y, r, r * 0.8); g.fillStyle = D(main, 0.25); g.fill(); }
+      for (const [x, y, r] of [[-6, 11, 2.3], [6, 7, 1.9], [12, 11, 1.6], [-2, 3, 1.6], [8, -2, 1.3], [-12, 7, 1.4]]) { ell(g, x, y, r, r * 0.8); g.fillStyle = D(main, 0.3); g.fill(); }
+      shine(g, -8, 3, 4, 1.2, -0.3, 0.6);
       break;
     }
-    case 'diamond': {
-      glow(g, 0, 0, 22, '#bfe0ff', 0.5);
-      g.save(); g.rotate(-0.4);
-      bonePath(g, -11, 11, 5, 5.5);
-      paint(g, lin(g, -16, -10, 16, 10, [[0, '#ffffff'], [0.35, main], [0.6, '#cfe6ff'], [1, lo]]), 2);
-      g.save(); bonePath(g, -11, 11, 5, 5.5); g.clip(); g.strokeStyle = hexA('#ffffff', 0.9); g.lineWidth = 1; for (let x = -18; x < 20; x += 6) { g.beginPath(); g.moveTo(x, -12); g.lineTo(x + 8, 12); g.stroke(); } g.strokeStyle = hexA(lo, 0.5); for (let x = -16; x < 20; x += 6) { g.beginPath(); g.moveTo(x, 12); g.lineTo(x + 8, -12); g.stroke(); } g.restore();
+    case 'diamond': { // a bone biscuit in pale icing with a sugar diamond on top
+      g.save(); g.rotate(-0.38);
+      bonePath(g, -11, 11, 5.6, 6);
+      paint(g, lin(g, -18, -10, 18, 10, [[0, '#ffe6b8'], [0.45, '#f2c487'], [1, '#c98f4e']]), 2.1);
+      // a drizzle of pale blue icing along the shaft, baked speckles on the ends
+      g.beginPath(); g.moveTo(-9, -2.6); g.bezierCurveTo(-4, -4.4, 4, -4.4, 9, -2.6); g.lineTo(9, 1.2); g.bezierCurveTo(7, 3.6, 5, 1.4, 3, 3.2); g.bezierCurveTo(1, 5, -1, 2, -3, 3.4); g.bezierCurveTo(-5.5, 4.6, -7, 2, -9, 1.6); g.closePath();
+      paint(g, lin(g, -9, -4, 9, 4, [[0, '#ffffff'], [0.5, main], [1, '#b8d4f0']]), 1.4);
+      g.fillStyle = hexA('#a86a30', 0.5); for (const [x, y] of [[-14, -3], [-12.5, 3], [13, -3.5], [14.5, 2], [-15.5, 0.5], [12, 1]]) { circ(g, x, y, 0.9); g.fill(); }
       g.restore();
-      sparkle(g, 9, -8, 4, '#ffffff'); sparkle(g, -12, 6, 2.6, '#ffffff');
+      // the sugar diamond: a faceted gem of sugar, catching the light
+      g.save(); g.translate(1, -3);
+      g.beginPath(); g.moveTo(-6, -3); g.lineTo(-3, -7); g.lineTo(3, -7); g.lineTo(6, -3); g.lineTo(0, 5); g.closePath();
+      paint(g, lin(g, -6, -7, 6, 5, [[0, '#ffffff'], [0.5, '#dff0ff'], [1, lo]]), 1.6);
+      g.strokeStyle = hexA(lo, 0.7); g.lineWidth = 0.9; g.beginPath(); g.moveTo(-6, -3); g.lineTo(6, -3); g.moveTo(-3, -7); g.lineTo(-1.5, -3); g.lineTo(0, 5); g.lineTo(1.5, -3); g.lineTo(3, -7); g.stroke();
+      g.restore();
+      sparkle(g, 9, -10, 3.4, '#ffffff'); sparkle(g, -10, 7, 2.2, '#ffffff');
       break;
     }
-    case 'topaz': {
+    case 'topaz': { // a honey chew: an amber rounded chew, a honeycomb pattern, a slow drip
+      rr(g, -16, -12, 32, 22, 9); paint(g, vol(g, main, -16, -12, 16, 10, 0.5, 0.35), 2.1);
       const hexP = (r, x = 0, y = 0) => { g.beginPath(); for (let i = 0; i < 6; i++) { const a = (i / 6) * TAU + Math.PI / 6; const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r; i ? g.lineTo(px, py) : g.moveTo(px, py); } g.closePath(); };
-      hexP(17); paint(g, vol(g, main, -17, -17, 17, 17, 0.5, 0.35), 2);
-      g.save(); hexP(17); g.clip(); g.strokeStyle = hexA(lo, 0.55); g.lineWidth = 1.1;
-      for (let row = -3; row <= 3; row++) for (let col = -3; col <= 3; col++) { hexP(3.4, col * 6 + (row % 2 ? 3 : 0), row * 5.2); g.stroke(); }
+      g.save(); rr(g, -16, -12, 32, 22, 9); g.clip(); g.strokeStyle = hexA(lo, 0.45); g.lineWidth = 1;
+      for (let row = -2; row <= 2; row++) for (let col = -3; col <= 3; col++) { hexP(3.2, col * 5.6 + (row % 2 ? 2.8 : 0), row * 4.9 - 1); g.stroke(); }
+      g.fillStyle = rad(g, -4, -5, 14, [[0, hexA(hi, 0.65)], [1, hexA(hi, 0)]]); g.fillRect(-16, -12, 32, 22);
       g.restore();
-      g.beginPath(); g.moveTo(-6, 12); g.quadraticCurveTo(-6, 20, -3, 21); g.quadraticCurveTo(0, 20, 0, 13); g.fillStyle = main; g.fill(); stroke(g, INK, 1.4);
-      shine(g, -7, -8, 5, 2.4, -0.6, 0.8);
+      // a slow drip off the bottom-left corner
+      g.beginPath(); g.moveTo(-12, 8); g.quadraticCurveTo(-14, 13, -12.5, 15.5); g.quadraticCurveTo(-11, 18.5, -9, 15.5); g.quadraticCurveTo(-8, 12.5, -7, 10); g.closePath(); g.fillStyle = main; g.fill(); stroke(g, INK, 1.5);
+      circ(g, -11.5, 14.5, 1.1); g.fillStyle = hexA('#ffffff', 0.85); g.fill();
+      shine(g, -8, -7, 5, 2, -0.3, 0.85);
       break;
     }
     default: circ(g, 0, 0, 14); paint(g, main, 2);
   }
-  if (tier === 0) { g.beginPath(); g.moveTo(6, -10); g.lineTo(2, -3); g.lineTo(6, 1); stroke(g, hexA(INK, 0.55), 1.2); }
+}
+/** a gold ribbon bow (the Gourmet tier), its knot at (x, y) */
+function goldBow(g, x, y, s = 1) {
+  g.save(); g.translate(x, y); g.scale(s, s);
+  for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(0, 0); g.lineTo(sx * 3, 8); g.lineTo(sx * 1.2, 7); g.lineTo(sx * 0.4, 9); g.closePath(); paint(g, vol(g, '#f4c04a', -3, 0, 3, 9, 0.4, 0.3), 1.4); }
+  for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(0, 0); g.bezierCurveTo(sx * 4, -7, sx * 10, -5, sx * 8, 1); g.bezierCurveTo(sx * 7, 4, sx * 3, 3, 0, 0); g.closePath(); paint(g, vol(g, '#ffd85a', sx * 2, -6, sx * 9, 3, 0.45, 0.3), 1.6); }
+  circ(g, 0, 0.5, 2.6); paint(g, vol(g, '#f0b030', -2, -2, 2, 3, 0.5, 0.3), 1.4);
   g.restore();
-  if (tier === 2) { sparkle(g, -17, -14, 3.6, '#ffffff'); sparkle(g, 18, 14, 2.6, '#fff6c0'); }
+}
+function drawGem(g, type, tier, cols) {
+  const [main] = cols;
+  const s = tier === 0 ? 1.1 : tier === 2 ? 1.14 : 1.2; // (the treat fills its cell; the gourmet's bow and sparkles need a little room)
+  shadow(g, 18 * s + 3, 15 * s, 3);
+  if (tier === 2) glow(g, 0, 0, 29, main === '#e8f4ff' ? '#bfe0ff' : main, 0.42);
+  g.save(); g.scale(s, s);
+  if (tier === 0) {
+    // Crumbly: a piece broken off the top right (a jagged bite cut out, its edge inked), and crumbs beside it
+    const bite = () => { g.beginPath(); g.moveTo(30, -30); g.lineTo(1, -30); g.lineTo(3, -18); g.lineTo(-1, -13); g.lineTo(5, -8); g.lineTo(2, -3); g.lineTo(9, -1); g.lineTo(8, 4); g.lineTo(15, 3); g.lineTo(18, 9); g.lineTo(30, 8); g.closePath(); };
+    drawTreat(g, type, cols);
+    g.save(); g.globalCompositeOperation = 'destination-out'; bite(); g.fillStyle = '#000'; g.fill(); g.restore();
+    g.save(); g.globalCompositeOperation = 'source-atop'; bite(); g.strokeStyle = hexA(D(main, 0.45), 0.55); g.lineWidth = 5; g.stroke(); g.strokeStyle = INK; g.lineWidth = 3.4; g.stroke(); g.restore();
+    for (const [x, y, r, a] of [[17, 14, 2.4, 0.4], [21, 8, 1.8, 1.1], [13, 19, 1.5, 2]]) { g.save(); g.translate(x, y); g.rotate(a); g.beginPath(); g.moveTo(-r, -r * 0.4); g.lineTo(0, -r); g.lineTo(r, -r * 0.2); g.lineTo(r * 0.6, r * 0.8); g.lineTo(-r * 0.7, r * 0.7); g.closePath(); paint(g, vol(g, main, -r, -r, r, r, 0.35, 0.3), 1.2); g.restore(); }
+  } else drawTreat(g, type, cols);
+  g.restore();
+  if (tier === 2) { goldBow(g, -17, -17, 1.05); sparkle(g, 21, -17, 3.6, '#fff6c0'); sparkle(g, 20, 17, 2.6, '#ffffff'); sparkle(g, -21, 14, 2, '#fff6c0'); }
 }
 
 // ================================================================== potions & materials
@@ -1420,6 +1499,16 @@ export function itemIcon(item) {
   const rarity = item.rarity || 'normal';
   const key = `i|${ic.shape}|${ic.variant}|${(ic.colors || []).join(',')}|${rarity}`;
   return cached(key, () => compose(g => (draw ? draw(g, ic.variant, ic.colors) : null), { rarity }));
+}
+/** an item's icon drawn into its footprint (w x h cells, rpg/grid.js itemSize): long weapons upright in a tall one, the
+ *  rest scaled to fill it. 1 x 1 is itemIcon. */
+const LONG = new Set(['sword', 'staff', 'flail', 'lance']);
+export function itemIconSized(item, w = 1, h = 1) {
+  if (!item || (w === 1 && h === 1) || item.kind !== 'gear') return itemIcon(item);
+  const ic = item.icon || { shape: 'sword', variant: 'bone', colors: ['#f4e8cf', '#c23b3b', '#f2e4c6'] };
+  const draw = SHAPES[ic.shape]; if (!draw) return itemIcon(item);
+  const rarity = item.rarity || 'normal', rot = LONG.has(ic.shape) && h > w ? -Math.PI / 4 : 0;
+  return cached(`i|${ic.shape}|${ic.variant}|${(ic.colors || []).join(',')}|${rarity}|${w}x${h}`, () => composeSized(g => draw(g, ic.variant, ic.colors), { rarity }, w, h, rot));
 }
 export function gemIcon(type, tier = 0) {
   const COLS = { ruby: ['#e8364a', '#ff9aa8', '#8a1a2a'], blueberry: ['#4a6ae8', '#a8c0ff', '#22307a'], lemon: ['#ffd83a', '#fff6b0', '#c89a10'], cheese: ['#ffc83a', '#fff0a0', '#b88a1a'], diamond: ['#e8f4ff', '#ffffff', '#9ab8d8'], topaz: ['#ffa82a', '#ffe08a', '#b86a10'] };

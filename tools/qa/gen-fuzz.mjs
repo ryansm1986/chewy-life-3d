@@ -1,8 +1,11 @@
 // Node-only fuzz of the Burrow generator (src/dungeon/gen.js has no browser deps).
 // For many floors x seeds: no throw, >=2 rooms, every placed thing sits on floor, everything reachable from start,
 // exit portal / stairs / waypoint can actually be reached by the player (interaction radius).
-// Also the zone dungeons' two floors (dungeon/defs.js floorPlan: stairs on floor 1, the boss room on floor 2), and tier runs'
-// floors with their modifiers' layout hooks (rpg/zoneMods.js layoutMods; the Deep Burrow's too).
+// The old endless Burrow's floors (generate() without a plan: the ?test=dungeon page; kept exactly), the Burrow's four
+// dens' two floors each (dungeon/defs.js floorPlan, docs/ZONES.md §4.1: stairs on floor 1; on floor 2 the big room is
+// the boss's chamber, the arrival the farthest room from it, a treasure room), the zone dungeons' two floors (stairs on
+// floor 1, the boss room on floor 2), and tier runs' floors with their modifiers' layout hooks (rpg/zoneMods.js
+// layoutMods; the Deep Burrow's too).
 // usage: node tools/qa/gen-fuzz.mjs [seeds=300] [floors=40]
 import { generate, CELL } from '../../src/dungeon/gen.js';
 import { DUNGEONS, floorPlan } from '../../src/dungeon/defs.js';
@@ -34,9 +37,10 @@ function reachable(L, p, r, reach) {
   return false;
 }
 
-// the Burrow's floors, then every zone dungeon's two
+// the old Burrow's floors, then the four dens' two each, then every zone dungeon's two
 const JOBS = [];
 for (let floor = 1; floor <= FLOORS; floor++) JOBS.push({ floor, plan: null, name: '' });
+for (const d of Object.values(DUNGEONS)) if (d.kind === 'burrow') for (let floor = 1; floor <= d.floors; floor++) JOBS.push({ floor, plan: floorPlan(d, floor, { heroLvl: 10 }), name: d.id + ' ' });
 for (const d of Object.values(DUNGEONS)) if (d.kind === 'zone') for (let floor = 1; floor <= d.floors; floor++) JOBS.push({ floor, plan: floorPlan(d, floor, { heroLvl: 10 }), name: d.id + ' ' });
 // tier runs (docs/ZONES.md §5.1): the modifiers' layout hooks (rpg/zoneMods.js layoutMods) on every tier dungeon, the
 // Deep Burrow too: bigger packs, extra packs, promotions, extra chests and shrines all on reachable floor
@@ -74,6 +78,19 @@ for (const { floor, plan, name } of JOBS) for (let s = 1; s <= SEEDS; s++) {
   if (L.waypoint) { const w = c2w(L.waypoint.x, L.waypoint.y); if (!walkable(L, w.x, w.z)) bump('waypoint centre not walkable (mesh embedded in rock)', tag); if (!reachable(L, w, 1.75, reach)) bump('waypoint cannot be reached at all', tag); }
   if (L.stairs) { const w = c2w(L.stairs.x, L.stairs.y); if (!reachable(L, w, 1.65, reach)) bump('stairs cannot be reached', tag); }
   if (L.zone) zoneChecks(L, plan, reach, tag);
+  if (plan?.bigBoss) denChecks(L, plan, reach, tag);
+}
+// a den's last floor (docs/ZONES.md §4.1): the big room is the boss's chamber, the arrival the room farthest from it,
+// the boss at its centre with its fighting ring clear, a treasure room with a golden chest, no stairs
+function denChecks(L, plan, reach, tag) {
+  const B = L.bossRoom, S = L.rooms.find(r => r.kind === 'start');
+  if (!B || Math.min(B.w, B.h) < 15) { bump('den boss floor: the boss chamber is not the big room', tag); return; }
+  if (L.stairs) bump('den boss floor with stairs', tag);
+  if (L.rooms.some(r => r !== B && Math.hypot(r.cx - B.cx, r.cy - B.cy) > Math.hypot(S.cx - B.cx, S.cy - B.cy) + 1e-6)) bump('den boss floor: the arrival is not the room farthest from the boss', tag);
+  const b = L.spawns.find(s => s.boss); if (!b || b.x !== B.cx || b.y !== B.cy) bump('den boss not at its chamber centre', tag);
+  if (!reach[B.cy * L.W + B.cx]) bump('den boss chamber unreachable', tag);
+  if (!L.rooms.some(r => r.kind === 'treasure') || !L.chests.some(c => c.quality === 'gold')) bump('den boss floor without its treasure room', tag);
+  if (L.rooms.length < plan.rooms - 1) bump('den boss floor short of rooms', `${tag}: ${L.rooms.length}/${plan.rooms}`);
 }
 // zone dungeon floors (dungeon/zoneGen.js; docs/ZONES.md §8.2): density, elites, objective slots, the boss arena
 function zoneChecks(L, plan, reach, tag) {
@@ -116,7 +133,7 @@ function zoneChecks(L, plan, reach, tag) {
     }
   } else if (L.arena) bump('arena on a non-boss floor', tag);
 }
-console.log(`gen-fuzz: ${runs} layouts (${FLOORS} Burrow floors + ${JOBS.length - FLOORS} zone dungeon and tier run floors, x ${SEEDS} seeds)`);
+console.log(`gen-fuzz: ${runs} layouts (${FLOORS} old Burrow floors + ${JOBS.length - FLOORS} den, zone dungeon and tier run floors, x ${SEEDS} seeds)`);
 const keys = Object.keys(fails);
 if (!keys.length) console.log('PASS: no generator problems found');
 for (const k of keys) console.log(`FAIL ${k}: ${fails[k].n}x  e.g. ${fails[k].ex.join(' | ')}`);

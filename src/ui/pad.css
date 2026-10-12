@@ -45,6 +45,7 @@ body.pad-active .dch > .kc, body.pad-active .hw-k { display: none; }
 body.pad-active .mn-quick { display: flex; }
 .mn-quick .btn { font-size: 15px; padding: 7px 13px 8px; }
 .mn-quick .btn .gl { width: 19px; height: 19px; }
+.mn-quick .btn.dim { opacity: .62; } /* (the Town Portal mid boss fight: it says why) */
 
 /* Settings › Controls: per-device bindings, rebindable */
 .ctl-tabs { display: flex; justify-content: center; gap: 8px; margin: 0 0 10px; }
