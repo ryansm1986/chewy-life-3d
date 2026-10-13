@@ -113,6 +113,13 @@ export const SFX = {
     s.bell({ at: 0.35, f: 2093, d: 1.1, v: 0.06, rev: 0.4 });
     s.tone({ ...PON, v: 0.25 });
   } },
+  // a quest handed in: the hanko pressed onto the card (world/questMoments.js, ROADMAP UX-2): a soft wooden thunk as it
+  // lands (the stamp's press, 0.6 s into the card), a puff of paper
+  quest_stamp: { vary: 0.02, max: 1, fn(s) {
+    s.tone({ at: 0.6, pts: [[0, 190], [0.1, 88]], a: 0.002, d: 0.2, v: 0.32 });
+    s.noise({ at: 0.6, ft: 'lowpass', f: 1300, a: 0.002, d: 0.08, v: 0.3, color: 'pink' });
+    s.noise({ at: 0.62, ft: 'bandpass', f: 3000, q: 1.2, a: 0.004, d: 0.12, v: 0.07 });
+  } },
   ui_toast: { vary: 0.01, max: 2, fn(s) {
     s.tone({ f: 660, a: 0.005, d: 0.12, v: 0.1 });
     s.bell({ f: 1318, d: 0.5, v: 0.13, rev: 0.25 });
@@ -678,7 +685,7 @@ for (const k in GOLDEN_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SF
 export const SFX_NAMES = Object.keys(SFX);
 
 export const SFX_GROUPS = {
-  UI: ['ui_click', 'ui_hover', 'ui_open', 'ui_close', 'ui_tab', 'ui_error', 'ui_coin', 'ui_levelup', 'ui_learn', 'ui_equip', 'ui_buy', 'ui_quest', 'ui_quest_done', 'ui_toast', 'victory_sfx'],
+  UI: ['ui_click', 'ui_hover', 'ui_open', 'ui_close', 'ui_tab', 'ui_error', 'ui_coin', 'ui_levelup', 'ui_learn', 'ui_equip', 'ui_buy', 'ui_quest', 'ui_quest_done', 'quest_stamp', 'ui_toast', 'victory_sfx'],
   Pickups: ['pickup_item', 'pickup_magic', 'pickup_gem', 'pickup_rare', 'pickup_unique', 'pickup_gold', 'drop_item'],
   Footsteps: ['footstep_grass', 'footstep_stone', 'footstep_wood'],
   Combat: ['swing', 'swing_heavy', 'throw', 'ball_bounce', 'hit_flesh', 'hit_crit', 'monster_hit', 'monster_die', 'slime_bounce', 'ghost_wail', 'boss_roar', 'player_hurt', 'player_die'],

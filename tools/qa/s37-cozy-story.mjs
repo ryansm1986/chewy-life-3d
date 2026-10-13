@@ -60,6 +60,17 @@ async function sendErrand(page, id, crew) {
 } // (the debug clock: the Cozy debug section's "Add world hours")
 /** the town's growth tick, run now (the village sim ticks every 6 s of real time in town: a time skip, no unlock) */
 const growTown = async (page, n = 6) => { for (let i = 0; i < n; i++) { await ev(page, () => { window.G.sim.tickT = 99; }); await sleep(page, 90); } };
+// a quest whose steps are done waits for its hand-in (docs/QUESTS.md §4): walk up to its giver and talk, through the
+// game's own talk (their thank-you drained), as a player would → the ids handed in
+const handIn = async (page) => {
+  const ids = await ev(page, () => window.G.state.quests.active.filter(q => q.handIn).map(q => q.id));
+  for (const id of ids) {
+    await ev(page, id => { const G = window.G, d = G.story.def(id), n = G.npcs.find(x => x.id === d.giver); if (n) { G.player.setPos(n.pos.x + 1, n.pos.z + 1); G.player.moveTarget = null; G.story.talk(n); } }, id);
+    await sleep(page, 400); await drainDialogue(page); await sleep(page, 300);
+  }
+  return ids;
+};
+const won = (page, id) => ev(page, id => { const Q = window.G.state.quests; return Q.done.includes(id) || !!Q.active.find(q => q.id === id)?.handIn; }, id); // (its steps done: handed in, or waiting for it)
 async function readReport(page, name) {
   await page.waitForFunction(() => !window.G.ui.banners?.busy, null, { timeout: 15000 }).catch(() => {});
   await atBoard(page); await click(page, '.p-exp .ex-tab[data-v="reports"]'); await sleep(page, 500);
@@ -98,18 +109,20 @@ if (want('a')) {
   }
   R.check('a) R-14: burrow1\'s lunch reads as Rosie\'s on the Board (on and locked before and after a crew is picked, "Lunch packed by Rosie ♡", not "in the pantry"), a tap leaves it on, the odds count it (fed), no dish is packed', !!rl && [rl.empty, rl.t0, rl.t1].every(t => t && t.on && t.locked && !t.dis && /Lunch packed by Rosie ♡/.test(t.text) && !/in the pantry/.test(t.text)) && /packed\s*by Rosie/.test(rl.t0.fact) && rl.I.fed && rl.I.odds === 'good' && rl.I.meals === 0, rl);
   let b1 = null;
-  for (let k = 0; k < 6 && !(await ev(page, () => window.G.state.quests.done.includes('burrow1'))); k++) { // (good odds, not a sure thing: a partial leaves half the kills, and she tries again after a rest)
+  for (let k = 0; k < 6 && !(await won(page, 'burrow1')); k++) { // (good odds, not a sure thing: a partial leaves half the kills, and she tries again after a rest)
     const rest = await ev(page, () => (window.G.state.cozy.exp.tired['hero:moka'] || 0) - window.G.cozy.clock.h);
     if (rest > 0) await skip(page, rest + 0.1);
     const r = await sendVia(page, 'story', 'quest:burrow1', ['hero:moka'], { shotName: b1 ? null : 'a1-board-burrow1' }); b1 ||= r;
     await skip(page, 2.1); await sleep(page, 900);
   }
+  const b1waits = await ev(page, () => !!window.G.state.quests.active.find(q => q.id === 'burrow1')?.handIn);
+  const b1h = await handIn(page); // (Rosie hears about Moka: "Bring the Mochi Jelly to Rosie")
   await page.waitForFunction(() => window.G.state.quests.active.some(q => q.id === 'homes' || q.id === 'lights'), null, { timeout: 6000 }).catch(() => {});
   const b1r = await ev(page, () => ({ done: window.G.state.quests.done.includes('burrow1'), mochi: window.G.state.materials.mochi, rep: window.G.cozy.exp.reports().at(-1)?.result, potions: window.G.state.potions.heart, next: window.G.state.quests.active.map(q => q.id), onigiri: window.G.state.pantry.onigiri || 0 }));
   R.check("a) R-14: Rosie's lunch, not the pantry's: the onigiri in the pantry is still there after Moka's trip", b1r.onigiri === 1, { onigiri: b1r.onigiri });
   await ev(page, () => window.G.actions.spendPantry({ onigiri: 1 }, { quiet: true })); // (the later parts start from the pantry they always had)
   const b1rep = b1r.rep === 'success' ? await readReport(page, 'a2-report-burrow1') : null;
-  R.check('a) burrow1 by Moka alone (level 1, good odds with Rosie\'s lunch): the quest done, the 3 Mochi Jelly home, its reward paid, "A Home for Everyone" next', b1.sent && b1.odds === 'good' && b1r.done && b1r.mochi >= 3 && b1r.potions >= 3 && (b1r.next.includes('homes') || b1r.next.includes('lights')) && /Something Squishy: done/.test(b1rep?.ribbon || ''), { b1, b1r, b1rep });  // the farm for lunches: four turnips
+  R.check('a) burrow1 by Moka alone (level 1, good odds with Rosie\'s lunch): its hand-in waiting, then told to Rosie: the quest done, the 3 Mochi Jelly home, its reward paid, "A Home for Everyone" next', b1.sent && b1.odds === 'good' && b1waits && b1h.includes('burrow1') && b1r.done && b1r.mochi >= 3 && b1r.potions >= 3 && (b1r.next.includes('homes') || b1r.next.includes('lights')) && /Something Squishy: done/.test(b1rep?.ribbon || ''), { b1, b1r, b1rep });  // the farm for lunches: four turnips
   const farm = await ev(page, () => { const G = window.G, g = G.life.garden; const ok = G.actions.buyPantry('turnipSeed', 10, 4); g.syncBeds?.(true); return { ok, tiles: g.beds[0].tiles.slice(0, 4) }; });
   const tend = async (fn) => { for (const i of farm.tiles) { await ev(page, ([i, fn]) => { const g = window.G.life.garden, r = g.rec(i); if (fn === 'plant' && !r?.crop) { if (!(window.G.state.pantry.turnipSeed > 0)) window.G.actions.buyPantry('turnipSeed', 10, 4); if (!g.tilled(i)) { g.ensure(i).till = true; g.draw(i); } g.plant(i, 'turnipSeed'); } else if (fn === 'water' && r?.crop) g.water(i); else if (fn === 'harvest' && r?.crop && r.stage >= 2) g.harvest(i); }, [i, fn]); await page.waitForFunction(() => !window.G.life.tools.busy, null, { timeout: 4000 }).catch(() => {}); await sleep(page, 60); } };
   await ev(page, () => { const G = window.G, t = G.life.garden.tiles.get(G.life.garden.beds[0].tiles[0]); G.player.setPos(t.x + 0.5, t.z - 0.6); });
@@ -118,12 +131,19 @@ if (want('a')) {
   const sleepNight = async () => { await ev(page, () => window.G.sleep()); await sleep(page, 400); await waitIdle(page); await drainDialogue(page); await tend('harvest'); await tend('plant'); await tend('water'); await ev(page, () => { const P = window.G.state.pantry; if ((P.turnip || 0) >= 2) window.G.actions.cook('roastedVeggies', Math.floor(P.turnip / 2)); }); };
   // the town grows (homes on the painted zones) and the lanterns go up (paid from the purse)
   await growTown(page, 8);
+  // "A Home for Everyone" told to Rosie, so "Lights of Blossom Hollow" starts before the lanterns go up (its count starts then)
+  for (let k = 0; k < 4 && !(await ev(page, () => window.G.state.quests.active.some(q => q.id === 'lights') || window.G.state.quests.done.includes('lights'))); k++) {
+    await handIn(page); await page.waitForFunction(() => window.G.state.quests.active.some(q => q.id === 'lights'), null, { timeout: 4000 }).catch(() => {});
+    if (!(await ev(page, () => window.G.state.quests.active.some(q => q.id === 'lights')))) await growTown(page, 2);
+  }
   const lamps = await ev(page, () => {
     const G = window.G, sim = G.sim, P = G.world.landmarks.plaza; let n = 0;
     for (let r = 4; r < 40 && n < 3; r += 2) for (let a = 0; a < 24 && n < 3; a++) { const x = Math.round(P.x + Math.cos(a / 24 * Math.PI * 2) * r), z = Math.round(P.z + Math.sin(a / 24 * Math.PI * 2) * r); if (sim.canPlace('stoneLantern', x, z, 0).ok && sim.roadAccess({ type: 'stoneLantern', x, z, rot: 0, level: 1 }) && sim.place('stoneLantern', x, z, 0, { silent: true })) n++; }
     return n;
   });
   await growTown(page, 4);
+  await page.waitForFunction(() => !!window.G.state.quests.active.find(q => q.id === 'lights')?.handIn, null, { timeout: 8000 }).catch(() => {});
+  await handIn(page); // (Rosie sees the lanterns)
   await page.waitForFunction(() => window.G.state.quests.active.some(q => q.id === 'king'), null, { timeout: 8000 }).catch(() => {});
   const town1 = await ev(page, () => ({ homes: window.G.sim.stats.homes, pop: window.G.sim.stats.population, rank: window.G.sim.stats.rank, done: window.G.state.quests.done.slice(), act: window.G.state.quests.active.map(q => q.id) }));
   R.check('a) the town grows on its own zones and three stone lanterns are built: "A Home for Everyone" and "Lights of Blossom Hollow" done; "The King of Squish" next', lamps === 3 && town1.done.includes('homes') && town1.done.includes('lights') && town1.act.includes('king'), { lamps, town1 });
@@ -132,7 +152,7 @@ if (want('a')) {
   const lunchDish = () => ev(page, () => window.G.state.pantry.roastedVeggies || 0);
   let trips = 0, kingRep = null, relief = null, reliefTry = 0, kingTry = 0;
   for (let k = 0; k < 400; k++) {
-    const st = await ev(page, () => { const G = window.G, E = G.state.cozy.exp; return { king: G.state.quests.done.includes('king'), saved: G.state.zones.bamboo.village === 'saved', rest: (E.tired['hero:moka'] || 0) - G.cozy.clock.h, out: E.active.length, lvl: G.state.heroes.moka.player.lvl, story: G.cozy.exp.objectives('story').map(o => o.id) }; });
+    const st = await ev(page, () => { const G = window.G, E = G.state.cozy.exp; return { king: G.state.quests.done.includes('king') || !!G.state.quests.active.find(q => q.id === 'king')?.handIn, saved: G.state.zones.bamboo.village === 'saved', rest: (E.tired['hero:moka'] || 0) - G.cozy.clock.h, out: E.active.length, lvl: G.state.heroes.moka.player.lvl, story: G.cozy.exp.objectives('story').map(o => o.id) }; });
     log(k, JSON.stringify(st));
     if (st.king && st.saved) break;
     if (st.out) { await skip(page, 1); continue; }
@@ -146,7 +166,7 @@ if (want('a')) {
         if (target === 'quest:king') kingTry++; else reliefTry++;
         if (!r.sent) { log('send failed', target, JSON.stringify(r)); break; }
         await skip(page, 6.1); await sleep(page, 600);
-        if (target === 'quest:king' && await ev(page, () => window.G.state.quests.done.includes('king'))) kingRep = await readReport(page, 'a4-report-king');
+        if (target === 'quest:king' && await won(page, 'king')) kingRep = await readReport(page, 'a4-report-king');
         if (target === 'relief:bamboo' && await ev(page, () => window.G.state.zones.bamboo.village === 'saved')) relief = await readReport(page, 'a6-report-relief');
         continue;
       }
@@ -157,16 +177,21 @@ if (want('a')) {
     trips++; await skip(page, 3.05);
     if (trips % 4 === 0) await sleepNight();
   }
+  const kingWaits = await ev(page, () => !!window.G.state.quests.active.find(q => q.id === 'king')?.handIn);
+  const kingCrewLine = await (async () => { const n = await ev(page, () => { const G = window.G, r = G.npcs.find(x => x.id === 'rosie'); G.player.setPos(r.pos.x + 1, r.pos.z + 1); G.story.talk(r); return true; }); await page.waitForFunction(() => window.G.ui.dlg.active, null, { timeout: 8000 }).catch(() => {}); const t = await ev(page, () => (window.G.ui.dlg.lines || []).map(l => l.text).join(' ')); await drainDialogue(page); await sleep(page, 300); await ev(page, t => { window.__s37t = t; }, t); return n && /came by and told me the whole story/.test(t); })(); // (the hand-in: a line about Moka's crew, questMoments.js CREW_LINES)
   const kr = await ev(page, () => { const G = window.G; return { done: G.state.quests.done.includes('king'), owed: G.state.quests.owed?.mochiKing || null, trophy: G.state.furniture?.trophyMochiCrown || 0, uniques: [...G.state.inventory || [], ...G.state.stash || []].filter(it => it?.rarity === 'unique').length, next: G.state.quests.active.map(q => q.id) }; });
-  R.check('a) "The King of Squish" by Moka\'s crew: the quest done, King Mochi\'s crown cushion in storage, his quest unique owed to your own win (none in the bag)', kr.done && kr.trophy === 1 && kr.owed?.quest === 'king' && kr.uniques === 0 && /King of Squish: done/.test(kingRep?.ribbon || '') && /Crown Cushion/.test(kingRep?.loot || ''), { kr, kingRep, kingTry });
+  R.check('a) "The King of Squish" by Moka\'s crew: its hand-in waiting, Rosie\'s line about the crew, the quest done, King Mochi\'s crown cushion in storage, his quest unique owed to your own win (none in the bag)', kingWaits && kingCrewLine && kr.done && kr.trophy === 1 && kr.owed?.quest === 'king' && kr.uniques === 0 && /King of Squish: done/.test(kingRep?.ribbon || '') && /Crown Cushion/.test(kingRep?.loot || ''), { kr, kingWaits, kingCrewLine, said: await ev(page, () => window.__s37t || null), dlg: await ev(page, () => window.G.ui.dlg.active), kingRep, kingTry });
   const sv = await ev(page, () => { const Z = window.G.state.zones.bamboo; return { village: Z.village, by: Z.savedBy, celebrate: Z.celebrate, crew: Z.celebrateCrew, banner: window.G.state.furniture?.bannerGaleclaw || 0 }; });
   R.check('a) Takemori relieved by a crew: saved by the crew, its celebration waiting for your arrival, Galeclaw\'s torn banner in storage', sv.village === 'saved' && sv.by === 'crew' && sv.celebrate && sv.crew?.includes('hero:moka') && sv.banner === 1 && /Takemori Village is saved/.test(relief?.ribbon || ''), { sv, relief, reliefTry, trips });
+  // (the hand-in's chain: the King of Squish's next quest starts a beat after it, with its banner: let it land here first)
+  await page.waitForFunction(() => { const Q = window.G.state.quests; return Q.active.some(q => q.id === 'shrine') || Q.done.includes('shrine'); }, null, { timeout: 10000 }).catch(() => {});
+  await page.waitForFunction(() => !window.G.ui.banners.busy && !window.G.ui.banners.q.length, null, { timeout: 15000 }).catch(() => {});
   // the arrival: the crew's celebration in the square
   await ev(page, () => window.G.travel.go('bamboo'));
   await waitMode(page, 'dungeon', 30000);
   await page.waitForFunction(() => window.G.dungeon?.village?.celebrate?.stage >= 2, null, { timeout: 15000 }).catch(() => {});
   await sleep(page, 1400);
-  const party = await ev(page, () => { const G = window.G, V = G.dungeon.village; return { party: V.party, stage: V.celebrate?.stage, crew: (V.crew?.members || []).map(m => m.name), near: (V.crew?.members || []).every(m => Math.hypot(m.actor.pos.x - G.player.pos.x, m.actor.pos.z - G.player.pos.z) < 7), saved: V.savedGroup?.visible, banner: document.querySelector('.banners')?.textContent || '', flag: G.state.zones.bamboo.celebrate }; });
+  const party = await ev(page, () => { const G = window.G, V = G.dungeon.village; return { party: V.party, stage: V.celebrate?.stage, crew: (V.crew?.members || []).map(m => m.name), near: (V.crew?.members || []).every(m => Math.hypot(m.actor.pos.x - G.player.pos.x, m.actor.pos.z - G.player.pos.z) < 7), saved: V.savedGroup?.visible, banner: document.querySelector('.banners')?.textContent || '', flag: G.state.zones.bamboo.celebrate, bq: G.ui.banners.q.map(b => `${b.style}:${b.title}`), live: G.ui.banners.live?.style || null, dlg: !!G.ui.dlg.active, panels: Object.keys(G.ui.panels || {}).filter(k => G.ui.isOpen(k)) }; });
   await shot(page, 'a7-arrival-celebration');
   R.check('a) the arrival in Bamboo: the crew (Moka) stands in the square by the shrine, the saved village grows in, the banner names the crew; it plays once', party.party && party.stage >= 2 && party.crew.includes('Moka') && party.near && party.saved && /is saved/.test(party.banner) && /Moka/.test(party.banner) && party.flag === false, party);
   await page.waitForFunction(() => !window.G.dungeon?.village?.celebrate, null, { timeout: 20000 }).catch(() => {});

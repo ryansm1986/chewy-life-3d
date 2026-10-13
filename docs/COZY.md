@@ -135,6 +135,14 @@ for the bigger ones a town milestone. None is a free skip.
 The `burrow1` combat lesson moves: a player who goes in still gets Shadow's fight tips and the charge guide; a player
 who sends Moka gets the Board guide. Both meet the other later (§11).
 
+**The hand-in (ROADMAP UX-2, docs/QUESTS.md §4)**: a crew that finishes a story quest's last objective leaves its
+hand-in to you. The quest's last step becomes "Bring the news to Rosie" (the arrow, the pin and Shadow point at her);
+talking to her plays her happy hop and hearts, a line about the crew ("Moka came by and told me the whole story! You
+sent the best friends in the world."), her thank-you, the reward flying from her paws to the bag and the coins, and the "Quest
+complete" stamp. The report and its toast say "Rosie wants to hear all about it". The same goes for a zone villager's
+quest (the hand-in in their village). Shadow says no line for a place he wasn't at: a crew's objective gives no "way
+home" line, and no door, arrival or boss lines fire for places you never walked to.
+
 ### 3.2 The zones (`regions/village/*`, `dungeon/zoneRun.js`, `world/zoneQuests.js`)
 | Beat | Today | Cozy route | Gate (town + supplies) |
 |---|---|---|---|
@@ -264,6 +272,8 @@ who sends Moka gets the Board guide. Both meet the other later (§11).
   In the village, the crew walks in from the Wayfarer's Post and waves (heroes and hires as their villagers).
 - **The report** (the board's Reports view): a short card in the giver's or the crew's voice, one line per member
   ("Poe: I was very stealthy. Mostly."), the outcome, the loot row, the XP, and "Read it to Rosie" for the story ones.
+  A finished quest's report adds "Rosie wants to hear all about it: bring the news" (the giver's name); the quest
+  completes at its hand-in to the giver, not at the report (docs/QUESTS.md §4).
   Loot goes straight to the bag / materials / pantry; if the bag is full, the items wait in the report until there's
   room ("Take all").
 - **Results that change the world** apply at once: the quest step, `saveVillage`, the zone unlock, the dungeon count.
@@ -982,8 +992,9 @@ The code map is in [ARCHITECTURE.md](ARCHITECTURE.md) ("The cozy path, phase F")
     in about 2 hours… let's dig while we wait!").
   - **"Shadow's Nose" (Shadow, 7 steps)** after the answer (on the crew path, after the Board guide): a gather spot (the
     driftwood when it's near), Shadow sniffing a dig spot out, *hold F* and let go in the gold (Tap mode: press), the HUD
-    materials; on the crew path it waits for Moka's crew, spotlights the chip and the report, and Rosie has the last word
-    (the turn-in: "…brought my Mochi Jelly home!").
+    materials; on the crew path it waits for Moka's crew, spotlights the chip and the report, and Shadow's wrap-up sends
+    you to Rosie ("…Rosie wants to hear all about it: let's go and tell her"): she has the last word at the hand-in
+    (docs/QUESTS.md §4).
   - **"The Adventurers' Guild" (Old Hachi, 6 steps)** the first time the Guild stands: his door, sign a candidate on, the
     roster card (callouts on the class, the morale hearts, power and wage), the Expedition Board inside, a crew of two, the
     wages in the morning banner.

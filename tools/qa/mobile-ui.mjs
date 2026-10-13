@@ -166,6 +166,7 @@ try {
   await scene('craft', () => ev(() => window.G.openWorkbench?.('home')), ['.p-craft']);
   await scene('travel', () => ev(() => window.G.openTravel()), ['.p-travel']);
   await scene('burrow', () => ev(() => window.G.openBurrowMenu()), ['.p-burrow']); // (the Burrow door's den picker: docs/ZONES.md §4.1)
+  for (const id of ['king', 'tk_heartwood']) await scene('quest-card-' + id, () => ev(id => window.G.questMoments.showCard(id, { force: true }), id), ['.p-qcard']); // (the quest card: docs/QUESTS.md §1; a zone quest's long goal)
   await scene('gift', () => ev(() => { const G = window.G; G.ui.pickGift({ name: 'Rosie', portrait: G.portrait('rosie'), items: [{ key: 'onigiri', name: 'Onigiri', n: 1, pantry: true, love: 'liked' }, { key: 'turnip', name: 'Turnip', n: 4, pantry: true, love: 'like' }] }); }), ['.p-gift']);
   await scene('seeds', () => ev(() => window.G.ui.open('seeds', { seeds: ['carrotSeed', 'riceSeed'], last: 'carrotSeed', onPick() {} })), ['.p-seeds']);
   await scene('house-card', () => ev(() => { const G = window.G, rec = G.sim.list.find(r => r.data?.owner === 'usagi') || G.sim.list.find(r => r.data?.owner); G.ui.open('houseCard', { rec }); }), ['.p-house']);

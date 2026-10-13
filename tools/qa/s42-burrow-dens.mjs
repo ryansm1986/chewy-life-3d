@@ -14,7 +14,7 @@
 //     report says so
 //  f) the pad: the focus starts on the way in, the D-pad goes into the pins, A picks one, A on the way in sets off
 //  g) touch (a phone): the panel fits; tap a sealed den (its card says what opens it), tap the Mossy Burrow, tap the way in
-import { launch, boot, waitMode, sleep, makeReport, BASE } from './lib.mjs';
+import { launch, boot, waitMode, sleep, makeReport, BASE, drainDialogue } from './lib.mjs';
 import { launchTouch, PHONE } from './touch-lib.mjs';
 import { installPad, padTap } from './pad-lib.mjs';
 import { panelFit } from './ui-audit-lib.mjs';
@@ -120,10 +120,15 @@ try {
   await until(() => window.G.state.quests.active.find(q => q.id === 'king')?.step === 1, null, 5000).catch(() => {});
   const ptr3 = await ev(() => ({ step: window.G.state.quests.active.find(q => q.id === 'king')?.step, label: window.G.questTarget()?.label || null, boss: window.G.dungeon.boss?.name }));
   await ev(() => { const G = window.G, b = G.dungeon.boss; b.life = 1; G.combat.hitMonster(b, { dmgPct: 500 }); });
-  await until(() => window.G.state.quests.done.includes('king'), null, 8000).catch(() => {});
-  const c4 = await ev(() => ({ done: window.G.state.quests.done.includes('king'), fox: window.G.burrow.list().find(d => d.id === 'foxShrine').open }));
-  R.check('c) the pointer: in another den the way out (back to the door); in the Mossy Burrow the stairs; on floor 2 the step is done and the pointer finds King Mochi; his fall completes "The King of Squish" and opens the Fox Shrine', ptr1 === 'The way out' && ptr2.label === 'Stairs down' && ptr2.have === 1 && ptr3.step === 1 && ptr3.label === ptr3.boss && !!ptr3.boss && c4.done && c4.fox, { ptr1, ptr2, ptr3, c4 });
+  await until(() => window.G.state.quests.active.find(q => q.id === 'king')?.handIn, null, 8000).catch(() => {});
+  const c4 = await ev(() => ({ handIn: !!window.G.state.quests.active.find(q => q.id === 'king')?.handIn, ptr: window.G.questTarget()?.label || null, fox: window.G.burrow.list().find(d => d.id === 'foxShrine').open }));
   await toVillage();
+  // the hand-in (docs/QUESTS.md §4): home, the pointer is Rosie; telling her finishes the quest
+  c4.home = await ev(() => window.G.questTarget()?.label || null);
+  await ev(() => { const G = window.G, n = G.npcs.find(x => x.id === 'rosie'); G.player.setPos(n.pos.x + 1.2, n.pos.z); G.story.talk(n); });
+  await sleep(page, 500); await drainDialogue(page); await sleep(page, 300);
+  c4.done = await ev(() => window.G.state.quests.done.includes('king'));
+  R.check('c) the pointer: in another den the way out (back to the door); in the Mossy Burrow the stairs; on floor 2 the step is done and the pointer finds King Mochi; his fall opens the Fox Shrine and leaves "The King of Squish" waiting for its hand-in (the pointer: the way out, then Rosie at home); telling Rosie completes it', ptr1 === 'The way out' && ptr2.label === 'Stairs down' && ptr2.have === 1 && ptr3.step === 1 && ptr3.label === ptr3.boss && !!ptr3.boss && c4.handIn && c4.ptr === 'The way out' && c4.home === 'Rosie' && c4.done && c4.fox, { ptr1, ptr2, ptr3, c4 });
 
   // ================================================================ d) the save migration (old endless-Burrow saves)
   const den = () => ev(() => { const G = window.G; return { dens: G.burrow.list().map(d => `${d.cleared ? 'C' : d.crew ? 'K' : d.open ? 'o' : '-'}${d.bestFloor}`).join(' '), deep: G.state.dungeon.deep?.tier?.unlocked || 0, deepest: G.state.dungeon.deepest, q: G.state.quests.active.map(q => `${q.id}:${q.step}`).join(','), json: JSON.stringify(G.state.dungeon.dens) }; });
@@ -157,16 +162,23 @@ try {
     DEBUG_SECTIONS.get('cozy').actions.find(a => a.label === 'Give a sure-thing crew').run(G);
     G.state.pantry = { ...(G.state.pantry || {}), onigiri: 6 }; G.state.potions.heart = 6;
     const crewIds = ['hero:moka', 'hero:poe'], out = { tries: 0 };
-    for (let t = 0; t < 4 && !G.state.quests.done.includes('king'); t++) {
+    const won = () => G.state.quests.done.includes('king') || !!G.state.quests.active.find(q => q.id === 'king')?.handIn; // (a crew's win: the hand-in waits for you, docs/QUESTS.md §4)
+    for (let t = 0; t < 4 && !won(); t++) {
       out.tries++; const T = G.state.cozy.exp.tired; for (const k in T) delete T[k];
       out.listed = G.cozy.exp.objectives('story').some(o => o.id === 'quest:king');
       const r = G.cozy.exp.send('quest:king', crewIds, { meals: { onigiri: 2 }, potions: 3 }); out.sent = !!r?.ok; out.why = r?.why || null; if (!r?.ok) break;
       G.cozy.exp.finishAll(); await new Promise(q => setTimeout(q, 300));
       out.rep = G.cozy.exp.reports().at(-1); out.result = out.rep?.result;
     }
-    return { ...out, done: G.state.quests.done.includes('king'), rec: G.state.dungeon.dens?.mossyBurrow || null, fox: G.burrow.list().find(d => d.id === 'foxShrine').open, den: out.rep?.den || null, place: out.rep?.place?.label || null };
+    return { ...out, done: won(), handIn: !!G.state.quests.active.find(q => q.id === 'king')?.handIn, rep2: /Rosie wants to hear/.test(out.rep?.quest?.handIn ? `${out.rep.quest.giver} wants to hear` : ''), rec: G.state.dungeon.dens?.mossyBurrow || null, fox: G.burrow.list().find(d => d.id === 'foxShrine').open, den: out.rep?.den || null, place: out.rep?.place?.label || null };
   });
-  R.check('e) "The King of Squish" by a crew (on the Board, sent, home): the quest done, the Mossy Burrow counts the crew\'s win (not yours), the Fox Shrine opens, and the report says so', crew.listed && crew.sent && crew.done && crew.rec?.crew === 1 && crew.rec.cleared === 0 && crew.fox && crew.den?.opened === 'the Fox Shrine' && /Mossy Burrow/.test(crew.place || ''), { ...crew, rep: undefined });
+  // its hand-in: Rosie hears about the crew, and the quest is done
+  await ev(() => { const G = window.G, n = G.npcs.find(x => x.id === 'rosie'); G.player.setPos(n.pos.x + 1.2, n.pos.z); G.story.talk(n); });
+  await page.waitForFunction(() => window.G.ui.dlg.active, null, { timeout: 8000 }).catch(() => {}); // (her hop first, then her words)
+  crew.crewLine = await ev(() => /crew/.test(window.G.ui.dlg.lines?.map(l => l.text).join(' ') || ''));
+  await drainDialogue(page); await sleep(page, 300);
+  crew.handedIn = await ev(() => window.G.state.quests.done.includes('king'));
+  R.check('e) "The King of Squish" by a crew (on the Board, sent, home): the quest\'s fight done and its hand-in waiting (the report: Rosie wants to hear all about it), the Mossy Burrow counts the crew\'s win (not yours), the Fox Shrine opens, and the report says so; Rosie\'s hand-in has a line about the crew and finishes it', crew.listed && crew.sent && crew.done && crew.handIn && crew.rep2 && crew.crewLine && crew.handedIn && crew.rec?.crew === 1 && crew.rec.cleared === 0 && crew.fox && crew.den?.opened === 'the Fox Shrine' && /Mossy Burrow/.test(crew.place || ''), { ...crew, rep: undefined });
 
   // ================================================================ f) the pad
   await installPad(page);

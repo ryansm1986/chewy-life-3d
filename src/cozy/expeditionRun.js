@@ -341,7 +341,7 @@ class CozyRun {
     const where = rep.kind === 'errand' ? rep.name.replace(/^[A-Z]/, c => c.toLowerCase()) : rep.place?.label || rep.name;
     const word = { success: 'is back', partial: 'is back (partly done)', setback: 'is back, muddy and tired', beaten: 'is back early', recalled: 'came home' }[rep.result] || 'is back';
     const ups = Object.entries(rep.levels || {}).map(([k, [, to]]) => `${memberInfo(this.st, k)?.name || ''} is level ${to} now!`);
-    const news = rep.saved ? `${rep.saved.village} is saved! ` : rep.cleared ? `The ${rep.cleared.dungeon} is clear! ` : rep.quest?.done ? `${rep.quest.title}: done! ` : '';
+    const news = rep.saved ? `${rep.saved.village} is saved! ` : rep.cleared ? `The ${rep.cleared.dungeon} is clear! ` : rep.quest?.done ? `${rep.quest.title}: done!${rep.quest.handIn ? ` ${rep.quest.giver} wants to hear all about it.` : ''} ` : ''; // (handIn: it waits for you to bring the news: docs/QUESTS.md §4)
     G.ui?.toast?.(`${rep.crew.length > 1 ? `${lead}'s crew` : lead} ${word}: ${rep.kind === 'errand' ? where : rep.name}!`, { icon: 'map', color: rep.result === 'success' ? '#8fe0c0' : '#ffd8a8', sub: `${news}${ups.length ? `${ups.join(' ')} · the report is on the board` : `${names} · the report is on the Expedition Board`}`, duration: 6 });
     Events.emit('sfx', rep.result === 'success' ? 'ui_quest_done' : 'rune_chime');
     void e;

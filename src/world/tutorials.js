@@ -173,7 +173,8 @@ export class Tutorials {
     const place = G.mode === 'village' || (G.mode === 'interior' && g?.indoors);
     const open = ui?.anyModal?.() ? Object.keys(ui.panels || {}).filter(n => ui.isOpen(n)) : [];
     const panels = !open.length || (g?.startPanels && open.every(n => g.startPanels.includes(n)));
-    return !(G.titleActive || G.playerDead || !place || ui?.iris?.active || ui?.dlg?.active || !panels || ui?.banners?.busy || G.player?.controlLocked || G.heroSwitching || G.build?.active || G.introFocus || this.ui?.offering);
+    return !(G.titleActive || G.playerDead || !place || ui?.iris?.active || ui?.dlg?.active || !panels || ui?.banners?.busy || G.player?.controlLocked || G.heroSwitching || G.build?.active || G.introFocus || this.ui?.offering
+      || G.questMoments?.cardPending); // (a quest card waiting for its calm moment goes first: world/questMoments.js)
   }
   update(dt) {
     const G = this.G;

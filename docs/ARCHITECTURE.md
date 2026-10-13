@@ -849,6 +849,45 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   (remembered per tab), so s1-s15 never meet one; s16 drives them (s17 the housing guides, s19 "Hold to power up!", s20 "Meet Poe", s28
   "Meet <the Shih Tzu>").
 
+## Quests as moments (src/world/questMoments.js, questLore.js, src/ui/questCard.js + quest.css — design and as-built: docs/QUESTS.md, ROADMAP UX-2)
+- `G.questMoments` (installed after the map pin; `update(dt)` each frame after the guides). **The card**: `Story.start`
+  (not silent) asks `accepted(id, def)`: a story, zone or villager quest is queued in `state.quests.cards` (saved) and
+  opens as the `questCard` panel after 0.6 s of calm (`why()`: no fight by Shadow's calm clock, boss or aggroed foe; no
+  dialogue, panel, offer, banner, transition, scene, build, decorate, fishing, dig, or Shadow's tip); "Let's go!" →
+  `G.lead.toggle(id)` at Settings › Shadow leads the way ≥ Quests. A request gets `slip()` (a toast). `cardPending` holds
+  the guides (`tutorials.js calm`) and Shadow's tips (`game.js hintHold`). The QA's quiet sessions (`?nointro` without
+  `?qcard`, or `?nocard`, remembered for the tab) keep the old banner (`cards: false`).
+- **The place title**: `placeTick()` four times a second and on every `mode:changed` (after Story's own listener): the
+  areas you're in (`questLore.js areasHere`) against each quest's current step's area (`stepArea`), once per step and area
+  (`q.tt`); a Banners `place` style (`ui/fx.js`; `drop(style)` takes the arrival's area banner's place; a boss card drops a
+  place title; `onShow` plays `STINGS.place`). Waits behind the iris, a dialogue, a panel or a boss card.
+  A hand-in's area is `giver:<npc>`: you're in it within `GIVER_R` (14 m) of where the giver is now, or in the
+  district they're in now (`giverAt`, read from `world/mapData.js` `personSpot` / `personWhere`, the map's People list).
+- **Shadow's lines**: `lineTick()` (same poll) queues a beat per current step, once per step and beat (`q.sl`): `door`
+  (within 7 m of the Burrow door or a zone dungeon's gate), `arrive` (with the place title), `near` (10 m from a find's
+  or rescue's mark), `boss` (a boss that hasn't noticed you: on the screen within 26 m, or within 15 m), `home` (the
+  objective done by you, not a crew). A place's line is said only where it was due (`spot()`: the door's never on the
+  floor below).
+  `lineWhy()` holds it (a fight, a dialogue, a guide, a panel, a card, a banner, a tip, build, a scene, the 4 s gap);
+  a fight retires a line that is up. `say()` is his tip card (`LINE_TOAST`, priority normal) and `G.lead.say` (his bark,
+  an emote). The words: `d.lines[step][beat]`, else `questLore.js LINE_TEMPLATES` by step type (`lineFor`). `speaking`
+  (a line up or waiting) holds his one-off tips (`game.js hintHold`), so a line due goes before the next tip.
+- **The hand-in**: `Story.stepsDone` (the last step done) sets `q.handIn = 1` when `handInFor(q, d)` (a villager's or a
+  zone NPC's quest, not a request, not `handIn: false`, last step not already a talk to the giver); `stepOf(q, d)`
+  returns the virtual `handInStep` (`{ type: 'talk', npc: giver, text: 'Bring the news to <giver>', handIn, lead }`), so
+  the tracker, the arrow (`target` → `giverTarget`), the pin, the marker and Shadow's lead all point at the giver. Talking
+  to them (`Story.talk` / `regions/village/talk.js`) runs `handInScene`: face you, the happy hop, hearts, a sparkle, a
+  crew line (`CREW_LINES`) when a crew did it, their `thanks`, then `Story.handIn` → `complete(q, d, { from })`, which
+  queues `completed()` (the stamp banner, `rewardFly` from their paws to the bag and the coins) before the rewards, so a
+  level-up folds into the stamp as a chip (`ui/fx.js foldLevel`). A crew's last step (`crewResult`) leaves the hand-in
+  for you. Old saves: a quest past its last step migrates to its hand-in (or completes quietly with none).
+- `world/questLore.js` is pure (node-tested): `goalOf`, `rewardList`, `stepArea`, `areasHere`, `districtAt`, `npcDistrict`,
+  `bare`, `handInText`, `LINE_TEMPLATES`, `lineFor`.
+- Events: `quest:start { id, silent }` (Story.start), `quest:card { id, open, how }`, `quest:place { quest, step, area,
+  title }`, `quest:line { quest, step, beat, text }`, `quest:handIn { id, crew }` (the hand-in starts),
+  `quest:handedIn { id, giver, crew }`.
+- QA: `tools/qa/s46-quest-moments.mjs`, test-rpg "QUEST MOMENTS", prod-smoke `quest`, the look review `tools/qa/quest-shots.mjs`.
+
 ## Housing (src/home/ — design and as-built notes: docs/HOUSING.md)
 - **Interiors**: `G.mode = 'interior'`. One persistent `InteriorWorld` (home/interiorWorld.js: its scene, the same light
   rig as the village — 1 hemi, 1 shadow sun, the 8-light pool — its own materials and VFX) loads a house per visit and

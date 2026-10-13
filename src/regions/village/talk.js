@@ -184,7 +184,8 @@ async function flow(V, v, say) {
   if (f && f.talkedDay !== day) { f.talkedDay = day; G.story.addHearts(id, 2); }
   // a quest's closing talk step: the thank-you line, then the reward (Story.complete via markTalk)
   const turnIn = (st.quests.active || []).filter(q => { const d = ZONE_QUESTS[q.id], s = d?.steps[q.step]; return s?.type === 'talk' && s.npc === id; });
-  if (turnIn.length) {
+  if (turnIn.length) { // (the hand-in: their happy hop, the thank-you, the reward from their paws, the stamp: docs/QUESTS.md §4)
+    if (G.questMoments?.handInScene) { await G.questMoments.handInScene(v, turnIn.map(q => ({ q, d: ZONE_QUESTS[q.id] })), say); return; }
     for (const q of turnIn) await say([ZONE_QUESTS[q.id].thanks || 'Thank you!']);
     G.story?.markTalk?.(id);
     v.anim.play('happy'); v.emote('heart', 2);

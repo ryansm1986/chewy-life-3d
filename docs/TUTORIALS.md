@@ -42,7 +42,7 @@ Status: **built** (2026-10-03; the cozy path's three guides 2026-10-09). The gui
 - **Progress** lives in `state.flags.tutorials = { active, [id]: { step, started, offered, done, skipped } }`. A reload
   resumes the active guide at its step.
 - **Starting**: a guide starts on its own when its `trigger` first becomes true and the game is calm (no dialogue,
-  panel, banner, transition or switch). If several are pending, the lowest `priority` goes first. A guide with
+  panel, banner, transition or switch, and no quest card waiting for its moment: the card goes first, docs/QUESTS.md §1). If several are pending, the lowest `priority` goes first. A guide with
   `indoors: true` may also start inside a house, and one with `startPanels: [...]` over those panels (the Remodel
   guide starts over the house card it was triggered by).
 - **Old saves**: a save that is already past a guide's trigger when it loads (or its `past(G)`, when the guide has
@@ -50,7 +50,10 @@ Status: **built** (2026-10-03; the cozy path's three guides 2026-10-09). The gui
   thanks". An offered guide doesn't wait for its trigger moment.
 - **Replay**: the Journal has a **Guides** tab (status ✓ / skipped, Play / Replay). Esc closes panels as usual and
   never skips a guide; *Skip* on the card does.
-- **Shadow's tips**: his one-off toast tips wait while a guide is talking. The old `tabSwitch` tip is retired once the
+- **Shadow's tips**: his one-off toast tips wait while a guide is talking, while a quest card waits (docs/QUESTS.md §1;
+  the card waits for a tip that is already up), and while one of his quest lines is up (`questMoments.speaking`, §2).
+  His quest lines in turn wait for a guide, a tip, a card, a dialogue or a banner. A hand-in (§4) is a talk with the
+  giver, so it never runs over a guide's speech. The old `tabSwitch` tip is retired once the
   switching guide is done or skipped, and is never shown while that guide will run or be offered.
 - **QA**: guides start on their own only when the director is enabled.
   - It is off with `?notut`. It is also off with the QA's `?nointro` (unless `?tut`), and that's remembered in
@@ -212,8 +215,9 @@ Status: **built** (2026-10-03; the cozy path's three guides 2026-10-09). The gui
     1. The nearest full gather spot (the driftwood when it's near; the prompt spotlit at it; `scavenge:gather`). 2. Shadow
     sniffs a spot out (`found`). 3. *Hold F*, let go in the gold (Tap mode: press; `scavenge:dig`). 4. The HUD materials
     (a Perfect dig is cheered; Got it). 5–6. On the crew path: wait for Moka's crew (the chip), then its report spotlit
-    on the board (the chip, or the pause menu's Crews on a pad). 7. Wrap-up: Rosie's thank-you on the crew path (said
-    with her as the speaker), else Shadow's.
+    on the board (the chip, or the pause menu's Crews on a pad). 7. Wrap-up: on the crew path Shadow says the crew
+    brought the Mochi Jelly home and that Rosie wants to hear all about it (the quest waits for its hand-in to her,
+    where she thanks you and the crew: docs/QUESTS.md §4), else his own wrap-up.
   - **The Adventurers' Guild (Old Hachi)** the first time the Guild stands (old saves with a Guild: the offer):
     1. His door (the arrow; *F*). 2. Today's candidates spotlit: sign one on (skippable; done at once with a roster).
     3. The roster card (callouts: class, morale, power and wage; Got it). 4. The Expedition Board button inside.

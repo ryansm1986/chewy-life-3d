@@ -77,6 +77,7 @@ for (const [W, H] of SIZES) {
       await scene('cook', () => ev(() => window.G.life.kitchen.open('kitchen')));
       await scene('craft', () => ev(() => window.G.openWorkbench?.('home')));
       await scene('travel', () => ev(() => window.G.openTravel()));
+      for (const id of ['king', 'tk_heartwood']) await scene('quest-card-' + id, () => ev(id => window.G.questMoments.showCard(id, { force: true }), id)); // (the quest card: docs/QUESTS.md §1)
       await scene('house-card', () => ev(() => { const G = window.G, rec = G.sim.list.find(r => r.data?.owner === 'usagi') || G.sim.list.find(r => r.data?.owner); G.ui.open('houseCard', { rec }); }));
       await scene('remodel', () => ev(() => { const G = window.G, rec = G.sim.list.find(r => r.data?.owner === 'usagi') || G.sim.list.find(r => r.data?.owner); G.ui.open('remodel', { rec }); }));
       if (process.env.COZY !== '0') {

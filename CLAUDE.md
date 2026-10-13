@@ -19,6 +19,7 @@ A cozy 3D browser action-RPG and village sim (Three.js + Vite), starring Chewy, 
   - [COZY](docs/COZY.md): the no-combat story path (expeditions, the Guild, scavenging);
   - [MAP](docs/MAP.md): the map and minimap (layers, markers, People and Places, the pin);
   - [INVENTORY](docs/INVENTORY.md): the bag and stash grids, stash tabs, item sizes, sort and filter;
+  - [QUESTS](docs/QUESTS.md): quest moments (the quest card, place titles, Shadow's lines, the hand-in) and how to write a quest;
   - [DESKTOP](docs/DESKTOP.md): the Electron app for Windows and the Deck, and its in-app updates.
 - Releases:
   - itch: `node tools/push-itch.mjs`;

@@ -15,16 +15,17 @@ try {
     G.state.quests.active = [{ id: 'king', step: 1, prog: 0 }];
     const t0 = window.QA.toasts.length;
     G.events.emit('boss:dead', { id: 'mochiKing', floor: 5 });
+    const waited = !!G.state.quests.active.find(q => q.id === 'king')?.handIn; S.handIn('king'); // (its hand-in to Rosie: docs/QUESTS.md §4)
     const uniques = G.state.inventory.filter(x => x?.rarity === 'unique').length + G.state.stash.filter(x => x?.rarity === 'unique').length;
     const f = S.friend('pan'); f.pendingReward = 6; const inv0 = G.state.inventory.map(x => x?.uid).join();
     const n = G.npcs.find(x => x.id === 'pan');
     const talk = S.talk(n);
     for (let i = 0; i < 20 && G.ui.dlg.active; i++) { G.ui.dlg.advance(); await new Promise(r => setTimeout(r, 60)); }
     // leave whatever dialogue follows
-    return { kingDone: G.state.quests.done.includes('king'), uniqueReceived: uniques, toasts: window.QA.toasts.slice(t0), pendingAfter: f.pendingReward, rewardDelivered: G.state.inventory.map(x => x?.uid).join() !== inv0 };
+    return { kingDone: G.state.quests.done.includes('king'), waited, uniqueReceived: uniques, toasts: window.QA.toasts.slice(t0), pendingAfter: f.pendingReward, rewardDelivered: G.state.inventory.map(x => x?.uid).join() !== inv0 };
   });
   await drainDialogue(page); await sleep(page, 300);
-  R.check('boss-quest unique reward is not silently lost when the bag is full (stash / ground / retry)', full.uniqueReceived > 0, JSON.stringify(full));
+  R.check('boss-quest unique reward is not silently lost when the bag is full (stash / ground / retry), once the quest is handed in', full.waited && full.kingDone && full.uniqueReceived > 0, JSON.stringify(full));
   R.check('6-heart reward item is not silently lost when the bag is full', full.rewardDelivered || full.pendingAfter === 6, JSON.stringify({ pendingAfter: full.pendingAfter, rewardDelivered: full.rewardDelivered }));
 
   // b) reload during the gap between welcome completion and burrow1 start

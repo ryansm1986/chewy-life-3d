@@ -312,11 +312,17 @@ try {
     await sleep(page, 600); const r1 = { ring: await ringOn('.p-exp .ex-rep') }; await snap('cozy_nose_report');
     await sleep(page, 3500); await page.keyboard.press('Escape'); // (read, then the board closed: Rosie's line follows)
     await stepIs('nose', 'wrap', 12000); await sleep(page, 600);
-    const w1 = await G(() => ({ who: document.querySelector('.ts-name')?.textContent, say: document.querySelector('.ts-tx')?.textContent || '', burrow1: window.G.state.quests.done.includes('burrow1') }));
+    const w1 = await G(() => ({ who: document.querySelector('.ts-name')?.textContent, say: document.querySelector('.ts-tx')?.textContent || '', burrow1: !!window.G.state.quests.active.find(q => q.id === 'burrow1')?.handIn }));
     await snap('cozy_nose_wrap');
     await clickSel('.to-ok'); await sleep(page, 500);
     const w2 = await G(() => ({ rec: window.G.state.flags.tutorials.nose, active: window.G.tutorials.active }));
-    R.check("g) Moka's crew comes home: the chip spotlit, the report spotlit on the board; Rosie's thank-you (burrow1 done by the crew); the Nose guide done", r0.ring && r1.ring && w1.who === 'Rosie' && /Mochi Jelly/.test(w1.say) && w1.burrow1 && w2.rec.done && !w2.active, JSON.stringify({ r0, r1, w1, w2 }));
+    // the hand-in (docs/QUESTS.md §4): Rosie hears about Moka's crew, and burrow1 is done
+    await G(() => { const G = window.G, n = G.npcs.find(x => x.id === 'rosie'); G.player.setPos(n.pos.x + 1.2, n.pos.z); G.story.talk(n); });
+    await page.waitForFunction(() => window.G.ui.dlg.active, null, { timeout: 8000 }).catch(() => {}); // (her hop first, then her words)
+    const w3 = await G(() => ({ crew: /crew|Moka/.test(window.G.ui.dlg.lines?.map(l => l.text).join(' ') || '') }));
+    await drainDialogue(page); await sleep(page, 400);
+    w3.done = await G(() => window.G.state.quests.done.includes('burrow1'));
+    R.check("g) Moka's crew comes home: the chip spotlit, the report spotlit on the board; Shadow: Rosie wants to hear all about it (burrow1 done by the crew, its hand-in waiting); the Nose guide done; Rosie's hand-in with a line about the crew finishes burrow1", r0.ring && r1.ring && w1.who === 'Shadow' && /Mochi Jelly/.test(w1.say) && /Rosie/.test(w1.say) && w1.burrow1 && w2.rec.done && !w2.active && w3.crew && w3.done, JSON.stringify({ r0, r1, w1, w2, w3 }));
     await G(() => window.G.ui.closeAll());
   }
 

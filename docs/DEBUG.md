@@ -91,6 +91,18 @@ Every action is one tap and says what it did in a toast. The ones that travel cl
   again. Not the hero you're playing.
 - *Reset every guide* / *Mark every guide done*.
 
+**Quests** (quests as moments: docs/QUESTS.md §6; registered by world/questMoments.js)
+- *Show the quest card*: an active quest's storybook card, now (no calm wait); with none running, Something Squishy's.
+- *Cards on accept*: on, or off (the old "New Quest" banner), for the session.
+- *Show a place title here*: the first running quest's place title, with where you are and its sting.
+- *Forget the titles shown*: every step shows its place titles again.
+- *Say Shadow's line*: the first running quest's line for its current step (pick the beat: door, arrive, near, boss,
+  home), now.
+- *Forget Shadow's lines*: Shadow says each step's lines again at their places.
+- *Finish this step*: the chosen quest's current step done (its last step starts the hand-in).
+- *Hand it in now*: the chosen quest's steps done, then a talk with the giver when they're here (in the village, or a
+  zone villager in their village): the hop, the thanks, the reward and the stamp; anywhere else it's handed in at once.
+
 **Dens** (the Burrow's four dens: docs/ZONES.md §4.1; registered by world/burrowDoor.js)
 - *Clear the dens up to*: the Mossy Burrow … the Moonlit Sanctum: each den up to it beaten once, so the next opens (the
   Moonlit Sanctum also wakes the Deep Burrow's Lantern).

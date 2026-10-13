@@ -28,6 +28,7 @@ import { DenPanel } from './dens.js';
 import { RunChip } from './runChip.js';
 import { ExpeditionPanel } from './expeditions.js';
 import { AwayCardPanel } from './awayCard.js';
+import { QuestCardPanel } from './questCard.js'; // (the quest card: ROADMAP UX-2, world/questMoments.js)
 import { SightingsPanel } from './sightings.js';
 import { GuildPanel } from './guild.js';
 import { CozyChip } from './cozyChip.js';
@@ -119,6 +120,7 @@ export const UI = {
       expeditions: new ExpeditionPanel(this), awayCard: new AwayCardPanel(this), // (the cozy path: the Expedition Board, "While you were away…" — docs/COZY.md §4)
       sightings: new SightingsPanel(this), // (the Sightings board: the wild areas' daily bounties — docs/COZY.md §6.3)
       guild: new GuildPanel(this), // (the Adventurers' Guild: hires, the roster, upgrades and tools — docs/COZY.md §5)
+      questCard: new QuestCardPanel(this), // (a quest taken: the storybook card, "Let's go!" — docs/QUESTS.md §1)
     };
     this.homeHud = new HomeHud(this); // (indoors: the house name, the Decorate button)
     this.chargeHud = new ChargeHud(this); // (the hotbar's charge ring + stage pips: docs/CHARGE.md)
@@ -507,7 +509,8 @@ export const UI = {
     if (key) this._flown.set(key, now);
     let from = { x: innerWidth / 2, y: innerHeight / 2 };
     const cam = this.G?.engine?.camera;
-    const wp = worldPos || this.hud.playerPos();
+    const ff = this._flyFrom && performance.now() < this._flyFrom.until ? this._flyFrom.pos : null; // (a hand-in's reward: from the giver, world/story.js complete)
+    const wp = worldPos || ff || this.hud.playerPos();
     if (cam && wp) { const v = new Vector3(wp.x, (wp.y || 0) + (worldPos ? 0 : 0.8), wp.z).project(cam); from = { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight }; }
     this.flyToBag(itemIconURL(item), from, item);
     if (item.rarity && item.rarity !== 'normal' || item.kind === 'gem' || item.kind === 'gift' || item.kind === 'key') {

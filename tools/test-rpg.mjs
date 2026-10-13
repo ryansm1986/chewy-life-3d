@@ -2471,6 +2471,49 @@ hr('ITEM SIZES, SORT, LOST & FOUND, TREATS (ROADMAP R-20 to R-22: rpg/grid.js, r
   normalizeHeroes(st2);
   ok(st2.inventory[0].name === 'Gourmet Stinky Cheese' && st2.heroes.chewy.equipment.hat.gems[0].name === 'Crumbly Diamond Biscuit', 'treats: renamed on load (normalizeHeroes): the bag, and socketed in equipped gear');
 }
+hr('QUEST MOMENTS: THE CARD\'S WORDS, THE PLACES (ROADMAP UX-2: world/questLore.js, docs/QUESTS.md)');
+{
+  const QL = await import('../src/world/questLore.js'), { QUESTS } = await import('../src/world/story.js'), { ZONE_QUESTS } = await import('../src/world/zoneQuests.js');
+  const all = { ...QUESTS, ...ZONE_QUESTS };
+  // the writers' contract: every story and zone quest has its hook (short, in the giver's voice), its goal (an action and
+  // a place) and a reward to show
+  for (const [id, d] of Object.entries(all)) {
+    ok(typeof d.hook === 'string' && d.hook.length >= 20 && d.hook.length <= 130, `${id}: a hook, one or two short lines (${d.hook?.length} chars)`);
+    const [a, p] = QL.goalOf(d); ok(Array.isArray(d.goal) && a && p && a.length <= 56 && p.length <= 44, `${id}: a goal, an action and a place ("${a}" · "${p}")`);
+    ok(QL.rewardList(d.reward).length >= 1, `${id}: its reward as icons`);
+    for (const s of d.steps) if (['floor', 'boss', 'kill', 'find', 'rescue', 'dungeonFloor', 'talk'].includes(s.type)) ok(QL.stepArea(s), `${id}: its ${s.type} step has a place for its title`);
+  }
+  // the goal made up for a quest without one (a request), and the reward's order
+  const req = { title: "Kero's Request", giver: 'kero', steps: [{ type: 'deliver', npc: 'kero', mat: 'wood', n: 3, text: 'Bring 3 wood to Kero' }], reward: { coins: 52, xp: 50, hearts: 12 }, request: true };
+  ok(QL.goalOf(req, { npcName: () => 'Kero' }).join('|') === 'Bring 3 wood to Kero|Kero' && QL.goalOf({ steps: [{ type: 'find', item: 'x', dungeon: 'bambooDepths', floor: 1, text: 'Find it (Bamboo Depths, floor 1)' }, { type: 'talk', npc: 'tk_chiku', text: 'Tell Chiku' }] }).join('|') === 'Find it|the Bamboo Depths, floor 1', 'goal: made from the main step (its text without the parenthetical, and where it is)');
+  ok(QL.rewardList(QUESTS.king.reward).map(r => r.k).join() === 'coins,xp,skill,unique' && QL.rewardList(ZONE_QUESTS.tk_kome.reward).map(r => r.k + (r.id ? ':' + r.id : '')).join() === 'coins,xp,pantry:onigiri,pantry:misoSoup,hearts', 'rewards: coins, XP, skill points, the treasure, then the goods, friendship last');
+  // the areas the place titles fire in
+  ok(QL.stepArea(QUESTS.king.steps[0]).key === 'dun:mossyBurrow' && QL.stepArea(QUESTS.king.steps[1]).key === 'dun:mossyBurrow:2', 'king: the floor step is the den as a whole, the boss its second floor');
+  ok(QL.stepArea(QUESTS.burrow1.steps[0]).key === 'dun:burrow' && QL.stepArea(QUESTS.burrow1.steps[1]).key === 'dun:burrow', 'burrow1: the kills and the Mochi Jelly are any den');
+  ok(QL.stepArea(QUESTS.keroRod.steps[0]).key === 'giver:kero' && QL.stepArea(QUESTS.tasteTest.steps[1]).key === 'giver:rosie' && QL.stepArea({ type: 'talk', npc: 'rosie', handIn: true }).key === 'giver:rosie', "a Blossom Hollow villager's talk step (and a hand-in): the villager wherever they are now");
+  ok(QL.stepArea(ZONE_QUESTS.tk_kome.steps[0]).key === 'dun:bambooDepths:2' && QL.stepArea(ZONE_QUESTS.tk_kome.steps[1]).key === 'zone:bamboo' && QL.stepArea(ZONE_QUESTS.tk_windScroll.steps[0]).key === 'dun:bambooDepths' && QL.stepArea(ZONE_QUESTS.tk_roots.steps[0]).key === 'dun:bambooDepths', 'zone quests: a rescue its floor, a kill or a floor step the dungeon, the turn-in its zone');
+  ok(['homes', 'lights', 'shrine', 'onsen', 'firstSprouts'].every(id => QUESTS[id].steps.every(s => !QL.stepArea(s))) && QL.stepArea(QUESTS.tasteTest.steps[0]) === null, 'build, grow and cook steps: no place to arrive at');
+  ok(QL.stepArea(req.steps[0], { request: true }) === null && QL.stepArea({ type: 'decorate', npc: 'mochi', need: {} }).key === 'room:mochi' && QL.stepArea({ type: 'reach', at: 'home', x: 142, z: 150 }).key === 'district:pond', 'a request has none; a decorate step their room; a reach step at home its district');
+  ok(QL.areasHere({ mode: 'dungeon', dungeon: 'mossyBurrow', floor: 2 }).join() === 'dun:mossyBurrow:2,dun:mossyBurrow,dun:burrow' && QL.areasHere({ mode: 'dungeon', dungeon: 'bambooDepths', floor: 1 }).join() === 'dun:bambooDepths:1,dun:bambooDepths' && QL.areasHere({ mode: 'region', zone: 'bamboo' }).join() === 'zone:bamboo' && QL.areasHere({ mode: 'village', district: 'market' }).join() === 'district:market' && QL.areasHere({ mode: 'village', district: 'market', givers: ['rosie'] }).join() === 'district:market,giver:rosie' && QL.areasHere({ mode: 'village' }).length === 0, 'where you are: a den floor (the den, the Burrow), a zone dungeon floor, a zone, a district (and the givers you are with)');
+  // Shadow's lines (docs/QUESTS.md §2): every story quest with a place, every zone quest and the den quests have their own;
+  // short, at most one per beat; the templates cover the rest, with their words filled in
+  const placed = d => d.steps.some(s => QL.stepArea(s)?.kind === 'dungeon');
+  for (const [id, d] of Object.entries(all)) {
+    const L = d.lines || {}, texts = Object.values(L).flatMap(v => (Array.isArray(v) ? v : [v])).filter(Boolean);
+    if (placed(d)) ok(L.door && L.arrive && L.home, `${id}: Shadow's lines at its door, on arriving and on the way home`);
+    if (d.steps.some(s => s.type === 'boss')) ok(L.boss, `${id}: his line in sight of the boss`);
+    if (ZONE_QUESTS[id] && d.steps.some(s => s.type === 'rescue' || (s.type === 'find' && s.from !== 'chest'))) ok(L.near, `${id}: his line by the find or the cage`);
+    ok(texts.every(t => typeof t === 'string' && t.length >= 12 && t.length <= 110) && Object.keys(L).every(k => QL.LINE_BEATS.includes(k)), `${id}: Shadow's lines are short, under known beats`);
+  }
+  ok(['homes', 'lights', 'shrine', 'onsen', 'keroRod', 'firstSprouts', 'tasteTest'].every(id => QUESTS[id].lines?.home), 'the village quests have their way-home line');
+  ok(QL.lineFor(QUESTS.king, { step: 1 }, QUESTS.king.steps[1], 'arrive') === QUESTS.king.lines.arrive[1] && QL.lineFor({}, { step: 0 }, { type: 'rescue' }, 'near', { npc: 'Kome' }) === "Kome is right over there! Let's get that cage open!" && QL.lineFor({}, {}, { type: 'kill' }, 'home', { giver: 'Rosie' }).startsWith("Rosie's going to be so happy") && QL.lineFor({}, {}, { type: 'talk' }, 'nope') === null, "lineFor: the quest's own (by step), else the step type's template with its words, nothing for an unknown beat");
+  // the hand-in (docs/QUESTS.md §4): which quests wait for their giver once their steps are done, and in whose words
+  const { Story } = await import('../src/world/story.js'), hf = (id, d = all[id]) => Story.prototype.handInFor.call({}, { id }, d);
+  ok(['burrow1', 'homes', 'lights', 'king', 'shrine', 'umbrella', 'onsen', 'oni', 'keroRod', 'firstSprouts', 'tails'].every(id => hf(id)) && !hf('welcome') && !hf('tasteTest') && Object.keys(ZONE_QUESTS).every(id => !hf(id)) && !hf('req', req), 'hand-ins: every story quest waits for its giver, except the welcome (the intro) and those whose last step already talks to them (the Taste Test, every zone quest: their scene plays there); a daily request finishes on the spot');
+  ok(['burrow1', 'homes', 'lights', 'king', 'shrine', 'umbrella', 'onsen', 'oni', 'keroRod', 'firstSprouts', 'tails'].every(id => QUESTS[id].handIn?.text && QUESTS[id].thanks) && QUESTS.tasteTest.thanks && Object.values(ZONE_QUESTS).every(d => d.thanks) && QL.handInText({}, 'Rosie') === 'Bring the news to Rosie' && QL.handInText(QUESTS.king, 'Rosie') === 'Bring the festival mochi home to Rosie', 'hand-ins: each has its step\'s words ("Bring the festival mochi home to Rosie", else "Bring the news to …") and the giver\'s thank-you');
+  ok(QL.districtAt(112, 121) === 'core' && QL.districtAt(142, 146) === 'pond' && QL.districtAt(178, 78) === 'shrine' && QL.npcDistrict('rosie') === 'market' && QL.npcDistrict('kero') === 'pond' && QL.npcDistrict('usagi') === 'meadows' && QL.npcDistrict('mochi') === 'core', 'districts: the plaza is the Civic Core, the koi pond Pond Park, the Burrow door Shrine Hill; Rosie Market Street, Kero Pond Park, Usagi the South Meadows, Mochi the Civic Core');
+  ok(QL.bare("Find Chiku's Ledger (Bamboo Depths, floor 1)") === "Find Chiku's Ledger" && QL.bare('Defeat King Mochi') === 'Defeat King Mochi', 'a step text without its trailing parenthetical');
+}
 function TAB_PRICES_OK() { const P = STASH_PRICES.slice(1); return P.every((p, k) => !k || (p.coins > P[k - 1].coins && Object.keys(P[k - 1]).every(m => (p[m] || 0) >= P[k - 1][m] || m === 'silk'))); }
 
 hr('RESULT');

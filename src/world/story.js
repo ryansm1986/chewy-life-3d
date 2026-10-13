@@ -16,6 +16,7 @@ import { DUNGEONS, BURROW, isBurrow } from '../dungeon/defs.js';
 import { ZONE_QUESTS, dungeonObjectives as zoneObjectives, offersFor } from './zoneQuests.js'; // (zone villagers' quests: docs/ZONES.md §3)
 import { ZONE_NPCS } from '../regions/village/data.js';
 import { storyObjectives, villageObjectives, CREW_STEP_TYPES } from '../cozy/objectives.js'; // (the cozy path's crew routes: docs/COZY.md §3)
+import { handInText } from './questLore.js'; // (the hand-in step's words: docs/QUESTS.md §4)
 
 // step types: talk(npc) | collect(material,n) | kill(monster?,n) | boss(id) | floor(den,n) (reach floor n of one of the
 //   Burrow's dens: docs/ZONES.md §4.1) | build(type,n) | pop(n) | zone(n)
@@ -28,22 +29,27 @@ import { storyObjectives, villageObjectives, CREW_STEP_TYPES } from '../cozy/obj
 //     its text, or its giver's line, says so)
 //   the zones (docs/ZONES.md §3, rules in world/questSteps.js): kill / boss take optional zone, dungeon, floor and tier
 //   filters | find(item, n) | rescue(npc) | dungeonFloor(dungeon, n) | tier(dungeon, n) | villageSaved(zone)
+// a quest's moments (docs/QUESTS.md, world/questMoments.js): hook (the quest card's line or two in the giver's voice) and
+//   goal ([action, place]: the card's goal line); desc stays the Journal's longer note; lines (Shadow's, at the quest's
+//   places: { door, arrive, near, boss, home }, any a list by step); the hand-in (§4): when a quest's steps are all done
+//   and its giver is a villager you can reach, it waits for you to bring them the news (q.handIn: its last step becomes
+//   "Bring the news to Rosie", or handIn.text); thanks: their line as you do; handIn: false opts a quest out
 export const QUESTS = {
-  welcome: { title: 'Welcome Home, Chewy', giver: 'rosie', desc: 'Rosie wants to show you around Blossom Hollow.', steps: [{ type: 'talk', npc: 'rosie', text: 'Say hi to Rosie' }], reward: { coins: 50, xp: 20 }, next: 'burrow1' },
-  burrow1: { title: 'Something Squishy', giver: 'rosie', desc: 'Strange squeaks echo from the Burrow on the shrine hill. Go take a peek!', steps: [{ type: 'kill', n: 8, text: 'Defeat yokai in the Burrow', lead: (G, q) => G.state.flags?.burrowChoice === 'self' && !(q.prog > 0) }, { type: 'collect', mat: 'mochi', n: 3, text: 'Bring back Mochi Jelly' }], reward: { coins: 120, xp: 80, potions: { heart: 3 } }, next: 'homes' },
-  homes: { title: 'A Home for Everyone', giver: 'rosie', desc: 'New friends want to move in! Paint a homes zone (B → Zones) next to a path and let the village grow.', steps: [{ type: 'build', btype: 'home', n: 9, text: 'Grow the village to 9 homes' }], reward: { coins: 200, xp: 120, mats: { wood: 20, stone: 10 } }, next: 'lights' },
-  lights: { title: 'Lights of Blossom Hollow', giver: 'rosie', desc: 'Nights are a little spooky. Place lanterns so everyone can find their way home.', steps: [{ type: 'buildAny', btypes: ['stoneLantern', 'streetLamp', 'lanternString'], n: 3, text: 'Build 3 more lanterns' }], reward: { coins: 150, xp: 150, mats: { lantern: 3 } }, next: 'king' },
-  king: { title: 'The King of Squish', giver: 'rosie', desc: 'A giant mochi with a crown is hogging the deepest chamber of the Mossy Burrow. Time to deflate that ego!', steps: [{ type: 'floor', den: 'mossyBurrow', n: 2, text: "Reach the Mossy Burrow's second floor" }, { type: 'boss', id: 'mochiKing', text: 'Defeat King Mochi' }], reward: { coins: 500, xp: 600, skillPts: 1, unique: true }, next: 'shrine' },
-  shrine: { title: 'A Shrine for Wishes', giver: 'kitsune', desc: 'Kitsune says a shrine would make the whole village happier. (Needs village rank 2.)', steps: [{ type: 'build', btype: 'shrine', n: 1, text: 'Build a Blossom Shrine' }], reward: { coins: 300, xp: 400 }, next: 'umbrella' },
-  umbrella: { title: 'Umbrella Trouble', giver: 'rosie', desc: 'Umbrellas keep hopping out of the Burrow at night. Their lord waits deep in the Fox Shrine.', steps: [{ type: 'floor', den: 'foxShrine', n: 2, text: "Reach the Fox Shrine's second floor" }, { type: 'boss', id: 'kasaLord', text: 'Defeat Lord Karakasa' }], reward: { coins: 1200, xp: 2500, skillPts: 1, unique: true }, next: 'onsen' },
-  onsen: { title: 'Hot Spring Dreams', giver: 'kuma', desc: 'Kuma dreams of a steamy hot spring for sore paws. (Needs village rank 3.)', steps: [{ type: 'build', btype: 'onsen', n: 1, text: 'Build a Hot Spring' }, { type: 'pop', n: 30, text: 'Reach 30 villagers' }], reward: { coins: 800, xp: 3000 }, next: 'oni' },
-  oni: { title: "Oni's Kitchen Nightmare", giver: 'rosie', desc: "Someone is stealing all the dumplings. The trail leads down to Oni's Kitchen.", steps: [{ type: 'floor', den: 'oniKitchen', n: 2, text: "Reach the second floor of Oni's Kitchen" }, { type: 'boss', id: 'oniChef', text: 'Defeat Oni Chef Gorobei' }], reward: { coins: 3000, xp: 12000, skillPts: 1, unique: true }, next: 'tails' },
+  welcome: { title: 'Welcome Home, Chewy', giver: 'rosie', handIn: false, hook: "Good morning, sleepyhead! Come and say hi, I want to show you around Blossom Hollow.", goal: ["Say hi to Rosie", "Blossom Hollow"], desc: 'Rosie wants to show you around Blossom Hollow.', steps: [{ type: 'talk', npc: 'rosie', text: 'Say hi to Rosie' }], reward: { coins: 50, xp: 20 }, next: 'burrow1' },
+  burrow1: { title: 'Something Squishy', giver: 'rosie', hook: "Something keeps squeaking in the Burrow on Shrine Hill. Squishy squeaks! Could you go and take a peek?", goal: ["Shoo 8 yokai, bring back 3 Mochi Jelly", "the Burrow on Shrine Hill"], handIn: { text: "Bring the Mochi Jelly to Rosie" }, thanks: "Mochi Jelly! And not a single squeak left! You're the bravest pup in Blossom Hollow. Shadow too, of course.", lines: { door: "Sniff sniff… strawberries and trouble down there. Stay close!", arrive: ["Squeak! Squeak! There they are, the squishy ones! Let's shoo them out!", "Mochi Jelly! It wobbles when they bounce. Three for Rosie!"], home: "Mochi Jelly for Rosie! I won't eat any. Probably." }, desc: 'Strange squeaks echo from the Burrow on the shrine hill. Go take a peek!', steps: [{ type: 'kill', n: 8, text: 'Defeat yokai in the Burrow', lead: (G, q) => G.state.flags?.burrowChoice === 'self' && !(q.prog > 0) }, { type: 'collect', mat: 'mochi', n: 3, text: 'Bring back Mochi Jelly' }], reward: { coins: 120, xp: 80, potions: { heart: 3 } }, next: 'homes' },
+  homes: { title: 'A Home for Everyone', giver: 'rosie', hook: "New friends want to move to Blossom Hollow! Paint them a homes zone by a path, and they'll do the rest.", goal: ["Grow the village to 9 homes", "Blossom Hollow"], handIn: { text: "Tell Rosie the new friends are home" }, thanks: "Look at all the new faces! Blossom Hollow feels like a real village now. Thank you!", lines: { home: "Nine homes! Blossom Hollow is getting so big. Let's tell Rosie!" }, desc: 'New friends want to move in! Paint a homes zone (B → Zones) next to a path and let the village grow.', steps: [{ type: 'build', btype: 'home', n: 9, text: 'Grow the village to 9 homes' }], reward: { coins: 200, xp: 120, mats: { wood: 20, stone: 10 } }, next: 'lights' },
+  lights: { title: 'Lights of Blossom Hollow', giver: 'rosie', hook: "Nights get a little spooky around here. A few more lanterns, and everyone can find their way home.", goal: ["Build 3 more lanterns", "around the village"], handIn: { text: "Show Rosie the new lanterns" }, thanks: "Lanterns everywhere! Now nobody gets lost on the way home. Not even Shadow at three in the morning.", lines: { home: "So many lanterns! Nobody will get lost now, not even me. Let's show Rosie!" }, desc: 'Nights are a little spooky. Place lanterns so everyone can find their way home.', steps: [{ type: 'buildAny', btypes: ['stoneLantern', 'streetLamp', 'lanternString'], n: 3, text: 'Build 3 more lanterns' }], reward: { coins: 150, xp: 150, mats: { lantern: 3 } }, next: 'king' },
+  king: { title: 'The King of Squish', giver: 'rosie', hook: "King Mochi stole every mochi for the spring festival! He's hiding at the bottom of the Mossy Burrow, crown and all.", goal: ["Find King Mochi", "the Mossy Burrow, floor 2"], handIn: { text: "Bring the festival mochi home to Rosie" }, thanks: "The festival mochi! You got it all back! I could hug you. I'm going to hug you.", lines: { door: "It smells like stolen mochi down there… Sweet, sticky, stolen mochi.", arrive: ["The King's chamber is on the second floor. I can smell the festival mochi from here!", "He's on this floor, I just know it. Everything smells like mochi!"], boss: "Sniff… sugar and crown polish! King Mochi is just ahead. Ready when you are.", home: "We got the festival mochi back! Rosie's going to be so happy!" }, desc: 'A giant mochi with a crown is hogging the deepest chamber of the Mossy Burrow. Time to deflate that ego!', steps: [{ type: 'floor', den: 'mossyBurrow', n: 2, text: "Reach the Mossy Burrow's second floor" }, { type: 'boss', id: 'mochiKing', text: 'Defeat King Mochi' }], reward: { coins: 500, xp: 600, skillPts: 1, unique: true }, next: 'shrine' },
+  shrine: { title: 'A Shrine for Wishes', giver: 'kitsune', hook: "The shrine lanterns whisper that a village with a shrine sleeps sweeter. Shall we build one, little one?", goal: ["Build a Blossom Shrine", "Blossom Hollow, at village rank 2"], handIn: { text: "Tell Kitsune the shrine stands" }, thanks: "The shrine stands, and the lanterns hum a happy song. You have done well, little one.", lines: { home: "A real shrine! Kitsune's tails are going to swish all day. Let's go tell her!" }, desc: 'Kitsune says a shrine would make the whole village happier. (Needs village rank 2.)', steps: [{ type: 'build', btype: 'shrine', n: 1, text: 'Build a Blossom Shrine' }], reward: { coins: 300, xp: 400 }, next: 'umbrella' },
+  umbrella: { title: 'Umbrella Trouble', giver: 'rosie', hook: "Umbrellas keep hopping out of the Burrow at night. One licked my window! Their lord waits in the Fox Shrine.", goal: ["Defeat Lord Karakasa", "the Fox Shrine, floor 2"], handIn: { text: "Bring the news to Rosie" }, thanks: "No more umbrellas at my window! I can finally sleep without something licking the glass.", lines: { door: "Pitter-patter… umbrellas, hopping around down there. They'd better not lick ME.", arrive: ["Torii gates and paper lanterns… The Umbrella Lord lives on the floor below!", "Umbrellas everywhere! Their lord is close. Keep your ears dry!"], boss: "Flap, flap… the big umbrella is just ahead! Let's fold him up!", home: "No more window-licking umbrellas! Rosie's going to bake us something, I can feel it." }, desc: 'Umbrellas keep hopping out of the Burrow at night. Their lord waits deep in the Fox Shrine.', steps: [{ type: 'floor', den: 'foxShrine', n: 2, text: "Reach the Fox Shrine's second floor" }, { type: 'boss', id: 'kasaLord', text: 'Defeat Lord Karakasa' }], reward: { coins: 1200, xp: 2500, skillPts: 1, unique: true }, next: 'onsen' },
+  onsen: { title: 'Hot Spring Dreams', giver: 'kuma', hook: "All day on my paws by the oven… A steamy hot spring would be heaven. With honey. Maybe not in the water.", goal: ["Build a Hot Spring, grow to 30 villagers", "Blossom Hollow, at village rank 3"], handIn: { text: "Tell Kuma the hot spring is ready" }, thanks: "A hot spring, all ours! My paws are crying happy tears. Have a melon-pan. Have two.", lines: { home: "A hot spring! Kuma's sore paws are saved. Let's tell him, he might give us honey!" }, desc: 'Kuma dreams of a steamy hot spring for sore paws. (Needs village rank 3.)', steps: [{ type: 'build', btype: 'onsen', n: 1, text: 'Build a Hot Spring' }, { type: 'pop', n: 30, text: 'Reach 30 villagers' }], reward: { coins: 800, xp: 3000 }, next: 'oni' },
+  oni: { title: "Oni's Kitchen Nightmare", giver: 'rosie', hook: "Someone's pinching every dumpling in town! The crumbs lead all the way down to Oni's Kitchen.", goal: ["Stop Oni Chef Gorobei", "Oni's Kitchen, floor 2"], handIn: { text: "Bring the dumplings home to Rosie" }, thanks: "Every dumpling, home safe! I'll make a big pot of soup for everyone. Even the oni, if he says sorry.", lines: { door: "Mmm… dumplings! And smoke. And something BIG chopping vegetables. Let's go!", arrive: ["Pots bubbling everywhere… The Oni's kitchen is one more floor down!", "I can smell every stolen dumpling in town. The chef's here somewhere!"], boss: "Chop, chop, chop… Chef Gorobei is just ahead, with a cleaver AND a ladle. Careful!", home: "The dumplings are coming home! Rosie's going to hug everyone." }, desc: "Someone is stealing all the dumplings. The trail leads down to Oni's Kitchen.", steps: [{ type: 'floor', den: 'oniKitchen', n: 2, text: "Reach the second floor of Oni's Kitchen" }, { type: 'boss', id: 'oniChef', text: 'Defeat Oni Chef Gorobei' }], reward: { coins: 3000, xp: 12000, skillPts: 1, unique: true }, next: 'tails' },
   // the homestead (docs/HOMESTEAD.md): offered from day 2 (life/fishSocial.js); Kero hands over the rod at the talk step
-  keroRod: { title: "Pond Guardian's Apprentice", giver: 'kero', desc: 'Kero the pond guardian has a spare fishing rod — and opinions about floats. Go and find him.', steps: [{ type: 'talk', npc: 'kero', text: 'Visit Kero, the pond guardian' }, { type: 'fish', n: 3, text: 'Catch 3 fish' }], reward: { coins: 150, xp: 60, hearts: 10 }, next: null },
+  keroRod: { title: "Pond Guardian's Apprentice", giver: 'kero', hook: "Ribbit. I have a spare fishing rod, and a great many opinions about floats. Come to the koi pond, apprentice.", goal: ["Visit Kero, then catch 3 fish", "the koi pond in Pond Park"], handIn: { text: "Show Kero your catch" }, thanks: "Three fish. Ribbit. You may yet become a pond guardian. Keep the rod; the koi approve.", lines: { arrive: ["There's the koi pond! Kero's by the water. I can smell frog.", null], home: "Three fish! Let's show Kero, he'll ribbit so proudly." }, desc: 'Kero the pond guardian has a spare fishing rod — and opinions about floats. Go and find him.', steps: [{ type: 'talk', npc: 'kero', text: 'Visit Kero, the pond guardian' }, { type: 'fish', n: 3, text: 'Catch 3 fish' }], reward: { coins: 150, xp: 60, hearts: 10 }, next: null },
   // Usagi's starter-pack quest (offered with the starter seeds, life/index.js) leads into Rosie's taste test
-  firstSprouts: { title: 'First Sprouts', giver: 'usagi', desc: 'Usagi can\'t wait to see your first harvest! Plant seeds in your garden bed (F), water them every day and pick what grows.', steps: [{ type: 'plant', n: 3, text: 'Plant 3 seeds' }, { type: 'harvest', n: 3, text: 'Harvest 3 crops' }], reward: { coins: 120, xp: 50, hearts: 10, recipe: 'carrotSoup', pantry: { strawberrySeed: 2 } }, next: 'tasteTest' },
-  tasteTest: { title: 'Taste Test', giver: 'rosie', desc: 'Rosie wants to taste your cooking! Cook at home (your cottage), at a campfire in the Burrow, or bake with her at the shop.', steps: [{ type: 'cook', n: 3, text: 'Cook 3 dishes' }, { type: 'talk', npc: 'rosie', text: 'Let Rosie have a taste' }], reward: { coins: 200, xp: 80, hearts: 10, recipe: 'strawberryMochi', mats: { mochi: 2 } }, next: null },
-  tails: { title: 'Nine Tails of Moonlight', giver: 'kitsune', desc: "The old fox spirit Tamamo stirs in the Moonlit Sanctum, the Burrow's deepest den. Kitsune believes only a good boy can calm her.", steps: [{ type: 'floor', den: 'moonSanctum', n: 2, text: "Reach the Moonlit Sanctum's second floor" }, { type: 'boss', id: 'nineTails', text: 'Calm Tamamo, the Nine-Tailed' }], reward: { coins: 10000, xp: 40000, skillPts: 2, unique: true }, next: null },
+  firstSprouts: { title: 'First Sprouts', giver: 'usagi', hook: "Hop hop! Your very own garden bed! Plant your seeds, water them every day, and we'll see what pops up!", goal: ["Plant 3 seeds, harvest 3 crops", "your garden bed, by the cottage"], handIn: { text: "Show Usagi your harvest" }, thanks: "Your very first harvest! Hop hop HOP! These are for you, and I just know Rosie wants a taste of whatever you cook!", lines: { home: "Our very own veggies! Usagi's going to hop so high. Let's show her!" }, desc: 'Usagi can\'t wait to see your first harvest! Plant seeds in your garden bed (F), water them every day and pick what grows.', steps: [{ type: 'plant', n: 3, text: 'Plant 3 seeds' }, { type: 'harvest', n: 3, text: 'Harvest 3 crops' }], reward: { coins: 120, xp: 50, hearts: 10, recipe: 'carrotSoup', pantry: { strawberrySeed: 2 } }, next: 'tasteTest' },
+  tasteTest: { title: 'Taste Test', giver: 'rosie', hook: "You grew those yourself? Then cook me something! I'll be your official taste-tester. Very official.", goal: ["Cook 3 dishes, then let Rosie taste", "your cottage, a campfire or Rosie's oven"], thanks: "Mmm! You're a natural! Here's my strawberry mochi recipe. Don't tell Kuma I gave it away.", lines: { home: "Three dishes, and they all smell SO good. Quick, to Rosie, before I taste-test them myself!" }, desc: 'Rosie wants to taste your cooking! Cook at home (your cottage), at a campfire in the Burrow, or bake with her at the shop.', steps: [{ type: 'cook', n: 3, text: 'Cook 3 dishes' }, { type: 'talk', npc: 'rosie', text: 'Let Rosie have a taste' }], reward: { coins: 200, xp: 80, hearts: 10, recipe: 'strawberryMochi', mats: { mochi: 2 } }, next: null },
+  tails: { title: 'Nine Tails of Moonlight', giver: 'kitsune', hook: "Tamamo, the nine-tailed one, stirs in the Moonlit Sanctum. Her anger is old, but a kind heart can calm it. Yours, I think.", goal: ["Calm Tamamo, the Nine-Tailed", "the Moonlit Sanctum, floor 2"], handIn: { text: "Tell Kitsune that Tamamo sleeps" }, thanks: "Tamamo sleeps, and the moon shines softly again. The old songs will speak of you, little one.", lines: { door: "The deepest den… It smells like moonlight and old, old magic. I'm brave. I'm brave!", arrive: ["Crystals everywhere, humming… Tamamo's sanctum is one floor further down.", "The moon is shining down here somehow. She's close. Let's be gentle."], boss: "Moonlight, just ahead… Tamamo is there, and she's so sad. Let's help her rest.", home: "Tamamo is calm, and the moon feels warm again. Kitsune will be so proud of you!" }, desc: "The old fox spirit Tamamo stirs in the Moonlit Sanctum, the Burrow's deepest den. Kitsune believes only a good boy can calm her.", steps: [{ type: 'floor', den: 'moonSanctum', n: 2, text: "Reach the Moonlit Sanctum's second floor" }, { type: 'boss', id: 'nineTails', text: 'Calm Tamamo, the Nine-Tailed' }], reward: { coins: 10000, xp: 40000, skillPts: 2, unique: true }, next: null },
 };
 
 const CHAT = {
@@ -83,6 +89,7 @@ export const NIGHT_CHAT = {
 const CRAFT_REWARD = { mochi: 'catTower', kero: 'fishTank' };
 const HEART_REWARDS = { 3: { coins: 100, text: 'Here, a little something for being such a good friend!' }, 6: { item: 'magic', text: 'I found this and thought of you!' }, 9: { item: 'rare', text: 'You\'re my best friend in the whole village. Take this, please!' } };
 const REACH_POS = new WeakMap(); // reach step → { w: world, p: its spot on that world's ground } (never on the step: it's saved)
+const HAND_IN = new Map(); // quest id → its hand-in step (one object a quest: the pointer's caches key on it)
 
 export class Story {
   constructor(G) {
@@ -91,6 +98,13 @@ export class Story {
     Q.active ||= []; Q.done ||= []; Q.requests ||= {};
     if (!Q.active.length && !Q.done.length) this.start('welcome', true);
     for (const id of Q.done) { const nx = QUESTS[id]?.next; if (nx && !Q.done.includes(nx) && !Q.active.some(q => q.id === nx)) this.start(nx, true); }
+    // a quest whose steps are all done (docs/QUESTS.md §4, the save migration): a hand-in waits for its giver; one whose
+    // giver can't take it (or a record that got past its last step some other way) completes as it always did
+    for (const q of [...Q.active]) {
+      const d = this.def(q.id); if (!d) continue;
+      if (q.step < d.steps.length) { delete q.handIn; continue; }
+      if (this.handInFor(q, d)) q.handIn = 1; else { delete q.handIn; this.complete(q, d, { quiet: true }); }
+    }
     Events.on('monster:killed', e => this.progress('kill', e));
     Events.on('boss:dead', e => this.progress('boss', e));
     Events.on('mode:changed', e => { if (e.mode === 'dungeon') this.progress('floor', e); });
@@ -118,7 +132,10 @@ export class Story {
     if (this.Q.active.some(q => q.id === id) || this.Q.done.includes(id)) return;
     this.Q.active.push({ id, step: 0, prog: 0 });
     const d = this.def(id);
-    if (!silent) { this.G.ui?.banner?.('New Quest', d.title, { style: 'quest' }); Events.emit('sfx', 'ui_quest'); }
+    // the quest card on a calm moment, or a request's slip (world/questMoments.js, ROADMAP UX-2); the QA's quiet sessions
+    // keep the old banner
+    if (!silent && !this.G.questMoments?.accepted?.(id, d)) { this.G.ui?.banner?.('New Quest', d.title, { style: 'quest' }); Events.emit('sfx', 'ui_quest'); }
+    Events.emit('quest:start', { id, silent });
     Events.emit('quest:update');
     this.progress('any');
   }
@@ -148,16 +165,64 @@ export class Story {
       if ((kind === 'plant' || kind === 'harvest' || kind === 'cook') && s.type === kind) { q.prog += kind === 'cook' ? e?.n || 1 : 1; changed = true; }
       if (this.stepDone(q, s)) {
         q.step++; q.prog = 0; changed = true;
-        if (q.step >= d.steps.length) this.complete(q, d);
+        if (q.step >= d.steps.length) this.stepsDone(q, d);
         else this.G.ui?.toast?.(`Quest updated: ${d.steps[q.step].text}`, { color: '#ffd84a' });
       }
     }
     if (changed) Events.emit('quest:update');
   }
-  complete(q, d) {
-    const G = this.G, A = G.actions, r = d.reward || {};
+  /** the hand-in (docs/QUESTS.md §4) ---------------------------------------------------------------------------------------
+   *  a quest's current step: its own, or (its steps all done) the hand-in to its giver */
+  stepOf(q, d = this.def(q?.id)) { if (!q || !d) return null; return d.steps[q.step] || (q.handIn ? this.handInStep(d, q.id) : null); }
+  /** the hand-in step: talk to the giver ("Bring the news to Rosie"), Shadow leading the way */
+  handInStep(d, id = '') {
+    const k = id || d.title; let s = HAND_IN.get(k);
+    if (!s) HAND_IN.set(k, s = { type: 'talk', npc: d.giver, text: handInText(d, this.nameOf(d.giver)), handIn: true, lead: true });
+    return s;
+  }
+  /** does this quest wait for its giver once its steps are done? A villager's (Blossom Hollow's, or a zone's), unless
+   *  its last step already talks to them, it opts out (handIn: false) or it's a daily request (repeatable: it finishes
+   *  on the spot, as it always did) */
+  handInFor(q, d) {
+    if (!d || d.request || d.handIn === false || !d.giver || this.Q?.requests?.[q?.id]) return false; // (anything kept with the requests is one)
+    const last = d.steps[d.steps.length - 1];
+    if (last?.type === 'talk' && last.npc === d.giver) return false;
+    return d.giver === 'rosie' || VILLAGERS.some(v => v.id === d.giver) || !!ZONE_NPCS[d.giver];
+  }
+  /** a quest's steps are all done: its hand-in starts (the arrow, the pin and Shadow to the giver), or it completes */
+  stepsDone(q, d) {
+    if (!this.handInFor(q, d)) { this.complete(q, d); return; }
+    q.handIn = 1; q.prog = 0;
+    this.G.ui?.toast?.(`Quest updated: ${this.handInStep(d, q.id).text}`, { color: '#ffd84a' });
+    Events.emit('quest:handIn', { id: q.id, crew: q.crewBy || null });
+  }
+  /** the quests a villager can take in now: their hand-ins, and quests at a last step that talks to them */
+  handInsFor(id) {
+    const out = [];
+    for (const q of this.Q.active) {
+      const d = this.def(q.id); if (!d || d.request) continue;
+      const s = d.steps[q.step];
+      if (q.handIn ? d.giver === id : d.handIn !== false && s?.type === 'talk' && s.npc === id && q.step === d.steps.length - 1) out.push({ q, d }); // (handIn: false: the welcome, whose talk is the intro)
+    }
+    return out;
+  }
+  /** hand a quest in: a waiting hand-in, or a quest at its last step's talk to the giver. from: the giver (the reward flies
+   *  from their paws: world/questMoments.js handInScene) → true */
+  handIn(id, { from = null } = {}) {
+    const q = this.Q.active.find(x => x.id === id), d = q && this.def(id); if (!d) return false;
+    if (!q.handIn) { const s = d.steps[q.step]; if (s?.type !== 'talk' || q.step !== d.steps.length - 1) return false; q.step = d.steps.length; }
+    this.complete(q, d, { from });
+    return true;
+  }
+  complete(q, d, o = {}) {
+    const G = this.G, A = G.actions, r = d.reward || {}, from = o.from || this._from || null;
+    delete q.handIn;
+    if (G.ui && from?.pos) G.ui._flyFrom = { pos: from.pos.clone ? from.pos.clone() : from.pos, until: performance.now() + 900 }; // (a reward item flies from the giver: ui.js pickup)
     this.Q.active.splice(this.Q.active.indexOf(q), 1);
     this.Q.done.push(q.id);
+    // the "Quest complete" stamp and the reward flying in (world/questMoments.js), queued before the XP lands, so a level-up
+    // it brings folds into the stamp's card as a chip; without it, the banner after the rewards
+    const stamped = !o.quiet && !!G.questMoments?.completed?.(q, d, { from });
     if (d.giver && d.giver !== 'rosie' || d.request) { /* reward delivered on completion */ }
     if (r.coins) A.addCoins(r.coins);
     if (r.xp) A.addXp(r.xp);
@@ -174,9 +239,11 @@ export class Story {
     if (r.craft) setTimeout(() => G.teachRecipe?.(r.craft, { from: d.giver }), 2400); // (a workbench recipe: home/sources.js)
     if (d.request && d.steps.some(s => s.pantry)) setTimeout(() => G.life?.onRequestDone?.(d.giver), 2200);
     if (r.hearts && d.giver) this.addHearts(d.giver, r.hearts);
-    G.ui?.banner?.('Quest Complete!', d.title, { style: 'quest' });
-    Events.emit('sfx', 'ui_levelup');
-    G.vfx?.levelUp?.(G.player.pos.clone());
+    if (!o.quiet && !stamped) {
+      G.ui?.banner?.('Quest Complete!', d.title, { style: 'quest' });
+      Events.emit('sfx', 'ui_levelup');
+      G.vfx?.levelUp?.(G.player.pos.clone());
+    }
     if (d.request) { delete this.Q.requests[q.id]; const k = this.Q.done.lastIndexOf(q.id); if (k >= 0) this.Q.done.splice(k, 1); }
     if (d.next) setTimeout(() => this.start(d.next), 2500);
     Events.emit('quest:update');
@@ -189,7 +256,7 @@ export class Story {
     if (!d || q.step !== i || !d.steps[i]) return false;
     if (crew) { (q.crewSteps ||= []).includes(i) || q.crewSteps.push(i); q.crewBy = crew; }
     q.step++; q.prog = 0;
-    if (q.step >= d.steps.length) this.complete(q, d);
+    if (q.step >= d.steps.length) this.stepsDone(q, d); // (a crew's last step: the hand-in waits for you, with a line about them)
     else this.G.ui?.toast?.(`Quest updated: ${d.steps[q.step].text}`, { color: '#ffd84a' });
     Events.emit('quest:update');
     this.progress('any'); // (a state-derived next step that already holds: burrow1's Mochi Jelly the crew brought home)
@@ -209,7 +276,9 @@ export class Story {
       if (c?.s.type === 'kill') { const half = Math.ceil((c.s.n || 1) / 2); if ((c.q.prog || 0) < half) { c.q.prog = half; out.steps = 0.5; Events.emit('quest:update'); } }
       else if (c?.s.type === 'floor' && this.completeStep(id, c.q.step, { crew })) out.steps = 1;
     }
-    out.done = this.Q.done.includes(id) || (!this.Q.active.some(x => x.id === id) && !!d.request);
+    const hq = this.Q.active.find(x => x.id === id && x.handIn);
+    out.done = this.Q.done.includes(id) || !!hq || (!this.Q.active.some(x => x.id === id) && !!d.request);
+    if (hq) { out.handIn = true; out.giver = this.nameOf(d.giver); } // (the report: "Rosie wants to hear all about it")
     return out;
   }
   /** a quest unique a crew's win left for you: owed until you beat that boss yourself (docs/COZY.md §0.3, §14.1) */
@@ -238,7 +307,7 @@ export class Story {
   // what marker (if any) should float above this NPC: '!' = has something for you, '?' = waiting on your progress
   markerFor(id) {
     if (id === 'moka' && !this.G.state.flags?.mokaJoined) return '!'; // waiting by the fountain to meet the pack
-    for (const q of this.Q.active) { const d = this.def(q.id); const s = d?.steps[q.step]; if (s?.type === 'talk' && s.npc === id) return '!'; }
+    for (const q of this.Q.active) { const s = this.stepOf(q); if (s?.type === 'talk' && s.npc === id) return '!'; } // (a hand-in too)
     const f = this.G.state.friends[id];
     if (f?.pendingReward) return 'gift';
     const lm = this.G.life?.markerFor?.(id); if (lm) return lm; // (the homestead: Kero's Fish Log gifts)
@@ -285,8 +354,9 @@ export class Story {
     // region, at village coordinates: ROADMAP R-4, the welcome quest's pointer at Rosie from inside a zone)
     const npcPos = id => { const n = G.mode === 'village' && G.npcs?.find(x => x.id === id && x.visible); return n ? { pos: n.pos, label: n.name, kind: 'npc' } : null; };
     for (const q of order) {
-      const d = this.def(q.id), s = d.steps[q.step]; if (!s) continue;
-      if (s.type === 'talk') { const t = npcPos(s.npc) || this.zoneTalkTarget(s) || this.homeTalkTarget(s); if (t) return tag(t, q, s); continue; }
+      const d = this.def(q.id), s = this.stepOf(q, d); if (!s) continue;
+      // (a hand-in: the giver where they are now, by the map's People lookup, their door while they're indoors: questMoments)
+      if (s.type === 'talk') { const t = (s.handIn && G.mode === 'village' ? G.questMoments?.giverTarget?.(s.npc) : null) || npcPos(s.npc) || this.zoneTalkTarget(s) || this.homeTalkTarget(s); if (t) return tag(t, q, s); continue; }
       if (s.type === 'decorate') { // their home's door (inside it: nothing to point at)
         const rec = G.mode === 'village' && G.sim?.list.find(r => r.data.owner === s.npc);
         if (rec) return tag({ pos: rec.door, label: `${this.nameOf(s.npc)}'s home`, kind: 'place' }, q, s);
@@ -377,7 +447,7 @@ export class Story {
       const crew = done && q.crewSteps?.includes(i) && q.crewBy; // (done by a crew: docs/COZY.md §4.10)
       return { text: crew ? `${s.text} · done by ${q.crewBy}` : s.text, have: done ? need : Math.min(need, have), need, done, crew: crew || null };
     };
-    const act = this.Q.active.map(q => { const d = this.def(q.id); if (!d) return null; return { id: q.id, title: d.title, desc: d.desc, giver: this.nameOf(d.giver), main: !d.request, steps: d.steps.map((s, i) => stepView(q, s, i)).slice(0, q.step + 1), reward: d.reward }; }).filter(Boolean);
+    const act = this.Q.active.map(q => { const d = this.def(q.id); if (!d) return null; const all = q.handIn ? [...d.steps, this.handInStep(d, q.id)] : d.steps; return { id: q.id, title: d.title, desc: d.desc, giver: this.nameOf(d.giver), main: !d.request, handIn: !!q.handIn, steps: all.map((s, i) => stepView(q, s, i)).slice(0, q.step + 1), reward: d.reward }; }).filter(Boolean);
     const done = this.Q.done.filter(id => QUESTS[id]).map(id => ({ id, title: QUESTS[id].title, desc: QUESTS[id].desc, giver: this.nameOf(QUESTS[id].giver), main: true, steps: QUESTS[id].steps.map(s => ({ text: s.text, have: 1, need: 1, done: true })), reward: QUESTS[id].reward, done: true }));
     return act; // (completed quests live in state.quests.done)
   }
@@ -423,6 +493,13 @@ export class Story {
     // villagers' lines are written to Chewy: heroText addresses whoever is being played
     const say = (lines, choices) => ui?.dialogue ? ui.dialogue({ speaker: npc.name, portrait, lines: lines.map(l => heroText(l, this.G.state)), choices: choices?.map(c => ({ ...c, text: heroText(c.text, this.G.state) })), voice: npc.spec.voice }) : Promise.resolve(null);
     if (f.talkedDay !== day) { f.talkedDay = day; this.addHearts(id, 2); }
+    // a quest to hand in: their happy hop, their thank-you, the reward from their paws, the stamp (docs/QUESTS.md §4)
+    const hands = npc.folk ? [] : this.handInsFor(id);
+    if (hands.length) {
+      if (G.questMoments?.handInScene) await G.questMoments.handInScene(npc, hands, say);
+      else for (const h of hands) this.handIn(h.q.id, { from: npc });
+      return;
+    }
     // story talk steps
     this.markTalk(id);
     if (!npc.folk && this.G.life?.onTalk) await this.G.life.onTalk(npc, say); // (the homestead: Kero's rod, gifts, records)
@@ -443,7 +520,7 @@ export class Story {
       if (R.item) this.giveItem(generateItem({ ilvl: G.state.player.lvl + 2, rarity: R.item }));
       Events.emit('sfx', 'ui_quest');
     }
-    const dv = !npc.folk && this.tryDeliver(id);
+    this._from = npc; let dv; try { dv = !npc.folk && this.tryDeliver(id); } finally { this._from = null; } // (a request's goods handed over: its reward from their paws)
     const thanks = dv?.done ? [`${dv.done.n} ${dv.done.mat}! Oh, thank you so much, Chewy!`] : [];
     if (dv?.done) { npc.anim.play('happy'); G.vfx?.emote?.(npc, 'heart', 2); }
     if (npc.folk) { await say([pick(['Blossom Hollow is the coziest village ever!', 'I just moved in! My new home smells like fresh cedar.', 'Have you seen the koi pond? So peaceful.', 'The Burrow gives me the shivers… you are so brave, Chewy!', 'I love the lanterns at night.', 'Shadow let me pet him! Best day ever.'])]); return; }

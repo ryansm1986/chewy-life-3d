@@ -57,6 +57,7 @@ import { installServices } from './world/services.js';
 import { Waterfall } from './world/waterfall.js';
 import { VillageMinimap, DungeonMinimap, RegionMinimap } from './world/minimap.js';
 import { installMapPin } from './world/mapPin.js';
+import { installQuestMoments } from './world/questMoments.js';
 import { prewarmWorld } from './world/prewarm.js';
 import { WORLD } from './world/layout.js';
 import { installLife } from './life/index.js';
@@ -471,6 +472,12 @@ export async function boot() {
   }
   installShadowLead(G); // Shadow leads the way to the objective: the pointer follows a quest he was asked to follow, the tracker's tap (actors/shadowLead.js, ROADMAP R-17)
   installMapPin(G); // the map pin: a person or place picked on the big map is what the pointer, the minimap and Shadow point at (world/mapPin.js, ROADMAP UX-1)
+  { // quests as moments (world/questMoments.js, ROADMAP UX-2): the card on accept, the place titles. The QA's quiet
+    // sessions (?nointro without ?qcard, or ?nocard; remembered for the tab, as the guides') keep the old banner, no cards
+    let off = P.has('nocard') || (P.has('nointro') && !P.has('qcard'));
+    try { if (P.has('qcard')) sessionStorage.removeItem('chewy3d.nocard'); else if (off) sessionStorage.setItem('chewy3d.nocard', '1'); else off = !!sessionStorage.getItem('chewy3d.nocard'); } catch (e) { /* storage unavailable */ }
+    installQuestMoments(G, { cards: !off });
+  }
   installCozyGuide(G); // the cozy path's tutorial moments: Rosie's burrow1 question, the Board guide offered to a fighter, the Peaceful paths tip (cozy/cozyGuide.js, docs/COZY.md §11)
   installDebugAccess(G); // debug tools: off by default; the password prompt, F10 / ` / the bug / Select+Start, the lazy menu (src/debug, docs/DEBUG.md)
   const vMap = G.villageMinimap = new VillageMinimap(G);
@@ -700,6 +707,8 @@ export async function boot() {
     if (G.titleActive || G.playerDead || ui?.dlg?.active || ui?.iris?.active) return true;
     if (urgent) return false;
     if (G.tutorials?.busy || ui?.tutorial?.offering) return true; // (a guide is talking: Shadow's tips wait)
+    if (G.questMoments?.cardPending) return true; // (a quest card waits for its calm moment, and waits for a tip: the card first)
+    if (G.questMoments?.speaking) return true; // (one of Shadow's quest lines is up: his tip waits its turn, never stacks under it)
     if (G.life?.fishing?.s || G.cozy?.scav?.busy) return true; // (a cast, a bite or a reel, or a dig: tips wait; on a phone a tip covers the reel bar / the dig ring)
     if (G.build?.active || G.housing?.decor?.active) return true; // (building or decorating: a tip would cover the palette, CT-11)
     const now = performance.now();
@@ -886,6 +895,7 @@ export async function boot() {
     player.update(dt);
     G.life?.update(dt);
     G.tutorials?.update(rdt);
+    G.questMoments?.update(rdt); // (a quest card on a calm moment, the place titles: world/questMoments.js)
     G.mapPin?.tick(rdt); // (the map pin: you got there)
     shadow.update(dt);
     skills.update(dt, skillInput);

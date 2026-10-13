@@ -116,8 +116,9 @@ export async function tap(page, key, hold = 60) { await page.keyboard.down(key);
 export async function drainDialogue(page, picks = [], maxSteps = 40) {
   const chosen = [];
   for (let i = 0; i < maxSteps; i++) {
-    const s = await page.evaluate(() => { const d = window.G.ui?.dlg; if (!d?.active) return null; return { typing: d.typing, choices: d.choices?.map(c => c.text || c) || null, last: d.i >= d.lines.length - 1, text: d.lines?.[d.i]?.text }; });
+    const s = await page.evaluate(() => { const d = window.G.ui?.dlg; if (!d?.active) return window.G.questMoments?.handing ? { wait: true } : null; return { typing: d.typing, choices: d.choices?.map(c => c.text || c) || null, last: d.i >= d.lines.length - 1, text: d.lines?.[d.i]?.text }; });
     if (!s) return chosen;
+    if (s.wait) { await page.waitForTimeout(100); continue; } // (a quest's hand-in: the giver's hop comes a beat before their thanks)
     if (s.typing) { await page.keyboard.press('Enter'); await page.waitForTimeout(80); continue; }
     if (s.choices && s.last) {
       let k = picks.length ? picks.shift() : s.choices.length - 1;

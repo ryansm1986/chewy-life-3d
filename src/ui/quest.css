@@ -1,0 +1,166 @@
+/* Quest moments (ROADMAP UX-2, docs/QUESTS.md): the quest card (ui/questCard.js) and the place title (ui/fx.js
+   Banners, style 'place'). A storybook page: cream paper with the pages of the book showing under it, an oval
+   illustration of the giver with their name on a ribbon, a silk bookmark, the title, the giver's words, the goal, the
+   reward as icons and "Let's go!". Nothing in it glows or flashes: no rays, no screen tint. */
+
+/* ---------------------------------------------------------------- the card */
+.pw .panel.p-qcard { width: 664px; padding: 20px 24px 18px 20px; border-radius: 22px 30px 30px 22px;
+  background: var(--paper-noise), var(--paper-blot), linear-gradient(96deg, #efdcc2 0%, #fbf0de 3.2%, #fffaf0 9%, #fffcf6 60%, #fff3e2 100%);
+  /* the book's pages under this one, then its shadow */
+  box-shadow: 4px 5px 0 -1px #f6e8d4, 4px 5px 0 2px var(--ink), 8px 10px 0 -1px #efdcc2, 8px 10px 0 2px var(--ink),
+    10px 18px 0 rgba(74, 44, 42, .22), 0 28px 60px rgba(60, 26, 40, .32), inset 0 3px 0 #fff, inset 6px 0 10px -6px rgba(140, 90, 60, .35); }
+.pw .panel.p-qcard::before { inset: 9px 9px 9px 12px; border-radius: 16px 22px 22px 14px; }
+.pw .panel.p-qcard > .ph, .pw .panel.p-qcard > .deco { display: none !important; }
+.p-qcard .pb { overflow: visible; }
+.qc { position: relative; display: grid; grid-template-columns: 168px minmax(0, 1fr); grid-template-areas: 'art page' 'foot foot'; column-gap: 22px; row-gap: 12px; }
+
+/* the silk bookmark over the page's top edge */
+.qc-mark { position: absolute; right: 34px; top: -30px; width: 24px; height: 62px; z-index: 2; pointer-events: none;
+  background: linear-gradient(90deg, #d8456e, #ff8aa8 45%, #e8577e); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
+  filter: drop-shadow(0 2px 0 rgba(74, 44, 42, .35)); }
+
+/* the giver: an oval illustration, a watercolour wash behind them, their name on a ribbon */
+.qc-art { grid-area: art; display: flex; flex-direction: column; align-items: center; padding-top: 2px; }
+.qc-frame { position: relative; width: 164px; height: 184px; border-radius: 50% / 47%; border: 4px solid var(--ink); overflow: hidden;
+  background: #ffe9d6; box-shadow: 0 5px 0 rgba(74, 44, 42, .3), inset 0 0 0 5px #fff8ec; }
+.qc-wash { position: absolute; inset: 0; background: radial-gradient(ellipse 70% 55% at 50% 38%, #fff6ea 0 30%, rgba(255, 246, 234, 0) 70%),
+  radial-gradient(circle at 18% 78%, rgba(255, 170, 196, .55), rgba(255, 170, 196, 0) 46%), radial-gradient(circle at 86% 22%, rgba(255, 214, 150, .6), rgba(255, 214, 150, 0) 44%),
+  linear-gradient(170deg, #ffe2cf, #ffd0dc 60%, #f6c6e0); }
+.p-qcard[data-kind="zone"] .qc-wash { background: radial-gradient(ellipse 70% 55% at 50% 38%, #f6fbec 0 30%, rgba(246, 251, 236, 0) 70%),
+  radial-gradient(circle at 18% 78%, rgba(160, 214, 150, .55), rgba(160, 214, 150, 0) 46%), radial-gradient(circle at 86% 22%, rgba(255, 220, 150, .55), rgba(255, 220, 150, 0) 44%),
+  linear-gradient(170deg, #e4f2d6, #cfe8c8 60%, #c4ddd2); }
+.qc-por { position: absolute; inset: 0; }
+.qc-por .p3d, .qc-por img, .qc-por svg { position: absolute; left: -9%; top: 3%; width: 118% !important; height: 118% !important; object-fit: cover; display: block; }
+.qc-petal { position: absolute; width: 26px; height: 26px; pointer-events: none; animation: qcDrift 5s ease-in-out infinite; }
+.qc-petal .gl { width: 100%; height: 100%; }
+.qc-petal.a { left: 8px; top: 20px; }
+.qc-petal.b { right: 10px; bottom: 34px; width: 20px; height: 20px; animation-delay: -2.4s; }
+@keyframes qcDrift { 50% { transform: translate(3px, 4px) rotate(24deg); } }
+.qc-name { position: relative; margin-top: -20px; z-index: 1; display: flex; justify-content: center; }
+.qc-name span { display: block; min-width: 116px; max-width: 176px; padding: 6px 16px 8px; text-align: center; font: 700 19px/1 var(--font); color: #fff; letter-spacing: .3px;
+  -webkit-text-stroke: 5px var(--ink); paint-order: stroke fill; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: linear-gradient(#ffc0d3, #ff8fb0); border: 3px solid var(--ink); border-radius: 10px; box-shadow: 0 4px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, .5); transform: rotate(-2deg); }
+.p-qcard[data-kind="zone"] .qc-name span { background: linear-gradient(#cdeec0, #8fcf86); }
+
+/* the page: the kicker, the title, the giver's words, the goal, the rewards */
+.qc-page { grid-area: page; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding-top: 2px; }
+.qc-kick { display: flex; align-items: center; gap: 6px; font: 700 13px/1 var(--font); color: #d8456e; letter-spacing: 1.4px; text-transform: uppercase; }
+.qc-kick .gl { width: 20px; height: 20px; }
+.qc-kick .jp { font-size: 12px; letter-spacing: 3px; color: #e88aa6; margin-left: 2px; }
+.qc-title { margin: 0; font: 700 31px/1.04 var(--font); color: var(--ink); letter-spacing: .2px; text-shadow: 0 2px 0 #fff; }
+.qc-hook { position: relative; margin: 0; padding: 2px 0 0 25px; font: 500 17px/1.38 var(--font); color: #5c3b36; }
+.qc-q.o { position: absolute; left: -1px; top: -5px; font: 700 48px/1 var(--font); color: #ff9ab8; }
+.qc-q.c { font: 700 20px/0 var(--font); color: #ff9ab8; margin-left: 2px; vertical-align: -3px; }
+.qc-goal { display: flex; align-items: center; gap: 10px; padding: 8px 14px 9px 9px; border: 3px solid var(--ink); border-radius: 14px;
+  background: linear-gradient(#fffdf8, #fff2df); box-shadow: 0 3px 0 rgba(74, 44, 42, .22), inset 0 2px 0 #fff; }
+.qc-gi { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; border: 2.5px solid var(--ink); background: radial-gradient(circle at 40% 35%, #fff, #ffdfe8 70%); }
+.qc-gi .gl { width: 24px; height: 24px; }
+.qc-goal > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.qc-goal b { font: 700 18px/1.15 var(--font); color: var(--ink); }
+.qc-goal span { font: 600 15px/1.2 var(--font); color: #7a5650; }
+.qc-rw { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.qc-rh { font: 700 13px/1 var(--font); color: #7a5650; letter-spacing: .6px; text-transform: uppercase; margin-right: 2px; }
+.qc-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.qc-chip { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 11px 0 5px; border: 2.5px solid var(--ink); border-radius: 999px;
+  background: #fffaf2; box-shadow: 0 2.5px 0 rgba(74, 44, 42, .28), inset 0 2px 0 #fff; white-space: nowrap; }
+.qc-chip i { display: grid; place-items: center; width: 24px; height: 24px; }
+.qc-chip i .gl, .qc-chip i img { width: 24px; height: 24px; object-fit: contain; }
+.qc-chip b { font: 700 15px/1 var(--font); color: var(--ink); }
+.qc-chip[data-t="gold"] { background: linear-gradient(#fff8d6, #ffe48a); }
+.qc-chip[data-t="lav"] { background: linear-gradient(#f4efff, #ddd2ff); }
+.qc-chip[data-t="pink"] { background: linear-gradient(#ffeef3, #ffcadb); }
+.qc-chip[data-t="amber"] { background: linear-gradient(#fff0dc, #ffc98a); }
+.qc-chip[data-t="mint"] { background: linear-gradient(#ecfbf3, #bfeedb); }
+
+/* the foot: Shadow's note and "Let's go!" */
+.qc-foot { grid-area: foot; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 10px; border-top: 2px dashed rgba(74, 44, 42, .18); }
+.qc-lead { display: flex; align-items: center; gap: 7px; font: 600 15px/1.2 var(--font); color: #4a6aa8; }
+.qc-lead .gl { width: 22px; height: 22px; color: #6a7ab8; animation: bob 1.4s ease-in-out infinite; }
+.qc-go { flex: none; }
+.qc-go .gl { color: var(--ink); }
+.qc-k { display: inline-flex; margin-left: 4px; }
+.qc-k .kc { box-shadow: 0 2px 0 var(--ink); }
+.pw.opening .p-qcard .qc-frame { animation: qcIn .7s .08s var(--pop) both; }
+.pw.opening .p-qcard .qc-name span { animation: qcIn .6s .22s var(--pop) both; }
+.pw.opening .p-qcard .qc-go { animation: qcGo .5s .3s cubic-bezier(.2, .9, .3, 1) both; } /* (no overshoot: the body's foot is its edge, CT-10's panelFit) */
+@keyframes qcIn { 0% { opacity: 0; transform: scale(.7) rotate(-4deg); } 70% { opacity: 1; transform: scale(1.04) rotate(1deg); } 100% { transform: none; } }
+@keyframes qcGo { 0% { opacity: 0; transform: translateY(-8px) scale(.9); } 100% { opacity: 1; transform: none; } }
+
+/* a phone: the same page, a narrower picture */
+.ui-root.m-phone .pw .panel.p-qcard { width: 640px; padding: 14px 18px 14px 14px; }
+.ui-root.m-phone .qc { grid-template-columns: 132px minmax(0, 1fr); column-gap: 16px; row-gap: 8px; }
+.ui-root.m-phone .qc-frame { width: 128px; height: 144px; }
+.ui-root.m-phone .qc-name span { font-size: 17px; min-width: 96px; max-width: 140px; padding: 5px 12px 7px; }
+.ui-root.m-phone .qc-title { font-size: 27px; }
+.ui-root.m-phone .qc-hook { font-size: 16px; line-height: 1.3; padding-left: 22px; }
+.ui-root.m-phone .qc-q.o { font-size: 42px; }
+.ui-root.m-phone .qc-page { gap: 6px; }
+.ui-root.m-phone .qc-mark { top: -24px; height: 52px; }
+.ui-root.m-phone .qc-foot { padding-top: 8px; }
+
+/* ---------------------------------------------------------------- the place title (Banners 'place') */
+.bn-place { text-align: center; }
+.bn-place .bn-pk { display: flex; align-items: center; justify-content: center; margin-bottom: 4px; animation: fadeUp .5s both; }
+.bn-place .bn-pk span { display: inline-flex; align-items: center; gap: 7px; padding: 5px 16px 7px 10px; font: 700 18px/1 var(--font); color: var(--ink); letter-spacing: .4px;
+  background: linear-gradient(#fff3c8, #ffd96a); border: 3px solid var(--ink); border-radius: 9px; box-shadow: 0 3px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, .6); white-space: nowrap; }
+.bn-place .bn-pk .gl { width: 22px; height: 22px; }
+.bn-place .bn-pk-t { display: block; width: 26px; height: 28px; margin: 9px -7px 0; flex: none; overflow: visible; }
+.bn-place .bn-pk-t.r { transform: scaleX(-1); }
+.bn-place .bn-pk span { position: relative; z-index: 1; } /* (over its tails: no negative z-index, which an animating ancestor's stacking context hides) */
+.bn-place .bn-jp { color: #fff; font-size: 16px; letter-spacing: 9px; animation-duration: 1.1s; margin: 2px 0 2px; }
+.bn-place .bn-title { font: 600 56px/1.1 var(--font); color: #fff6e8; -webkit-text-stroke: 9px var(--ink); text-shadow: 0 6px 0 rgba(74, 44, 42, .85); letter-spacing: 3px; }
+.bn-place .bn-title .lt { animation: qpLetter .5s cubic-bezier(.2, .9, .3, 1) both; animation-delay: calc(.1s + min(var(--i) * .03s, .45s)); } /* (quick and never blurred: every letter crisp by about 1 s, held for the rest) */
+@keyframes qpLetter { from { opacity: 0; transform: translateY(10px) scale(1.06); } }
+.bn-place .bn-brush { width: 420px; }
+.bn-place .bn-brush path { stroke: #ffcf4a; }
+.bn-place .bn-brush path.thin { stroke: #ff8fb0; }
+.bn-place .bn-sub { font-size: 19px; letter-spacing: 1px; animation-delay: .55s; }
+.bn-place.out { animation: bnPlaceOut .6s ease-in forwards; }
+@keyframes bnPlaceOut { to { opacity: 0; transform: translateY(-10px); } } /* (a plain fade: no blur, nothing that reads as a smear) */
+/* touch: the toasts sit top centre, in the title's band (touch.css): they step aside while it's up */
+body.touch-active .ui-root:has(.banners[data-style="place"] .bn-place:not(.out)) .toasts { opacity: 0; transition: opacity .25s; }
+/* a phone: smaller and higher, clear of the hero in the middle of the screen */
+.ui-root.m-phone .banners[data-style="place"] { top: 10%; }
+.ui-root.m-phone .bn-place .bn-pk span { font-size: 16px; padding: 4px 13px 6px 8px; }
+.ui-root.m-phone .bn-place .bn-pk .gl { width: 19px; height: 19px; }
+.ui-root.m-phone .bn-place .bn-jp { font-size: 14px; letter-spacing: 7px; }
+.ui-root.m-phone .bn-place .bn-title { font-size: 42px; -webkit-text-stroke-width: 8px; text-shadow: 0 5px 0 rgba(74, 44, 42, .85); }
+.ui-root.m-phone .bn-place .bn-brush { width: 330px; height: 24px; }
+.ui-root.m-phone .bn-place .bn-sub { font-size: 17px; margin-top: 6px; }
+
+/* ---------------------------------------------------------------- the "Quest complete" stamp (Banners 'stamp': a quest handed in) */
+.banners[data-style="stamp"] { top: 12%; }
+.bn-stamp { animation: stIn .5s cubic-bezier(.2, 1.3, .4, 1) both; }
+@keyframes stIn { 0% { opacity: 0; transform: translateY(-16px) scale(.92); } 100% { opacity: 1; transform: none; } }
+.bn-stamp.out { animation: stOut .55s ease-in forwards; }
+@keyframes stOut { to { opacity: 0; transform: translateY(-12px); } }
+.st-card { position: relative; min-width: 400px; max-width: 580px; padding: 14px 104px 14px 22px; text-align: left; border: 4px solid var(--ink); border-radius: 18px 24px 24px 18px;
+  background: var(--paper-noise), linear-gradient(96deg, #efdcc2 0%, #fbf0de 3%, #fffaf0 9%, #fffcf6 60%, #fff3e2 100%);
+  box-shadow: 4px 5px 0 -1px #f6e8d4, 4px 5px 0 2px var(--ink), 8px 12px 0 rgba(74, 44, 42, .22), 0 18px 40px rgba(60, 26, 40, .28), inset 0 3px 0 #fff; }
+.st-k { display: flex; align-items: center; gap: 6px; font: 700 13px/1 var(--font); color: #d8456e; letter-spacing: 1.4px; text-transform: uppercase; }
+.st-k .gl { width: 19px; height: 19px; }
+.st-t { margin-top: 5px; font: 700 27px/1.05 var(--font); color: var(--ink); text-shadow: 0 2px 0 #fff; white-space: nowrap; }
+.st-s { display: flex; align-items: center; gap: 6px; margin-top: 5px; font: 600 15px/1.2 var(--font); color: #7a5650; }
+.st-s .gl { width: 18px; height: 18px; }
+.st-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.st-chips .qc-chip { height: 28px; padding: 0 9px 0 4px; }
+.st-chips .qc-chip i, .st-chips .qc-chip i .gl, .st-chips .qc-chip i img { width: 21px; height: 21px; }
+.st-chips .qc-chip b { font-size: 13px; }
+/* the hanko: red ink, a little rough, pressed on at an angle */
+.st-hanko { position: absolute; right: -6px; top: 50%; width: 100px; height: 100px; margin-top: -52px; display: grid; place-items: center; color: #d33b4c; transform: rotate(-14deg);
+  animation: stPress .5s .35s cubic-bezier(.3, 1.6, .5, 1) both; }
+.st-hanko svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.st-hanko circle { fill: rgba(255, 236, 236, .55); stroke: currentColor; stroke-width: 6; stroke-dasharray: 210 6 40 4; }
+.st-hanko circle.in { fill: none; stroke-width: 2.5; stroke-dasharray: none; opacity: .85; }
+.st-hanko b { position: relative; margin-top: -12px; font: 800 30px/1 var(--jp); letter-spacing: 2px; }
+.st-hanko i { position: absolute; bottom: 22px; font: 800 13px/1 var(--font); font-style: normal; letter-spacing: 2px; }
+@keyframes stPress { 0% { opacity: 0; transform: rotate(-24deg) scale(2.1); } 60% { opacity: 1; transform: rotate(-12deg) scale(.94); } 100% { opacity: 1; transform: rotate(-14deg) scale(1); } }
+.ui-root.m-phone .st-card { min-width: 340px; padding: 10px 84px 10px 16px; }
+.ui-root.m-phone .st-t { font-size: 23px; }
+.ui-root.m-phone .st-hanko { width: 80px; height: 80px; margin-top: -42px; right: -4px; }
+.ui-root.m-phone .st-hanko b { font-size: 24px; }
+.ui-root.m-phone .st-hanko i { bottom: 17px; font-size: 11px; }
+body.touch-active .ui-root:has(.banners[data-style="stamp"] .bn-stamp:not(.out)) .toasts { opacity: 0; transition: opacity .25s; }
+/* a level-up the quest's XP brought: a chip on the stamp's card (Banners.foldLevel), not a banner over the giver */
+.st-card .st-lvl { justify-content: flex-start; min-height: 0; margin-top: 6px; }
+.st-card .st-lvl:empty { display: none; }

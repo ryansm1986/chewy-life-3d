@@ -217,9 +217,11 @@ const page1 = async (qs, o) => { const L = await launch(o || { w: 1600, h: 900 }
   await shot(page, 'phone-combat');
   R.check('phone: the one-panel layout (the title bar at the bottom), 44 px targets, the 12 px floor, a tap switches tabs', a1.phone && a1.fits && a1.titleAtBottom && !a1.small.length && !a1.tiny.length && !a2.small.length && await page.evaluate(() => document.querySelector('.p-debug .dbg-tabs .tab.on')?.dataset.tab === 'combat'), { a1, a2 });
   await page.evaluate(() => window.G.ui.close('debug')); await sleep(page, 400);
+  // (the button comes back on its own half-second re-place, debug/access.js placeBug: wait for it, not the clock)
+  await page.waitForFunction(() => { const b = document.querySelector('.dbg-bug'); return !!b && !b.classList.contains('hide'); }, null, { timeout: 3000 }).catch(() => {});
   const bug = await page.evaluate(() => { const b = document.querySelector('.dbg-bug'); const r = b?.getBoundingClientRect(); return b && !b.classList.contains('hide') ? { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width } : null; });
   if (bug) { await F.tap(bug.x, bug.y); await page.waitForFunction(() => window.G.ui.isOpen('debug'), null, { timeout: 5000 }).catch(() => {}); }
-  R.check('phone: the bug button (≥ 44 px) opens the menu with a tap', !!bug && bug.w >= 43.5 && await page.evaluate(() => window.G.ui.isOpen('debug')), bug);
+  R.check('phone: the bug button (≥ 44 px) opens the menu with a tap', !!bug && bug.w >= 43.5 && await page.evaluate(() => window.G.ui.isOpen('debug')), bug || await page.evaluate(() => { const G = window.G, R = G.ui.root; return { why: 'hidden', dlg: !!G.ui.dlg?.active, speaker: G.ui.dlg?.speaker || null, hasPanel: R.classList.contains('has-panel'), panels: Object.keys(G.ui.panels || {}).filter(k => G.ui.isOpen(k)), el: !!document.querySelector('.dbg-bug') }; }));
   await page.evaluate(() => window.G.ui.close('debug')); await sleep(page, 400);
   await shot(page, 'phone-hud-bug');
   errs.push(...errors); warns.push(...w); await browser.close();

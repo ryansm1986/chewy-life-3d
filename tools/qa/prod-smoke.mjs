@@ -31,7 +31,7 @@ const url = server.resolvedUrls.local[0].replace(/\/$/, '');
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true, args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] });
 let failed = 0;
 const ONLY = process.argv.slice(2).filter(a => !a.startsWith('--'));
-for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['poe', '/?fresh&nointro&hero=poe'], ['shihtzu', '/?fresh&nointro&hero=shihtzu'], ['golden', '/?fresh&nointro&hero=golden'], ['home', '/?fresh&nointro'], ['tooltip', '/?fresh&nointro&notut'], ['charge', '/?fresh&nointro&notut'], ['pad', '/?fresh&nointro&notut'], ['deck', '/?fresh&nointro&notut'], ['touch', '/?fresh&nointro&notut'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`]), ...Object.values(DUNGEONS).filter(dd => dd.gate).map(dd => ['zone:' + dd.id, '/?fresh&nointro']), ['tier:bambooDepths', '/?fresh&nointro&notut'], ['tier:burrowDeep', '/?fresh&nointro&notut'], ['pinnacle:bambooDepths', '/?fresh&nointro&notut'], ['debug', '/?fresh&nointro&notut&debug'], ['cozy', '/?fresh&nointro&notut'], ['guild', '/?fresh&nointro&notut'], ['dig', '/?fresh&nointro&notut'], ['fish', '/?fresh&nointro&notut&hour=10'], ['peaceful', '/?fresh&nointro&notut&villagesaved=bamboo'], ['crewclear', '/?fresh&nointro&notut&villagesaved=bamboo'], ['lead', '/?fresh&nointro&notut&hour=10'], ['dens', '/?fresh&nointro&notut'], ['portal', '/?fresh&nointro&notut']]) { // (every zone dungeon that has its gate: its kit, a dense floor, the arena)
+for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['poe', '/?fresh&nointro&hero=poe'], ['shihtzu', '/?fresh&nointro&hero=shihtzu'], ['golden', '/?fresh&nointro&hero=golden'], ['home', '/?fresh&nointro'], ['tooltip', '/?fresh&nointro&notut'], ['charge', '/?fresh&nointro&notut'], ['pad', '/?fresh&nointro&notut'], ['deck', '/?fresh&nointro&notut'], ['touch', '/?fresh&nointro&notut'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`]), ...Object.values(DUNGEONS).filter(dd => dd.gate).map(dd => ['zone:' + dd.id, '/?fresh&nointro']), ['tier:bambooDepths', '/?fresh&nointro&notut'], ['tier:burrowDeep', '/?fresh&nointro&notut'], ['pinnacle:bambooDepths', '/?fresh&nointro&notut'], ['debug', '/?fresh&nointro&notut&debug'], ['cozy', '/?fresh&nointro&notut'], ['guild', '/?fresh&nointro&notut'], ['dig', '/?fresh&nointro&notut'], ['fish', '/?fresh&nointro&notut&hour=10'], ['peaceful', '/?fresh&nointro&notut&villagesaved=bamboo'], ['crewclear', '/?fresh&nointro&notut&villagesaved=bamboo'], ['lead', '/?fresh&nointro&notut&hour=10'], ['dens', '/?fresh&nointro&notut'], ['portal', '/?fresh&nointro&notut'], ['quest', '/?fresh&nointro&notut&qcard&hour=10']]) { // (every zone dungeon that has its gate: its kit, a dense floor, the arena)
   if (ONLY.length && !ONLY.includes(label)) continue; // (node tools/qa/prod-smoke.mjs tooltip home: just those cases)
   const page = await browser.newPage(label === 'touch' ? { viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true } : { viewport: label === 'deck' ? { width: 1280, height: 800 } : { width: 1600, height: 900 } }); // (deck: the Steam Deck's screen; touch: a phone in landscape)
   const errs = [];
@@ -372,6 +372,44 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
       return r;
     });
   }
+  if (label === 'quest') { // UX-2 in the bundle (world/questMoments.js, docs/QUESTS.md): a quest taken opens its storybook card (its CSS, the giver's 3D face), Enter presses "Let's go!" and Shadow sets off; the Mossy Burrow's floor 1 shows its place title (its style, in the area banner's place) with the sting
+    s.quest = await page.evaluate(async () => {
+      const G = window.G, sl = ms => new Promise(q => setTimeout(q, ms)), r = {}, Q = G.state.quests;
+      G.state.flags.burrowTut = true; G.state.flags.hints = { all: true }; Q.active = []; Q.done = ['welcome', 'burrow1', 'homes', 'lights']; Q.cards = [];
+      const stings = []; const rs = G.audio.sting.bind(G.audio); G.audio.sting = (n, o) => { stings.push(n); return rs(n, o); };
+      G.story.start('king');
+      for (let i = 0; i < 200 && !G.ui.isOpen('questCard'); i++) await sl(100);
+      await sl(900);
+      const P = document.querySelector('.p-qcard'), F = P?.querySelector('.qc-frame'), go = P?.querySelector('.qc-go');
+      r.card = G.ui.isOpen('questCard'); r.title = P?.querySelector('.qc-title')?.textContent; r.face = !!P?.querySelector('.qc-por img'); r.chips = P?.querySelectorAll('.qc-chip').length || 0;
+      r.css = F ? getComputedStyle(F).borderTopLeftRadius !== '0px' && getComputedStyle(P).width !== 'auto' : false; r.goH = go ? Math.round(go.getBoundingClientRect().height) : 0;
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      for (let i = 0; i < 40 && G.ui.isOpen('questCard'); i++) await sl(100);
+      r.closed = !G.ui.isOpen('questCard');
+      for (let i = 0; i < 60 && G.lead.intent?.t?.quest !== 'king'; i++) await sl(100);
+      r.lead = G.lead.intent?.t?.quest || null;
+      // the hand-in (docs/QUESTS.md §4): the King of Squish done, told to Rosie: her thanks, the stamp (its CSS), the next quest
+      G.lead.toggle?.(); Q.active = [{ id: 'king', step: 2, prog: 0, handIn: 1 }]; Q.cards = [];
+      const ro = G.npcs.find(n => n.id === 'rosie'); G.player.setPos(ro.pos.x + 1, ro.pos.z + 1); G.talkTo(ro);
+      for (let i = 0; i < 40 && !G.ui.dlg.active; i++) await sl(100);
+      r.thanks = (G.ui.dlg.lines || []).map(l => l.text).join(' ');
+      for (let i = 0; i < 40 && G.ui.dlg.active; i++) { G.ui.dlg.advance(); await sl(120); }
+      for (let i = 0; i < 60 && !document.querySelector('.banners .bn-stamp'); i++) await sl(100);
+      await sl(700);
+      const H = document.querySelector('.banners .bn-stamp .st-hanko');
+      r.stamp = !!H; r.stampCss = H ? getComputedStyle(H).position === 'absolute' && getComputedStyle(H.querySelector('circle')).strokeWidth !== '' : false; r.kingDone = Q.done.includes('king');
+      for (let i = 0; i < 80 && !G.ui.isOpen('questCard'); i++) await sl(100);
+      r.next = G.ui.isOpen('questCard') ? document.querySelector('.p-qcard .qc-title')?.textContent : null;
+      G.ui.close('questCard'); Q.active = [{ id: 'king', step: 0, prog: 0 }]; Q.done = Q.done.filter(x => x !== 'king'); Q.cards = [];
+      const den = G.state.dungeon.dens?.mossyBurrow; if (den) { den.bestFloor = 0; den.cleared = 0; den.crew = 0; } // (the hand-in cleared the den: its floor step would be done on arrival)
+      G.enterDungeon({ id: 'mossyBurrow', floor: 1 });
+      for (let i = 0; i < 300 && !(G.mode === 'dungeon' && !G.ui.iris.active && G.ui.banners.live?.style === 'place'); i++) await sl(100);
+      await sl(600);
+      const B = document.querySelector('.banners .bn-place');
+      r.place = G.questMoments.stats.lastTitle?.sub || null; r.placeCss = B ? getComputedStyle(B.querySelector('.bn-pk span')).borderTopStyle === 'solid' : false; r.area = !!document.querySelector('.banners .bn-area'); r.sting = stings.includes('place');
+      return r;
+    });
+  }
   if (label === 'lead') { // R-17 in the bundle (actors/shadowLead.js): a "Follow Shadow" reach step, he plans one route and leads it ahead of the hero, the paw trail's instanced mesh (its shader), the growl, the setting's default, the tracker's tap
     const E = (fn, a) => page.evaluate(fn, a), W = (fn, t = 6000) => page.waitForFunction(fn, null, { timeout: t }).then(() => true, () => false);
     await E(() => { const G = window.G, P = G.player, nav = P.nav, Q = G.state.quests; for (const sp of G.cozy?.scav?.view?.()?.spots || []) if (sp.state === 'hidden') sp.state = 'dug'; Q.active = [];
@@ -439,7 +477,8 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
   const m = s.moka, mokaOk = !m || ((!TOY_MOKA || s.model === 'moka_toy') && m.baked && m.staff && m.wt === 'staff' && m.cast && m.switch && m.after === 'chewy' && m.chewyBaked && m.mokaVillager);
   const dn = s.dens, densOk = !dn || (dn.open && dn.pins === 4 && dn.locked === 3 && dn.go && dn.painted && dn.den === 'mossyBurrow' && dn.floor === 1 && dn.kind === 'burrow' && dn.closed && dn.loc === 'Mossy Burrow' && dn.boss === 'mochiKing' && dn.big >= 15 && !dn.stairs);
   const tp = s.portal, portalOk = !tp || (tp.pressed && tp.casting && tp.gate && tp.mode === 'village' && tp.label === 'Step into the Town Portal (the Mossy Burrow, floor 1)' && tp.dead >= 3 && tp.back && tp.after === tp.alive && tp.used);
-  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && densOk && portalOk && ttOk && chgOk && debugOk && cozyOk && crewOk && guildOk && peaceOk && digOk && leadOk && fishOk && mokaOk && padOk && touchOk && deckOk && poeOk && stzOk && gldOk && regionOk && zoneOk && homeOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!CHEWY_MODEL || s.model === CHEWY_MODEL) && (!SAMURAI_CHEWY || s.saya) && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
+  const qm = s.quest, questOk = !qm || (qm.card && qm.title === 'The King of Squish' && qm.face && qm.chips === 4 && qm.css && qm.goH >= 40 && qm.closed && qm.lead === 'king' && /festival mochi/.test(qm.thanks || '') && qm.stamp && qm.stampCss && qm.kingDone && qm.next === 'A Shrine for Wishes' && qm.place === 'Floor 1 of 2 · Find the stairs down to floor 2' && qm.placeCss && !qm.area && qm.sting);
+  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && questOk && densOk && portalOk && ttOk && chgOk && debugOk && cozyOk && crewOk && guildOk && peaceOk && digOk && leadOk && fishOk && mokaOk && padOk && touchOk && deckOk && poeOk && stzOk && gldOk && regionOk && zoneOk && homeOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!CHEWY_MODEL || s.model === CHEWY_MODEL) && (!SAMURAI_CHEWY || s.saya) && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
   console.log(`${ok ? 'PASS' : 'FAIL'}  production ${label}: ${JSON.stringify(s)}${errs.length ? '\n   ' + [...new Set(errs)].slice(0, 8).join('\n   ') : ''}`);
   if (!ok) failed++;
   await page.close();

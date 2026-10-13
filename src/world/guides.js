@@ -531,9 +531,9 @@ const nose = {
       highlight: G => (expOpen(G) ? '.p-exp .ex-rep' : dev() === 'pad' && G.ui?.isOpen?.('menu') ? '.p-menu [data-a="crews"]' : '.hud .cz-chip.on'),
       done: (G, T) => !T.data.crew || !peekReport(G) || (peekReport(G).read && (!expOpen(G) || T.cur.t > 4)) },
     { id: 'wrap', ack: true,
-      // (on the crew path Rosie has the last word, the turn-in: COZY §11. Her line is said with her as the speaker, once the
-      //  board is closed: a phone hides the speech card while a panel is up)
-      onEnter: (G, T) => { if (T.data.crew && peekReport(G)?.result === 'success') T.say(`${crewKey(G)?.name || 'Your friend'} brought my Mochi Jelly home, and the squeaks are all sorted! Thank you, ${me(G)}, and thank you, Shadow. Both ways help!`, 'rosie'); },
+      // (on the crew path the quest waits for its hand-in to Rosie, who has the last word there: docs/QUESTS.md §4, COZY
+      //  §11. Shadow says so once the board is closed: a phone hides the speech card while a panel is up)
+      onEnter: (G, T) => { if (T.data.crew && peekReport(G)?.result === 'success') T.say(`${crewKey(G)?.name || 'Your friend'} brought the Mochi Jelly home, and the squeaks are all sorted! Rosie wants to hear all about it: let's go and tell her. Both ways help!`); },
       say: (G, T) => (T.data.crew && peekReport(G)?.result === 'success' ? '' : "Gather spots, dig spots, errands from the board: that's everything a home needs. And if you ever want a scrap, the Burrow is always squeaky. Woof!"),
       objective: 'Gather, dig, send crews: build without a fight' },
   ],

@@ -1,7 +1,8 @@
 // Scenario 3: the Burrow's four bosses, one at the end of each den's floor 2 (ROADMAP Z-H1: the Mossy Burrow, the Fox
 // Shrine, Oni's Kitchen, the Moonlit Sanctum). Aggro the boss (intro), push it through its summon phases, kill it, then
 // verify: boss:dead fires once, onBossDefeated -> a return portal appears where it fell (the den ends there: no stairs),
-// boss bar hidden, time scale restored, the boss quest completes (reward unique), and the next den opens (after the
+// boss bar hidden, time scale restored, the boss quest's objectives done and its hand-in waiting (docs/QUESTS.md §4), then
+// handed in it completes (reward unique), and the next den opens (after the
 // Moonlit Sanctum: the Deep Burrow's Spirit Lantern).
 import { launch, boot, waitMode, sleep, makeReport, drainDialogue } from './lib.mjs';
 
@@ -50,7 +51,7 @@ try {
     await drainDialogue(page);
     const after = await page.evaluate(next => {
       const G = window.G, L = G.burrow.list();
-      return { dead: (window.QA.counts['boss:dead'] || 0), boss: !!G.dungeon.boss, bar: !!G.ui.hud.boss, ts: G.engine.timeScale, inter: G.world.interactables.map(i => i.label), done: [...G.state.quests.done], active: G.state.quests.active.map(q => q.id), uniques: G.state.inventory.filter(x => x && x.rarity === 'unique').length, log: window.QA.log.filter(l => l[1] === 'boss:dead').slice(-1),
+      return { dead: (window.QA.counts['boss:dead'] || 0), boss: !!G.dungeon.boss, bar: !!G.ui.hud.boss, ts: G.engine.timeScale, inter: G.world.interactables.map(i => i.label), done: [...G.state.quests.done], active: G.state.quests.active.map(q => q.id), handIn: G.state.quests.active.map(q => q.handIn ? q.id : null).filter(Boolean), ptr: G.questTarget()?.label || null, step: G.story.uiList().find(x => x.handIn)?.steps.at(-1)?.text || null, uniques: G.state.inventory.filter(x => x && x.rarity === 'unique').length, log: window.QA.log.filter(l => l[1] === 'boss:dead').slice(-1),
         nextOpen: next ? L.find(d => d.id === next).open : null, deep: G.state.dungeon.deep?.tier?.unlocked || 0, cleared: L.find(d => d.id === G.dungeon.def.id).cleared };
     }, next);
     R.check(`${f}: boss:dead fired exactly once`, after.dead === dead0 + 1, `${dead0} -> ${after.dead} ${JSON.stringify(after.log)}`);
@@ -59,7 +60,10 @@ try {
     const newStairs = after.inter.filter(l => /deeper/.test(l)).length - inter0.filter(l => /deeper/.test(l)).length;
     const newPortal = after.inter.filter(l => l === 'Return to Blossom Hollow').length - inter0.filter(l => l === 'Return to Blossom Hollow').length;
     R.check(`${f}: a return portal appears where the boss fell, and no stairs (the den ends with its boss)`, newStairs === 0 && newPortal === 1, `stairs +${newStairs}, portal +${newPortal}`);
-    R.check(`${f}: boss quest "${q}" completed`, after.done.includes(q), `done=${after.done.join(',')} active=${after.active.join(',')}`);
+    // (docs/QUESTS.md §4: a quest's objectives done, it waits for its hand-in to the giver; s46 plays the scene itself)
+    R.check(`${f}: boss quest "${q}": its objectives done, it waits for its hand-in ("${after.step}"), the pointer on the way out`, after.handIn.includes(q) && !after.done.includes(q) && /^(Bring|Tell)/.test(after.step || '') && after.ptr === 'The way out', JSON.stringify({ handIn: after.handIn, done: after.done, step: after.step, ptr: after.ptr }));
+    const hd = await page.evaluate(q => { const G = window.G, ok = G.story.handIn(q); return { ok, done: G.state.quests.done.includes(q), active: G.state.quests.active.map(x => x.id) }; }, q);
+    R.check(`${f}: handed in, boss quest "${q}" completed`, hd.ok && hd.done, JSON.stringify(hd));
     R.check(next ? `${f}: the den is cleared and ${next} opens` : `${f}: the den is cleared and the Deep Burrow's Spirit Lantern wakes (T1)`, after.cleared >= 1 && (next ? after.nextOpen === true : after.deep >= 1), JSON.stringify({ cleared: after.cleared, nextOpen: after.nextOpen, deep: after.deep }));
   }
   // the boss portal spawns on a 1.5 s timer: leave right after the kill -> does it touch the new world?

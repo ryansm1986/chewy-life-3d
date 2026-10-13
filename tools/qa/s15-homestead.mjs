@@ -244,8 +244,15 @@ try {
   const hc = await G(() => window.G.state.fishLog.crucian?.n || 0);
   R.check('R-12: a bot with a human\'s 0.26 s reaction lands a crucian carp on the real F key (Normal, the Bamboo Rod, no safety floor); the how-to still shows on the third reel', hb === 'catch' && hc === 1 && !howN.sure && howN.reels === 3 && howN.howto, JSON.stringify({ hb, hc, howN }));
   await quick('loach');
-  const q3 = await G(() => { const G = window.G; return { done: G.story.Q.done.includes('keroRod'), species: Object.keys(G.state.fishLog).length, howto: document.querySelector('.rl-card').classList.contains('howto'), reels: G.state.fishing.reels }; });
-  R.check("three catches finish Kero's quest; from the fourth reel the card drops the how-to", q3.done && q3.species === 3 && !q3.howto && q3.reels >= 4, JSON.stringify(q3));
+  const q3 = await G(() => { const G = window.G; return { handIn: !!G.story.Q.active.find(q => q.id === 'keroRod')?.handIn, step: G.story.uiList().find(x => x.id === 'keroRod')?.steps.at(-1)?.text, species: Object.keys(G.state.fishLog).length, howto: document.querySelector('.rl-card').classList.contains('howto'), reels: G.state.fishing.reels }; });
+  // (docs/QUESTS.md §4: "Catch three and come tell me": the quest waits for its hand-in, then talking to Kero finishes it)
+  await G(() => { const G = window.G, k = G.npcs.find(n => n.id === 'kero'); G.player.setPos(k.pos.x + 1.2, k.pos.z); G.story.talk(k); });
+  // (his happy hop first, then his thanks: the dialogue opens a beat after the talk, world/questMoments.js handInScene)
+  await page.waitForFunction(() => window.G.ui.dlg.active || window.G.story.Q.done.includes('keroRod'), null, { timeout: 8000 }).catch(() => {});
+  await drainDialogue(page);
+  await page.waitForFunction(() => window.G.story.Q.done.includes('keroRod') && !window.G.ui.dlg.active, null, { timeout: 8000 }).catch(() => {});
+  q3.done = await G(() => window.G.story.Q.done.includes('keroRod'));
+  R.check("three catches: Kero's quest waits for its hand-in (\"Show Kero your catch\"), and telling Kero finishes it; from the fourth reel the card drops the how-to", q3.handIn && /Show Kero/.test(q3.step || '') && q3.done && q3.species === 3 && !q3.howto && q3.reels >= 4, JSON.stringify(q3));
 
   // ---------------------------------------------------------------- R-12) the balance, Settings › Fishing
   const sim = { r1: await simRates(page, { rod: 1, N: 150 }), r2: await simRates(page, { rod: 2, N: 150 }), x1: await simRates(page, { rod: 1, relaxed: true, N: 150 }) };
@@ -335,9 +342,12 @@ try {
     for (const i of free) { const r = g.rec(i); if (r?.crop) { r.stage = 9; g.draw(i); g.harvest(i); await w(); } }
     return free.length;
   });
+  const fsH = await G(() => !!window.G.story.Q.active.find(q => q.id === 'firstSprouts')?.handIn); // (docs/QUESTS.md §4: shown to Usagi)
+  await G(() => { const G = window.G, u = G.npcs.find(n => n.id === 'usagi'); G.player.setPos(u.pos.x + 1.2, u.pos.z); G.story.talk(u); });
+  await sleep(page, 500); await drainDialogue(page);
   await sleep(page, 3500);
   const fs2 = await G(() => { const G = window.G, Q = G.story.Q; return { done: Q.done.includes('firstSprouts'), carrotSoup: !!G.state.cookbook?.known && 'carrotSoup' in G.state.cookbook.known, taste: Q.active.find(q => q.id === 'tasteTest')?.step ?? null, toast: window.QA.toasts.some(t => /New recipe: Carrot Soup/.test(t)) }; });
-  R.check('Usagi\'s "First Sprouts" came with the starter seeds; planting and harvesting finish it: the Carrot Soup recipe, then Rosie\'s "Taste Test"', sprouts === 3 && !!(fs1.active || fs1.done) && fs2.done && fs2.carrotSoup && fs2.taste === 0 && fs2.toast, JSON.stringify({ sprouts, fs1, fs2 }));
+  R.check('Usagi\'s "First Sprouts" came with the starter seeds; planting and harvesting do it, showing Usagi the harvest finishes it: the Carrot Soup recipe, then Rosie\'s "Taste Test"', sprouts === 3 && !!(fs1.active || fs1.done) && (fsH || fs1.done) && fs2.done && fs2.carrotSoup && fs2.taste === 0 && fs2.toast, JSON.stringify({ sprouts, fs1, fs2 }));
   await G(() => { const G = window.G, A = G.actions; for (const [id, n] of Object.entries({ crucian: 3, loach: 2, salmon: 1, rice: 3, carrot: 3, turnip: 2, daikon: 1, strawberry: 2, honey: 1 })) A.addPantry(id, n, { silent: true }); A.addMaterial('mochi', 1); G.player.setPos(95.5, 126.2); });
   // the cottage's kitchen is the stove inside the house now (docs/HOUSING.md §1): in through the door, F at the stove
   await G(() => { window.G.openHome(); });
@@ -368,6 +378,9 @@ try {
   await G(() => { window.G.housing.exit(); }); await waitMode(page, 'village'); // (back out to the village for Rosie)
   const taste = await G(() => window.G.story.Q.active.find(q => q.id === 'tasteTest'));
   await G(() => { const G = window.G, n = G.npcs.find(x => x.id === 'rosie'); G.player.setPos(n.pos.x + 1.2, n.pos.z); G.story.talk(n); });
+  await sleep(page, 500); await drainDialogue(page); await sleep(page, 600); // (the hand-in: her taste, her thanks, the recipe; docs/QUESTS.md §4)
+  const tasted = await G(() => window.G.story.Q.done.includes('tasteTest'));
+  await G(() => { const G = window.G, n = G.npcs.find(x => x.id === 'rosie'); G.story.talk(n); }); // (then her menu, the next time you talk)
   await sleep(page, 500);
   const rosieCh = [];
   for (let i = 0; i < 40; i++) { // (answer by text: Rosie's menu grows with the day's options)
@@ -379,7 +392,7 @@ try {
   }
   await sleep(page, 2600);
   const oven = await G(() => { const G = window.G, p = G.ui.panels.cook; return { open: G.ui.isOpen('cook'), station: p.station, can: [...document.querySelectorAll('.ck-row.known:not(.away)')].map(r => r.dataset.id), mochi: 'strawberryMochi' in G.state.cookbook.known, done: G.story.Q.done.includes('tasteTest') }; });
-  R.check('Taste Test: three dishes cooked, then Rosie tastes them (the Strawberry Mochi recipe); "Bake with Rosie" opens her oven, where only baked goods cook (and Pound Mochi: COZY §7.2)', taste?.step === 1 && oven.done && oven.mochi && rosieCh.includes('Bake with Rosie 🧁') && oven.open && oven.station === 'oven' && oven.can.length >= 1 && oven.can.every(id => ['strawberryMochi', 'honeyCake', 'melonBread', 'poundMochi'].includes(id)), JSON.stringify({ taste, rosieCh, oven }));
+  R.check('Taste Test: three dishes cooked, then Rosie tastes them (the hand-in: the Strawberry Mochi recipe); "Bake with Rosie" opens her oven, where only baked goods cook (and Pound Mochi: COZY §7.2)', taste?.step === 1 && tasted && oven.done && oven.mochi && rosieCh.includes('Bake with Rosie 🧁') && oven.open && oven.station === 'oven' && oven.can.length >= 1 && oven.can.every(id => ['strawberryMochi', 'honeyCake', 'melonBread', 'poundMochi'].includes(id)), JSON.stringify({ taste, tasted, rosieCh, oven }));
   await G(() => window.G.ui.closeAll()); await sleep(page, 300);
 
   // ---------------------------------------------------------------- m) eating and Well Fed

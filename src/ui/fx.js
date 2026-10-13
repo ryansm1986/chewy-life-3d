@@ -14,6 +14,8 @@ const RARITY_COL = { magic: '#6ea8ff', rare: '#ffd84a', unique: '#ff9a3c', set: 
 // screen rect a live top-band banner (boss Victory!) keeps for itself: loot labels that would stack into it wait
 let reservedRect = null;
 const PALETTE = ['#ff8fb0', '#ffcf4a', '#8fe0c0', '#8fd0ff', '#c3b3ff', '#fff6e8', '#ffbcd6'];
+// the place title's ribbon tails (a swallowtail in the ribbon's gold, inked; the right one mirrored in CSS): ui/quest.css
+const PK_TAIL = '<svg class="bn-pk-t" viewBox="0 0 26 28" aria-hidden="true"><path d="M25 3.5H3l7 10.5-7 10.5h22z" fill="#f5c04e" stroke="#4a2c2a" stroke-width="3" stroke-linejoin="round"/></svg>';
 
 // ------------------------------------------------------------------ floating text
 const KIND = {
@@ -323,9 +325,11 @@ export class Banners {
     if (style === 'levelup' && this.foldLevel(sub, opts)) return;
     // area banners replace each other; others queue
     if (style === 'area') this.q = this.q.filter(b => b.style !== 'area');
+    // a boss's card never waits behind a quest's place title (ROADMAP UX-2): the title steps aside at once
+    if (style === 'boss' || style === 'victory') this.drop('place');
     const key = style + '|' + title + '|' + sub;
     if (this.q.some(b => b.key === key) || (this.busy && this.cur === key)) return;
-    const item = { key, title, sub, style, dur: opts.duration, jp: opts.jp, xp: opts.xp, lvl: opts.lvl, top: opts.top };
+    const item = { key, title, sub, style, dur: opts.duration, jp: opts.jp, xp: opts.xp, lvl: opts.lvl, top: opts.top, kicker: opts.kicker, onShow: opts.onShow, chips: opts.chips };
     if (style === 'victory') {
       // Victory owns the moment: it jumps the queue; a level-up banner that popped up a beat earlier, or a boss intro
       // banner still up after a very quick kill, yields to it
@@ -342,7 +346,7 @@ export class Banners {
   }
   foldLevel(sub, opts) {
     const lvl = opts.lvl || +((/(\d+)/.exec(sub || '') || [])[1]) || 0;
-    const v = this.live?.style === 'victory' ? this.live : this.q.find(b => b.style === 'victory');
+    const v = this.live?.style === 'victory' || this.live?.style === 'stamp' ? this.live : this.q.find(b => b.style === 'victory' || b.style === 'stamp'); // (a quest's stamp too: the XP it pays, a chip on its card: ROADMAP UX-2)
     if (!v) return false;
     v.lvl = Math.max(v.lvl || 0, lvl);
     if (v.node) this.levelChip(v.node, v.lvl);
@@ -362,7 +366,7 @@ export class Banners {
     if (!b) { this.busy = false; this.cur = null; return; }
     this.busy = true; this.cur = b.key;
     if (this.root.children.length > 2) for (const c of [...this.root.children].slice(0, -1)) c.remove();
-    let dur = b.dur || { levelup: 2.8, area: 3.2, boss: 2.0, quest: 2.8, victory: 3.6, default: 2.4 }[b.style] || 2.4;
+    let dur = b.dur || { levelup: 2.8, area: 3.2, boss: 2.0, quest: 2.8, victory: 3.6, place: 2.6, stamp: 3.0, default: 2.4 }[b.style] || 2.4;
     if (this.q.length && b.style !== 'victory') dur *= 0.7;
     this.root.dataset.style = b.style; // boss / victory banners sit in the top band, clear of the arena
     this.root.style.top = b.top || ''; // …unless the caller places it (the boss card picks the band the boss isn't in)
@@ -386,10 +390,19 @@ export class Banners {
       n.innerHTML = `<div class="bn-vig"></div><div class="bn-streak"></div><div class="bn-warn">${glyph('oni')}<span>BOSS</span>${glyph('oni')}</div><div class="bn-title">${L}</div>${b.sub ? `<div class="bn-sub">${esc(b.sub)}</div>` : ''}`;
     } else if (b.style === 'quest') {
       n.innerHTML = `<div class="bn-rays gold"></div><div class="bn-scroll">${glyph('scroll')}</div><div class="bn-title">${L}</div>${b.sub ? `<div class="bn-sub">${esc(b.sub)}</div>` : ''}<div class="bn-conf">${confettiHTML(24)}</div>`;
+    } else if (b.style === 'place') { // a quest's place title (ROADMAP UX-2, ui/quest.css): the quest on a ribbon, the place, the step
+      n.innerHTML = `${b.kicker ? `<div class="bn-pk">${PK_TAIL}<span>${glyph('scroll')}${esc(b.kicker)}</span>${PK_TAIL.replace('bn-pk-t', 'bn-pk-t r')}</div>` : ''}${b.jp ? `<div class="bn-jp">${esc(b.jp)}</div>` : ''}<div class="bn-title">${L}</div>
+        <svg class="bn-brush" viewBox="0 0 400 30" preserveAspectRatio="none"><path d="M14 17 C90 9 170 21 236 14 S344 11 386 16" pathLength="1"/><path class="thin" d="M60 23 C140 19 230 25 322 20" pathLength="1"/></svg>
+        ${b.sub ? `<div class="bn-sub">${esc(b.sub)}</div>` : ''}`;
+    } else if (b.style === 'stamp') { // a quest handed in (ROADMAP UX-2, ui/quest.css): its storybook card and the red "done" stamp
+      n.innerHTML = `<div class="st-card"><div class="st-k">${glyph('scroll')}<span>Quest complete</span></div><div class="st-t">${esc(b.title)}</div>${b.sub ? `<div class="st-s">${glyph('heart')}<span>${esc(b.sub)}</span></div>` : ''}${b.chips ? `<div class="st-chips">${b.chips}</div>` : ''}<div class="bn-chips st-lvl"></div>
+        <div class="st-hanko" aria-hidden="true"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44"/><circle class="in" cx="50" cy="50" r="36"/></svg><b>完了</b><i>DONE!</i></div></div>`;
+      if (b.lvl) this.levelChip(n, b.lvl); // (a level-up its XP brought: a chip on the card)
     } else {
       n.innerHTML = `<div class="bn-title">${L}</div>${b.sub ? `<div class="bn-sub">${esc(b.sub)}</div>` : ''}`;
     }
     this.root.appendChild(n);
+    try { b.onShow?.(); } catch (e) { console.warn('[banners] onShow', e); } // (the place title's sting: when it shows, not when queued)
     if (b.style === 'victory') { // measured once the letters have landed; released when it leaves
       const core = n.querySelector('.bn-vcore'), chips = n.querySelector('.bn-chips');
       setTimeout(() => { if (!n.isConnected || n.classList.contains('out')) return; const a = core.getBoundingClientRect(), c = chips.getBoundingClientRect(); reservedRect = { left: Math.min(a.left, c.left) - 70, right: Math.max(a.right, c.right) + 70, top: a.top - 30, bottom: Math.max(a.bottom, c.bottom) + 8, n }; }, 120);
@@ -405,6 +418,13 @@ export class Banners {
     await wait(b.style === 'boss' ? 420 : b.style === 'victory' ? 560 : 650);
     n.remove();
     this.next();
+  }
+  /** Banners of `style` gone at once: the queued ones dropped, the live one removed without its exit (the place title
+   *  taking an arrival's area banner's place behind the iris; a boss card pre-empting a place title) */
+  drop(style) {
+    this.q = this.q.filter(b => b.style !== style);
+    const L = this.live;
+    if (L?.style === style && !L.instant) { L.instant = true; clearTimeout(L.timer); L.done(); }
   }
   /** Retire banners of `style`: queued ones are dropped, the live one leaves once it has been up `minShown` seconds. */
   dismiss(style, minShown = 0.9) {

@@ -1264,5 +1264,22 @@ export const STINGS = {
       for (let i = 0; i < 6; i++) p.hit('glock', 'bell', T(18) + i * 0.16 + p.rng() * 0.05, 0.28 - i * 0.03, pickR(p.rng, [96, 98, 100, 103]));
     },
   },
+  // A quest's place title (ROADMAP UX-2, world/questMoments.js): a storybook's page turning. A harp run up, two koto
+  // notes, a short flute phrase over a soft pad, a rin to end on. F major, gentle: no brass, no drums.
+  place: {
+    bpm: 96, key: 65, len: 2.8, gain: 0.6,
+    mix: {
+      flute: { vol: 0.7, rev: 0.55, echo: 0.12, pan: 0.05 }, koto: { vol: 0.6, rev: 0.45, pan: -0.2 }, harp: { vol: 0.5, rev: 0.6, pan: 0.25 },
+      bell: { vol: 0.4, rev: 0.75, pan: -0.15 }, pad: { vol: 0.4, rev: 0.65 },
+    },
+    play(p, t) {
+      const k = p.key, S = p.s16, T = i => t + i * S;
+      [0, 2, 4, 7, 9, 12, 14, 16].forEach((x, i) => p.note('harp', 'harp', t + i * 0.045, k + x, 0.42 - i * 0.02, 1.1));
+      p.note('koto', 'koto', T(2), k + 7, 0.55, 1); p.note('koto', 'koto', T(3), k + 12, 0.6, 1.2);
+      for (const [at, m, len] of [[4, 72, 2], [6, 77, 2], [8, 81, 10]]) p.note('flute', 'flute', T(at), m, 0.75, len * S * 0.95);
+      p.padChord({ root: 0, iv: [0, 4, 7, 11] }, T(4), 12 * S, 0.5, 53);
+      p.hit('rin', 'bell', T(8), 0.45, 93);
+    },
+  },
 };
 export const STING_NAMES = Object.keys(STINGS);
