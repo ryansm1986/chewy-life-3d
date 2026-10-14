@@ -1,11 +1,12 @@
 // Scenario 29: Foosy the dragoon, the fifth hero (docs/GOLDEN.md).
-//  a) his joining scene at the Onsen: he stands guard by the big hot spring, very straight, the lance upright; walk up and
-//     he turns, salutes and begins his vow; a tennis ball bounces out of the bathhouse, the lance drops and he fetches it,
+//  a) his arrival in Blossom Hollow (since ROADMAP Z-H3; docs/GOLDEN.md §5): the Onsen open and Kaizo's visit behind us,
+//     he marches in and stands guard by the plaza's fountain, very straight, the lance upright; walk up and he turns,
+//     salutes and begins his vow; a tennis ball comes bouncing in from Rosie's Treats, the lance drops and he fetches it,
 //     sits with it and finishes the vow; the talk; the gift: Shadow in the whelp outfit (while Foosy isn't the one played),
-//     a wobbly first flap, a squeak of a roar, a loop; he joins, bows and trots off; the outfit comes off; back in town he
-//     lives at home, four heroes on the bench
-//  b) leaving mid-scene resets it (no actor, no ball, no lance on the ground, Shadow undressed) and it starts again on the
-//     next visit; an old save (Floofy joined, him not) gets Shadow's rumour in town, once
+//     a wobbly first flap, a squeak of a roar, a loop; he joins, bows and trots off; the outfit comes off; he lives at home
+//     at once, four heroes on the bench; his quest starts
+//  b) leaving town mid-scene resets it (no actor, no ball, no lance on the ground, Shadow undressed) and his arrival comes
+//     again back in town; an old save (Floofy joined, him not, the Onsen shut) gets Shadow's rumour in town, once
 //  c) the "Meet <name>" guide (?tut): hold Tab → the wheel with five, his card, a pick by key; the lance, the javelin,
 //     Shadow the whelp taking off (keyed on his flight state), the trees; done
 //  d) playing him: every active skill tapped in a Burrow fight lands its hits with no errors (Shadow breathes, swoops,
@@ -16,7 +17,7 @@ import { launch, boot, waitMode, sleep, makeReport, drainDialogue } from './lib.
 import fs from 'node:fs';
 import { CLASSES } from '../../src/rpg/classes.js';
 
-const R = makeReport('S29 Foosy: joining at the Onsen, the rumour, the Meet guide, every skill, a real charge, perf');
+const R = makeReport('S29 Foosy: his arrival by the fountain, the rumour, the Meet guide, every skill, a real charge, perf');
 const { browser, page, errors, warns } = await launch({ w: 1280, h: 720 });
 const ev = (f, a) => page.evaluate(f, a);
 const SHOTS = !!process.env.SHOTS, OUT = 'tools/qa/tmp/s29', PART = process.env.PART || 'abcde';
@@ -24,14 +25,13 @@ if (SHOTS) fs.mkdirSync(OUT, { recursive: true });
 const shot = async name => { if (SHOTS) await page.screenshot({ path: `${OUT}/${name}.png` }); };
 const quiet = () => ev(() => { const G = window.G; G.sim.tickT = -1e9; clearInterval(window.__freeze); window.__freeze = setInterval(() => { G.sim.tickT = -1e9; }, 200); G.state.flags.hints = { ...(G.state.flags.hints || {}), garden: 1, build: 1, travel: 1, skills: 1, stats: 1, loot: 1, potion: 1, fight: 1 }; });
 const stzIn = () => ev(() => { const G = window.G; for (const id of ['moka', 'poe', 'shihtzu']) { G.state.flags[`${id}Joined`] = true; const v = G.heroes.villagers[id]; if (v) { v.frozen = false; v.waitingToJoin = false; } } });
-const toOnsen = async () => {
-  await ev(() => { const G = window.G; G.state.player.lvl = 20; G.actions.recompute(); G.state.flags.burrowTut = true; G.enterRegion('onsen'); });
-  await waitMode(page, 'dungeon'); await sleep(page, 600);
-  await ev(() => { for (const m of window.G.dungeon.monsters) { m.pos.set(-500, 0, -500); m.aggro = false; } }); // (a quiet spa)
-};
+/** the Onsen open (level 26), the arrivals before his behind us (Poe's, Floofy's, Captain Kaizo's visit; their quests
+ *  done): Foosy's arrival is due (actors/arrivals.js) */
+const opened = () => ev(() => { const G = window.G, F = G.state.flags, A = (F.arrivals ||= {}); for (const z of ['bamboo', 'maple', 'tidepool']) A[z] = { how: 'scene', quest: 'start', day: 1 }; G.state.quests.done.push('hq_takemori', 'hq_akane', 'hq_shiokaze'); G.state.quests.active = G.state.quests.active.filter(q => q.id !== 'welcome'); G.state.quests.cards = []; G.state.player.lvl = 26; G.actions.recompute(); G.heroes.spawnBench?.(); if (G.day) G.day.paused = true; });
+const FOUNTAIN = () => ev(() => ({ x: window.G.world.landmarks.fountain.x, z: window.G.world.landmarks.fountain.z }));
 const J = () => ev(() => {
-  const G = window.G, S = G.heroes.gldJoin, P = G.player, k = S.knight, sh = G.companion;
-  return { state: S.state, vis: !!k?.visible, act: k?.anim.action?.name || null, d: k ? Math.round(Math.hypot(k.pos.x - P.pos.x, k.pos.z - P.pos.z) * 10) / 10 : -1, spring: k ? Math.round(Math.hypot(k.pos.x - 55.5, k.pos.z - 64.5) * 10) / 10 : -1,
+  const G = window.G, S = G.heroes.gldJoin, P = G.player, k = S.knight, sh = G.companion, F = G.world.landmarks?.fountain; // (none in a zone)
+  return { state: S.state, vis: !!k?.visible, act: k?.anim.action?.name || null, d: k ? Math.round(Math.hypot(k.pos.x - P.pos.x, k.pos.z - P.pos.z) * 10) / 10 : -1, fountain: k && F ? Math.round(Math.hypot(k.pos.x - F.x, k.pos.z - F.z) * 10) / 10 : -1, paved: S.spot && G.world.terrain?.tile ? [1, 2].includes(G.world.terrain.tile(S.spot.x, S.spot.z)) : null,
     knight: !!k, ball: !!S.ball, held: !!S.ballState?.held, groundLance: !!S.groundLance, lanceUp: !!k && !k.lanceThrown && !!k.lance, whelp: !!sh?.whelp?.on, forced: sh?.whelp?.forced ?? null, lift: +(sh?.whelp?.lift || 0).toFixed(2), joined: !!G.state.flags.goldenJoined, hero: G.state.activeHero };
 });
 /** where the beat's actors sit on screen (0..1 across, 0..1 down; heads at +1.2 m): him, you, Shadow, the ball */
@@ -58,15 +58,16 @@ const approach = () => ev(() => { const S = window.G.heroes.gldJoin, P = window.
 try {
   const name = CLASSES.golden.name;
   if (PART.includes('a')) { // ================================================================ a) the joining scene
-    await boot(page, 'fresh&nointro&notut'); await quiet(); await stzIn();
+    await boot(page, 'fresh&nointro&notut&arrive&qcard&hour=11'); await quiet(); await stzIn();
     await ev(() => { window.__scene = []; window.G.events.on('golden:joinScene', p => window.__scene.push(p.phase)); });
-    await toOnsen();
+    await opened();
+    await page.waitForFunction(() => ['march', 'guard'].includes(window.G.heroes.gldJoin.state), null, { timeout: 30000 }).catch(() => {});
     const a0 = await J();
     await page.waitForFunction(() => window.G.heroes.gldJoin.state === 'guard', null, { timeout: 20000 }).catch(() => {});
     const a1 = { ...await J(), staged: await ev(() => { const st = window.G.heroes.gldJoin.stg; return st ? { clear: st.clear, ball: !!st.ball } : null; }) };
-    await ev(() => { const S = window.G.heroes.gldJoin, P = window.G.player, k = S.knight; const W = window.G.world, ok = (x, z) => W.walkable(x, z) && !W.collision?.solidAt?.(x, z, 0.3) && (W.waterAt?.(x, z) || 0) < 0.05 && [[55.5, 64.5, 2.5], [59.5, 60.2, 1.5], [52.2, 67.6, 1.3]].every(([sx, sz, r]) => Math.hypot(x - sx, z - sz) > r + 3) && !S.screened(x, z); /* (on his way in: 6-7 m off, in the open, out of the steam) */ outer: for (const r of [6.5, 7.5, 5.8]) for (let i = 0; i < 16; i++) { const a = k.facing + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 0.35, x = k.pos.x + Math.sin(a) * r, z = k.pos.z + Math.cos(a) * r; if (ok(x, z)) { P.setPos(x, z); P.faceTo(k.pos.x, k.pos.z); break outer; } } S.dropOcc(); /* (on his way in, past your mark: the staging's line) */ window.G.introFocus = P.pos.clone().lerp(k.pos, 0.5); const R2 = window.G.engine.rig; R2.focus.copy(window.G.introFocus); R2.snap(); });
-    await sleep(page, 900); await shot('1-guard'); await ev(() => { window.G.introFocus = null; });
-    R.check('at the Onsen he stands guard by the big hot spring, at attention, the lance upright in his paw (hidden until then); the scene staged in plain view of the camera (his post, your mark, the spots for Shadow and the ball)', a0.state === 'wait' && a1.state === 'guard' && a1.vis && a1.act === 'gldAttention' && a1.spring < 5 && a1.lanceUp && a1.staged?.clear && a1.staged.ball, JSON.stringify({ a0, a1 }));
+    await ev(() => { const G = window.G, S = G.heroes.gldJoin, P = G.player, k = S.knight, W = G.world, cam = G.engine.camera, rig = G.engine.rig, v = new G.THREE.Vector3(); /* (on his way in: 6-7 m off on the plaza, him on screen) */ outer: for (const r of [6.5, 7.5, 5.8]) for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2, x = k.pos.x + Math.sin(a) * r, z = k.pos.z + Math.cos(a) * r; if (W.walkable(x, z) === false || W.collision?.solidAt?.(x, z, 0.35)) continue; P.setPos(x, z); rig.focus?.copy?.(P.pos); rig.snap?.(); cam.updateMatrixWorld(); v.set(k.pos.x, k.pos.y + 0.8, k.pos.z).project(cam); if (Math.abs(v.x) < 0.75 && v.y > -0.5 && v.y < 0.7 && !(S.view?.occ && S.view.screened(k.pos.x, k.pos.z, [0.4, 0.9], 0.2, cam.position))) { P.faceTo(k.pos.x, k.pos.z); break outer; } } });
+    await sleep(page, 1500); await shot('1-guard');
+    R.check('in Blossom Hollow (the Onsen open, Kaizo\'s visit behind us) he marches in and stands guard by the fountain, on the paving, at attention, the lance upright in his paw; the scene staged in plain view of the camera (his post, your mark, the spots for Shadow and the ball)', ['march', 'guard'].includes(a0.state) && a1.state === 'guard' && a1.vis && a1.act === 'gldAttention' && a1.fountain < 6 && a1.paved && a1.lanceUp && a1.staged?.clear && a1.staged.ball, JSON.stringify({ a0, a1 }));
     await approach();
     await page.waitForFunction(() => window.G.ui.dlg?.active, null, { timeout: 12000 }).catch(() => {});
     const a2 = await ev(() => ({ speaker: window.G.ui.dlg?.opts?.speaker, text: (window.G.ui.dlg?.lines || []).map(l => l.text || l).join(' '), locked: window.G.player.controlLocked, act: window.G.heroes.gldJoin.knight?.anim.action?.name, scene: window.__scene.slice() }));
@@ -79,7 +80,7 @@ try {
     await page.waitForFunction(() => window.G.heroes.gldJoin.ballState?.held, null, { timeout: 8000 }).catch(() => {});
     await sleep(page, 200); const f4 = await onScreen(); await shot('4-fetch');
     const a4 = await J();
-    R.check('a tennis ball bounces out of the bathhouse: the lance drops (on the ground, not in his paw) and he fetches the ball in his mouth (him, you and the ball in frame)', a3.ball && a3.groundLance && !a3.lanceUp && a4.held && framed(f4), JSON.stringify({ a3, a4, f4 }));
+    R.check('a tennis ball comes bouncing in from Rosie\'s Treats: the lance drops (on the ground, not in his paw) and he fetches the ball in his mouth (him, you and the ball in frame)', a3.ball && a3.groundLance && !a3.lanceUp && a4.held && framed(f4), JSON.stringify({ a3, a4, f4 }));
     await page.waitForFunction(() => window.G.ui.dlg?.active, null, { timeout: 10000 }).catch(() => {});
     const a5 = await ev(() => ({ text: (window.G.ui.dlg?.lines || []).map(l => l.text || l).join(' '), act: window.G.heroes.gldJoin.knight?.anim.action?.name }));
     await shot('5-sit');
@@ -93,23 +94,26 @@ try {
     await sleep(page, 1500); await shot('7-joined');
     const a6 = await ev(() => { const G = window.G, S = G.heroes.gldJoin; return { joined: !!G.state.flags.goldenJoined, lvl: G.state.heroes.golden.player.lvl, locked: G.player.controlLocked, knight: !!S.knight, state: S.state, scene: window.__scene.slice(), whelp: G.companion.whelp.on, forced: G.companion.whelp.forced, roster: G.heroes.roster().map(h => h.id + (h.joined ? '+' : '-')).join(' ') }; });
     R.check('he joins (near the pack\'s level), bows and trots off; controls back; Shadow\'s outfit comes off (kept for when Foosy is played)', a6.joined && a6.lvl >= 5 && !a6.locked && !a6.knight && ['done', 'off'].includes(a6.state) && a6.scene.includes('leave') && !a6.whelp && a6.forced == null && /golden\+/.test(a6.roster) && picked.length >= 2, JSON.stringify({ a6, picked }));
-    await ev(() => window.G.returnToVillage()); await waitMode(page, 'village'); await sleep(page, 1200);
+    await page.keyboard.press('Escape'); await sleep(page, 400); // (his quest's card)
     const a7 = await ev(() => { const G = window.G, v = G.heroes.villagers.golden, h = G.heroes.homeSpot('golden'); return { v: !!v, near: v ? Math.round(Math.hypot(v.pos.x - h.x, v.pos.z - h.z)) : -1, bench: G.heroes.bench(), lance: !!v?.rig?.parts?.lance, ball: !!G.heroes.gldJoin.ball }; });
-    R.check('back in town he lives at the cottage (a villager, his lance on his back), four heroes on the bench; nothing of the scene left', a7.v && a7.near < 12 && a7.bench.length === 4 && a7.lance && !a7.ball, JSON.stringify(a7));
+    const a8 = await ev(() => window.G.state.quests.active.some(q => q.id === 'hq_yukimi') || window.G.state.quests.done.includes('hq_yukimi'));
+    R.check('he lives at the cottage at once (a villager, his lance on his back), four heroes on the bench; nothing of the scene left; "The Siege of Yukimi" started', a7.v && a7.near < 12 && a7.bench.length === 4 && a7.lance && !a7.ball && a8, JSON.stringify({ a7, a8 }));
   }
   if (PART.includes('b')) { // ================================================================ b) a reset mid-scene; an old save's rumour
-    await boot(page, 'fresh&nointro&notut'); await quiet(); await stzIn();
+    await boot(page, 'fresh&nointro&notut&arrive&qcard&hour=11'); await quiet(); await stzIn();
     await ev(() => { window.__scene = []; window.G.events.on('golden:joinScene', p => window.__scene.push(p.phase)); });
-    await toOnsen();
-    await page.waitForFunction(() => window.G.heroes.gldJoin.state === 'guard', null, { timeout: 20000 }).catch(() => {});
-    await ev(() => window.G.returnToVillage()); await waitMode(page, 'village'); await sleep(page, 600);
+    await opened();
+    await page.waitForFunction(() => window.G.heroes.gldJoin.state === 'guard', null, { timeout: 40000 }).catch(() => {});
+    await ev(() => { const G = window.G; G.state.flags.burrowTut = true; G.enterRegion('onsen'); }); await waitMode(page, 'dungeon'); await sleep(page, 600);
     const b0 = await J();
-    await toOnsen(); const b1 = await J();
-    R.check('leaving the Onsen mid-scene resets it (no knight, no ball, no lance on the ground, Shadow undressed); the next visit starts it again', b0.state === 'off' && !b0.knight && !b0.ball && !b0.groundLance && !b0.whelp && !b0.joined && b1.state === 'wait', JSON.stringify({ b0, b1 }));
-    await ev(() => window.G.returnToVillage()); await waitMode(page, 'village'); await sleep(page, 400);
+    await ev(() => window.G.returnToVillage()); await waitMode(page, 'village');
+    await page.waitForFunction(() => ['march', 'guard'].includes(window.G.heroes.gldJoin.state), null, { timeout: 40000 }).catch(() => {});
+    const b1 = await J();
+    R.check('leaving town mid-scene resets it (no knight, no ball, no lance on the ground, Shadow undressed); back in town his arrival comes again', b0.state === 'off' && !b0.knight && !b0.ball && !b0.groundLance && !b0.whelp && !b0.joined && ['march', 'guard'].includes(b1.state), JSON.stringify({ b0, b1 }));
     await ev(() => { // an old save from before Foosy: Floofy joined, no heroes.golden at all
       const G = window.G; G.save(); const s = JSON.parse(localStorage.getItem('chewy3d.save'));
       delete s.heroes.golden; delete s.flags.goldenJoined; if (s.flags.hints) delete s.flags.hints.gldRumour; for (const id of ['moka', 'poe', 'shihtzu']) s.flags[`${id}Joined`] = true;
+      for (const h of Object.values(s.heroes)) if (h?.player) h.player.lvl = 20; if (s.player) s.player.lvl = 20; // (the Onsen shut: the rumour, not the arrival)
       window.__ignoreSave = true; localStorage.setItem('chewy3d.save', JSON.stringify(s)); removeEventListener('beforeunload', G.save); G.save = () => {};
     });
     await boot(page, 'notitle&notut'); await quiet();
@@ -118,8 +122,8 @@ try {
     await ev(() => { delete window.G.state.flags.hints.gldRumour; window.G.heroes.gldJoin.hintT = 0; });
     await page.waitForFunction(() => window.G.state.flags.hints?.gldRumour, null, { timeout: 30000 }).catch(() => {});
     await sleep(page, 300); await shot('8-rumour');
-    const b3 = await ev(() => ({ rumour: !!window.G.state.flags.hints?.gldRumour }));
-    R.check('in town (Floofy joined, him not): Shadow passes on the rumour about the knight guarding the hot springs, once', b3.rumour, JSON.stringify(b3));
+    const b3 = await ev(() => ({ rumour: !!window.G.state.flags.hints?.gldRumour, wheel: window.G.heroes.roster().find(h => h.id === 'golden').why }));
+    R.check('in town (Floofy joined, him not, the Onsen shut): Shadow passes on the rumour about the knight guarding the hot springs, once; the wheel says when he\'ll come', b3.rumour && b3.wheel === 'Will arrive when the Onsen opens', JSON.stringify(b3));
   }
   if (PART.includes('c')) { // ================================================================ c) the Meet guide
     await boot(page, 'fresh&nointro&tut&hour=11'); await quiet(); await stzIn();

@@ -313,6 +313,8 @@ export class Villager extends Actor {
     if (G.player && !G.playerDead) this.avoid(dir, G.player, PLAYER_VR, true);
     if (G.companion?.pos) this.avoid(dir, G.companion, PET_VR, true);
     for (const n of G.npcs) if (n !== this && n.visible && !n.seated) this.avoid(dir, n, n.radius, false);
+    const K = G.sceneKeepOut; // (a little scene playing there, an arrival in town: walk round it, never through: actors/sceneStage.js keepOut)
+    if (K) { const ox = K.x - this.pos.x, oz = K.z - this.pos.z, d = Math.hypot(ox, oz) || 1e-3, toward = (ox * dir.x + oz * dir.z) / d; if (d < K.r + 1.6 && toward > 0) { const side = ox * -dir.z + oz * dir.x; this._lat += (side >= 0 ? -1 : 1) * toward * 2.6 * Math.min(1, (K.r + 1.6 - d) / 1.6); } }
     let lat = this._lat;
     if (this.sideT > 0) { this.sideT -= dt; lat += this.sideDir * 1.3; }
     if (lat) {

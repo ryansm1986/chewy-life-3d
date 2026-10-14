@@ -8,8 +8,9 @@ the kit fallback's crest helm; **Shadow as a flying dragon whelp** while Foosy i
 flight, the landing, indoors); five-hero switching. Play him at once from `/?hero=golden` (he counts as joined).
 His name is **Foosy** (the owner's pick), in one place: `CLASSES.golden.name` (`src/rpg/classes.js`; `HERO_TEXT.golden`
 holds the kana, フージー). Everything else reads it. The id stays `golden`.
-Checkpoint 3 added the Onsen joining scene (§5), the rumour, the "Meet Foosy" guide with Shadow's take-off, `s29-golden`,
-and the floor loot drawn instanced (his draw calls at Poe's level, §11).
+Checkpoint 3 added the joining scene (§5; since Z-H3 his arrival in Blossom Hollow, by the fountain), the rumour, the
+"Meet Foosy" guide with Shadow's take-off, `s29-golden`, and the floor loot drawn instanced (his draw calls at Poe's
+level, §11).
 
 ## 1. Who he is
 - A male Golden Retriever (he/him): a deep red-gold coat with lighter feathering, long feathered floppy ears, a cream
@@ -253,57 +254,72 @@ and the Whelp Bond build at **clear ×0.85–1.05**.
   95 → 100%; Tailwag Volley 85 + 9 → 96 + 9, cost 7 + 0.35 → 4.2 + 0.33 (it was starved of zoom); Bonk Dart 130 → 140%,
   cost 3 → 2.5, its splash 40% in 1.1 m → 50% in 1.3 m.
 
-## 5. Joining (built in checkpoint 3: `src/actors/goldenJoin.js`, owned by HeroManager like the others: `G.heroes.gldJoin`)
-- **The scene** runs in the **Onsen** zone (`JOIN_AT.golden = 'onsen'`, at Yukimi's big hot spring, `onsen.js SPRINGS[0]`),
-  on any visit while he hasn't joined. Until then he isn't in town and the wheel's card says "Standing guard by the hot
-  springs…". The scene's actor is a `SceneGolden` (an Actor with his gear: the lance in his paw, `gldAttention` and the
-  other scene poses in `goldenPoses.js`); it is built hidden on arrival and shown two seconds in, once the field is calm.
-  - **Staging** (`stage`, worked out once as he takes his post): his post on the big spring's rim; your mark beside him
-    on screen (2.7 m across, a step toward the camera); Shadow's mark between you, in front; where the ball lands (his
-    other side or behind him). Every spot is dry, level and **in plain view of the game camera**: rays from each actor's
-    middle and head up the camera's line against the scenery (`screened`). The scenery near the spring is gathered a
-    few milliseconds a frame while he waits (`prepStep` / `occBuild`: the big merged batches cut to their triangles in
-    a box round the spring above knee height, sorted into half-metre strips across the screen so a ray meets a few
-    thousand triangles; the trees' batched and instanced meshes and the small props as they are; no actors, ground or
-    see-through things), so taking the post costs ~15–25 ms once. Pairs that leave the spring and its steam in front of
-    them are scored down.
-  - *guard*: at his post, facing the camera, standing very straight, the lance upright (`gldAttention`). Within 16 m
-    Shadow notices him once (a "?" and the hint `gldGuard`: "…Is he a statue?").
-  - *vow* (within 5 m, the field calm): controls lock, you walk to your mark (`moveTarget`; on it after 4 s if the way
-    is blocked) and Shadow trots to his and sits watching. The scene's camera (`frameTick`, every frame of the scene) frames the beat's actors with a margin and
-    keeps the group in the middle of the screen: him and you, Shadow once he's called, the ball during the fetch, the
-    loop's circle during the loop; the distance from the group's size on screen (the 20° lens), 14–26 m. He turns, salutes
-    (`gldSalute`) and begins: "Halt! Who approaches the springs of Yukimi? …A traveller. Then bear witness: I, Foosy of
-    the Emberleaf Guard, do solemnly swear upon my lance to guard these springs against all—". A tennis ball (a
-    procedural one, with a seam) arcs out of the old bathhouse (the zone's `feature` POI) and bounces past him ("Fetch!").
-    He startles (`gldStartle`, a "!"), the lance falls and lies on the ground, he bounds after the ball, picks it up
-    (it rides in his jaw, following the head), trots back to his post, sits with it, very pleased (`gldSitProud`, a
-    heart), drops it at your feet and finishes: "—against all comers. … Is this yours? It was very well thrown."
-  - *talk*: two answers ("That ball is the bathhouse's." / "Good catch!"), then the gift: Shadow is called to his mark,
-    he offers a little emerald bundle (`gldOffer`): "Every dragoon needs a dragon. Would you like to be mine?" Shadow
-    barks, the bundle goes, and **Shadow wears the whelp outfit though Foosy isn't the one played** (`Whelp.forced`
-    overrides `wanted()`; the swap's poof): a wobbly first flap (up, a bump back down, up for real), a tiny roar that
-    comes out as a squeak (`whelp_roar`), then a happy twelve-point loop round you both at 1.3 m. "…Magnificent. He is a
-    natural. A little squeaky."
-  - `prepareJoin`; "May I join your pack? I promise to guard it with my whole heart." ("Welcome to the pack! ♡" / "Only
-    if you bring the ball."); he picks up his lance, bows (`gldBow`), trots off and is gone in a poof; `joinGolden()`
-    (banner, `flags.goldenJoined`, the save; near the pack's level). `Whelp.forced` clears (the outfit comes off with a
-    poof) and Shadow's hint `gldWings` says he wears his wings whenever Foosy is played. He lives at Chewy's house from the
-    next town visit, the lance on his back.
-  - Leaving the zone, dying or a hero switch mid-scene resets it all (the actor, the ball, the bundle, the lance on the
-    ground, `forced`, Shadow's hold); it plays again on the next visit.
-- **The rumour**: in town, once the Shih Tzu has joined and Foosy hasn't, Shadow passes it on once (`gldRumour`): a very
-  polite dog in emerald armour is guarding the hot springs at Yukimi Onsen and won't let anyone in without the password
-  ("…Is the password 'ball'?"), with the Wayfarer's Post, or the unlock the zone still needs.
+## 5. Joining: his arrival in Blossom Hollow (`src/actors/goldenJoin.js`; ROADMAP Z-H3, docs/ZONES.md §3.1)
+Since Z-H3 the scene plays **in town, by the plaza's fountain**, not at the Onsen's hot spring (that scene is gone).
+`G.arrivals` (`actors/arrivals.js`) starts it once the Onsen opens (level 26, or the Tide Pool's dungeon cleared by you
+or a crew), Captain Kaizo has brought the Tide Pool's news (docs/ZONES.md §3.1), and Blossom Hollow has a calm moment.
+`heroes.gldJoin` is the scene; Arrivals updates it. The scene's actor is a `SceneGolden` (an Actor with his gear: the
+lance in his paw, the scene poses in `goldenPoses.js`). Event `golden:joinScene` (phases `march`, `guard`, `vow`,
+`leave`, `done`).
+- **Staging** (`stage`, once, as he comes): his post on the fountain's rim (24 angles, two radii); your mark beside him on
+  screen (2.7 m across, a step toward the camera); Shadow's mark between you, behind; where the ball lands (his far side
+  from Rosie's Treats first: the ball bounces on past him). Every spot free and level, **on the plaza's paving**, clear
+  of the villagers and **in plain view of where the scene's camera will be** (`actors/sceneStage.js`: the plaza's scenery
+  gathered a few ms a frame while he waits; rays from each body up toward the predicted camera); the fountain beside the
+  pair on screen rather than in front of them.
+- **The beats**:
+  - *march*: he marches in across the plaza to his post, very straight, the lance upright, from about 12 m off along a
+    clear straight line (up-screen if it can be: he comes toward the camera), so he's never simply there beside you.
+  - *guard*: at his post he turns to the camera, plants the lance (a thunk) and stands at attention (`gldAttention`).
+    Shadow's tip once it can show (never over a dialogue or another tip): "*Sniff…* Someone in shiny green armour is
+    standing guard by the fountain. Very, very still. …Is he a statue?". On the maps he's a person ("???", "Marching to the
+    fountain" / "Standing guard by the fountain", a `!`); the pointer says "A guard by the fountain".
+  - *vow* (within 5 m, at attention a moment first, the town calm): controls lock, you walk to your mark (on it after 4 s
+    if blocked), Shadow trots to his and sits watching; the camera (`frameTick`) frames the beat: him and you, Shadow, the
+    ball once it's close, the loop; the talk beats 18 m at most (so you two read on a phone), wider only for the ball's arc
+    and the whelp's loop. He salutes (`gldSalute`): "Halt! Who approaches the fountain of Blossom Hollow? …A
+    local. Then bear witness: I, Foosy of the Emberleaf Guard, do solemnly swear upon my lance to guard this fountain
+    against all—". A tennis ball comes bouncing in from Rosie's Treats' way (thrown from her door, or from the frame's
+    edge on that line when her door is further off; "Fetch!"). He startles (`gldStartle`, a "!"), the lance falls, he
+    bounds after the ball, picks it up (it rides in his jaw), trots back, sits with it, very pleased (`gldSitProud`, a
+    heart), drops it at your feet: "—against all comers. … Is this yours? It was very well thrown."
+  - *talk*: "Ahem. Foosy of the Emberleaf Guard. I guard the springs of Yukimi. Mostly from snow monkeys. They do not
+    respect the vow either." ("That ball is Rosie's." → "Then I shall return it. Later. With honour. …After one more
+    throw." / "Good catch!"); "I have been guarding your fountain while I waited for you. It seemed the polite thing to
+    do. Which brings me to my second duty." The gift: the emerald bundle (`gldOffer`), "Every dragoon needs a dragon.
+    Would you like to be mine?"; **Shadow wears the whelp outfit** (`Whelp.forced`): the wobbly first flap, the squeak of
+    a roar, the loop round you both. "…Magnificent. He is a natural. A little squeaky. So am I, when I am excited."
+    `prepareJoin`; **his plea**: "And my first duty. The springs of Yukimi are besieged. Snow yokai sit in the hot
+    springs, and a snowman general, Captain Frostbelly, holds the square. I guarded them alone as long as I could. A
+    knight knows when to fetch help. …And balls. May I join your pack? And will you come to Yukimi?" ("Welcome to the
+    pack! ♡" → "A knight does not wag. …It is the wind." / "Only if you bring the ball." → "…I was always going to bring
+    the ball."); "I shall meet you at the cottage, and then: Yukimi!"
+  - The end: he picks up his lance, bows (`gldBow`), trots off and is gone in a poof (the ball with him); `joinGolden()`
+    (the banner, `flags.goldenJoined`, his villager at the cottage); Shadow's outfit comes off (`gldWings`: he wears his
+    wings whenever Foosy is played); `Arrivals.finished`: the record and **his quest**, "The Siege of Yukimi", with its
+    card (docs/QUESTS.md §9).
+  - **Yukimi saved before he came** (a crew, an old save): "…the snow monkeys tell me your crew has already broken the
+    siege. …I am told they bowed. I approve." / "…You. Of course it was you."; "So I came to say thank you, and to offer
+    my lance."; he joins, and no quest starts.
+- **Resets**: leaving town, a hero switch or a knock-out before the vow drops it all (the actor, the ball, the bundle, the
+  lance on the ground, `forced`, Shadow's mark, the keep-out); the arrival is due again 10 s later.
+- **The rumour**: in town, once Floofy has joined and before the Onsen opens, Shadow passes it on once (`gldRumour`, never
+  over an arrival's scene): a very polite dog in emerald armour is guarding the hot springs at Yukimi Onsen and won't
+  let anyone in without the password ("…Is the password 'ball'? Once the Wayfarer's Post opens it (…), I bet he'll come
+  to us!"). The wheel's card: "Will arrive when the Onsen opens", "Will arrive after Old Captain Kaizo comes by", then
+  "On the way to Blossom Hollow…".
 - **The guide** "Meet Foosy" (`world/guides.js meetGolden`, narrated by him, the class colour; the title and lines read
   `CLASSES.golden.name`): *hold* Tab, the wheel with five, pick him; *lance* (left-click the reach combo, right-click
   Sunbeam Thrust); *javelin* (1: Bonk Dart); **whelp**: Shadow flies beside him while he's played; done when Shadow is
   airborne and lifted (`whelp.air > 0.9`, `lift > 0.6`: walk a few steps and he takes off), after 3 s on the step; *wrap*
   (his trees, K).
-- `?hero=golden` (debug) and `G.heroes.joinGolden()` (QA) join him at once.
-- QA: `tools/qa/s29-golden.mjs` (a: the scene beat by beat, b: a reset mid-scene and the rumour, c: the guide, d: every
-  skill tapped in a Burrow fight and a real Sunbeam Thrust hold, e: a charged burst's frames; `SHOTS=1` saves the beats to
-  `tools/qa/tmp/s29/`); `prod-smoke.mjs` checks his guard at the Onsen in the built bundle.
+- Old saves: Foosy already joined (his old Onsen scene) gets no second arrival; his quest starts quietly with its card
+  while Yukimi still needs saving. `?hero=golden` (debug) and `G.heroes.joinGolden()` (QA) join him at once; the debug
+  menu's *Play an arrival* plays it again.
+- QA: `tools/qa/s29-golden.mjs` (a: the scene in town beat by beat, b: a reset mid-scene and the rumour, c: the guide, d:
+  every skill tapped in a Burrow fight and a real Sunbeam Thrust hold, e: a charged burst's frames; `SHOTS=1` saves the
+  beats to `tools/qa/tmp/s29/`), `tools/qa/s47-hero-arrivals.mjs` j), n)–p); `prod-smoke.mjs` plays his arrival in the
+  built bundle; the look review `node tools/qa/arrival-shots.mjs golden`.
 
 ## 6. Shadow the dragon whelp (`src/actors/whelp.js`; Companion.update calls it)
 - **The rule**: Shadow wears the whelp outfit **only while Foosy is the active hero** (`Whelp.wanted()`: `activeHero ===
@@ -456,8 +472,9 @@ Storybook set) has none, so he stays the kit there (`CAST.golden`), as he does i
 - Heroes: `src/actors/heroes.js` (JOIN_AT, JOIN_HINT, HOME_OFS, HERO_CHAT, `joinGolden`), `src/actors/heroModels.js`
   (`HERO_MODELS.goldenToy`, `lanceMount`, `warmGrade` / `warmCap`), `src/gfx/portraits.js` (his framing, `dresser`),
   `src/game.js` (his model and portrait), `src/ui/hud.js` (the weapon badge's glyph; the kana from HERO_TEXT).
-- Joining: `src/actors/goldenJoin.js` (`GoldenJoin`: the Onsen scene, its `SceneGolden` actor, the ball and the bundle, the
-  rumour; HeroManager owns it as `gldJoin` and ticks it after `stzJoin`), the scene poses in `goldenPoses.js`
+- Joining: `src/actors/goldenJoin.js` (`GoldenJoin`: his arrival by the fountain, its `SceneGolden` actor, the ball and the
+  bundle, the rumour; HeroManager owns it as `gldJoin`, registered with `actors/arrivals.js`, which ticks it; staged with
+  `actors/sceneStage.js`), the scene poses in `goldenPoses.js`
   (`gldAttention`, `gldSalute`, `gldStartle`, `gldSitProud`, `gldOffer`, `gldBow`), `Whelp.forced` in `whelp.js` (the gift's
   try-on), `world/guides.js meetGolden`, `tools/qa/s29-golden.mjs`.
 - Floor loot (shared, `src/combat/groundLoot.js`): coins, potions, materials, pantry, gems, quest items and items are

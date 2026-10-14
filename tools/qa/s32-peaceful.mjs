@@ -63,16 +63,17 @@ if (want('a') || want('b') || want('c')) {
     return { aggro, peak: +peak.toFixed(1), home };
   });
   R.check('b) the wild: the entry note, packs a step above the strongest hero (8 + 2 = 10, within 6…13), the leash: they chase to r + 6 m and walk home', b1.enter && b1.lv.length === 1 && b1.lv[0] === 10 && b2.aggro && b2.peak <= 7.5 && b2.home, { b1, b2 });
-  // Poe's scene in the calm grove (a fresh flag, a walk out of the village)
+  // Poe and the calm grove (ROADMAP Z-H3): her scene no longer plays here (a fresh flag, a walk out of the village); her
+  // arrival waits for you in Blossom Hollow instead (s47 plays it, Takemori saved before she came: a thank-you)
   const pj = await ev(page, async () => {
-    const G = window.G; G.state.flags.poeJoined = false; G.enterRegion('bamboo');
+    const G = window.G; G.state.flags.poeJoined = false; G.state.flags.mokaJoined = true; G.enterRegion('bamboo');
     await new Promise(r => { const f = () => (G.dungeon?.isRegion && !G.ui?.iris?.active && G.dungeon.monsters.length ? r() : requestAnimationFrame(f)); f(); });
     const J = G.heroes.poeJoin, P = G.player, tr = G.dungeon.layout.plan.trail; let i = 0, bd = 1e9; tr.forEach(([x, z], j) => { const d = Math.hypot(x - P.pos.x, z - P.pos.z); if (d < bd) { bd = d; i = j; } });
     const t0 = performance.now();
-    await new Promise(res => { const f = () => { if (J.state !== 'off' && J.state !== 'wait' || performance.now() - t0 > 30000) return res(); if (i < tr.length - 2) { const nx = tr[i + 2], L = Math.hypot(nx[0] - P.pos.x, nx[1] - P.pos.z) || 1; if (L < 1) i++; else { P.setPos(P.pos.x + (nx[0] - P.pos.x) / L * 0.08, P.pos.z + (nx[1] - P.pos.z) / L * 0.08); P.facing = P.faceTarget = Math.atan2(nx[0] - P.pos.x, nx[1] - P.pos.z); } } requestAnimationFrame(f); }; f(); });
-    return J.state;
+    await new Promise(res => { const f = () => { if (J.state !== 'off' && J.state !== 'wait' || performance.now() - t0 > 12000) return res(); /* (the old scene began after 7 s and 6 m of trail) */ if (i < tr.length - 2) { const nx = tr[i + 2], L = Math.hypot(nx[0] - P.pos.x, nx[1] - P.pos.z) || 1; if (L < 1) i++; else { P.setPos(P.pos.x + (nx[0] - P.pos.x) / L * 0.08, P.pos.z + (nx[1] - P.pos.z) / L * 0.08); P.facing = P.faceTarget = Math.atan2(nx[0] - P.pos.x, nx[1] - P.pos.z); } } requestAnimationFrame(f); }; f(); });
+    return { state: J.state, due: G.arrivals.due()?.who || null, plan: G.arrivals.due() ? (await import('/src/world/heroQuests.js')).questPlan(G.state, G.arrivals.due()) : null };
   });
-  R.check("b) Poe's joining scene starts in the calm, saved grove", pj === 'tail' || pj === 'caught' || pj === 'talk', pj);
+  R.check("b) the calm, saved grove: no Poe scene there any more (it timed out walking the trail); her arrival is due in town, as a thank-you (Takemori saved)", pj.state === 'off' && pj.due === 'poe' && pj.plan === 'saved', pj);
   await quiet(page); await ev(page, () => { const G = window.G; G.ui.dlg?.finish?.(-1); G.heroes.poeJoin.reset?.(); });
   // ---- c) the minimap, the big map, the Travel Map
   await toRegion(page, 'bamboo');

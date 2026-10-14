@@ -9,7 +9,8 @@ the hex build's balance pass, per-base flail tints, the kit fallback's topknot a
 Play him at once from `/?hero=shihtzu` (he counts as joined).
 **His name is Floofy** (the owner's pick, 2026-10-07; kana フルーフィ). It lives in `CLASSES.shihtzu.name`
 (`src/rpg/classes.js`; `HERO_TEXT.shihtzu` holds the kana), and everything else reads it. The code id stays `shihtzu`.
-Checkpoint 3: the Momiji Hollow joining scene, the rumour, the "Meet <name>" guide, `tools/qa/s28-shihtzu.mjs` (§5).
+Checkpoint 3: the joining scene (since Z-H3 his arrival in Blossom Hollow, on the Shrine Road), the rumour, the "Meet
+<name>" guide, `tools/qa/s28-shihtzu.mjs` (§5).
 
 ## 1. Who he is
 - A black-and-white Shih Tzu (he/him): a white blaze, muzzle, beard and topknot (tied with a plum band), big black ear
@@ -234,37 +235,63 @@ Both are asserted: the tank at **dps ×0.85–1.05, eHP ×1.15–1.4**, the hex 
   50 + 6, Lingering Gloom 30 + 10 → 28 + 9.5. (Checkpoint 1: Woeful Wallop 190 → 140%, its synergies on the mastery and the
   Maelstrom; Weight of the World 30 + 11 → 25 + 9 per level.)
 
-## 5. Joining (`src/actors/shihtzuJoin.js`, owned by HeroManager like Poe's: `G.heroes.stzJoin`)
-- **The scene** runs in **Momiji Hollow** (the Maple zone, `JOIN_AT.shihtzu = 'maple'`) in its golden-hour light, on any
-  visit while he hasn't joined, so a new game and an old save meet him the same way. Event `shihtzu:joinScene` (phases
-  `kneel`, `proclaim`, `done`).
-  - *wait*: his rig (`Player.buildRig(…, 'shihtzu')`: the baked model, the flail on his back) is built hidden as you
-    arrive. Once you've been there 5 s, walked 5 m and nothing is chasing you, he appears.
-  - *kneel*: beside the trail ahead of you, on screen (by the jizo shrine when you're within 16 m of it), kneeling by
-    three little plum paper lanterns (`fx.shrineLantern`), lighting them one by one every 1.6 s with a reach of his left
-    paw (`stzKneel`, `a.reach`), a ghost pup (a slot in the pup batch) bobbing at his shoulder. Shadow notices (a "?"
-    and a tip: "Ghostlights, by the road!").
-  - *proclaim*: walk within 4.5 m (or stand about for 18 s: the ghost pup zooms over, yips at you and leads you back). He
-    rises (`stzRise`), walks over to a dignified distance, the camera frames you both (13 m), and, paw raised
-    (`stzProclaim`): "Halt, traveller. You stand at the edge of the gloom. Few return fr—" The ghost pup zooms to his face:
-    *slurp* (`stzLicked`: head yanked back, eyes shut, ears flung up; hearts; `gp_lick`). The sweat drop; Shadow's heart.
-  - *talk*: "…That was part of the ritual." His name (`CLASSES.shihtzu.name`), Knight of the Gloomhowl, keeper of the
-    ghostlights along the Maple road; the ghost pup ("He followed me home from the old shrine. They all do."); why he lights
-    the lanterns (so lost pups can find their way home); `prepareJoin`; "The gloom needs a pack. May I join yours?" (two
-    answers); `joinShihtzu()` (banner, `flags.shihtzuJoined`, the save).
-  - The end: he holds up the tome (`stzTomeHold`) and each lantern's flame flies into it as a ghostlight wisp; pages flutter;
-    he fades away in ghostlight "to meet you at the cottage". He lives at Chewy's house from the next town visit.
-  - Leaving the zone, dying or a hero switch before he speaks resets it (no knight, lanterns or pup left behind).
-- **The rumour**: in town, once Poe has joined and he hasn't (12 s in, nothing else talking), Shadow passes it on once
-  (`flags.hints.stzRumour`): a very serious little knight has been lighting lanterns along the road in Momiji Hollow every
-  sunset; "Let's take the Wayfarer's Post and see!", or the unlock it still needs (`regionUnlocked`).
+## 5. Joining: his arrival in Blossom Hollow (`src/actors/shihtzuJoin.js`; ROADMAP Z-H3, docs/ZONES.md §3.1)
+Since Z-H3 the scene plays **in town**, not in Momiji Hollow (the maple-road scene is gone). `G.arrivals`
+(`actors/arrivals.js`) starts it once Momiji Hollow opens (level 11, or the Bamboo's dungeon cleared by you or a crew:
+`regionUnlocked`), Poe has joined, and Blossom Hollow has a calm moment. `heroes.stzJoin` is the scene; Arrivals updates
+it. Event `shihtzu:joinScene` (phases `kneel`, `proclaim`, `snuff`, `done`).
+- **The dusk rule** (written down, as the owner asked): a knight lights his lanterns at sunset. Golden hour is 5:36–8:12 pm
+  (game hours 17.6–20.2). If the arrival comes between 4:24 and 5:36 pm (16.4–17.6) he waits for golden hour (about
+  40 s at the day's pace); at any other hour he comes at once, and says so: "…It is not sunset. I am early. A knight is
+  never late." He never waits longer than that, so an arrival is never stranded.
+- **The beats**:
+  - *wait*: his rig (`Player.buildRig(…, 'shihtzu')`), the Shrine Road's scenery (a wide view round the jizo, its floor the
+    lowest ground near: the road climbs) are made a few ms a frame.
+  - *kneel*: his spot is on the **Shrine Road's paving** (the way up to the Burrow, which always exists), by the jizo or
+    one of the road's stone lanterns, where he and the ground in front of him are in plain view of the game camera (the
+    road's maples and sakura stand between it and the camera for much of its length: rays, `actors/sceneStage.js`), with
+    paving for his three lanterns in front of him and room on the road for the talk. He kneels facing the camera across
+    the road and lights three little plum paper lanterns (`fx.shrineLantern`, a soft ghostlight halo when lit, so they
+    read by day and at golden hour) one by one every 1.6 s with a reach of his left paw (`stzKneel`), a ghost pup bobbing
+    at his shoulder. A view of his own spot is built while he lights them (for the talk's staging). Shadow's tip once it
+    can show (never over a dialogue or another tip): "*Sniff…* Ghostlights, up the Shrine Road! Somebody is lighting
+    little paper lanterns by the stone ones…". On the maps he's a person ("???", "Lighting lanterns on the Shrine
+    Road", a `!`); the pointer says "Ghostlights on the Shrine Road".
+  - *proclaim*: walk within 4.5 m (or stand about within 14 m for 18 s: the ghost pup zooms over, yips at you and goes
+    back). He rises (`stzRise`) and **stays among his lanterns**; your mark is worked out round him (`stageTalk` with an
+    anchor: 1.5 m across the screen and 1.5 m down-screen of him, so facing you he faces the camera and the lick reads;
+    on the paving if it can be, in plain view, clear of villagers), Shadow sits at your other side, the villagers walk
+    round, the camera frames you (`frameClear`). Paw raised (`stzProclaim`): "Halt, traveller. You stand at the edge of
+    the gloom. Few return fr—" The ghost pup zooms to his face: *slurp* (`stzLicked`; hearts; `gp_lick`). The sweat drop;
+    Shadow's heart.
+  - *talk*: "…That was part of the ritual." His name, Knight of the Gloomhowl, keeper of the ghostlights along the Maple
+    road ("Is that a ghost puppy?" / "Very spooky!"); why he lights the lanterns (and, out of golden hour, that he's
+    early); he came down the Maple road to find you; `prepareJoin`; **his plea**: "And I need your help. Akane Hamlet, my
+    home among the maples, has fallen under the gloom. Yokai camp in its square, under a scarecrow captain with a scythe.
+    Captain Strawgrin. He has no manners either. My ghostlights cannot hold them back alone. The gloom needs a pack. May
+    I join yours? And will you come to Akane?" ("Welcome to the pack! ♡" / "Only if the ghost pups come too." → "They were
+    always coming. They do not listen to me at all."); "Knights do not cry. It is the lantern smoke."
+  - The end: he holds up the tome (`stzTomeHold`), each lantern's flame flies into it as a wisp, pages flutter, he fades
+    away in ghostlight; then `joinShihtzu()` (the banner, `flags.shihtzuJoined`, his villager at the cottage) and
+    `Arrivals.finished`: the record and **his quest**, "The Gloom over Akane", with its card (docs/QUESTS.md §9).
+  - **Akane saved before he came** (a crew, an old save): the plea is a thank-you ("…the ghostlights whisper that your
+    crew has already lifted it. …I was going to be very brave about it." / "…It was you. The ghostlights are rarely
+    wrong."), "So I have come to say thank you. Solemnly.", he joins, and no quest starts.
+- **Resets**: leaving town, a hero switch or a knock-out before he speaks drops the scene (no knight, lanterns, pup, view,
+  keep-out or Shadow's mark left); the arrival is due again 10 s later.
+- **The rumour**: in town, once Poe has joined and before Momiji Hollow opens, Shadow passes it on once (12 s in, never
+  over an arrival's scene; `flags.hints.stzRumour`): "…a very serious little knight has been lighting lanterns along the
+  road in Momiji Hollow, every sunset. Once the Wayfarer's Post opens it (…), I bet he'll come to us!" The hero wheel's
+  card says "Will arrive after Poe joins", "Will arrive when Momiji Hollow opens", then "On the way to Blossom Hollow…".
 - **The guide** "Meet <name>" (`world/guides.js meetShihtzu`, narrated by him, plum; the title and lines read
-  `CLASSES.shihtzu.name`): *hold* Tab, the wheel with four, pick him (his card highlighted; a number key works); *flail*
-  (left-click the three swings, right-click Woeful Wallop); *hex* (1: Dripping Paw, stacks); *blanket* (the Gloom
-  Blanket); *wrap* (his trees, K; "Grandpaw sends his regards").
-- `?hero=shihtzu` (debug) and `G.heroes.joinShihtzu()` (QA) join him at once. Until then the wheel's card says "Somewhere in
-  the maples, at dusk…".
-- QA: `tools/qa/s28-shihtzu.mjs` (`SHOTS=1` saves the scene beats and the guide steps to `tools/qa/tmp/s28/`).
+  `CLASSES.shihtzu.name`): *hold* Tab, the wheel, pick him; *flail* (left-click the three swings, right-click Woeful
+  Wallop); *hex* (1: Dripping Paw, stacks); *blanket* (the Gloom Blanket); *wrap* (his trees, K; "Grandpaw sends his
+  regards").
+- Old saves: Floofy already joined (his old maple scene) gets no second arrival; his quest starts quietly with its card
+  while Akane still needs saving. `?hero=shihtzu` (debug) and `G.heroes.joinShihtzu()` (QA) join him at once; the debug
+  menu's *Play an arrival* plays it again.
+- QA: `tools/qa/s28-shihtzu.mjs` (his scene in town beat by beat; `SHOTS=1` saves the beats and the guide steps to
+  `tools/qa/tmp/s28/`), `tools/qa/s47-hero-arrivals.mjs` j)–l), o); the look review `node tools/qa/arrival-shots.mjs shihtzu`.
 
 ## 6. Four heroes (and more): switching, the wheel, the HUD
 - `HERO_IDS` follows `CLASSES` (Chewy, Moka, Poe, the Shih Tzu; H-5 adds the dragoon). `state.heroes.shihtzu` is created
@@ -301,9 +328,9 @@ Both are asserted: the tank at **dps ×0.85–1.05, eHP ×1.15–1.4**, the hex 
   (merged by `charge.js`), `src/combat/chargedShihtzu.js`, `tools/charge-sim-shihtzu.mjs` (merged by `charge-sim.mjs`).
   Shared edits: `skillRunner.js` (a channel may bring its own `update`), `combat.js` (`hitPlayer` returns 0 when the guard
   soaks a blow whole), `charge.js` / `charge-sim.mjs` / `charge-table.mjs` (his tables, models and labels).
-- Checkpoint 3: `src/actors/shihtzuJoin.js` (the scene, the rumour), `world/guides.js meetShihtzu`, his scene poses
-  (`stzKneel`, `stzRise`, `stzProclaim`, `stzLicked`, `stzTomeHold`), `fx.shrineLantern`, `tools/qa/s28-shihtzu.mjs`
-  (in run-all).
+- Checkpoint 3: `src/actors/shihtzuJoin.js` (the scene, the rumour; since Z-H3 his arrival in town, registered with
+  `actors/arrivals.js`, staged with `actors/sceneStage.js`), `world/guides.js meetShihtzu`, his scene poses (`stzKneel`,
+  `stzRise`, `stzProclaim`, `stzLicked`, `stzTomeHold`), `fx.shrineLantern`, `tools/qa/s28-shihtzu.mjs` (in run-all).
 
 ## 8. The baked model (`HERO_MODELS.shihtzuToy`, the flail prop and its chain, the coat)
 Built by an Opus agent with the toybox-character skill (sources archived in `tools/blender/codex/assets/shihtzu-toy/`;

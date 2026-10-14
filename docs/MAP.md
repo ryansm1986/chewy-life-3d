@@ -86,7 +86,11 @@ cut-down front walls thin, the door mat. Drawn again when its signature (the sur
 
 ## 3. People and places (src/world/mapData.js)
 - `people(G)`: everyone in `G.npcs` (Rosie, the named cast, the heroes in town, Old Hachi, the Guild's hires, the
-  townsfolk), you, Shadow, and the heroes and hires out with a crew (listed, no position). Each has a group, a role, a
+  townsfolk), you, Shadow, a hero arriving in town (ROADMAP Z-H3: `G.arrivals.people()`, the scene's own `person()`:
+  Poe as "???", "Somebody very sneaky"; Floofy as "???", "Lighting lanterns on the Shrine Road"; "Old Captain Kaizo",
+  "Just landed on the beach"; Foosy as "???", "Standing guard by the fountain"; each with a `!`, while they're about;
+  docs/ZONES.md §3.1), and the heroes and hires out
+  with a crew (listed, no position). Each has a group, a role, a
   colour, an initial, a badge and a priority. Groups: **Something for you** (a `!` or `?`: they move to the top), **Shopkeepers**
   (Rosie, Kuma, Usagi, Tanu, Old Hachi), **Townsfolk** (Mochi, Kitsune, Pan, Kero, the townsfolk), **Heroes**, **Hires**.
 - `places(G)`: the village's buildings (homes only when someone named lives there, and your cottage), the interactables

@@ -14,6 +14,10 @@
 //   tier { dungeon, n }                                   clear that dungeon (a zone dungeon or the Deep Burrow) at tier n
 //                                                         or higher
 //   villageSaved { zone }                                 the zone's village is saved
+//   visit { zone }                                        travel to the zone (its region, by the Wayfarer's Post): done
+//                                                         on arriving there (Story.stepDone reads where you are), or once
+//                                                         its village is saved (a crew got there first: the hero quests,
+//                                                         world/heroQuests.js, ROADMAP Z-H3)
 //   reach { at, x, z, r?, floor?, label? }                walk to a spot (at: 'home' = Blossom Hollow, a zone id = its
 //                                                         region, a dungeon id = that floor); polled by Story.reachTick.
 //                                                         The pointer shows the spot in its world, the way there elsewhere
@@ -23,7 +27,7 @@ import { DUNGEONS, BURROW, DEN_OF_BOSS, legacyFloor } from '../dungeon/defs.js';
 import { zoneOf, tierCleared, villageSaved } from '../rpg/zones.js';
 import { denRecord, legacyDepth } from '../rpg/dens.js';
 
-export const ZONE_STEP_TYPES = ['find', 'rescue', 'dungeonFloor', 'tier', 'villageSaved'];
+export const ZONE_STEP_TYPES = ['find', 'rescue', 'dungeonFloor', 'tier', 'villageSaved', 'visit'];
 /** how near (m) the hero must come to a reach step's spot */
 export const REACH_R = 2.6;
 
@@ -60,12 +64,15 @@ export function zoneStepDone(s, state) {
   if (s.type === 'dungeonFloor') return bestFloorOf(state, s.dungeon) >= (s.n || 1);
   if (s.type === 'tier') { const id = s.dungeon || s.zone; return !!id && tierCleared(state, id, s.n || 1); } // (a zone dungeon or the Deep Burrow; a Spirit clear counts as T5)
   if (s.type === 'villageSaved') return !!s.zone && villageSaved(state, s.zone);
+  if (s.type === 'visit') return !!s.zone && villageSaved(state, s.zone); // (the state's part: being there is Story's, w)
   return null;
 }
+/** a visit step: you're in its zone (w: Story.whereNow, outdoors in that zone's region) or its village is saved */
+export const visitDone = (s, state, w) => s?.type === 'visit' && (!!(w && !w.dungeon && w.zone === s.zone) || !!zoneStepDone(s, state));
 /** the tracker's "have" for those steps (null: not one of them) */
 export function zoneStepHave(s, state) {
   if (s.type === 'dungeonFloor') return Math.min(s.n || 1, bestFloorOf(state, s.dungeon));
-  if (s.type === 'tier' || s.type === 'villageSaved') return zoneStepDone(s, state) ? (s.n || 1) : 0;
+  if (s.type === 'tier' || s.type === 'villageSaved' || s.type === 'visit') return zoneStepDone(s, state) ? (s.n || 1) : 0;
   return null;
 }
 /** Where a step's objective is: { dungeon?, zone?, floor?, boss?, village? } — what the quest pointer heads for (the zone's
@@ -85,6 +92,7 @@ export function destOf(s) {
     case 'dungeonFloor': return inD(s.dungeon, { floor: s.n || 1 });
     case 'tier': return inD(s.dungeon, { floor: last(s.dungeon), boss: true });
     case 'villageSaved': return s.zone ? { zone: s.zone, village: true } : null;
+    case 'visit': return s.zone ? { zone: s.zone, visit: true } : null;
     case 'reach': return !s.at || s.at === 'home' ? { home: true, reach: true } : DUNGEONS[s.at] ? inD(s.at, { floor: s.floor ?? 1, reach: true }) : { zone: s.at, reach: true };
     default: return null;
   }

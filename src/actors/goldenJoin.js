@@ -1,38 +1,37 @@
-// Foosy the dragoon joins the pack (docs/GOLDEN.md §5): his scene at the hot springs of Yukimi Onsen, and the rumour in
-// town that sends you there. HeroManager (heroes.js) owns one GoldenJoin and calls update(dt) every frame.
-//
-// The scene runs on any Onsen visit while he hasn't joined, so a new game and an old save meet him the same way:
-//   wait   — his rig is made hidden as you arrive (no hitch later); once you've been there a moment and nothing is chasing
-//            you, he stands guard by the big hot spring, very straight, the lance upright, the little dragon on his helm
-//   guard  — he holds it. Shadow notices once you're near ("is he a statue?"); walk up to him
-//   vow    — he turns, raises the lance in salute and begins a solemn knightly vow ("I, Foosy of the Emberleaf Guard, do
-//            solemnly swear upon my lance to guard these springs against all—"); a tennis ball bounces out of the
-//            bathhouse. His ears go up, the lance drops, and he bounds after it, brings it back in his mouth, sits, very
-//            pleased, and finishes: "—against all comers. …Is this yours? It was very well thrown."
-//   talk   — the dialogue; the gift: he has been guarding a dragon whelp costume for Shadow. Shadow tries it on (a poof,
-//            Whelp.forced), a wobbly first flap, a tiny roar that comes out as a squeak, a happy loop round them both;
-//            prepareJoin; he asks to join; HeroManager.joinGolden (the banner, flags.goldenJoined, the save); he picks
-//            up his lance, bows, and trots off "to meet you at the cottage"; Shadow's outfit comes off (it's kept for when
-//            Foosy is played)
-// Leaving the zone, dying or a hero switch before he speaks resets it: the next Onsen visit starts over.
-// The rumour: in town, once Floofy (the Shih Tzu) has joined and Foosy hasn't, Shadow passes it on (once).
+// Foosy the dragoon arrives in Blossom Hollow (docs/GOLDEN.md §5; ROADMAP Z-H3): his old Onsen scene, moved to the island.
+// The arrivals (actors/arrivals.js) start it once the Onsen opens and Captain Kaizo has brought the Tide Pool's news, on a
+// calm moment in town; HeroManager owns it (heroes.gldJoin) and Arrivals calls update(dt) every frame.
+//   wait   — his rig is made hidden; the scenery round the fountain is gathered a few milliseconds a frame for his staging
+//   march  — he marches in across the plaza to his post by the fountain, very straight, the lance upright
+//   guard  — at his post he turns to the camera, plants the lance and stands at attention. Shadow notices ("…Is he a
+//            statue?"); the pointer and the maps show where. Walk up to him
+//   vow    — you walk to your mark beside him, he turns, salutes and begins a solemn knightly vow ("…to guard this fountain
+//            against all—"); a tennis ball comes bouncing in from Rosie's Treats. His ears go up, the lance drops, and he
+//            bounds after it, brings it back in his mouth, sits, very pleased, and finishes: "—against all comers. …Is this
+//            yours?"
+//   talk   — the dialogue; the gift: he has been guarding a dragon whelp costume for Shadow (Whelp.forced: a poof, a wobbly
+//            first flap, a squeak of a roar, a loop); his plea for Yukimi Spa (or, saved before he came, a thank-you);
+//            prepareJoin; he asks to join; he picks up his lance, bows, trots off, a poof, HeroManager.joinGolden; Shadow's
+//            outfit comes off (kept for when Foosy is played); Arrivals.finished starts his quest ("The Siege of Yukimi")
+// Leaving town, a hero switch or a knock-out before the vow drops it: the arrival comes again a little later.
+// The rumour: in town, once Floofy has joined and before the Onsen opens, Shadow passes it on (once).
 import * as THREE from 'three';
 import { Actor } from './actor.js';
 import { Player } from './player.js';
 import { Events } from '../core/events.js';
 import { regionUnlocked, REGIONS } from '../regions/index.js';
 import { installGoldenGear, lanceObject, setLanceLook } from './goldenGear.js';
-import { gldFx } from '../gfx/goldenFx.js';
 import { makeToon } from '../gfx/materials.js';
+import { LANDMARKS } from '../world/layout.js';
+import { SceneView, frameGroup, frameFor, frameClear, camAt, keepOut, camAxes, paved, villagersNear, shadowOnMark, BODY, PUP } from './sceneStage.js';
 import { dist } from '../core/util.js';
 
 const sfx = (n, o) => Events.emit('sfx', n, o);
-// the big hot spring in front of the ruined ryokan (regions/biomes/onsen.js SPRINGS[0]) and, if the plan has none, a
-// stand-in for the bathhouse (its `feature` POI)
-const SPRING = { x: 55.5, z: 64.5, r: 2.5 }, BATHHOUSE = { x: 45, z: 67 };
+// the plaza's fountain (its basin's rim) and Rosie's Treats, whose door the ball comes out of (the village's own records
+// when they're there: world/layout.js LANDMARKS)
+const FOUNTAIN = { x: LANDMARKS.fountain.x, z: LANDMARKS.fountain.z, r: 2.6 }, ROSIE_DOOR = { x: 130.95, z: 116.7 };
 
-/** the scene's Foosy: a rig that walks and poses, his lance in his paw (no villager life, no combat: monsters can't see
- *  him) */
+/** the scene's Foosy: a rig that walks and poses, his lance in his paw (no villager life) */
 class SceneGolden extends Actor {
   constructor(world, G) {
     super(world, Player.buildRig(undefined, 'golden'), { radius: 0.3, speed: 3.8, name: 'Foosy' });
@@ -80,20 +79,29 @@ function mergeTwo(gs) {
 export class GoldenJoin {
   constructor(G, heroes) {
     this.G = G; this.H = heroes;
-    this.state = 'off'; this.t = 0; this.knight = null; this.waits = []; this.ball = null; this.bundle = null; this.groundLance = null; this.spot = null;
+    this.state = 'off'; this.t = 0; this.knight = null; this.waits = []; this.ball = null; this.bundle = null; this.groundLance = null; this.spot = null; this.plan = 'start';
     Events.on('mode:changed', () => this.reset());
     Events.on('hero:switching', () => this.reset());
   }
   get joined() { return !!this.G.state.flags.goldenJoined; }
   get busy() { return this.state === 'vow' || this.state === 'talk'; }
-  /** at the Onsen, on a visit where he can still meet you */
-  inOnsen() { const G = this.G; return G.mode === 'dungeon' && G.dungeon?.isRegion && G.dungeon.regionId === 'onsen' && !this.joined; }
-  reset() {
-    if (this.busy) return; // (the scene finishes what it started)
+  get active() { return this.state !== 'off' && this.state !== 'done'; }
+  /** the arrival begins (actors/arrivals.js): plan 'start' (he asks for help), 'saved' (Yukimi saved before he came) */
+  start(a, plan = 'start') {
+    if (this.busy) return;
+    this.reset(true);
+    this.plan = plan; this.state = 'wait'; this.t = 0;
+  }
+  reset(force = false) {
+    if (this.busy && !force) return; // (the scene finishes what it started)
+    const G = this.G;
     this.knight?.dispose(); this.knight = null;
     this.dropProps();
-    const sh = this.G.companion; if (sh?.whelp && sh.whelp.forced != null) { sh.whelp.forced = null; sh.whelp.act = null; } if (sh?.hold?.gld) sh.hold = null;
-    this.waits.length = 0; this.state = 'off'; this.t = 0; this.spot = null; this.stg = null; this.beat = null; this.loop = null; this.noticed = false; this.dropOcc();
+    const sh = G.companion; if (sh?.whelp && sh.whelp.forced != null) { sh.whelp.forced = null; sh.whelp.act = null; } if (sh?.hold?.gld) sh.hold = null;
+    if (force && this.busy) { const P = G.player; if (P) { P.controlLocked = false; P.moveTarget = null; } G.introFocus = null; }
+    if (G.sceneKeepOut?.by === 'golden') keepOut(G, null);
+    this.view?.dispose(); this.view = null;
+    this.waits.length = 0; this.state = 'off'; this.t = 0; this.spot = null; this.stg = null; this.beat = null; this.loop = null; this.noticed = false;
   }
   dropProps() {
     for (const k of ['ball', 'bundle']) { const m = this[k]; if (m) { m.parent?.remove(m); this[k] = null; } }
@@ -102,33 +110,26 @@ export class GoldenJoin {
   /** resolves once fn() is true (checked every frame in update), or after max seconds */
   until(fn, max = 4) { return new Promise(res => this.waits.push({ fn, res, t: max })); }
   wait(s) { return this.until(() => false, s); }
-  /** nothing chasing the hero, no dialogue, no boss fight: a moment for a scene */
-  calm() {
-    const G = this.G, P = G.player;
-    if (!P || G.playerDead || G.ui?.dlg?.active || G.heroSwitching || G.ui?.anyModal?.() || P.controlLocked || G.ui?.iris?.active) return false;
-    if (G.dungeon?.boss?.introDone && G.dungeon.boss.alive && G.dungeon.boss.aggro) return false;
-    if (G.dungeon?.village?.celebrate) return false; // (a crew's relief being celebrated in the square: docs/COZY.md §3.2)
-    for (const m of G.dungeon?.monsters || []) if (m.alive && m.aggro && dist(m.pos.x, m.pos.z, P.pos.x, P.pos.z) < 13) return false;
-    return true;
-  }
+  /** nothing else going on in town: a moment for a scene (actors/arrivals.js why) */
+  calm() { return !this.H.arrivals?.why?.(); }
   update(dt) {
     const G = this.G;
     for (let i = this.waits.length - 1; i >= 0; i--) { const w = this.waits[i]; w.t -= dt; if (w.t <= 0 || w.fn()) { this.waits.splice(i, 1); w.res(); } }
-    if (G.mode === 'village') return this.townHint(dt);
+    if (G.mode === 'village' && this.state === 'off') return this.townHint(dt);
     if (this.knight && this.state !== 'wait') this.knight.update(dt);
     this.tickBall(dt);
     if (this.busy && this.beat) this.frameTick();
-    if (this.busy || this.state === 'done') return; // (done: he trots off, then reset() clears it)
-    if (!this.inOnsen()) { if (this.state !== 'off') this.reset(); return; }
-    const P = G.player; if (!P || G.playerDead) return;
+    if (this.busy || this.state === 'off' || this.state === 'done') return; // (done: he trots off, then reset() clears it)
+    if (G.mode !== 'village') { this.reset(); return; }
+    const P = G.player; if (!P || G.playerDead) { this.reset(); return; }
     this.t += dt;
-    if (this.state === 'off') { this.state = 'wait'; this.t = 0; return; }
     if (this.state === 'wait') {
-      if (!this.knight) { this.knight = new SceneGolden(G.world, G); this.knight.visible = false; this.knight.setPos(SPRING.x + SPRING.r + 1.2, SPRING.z); this.knight.update(0); }
-      const ready = this.t > 1.5 && this.prepStep(); // (the scenery round the spring once the zone has settled, a little a frame: for his staging)
-      if (ready && this.t > 2 && this.calm()) this.standGuard(P);
+      if (!this.knight) { this.knight = new SceneGolden(G.world, G); this.knight.visible = false; this.knight.setPos(FOUNTAIN.x + FOUNTAIN.r + 1.2, FOUNTAIN.z); this.knight.update(0); }
+      this.view ||= new SceneView(G, FOUNTAIN, { w: 16, back: 10, front: 20 }); // (the plaza's scenery, a few ms a frame: for his staging)
+      if (this.view.prepStep(3) && this.t > 2 && this.calm()) this.standGuard(P);
       return;
     }
+    if (this.state === 'march') this.tickMarch(dt);
     if (this.state === 'guard') this.tickGuard(dt, P);
   }
   /** room for him: walkable, clear, level-ish, dry */
@@ -140,156 +141,118 @@ export class GoldenJoin {
     }
     return true;
   }
-  /** the scenery that could stand between the scene and the camera, near the big spring: the big merged batches cut down
-   *  to their triangles in a box round it and up the camera's line, above knee height, sorted into half-metre strips
-   *  across the screen (a ray up the camera's line stays in one strip: it meets a few thousand triangles, not a few
-   *  hundred thousand), plus the small and the instanced meshes near the box as they are. No actors (rigs, the horde),
-   *  no ground, nothing see-through or off the camera's layers. Built when he takes his post, dropped once he's staged. */
-  occluders() { if (!this._occ) { const job = this._occJob || this.occBuild(); while (!job.next().done); this._occJob = null; } return this._occ; }
-  /** build the occluders a few milliseconds a frame while he waits to take his post (true once they're ready) */
-  prepStep(budget = 3) {
-    if (this._occ) return true;
-    const job = this._occJob ||= this.occBuild(), t0 = performance.now();
-    while (performance.now() - t0 < budget) if (job.next().done) { this._occJob = null; return true; }
-    return false;
-  }
-  *occBuild() {
-    const G = this.G, W = G.world, cam = G.engine.camera, yaw = G.engine.rig.yaw, tx = Math.sin(yaw), tz = Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
-    const skip = new Set([this.knight?.rig.root, G.player?.rig?.root, G.companion?.rig?.root]);
-    const y0 = W.heightAt(SPRING.x + SPRING.r + 2, SPRING.z) + 0.8; // (lower than that, nothing hides a standing actor from up here)
-    const U = (x, z) => (x - SPRING.x) * tx + (z - SPRING.z) * tz, Wd = (x, z) => (x - SPRING.x) * rx + (z - SPRING.z) * rz;
-    const inBox = v => { const u = U(v.x, v.z), w = Wd(v.x, v.z); return v.y > y0 && v.y < 13 && Math.abs(w) < 10 && u > -9 && u < 18; };
-    const occ = { rest: [], tris: Array.from({ length: 40 }, () => []), meshes: [] }, list = []; let work = 0;
-    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), sph = new THREE.Sphere();
-    for (const m of G.dungeon?.monsters || []) skip.add(m.rig?.root);
-    const walk = o => { // (not into an actor: the pack, him, the monsters, the horde, a skinned rig)
-      if (skip.has(o) || o.name === 'horde' || o.isBone || o.isSkinnedMesh || o.visible === false || /ground/i.test(o.name)) return;
-      if (o.isMesh && o.layers.test(cam.layers) && !o.material?.transparent && !o.userData?.lookH && o.geometry?.attributes?.position) list.push(o);
-      for (const c of o.children) walk(c);
-    };
-    for (const ch of W.scene.children) walk(ch);
-    yield;
-    for (const o of list) {
-      const g = o.geometry, pos = g.attributes.position;
-      const idx = g.index, n = idx ? idx.count : pos.count;
-      o.updateWorldMatrix(true, false);
-      if (o.isInstancedMesh || o.isBatchedMesh || n < 3000) { // (only what lies near the box; the instanced and the batched (trees) as they are)
-        if (!g.boundingSphere) g.computeBoundingSphere();
-        if (!o.isInstancedMesh && !o.isBatchedMesh) { sph.copy(g.boundingSphere).applyMatrix4(o.matrixWorld); const u = U(sph.center.x, sph.center.z), w = Wd(sph.center.x, sph.center.z); if (Math.abs(w) > 10 + sph.radius || u < -9 - sph.radius || u > 18 + sph.radius || sph.center.y + sph.radius < y0) continue; }
-        occ.rest.push(o); continue;
-      }
-      const M = o.matrixWorld;
-      for (let i = 0; i + 2 < n; i += 3) {
-        if (++work % 1000 === 0) yield; // (a few ms of triangles a frame)
-        a.fromBufferAttribute(pos, idx ? idx.getX(i) : i).applyMatrix4(M); b.fromBufferAttribute(pos, idx ? idx.getX(i + 1) : i + 1).applyMatrix4(M); c.fromBufferAttribute(pos, idx ? idx.getX(i + 2) : i + 2).applyMatrix4(M);
-        if (!inBox(a) && !inBox(b) && !inBox(c)) continue;
-        const wa = Wd(a.x, a.z), wb = Wd(b.x, b.z), wc = Wd(c.x, c.z);
-        const s0 = Math.max(0, Math.floor((Math.min(wa, wb, wc) + 10) / 0.5)), s1 = Math.min(39, Math.floor((Math.max(wa, wb, wc) + 10) / 0.5));
-        for (let k = s0; k <= s1; k++) occ.tris[k].push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
-      }
-      yield;
-    }
-    occ.strip = (x, z) => { // the strip's own little mesh, made on first use
-      const k = Math.floor((Wd(x, z) + 10) / 0.5); if (k < 0 || k > 39) return null;
-      if (occ.meshes[k] === undefined) {
-        const t = occ.tris[k]; occ.meshes[k] = null;
-        if (t.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(t, 3)); g.computeBoundingSphere(); const m = occ.meshes[k] = new THREE.Mesh(g, this._occMat ||= new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); m.updateMatrixWorld(); }
-      }
-      return occ.meshes[k];
-    };
-    this._occ = occ;
-  }
-  dropOcc() { for (const m of this._occ?.meshes || []) m?.geometry.dispose(); this._occ = null; this._occJob = null; this._seen = null; }
-  /** would something (a pine, a village roof, a lantern) stand between (x, z) and the game camera? Rays from there up the
-   *  camera's line (`hs`: the heights, an actor's middle and head) against the scenery near the spring */
-  screened(x, z, hs = [0.55, 1.3]) {
-    const G = this.G, W = G.world, rig = G.engine?.rig; if (!rig) return false;
-    const key = `${Math.round(x * 4)},${Math.round(z * 4)},${hs.join()}`, seen = this._seen ||= new Map(); if (seen.has(key)) return seen.get(key);
-    const dir = new THREE.Vector3(Math.sin(rig.yaw) * Math.cos(rig.pitch), Math.sin(rig.pitch), Math.cos(rig.yaw) * Math.cos(rig.pitch));
-    const rc = this._rc ||= new THREE.Raycaster(), occ = this.occluders(), strip = occ.strip(x, z), list = strip ? [strip, ...occ.rest] : occ.rest;
-    let hit = false;
-    for (const dy of hs) { rc.set(new THREE.Vector3(x, W.heightAt(x, z) + dy, z), dir); rc.near = 0.3; rc.far = 30; if (rc.intersectObjects(list, false).length) { hit = true; break; } }
-    seen.set(key, hit); return hit;
-  }
+  /** nothing solid between two marks (a bench, a planter: low, so the rays don't see them, but right in the shot) */
+  between(a, b) { const C = this.G.world.collision; for (const t of [0.25, 0.5, 0.75]) if (C?.solidAt?.(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, 0.45)) return false; return true; }
   /** the camera's ground axes: toward it (T) and the screen's right (R) */
-  axes() { const y = this.G.engine?.rig?.yaw ?? Math.PI / 4; return { T: [Math.sin(y), Math.cos(y)], R: [Math.cos(y), -Math.sin(y)] }; }
-  /** the scene's staging, worked out once when he takes his post: his post on the big spring's rim; where you stand for
-   *  the vow (beside him on screen, a step toward the camera); where Shadow sits for the gift (between you, in front);
-   *  where the ball lands (his other side, or behind him: he runs off and back). Every spot dry, level and in plain view
-   *  of the game camera; the spring and its steam beside the pair on screen rather than in front of them. */
+  axes() { return camAxes(this.G); }
+  /** the scene's staging, worked out once when he takes his post: his post on the fountain's rim; where you stand for the
+   *  vow (beside him on screen, 2.7 m across, a step toward the camera); where Shadow sits for the gift (behind you both,
+   *  between you, his face to the camera); where the ball lands (his other side, or behind him: he runs off and back).
+   *  Every spot free, on the plaza's paving, clear of the villagers and in plain view of where the scene's camera will be
+   *  (actors/sceneStage.js); the fountain beside the pair on screen rather than in front of them */
   stage(P) {
-    const { T, R } = this.axes(), at = (o, side, t) => ({ x: o.x + R[0] * side + T[0] * t, z: o.z + R[1] * side + T[1] * t });
+    const G = this.G, V = this.view?.occ ? this.view : null, { T, R } = this.axes(), at = (o, side, t) => ({ x: o.x + R[0] * side + T[0] * t, z: o.z + R[1] * side + T[1] * t });
     const combos = [];
     for (let k = 0; k < 24; k++) {
       const a = k / 24 * Math.PI * 2;
-      for (const r of [SPRING.r + 1.1, SPRING.r + 1.7]) {
-        const post = { x: SPRING.x + Math.cos(a) * r, z: SPRING.z + Math.sin(a) * r }; if (!this.free(post.x, post.z)) continue;
+      for (const r of [FOUNTAIN.r + 1.1, FOUNTAIN.r + 1.7]) {
+        const post = { x: FOUNTAIN.x + Math.cos(a) * r, z: FOUNTAIN.z + Math.sin(a) * r }; if (!this.free(post.x, post.z)) continue;
         for (const side of [1, -1]) for (const t of [0.6, 1.1, 0.1]) {
-          const aud = at(post, side * 2.7, t); if (!this.free(aud.x, aud.z)) continue;
-          const mid = { x: (post.x + aud.x) / 2, z: (post.z + aud.z) / 2 }, shd = at(mid, 0, 0.9);
-          const balls = [at(post, -side * 2.6, 0.3), at(post, -side * 2.2, -1.2), at(post, -side * 0.6, -2.6), at(post, side * 0.6, -2.6)].filter(p => this.free(p.x, p.z));
-          // the spring's offset from the pair's middle: across the screen (sx) and toward the camera (su)
-          const dx = SPRING.x - mid.x, dz = SPRING.z - mid.z, sx = dx * R[0] + dz * R[1], su = dx * T[0] + dz * T[1];
-          const front = Math.max(0, SPRING.r + 3.2 - Math.abs(sx)) * Math.max(0, Math.min(1, (su + 2.5) / 3));
-          const s = front * 1.5 + (balls.length ? 0 : 5) + (this.free(shd.x, shd.z) ? 0 : 5) + Math.abs(t - 0.6) + (Math.abs(sx) < SPRING.r + 6.5 ? 0 : 2) + dist(post.x, post.z, P.pos.x, P.pos.z) * 0.03;
-          combos.push({ post, aud, shd, balls, side, s });
+          const aud = at(post, side * 2.7, t); if (!this.free(aud.x, aud.z) || !this.between(post, aud)) continue;
+          const mid = { x: (post.x + aud.x) / 2, z: (post.z + aud.z) / 2 }, shd = at(mid, 0, -1.1);
+          const balls = [at(post, -side * 2.6, 0.3), at(post, -side * 2.2, -1.2), at(post, -side * 0.6, -2.6), at(post, side * 0.6, -2.6)].filter(p => this.free(p.x, p.z) && this.between(post, p));
+          // the fountain's offset from the pair's middle: across the screen (sx) and toward the camera (su)
+          const dx = FOUNTAIN.x - mid.x, dz = FOUNTAIN.z - mid.z, sx = dx * R[0] + dz * R[1], su = dx * T[0] + dz * T[1];
+          const front = Math.max(0, FOUNTAIN.r + 3.2 - Math.abs(sx)) * Math.max(0, Math.min(1, (su + 2.5) / 3));
+          const s = front * 1.5 + (balls.length ? 0 : 5) + (this.free(shd.x, shd.z) ? 0 : 5) + Math.abs(t - 0.6) + (Math.abs(sx) < FOUNTAIN.r + 6.5 ? 0 : 2) + Math.max(0, 7 - dist(post.x, post.z, P.pos.x, P.pos.z)) * 0.8 // (a post a little way off from you: you walk up to him)
+            + (paved(G, post.x, post.z) ? 0 : 2.6) + (paved(G, aud.x, aud.z) ? 0 : 2.6) + villagersNear(G, mid.x, mid.z, 3) * 1.5;
+          combos.push({ post, aud, shd, mid, balls, side, s });
         }
       }
     }
     combos.sort((a, b) => a.s - b.s);
+    const cam = new THREE.Vector3();
     const clear = c => {
-      if (this.screened(c.post.x, c.post.z) || this.screened(c.aud.x, c.aud.z) || this.screened(c.shd.x, c.shd.z, [0.45])) return false;
-      c.ball = c.balls.find(p => !this.screened(p.x, p.z, [0.5])) || null; return !!c.ball;
+      if (!V) return true;
+      camAt(G, frameFor(G, [[c.post.x, c.post.z, 0, 1.55], [c.aud.x, c.aud.z, 0, 1.45], [c.shd.x, c.shd.z, 0, 0.8]], { min: 13, max: 22 }), cam);
+      if (V.screened(c.post.x, c.post.z, BODY, 0.32, cam) || V.screened(c.aud.x, c.aud.z, BODY, 0.32, cam) || V.screened(c.shd.x, c.shd.z, PUP, 0.2, cam)) return false;
+      c.ball = c.balls.find(p => !V.screened(p.x, p.z, [0.3, 0.6], 0.15, cam)) || null; return !!c.ball;
     };
-    let best = combos.slice(0, 60).find(clear) || null;
+    // (the ball comes from Rosie's Treats and bounces on past him: its landing spots on his far side from her door first)
+    const rd = this.rosieDoor();
+    for (const c of combos) { const ax = c.post.x - rd.x, az = c.post.z - rd.z, L = Math.hypot(ax, az) || 1; c.balls.sort((p, q) => ((q.x - c.post.x) * ax + (q.z - c.post.z) * az) / L - ((p.x - c.post.x) * ax + (p.z - c.post.z) * az) / L); }
+    let best = combos.slice(0, 80).find(clear) || null;
     if (best) best.clear = true; else if ((best = combos[0] || null)) { best.clear = false; best.ball = best.balls[0] || null; }
-    this.dropOcc();
+    return best;
+  }
+  /** where he marches in from: a clear straight line to his post across the plaza, ~12 m long, from up-screen if it can be
+   *  (he comes toward the camera, very straight, the lance upright) */
+  entry(post) {
+    const G = this.G, W = G.world, { T } = this.axes(), clear = (x, z) => W.walkable?.(x, z) !== false && !W.collision?.solidAt?.(x, z, 0.3);
+    let best = null;
+    for (let i = 0; i < 24; i++) {
+      const a = i / 24 * Math.PI * 2, dx = Math.sin(a), dz = Math.cos(a);
+      for (const r of [12, 10, 14, 8]) {
+        let ok = true; for (let d = 1.2; d <= r; d += 0.5) if (!clear(post.x + dx * d, post.z + dz * d)) { ok = false; break; }
+        if (!ok) continue;
+        const x = post.x + dx * r, z = post.z + dz * r, s = (1 + dx * T[0] + dz * T[1]) * 1.5 + (paved(G, x, z) ? 0 : 1) + Math.abs(r - 12) * 0.15 + villagersNear(G, x, z, 3);
+        if (!best || s < best.s) best = { x, z, s };
+        break;
+      }
+    }
     return best;
   }
   standGuard(P) {
     const G = this.G, st = this.stage(P); if (!st) return;
     const k = this.knight, W = G.world;
     this.stg = st; this.spot = new THREE.Vector3(st.post.x, W.heightAt(st.post.x, st.post.z), st.post.z);
-    const { T } = this.axes();
-    k.setPos(st.post.x, st.post.z); k.facing = k.faceTarget = Math.atan2(T[0], T[1]); k.visible = true; k.update(0); // (to the camera)
-    k.anim.play('gldAttention');
-    this.state = 'guard'; this.t = 0;
+    // he marches in across the plaza to his post (or, nowhere clear to march from, he's there)
+    const e = this.entry(st.post);
+    if (e) { k.setPos(e.x, e.z); k.faceTo(st.post.x, st.post.z); k.facing = k.faceTarget; k.visible = true; k.update(0); this.state = 'march'; this.t = 0; Events.emit('golden:joinScene', { phase: 'march' }); return; }
+    this.atPost();
+  }
+  tickMarch(dt) {
+    const k = this.knight, p = this.spot;
+    if (k.moveTo(p.x, p.z, dt, 0.72, 0.12) || this.t > 14) { if (this.t > 14) k.setPos(p.x, p.z); this.atPost(); }
+  }
+  /** at his post: he turns to the camera, plants the lance and stands at attention */
+  atPost() {
+    const G = this.G, k = this.knight, { T } = this.axes();
+    k.faceTarget = Math.atan2(T[0], T[1]); k.visible = true; k.update(0); // (to the camera)
+    k.anim.play('gldAttention'); sfx('jav_stick', { pos: k.pos, pitch: 0.7, vol: 0.5 });
+    this.state = 'guard'; this.t = 0; this.far = false;
     Events.emit('golden:joinScene', { phase: 'guard' });
   }
-  /** the scene's camera: everyone in the beat (him, you, Shadow, the ball when it matters, the loop) in frame with a
-   *  margin, the group in the middle of the screen (the 20° lens: the distance from the group's size on screen) */
+  /** Shadow notices, wherever you are (his tip, once it can show: never over a dialogue or another tip, never after the
+   *  scene has moved on) */
+  notice() {
+    const G = this.G, F = G.state.flags; if (F.hints?.gldGuardTown || this.t < 1.5 || !this.calm()) return;
+    G.hint?.('gldGuardTown', "*Sniff…* Someone in shiny green armour is standing guard by the fountain. Very, very still. …Is he a statue?", false);
+    if (F.hints?.gldGuardTown && G.companion) G.vfx?.emote?.(G.companion, '?', 1.4);
+  }
+  /** the scene's camera: everyone in the beat (him, you, Shadow, the ball when it matters, the loop) in frame with a margin,
+   *  the group in the middle of the band above the dialogue box (actors/sceneStage.js frameFor) */
   frameTick() {
-    const G = this.G, rig = G.engine?.rig, k = this.knight, P = G.player; if (!rig || !k || !P) return;
-    const { T, R } = this.axes(), sp = Math.sin(rig.pitch), cp = Math.cos(rig.pitch), cam = G.engine.camera;
-    const tv = Math.tan((cam.fov || 20) * Math.PI / 360), th = tv * (cam.aspect || 16 / 9);
+    const G = this.G, k = this.knight, P = G.player; if (!k || !P) return;
     const pts = [[P.pos.x, P.pos.z, 0, 1.4]];
     if (k.visible) pts.push([k.pos.x, k.pos.z, 0, 1.55]);
     const sh = G.companion, b = this.beat;
     if (sh && (sh.hold?.gld || sh.whelp?.forced)) pts.push([sh.pos.x, sh.pos.z, 0, (sh.whelp?.lift || 0) + 0.9]);
-    if (b === 'fetch' && this.ball) pts.push([this.ball.position.x, this.ball.position.z, 0, 0.4]);
+    if (b === 'fetch' && this.ball && dist(this.ball.position.x, this.ball.position.z, k.pos.x, k.pos.z) < 7) pts.push([this.ball.position.x, this.ball.position.z, 0, 0.4]); // (once it's close: it flies in)
     if (b === 'loop' && this.loop) for (let i = 0; i < 4; i++) pts.push([this.loop.x + Math.sin(i * 1.571) * this.loop.r, this.loop.z + Math.cos(i * 1.571) * this.loop.r, 1.3, 2.3]);
-    const ox = pts.reduce((a, p) => a + p[0], 0) / pts.length, oz = pts.reduce((a, p) => a + p[1], 0) / pts.length;
-    let h0 = 1e9, h1 = -1e9, v0 = 1e9, v1 = -1e9;
-    for (const [x, z, y0, y1] of pts) {
-      const h = (x - ox) * R[0] + (z - oz) * R[1], u = (x - ox) * T[0] + (z - oz) * T[1];
-      h0 = Math.min(h0, h - 0.4); h1 = Math.max(h1, h + 0.4);
-      v0 = Math.min(v0, -u * sp + (y0 - 0.6) * cp); v1 = Math.max(v1, -u * sp + (y1 - 0.6) * cp);
-    }
-    const ch = (h0 + h1) / 2, cv = (v0 + v1) / 2, eh = (h1 - h0) / 2, ev = (v1 - v0) / 2;
-    const f = G.introFocus ||= new THREE.Vector3();
-    f.set(ox + R[0] * ch - T[0] * cv / sp, P.pos.y, oz + R[1] * ch - T[1] * cv / sp);
-    rig.distTarget = Math.min(26, Math.max(14, (eh * 1.3 + 0.9) / th, (ev * 1.3 + 0.8) / tv));
+    // (the talk beat close, 18 m at most, so you two read on a phone; wider only for the ball's arc and the whelp's loop)
+    const TALK_MAX = 18, wide = b === 'fetch' || b === 'loop';
+    frameGroup(G, pts, { min: 13, max: wide ? 24 : TALK_MAX });
+    const fx = this.camFix; if (fx && b === 'pair') { G.introFocus.x += fx.x; G.introFocus.z += fx.z; G.engine.rig.distTarget += fx.d; } // (a garland or a lantern post would cross you from the plain framing)
+    if (!wide) G.engine.rig.distTarget = Math.min(TALK_MAX, G.engine.rig.distTarget);
   }
   tickGuard(dt, P) {
-    const G = this.G, k = this.knight, d = dist(P.pos.x, P.pos.z, k.pos.x, k.pos.z);
-    if (!this.noticed && d < 16) {
-      this.noticed = true;
-      if (G.companion) G.vfx?.emote?.(G.companion, '?', 1.4);
-      G.hint?.('gldGuard', "*Sniff…* Someone in shiny green armour is standing guard by the hot springs. Very, very still. …Is he a statue?", false);
-    }
-    if (d < 5 && this.calm()) this.vow(P);
+    const k = this.knight, d = dist(P.pos.x, P.pos.z, k.pos.x, k.pos.z);
+    this.notice();
+    if (d > 6) this.far = true; // (you walk up to him: from further off, or, standing beside him all along, after a while)
+    if (d < 5 && this.t > 1.2 && (this.far || this.t > 12) && this.calm()) this.vow(P);
   }
-  // ------------------------------------------------------------------ the tennis ball (thrown from the bathhouse)
+  // ------------------------------------------------------------------ the tennis ball (thrown out of Rosie's Treats)
   tickBall(dt) {
     const b = this.ballState; if (!b || !this.ball) return;
     const G = this.G, m = this.ball;
@@ -305,15 +268,21 @@ export class GoldenJoin {
     const gy = G.world.heightAt(m.position.x, m.position.z) + 0.075;
     if (m.position.y <= gy) {
       m.position.y = gy;
-      if (Math.abs(b.v.y) > 1.2) { b.v.y = -b.v.y * 0.62; b.v.x *= 0.8; b.v.z *= 0.8; sfx('ball_bounce', { pos: m.position, pitch: 1.2, vol: 0.7 }); b.bounces++; }
-      else { b.v.set(b.v.x * (1 - dt * 3), 0, b.v.z * (1 - dt * 3)); if (Math.hypot(b.v.x, b.v.z) < 0.15) b.rest = true; }
+      // (the first bounce takes most of its run out of it: it skips on a step or two past him and stops near its spot)
+      if (Math.abs(b.v.y) > 1.2) { const k = b.bounces ? 0.5 : 0.15; b.v.y = -b.v.y * (b.bounces ? 0.6 : 0.45); b.v.x *= k; b.v.z *= k; sfx('ball_bounce', { pos: m.position, pitch: 1.2, vol: 0.7 }); b.bounces++; }
+      else { const f = Math.max(0, 1 - dt * 5); b.v.set(b.v.x * f, 0, b.v.z * f); if (Math.hypot(b.v.x, b.v.z) < 0.15) b.rest = true; }
     }
   }
+  /** Rosie's Treats' door (the village's own record when it's there) */
+  rosieDoor() { const r = this.G.sim?.list?.find(x => x.data.type === 'rosieShop'); return r?.door ? { x: r.door.x, z: r.door.z } : ROSIE_DOOR; }
   throwBall(to) {
-    const G = this.G, W = G.world, poi = G.world.plan?.pois?.find(p => p.kind === 'feature') || BATHHOUSE;
-    const from = new THREE.Vector3(poi.x + 0.6, W.heightAt(poi.x, poi.z) + 1.4, poi.z + 1.4);
-    const m = this.ball = new THREE.Mesh(ballGeo(), propMat()); m.castShadow = true; m.position.copy(from); G.world.scene.add(m);
-    const T = 0.85, v = new THREE.Vector3((to.x - from.x) / T, 0, (to.z - from.z) / T); v.y = (to.y + 0.1 - from.y + 0.5 * 14 * T * T) / T;
+    const G = this.G, W = G.world, d = this.rosieDoor(), p = this.spot || to;
+    // (from Rosie's Treats' way: in at the frame's edge, already on its way, when her door is further off than that)
+    let fx = d.x, fz = d.z + 0.6; const L = Math.hypot(fx - p.x, fz - p.z); if (L > 8.5) { fx = p.x + (fx - p.x) / L * 8.5; fz = p.z + (fz - p.z) / L * 8.5; }
+    const from = new THREE.Vector3(fx, W.heightAt(fx, fz) + (L > 8.5 ? 2.2 : 1.3), fz);
+    const m = this.ball = new THREE.Mesh(ballGeo(), propMat()); m.castShadow = true; m.position.copy(from); m.userData.sceneActor = true; G.world.scene.add(m);
+    // (a long lob down Market Street: the further, the higher and slower, and it bounces in past him)
+    const T = Math.max(0.85, Math.min(2.2, Math.hypot(to.x - from.x, to.z - from.z) / 8)), v = new THREE.Vector3((to.x - from.x) / T, 0, (to.z - from.z) / T); v.y = (to.y + 0.1 - from.y + 0.5 * 14 * T * T) / T;
     this.ballState = { v, bounces: 0, rest: false, held: false };
     sfx('throw', { pos: from, pitch: 1.3, vol: 0.6 });
     G.ui?.float?.(from.clone().setY(from.y + 0.6), 'Fetch!', { kind: 'status', color: '#ffe6a0' });
@@ -323,32 +292,38 @@ export class GoldenJoin {
     const G = this.G, k = this.knight, rig = G.engine.rig, sh = G.companion;
     this.state = 'vow';
     P.controlLocked = true; P.moveTarget = null; G.skills?.charge?.cancel?.('scene', true);
+    G.ui?.toasts?.retire?.(0); // (Shadow's "is he a statue?" steps aside)
     Events.emit('golden:joinScene', { phase: 'vow' });
     const prevDist = rig.distTarget;
     try {
-      // you walk to your mark beside him (the staging: in plain view, the spring beside you both), he turns to you
+      // you walk to your mark beside him (the staging: in plain view, the fountain beside you both), he turns to you
       const st = this.stg, W = G.world;
+      keepOut(G, st ? st.mid : k.pos, 4); G.sceneKeepOut.by = 'golden';
       this.beat = 'pair';
-      if (sh && st) { sh.hold = { x: st.shd.x, z: st.shd.z, face: Math.atan2(k.pos.x - st.shd.x, k.pos.z - st.shd.z), gld: true }; sh.anim?.stop?.('sit'); } // (Shadow sits on his mark and watches)
+      if (sh && st) { sh.hold = { x: st.shd.x, z: st.shd.z, face: Math.atan2(st.mid.x - st.shd.x, st.mid.z - st.shd.z), gld: true }; sh.anim?.stop?.('sit'); } // (Shadow sits on his mark and watches)
       if (st) {
         P.moveTarget = new THREE.Vector3(st.aud.x, W.heightAt(st.aud.x, st.aud.z), st.aud.z);
         await this.until(() => { k.faceTo(P.pos.x, P.pos.z); return dist(P.pos.x, P.pos.z, st.aud.x, st.aud.z) < 0.3; }, 4);
         if (dist(P.pos.x, P.pos.z, st.aud.x, st.aud.z) > 0.6) P.setPos(st.aud.x, st.aud.z); // (blocked on the way: on the mark)
         P.moveTarget = null;
-        if (sh?.hold?.gld) { await this.until(() => dist(sh.pos.x, sh.pos.z, sh.hold.x, sh.hold.z) < 0.4, 3); if (dist(sh.pos.x, sh.pos.z, sh.hold.x, sh.hold.z) > 1.2) sh.setPos?.(sh.hold.x, sh.hold.z); }
+        if (sh?.hold?.gld) { await this.until(() => dist(sh.pos.x, sh.pos.z, sh.hold.x, sh.hold.z) < 0.4, 3); shadowOnMark(sh); }
       }
       k.faceTo(P.pos.x, P.pos.z); P.faceTo(k.pos.x, k.pos.z);
+      // (the pair's framing in the clear from the camera's real place: frameClear's step closer, further or aside, kept by frameTick)
+      const pts = [[P.pos.x, P.pos.z, 0, 1.4], [k.pos.x, k.pos.z, 0, 1.55]]; if (sh?.hold?.gld) pts.push([sh.hold.x, sh.hold.z, 0, 0.9]);
+      const base = frameFor(G, pts, { min: 13, max: 18 }), pick = this.view?.occ ? frameClear(G, this.view, pts, [P.pos, k.pos], sh?.hold?.gld ? [sh.pos] : [], { min: 13, max: 18 }) : null;
+      this.camFix = base && pick?.moved ? { x: pick.focus.x - base.focus.x, z: pick.focus.z - base.focus.z, d: pick.dist - base.dist } : null; this.framed = pick?.moved ? 'moved' : 'base';
       await this.until(() => Math.abs(Math.atan2(Math.sin(k.faceTarget - k.facing), Math.cos(k.faceTarget - k.facing))) < 0.15, 0.8);
       k.anim.play('gldSalute'); sfx('lance_whoosh', { pitch: 0.8, vol: 0.5 });
       const name = this.H.name('golden'), portrait = G.portrait?.('golden');
-      await G.ui?.dialogue?.({ speaker: name, portrait, lines: ['Halt! Who approaches the springs of Yukimi?', '…A traveller. Then bear witness:', `I, ${name} of the Emberleaf Guard, do solemnly swear upon my lance to guard these springs against all—`] });
-      // a tennis ball bounces out of the bathhouse, past him
+      await G.ui?.dialogue?.({ speaker: name, portrait, lines: ['Halt! Who approaches the fountain of Blossom Hollow?', '…A local. Then bear witness:', `I, ${name} of the Emberleaf Guard, do solemnly swear upon my lance to guard this fountain against all—`] });
+      // a tennis ball bounces out of Rosie's Treats, past him
       const f = k.facing, past = this.stg?.ball ? new THREE.Vector3(this.stg.ball.x, 0, this.stg.ball.z) : new THREE.Vector3(k.pos.x - Math.cos(f) * 2.6 - Math.sin(f) * 1.2, 0, k.pos.z + Math.sin(f) * 2.6 - Math.cos(f) * 1.2);
       if (!this.free(past.x, past.z)) past.set(k.pos.x + Math.cos(f) * 2.6, 0, k.pos.z - Math.sin(f) * 2.6);
       this.beat = 'fetch';
       past.y = G.world.heightAt(past.x, past.z);
       this.throwBall(past);
-      await this.until(() => this.ballState?.bounces >= 1, 1.6);
+      await this.until(() => this.ballState?.bounces >= 1, 2.6);
       // his ears go up, his tail goes, the vow is forgotten: the lance drops and he's off after it
       k.anim.play('gldStartle'); G.vfx?.emote?.(k, '!', 1.1); sfx('golden_boof', { pos: k.pos, pitch: 1.15 });
       await this.wait(0.45);
@@ -356,7 +331,7 @@ export class GoldenJoin {
       gl.holder.rotation.set(0, k.facing, Math.PI / 2 - 0.05); G.world.scene.add(gl.holder);
       k.lanceThrown = true; sfx('jav_stick', { pos: k.pos, pitch: 0.8 });
       if (sh) G.vfx?.emote?.(sh, '!', 1);
-      await this.until(() => this.ballState?.rest || this.ballState?.bounces >= 3, 1.4);
+      await this.until(() => this.ballState?.rest || this.ballState?.bounces >= 3, 1.6);
       const bp = this.ball.position.clone();
       await this.until(() => k.moveTo(bp.x, bp.z, 1 / 60, 1.9, 0.35), 3);
       k.anim.play('pickup'); await this.wait(0.38);
@@ -374,8 +349,9 @@ export class GoldenJoin {
       this.state = 'talk';
       await this.talk(P);
     } finally {
-      G.introFocus = null; rig.distTarget = prevDist; P.controlLocked = false; P.moveTarget = null; this.beat = null; this.loop = null;
-      if (!this.joined) { this.state = 'off'; this.reset(); } else this.state = 'done';
+      G.introFocus = null; rig.distTarget = prevDist; P.controlLocked = false; P.moveTarget = null; this.beat = null; this.loop = null; this.camFix = null;
+      if (G.sceneKeepOut?.by === 'golden') keepOut(G, null);
+      if (!this.joined) { this.reset(true); } else { this.state = 'done'; this.H.arrivals?.finished?.('golden'); } // (the arrival recorded; his quest and its card)
     }
   }
   // ------------------------------------------------------------------ the talk, the gift, the join
@@ -383,17 +359,17 @@ export class GoldenJoin {
     const G = this.G, ui = G.ui, k = this.knight, me = this.H.name(), name = this.H.name('golden'), sh = G.companion;
     const portrait = G.portrait?.('golden'), say = (lines, choices) => ui.dialogue({ speaker: name, portrait, lines, choices });
     k.anim.talk = 0.8;
-    const a = await say([`Ahem. ${name} of the Emberleaf Guard. I guard the springs.`, 'Mostly from snow monkeys. They do not respect the vow either.'],
-      [{ text: "That ball is the bathhouse's." }, { text: 'Good catch!' }]);
+    const a = await say([`Ahem. ${name} of the Emberleaf Guard. I guard the springs of Yukimi.`, 'Mostly from snow monkeys. They do not respect the vow either.'],
+      [{ text: "That ball is Rosie's." }, { text: 'Good catch!' }]);
     await say(a === 0 ? ['Then I shall return it. Later. With honour. …After one more throw.'] : ['Thank you! It is my best skill. After the lance. And the javelins. Mostly the ball.']);
-    await say([`And you must be ${me}. Rosie's notice reached even Yukimi. The Burrow, the yokai, the very good dog.`, 'Which brings me to my second duty.']);
+    await say([`And you must be ${me}. Rosie's notice reached even Yukimi. The Burrow, the yokai, the very good dog.`, 'I have been guarding your fountain while I waited for you. It seemed the polite thing to do.', 'Which brings me to my second duty.']);
     // the gift: he has been guarding a dragon whelp costume for Shadow
     if (sh) {
       const m = this.stg?.shd || { x: k.pos.x + Math.sin(k.facing) * 1.1, z: k.pos.z + Math.cos(k.facing) * 1.1 };
       sh.hold = { x: m.x, z: m.z, face: Math.atan2(k.pos.x - m.x, k.pos.z - m.z), gld: true }; sh.anim?.stop?.('sit');
     }
     k.anim.talk = 0; k.anim.play('gldOffer');
-    const bundle = this.bundle = new THREE.Mesh(bundleGeo(), propMat()); bundle.castShadow = true; G.world.scene.add(bundle);
+    const bundle = this.bundle = new THREE.Mesh(bundleGeo(), propMat()); bundle.castShadow = true; bundle.userData.sceneActor = true; G.world.scene.add(bundle);
     const placeBundle = () => { bundle.position.set(k.pos.x + Math.sin(k.facing) * 0.34, k.pos.y + 0.62, k.pos.z + Math.cos(k.facing) * 0.34); bundle.rotation.y = k.facing; };
     placeBundle();
     await this.until(() => !sh || dist(sh.pos.x, sh.pos.z, sh.hold.x, sh.hold.z) < 0.3, 3);
@@ -425,12 +401,16 @@ export class GoldenJoin {
     k.anim.play('gldAttention'); k.anim.talk = 0.8;
     await say(['…Magnificent.', 'He is a natural. A little squeaky. So am I, when I am excited.']);
     G.actions.prepareJoin?.('golden');
-    const c = await say(['The springs are safe. The snow monkeys and I have an understanding.', 'May I join your pack? I promise to guard it with my whole heart.'],
+    // his first duty: the plea for Yukimi (or, saved before he came, a thank-you)
+    const saved = this.plan === 'saved', crew = this.H.arrivals?.savedBy?.('onsen') === 'crew';
+    const c = await say(saved
+      ? ['And my first duty. I came to fetch help: the springs of Yukimi were besieged.', crew ? 'But the snow monkeys tell me your crew has already broken the siege. …I am told they bowed. I approve.' : 'But the snow monkeys tell me someone has already broken the siege. …You. Of course it was you.', 'So I came to say thank you, and to offer my lance.', 'May I join your pack? I promise to guard it with my whole heart.']
+      : ['And my first duty. The springs of Yukimi are besieged.', 'Snow yokai sit in the hot springs, and a snowman general, Captain Frostbelly, holds the square.', 'I guarded them alone as long as I could. A knight knows when to fetch help. …And balls.', 'May I join your pack? And will you come to Yukimi? I promise to guard you with my whole heart.'],
       [{ text: 'Welcome to the pack! ♡' }, { text: 'Only if you bring the ball.' }]);
-    await say(c === 1 ? ['…I was always going to bring the ball.', 'I shall meet you at the cottage. Shadow will keep his wings for when we fight side by side.']
-      : ['A knight does not wag. …It is the wind.', 'I shall meet you at the cottage. Shadow will keep his wings for when we fight side by side.']);
+    const then = saved ? 'I shall meet you at the cottage. Shadow will keep his wings for when we fight side by side.' : 'I shall meet you at the cottage, and then: Yukimi! Shadow will keep his wings for when we fight side by side.';
+    await say(c === 1 ? ['…I was always going to bring the ball.', then] : ['A knight does not wag. …It is the wind.', then]);
     k.anim.talk = 0;
-    // he picks up his lance, bows, and trots off down the trail; Shadow's outfit comes off (kept for when Foosy is played)
+    // he picks up his lance, bows, and trots off; Shadow's outfit comes off (kept for when Foosy is played)
     if (this.groundLance) { this.groundLance.holder.parent?.remove(this.groundLance.holder); this.groundLance = null; }
     k.lanceThrown = false; sfx('lance_catch', { pos: k.pos });
     k.anim.play('gldBow'); await this.until(() => k.anim.action?.name !== 'gldBow', 1.4);
@@ -439,20 +419,26 @@ export class GoldenJoin {
     this.until(() => k.moveTo(away.x, away.z, 1 / 60, 1.2, 0.4), 2.2);
     await this.wait(1.6);
     const k0 = k; G.vfx?.poof?.(new THREE.Vector3(k.pos.x, k.pos.y + 0.4, k.pos.z), { color: '#fff6e0', n: 12, size: 0.6 }); k0.visible = false;
+    if (this.ball) { this.ball.parent?.remove(this.ball); this.ball = null; this.ballState = null; } // (he took the ball: he was always going to)
     await this.H.joinGolden();
     if (sh?.whelp) sh.whelp.forced = null; // (the outfit swaps back with a poof unless Foosy is the one you play)
     G.hint?.('gldWings', `*Flap flap!* I get to wear my dragon wings whenever you play ${name}. Rawr! (a very small rawr)`, false);
     Events.emit('golden:joinScene', { phase: 'done' });
-    this.until(() => false, 0.6).then(() => { if (this.knight === k0) { this.state = 'off'; this.reset(); } });
+    this.until(() => false, 0.6).then(() => { if (this.knight === k0 && this.state === 'done') { this.knight?.dispose(); this.knight = null; this.dropProps(); this.view?.dispose(); this.view = null; } });
   }
+  // ------------------------------------------------------------------ the maps and the pointer (actors/arrivals.js)
+  person() {
+    const k = this.knight; if (!k?.visible || !this.active || this.G.mode !== 'village') return null;
+    return { key: 'p:arrival:golden', kind: 'person', group: 'quest', id: 'golden', name: '???', role: this.state === 'march' ? 'Marching to the fountain' : 'Standing guard by the fountain', color: '#2f9a6a', initial: '?', npc: k, pos: k.pos, visible: true, badge: '!', prio: 7, named: true, area: 'village', arrival: true };
+  }
+  target() { const k = this.knight; return (this.state === 'guard' || this.state === 'march') && k?.visible ? { pos: k.pos, label: 'A guard by the fountain', kind: 'npc', arrival: 'golden' } : null; }
   // ------------------------------------------------------------------ the rumour in town
   townHint(dt) {
     const G = this.G, F = G.state.flags;
     if (this.joined || !this.H.joined('shihtzu') || F.hints?.gldRumour) return;
-    if ((this.hintT = (this.hintT || 0) + dt) < 12 || G.ui?.dlg?.active || G.tutorials?.busy || G.tutorials?.cur || G.titleActive) return;
-    const u = regionUnlocked(G.state, 'onsen'), where = REGIONS.onsen?.name || 'Yukimi Onsen';
-    G.hint?.('gldRumour', u.ok
-      ? `*Sniff sniff…* Rosie says a very polite dog in emerald armour is guarding the hot springs at ${where}, and won't let anyone in without the password. …Is the password "ball"? Let's take the Wayfarer's Post and see!`
-      : `*Sniff sniff…* Rosie says a very polite dog in emerald armour is guarding the hot springs at ${where}, and won't let anyone in without the password. The Wayfarer's Post opens it: ${u.why.toLowerCase()}.`);
+    const u = regionUnlocked(G.state, 'onsen'); if (u.ok) return; // (the Onsen is open: he comes to town himself, actors/arrivals.js)
+    if ((this.hintT = (this.hintT || 0) + dt) < 12 || G.ui?.dlg?.active || G.tutorials?.busy || G.tutorials?.cur || G.titleActive || this.H.arrivals?.active || G.player?.controlLocked) return; // (never over an arrival's scene)
+    const where = REGIONS.onsen?.name || 'Yukimi Onsen';
+    G.hint?.('gldRumour', `*Sniff sniff…* Rosie says a very polite dog in emerald armour is guarding the hot springs at ${where}, and won't let anyone in without the password. …Is the password "ball"? Once the Wayfarer's Post opens it (${u.why.toLowerCase()}), I bet he'll come to us!`);
   }
 }

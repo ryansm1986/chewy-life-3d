@@ -4,11 +4,11 @@ Status: **phases 1–3 built**. Phase 1: the class, her fūma and its bases, eve
 three-hero switching with the Tab wheel, the basic attack + Fūma Throw, Smoke Bomb and Shadow Step. Phase 2: the other
 18 skills (moves, effects, sounds, icons), all 18 charge tables with their perks and charged releases, in the DPS band
 (§3b), Shadow Step raised to a single-target tree starter (§4), the Fūma Throw read in flight and the Smoke Bomb's cap
-(§3c). Phase 3: her joining scene in the Bamboo Grove and Shadow's rumour in town (§5), the "Meet Poe" guide (§6),
+(§3c). Phase 3: her joining scene and Shadow's rumour in town (§5; since ROADMAP Z-H3 she **arrives in Blossom Hollow** once the Bamboo opens, and her quest "Takemori Under Siege" starts), the "Meet Poe" guide (§6),
 the phase-2 review fixes (Kunai Storm grows, capped Puff Ball and Thunder Paw glows, the Smoke Dragon redrawn: §3d) and
 `tools/qa/s20-poe.mjs`. Her baked model is in (§8): the Toybox rig `poe_toy` and the Blender fūma `poe-fuma.glb`, with
 the samurai shader's gated grade on her coat. Play her at once from `/?hero=poe` (she counts as joined).
-QA: `tools/qa/s20-poe.mjs` (her scenario: the joining scene, a reset mid-scene, an old save and the rumour, the Meet
+QA: `tools/qa/s20-poe.mjs` (her scenario: her arrival in town, a reset mid-scene, an old save and the rumour, the Meet
 Poe guide, every skill tapped, the baked model and its fūma, a real charge, perf), `tools/qa/s12-heroes.mjs` §i (three heroes),
 `tools/qa/s19-charge.mjs` §d (every active skill of all three heroes charge-casts), `tools/qa/prod-smoke.mjs` (the `poe`
 case), `tools/test-rpg.mjs` ("POE", "CHARGED ABILITIES"); look tools `/?test=poe`, `node tools/qa/poe-shots.mjs` and
@@ -235,32 +235,49 @@ test-rpg asserts dps ×0.85–1.2 and eHP ×0.9–1.15 of the mean at levels 6/1
 and single target ×1.15–1.6, and that a throw's round trip stays under ~1 s. Fūma Throw's out-and-back flight is
 integrated by `fumaFlight()` (the same equations as `poeSkills.js updateFuma`).
 
-## 5. Joining (`src/actors/poeJoin.js`, owned by HeroManager: `heroes.poeJoin`, updated every frame)
-- **The scene** runs on any visit to the **Whispering Bamboo Grove** while `flags.poeJoined` is false, so a new game and
-  an old save meet her the same way (the grove opens at level 4, the Wayfarer's Post). It has four beats:
-  - *wait*: her rig is built hidden as you arrive (no hitch later); she starts once you've been there 7 s, walked 6 m
-    and nothing is chasing you (no aggro within 13 m, no dialogue, no boss fight, no modal).
-  - *tail*: she "stealthily" follows up to 7 m behind, along **your path** (a point every 0.5 m, so she comes round the
-    bamboo, not through it), crouched on tiptoe (`sneakWalk`), and always **on screen** (clear of the HUD): walking
-    up-screen the path behind you runs off the bottom of the screen within a few metres, so she sneaks along beside you
-    instead, 3.5–5.5 m off to one side (`behindPoint`). Look her way (within ~50°, under 11 m) and she freezes
-    stiff as a bamboo stalk, eyes shut (`ninjaFreeze`, a sweat drop). Every 4–6.5 s a little pug snort (`poe_snort`, a
-    puff at her nose) and Shadow pricks up his ears ("?"); after 2.5 s his hint: "Something is following us…". If she
-    falls more than 16 m behind (round a corner) she catches up.
-  - *caught*: after 16 s of it, or the moment you walk up to her (under 2.6 m): ah… ah… **ACHOO!** (the sneeze, the
-    ACHOO! word, "!" over you and Shadow); controls lock, the camera pulls in to frame you both (`G.introFocus`), she
-    trots up, embarrassed.
-  - *talk*: "Ahem. You saw nothing… just a very short bamboo." (two choices); she insists it was a TEST and you passed;
-    `prepareJoin('poe')` (she arrives near the pack's level, with points to spend); "Can I join?" (two choices);
-    `joinPoe()` (banner "Poe joined the pack!", `flags.poeJoined`, the save) and she vanishes in a puff of smoke ("POOF!",
-    and a faint achoo from somewhere in the bamboo a moment later). Controls come back.
-- **Resets**: leaving the grove, a hero switch or dying before she's caught drops the scene (and her actor); the next
-  visit starts over. Once caught it always finishes. Events: `poe:joinScene { phase: 'tail' | 'caught' | 'done' }`.
-- **The rumour**: in town, once Moka has joined and Poe hasn't, Shadow passes on a rumour after 10 s (once,
-  `flags.hints.poeRumour`): somebody's been tiptoeing round the Bamboo Grove, very loudly — "take the Wayfarer's Post" if
-  the grove is open, "it opens at level 4" if not.
-- After the scene she's a villager at the cottage (`spawnBench` on the return to town). `?hero=poe` (debug) and
-  `G.heroes.joinPoe()` (QA) join her at once.
+## 5. Joining: her arrival in Blossom Hollow (`src/actors/poeJoin.js`; ROADMAP Z-H3, docs/ZONES.md §3.1)
+Since Z-H3 the scene plays **in town**, not in the Bamboo Grove (the grove scene is gone). `G.arrivals`
+(`actors/arrivals.js`) starts it once the Bamboo opens (level 4, `regionUnlocked`), Moka has joined, and Blossom Hollow
+has a calm moment (no dialogue, panel, banner, card, guide or scene). `heroes.poeJoin` is the scene; Arrivals updates it.
+- **The beats**:
+  - *wait*: her rig is built hidden. She starts once you've walked a few metres round the plaza (within 28 m of the
+    fountain), or, after 40 s of calm elsewhere in town, wherever you are (an arrival is never stranded).
+  - *tail*: she "stealthily" follows up to 7 m behind, along **your path** (a point every half metre: she walks it, so she
+    comes round the signpost, not into it), crouched on tiptoe (`sneakWalk`), always **on screen** and clear of the HUD
+    (a phone's taller bars too) and **in view**: a spot the scenery would hide (a roof, a sakura canopy) isn't picked
+    (`sceneStage.js` rays, a few new ones a frame, the answers kept). Walking up-screen she sneaks along beside you, 3.5–5.5 m
+    to one side. Stuck out of sight, she's simply there. Look her way (within ~50°, under 11 m) and she freezes stiff as a
+    lantern post, eyes shut (`ninjaFreeze`, a sweat drop). Every 4–6.5 s a pug snort and Shadow's "?"; after 2.5 s his
+    hint: "Psst! Something is following us… and it smells like bamboo." On the maps she's a person, "???", "Somebody very
+    sneaky", with a `!`.
+  - *caught*: after 16 s, or when you walk up to her (under 2.6 m): ah… ah… **ACHOO!**; controls lock, Shadow's tip steps
+    aside. While she sneezes the staging is worked out (`stageJob`, a few ms a frame): your mark (where you are or a step
+    away; well onto the plaza's paving or a path if it can be, the grass only when nothing paved frames cleanly: it
+    leans over feet and legs from up here), hers 2.3 m across the screen and a little up-screen (facing you, she half faces the camera), Shadow's just
+    behind you both, between you, his face to the camera; all free, in plain view of where the scene's camera will be
+    (rays at five heights and across each body's width; a garland's pennants count), as clear of villagers as can be. You
+    step to your mark, she trots to hers, Shadow sits on his, the villagers walk round (`G.sceneKeepOut`), and the camera
+    frames you all in the band above the dialogue box (`frameFor`; a step closer or further, or to the side, if from its
+    real place a lantern post would still cross you: `frameClear`).
+  - *talk*: "Ahem. You saw nothing. There is nobody here. Just a very short lantern post." (two choices: "A lantern post…
+    with a giant fūma?" / "Bless you!"); she insists it was a TEST; then **her plea**: "…The truth is, I came to fetch help.
+    Takemori is under siege!…"; `prepareJoin('poe')`; "Can I join? And will you come to Takemori?" (two answers); a puff
+    of smoke ("POOF!"), then `joinPoe()` (the banner "Poe joined the pack!", `flags.poeJoined`, her villager at the
+    cottage at once) and a faint achoo from behind the bakery. Then `Arrivals.finished`: the record and **her quest**,
+    "Takemori Under Siege", with its card (docs/QUESTS.md §9).
+  - **Takemori saved before she came** (a crew, an old save): the plea is a thank-you ("…your crew already chased the
+    yokai off! Faster than a ninja. I am not jealous." / "…It was you, wasn't it."), she joins, and no quest starts.
+- **Resets**: leaving town, a hero switch or a knock-out before she's caught drops the scene (and her actor, the view,
+  the keep-out, Shadow's mark); the arrival is due again 10 s later. Once caught it always finishes. Events:
+  `poe:joinScene { phase: 'tail' | 'caught' | 'done' }`, `arrival:start` / `arrival:done`.
+- **The rumour**: in town, once Moka has joined and before the Bamboo opens, Shadow passes on a rumour after 10 s (once,
+  `flags.hints.poeRumour`): somebody's been tiptoeing round the Bamboo Grove, very loudly; "Once the Wayfarer's Post opens it
+  (level 4), I bet they'll come and find us!" The hero wheel's card says "Will arrive when the Bamboo opens", then "On the
+  way to Blossom Hollow…".
+- Old saves: Poe already joined (her old grove scene) gets no second arrival; her quest starts quietly with its card while
+  Takemori still needs saving (docs/ZONES.md §3.1). `?hero=poe` (debug) and `G.heroes.joinPoe()` (QA) join her at once;
+  the debug menu's *Play an arrival* plays it again.
+- QA: `tools/qa/s20-poe.mjs` a)–b), `tools/qa/s47-hero-arrivals.mjs`; the look review `node tools/qa/arrival-shots.mjs`.
 
 ## 6. Three heroes: switching and the Tab wheel (`src/actors/heroes.js`, `src/ui/heroWheel.js`)
 - `state.heroes.poe` is a full hero (`player`, `equipment`), created fresh by `normalizeHeroes` for every save, so
@@ -305,7 +322,7 @@ integrated by `fumaFlight()` (the same equations as `poeSkills.js updateFuma`).
   Smoke Dragon, the Bullseye), `src/actors/poeProps.js` (kunai, tiny shuriken, the log, caltrops; `smokeCopy` — the
   clone / afterimage rig copies), `src/audio/poe.sfx.js` (35 synth sounds), `src/rpg/iconsPoe.js` (fūma item art and all
   21 skill icons).
-- Joining: `src/actors/poeJoin.js` (the scene and the rumour; `heroes.js` owns it), the `sneakWalk` / `ninjaFreeze`
+- Joining: `src/actors/poeJoin.js` (her island scene and the rumour; `heroes.js` owns it, `actors/arrivals.js` starts it, `actors/sceneStage.js` stages it), the `sneakWalk` / `ninjaFreeze`
   holds in `poePoses.js`, the `meetPoe` guide in `src/world/guides.js`.
 - UI: `src/ui/heroWheel.js` + `.css`, `src/ui/hud.js` (the second mini portrait, the fūma weapon badge),
   `src/ui/rpg.js` / `character.js` (her trees and text), `src/ui/glyphs.js` (fuma, smoke, kunai).

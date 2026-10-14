@@ -4,7 +4,8 @@
 //      Rosie's welcome; Moka joins; "Peek into the Burrow" (burrow1) by Moka's crew; turnips grown and cooked into
 //      lunches; errands; A Home for Everyone and the Lights grow and get built; "The King of Squish" by a crew (King
 //      Mochi's crown cushion, his unique owed to your own win); Takemori relieved by a crew; the arrival in Bamboo: the
-//      crew's celebration in the square; Poe joins in the calm grove; "Clear the Bamboo Depths" by Moka and Poe: the
+//      crew's celebration in the square; Poe arrives in Blossom Hollow (ROADMAP Z-H3: Takemori already relieved, so a
+//      thank-you and no quest); "Clear the Bamboo Depths" by Moka and Poe: the
 //      Maple Hollow opens, the Travel Map's 救 stamp, Tier 1 at the Depths' Spirit Lantern, the Tengu's fan; no kills,
 //      no boss fallen, Bamboo's dungeon.cleared still 0 (the boss unique waits for your own first clear)
 //   b) the keepsakes placed in Chewy's cottage (the decorate mode), a shot at the game camera
@@ -83,7 +84,7 @@ async function readReport(page, name) {
 // ================================================================== a) the headline: no fights, a crew clears the Bamboo Depths
 if (want('a')) {
   const { browser, page, errors, warns: w } = await launch({ w: 1600, h: 900 });
-  await boot(page, 'fresh&nointro&notut&hour=9');
+  await boot(page, 'fresh&nointro&notut&arrive&hour=9'); // (the arrivals on: Poe comes to town once the Bamboo opens, docs/ZONES.md §3.1)
   await ev(page, () => { const G = window.G; window.__fights = { kills: 0, bosses: [], hits: 0 }; G.events.on('monster:killed', () => window.__fights.kills++); G.events.on('boss:dead', e => window.__fights.bosses.push(e?.id)); window.__hxp = 0; G.events.on('homestead:xp', e => { window.__hxp += e?.xp || 0; }); window.__ev = []; for (const n of ['expedition:back', 'village:saved', 'dungeon:cleared', 'tier:unlocked', 'village:celebrate']) G.events.on(n, e => window.__ev.push([n, e?.crew ? 'crew' : '', e?.result || e?.zone || e?.id || ''])); });
   // Rosie's welcome: walk up and talk
   await ev(page, () => { const G = window.G, n = G.npcs.find(x => x.id === 'rosie'); G.player.setPos(n.pos.x + 1, n.pos.z + 1); G.player.moveTarget = null; n.interacted(); });
@@ -197,19 +198,26 @@ if (want('a')) {
   await page.waitForFunction(() => !window.G.dungeon?.village?.celebrate, null, { timeout: 20000 }).catch(() => {});
   const gone = await ev(page, () => ({ crew: !!window.G.dungeon.village.crew, kills: window.__fights.kills }));
   R.check('a) the crew heads home after the cheer (no actors left behind)', !gone.crew, gone);
-  // Poe joins in the calm grove (her scene: she tails you, you catch her)
-  // (onto the trail by the village: the shrine's steps and fences hem the arrival spot in)
-  await ev(page, () => { const G = window.G, P = G.player, tr = G.dungeon.layout.plan.trail; let bi = 0, bd = 1e9; for (let j = 0; j < tr.length; j++) { const q = Math.hypot(tr[j][0] - P.pos.x, tr[j][1] - P.pos.z); if (q < bd) { bd = q; bi = j; } } P.setPos(tr[bi][0], tr[bi][1]); });
-  const walk = async n => { for (let i = 0; i < n; i++) { await ev(page, () => { const G = window.G, P = G.player, tr = G.dungeon?.layout?.plan?.trail, ok = (x, z) => G.world.walkable(x, z) && !G.world.collision?.solidAt?.(x, z, 0.3); if (!tr) return; let bi = window.__walkI || 0, bd = 1e9; for (let j = 0; j < tr.length; j++) { const q = Math.hypot(tr[j][0] - P.pos.x, tr[j][1] - P.pos.z); if (q < bd) { bd = q; bi = j; } } window.__walkI = bi; const nx = tr[Math.min(tr.length - 1, bi + 2)], L = Math.hypot(nx[0] - P.pos.x, nx[1] - P.pos.z) || 1, d = { x: (nx[0] - P.pos.x) / L, z: (nx[1] - P.pos.z) / L }; const x = P.pos.x + d.x * 0.35, z = P.pos.z + d.z * 0.35; if (ok(x, z)) { P.setPos(x, z); P.facing = P.faceTarget = Math.atan2(d.x, d.z); } }); await sleep(page, 55); } };
-  for (let k = 0; k < 6 && (await ev(page, () => window.G.heroes.poeJoin.state)) !== 'tail'; k++) await walk(30);
-  await page.waitForFunction(() => { const J = window.G.heroes.poeJoin; return J.state === 'tail' && J.poe; }, null, { timeout: 20000 }).catch(() => {});
-  await ev(page, () => { const J = window.G.heroes.poeJoin, P = window.G.player; if (J.poe) P.setPos(J.poe.pos.x + 1.4, J.poe.pos.z + 0.8); });
-  await page.waitForFunction(() => window.G.ui.dlg?.active, null, { timeout: 12000 }).catch(() => {});
-  await drainDialogue(page, [1, 0]);
-  await page.waitForFunction(() => window.G.state.flags.poeJoined, null, { timeout: 10000 }).catch(() => {});
-  const poe = await ev(page, () => ({ joined: !!window.G.state.flags.poeJoined, lvl: window.G.state.heroes.poe?.player?.lvl, kills: window.__fights.kills }));
-  R.check('a) Poe joins in the calm grove (her scene, no fight)', poe.joined && poe.kills === 0, poe);
+  // Poe arrives in Blossom Hollow (ROADMAP Z-H3): the Bamboo has been open since Moka's errands took her to level 4, and
+  // her arrival waited for a walk in town; Takemori was relieved before she came, so she comes to say thank you
   await ev(page, () => window.G.returnToVillage()); await waitMode(page, 'village', 30000); await sleep(page, 1500);
+  await page.waitForFunction(() => window.G.heroes.poeJoin.state === 'wait', null, { timeout: 30000 }).catch(() => {});
+  const marks = [[-4, 7], [-8, 2], [-7, -5], [0, -7], [7, -5], [8, 2], [4, 7]];
+  for (let k = 0; k < 28 && (await ev(page, () => window.G.heroes.poeJoin.state)) === 'wait'; k++) {
+    await ev(page, ([dx, dz]) => { const G = window.G, F = G.world.landmarks.fountain; G.player.moveTarget = new G.THREE.Vector3(F.x + dx, 0, F.z + dz); }, marks[k % 7]);
+    await page.waitForFunction(() => !window.G.player.moveTarget || window.G.heroes.poeJoin.state !== 'wait', null, { timeout: 6000 }).catch(() => {});
+  }
+  await page.waitForFunction(() => { const J = window.G.heroes.poeJoin; return J.state === 'tail' && J.poe; }, null, { timeout: 20000 }).catch(() => {});
+  await sleep(page, 2200);
+  await ev(page, () => { const J = window.G.heroes.poeJoin, P = window.G.player; if (J.poe && J.state === 'tail') P.moveTarget = new window.G.THREE.Vector3(J.poe.pos.x, 0, J.poe.pos.z); });
+  await page.waitForFunction(() => window.G.ui.dlg?.active, null, { timeout: 15000 }).catch(() => {});
+  const said = [];
+  for (let i = 0; i < 40 && await ev(page, () => window.G.ui.dlg?.active || window.G.heroes.poeJoin.state === 'caught' || window.G.heroes.poeJoin.state === 'talk'); i++) { said.push(await ev(page, () => (window.G.ui.dlg?.lines || []).map(l => l.text || l).join(' '))); await drainDialogue(page, [1, 0], 1); await sleep(page, 150); }
+  await page.waitForFunction(() => window.G.state.flags.poeJoined, null, { timeout: 10000 }).catch(() => {});
+  const poe = await ev(page, () => ({ joined: !!window.G.state.flags.poeJoined, lvl: window.G.state.heroes.poe?.player?.lvl, kills: window.__fights.kills, quest: window.G.state.quests.active.some(q => q.id === 'hq_takemori') || window.G.state.quests.done.includes('hq_takemori'), rec: window.G.state.flags.arrivals?.bamboo || null }));
+  const thanks = [...new Set(said)].join(' ');
+  R.check('a) Poe arrives in Blossom Hollow and joins (her scene, no fight); Takemori already relieved by the crew, so a thank-you and no quest', poe.joined && poe.kills === 0 && !poe.quest && poe.rec?.quest === 'saved' && /your crew already chased the yokai off/.test(thanks), { poe, thanks: thanks.slice(0, 240) });
+  await sleep(page, 1500);
   // the dungeon: Moka and Poe, a lunch each and 2 Heart Treats; errands (Bamboo's too) until the odds are good
   let clear = null, dTry = 0;
   for (let k = 0; k < 400; k++) {

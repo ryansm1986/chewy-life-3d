@@ -2516,6 +2516,69 @@ hr('QUEST MOMENTS: THE CARD\'S WORDS, THE PLACES (ROADMAP UX-2: world/questLore.
 }
 function TAB_PRICES_OK() { const P = STASH_PRICES.slice(1); return P.every((p, k) => !k || (p.coins > P[k - 1].coins && Object.keys(P[k - 1]).every(m => (p[m] || 0) >= P[k - 1][m] || m === 'silk'))); }
 
+hr('HERO ARRIVALS: THE HEROES COME TO BLOSSOM HOLLOW (ROADMAP Z-H3: world/heroQuests.js, the visit step)');
+{
+  const HQ = await import('../src/world/heroQuests.js'), QL = await import('../src/world/questLore.js'), Q = await import('../src/world/questSteps.js'), Z = await import('../src/rpg/zones.js');
+  const CS = await import('../src/cozy/state.js'), { REGION_IDS } = await import('../src/regions/index.js'), { ZONE_NPCS } = await import('../src/regions/village/data.js'), { Story } = await import('../src/world/story.js');
+  const fresh = () => CS.normalizeCozy(Z.normalizeZones(normalizeHeroes(newGameState())));
+  const lv = (st, n) => { st.player.lvl = n; for (const h of Object.values(st.heroes)) h.player.lvl = Math.max(h.player.lvl || 1, 1); st.heroes.chewy.player.lvl = n; return st; };
+  // ---- the table: one arrival per zone, in the zones' order; each brings its zone's quest
+  ok(HQ.ARRIVALS.map(a => a.zone).join() === REGION_IDS.join() && HQ.ARRIVALS.map(a => a.who).join() === 'poe,shihtzu,sk_kaizo,golden', 'arrivals: one a zone in order (Poe, Floofy, Captain Kaizo for the Tide Pool until Stella, Foosy)');
+  ok(HQ.ARRIVALS.every(a => HQ.HERO_QUESTS[a.quest]?.zone === a.zone && (a.hero ? !!CLASSES[a.who] && HQ.HERO_QUESTS[a.quest].giver === a.who : !!ZONE_NPCS[a.who] && HQ.HERO_QUESTS[a.quest].giver === a.who) && typeof a.scene === 'string'), 'arrivals: each { zone, who, scene, quest }, the quest its zone\'s and given by whoever comes');
+  ok(HQ.ARRIVALS.filter(a => !a.hero).every(a => a.zone === 'tidepool'), 'arrivals: the only messenger is the Tide Pool\'s (Stella replaces him with one entry)');
+  // ---- the quests: the writers' contract (as QUEST MOMENTS), the steps and the hand-in
+  for (const [id, d] of Object.entries(HQ.HERO_QUESTS)) {
+    ok(typeof d.hook === 'string' && d.hook.length >= 20 && d.hook.length <= 130, `${id}: a hook in the giver's voice (${d.hook?.length} chars)`);
+    const [a, p] = QL.goalOf(d); ok(a && p && a.length <= 56 && p.length <= 44, `${id}: a goal ("${a}" · "${p}")`);
+    ok(d.steps.length === 2 && d.steps[0].type === 'visit' && d.steps[0].zone === d.zone && d.steps[1].type === 'villageSaved' && d.steps[1].zone === d.zone && d.next === null, `${id}: travel to the zone, save its village`);
+    ok(d.steps.every(s => QL.stepArea(s)?.key === `zone:${d.zone}`), `${id}: both steps' place is the zone (the place title on arriving)`);
+    ok(d.heroQuest && d.handIn?.text && d.thanks && d.crew && QL.rewardList(d.reward).length >= 3, `${id}: its hand-in words, the thanks, the crew's line, the reward`);
+    ok(Story.prototype.handInFor.call({}, { id }, d), `${id}: it waits for whoever asked (the hand-in)`);
+    const L = d.lines || {}, texts = Object.values(L).flatMap(v => (Array.isArray(v) ? v : [v])).filter(Boolean);
+    ok(L.arrive && L.home && texts.every(t => t.length >= 12 && t.length <= 110) && Object.keys(L).every(k => QL.LINE_BEATS.includes(k)), `${id}: Shadow's lines on arriving and on the way home, short`);
+    if (CLASSES[d.giver]) ok(d.selfThanks && d.crewSelf?.includes('{others}'), `${id}: the hero's own line when you play them, and theirs when they went with the crew`);
+  }
+  ok(Story.prototype.nameOf.call({}, 'poe') === 'Poe' && Story.prototype.nameOf.call({}, 'sk_kaizo') === ZONE_NPCS.sk_kaizo.name, 'a hero (or Kaizo) named as a giver');
+  ok(HQ.crewThanks(HQ.HERO_QUESTS.hq_takemori, "Moka's crew") === "Moka's crew snuck into Takemori and chased the siege off! Almost as quietly as I would have." && /^Moka and I chased/.test(HQ.crewThanks(HQ.HERO_QUESTS.hq_takemori, '', { others: 'Moka' })) && /^I chased the siege out of Takemori!.*sending me\.$/.test(HQ.crewThanks(HQ.HERO_QUESTS.hq_takemori, '', { solo: true })), "the crew lines: a crew, the giver with others, the giver alone");
+  // ---- the visit step (world/questSteps.js)
+  { const s = HQ.HERO_QUESTS.hq_takemori.steps[0], st = fresh();
+    ok(JSON.stringify(Q.destOf(s)) === '{"zone":"bamboo","visit":true}' && Q.ZONE_STEP_TYPES.includes('visit'), 'visit: it points to its zone (the Wayfarer\'s Post from town)');
+    ok(!Q.visitDone(s, st, { home: true, zone: null, dungeon: null }) && !Q.visitDone(s, st, { zone: 'maple', dungeon: null }) && !Q.visitDone(s, st, { zone: 'bamboo', dungeon: 'bambooDepths' }) && Q.visitDone(s, st, { zone: 'bamboo', dungeon: null }), 'visit: done outdoors in its zone (not in town, another zone or the dungeon)');
+    Z.saveVillage(st, 'bamboo', 'crew'); ok(Q.visitDone(s, st, { home: true }) && Q.zoneStepHave(s, st) === 1, 'visit: done once the village is saved (a crew got there first)'); }
+  // ---- when an arrival is due: in order, by level or the zone before it cleared (by you or a crew)
+  { const all = { poe: 1, shihtzu: 1, kaizo: 1, golden: 1 }, due = (st, scenes = all) => HQ.arrivalDue(st, { scenes })?.who || null;
+    const st = fresh();
+    ok(due(lv(st, 6)) === null, 'arrivals: none before Moka has joined (she comes first)');
+    st.flags.mokaJoined = true;
+    ok(due(lv(st, 3)) === null && due(lv(st, 4)) === 'poe', 'arrivals: Poe once the Bamboo opens (level 4)');
+    ok(due(lv(st, 4), { kaizo: 1 }) === null, 'arrivals: an arrival whose scene isn\'t built waits (and so do the ones after it)');
+    st.flags.poeJoined = true; lv(st, 6);
+    ok(due(st) === null, 'arrivals: Floofy waits for Momiji Hollow');
+    Z.zoneOf(st, 'bamboo').dungeon.crew = 1; ok(due(st) === 'shihtzu', 'arrivals: the zone before cleared by a crew opens it: Floofy is due');
+    Z.zoneOf(st, 'bamboo').dungeon.crew = 0; Z.zoneOf(st, 'bamboo').dungeon.cleared = 1; ok(due(st) === 'shihtzu', '…or cleared by you');
+    st.flags.shihtzuJoined = true; lv(st, 26);
+    ok(due(st) === 'sk_kaizo', 'arrivals: the Tide Pool\'s messenger before Foosy, though both zones are open');
+    (st.flags.arrivals ||= {}).tidepool = { how: 'scene' }; ok(due(st) === 'golden', 'arrivals: then Foosy');
+    const old = fresh(); old.flags.mokaJoined = old.flags.goldenJoined = true; lv(old, 30);
+    ok(due(old) === 'poe' && HQ.arrivalDone(old, HQ.arrivalOf('golden')), 'an old save with Foosy joined first: no arrival for him; the others still come, in order');
+    old.flags.poeJoined = old.flags.shihtzuJoined = true; old.flags.arrivals = { tidepool: { how: 'scene' } }; ok(due(old) === null, '…and once they all have, none is due'); }
+  // ---- what an arrival brings: its quest, a thank-you (the village saved before they came), or nothing more (an old save)
+  { const st = fresh(), a = HQ.arrivalOf('poe'); st.flags.mokaJoined = true; lv(st, 6);
+    ok(HQ.questPlan(st, a) === 'start', 'the plan: the village besieged, their quest starts');
+    st.quests.active.push({ id: 'hq_takemori', step: 0, prog: 0 }); ok(HQ.questPlan(st, a) === 'had', 'the plan: the quest already running: no second one');
+    st.quests.active.pop(); Z.saveVillage(st, 'bamboo'); ok(HQ.questPlan(st, a) === 'saved', 'the plan: saved before they came (an old save, a crew): a thank-you, no quest');
+    const o = fresh(); o.flags.mokaJoined = o.flags.poeJoined = true; lv(o, 6);
+    ok(HQ.questsOwed(o).map(x => x.who).join() === 'poe', 'old saves: Poe joined in the bamboo, Takemori besieged: her quest is owed (no arrival)');
+    lv(o, 2); ok(!HQ.questsOwed(o).length, '…not before the Bamboo opens');
+    lv(o, 6); Z.saveVillage(o, 'bamboo'); ok(!HQ.questsOwed(o).length, '…and none once Takemori is saved'); }
+  // ---- the wheel's line for a hero not met yet
+  { const st = fresh(), h = (id, o = {}) => HQ.arrivalHint(st, id, o);
+    ok(h('poe') === 'Will arrive when the Bamboo opens' && h('shihtzu') === 'Will arrive when Momiji Hollow opens' && h('golden') === 'Will arrive when the Onsen opens', 'the wheel: before a zone opens, when they\'ll come');
+    lv(st, 6); ok(h('poe') === 'Will arrive after Moka joins', 'the wheel: the zone open, Moka not joined yet');
+    st.flags.mokaJoined = true; ok(h('poe') === 'On the way to Blossom Hollow…' && h('poe', { inTown: false }) === 'Will be waiting in Blossom Hollow' && h('poe', { running: true }) === 'Arriving in Blossom Hollow now!', 'the wheel: due (in town, out of town, arriving)');
+    lv(st, 26); ok(h('shihtzu') === 'Will arrive after Poe joins' && h('golden') === 'Will arrive after Old Captain Kaizo comes by', 'the wheel: waiting for the one before'); }
+}
+
 hr('RESULT');
 if (fails) {
   log(`FAILED ${fails}/${checks} checks:`);

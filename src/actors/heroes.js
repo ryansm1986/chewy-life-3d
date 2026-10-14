@@ -10,7 +10,7 @@
 // Multiplayer seam (docs/MULTIPLAYER.md): a remote player's hero is just another "controlled body"; the roster and the
 // NPC-mode handoff here are what a session host would drive per connected player.
 import * as THREE from 'three';
-import { CLASSES, HERO_IDS } from '../rpg/classes.js';
+import { CLASSES, HERO_IDS, heroText } from '../rpg/classes.js';
 import { setLootClass } from '../rpg/items.js';
 import { CAST } from './charKit.js';
 import { Villager } from './npc.js';
@@ -21,6 +21,8 @@ import { HeroWheel } from '../ui/heroWheel.js';
 import { PoeJoin } from './poeJoin.js';
 import { ShihtzuJoin } from './shihtzuJoin.js';
 import { GoldenJoin } from './goldenJoin.js';
+import { KaizoArrive } from './kaizoArrive.js';
+import { Arrivals } from './arrivals.js';
 import { heroAway } from '../cozy/state.js';
 
 const V = (x, z) => new THREE.Vector3(x, 0, z);
@@ -28,12 +30,14 @@ const ease = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 const pick = a => a[Math.floor(Math.random() * a.length)];
 const SWITCH_CD = 2;
 const WHEEL_HOLD = 0.26; // s: Tab held this long opens the hero wheel (a shorter press is a tap: the next hero)
-// where a hero who hasn't joined yet waits: Moka by the fountain (she joins in town), Poe in the Bamboo region (she joins
-// there: docs/POE.md §5), the Shih Tzu in the Maple zone at dusk (docs/SHIHTZU.md §5) — so they aren't in town until they
-// have joined, and the Golden Retriever dragoon by the hot springs in the Onsen zone (docs/GOLDEN.md §5); JOIN_HINT: what
-// the hero wheel says about a hero not met yet
-const JOIN_AT = { moka: 'fountain', poe: 'bamboo', shihtzu: 'maple', golden: 'onsen' };
-const JOIN_HINT = { moka: 'Waiting by the fountain', poe: 'Somewhere in the bamboo…', shihtzu: 'Somewhere in the maples, at dusk…', golden: 'Standing guard by the hot springs…' };
+// where a hero who hasn't joined yet waits: Moka by the fountain (she joins in town); the others aren't in town until their
+// arrival (actors/arrivals.js: each comes to Blossom Hollow once their zone opens, ROADMAP Z-H3): Poe once the Bamboo opens
+// (docs/POE.md §5), the Shih Tzu once Momiji Hollow does (docs/SHIHTZU.md §5), the Golden Retriever dragoon once the Onsen
+// does (docs/GOLDEN.md §5);
+// JOIN_HINT: what the hero wheel says about a hero not met yet when their arrival has nothing to say (Arrivals.hintFor:
+// "Will arrive when the Bamboo opens")
+const JOIN_AT = { moka: 'fountain', poe: 'arrival', shihtzu: 'arrival', golden: 'arrival' };
+const JOIN_HINT = { moka: 'Waiting by the fountain', poe: 'On the way to Blossom Hollow…', shihtzu: 'On the way to Blossom Hollow…', golden: 'On the way to Blossom Hollow…' };
 const ARRIVE_PITCH = { chewy: 1, moka: 1.12, poe: 1.22, shihtzu: 0.88, golden: 0.96 };
 // where a hero stands when whisked home from the Burrow (beside Chewy's house door; they share the house)
 const HOME_OFS = { chewy: [1.6, 1.0], moka: [-0.2, 1.7], poe: [-1.5, 1.2], shihtzu: [0.7, 2.4], golden: [-1.1, 2.7] };
@@ -83,9 +87,11 @@ export class HeroManager {
     this.T = null;       // running transition
     this.tab = null;     // a Tab press being timed (tap = next hero, hold = the wheel)
     this.wheel = null;   // ui/heroWheel.js (made on first use)
-    this.poeJoin = new PoeJoin(G, this); // Poe's joining scene in the Bamboo Grove + the rumour in town (actors/poeJoin.js)
-    this.stzJoin = new ShihtzuJoin(G, this); // the Shih Tzu's scene in Momiji Hollow + his rumour in town (actors/shihtzuJoin.js)
-    this.gldJoin = new GoldenJoin(G, this); // Foosy's scene at the Onsen's hot springs + his rumour in town (actors/goldenJoin.js)
+    this.arrivals = G.arrivals = new Arrivals(G, this); // the heroes arrive in Blossom Hollow when their zone opens (actors/arrivals.js, ROADMAP Z-H3)
+    this.poeJoin = this.arrivals.register('poe', new PoeJoin(G, this)); // Poe's arrival in town + the rumour (actors/poeJoin.js)
+    this.stzJoin = this.arrivals.register('shihtzu', new ShihtzuJoin(G, this)); // Floofy's, by the jizo at dusk + his rumour (actors/shihtzuJoin.js)
+    this.kaizoArrive = this.arrivals.register('kaizo', new KaizoArrive(G, this)); // Captain Kaizo's boat, for Shiokaze Port (actors/kaizoArrive.js)
+    this.gldJoin = this.arrivals.register('golden', new GoldenJoin(G, this)); // Foosy's, by the fountain + his rumour (actors/goldenJoin.js)
     // back in town: a hero who joined while you were out (Poe, in the bamboo) moves into the cottage
     Events.on('mode:changed', p => { if (p?.mode === 'village') this.spawnBench(); });
     setLootClass(this.active);
@@ -226,15 +232,13 @@ export class HeroManager {
     return HERO_IDS.map(id => {
       const C = this.cls(id), joined = this.joined(id), active = id === this.active;
       const away = !active && joined ? this.G.cozy?.awayInfo?.(id) || null : null; // (out on an expedition: docs/COZY.md §4.8)
-      const why = active ? 'Playing now' : away ? `Away · ${away.label}` : joined ? this.canSwitch(id) : JOIN_HINT[id] || 'Not met yet';
+      const why = active ? 'Playing now' : away ? `Away · ${away.label}` : joined ? this.canSwitch(id) : (this.arrivals.scenes[id] && this.arrivals.hintFor(id)) || JOIN_HINT[id] || 'Not met yet'; // (when their arrival comes: actors/arrivals.js)
       return { id, name: joined || active ? C.name : '???', title: joined || active ? C.title : 'Not met yet', color: C.color, lvl: this.G.state.heroes?.[id]?.player?.lvl || 1, active, joined: joined || active, away, ready: !active && joined && !why, why: why === 'busy' ? 'Just a moment…' : why };
     });
   }
   update(dt) {
     this.cd = Math.max(0, this.cd - dt);
-    this.poeJoin.update(dt);
-    this.stzJoin.update(dt);
-    this.gldJoin.update(dt);
+    this.arrivals.update(dt); // (the arrivals' island scenes, and the rumours: actors/arrivals.js)
     // a Tab press or the wheel can't outlive play input (a dialogue, a menu, a switch starting)
     const ui = this.G.ui;
     if ((this.tab || this.wheelOpen) && (this.G.player?.controlLocked || ui?.dlg?.active || ui?.anyModal?.() || this.G.titleActive || this.T)) { this.tab = null; if (this.wheelOpen) this.pickFromWheel(null); }
@@ -311,6 +315,12 @@ export class HeroManager {
     const G = this.G, id = npc.id, ui = G.ui;
     if (!ui?.dialogue) return;
     if (!this.joined(id)) return this.join(id, npc);
+    // a quest to hand in: their homeland's (actors/arrivals.js, world/heroQuests.js) — their hop, their thanks, the stamp
+    const hands = G.story?.handInsFor?.(id) || [];
+    if (hands.length && G.questMoments?.handInScene) {
+      const say = lines => ui.dialogue({ speaker: this.name(id), portrait: G.portrait?.(id), lines: lines.map(l => heroText(l, G.state)), voice: CAST[id]?.voice });
+      return G.questMoments.handInScene(npc, hands, say);
+    }
     const lines = pick(HERO_CHAT[id] || [['Hi!']]).map(s => s.replace(/\{me\}/g, this.name()));
     const lv = G.state.heroes?.[id]?.player?.lvl || 1, mine = G.state.player.lvl || 1;
     if (lv + 2 < mine) lines.push(`(${this.name(id)} is level ${lv} — the pack spirit helps them catch up: double XP!)`);

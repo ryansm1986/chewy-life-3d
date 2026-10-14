@@ -347,7 +347,7 @@ const meetPoe = {
   icon: null,
   trigger: G => !!G.heroes?.joined('poe') && G.state.activeHero !== 'poe',
   past: G => !!G.heroes?.joined('poe'),
-  locked: G => (G.heroes?.joined('poe') ? null : 'Meet Poe in the Bamboo Grove first'),
+  locked: G => (G.heroes?.joined('poe') ? null : 'Poe arrives in Blossom Hollow once the Bamboo opens'),
   steps: [
     { id: 'tap', say: G => `A ninja reports for duty! *Tap Tab* — a quick press — and you play the next hero in the pack, ${me(G)}.`, objective: 'Tap *Tab* to switch to the next hero', allow: { switching: true },
       onEnter: (G, T) => { T.data.from = G.state.activeHero; },

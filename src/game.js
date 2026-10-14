@@ -44,6 +44,7 @@ import { GroundLoot } from './combat/groundLoot.js';
 import { newGameState, createActions, normalizeHeroes, saveableState } from './rpg/actions.js';
 import { CLASSES } from './rpg/classes.js';
 import { HeroManager } from './actors/heroes.js';
+import { arrivalsOn } from './actors/arrivals.js';
 import { loadWhelp, dressWings } from './actors/whelp.js';
 import { loadGoldenProps } from './actors/goldenGear.js';
 import { skillRuntime } from './rpg/skills.js';
@@ -454,7 +455,7 @@ export async function boot() {
   installBurrowDoor(G, village); // (the Burrow door's four dens: G.burrow, the picker ui/dens.js, the debug rows — world/burrowDoor.js, docs/ZONES.md §4.1)
   installTownPortal(G, village); // (the Town Portal: T / the Game page / touch on a dungeon floor, its return portal by the plaza, the floor snapshot — dungeon/townPortal.js, docs/ZONES.md §4.2)
   G.ui?.setQuestProvider?.(() => G.story.uiList());
-  G.questTarget = () => (G.titleActive || G.playerDead ? null : G.tutorials?.target() || (G.mode === 'interior' ? null : G.story.target())); // (a guide's pointer first; indoors only a guide points)
+  G.questTarget = () => (G.titleActive || G.playerDead ? null : G.tutorials?.target() || G.arrivals?.target?.() || (G.mode === 'interior' ? null : G.story.target())); // (a guide's pointer first, then a hero waiting at their spot in town: actors/arrivals.js; indoors only a guide points)
   installServices(G);
   installLife(G, village); // farming, the pantry, the Seed Stall (docs/HOMESTEAD.md)
   installHousing(G); // enterable houses, the cottage's bed / chest / stove, decorating (docs/HOUSING.md)
@@ -478,6 +479,7 @@ export async function boot() {
     try { if (P.has('qcard')) sessionStorage.removeItem('chewy3d.nocard'); else if (off) sessionStorage.setItem('chewy3d.nocard', '1'); else off = !!sessionStorage.getItem('chewy3d.nocard'); } catch (e) { /* storage unavailable */ }
     installQuestMoments(G, { cards: !off });
   }
+  heroes.arrivals.enabled = arrivalsOn(P); // the heroes' arrivals in town (actors/arrivals.js, ROADMAP Z-H3): off in the QA's quiet sessions (?nointro without ?arrive, or ?noarrive; remembered for the tab)
   installCozyGuide(G); // the cozy path's tutorial moments: Rosie's burrow1 question, the Board guide offered to a fighter, the Peaceful paths tip (cozy/cozyGuide.js, docs/COZY.md §11)
   installDebugAccess(G); // debug tools: off by default; the password prompt, F10 / ` / the bug / Select+Start, the lazy menu (src/debug, docs/DEBUG.md)
   const vMap = G.villageMinimap = new VillageMinimap(G);

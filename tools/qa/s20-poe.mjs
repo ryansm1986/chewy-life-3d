@@ -1,19 +1,32 @@
 // Scenario 20: Poe, the third hero (docs/POE.md).
-//  a) her joining scene in the Bamboo Grove: she tails you (crouched, 4-7 m back, on screen), freezes stiff when you
-//     look her way, sneezes when you walk up to her, the dialogue, she joins and vanishes; back in town she lives at home
-//  b) leaving mid-scene resets it (no actor left behind) and it starts again on the next visit; an old save (Moka
-//     joined, Poe not) gets Shadow's rumour in town, once
+//  a) her arrival in Blossom Hollow (ROADMAP Z-H3; the scene once played in the Bamboo Grove): once the Bamboo opens she
+//     tails you round the plaza (crouched, a few metres back, on screen), freezes stiff when you look her way, sneezes
+//     when you walk up to her, the dialogue and her plea, she joins and vanishes; she lives at home at once, and her
+//     quest ("Takemori Under Siege") has started (the whole arrival and its quest: tools/qa/s47-hero-arrivals.mjs)
+//  b) leaving town mid-scene resets it (no actor left behind) and it starts again on the way back; an old save (Moka
+//     joined, Poe not, the Bamboo still closed) gets Shadow's rumour in town, once
 //  c) the "Meet Poe" guide (?tut): tap Tab → the next hero, hold Tab → the wheel → a pick, her fūma, the wrap
 //  d) playing Poe: every active skill tapped in a Burrow fight lands its hits with no errors; she's the baked poe_toy with
 //     the Blender fūma; a real hold on Fūma Throw charges past Stage Ⅰ and releases the charged throw
 //  e) perf: a burst of her fully charged releases frames like the tapped burst; GPU geometries plateau
 import { launch, boot, waitMode, sleep, makeReport, drainDialogue, tap } from './lib.mjs';
 
-const R = makeReport('S20 Poe: joining in the bamboo, the rumour, the Meet Poe guide, every skill, a real charge, perf');
+const R = makeReport('S20 Poe: her arrival in town, the rumour, the Meet Poe guide, every skill, a real charge, perf');
 const { browser, page, errors, warns } = await launch({ w: 1280, h: 720 });
 const ev = (f, a) => page.evaluate(f, a);
 const quiet = () => ev(() => { const G = window.G; G.sim.tickT = -1e9; clearInterval(window.__freeze); window.__freeze = setInterval(() => { G.sim.tickT = -1e9; }, 200); G.state.flags.hints = { ...(G.state.flags.hints || {}), garden: 1, build: 1, travel: 1, skills: 1, stats: 1, loot: 1, potion: 1, fight: 1 }; });
 const mokaIn = () => ev(() => { const G = window.G; G.state.flags.mokaJoined = true; const v = G.heroes.villagers.moka; if (v) { v.frozen = false; v.waitingToJoin = false; } });
+/** the Bamboo open (level 4): her arrival is due in town; the welcome done, the sim and the tips quiet */
+const bambooOpen = () => ev(() => { const G = window.G; G.state.quests.active = G.state.quests.active.filter(q => q.id !== 'welcome'); G.state.quests.cards = []; G.state.flags.hints = { ...(G.state.flags.hints || {}), scavDig: 1, sprint: 1, dig: 1 }; G.state.player.lvl = 6; G.actions.recompute(); if (G.day) G.day.paused = true; });
+/** walk round the plaza until her scene leaves its wait (or n marks) */
+const walkPlaza = async (n = 21, until = 'wait') => {
+  const marks = [[-4, 7], [-8, 2], [-7, -5], [0, -7], [7, -5], [8, 2], [4, 7]];
+  for (let k = 0; k < n; k++) {
+    if ((await ev(() => window.G.heroes.poeJoin.state)) !== until) return;
+    await ev(([dx, dz]) => { const G = window.G, F = G.world.landmarks.fountain; G.player.moveTarget = new G.THREE.Vector3(F.x + dx, 0, F.z + dz); }, marks[k % 7]);
+    await page.waitForFunction(u => !window.G.player.moveTarget || window.G.heroes.poeJoin.state !== u, until, { timeout: 6000 }).catch(() => {});
+  }
+};
 const toBamboo = async () => {
   await ev(() => { const G = window.G; G.state.player.lvl = 6; G.actions.recompute(); G.state.flags.burrowTut = true; window.__walkI = 0; G.enterRegion('bamboo'); });
   await waitMode(page, 'dungeon'); await sleep(page, 600);
@@ -38,46 +51,48 @@ const walk = async (n) => {
 };
 const J = () => ev(() => { const H = window.G.heroes, J = H.poeJoin, P = window.G.player; return { state: J.state, frozen: !!J.frozen, vis: !!J.poe?.visible, act: J.poe?.anim.action?.name || null, d: J.poe ? Math.round(Math.hypot(J.poe.pos.x - P.pos.x, J.poe.pos.z - P.pos.z) * 10) / 10 : null, joined: !!window.G.state.flags.poeJoined, poe: !!J.poe, onScreen: !!J.poe && J.onScreen(J.poe.pos.x, J.poe.pos.y, J.poe.pos.z) }; });
 try {
-  // ================================================================ a) the joining scene
-  await boot(page, 'fresh&nointro&notut'); await quiet(); await mokaIn();
+  // ================================================================ a) her arrival in town
+  await boot(page, 'fresh&nointro&notut&arrive'); await quiet(); await mokaIn();
   await ev(() => { window.__scene = []; window.G.events.on('poe:joinScene', p => window.__scene.push(p.phase)); });
-  await toBamboo();
   const a0 = await J();
-  await walk(30);
+  await bambooOpen();
+  await page.waitForFunction(() => window.G.heroes.poeJoin.state === 'wait', null, { timeout: 20000 }).catch(() => {});
+  await walkPlaza();
   await page.waitForFunction(() => window.G.heroes.poeJoin.state === 'tail', null, { timeout: 30000 }).catch(() => {});
-  await walk(28); await sleep(page, 300);
-  await page.waitForFunction(() => { const J = window.G.heroes.poeJoin; return J.poe && J.onScreen(J.poe.pos.x, J.poe.pos.y, J.poe.pos.z); }, null, { timeout: 4000 }).catch(() => {}); // (she sneaks into view)
+  await ev(() => { window.G.player.moveTarget = null; }); // (stand still: she creeps up behind you)
+  await page.waitForFunction(() => { const J = window.G.heroes.poeJoin; return J.poe && J.onScreen(J.poe.pos.x, J.poe.pos.y, J.poe.pos.z) && J.poe.anim.action?.name === 'sneakWalk'; }, null, { timeout: 8000 }).catch(() => {}); // (she sneaks into view)
   const a1 = await J();
-  R.check('in the bamboo she tails you: crouched on tiptoe, a few metres back, on screen (clear of the HUD) even walking up-screen', a0.state === 'wait' && a1.state === 'tail' && a1.vis && a1.act === 'sneakWalk' && a1.d > 3 && a1.d < 14 && a1.onScreen, JSON.stringify({ a0, a1 }));
+  R.check('once the Bamboo opens she arrives in town and tails you round the plaza: crouched on tiptoe, a few metres back, on screen (clear of the HUD)', a0.state === 'off' && a1.state === 'tail' && a1.vis && a1.act === 'sneakWalk' && a1.d > 3 && a1.d < 14 && a1.onScreen, JSON.stringify({ a0, a1 }));
   await ev(() => { const J = window.G.heroes.poeJoin, P = window.G.player; P.faceTo(J.poe.pos.x, J.poe.pos.z); P.facing = P.faceTarget; });
   await sleep(page, 400);
   const a2 = await J();
-  R.check('look her way and she freezes stiff (a very convincing bamboo)', a2.frozen && a2.act === 'ninjaFreeze', JSON.stringify(a2));
-  await ev(() => { const J = window.G.heroes.poeJoin, P = window.G.player; P.setPos(J.poe.pos.x + 1.4, J.poe.pos.z + 0.8); });
-  await page.waitForFunction(() => window.G.ui.dlg?.active, null, { timeout: 12000 }).catch(() => {});
+  R.check('look her way and she freezes stiff (a very convincing lantern post)', a2.frozen && a2.act === 'ninjaFreeze', JSON.stringify(a2));
+  await ev(() => { const J = window.G.heroes.poeJoin, P = window.G.player; P.moveTarget = new window.G.THREE.Vector3(J.poe.pos.x, 0, J.poe.pos.z); });
+  await page.waitForFunction(() => window.G.ui.dlg?.active, null, { timeout: 15000 }).catch(() => {});
   const a3 = await ev(() => ({ ...{ speaker: window.G.ui.dlg?.opts?.speaker }, locked: window.G.player.controlLocked, scene: window.__scene.slice() }));
   R.check('walk up to her: ACHOO! — caught; the camera frames you and she talks (Poe speaking, controls locked)', a3.speaker === 'Poe' && a3.locked && a3.scene.includes('caught'), JSON.stringify(a3));
   const picked = await drainDialogue(page, [1, 0]);
   await page.waitForFunction(() => window.__scene.includes('done'), null, { timeout: 8000 }).catch(() => {});
   await sleep(page, 900);
-  const a4 = await ev(() => { const G = window.G; return { joined: !!G.state.flags.poeJoined, lvl: G.state.heroes.poe.player.lvl, locked: G.player.controlLocked, poeActor: !!G.heroes.poeJoin.poe, state: G.heroes.poeJoin.state, roster: G.heroes.roster().map(h => h.id + (h.joined ? '+' : '-')).join(), scene: window.__scene.slice() }; });
-  R.check('she joins (near the pack\'s level) and vanishes in a puff of smoke; controls back', a4.joined && a4.lvl >= 3 && !a4.locked && !a4.poeActor && ['done', 'off'].includes(a4.state) && a4.scene.includes('done') && /poe\+/.test(a4.roster), JSON.stringify({ a4, picked }));
-  await ev(() => window.G.returnToVillage()); await waitMode(page, 'village'); await sleep(page, 1200);
+  const a4 = await ev(() => { const G = window.G; return { joined: !!G.state.flags.poeJoined, lvl: G.state.heroes.poe.player.lvl, locked: G.player.controlLocked, poeActor: !!G.heroes.poeJoin.poe, state: G.heroes.poeJoin.state, roster: G.heroes.roster().map(h => h.id + (h.joined ? '+' : '-')).join(), scene: window.__scene.slice(), quest: G.state.quests.active.some(q => q.id === 'hq_takemori') }; });
+  R.check('she joins (near the pack\'s level) and vanishes in a puff of smoke; controls back; her quest started', a4.joined && a4.lvl >= 3 && !a4.locked && !a4.poeActor && ['done', 'off'].includes(a4.state) && a4.scene.includes('done') && /poe\+/.test(a4.roster) && a4.quest, JSON.stringify({ a4, picked }));
   const a5 = await ev(() => { const G = window.G, v = G.heroes.villagers.poe, h = G.heroes.homeSpot('poe'); return { v: !!v, near: v ? Math.round(Math.hypot(v.pos.x - h.x, v.pos.z - h.z)) : -1, bench: G.heroes.bench() }; });
-  R.check('back in town she lives at the cottage (a villager), two heroes on the bench', a5.v && a5.near < 12 && a5.bench.length === 2, JSON.stringify(a5));
+  R.check('she lives at the cottage at once (a villager), two heroes on the bench', a5.v && a5.near < 12 && a5.bench.length === 2, JSON.stringify(a5));
 
   // ================================================================ b) a reset mid-scene; an old save's rumour
-  await boot(page, 'fresh&nointro&notut'); await quiet(); await mokaIn();
-  await toBamboo(); await walk(30);
+  await boot(page, 'fresh&nointro&notut&arrive'); await quiet(); await mokaIn(); await bambooOpen();
+  await page.waitForFunction(() => window.G.heroes.poeJoin.state === 'wait', null, { timeout: 20000 }).catch(() => {});
+  await walkPlaza();
   await page.waitForFunction(() => window.G.heroes.poeJoin.state === 'tail', null, { timeout: 30000 }).catch(() => {});
-  await ev(() => window.G.returnToVillage()); await waitMode(page, 'village'); await sleep(page, 600);
+  await toBamboo(); // (out of town mid-tail)
   const b0 = await J();
-  await toBamboo(); const b1 = await J();
-  R.check('leaving the grove mid-scene resets it (no actor left behind); the next visit starts it again', b0.state === 'off' && !b0.poe && !b0.joined && b1.state === 'wait', JSON.stringify({ b0, b1 }));
-  await ev(() => window.G.returnToVillage()); await waitMode(page, 'village'); await sleep(page, 400);
+  await ev(() => window.G.returnToVillage()); await waitMode(page, 'village'); await sleep(page, 600);
+  await page.waitForFunction(() => window.G.heroes.poeJoin.state === 'wait', null, { timeout: 25000 }).catch(() => {});
+  const b1 = await J();
+  R.check('leaving town mid-scene resets it (no actor left behind, no old scene in the grove); back in town it starts again', b0.state === 'off' && !b0.poe && !b0.joined && b1.state === 'wait' && !b1.joined, JSON.stringify({ b0, b1 }));
   await ev(() => { // an old save from before Poe: Moka joined, no heroes.poe at all
     const G = window.G; G.save(); const s = JSON.parse(localStorage.getItem('chewy3d.save'));
-    delete s.heroes.poe; delete s.flags.poeJoined; if (s.flags.hints) delete s.flags.hints.poeRumour; s.flags.mokaJoined = true;
+    delete s.heroes.poe; delete s.flags.poeJoined; if (s.flags.hints) delete s.flags.hints.poeRumour; s.flags.mokaJoined = true; s.heroes.chewy.player.lvl = 2; if (s.heroes.moka) s.heroes.moka.player.lvl = 2; // (the Bamboo still closed: the rumour's for then)
     window.__ignoreSave = true; localStorage.setItem('chewy3d.save', JSON.stringify(s)); removeEventListener('beforeunload', G.save); G.save = () => {};
   });
   await boot(page, 'notitle&notut'); await quiet();
@@ -87,7 +102,7 @@ try {
   await page.waitForFunction(() => window.G.state.flags.hints?.poeRumour, null, { timeout: 25000 }).catch(() => {});
   const b2 = await ev(() => ({ rumour: !!window.G.state.flags.hints?.poeRumour, toast: [...document.querySelectorAll('.toast, .tst')].some(t => /Bamboo Grove/.test(t.textContent)) }));
   await sleep(page, 400);
-  R.check('in town (Moka joined, Poe not): Shadow passes on the rumour about the bamboo, once', b2.rumour, JSON.stringify(b2));
+  R.check('in town (Moka joined, Poe not, the Bamboo not open yet): Shadow passes on the rumour about the bamboo, once', b2.rumour, JSON.stringify(b2));
 
   // ================================================================ c) the Meet Poe guide
   await boot(page, 'fresh&nointro&tut&hour=11'); await quiet(); await mokaIn();

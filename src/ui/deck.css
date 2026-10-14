@@ -18,6 +18,7 @@
   .cd-size, .cd-built, .rk-next, .rk-badge b, .rk-n, .ovl, .bd-side .bh-k, .bd-side .bd-stats small,
   .p-inv .eq-l, .p-char .ch-xpl > span, .p-decor .dc-n, .p-decor .dc-tip, /* (CT-10: deck-ui never audited the bag, the character sheet or decorate: their scope names were wrong) */
   .toasts .t-tx small, .hud .buff > i, /* (CT-10: a toast's second line, a buff's seconds: the busy HUD and the fight, audited now) */
+  .p-guild .gd-cost > em, /* (the Guild's upgrade cost, what you're short: 11.5 px, 10.6 on the Deck's screen) */
   .kc.sm:not(.pad)
 ) { font-size: 12px; }
 

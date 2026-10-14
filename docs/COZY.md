@@ -101,11 +101,17 @@ NEW GAME
 ZONES (each zone, in order: Bamboo → Maple → Tidepool → Onsen)
  the zone opens: a hero at its level (any hero, crews level them), or the previous zone's dungeon
    cleared once (by you or by a crew) ....................................... [F/C]
-  └─ the besieged village: 3 camps + the captain ............................ [F/C] crew: "Relieve <village>"
-      │   (camps you broke stay broken; the crew's objective shrinks with them)
-      └─ the village is SAVED → the zone turns peaceful (2 wild areas stay) .. automatic
-          ├─ the zone's hero joins in the now-calm zone (Poe / Floofy / Foosy)  [T] visit (scene; no fight)
-          ├─ 6 villager quests, objectives in the zone dungeon .............. [F/C] crew per objective; the turn-in
+  └─ its hero arrives in Blossom Hollow and asks for help (Poe / Floofy / Foosy; ROADMAP Z-H3, ZONES §3.1)
+     — Captain Kaizo for the Tide Pool until Stella — the hero joins; the zone's main
+     story quest starts ("Takemori Under Siege") ............................ [T] scene in town (no fight)
+      └─ travel to the zone (the Wayfarer's Post) ............................ [T]
+      └─ the besieged village: 3 camps + the captain ........................ [F/C] crew: "Relieve <village>"
+          │   (camps you broke stay broken; the crew's objective shrinks with them; relieved before the
+          │    hero came: they still arrive and join, with a thank-you and no quest)
+          └─ the village is SAVED → the zone turns peaceful (2 wild areas stay) automatic
+              ├─ the hand-in to whoever asked: the benched hero in town (their line
+              │   about the crew if one did it), or their own scene if you play them .. [T]
+              ├─ 6 villager quests, objectives in the zone dungeon .......... [F/C] crew per objective; the turn-in
           │                                                                      talk is always yours [T]
           ├─ the zone dungeon's first clear (2 floors + the boss) ........... [F/C] crew: "Clear the <dungeon>"
           │   └─ opens the next zone ......................................... automatic
@@ -146,9 +152,9 @@ home" line, and no door, arrival or boss lines fire for places you never walked 
 ### 3.2 The zones (`regions/village/*`, `dungeon/zoneRun.js`, `world/zoneQuests.js`)
 | Beat | Today | Cozy route | Gate (town + supplies) |
 |---|---|---|---|
-| **The siege** (3 camps, cages, the captain's ward, the captain) | Fight in the village | **[C] "Relieve <village>"**, 6 h. Its power scales with the camps still standing (each broken camp −25%; the captain is the last 25%). On success: the camps fall, the cages open, the captain is driven off ("Captain Galeclaw flees into the Depths!"), `saveVillage` with `savedBy: 'crew'`, `village:saved` | Takemori: the Guild built, **or a crew of 2, or one hero with packed lunches** (the director's call at phase A: the first relief must be reachable with only Moka benched, since Poe joins in Takemori's own zone and the Guild comes in phase D; gates are data in `cozy/objectives.js RELIEFS`, CZ-9 may retune). Akane: rank 3. Shiokaze: rank 3 + Guild L2. Yukimi: Guild L3. Each: 1 meal pack per crew member |
+| **The siege** (3 camps, cages, the captain's ward, the captain) | Fight in the village | **[C] "Relieve <village>"**, 6 h. Its power scales with the camps still standing (each broken camp −25%; the captain is the last 25%). On success: the camps fall, the cages open, the captain is driven off ("Captain Galeclaw flees into the Depths!"), `saveVillage` with `savedBy: 'crew'`, `village:saved` | Takemori: the Guild built, **or a crew of 2, or one hero with packed lunches** (the director's call at phase A: the first relief must be reachable with only Moka benched, since Poe joined in Takemori's own zone then and the Guild comes in phase D; since Z-H3 she arrives in town as the Bamboo opens, so Moka and Poe are usually both there for it; gates are data in `cozy/objectives.js RELIEFS`, CZ-9 may retune). Akane: rank 3. Shiokaze: rank 3 + Guild L2. Yukimi: Guild L3. Each: 1 meal pack per crew member |
 | **The celebration** | Plays live when the captain falls | Plays on your **next arrival** in the zone (`zones[z].celebrate`): arriving at the Waypoint Shrine, the crew stands in the square with the villagers, the overlays grow in, everyone cheers. The crew's heroes then go home | — |
-| **The zone's hero joining** (Poe in Bamboo, Floofy in Maple, Foosy in Onsen) | Any visit while not joined, once `calm()` (nothing chasing within 13 m) | **No change needed.** The scenes need no fight, only a calm moment. In a saved, peaceful zone they always get one. While besieged, the Travel Map card says "Under siege: yokai on the trail" so a cozy player knows to send the relief first | The zone is open |
+| **The zone's hero joining** (Poe for the Bamboo, Floofy for the Maple, Foosy for the Onsen; Kaizo brings the Tide Pool's news) | Since Z-H3 (ZONES §3.1): they **arrive in Blossom Hollow** once their zone opens, ask for help, join and start the zone's main quest (travel, save the village, the hand-in to them) | **No change needed.** The arrival needs no fight, only a calm moment in town; the quest's village step takes a crew's relief, and its hand-in has the giver's line about the crew. Relieved before they came: a thank-you, no quest | The zone is open |
 | **Villager quests** (6 per zone, objectives in the zone dungeon) | `dungeonFloor`, `find` (champion / unique / chest), `rescue` (behind a guard pack), `kill` N, `boss` | **[C] one objective per step**, 4 h each ("Find Chiku's Ledger", "Bring Kome home", "Teach 12 Kamaitachi manners"). The crew returns with the quest item or the rescued villager (they walk home to the village). **The turn-in talk stays yours** | The village saved (as now), the quest's prereqs |
 | **The zone dungeon's first clear** | Both floors + the arena boss | **[C] "Clear the <dungeon>"**, 10 h (overnight). On success: `zones[z].dungeon.crew += 1`, the next zone opens (`openedByPrev` reads `dungeon.cleared > 0 || dungeon.crew > 0`), the Travel Map stamps 救 (relieved) instead of 踏破, and any active quest's `dungeonFloor` / `boss` steps for that dungeon tick | Village saved; Bamboo: rank 2; Maple: Guild L2; Tidepool: rank 4; Onsen: rank 4 + Guild L3. Supplies: 1 meal pack per member + 2 heart potions |
 | **The Spirit Lantern** (Tier 1) | The first clear | **A crew's clear wakes it too** (the owner's pick): `recordDungeonClear`'s tier side runs (T0 counts as cleared for the tiers, T1 opens, `tier:unlocked` fires, the Lantern lights live). Every tier run is hands-on | — |

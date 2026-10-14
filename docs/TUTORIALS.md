@@ -42,7 +42,8 @@ Status: **built** (2026-10-03; the cozy path's three guides 2026-10-09). The gui
 - **Progress** lives in `state.flags.tutorials = { active, [id]: { step, started, offered, done, skipped } }`. A reload
   resumes the active guide at its step.
 - **Starting**: a guide starts on its own when its `trigger` first becomes true and the game is calm (no dialogue,
-  panel, banner, transition or switch, and no quest card waiting for its moment: the card goes first, docs/QUESTS.md §1). If several are pending, the lowest `priority` goes first. A guide with
+  panel, banner, transition or switch, no quest card waiting for its moment: the card goes first, docs/QUESTS.md §1;
+  and no hero arriving in town: docs/ZONES.md §3.1). If several are pending, the lowest `priority` goes first. A guide with
   `indoors: true` may also start inside a house, and one with `startPanels: [...]` over those panels (the Remodel
   guide starts over the house card it was triggered by).
 - **Old saves**: a save that is already past a guide's trigger when it loads (or its `past(G)`, when the guide has

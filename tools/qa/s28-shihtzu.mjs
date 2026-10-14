@@ -1,10 +1,12 @@
 // Scenario 28: the Shih Tzu, the fourth hero (docs/SHIHTZU.md).
-//  a) his joining scene in Momiji Hollow: he appears beside the trail ahead (on screen) kneeling by three paper lanterns,
+//  a) his arrival in Blossom Hollow (since ROADMAP Z-H3; docs/SHIHTZU.md §5): Momiji Hollow open and Poe joined, at
+//     golden hour he kneels on the Shrine Road's paving by three paper lanterns (on screen as you come up the road),
 //     lighting them one by one with a ghost pup at his shoulder; walk up and he rises, proclaims, the pup licks his face
-//     mid-word; the dialogue (his name from CLASSES.shihtzu.name); he joins and snuffs the lanterns into his tome; back in
-//     town he lives at home, three heroes on the bench
-//  b) leaving mid-scene resets it (no actor, no lanterns, no pup left behind) and it starts again on the next visit; left
-//     alone, the ghost pup comes to fetch you; an old save (Poe joined, him not) gets Shadow's rumour in town, once
+//     mid-word; the dialogue (his name from CLASSES.shihtzu.name); he joins and snuffs the lanterns into his tome; his
+//     quest starts; he lives at home at once, three heroes on the bench
+//  b) leaving town mid-scene resets it (no actor, no lanterns, no pup left behind) and his arrival comes again back in
+//     town; standing about nearby, the ghost pup comes to fetch you; an old save (Poe joined, him not, Momiji Hollow shut)
+//     gets Shadow's rumour in town, once
 //  c) the "Meet <name>" guide (?tut): hold Tab → the wheel, his card, a pick by key; the flail, the hex, the blanket, done
 //  d) playing him: every active skill tapped in a Burrow fight lands its hits with no errors (the summons and the ward
 //     appear); he's the baked shihtzu_toy with the Blender flail; a real hold on Woeful Wallop charges past Stage Ⅰ and
@@ -15,7 +17,7 @@ import { launch, boot, waitMode, sleep, makeReport, drainDialogue, tap } from '.
 import fs from 'node:fs';
 import { CLASSES } from '../../src/rpg/classes.js';
 
-const R = makeReport('S28 the Shih Tzu: joining in Momiji Hollow, the rumour, the Meet guide, every skill, a real charge, perf');
+const R = makeReport('S28 the Shih Tzu: his arrival on the Shrine Road, the rumour, the Meet guide, every skill, a real charge, perf');
 const { browser, page, errors, warns } = await launch({ w: 1280, h: 720 });
 const ev = (f, a) => page.evaluate(f, a);
 const SHOTS = !!process.env.SHOTS, OUT = 'tools/qa/tmp/s28', PART = process.env.PART || 'abcde'; // (PART=a: only the scene)
@@ -23,38 +25,23 @@ if (SHOTS) fs.mkdirSync(OUT, { recursive: true });
 const shot = async name => { if (SHOTS) await page.screenshot({ path: `${OUT}/${name}.png` }); };
 const quiet = () => ev(() => { const G = window.G; G.sim.tickT = -1e9; clearInterval(window.__freeze); window.__freeze = setInterval(() => { G.sim.tickT = -1e9; }, 200); G.state.flags.hints = { ...(G.state.flags.hints || {}), garden: 1, build: 1, travel: 1, skills: 1, stats: 1, loot: 1, potion: 1, fight: 1 }; });
 const poeIn = () => ev(() => { const G = window.G; G.state.flags.mokaJoined = true; G.state.flags.poeJoined = true; for (const id of ['moka', 'poe']) { const v = G.heroes.villagers[id]; if (v) { v.frozen = false; v.waitingToJoin = false; } } });
-const toMaple = async () => {
-  await ev(() => { const G = window.G; G.state.player.lvl = 14; G.actions.recompute(); G.state.flags.burrowTut = true; window.__walkI = null; G.enterRegion('maple'); });
-  await waitMode(page, 'dungeon'); await sleep(page, 600);
-  await ev(() => { for (const m of window.G.dungeon.monsters) { m.pos.set(-500, 0, -500); m.aggro = false; } }); // (a quiet hollow)
-};
-/** walk n small steps along the region's trail from the arrival (the trail start, or in a saved zone the village's
- *  Waypoint Shrine: the first step finds the nearest trail point, then it walks on toward the dungeon gate) */
-const walk = async (n) => {
-  for (let i = 0; i < n; i++) {
-    await ev(() => {
-      const G = window.G, P = G.player, ok = (x, z) => G.world.walkable(x, z) && !G.world.collision?.solidAt?.(x, z, 0.3), tr = G.dungeon?.layout?.plan?.trail;
-      if (!tr) return;
-      if (window.__walkI == null) { let j0 = 0, d0 = 1e9; tr.forEach(([x, z], j) => { const q = Math.hypot(x - P.pos.x, z - P.pos.z); if (q < d0) { d0 = q; j0 = j; } }); if (d0 > 2.5) { P.setPos(tr[j0][0], tr[j0][1]); G.engine.rig.focus.copy(P.pos); G.engine.rig.snap?.(); } } // (a saved zone: step onto the road from the shrine)
-      let bi = window.__walkI ?? 0, bd = 1e9; for (let j = window.__walkI == null ? 0 : Math.max(0, bi - 2); j < (window.__walkI == null ? tr.length : Math.min(tr.length, bi + 12)); j++) { const q = Math.hypot(tr[j][0] - P.pos.x, tr[j][1] - P.pos.z); if (q < bd) { bd = q; bi = j; } } window.__walkI = bi;
-      const nx = tr[Math.min(tr.length - 1, bi + 2)], L = Math.hypot(nx[0] - P.pos.x, nx[1] - P.pos.z) || 1, d = { x: (nx[0] - P.pos.x) / L, z: (nx[1] - P.pos.z) / L };
-      const x = P.pos.x + d.x * 0.35, z = P.pos.z + d.z * 0.35; if (ok(x, z)) { P.setPos(x, z); P.facing = P.faceTarget = Math.atan2(d.x, d.z); }
-    });
-    await sleep(page, 55);
+/** Momiji Hollow open (level 11), Poe's arrival behind us (her quest done): Floofy's arrival is due (actors/arrivals.js) */
+const opened = () => ev(() => { const G = window.G, F = G.state.flags; (F.arrivals ||= {}).bamboo = { how: 'scene', quest: 'start', day: 1 }; G.state.quests.done.push('hq_takemori'); G.state.quests.active = G.state.quests.active.filter(q => q.id !== 'welcome'); G.state.quests.cards = []; G.state.player.lvl = 11; G.actions.recompute(); if (G.day) G.day.paused = true; });
+/** you come up the Shrine Road: r m from him, where it's walkable, him on screen from there */
+const upTheRoad = r => ev(r => {
+  const G = window.G, S = G.heroes.stzJoin, k = S.knight, P = G.player, W = G.world, cam = G.engine.camera, rig = G.engine.rig, v = new G.THREE.Vector3();
+  if (!k) return false;
+  for (const rr of [r, r + 1, r - 1, r + 2]) for (let i = 0; i < 24; i++) {
+    const a = i / 24 * Math.PI * 2, x = k.pos.x + Math.sin(a) * rr, z = k.pos.z + Math.cos(a) * rr; if (W.walkable(x, z) === false || W.collision?.solidAt?.(x, z, 0.35)) continue;
+    P.setPos(x, z); rig.focus?.copy?.(P.pos); rig.snap?.(); cam.updateMatrixWorld(); v.set(k.pos.x, k.pos.y + 0.6, k.pos.z).project(cam);
+    if (Math.abs(v.x) < 0.75 && v.y > -0.5 && v.y < 0.7 && !(S.view?.occ && S.view.screened(k.pos.x, k.pos.z, [0.4, 0.8], 0.2, cam.position))) { P.faceTo(k.pos.x, k.pos.z); return true; }
   }
-};
-/** walk until his scene starts (a saved zone's arrival is the village: a longer walk out before a spot ahead is free) */
-const walkOn = async () => {
-  await walk(24);
-  for (let k = 0; k < 8; k++) {
-    await page.waitForFunction(() => window.G.heroes.stzJoin.state !== 'wait', null, { timeout: 7000 }).catch(() => {});
-    if ((await ev(() => window.G.heroes.stzJoin.state)) !== 'wait') return;
-    await walk(12);
-  }
-};
+  return false;
+}, r);
 const J = () => ev(() => {
-  const G = window.G, S = G.heroes.stzJoin, P = G.player, k = S.knight;
-  return { state: S.state, vis: !!k?.visible, act: k?.anim.action?.name || null, d: k ? Math.round(Math.hypot(k.pos.x - P.pos.x, k.pos.z - P.pos.z) * 10) / 10 : -1, onScreen: k ? S.onScreen(k.pos.x, k.pos.y, k.pos.z) : false,
+  const G = window.G, S = G.heroes.stzJoin, P = G.player, k = S.knight, cam = G.engine.camera;
+  const on = k ? (() => { const v = k.pos.clone(); v.y += 0.6; v.project(cam); return Math.abs(v.x) < 0.9 && v.y > -0.7 && v.y < 0.9 && v.z < 1; })() : false;
+  return { state: S.state, vis: !!k?.visible, act: k?.anim.action?.name || null, d: k ? Math.round(Math.hypot(k.pos.x - P.pos.x, k.pos.z - P.pos.z) * 10) / 10 : -1, onScreen: on, paved: S.spot && G.world.terrain?.tile ? [1, 2].includes(G.world.terrain.tile(S.spot.x, S.spot.z)) : null,
     lanterns: S.lanterns.length, lit: S.lanterns.filter(L => L.want > 0).length, pup: !!S.pup, pupSlots: G.vfx.stz?._pups?.slots.length || 0, knight: !!k, joined: !!G.state.flags.shihtzuJoined };
 });
 /** answer the scene's dialogues (between them the lick plays) until it's done */
@@ -70,18 +57,19 @@ const drainScene = async picks => {
 };
 try {
   const name = CLASSES.shihtzu.name; // (the owner's to pick: the scene and the guide read it)
-  if (PART.includes('a')) { // ================================================================ a) the joining scene
-  await boot(page, 'fresh&nointro&notut'); await quiet(); await poeIn();
+  if (PART.includes('a')) { // ================================================================ a) his arrival on the Shrine Road
+  await boot(page, 'fresh&nointro&notut&arrive&qcard&hour=18.2'); await quiet(); await poeIn();
   await ev(() => { window.__scene = []; window.G.events.on('shihtzu:joinScene', p => window.__scene.push(p.phase)); });
-  await toMaple();
+  await opened();
+  await page.waitForFunction(() => window.G.heroes.stzJoin.state !== 'off', null, { timeout: 20000 }).catch(() => {});
   const a0 = await J();
-  await walkOn();
   await page.waitForFunction(() => window.G.heroes.stzJoin.state === 'kneel', null, { timeout: 30000 }).catch(() => {});
   await page.waitForFunction(() => window.G.heroes.stzJoin.lanterns.filter(L => L.want > 0).length >= 2, null, { timeout: 8000 }).catch(() => {});
+  await upTheRoad(7); await sleep(page, 900);
   const a1 = await J();
   await shot('1-kneel');
-  R.check('in Momiji Hollow he appears beside the trail ahead, on screen: kneeling by three paper lanterns, lighting them one by one, a ghost pup at his shoulder', a0.state === 'wait' && a1.state === 'kneel' && a1.vis && a1.act === 'stzKneel' && a1.onScreen && a1.d > 4 && a1.d < 13 && a1.lanterns === 3 && a1.lit >= 2 && a1.pup && a1.pupSlots === 1, JSON.stringify({ a0, a1 }));
-  await ev(() => { const S = window.G.heroes.stzJoin, P = window.G.player, k = S.knight; P.setPos(k.pos.x + Math.sin(k.facing + 1.6) * 3.2, k.pos.z + Math.cos(k.facing + 1.6) * 3.2); });
+  R.check('in Blossom Hollow (Momiji Hollow open, Poe joined) he arrives at golden hour on the Shrine Road: kneeling on the paving by three paper lanterns, lighting them one by one, a ghost pup at his shoulder; on screen as you come up the road', ['wait', 'kneel'].includes(a0.state) && a1.state === 'kneel' && a1.vis && a1.act === 'stzKneel' && a1.onScreen && a1.paved && a1.lanterns === 3 && a1.lit >= 2 && a1.pup, JSON.stringify({ a0, a1 }));
+  await ev(() => { const S = window.G.heroes.stzJoin, P = window.G.player, k = S.knight; P.setPos(k.pos.x + Math.sin(k.facing) * 3.2, k.pos.z + Math.cos(k.facing) * 3.2); });
   await page.waitForFunction(() => window.G.ui.dlg?.active, null, { timeout: 12000 }).catch(() => {});
   const a2 = await ev(() => ({ speaker: window.G.ui.dlg?.opts?.speaker, text: (window.G.ui.dlg?.lines || []).map(l => l.text || l).join(' '), locked: window.G.player.controlLocked, act: window.G.heroes.stzJoin.knight?.anim.action?.name, scene: window.__scene.slice() }));
   await shot('2-proclaim');
@@ -100,34 +88,37 @@ try {
   await page.waitForFunction(() => window.__scene.includes('done'), null, { timeout: 12000 }).catch(() => {});
   await sleep(page, 300); await shot('6-joined');
   await sleep(page, 1300);
-  const a4 = await ev(() => { const G = window.G, S = G.heroes.stzJoin; return { joined: !!G.state.flags.shihtzuJoined, lvl: G.state.heroes.shihtzu.player.lvl, locked: G.player.controlLocked, knight: !!S.knight, lanterns: S.lanterns.length, pupSlots: G.vfx.stz?._pups?.slots.length || 0, state: S.state, scene: window.__scene.slice(), roster: G.heroes.roster().map(h => h.id + (h.joined ? '+' : '-')).join(' ') }; });
-  R.check('he joins (near the pack\'s level), snuffs the lanterns into his tome and fades away in ghostlight; controls back, nothing left behind', a4.joined && a4.lvl >= 5 && !a4.locked && !a4.knight && !a4.lanterns && !a4.pupSlots && ['done', 'off'].includes(a4.state) && a4.scene.includes('snuff') && /shihtzu\+/.test(a4.roster) && picked.length >= 2, JSON.stringify({ a4, picked }));
-  await ev(() => window.G.returnToVillage()); await waitMode(page, 'village'); await sleep(page, 1200);
-  const a5 = await ev(() => { const G = window.G, v = G.heroes.villagers.shihtzu, h = G.heroes.homeSpot('shihtzu'); return { v: !!v, near: v ? Math.round(Math.hypot(v.pos.x - h.x, v.pos.z - h.z)) : -1, bench: G.heroes.bench(), flail: v?.rig?.parts?.flail?.kind || null }; });
-  R.check('back in town he lives at the cottage (a villager, his flail on his back), three heroes on the bench', a5.v && a5.near < 12 && a5.bench.length === 3 && !!a5.flail, JSON.stringify(a5));
+  const a4 = await ev(() => { const G = window.G, S = G.heroes.stzJoin; return { joined: !!G.state.flags.shihtzuJoined, lvl: G.state.heroes.shihtzu.player.lvl, locked: G.player.controlLocked, knight: !!S.knight, lanterns: S.lanterns.length, pupSlots: G.vfx.stz?._pups?.slots.length || 0, state: S.state, scene: window.__scene.slice(), quest: G.state.quests.active.some(q => q.id === 'hq_akane') }; });
+  R.check('he joins (near the pack\'s level), snuffs the lanterns into his tome and fades away in ghostlight; controls back, nothing left behind; his quest starts', a4.joined && a4.lvl >= 5 && !a4.locked && !a4.knight && !a4.lanterns && !a4.pupSlots && ['done', 'off'].includes(a4.state) && a4.scene.includes('snuff') && a4.quest && picked.length >= 2, JSON.stringify({ a4, picked }));
+  await page.keyboard.press('Escape'); await sleep(page, 400); // (his quest's card)
+  const a5 = await ev(() => { const G = window.G, v = G.heroes.villagers.shihtzu, h = G.heroes.homeSpot('shihtzu'); return { v: !!v, near: v ? Math.round(Math.hypot(v.pos.x - h.x, v.pos.z - h.z)) : -1, bench: G.heroes.bench(), flail: v?.rig?.parts?.flail?.kind || (v?.rig?.parts?.flail ? 'yes' : null) }; });
+  R.check('he lives at the cottage at once (a villager, his flail on his back), three heroes on the bench', a5.v && a5.near < 12 && a5.bench.length === 3 && !!a5.flail, JSON.stringify(a5));
 
   }
   if (PART.includes('b')) { // ================================================================ b) a reset mid-scene; the pup fetches you; an old save's rumour
-  await boot(page, 'fresh&nointro&notut'); await quiet(); await poeIn();
+  await boot(page, 'fresh&nointro&notut&arrive&qcard&hour=18.2'); await quiet(); await poeIn();
   await ev(() => { window.__scene = []; window.G.events.on('shihtzu:joinScene', p => window.__scene.push(p.phase)); });
-  await toMaple(); await walkOn();
-  await page.waitForFunction(() => window.G.heroes.stzJoin.state === 'kneel', null, { timeout: 30000 }).catch(() => {});
-  await ev(() => window.G.returnToVillage()); await waitMode(page, 'village'); await sleep(page, 600);
+  await opened();
+  await page.waitForFunction(() => window.G.heroes.stzJoin.state === 'kneel', null, { timeout: 40000 }).catch(() => {});
+  await ev(() => { const G = window.G; G.state.flags.burrowTut = true; G.enterRegion('maple'); }); await waitMode(page, 'dungeon'); await sleep(page, 600);
   const b0 = await J();
-  await toMaple(); const b1 = await J();
-  R.check('leaving the hollow mid-scene resets it (no knight, no lanterns, no pup left behind); the next visit starts it again', b0.state === 'off' && !b0.knight && !b0.lanterns && !b0.pupSlots && !b0.joined && b1.state === 'wait', JSON.stringify({ b0, b1 }));
-  await walkOn();
+  await ev(() => window.G.returnToVillage()); await waitMode(page, 'village');
+  await page.waitForFunction(() => ['wait', 'kneel'].includes(window.G.heroes.stzJoin.state), null, { timeout: 40000 }).catch(() => {});
+  const b1 = await J();
+  R.check('leaving town mid-scene resets it (no knight, no lanterns, no pup left behind); back in town his arrival comes again', b0.state === 'off' && !b0.knight && !b0.lanterns && !b0.pupSlots && !b0.joined && ['wait', 'kneel'].includes(b1.state), JSON.stringify({ b0, b1 }));
   await page.waitForFunction(() => window.G.heroes.stzJoin.state === 'kneel', null, { timeout: 30000 }).catch(() => {});
+  await upTheRoad(10);
   const bk = await J();
-  await page.waitForFunction(() => window.__scene.includes('proclaim'), null, { timeout: 26000 }).catch(() => {}); // (stand still: the pup comes to fetch you)
+  await page.waitForFunction(() => window.__scene.includes('proclaim'), null, { timeout: 30000 }).catch(() => {}); // (stand about: the pup comes to fetch you)
   await page.waitForFunction(() => window.G.ui.dlg?.active, null, { timeout: 10000 }).catch(() => {});
   const b2 = await ev(() => ({ scene: window.__scene.slice(), dlg: !!window.G.ui.dlg?.active }));
-  R.check('left alone by the lanterns, the ghost pup comes to fetch you and he walks over: the scene goes on', bk.state === 'kneel' && b2.scene.includes('proclaim') && b2.dlg, JSON.stringify({ bk, b2 }));
+  R.check('standing about near his lanterns, the ghost pup comes to fetch you and he takes his mark: the scene goes on', bk.state === 'kneel' && bk.d > 4.5 && bk.d < 14 && b2.scene.includes('proclaim') && b2.dlg, JSON.stringify({ bk, b2 }));
   await drainScene([1, 0]);
-  await ev(() => window.G.returnToVillage()); await waitMode(page, 'village'); await sleep(page, 400);
-  await ev(() => { // an old save from before the Shih Tzu: Poe joined, no heroes.shihtzu at all
+  await page.keyboard.press('Escape'); await sleep(page, 300);
+  await ev(() => { // an old save from before the Shih Tzu: Poe joined, no heroes.shihtzu at all, Momiji Hollow not open yet
     const G = window.G; G.save(); const s = JSON.parse(localStorage.getItem('chewy3d.save'));
     delete s.heroes.shihtzu; delete s.flags.shihtzuJoined; if (s.flags.hints) delete s.flags.hints.stzRumour; s.flags.mokaJoined = true; s.flags.poeJoined = true;
+    for (const h of Object.values(s.heroes)) if (h?.player) h.player.lvl = 5; if (s.player) s.player.lvl = 5; s.quests.active = s.quests.active.filter(q => q.id !== 'hq_akane'); s.quests.cards = [];
     window.__ignoreSave = true; localStorage.setItem('chewy3d.save', JSON.stringify(s)); removeEventListener('beforeunload', G.save); G.save = () => {};
   });
   await boot(page, 'notitle&notut'); await quiet();
@@ -136,8 +127,8 @@ try {
   await ev(() => { delete window.G.state.flags.hints.stzRumour; window.G.heroes.stzJoin.hintT = 0; });
   await page.waitForFunction(() => window.G.state.flags.hints?.stzRumour, null, { timeout: 30000 }).catch(() => {});
   await sleep(page, 300); await shot('7-rumour');
-  const b3 = await ev(() => ({ rumour: !!window.G.state.flags.hints?.stzRumour, toast: [...document.querySelectorAll('.toast, .tst')].some(t => /lanterns/.test(t.textContent)) }));
-  R.check('in town (Poe joined, him not): Shadow passes on the rumour about the lanterns in Momiji Hollow, once', b3.rumour, JSON.stringify(b3));
+  const b3 = await ev(() => ({ rumour: !!window.G.state.flags.hints?.stzRumour, wheel: window.G.heroes.roster().find(h => h.id === 'shihtzu').why }));
+  R.check('in town (Poe joined, him not, Momiji Hollow shut): Shadow passes on the rumour about the lanterns, once; the wheel says when he\'ll come', b3.rumour && b3.wheel === 'Will arrive when Momiji Hollow opens', JSON.stringify(b3));
 
   }
   if (PART.includes('c')) { // ================================================================ c) the Meet guide

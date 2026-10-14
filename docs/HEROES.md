@@ -5,11 +5,13 @@ Status: **shipped** (Moka update; QA: tools/qa/s12-heroes.mjs, spell perf: tools
 (dog-themed water, starlight and duck-hunt magic). The player controls one hero at a time and can switch on demand;
 the other hero lives in Blossom Hollow as a villager. The same seams are the base for co-op multiplayer
 (see docs/MULTIPLAYER.md). The third hero, **Poe** (a black pug ninja with a giant bone fūma), has her own doc:
-docs/POE.md (class, skills, charge, joining in the Bamboo Grove, the hero wheel; QA tools/qa/s20-poe.mjs). The fourth,
-**the Shih Tzu** (a black-and-white dark knight with a toy flail and dark dog magic; name TBD), has docs/SHIHTZU.md
-(class, skills, charge, joining in Momiji Hollow; QA tools/qa/s28-shihtzu.mjs). The fifth, **Foosy** (a Golden Retriever
+docs/POE.md (class, skills, charge, her arrival in Blossom Hollow, the hero wheel; QA tools/qa/s20-poe.mjs). Since
+ROADMAP Z-H3 the heroes **arrive in Blossom Hollow** when their zone opens, ask for help, join and start their homeland's
+main quest (§6, docs/ZONES.md §3.1). The fourth,
+**the Shih Tzu** (a black-and-white dark knight with a toy flail and dark dog magic; Floofy), has docs/SHIHTZU.md
+(class, skills, charge, his arrival in Blossom Hollow; QA tools/qa/s28-shihtzu.mjs). The fifth, **Foosy** (a Golden Retriever
 dragoon with a toy lance and javelins; Shadow flies beside him as a dragon whelp), has docs/GOLDEN.md (class, skills,
-charge, the whelp, joining at the Onsen; QA tools/qa/s29-golden.mjs).
+charge, the whelp, his arrival in Blossom Hollow; QA tools/qa/s29-golden.mjs).
 
 ## 1. Who is Moka
 - Boykin Spaniel (South Carolina's retriever): rich chocolate/liver wavy-curly coat, long pendant wavy ears, golden
@@ -105,20 +107,31 @@ free little sparkle bolt. Hotbar hints on first join. Staff bases span tiers lik
 - New game: after Rosie's welcome, Moka arrives at the plaza (a bookish spaniel mage who read about the Burrow) and
   joins; a banner + tip teach Tab.
 - Existing saves: Moka waits by the fountain with a "!" marker; talking to her plays the same scene.
-- Poe joins later, in the Whispering Bamboo Grove: she tails you (badly), sneezes, gets caught and joins; once Moka has
-  joined, Shadow passes on a rumour in town that points there (`src/actors/poeJoin.js`, docs/POE.md §5).
-- The Shih Tzu joins in Momiji Hollow (the Maple zone): kneeling by the trail, lighting ghostlight lanterns; he rises to
-  proclaim and a ghost pup licks his face mid-word; once Poe has joined, Shadow passes on the rumour in town
-  (`src/actors/shihtzuJoin.js`, docs/SHIHTZU.md §5).
-- Foosy joins at the hot springs of Yukimi Onsen: standing guard, he begins a solemn vow and a tennis ball from the
-  bathhouse undoes it; he gives Shadow a dragon whelp costume; once the Shih Tzu has joined, Shadow passes on the rumour
-  in town (`src/actors/goldenJoin.js`, docs/GOLDEN.md §5).
+- **The arrivals** (ROADMAP Z-H3; `src/actors/arrivals.js`, the rules and quests `src/world/heroQuests.js`; docs/ZONES.md
+  §3.1): once a hero's zone opens (the level, or the zone before cleared by you or a crew) and the hero before them has
+  joined, they come to Blossom Hollow on a calm moment, play their old gag in town, ask for help for their home village,
+  **join at once** and start its main quest (travel to the zone, save the village, the hand-in to them). In order: Moka →
+  Poe → Floofy → (Captain Kaizo, the Tide Pool's messenger, until Stella) → Foosy. Before their zone opens the wheel says
+  when they'll come ("Will arrive when the Bamboo opens") and Shadow passes on a rumour.
+- Poe arrives once the Bamboo opens: she tails you (badly) round the plaza, freezes when you look, sneezes, gets caught,
+  pleads for Takemori and joins (`src/actors/poeJoin.js`, docs/POE.md §5).
+- Floofy arrives once Momiji Hollow opens: kneeling on the Shrine Road's paving, lighting ghostlight lanterns (at golden
+  hour, or early and saying so); he rises to proclaim and a ghost pup licks his face mid-word; he pleads for Akane and
+  joins (`src/actors/shihtzuJoin.js`, docs/SHIHTZU.md §5).
+- Captain Kaizo, Shiokaze Port's old captain, rows over once the Tide Pool opens: his boat on the beach, "Ahoy there!", his
+  plea for the port; he rows home and the quest's hand-in is his, at his lookout (`src/actors/kaizoArrive.js`; Stella
+  takes his place in the arrival table when she's built, ROADMAP H-6).
+- Foosy arrives once the Onsen opens and Kaizo has been: he marches in and stands guard by the fountain, begins a solemn
+  vow and a tennis ball from Rosie's Treats undoes it; he gives Shadow a dragon whelp costume, pleads for Yukimi and joins
+  (`src/actors/goldenJoin.js`, docs/GOLDEN.md §5).
 
 ## 7. Code map
 - `src/rpg/classes.js` — class table. `src/rpg/skillsMoka.js` — Moka's skill defs (merged into SKILLS).
 - `src/actors/heroes.js` — HeroManager: roster, state linking, switching + transition, NPC-mode heroes, Shadow;
-  tap / hold Tab (`tabInput`) and the hero wheel (`src/ui/heroWheel.js`); Poe's joining scene (`poeJoin.js`) and the
-  Shih Tzu's (`shihtzuJoin.js`), Foosy's (`goldenJoin.js`).
+  tap / hold Tab (`tabInput`) and the hero wheel (`src/ui/heroWheel.js`); the arrivals (`arrivals.js`: the due rules from
+  `world/heroQuests.js`, the calm moment, the records, the hand-in when you play the giver, the debug actions; the
+  staging helpers `sceneStage.js`); Poe's island scene (`poeJoin.js`), the Shih Tzu's (`shihtzuJoin.js`), Foosy's
+  (`goldenJoin.js`). Talking to a benched hero hands their homeland quest in first.
 - `src/actors/heroModels.js` — baked hero models (Chewy, Moka, and Shadow on the quad contract); `src/actors/heroGear.js` — staff geometry.
 - `src/combat/mokaSpells.js` — SkillRunner cast implementations for Moka; `src/gfx/spellFx.js` — spell VFX.
 - Blender: `tools/blender/disney/moka.py` (build.py `char=moka`), export `public/rigs/moka_disney.*` (63.9k tris, the

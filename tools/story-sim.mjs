@@ -68,9 +68,9 @@ function play(rng) {
     const g = st.cozy.guild, want = T.rank >= 4 ? 3 : T.rank >= 3 ? 2 : T.rank >= 2 ? 1 : 0;
     if (g.level < want) { g.level = want; log.push(`h${C.h.toFixed(0)} the Guild L${want}`); }
     if (g.level && g.hires.length < rosterCap(g.level) && (g.signDay ?? -1) < day) { g.signDay = day; const c = rollCandidates(day, candidateLevel(st), g.level).sort((a, b) => b.lvl - a.lvl)[0]; signOn(st, { ...c, taken: false }, C.h); }
-    // the joiners
-    if (at.bamboo != null && !st.flags.poeJoined && C.h >= at.bamboo + 24) { st.flags.poeJoined = true; A.prepareJoin('poe'); log.push(`h${C.h.toFixed(0)} Poe joins at L${st.heroes.poe.player.lvl}`); }
-    if (at.maple != null && !st.flags.shihtzuJoined && C.h >= at.maple + 24) { st.flags.shihtzuJoined = true; A.prepareJoin('shihtzu'); log.push(`h${C.h.toFixed(0)} Floofy joins at L${st.heroes.shihtzu.player.lvl}`); }
+    // the joiners: they arrive in Blossom Hollow on the next calm moment there once their zone opens (ROADMAP Z-H3; was a day, for the visit)
+    if (at.bamboo != null && !st.flags.poeJoined && C.h >= at.bamboo + 2) { st.flags.poeJoined = true; A.prepareJoin('poe'); log.push(`h${C.h.toFixed(0)} Poe joins at L${st.heroes.poe.player.lvl}`); }
+    if (at.maple != null && !st.flags.shihtzuJoined && C.h >= at.maple + 2) { st.flags.shihtzuJoined = true; A.prepareJoin('shihtzu'); log.push(`h${C.h.toFixed(0)} Floofy joins at L${st.heroes.shihtzu.player.lvl}`); }
     let free = freeNow();
     if (free.length) {
       waves++;

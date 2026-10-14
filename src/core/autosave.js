@@ -99,7 +99,7 @@ export function blocker(G) {
   if (G.ui?.iris?.active || G.housing?.busy) return 'transition';
   if (G.heroSwitching || G.heroFocus) return 'heroSwitch';
   if (G.introFocus || G.introJoinPending || G.cutscene) return 'cutscene';
-  const H = G.heroes; if (H && (H.poeJoin?.busy || H.stzJoin?.busy || H.gldJoin?.busy)) return 'joinScene';
+  const H = G.heroes; if (H && (H.arrivals?.busy || H.arrivals?.selfBusy || H.poeJoin?.busy || H.stzJoin?.busy || H.gldJoin?.busy)) return 'joinScene'; // (an arrival's scene, a hand-in to the hero you play: actors/arrivals.js)
   const D = G.mode === 'dungeon' ? G.dungeon : null;
   if (D) {
     const b = D.boss, p = G.player?.pos;

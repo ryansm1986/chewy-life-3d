@@ -451,10 +451,12 @@ const M = {
       const body = add(new THREE.SphereGeometry(0.13, 14, 10).scale(1, 1.25, 1), paper.clone(), 0.2);
       add(new THREE.CylinderGeometry(0.06, 0.09, 0.04, 10), frame, 0.37);
       const flame = sprite(SF.MOTE, COL.flame, { blending: THREE.AdditiveBlending, opacity: 0 }); flame.scale.setScalar(0.42); flame.position.y = 0.2; flame.renderOrder = 13; root.add(flame);
-      root.userData = { flame, body };
+      // (a soft ghostlight halo round the paper: it reads in town by day and at golden hour, never a wash)
+      const halo = sprite(SF.MOTE, K.ghost, { blending: THREE.AdditiveBlending, opacity: 0 }); halo.scale.setScalar(0.85); halo.position.y = 0.21; halo.renderOrder = 12; root.add(halo);
+      root.userData = { flame, body, halo };
       return root;
     });
-    const { flame, body } = g.userData; g.position.copy(pos); g.rotation.y = yaw; g.scale.setScalar(1);
+    const { flame, body, halo } = g.userData; g.position.copy(pos); g.rotation.y = yaw; g.scale.setScalar(1);
     const H = { root: g, lit: 0, want: 0, done: false,
       light: () => { H.want = 1; this.glint(_a.set(pos.x, pos.y + 0.3, pos.z), 4); this.pa.spawn({ frame: SF.DOT, x: pos.x, y: pos.y + 0.22, z: pos.z, life: 0.3, size: 0.2, size1: 0.7, color: K.ghost, alpha: 0.6, alpha1: 0 }); },
       snuff: (to, dur = 0.45) => {
@@ -465,8 +467,10 @@ const M = {
     };
     this.run((dt, t) => {
       H.lit += (H.want - H.lit) * Math.min(1, dt * 6);
-      flame.material.opacity = Math.min(0.55, 0.5 * H.lit * (0.85 + 0.15 * Math.sin(t * 9 + pos.x)));
-      body.material.emissiveIntensity = 0.35 * H.lit;
+      const fl = 0.85 + 0.15 * Math.sin(t * 9 + pos.x);
+      flame.material.opacity = Math.min(0.7, 0.65 * H.lit * fl);
+      halo.material.opacity = 0.22 * H.lit * (0.9 + 0.1 * fl);
+      body.material.emissiveIntensity = 0.75 * H.lit;
       if (H.lit > 0.5 && Math.random() < dt * 3) this.pa.spawn({ x: pos.x + rand(-0.06, 0.06), y: pos.y + 0.35, z: pos.z + rand(-0.06, 0.06), vy: rand(0.3, 0.6), life: 1, size: 0.07, size1: 0.02, color: K.ghost, alpha: 0.7, alpha1: 0, frame: SF.MOTE });
       return !H.done;
     }, () => this.give('shrineLantern', g));

@@ -60,6 +60,8 @@ export function people(G) {
   }
   const sh = G.companion;
   if (sh) out.push({ key: 'p:shadow', kind: 'person', group: 'hero', id: 'shadow', name: sh.whelp?.on ? 'Shadow (whelp)' : 'Shadow', role: 'Your pup', color: '#26232c', initial: 'S', shadow: true, pos: sh.pos, visible: true, badge: null, prio: 8, named: true });
+  // a hero (or messenger) arriving in town (actors/arrivals.js, ROADMAP Z-H3): a person while they're about
+  if (home) for (const e of G.arrivals?.people?.() || []) if (e?.pos) out.push({ ...e, visible: G.mode === 'village' && e.visible !== false });
   // the heroes and hires out with a crew (no position: "away")
   for (const h of G.heroes?.roster?.() || []) if (h.joined && !h.active && !G.heroes.villagers?.[h.id] && G.heroes.away?.(h.id)) out.push({ key: `p:${h.id}`, kind: 'person', group: 'hero', id: h.id, name: h.name, role: h.title || 'Hero', color: HERO_COLOR[h.id] || '#8fd0ff', initial: h.name[0], away: true, pos: null, visible: false, prio: 1, named: true });
   for (const h of st.cozy?.guild?.hires || []) if (!(G.npcs || []).some(n => n.hire === h.id)) out.push({ key: `p:hire_${h.id}`, kind: 'person', group: 'hire', id: `hire_${h.id}`, name: h.name, role: `${HIRE_CLASSES[h.cls]?.name || 'Hire'} · away with a crew`, color: HIRE_CLASSES[h.cls]?.color || '#8fd0ff', initial: (h.name || '?')[0], away: true, pos: null, visible: false, prio: 1 });

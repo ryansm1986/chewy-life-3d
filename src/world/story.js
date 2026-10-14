@@ -1,5 +1,5 @@
 // Story quests (Rosie), villager friendship (hearts, gifts, daily chats) and villager requests.
-import { heroText } from '../rpg/classes.js';
+import { heroText, CLASSES } from '../rpg/classes.js';
 import { Events } from '../core/events.js';
 import { BUILDINGS } from './buildings/index.js';
 import { VILLAGERS } from '../actors/roster.js';
@@ -11,9 +11,10 @@ import { MATERIALS } from '../ui/glyphs.js';
 import { pantryIcon } from '../life/pantryIcons.js';
 import { meetsNeed, homeRating, starText } from '../home/rating.js';
 import { FURNITURE } from '../home/furniture.js';
-import { stepGain, zoneStepDone, zoneStepHave, destOf, reachIsHere, REACH_R, floorStepDone, floorStepHave } from './questSteps.js';
+import { stepGain, zoneStepDone, zoneStepHave, destOf, reachIsHere, REACH_R, floorStepDone, floorStepHave, visitDone } from './questSteps.js';
 import { DUNGEONS, BURROW, isBurrow } from '../dungeon/defs.js';
 import { ZONE_QUESTS, dungeonObjectives as zoneObjectives, offersFor } from './zoneQuests.js'; // (zone villagers' quests: docs/ZONES.md §3)
+import { HERO_QUESTS } from './heroQuests.js'; // (the heroes' homeland quests, started by their arrival in Blossom Hollow: ROADMAP Z-H3)
 import { ZONE_NPCS } from '../regions/village/data.js';
 import { storyObjectives, villageObjectives, CREW_STEP_TYPES } from '../cozy/objectives.js'; // (the cozy path's crew routes: docs/COZY.md §3)
 import { handInText } from './questLore.js'; // (the hand-in step's words: docs/QUESTS.md §4)
@@ -127,7 +128,7 @@ export class Story {
     Events.on('boss:dead', e => this.payOwed(e));
   }
   get Q() { return this.G.state.quests; }
-  def(id) { return QUESTS[id] || ZONE_QUESTS[id] || this.Q.requests?.[id]?.def; }
+  def(id) { return QUESTS[id] || ZONE_QUESTS[id] || HERO_QUESTS[id] || this.Q.requests?.[id]?.def; }
   start(id, silent = false) {
     if (this.Q.active.some(q => q.id === id) || this.Q.done.includes(id)) return;
     this.Q.active.push({ id, step: 0, prog: 0 });
@@ -150,6 +151,7 @@ export class Story {
       case 'pop': return (G.sim?.stats.population || 0) >= s.n;
       case 'floor': return floorStepDone(s, st); // (that den's floor: rpg/dens.js)
       case 'dungeonFloor': case 'tier': case 'villageSaved': return zoneStepDone(s, st);
+      case 'visit': return visitDone(s, st, this.whereNow()); // (in the zone now, or its village already saved)
       default: return q.prog >= (s.n || 1);
     }
   }
@@ -187,7 +189,7 @@ export class Story {
     if (!d || d.request || d.handIn === false || !d.giver || this.Q?.requests?.[q?.id]) return false; // (anything kept with the requests is one)
     const last = d.steps[d.steps.length - 1];
     if (last?.type === 'talk' && last.npc === d.giver) return false;
-    return d.giver === 'rosie' || VILLAGERS.some(v => v.id === d.giver) || !!ZONE_NPCS[d.giver];
+    return d.giver === 'rosie' || VILLAGERS.some(v => v.id === d.giver) || !!ZONE_NPCS[d.giver] || !!(d.heroQuest && CLASSES[d.giver]); // (a hero's homeland quest: whoever asked, wherever they are)
   }
   /** a quest's steps are all done: its hand-in starts (the arrow, the pin and Shadow to the giver), or it completes */
   stepsDone(q, d) {
@@ -484,7 +486,7 @@ export class Story {
     }
     Events.emit('friend:changed', { id });
   }
-  nameOf(id) { return id === 'rosie' ? 'Rosie' : VILLAGERS.find(v => v.id === id)?.spec.name || ZONE_NPCS[id]?.name || id; }
+  nameOf(id) { return id === 'rosie' ? 'Rosie' : VILLAGERS.find(v => v.id === id)?.spec.name || ZONE_NPCS[id]?.name || CLASSES[id]?.name || id; }
   likesOf(id) { return id === 'rosie' ? ['petal', 'mochi', 'crystal'] : VILLAGERS.find(v => v.id === id)?.likes || []; }
   // full conversation flow for a villager
   async talk(npc) {

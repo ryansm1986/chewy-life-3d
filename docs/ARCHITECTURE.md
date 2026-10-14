@@ -403,7 +403,8 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   the fallback (POE.md §8). prod-smoke requires `poe_toy` and the GLB fūma whenever they ship.
   - Three heroes: tap Tab = `switchTo()` the next joined hero; hold Tab ≥ 0.26 s = the hero wheel (`src/ui/heroWheel.js`,
     `heroes.tabInput`, event `hero:wheel`). `flags.poeJoined` gates her; `G.heroes.poeJoin` (`src/actors/poeJoin.js`) runs
-    her Bamboo Grove scene (event `poe:joinScene`) and Shadow's rumour in town; `joinPoe()` joins her.
+    her arrival scene in Blossom Hollow (event `poe:joinScene`; started by `G.arrivals`) and Shadow's rumour in town;
+    `joinPoe()` joins her.
 - **The Shih Tzu** (docs/SHIHTZU.md): `CLASSES.shihtzu`, the flail (`wtype: 'flail'`); skills `src/rpg/skillsShihtzu.js`,
   casts on SkillRunner by `src/combat/shihtzuSkills.js` (the combo, Woeful Wallop, Dripping Paw, the hexes, the guard) +
   `shihtzuArts.js` (the other 13) + `shihtzuAllies.js` (the ghost pups, Grandpaw) + `chargedShihtzu.js`; effects
@@ -413,7 +414,8 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   (`public/rigs/shihtzu_toy.*`, `HERO_MODELS.shihtzuToy`: lidTilt, squint, `flailMount`, the gated coat grade and a white
   cap) with the Blender flail (`public/models/shihtzu-flail.glb`, tinted per base); the kit (`CAST.shihtzu` +
   `shihtzuKit.js`) is the fallback. A new element, **gloom**. `flags.shihtzuJoined` gates him; `G.heroes.stzJoin`
-  (`src/actors/shihtzuJoin.js`) runs his Momiji Hollow scene (event `shihtzu:joinScene`) and Shadow's rumour in town;
+  (`src/actors/shihtzuJoin.js`) runs his arrival scene on the Shrine Road (event `shihtzu:joinScene`; started by
+  `G.arrivals`) and Shadow's rumour in town;
   `joinShihtzu()` joins him. The hero wheel and the HUD minis take any number of heroes. prod-smoke requires
   `shihtzu_toy` and the GLB flail whenever they ship.
 - **Foosy** (docs/GOLDEN.md): `CLASSES.golden`, the lance (`wtype: 'lance'`); skills `src/rpg/skillsGolden.js`, casts on
@@ -427,8 +429,32 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   `goldenKit.js`, the helm built on the classic kits) is the fallback. **Shadow the whelp** (`src/actors/whelp.js`): the
   `shadow_whelp` rig and the mirrored wing prop, worn while `activeHero === 'golden'` (or `Whelp.forced`), a flight mode
   drawn over the companion's ground AI (`poseQuad` fly / grow). `flags.goldenJoined` gates him; `G.heroes.gldJoin`
-  (`src/actors/goldenJoin.js`) runs his Onsen scene (event `golden:joinScene`) and Shadow's rumour in town; `joinGolden()`
-  joins him. Ground loot is drawn instanced with the monsters (`groundLoot.js` → `horde.js lookIn`).
+  (`src/actors/goldenJoin.js`) runs his arrival scene by the fountain (event `golden:joinScene`; started by `G.arrivals`)
+  and Shadow's rumour in town; `joinGolden()` joins him. Ground loot is drawn instanced with the monsters (`groundLoot.js` → `horde.js lookIn`).
+- **The arrivals** (ROADMAP Z-H3; design and as-built: docs/ZONES.md §3.1): `src/world/heroQuests.js` (pure, node-tested:
+  `ARRIVALS` — one `{ zone, who, scene, quest, hero }` a zone —, `arrivalDue`, `questPlan`, `questsOwed`, `arrivalHint`,
+  `HERO_QUESTS`, `crewThanks`); `src/actors/arrivals.js` (`G.arrivals` = `heroes.arrivals`: the registered island scenes
+  (`register(id, scene)`: `start(entry, plan)`, `update`, `reset`, `state`, `busy`, `active`, `person()`, `target()`), the
+  calm moment in town (`why`), `begin` / `finished` (the record in `flags.arrivals`, the quest's start), the old saves'
+  owed quests, the crews' marks on a quest (`onSaved`), the hand-in when you play the giver (`selfHandIn`), the maps'
+  people, the pointer (`target`, asked by `G.questTarget` after a guide), the debug actions; `arrivalsOn(params)`: off in
+  the QA's quiet sessions); `src/actors/sceneStage.js` (`SceneView`: the scenery near a scene in screen strips, built a
+  few ms a frame, `screened(x, z, hs, r, cam)`, a `floor` for sloping ground; `frameFor` / `frameGroup` / `camAt` /
+  `viewBand`: the scene's camera in the band above the dialogue box; `keepOut` → `G.sceneKeepOut`, which `npc.js steer`
+  walks round; `stageTalk`, a two-actor talk's marks as a generator: near you, or round an `anchor` (Floofy among his
+  lanterns, Kaizo by his boat), on the paving if it can be (`paved`, `onPaving`, `groundCost`), Shadow's mark (`shadow`);
+  `finish`, `frameClear` (the framing in the clear from the camera's real place), `faceUp`, `shadowOnMark`). The scenes:
+  `poeJoin.js`, `shihtzuJoin.js`, `goldenJoin.js` and **`kaizoArrive.js`** (Captain Kaizo, the Tide Pool's messenger until
+  Stella: his zone villager's Toybox rig (`zoneNpcRig`), a rowboat from the buildings kit (`boat` + oars, `instantiate`
+  with the village's materials) pulled up on the beach below Beach Lane, his talk, his row home; event `kaizo:arrive`
+  `{ phase: 'land' | 'talk' | 'leave' | 'done' }`). Shared edits: `regions/village/talk.js` (a zone villager takes in a
+  quest that waits for them: Kaizo's), `story.js`
+  (`def` reads HERO_QUESTS, the `visit` step, `handInFor` takes a hero, `nameOf` names one), `questSteps.js` (`visit`,
+  `visitDone`), `questMoments.js` (`handInScene(…, { self })`, a hero quest's crew words, no way-home line for the hero you
+  play), `heroes.js` (the arrivals, the wheel's hint, a benched hero's hand-in), `tutorials.js calm` and
+  `autosave.js blocker` (they wait for an arrival), `questMoments.js why` (a card waits while an arrival's scene is busy:
+  Kaizo rowing home), the rumours (never over an arrival's scene), `mapData.js people`, `game.js` (`questTarget`,
+  `arrivalsOn`).
 - **The procedural NPCs (villagers, townsfolk, humanoid monsters) are Toybox-style** by default: `src/actors/toyKit.js`, through
   `makeToyHumanoid` in charKit.js. The targets are the 7 approved sheets in tools/blender/work/codex/npc-kit/sheets.
   - **Style:** `kitStyle()` is the Toybox kit; the QA's `?chewymodel=disney` gives the Disney kit and `?chewy=classic` the

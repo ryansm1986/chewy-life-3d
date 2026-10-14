@@ -184,9 +184,13 @@ async function flow(V, v, say) {
   if (f && f.talkedDay !== day) { f.talkedDay = day; G.story.addHearts(id, 2); }
   // a quest's closing talk step: the thank-you line, then the reward (Story.complete via markTalk)
   const turnIn = (st.quests.active || []).filter(q => { const d = ZONE_QUESTS[q.id], s = d?.steps[q.step]; return s?.type === 'talk' && s.npc === id; });
-  if (turnIn.length) { // (the hand-in: their happy hop, the thank-you, the reward from their paws, the stamp: docs/QUESTS.md §4)
-    if (G.questMoments?.handInScene) { await G.questMoments.handInScene(v, turnIn.map(q => ({ q, d: ZONE_QUESTS[q.id] })), say); return; }
+  // (and a quest that waits for them once its steps are done: a homeland quest they asked for in Blossom Hollow, Captain
+  //  Kaizo's "Trouble at Shiokaze Port": world/heroQuests.js)
+  const waits = (G.story?.handInsFor?.(id) || []).filter(h => h.q.handIn && !ZONE_QUESTS[h.q.id]);
+  if (turnIn.length || waits.length) { // (the hand-in: their happy hop, the thank-you, the reward from their paws, the stamp: docs/QUESTS.md §4)
+    if (G.questMoments?.handInScene) { await G.questMoments.handInScene(v, [...turnIn.map(q => ({ q, d: ZONE_QUESTS[q.id] })), ...waits], say); return; }
     for (const q of turnIn) await say([ZONE_QUESTS[q.id].thanks || 'Thank you!']);
+    for (const h of waits) { await say([h.d.handIn?.text || 'Thank you!']); G.story.handIn(h.q.id, { from: v }); }
     G.story?.markTalk?.(id);
     v.anim.play('happy'); v.emote('heart', 2);
     return;

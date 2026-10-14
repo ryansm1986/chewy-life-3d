@@ -501,7 +501,7 @@ export class Housing {
   // ---------------------------------------------------------------- guests (the benched hero lives at the cottage)
   hostBenched() {
     const G = this.G, H = G.heroes; if (!this.home?.household || !H) return;
-    const id = H.next?.(), v = id && H.villagers[id];
+    const want = G.arrivals?.handInGiver?.(), id = (want && H.villagers[want] ? want : null) || H.next?.(), v = id && H.villagers[id]; // (a hero waiting to hear their homeland's news is the one at home: actors/arrivals.js)
     if (!v || v.waitingToJoin) return;
     const home = !v.visible || v.state === 'inside' || v.state === 'hidden';
     if (!home) return;

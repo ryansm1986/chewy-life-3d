@@ -31,7 +31,7 @@ const url = server.resolvedUrls.local[0].replace(/\/$/, '');
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true, args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] });
 let failed = 0;
 const ONLY = process.argv.slice(2).filter(a => !a.startsWith('--'));
-for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['poe', '/?fresh&nointro&hero=poe'], ['shihtzu', '/?fresh&nointro&hero=shihtzu'], ['golden', '/?fresh&nointro&hero=golden'], ['home', '/?fresh&nointro'], ['tooltip', '/?fresh&nointro&notut'], ['charge', '/?fresh&nointro&notut'], ['pad', '/?fresh&nointro&notut'], ['deck', '/?fresh&nointro&notut'], ['touch', '/?fresh&nointro&notut'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`]), ...Object.values(DUNGEONS).filter(dd => dd.gate).map(dd => ['zone:' + dd.id, '/?fresh&nointro']), ['tier:bambooDepths', '/?fresh&nointro&notut'], ['tier:burrowDeep', '/?fresh&nointro&notut'], ['pinnacle:bambooDepths', '/?fresh&nointro&notut'], ['debug', '/?fresh&nointro&notut&debug'], ['cozy', '/?fresh&nointro&notut'], ['guild', '/?fresh&nointro&notut'], ['dig', '/?fresh&nointro&notut'], ['fish', '/?fresh&nointro&notut&hour=10'], ['peaceful', '/?fresh&nointro&notut&villagesaved=bamboo'], ['crewclear', '/?fresh&nointro&notut&villagesaved=bamboo'], ['lead', '/?fresh&nointro&notut&hour=10'], ['dens', '/?fresh&nointro&notut'], ['portal', '/?fresh&nointro&notut'], ['quest', '/?fresh&nointro&notut&qcard&hour=10']]) { // (every zone dungeon that has its gate: its kit, a dense floor, the arena)
+for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['poe', '/?fresh&nointro&hero=poe'], ['shihtzu', '/?fresh&nointro&hero=shihtzu'], ['golden', '/?fresh&nointro&hero=golden'], ['home', '/?fresh&nointro'], ['tooltip', '/?fresh&nointro&notut'], ['charge', '/?fresh&nointro&notut'], ['pad', '/?fresh&nointro&notut'], ['deck', '/?fresh&nointro&notut'], ['touch', '/?fresh&nointro&notut'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`]), ...Object.values(DUNGEONS).filter(dd => dd.gate).map(dd => ['zone:' + dd.id, '/?fresh&nointro']), ['tier:bambooDepths', '/?fresh&nointro&notut'], ['tier:burrowDeep', '/?fresh&nointro&notut'], ['pinnacle:bambooDepths', '/?fresh&nointro&notut'], ['debug', '/?fresh&nointro&notut&debug'], ['cozy', '/?fresh&nointro&notut'], ['guild', '/?fresh&nointro&notut'], ['dig', '/?fresh&nointro&notut'], ['fish', '/?fresh&nointro&notut&hour=10'], ['peaceful', '/?fresh&nointro&notut&villagesaved=bamboo'], ['crewclear', '/?fresh&nointro&notut&villagesaved=bamboo'], ['lead', '/?fresh&nointro&notut&hour=10'], ['dens', '/?fresh&nointro&notut'], ['portal', '/?fresh&nointro&notut'], ['quest', '/?fresh&nointro&notut&qcard&hour=10'], ['arrival', '/?fresh&nointro&notut&arrive&qcard&hour=11']]) { // (every zone dungeon that has its gate: its kit, a dense floor, the arena)
   if (ONLY.length && !ONLY.includes(label)) continue; // (node tools/qa/prod-smoke.mjs tooltip home: just those cases)
   const page = await browser.newPage(label === 'touch' ? { viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true } : { viewport: label === 'deck' ? { width: 1280, height: 800 } : { width: 1600, height: 900 } }); // (deck: the Steam Deck's screen; touch: a phone in landscape)
   const errs = [];
@@ -265,13 +265,13 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
   if (regionId) { // every outdoor region in the bundle (docs/REGIONS.md): built, populated, with its own boss (or its dungeon gate)
     await page.waitForFunction(() => window.G?.dungeon?.isRegion && !window.G.ui?.iris?.active, null, { timeout: 30000 }).catch(() => errs.push('region never loaded'));
     s.region = await page.evaluate(() => ({ id: window.G.dungeon?.regionId, monsters: window.G.dungeon?.monsters?.length || 0, boss: !!window.G.dungeon?.boss, gate: !!window.G.dungeon?.gate }));
-    if (regionId === 'onsen') { // Foosy's joining scene in the bundle (docs/GOLDEN.md §5): on guard by the big spring, his rig and lance
-      await page.waitForFunction(() => window.G.heroes.gldJoin?.state === 'guard', null, { timeout: 15000 }).catch(() => {});
-      s.region.gld = await page.evaluate(() => { const S = window.G.heroes.gldJoin, k = S.knight; return { state: S.state, vis: !!k?.visible, act: k?.anim.action?.name || null, model: k?.rig?.model || null, lance: !!k?.lance, glb: !!k?.lance?.glb, spring: k ? Math.round(Math.hypot(k.pos.x - 55.5, k.pos.z - 64.5) * 10) / 10 : -1 }; });
+    if (regionId === 'onsen') { // since Z-H3 Foosy arrives in Blossom Hollow (docs/GOLDEN.md §5): the old scene at the big spring never plays (his scene in town: the arrival case)
+      await new Promise(q => setTimeout(q, 4000));
+      s.region.gld = await page.evaluate(() => { const S = window.G.heroes.gldJoin, k = S.knight; return { state: S.state, vis: !!k?.visible }; });
     }
   }
   // (a zone whose boss moved into its dungeon has the dungeon gate at the trail's end instead: docs/ZONES.md §8.2)
-  const rg = s.region?.gld, gldSceneOk = regionId !== 'onsen' || (rg?.state === 'guard' && rg.vis && rg.act === 'gldAttention' && rg.lance && rg.spring < 6 && (!TOY_GOLDEN || rg.model === 'golden_toy') && (!GLD_PROPS || rg.glb));
+  const rg = s.region?.gld, gldSceneOk = regionId !== 'onsen' || (rg?.state === 'off' && !rg.vis);
   const regionOk = !s.region || (s.region.id === regionId && s.region.monsters >= 10 && (s.region.boss || s.region.gate) && gldSceneOk);
   const zoneId = label.startsWith('zone:') ? label.slice(5) : null;
   if (zoneId) { // a zone dungeon in the bundle (docs/ZONES.md §8.2): its cave kit, a dense floor, the arena with its boss
@@ -372,6 +372,54 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
       return r;
     });
   }
+  if (label === 'arrival') { // ROADMAP Z-H3 in the bundle (actors/arrivals.js, poeJoin.js, shihtzuJoin.js, kaizoArrive.js, goldenJoin.js, sceneStage.js; docs/ZONES.md §3.1): the Bamboo open, Poe arrives in town: she tails you round the plaza (her baked rig), the scene's view of the scenery is built, the sneeze and the staging, the dialogue and her plea, she joins and her quest's card opens; then Floofy kneels on the Shrine Road by his lanterns (his baked rig), Captain Kaizo's boat comes ashore, and Foosy marches in to guard the fountain (his baked rig and the Blender lance) and plays to the end: the vow, the ball, the whelp, his plea, he joins, his card
+    s.arrival = await page.evaluate(async () => {
+      const G = window.G, sl = ms => new Promise(q => setTimeout(q, ms)), r = {}, J = G.heroes.poeJoin, P = G.player, F = G.world.landmarks.fountain;
+      G.sim.tickT = -1e9; G.state.quests.active = G.state.quests.active.filter(q => q.id !== 'welcome'); G.state.quests.cards = []; G.state.flags.hints = { all: true, scavDig: 1, travel: 1 };
+      G.state.flags.mokaJoined = true; const mv = G.heroes.villagers.moka; if (mv) { mv.frozen = false; mv.waitingToJoin = false; }
+      G.state.player.lvl = 4; G.actions.recompute(); if (G.day) G.day.paused = true;
+      for (let i = 0; i < 100 && J.state !== 'wait'; i++) await sl(100);
+      r.due = G.arrivals.cur?.a?.who || null;
+      const marks = [[-4, 7], [-8, 2], [-7, -5], [0, -7], [7, -5], [8, 2], [4, 7]];
+      for (let k = 0; k < 28 && J.state === 'wait'; k++) { P.moveTarget = new G.THREE.Vector3(F.x + marks[k % 7][0], 0, F.z + marks[k % 7][1]); for (let i = 0; i < 60 && P.moveTarget && J.state === 'wait'; i++) await sl(100); }
+      r.tail = J.state === 'tail'; r.model = J.poe?.rig?.model || null;
+      for (let i = 0; i < 60 && !J.view?.occ; i++) await sl(100);
+      r.view = J.view?.occ?.n || 0;
+      if (J.poe) P.moveTarget = new G.THREE.Vector3(J.poe.pos.x, 0, J.poe.pos.z);
+      for (let i = 0; i < 150 && !G.ui.dlg.active; i++) await sl(100);
+      r.staged = !!J.stg && !J.stg.fallback; r.speaker = G.ui.dlg.opts?.speaker || null;
+      const said = [];
+      for (let i = 0; i < 200 && J.state !== 'done' && J.state !== 'off'; i++) { if (G.ui.dlg.active) { said.push((G.ui.dlg.lines || []).map(l => l.text).join(' ')); if (G.ui.dlg.typing) G.ui.dlg.advance(); else if (G.ui.dlg.choices?.length && G.ui.dlg.i >= G.ui.dlg.lines.length - 1) G.ui.dlg.finish(0); else G.ui.dlg.advance(); } await sl(150); }
+      r.plea = said.some(t => /Takemori is under siege/.test(t));
+      r.joined = !!G.state.flags.poeJoined; r.villager = !!G.heroes.villagers.poe;
+      for (let i = 0; i < 150 && !G.ui.isOpen('questCard'); i++) await sl(100);
+      await sl(400);
+      r.card = G.ui.isOpen('questCard') && G.questMoments.open === 'hq_takemori'; r.title = document.querySelector('.p-qcard .qc-title')?.textContent || null; r.face = !!document.querySelector('.p-qcard .qc-por img');
+      G.ui.close('questCard');
+      r.quest = G.state.quests.active.some(q => q.id === 'hq_takemori'); r.rec = G.state.flags.arrivals?.bamboo?.quest || null;
+      return r;
+    });
+    Object.assign(s.arrival, await page.evaluate(async () => { // checkpoint 2: the next three in order (each the one due once the one before is behind us)
+      const G = window.G, sl = ms => new Promise(q => setTimeout(q, ms)), r = {}, P = G.player;
+      const Fl = G.state.flags, A = G.arrivals, Q = G.state.quests, wait = async (fn, n) => { for (let i = 0; i < n && !fn(); i++) await sl(100); return !!fn(); };
+      const past = (zone, quest, joined) => { if (joined) Fl[joined + 'Joined'] = true; Fl.arrivals[zone] = { how: 'scene', quest: 'had', day: 1 }; Q.active = Q.active.filter(q => q.id !== quest); if (!Q.done.includes(quest)) Q.done.push(quest); A.cur = null; A.coolT = 0; };
+      past('bamboo', 'hq_takemori'); G.state.player.lvl = 26; G.actions.recompute(); Q.cards = [];
+      const S1 = G.heroes.stzJoin; r.stz = (await wait(() => S1.state === 'kneel' && S1.lanterns.length === 3, 600)) ? (S1.knight?.rig?.model || 'kit') : null;
+      S1.reset(true); past('maple', 'hq_akane', 'shihtzu');
+      const S2 = G.heroes.kaizoArrive; r.kaizo = await wait(() => S2.state === 'land' && !!S2.boat?.parent && !!S2.kaizo?.visible, 600);
+      S2.reset(true); past('tidepool', 'hq_shiokaze');
+      const S3 = G.heroes.gldJoin; await wait(() => S3.state === 'guard', 600); await sl(1500);
+      const k3 = S3.knight; r.gld = { state: S3.state, model: k3?.rig?.model || null, glb: !!k3?.lance?.glb, act: k3?.anim.action?.name || null };
+      if (k3) P.setPos(k3.pos.x + Math.sin(k3.facing) * 3.6, k3.pos.z + Math.cos(k3.facing) * 3.6);
+      await wait(() => G.ui.dlg.active, 150);
+      const said3 = []; let ball = false;
+      for (let i = 0; i < 300 && S3.state !== 'done' && S3.state !== 'off'; i++) { ball ||= !!S3.ballState?.held; if (G.ui.dlg.active) { said3.push((G.ui.dlg.lines || []).map(l => l.text).join(' ')); if (G.ui.dlg.typing) G.ui.dlg.advance(); else if (G.ui.dlg.choices?.length && G.ui.dlg.i >= G.ui.dlg.lines.length - 1) G.ui.dlg.finish(0); else G.ui.dlg.advance(); } await sl(150); }
+      r.gldBall = ball; r.gldPlea = said3.some(t => /Frostbelly/.test(t)); r.gldJoined = !!Fl.goldenJoined && !!G.heroes.villagers.golden;
+      await wait(() => G.ui.isOpen('questCard'), 150); await sl(300);
+      r.gldCard = G.questMoments.open === 'hq_yukimi'; G.ui.close('questCard');
+      return r;
+    }));
+  }
   if (label === 'quest') { // UX-2 in the bundle (world/questMoments.js, docs/QUESTS.md): a quest taken opens its storybook card (its CSS, the giver's 3D face), Enter presses "Let's go!" and Shadow sets off; the Mossy Burrow's floor 1 shows its place title (its style, in the area banner's place) with the sting
     s.quest = await page.evaluate(async () => {
       const G = window.G, sl = ms => new Promise(q => setTimeout(q, ms)), r = {}, Q = G.state.quests;
@@ -443,6 +491,15 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
     await page.waitForTimeout(1200);
     const r = await tooltipCheck(page, { shot: path.resolve('tools/qa/tmp/prod-smoke/tooltip') });
     s.tooltip = { ok: r.ok, ...Object.fromEntries(Object.entries(r.kinds).map(([k, v]) => [k, v ? { luma: v.luma, bg: /gradient/.test(v.bg || '') ? 'gradient' : v.bg || null, ok: v.ok } : null])) };
+    // (the cause, found 2026-10-12: a Windows contrast theme (forced colours) drops the box's gradients and Dark Reader
+    // rewrites them; the page opts out of both (style.css :root forced-color-adjust, index.html darkreader-lock). The
+    // same check again with a contrast theme emulated)
+    await page.emulateMedia({ forcedColors: 'active' }); await page.waitForTimeout(400);
+    const f = await tooltipCheck(page, { shot: path.resolve('tools/qa/tmp/prod-smoke/tooltip-forced') });
+    await page.emulateMedia({ forcedColors: 'none' });
+    s.tooltip.forced = { ok: f.ok, ...Object.fromEntries(Object.entries(f.kinds).map(([k, v]) => [k, v ? v.luma : null])) };
+    s.tooltip.lock = await page.evaluate(() => !!document.querySelector('meta[name="darkreader-lock"]'));
+    s.tooltip.ok = s.tooltip.ok && f.ok && s.tooltip.lock;
   }
   if (label === 'charge') { // R-16 (the owner's "the charge window can't change"): by the real mouse in the bundle, K opens the skills, the Charge drawer's strip shows Whirlwind Stance and a click buys its perk
     const E = (fn, a) => page.evaluate(fn, a), W = (fn, a, t = 5000) => page.waitForFunction(fn, a, { timeout: t }).then(() => true, () => false);
@@ -477,8 +534,10 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
   const m = s.moka, mokaOk = !m || ((!TOY_MOKA || s.model === 'moka_toy') && m.baked && m.staff && m.wt === 'staff' && m.cast && m.switch && m.after === 'chewy' && m.chewyBaked && m.mokaVillager);
   const dn = s.dens, densOk = !dn || (dn.open && dn.pins === 4 && dn.locked === 3 && dn.go && dn.painted && dn.den === 'mossyBurrow' && dn.floor === 1 && dn.kind === 'burrow' && dn.closed && dn.loc === 'Mossy Burrow' && dn.boss === 'mochiKing' && dn.big >= 15 && !dn.stairs);
   const tp = s.portal, portalOk = !tp || (tp.pressed && tp.casting && tp.gate && tp.mode === 'village' && tp.label === 'Step into the Town Portal (the Mossy Burrow, floor 1)' && tp.dead >= 3 && tp.back && tp.after === tp.alive && tp.used);
+  const av = s.arrival, arrivalOk = !av || (av.due === 'poe' && av.tail && (!TOY_POE || av.model === 'poe_toy') && av.view > 1000 && av.staged && av.speaker === 'Poe' && av.plea && av.joined && av.villager && av.card && av.title === 'Takemori Under Siege' && av.face && av.quest && av.rec === 'start'
+    && !!av.stz && (!TOY_STZ || av.stz === 'shihtzu_toy') && av.kaizo && av.gld?.state === 'guard' && (!TOY_GOLDEN || av.gld.model === 'golden_toy') && (!GLD_PROPS || av.gld.glb) && av.gldBall && av.gldPlea && av.gldJoined && av.gldCard);
   const qm = s.quest, questOk = !qm || (qm.card && qm.title === 'The King of Squish' && qm.face && qm.chips === 4 && qm.css && qm.goH >= 40 && qm.closed && qm.lead === 'king' && /festival mochi/.test(qm.thanks || '') && qm.stamp && qm.stampCss && qm.kingDone && qm.next === 'A Shrine for Wishes' && qm.place === 'Floor 1 of 2 · Find the stairs down to floor 2' && qm.placeCss && !qm.area && qm.sting);
-  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && questOk && densOk && portalOk && ttOk && chgOk && debugOk && cozyOk && crewOk && guildOk && peaceOk && digOk && leadOk && fishOk && mokaOk && padOk && touchOk && deckOk && poeOk && stzOk && gldOk && regionOk && zoneOk && homeOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!CHEWY_MODEL || s.model === CHEWY_MODEL) && (!SAMURAI_CHEWY || s.saya) && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
+  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && questOk && arrivalOk && densOk && portalOk && ttOk && chgOk && debugOk && cozyOk && crewOk && guildOk && peaceOk && digOk && leadOk && fishOk && mokaOk && padOk && touchOk && deckOk && poeOk && stzOk && gldOk && regionOk && zoneOk && homeOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!CHEWY_MODEL || s.model === CHEWY_MODEL) && (!SAMURAI_CHEWY || s.saya) && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
   console.log(`${ok ? 'PASS' : 'FAIL'}  production ${label}: ${JSON.stringify(s)}${errs.length ? '\n   ' + [...new Set(errs)].slice(0, 8).join('\n   ') : ''}`);
   if (!ok) failed++;
   await page.close();

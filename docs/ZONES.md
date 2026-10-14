@@ -1,6 +1,6 @@
 # Zones: rescue the village, clear its dungeon, then push tiers (design)
 
-Status: **phases A–D built** (designed 2026-10-05; sprint and the foundations §8.1, §9.1; the dungeons §8.2; the villages §2.1, §2.2); **phase E built: tiers, modifiers, the Spirit Lantern, the Spirit endgame and its pinnacle** (§5.1, §5.2, §5.3); **the Burrow as four 2-floor dens** (§4.1, ROADMAP Z-H1); **the Town Portal** (§4.2, ROADMAP Z-H2). The work is tracked in [ROADMAP.md](ROADMAP.md); this file is the design.
+Status: **phases A–D built** (designed 2026-10-05; sprint and the foundations §8.1, §9.1; the dungeons §8.2; the villages §2.1, §2.2); **phase E built: tiers, modifiers, the Spirit Lantern, the Spirit endgame and its pinnacle** (§5.1, §5.2, §5.3); **the Burrow as four 2-floor dens** (§4.1, ROADMAP Z-H1); **the Town Portal** (§4.2, ROADMAP Z-H2); **the heroes arrive in Blossom Hollow** and start their homeland's quest (§3.1, ROADMAP Z-H3: all four arrivals built, checkpoints 1 and 2). The work is tracked in [ROADMAP.md](ROADMAP.md); this file is the design.
 
 The owner's direction (2026-10-05):
 - Every zone has **a village to save** from monsters.
@@ -274,6 +274,75 @@ services in `talk.js`, the quests in `world/zoneQuests.js`.
   - clear a tier (`tier` n);
   - bring back zone materials (`deliver`).
 - The quest pointer guides you to the zone, then to the dungeon gate, then on the floor to the objective.
+
+### 3.1 As built: the heroes arrive in Blossom Hollow (ROADMAP Z-H3; checkpoints 1 and 2, 2026-10-12)
+The owner (2026-10-12): "I want to be able to unlock the new characters in the main island. Maybe we can have them
+trigger the main story quest to help their island." Before Z-H3 the heroes joined in their zones and no main story quest
+sent you to the zones at all. The owner's picks: **they join on arrival**; **the old join scenes move to the island**;
+the Tide Pool's hero (Stella, H-6) is still a concept, so **Captain Kaizo brings its news** for now.
+
+- **The arrivals** (data: `world/heroQuests.js ARRIVALS`, one entry a zone, `{ zone, who, scene, quest, hero }`):
+
+  | Zone | Who | Their island scene | Their quest |
+  |---|---|---|---|
+  | Bamboo | Poe (joins) | she tails you round the plaza, freezes when you look, sneezes (`actors/poeJoin.js`) | Takemori Under Siege |
+  | Maple | Floofy (joins) | he lights paper lanterns on the Shrine Road's paving by the jizo or a stone lantern; "Halt, traveller…", the ghost pup licks him (`actors/shihtzuJoin.js`; the dusk rule: docs/SHIHTZU.md §5) | The Gloom over Akane |
+  | Tide Pool | Captain Kaizo (asks, goes home) | his rowboat pulled up on the beach below Beach Lane; "Ahoy there!"; he rows home (`actors/kaizoArrive.js`) | Trouble at Shiokaze Port |
+  | Onsen | Foosy (joins) | he marches in and stands guard by the fountain; his vow, interrupted by a tennis ball from Rosie's Treats; the whelp costume for Shadow (`actors/goldenJoin.js`) | The Siege of Yukimi |
+
+  Stella replaces Kaizo with one change to his entry (`who: 'stella', scene: 'stella', hero: true`) and her scene
+  (registered with `Arrivals.register('stella', …)` as the others are in `heroes.js`); his quest becomes hers by its
+  `giver`. Kaizo's hand-in is at his lookout in Shiokaze Port (`regions/village/talk.js`: a zone villager takes in a
+  quest that waits for them).
+- **When**: an arrival is **due** once its zone is open (`regionUnlocked`: a hero's level, or the zone before cleared by
+  you or a crew) and the arrival before it is done (Moka joined, for Poe; a hero joined, or a messenger's visit
+  recorded). They come in the zones' order: the first not done blocks the rest. A due arrival waits for a calm moment in
+  Blossom Hollow (`Arrivals.why`: no dialogue, panel, banner, quest card, guide, scene, hero switch, build or decorate,
+  fishing or dig, Rosie's welcome; 2.5 s of it), then its scene starts. Leaving town, a hero switch or a knock-out before
+  its locked part drops the scene; it's due again 10 s later. The guides wait while an arrival plays
+  (`tutorials.js calm`); the save waits for its locked part (`autosave.js blocker`).
+- **The scenes** play their old gags in town, staged in plain view of the game camera (`actors/sceneStage.js`: the
+  scenery near the scene cut into strips and ray-tested toward where the scene's camera will be; a garland's pennants
+  grown so a ray can't slip between them; a final check of the framing from the camera's real place, a step closer or to
+  the side if a lantern post would cross you), with the villagers walking round them (`G.sceneKeepOut`, npc.js steer)
+  and Shadow on a mark. **On the paving** where it can be: the scenes pick paved ground (the plaza, the paths, the
+  Shrine Road, the beach's sand) and fall back to grass only when no paved spot frames cleanly (the grass leans over feet
+  and legs from up here). Each ends with the plea for help, the join (the banner, after the vanish) and the quest's
+  card; Kaizo's card waits until he has rowed home (`questMoments.js why`: an arrival's scene busy).
+- **The quests** (`world/heroQuests.js HERO_QUESTS`, the giver the hero, or Kaizo; docs/QUESTS.md §9): travel to the zone
+  (the `visit` step: done on arriving there by the Wayfarer's Post, or once its village is saved), save its village
+  (`villageSaved`), then the hand-in to whoever asked (a skill point, coins, XP and a keepsake from their home):
+  - a benched hero in town: talk to them (`heroes.js talk`: the hand-in scene first: their hop, a line about the crew if
+    one did it, their thanks, the stamp); the arrow, the pin, their `!` and Shadow point at them;
+  - the hero you're playing: their own little scene at the next calm moment wherever you are (`Arrivals.selfHandIn`: the
+    hop, their line to Shadow, `selfThanks`), often right after the village's celebration;
+  - a hero away on an expedition: it waits until they're home; Kaizo: back at his lookout in Shiokaze Port.
+- **The cozy path**: a crew that relieves the village while the quest runs finishes it at once (the hand-in waits); the
+  quest's record names the crew (`Arrivals.onSaved`), so the giver's first line is about them ("Moka snuck into
+  Takemori…", or "Moka and I…" when the giver went too), and Shadow says no way-home line. A village relieved **before**
+  its hero arrived: they still arrive and join, but say thank you instead of asking, and no quest starts.
+- **Old saves**: a hero who already joined (their zone scene, `?hero=`, the debug menu) gets no second arrival; their
+  quest starts quietly with its card while their village still needs saving and their zone is open (`questsOwed`; the
+  record `how: 'old'`). A zone whose village is saved gets no new quest. A hero not yet joined whose zone is open arrives
+  the next time you're in Blossom Hollow. The old zone scenes never play (Poe's grove scene, Floofy's on the maple road and
+  Foosy's at the hot spring are gone). A messenger's visit is recorded the same way: Kaizo comes once even for a save where
+  Foosy joined at the Onsen long ago (his quest is the Tide Pool's). Records: `state.flags.arrivals[zone] = { how: 'scene' | 'old', quest: 'start' | 'saved' | 'had', day }`.
+- **The hints**: the hero wheel's card for a hero not met yet says when they'll come (`arrivalHint`: "Will arrive when the
+  Bamboo opens", "Will arrive after Poe joins", "Will arrive after Old Captain Kaizo comes by", "On the way to Blossom
+  Hollow…", "Arriving in Blossom Hollow now!"); Shadow's rumour in town plays only before their zone opens, never over an
+  arrival's scene ("…I bet they'll come and find us!"); Shadow notices each arrival once it can show (a "?" and a tip:
+  "Ghostlights, up the Shrine Road!", "Salt, tar and old rope!", "…Is he a statue?"). On the maps an arriving hero (or
+  Kaizo) is a person while they're about (`mapData.js people` ← `Arrivals.people`), and the pointer shows where.
+- **QA**: the arrivals are off in the QA's quiet sessions (`?nointro` without `?arrive`, or `?noarrive`; remembered for the
+  tab), so the flows that set heroes' flags by hand never meet one; the hand-ins work everywhere. `tools/qa/s47-hero-arrivals.mjs`
+  (a–i Poe: the triggers and the order, the scene end to end, the card, the quest by you, by a crew and by the hero you
+  play, old saves with a second reload, the pad, touch, the debug actions; j–p Floofy, Kaizo and Foosy: their triggers
+  and the order, each scene end to end, the dusk rule, the quests by you with Kaizo's hand-in at his lookout, the crews,
+  old saves with a second reload, the pad, touch), s20 a)–b) (Poe's scene in town), s28 a)–b) (Floofy's), s29 a)–b)
+  (Foosy's), s37 a) (the cozy path: Takemori relieved before she came), test-rpg "HERO ARRIVALS", prod-smoke `arrival`;
+  the look review `node tools/qa/arrival-shots.mjs [poe shihtzu kaizo golden] [desktop deck phone ipad] [day dusk]
+  [saved]` → `tools/qa/tmp/arrivals/`.
+- **Debug**: Heroes › *Play an arrival*, *Reset the arrivals*, *Arrivals on* (docs/DEBUG.md).
 
 ## 4. The zone dungeon (2 floors + the boss)
 - **Per zone**, a `DungeonDef`:

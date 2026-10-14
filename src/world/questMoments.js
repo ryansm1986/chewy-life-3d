@@ -28,6 +28,7 @@ import { heroText } from '../rpg/classes.js';
 import { REGIONS } from '../regions/index.js';
 import { VILLAGES, ZONE_NPCS } from '../regions/village/data.js';
 import { ZONE_QUESTS, QUEST_ITEMS } from './zoneQuests.js';
+import { crewThanks } from './heroQuests.js'; // (a hero's homeland quest: their own words about the crew, ROADMAP Z-H3)
 import { goalOf, rewardList, stepArea, areasHere, districtAt, districtName, bare, lineFor, LINE_BEATS } from './questLore.js';
 import { people, places, personSpot, personWhere } from './mapData.js'; // (the map's "where is this person now": read only)
 import { LANDMARKS } from './layout.js';
@@ -58,6 +59,9 @@ const CREW_LINES = {
   usagi: '{crew} hopped by with the news! Hop hop!',
 };
 const crewLine = (giver, crew) => (CREW_LINES[giver] || '{crew} came back with the news! Thank you for sending them.').replace('{crew}', crew);
+/** the giver's line about the crew a quest's record names: a hero quest's own (crew, or crewSelf when the giver went
+ *  too: q.crewWith, the others' names, '' when they went alone), else the giver's CREW_LINES */
+const crewWords = (q, d) => (q.crewBy ? (d.heroQuest && crewThanks(d, q.crewBy, { others: q.crewWith ?? null, solo: q.crewWith === '' })) || crewLine(d.giver, q.crewBy) : null);
 
 export function installQuestMoments(G, o = {}) {
   const M = G.questMoments = new QuestMoments(G, o);
@@ -107,7 +111,7 @@ export class QuestMoments {
     const G = this.G, S = G.story, d = this.def(id); if (!d) return null;
     const lead = this.wouldLead(id);
     return {
-      id, kind: d.request ? 'request' : ZONE_QUESTS[id] ? 'zone' : 'story', title: d.title, giver: d.giver, name: S?.nameOf?.(d.giver) || d.giver,
+      id, kind: d.request ? 'request' : ZONE_QUESTS[id] ? 'zone' : 'story', title: d.title, giver: d.giver, name: d.giverName || S?.nameOf?.(d.giver) || d.giver, // (giverName: a shorter one for the card's name plate)
       portrait: G.portrait?.(d.giver) || null, hook: heroText(d.hook || d.desc || '', G.state),
       goal: goalOf(d, { zoneName: this.zoneName, npcName: this.npcName }).map(t => heroText(t, G.state)), rewards: rewardList(d.reward), lead,
     };
@@ -129,7 +133,7 @@ export class QuestMoments {
     if (ui.banners?.busy) return 'banner';
     if (G.build?.active || G.buildMode || G.housing?.decor?.active || G.decorFocus) return 'build';
     if (shadowTalking(ui)) return 'tip'; // (Shadow's one-line tip or one of his lines is up: his words first)
-    if (G.introFocus || G.cutscene || G.heroSwitching || G.heroFocus || P?.controlLocked) return 'scene';
+    if (G.introFocus || G.cutscene || G.heroSwitching || G.heroFocus || P?.controlLocked || G.arrivals?.busy) return 'scene'; // (an arrival's scene: Captain Kaizo rowing home first)
     if (G.dungeon?.village?.celebrate) return 'celebration';
     if (G.life?.fishing?.s || G.cozy?.scav?.busy || G.cozy?.scav?.session) return 'busy';
     if (this.fight()) return 'fight';
@@ -284,15 +288,17 @@ export class QuestMoments {
   /** Talking to a giver with quests to take in (Story.talk, regions/village/talk.js): for each, their happy hop and hearts,
    *  a line about the crew when one did it, their thank-you, then the quest completes (Story.handIn) with the reward flying
    *  from their paws and the stamp (completed). list: [{ q, d }]; say: their dialogue */
-  async handInScene(npc, list, say) {
+  async handInScene(npc, list, say, o = {}) {
     this.handing = (this.handing || 0) + 1; // (a hand-in is playing: the QA's drainDialogue waits through its beat)
-    try { await this.handInPlay(npc, list, say); } finally { this.handing--; }
+    try { await this.handInPlay(npc, list, say, o); } finally { this.handing--; }
   }
-  async handInPlay(npc, list, say) {
+  /** o.self: the giver is the hero you play (a hero's homeland quest: actors/arrivals.js selfHandIn): no turning to you,
+   *  their own line to Shadow (selfThanks) */
+  async handInPlay(npc, list, say, o = {}) {
     const G = this.G, P = G.player;
     for (const { q, d } of list) {
       if (!this.live(q.id)) continue;
-      if (P && npc.faceTo) npc.faceTo(P.pos.x, P.pos.z);
+      if (P && npc.faceTo && !o.self) npc.faceTo(P.pos.x, P.pos.z);
       npc.anim?.play?.('happy');
       if (npc.emote) npc.emote('heart', 2.2); else G.vfx?.emote?.(npc, 'heart', 2.2);
       const head = npc.pos?.clone ? npc.pos.clone().setY(npc.pos.y + 1.5) : null;
@@ -300,9 +306,9 @@ export class QuestMoments {
       Events.emit('sfx', 'gift_loved');
       // a beat to see the hop and the hearts before the dialogue box covers the bottom of the screen (talk locks control)
       await new Promise(r => setTimeout(r, HOP_BEAT_MS));
-      const lines = [];
-      if (q.crewBy) lines.push(crewLine(d.giver, q.crewBy));
-      lines.push(d.thanks || `Thank you, Chewy! You've made my day.`);
+      const lines = [], crew = crewWords(q, d);
+      if (crew) lines.push(crew);
+      if (!(o.self && crew)) lines.push((o.self && d.selfThanks) || d.thanks || `Thank you, Chewy! You've made my day.`); // (you play the giver and a crew did it: their line about the crew is the thank-you)
       await say(lines);
       this.stats.handIns++; this.stats.lastHandIn = { id: q.id, crew: q.crewBy || null, giver: d.giver };
       Events.emit('quest:handedIn', { id: q.id, giver: d.giver, crew: q.crewBy || null });
@@ -392,7 +398,7 @@ export class QuestMoments {
         }
       }
       // the way home: the objective done (yours, not a crew's: they did it, and Shadow wasn't there)
-      if (s.type === 'talk' && s.npc === d.giver && (q.handIn || q.step === d.steps.length - 1) && q.step > 0) {
+      if (s.type === 'talk' && s.npc === d.giver && (q.handIn || q.step === d.steps.length - 1) && q.step > 0 && d.giver !== G.state.activeHero) { // (you play the giver: their own scene, arrivals.js, no way home)
         const lastObj = q.handIn ? d.steps.length - 1 : q.step - 1;
         if (!q.crewSteps?.includes(lastObj)) this.queueLine(q, d, s, 'home', 600);
       }

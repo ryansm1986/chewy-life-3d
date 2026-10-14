@@ -11,6 +11,8 @@ The owner's pick, four moments:
 3. **The place title** when you arrive where the step is (§3). Built (checkpoint 1).
 4. **Handing the quest in** to its giver (§4). Built (checkpoint 2).
 
+Since ROADMAP Z-H3 the heroes' homeland quests (§9) use all four, with a hero (or Captain Kaizo) as the giver.
+
 Later, not in UX-2: a storybook Journal with chapters, the journey on the Travel Map, a livelier tracker.
 
 Code: `world/questMoments.js` (`G.questMoments`: the card queue and its calm moment, the place titles, Shadow's lines,
@@ -136,7 +138,7 @@ the hot spring, Kero's rod, the sprouts, the taste test) their way-home line. Th
 | `boss` (a den's or a zone dungeon's) | its last floor | "Mossy Burrow · Floor 2 of 2 · Defeat King Mochi" |
 | `kill`, `collect` Mochi Jelly | the dungeon (an unfiltered kill: any of the Burrow's dens) | "Mossy Burrow · Floor 1 of 2 · Defeat yokai in the Burrow" |
 | `find`, `rescue` with a floor | that floor | "Bamboo Depths · Floor 2 of 2 · Rescue Kome" |
-| `villageSaved`, a zone `kill` / `boss`, `reach` in a zone | the zone | |
+| `villageSaved`, `visit` (a hero's homeland quest: §9), a zone `kill` / `boss`, `reach` in a zone | the zone | |
 | `talk` to a zone villager (the turn-in) | their zone; the title names their village | "Takemori Village · 竹守村 · Bring the ledger back to Chiku" |
 | `talk` / `deliver` to a Blossom Hollow villager, and a hand-in (§4) | the villager where they are now (the map's People lookup): within 14 m of them, or in the district they're in; the title names their spot in the map's words | "Rosie's Treats · さくら村 · Bring the festival mochi home to Rosie" |
 | `decorate` | their room | |
@@ -313,3 +315,40 @@ for sending them."
 - **The Mitten Thieves** (yk_mittens, yk_mikan): thanks: "My mittens! A little damp, still fluffy. Here — a noren for your door and honey for your buns. Warm paws, warm heart!" · door: "Mikan's fluffy mittens are in there! On yokai paws!" · arrive: "The big yokai on this floor are wearing mittens. So unfair!" · near: "That one's wearing Mikan's mittens! Get them back!" · home: "Three pairs of mittens, a little damp, still fluffy! Let's take them to Mikan."
 - **Too Many Snowmen** (yk_snowmen, yk_yuzu): thanks: "Not a single snowman in the water! The monkeys are delighted. Here, a little tub — for soaking at home." · door: "Snowmen that sit in hot baths… They come up from in there!" · arrive: "Yuki-daruma! Twelve of them. Let's roll them back where they belong." · home: "No more snowmen in the baths! The monkeys can soak again. Let's tell Yuzu!"
 - **The Snow Woman** (yk_yukionna, yk_shirayuki): thanks: "Feel that? The steam is rising straight. Sixty-one thousand, two hundred and thirteen snowfalls — and the warmest one of all." · door: "Yuki-onna sleeps at the bottom… only she isn't sleeping. Let's be gentle." · arrive: "Snowflakes falling indoors… She's on this floor." · boss: "It's getting colder… she's just ahead. Not wicked, only cold. Let's help her rest." · home: "The steam rises straight again! Granny Shirayuki will be so happy."
+
+## 9. The heroes' homeland quests (ROADMAP Z-H3; docs/ZONES.md §3.1)
+When a zone opens, its hero arrives in Blossom Hollow, asks for help and joins; their arrival starts the zone's **main
+story quest** (`world/heroQuests.js HERO_QUESTS`, read through `Story.def`; `heroQuest: true`). All four are live: Poe's
+(checkpoint 1), Floofy's, Kaizo's and Foosy's (checkpoint 2).
+- **The card**: the story card (a rose wash, "A new quest 冒険"), the hero's 3D face and name (`Story.nameOf` knows the
+  heroes), their hook.
+- **The steps**: `visit` (travel to the zone: the pointer to the Wayfarer's Post from town; done on arriving there, or once
+  its village is saved) and `villageSaved`. Both steps' place is the zone, so arriving shows the place title for the
+  village step ("Takemori Under Siege · Whispering Bamboo Grove · Save Takemori Village") and Shadow's line.
+- **The hand-in** (`Story.handInFor`: a hero's homeland quest waits for whoever asked): to the benched hero in town
+  (`heroes.js talk` runs `handInScene` before their chat), to Kaizo in his village, or, when you're playing the giver,
+  their own scene at the next calm moment (`Arrivals.selfHandIn` → `handInScene(…, { self: true })`: no turning to you,
+  their `selfThanks` to Shadow). Shadow's way-home line isn't said when you play the giver.
+- **Crews**: a crew's relief marks the quest's record (`crewBy`, and `crewWith` when the giver went too), so the hand-in
+  opens with the giver's own crew line (`crew` / `crewSelf`; `heroQuests.js crewThanks`).
+- **Every line** (the hooks in the quest's `hook`):
+
+| Quest | Giver | Hook | Thanks | When you play them | A crew did it | They went too |
+|---|---|---|---|---|---|---|
+| **Takemori Under Siege** (`hq_takemori`) | Poe | "Takemori is under siege! I… came to fetch help. Very stealthily." | "Takemori is safe? You saved my whole village… *sniff* That's not crying. A shinobi's eyes just leak when she's proud. Take this scroll, it's from the dojo." | "We did it, Shadow! Takemori is safe, and nobody saw us coming. …Everybody saw us coming. Good boy anyway." | "{crew} snuck into Takemori and chased the siege off! Almost as quietly as I would have." | "{others} and I chased the siege out of Takemori! I was the stealthy part. Thank you for sending us." |
+| **The Gloom over Akane** (`hq_akane`) | Floofy | "Akane Hamlet has fallen under the gloom. Not the good kind. The ghostlights cannot hold it back alone." | "Akane is free of the gloom. …Knights do not cry. It is the lantern smoke. Take this lantern. It winks. I did not teach it that." | "It is done, Shadow. The gloom has lifted over Akane. …You may lick my face. Once. Solemnly." | "{crew} lifted the gloom over Akane. The ghost pups followed them home. They follow everyone home." | "{others} and I lifted the gloom over Akane. I was very hard to knock over. Thank you for sending us." |
+| **Trouble at Shiokaze Port** (`hq_shiokaze`) | Captain Kaizo | "Shiokaze Port's under siege, matey! Crabs in the nets, kappa on the roofs. I rowed all night to find you." | "The nets are clear and the kappa are off my roof! You've the heart of a sea dog, matey. Take this lantern, it hung on my old ship." | — | "{crew} sailed in and chased the siege back to sea! You know how to pick a crew, matey." | — |
+| **The Siege of Yukimi** (`hq_yukimi`) | Foosy | "Yukimi Spa is besieged by snow and yokai! I guarded the springs alone as long as I could. Will you come?" | "The springs are safe! I knew it. I absolutely knew it. …A knight does not wag. It is the wind. Take this daruma; I painted in one eye for you." | "The springs are safe, Shadow! My vow is kept. …Mostly kept. We fetched a ball in the middle of it." | "{crew} broke the siege of Yukimi! I shall write them a ballad. A short one. With a ball in it." | "{others} and I broke the siege of Yukimi! I guarded everyone with my whole heart. Thank you for sending us." |
+
+- **Shadow's lines**: Takemori: arrive "Takemori is just up the trail! I can smell yokai camping in the square. Let's go!" · home
+  "Takemori is safe! Let's tell Poe. She'll say she isn't crying." Akane: arrive "Akane is just down the maple road. The gloom
+  is thickest in the square. Ears up!" · home "Akane is safe! Let's tell Floofy. He'll say it's the lantern smoke." Shiokaze:
+  arrive "I can smell the sea! Shiokaze Port is just down the shore. Let's help Captain Kaizo!" · home "The port is safe!
+  Let's tell Captain Kaizo. Can I be first mate now?" Yukimi: arrive "Brrr, snow! Yukimi Spa is just up the trail. I can
+  smell yokai in the hot springs!" · home "The springs are safe! Let's tell Foosy. He'll say a knight doesn't wag."
+- **The hand-in words**: "Tell Poe that Takemori is safe" · "Tell Floofy that Akane is safe" · "Tell Captain Kaizo the port is
+  safe" · "Tell Foosy the springs are safe". **Rewards**: Takemori 400 coins, 500 XP, a skill point, the Hanging Scroll;
+  Akane 1,000 coins, 3,000 XP, a skill point, the Yokai Lantern; Shiokaze 1,800 coins, 7,000 XP, a skill point, the Festival
+  Chochin; Yukimi 2,600 coins, 14,000 XP, a skill point, the Daruma.
+- QA: s47 (the card, the quest by you, by a crew, by the hero you play, the old saves), test-rpg "HERO ARRIVALS" (the
+  writers' contract as QUEST MOMENTS, the `visit` step, the crew lines), prod-smoke `arrival`.

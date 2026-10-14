@@ -2,6 +2,7 @@
    Pawhaven UI — base tokens, layers, buttons, panels, slots, tooltips
    ========================================================================== */
 :root {
+  forced-color-adjust: none; /* (a Windows contrast theme keeps the game's own colours: forced colours dropped the gradients that draw the tooltips and panels, ROADMAP R-13; inherited by everything) */
   --cream: #fff6e8; --cream2: #ffeedd; --cream3: #f3e3cf; --paper: #fffaf0;
   --ink: #4a2c2a; --ink2: #7a5650; --ink3: rgba(74, 44, 42, .35);
   --pink: #ff8fb0; --pink2: #ffc4d6; --rose: #e8506e;
@@ -185,8 +186,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1c1424; }
 .tt-wrap { position: fixed; left: 0; top: 0; pointer-events: none; z-index: 60; opacity: 0; transition: opacity .1s; }
 .tt-wrap.show { opacity: 1; }
 .tt { zoom: var(--ui-scale); max-width: 340px; min-width: 170px; position: relative; padding: 11px 16px 12px; text-align: center; color: #f7ede0; font: 500 14px/1.38 var(--font);
-  background: radial-gradient(ellipse at 50% 0%, rgba(90, 60, 100, .5), transparent 70%), linear-gradient(180deg, rgba(50, 32, 58, .97), rgba(34, 21, 40, .98));
-  border: 3px solid #ffeede; border-radius: 16px; box-shadow: 0 0 0 3px var(--ink), 0 14px 30px rgba(20, 8, 20, .45); }
+  background: radial-gradient(ellipse at 50% 0%, rgba(90, 60, 100, .5), transparent 70%), linear-gradient(180deg, rgba(50, 32, 58, .97), rgba(34, 21, 40, .98)) #2c1c33;
+  border: 3px solid #ffeede; border-radius: 16px; box-shadow: 0 0 0 3px var(--ink), 0 14px 30px rgba(20, 8, 20, .45);
+  forced-color-adjust: none; } /* (a solid colour under the gradients, and no forced-colours override: the box stays dark if a browser drops gradients: ROADMAP R-13) */
 .tt::before { content: ''; position: absolute; left: -9px; top: -9px; width: 22px; height: 22px; border-radius: 80% 0 80% 0; background: linear-gradient(135deg, #ffd6e6, #ff8fb0); border: 2.5px solid var(--ink); transform: rotate(-20deg); }
 .tt-wrap.show .tt { animation: ttIn .22s var(--pop); }
 @keyframes ttIn { from { transform: scale(.86) translateY(8px); opacity: .4; } }
