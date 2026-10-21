@@ -14,7 +14,7 @@ import { FURNITURE } from '../home/furniture.js';
 import { stepGain, zoneStepDone, zoneStepHave, destOf, reachIsHere, REACH_R, floorStepDone, floorStepHave, visitDone } from './questSteps.js';
 import { DUNGEONS, BURROW, isBurrow } from '../dungeon/defs.js';
 import { ZONE_QUESTS, dungeonObjectives as zoneObjectives, offersFor } from './zoneQuests.js'; // (zone villagers' quests: docs/ZONES.md §3)
-import { HERO_QUESTS } from './heroQuests.js'; // (the heroes' homeland quests, started by their arrival in Blossom Hollow: ROADMAP Z-H3)
+import { HERO_QUESTS, heroQuestDef } from './heroQuests.js'; // (the heroes' homeland quests, started by their arrival in Blossom Hollow: ROADMAP Z-H3)
 import { ZONE_NPCS } from '../regions/village/data.js';
 import { storyObjectives, villageObjectives, CREW_STEP_TYPES } from '../cozy/objectives.js'; // (the cozy path's crew routes: docs/COZY.md §3)
 import { handInText } from './questLore.js'; // (the hand-in step's words: docs/QUESTS.md §4)
@@ -128,7 +128,8 @@ export class Story {
     Events.on('boss:dead', e => this.payOwed(e));
   }
   get Q() { return this.G.state.quests; }
-  def(id) { return QUESTS[id] || ZONE_QUESTS[id] || HERO_QUESTS[id] || this.Q.requests?.[id]?.def; }
+  // (a hero quest as it stands for this save: its giver `q.giver || d.giver`, an old save's Captain Kaizo keeping his: heroQuestDef)
+  def(id) { return QUESTS[id] || ZONE_QUESTS[id] || (HERO_QUESTS[id] && heroQuestDef(this.G?.state, id)) || this.Q.requests?.[id]?.def; }
   start(id, silent = false) {
     if (this.Q.active.some(q => q.id === id) || this.Q.done.includes(id)) return;
     this.Q.active.push({ id, step: 0, prog: 0 });
@@ -178,7 +179,7 @@ export class Story {
   stepOf(q, d = this.def(q?.id)) { if (!q || !d) return null; return d.steps[q.step] || (q.handIn ? this.handInStep(d, q.id) : null); }
   /** the hand-in step: talk to the giver ("Bring the news to Rosie"), Shadow leading the way */
   handInStep(d, id = '') {
-    const k = id || d.title; let s = HAND_IN.get(k);
+    const k = `${id || d.title}:${d.giver}`; let s = HAND_IN.get(k); // (per giver: a hero quest's can be its old giver's)
     if (!s) HAND_IN.set(k, s = { type: 'talk', npc: d.giver, text: handInText(d, this.nameOf(d.giver)), handIn: true, lead: true });
     return s;
   }
@@ -227,7 +228,7 @@ export class Story {
     const stamped = !o.quiet && !!G.questMoments?.completed?.(q, d, { from });
     if (d.giver && d.giver !== 'rosie' || d.request) { /* reward delivered on completion */ }
     if (r.coins) A.addCoins(r.coins);
-    if (r.xp) A.addXp(r.xp);
+    if (r.xp) { if (G.coop?.active) G.coop.shareXp(r.xp); else A.addXp(r.xp); } // (couch co-op: the whole pack)
     if (r.skillPts) A.addSkillPts(r.skillPts);
     if (r.mats) for (const k in r.mats) A.addMaterial(k, r.mats[k]);
     if (r.potions) for (const k in r.potions) A.addPotion(k, r.potions[k]);

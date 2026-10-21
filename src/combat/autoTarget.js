@@ -62,7 +62,7 @@ const DEG = Math.PI / 180;
 // width to (width ?? 2 × grabRadius ?? 0.7), a cone's half-angle to (spread ?? arc) / 2. A dash goes where the move stick
 // points (escape) and, with no move input, as its `idle` form; `away`: the cast itself moves away from its aim.
 const K = (kind, o) => ({ kind, ...o });
-export const AIM_KINDS = ['melee', 'target', 'ground', 'line', 'cone', 'leap', 'dash', 'heal', 'self'];
+export const AIM_KINDS = ['melee', 'target', 'ground', 'line', 'cone', 'leap', 'dash', 'heal', 'self', 'ally'];
 export const AIM = {
   // Chewy: Bone Blade, Fetch Mastery, Pack Spirit
   chomp: K('melee'), whirl: K('self'), dig: K('leap'), bonestorm: K('self'),
@@ -86,6 +86,11 @@ export const AIM = {
   sunbeamThrust: K('melee', { reach: p => p.length }), sunfallJump: K('leap'), pinwheelSweep: K('self'), gallantCharge: K('dash', { idle: 'line' }), // (its width is the whole lane; Flash Draw's and Afterimage's are a radius round him)
   starfallLance: K('ground'), bonkDart: K('target'), tailwagVolley: K('cone'), trueFlight: K('line'), emberleafJavelin: K('target'), sunshower: K('ground'),
   emberBreath: K('ground', { range: () => 10, radius: p => p.range * 0.5 }), divebombSwoop: K('ground'), wingShield: K('self'), mightyRoar: K('self'), dragonHeart: K('self'),
+  // Stella (docs/STELLA.md §5.1): `ally` goes to the ally who needs it most (her, Shadow, Hinata; co-op heroes); Kind Light
+  // falls back to a foe by the `line` rule when nobody does (fallback), Sun Dog is always Shadow
+  goldenRay: K('line'), glint: K('cone'), prism: K('cone'), solarRay: K('target'), sundial: K('self'),
+  solarFlare: K('ground'), skippingSun: K('line'), sunspot: K('ground'), littleSun: K('self'), risingSun: K('ground'),
+  morningLight: K('self'), kindLight: K('ally', { fallback: 'line' }), halo: K('ally'), sunDog: K('ally'), daybreak: K('self'),
 };
 /** a skill's aim in numbers (R: its runtime, rpg/skills.js skillRuntime) → { kind, range, radius, width, half, reach, idle, away } */
 export function aimSpec(id, R) {
@@ -100,7 +105,7 @@ export function aimSpec(id, R) {
     width: +f(a.width, p.width ?? (p.grabRadius ? p.grabRadius * 2 : 0.7)) || 0.7,
     half: (+f(a.half, (p.spread ?? p.arc ?? 50) / 2) || 25) * DEG,
     reach: a.reach ? +f(a.reach, null) : null,
-    idle: a.idle || null, away: !!a.away,
+    idle: a.idle || null, away: !!a.away, fallback: a.fallback || null,
   };
 }
 
@@ -345,6 +350,12 @@ export class AutoAim {
         if (sp.idle === 'away' && lock) { const away = _v.set(P.pos.x - lock.pos.x, 0, P.pos.z - lock.pos.z); if (away.lengthSq() < 1e-4) away.set(-Math.sin(P.facing), 0, -Math.cos(P.facing)); const dir = this.openDir(away.normalize().clone(), sp.range); return [this.ground(P.pos.x + dir.x * sp.range, P.pos.z + dir.z * sp.range, P.pos.y), null]; }
         return lock ? [lock.pos, null] : [fb(), null]; // ('lock': Caltrop Flip flips away from it by itself)
       }
+      case 'ally': { // (the ally who needs it most: combat/stellaArts.js stlAllyFor; nobody: Kind Light's line at a foe)
+        const b = G.skills?.stlAllyFor?.(id, null);
+        if (b) return [b.e === P ? this.ground(P.pos.x + Math.sin(P.facing) * 0.6, P.pos.z + Math.cos(P.facing) * 0.6, P.pos.y) : b.pos.clone(), null];
+        if (sp.fallback === 'line') return this.lineAim(sp, sp.range, sp.width, lock, fb);
+        return [lock ? lock.pos : fb(), null];
+      }
       case 'heal': {
         if (!lock) return [this.ground(P.pos.x + Math.sin(P.facing) * 0.6, P.pos.z + Math.cos(P.facing) * 0.6, P.pos.y), null];
         const dd = d(lock) || 1, k = Math.min(1.2, dd) / dd;
@@ -395,7 +406,7 @@ export class AutoAim {
       return c ? [this.ground(c.x, c.z, cursor.y), null] : hov ? [hov.pos, null] : [cursor, null];
     }
     if (hov) return [hov.pos, hov];
-    if (sp.kind === 'self' || sp.kind === 'heal' || sp.kind === 'dash') return [cursor, null];
+    if (sp.kind === 'self' || sp.kind === 'heal' || sp.kind === 'dash' || sp.kind === 'ally') return [cursor, null]; // (an ally skill: the cursor's ally, else the neediest: stellaArts.js)
     let best = null, bd = Infinity;
     C.inRadius(cursor.x, cursor.z, SNAP + 1.5, 'ally', (e, dd) => {
       if (e.team !== 'enemy' || !this.ok(e) || e.breakable) return;
@@ -419,7 +430,7 @@ export class AutoAim {
     if (m.parent !== W.scene) { m.removeFromParent(); W.scene.add(m); m.userData.key = ''; } // (another world: sample its ground afresh)
     this.mt += dt;
     const at = G.skills.charge.aim, r = Math.max(0.8, Math.round(sp.radius * 4) / 4), pulse = 1 + 0.025 * Math.sin(this.mt * 5);
-    const tex = markerTex(r); if (m.material.map !== tex) { m.material.map = tex; m.material.needsUpdate = true; }
+    const tex = markerTex(r, G.player?.hero === 'stella'); if (m.material.map !== tex) { m.material.map = tex; m.material.needsUpdate = true; }
     const h0 = W.heightAt ? W.heightAt(at.x, at.z) : at.y;
     m.position.set(at.x, h0 + 0.05, at.z);
     m.scale.set(pulse, 1, pulse);
@@ -434,21 +445,22 @@ export class AutoAim {
 // Treat Meteor reads as thin as a small Paw Rune. One draw call, normal blending (it never lights or washes the scene),
 // under padAim's lock ring.
 const MARK_PAD = 1.08, MARK_OPACITY = 0.8, MARK_TEX = new Map();
-function markerTex(r) {
-  let tex = MARK_TEX.get(r); if (tex) return tex;
+function markerTex(r, gold = false) { // (gold: Stella's ground skills, docs/STELLA.md §5.1: gold dashes and a rose-gold rim)
+  const key = gold ? `g${r}` : r;
+  let tex = MARK_TEX.get(key); if (tex) return tex;
   const N = 512, cv = document.createElement('canvas'); cv.width = cv.height = N;
   const g = cv.getContext('2d'), c = N / 2, R = N / 2 / MARK_PAD, ppm = R / r; // (px per metre)
   const rim = g.createRadialGradient(c, c, Math.max(0, R - 0.9 * ppm), c, c, R);
-  rim.addColorStop(0, 'rgba(255, 143, 176, 0)'); rim.addColorStop(1, 'rgba(255, 143, 176, 0.32)');
+  rim.addColorStop(0, gold ? 'rgba(247, 184, 168, 0)' : 'rgba(255, 143, 176, 0)'); rim.addColorStop(1, gold ? 'rgba(247, 184, 168, 0.34)' : 'rgba(255, 143, 176, 0.32)');
   g.beginPath(); g.arc(c, c, R, 0, Math.PI * 2); g.fillStyle = rim; g.fill();
   const n = Math.max(10, Math.round(Math.PI * 2 * r / 0.95)), step = Math.PI * 2 * R / n; // (dashes about 0.6 m, gaps 0.35 m)
   g.lineCap = 'round'; g.setLineDash([step * 0.62, step * 0.38]);
-  for (const [w, col] of [[0.17, '#4a2c2a'], [0.08, '#fff6e8']]) { g.beginPath(); g.arc(c, c, R - 0.09 * ppm, 0, Math.PI * 2); g.lineWidth = Math.max(2, w * ppm); g.strokeStyle = col; g.stroke(); }
+  for (const [w, col] of [[0.17, '#4a2c2a'], [0.08, gold ? '#ffd36a' : '#fff6e8']]) { g.beginPath(); g.arc(c, c, R - 0.09 * ppm, 0, Math.PI * 2); g.lineWidth = Math.max(2, w * ppm); g.strokeStyle = col; g.stroke(); }
   g.setLineDash([]);
   const dot = Math.max(4, 0.11 * ppm);
   g.beginPath(); g.arc(c, c, dot, 0, Math.PI * 2); g.fillStyle = '#ffcf4a'; g.fill(); g.lineWidth = Math.max(2, dot * 0.45); g.strokeStyle = '#4a2c2a'; g.stroke();
   tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-  MARK_TEX.set(r, tex);
+  MARK_TEX.set(key, tex);
   return tex;
 }
 // The disc is a polar mesh draped on the ground (MARK_SEG spokes, MARK_RINGS rings): each vertex takes the height under
@@ -516,7 +528,7 @@ export function aimWords(text, id, o = {}) {
   const { dev, mode } = modeNow(o);
   if (dev === 'kbm' && mode !== TARGETING.AUTO) return text;
   const a = o.kind ? { kind: o.kind } : id === 'attack' ? { kind: 'target' } : AIM[id] || { kind: 'self' }, auto = mode === TARGETING.AUTO;
-  const noun = !auto ? 'your aim' : a.kind === 'ground' || a.kind === 'leap' ? 'the biggest group' : a.kind === 'line' || a.kind === 'cone' ? 'the most foes' : 'your target';
+  const noun = !auto ? 'your aim' : a.kind === 'ally' ? 'the ally who needs it most (you or Shadow)' : a.kind === 'ground' || a.kind === 'leap' ? 'the biggest group' : a.kind === 'line' || a.kind === 'cone' ? 'the most foes' : 'your target';
   return String(text)
     .replace(/\b(at|to|toward|after) (?:the|your) cursor\b/g, (m, prep) => {
       if (!auto || a.kind !== 'dash') return `${prep} ${noun}`;
@@ -536,6 +548,7 @@ const AIM_LINE = {
   cone: 'the way its fan catches the most foes',
   leap: 'a leap onto the biggest group',
   heal: 'beside you, so you are always in it',
+  ally: 'the ally who needs it most',
 };
 /** one line for a skill's tooltip: where it goes with this device's Targeting ('' for self skills, and with the mouse
  *  in Off) */
@@ -546,6 +559,7 @@ export function aimLine(id, o = {}) {
   if (mode === TARGETING.ASSIST) return dev === 'kbm' ? 'Targeting Assist: snaps onto a foe or a group near the cursor' : 'Targeting Assist: at the foe in front of you';
   if (id === 'attack') return 'Targeting Auto: at your target (a melee swing steps in only when it is close)';
   if (a.kind === 'dash') return `Targeting Auto: where you're heading; standing still, ${a.idle === 'line' ? 'through the most foes' : a.idle === 'ground' ? 'onto the biggest group' : 'away from your target'}`;
+  if (a.kind === 'ally') return id === 'sunDog' ? 'Targeting Auto: always Shadow' : a.fallback ? 'Targeting Auto: the ally who needs it most, or a foe when nobody does' : 'Targeting Auto: the ally who needs it most (the one under attack first)';
   return `Targeting Auto: ${AIM_LINE[a.kind]}`;
 }
 

@@ -1,6 +1,6 @@
 // Hero roster: which hero the player controls, switching between them (with a zoom-out / zoom-in transition), and the
 // heroes nobody is playing living in Blossom Hollow as villagers (docs/HEROES.md §4-6, docs/POE.md §6).
-// Any number of heroes (classes.js HERO_IDS: Chewy, Moka, Poe, the Shih Tzu, the dragoon): tap Tab for the next joined hero in roster order, hold
+// Any number of heroes (classes.js HERO_IDS: Chewy, Moka, Poe, the Shih Tzu, the dragoon, Stella): tap Tab for the next joined hero in roster order, hold
 // Tab for the hero wheel (ui/heroWheel.js) to pick one; the HUD shows a mini portrait per benched hero.
 //
 // One controlled body: G.player (the Player actor) always embodies the ACTIVE hero — switching swaps its rig, class and
@@ -21,7 +21,7 @@ import { HeroWheel } from '../ui/heroWheel.js';
 import { PoeJoin } from './poeJoin.js';
 import { ShihtzuJoin } from './shihtzuJoin.js';
 import { GoldenJoin } from './goldenJoin.js';
-import { KaizoArrive } from './kaizoArrive.js';
+import { StellaJoin } from './stellaJoin.js';
 import { Arrivals } from './arrivals.js';
 import { heroAway } from '../cozy/state.js';
 
@@ -32,15 +32,15 @@ const SWITCH_CD = 2;
 const WHEEL_HOLD = 0.26; // s: Tab held this long opens the hero wheel (a shorter press is a tap: the next hero)
 // where a hero who hasn't joined yet waits: Moka by the fountain (she joins in town); the others aren't in town until their
 // arrival (actors/arrivals.js: each comes to Blossom Hollow once their zone opens, ROADMAP Z-H3): Poe once the Bamboo opens
-// (docs/POE.md §5), the Shih Tzu once Momiji Hollow does (docs/SHIHTZU.md §5), the Golden Retriever dragoon once the Onsen
-// does (docs/GOLDEN.md §5);
+// (docs/POE.md §5), the Shih Tzu once Momiji Hollow does (docs/SHIHTZU.md §5), Stella once the Tide Pool does (Captain
+// Kaizo rows her over: docs/STELLA.md §6), the Golden Retriever dragoon once the Onsen does (docs/GOLDEN.md §5);
 // JOIN_HINT: what the hero wheel says about a hero not met yet when their arrival has nothing to say (Arrivals.hintFor:
 // "Will arrive when the Bamboo opens")
-const JOIN_AT = { moka: 'fountain', poe: 'arrival', shihtzu: 'arrival', golden: 'arrival' };
-const JOIN_HINT = { moka: 'Waiting by the fountain', poe: 'On the way to Blossom Hollow…', shihtzu: 'On the way to Blossom Hollow…', golden: 'On the way to Blossom Hollow…' };
-const ARRIVE_PITCH = { chewy: 1, moka: 1.12, poe: 1.22, shihtzu: 0.88, golden: 0.96 };
+const JOIN_AT = { moka: 'fountain', poe: 'arrival', shihtzu: 'arrival', golden: 'arrival', stella: 'arrival' };
+const JOIN_HINT = { moka: 'Waiting by the fountain', poe: 'On the way to Blossom Hollow…', shihtzu: 'On the way to Blossom Hollow…', golden: 'On the way to Blossom Hollow…', stella: 'On the way to Blossom Hollow…' };
+const ARRIVE_PITCH = { chewy: 1, moka: 1.12, poe: 1.22, shihtzu: 0.88, golden: 0.96, stella: 1.06 };
 // where a hero stands when whisked home from the Burrow (beside Chewy's house door; they share the house)
-const HOME_OFS = { chewy: [1.6, 1.0], moka: [-0.2, 1.7], poe: [-1.5, 1.2], shihtzu: [0.7, 2.4], golden: [-1.1, 2.7] };
+const HOME_OFS = { chewy: [1.6, 1.0], moka: [-0.2, 1.7], poe: [-1.5, 1.2], shihtzu: [0.7, 2.4], golden: [-1.1, 2.7], stella: [2.0, 2.3] };
 
 // what the hero you are NOT playing says when you walk up to them ({me} = the active hero's name)
 const HERO_CHAT = {
@@ -76,6 +76,15 @@ const HERO_CHAT = {
     ['Shadow is a very good dragon. I told him so twelve times today.', 'Shall I take a turn in the Burrow? My lance and I would be honoured!'],
     ["Kuma says I can't fetch the moon. I said I could jump very high.", "He's still thinking about it. So am I."],
   ],
+  // the Weimaraner Sun Oracle (docs/STELLA.md): calm, kind and quietly confident, dry and playful; solemn about the sun; and
+  // then, when something delights her (a dog, mostly), the zoomies, and a very composed "…Ahem."
+  stella: [
+    ['Good morning, {me}. I greeted the sun for both of us today.', "It said nothing. It never does. That's how you know it's listening."],
+    ["Shall I take a turn in the Burrow? I'll keep everyone warm.", "And a little bit on fire, if anyone's rude."],
+    ['Shadow bowed to me at the fountain this morning. A perfect play-bow.', '…I did not get the zoomies. I walked briskly. In circles. With dignity.'],
+    ["Kuma asked if my wagasa keeps the rain off. I said it keeps the sun company.", 'He gave me a melon-pan anyway. I think he understood.'],
+    ['The sun has never once been late, {me}.', "I like to think that's partly me."],
+  ],
 };
 
 export class HeroManager {
@@ -90,7 +99,7 @@ export class HeroManager {
     this.arrivals = G.arrivals = new Arrivals(G, this); // the heroes arrive in Blossom Hollow when their zone opens (actors/arrivals.js, ROADMAP Z-H3)
     this.poeJoin = this.arrivals.register('poe', new PoeJoin(G, this)); // Poe's arrival in town + the rumour (actors/poeJoin.js)
     this.stzJoin = this.arrivals.register('shihtzu', new ShihtzuJoin(G, this)); // Floofy's, by the jizo at dusk + his rumour (actors/shihtzuJoin.js)
-    this.kaizoArrive = this.arrivals.register('kaizo', new KaizoArrive(G, this)); // Captain Kaizo's boat, for Shiokaze Port (actors/kaizoArrive.js)
+    this.stlJoin = this.arrivals.register('stella', new StellaJoin(G, this)); // Stella's, Captain Kaizo rowing her over to the beach + her rumour (actors/stellaJoin.js)
     this.gldJoin = this.arrivals.register('golden', new GoldenJoin(G, this)); // Foosy's, by the fountain + his rumour (actors/goldenJoin.js)
     // back in town: a hero who joined while you were out (Poe, in the bamboo) moves into the cottage
     Events.on('mode:changed', p => { if (p?.mode === 'village') this.spawnBench(); });
@@ -102,14 +111,16 @@ export class HeroManager {
   joined(id) { return id === 'chewy' || !!this.G.state.flags?.[`${id}Joined`]; }
   /** out on an expedition (docs/COZY.md §4.8): not on the bench, not in the wheel's picks, not in town */
   away(id) { return !!heroAway(this.G.state, id); }
-  /** heroes the player could switch to right now (joined, not the active one, not away), in roster order */
-  bench() { return HERO_IDS.filter(id => id !== this.active && this.joined(id) && !this.away(id)); }
+  /** being played by another player in couch co-op (coop/coop.js, docs/COOP.md): not on the bench, not in town */
+  claimed(id) { return !!this.G.coop?.claimed?.(id); }
+  /** heroes the player could switch to right now (joined, not the active one, not away, not another player's), in roster order */
+  bench() { return HERO_IDS.filter(id => id !== this.active && this.joined(id) && !this.away(id) && !this.claimed(id)); }
   /** the HUD's minis: the bench and the heroes away on expeditions (shown greyed with a backpack: ui/hud.js) */
-  benchShown() { return HERO_IDS.filter(id => id !== this.active && this.joined(id)); }
+  benchShown() { return HERO_IDS.filter(id => id !== this.active && this.joined(id) && !this.claimed(id)); }
   /** the next joined hero after `from` in roster order (wrapping round): what a Tab tap switches to */
   next(from = this.active) {
     const n = HERO_IDS.length, i0 = HERO_IDS.indexOf(from);
-    for (let k = 1; k < n; k++) { const id = HERO_IDS[(i0 + k) % n]; if (id !== this.active && this.joined(id) && !this.away(id)) return id; }
+    for (let k = 1; k < n; k++) { const id = HERO_IDS[(i0 + k) % n]; if (id !== this.active && this.joined(id) && !this.away(id) && !this.claimed(id)) return id; }
     return null;
   }
   get wheelOpen() { return !!this.wheel?.open; }
@@ -130,6 +141,7 @@ export class HeroManager {
       if (id === this.active || this.villagers[id]) continue;
       if (!this.joined(id) && JOIN_AT[id] !== 'fountain') continue;
       if (this.away(id)) continue; // (out on an expedition: they walk back in from the Wayfarer's Post: cozy/expeditionRun.js)
+      if (this.claimed(id)) continue; // (another player is playing them: couch co-op)
       const at = this.joined(id) ? this.homeSpot(id) : V(L.plaza.x + 2.4, L.plaza.z - 1.2);
       const v = this.spawnVillager(id, at.x, at.z);
       if (!this.joined(id)) { v.waitingToJoin = true; v.frozen = true; v.faceTo(L.spawn.x, L.spawn.z); }
@@ -165,6 +177,7 @@ export class HeroManager {
   canSwitch(to = this.next()) {
     const G = this.G, P = G.player, ui = G.ui;
     if (to && to !== this.active && this.joined(to) && this.away(to)) return `${this.name(to)} is away on an expedition`;
+    if (to && this.claimed(to)) return `Player ${G.coop.holder(to).n} is playing ${this.name(to)}`;
     if (!this.bench().length) return HERO_IDS.some(id => id !== this.active && this.joined(id) && this.away(id)) ? 'Everyone else is out on an expedition' : this.joined('moka') ? 'Nobody to switch with' : 'Moka is waiting by the fountain!';
     if (!to || to === this.active || !this.joined(to)) return 'Nobody to switch with';
     if (this.T) return 'busy';
@@ -177,6 +190,7 @@ export class HeroManager {
     return '';
   }
   switchTo(to = this.next(), { quiet = false } = {}) {
+    if (this.G.coop?.cur) return this.G.coop.switchHero(this.G.coop.cur, to); // (couch co-op: player 2-4 asked, e.g. "Let's switch!" with a hero in town)
     const G = this.G, P = G.player, why = this.canSwitch(to);
     if (why) {
       if (!quiet && why !== 'busy') { G.ui?.float?.(P.pos.clone().setY(P.pos.y + 1.7), why, { kind: 'status', color: '#9fd0ff' }); Events.emit('sfx', 'ui_error'); }
@@ -186,7 +200,7 @@ export class HeroManager {
     G.skills?.clearAll?.();
     G.skills && (G.skills.queued = null);
     P.moveTarget = null; P.interactTarget = null; P.pendingLoot = null; P.controlLocked = true;
-    this.T = { t: 0, from: this.active, to, mode: G.mode, dist0: rig.distTarget, pitch0: rig.pitch, focus0: P.pos.clone(), swapped: false };
+    this.T = { t: 0, from: this.active, to, mode: G.mode, dist0: rig.distTarget, pitch0: rig.pitch, focus0: P.pos.clone(), swapped: false, quick: !!G.coop?.active }; // (quick: couch co-op, the camera is everyone's: a tag-in on the spot, no fly-over)
     G.heroSwitching = true;
     G.ui?.heroCard?.({ id: to, name: this.name(to), title: this.cls(to).title, color: this.cls(to).color, portrait: G.portrait?.(to) });
     Events.emit('sfx', 'hero_swap');
@@ -232,7 +246,7 @@ export class HeroManager {
     return HERO_IDS.map(id => {
       const C = this.cls(id), joined = this.joined(id), active = id === this.active;
       const away = !active && joined ? this.G.cozy?.awayInfo?.(id) || null : null; // (out on an expedition: docs/COZY.md §4.8)
-      const why = active ? 'Playing now' : away ? `Away · ${away.label}` : joined ? this.canSwitch(id) : (this.arrivals.scenes[id] && this.arrivals.hintFor(id)) || JOIN_HINT[id] || 'Not met yet'; // (when their arrival comes: actors/arrivals.js)
+      const why = active ? 'Playing now' : this.claimed(id) ? `Player ${this.G.coop.holder(id).n} is playing` : away ? `Away · ${away.label}` : joined ? this.canSwitch(id) : (this.arrivals.scenes[id] && this.arrivals.hintFor(id)) || JOIN_HINT[id] || 'Not met yet'; // (when their arrival comes: actors/arrivals.js)
       return { id, name: joined || active ? C.name : '???', title: joined || active ? C.title : 'Not met yet', color: C.color, lvl: this.G.state.heroes?.[id]?.player?.lvl || 1, active, joined: joined || active, away, ready: !active && joined && !why, why: why === 'busy' ? 'Just a moment…' : why };
     });
   }
@@ -246,6 +260,11 @@ export class HeroManager {
     const T = this.T; if (!T) return;
     const G = this.G, rig = G.engine.rig, P = G.player;
     T.t += dt;
+    if (T.quick) { // (couch co-op: the starlight column on the spot, the camera stays on the pack)
+      if (!T.swapped && T.t >= 0.22) { T.swapped = true; this.swap(T); }
+      else if (T.swapped && T.t >= 0.55) { P.controlLocked = false; G.heroSwitching = false; this.T = null; this.cd = SWITCH_CD * 0.5; G.save?.(); Events.emit('hero:switched', { from: T.from, to: T.to }); }
+      return;
+    }
     const OUT = 0.5, PAN = T.mode === 'village' ? Math.min(1.1, 0.35 + (T.panLen || 0) * 0.02) : 0.3, IN = 0.6;
     const far = T.mode === 'interior' ? T.dist0 + 6 : Math.max(T.dist0 + 16, T.mode === 'village' ? 40 : 36); // high enough to read as "zooming out to the map" (indoors just a step back: the room is all there is)
     if (T.t < OUT) { // pull back
@@ -283,7 +302,7 @@ export class HeroManager {
       v.anim.play('wave');
     } else if (T.mode === 'village') {
       const at = this.removeVillager(to);                 // wherever the other hero was in town…
-      arrive = at || old;
+      arrive = (!T.quick && at) || old;                   // (couch co-op: the new hero tags in right here)
       const v = this.spawnVillager(from, old.x, old.z, old.face); // …and the old hero carries on right here
       v.warm = true; v.state = 'idle'; v.t = 2.2; v.greeted = 20; // (no boot warm-up teleport: a wave, then back to their day)
       v.anim.play('wave');
@@ -334,6 +353,7 @@ export class HeroManager {
     if (id === 'poe') return this.joinPoe();
     if (id === 'shihtzu') return this.joinShihtzu();
     if (id === 'golden') return this.joinGolden();
+    if (id === 'stella') return this.joinStella();
     const G = this.G, ui = G.ui;
     if (id !== 'moka' || this.joined(id) || !ui?.dialogue) return;
     const P = G.player, portrait = G.portrait?.('moka'), me = this.name();
@@ -385,6 +405,21 @@ export class HeroManager {
     if (this.joined(id)) return false;
     G.actions.prepareJoin?.(id);
     G.state.flags.goldenJoined = true;
+    if (G.mode === 'village' && !this.villagers[id] && this.active !== id) { const h = this.homeSpot(id); this.spawnVillager(id, h.x, h.z).warm = true; }
+    Events.emit('sfx', 'ui_quest');
+    G.ui?.banner?.(`${this.name(id)} joined the pack!`, 'Tap Tab for the next hero · hold Tab to pick', { style: 'levelup' });
+    Events.emit('hero:joined', { id });
+    G.save?.();
+    return true;
+  }
+  /** Stella joins the pack: the end of her arrival on the beach (docs/STELLA.md §6), or at once for ?hero=stella and tests
+   *  (her quest then starts quietly with its card while Shiokaze needs saving: actors/arrivals.js questsOwed). She lives
+   *  in Chewy's house with the others from now on (back in town: spawnBench). */
+  async joinStella() {
+    const G = this.G, id = 'stella';
+    if (this.joined(id)) return false;
+    G.actions.prepareJoin?.(id);
+    G.state.flags.stellaJoined = true;
     if (G.mode === 'village' && !this.villagers[id] && this.active !== id) { const h = this.homeSpot(id); this.spawnVillager(id, h.x, h.z).warm = true; }
     Events.emit('sfx', 'ui_quest');
     G.ui?.banner?.(`${this.name(id)} joined the pack!`, 'Tap Tab for the next hero · hold Tab to pick', { style: 'levelup' });

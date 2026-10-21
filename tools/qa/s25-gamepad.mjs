@@ -343,7 +343,7 @@ try {
   const g0 = await NAV();
   P.bagOpen = g0.open.includes('inventory') && /^slot:inv:/.test(g0.cur || '') && g0.ring && /Pick up/.test(g0.hints) && g0.tip;
   const first = await ev(() => window.G.state.inventory.findIndex(Boolean));
-  const tipCmp = await ev(() => /tt-cmp|Empty slot/.test(document.querySelector('.tt')?.innerHTML || ''));
+  const tipCmp = await ev(() => /tt-cmp|tt-pow|Empty slot/.test(document.querySelector('.tt')?.innerHTML || ''));
   await navTo(`.slot[data-c="inv"][data-i="${first}"]`); await press('A');
   const heldIt = await ev(() => window.G.ui.drag.held);
   await navTo('.slot[data-c="inv"][data-i="12"]'); await press('A');

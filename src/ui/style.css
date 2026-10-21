@@ -159,6 +159,12 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1c1424; }
 .slot.new { animation: newGlow 1.6s ease-in-out infinite; }
 @keyframes newGlow { 50% { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #ffcf4a, 0 0 14px #ffcf4a; } }
 .slot .qty { position: absolute; right: 3px; bottom: 0; z-index: 2; font: 700 13px/1.1 var(--font); color: #fff; -webkit-text-stroke: 3.5px var(--ink); paint-order: stroke fill; }
+/* the green arrow: better than what the hero being played wears (docs/STATS.md §1) */
+.slot .upg-a { position: absolute; left: 2px; bottom: 2px; z-index: 2; width: 19px; height: 19px; border-radius: 50%; background: radial-gradient(circle at 40% 32%, #b8ffcf, #3ccf6e 70%);
+  border: 2px solid var(--ink); box-shadow: 0 1.5px 0 rgba(74, 44, 42, .35); animation: upgBob 1.6s ease-in-out infinite; pointer-events: none; }
+.slot .upg-a::after { content: ''; position: absolute; left: 50%; top: 45%; width: 0; height: 0; transform: translate(-50%, -50%); border: 5px solid transparent; border-bottom: 7px solid #fff; border-top: 0;
+  filter: drop-shadow(0 1px 0 rgba(30, 90, 50, .6)); }
+@keyframes upgBob { 50% { transform: translateY(-2px); } }
 .slot .socks { position: absolute; left: 50%; top: 3px; transform: translateX(-50%); display: flex; gap: 2px; z-index: 2; }
 .slot .socks i { width: 6px; height: 6px; border-radius: 50%; background: rgba(74, 44, 42, .25); border: 1px solid rgba(74, 44, 42, .5); }
 .slot .socks i.on { background: #ff8fd0; }
@@ -219,6 +225,33 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1c1424; }
 .tt-cmph { font-size: 12px; color: #b8a8bc; margin-bottom: 2px; }
 .tt-cmp { font-size: 13px; }
 .tt-cmp.up { color: #7cf0a0; } .tt-cmp.down { color: #ff8a96; }
+/* simple item tooltips (docs/STATS.md §1): the Power box (what the piece adds, better or worse than what's on), the
+   piece's damage or defense, its bonuses in plain words */
+.tt-pow { margin: 2px -6px 8px; padding: 7px 10px 8px; border-radius: 12px; background: rgba(255, 255, 255, .07); border: 2px solid rgba(255, 238, 222, .16); }
+.tt-pw { display: flex; align-items: center; justify-content: center; gap: 6px; font: 700 14px/1 var(--font); color: #cfe6ff; }
+.tt-pw .gl { width: 20px; height: 20px; }
+.tt-pw b { font-size: 22px; color: #fff; text-shadow: 0 0 10px rgba(143, 208, 255, .6); }
+.tt-vd { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 3px 8px; margin-top: 5px; font: 700 15px/1.15 var(--font); color: #e8dccd; }
+.tt-vd span { font-size: 13px; padding: 2px 8px 3px; border-radius: 999px; background: rgba(0, 0, 0, .28); }
+.tt-pow.v-better, .tt-pow.v-empty { background: linear-gradient(rgba(94, 224, 122, .22), rgba(94, 224, 122, .07)); border-color: rgba(124, 240, 160, .6); }
+.tt-pow.v-better .tt-vd, .tt-pow.v-empty .tt-vd { color: #7cf0a0; }
+.tt-wrap.show .tt-pow.v-better .tt-vd b, .tt-wrap.show .tt-pow.v-empty .tt-vd b { animation: vdPop .5s var(--pop) .06s both; }
+@keyframes vdPop { from { transform: scale(.6); opacity: 0; } }
+.tt-pow.v-worse { background: rgba(255, 106, 122, .1); border-color: rgba(255, 138, 150, .42); }
+.tt-pow.v-worse .tt-vd { color: #ff9aa4; }
+.tt-pow.v-worn .tt-vd { color: #ffd9a8; }
+.tt-vs { margin-top: 3px; font-size: 12px; color: #b8a8bc; }
+.tt-lock { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 6px; font: 700 13.5px/1 var(--font); color: #ff8a96; }
+.tt-lock .gl { width: 17px; height: 17px; }
+.tt-bs { display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; color: #f1e4d6; margin: 1px 0; }
+.tt-bs .gl { width: 18px; height: 18px; }
+.tt-bs b { color: #fff; font-size: 16px; }
+.tt-bs i { font-style: normal; font-size: 12.5px; color: #b8a8bc; }
+.tt-affs { margin-top: 6px; }
+.tt-set { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 6px; color: #7ef09a; font-size: 13px; }
+.tt-set .gl { width: 16px; height: 16px; }
+.tt-set b { color: #b4ffc6; }
+.tt-best { color: #ffd86a; }
 .tt-price { margin-top: 8px; color: #ffe07a; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 4px; }
 .tt-price .gl { width: 18px; height: 18px; }
 .tt-price.bad { color: #ff6f7f; }

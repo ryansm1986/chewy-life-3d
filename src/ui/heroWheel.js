@@ -29,9 +29,12 @@ export class HeroWheel {
     const list = this.H.roster(), n = list.length;
     this.ring.innerHTML = '';
     this.cards = list.map((h, i) => {
-      const a = -Math.PI / 2 + (i / n) * Math.PI * 2, R = n > 5 ? 228 : n > 4 ? 206 : n > 3 ? 190 : 178; // (the first hero at the top, the others round the ring; a wider ring for more heroes)
+      // (the first hero at the top, the others round the ring; a wider ring for more heroes. Six or more: an ellipse, wider
+      //  than tall, so the cards at the top and bottom stay off the HUD's top row and the hotbar on a 16:10 Deck)
+      const t = -Math.PI / 2 + (i / n) * Math.PI * 2, R = n > 5 ? 250 : n > 4 ? 206 : n > 3 ? 190 : 178, Ry = n > 5 ? 196 : R;
+      const x = Math.cos(t) * R, y = Math.sin(t) * Ry, a = Math.atan2(y, x); // (a: the card's real direction, for the mouse and the stick)
       const c = el('button', 'hw-card'); c.dataset.id = h.id; // (the Meet Poe guide spotlights her card)
-      c.style.setProperty('--hc', h.color); c.style.setProperty('--x', `${Math.cos(a) * R}px`); c.style.setProperty('--y', `${Math.sin(a) * R}px`); c.style.setProperty('--i', i);
+      c.style.setProperty('--hc', h.color); c.style.setProperty('--x', `${x.toFixed(1)}px`); c.style.setProperty('--y', `${y.toFixed(1)}px`); c.style.setProperty('--i', i);
       c.classList.toggle('active', h.active); c.classList.toggle('locked', !h.joined); c.classList.toggle('blocked', h.joined && !h.active && !h.ready); c.classList.toggle('away', !!h.away); // (away: out on an expedition, docs/COZY.md §4.8)
       const url = this.G.portrait?.(h.id), face = url ? `<img class="p3d" src="${url}" alt="" draggable="false">` : portrait(h.id);
       const jp = h.joined ? HERO_TEXT[h.id]?.jp || '' : '';
@@ -58,7 +61,7 @@ export class HeroWheel {
     this.sel = i;
     this.cards.forEach((c, k) => c.el.classList.toggle('sel', k === i));
     const h = this.cards[i].h;
-    this.hub.innerHTML = `<b>${esc(h.joined ? h.name : '???')}</b><span>${h.active ? 'Playing now' : h.ready ? `${Actions.device === 'touch' ? 'Tap a card' : `Let go of ${keyCap('hero', { sm: true })}`} to play as ${esc(h.name)}` : esc(h.why)}</span>`; // (touch: the wheel stays up for a tap, ui/touch.js)
+    this.hub.innerHTML = `<b>${esc(h.joined ? h.name : '???')}${h.joined ? `<em class="hw-ht">${esc(h.title)}</em>` : ''}</b><span>${h.active ? 'Playing now' : h.ready ? `${Actions.device === 'touch' ? 'Tap a card' : `Let go of ${keyCap('hero', { sm: true })}`} to play as ${esc(h.name)}` : esc(h.why)}</span>`; // (touch: the wheel stays up for a tap, ui/touch.js)
     this.G.audio?.play?.('ui_hover', { vol: 0.5 });
   }
   confirm() {

@@ -487,7 +487,7 @@ export class DungeonMode {
     const isBoss = m === this.boss && !this.tr?.pin?.seasonFalls(m); // (the pinnacle: a season falls, the next rises: dungeon/pinnacle.js)
     // the Victory banner goes up before the xp lands, so a level-up from the kill folds into it (no second banner)
     if (isBoss) this.onBossDefeated(m, xp);
-    G.actions.addXp(xp);
+    if (G.coop?.active) G.coop.shareXp(xp); else G.actions.addXp(xp); // (couch co-op: the whole pack gets it)
     // batch xp into one floating number above Chewy instead of one per kill (a boss's xp is shown on the Victory banner)
     if (!isBoss) {
       this.xpAcc = (this.xpAcc || 0) + xp;

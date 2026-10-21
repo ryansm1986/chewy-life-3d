@@ -37,6 +37,8 @@ const ACT = {
   sweep: { pose: 'sweep', dur: [12, 22], fidget: ['stretch'], emote: ['note'] },
   well: { pose: 'crank', dur: [4, 6] },
   board: { pose: 'read', dur: [6, 11], fidget: ['scratchHead', 'nod'], emote: ['?', '!', 'note'], chatty: true },
+  // Stella's dawn greeting (docs/STELLA.md §10): on the beach, facing the sea, a solemn bow or two (a virtual slot: sunriseSpot)
+  sunrise: { pose: 'admire', dur: [18, 28], fidget: ['bow', 'bow', 'stretch'], emote: ['sparkle', 'heart', 'sparkle'] },
   lantern: { pose: 'admire', dur: [14, 26], fidget: ['yawn', 'lookAround'], emote: ['sparkle', 'heart'], chatty: true },
   onsen: { hide: true, dur: [35, 60] },
 };
@@ -67,14 +69,17 @@ const LIKES = {
   shihtzu: { lantern: 3.5, bench: 2.5, admire: 2, garden: 1.6, board: 1.5, chat: 1.8 },
   // the dragoon patrols (very seriously), fishes (retrievers love water), and stops for a chat with everyone he meets
   golden: { stroll: 3, fish: 2.2, chat: 2.6, admire: 1.8, bench: 1.4, garden: 1.4 },
+  // Stella (docs/STELLA.md §10): greets the sun on the beach at dawn (decide: sunriseSpot), sits by the fountain, twirls her
+  // wagasa on the benches (wagasaTwirl), admires the gardens in the light; chats calmly with everyone
+  stella: { rim: 3, bench: 3, admire: 2.2, garden: 1.4, chat: 2, stroll: 1.4 },
 };
 const FOLK_LIKES = ['bench', 'garden', 'farm', 'fish', 'counter', 'browse', 'admire', 'sweep', 'chat', 'onsen', 'board'];
 // bedtimes [in, out] in game hours. Rosie keeps her shop lit a little later; Kitsune (lantern gazing) and Kero (night
 // fishing, the hot spring) are the night owls, but the whole cast is tucked in by 23:30. Townsfolk head home at dusk
 // (19:15-20:00) and wake 5:30-6:30, staggered so doors open one by one.
-const BED = { chewy: [22.4, 7.0], moka: [22.0, 6.6], poe: [22.8, 6.8], shihtzu: [21.8, 7.6], golden: [22.2, 6.4], rosie: [22.9, 6.6], mochi: [21.6, 7.0], usagi: [20.8, 6.0], kuma: [21.0, 5.8], kitsune: [23.3, 7.6], pan: [22.2, 8.0], tanu: [22.6, 7.2], kero: [23.0, 6.4] };
+const BED = { chewy: [22.4, 7.0], moka: [22.0, 6.6], poe: [22.8, 6.8], shihtzu: [21.8, 7.6], golden: [22.2, 6.4], stella: [21.6, 5.4], rosie: [22.9, 6.6], mochi: [21.6, 7.0], usagi: [20.8, 6.0], kuma: [21.0, 5.8], kitsune: [23.3, 7.6], pan: [22.2, 8.0], tanu: [22.6, 7.2], kero: [23.0, 6.4] };
 // nightcap colours (townsfolk pick one from their id)
-const CAP_COLOR = { chewy: '#e0443a', moka: '#5cc8b8', poe: '#7aa86a', shihtzu: '#9a6a9a', golden: '#e0a868', rosie: '#ff8fb0', mochi: '#ffb3cf', usagi: '#9fe0c0', kuma: '#8fb8ff', kitsune: '#c9a0ff', pan: '#ffd36e', tanu: '#8fd0ff', kero: '#ffb07a' };
+const CAP_COLOR = { chewy: '#e0443a', moka: '#5cc8b8', poe: '#7aa86a', shihtzu: '#9a6a9a', golden: '#e0a868', stella: '#f0c24e', rosie: '#ff8fb0', mochi: '#ffb3cf', usagi: '#9fe0c0', kuma: '#8fb8ff', kitsune: '#c9a0ff', pan: '#ffd36e', tanu: '#8fd0ff', kero: '#ffb07a' };
 const CAP_FOLK = ['#8fb8ff', '#ffb3cf', '#9fe0c0', '#c9a0ff', '#ffd36e', '#ffb07a'];
 
 export class Villager extends Actor {
@@ -197,6 +202,11 @@ export class Villager extends Actor {
     this.t = rand(2, 4);
     if (this.role === 'shop') return this.decideShop(teleport);
     const h = this.hour, night = this.G.day?.isNight?.() ?? false;
+    // Stella greets the sun once a morning, on the beach (docs/STELLA.md §10)
+    if (this.id === 'stella' && !night && h >= 5.5 && h < 8.5 && this.sunDay !== (this.G.day?.day ?? 0)) {
+      const sl = this.sunriseSpot();
+      if (sl) { this.sunDay = this.G.day?.day ?? 0; if (teleport) return this.beginAct(sl, true); return this.go(sl.x, sl.z, { kind: 'slot', slot: sl, speed: 1 }); }
+    }
     const base = schedule(h, night);
     if (!this.likes) { this.likes = {}; for (let i = 0; i < 2; i++) this.likes[pick(FOLK_LIKES)] = 2.4; }
     let sum = 0; const opts = this._opts || (this._opts = []); opts.length = 0;
@@ -236,6 +246,34 @@ export class Villager extends Actor {
       if (this.world.walkable?.(x, z) !== false && !this.world.collision?.solidAt(x, z, 0.3)) return this.go(x, z, { kind: 'wander', speed: 0.75 });
     }
     this.state = 'idle'; this.t = rand(3, 7);
+  }
+  /** Stella's spot to greet the sun (a virtual slot): a walkable patch of sand near the beach landmark with the sea within a
+   *  few metres, facing it (found once; null when the village has no beach) */
+  sunriseSpot() {
+    if (this._sunSpot !== undefined) return this._sunSpot && { ...this._sunSpot };
+    const W = this.world, B = W.landmarks?.beach, hAt = (x, z) => (W.terrain?.heightAt ? W.terrain.heightAt(x, z) : W.heightAt?.(x, z) ?? 0);
+    let best = null;
+    // (at the water's edge, on the wet sand: low ground with the sea within 1.2 m, clear of the beach's trees)
+    if (B) for (let r = 0; r <= 16 && !best; r += 1) for (let k = 0; k < (r ? 24 : 1) && !best; k++) {
+      const a0 = k / 24 * Math.PI * 2, x = B.x + Math.sin(a0) * r, z = B.z + Math.cos(a0) * r;
+      const hy = hAt(x, z);
+      if (W.walkable?.(x, z) === false || W.collision?.solidAt(x, z, 0.35) || hy < -0.02 || hy > 0.12) continue;
+      let face = null, low = Infinity; // (facing the open sea: the way the shore drops away fastest)
+      for (let j = 0; j < 16; j++) { const a = j / 16 * Math.PI * 2, sx = Math.sin(a), sz = Math.cos(a), h3 = hAt(x + sx * 3, z + sz * 3); if (hAt(x + sx * 1.2, z + sz * 1.2) < -0.05 && h3 < low) { low = h3; face = a; } }
+      if (face != null) best = { kind: 'sunrise', x, z, face, virtual: true, look: 0.3 };
+    }
+    this._sunSpot = best;
+    return best && { ...best };
+  }
+  /** Stella twirls her wagasa on the benches (docs/STELLA.md §10): now and then two eased turns about its shaft (the
+   *  holder's +Y on her shoulder mount), ending square where they began; a sparkle on some */
+  wagasaTwirl(dt) {
+    const h = this.rig.parts.parasol?.holder; if (!h) return;
+    const w = this._tw ||= { t: rand(3, 7), k: -1, y0: 0 };
+    if (w.k < 0) { if ((w.t -= dt) <= 0) { w.k = 0; w.y0 = h.rotation.y; if (chance(0.4)) this.emote('sparkle'); } return; }
+    w.k = Math.min(1, w.k + dt / 1.8);
+    h.rotation.y = w.y0 + w.k * w.k * (3 - 2 * w.k) * Math.PI * 4;
+    if (w.k >= 1) { h.rotation.y = w.y0; w.k = -1; w.t = rand(6, 14); }
   }
   freeSlot(kind) { const l = this.life.byKind.get(kind); if (!l) return false; for (const s of l) if (!s.by && !s.dead) return true; return false; }
   // Rosie minds her shop front: sweep in the morning, stand at the counter, tiny wanders (never strays)
@@ -418,6 +456,7 @@ export class Villager extends Actor {
     if (a.kind === 'fish') this.fishTick(dt, a, pd);
     if (a.kind === 'bench' && this.seated && !this.benchChat && sl.pair?.by && sl.pair.by !== this && sl.pair.by.seated && sl.pair.by.act?.phase === 'do' && this.chatCD <= 0 && a.pose !== 'sitDoze' && sl.pair.by.act.pose !== 'sitDoze' && chance(dt * 0.25)) this.startBenchChat(sl.pair.by);
     if (this.benchChat) this.benchChatTick(dt);
+    if (this.id === 'stella' && a.kind === 'bench' && this.seated && a.pose !== 'sitDoze') this.wagasaTwirl(dt);
     if (a.t <= 0 && !busy && !this.benchChat) {
       if (this.seated) {
         // don't stand up into Chewy
@@ -481,6 +520,7 @@ export class Villager extends Actor {
     const a = this.act; if (!a) return;
     if (!a.slot.virtual) this.life.release(a.slot, this);
     this.act = null;
+    if (this._tw?.k >= 0) { const h = this.rig.parts.parasol?.holder; if (h) h.rotation.y = this._tw.y0; this._tw.k = -1; } // (Stella stood up mid-twirl)
     if (this.benchChat) this.endBenchChat();
     this.setProp(null);
     if (this.anim.action && (this.anim.action.def.hold || SEATED.has(this.anim.action.name))) this.anim.stop();
@@ -742,6 +782,7 @@ export class Villager extends Actor {
   clearTask() {
     if (this.chat) this.endChat(false);
     if (this.act) this.endAct();
+    if (this.state === 'act') this.state = 'idle'; // (no act left to tick: the porch wait clears the task without a new state)
     if (this.goal?.slot) this.life?.release(this.goal.slot, this);
     this.goal = null; this.path = null; this.pauseT = 0;
     if (this.anim.action?.def.hold) this.anim.stop();

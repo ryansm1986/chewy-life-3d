@@ -1368,6 +1368,16 @@ export const CAST = {
     outfit: { top: 'gi', topColor: GOLDEN_PAL.emerald, topColor2: GOLDEN_PAL.brass, bottomColor: '#2f7a55', sash: GOLDEN_PAL.brass, wraps: GOLDEN_PAL.emerald },
     toy: { head: 'dog', ears: 'round', tail: 'dog', feet: GOLDEN_PAL.light, extras: goldenToyExtras }, // (the ear drapes, the crest helm, the ruff, the quiver: goldenKit.js)
   },
+  // Stella the Sun Oracle (docs/STELLA.md): the procedural fallback for ?chewy=classic and while her baked Toybox model
+  // loads (heroModels.js stellaToy). A silver-grey Weimaraner in the Midday robe (saffron, a warm-white petticoat, a
+  // sunset-red obi); the sun wagasa is a separate prop (stellaGear.js dressStella).
+  stella: {
+    name: CLASSES.stella.name, species: 'dog', earKind: 'spaniel', voice: 1.04, fur: '#a9a6a2', fur2: '#bcb9b4', fur3: '#8f8c88', earColor: '#a29f9b', earInner: '#c9b4b0', tail: 'dog',
+    nose: '#8f7474', iris: '#dfa23c', eye: '#dfa23c', muzzleColor: '#b8b5b0', blush: '#f2a8a0', muzzleScale: 0.96,
+    patterns: {}, brows: false,
+    outfit: { top: 'kimono', topColor: '#f0c24e', topColor2: '#fff9ec', bottomColor: '#fff9ec', sash: '#d9573e', scarf: '#dfa23c' },
+    toy: { head: 'dog', ears: 'round', tail: 'dog', feet: '#a9a6a2' },
+  },
 };
 
 // characters with a Blender-refined skin in public/rigs (tools/blender/build.mjs exports exactly these specs)

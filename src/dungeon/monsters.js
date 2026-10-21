@@ -4,6 +4,8 @@ import { makeToon, makeOutline } from '../gfx/materials.js';
 import { paint, merge, tube, xf, RoundedBox } from '../gfx/geom.js';
 import { buildHumanoid, cloneRig } from '../actors/charKit.js';
 import { clamp, TAU, rand, ease } from '../core/util.js';
+import { enemyParts, ownEnemyModel, enemyPartGeo } from '../regions/monsters/enemyModels.js';
+import { heroModelReady, buildHeroModel } from '../actors/heroModels.js';
 
 const C = h => new THREE.Color(h);
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -80,6 +82,16 @@ const CACHED = new Set(['mochi', 'dustbunny', 'kinoko', 'lantern', 'kasa', 'wisp
 const LAYOUTS = { dustbunny: 3 }; // (random fluff layouts per variant: 9 different bunnies; each layout is its own instanced batch)
 const MASTERS = new Map();
 let RECORD = null;
+/** a Blender model for this kind × variant (ROADMAP EN-1; regions/monsters/enemyModels.js): its parts merged into one
+ *  rigid geometry in model space, or null (not built, ?procmon). The kind's builder still runs once, for its material
+ *  options and extras (the glow colour), and its own geometry is dropped. */
+function glbGeo(id, vi) {
+  if (!ownEnemyModel(id, vi)) return null;
+  const list = [];
+  for (const part of Object.values(enemyParts(id, vi))) for (const g of part.geos) list.push(g.clone().translate(...part.at));
+  const geo = merge(list); geo.userData.shared = true;
+  return geo;
+}
 function finish(parts, opts = {}) {
   const geo = merge(parts);
   if (RECORD && !RECORD.geo) { RECORD.geo = geo; RECORD.opts = opts; geo.userData.shared = true; }
@@ -295,9 +307,10 @@ const BUILD = {
     return finish(parts, { mat: { fragOut: LUM_CAP } });
   },
   tamamo(v) { // Tamamo-no-Mae: white kitsune in an indigo kimono, fan of nine foxfire-tipped tails, fox mask + kanzashi, orbiting wisps
-    const rig = buildHumanoid({ name: 'Tamamo', species: 'fox', fur: v.color || '#f8eee6', fur2: '#ffffff', earColor: '#fff8f2', earInner: '#c8a8ff', eye: '#ff3a6a', blush: '#ffb0d0', outfit: { top: 'kimono', topColor: '#3c2c78', topColor2: '#ffd24a', bottomColor: '#281a50', sash: '#ffcf3a' } });
+    const baked = heroModelReady('tamamo'); // (the Toybox Tamamo, rigged like the heroes, her regalia in the model; her tail is tamamo-tail.glb)
+    const rig = baked ? buildHeroModel('tamamo') : buildHumanoid({ name: 'Tamamo', species: 'fox', fur: v.color || '#f8eee6', fur2: '#ffffff', earColor: '#fff8f2', earInner: '#c8a8ff', eye: '#ff3a6a', blush: '#ffb0d0', outfit: { top: 'kimono', topColor: '#3c2c78', topColor2: '#ffd24a', bottomColor: '#281a50', sash: '#ffcf3a' } });
     const P = rig.parts;
-    if (P.tail) P.tail.visible = false;
+    if (P.tail && !baked) P.tail.visible = false; // (baked: the tail root bone carries the fan)
     // --- one fluffy tail (puffs along an S-curve, white fading to a foxfire tip); nine instances fan out behind her
     const path = [[0, 0, 0, 0.05], [0, 0.1, -0.05, 0.08], [0, 0.22, -0.08, 0.105], [0, 0.36, -0.08, 0.12], [0, 0.5, -0.05, 0.115], [0, 0.62, 0.0, 0.095], [0, 0.71, 0.06, 0.07], [0, 0.77, 0.12, 0.04]];
     const tp = [], TIP = C('#9ad0ff'), LAV = C('#d8c8ff'), WH = C('#fffaf4');
@@ -307,11 +320,11 @@ const BUILD = {
       const g = new THREE.SphereGeometry(1, 12, 9); g.scale(r * 1.05, r * 1.25, r); g.translate(x + (i % 2 ? 0.012 : -0.012), y, z);
       tp.push(paint(g, (p, n, o) => { o.copy(WH); if (t > 0.55) o.lerp(LAV, clamp((t - 0.55) / 0.2)); if (t > 0.78) o.lerp(TIP, clamp((t - 0.78) / 0.18)); o.multiplyScalar(0.92 + 0.08 * clamp(n.y + 0.5)); }));
     }
-    const tailGeo = merge(tp);
+    const tailGeo = (baked && enemyPartGeo('tamamoTail', 0, 'body')) || merge(tp);
     capLuminance(rig.mat); // white fur under moonlight + her own foxfire light sat far above the bloom threshold
     const N = 9, tails = new THREE.InstancedMesh(tailGeo, rig.propMat || rig.mat, N), tailsOl = new THREE.InstancedMesh(tailGeo, rig.outMat, N);
     tails.castShadow = true; tails.receiveShadow = true; tails.frustumCulled = tailsOl.frustumCulled = false;
-    const fan = new THREE.Group(); fan.position.set(0, 0.06, -0.16); P.body.add(fan); fan.add(tails, tailsOl);
+    const fan = new THREE.Group(); if (baked && P.tail) P.tail.add(fan); else { fan.position.set(0, 0.06, -0.16); P.body.add(fan); } fan.add(tails, tailsOl); // (baked: on the tail root)
     // --- kanzashi hairpins with dangling sakura + a white fox mask worn on the side of the head
     const acc = [];
     for (const [a, l] of [[0.5, 0.3], [0.85, 0.26], [1.15, 0.22]]) acc.push(paint(xf(new THREE.CylinderGeometry(0.012, 0.012, l, 6), { p: [0.13, 0.27, -0.05], r: [0.2, 0, -a] }), (p, n, o) => o.set('#ffcf3a')));
@@ -328,7 +341,7 @@ const BUILD = {
     }
     const mask = merge(mk); mask.rotateY(-1.25); mask.rotateZ(0.35); mask.translate(-0.25, 0.14, 0.02);
     acc.push(mask);
-    rig.add(P.head, merge(acc), 'regalia');
+    if (!baked) rig.add(P.head, merge(acc), 'regalia');
     // --- orbiting foxfire wisps (unlit, bloom picks them up)
     // hitodama-style foxfire: glowing head with a tapering comet tail that trails behind along the orbit (-x)
     const fl = new THREE.LatheGeometry([[0.001, -0.075], [0.05, -0.06], [0.07, -0.02], [0.066, 0.03], [0.05, 0.08], [0.034, 0.14], [0.02, 0.2], [0.008, 0.26], [0.001, 0.3]].map(([r, y]) => new THREE.Vector2(r, y)), 10);
@@ -362,6 +375,8 @@ const BUILD = {
     return { root: rig.root, pivot: P.body, body: rig.meshes[0], mat: rig.mat, rig, animate, glow: '#9ac4ff' };
   },
   tanuki(v) {
+    const id = v.color === '#6a3a3a' ? 'tanukiBanditMaroon' : 'tanukiBandit'; // (the Toybox Tanuki Bandit, rigged like the heroes)
+    if (heroModelReady(id)) { const r = buildHeroModel(id); return { root: r.root, pivot: r.parts.body, body: r.meshes[0], mat: r.mat, rig: r, baked: true }; }
     const rig = buildHumanoid({ name: 'Tanuki Bandit', species: 'tanuki', fur: '#8a6a58', fur2: '#e0cbb0', fur3: '#3a2c28', earColor: '#3a2c28', outfit: { top: 'gi', topColor: v.color || '#4a4a6a', bottomColor: '#2a2a3a', scarf: '#e8503a' } });
     return { root: rig.root, pivot: rig.parts.body, body: rig.meshes[0], mat: rig.mat, rig };
   },
@@ -446,18 +461,28 @@ export function buildMonster(id, variantIdx = 0) {
   if (RIG_CLONE.has(def.build)) {
     const key = id + ':' + vi;
     let T = RIG_TPL.get(key);
-    if (!T) { T = BUILD[def.build](v); T.rig.root.traverse(o => { if (o.isMesh) o.geometry.userData.shared = true; }); RIG_TPL.set(key, T); }
+    if (!T) {
+      T = BUILD[def.build](v); T.rig.root.traverse(o => { if (o.isMesh) o.geometry.userData.shared = true; });
+      if (T.baked) { T.variant = v; return T; } // (a baked Toybox rig, ROADMAP EN-1: its geometry is shared already; build it fresh each spawn)
+      RIG_TPL.set(key, T);
+    }
     const rig = cloneRig(T.rig);
     rig.spec = { ...T.rig.spec }; // (its own: the Monster sets spec.scale per rank and the Animator reads it every frame)
     return { root: rig.root, pivot: rig.parts.body, body: rig.meshes[0], mat: rig.mat, rig, variant: v };
   }
   if (CACHED.has(def.build)) {
-    const n = LAYOUTS[def.build] || 1, key = `${id}:${vi}:${n > 1 ? (Math.random() * n) | 0 : 0}`, M = MASTERS.get(key);
+    const glb = MASTERS.has(id + ':' + vi + ':glb') || ownEnemyModel(id, vi);
+    const n = glb ? 1 : LAYOUTS[def.build] || 1, key = `${id}:${vi}:${glb ? 'glb' : n > 1 ? (Math.random() * n) | 0 : 0}`, M = MASTERS.get(key);
     if (M) { const model = finishGeo(M.geo, M.opts); Object.assign(model, M.extra); model.variant = v; return model; }
     RECORD = {};
     let model, rec;
     try { model = BUILD[def.build](v); } finally { rec = RECORD; RECORD = null; }
-    if (rec.geo) { const extra = {}; for (const k in model) if (!FINISHED.has(k)) extra[k] = model[k]; MASTERS.set(key, { geo: rec.geo, opts: rec.opts, extra }); }
+    if (rec.geo) {
+      const extra = {}; for (const k in model) if (!FINISHED.has(k)) extra[k] = model[k];
+      const G = glb && glbGeo(id, vi);
+      if (G) { rec.geo.dispose(); model = Object.assign(finishGeo(G, rec.opts), extra); } // (the Blender model on the builder's material)
+      MASTERS.set(key, { geo: G || rec.geo, opts: rec.opts, extra });
+    }
     model.variant = v;
     return model;
   }

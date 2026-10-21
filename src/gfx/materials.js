@@ -19,6 +19,7 @@ export const U = {
   uSunDir: { value: new THREE.Vector3(0.5, 0.8, 0.3).normalize() },
   uSkyHor: { value: new THREE.Color('#d8f0ff') },
   uOccl: { value: new THREE.Vector4(-9999, -9999, 1, 0) }, // player screen px (x,y), radius px, view depth
+  uOcclB: { value: [new THREE.Vector4(-9999, -9999, 1, -1e4), new THREE.Vector4(-9999, -9999, 1, -1e4), new THREE.Vector4(-9999, -9999, 1, -1e4)] }, // couch co-op: players 2-4's cuts, the same (w -1e4: off; coop/coop.js)
   // painted light pools: the nearest lamps as (x, y, z, radius) + premultiplied colour; radius 0 ends the list
   uPoolPos: { value: Array.from({ length: 32 }, () => new THREE.Vector4()) },
   uPoolCol: { value: Array.from({ length: 32 }, () => new THREE.Vector3()) },
@@ -133,6 +134,7 @@ uniform float uCloudShadow;
 uniform vec2 uCloudOffset;
 uniform float uNight;
 uniform vec4 uOccl;
+uniform vec4 uOcclB[3];
 uniform float uOcclOn;
 varying vec3 vCWorld;
 varying vec3 vCObj;
@@ -157,15 +159,21 @@ float bayer4(vec2 p) {
 varying vec2 vOcclAnchor;
 #endif
 float cCutRim = 0.0;
+// one hero's cut: device px outside its edge (< 0 inside), or a big number when this surface isn't well in front of them
+float occlEdge(vec4 o, float fragDepth) {
+#ifdef OCCL_ANCHOR
+  if (vOcclAnchor.y < 0.5 || o.w - vOcclAnchor.x < 0.4) return 1e9;
+#else
+  if (o.w - fragDepth < 1.15) return 1e9;
+#endif
+  vec2 d = gl_FragCoord.xy - o.xy;
+  return length(d * vec2(1.0, 1.15)) - o.z;
+}
 void occlusionFade(float fragDepth) {
   if (uOcclOn < 0.5) return;
-#ifdef OCCL_ANCHOR
-  if (vOcclAnchor.y < 0.5 || uOccl.w - vOcclAnchor.x < 0.4) return;
-#else
-  if (uOccl.w - fragDepth < 1.15) return;
-#endif
-  vec2 d = gl_FragCoord.xy - uOccl.xy;
-  float e = length(d * vec2(1.0, 1.15)) - uOccl.z; // device px outside the cut's edge (< 0 inside)
+  float e = occlEdge(uOccl, fragDepth); // (couch co-op: players 2-4 have their own, uOcclB)
+  e = min(e, min(occlEdge(uOcclB[0], fragDepth), min(occlEdge(uOcclB[1], fragDepth), occlEdge(uOcclB[2], fragDepth))));
+  if (e > 1e8) return;
   if (uOcclOn > 1.5) cCutRim = 1.0 - smoothstep(1.0, 3.5, e);
   if (e > 0.0) return;
   float ign = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));

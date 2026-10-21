@@ -2,13 +2,14 @@
 // §9). Pure (no three.js, no DOM): node-tested in tools/test-rpg.mjs "HERO ARRIVALS".
 //
 // When a zone opens (regions/index.js regionUnlocked: a hero's level, or the zone before it cleared by you or a crew), its
-// arrival comes to Blossom Hollow: the zone's hero (or, for the Tide Pool until Stella is ready, a messenger) plays their
-// old gag in town, asks for help for their home village and, a hero, joins at once; then the zone's main story quest
-// starts with its card: travel to the zone, save its village, and bring the news back to whoever asked.
+// arrival comes to Blossom Hollow: the zone's hero plays their gag in town, asks for help for their home village and
+// joins at once; then the zone's main story quest starts with its card: travel to the zone, save its village, and bring
+// the news back to whoever asked. (The Tide Pool's was Captain Kaizo, a messenger, until Stella came: ROADMAP H-6; he
+// rows her over now, docs/STELLA.md §6. A messenger entry, hero: false, still works: they ask and go home.)
 //
 //   ARRIVALS: one entry per zone, in the zones' order: { zone, who, scene, quest, hero }
 //     who    the hero id (CLASSES), or a zone villager (ZONE_NPCS) for a messenger who doesn't join
-//     scene  the island scene that plays it (actors/arrivals.js SCENES); Stella replaces Kaizo by changing this entry
+//     scene  the island scene that plays it (Arrivals.register: actors/heroes.js)
 //     quest  the HERO_QUESTS id the arrival starts
 //     hero   true: they join the pack (flags[`${who}Joined`]); false: a messenger, who goes home after asking
 //   Each arrival waits for the one before it (Moka joined, for the first), and for its zone to open.
@@ -19,6 +20,8 @@
 //     villageSaved; the hand-in is the giver's (Story.handInFor: a hero, a Blossom Hollow villager or a zone villager)
 //     thanks      the giver's line at the hand-in; selfThanks: the hero's own line when you play them (to Shadow)
 //     crew        the giver's first line when a crew saved the village ({crew}); crewSelf: when the giver was in it ({others})
+//     kaizo       (hq_shiokaze) Captain Kaizo's own lines, from before Stella came: an old save's quest stays his
+//                 (heroQuestGiver, heroQuestDef; docs/STELLA.md §6.2)
 import { CLASSES } from '../rpg/classes.js';
 import { REGIONS, regionUnlocked } from '../regions/index.js';
 import { VILLAGES, ZONE_NPCS } from '../regions/village/data.js';
@@ -27,9 +30,8 @@ import { zoneOf } from '../rpg/zones.js';
 export const ARRIVALS = [
   { zone: 'bamboo', who: 'poe', scene: 'poe', quest: 'hq_takemori', hero: true },
   { zone: 'maple', who: 'shihtzu', scene: 'shihtzu', quest: 'hq_akane', hero: true },
-  // the Tide Pool's hero, Stella the Weimaraner (ROADMAP H-6), is still a concept: Captain Kaizo brings the news for now.
-  // Her arrival replaces this entry: { zone: 'tidepool', who: 'stella', scene: 'stella', quest: 'hq_shiokaze', hero: true }
-  { zone: 'tidepool', who: 'sk_kaizo', scene: 'kaizo', quest: 'hq_shiokaze', hero: false },
+  // the Tide Pool's hero, Stella the Sun Oracle (ROADMAP H-6, docs/STELLA.md §6): Captain Kaizo rows her over
+  { zone: 'tidepool', who: 'stella', scene: 'stella', quest: 'hq_shiokaze', hero: true },
   { zone: 'onsen', who: 'golden', scene: 'golden', quest: 'hq_yukimi', hero: true },
 ];
 export const arrivalOf = key => ARRIVALS.find(a => a.who === key || a.zone === key || a.quest === key) || null;
@@ -128,18 +130,32 @@ export const HERO_QUESTS = {
     lines: { arrive: [null, "Akane is just down the maple road. The gloom is thickest in the square. Ears up!"], home: "Akane is safe! Let's tell Floofy. He'll say it's the lantern smoke." },
     next: null,
   },
-  // ---------------------------------------------------------------- Captain Kaizo (a messenger, for now): Shiokaze Port (the Tide Pool)
+  // ---------------------------------------------------------------- Stella: Shiokaze Port (the Tide Pool)
   hq_shiokaze: {
-    title: 'Trouble at Shiokaze Port', giver: 'sk_kaizo', giverName: 'Captain Kaizo', zone: 'tidepool', heroQuest: true, // (the card's name plate: "Old Captain Kaizo" won't fit)
-    hook: "Shiokaze Port's under siege, matey! Crabs in the nets, kappa on the roofs. I rowed all night to find you.",
+    title: 'Trouble at Shiokaze Port', giver: 'stella', zone: 'tidepool', heroQuest: true,
+    hook: "Shiokaze Port is under siege, and the sun comes up grey. I'd like my sunrise back. Will you come?",
     goal: ['Save Shiokaze Port', 'the Shiokaze Tidepools'],
-    desc: "Old Captain Kaizo rowed all night from Shiokaze Port to ask for help: crabs and kappa have the harbour under siege. Take the Wayfarer's Post to the Tidepools and break the siege. He'll be waiting at his lookout.",
+    desc: "Stella, the oracle of Shiokaze Port's sunrise shrine, came to Blossom Hollow in Captain Kaizo's rowboat: crabs and kappa have the harbour under siege, and the shrine's steps with it. Take the Wayfarer's Post to the Tidepools and break the siege.",
     steps: [visit('tidepool', "Travel to the Tidepools (the Wayfarer's Post)"), saved('tidepool', 'Save Shiokaze Port')],
     reward: { coins: 1800, xp: 7000, skillPts: 1, furniture: 'festivalLantern' },
-    handIn: { text: 'Tell Captain Kaizo the port is safe' },
-    thanks: "The nets are clear and the kappa are off my roof! You've the heart of a sea dog, matey. Take this lantern, it hung on my old ship.",
-    crew: "{crew} sailed in and chased the siege back to sea! You know how to pick a crew, matey.",
-    lines: { arrive: [null, "I can smell the sea! Shiokaze Port is just down the shore. Let's help Captain Kaizo!"], home: "The port is safe! Let's tell Captain Kaizo. Can I be first mate now?" },
+    handIn: { text: 'Tell Stella the port is safe' },
+    thanks: "The port is safe, and tomorrow the sun will come up gold over the shrine. I'll greet it twice, once for you. Take this lantern. It hung on Captain Kaizo's ship; he says you've earned it.",
+    selfThanks: "We did it, Shadow. Tomorrow's sunrise will be a good one. …Bow with me? Good boy. Perfect form.",
+    crew: "{crew} sailed in and chased the siege back to sea. The shrine steps are clear. I bowed to them. They seemed embarrassed.",
+    crewSelf: "{others} and I chased the siege back to sea. I kept everyone warm. Thank you for sending us.",
+    lines: { arrive: [null, "I can smell the sea! Shiokaze Port is just down the shore. Let's give Stella her sunrise back!"], home: "The port is safe! Let's tell Stella. Maybe she'll bow again. I'll bow too!" },
+    // Captain Kaizo's, from before she came (he asked alone, a messenger): an old save's quest stays his, its hand-in at his
+    // lookout in Shiokaze Port (heroQuestGiver)
+    kaizo: {
+      giver: 'sk_kaizo', giverName: 'Captain Kaizo', // (the card's name plate: "Old Captain Kaizo" won't fit)
+      hook: "Shiokaze Port's under siege, matey! Crabs in the nets, kappa on the roofs. I rowed all night to find you.",
+      desc: "Old Captain Kaizo rowed all night from Shiokaze Port to ask for help: crabs and kappa have the harbour under siege. Take the Wayfarer's Post to the Tidepools and break the siege. He'll be waiting at his lookout.",
+      handIn: { text: 'Tell Captain Kaizo the port is safe' },
+      thanks: "The nets are clear and the kappa are off my roof! You've the heart of a sea dog, matey. Take this lantern, it hung on my old ship.",
+      crew: "{crew} sailed in and chased the siege back to sea! You know how to pick a crew, matey.",
+      selfThanks: null, crewSelf: null,
+      lines: { arrive: [null, "I can smell the sea! Shiokaze Port is just down the shore. Let's help Captain Kaizo!"], home: "The port is safe! Let's tell Captain Kaizo. Can I be first mate now?" },
+    },
     next: null,
   },
   // ---------------------------------------------------------------- Foosy: Yukimi Spa Village (the Onsen)
@@ -160,6 +176,28 @@ export const HERO_QUESTS = {
   },
 };
 export const HERO_QUEST_IDS = Object.keys(HERO_QUESTS);
+/** Who gives a hero quest now (Story.def reads it: `q.giver || d.giver`): the record's own (q.giver: Captain Kaizo's
+ *  quest kept his when Stella arrived with it running), else, for a quest that came before its hero (its zone's arrival
+ *  recorded without `by`: Kaizo's visit, on a save from before Stella), the old giver's (d.kaizo), else the table's
+ *  (docs/STELLA.md §6.2). q: the quest's record (looked up when not given) */
+export function heroQuestGiver(state, id, q = undefined) {
+  const d = HERO_QUESTS[id]; if (!d) return null;
+  const Q = state?.quests;
+  if (q === undefined) q = Q?.active?.find(x => x.id === id) || null;
+  if (q?.giver) return q.giver;
+  const alt = d.kaizo; if (!alt) return d.giver;
+  const rec = flagsOf(state).arrivals?.[d.zone];
+  return (q || (Q?.done || []).includes(id)) && rec && !rec.by ? alt.giver : d.giver;
+}
+const BY_GIVER = new Map();
+/** a hero quest's definition as it stands for this save: the table's, or with its old giver's own lines (heroQuestGiver) */
+export function heroQuestDef(state, id, q = undefined) {
+  const d = HERO_QUESTS[id]; if (!d) return null;
+  const g = heroQuestGiver(state, id, q); if (!g || g === d.giver) return d;
+  const k = `${id}:${g}`; let m = BY_GIVER.get(k);
+  if (!m) { const alt = Object.values(d).find(v => v && typeof v === 'object' && !Array.isArray(v) && v.giver === g); m = { ...d, ...(alt || {}), giver: g }; BY_GIVER.set(k, m); }
+  return m;
+}
 /** the hero quest a zone's arrival brings */
 export const heroQuestOf = zone => HERO_QUEST_IDS.find(id => HERO_QUESTS[id].zone === zone) || null;
 /** the giver's first line at the hand-in when a crew saved their village: crew (the crew's names), others (the crew

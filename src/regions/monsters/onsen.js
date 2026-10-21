@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import { V, col, ell, cone, shell, paint, xf, tubeC, lathe, eyesCute, cheeks, smile, blob, assemble, act, mdef, every, roll, sfx, playerIn, hitArea, chill, kite, push, lob } from './bamboo.js';
 import { frostFx, FR, ICE, PAL_SNOW, PAL_ICE, orbitFn } from '../bosses/fx_yukionna.js';
+import { enemySpec, ownEnemyModel } from './enemyModels.js';
 import { rand, clamp, TAU, dist, ease, smoothstep } from '../../core/util.js';
 
 // telegraph colours, picked against snow (white / pale blue ground): saturated, with the kit's ink veil and hot rim
@@ -154,10 +155,11 @@ function warashiSpec(v) {
   ] };
 }
 function buildWarashi(v) {
-  const M = assemble('warashi:' + v.key, () => warashiSpec(v));
+  const M = assemble('warashi:' + v.key, () => enemySpec('yukiwarashi', v.key, null, { parent: { ballR: 'armR', ballL: 'armL' }, part: { face: { outline: 0.006, shadow: false } } }) || warashiSpec(v)); // (the Blender model: ROADMAP EN-1)
   const I = M.inner, AR = M.g.armR, AL = M.g.armL, BR = M.g.ballR, BL = M.g.ballL;
   let hop = 0;
   M.flick = 0; M.side = 1; M.grow = [1, 1]; // throwing arm whip, which side, ball regrowth [L, R]
+  M.throwAt = ownEnemyModel('yukiwarashi', v.key) ? [0.3, 0.7] : [0.14, 1.02]; // (where a snowball leaves the mitten: side, height; the Blender arms are shorter)
   M.animate = (dt, t, moving) => {
     const a = M.act, k = (M.actT += dt);
     let y = 0, sy = 1, rx = 0, rz = 0, lX = -0.4, lZ = -0.12, rX = -0.4, rZ = 0.12;
@@ -215,7 +217,8 @@ function throwBall(m, target, i) {
   if (!W.walkable(tx, tz)) { tx = px; tz = pz; }
   const side = i % 2 ? -1 : 1, f = m.facing, sc = m.scale;
   M.flick = 1; M.side = side; M.grow[side > 0 ? 1 : 0] = 0;
-  _from.set(m.pos.x + (Math.sin(f) * 0.16 + Math.cos(f) * 0.14 * side) * sc, m.pos.y + 1.02 * sc, m.pos.z + (Math.cos(f) * 0.16 - Math.sin(f) * 0.14 * side) * sc);
+  const [hx, hy] = M.throwAt || [0.14, 1.02];
+  _from.set(m.pos.x + (Math.sin(f) * 0.16 + Math.cos(f) * hx * side) * sc, m.pos.y + hy * sc, m.pos.z + (Math.cos(f) * 0.16 - Math.sin(f) * hx * side) * sc);
   const time = WR.FLIGHT + i * 0.03;
   fx.tele({ shape: 'circle', x: tx, z: tz, r: WR.R, time, color: TC.ball });
   lob(m, { look: SNOWBALL_LOOK, from: _from, to: { x: tx, z: tz }, h: 2.1, time, r: WR.R, tele: false, onLand: s => {
@@ -275,6 +278,8 @@ function warashiUpdate(m, dt) {
 // It lumbers after you; from range it curls up into a giant rolling snowball (lane telegraph) and bowls through, then
 // pops out dizzy (bonking a wall: dizzier); up close it raises both fists (circle telegraph) and frost-slams.
 const DR = { CURL: 0.95, ROLL: 10.5, LANE: 0.78, SLAM_W: 0.85, SLAM_R: 2.3, DIZZY: 1.15, BALL_R: 0.72 };
+// a soft luminance knee: a near-white snowman under dusk bloom (threshold 0.7) would glow like glass
+const DARUMA_KNEE = ' { float lmD = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722)); if (lmD > 0.52) { float nlD = 0.52 + 0.16 * (1.0 - exp(-(lmD - 0.52) / 0.16)); outgoingLight *= nlD / lmD; } }';
 function darumaSpec(v) {
   const snowC = col(v.snow || '#f6faff'), shadeC = col(v.shade || '#c2d4ee'), speck = col('#dcefff'), coal = v.coal || '#2c2934';
   const snowP = (p, n, o) => { o.copy(snowC); if (n.y < 0.2) o.lerp(shadeC, clamp((0.2 - n.y) * 0.85)); if (Math.sin(p.x * 41 + p.y * 17) * Math.sin(p.z * 37 - p.y * 23) > 0.86) o.lerp(speck, 0.8); };
@@ -322,16 +327,14 @@ function darumaSpec(v) {
   BL.push(tubeC([[0.5, 0.45, 0.1, 0.035], [0.66, 0.6, 0.1, 0.028], [0.76, 0.66, 0.14, 0.018]], '#7a5236', 5), tubeC([[-0.52, -0.3, 0.4, 0.035], [-0.64, -0.38, 0.52, 0.025]], '#7a5236', 5));
   BL.push(ell(0.12, 0.11, 0.11, mit, [-0.6, 0.35, -0.38], [0, 0, 0], 10), ell(0.1, 0.06, 0.1, v.bucket || '#d8453a', [0.1, 0.72, -0.2], [0.3, 0, 0.2], 10));
   for (let i = 0; i < 5; i++) { const a = i * 1.9, b = i * 0.8 - 1.5; BL.push(ell(0.035, 0.035, 0.03, coal, [Math.cos(a) * Math.cos(b) * DR.BALL_R, Math.sin(b) * DR.BALL_R, Math.sin(a) * Math.cos(b) * DR.BALL_R], [0, 0, 0], 6)); }
-  // a soft luminance knee: a near-white snowman under dusk bloom (threshold 0.7) would glow like glass
-  const knee = ' { float lmD = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722)); if (lmD > 0.52) { float nlD = 0.52 + 0.16 * (1.0 - exp(-(lmD - 0.52) / 0.16)); outgoingLight *= nlD / lmD; } }';
-  return { mat: { fragOut: knee }, parts: [
+  return { mat: { fragOut: DARUMA_KNEE }, parts: [
     { name: 'body', geo: B },
     { name: 'armR', geo: arm(1), at: [0.47, 0.78, 0.02] }, { name: 'armL', geo: arm(-1), at: [-0.47, 0.78, 0.02] },
     { name: 'ball', geo: BL, at: [0, DR.BALL_R, 0], parent: 'pivot' },
   ] };
 }
 function buildDaruma(v) {
-  const M = assemble('daruma:' + v.key, () => darumaSpec(v));
+  const M = assemble('daruma:' + v.key, () => enemySpec('yukidaruma', v.key, { fragOut: DARUMA_KNEE }, { parent: { ball: 'pivot' } }) || darumaSpec(v));
   const I = M.inner, AR = M.g.armR, AL = M.g.armL, BALL = M.g.ball;
   BALL.visible = false; M.spin = 0;
   let step = 0;
@@ -454,6 +457,9 @@ function darumaUpdate(m, dt) {
 // floats at 4–7 m, blinks elsewhere every few seconds (it shatters into glints; a violet ring marks where it will
 // reappear), and raises its arms to call icicle rain: 3 (4) circles, one on you, the rest close by.
 const TS = { CAST: 0.55, BLINK: 0.36, GONE: 0.24, APPEAR: 0.34, R: 1.0 };
+// cyan vertex colours (eyes, crystals) glow; a cool fresnel rim
+const TS_GLOW = 'outgoingLight += diffuseColor.rgb * 0.95 * step(0.62, diffuseColor.g) * step(0.8, diffuseColor.b) * step(diffuseColor.r, 0.55);'
+  + ' outgoingLight += vec3(0.5, 0.82, 1.0) * pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 2.4) * 0.42;';
 function tsuraraSpec(v) {
   const body = col(v.body), bodyD = col(v.bodyD), white = col('#ffffff'), tip = col(v.tip || '#ffffff');
   const PROF = [[0.001, 0.0], [0.05, 0.03], [0.1, 0.1], [0.16, 0.2], [0.22, 0.33], [0.265, 0.46], [0.28, 0.57], [0.27, 0.67], [0.235, 0.76], [0.17, 0.84], [0.09, 0.895], [0.001, 0.915]];
@@ -493,9 +499,7 @@ function tsuraraSpec(v) {
   }
   // the wisp tail curling back
   const T = [tubeC([[0, 0.02, 0, 0.07], [0, -0.07, -0.08, 0.056], [0, -0.1, -0.2, 0.04], [0, -0.05, -0.3, 0.026], [0, 0.04, -0.34, 0.012]], (p, n, o) => o.copy(bodyD).lerp(white, clamp(-p.z * 1.5) * 0.4), 8)];
-  const glow = 'outgoingLight += diffuseColor.rgb * 0.95 * step(0.62, diffuseColor.g) * step(0.8, diffuseColor.b) * step(diffuseColor.r, 0.55);'
-    + ' outgoingLight += vec3(0.5, 0.82, 1.0) * pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 2.4) * 0.42;';
-  return { mat: { fragOut: glow }, parts: [
+  return { mat: { fragOut: TS_GLOW }, parts: [
     { name: 'body', geo: B },
     { name: 'crown', geo: C, at: [0, 0.72, 0] },
     { name: 'arms', geo: A, at: [0, 0.44, 0.02] },
@@ -503,7 +507,7 @@ function tsuraraSpec(v) {
   ] };
 }
 function buildTsurara(v) {
-  const M = assemble('tsurara:' + v.key, () => tsuraraSpec(v));
+  const M = assemble('tsurara:' + v.key, () => enemySpec('tsurara', v.key, { fragOut: TS_GLOW }) || tsuraraSpec(v));
   const I = M.inner, CR = M.g.crown, AR = M.g.arms, TL = M.g.tail;
   let spin = 0;
   M.animate = (dt, t, moving) => {

@@ -1,0 +1,247 @@
+{
+  "units": "metres (final, crown 1.00 m)",
+  "coordinate_system": "Blender Z-up, front -Y; character left is +X",
+  "hips": [
+    0.0,
+    0.00333,
+    0.25
+  ],
+  "spine": [
+    0.0,
+    0.00167,
+    0.33333
+  ],
+  "chest": [
+    0.0,
+    0.0,
+    0.43333
+  ],
+  "neck": [
+    0.0,
+    0.00333,
+    0.53333
+  ],
+  "head": [
+    0.0,
+    0.02928,
+    0.7652
+  ],
+  "head_nod_pivot_suggested": [
+    0.0,
+    0.07975,
+    0.58226
+  ],
+  "jaw_pivot": [
+    0.0,
+    -0.12212,
+    0.6485
+  ],
+  "eyes": {
+    "R": [
+      -0.1165,
+      -0.17659,
+      0.71747
+    ],
+    "L": [
+      0.1165,
+      -0.17659,
+      0.71747
+    ]
+  },
+  "eye_axes": {
+    "R": {
+      "out_deg": 29.3,
+      "down_deg": -1.8
+    },
+    "L": {
+      "out_deg": 29.3,
+      "down_deg": -1.8
+    }
+  },
+  "ears": {
+    "R": {
+      "base": [
+        -0.18023,
+        0.03522,
+        0.94606
+      ],
+      "mid": [
+        -0.18788,
+        0.04423,
+        1.00095
+      ],
+      "tip": [
+        -0.21291,
+        0.05988,
+        1.05232
+      ]
+    },
+    "L": {
+      "base": [
+        0.18023,
+        0.03522,
+        0.94606
+      ],
+      "mid": [
+        0.18788,
+        0.04423,
+        1.00095
+      ],
+      "tip": [
+        0.21291,
+        0.05988,
+        1.05232
+      ]
+    }
+  },
+  "quiff_tips": [
+    [
+      0.05631,
+      -0.04232,
+      1.00731
+    ],
+    [
+      0.00779,
+      -0.01967,
+      1.00955
+    ],
+    [
+      0.08349,
+      -0.0303,
+      0.99522
+    ]
+  ],
+  "arms": {
+    "L": {
+      "shoulder": [
+        0.16,
+        -0.00333,
+        0.4875
+      ],
+      "elbow": [
+        0.2402,
+        -0.01082,
+        0.39192
+      ],
+      "wrist": [
+        0.28833,
+        -0.01531,
+        0.33457
+      ]
+    },
+    "R": {
+      "shoulder": [
+        -0.16,
+        -0.00333,
+        0.4875
+      ],
+      "elbow": [
+        -0.2402,
+        -0.01082,
+        0.39192
+      ],
+      "wrist": [
+        -0.28833,
+        -0.01531,
+        0.33457
+      ]
+    }
+  },
+  "legs": {
+    "L": {
+      "hip": [
+        0.09167,
+        0.00333,
+        0.25
+      ],
+      "knee": [
+        0.13333,
+        -0.00333,
+        0.15833
+      ],
+      "ankle": [
+        0.14667,
+        0.0,
+        0.075
+      ],
+      "toe": [
+        0.18716,
+        -0.15826,
+        0.03167
+      ]
+    },
+    "R": {
+      "hip": [
+        -0.09167,
+        0.00333,
+        0.25
+      ],
+      "knee": [
+        -0.13333,
+        -0.00333,
+        0.15833
+      ],
+      "ankle": [
+        -0.14667,
+        0.0,
+        0.075
+      ],
+      "toe": [
+        -0.18716,
+        -0.15826,
+        0.03167
+      ]
+    }
+  },
+  "tail": [
+    [
+      -0.00333,
+      0.125,
+      0.25
+    ],
+    [
+      -0.01,
+      0.24167,
+      0.25
+    ],
+    [
+      -0.02167,
+      0.35,
+      0.26
+    ],
+    [
+      -0.03667,
+      0.4375,
+      0.26917
+    ],
+    [
+      -0.04583,
+      0.48333,
+      0.275
+    ],
+    [
+      -0.08239,
+      0.66145,
+      0.29841
+    ]
+  ],
+  "palm_R": [
+    -0.30847,
+    -0.01791,
+    0.295
+  ],
+  "palm_L": [
+    0.30847,
+    -0.01791,
+    0.295
+  ],
+  "notes": [
+    "Phase 1: no rig, weights or animations. Same keys as poe-toy joints.json (all values in final metres).",
+    "head = the head centre (the radial origin); head_nod_pivot_suggested = base of the skull, for the rig.",
+    "Head skin = zero surface of one implicit ball (dome skull + jaw + cheek ruff + muzzle + chin + nose), analytic normals, adaptive toon-band refinement.",
+    "Eyelid holes ringed by 6 loops each with the rim rolled 4.5 mm (build) in behind separate lens eyeballs; 3 loops round the mouth, 4 round the nose.",
+    "Ears: separate pieces (Tanuki_ear_L / _R), polar-gridded with 9 rings (bend loops) and a rounded rim; the buried part is deleted; pivot = ears.base.",
+    "Tail: Tanuki_tail, a 27-ring x 32-side SDF ring stack (bend loops), pivot = tail[0]; tail[-1] is the end of the rounded tip.",
+    "Trousers are split per leg (two closed islands); the sleeves are open tubes with a lining; arms carry rings along the forearm and wrist."
+  ]
+}

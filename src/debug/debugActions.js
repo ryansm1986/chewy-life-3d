@@ -1,6 +1,6 @@
 // The debug menu's own sections (docs/DEBUG.md, ROADMAP R-10), registered into the section registry (./registry.js)
 // when the lazy menu loads. Every action goes through the game's own code paths (the join scenes' joinPoe / joinShihtzu /
-// joinGolden, prepareJoin, G.tierDebug, G.zoneDebug, G.enterDungeon, G.lantern, the actions API, Story), never a
+// joinGolden / joinStella, prepareJoin, G.tierDebug, G.zoneDebug, G.enterDungeon, G.lantern, the actions API, Story), never a
 // hand-poked save where a real path exists. Each run(G, value) returns its toast.
 import { Events } from '../core/events.js';
 import { registerDebug } from './registry.js';
@@ -20,6 +20,7 @@ import { Monster } from '../dungeon/monster.js';
 import { REGIONS } from '../regions/index.js';
 import { villageReady, VILLAGES } from '../regions/village/data.js';
 import { QUESTS } from '../world/story.js';
+import { arrivalOf } from '../world/heroQuests.js';
 import { GUIDE_IDS } from '../world/guides.js';
 import { PANTRY_IDS, PANTRY } from '../life/pantry.js';
 import { RECIPE_IDS as COOK_IDS } from '../life/cooking.js';
@@ -56,6 +57,7 @@ function joinHero(G, id) {
   if (id === 'poe') H.joinPoe();
   else if (id === 'shihtzu') H.joinShihtzu();
   else if (id === 'golden') H.joinGolden();
+  else if (id === 'stella') H.joinStella();
   else if (id === 'moka') { // (her scene is a dialogue: the same steps without it)
     G.actions.prepareJoin?.('moka');
     G.state.flags.mokaJoined = true;
@@ -93,10 +95,23 @@ function rearm(G, id) {
   const F = G.state.flags, H = G.heroes;
   if (id === 'chewy' || G.state.activeHero === id) return false;
   F[`${id}Joined`] = false;
-  const hint = { poe: 'poeRumour', shihtzu: 'stzRumour', golden: 'gldRumour' }[id]; if (hint && F.hints) delete F.hints[hint];
+  const hint = { poe: 'poeRumour', shihtzu: 'stzRumour', golden: 'gldRumour', stella: 'stlRumour' }[id]; if (hint && F.hints) delete F.hints[hint];
   H.removeVillager(id);
   if (id === 'moka' && G.mode === 'village') H.spawnBench(); // (she waits by the fountain again)
   return true;
+}
+
+/** Stella's arrival on the beach, now (docs/STELLA.md §6): she isn't joined, her record and quest forgotten; kaizo: an old
+ *  save's case, Captain Kaizo's visit recorded (no `by`) and his "Trouble at Shiokaze Port" running: it stays his (§6.2) */
+function stellaArrival(G, { kaizo = false } = {}) {
+  const A = G.arrivals, a = arrivalOf('stella'); if (!A || !a || !A.scenes[a.scene]) return 'Not built yet';
+  if (G.mode !== 'village') return 'Go back to Blossom Hollow first';
+  if (G.state.activeHero === 'stella') return 'Switch to another hero first';
+  if (A.cur) { A.scenes[A.cur.a.scene]?.reset?.(true); A.cur = null; }
+  A.forget(a);
+  if (kaizo) { (G.state.flags.arrivals ||= {}).tidepool = { how: 'scene', quest: 'start', day: G.day?.day || 1 }; G.state.quests.active.push({ id: 'hq_shiokaze', step: 0, prog: 0 }); Events.emit('quest:update'); }
+  A.begin(a, { force: true });
+  return kaizo ? "Captain Kaizo is rowing Stella over (his quest running: it stays his)…" : 'Captain Kaizo is rowing Stella over…';
 }
 
 // ------------------------------------------------------------------ world and story
@@ -316,6 +331,9 @@ export function registerCoreSections(G, api) {
     { label: 'Stat points', choices: [5, 50, 250].map(n => ({ label: `+${n}`, value: n })), run: (G, n) => { G.actions.addStatPts(n); return `+${n} stat points`; } },
     { label: 'Max every skill', hint: 'All the active hero\'s skills at 20', run: G => { const P = G.state.player, cls = G.state.activeHero; let n = 0; for (const [id, d] of Object.entries(SKILLS)) if ((d.cls || 'chewy') === cls && !d.training) { P.skills[id] = MAX_SKILL_LVL; n++; } refreshHero(G); return `${heroName(cls)}: ${n} skills at ${MAX_SKILL_LVL}`; } },
     { label: 'Reset skills', confirm: true, hint: 'Every skill and stat point back (the Forget-Me-Not Tea)', run: G => { const r = G.actions.respec(); refreshHero(G); return `Refunded ${r.skillPts} skill and ${r.statPts} stat points`; } },
+    { group: 'Stella (H-6)', label: 'Unlock Stella', hint: 'She joins at once (her quest starts quietly with its card while Shiokaze needs saving)', run: G => (joinHero(G, 'stella') ? `${heroName('stella')} joined the pack` : `${heroName('stella')} has joined already`) },
+    { label: 'Play her arrival', closes: true, hint: 'Captain Kaizo rows her over to the beach, now (she leaves the pack first; her quest is forgotten)', run: G => stellaArrival(G) },
+    { label: "Her arrival with Kaizo's quest running", closes: true, hint: "An old save: Kaizo's visit recorded and his quest running; it stays his, her plea says so", run: G => stellaArrival(G, { kaizo: true }) },
     { group: 'Shadow', label: "Shadow's whelp outfit", choices: [{ label: 'With Foosy', value: 'auto' }, { label: 'On', value: 'on' }, { label: 'Off', value: 'off' }], run: (G, v) => { const w = G.companion?.whelp; if (!w) return 'No whelp outfit'; w.forced = v === 'auto' ? undefined : v === 'on'; return v === 'auto' ? 'Shadow dresses up only with Foosy again' : `Whelp outfit ${v} (this session)`; } },
   ], { title: 'Heroes', icon: 'paw', order: 10 });
 
@@ -395,6 +413,8 @@ export function registerCoreSections(G, api) {
     { label: 'Freeze monsters', toggle: true, get: () => TOG.freeze, run: (G, on) => { TOG.freeze = on; if (!on) for (const m of G.dungeon?.monsters || []) if (m.status) m.status.freeze = 0; return `Monsters ${on ? 'frozen' : 'free'}`; } },
     { label: 'FPS and draw calls', toggle: true, noMark: true, get: () => TOG.perf, run: (G, on) => { TOG.perf = on; return `Perf overlay ${on ? 'on' : 'off'}`; } },
     { label: 'Kill every monster here', run: G => { const n = killAll(G); return n ? `${n} monsters down` : 'No monsters here'; } },
+    { label: 'Gild everything', hint: "Stella: every foe here gilded to 3 Sunlit stacks (docs/STELLA.md §3)", run: G => { const f = G.skills?.stlGildAll; if (!f) return 'Not built yet'; const n = f.call(G.skills); return n ? `${n} foes gilded` : 'No foes here'; } },
+    { label: 'Fill the shells', hint: "Stella's sun shells full on her, Shadow and Hinata (playing her)", run: G => { const f = G.skills?.stlFillShells; if (!f) return 'Not built yet'; f.call(G.skills); return 'Sun shells full'; } },
     { label: 'Spawn a pack', closes: true, fields: [{ key: 'kind', label: 'Kind', choices: kinds, value: kinds[0]?.value }, { key: 'n', label: 'Count', choices: [3, 8, 16, 30], value: 8 }, { key: 'rank', label: 'Leader', choices: [{ label: 'None', value: 'normal' }, { label: 'Champion', value: 'champion' }, { label: 'Unique', value: 'unique' }], value: 'normal' }], go: 'Spawn',
       run: (G, v) => spawnPack(G, v.kind, v.n, v.rank) },
   ], { title: 'Combat', icon: 'swords', order: 70 });

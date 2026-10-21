@@ -14,7 +14,7 @@
 //            prepareJoin; he asks to join; he picks up his lance, bows, trots off, a poof, HeroManager.joinGolden; Shadow's
 //            outfit comes off (kept for when Foosy is played); Arrivals.finished starts his quest ("The Siege of Yukimi")
 // Leaving town, a hero switch or a knock-out before the vow drops it: the arrival comes again a little later.
-// The rumour: in town, once Floofy has joined and before the Onsen opens, Shadow passes it on (once).
+// The rumour: in town, once Stella has joined (she comes before him since H-6) and before the Onsen opens, Shadow passes it on (once).
 import * as THREE from 'three';
 import { Actor } from './actor.js';
 import { Player } from './player.js';
@@ -435,7 +435,7 @@ export class GoldenJoin {
   // ------------------------------------------------------------------ the rumour in town
   townHint(dt) {
     const G = this.G, F = G.state.flags;
-    if (this.joined || !this.H.joined('shihtzu') || F.hints?.gldRumour) return;
+    if (this.joined || !this.H.joined('stella') || F.hints?.gldRumour) return; // (after Stella: her arrival comes before his, ROADMAP H-6)
     const u = regionUnlocked(G.state, 'onsen'); if (u.ok) return; // (the Onsen is open: he comes to town himself, actors/arrivals.js)
     if ((this.hintT = (this.hintT || 0) + dt) < 12 || G.ui?.dlg?.active || G.tutorials?.busy || G.tutorials?.cur || G.titleActive || this.H.arrivals?.active || G.player?.controlLocked) return; // (never over an arrival's scene)
     const where = REGIONS.onsen?.name || 'Yukimi Onsen';

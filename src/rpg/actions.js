@@ -28,7 +28,7 @@ import { Events } from '../core/events.js';
 import { computeStats, xpToNext, LEVEL_CAP } from './stats.js';
 import { SKILLS, canLearn } from './skills.js';
 import { learnPerk as learnPerkIn, perkPoints } from './charge.js';
-import { starterItems, starterStaff, starterFuma, starterFlail, starterLance, generateItem, EQUIP_SLOT_ITEM, meetsReq, socketGem, POTIONS, targetSlot, SET_ITEMS, renameLegacyItem, renameTreat } from './items.js';
+import { starterItems, starterStaff, starterFuma, starterFlail, starterLance, starterParasol, generateItem, EQUIP_SLOT_ITEM, meetsReq, socketGem, POTIONS, targetSlot, SET_ITEMS, renameLegacyItem, renameTreat } from './items.js';
 import { CLASSES, HERO_IDS, canWield, WEAPON_CLASS } from './classes.js';
 import { uid as rid } from '../core/util.js';
 import { PANTRY, pantryOf, pantryHas, sellPrice as pantrySellPrice } from '../life/pantry.js';
@@ -37,6 +37,7 @@ import { mealFor, mealActive } from '../life/meals.js';
 import { storable, furnitureOf } from '../home/furniture.js';
 import { migrateStash, defaultTab, nextTabPrice, addTab, setTabName, setTabColor, stashPut as stashPutIn, tabGrid, tabOf, lostGrid, lostTidy, stow, packSave, stashSpot } from './stash.js';
 import { bagGrid, findSpot, fitsAt, packGrid, packOrder, itemArea } from './grid.js';
+import { autoOn, spendAuto } from './power.js';
 
 export const INV_SIZE = 40;
 export const STASH_SIZE = 60;
@@ -54,6 +55,7 @@ export function newHeroState(id) {
   else if (C.id === 'poe') equipment.weapon = starterFuma(); // (one fūma: both weapon sets throw it)
   else if (C.id === 'shihtzu') equipment.weapon = starterFlail(); // (one flail: the second set keeps the hexes on its right click)
   else if (C.id === 'golden') equipment.weapon = starterLance(); // (one lance: the second set keeps the javelins on its right click)
+  else if (C.id === 'stella') equipment.weapon = starterParasol(); // (one wagasa: the second set's right click is Morning Light)
   else { const { sword, ball } = starterItems(); equipment.weapon = sword; equipment.weaponAlt = ball; }
   return {
     player: {
@@ -232,7 +234,7 @@ export function createActions(G) {
   // player.mouseSets. The active set's pair is always live in hotbar[0..1] (so input / HUD keep reading the hotbar);
   // swapWeapons() files the live pair under the set being put away and brings the other set's pair in.
   // Keys 1–4 (hotbar[2..5]) are shared by both sets.
-  const setWeaponType = i => (S().equipment[i ? 'weaponAlt' : 'weapon']?.wtype) || (S().player.cls === 'moka' ? 'staff' : S().player.cls === 'poe' ? 'fuma' : S().player.cls === 'shihtzu' ? 'flail' : S().player.cls === 'golden' ? 'lance' : i ? 'ball' : 'sword');
+  const setWeaponType = i => (S().equipment[i ? 'weaponAlt' : 'weapon']?.wtype) || (S().player.cls === 'moka' ? 'staff' : S().player.cls === 'poe' ? 'fuma' : S().player.cls === 'shihtzu' ? 'flail' : S().player.cls === 'golden' ? 'lance' : S().player.cls === 'stella' ? 'parasol' : i ? 'ball' : 'sword');
   const fitsSet = (id, i) => !id || id === 'attack' || !SKILLS[id]?.wep || SKILLS[id].wep === setWeaponType(i);
   const knows = id => S().player.skills[id] > 0 && SKILLS[id] && SKILLS[id].kind !== 'passive' && SKILLS[id].kind !== 'aura';
   /** Best right-click skill for a weapon set: the weapon's most-trained spammable skill, else its other actives. */
@@ -243,6 +245,7 @@ export function createActions(G) {
       : wt === 'fuma' ? ['fumaThrow', 'kunaiFan', 'puffBall', 'shadowStep', 'thunderPaw', 'shadowStitch', 'shurikenRain', 'smokeDragon', 'thousandStars']
       : wt === 'flail' ? ['woefulWallop', 'drippingPaw', 'tugOfWoe', 'maelstrom', 'grumbleCloud', 'borrowedWarmth', 'mournfulAwoo', 'heaviestSigh', 'everlastingGloom']
       : wt === 'lance' ? ['sunbeamThrust', 'bonkDart', 'pinwheelSweep', 'tailwagVolley', 'trueFlight', 'emberBreath', 'sunfallJump', 'gallantCharge', 'emberleafJavelin']
+      : wt === 'parasol' ? ['goldenRay', 'solarFlare', 'kindLight', 'prism', 'skippingSun', 'glint', 'sunspot', 'morningLight', 'halo']
       : ['chomp', 'dig', 'whirl', 'bonestorm'];
     let best = null;
     pref.forEach((id, k) => { if (!knows(id)) return; const sc = (P.skills[id] || 0) * 10 - k * (k < 4 ? 1 : 25); if (!best || sc > best.sc) best = { id, sc }; });
@@ -753,8 +756,9 @@ export function createActions(G) {
     if (P.lvl >= LEVEL_CAP) P.xp = 0;
     if (P.lvl > from) {
       P.life = null; P.zoom = null;
+      const auto = autoOn(P) ? spendAuto(P, S().equipment) : null; // (Shadow picks the points: docs/STATS.md §3)
       recompute();
-      emit('player:levelup', { lvl: P.lvl, from, gained: P.lvl - from, hero: P.cls || 'chewy', name: P.name || 'Chewy' });
+      emit('player:levelup', { lvl: P.lvl, from, gained: P.lvl - from, hero: P.cls || 'chewy', name: P.name || 'Chewy', auto });
     }
     return gained;
   }
@@ -773,7 +777,7 @@ export function createActions(G) {
     P.xp = (P.xp || 0) + gained;
     while (P.lvl < LEVEL_CAP && P.xp >= xpToNext(P.lvl)) { P.xp -= xpToNext(P.lvl); P.lvl++; P.statPts = (P.statPts || 0) + 5; P.skillPts = (P.skillPts || 0) + 1; }
     if (P.lvl >= LEVEL_CAP) P.xp = 0;
-    if (P.lvl > from) { P.life = null; P.zoom = null; emit('hero:levelup', { id, lvl: P.lvl, from }); }
+    if (P.lvl > from) { P.life = null; P.zoom = null; if (autoOn(P)) spendAuto(P, h.equipment); emit('hero:levelup', { id, lvl: P.lvl, from }); }
     return { gained, from, lvl: P.lvl };
   }
   function addSkillPts(n = 1) { S().player.skillPts += n; emit('stats:changed', d()); }
@@ -792,10 +796,32 @@ export function createActions(G) {
     P.skillPts += kp;
     P.hotbar = ['attack', null, null, null, null, null];
     P.mouseSets = [['attack', null], ['attack', null]];
+    if (autoOn(P)) spendAuto(P, S().equipment); // (Shadow places the stat points again; the skill points wait for K)
     emit('hotbar:changed', { hotbar: P.hotbar });
     recompute();
     return { statPts: sp, skillPts: kp };
   }
+  /** Free, any time: every stat point back (the Character screen's Start over: docs/STATS.md §4). With Shadow's auto
+   *  points on they go straight back by the plan. → points refunded */
+  function resetStats() {
+    const P = S().player, base0 = (CLASSES[P.cls] || CLASSES.chewy).base;
+    let sp = 0;
+    for (const k of STAT_KEYS) { sp += P.stats[k] - base0[k]; P.stats[k] = base0[k]; }
+    P.statPts += sp;
+    if (autoOn(P)) spendAuto(P, S().equipment);
+    recompute();
+    return sp;
+  }
+  /** Shadow's auto points on or off for the hero being played (on: the points waiting are spent now) → gains */
+  function setAutoStats(on) {
+    const P = S().player;
+    P.autoStats = !!on;
+    const g = on ? spendAuto(P, S().equipment) : {};
+    recompute();
+    return g;
+  }
+  /** spend the points waiting by Shadow's plan, once (the auto points off: "Pick for me") → gains */
+  function spendAutoNow() { const g = spendAuto(S().player, S().equipment); recompute(); return g; }
   /** Socket the gem at gemRef into the gear at itemRef (consumes one gem from the stack). */
   function socket(itemRef, gemRef) {
     const it = getItem(itemRef), gem = getItem(gemRef);
@@ -845,6 +871,7 @@ export function createActions(G) {
     if (P.lvl < lvl) {
       const up = lvl - P.lvl;
       P.lvl = lvl; P.xp = 0; P.statPts += up * 5; P.skillPts += up;
+      if (autoOn(P)) spendAuto(P, h.equipment);
       const w = h.equipment.weapon;
       if (lvl >= 3 && w && w.rarity === 'normal') h.equipment.weapon = generateItem({ ilvl: lvl, slot: 'weapon', wtype: w.wtype, rarity: 'magic' });
     }
@@ -874,7 +901,7 @@ export function createActions(G) {
     setHotbar, addXp, addXpTo, addCoins, spendCoins, addMaterial, hasMaterials, spendMaterials, recompute, learnPerk,
     // extras
     tickRegen, activeHots, addPotion, heal, restoreZoom, spendZoom, damage, restoreAll, life, zoom,
-    addSkillPts, addStatPts, respec, socket, getItem, firstFree, canEquip, equipProblem, setPieces,
+    addSkillPts, addStatPts, respec, resetStats, setAutoStats, spendAutoNow, socket, getItem, firstFree, canEquip, equipProblem, setPieces,
     mouseSet, ensureMouseSets, setWeaponType,
     setActiveHero, prepareJoin, isCatchingUp: catchUp,
     // pantry (docs/HOMESTEAD.md)

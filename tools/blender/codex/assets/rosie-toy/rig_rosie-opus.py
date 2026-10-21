@@ -20,6 +20,7 @@ from mathutils.bvhtree import BVHTree
 ROOT = Path(__file__).resolve().parent
 src = (ROOT / 'build_rosie-opus.py').read_text(encoding='utf-8')
 ns = {'__file__': str(ROOT / 'build_rosie-opus.py'), '__name__': 'rosie_model', 'RIG_MODE': True}
+ns['REFINE_ADD'] = int(os.environ.get('REFINE_ADD', '1200'))     # round 8: the face refinement budget (was 1300; the convex face needs less, the new lid more)
 exec(compile(src, str(ROOT / 'build_rosie-opus.py'), 'exec'), ns)
 W, CHIN, HY = ns['W'], ns['CHIN'], ns['HY']
 EX, EZ, EHW, EHH, EN = ns['EX'], ns['EZ'], ns['EHW'], ns['EHH'], ns['EN']
@@ -190,6 +191,17 @@ def lid_normal(p, tag):
             t = float(smooth(1.0, 1.12, sr)); nk = ns['grad_n'](np.array([[p[0], hy, p[2]]]))[0]
             n = (1 - t) * n + t * nk; n /= np.linalg.norm(n)
     return n
+def lid_normal_v(P, tag):
+    """lid_normal for many points (round 8)"""
+    s_ = 1 if tag == 'L' else -1; xz, N = RIM_N[tag]; P = np.asarray(P, float)
+    d2 = (xz[None, :, 0] - P[:, None, 0]) ** 2 + (xz[None, :, 1] - P[:, None, 2]) ** 2; w = 1 / (d2 + 1e-7) ** 1.5
+    n = w @ N; n /= np.linalg.norm(n, axis=1, keepdims=True)
+    sr = ns['eye_s'](s_, P[:, 0], P[:, 2])[0]
+    hy = front_hit(P[:, 0], P[:, 2]); ok = (sr > 1.0) & np.isfinite(hy)
+    if ok.any():
+        nk = ns['grad_n'](np.stack([P[ok, 0], hy[ok], P[ok, 2]], -1)); t = smooth(1.0, 1.12, sr[ok])[:, None]
+        m = (1 - t) * n[ok] + t * nk; n[ok] = m / np.linalg.norm(m, axis=1, keepdims=True)
+    return n
 def lid_geometry(tag, upper, dz):
     s = 1 if tag == 'L' else -1
     cx = s * EX; ye = float(front_hit(cx, EZ)[0]); H = 2 * EHH
@@ -325,10 +337,123 @@ def rest_exposure(V, pivot, angs):
         Vr = np.stack([d[:, 0], d[:, 1] * c - d[:, 2] * s_, d[:, 1] * s_ + d[:, 2] * c], -1) + pivot
         worst = max(worst, float(head_sdf(Vr).max()))
     return worst
+# ---------------------------------------------------------------- round 8: the upper lid for the convex face (LID8, default on)
+# The old shell came out of the skin at the top rim, under the painted lash band, which stays put: mid-blink the eye read as an
+# empty skin oval inside a dark outline, its edge tore where the shell grazed the skin, and shut its edge sank ~3 cm under
+# the cheek (no lash curve). Now each column is one radius r_body = the skin's distance from the hinge at the TOP of the
+# lash band (+0.3 mm), so the skin-coloured lid always emerges along the band top (the skin's distance grows above it) and
+# covers the band from the first frame: one lash line travels down. Only its dark lash stripe (the edge, painted on the
+# lid) dives to r_edge, just outside the eye, to tuck under the lower rim when shut; dark on the dark band, that dive can't
+# show. The hinge sits on the eye's height, far enough back (0.21 m) that the lid stands ~2-5 mm off the eye.
+LID8 = os.environ.get('LID8', '1') == '1'
+L8 = dict(YB=float(os.environ.get('L8_YB', '.21')), ZO=float(os.environ.get('L8_ZO', '-.004')),
+          SQ=float(os.environ.get('L8_SQ', '.70')), COV=float(os.environ.get('L8_COV', '.20')),
+          DELTA=.0003, G_BODY=.0008, G_EDGE=.0006, TUCK=.0005, NCOL=21)
+ROWS8 = [0, .025, .05, .075, .10, .125, .15] + [float(v) for v in np.linspace(.15, 1, 13)[1:]]
+def eye_hits(x, pivot, phs, tag):
+    """outermost VISIBLE eye surface (front projection inside the opening) along the hinge rays; nan elsewhere"""
+    s_ = 1 if tag == 'L' else -1; out = np.full(len(phs), np.nan)
+    for i, ph in enumerate(phs):
+        d = Vector((0, -math.cos(ph), math.sin(ph))); o = Vector((x, pivot[1], pivot[2]))
+        h = eye_tree[tag].ray_cast(o + d * .40, -d, .40)
+        if h[0] is not None and float(ns['eye_s'](s_, h[0].x, h[0].z)[0]) < 1.0: out[i] = .40 - h[3]
+    return out
+def upper_lid8(tag):
+    s = 1 if tag == 'L' else -1; cx = s * EX; ye = float(front_hit(cx, EZ)[0])
+    yp, zp = ye + L8['YB'], EZ + L8['ZO']; pivot = np.array([cx, yp, zp]); target = 1.22
+    def angp(y, z): return math.atan2(z - zp, yp - y)
+    Xs = np.unique(np.r_[np.linspace(-1.14, 1.0, L8['NCOL']), [-.97, -1.24]]); cols = []; diag = []     # (-0.97: the rim turns up steeply into the inner corner)
+    zlev = EZ + EHH - L8['COV'] * 2 * EHH
+    for X in Xs:
+        x = cx + s * EHW * X
+        zl, zt = (float(outline_z(X, False)), float(outline_z(X, True))) if abs(X) < 1 else (EZ, EZ)
+        Zb = max(float(zt - EZ) / EHH, .05)
+        for _ in range(6):
+            srt = 1.04 + float(ns['lash_th'](np.array([math.atan2(Zb, abs(X))]))[0])
+            Zb = max(srt ** EN - min(abs(X), srt * .999) ** EN, 1e-6) ** (1 / EN)
+        zb = EZ + EHH * Zb
+        fy = lambda z: float(front_hit(np.array([x]), np.array([z]))[0])
+        pl, pt_, pb = angp(fy(zl), zl), angp(fy(zt), zt), angp(fy(zb), zb)
+        phs = np.arange(pl - .40, pb + 1.75, .004); dsk = skin_dist(x, pivot, phs)
+        po = np.arange(pl - .02, pt_ + .02, .006); de = eye_hits(x, pivot, po, tag)
+        maxeye = float(np.nanmax(de)) if np.isfinite(de).any() else 0.
+        d_bt = float(np.interp(pb, phs, dsk))
+        r_body = max(d_bt + L8['DELTA'], maxeye + L8['G_BODY'])
+        # the crossing: where the skin passes behind... the first angle above the top rim with the skin beyond r_body
+        above = (phs > pt_) & (dsk > r_body)
+        px = float(phs[np.argmax(above)]) if above.any() else pb
+        r_edge = min(r_body, max(maxeye + L8['G_EDGE'], float(np.interp(pl, phs, dsk)) - L8['TUCK'])) if np.isfinite(de).any() else r_body
+        pe = pl - .004                       # shut, every column's edge sits just under the lower rim: one clean lash curve
+        if os.environ.get('L8_LEVEL') == '1' and zl < zlev < zt: pe = min(pe, angp(fy(zlev), zlev) - (target - L8['SQ']))
+        dk = .0020 + .0058 * max(0., 1 - min(abs(X), 1.) ** 2) ** .6
+        if X < 0: dk = max(.0007, dk * float(smooth(-.98, -.55, X)))      # fades toward the inner corner (no hook)
+        if X <= -.999:                       # past the inner corner: the edge well under the corner, no stripe (the interpolated edge stays under the rim)
+            pe = angp(fy(EZ - .30 * EHH), EZ - .30 * EHH); dk = 0.
+            if X > -1.2:                     # ... and in front of the band's inner end (it reaches X -1.11) (the skin bulges out toward the bridge)
+                zone = (phs >= pe) & (phs <= pb); r_body = r_edge = max(r_body, float(np.max(dsk[zone])) + .0005)
+        if X < -1.2 or X >= .999:            # the lid's two ends tuck just under the skin all through the sweep (X -1.03 / -1.14 cover the band's inner end)
+            sw = (phs >= pe - .02) & (phs <= pb + .45)
+            r_body = r_edge = float(np.min(dsk[sw])) - .0008; dk = 0.; px = pb
+        cols.append(dict(X=X, x=x, pl=pl, pt=pt_, pb=pb, px=px, r_body=r_body, r_edge=r_edge, pe=pe, dk=dk, phs=phs, dsk=dsk, maxeye=maxeye))
+        diag.append((round(X, 2), round(r_body, 4), round((r_body - r_edge) * 1000, 1), round((px - pb) * r_body * 1000, 1),
+                     round((pe - pl) * r_body * 1000, 1), round((r_body - maxeye) * 1000, 1)))
+    V = []; UVs = []; NRM = []; G = []; ARC = []; out_cols = []
+    nr = len(ROWS8)
+    for i, c in enumerate(cols):
+        dk = c['dk']; ramp = max(min(.85 * dk, dk - .0007), 1e-4)
+        ph_dark = c['pe'] + max(1.05 * dk, .004) / c['r_edge']; ph_top = max(c['px'], c['pb']) + .03
+        g_row = []; a_row = []
+        for t in ROWS8:
+            ph = c['pe'] + (ph_dark - c['pe']) * t / .15 if t <= .15 else ph_dark + (ph_top - ph_dark) * (t - .15) / .85
+            arc = (ph - c['pe']) * c['r_edge']
+            k = float(ns['smoother'](0, ramp, arc)) if arc < ramp else 1.
+            r = c['r_edge'] + (c['r_body'] - c['r_edge']) * k
+            ph_rest = ph + target
+            V.append((c['x'], yp - r * math.cos(ph_rest), zp + r * math.sin(ph_rest))); UVs.append((i / (len(cols) - 1), t))
+            py_t = yp - r * math.cos(ph); pz_t = zp + r * math.sin(ph)
+            g_row.append((c['x'], py_t, pz_t)); a_row.append(arc); NRM.append((c['x'], r, ph))
+        G.append(g_row); ARC.append(a_row); out_cols.append((c['x'], c['r_body'], c['pe'], ph_top))
+    # shading normals: the skin ball's normal under each vertex (over the opening too: the shut lid is that skin), averaged in the lid's
+    # own frame over every blink angle at which that vertex shows (shut weighted 3x), so the half-closed lid meets the skin
+    # around it without a lighter or darker patch (one rigid normal can't be exact at every angle; this halves the worst error)
+    XR = np.array(NRM); acc = np.zeros((len(XR), 3)); wsum = np.zeros(len(XR))
+    for a in np.linspace(0, target, 13):
+        pa = XR[:, 2] + (target - a)
+        Pp = np.stack([XR[:, 0], yp - XR[:, 1] * np.cos(pa), zp + XR[:, 1] * np.sin(pa)], -1)
+        vis = head_sdf(Pp) > -.0006
+        Q = Pp.copy()                         # the convex ball's own normal under the lid (round 8: no socket, so no membrane)
+        for _ in range(3): Q = Q - head_sdf(Q)[:, None] * ns['grad_n'](Q)
+        n = ns['grad_n'](Q); c_, s_ = math.cos(-a), math.sin(-a)
+        nb = np.stack([n[:, 0], n[:, 1] * c_ - n[:, 2] * s_, n[:, 1] * s_ + n[:, 2] * c_], -1)
+        w = np.where(vis, 3. if a == target else 1., 0.)
+        if a == target: w = np.maximum(w, 1e-3)          # never empty: the shut normal as a fallback
+        acc += w[:, None] * nb; wsum += w
+    NRM = [tuple(v) for v in acc / np.linalg.norm(acc, axis=1, keepdims=True)]
+    fs = []
+    for i in range(len(cols) - 1):
+        for j in range(nr - 1):
+            q = i * nr + j; fs.append((q, q + nr, q + nr + 1, q + 1))
+    # closure (edge vs the lower rim, shut), the squint cover at L8.SQ, the shut standoff off the eye at the centre column
+    clo = max(zp + c['r_edge'] * math.sin(c['pe']) - (outline_z(c['X'], False) - .0015) for c in cols if abs(c['X']) <= .95)
+    covs = []
+    for c in cols:
+        if abs(c['X']) > .9: continue
+        ze = zp + c['r_edge'] * math.sin(c['pe'] + target - L8['SQ']); zl, zt = outline_z(c['X'], False), outline_z(c['X'], True)
+        covs.append(float(np.clip((zt - ze) / (zt - zl), 0, 1)))
+    cc_ = cols[len(cols) // 2]; standoff = cc_['r_body'] - cc_['maxeye']
+    closure = (clo, float(np.mean(covs)), standoff)
+    print('LID8', tag, 'pivot', pivot.round(4), 'cols (X, r_body, dive_mm, cross_above_bandtop_mm, edge_below_rim_mm, standoff_mm)', diag,
+          'squint_cover', [round(v, 2) for v in covs], flush=True)
+    paint = {'G': np.array(G), 'arc': np.array(ARC), 'X': np.array([c['X'] for c in cols]), 'rows': np.array(ROWS8),
+             'dark': np.array([c['dk'] for c in cols])}
+    return V, UVs, fs, pivot, out_cols, target, NRM, closure, paint
+
 def lid_shell(tag, upper):
     angs = [0.0] if upper else [0.0, -.10]
     cands = np.linspace(-.04, .32, 10) if upper else np.linspace(0, .32, 17)
     best = None
+    if upper and LID8:
+        g = upper_lid8(tag); e = rest_exposure(g[0], g[3], angs); best = (e, 0., g); cands = []
     for dz in cands:
         g = lid_geometry(tag, upper, float(dz)); e = rest_exposure(g[0], g[3], angs)
         if upper:      # hidden at rest and closing fully are required; then the squint nearest 28 % and the snuggest shell
@@ -629,6 +754,27 @@ for o, bname in lid_objects:
         c, s_ = math.cos(ang), math.sin(ang); d = V - piv
         Vr = np.stack([d[:, 0], d[:, 1] * c - d[:, 2] * s_, d[:, 1] * s_ + d[:, 2] * c], -1) + piv
         sd = head_sdf(Vr); hidden[f'{o.name}@{ang}'] = {'max_sdf_mm': round(float(sd.max()) * 1000, 2), 'outside_count': int((sd > -.0005).sum())}
+# round 8: the whole sweep, not only rest / squint / shut (the Stella lesson): at each blink angle, lid vertices in front of
+# the skin outside the opening (flaps; on the painted lash band they're allowed to cover it) and vertices over the opening
+# behind the eye surface while their neighbours are in front (holes: the eye pokes through the lid)
+def lid_sweep(o, bname):
+    tag = bname[-1]; s_ = 1 if tag == 'L' else -1; piv = np.array(P[bname]); V = np.array([list(v.co) for v in o.data.vertices])
+    out = {}
+    angs = np.round(np.linspace(0, 1.22, 13), 3) if bname.startswith('lidU') else np.round([-.10, -.18, -.26], 3)
+    for a in angs:
+        c, s__ = math.cos(a), math.sin(a); d = V - piv
+        Vr = np.stack([d[:, 0], d[:, 1] * c - d[:, 2] * s__, d[:, 1] * s__ + d[:, 2] * c], -1) + piv
+        sd = head_sdf(Vr); sr, psi_, X_, Z_ = ns['eye_s'](s_, Vr[:, 0], Vr[:, 2])
+        th = ns['lash_th'](psi_); band = (Z_ > -.05) & (sr <= 1.05 + th)
+        esd = np.array([eye_sd(p, tag) for p in Vr])
+        near = sd > -.006
+        flap = (sr > 1.02) & (sd > .0003) & ~band
+        flap_b = (sr > 1.02) & (sd > .0003) & band
+        hole = (sr < .97) & (esd < -.0002) & near
+        out[float(a)] = [int(flap.sum()), int(flap_b.sum()), int(hole.sum()), round(float(sd[flap].max()) * 1000, 1) if flap.any() else 0]
+    return out
+SWEEP = {o.name: lid_sweep(o, b) for o, b in lid_objects}
+print('LID_SWEEP', json.dumps(SWEEP), flush=True)
 sd = head_sdf(np.array([list(v.co) for v in tongue.data.vertices]))
 hidden['Rosie_tongue@rest'] = {'max_sdf_mm': round(float(sd.max()) * 1000, 2), 'outside_count': int((sd > -.0005).sum())}
 assert hidden['Rosie_tongue@rest']['outside_count'] == 0, hidden['Rosie_tongue@rest']

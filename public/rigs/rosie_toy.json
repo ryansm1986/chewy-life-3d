@@ -73,7 +73,7 @@
    "pos": [
     0.13223,
     0.89381,
-    0.21887
+    0.24227
    ]
   },
   {
@@ -81,8 +81,8 @@
    "parent": "head",
    "pos": [
     0.1404,
-    0.89066,
-    0.06572
+    0.8902,
+    0.04528
    ]
   },
   {
@@ -91,7 +91,7 @@
    "pos": [
     0.1404,
     1.18716,
-    -0.12544
+    -0.10204
    ]
   },
   {
@@ -100,7 +100,7 @@
    "pos": [
     0.1378,
     1.01744,
-    0.21191
+    0.21548
    ]
   },
   {
@@ -109,7 +109,7 @@
    "pos": [
     0.0442,
     0.80112,
-    0.29347
+    0.29448
    ]
   },
   {
@@ -190,7 +190,7 @@
    "pos": [
     -0.13223,
     0.89381,
-    0.21887
+    0.24227
    ]
   },
   {
@@ -198,8 +198,8 @@
    "parent": "head",
    "pos": [
     -0.1404,
-    0.89066,
-    0.06572
+    0.8902,
+    0.04528
    ]
   },
   {
@@ -208,7 +208,7 @@
    "pos": [
     -0.1404,
     1.18716,
-    -0.12544
+    -0.10204
    ]
   },
   {
@@ -217,7 +217,7 @@
    "pos": [
     -0.1378,
     1.01744,
-    0.21191
+    0.21548
    ]
   },
   {
@@ -226,7 +226,7 @@
    "pos": [
     -0.0442,
     0.80112,
-    0.29347
+    0.29448
    ]
   },
   {
@@ -345,51 +345,51 @@
    "itemSize": 3,
    "normalized": false,
    "offset": 0,
-   "count": 56181
+   "count": 56835
   },
   {
    "name": "normal",
    "type": "i2",
    "itemSize": 3,
    "normalized": true,
-   "offset": 224724,
-   "count": 56181
+   "offset": 227340,
+   "count": 56835
   },
   {
    "name": "uv",
    "type": "f4",
    "itemSize": 2,
    "normalized": false,
-   "offset": 337088,
-   "count": 37454
+   "offset": 341012,
+   "count": 37890
   },
   {
    "name": "skinIndex",
    "type": "u1",
    "itemSize": 4,
    "normalized": false,
-   "offset": 486904,
-   "count": 74908
+   "offset": 492572,
+   "count": 75780
   },
   {
    "name": "skinWeight",
    "type": "u1",
    "itemSize": 4,
    "normalized": true,
-   "offset": 561812,
-   "count": 74908
+   "offset": 568352,
+   "count": 75780
   },
   {
    "name": "index",
    "type": "u4",
    "itemSize": 1,
    "normalized": false,
-   "offset": 636720,
-   "count": 100518
+   "offset": 644132,
+   "count": 101724
   }
  ],
- "vertexCount": 18727,
- "outlineIndexCount": 90810,
+ "vertexCount": 18945,
+ "outlineIndexCount": 90510,
  "bin": "rosie_toy.bin",
  "tex": "rosie_toy.png",
  "normalTex": "rosie_toy_n.png"

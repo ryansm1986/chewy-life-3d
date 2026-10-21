@@ -1,9 +1,17 @@
 // Cursor-following tooltip + item/skill tooltip builders.
-import { el, esc, rarityColor, RARITY_JP, cap } from './dom.js';
+import { el, esc, rarityColor, RARITY_JP, cap, fmt } from './dom.js';
 import { glyph } from './glyphs.js';
 import { itemName, baseName, meetsReq, rpgItemTooltip, equipSlotsFor } from './rpg.js';
 import { padWording } from './padGlyphs.js';
 import { Actions } from '../core/actions.js';
+import { itemPower } from '../rpg/power.js';
+import { itemDamage, itemKindName, statText, SETS, RARITY } from '../rpg/items.js';
+import { CLASSES } from '../rpg/classes.js';
+
+// Item tooltips come simple (Power, a better / worse verdict, the bonuses in plain words: docs/STATS.md §1) unless
+// details are on: Settings › Item details (full), Shift held, or L3 on the pad (sticks until pressed again).
+export const TIP = { full: false, held: false, sticky: false };
+export const tipDetail = () => TIP.full || TIP.held || TIP.sticky;
 
 export class Tooltip {
   constructor(layer) {
@@ -13,8 +21,14 @@ export class Tooltip {
     layer.appendChild(this.wrap);
     this.on = false; this.x = 0; this.y = 0; this.w = 0; this.h = 0; this.owner = null;
     addEventListener('mousemove', e => { this.x = this._px = e.clientX; this.y = this._py = e.clientY; if (this.on) this.place(); }, { passive: true }); // (_px / _py: where the real pointer last was)
+    // Shift held: the item tooltip shows its details (TIP)
+    const held = v => { if (TIP.held !== v) { TIP.held = v; this.rerender(); } };
+    addEventListener('keydown', e => { if (e.key === 'Shift') held(true); });
+    addEventListener('keyup', e => { if (e.key === 'Shift') held(false); });
+    addEventListener('blur', () => held(false));
   }
-  show(html, cls = '', owner = null) {
+  /** gen: the tooltip's builder, so it can be built again (details on / off) */
+  show(html, cls = '', owner = null, gen = null) {
     if (this.muted) return; // (a background panel build or render: ui/prewarm.js)
     if (!html) return this.hide();
     // (while the pad plays, a hidden pointer resting on a panel (the Deck's trackpad) brings up no hover tooltip as the
@@ -23,7 +37,7 @@ export class Tooltip {
     const ev = typeof window !== 'undefined' ? window.event : null;
     if (Actions.device === 'pad' && ev?.isTrusted && /^(mouse|pointer)(over|enter|move)$/.test(ev.type) && ev.clientX === this._px && ev.clientY === this._py) return; // (the same spot as its last move: it didn't move)
     html = padWording(html); // (while the pad plays: its buttons instead of the mouse's, ui/padGlyphs.js)
-    this.owner = owner;
+    this.owner = owner; this.gen = gen;
     this.box.className = 'tt ' + cls;
     this.box.innerHTML = html;
     const r = this.box.getBoundingClientRect();
@@ -32,7 +46,11 @@ export class Tooltip {
     this.wrap.classList.add('show');
     this.place();
   }
-  refresh(html) { if (this.on) this.show(html, this.box.className.replace(/^tt\s*/, ''), this.owner); }
+  refresh(html) { if (this.on) this.show(html, this.box.className.replace(/^tt\s*/, ''), this.owner, this.gen); }
+  /** build the showing tooltip again (its builder's now) */
+  rerender() { if (this.on && this.gen) { const g = this.gen, h = g(); if (h) this.show(h, this.box.className.replace(/^tt\s*/, ''), this.owner, g); } }
+  /** L3 on the pad: details on / off for every item tooltip until pressed again → on */
+  toggleDetail() { TIP.sticky = !TIP.sticky; this.rerender(); return TIP.sticky; }
   place() {
     const pad = 10, off = 20;
     let x = this.x + off, y = this.y - this.h - 22;
@@ -47,12 +65,12 @@ export class Tooltip {
     if (this.muted) return;
     if (owner && this.owner && owner !== this.owner) return;
     if (!this.on) return;
-    this.on = false; this.owner = null;
+    this.on = false; this.owner = null; this.gen = null;
     this.wrap.classList.remove('show');
   }
   // Bind hover tooltip to an element. fn() returns html (or null).
   bind(target, fn, cls = '') {
-    target.addEventListener('mouseenter', () => { const h = fn(target); if (h) this.show(h, cls, target); });
+    target.addEventListener('mouseenter', () => { const h = fn(target); if (h) this.show(h, cls, target, () => fn(target)); });
     target.addEventListener('mouseleave', () => this.hide(target));
     return target;
   }
@@ -60,11 +78,11 @@ export class Tooltip {
 
 // ------------------------------------------------------------------ item tooltip
 const STAT_NAMES = {
-  str: 'Strength', dex: 'Dexterity', vit: 'Vitality', ene: 'Energy', lifeMax: 'Life', zoomMax: 'Zoom', lifeRegen: 'Life Regen', zoomRegen: 'Zoom Regen',
-  dmgMin: 'Min Damage', dmgMax: 'Max Damage', dmgPct: '% Damage', aspd: 'Attack Speed', atkSpeed: '% Attack Speed', castSpeed: '% Cast Speed', moveSpeed: '% Move Speed',
-  crit: '% Crit Chance', critDmg: '% Crit Damage', def: 'Defense', block: '% Block', resFire: 'Fire Resist', resFrost: 'Frost Resist', resZap: 'Zap Resist', resStink: 'Stink Resist',
-  lifeSteal: '% Life Steal', zoomSteal: '% Zoom Steal', fireDmg: 'Fire Damage', frostDmg: 'Frost Damage', zapDmg: 'Zap Damage', stinkDmg: 'Stink Damage', mf: '% Magic Find', gf: '% Coin Find',
-  thorns: 'Thorns', allSkills: 'All Skills', xpBonus: '% XP', pierce: '% Pierce', cdr: '% Cooldown Reduction', lifeOnKill: 'Life on Kill', shadowDmg: '% Shadow Damage', shadowLife: '% Shadow Life',
+  str: 'Strength', dex: 'Dexterity', vit: 'Vitality', ene: 'Energy', lifeMax: 'Life', zoomMax: 'Zoom', lifeRegen: 'Life back a second', zoomRegen: '% Zoom refill',
+  dmgMin: 'Weakest hit', dmgMax: 'Strongest hit', dmgPct: '% Harder hits', aspd: 'Hits a second', atkSpeed: '% Attack speed', castSpeed: '% Skill speed', moveSpeed: '% Run speed',
+  crit: '% Big hit chance', critDmg: '% Big hit damage', def: 'Defense', block: '% Block', resFire: 'Fire guard', resFrost: 'Frost guard', resZap: 'Zap guard', resStink: 'Stink guard',
+  lifeSteal: '% Heal on hit', zoomSteal: '% Zoom on hit', fireDmg: 'Fire damage', frostDmg: 'Frost damage', zapDmg: 'Zap damage', stinkDmg: 'Stink damage', mf: '% Treasure luck', gf: '% More coins',
+  thorns: 'Prickly', allSkills: 'Every skill', xpBonus: '% XP', pierce: 'Fly-through', cdr: '% Sooner skills', lifeOnKill: 'Life per yokai beaten', shadowDmg: '% Shadow bites', shadowLife: '% Shadow life',
 };
 export const statName = k => STAT_NAMES[k] || k;
 
@@ -94,9 +112,58 @@ function compareLines(item, other) {
   return out;
 }
 
-// ctx: {state, derived, compare(item)→equipped item | null, price:{label, value, afford}, hints:[..]}
+// ------------------------------------------------------------------ Power (docs/STATS.md §1)
+const sgnN = n => (n > 0 ? '+' : n < 0 ? '−' : '') + fmt(Math.abs(n));
+/** the Power box: what the piece adds, better / worse than what's on now, and what stops the hero wearing it */
+export function powerBox(item, ctx = {}) {
+  const pw = ctx.state ? itemPower(item, ctx.state) : null;
+  if (!pw) return '';
+  const C = CLASSES[pw.hero], nm = esc(C?.name || 'another hero');
+  if (pw.verdict === 'none') return `<div class="tt-pow v-none"><div class="tt-vd"><b>${nm}'s weapon</b></div></div>`;
+  const v = pw.verdict, who = pw.other ? ` for ${nm}` : '';
+  const vd = v === 'better' ? `<b>▲ Better${who}!</b><span>${sgnN(pw.delta)}</span>`
+    : v === 'worse' ? `<b>▼ Not as good${who}</b><span>${sgnN(pw.delta)}</span>`
+    : v === 'same' ? `<b>= About the same${who}</b>`
+    : v === 'empty' ? `<b>✦ Nothing on there${who}: wear it!</b>`
+    : `<b>✓ Wearing it</b>`;
+  const vs = pw.vs && v !== 'worn' && v !== 'empty' ? `<div class="tt-vs">vs. ${pw.other ? `${nm}'s` : 'your'} <span style="color:${rarityColor(pw.vs.rarity)}">${esc(itemName(pw.vs))}</span></div>` : '';
+  const lock = pw.locked ? `<div class="tt-lock">${glyph('lock')}<span>${esc(pw.locked)}</span></div>` : '';
+  return `<div class="tt-pow v-${v}${pw.other ? ' other' : ''}"><div class="tt-pw">${glyph('bolt')}<span>Power</span><b>${sgnN(pw.power)}</b></div><div class="tt-vd">${vd}</div>${vs}${lock}</div>`;
+}
+const speedWord = a => (a >= 1.3 ? 'Very fast' : a >= 1.2 ? 'Fast' : a >= 1.05 ? 'Normal speed' : a >= 0.97 ? 'Slow' : 'Very slow');
+const AFF_COL = { unique: '#ffb86a', set: '#7ef09a' };
+/** a piece of gear, simply: Power, its damage or defense, its bonuses in plain words */
+function simpleGearTip(item, ctx) {
+  const col = rarityColor(item.rarity), R = RARITY[item.rarity];
+  const sub = `${item.rarity && item.rarity !== 'normal' ? `${esc(R?.name || cap(item.rarity))} ` : ''}${esc(itemKindName(item))}`;
+  let body = powerBox(item, ctx);
+  if (item.dmg) { const d = itemDamage(item); body += `<div class="tt-bs">${glyph('swords')}<span>Damage</span><b>${d[0]}–${d[1]}</b><i>${speedWord(item.aspd || 1)}</i></div>`; }
+  if (item.def) { let ed = 0; for (const a of item.affixes || []) if (a.stat === 'def') ed += a.value; body += `<div class="tt-bs">${glyph('shield')}<span>Defense</span><b>${item.def + ed}</b></div>`; }
+  const affs = item.affixes || [];
+  if (affs.length) body += `<div class="tt-affs">${affs.map(a => `<div class="tt-aff" style="--c:${a.gem ? '#ff9ad0' : AFF_COL[item.rarity] || '#8ab8ff'}">${esc(statText(a.stat, a.value, a, item))}</div>`).join('')}</div>`;
+  if (item.sockets) { const gems = item.gems || []; body += `<div class="tt-sock">${Array.from({ length: item.sockets }, (_, i) => `<i class="${gems[i] ? 'on' : ''}"></i>`).join('')}<span>Treats ${gems.length}/${item.sockets}</span></div>`; }
+  if (item.setId && SETS[item.setId]) {
+    const S = SETS[item.setId], eq = ctx.state?.equipment || {};
+    const n = Object.values(eq).filter(e => e && e.setId === item.setId).length;
+    body += `<div class="tt-set">${glyph('sparkle')}<span>Part of <b>${esc(S.name)}</b> · ${n}/${S.pieces.length} worn</span></div>`;
+  }
+  if (item.flavor && item.rarity === 'unique') body += `<div class="tt-flavor">“${esc(String(item.flavor).replace(/^["“]|["”]$/g, ''))}”</div>`;
+  const price = ctx.price ? `<div class="tt-price ${ctx.price.afford === false ? 'bad' : ''}">${ctx.price.label || 'Value'}: ${glyph('coin')}<b>${ctx.price.value}</b></div>` : '';
+  const hints = [...(ctx.hints || [])];
+  if (ctx.more !== false && Actions.device !== 'touch') hints.push('<b>Shift</b> details'); // (touch: Settings › Item details)
+  const hintsH = hints.length ? `<div class="tt-hints">${hints.map(h => `<span>${h}</span>`).join('')}</div>` : '';
+  return `<div class="tt-item tt-simple-item r-${item.rarity || 'normal'}" style="--rc:${col}">
+    <div class="tt-name">${esc(itemName(item))}</div>
+    <div class="tt-kind"><span>${sub}</span><span class="jp">${RARITY_JP[item.rarity] || ''}</span></div>
+    ${body}${price}${hintsH}</div>`;
+}
+
+// ctx: {state, derived, compare(item)→equipped item | null, price:{label, value, afford}, hints:[..], detail?: true (the
+// full tooltip) | false (simple) | undefined (TIP), more?: false (no "Shift details" hint)}
 export function itemTipHTML(item, ctx = {}) {
   if (!item) return '';
+  const full = ctx.detail ?? tipDetail();
+  if (item.kind === 'gear' && !full) return simpleGearTip(item, ctx);
   const col = rarityColor(item.rarity);
   let name = itemName(item), sub = '', titleColor = col;
   const base = baseName(item.base);
@@ -156,7 +223,7 @@ export function itemTipHTML(item, ctx = {}) {
   return `<div class="tt-item r-${item.rarity || 'normal'}" style="--rc:${titleColor}">
     <div class="tt-name">${esc(name)}</div>
     <div class="tt-kind"><span>${sub}</span>${item.ilvl ? `<span class="tt-il">iLvl ${item.ilvl}</span>` : ''}<span class="jp">${RARITY_JP[item.rarity] || ''}</span></div>
-    ${body}${cmp}${price}${hints}</div>`;
+    ${item.kind === 'gear' ? powerBox(item, ctx) : ''}${body}${cmp}${price}${hints}</div>`;
 }
 
 export function simpleTip(title, text, extra = '') {

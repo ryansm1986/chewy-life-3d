@@ -20,6 +20,7 @@ import { makeToon, makeOutline } from '../../gfx/materials.js';
 import { Events } from '../../core/events.js';
 import { lookIn } from '../../dungeon/horde.js';
 import { teleBatchFor } from '../../gfx/teleBatch.js';
+import { enemySpec, enemyPivot } from './enemyModels.js';
 import { rand, randInt, clamp, TAU, dist, angleDiff, ease } from '../../core/util.js';
 
 // ================================================================================================= KIT: geometry
@@ -139,6 +140,7 @@ export function hitArea(m, x, z, r, raw, el = m.stats.element, knockMul = 1, noI
   let res = 0;
   const from = V(x, P?.pos.y || 0, z);
   if (playerIn(G, x, z, r) && !(noInvuln && P.invuln)) res = Cb.hitPlayer(raw, { element: el, level: m.level, from, knock: (m.stats.knockback || 0.4) * knockMul, onHit: m.stats.onHit, src: m });
+  if (G.coop?.active) for (const s of G.coop.slots) { const B = G.coop.bodyOf(s); if (B && B !== P) G.coop.with(s, () => { if (playerIn(G, x, z, r) && !(noInvuln && B.invuln)) Cb.hitPlayer(raw, { element: el, level: m.level, from, knock: (m.stats.knockback || 0.4) * knockMul, onHit: m.stats.onHit, src: m }); }); } // (couch co-op: every hero in the blast, each as themselves)
   for (const e of Cb.allies || Cb.entities) if (e.alive && e.team === 'ally' && e !== P && !e.untargetable && e.pos && dist(e.pos.x, e.pos.z, x, z) < r + (e.radius || 0.3)) Cb.hitAlly(e, raw, { element: el, from }); // (allies: combat.js keeps them apart, same order)
   return res;
 }
@@ -253,6 +255,7 @@ const ENTS = [];
 function targetsNear(G, Cb, x, z, r) { // player first, then allies; into a reused array
   ENTS.length = 0; const P = G.player;
   if (P && !G.playerDead && !P.invuln && (P.pos.x - x) ** 2 + (P.pos.z - z) ** 2 < (r + (P.radius || 0.3)) ** 2) ENTS.push(P);
+  if (G.coop?.active) for (const s of G.coop.slots) { const B = G.coop.bodyOf(s); if (B && B !== P && !G.coop.isDown(s) && !B.invuln && (B.pos.x - x) ** 2 + (B.pos.z - z) ** 2 < (r + (B.radius || 0.3)) ** 2) ENTS.push(B); } // (couch co-op: the other heroes)
   for (const e of Cb.allies || Cb.entities) if (e.alive && e.team === 'ally' && e !== P && !e.untargetable && e.pos && (e.pos.x - x) ** 2 + (e.pos.z - z) ** 2 < (r + (e.radius || 0.3)) ** 2) ENTS.push(e);
   return ENTS;
 }
@@ -285,7 +288,7 @@ export function bolt(m, o) {
     s.x = nx; s.z = nz; s.trav += step;
     const ny = (W.heightAt?.(nx, nz) || 0) + s.h; s.vy = (ny - s.y) / Math.max(dt, 1e-4); s.y = ny;
     const hits = targetsNear(G, Cb, s.x, s.z, s.r);
-    if (hits.length) { const e = hits[0]; o.onHit?.(e, s); end(true); z.life = 0; return; }
+    if (hits.length) { const e = hits[0]; if (e._coopSlot && G.coop?.active) G.coop.with(e._coopSlot, () => o.onHit?.(e, s)); else o.onHit?.(e, s); end(true); z.life = 0; return; } // (a hero is hit as themselves: couch co-op)
     if (s.trav >= s.range) { end(false); z.life = 0; return; }
     vis.update(dt, s);
   }, dispose: () => end(false) });
@@ -405,7 +408,7 @@ function takenokoSpec(v) {
   return { parts: [{ name: 'body', geo: parts }, { name: 'mound', geo: mound, parent: 'root' }] };
 }
 function buildTakenoko(v) {
-  const M = assemble('takenoko:' + v.key, () => takenokoSpec(v));
+  const M = assemble('takenoko:' + v.key, () => enemySpec('takenoko', v.key, null, { parent: { mound: 'root' } }) || takenokoSpec(v)); // (the Blender model when it's loaded: enemyModels.js)
   const I = M.inner, mound = M.g.mound;
   mound.visible = false;
   let spin = 0, hop = 0;
@@ -560,12 +563,13 @@ function kodamaSpec(v) {
     body.push(tubeC([[k * 0.1, 0.38, 0.02, 0.032], [k * 0.19, 0.3, 0.05, 0.028], [k * 0.22, 0.22, 0.07, 0.026]], skin.getStyle(), 6), ell(0.036, 0.036, 0.036, skin.getStyle(), [k * 0.225, 0.2, 0.075], [0, 0, 0], 8));
     body.push(tubeC([[k * 0.06, 0.16, 0, 0.03], [k * 0.075, 0.07, 0.02, 0.026], [k * 0.08, 0.0, 0.03, 0.024]], skin.getStyle(), 6), ell(0.034, 0.028, 0.045, skin.getStyle(), [k * 0.08, -0.01, 0.045], [0, 0, 0], 8));
   }
-  const glowOut = v.glow ? 'outgoingLight += diffuseColor.rgb * 0.85 * step(0.9, diffuseColor.r) * step(0.6, diffuseColor.g) * step(diffuseColor.b, 0.45);' : '';
-  return { mat: { fragOut: glowOut }, parts: [{ name: 'body', geo: body }, { name: 'head', geo: head, at: [0, 0.68, 0] }] };
+  return { mat: kodamaMat(v), parts: [{ name: 'body', geo: body }, { name: 'head', geo: head, at: [0, 0.68, 0] }] };
 }
+// the Elder's gold eyes glow (any gold-ish colour on the model)
+const kodamaMat = v => ({ fragOut: v.glow ? 'outgoingLight += diffuseColor.rgb * 0.85 * step(0.9, diffuseColor.r) * step(0.6, diffuseColor.g) * step(diffuseColor.b, 0.45);' : '' });
 function buildKodama(v) {
-  const M = assemble('kodama:' + v.key, () => kodamaSpec(v));
-  const I = M.inner, H = M.g.head;
+  const M = assemble('kodama:' + v.key, () => enemySpec('kodama', v.key, kodamaMat(v)) || kodamaSpec(v));
+  const I = M.inner, H = M.g.head, HY = enemyPivot('kodama', v.key, 'head', [0, 0.68, 0])[1];
   let rattle = 0, recoil = 0, lean = 0;
   M.animate = (dt, t, moving) => {
     const a = M.act, k = (M.actT += dt);
@@ -579,7 +583,7 @@ function buildKodama(v) {
     const sq = a === 'wind' ? 1 - 0.07 * clamp(k / KD.WIND) : 1 + recoil * 0.08;
     I.scale.set(1 / Math.sqrt(sq), sq, 1 / Math.sqrt(sq));
     H.rotation.set(Math.sin(t * 23) * 0.08 * rattle - recoil * 0.2, Math.sin(t * 29 + 1) * 0.16 * rattle, Math.sin(t * 41) * 0.24 * rattle + Math.sin(t * 1.1) * 0.05);
-    H.position.y = 0.68 + Math.abs(Math.sin(t * 41)) * 0.02 * rattle;
+    H.position.y = HY + Math.abs(Math.sin(t * 41)) * 0.02 * rattle;
     M.rattleNow = rattle;
   };
   return M;
@@ -662,8 +666,10 @@ function kamaitachiSpec(v) {
   return { parts: [{ name: 'body', geo: B }, { name: 'tail', geo: T, at: [0, 0.34, -0.3] }] };
 }
 function buildKamaitachi(v) {
-  const M = assemble('kamaitachi:' + v.key, () => kamaitachiSpec(v));
+  const M = assemble('kamaitachi:' + v.key, () => enemySpec('kamaitachi', v.key) || kamaitachiSpec(v));
   const I = M.inner, T = M.g.tail;
+  const bb = M.body.geometry.boundingBox || (M.body.geometry.computeBoundingBox(), M.body.geometry.boundingBox);
+  const HZ = bb.min.z + 0.12; // (the hind paws: a rear-up pivots on them instead of sinking them into the ground)
   let run = 0, swish = 0;
   M.animate = (dt, t, moving) => {
     const a = M.act, k = (M.actT += dt);
@@ -683,6 +689,7 @@ function buildKamaitachi(v) {
         tx = 0.35 * run; ty = ty * (1 - run * 0.5);
       }
     }
+    if (rx < 0) y += HZ * Math.sin(rx);
     I.position.set(0, y, 0); I.rotation.set(rx, 0, rz); I.scale.set(1, sy, sz);
     T.rotation.set(tx, ty, tz);
   };

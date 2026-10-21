@@ -27,6 +27,29 @@ function gearPath(cx, cy, r1, r2, n) {
   return d + 'Z';
 }
 
+// Stella's glyphs (docs/STELLA.md): a star of n points (r1 out, r0 in) round (cx, cy), for her flares
+function starPath(cx, cy, n, r1, r0, rot = -Math.PI / 2) {
+  let d = '';
+  for (let i = 0; i < n * 2; i++) { const a = rot + (i / (n * 2)) * Math.PI * 2, r = i % 2 ? r0 : r1; d += `${i ? 'L' : 'M'}${(cx + Math.cos(a) * r).toFixed(2)} ${(cy + Math.sin(a) * r).toFixed(2)}`; }
+  return d + 'Z';
+}
+// the sun wagasa: a red canopy with gold sunburst panels from the crown (a scalloped rim between the rib tips), a gold
+// sun-disc finial, a cane shaft with a red grip wrap, an amber tassel off the rim
+const WAGASA_TIPS = [3.4, 8.44, 13.48, 18.52, 23.56, 28.6], WAGASA_Y = 15.6, WAGASA_SC = 13.6;
+const wagasaRim = (a = 0, b = WAGASA_TIPS.length - 1) => { let d = ''; for (let i = b; i > a; i--) { const x0 = WAGASA_TIPS[i], x1 = WAGASA_TIPS[i - 1]; d += ` Q${((x0 + x1) / 2).toFixed(2)} ${WAGASA_SC} ${x1} ${WAGASA_Y}`; } return d; };
+const wagasa = () => {
+  const dome = `<path d="M3.4 ${WAGASA_Y} C3.8 8.4 9.4 4.6 16 4.6 C22.6 4.6 28.2 8.4 28.6 ${WAGASA_Y}${wagasaRim()} Z"/>`;
+  const gold = [0, 2, 4].map(i => `<path d="M16 5.6 L${WAGASA_TIPS[i + 1]} ${WAGASA_Y}${wagasaRim(i, i + 1)} Z"/>`).join('');
+  return '<g transform="rotate(-16 16 16)">'
+    + ol('<rect x="14.8" y="13" width="2.4" height="15.4" rx="1.2"/>', '#e8c890', 3)
+    + line('M14.9 24.6h2.2M14.9 26.6h2.2', '#d9573e', 1.8)
+    + ol(dome, '#d9573e', 3.4)
+    + `<g fill="#f0c24e">${gold}</g>`
+    + line(WAGASA_TIPS.slice(1, -1).map(x => `M16 5.8L${x} ${WAGASA_Y - 0.4}`).join(''), '#a83a2a', 0.8)
+    + ol('<circle cx="16" cy="3.8" r="2.6"/>', '#ffd36a', 2.6)
+    + line(`M28.4 ${WAGASA_Y}v2.6`, INK, 1.6) + ol('<path d="M28.4 18c1.5 0 2 1.4 2 2.6 0 1.6-.9 3.2-2 3.2s-2-1.6-2-3.2c0-1.2.5-2.6 2-2.6z"/>', '#dfa23c', 2.4)
+    + '</g>' + shine(10.6, 9.4, 2.2, 1.1, -30);
+};
 const bottle = (liquid, deco) => ol('<rect x="12.5" y="4" width="7" height="8" rx="2"/><circle cx="16" cy="19.5" r="9.5"/>', '#fdfaff')
   + `<path d="M7.17 16A9.5 9.5 0 1 0 24.83 16Q16 13.6 7.17 16Z" fill="${liquid}"/>`
   + `<path d="M7.6 16.4Q16 14 24.4 16.4" fill="none" stroke="#fff" stroke-width="1.4" opacity=".7"/>`
@@ -148,6 +171,16 @@ export const GLYPHS = {
   lance: `<g transform="rotate(45 16 16)">${ol('<rect x="14.7" y="8" width="2.6" height="20" rx="1.3"/>', '#f4e8d0', 3)}${line('M14.8 12.5h2.4M14.8 17h2.4M14.8 21.5h2.4', '#e0a868', 1.6)}${ol('<path d="M16 0.8c3.2 3.4 4.6 6.4 2.6 9.6h-5.2c-2-3.2-.6-6.2 2.6-9.6z"/>', '#3a9a6a', 3)}${ol('<path d="M10.2 11.6c2.6-1.6 9-1.6 11.6 0l-1.4 2.4c-2.6-1-6.2-1-8.8 0z"/>', '#3a9a6a', 2.6)}${ol('<circle cx="16" cy="28.4" r="3.1"/>', '#d6c85c', 2.8)}</g>` + shine(19.4, 6.6, 1.2, 0.8),
   javelin: `<g transform="rotate(45 16 16)">${ol('<rect x="14.8" y="7" width="2.4" height="17" rx="1.2"/>', '#f4e8d0', 3)}${ol('<circle cx="16" cy="5.4" r="3.4"/>', '#c8a050', 3)}${ol('<path d="M16 21l5 6.5h-10z"/>', '#3a9a6a', 2.8)}</g>` + shine(14.4, 4.6, 1.2, 0.8),
   whelp: ol('<path d="M5 9c4-3 8-3 11 0 3-4 9-5 13-3-1 7-3 13-8 17-1-3-3-4-5-4-2 0-4 1-5 4-4-3-6-8-6-14z"/>', '#3a9a6a', 3.2) + '<path d="M16 9c-.4 4 0 8 0 10M9 10.5c2 3 3.6 6 4 8.6M23 9c-2 3.4-3.4 6.4-3.6 9.6" fill="none" stroke="#f2c48a" stroke-width="2.6" stroke-linecap="round"/>' + shine(9.4, 9.4, 1.6, 1),
+  // Stella, the Sun Oracle (docs/STELLA.md): her sun wagasa; Radiance, a ray of light flung from a sun disc; Corona, a
+  // flare of sunlight (a white-gold core in a dawn-rose rim); Dawn, the sun rising over the sea
+  parasol: wagasa(),
+  ray: ol('<path d="M10 20 L24.45 2.45 Q28.9 1.1 29.55 7.55 L12 22 Z"/>', '#fff1b8', 3) + line('M11.4 20.6 L26.8 5.2', '#fffaf0', 1.8)
+    + `<g fill="#ffcf4a" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round">${petals(8, 9, 22, 'M9 12.6l2.6 4.8h-5.2z', 22.5)}</g>` + ol('<circle cx="9" cy="22" r="5.2"/>', '#ffd36a', 3) + '<circle cx="9" cy="22" r="2.6" fill="#fff1b8"/>' + shine(7.4, 20.4, 1.4, 0.9),
+  flare: ol(`<path d="${starPath(16, 16, 8, 14.6, 7.4)}"/>`, '#ffd36a', 3.2) + `<path d="${starPath(16, 16, 8, 9.6, 6.2, -Math.PI / 2 + Math.PI / 8)}" fill="#fff1b8"/>`
+    + '<circle cx="16" cy="16" r="5.4" fill="#fffaf0" stroke="#f7b8a8" stroke-width="2.2"/>' + shine(14.2, 14, 1.6, 1),
+  dawn: `<g fill="#f7b8a8" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round">${[-60, -30, 0, 30, 60].map(a => `<path d="M16 4l2.5 4.8h-5z" transform="rotate(${a} 16 20)"/>`).join('')}</g>`
+    + ol('<path d="M7.4 20.4a8.6 8.6 0 0 1 17.2 0z"/>', '#ffd36a', 3.2) + '<path d="M11.4 20.4a4.6 4.6 0 0 1 9.2 0z" fill="#fff1b8"/>'
+    + ol('<path d="M3 20.4h26v4c-2.2 1.6-4.3 1.6-6.5 0s-4.3-1.6-6.5 0-4.3 1.6-6.5 0-4.3-1.6-6.5 0z"/>', '#8fd0e8', 3) + '<ellipse cx="16" cy="22.2" rx="4.6" ry="1" fill="#f7b8a8"/>' + line('M5.6 22.4c1.4-.7 2.8-.7 4.2 0M22.2 22.4c1.4-.7 2.8-.7 4.2 0', '#e2f6fc', 1.4) + shine(12.2, 15.6, 1.6, 1),
 };
 
 // Material → glyph, name, and Japanese flavour label

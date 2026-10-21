@@ -27,6 +27,7 @@ import { mergeVertices } from '../../gfx/geom.js';
 import { makeToon, makeOutline } from '../../gfx/materials.js';
 import { dampAngle, angleDiff } from '../../core/util.js';
 import { mapleFx, MCOL } from './fx_tanuki.js';
+import { enemyParts, enemyMarker } from '../monsters/enemyModels.js';
 import { roll, hitWhere, pushPlayer, summonAdds, pickId, sfx, arenaOf, clearRun, clamp, rand, TAU, ease, F } from './kitA.js';
 
 const PAL = {
@@ -111,6 +112,31 @@ function hatParts() { // straw sugegasa (weave + red band), with its chin cords;
   paint(hat, (p, n, o) => { const a = Math.atan2(p.x, p.z), r = Math.hypot(p.x, p.z); o.set(PAL.straw); if (Math.cos(a * 12) > 0.6 || Math.abs(r - 0.3) < 0.01 || Math.abs(r - 0.11) < 0.01) o.set(PAL.strawDark); if (r > 0.225 && r < 0.265) o.set(PAL.band); if (r > 0.36) o.set(PAL.strawDark); });
   return [...shell(hat, 0.94, '#b08a44'), ell(0.03, 0.03, 0.03, PAL.band, [0, 0.172, 0], [0, 0, 0], 8)];
 }
+/**
+ * The Blender Danzaburō (ROADMAP EN-1; tools/blender/codex/assets/danzaburo): his parts, both forms and the markers. The
+ * GLB bakes each part's rest orientation, so the kit's groups move to the GLB's pivots (relative to their parents) with
+ * their rest rotations cleared, and each group's mesh takes the part's geometry. The kettle's leaf rides on the lid.
+ * → true when it applied
+ */
+function glbDanza(p) {
+  const P = enemyParts('danzaburo', 0); if (!P) return false;
+  const geo = n => { const g = P[n]?.geos; return g ? (g.length === 1 ? g[0].clone() : merge(g.map(x => x.clone()))) : null; };
+  const piv = n => P[n]?.at || [0, 0, 0];
+  const swap = (mesh, g) => { if (!mesh || !g) return; const old = mesh.geometry; for (const c of mesh.parent.children) if (c.isMesh && c.geometry === old) c.geometry = g; old.dispose(); };
+  const mesh0 = g => g.children.find(c => c.isMesh);
+  const place = (grp, n, parent) => { const a = piv(n), b = parent ? piv(parent) : [0, 0, 0]; grp.position.set(a[0] - b[0], a[1] - b[1], a[2] - b[2]); grp.rotation.set(0, 0, 0); };
+  p.lid.add(p.kLeaf);
+  for (const [grp, n, parent] of [[p.belly, 'belly'], [p.tail, 'tail'], [p.armL, 'armL'], [p.armR, 'armR'], [p.head, 'head'], [p.jaw, 'jaw', 'head'], [p.blush, 'blush', 'head'],
+    [p.hat, 'hat', 'head'], [p.leaf, 'leaf', 'hat'], [p.rock, 'rock'], [p.rockLeaf, 'rockLeaf', 'rock'], [p.lid, 'lid', 'kettle'], [p.khead, 'khead', 'kettle'], [p.kLeaf, 'kLeaf', 'lid']]) place(grp, n, parent);
+  swap(p.body, geo('body'));
+  for (const [grp, n] of [[p.belly, 'belly'], [p.tail, 'tail'], [p.armL, 'armL'], [p.armR, 'armR'], [p.head, 'head'], [p.jaw, 'jaw'], [p.blush, 'blush'], [p.hat, 'hat'], [p.leaf, 'leaf'],
+    [p.rockSpin, 'rock'], [p.rockLeaf, 'rockLeaf'], [p.kettle, 'kettle'], [p.lid, 'lid'], [p.khead, 'khead'], [p.kLeaf, 'kLeaf']]) swap(mesh0(grp), geo(n));
+  const bt = enemyMarker('danzaburo', 0, 'bellyTip', null), sp = enemyMarker('danzaburo', 0, 'spout', null), bp = piv('belly');
+  if (bt) p.bellyTip.position.set(bt[0] - bp[0], bt[1] - bp[1], bt[2] - bp[2]);
+  if (sp) p.spout.position.set(...sp);
+  const hm = mesh0(p.hat); if (hm) hm.receiveShadow = false; // (the camera sees the pushed-back hat's underside: unshadowed it stays golden straw)
+  return true;
+}
 function buildDanzaburo() {
   const mat = makeToon({ vertexColors: true, objectBrush: true, brush: 0.1, rim: 0.7, term: [-0.02, 0.3], fragOut: EDGE_OUT + LUM_CAP });
   const ol = makeOutline('#2a1622', 0.014);
@@ -191,6 +217,8 @@ function buildDanzaburo() {
   const cur = { hop: 0, crouch: 0, lean: 0, armLx: 0, armLz: 0, armRx: 0, armRz: 0, head: 0, tilt: 0, jaw: 0, belly: 1, blush: 0, rock: 0, spinA: 0, sit: 0, walk: 0 };
   const SM = ['crouch', 'lean', 'armLx', 'armLz', 'armRx', 'armRz', 'head', 'tilt', 'jaw', 'belly', 'blush', 'rock', 'sit'];
   let form = 'tanuki', bellyWob = 0;
+  const glb = glbDanza({ body, belly, bellyTip, tail, armL, armR, head, jaw, blush, hat, leaf, rock, rockSpin, rockLeaf, kettle, lid, khead, kLeaf, spout });
+  const LEAF_Z = glb ? 0 : -0.25, LID_Y = lid.position.y; // (the Blender model bakes the leaf's rest turn and places the lid)
   const animate = (dt, t, moving) => {
     const k = 1 - Math.exp(-pose.rate * dt);
     for (const n of SM) cur[n] += (pose[n] - cur[n]) * k;
@@ -214,12 +242,13 @@ function buildDanzaburo() {
       jaw.scale.setScalar(Math.max(0.001, cur.jaw + lg * 0.9));
       blush.scale.setScalar(Math.max(0.001, cur.blush));
       tail.rotation.set(Math.sin(t * 2.4) * 0.06, Math.sin(t * 1.6) * 0.3 * (1 + w), 0);
-      leaf.rotation.z = -0.25 + Math.sin(t * 2.2) * 0.08;
+      leaf.rotation.z = LEAF_Z + Math.sin(t * 2.2) * 0.08;
+      if (glb) hat.rotation.x = -0.8 * Math.min(0, cur.head); // (his big pushed-back hat would sink into his back as he tips his head back)
     } else if (form === 'rock') {
       if (pose.spin) cur.spinA += pose.spin * dt; else cur.spinA += (Math.round(cur.spinA / TAU) * TAU - cur.spinA) * Math.min(1, dt * 8);
       rockSpin.rotation.x = cur.spinA;
     } else {
-      lid.position.y = 0.48 + (pose.lid ? Math.abs(Math.sin(t * 34)) * 0.035 * pose.lid : 0); lid.rotation.z = pose.lid ? Math.sin(t * 29) * 0.12 * pose.lid : 0;
+      lid.position.y = LID_Y + (pose.lid ? Math.abs(Math.sin(t * 34)) * 0.035 * pose.lid : 0); lid.rotation.z = pose.lid ? Math.sin(t * 29) * 0.12 * pose.lid : 0;
       khead.rotation.set(Math.sin(t * 2) * 0.05, Math.sin(t * 0.9) * 0.15, 0);
     }
   };

@@ -17,6 +17,7 @@ import { ITEM_BASES, GEAR_BASE_IDS, generateItem } from '../src/rpg/items.js';
 import { RNG } from '../src/core/util.js';
 import { SHIHTZU_TRAINING } from '../src/rpg/skillsShihtzu.js';
 import { GOLDEN_TRAINING } from '../src/rpg/skillsGolden.js';
+import { STELLA_TRAINING } from '../src/rpg/skillsStella.js';
 
 export const FIGHT = 60, PACK = 5, RP = 3, BLEND = 0.7;
 const area = (r, n) => (n <= 1 ? 1 : Math.max(1, Math.min(n, n * (r / RP) ** 2)));
@@ -98,7 +99,86 @@ export const BUILDS = {
     cycle: (R, d) => Math.max(R.cd, 0.45 / (d.castMul || 1), R.params.ticks * 0.17),
     hits: (p, n, d) => (p.dmgPct * p.ticks + p.burnPct * Math.min(p.burnDur, Math.max(0.6, p.ticks * 0.17))) * (n <= 1 ? 1 : Math.max(1, area(Math.min(p.range, RP + 1), n) * Math.min(1, p.arc / 120))) / 100,
     attack: (p, n, d) => BUILDS.golden.attack(p, n, d) },
+  // Stella the Sun Oracle (docs/STELLA.md §7): an Energy hero (70% of her points in Energy, as Moka). Her fights are rotations
+  // (stlRotation below). Her basic attack is the Sunsweep (two sweeps on a 90° arc at 1/aspd, then a twirl's ring ×1.1 at
+  // 1/(0.9 aspd)). Radiance: Golden Ray on repeat down a 10 m line (a pack skill), Solar Ray against a lone foe when it fights
+  // better; Corona: Solar Flare on repeat with Hinata kept up; Dawn: the support (Halo kept on her, Kind Light, half its
+  // presses falling back to a foe); stella·heal: Radiance with a Morning Light every 8 s (the heal budget).
+  stella: { hero: 'stella', skill: 'goldenRay', mastery: 'innerLight', stat: 'ene', wtype: 'parasol',
+    plan: [['morningLight', 1], ['goldenRay', 20], ['innerLight', 20], ['prism', 1], ['sunlit', 20], ['solarRay', 20], ['prism', 20]],
+    rotation: (st, d, n) => stlRotation(st, d, n, 'ray'), attack: (p, n, d) => stlSweep(p, n, d) },
+  'stella·flare': { hero: 'stella', skill: 'solarFlare', mastery: 'sunKissed', stat: 'ene', wtype: 'parasol',
+    plan: [['morningLight', 1], ['solarFlare', 20], ['sunKissed', 20], ['sunspot', 1], ['skippingSun', 1], ['sunburn', 20], ['littleSun', 20], ['sunspot', 20]],
+    rotation: (st, d, n) => stlRotation(st, d, n, 'flare'), attack: (p, n, d) => stlSweep(p, n, d) },
+  'stella·dawn': { hero: 'stella', skill: 'kindLight', mastery: 'sunnyDisposition', stat: 'ene', wtype: 'parasol',
+    plan: [['morningLight', 1], ['kindLight', 1], ['sunnyDisposition', 1], ['halo', 1], ['kindLight', 20], ['sunnyDisposition', 20], ['halo', 20], ['stlZoomies', 5], ['sunDog', 10], ['daybreak', 10]],
+    rotation: (st, d, n) => stlRotation(st, d, n, 'dawn'), attack: (p, n, d) => stlSweep(p, n, d) },
+  // the single-target build (STELLA §7: Solar Ray for one big foe): Inner Light while Solar Ray's row is closed, then Solar Ray
+  'stella·solar': { hero: 'stella', ref: true, skill: 'goldenRay', mastery: 'innerLight', stat: 'ene', wtype: 'parasol',
+    plan: [['morningLight', 1], ['goldenRay', 1], ['prism', 1], ['solarRay', 20], ['innerLight', 20], ['sunlit', 20], ['goldenRay', 20]],
+    rotation: (st, d, n) => stlRotation(st, d, n, 'ray'), attack: (p, n, d) => stlSweep(p, n, d) },
+  'stella·heal': { hero: 'stella', ref: true, skill: 'goldenRay', mastery: 'innerLight', stat: 'ene', wtype: 'parasol',
+    plan: [['morningLight', 1], ['goldenRay', 20], ['innerLight', 20], ['prism', 1], ['sunlit', 20], ['solarRay', 20], ['prism', 20]],
+    rotation: (st, d, n) => stlRotation(st, d, n, 'ray', true), attack: (p, n, d) => stlSweep(p, n, d) },
 };
+/** Stella's Sunsweep combo as a basic attack (the ATTACK params: radius, arc, ringRadius, ringMul) */
+export function stlSweep(p, n, d) { return { per: p.dmgPct * (2 * area(p.radius, n) * Math.min(1, p.arc / 200) + p.ringMul * area(p.ringRadius, n)) / 3 / 100, cycle: (2 + 1 / 0.9) / 3 / d.aspd }; }
+/** Stella's sustained damage (weapon-damage % a second) against n foes, by build. Each second of fight, zoom and cast time
+ *  go by priority (as hexRotation): the heal budget's Morning Light (every 8 s), the Dawn's Halo kept on her, Hinata kept up
+ *  (Corona), then the build's skill on repeat with what's left; any time still free swings the wagasa. The marks: Sunlit
+ *  (Radiance) counts ~2 stacks a gilded foe and its flare once every ~2.5 s; Sunburn (Corona) its take on sunburnt foes. */
+/** her casts' action lengths at cast speed 1 (actors/stellaPoses.js: parasolAim, parasolRaise) */
+export const STL_CAST = { aim: 0.56, raise: 0.7 };
+export function stlRotation(st, d, n, kind, heal = false, parts = null) {
+  const has = id => (st.player.skills[id] || 0) > 0, rt = id => (has(id) ? skillRuntime(id, st, d) : null), A = skillRuntime('attack', st, d);
+  const cm = d.castMul || 1;
+  let zoom = d.zoomRegen, time = 1;
+  const take = (R, rate, castT) => { if (!R) return 0; const r = Math.max(0, Math.min(rate, zoom / R.cost, time / castT)); zoom -= r * R.cost; time -= r * castT; return r; };
+  const P = {};
+  const lit = d.sunlit ? 1 + 2 * d.sunlit.per / 100 : 1, litFlare = d.sunlit ? d.sunlit.flarePct / 2.5 * area(d.sunlit.flareR, n) : 0;
+  const burnt = d.sunburn ? 1 + d.sunburn.take / 100 : 1;
+  const AIM = STL_CAST.aim / cm, RAISE = STL_CAST.raise / cm;
+  if (heal) take(rt('morningLight'), 1 / 8, RAISE);
+  if (kind === 'ray') {
+    const ray = rt('goldenRay'), sol = n <= 1 ? rt('solarRay') : null;
+    if (sol) { // a lone foe: Solar Ray held, ramping +ramp%/s to ×rampMax (a hold of H s averages its ramp), while zoom lasts
+      const H = Math.max(1, Math.min(time, zoom / Math.max(0.01, sol.cost)) * FIGHT), up = (sol.params.rampMax - 1) / (sol.params.ramp / 100), avg = H > up ? 1 + (sol.params.rampMax - 1) * (H - up / 2) / H : 1 + sol.params.ramp / 100 * H / 2;
+      const f = Math.min(time, zoom / sol.cost); zoom -= f * sol.cost; time -= f;
+      P.solar = f * sol.params.dmgPct * avg * lit + (d.sunlit ? f * litFlare : 0);
+    }
+    const r = take(ray, 1 / AIM, AIM);
+    P.ray = r * ray.params.dmgPct * lineArea(ray.params.length, ray.params.width, n) * lit + (d.sunlit ? Math.min(1, r * 3) * litFlare : 0);
+  } else if (kind === 'flare') {
+    const sun = rt('littleSun'), fl = rt('solarFlare');
+    const rSun = take(sun, sun ? 1 / Math.max(sun.cd, sun.params.duration) : 0, 0.85 / cm), up = sun ? Math.min(1, rSun * sun.params.duration) : 0;
+    P.hinata = sun ? up * sun.params.dmgPct / sun.params.every * burnt : 0;
+    const r = take(fl, 1 / RAISE, RAISE);
+    P.flare = r * (fl.params.dmgPct + fl.params.burnPct * fl.params.burnDur * 0.6) * area(fl.params.radius, n) * burnt;
+  } else { // the Dawn: Halo kept on her (its flare when it ends), Kind Light with the rest (half its presses at a foe)
+    const halo = rt('halo'), kl = rt('kindLight');
+    const rH = take(halo, halo ? 1 / halo.params.duration : 0, RAISE);
+    P.halo = halo ? rH * halo.params.flarePct * (1 + 0.2 * halo.params.burnDur * 0.6) * area(halo.params.radius, n) : 0;
+    const r = take(kl, 1 / AIM, AIM);
+    P.kind = r * 0.5 * kl.params.rayPct * lineArea(kl.params.length, kl.params.width, n);
+  }
+  const atk = stlSweep(A.params, n, d); P.swing = Math.max(0, time) * atk.per * 100 / atk.cycle;
+  let dps = 0; for (const k in P) dps += P[k];
+  if (parts) Object.assign(parts, P, { time, zoom });
+  return dps / 100;
+}
+/** Stella's healing a second on herself, by build (the heal budget's Morning Light every 8 s; the Dawn's Halo kept on her
+ *  and half its Kind Light presses healing her), as a share of her life a second */
+export function stlHealRate(st, d, kind, heal) {
+  const has = id => (st.player.skills[id] || 0) > 0, rt = id => (has(id) ? skillRuntime(id, st, d) : null);
+  let h = 0;
+  if (heal) { const ml = rt('morningLight'); if (ml) h += ml.params.healPct / 100 / 8; }
+  if (kind === 'dawn') {
+    const halo = rt('halo'), kl = rt('kindLight'), cm = d.castMul || 1;
+    if (halo) h += halo.params.absorbPct / 100 / halo.params.duration;
+    if (kl) { const left = Math.max(0, d.zoomRegen - (halo ? halo.cost / halo.params.duration : 0)), r = Math.min(1 / (0.5 / cm), left / kl.cost); h += r * 0.5 * kl.params.healPct / 100; }
+  }
+  return h;
+}
 /** the hex build's sustained damage (weapon-damage % per second) against n foes. Per second of fight, zoom and cast time are spent
  *  by priority: Everlasting Gloom kept up, one Grumble Cloud kept up, Mournful Awoo on its cooldown (it spreads the hexes to the whole
  *  pack), Dripping Paw with what's left; any time still free swings the flail. The hexes: every hexed foe carries min(cap, stacks
@@ -135,18 +215,20 @@ export function hexRotation(st, d, n, parts = null) {
 export function buildHero(id, lvl) {
   const B = BUILDS[id], h = newHeroState(B.hero || id), st = { player: h.player, equipment: h.equipment, flags: {} }, P = st.player;
   P.lvl = lvl; P.skillPts = lvl; P.skills = {};
-  const pts = (lvl - 1) * 5; P.stats[B.stat] += Math.round(pts * 0.5); P.stats.vit += Math.round(pts * 0.3); P.stats.ene += pts - Math.round(pts * 0.5) - Math.round(pts * 0.3);
+  const pts = (lvl - 1) * 5, share = B.stat === 'ene' && (B.hero || id) === 'stella' ? 0.7 : 0.5; // (Stella: 70% of her points in Energy, her damage stat AND her zoom, as Moka's plan in STELLA §7)
+  if (share !== 0.5) { P.stats.ene += Math.round(pts * share); P.stats.vit += pts - Math.round(pts * share); }
+  else P.stats[B.stat] += Math.round(pts * 0.5); if (share === 0.5) { P.stats.vit += Math.round(pts * 0.3); P.stats.ene += pts - Math.round(pts * 0.5) - Math.round(pts * 0.3); }
   // skill points: the main skill first, then its mastery, then the synergy picks (each as far as the level gates allow)
   const plan = B.plan || [B.skill, B.mastery, ...B.extra].map(s => [s, 20]); // ([skill, up to level] in order: a plan puts points in steps)
   // (the balance models the finished class: skills still "in training" — built at a later checkpoint — count as learnable)
-  const locked = [...SHIHTZU_TRAINING], lockedG = [...GOLDEN_TRAINING]; SHIHTZU_TRAINING.clear(); GOLDEN_TRAINING.clear();
+  const locked = [...SHIHTZU_TRAINING], lockedG = [...GOLDEN_TRAINING], lockedS = [...STELLA_TRAINING]; SHIHTZU_TRAINING.clear(); GOLDEN_TRAINING.clear(); STELLA_TRAINING.clear();
   try {
     for (let guard = 0; guard < 400 && P.skillPts > 0; guard++) {
       const step = plan.find(([s, max]) => (P.skills[s] || 0) < max && canLearn(s, st).ok);
       if (!step) break;
       P.skills[step[0]] = (P.skills[step[0]] || 0) + 1; P.skillPts--;
     }
-  } finally { for (const id of locked) SHIHTZU_TRAINING.add(id); for (const id of lockedG) GOLDEN_TRAINING.add(id); }
+  } finally { for (const id of locked) SHIHTZU_TRAINING.add(id); for (const id of lockedG) GOLDEN_TRAINING.add(id); for (const id of lockedS) STELLA_TRAINING.add(id); }
   // the gear: the best normal base of the weapon type the level allows (same rule for every hero)
   const base = GEAR_BASE_IDS.map(k => ITEM_BASES[k]).filter(b => b.wtype === B.wtype && b.req.lvl <= lvl && b.lvl <= lvl).sort((a, b) => (b.dmg[0] + b.dmg[1]) - (a.dmg[0] + a.dmg[1]))[0];
   st.equipment.weapon = generateItem({ ilvl: lvl, base: base.id, rarity: 'normal', rng: new RNG(5) }); st.equipment.weaponAlt = null;
@@ -213,6 +295,23 @@ export function gldBand(levels = [6, 15, 30, 45]) {
   });
 }
 
+/** Stella's clear (blend dps) and single-target dps over the five-hero mean (Chewy, Moka, Poe, the Shih Tzu, Foosy) per level,
+ *  by build (docs/STELLA.md §7), and the time to fall under the standard pressure (incoming 5% of the mean's life a second,
+ *  after defence: the mean falls in ~20 s; her heals and halo counted; capped at 60 s, the fight) */
+export function stlBand(levels = [6, 15, 30, 45]) {
+  return compare(levels).map(r => {
+    const ids = ['chewy', 'moka', 'poe', 'shihtzu', 'golden'], mean = k => ids.reduce((a, id) => a + r[id][k], 0) / ids.length;
+    const inc = 0.05 * mean('life'), fall = (life, ehp, hps) => Math.min(60, life / Math.max(1e-6, inc - hps * life)) * (ehp / life);
+    const tMean = ids.reduce((a, id) => a + fall(r[id].life, r[id].ehp, 0), 0) / ids.length;
+    const row = { lvl: r.lvl, tMean };
+    for (const [k, kind, heal] of [['ray', 'ray', false], ['flare', 'flare', false], ['dawn', 'dawn', false], ['heal', 'ray', true], ['solar', 'ray', false]]) {
+      const id = { ray: 'stella', flare: 'stella·flare', dawn: 'stella·dawn', heal: 'stella·heal', solar: 'stella·solar' }[k], X = r[id], h = buildHero(id, r.lvl);
+      row[k] = { clear: X.dps / mean('dps'), single: X.singleDps / mean('singleDps'), falls: fall(X.life, X.ehp, stlHealRate(h.st, h.d, kind, heal)) / tMean, life: X.life / mean('life') };
+    }
+    return row;
+  });
+}
+
 if (process.argv[1]?.replace(/\\/g, '/').endsWith('tools/hero-balance.mjs')) {
   const a = process.argv.slice(2), li = a.indexOf('--levels');
   const levels = li >= 0 ? a[li + 1].split(',').map(Number) : [6, 15, 30, 45];
@@ -234,4 +333,5 @@ if (process.argv[1]?.replace(/\\/g, '/').endsWith('tools/hero-balance.mjs')) {
   console.log('foosy (lance) vs the chewy–moka–poe–shih tzu mean: ' + gb.map(b => `L${b.lvl} dps ×${b.dps.toFixed(2)} eHP ×${b.ehp.toFixed(2)} (×${b.stzEhp.toFixed(2)} the shih tzu's) life ×${b.life.toFixed(2)}`).join(' · '));
   console.log('javelin build vs the mean: ' + gb.map(b => `L${b.lvl} clear ×${b.jav.clear.toFixed(2)} single ×${b.jav.single.toFixed(2)}`).join(' · '));
   console.log('whelp build vs the mean: ' + gb.map(b => `L${b.lvl} clear ×${b.whelp.clear.toFixed(2)} single ×${b.whelp.single.toFixed(2)}`).join(' · '));
+  for (const b of stlBand(levels)) console.log(`stella L${b.lvl} vs the five-hero mean (falls: × the mean's ${b.tMean.toFixed(1)} s): ` + ['ray', 'flare', 'dawn', 'heal', 'solar'].map(k => `${k} clear ×${b[k].clear.toFixed(2)} single ×${b[k].single.toFixed(2)} falls ×${b[k].falls.toFixed(2)}`).join(' · ') + ` · life ×${b.ray.life.toFixed(2)}`);
 }

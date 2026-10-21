@@ -1,0 +1,210 @@
+/* Couch co-op's HUD (ui/coopHud.js, docs/COOP.md §4): the player cards, the join card, the hero picker, the world tags.
+   (Every .ch-* rule is scoped to .coop-hud: the Character panel has its own .ch-name / .ch-lv / .ch-pts / .ch-pick.)
+   --pc is the player's colour (coop.js PLAYER_COLORS: P1 gold, P2 sky, P3 mint, P4 rose), --hc the hero's. */
+.coop-hud { position: absolute; inset: 0; pointer-events: none; }
+.coop-hud.off { display: none; }
+
+/* ---------------------------------------------------------------- player 1's P1 badge on the HUD portrait */
+.hud .pc-bub .ch-p1 { position: absolute; left: -6px; top: -5px; z-index: 3; font: 700 13px/1 var(--font); font-style: normal; color: #fff; padding: 3px 6px 3px; border-radius: 9px;
+  background: linear-gradient(#ffd96a, #f5ad1c); border: 2.5px solid var(--ink); box-shadow: 0 2px 0 var(--ink); -webkit-text-stroke: 3.4px var(--ink); paint-order: stroke fill;
+  transform: rotate(-10deg) scale(0); transition: transform .4s var(--pop); pointer-events: none; }
+.ui-root.coop-on .hud .pc-bub .ch-p1 { transform: rotate(-10deg) scale(1); }
+
+/* the toasts lift over the card stack (ui/coopHud.js layout: --coop-lift) */
+.ui-root.coop-on .toasts { translate: 0 calc(-1 * var(--coop-lift, 0px)); transition: bottom .45s var(--soft), translate .45s var(--soft); }
+
+/* ---------------------------------------------------------------- the player cards: bottom-left, stacked up from the corner */
+.coop-hud .ch-cards { position: absolute; left: 14px; bottom: 12px; width: 248px; height: 0; transform: scale(var(--ch-k, 1)); transform-origin: 0 100%;
+  transition: opacity .35s, translate .45s var(--soft); }
+.ui-root.deck-ui .coop-hud .ch-cards { left: 4px; bottom: 4px; } /* (the Deck's safe area is round the layer already) */
+.ui-root.dlg-open .coop-hud .ch-cards, .coop-hud.busy .ch-cards { opacity: 0; translate: -40px 0; }
+.coop-hud .ch-card { position: absolute; left: 0; bottom: 0; width: 248px; height: 72px; translate: 0 calc(var(--k, 0) * -80px);
+  transform: translateX(-120%) rotate(-3deg); opacity: 0; transition: translate .5s var(--soft), transform .55s var(--spring), opacity .3s; }
+.coop-hud .ch-card.in { transform: none; opacity: 1; }
+.coop-hud .ch-card.out { transform: translateX(-125%) rotate(-5deg); opacity: 0; transition: transform .42s cubic-bezier(.55, 0, .8, .2), opacity .3s .1s; }
+.coop-hud .ch-plate { position: absolute; left: 26px; right: 0; top: 4px; bottom: 2px; border-radius: 20px 18px 18px 20px; border: 3px solid var(--ink);
+  background: var(--paper-noise), linear-gradient(100deg, color-mix(in srgb, var(--pc) 26%, #fffaf2) 0, #fffdf8 34%, #fff2e2 100%);
+  box-shadow: 0 4px 0 rgba(74, 44, 42, .38), 0 8px 18px rgba(60, 26, 40, .16), inset 0 0 0 2px #fff, inset 0 -3px 0 color-mix(in srgb, var(--pc) 35%, transparent);
+  transition: filter .3s, box-shadow .3s; }
+/* the portrait in the player's colour ring */
+.coop-hud .ch-face { position: absolute; left: 0; top: 0; width: 72px; height: 72px; }
+.coop-hud .ch-pf { position: absolute; inset: 6px; border-radius: 50%; overflow: hidden; border: 3px solid var(--ink);
+  background: radial-gradient(circle at 50% 30%, #fff 0, color-mix(in srgb, var(--hc, #ff8fb0) 22%, #fff) 50%, color-mix(in srgb, var(--hc, #ff8fb0) 48%, #fff) 100%);
+  box-shadow: 0 0 0 3.5px var(--pc), 0 0 0 6px var(--ink), 0 5px 0 4px rgba(74, 44, 42, .3); transition: filter .35s; }
+.coop-hud .ch-pf .p3d, .coop-hud .ch-pf .portrait { position: absolute; left: -8%; top: 4%; width: 116% !important; height: 116% !important; object-fit: cover; }
+.coop-hud .ch-pf .p3d { animation: breathe 3.4s ease-in-out infinite; }
+.coop-hud .ch-p { position: absolute; left: -5px; top: -4px; z-index: 2; font: 700 13px/1 var(--font); font-style: normal; color: #fff; padding: 3px 6px 3px; border-radius: 9px; background: var(--pc);
+  border: 2.5px solid var(--ink); box-shadow: 0 2px 0 var(--ink); -webkit-text-stroke: 3.4px var(--ink); paint-order: stroke fill; transform: rotate(-10deg); }
+.coop-hud .ch-lv { position: absolute; right: -2px; bottom: -1px; z-index: 2; min-width: 26px; height: 26px; border-radius: 13px; display: grid; place-items: center; padding: 0 3px; box-sizing: border-box;
+  background: radial-gradient(circle at 35% 30%, #fff5c4, #ffcf4a 60%, #f0a830); border: 2.5px solid var(--ink); box-shadow: 0 2px 0 var(--ink); }
+.coop-hud .ch-lv span { font: 700 14px/1 var(--font); color: var(--ink); }
+.coop-hud .ch-lv.up { animation: lvPop 1.2s var(--pop); }
+.coop-hud .ch-pts { position: absolute; right: -4px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: #ff5c8a; border: 2px solid var(--ink); transform: scale(0); transition: transform .3s var(--pop); }
+.coop-hud .ch-pts.on { transform: scale(1); }
+/* the revive ring round the portrait (downed) */
+.coop-hud .ch-rev { position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); transform: rotate(-90deg); pointer-events: none; opacity: 0; transition: opacity .3s; }
+.coop-hud .ch-rev circle { fill: none; stroke-width: 6; }
+.coop-hud .ch-rev .t { stroke: rgba(74, 44, 42, .35); }
+.coop-hud .ch-rev .f { stroke: var(--pc); stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; filter: drop-shadow(0 0 3px var(--pc)); transition: stroke-dashoffset .12s linear; }
+/* name, bars, hotbar */
+.coop-hud .ch-info { position: absolute; left: 80px; right: 10px; top: 7px; display: flex; flex-direction: column; }
+.coop-hud .ch-name { height: 16px; display: flex; align-items: baseline; }
+.coop-hud .ch-name b { font: 700 16px/1 var(--font); color: var(--ink); white-space: nowrap; display: flex; align-items: baseline; gap: 5px; letter-spacing: .2px; }
+.coop-hud .ch-name .jp { font: 600 10px/1 var(--jp); color: color-mix(in srgb, var(--hc, #ff8fb0) 70%, var(--ink)); }
+.coop-hud .ch-bar { position: relative; height: 9px; margin-top: 3px; border-radius: 6px; border: 2px solid var(--ink); background: #4a2438; overflow: hidden; }
+.coop-hud .ch-bar i { position: absolute; inset: 0; transform-origin: 0 50%; transform: scaleX(var(--f, 1)); }
+.coop-hud .ch-life .g { background: #fff0c8; transition: transform .7s ease .35s; }
+.coop-hud .ch-life .f { background: linear-gradient(#ffa3c0, #ff4f7c 55%, #d12e5a); transition: transform .22s var(--soft); box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, .5); }
+.coop-hud .ch-life.low .f { animation: chLow 1s ease-in-out infinite; }
+@keyframes chLow { 50% { filter: brightness(1.35) saturate(1.2); } }
+.coop-hud .ch-zoom { height: 7px; margin-top: 2px; background: #1e2244; }
+.coop-hud .ch-zoom .f { background: linear-gradient(#aee4ff, #4aa6ff 55%, #2c5ad8); transition: transform .22s var(--soft); box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, .5); }
+.coop-hud .ch-hb { display: flex; gap: 4px; margin-top: 4px; transition: opacity .25s, transform .3s var(--soft); }
+.coop-hud .ch-sk { position: relative; width: 23px; height: 23px; border-radius: 7px; border: 2px solid var(--ink); overflow: hidden; box-sizing: border-box;
+  background: radial-gradient(circle at 50% 35%, #fff, #f3e6d6); box-shadow: 0 1.5px 0 rgba(74, 44, 42, .35); }
+.coop-hud .ch-sk img { position: absolute; inset: 1px; width: calc(100% - 2px); height: calc(100% - 2px); object-fit: contain; }
+.coop-hud .ch-sk.empty img { display: none; }
+.coop-hud .ch-sk.empty { background: repeating-linear-gradient(45deg, #f8ecdc 0 4px, #f0e1cc 4px 8px); box-shadow: none; opacity: .75; }
+.coop-hud .ch-sk .cd { position: absolute; inset: 0; opacity: 0; background: conic-gradient(rgba(38, 22, 50, .7) calc(var(--cd, 0) * 360deg), transparent 0); transition: opacity .15s; }
+.coop-hud .ch-sk.cool .cd { opacity: 1; }
+.coop-hud .ch-sk.ready { animation: slotPop .5s var(--pop); }
+.coop-hud .ch-sk.swap { animation: slotPop .45s var(--pop); }
+/* a line in place of the hotbar: downed, a lost pad */
+.coop-hud .ch-msg { position: absolute; left: 0; right: -4px; top: 34px; height: 28px; display: flex; flex-direction: column; justify-content: center; opacity: 0; transform: translateY(5px); transition: opacity .25s, transform .3s var(--soft); pointer-events: none; }
+.coop-hud .ch-msg b { font: 700 13.5px/1.05 var(--font); color: #d8345a; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+.coop-hud .ch-card.lost .ch-msg b span { font-size: 12.5px; line-height: 1.05; }
+.coop-hud .ch-msg small { font: 600 11px/1.1 var(--font); color: var(--ink2); white-space: nowrap; }
+.coop-hud .ch-padic { width: 26px; height: 17px; flex: none; animation: chWiggle 1.4s ease-in-out infinite; }
+@keyframes chWiggle { 0%, 60%, 100% { transform: rotate(0); } 70% { transform: rotate(-10deg); } 80% { transform: rotate(9deg); } 90% { transform: rotate(-5deg); } }
+.coop-hud .ch-card:is(.down, .lost) .ch-hb { opacity: 0; transform: translateY(-4px); }
+.coop-hud .ch-card:is(.down, .lost) .ch-msg { opacity: 1; transform: none; }
+.coop-hud .ch-card.down .ch-pf { filter: grayscale(.85) brightness(.82); }
+.coop-hud .ch-card.down .ch-rev { opacity: 1; }
+.coop-hud .ch-card.down .ch-plate { box-shadow: 0 4px 0 rgba(74, 44, 42, .38), 0 0 0 3px rgba(255, 92, 138, .0), 0 0 18px rgba(255, 80, 120, .45), inset 0 0 0 2px #fff; animation: chDown 1.6s ease-in-out infinite; }
+@keyframes chDown { 50% { box-shadow: 0 4px 0 rgba(74, 44, 42, .38), 0 0 26px rgba(255, 80, 120, .7), inset 0 0 0 2px #fff; } }
+.coop-hud .ch-card.down .ch-bar { filter: saturate(.5); }
+.coop-hud .ch-card.lost .ch-plate { filter: saturate(.35) brightness(.96); }
+.coop-hud .ch-card.lost .ch-pf { filter: grayscale(.7) opacity(.75); }
+.coop-hud .ch-card.lost .ch-msg b { color: var(--ink); font-size: 13px; }
+.coop-hud .ch-card.state .ch-face { animation: slotPop .5s var(--pop); }
+.coop-hud .ch-card.hurt .ch-face { animation: shake .42s; }
+/* their bag pane is open: a little bag pops onto the card */
+.coop-hud .ch-bag { position: absolute; right: -9px; top: -11px; z-index: 3; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 40% 30%, #fff, color-mix(in srgb, var(--pc) 45%, #fff));
+  border: 2.5px solid var(--ink); box-shadow: 0 2px 0 var(--ink); transform: scale(0) rotate(-30deg); transition: transform .35s var(--pop); }
+.coop-hud .ch-bag .gl { width: 23px; height: 23px; }
+.coop-hud .ch-card.pane .ch-bag { transform: none; animation: bob 1.4s ease-in-out .35s infinite; }
+/* a hero switch: the portrait spins in with a ring of the new hero's colour */
+.coop-hud .ch-card.swap .ch-pf { animation: heroSwap .7s var(--pop); }
+.coop-hud .ch-card.swap .ch-face::after { content: ''; position: absolute; inset: 2px; border-radius: 50%; border: 4px solid var(--hc); animation: chRing .7s ease-out forwards; pointer-events: none; }
+@keyframes chRing { 0% { transform: scale(.8); opacity: 1; } 100% { transform: scale(1.7); opacity: 0; } }
+
+/* ---------------------------------------------------------------- the picker (LB held): an arc of portraits over the card */
+.coop-hud .ch-card.picking { z-index: 5; }
+.coop-hud .ch-pick { position: absolute; left: 4px; bottom: calc(100% + 12px); width: 236px; height: 132px; pointer-events: none; border-radius: 24px; border: 3px solid var(--ink);
+  background: var(--paper-noise), linear-gradient(#fffdf8, #fff2e2 70%, color-mix(in srgb, var(--pc) 22%, #fff2e2));
+  box-shadow: 0 5px 0 rgba(74, 44, 42, .38), 0 12px 26px rgba(60, 26, 40, .3), inset 0 0 0 2.5px #fff, inset 0 0 0 5px color-mix(in srgb, var(--pc) 40%, #fff);
+  transform-origin: 30px calc(100% + 12px); transform: translateY(10px) scale(.4); opacity: 0; visibility: hidden; transition: transform .3s var(--pop), opacity .18s, visibility 0s .3s; }
+.coop-hud .ch-pick::after { content: ''; position: absolute; left: 22px; bottom: -11px; width: 16px; height: 16px; background: color-mix(in srgb, var(--pc) 22%, #fff2e2); border-right: 3px solid var(--ink); border-bottom: 3px solid var(--ink); transform: rotate(45deg); border-radius: 0 0 4px 0; }
+.coop-hud .ch-card.picking .ch-pick { transform: none; opacity: 1; visibility: visible; transition: transform .34s var(--pop), opacity .15s, visibility 0s; }
+.coop-hud .ch-pk { position: absolute; left: 0; top: 0; width: 44px; height: 44px; transform: translate(calc(var(--x) - 50%), calc(var(--y) - 50%)) scale(.9);
+  transition: transform .3s var(--pop) calc(var(--i) * 30ms), opacity .2s calc(var(--i) * 30ms); }
+.coop-hud .ch-card:not(.picking) .ch-pk { transform: translate(calc(var(--x) - 50%), calc(var(--y) - 50% + 20px)) scale(.3); opacity: 0; transition: transform .15s ease-in, opacity .12s; }
+.coop-hud .ch-pkf { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; border: 3px solid var(--ink); background: radial-gradient(circle at 50% 30%, #fff, color-mix(in srgb, var(--hc) 40%, #fff));
+  box-shadow: 0 3px 0 rgba(74, 44, 42, .4); transition: box-shadow .2s, filter .2s; filter: saturate(.7) brightness(.97); }
+.coop-hud .ch-pkf .p3d, .coop-hud .ch-pkf .portrait { position: absolute; left: -8%; top: 4%; width: 116% !important; height: 116% !important; }
+.coop-hud .ch-pk em { position: absolute; left: 50%; bottom: -9px; z-index: 1; transform: translateX(-50%); font: 700 10px/1 var(--font); font-style: normal; color: #fff; background: #a0909a; border: 2px solid var(--ink); border-radius: 7px; padding: 2px 4px; }
+.coop-hud .ch-card.picking .ch-pk.sel { transform: translate(calc(var(--x) - 50%), calc(var(--y) - 50% - 4px)) scale(1.22); z-index: 2; }
+.coop-hud .ch-pk.sel .ch-pkf { filter: none; box-shadow: 0 0 0 3px var(--pc), 0 0 0 5.5px var(--ink), 0 0 16px 4px color-mix(in srgb, var(--pc) 60%, transparent), 0 4px 0 3px rgba(74, 44, 42, .3); }
+.coop-hud .ch-pl { position: absolute; left: 0; right: 0; bottom: 9px; display: flex; flex-direction: column; align-items: center; white-space: nowrap; }
+.coop-hud .ch-pl b { font: 700 17px/1 var(--font); color: #fff; -webkit-text-stroke: 4.5px var(--ink); paint-order: stroke fill; text-shadow: 0 2px 0 var(--ink); }
+.coop-hud .ch-pl span { font: 600 11px/1.3 var(--font); color: var(--ink2); }
+.coop-hud .ch-pl.swap { animation: chPl .3s var(--pop); }
+@keyframes chPl { 0% { scale: .85; } 100% { scale: 1; } }
+
+/* ---------------------------------------------------------------- the join card: up over the hotbar, in the new player's colour */
+.coop-hud .ch-joins { position: absolute; left: 0; right: 0; bottom: 196px; display: flex; justify-content: center; gap: 16px; align-items: flex-end; }
+.cj { position: relative; width: 300px; padding: 22px 16px 12px; box-sizing: border-box; border-radius: 28px; border: 4px solid var(--ink); text-align: center;
+  background: var(--paper-noise), linear-gradient(175deg, #fffdf8 0%, #fff4e6 55%, color-mix(in srgb, var(--pc) 24%, #fff4e6) 100%);
+  box-shadow: 0 6px 0 rgba(74, 44, 42, .38), 0 16px 34px rgba(60, 26, 40, .28), inset 0 0 0 3px #fff, inset 0 0 0 6px color-mix(in srgb, var(--pc) 45%, #fff);
+  transform: translateY(calc(100% + 240px)) rotate(4deg); opacity: 0; transition: transform .6s var(--spring), opacity .25s, background .3s; }
+.cj.in { transform: none; opacity: 1; }
+.cj.out { transform: translateY(calc(100% + 240px)) rotate(-3deg); opacity: 0; transition: transform .42s cubic-bezier(.5, 0, .8, .3), opacity .3s .12s; }
+.cj.nope { animation: shake .45s; }
+.cj-h { position: absolute; left: 50%; top: -19px; transform: translateX(-50%) rotate(-2deg); display: flex; align-items: center; gap: 0; white-space: nowrap; }
+.cj-tag { font: 700 20px/1 var(--font); color: #fff; padding: 6px 14px 7px; border-radius: 15px; background: linear-gradient(color-mix(in srgb, var(--pc) 55%, #fff), var(--pc));
+  border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, .5); -webkit-text-stroke: 5px var(--ink); paint-order: stroke fill; position: relative; z-index: 1; transition: background .3s; }
+.cj-sub { font: 700 13px/1 var(--font); color: var(--ink); padding: 6px 12px 6px 16px; margin-left: -10px; border-radius: 0 12px 12px 0; background: #fffaf2; border: 3px solid var(--ink); border-left: 0; box-shadow: 0 3px 0 var(--ink); }
+/* the carousel: the picked hero in the middle, a neighbour each side */
+.cj-car { position: relative; height: 98px; margin: 4px -4px 0; display: flex; align-items: center; justify-content: space-between; }
+.cj-ar { position: relative; z-index: 2; width: 20px; height: 28px; flex: none; transition: transform .2s var(--spring), opacity .2s; }
+.cj-ar svg { width: 100%; height: 100%; display: block; }
+.cj-ar.bump.l { animation: cjBumpL .26s var(--pop); } .cj-ar.bump.r { animation: cjBumpR .26s var(--pop); }
+@keyframes cjBumpL { 50% { transform: translateX(-6px) scale(1.2); } } @keyframes cjBumpR { 50% { transform: translateX(6px) scale(1.2); } }
+.cj.one .cj-ar { opacity: .25; }
+.cj-track { position: absolute; left: 22px; right: 22px; top: 0; bottom: 0; -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 13%, #000 87%, transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 13%, #000 87%, transparent 100%); }
+.cj-f { position: absolute; left: 50%; top: 50%; width: 82px; height: 82px; transform: translate(calc(-50% + var(--d, 0) * 84px), -50%) scale(.66); opacity: .85;
+  transition: transform .38s var(--spring), opacity .3s; }
+.cj-f.sel { transform: translate(-50%, -50%) scale(1); opacity: 1; z-index: 1; }
+.cj-f.far { opacity: 0; }
+.cj-fi { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; border: 4px solid var(--ink); background: radial-gradient(circle at 50% 30%, #fff, color-mix(in srgb, var(--hc) 40%, #fff));
+  box-shadow: 0 4px 0 rgba(74, 44, 42, .35); filter: saturate(.75); transition: box-shadow .25s, filter .25s; }
+.cj-f.sel .cj-fi { filter: none; box-shadow: 0 0 0 4px var(--hc), 0 0 0 7px var(--ink), 0 0 22px 6px color-mix(in srgb, var(--hc) 55%, transparent), 0 6px 0 5px rgba(74, 44, 42, .3); }
+.cj-fi .p3d, .cj-fi .portrait { position: absolute; left: -8%; top: 4%; width: 116% !important; height: 116% !important; }
+.cj-f.sel .cj-fi .p3d { animation: breathe 3s ease-in-out infinite; }
+.cj-who { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-top: 6px; min-height: 40px; }
+.cj-who b { font: 700 22px/1 var(--font); color: #fff; -webkit-text-stroke: 5.5px var(--ink); paint-order: stroke fill; text-shadow: 0 3px 0 var(--ink); display: flex; align-items: baseline; gap: 6px; }
+.cj-who b .jp { font: 700 12px/1 var(--jp); -webkit-text-stroke: 3.5px var(--ink); color: var(--hc); }
+.cj-who span { font: 600 13px/1.2 var(--font); color: var(--ink2); }
+.cj-who em { font-style: normal; font-weight: 700; color: color-mix(in srgb, var(--hc) 75%, var(--ink)); }
+.cj-who.swap { animation: cjWho .32s var(--soft); }
+@keyframes cjWho { 0% { opacity: 0; transform: translateY(6px); } 100% { opacity: 1; transform: none; } }
+.cj-foot { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 8px; font: 700 15px/1 var(--font); color: var(--ink); }
+.cj-foot i { font-style: normal; color: var(--ink3); margin: 0 4px; }
+.cj-foot .kc.pad { height: 26px; }
+.cj-foot .kc.pad .pg { width: 26px; height: 26px; }
+/* nobody can join: why, and it closes by itself (coop.js: 3.5 s) */
+.cj-why { display: none; flex-direction: column; align-items: center; justify-content: center; gap: 8px; height: 98px; margin-top: 4px; }
+.cj-why b { font: 700 17px/1.2 var(--font); color: var(--ink); max-width: 240px; }
+.cj-wic { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 40% 30%, #fff, color-mix(in srgb, var(--pc) 40%, #fff)); border: 3px solid var(--ink); animation: bob 1.4s ease-in-out infinite; }
+.cj-wic .gl { width: 24px; height: 24px; }
+.cj.why .cj-car, .cj.why .cj-who { display: none; }
+.cj.why .cj-why { display: flex; }
+.cj-bar { position: absolute; left: 22px; right: 22px; bottom: 5px; height: 4px; border-radius: 2px; background: var(--pc); transform-origin: left; opacity: 0; }
+.cj.why .cj-bar { opacity: .8; animation: tbar 3.5s linear forwards; }
+
+/* ---------------------------------------------------------------- the world: the tags over the heads */
+.coop-world { position: absolute; inset: 0; pointer-events: none; }
+.coop-world.off { display: none; }
+.cw { position: absolute; left: 0; top: 0; width: 0; height: 0; will-change: transform; }
+.cw-in { position: absolute; left: 0; bottom: 0; transform: translate(-50%, 0) translateY(8px) scale(.6); transform-origin: 50% 100%; opacity: 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  transition: opacity .4s, transform .4s var(--spring); }
+.cw.show .cw-in { opacity: 1; transform: translate(-50%, 0); }
+.cw-pill { position: relative; display: flex; align-items: center; padding: 3px; border-radius: 14px; background: #fffaf2; border: 2.5px solid var(--ink); box-shadow: 0 3px 0 rgba(74, 44, 42, .45); white-space: nowrap; }
+.cw-pill::after { content: ''; position: absolute; left: 50%; bottom: -8px; width: 10px; height: 10px; margin-left: -5px; background: #fffaf2; border-right: 2.5px solid var(--ink); border-bottom: 2.5px solid var(--ink); transform: rotate(45deg); border-radius: 0 0 3px 0; }
+.cw-p { font: 700 14px/1 var(--font); color: #fff; padding: 3px 6px 3px; border-radius: 9px; background: var(--pc); -webkit-text-stroke: 3.4px var(--ink); paint-order: stroke fill; box-shadow: inset 0 -2px 0 rgba(74, 44, 42, .22); }
+.cw-pr { display: flex; align-items: center; gap: 5px; max-width: 0; overflow: hidden; opacity: 0; transition: max-width .35s var(--soft), opacity .25s, padding .3s; }
+.cw.prompt .cw-pr { max-width: 280px; opacity: 1; padding: 0 8px 0 6px; }
+.cw-k .kc.pad { height: 24px; animation: bob 1s ease-in-out infinite; }
+.cw-k .kc.pad .pg { width: 24px; height: 24px; }
+.cw-t { font: 700 15px/1 var(--font); color: var(--ink); }
+.cw-pill.pop { animation: slotPop .4s var(--pop); }
+/* downed: "Needs a hand!" over them, with Shadow's countdown round his face */
+.cw-dn { display: none; align-items: center; gap: 6px; padding: 3px 12px 3px 3px; border-radius: 22px; background: linear-gradient(#fff4f6, #ffe0e8); border: 2.5px solid var(--ink); box-shadow: 0 3px 0 rgba(74, 44, 42, .45);
+  white-space: nowrap; animation: bob 1.6s ease-in-out infinite; }
+.cw.down .cw-dn { display: flex; }
+.cw-sh { position: relative; width: 38px; height: 38px; flex: none; }
+.cw-sh svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg) scaleY(-1); }
+.cw-sh circle { fill: none; stroke-width: 4.5; }
+.cw-sh .t { stroke: rgba(74, 44, 42, .22); }
+.cw-sh .f { stroke: #8f7ae0; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 0; transition: stroke-dashoffset .3s linear; }
+.cw-shf { position: absolute; inset: 5px; border-radius: 50%; overflow: hidden; border: 2px solid var(--ink); background: radial-gradient(circle at 50% 30%, #fff, #cfe0ff); }
+.cw-shf .p3d, .cw-shf .portrait { position: absolute; left: -10%; top: 2%; width: 120% !important; height: 120% !important; }
+.cw-dt { display: flex; flex-direction: column; }
+.cw-dt b { font: 700 15px/1.05 var(--font); color: #d8345a; }
+.cw-dt small { font: 600 11px/1.15 var(--font); color: var(--ink2); }
+.cw.helped .cw-dn { background: linear-gradient(#f4fff6, #d8f6e0); }
+.cw.helped .cw-dt b { color: #2a9a5a; }
+
+@media (prefers-reduced-motion: reduce) {
+  .coop-hud .ch-pf .p3d, .cj-f.sel .cj-fi .p3d, .cw-dn, .cw-k .kc.pad, .coop-hud .ch-card.pane .ch-bag { animation: none; }
+}

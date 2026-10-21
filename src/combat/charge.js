@@ -35,7 +35,7 @@ export class ChargeController {
     this.focus = new THREE.Vector3(); this.color = new THREE.Color();
     // what the ring / hotbar draw (read by gfx/chargeFx.js and ui/chargeHud.js; never reallocated)
     this.view = { on: false, slot: -1, id: null, pos: new THREE.Vector3(), focus: this.focus, color: this.color, k: 0, stage: 0, max: 1, pips: [1, -1, -1], lit: [0, 0, 0], aff: [1, 1, 1], full: false, r: 1.25 };
-    Events.on('player:roll', () => this.cancel('roll'));
+    Events.on('player:roll', () => { if (this.G.skills === this.runner) this.cancel('roll'); }); // (couch co-op: only the hero who rolled; coop/coop.js)
   }
   /** 0 On (hold to charge) · 1 Off (hold repeats, as before) · 2 Toggle (press to start, press again to release) */
   get mode() { return this.modeOverride ?? this.G.ui?.settings?.chargeMode ?? CHARGE_MODE.ON; }

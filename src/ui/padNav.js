@@ -15,6 +15,7 @@
 import { Actions } from '../core/actions.js';
 import { el } from './dom.js';
 import { padGlyph } from './padGlyphs.js';
+import { TIP } from './tooltip.js';
 
 const FOCUSABLE = 'button, [data-focus], .slot[data-c], .node, .chg-pk, .sh-item, .ck-row, .mx-it, .mx-slot.has, .q-item, .tv-pin, .gf-card, .pslot[data-id], .sp-card, .card, .fl-card, .dr, .rm-set, .rm-o, input[type=range]';
 const SKIP = '.ph-x, .pad-skip';
@@ -22,7 +23,7 @@ const SKIP = '.ph-x, .pad-skip';
 const START = {
   menu: '[data-a="resume"], .ctl-b:not(.locked), .seg button.on, .tog',
   inventory: '.slot[data-c="inv"].has, .slot[data-c="inv"], .pslot[data-id]',
-  stash: '.slot[data-c="stash"], .slot[data-c="lost"]', shop: '.sh-item', skills: '.node.can, .node.learned, .node', character: '.at-plus:not([disabled]), .attr .at-plus, .dr',
+  stash: '.slot[data-c="stash"], .slot[data-c="lost"]', shop: '.sh-item', skills: '.node.can, .node.learned, .node', character: '.at-plus:not([disabled]), .attr .at-plus, .ch-auto',
   quests: '.q-item, .gd-card .btn, .fl-card', cook: '.ck-row.sel, .ck-row', craft: '.ck-row.sel, .ck-row', travel: '.tv-pin.sel, .tv-pin.here, .tv-pin', gift: '.gf-card', seeds: '.sp-card',
   houseCard: '.btn.pink, .btn', remodel: '.rm-set.on, .rm-set', lantern: '.ln-go',
   burrow: '.dn-go, .dn-pin.sel', // (the Burrow door's den picker: docs/ZONES.md §4.1)
@@ -100,6 +101,8 @@ export class PadNav {
     if (SP && (A.padHit('LT') || A.padHit('RT'))) { const d = A.padHit('RT') ? 1 : -1; A.padConsume('LT'); A.padConsume('RT'); this.stashTab(SP, d); }
     // R3 in the bag or the stash: Sort the grid the focus is in (the bag, or the stash's open tab: docs/INVENTORY.md)
     if (A.padHit('R3') && this.cur && !this.ui.drag?.held) { const P = this.cur.closest('.p-stash') ? this.ui.panels.stash : this.cur.closest('.p-inv') ? this.ui.panels.inventory : null; if (P?.sort) { A.padConsume('R3'); P.sort(); this.refocus(this.cur); } }
+    // L3 on a piece of gear: its tooltip's details on / off, and they stay so until pressed again (docs/STATS.md §1)
+    if (A.padHit('L3') && this.gearAt(this.cur)) { A.padConsume('L3'); this.ui.tip.toggleDetail(); }
     // the K panel: a right-stick flick steps the Charge drawer through the tree's skills (R-16; the focus stays where it is)
     if (S.top?.name === 'skills') { const ax = A.aim().x, fl = Math.abs(ax) > 0.6 ? Math.sign(ax) : Math.abs(ax) < 0.3 ? 0 : this._flick || 0; if (fl && fl !== this._flick) S.top.chg.cycle(fl); this._flick = fl; }
     if (A.padHit('A') && this.cur) { A.padConsume('A'); this.armed = null; this.press(this.cur); }
@@ -237,6 +240,13 @@ export class PadNav {
     R.classList.add('on');
     this.hints(S, e, r);
   }
+  /** the focus is on a piece of gear (a bag, stash or worn slot, or the shop's) */
+  gearAt(e) {
+    if (!e) return false;
+    if (e.matches('.sh-item')) return true;
+    if (!e.matches('.slot[data-c].has') || !this.ui.drag) return false;
+    return this.ui.drag.get(this.ui.drag.addr(e))?.kind === 'gear';
+  }
   hints(S, e) {
     const h = handlerFor(e), list = [];
     const a = e && h?.label ? h.label(e, this) : null;
@@ -245,6 +255,7 @@ export class PadNav {
     if (a?.y) list.push(['Y', a.y]);
     const root = S.top?.panel, PM = this.ui.padMenu?.active, tabs = !!root && [...root.querySelectorAll('.tabs .tab, .ctl-tabs button')].filter(visible).length > 1;
     if (e?.matches('.p-inv .slot[data-c="inv"], .p-stash .slot[data-c="stash"]') && !this.ui.drag?.held) list.push(['R3', 'Sort']); // (docs/INVENTORY.md)
+    if (this.gearAt(e) && !this.ui.drag?.held) list.push(['L3', TIP.sticky ? 'Less' : 'Details']); // (docs/STATS.md §1)
     if (PM) { list.push(['LB+RB', 'Pages']); if (tabs || this.ui.padMenu.current() === 'settings') list.push(['LT+RT', 'Tabs']); } // (the tabbed menu: CT-11)
     else if (tabs) list.push(['LB+RB', 'Tabs']);
     if (!PM && S.key !== 'pop' && this.ui.isOpen('stash') && (this.ui.G?.state?.stashTabs?.length || 1) > 1) list.push(['LT+RT', 'Stash tabs']);

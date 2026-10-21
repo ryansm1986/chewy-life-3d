@@ -49,6 +49,7 @@ export class Portraits {
     if (rig.model === 'poe_toy') { big *= 1.1; hp.y += 0.13; } // the Toybox Poe: her big round head (the head bone sits at the neck) and the fox mask in frame
     if (rig.model === 'shihtzu_toy') { big *= 1.2; hp.y += 0.2; } // the Shih Tzu: his big head with its draping ears and the topknot in frame
     if (rig.model === 'golden_toy') { big *= 1.32; hp.y += 0.27; } // the dragoon: his big head, the feathered ears and the dragon crest in frame
+    if (rig.model === 'stella_toy') { big *= 1.15; hp.y += 0.12; } // Stella: her domed head and both long ears in frame (the wagasa isn't dressed for the bust: no canopy over her face)
     if (rig.model === 'shadow_whelp') hp.y += 0.03; // (the whelp's hood horns)
     this.dressers?.get(id)?.(rig);
     rig.root.rotation.y = -0.25;

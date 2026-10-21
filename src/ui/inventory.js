@@ -14,6 +14,7 @@ import { padWording } from './padGlyphs.js';
 import { Actions } from '../core/actions.js';
 import { stashSpot, tabGrid, tabOf, lostGrid } from '../rpg/stash.js';
 import { bagGrid, findSpot, fitsAt, cover, itemSize } from '../rpg/grid.js';
+import { isUpgrade } from '../rpg/power.js';
 import './itemGrid.css';
 
 /** a footer hint: the mouse's wording, or the pad's buttons while it plays */
@@ -31,19 +32,21 @@ export function makeSlot(c, i, cls = '') {
 export function paintSlot(s, item, ui, w = 1, h = 1) {
   const st = ui.G?.state, d = ui.G?.derived;
   const req = item ? meetsReq(item, st, d).ok : true;
-  const sig = item ? `${item.uid}|${item.qty || 1}|${req}|${ui.seen.has(item.uid)}|${w}x${h}|${(item.gems || []).length}` : '';
+  const up = !!item && item.kind === 'gear' && s.dataset.c !== 'equip' && !!st && isUpgrade(item, st); // (the green arrow: better for the hero being played, docs/STATS.md §1)
+  const sig = item ? `${item.uid}|${item.qty || 1}|${req}|${ui.seen.has(item.uid)}|${w}x${h}|${(item.gems || []).length}|${up}` : '';
   if (s._sig === sig) return;
   const first = s._sig === undefined;
   const hadItem = !!s._sig || first;
   s._sig = sig;
-  s.classList.remove('r-normal', 'r-magic', 'r-rare', 'r-unique', 'r-set', 'has', 'unmet', 'new');
+  s.classList.remove('r-normal', 'r-magic', 'r-rare', 'r-unique', 'r-set', 'has', 'unmet', 'new', 'upg');
   const lbl = s.dataset.c === 'equip' ? `<span class="sl-lbl">${glyph(SLOT_GLYPH[s.dataset.i] || 'sparkle')}</span>` : '';
   if (!item) { s.innerHTML = lbl; return; }
   s.classList.add('has', 'r-' + (item.rarity || 'normal'));
   if (!req) s.classList.add('unmet');
   if (!ui.seen.has(item.uid)) s.classList.add('new');
+  if (up) s.classList.add('upg');
   s.style.setProperty('--rc', rarityColor(item.rarity));
-  s.innerHTML = `<img src="${w * h > 1 ? itemIconSizedURL(item, w, h) : itemIconURL(item)}" alt="" draggable="false">${item.qty > 1 ? `<b class="qty">${item.qty}</b>` : ''}${item.sockets ? `<span class="socks">${Array.from({ length: item.sockets }, (_, k) => `<i class="${item.gems?.[k] ? 'on' : ''}"${item.gems?.[k] ? ` style="--gc:${GEM_DOT[item.gems[k].type] || '#ff8fd0'}"` : ''}></i>`).join('')}</span>` : ''}`;
+  s.innerHTML = `<img src="${w * h > 1 ? itemIconSizedURL(item, w, h) : itemIconURL(item)}" alt="" draggable="false">${item.qty > 1 ? `<b class="qty">${item.qty}</b>` : ''}${up ? '<i class="upg-a" title="Better than what you wear"></i>' : ''}${item.sockets ? `<span class="socks">${Array.from({ length: item.sockets }, (_, k) => `<i class="${item.gems?.[k] ? 'on' : ''}"${item.gems?.[k] ? ` style="--gc:${GEM_DOT[item.gems[k].type] || '#ff8fd0'}"` : ''}></i>`).join('')}</span>` : ''}`;
   if (!hadItem || s._popNext) { s._popNext = false; replay(s, 'pop', 500); }
 }
 
@@ -111,7 +114,7 @@ export class ItemDrag {
     if (!it) { if (a.c === 'equip') this.ui.tip.show(`<div class="tt-simple"><div class="tt-h">${SLOT_LABEL[a.i] || a.i}</div><div class="tt-d tt-dim">Empty — drag gear here</div></div>`, '', s); return; }
     if (!this.ui.seen.has(it.uid)) { this.ui.seen.add(it.uid); s.classList.remove('new'); }
     if (this.dragging || this.held) return;
-    this.ui.tip.show(this.tipFor(it, a), 'item', s);
+    this.ui.tip.show(this.tipFor(it, a), 'item', s, () => { const i2 = this.get(a); return i2 ? this.tipFor(i2, a) : ''; });
   }
   tipFor(it, a) {
     const ui = this.ui, st = ui.G?.state;

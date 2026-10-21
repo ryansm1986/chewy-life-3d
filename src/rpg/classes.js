@@ -83,6 +83,25 @@ export const CLASSES = {
     shadow: 20, // % more life and damage for Shadow while he's the active hero (stats.js: goldenPassives; Best Friends adds more)
     starter: { skills: { sunbeamThrust: 1, bonkDart: 1 }, hotbar: ['attack', 'sunbeamThrust', 'bonkDart', null, null, null], mouseSets: [['attack', 'sunbeamThrust'], ['attack', 'bonkDart']] },
   },
+  // Stella, the Weimaraner Sun Oracle (docs/STELLA.md; the owner's picks 2026-10-12/13: the oracle of Shiokaze Port's
+  // sunrise shrine, two fire trees and a support tree). The sun wagasa scales with Energy (+1% damage per point, like
+  // Moka's staff), and so does every tree. Her fire is sunlight: the game's fire element, drawn gold and white. The trait
+  // (`sun`): healing past full life becomes a sun shell (up to `shell`% of that ally's life, `shellT` s), and Shadow
+  // wakes `shadowRevive` s after fainting while she's played (combat/stellaSkills.js, actors/companion.js).
+  stella: {
+    id: 'stella', name: 'Stella', title: 'Oracle', species: 'Weimaraner',
+    blurb: 'Sunlight: golden rays, flares, a little sun and the warmth of morning. Energy makes it all shine brighter.',
+    color: '#e6b422', accent: '#d9573e', // (saffron: her robe's, apart from Foosy's ember orange on the wheel)
+    pron: { sub: 'she', obj: 'her', pos: 'her' }, garment: 'robe',
+    trees: ['ray', 'flare', 'dawn'],
+    weapons: ['parasol'],
+    base: { str: 8, dex: 9, vit: 13, ene: 16 },
+    life: (vit, lvl) => 40 + vit * 4 + lvl * 5.8,
+    zoom: (ene, lvl) => 26 + ene * 3 + lvl * 2.6,
+    dmgStat: { parasol: 'ene', sword: 'str', ball: 'dex', staff: 'ene', fuma: 'dex', flail: 'str', lance: 'str' },
+    sun: { shell: 20, shellT: 8, shadowRevive: 6 },
+    starter: { skills: { goldenRay: 1, morningLight: 1 }, hotbar: ['attack', 'goldenRay', 'morningLight', null, null, null], mouseSets: [['attack', 'goldenRay'], ['attack', 'morningLight']] },
+  },
 };
 export const HERO_IDS = Object.keys(CLASSES);
 /** Per-hero flavour for the panels and the hero wheel: the name in kana and the character sheet's class line. */
@@ -92,11 +111,12 @@ export const HERO_TEXT = {
   poe: { jp: 'ポー', motto: 'Shinobi of the Bamboo Grove' },
   shihtzu: { jp: 'フルーフィ', motto: 'Warlock-Knight of the Gloomhowl' },
   golden: { jp: 'フージー', motto: 'Dragoon of the Emberleaf Guard' },
+  stella: { jp: 'ステラ', motto: 'Oracle of the Sunrise Shrine' },
 };
 export const classOf = state => CLASSES[state?.player?.cls || state?.activeHero || 'chewy'] || CLASSES.chewy;
 /** Which class may wield a weapon type ('sword' / 'ball' → Chewy, 'staff' → Moka, 'fuma' → Poe, 'flail' → the Shih Tzu,
- *  'lance' → the Golden Retriever dragoon). */
-export const WEAPON_CLASS = { sword: 'chewy', ball: 'chewy', staff: 'moka', fuma: 'poe', flail: 'shihtzu', lance: 'golden' };
+ *  'lance' → the Golden Retriever dragoon, 'parasol' → Stella). */
+export const WEAPON_CLASS = { sword: 'chewy', ball: 'chewy', staff: 'moka', fuma: 'poe', flail: 'shihtzu', lance: 'golden', parasol: 'stella' };
 export const canWield = (cls, wtype) => !wtype || WEAPON_CLASS[wtype] === cls;
 /** Villager / story lines are written to Chewy: address whoever is being played instead. */
 export function heroText(s, state) {

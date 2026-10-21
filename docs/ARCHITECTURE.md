@@ -24,6 +24,10 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
   and blunt **toy javelins** (Dexterity). Lance Arts / Javelins / Whelp Bond. While he's played **Shadow wears a dragon
   whelp outfit and flies** beside him; the Whelp Bond drives Shadow (breath, swoops, a wing shield, a roar, Dragon Heart).
   Met at the hot springs of Yukimi Onsen (a solemn vow undone by a tennis ball; he gives Shadow the costume).
+- **Stella** — sixth playable hero (docs/STELLA.md; id `stella`, title Oracle): a silver Weimaraner (she/her) in a saffron
+  robe, the oracle of Shiokaze Port's sunrise shrine; a **sun wagasa** (Energy). Radiance / Corona (her fire is sunlight:
+  gold and white, never flames) / Dawn (heals, sun shells, halos, Sun Dog for Shadow, Daybreak). Overheal becomes sun shells;
+  Shadow wakes in 6 s under her care. Kaizo rows her to Blossom Hollow's beach once the Tide Pool opens.
 - **Shadow** — sidekick Boston terrier (quadruped, black #1e1c24 + white muzzle/blaze/chest, big bat ears, round eyes, blue collar). Follows and fights (D2 mercenary style).
 - **Rosie** — human little girl, curly brown hair, brown eyes, fair skin, rosy cheeks, pink dress + red bow. Runs "Rosie's Treats" shop & gives quests.
 - Villagers — humanoid cartoony animals (cat, bunny, bear, fox, panda, tanuki, frog, duck…).
@@ -431,6 +435,21 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   drawn over the companion's ground AI (`poseQuad` fly / grow). `flags.goldenJoined` gates him; `G.heroes.gldJoin`
   (`src/actors/goldenJoin.js`) runs his arrival scene by the fountain (event `golden:joinScene`; started by `G.arrivals`)
   and Shadow's rumour in town; `joinGolden()` joins him. Ground loot is drawn instanced with the monsters (`groundLoot.js` → `horde.js lookIn`).
+- **Stella** (docs/STELLA.md): `CLASSES.stella`, the wagasa (`wtype: 'parasol'`, 2 × 2); skills `src/rpg/skillsStella.js`
+  (`stellaPassives`: masteries, Sunlit, Sunburn, Sunny Disposition's `healMul` / `shieldMul`, the `sunTrait`), casts on
+  SkillRunner by `src/combat/stellaSkills.js` (`stlHit`: her fire drawn as sunlight (`hitMonster` `look: 'sun'`: gold numbers,
+  a gold spark), the gilding and the sunburn; the Sunsweep; Radiance; `stellaGuard` in `combat.hitPlayer`) + `stellaArts.js`
+  (the Corona and the Dawn; every heal through `stlHeal`: overheal → sun shells, the halos, the heals over time, the summed
+  floats; `stlGuardAlly` from Shadow's and Hinata's `takeDamage`; `stlAllyFor`: the `ally` aim; Sun Dog's bite and catch via
+  companion.js) + `stellaAllies.js` (`stellaAllies(G, pos, r)`: the body records a heal can land on — her, Shadow, her little
+  suns, co-op heroes later; `neediest`; `LittleSun`: Hinata / Hikari) + `chargedStella.js` (tables `src/rpg/chargeStella.js`,
+  sim models `tools/charge-sim-stella.mjs`); effects `src/gfx/stellaFx.js` (pooled meshes and two atlas layers: normal blend
+  for everything wide, additive only for the budgeted cores and motes; `prewarm` draws every kind a few frames); the wagasa
+  `src/actors/stellaGear.js` (the Blender `stella-parasol.glb`: its parts, the `finial` empty, `tassel_*` pivots; the carry,
+  the paw, the aim); poses `stellaPoses.js`; sounds `src/audio/stella.sfx.js`; icons `src/rpg/iconsStella.js`. Her look is
+  the baked `stella_toy` (`HERO_MODELS.stellaToy`: `lidTilt`, `darkFur`, `whiteCap`, `parasolMount`); `CAST.stella` is the kit
+  fallback. Balance: `tools/hero-balance.mjs` `stlRotation` / `stlBand`. QA: `tools/qa/s48-stella.mjs`, the look tools
+  `stella-look.mjs`, `stella-shots.mjs`, `stella-fx-shots.mjs`.
 - **The arrivals** (ROADMAP Z-H3; design and as-built: docs/ZONES.md §3.1): `src/world/heroQuests.js` (pure, node-tested:
   `ARRIVALS` — one `{ zone, who, scene, quest, hero }` a zone —, `arrivalDue`, `questPlan`, `questsOwed`, `arrivalHint`,
   `HERO_QUESTS`, `crewThanks`); `src/actors/arrivals.js` (`G.arrivals` = `heroes.arrivals`: the registered island scenes
@@ -444,10 +463,11 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   walks round; `stageTalk`, a two-actor talk's marks as a generator: near you, or round an `anchor` (Floofy among his
   lanterns, Kaizo by his boat), on the paving if it can be (`paved`, `onPaving`, `groundCost`), Shadow's mark (`shadow`);
   `finish`, `frameClear` (the framing in the clear from the camera's real place), `faceUp`, `shadowOnMark`). The scenes:
-  `poeJoin.js`, `shihtzuJoin.js`, `goldenJoin.js` and **`kaizoArrive.js`** (Captain Kaizo, the Tide Pool's messenger until
-  Stella: his zone villager's Toybox rig (`zoneNpcRig`), a rowboat from the buildings kit (`boat` + oars, `instantiate`
-  with the village's materials) pulled up on the beach below Beach Lane, his talk, his row home; event `kaizo:arrive`
-  `{ phase: 'land' | 'talk' | 'leave' | 'done' }`). Shared edits: `regions/village/talk.js` (a zone villager takes in a
+  `poeJoin.js`, `shihtzuJoin.js`, `goldenJoin.js` and **`stellaJoin.js`** (since H-6: Stella in the bow of Captain Kaizo's
+  rowboat, the float down, the greeting, the zoomies; event `stella:joinScene`, docs/STELLA.md §6) on **`kaizoArrive.js`**,
+  now the shared boat-and-captain staging (Kaizo's zone villager's Toybox rig (`zoneNpcRig`), a rowboat from the buildings
+  kit (`boat` + oars, `instantiate` with the village's materials) pulled up on the beach below Beach Lane, his row home;
+  until H-6 it was his own messenger scene). Shared edits: `regions/village/talk.js` (a zone villager takes in a
   quest that waits for them: Kaizo's), `story.js`
   (`def` reads HERO_QUESTS, the `visit` step, `handInFor` takes a hero, `nameOf` names one), `questSteps.js` (`visit`,
   `visitDone`), `questMoments.js` (`handInScene(…, { self })`, a hero quest's crew words, no way-home line for the hero you

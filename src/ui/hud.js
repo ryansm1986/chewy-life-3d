@@ -305,7 +305,7 @@ export class Hud {
     ws.innerHTML = `<div class="ws-in"><span class="ws-ic"></span><b class="ws-n"></b></div>`;
     hb.appendChild(ws);
     ws.addEventListener('click', e => { e.stopPropagation(); const G = this.ui.G; if (!G?.actions?.swapWeapons || G.mode === 'title') return; G.actions.swapWeapons(); G.audio?.play?.('ui_equip'); });
-    tip.bind(ws, () => { const set = this.pl.activeWeapon === 1 ? 1 : 0, wt = this.d.weaponType || 'sword'; return simpleTip(`Weapon set ${set ? 'II' : 'I'} · ${wt === 'ball' ? 'Tennis Ball' : wt === 'staff' ? 'Staff' : wt === 'fuma' ? 'Fūma' : wt === 'flail' ? 'Toy Flail' : 'Bone Katana'}`, `Each weapon set remembers its own ${glyph('mouseL')} / ${glyph('mouseR')} skills.<br><span class="tt-dim">Press <span class="kc sm">X</span> or click to swap.</span>`); });
+    tip.bind(ws, () => { const set = this.pl.activeWeapon === 1 ? 1 : 0, wt = this.d.weaponType || 'sword'; return simpleTip(`Weapon set ${set ? 'II' : 'I'} · ${wt === 'ball' ? 'Tennis Ball' : wt === 'staff' ? 'Staff' : wt === 'fuma' ? 'Fūma' : wt === 'flail' ? 'Toy Flail' : wt === 'lance' ? 'Toy Lance' : wt === 'parasol' ? 'Sun Wagasa' : 'Bone Katana'}`, `Each weapon set remembers its own ${glyph('mouseL')} / ${glyph('mouseR')} skills.<br><span class="tt-dim">Press <span class="kc sm">X</span> or click to swap.</span>`); });
     hb.appendChild(el('div', 'hb-sep'));
     this.belt = [['heart', 'Q', 'Heart Potion', 'Restores Life', 'potionHeart'], ['zoom', 'E', 'Zoom Potion', 'Restores Zoom', 'potionZoom'], ['rejuv', 'R', 'Rejuv Potion', 'Restores Life and Zoom', 'potionR']].map(([k, key, name, desc, act]) => {
       const s = el('div', 'belt b-' + k);
@@ -443,7 +443,7 @@ export class Hud {
       const first = this.wsKey === undefined;
       this.wsKey = wsKey;
       const [set, wt] = wsKey.split(':');
-      this.wsBadge.querySelector('.ws-ic').innerHTML = glyph(wt === 'ball' ? 'ball' : wt === 'staff' ? 'staff' : wt === 'fuma' ? 'fuma' : wt === 'flail' ? 'flail' : wt === 'lance' ? 'lance' : 'sword');
+      this.wsBadge.querySelector('.ws-ic').innerHTML = glyph(wt === 'ball' ? 'ball' : wt === 'staff' ? 'staff' : wt === 'fuma' ? 'fuma' : wt === 'flail' ? 'flail' : wt === 'lance' ? 'lance' : wt === 'parasol' ? 'parasol' : 'sword');
       this.wsBadge.querySelector('.ws-n').textContent = set === '1' ? 'II' : 'I';
       this.$.hotbar.dataset.ws = wt;
       if (!first) { replay(this.wsBadge, 'flip', 520); for (const k of [0, 1]) replay(this.slots[k].el, 'swap', 450); }
@@ -810,7 +810,7 @@ export class Hud {
     const h = this.ui.pop?.querySelector?.('.pop-h');
     if (!h || h.querySelector('.pop-ws')) return;
     const wt = this.d.weaponType || 'sword', set = this.pl.activeWeapon === 1 ? 'II' : 'I';
-    h.insertAdjacentHTML('beforeend', `<span class="pop-ws" data-ws="${wt}">${glyph(wt === 'ball' ? 'ball' : wt === 'staff' ? 'staff' : wt === 'fuma' ? 'fuma' : wt === 'flail' ? 'flail' : wt === 'lance' ? 'lance' : 'sword')}Set ${set}</span>`);
+    h.insertAdjacentHTML('beforeend', `<span class="pop-ws" data-ws="${wt}">${glyph(wt === 'ball' ? 'ball' : wt === 'staff' ? 'staff' : wt === 'fuma' ? 'fuma' : wt === 'flail' ? 'flail' : wt === 'lance' ? 'lance' : wt === 'parasol' ? 'parasol' : 'sword')}Set ${set}</span>`);
   }
   flashMeal(ok) { const M = this.mealSlot; if (M) replay(M.el, ok ? 'press' : 'deny', 360); }
   flashBelt(k) { const b = this.belt.find(x => x.k === k); if (b) replay(b.el, b.v > 0 ? 'press' : 'deny', 360); }
@@ -821,7 +821,7 @@ export class Hud {
     const def = skillDef(id);
     const lvl = this.pl.skills?.[id] || (id === 'attack' ? 1 : 0);
     const cost = skillCost(id, this.st);
-    const wep = id === 'attack' ? (this.d.weaponType === 'ball' ? 'Basic attack · Red Tennis Ball' : this.d.weaponType === 'staff' ? 'Basic attack · Sparkle Bolt' : this.d.weaponType === 'fuma' ? 'Basic attack · Fūma slashes' : this.d.weaponType === 'flail' ? 'Basic attack · Flail swings' : 'Basic attack · Bone Katana') : '';
+    const wep = id === 'attack' ? (this.d.weaponType === 'ball' ? 'Basic attack · Red Tennis Ball' : this.d.weaponType === 'staff' ? 'Basic attack · Sparkle Bolt' : this.d.weaponType === 'fuma' ? 'Basic attack · Fūma slashes' : this.d.weaponType === 'flail' ? 'Basic attack · Flail swings' : this.d.weaponType === 'lance' ? 'Basic attack · Lance thrusts' : this.d.weaponType === 'parasol' ? 'Basic attack · Sunsweep' : 'Basic attack · Bone Katana') : '';
     const setNote = i < 2 ? `<br><span class="tt-dim">Weapon set ${this.pl.activeWeapon === 1 ? 'II' : 'I'} — <span class="kc sm">X</span> swaps to the other set's mouse skills</span>` : '';
     return simpleTip(`${esc(def?.name || id)} ${cap}`, `${def?.desc ? esc(def.desc) + '<br>' : ''}<span class="tt-dim">${id === 'attack' ? wep : 'Level ' + lvl}${cost ? ` · ${Math.round(cost * 10) / 10} Zoom` : ''}</span>${setNote}`);
   }

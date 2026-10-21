@@ -34,6 +34,7 @@ import { TAU, clamp, rand, ease, dampAngle, angleDiff, smoothstep } from '../../
 import { BossRuntime, V, C, hitCircle, roll, sfx, pickId, summonAt, playerIn } from './kitB.js';
 import { frostFx, whiteoutMesh, FR, ICE, PAL_SNOW, PAL_ICE, alignFn } from './fx_yukionna.js';
 import { icicleDrop } from '../monsters/onsen.js';
+import { enemyParts } from '../monsters/enemyModels.js';
 import { chill, bolt } from '../monsters/bamboo.js';
 
 const S = 2.4;            // model scale (unit model ≈ 1.2 tall → ≈ 2.9 m)
@@ -256,11 +257,23 @@ const YUKI_OUT = /* glsl */`{
   float lmY = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
   if (lmY > 0.56) { float nlY = 0.56 + 0.16 * (1.0 - exp(-(lmY - 0.56) / 0.16)); outgoingLight *= nlY / lmY; }
 }`;
-function yukiMat(mirror) { return makeToon({ vertexColors: true, map: kimonoTex(), objectBrush: true, brush: 0.035, brushScale: 0.9, rim: 0.6, term: [-0.02, 0.3], fragPars: YUKI_PARS, fragOut: YUKI_OUT, uniforms: { uMirror: { value: mirror ? 1 : 0 } } }); }
+function yukiMat(mirror, glb) { return makeToon({ vertexColors: true, ...(glb ? {} : { map: kimonoTex() }), objectBrush: true, brush: 0.035, brushScale: 0.9, rim: 0.6, term: [-0.02, 0.3], fragPars: YUKI_PARS, fragOut: YUKI_OUT, uniforms: { uMirror: { value: mirror ? 1 : 0 } } }); }
 
+const YUKI_PARTS = ['body', 'head', 'face', 'lids', 'mouthO', 'puff', 'hairB', 'slR', 'slL', 'shawl'];
+let YUKI_GLB;
+/** the Blender Yuki-onna (ROADMAP EN-1; tools/blender/codex/assets/yuki-onna): her parts on the kit's pivots (the same
+ *  part names), the kimono pattern in vertex colours (no texture); null without the file */
+function glbMasters() {
+  if (YUKI_GLB !== undefined) return YUKI_GLB;
+  const P = enemyParts('yukiOnna', 0);
+  if (!P || !YUKI_PARTS.every(n => P[n])) return (YUKI_GLB = null);
+  YUKI_GLB = {};
+  for (const n of YUKI_PARTS) { const g = P[n].geos; YUKI_GLB[n] = g.length === 1 ? g[0] : merge(g.map(x => x.clone())); }
+  return YUKI_GLB;
+}
 function buildYuki(v) {
-  const M = masters(), mirror = !!v.mirror;
-  const mat = yukiMat(mirror), ol = makeOutline(mirror ? '#3a4a8a' : '#2a1622', 0.012), olThin = makeOutline(mirror ? '#3a4a8a' : '#2a1622', 0.0035);
+  const GM = glbMasters(), M = GM || masters(), mirror = !!v.mirror;
+  const mat = yukiMat(mirror, !!GM), ol = makeOutline(mirror ? '#3a4a8a' : '#2a1622', 0.012), olThin = makeOutline(mirror ? '#3a4a8a' : '#2a1622', 0.0035);
   const root = new THREE.Group(), pivot = new THREE.Group(), hover = new THREE.Group();
   root.add(pivot); pivot.add(hover);
   const add = (parent, geo, { shadow = true, outline = true } = {}) => { const g = geo.clone(); const m = new THREE.Mesh(g, mat); m.castShadow = shadow && !mirror; m.receiveShadow = true; parent.add(m); if (outline) { const o = new THREE.Mesh(g, ol); parent.add(o); m.userData.ol = o; } return m; };

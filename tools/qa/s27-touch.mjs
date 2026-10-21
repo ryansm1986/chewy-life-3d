@@ -456,19 +456,20 @@ try {
   await wait(h => window.G.state.activeHero === h && !window.G.heroSwitching, h0, 6000); await sleep(page, 300);
   const h2 = await ev(() => ({ hero: window.G.state.activeHero, open: window.G.heroes.wheelOpen, held: window.G.controls.held('hero') }));
   R.check('holding the hero button opens the wheel, which stays up for a tap on a card; the tap switches', wo && card?.open && h2.hero === h0 && !h2.open && !h2.held, JSON.stringify({ wo, card, h2 }));
-  // five heroes (Floofy and Foosy joined): the touch wheel shows all five cards on screen and a tap on Foosy's plays him
-  // (Shadow puts his dragon wings on)
-  await ev(() => { const G = window.G; G.heroes.joinShihtzu?.(); G.heroes.joinGolden?.(); G.heroes.cd = 0; });
+  // six heroes (Floofy, Foosy and Stella joined): the touch wheel shows all six cards on screen, none overlapping, and a
+  // tap on Foosy's plays him (Shadow puts his dragon wings on)
+  await ev(() => { const G = window.G; G.heroes.joinShihtzu?.(); G.heroes.joinGolden?.(); if (G.heroes.joinStella) G.heroes.joinStella(); else { G.state.flags.stellaJoined = true; G.heroes.spawnBench?.(); } G.heroes.cd = 0; });
   await sleep(page, 2300);
   const hb3 = await C('.tc-hero');
   await F.hold(hb3.x, hb3.y, 600, 6);
   const wo5 = await wait(() => window.G.heroes.wheelOpen, null, 2000); await sleep(page, 300);
-  const cards5 = await ev(() => [...document.querySelectorAll('.hero-wheel .hw-card')].map(c => { const r = c.getBoundingClientRect(); return { id: c.dataset.id, x: r.left + r.width / 2, y: r.top + r.height / 2, in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight }; }));
+  const cards5 = await ev(() => [...document.querySelectorAll('.hero-wheel .hw-card')].map(c => { const r = c.getBoundingClientRect(); return { id: c.dataset.id, x: r.left + r.width / 2, y: r.top + r.height / 2, l: r.left, t: r.top, r: r.right, b: r.bottom, in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight }; }));
+  const overlap5 = cards5.some((a, i) => cards5.some((b, k) => k > i && a.l < b.r - 2 && b.l < a.r - 2 && a.t < b.b - 2 && b.t < a.b - 2));
   const gc = cards5.find(c => c.id === 'golden');
   if (gc) await F.tap(gc.x, gc.y);
   await wait(() => window.G.state.activeHero === 'golden' && !window.G.heroSwitching, null, 6000); await sleep(page, 800);
   const h5 = await ev(() => ({ hero: window.G.state.activeHero, whelp: !!window.G.companion?.whelp?.on }));
-  R.check('five heroes: the touch wheel shows all five cards on screen; a tap on Foosy\'s plays him and Shadow wears his dragon wings', wo5 && cards5.length === 5 && cards5.every(c => c.in) && h5.hero === 'golden' && h5.whelp, JSON.stringify({ cards5, h5 }));
+  R.check('six heroes: the touch wheel shows all six cards on screen, none overlapping, Stella\'s last; a tap on Foosy\'s plays him and Shadow wears his dragon wings', wo5 && cards5.length === 6 && cards5[5]?.id === 'stella' && cards5.every(c => c.in) && !overlap5 && h5.hero === 'golden' && h5.whelp, JSON.stringify({ cards5: cards5.map(c => [c.id, Math.round(c.l), Math.round(c.t), Math.round(c.r), Math.round(c.b), c.in]), overlap5, h5 }));
   await ev(h => { const G = window.G; G.heroes.cd = 0; G.heroes.switchTo(h, { quiet: true }); }, h0);
   await wait(h => window.G.state.activeHero === h && !window.G.heroSwitching, h0, 6000); await sleep(page, 400);
   await calm();

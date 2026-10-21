@@ -86,6 +86,7 @@ export const keyName = t => KEY_NAMES[t] || (t.includes('+') ? t.split('+').map(
 // sticks: a radial dead zone, the outer edge treated as full tilt, then the response curve
 const MOVE_DZ = 0.2, AIM_DZ = 0.24, OUTER = 0.94, MOVE_POW = 1.4, MOVE_MIN = 0.16;
 const TRIG_ON = 0.35, TRIG_OFF = 0.22; // the triggers as buttons, with a little hysteresis
+export const STICK = { MOVE_DZ, AIM_DZ, OUTER, MOVE_POW, MOVE_MIN, TRIG_ON, TRIG_OFF }; // (couch co-op's own pads read the same: coop/pads.js)
 const ACT_STICK = 0.35; // a stick pushed this far counts as using the pad
 const _mv = { x: 0, y: 0, mag: 0, pad: false }, _aim = { x: 0, y: 0, mag: 0 }, _zero = { x: 0, y: 0, mag: 0 };
 
@@ -98,6 +99,9 @@ export const Actions = {
   over: { kbm: {}, pad: {} }, // the player's overrides
   cur: new Set(), prev: new Set(), pPressed: new Set(), pReleased: new Set(), holdT: new Map(),
   axes: [0, 0, 0, 0], padIndex: -1, lastPadPress: null, _trig: [false, false], _rumbleT: 0, _mouseAcc: 0, _mouseT: 0,
+  // couch co-op (docs/COOP.md): `view` is another player's pad while their hero runs (coop/coop.js swaps it in and out);
+  // every read below then sees only that pad. `claimed`: the pad indices players 2-4 hold (never adopted as this pad)
+  view: null, claimed: new Set(),
 
   init() {
     if (this._init) return; this._init = true;
@@ -117,7 +121,7 @@ export const Actions = {
       this._mouseAcc += Math.abs(e.movementX || 0) + Math.abs(e.movementY || 0);
       if (this._mouseAcc > 10) kbm();
     }, true);
-    addEventListener('gamepadconnected', e => { this.connected = true; if (this.padIndex < 0) this.padIndex = e.gamepad.index; Events.emit('input:pad', { connected: true, id: e.gamepad.id }); });
+    addEventListener('gamepadconnected', e => { this.connected = true; if (this.padIndex < 0 && !this.claimed.has(e.gamepad.index)) this.padIndex = e.gamepad.index; Events.emit('input:pad', { connected: true, id: e.gamepad.id }); });
     addEventListener('gamepaddisconnected', e => { if (e.gamepad.index === this.padIndex) { this.padIndex = -1; this.cur.clear(); this.axes.fill(0); } Events.emit('input:pad', { connected: false, id: e.gamepad.id }); });
   },
   setDevice(dev) {
@@ -163,10 +167,10 @@ export const Actions = {
   // ------------------------------------------------------------------ the gamepad
   gamepad() {
     let list; try { list = navigator.getGamepads?.() || []; } catch (e) { return null; }
-    let gp = this.padIndex >= 0 ? list[this.padIndex] : null;
+    let gp = this.padIndex >= 0 && !this.claimed.has(this.padIndex) ? list[this.padIndex] : null;
     if (!gp || !gp.connected) {
       gp = null; this.padIndex = -1;
-      for (const g of list) if (g && g.connected && (g.mapping === 'standard' || !gp)) { gp = g; if (g.mapping === 'standard') break; }
+      for (const g of list) if (g && g.connected && !this.claimed.has(g.index) && (g.mapping === 'standard' || !gp)) { gp = g; if (g.mapping === 'standard') break; }
       if (gp) { this.padIndex = gp.index; this.connected = true; }
     }
     return gp;
@@ -214,6 +218,7 @@ export const Actions = {
 
   // ------------------------------------------------------------------ buttons
   held(a, dev) {
+    if (this.view) return this.view.held(a, dev);
     if (!Input.enabled) return false;
     if (!dev || dev === 'kbm') for (const t of this.binds(a, 'kbm')) if (kbmHeld(t)) return true;
     if (!dev || dev === 'pad') for (const t of this.binds(a, 'pad')) if (this.cur.has(t)) return true;
@@ -221,6 +226,7 @@ export const Actions = {
     return false;
   },
   pressed(a, dev) {
+    if (this.view) return this.view.pressed(a, dev);
     if (!Input.enabled) return false;
     if (!dev || dev === 'kbm') for (const t of this.binds(a, 'kbm')) if (kbmHit(t)) return true;
     if (!dev || dev === 'pad') for (const t of this.binds(a, 'pad')) if (this.pPressed.has(t)) return true;
@@ -228,15 +234,17 @@ export const Actions = {
     return false;
   },
   released(a, dev) {
+    if (this.view) return this.view.released(a, dev);
     if (!dev || dev === 'kbm') for (const t of this.binds(a, 'kbm')) if (t.startsWith('mouse') ? Input.mReleased.has(+t.slice(5)) : Input.released.has(t)) return true;
     if (!dev || dev === 'pad') for (const t of this.binds(a, 'pad')) if (this.pReleased.has(t)) return true;
     if ((!dev || dev === 'touch') && Touch.released.has(a)) return true;
     return false;
   },
   /** how long the pad (or a touch button) has held this action (s; 0 when up). The keyboard's hold times are the callers'. */
-  heldTime(a) { let m = Touch.holdT.get(a) || 0; for (const t of this.binds(a, 'pad')) m = Math.max(m, this.holdT.get(t) || 0); return m; },
+  heldTime(a) { if (this.view) return this.view.heldTime(a); let m = Touch.holdT.get(a) || 0; for (const t of this.binds(a, 'pad')) m = Math.max(m, this.holdT.get(t) || 0); return m; },
   /** a press already handled: nobody else this frame sees it (keys, mouse buttons, pad and touch buttons alike) */
   consume(a, dev) {
+    if (this.view) return this.view.consume(a, dev);
     if (!dev || dev === 'kbm') for (const t of this.binds(a, 'kbm')) { if (t.startsWith('mouse')) Input.consumeMouse(+t.slice(5)); else Input.consume(t.includes('+') ? t.split('+').pop() : t); }
     if (!dev || dev === 'pad') {
       for (const t of this.binds(a, 'pad')) this.pPressed.delete(t);
@@ -245,13 +253,14 @@ export const Actions = {
     if (!dev || dev === 'touch') { Touch.pressed.delete(a); if (a === 'interact') Touch.pressed.delete('attack'); } // (the attack button is the touch's context interact)
   },
   /** the pad buttons pressed this frame (raw tokens: the rebinding capture, the CT-2 focus navigation) */
-  padHit(t) { return Input.enabled && this.pPressed.has(t); },
-  padDown(t) { return Input.enabled && this.cur.has(t); },
-  padConsume(t) { this.pPressed.delete(t); },
+  padHit(t) { if (this.view) return this.view.padHit(t); return Input.enabled && this.pPressed.has(t); },
+  padDown(t) { if (this.view) return this.view.padDown(t); return Input.enabled && this.cur.has(t); },
+  padConsume(t) { if (this.view) return this.view.padConsume(t); this.pPressed.delete(t); },
 
   // ------------------------------------------------------------------ analogue
   /** the move vector: x right, y forward (camera-relative); mag 0..1 (keys: 1); pad: true when the stick drives it */
   move() {
+    if (this.view) return this.view.move();
     const o = _mv; o.x = 0; o.y = 0; o.mag = 0; o.pad = false;
     if (!Input.enabled) return o;
     const kx = (Input.down('d') || Input.down('right') ? 1 : 0) - (Input.down('a') || Input.down('left') ? 1 : 0);
@@ -271,11 +280,13 @@ export const Actions = {
   moving() { return this.move().mag > 0; },
   /** a move key pressed this frame, or the left stick just pushed past half tilt (ends a fishing session) */
   moveHit() {
+    if (this.view) return this.view.moveHit();
     for (const k of ['w', 'a', 's', 'd', 'up', 'down', 'left', 'right']) if (Input.hit(k)) return true;
     return Input.enabled && (this.lsPush || this.tsPush);
   },
   /** the right stick: x right, y up (forward on screen); mag 0..1 past its dead zone (linear) */
   aim() {
+    if (this.view) return this.view.aim();
     const ta = Touch.aim; // (a drag off a skill or the hero button: ui/touch.js)
     if (ta.on && ta.mag > 0 && Input.enabled) { _aim.x = ta.x; _aim.y = ta.y; _aim.mag = ta.mag; return _aim; }
     const x = this.axes[2], y = -this.axes[3], m = Math.hypot(x, y);
@@ -339,6 +350,7 @@ export const Actions = {
   },
   /** a light pulse on the active pad (strong / weak motor 0..1, ms); a stronger pulse overrides a weaker one */
   rumble(strong = 0.25, weak = 0.45, ms = 80) {
+    if (this.view) return this.view.rumble(strong, weak, ms);
     if (!this.opts.rumble || this.device !== 'pad') return false; // (touch buzzes on its own events: ui/touch.js)
     const k = Math.max(strong, weak);
     if (this._rumbleT > 0 && k <= this._rumbleK) return false;

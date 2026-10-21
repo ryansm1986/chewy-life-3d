@@ -12,7 +12,8 @@
 import * as THREE from 'three';
 import { makeToon, makeOutline } from '../../gfx/materials.js';
 import { rand, clamp, TAU, dist, angleDiff, ease } from '../../core/util.js';
-import { V, col, ell, paint, xf, INK, lathe, cyl, tubeC, eyesCute, cheeks, smile, blob, assemble, act, mdef, every, tele, roll, sfx, playerIn, hitArea, push, puff, screenAngle, shared } from './bamboo.js';
+import { V, col, ell, paint, xf, INK, lathe, cyl, tubeC, eyesCute, cheeks, smile, blob, assemble, act, mdef, every, tele, roll, sfx, playerIn, hitArea, push, puff, screenAngle, shared, merge } from './bamboo.js';
+import { enemyParts, ownEnemyModel } from './enemyModels.js';
 
 const _v = new THREE.Vector3(), _dir = new THREE.Vector3(), _q = new THREE.Vector3();
 const HINT = { crab: false };
@@ -33,6 +34,22 @@ function uvf(g, fn) {
 }
 /** every part not stamped yet gets uv (0, 0): no hook channel */
 const stamp = list => { for (const g of list) if (!g.userData.uvs) uvs(g, 0, 0); return list; };
+/**
+ * A Blender model's parts (enemyModels.js, ROADMAP EN-1) as one merged body: each part moved to model space (its node
+ * translation is its pivot) and stamped with its hook channel by `tag(name, geo, part)` (which calls uvs / uvf).
+ * → the model's [geo] list, or null when this variant has no file of its own (not built, ?procmon, a custom look).
+ */
+function glbBody(kind, v, tag) {
+  if (!ownEnemyModel(kind, v.key)) return null;
+  const P = enemyParts(kind, v.key), out = [];
+  for (const [n, part] of Object.entries(P)) for (const g0 of part.geos) {
+    const g = g0.clone(); g.userData = { ...g0.userData }; g.translate(...part.at);
+    tag(n, g, part); if (!g.userData.uvs) uvs(g, 0, 0); out.push(g);
+  }
+  return out;
+}
+/** a GLSL vec3 literal */
+const v3 = a => `vec3(${a.map(x => (+x).toFixed(4)).join(', ')})`;
 /** CatmullRom resample of [[x, y, z, r]…] into n + 1 tube points */
 function smooth(ctrl, n) {
   const c = new THREE.CatmullRomCurve3(ctrl.map(q => V(q[0], q[1], q[2]))), out = [];
@@ -65,7 +82,11 @@ function vhook(mat, key, U, pars, body, ol = '', nrm = '') {
     prev?.call(mat, sh, r);
     Object.assign(sh.uniforms, U);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n' + pars);
-    if (hull) sh.vertexShader = sh.vertexShader.replace('vec3 transformed = position + normalize(normal) * uOutW;', `vec3 transformed = position + normalize(normal) * uOutW;\n${ol}\n${body}`);
+    if (hull) { // (after the hull's push along the normal, whatever form gfx/materials.js makeOutline writes it in)
+      const vs = sh.vertexShader.replace(/vec3 transformed = position \+[^;]*uOutW;/, m => `${m}\n${ol}\n${body}`);
+      if (vs === sh.vertexShader) console.warn('[tidepool] vhook: no hull push line to hook (' + key + ')');
+      sh.vertexShader = vs;
+    }
     else sh.vertexShader = sh.vertexShader.replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>\n${nrm}`).replace('#include <begin_vertex>', `#include <begin_vertex>\n${body}`);
   };
   mat.customProgramCacheKey = () => (pk ? pk.call(mat) : '') + '|vh:' + key + (hull ? ':o' : '');
@@ -126,16 +147,27 @@ const hurtSfx = (m, name, gap = 0.45) => { const t = m.G.engine?.time || 0; if (
 // splashes you off) and a head-flick splash that soaks you.
 const KP = { GRAB_WIND: 0.5, LUNGE: 0.28, LUNGE_SPD: 11, HOLD: 0.85, SPL_WIND: 0.55, SPL_R: 2.7, SPL_ARC: 0.6, LANE_W: 0.5, HEAL_T: 2.8, DISH_Y: 0.36 };
 const KP_HEAD = [0, 0.56, 0.02], KP_ARMS = [0, 0.445, 0.02];
-const KAPPA_HOOK = {
+/** the hook for one set of pivots (the procedural ones, or the Blender model's: one key each, so their shaders never mix) */
+const kappaHook = (HP, AP, WP) => ({
   pars: 'uniform float uWater; uniform vec2 uHead; uniform vec2 uArm;' + KROT,
-  // head (uv.y 4) turns about the neck; its dish water (uv.y 3) also shrinks toward the dish centre and sinks as the
+  // head (uv.y 4) turns about the neck; its dish water (uv.y 3) also shrinks toward the dish centre WP and sinks as the
   // level (life) drops; the arms (uv.y 5) swing about the shoulders
-  body: `{ vec3 HP = vec3(${KP_HEAD.join(', ')}), AP = vec3(${KP_ARMS.join(', ')});
-      if (uv.y > 2.5 && uv.y < 4.5) { vec3 p = transformed - HP; if (uv.y < 3.5) { p.xz *= uWater; p.y -= (1.0 - uWater) * 0.022; } transformed = kRot(p, uHead) + HP; }
+  body: `{ vec3 HP = ${v3(HP)}, AP = ${v3(AP)}, WP = ${v3(WP)};
+      if (uv.y > 2.5 && uv.y < 4.5) { vec3 p = transformed; if (uv.y < 3.5) { p.xz = WP.xz + (p.xz - WP.xz) * uWater; p.y -= (1.0 - uWater) * 0.022; } transformed = kRot(p - HP, uHead) + HP; }
       else if (uv.y > 4.5) transformed = kRot(transformed - AP, uArm) + AP; }`,
   nrm: 'if (uv.y > 2.5 && uv.y < 4.5) objectNormal = kRot(objectNormal, uHead); else if (uv.y > 4.5) objectNormal = kRot(objectNormal, uArm);',
   ol: 'if (uv.y > 2.5 && uv.y < 3.5) transformed = position;',
-};
+});
+const KAPPA_HOOK = kappaHook(KP_HEAD, KP_ARMS, KP_HEAD);
+const KAPPA_CH = { head: 4, water: 3, arms: 5 }; // (the Blender model's parts → hook channels)
+/** the Blender kappa (ROADMAP EN-1): its parts as one hooked body (once per variant: assemble caches it) */
+const kappaGlb = v => ({ parts: [{ name: 'body', geo: glbBody('kappa', v, (n, g) => KAPPA_CH[n] && uvs(g, 0, KAPPA_CH[n])) }] });
+/** …and its hook, about the pivots of the base file (the brief keeps them the same in every variant) */
+let KAPPA_GLB_HOOK = null;
+function kappaGlbHook() {
+  const P = enemyParts('kappa', 0);
+  return KAPPA_GLB_HOOK ||= { key: 'kappa:glb', ...kappaHook(P.head.at, P.arms.at, P.water?.at || P.head.at) };
+}
 function kappaSpec(v) {
   const skin = col(v.skin), skinD = col(v.skin).multiplyScalar(0.78), belly = col(v.belly), shellC = col(v.shell), scute = col(v.scute), rim = col(v.rim);
   const B = [], H = [], A = [];
@@ -206,9 +238,10 @@ function kappaSpec(v) {
   return { parts: [{ name: 'body', geo: stamp([...B, ...H, ...A]) }] };
 }
 function buildKappa(v) {
-  const M = assemble('kappa:' + v.key, () => kappaSpec(v));
+  const glb = ownEnemyModel('kappa', v.key) && ownEnemyModel('kappa', 0);
+  const M = assemble('kappa:' + v.key + (glb ? ':glb' : ''), () => glb ? kappaGlb(v) : kappaSpec(v));
   const I = M.inner, uW = { value: 1 }, uH = { value: new THREE.Vector2() }, uA = { value: new THREE.Vector2() };
-  hookModel(M, { key: 'kappa', U: { uWater: uW, uHead: uH, uArm: uA }, ...KAPPA_HOOK });
+  hookModel(M, { key: 'kappa', ...(glb ? kappaGlbHook() : KAPPA_HOOK), U: { uWater: uW, uHead: uH, uArm: uA } });
   let wad = 0, lvl = 1, flick = 0, look = 0;
   M.dip = 0;
   M.animate = (dt, t, moving) => {
@@ -409,11 +442,11 @@ function kappaDamage(m, dmg) {
 // that leaves them stuck in the sand — guard down — for a moment.
 const HG = { SLAM_WIND: 0.78, SLAM_R: 1.35, SLAM_AT: 1.15, STUCK: 1.25, DASH_WIND: 0.5, DASH_SPD: 11.5, DASH_W: 0.72, TURN: 1.9, GUARD: 1.05, CY: 0.4 };
 const HG_CLAW = [0, HG.CY, 0.24];
-const CRAB_HOOK = {
+const crabHook = CP => ({
   pars: 'uniform float uWalk; uniform float uStride; uniform float uIdle; uniform vec2 uClaw;' + KROT,
   // legs: uv.x = step phase, uv.y = 0 at the hip … 1 at the tip. Lift + reach while walking, a lazy tap while idle.
   // claws (uv.y 5): both pitch together about the shoulders
-  body: `if (uv.y > 4.5) { vec3 CP = vec3(${HG_CLAW.join(', ')}); transformed = kRot(transformed - CP, uClaw) + CP; }
+  body: `if (uv.y > 4.5) { vec3 CP = ${v3(CP)}; transformed = kRot(transformed - CP, uClaw) + CP; }
     else if (uv.y > 0.001) {
       float ph = uWalk + uv.x, up = max(0.0, sin(ph));
       float sx = transformed.x > 0.0 ? 1.0 : -1.0;
@@ -423,6 +456,26 @@ const CRAB_HOOK = {
     }`,
   nrm: 'if (uv.y > 4.5) objectNormal = kRot(objectNormal, uClaw);',
   ol: '',
+});
+const CRAB_HOOK = crabHook(HG_CLAW);
+/** the Blender crab (ROADMAP EN-1): `claws` on channel 5 about its own axle; each `leg_L1…L4` (+x) / `leg_R1…R4` (−x)
+ *  weighted 0 at its hip (its pivot) … 1 at its farthest point, its step phase alternating by leg and side as the
+ *  procedural one's. Captain Brineclaw (variant 3) has his own file and his own claw axle (crabGlbHook). */
+function heikeganiGlb(v) {
+  return { parts: [{ name: 'body', geo: glbBody('heikegani', v, (n, g, part) => {
+    if (n === 'claws') return uvs(g, 0, 5);
+    const L = /^leg_([LR])(\d)$/.exec(n); if (!L) return;
+    const k = L[1] === 'L' ? 1 : -1, i = +L[2] - 1, ph = ((i + (k > 0 ? 1 : 0)) % 2) * Math.PI + i * 0.35;
+    const [hx, , hz] = part.at, P = g.attributes.position;
+    let R = 1e-3; for (let j = 0; j < P.count; j++) R = Math.max(R, Math.hypot(P.getX(j) - hx, P.getZ(j) - hz));
+    uvf(g, p => [ph, clamp(Math.hypot(p.x - hx, p.z - hz) / R) ** 1.2]);
+  }) }] };
+}
+const CRAB_GLB_HOOK = new Map(); // (the soldiers share the base file's claw axle; a captain's own shape has its own)
+const crabGlbHook = v => {
+  const k = v.key < 3 ? 0 : v.key;
+  if (!CRAB_GLB_HOOK.has(k)) CRAB_GLB_HOOK.set(k, { key: 'crab:glb' + (k ? ':' + k : ''), ...crabHook(enemyParts('heikegani', k).claws.at) });
+  return CRAB_GLB_HOOK.get(k);
 };
 function heikeganiSpec(v) {
   const CY = HG.CY, sh = col(v.shell), shD = col(v.shell).multiplyScalar(0.6), shL = col(v.shell).lerp(col('#fff0d8'), 0.3), belly = col(v.belly);
@@ -499,10 +552,11 @@ function heikeganiSpec(v) {
   return { parts: [{ name: 'body', geo: stamp([...B, ...C]) }] };
 }
 function buildHeikegani(v) {
-  const M = assemble('heikegani:' + v.key, () => heikeganiSpec(v));
+  const glb = ownEnemyModel('heikegani', v.key) && ownEnemyModel('heikegani', 0);
+  const M = assemble('heikegani:' + v.key + (glb ? ':glb' : ''), () => glb ? heikeganiGlb(v) : heikeganiSpec(v));
   const I = M.inner;
   const U = { uWalk: { value: 0 }, uStride: { value: 0 }, uIdle: { value: rand(0, 9) }, uClaw: { value: new THREE.Vector2() } };
-  hookModel(M, { key: 'crab', U, ...CRAB_HOOK });
+  hookModel(M, { key: 'crab', ...(glb ? crabGlbHook(v) : CRAB_HOOK), U });
   M.clank = 0; M.gait = 1; M.side = 0;
   let stride = 0;
   M.animate = (dt, t, moving) => {
@@ -701,14 +755,36 @@ function kurageSpec(v) {
     const g = tubeC(smooth(ctrl, 12), (p, n, o) => o.set(v.tent).lerp(col(v.core), clamp((-p.y - len * 0.6) / (len * 0.4))), 4);
     B.push(uvf(g, p => { const t = clamp(-p.y / (len + 0.03)); return [clamp((t - 0.6) * 2.5) * 1.2, noOl + t]; }));
   }
-  return {
-    mat: { vertexPars: 'varying vec2 vKu;', vertexWorld: 'vKu = uv;', fragPars: 'varying vec2 vKu; uniform float uGlowK;', fragOut: 'outgoingLight += diffuseColor.rgb * vKu.x * uGlowK;', uniforms: { uGlowK: { value: 1 } } },
-    parts: [{ name: 'body', geo: stamp(B) }],
-  };
+  return { mat: kurageSpec.mat(), parts: [{ name: 'body', geo: stamp(B) }] };
+}
+/** the jelly's toon extras: uv.x = glow (core, tips), × uGlowK (per jelly: flares as it charges) */
+kurageSpec.mat = () => ({ vertexPars: 'varying vec2 vKu;', vertexWorld: 'vKu = uv;', fragPars: 'varying vec2 vKu; uniform float uGlowK;', fragOut: 'outgoingLight += diffuseColor.rgb * vKu.x * uGlowK;', uniforms: { uGlowK: { value: 1 } } });
+/**
+ * The Blender kurage (ROADMAP EN-1; its origin is the bell's rim centre, like the procedural one): `bell` becomes the
+ * see-through bell (bellGeo); the rest is one hooked body. Sway weight grows with the depth below the rim (frill a
+ * little, arms and tentacles toward their ends); glow (uv.x) on the `glow`-material faces of the core and the tentacle
+ * tips, and fading in down the tentacles; the core (the bulb and its stem) has no ink hull (it is seen through the bell).
+ */
+const JL = { ARM_D: 0.6, TENT_D: 0.85, FRILL_W: 0.15, FRILL_GLOW: 0.15, ARM_GLOW: 0.2, CORE_GLOW: 1.35, TIP_GLOW: 1.2, FADE0: 0.35, FADE: 0.5 };
+const kurageHasGlb = v => ownEnemyModel('kurage', v.key) && !!enemyParts('kurage', v.key).bell;
+function kurageGlb(v) {
+  const geo = glbBody('kurage', v, (n, g) => {
+    if (n === 'bell') { g.userData.bell = true; return; }
+    if (n === 'core') return uvs(g, g.userData.glow ? JL.CORE_GLOW : 0, 2); // (the bulb glows; its stem doesn't)
+    if (n === 'frill') return uvs(g, JL.FRILL_GLOW, JL.FRILL_W);
+    if (n === 'arms') return uvf(g, p => [JL.ARM_GLOW, clamp(-p.y / JL.ARM_D) * 0.85]);
+    if (n === 'tentacles') return uvf(g, p => { const t = clamp(-p.y / JL.TENT_D); return [g.userData.glow ? JL.TIP_GLOW : clamp((t - JL.FADE0) / (1 - JL.FADE0)) * JL.FADE, t]; }); // (luminous toward the tips: strands of light, not legs)
+  });
+  return { mat: kurageSpec.mat(), parts: [{ name: 'body', geo: geo.filter(g => !g.userData.bell) }] };
 }
 const BELLS = new Map();
 function bellGeo(v) {
   let g = BELLS.get(v.key);
+  const B = !g && kurageHasGlb(v) && enemyParts('kurage', v.key).bell;
+  if (B) { // (the Blender bell: its primitives in model space, merged)
+    g = merge(B.geos.map(g0 => { const c = g0.clone(); c.userData = {}; return c.translate(...B.at); }));
+    BELLS.set(v.key, shared(g));
+  }
   if (!g) {
     const bell = col(v.bell), rib = col(v.bell).lerp(col(v.core), 0.45), seam = col(v.bell).multiplyScalar(0.82);
     g = lathe([[0.001, 0.075], [0.14, 0.065], [0.27, 0.035], [0.36, 0.0], [0.415, 0.004], [0.435, 0.05], [0.428, 0.12], [0.398, 0.2], [0.345, 0.28], [0.265, 0.345], [0.155, 0.39], [0.001, 0.405]], 30, (p, n, o) => {
@@ -722,9 +798,11 @@ function bellGeo(v) {
   return g; // (shared: ROADMAP Z-B1)
 }
 function buildKurage(v) {
-  const M = assemble('kurage:' + v.key, () => kurageSpec(v));
+  const glb = kurageHasGlb(v);
+  const M = assemble('kurage:' + v.key + (glb ? ':glb' : ''), () => glb ? kurageGlb(v) : kurageSpec(v));
   const I = M.inner;
   M.body.castShadow = false; // (the bell casts the jelly's shadow: one shadow draw)
+  if (glb) M.body.receiveShadow = false; // (…and must not shade its own tentacles grey: a glowing jelly reads lit)
   const U = { uSw: { value: rand(0, 9) }, uDrag: { value: 0 }, uPulse: { value: 0 } };
   hookModel(M, { key: 'jelly', U, ...JELLY_HOOK });
   const uGlow = ownU(M.mat, 'uGlowK', 1);

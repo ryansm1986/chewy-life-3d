@@ -67,19 +67,26 @@ open on the title screen (start or continue first). Under automation (the QA's b
 Every action is one tap and says what it did in a toast. The ones that travel close the menu first.
 
 **Heroes**
-- *Join every hero*: Moka, Poe, Floofy and Foosy join at once, through the same calls their scenes end in
-  (`joinPoe` / `joinShihtzu` / `joinGolden`, Moka's `prepareJoin` and flag), skipping the scenes and the banners.
+- *Join every hero*: Moka, Poe, Floofy, Foosy and Stella join at once, through the same calls their scenes end in
+  (`joinPoe` / `joinShihtzu` / `joinGolden` / `joinStella`, Moka's `prepareJoin` and flag), skipping the scenes and the banners.
 - *Switch to*: any hero (joining them first if needed), with the switch cooldown skipped.
 - *Set level*: the active hero, all of them, or one, to 1, 10, 20, 30, 45 or 60. Up adds that level's stat and skill
   points; down is a fresh start at that level (points back, gear kept).
 - *Skill points* +1 / +10 / +50, *Stat points* +5 / +50 / +250, *Max every skill* (the active hero's skills at 20),
   *Reset skills* (two taps: every point back, as the Forget-Me-Not Tea).
+- **Stella (H-6)** (docs/STELLA.md §6):
+  - *Unlock Stella*: she joins at once (`joinStella`: the banner, her villager at the cottage); her quest then starts
+    quietly with its card while Shiokaze needs saving and the Tide Pool is open (`questsOwed`).
+  - *Play her arrival*: in Blossom Hollow, now: she leaves the pack, her record and quest are forgotten, and Captain
+    Kaizo's boat comes ashore with her in its bow. Not while you're playing her.
+  - *Her arrival with Kaizo's quest running*: the old-save case (docs/STELLA.md §6.2): as above, then Kaizo's visit
+    recorded (no `by`) and his "Trouble at Shiokaze Port" running; it stays his, and her plea says so.
 - *Shadow's whelp outfit*: with Foosy (the normal rule), on, or off, for the session.
 - **Arrivals (Z-H3)** (registered by `actors/arrivals.js`; docs/ZONES.md §3.1):
   - *Play an arrival*: a hero's (or a messenger's) arrival in Blossom Hollow, now, whatever the rules say. The hero is
     un-joined first (their villager leaves town), their arrival record and their homeland quest are forgotten, and the
     scene starts on the next steps you take in town. Not while you're playing that hero. The list: Poe, Floofy (the dusk
-    rule holds: from 4:24 to 5:36 pm he waits for golden hour), Old Captain Kaizo, Foosy.
+    rule holds: from 4:24 to 5:36 pm he waits for golden hour), Stella (Captain Kaizo rows her over), Foosy.
   - *Reset the arrivals* (two taps): every arrival hero not joined, every record and homeland quest forgotten: each arrival
     is due again as its zone opens.
   - *Arrivals on*: the switch the QA's quiet sessions turn off (`?nointro` without `?arrive`, or `?noarrive`).
@@ -164,6 +171,8 @@ Every action is one tap and says what it did in a toast. The ones that travel cl
 - *God mode*, *One-hit kills*, *No cooldowns*, *Endless zoom* (zoom is the mana), *Hero speed ×2*, *Freeze monsters*.
 - *FPS and draw calls*: a small overlay (fps, frame ms, draw calls and triangles of the whole frame, GPU geometries and
   textures).
+- *Gild everything* (Stella: every foe here gilded to 3 Sunlit stacks) and *Fill the shells* (her sun shells full on
+  her, Shadow and Hinata), through `G.skills.stlGildAll` / `stlFillShells` (combat/stellaArts.js).
 - *Kill every monster here*; *Spawn a pack*: a kind, a count (3, 8, 16, 30) and a leader (none, champion, unique)
   next to the hero, alerted.
 - *Targeting on this device* (CT-8, `combat/autoTarget.js`): Off, Assist or Auto for the device playing now (the same

@@ -197,6 +197,18 @@ Extra def fields:
 Models use the monsters.js conventions: `{ root, pivot, body, mat, outline }` from `finish(parts)`, or a kit rig.
 They are cute, chunky, toon-shaded with ink outlines, readable at 22 m, and have distinct silhouettes.
 
+**Blender models** (ROADMAP EN-1): a kind listed in `ENEMY_MODELS` (`src/regions/monsters/enemyModels.js`) builds from
+its GLBs in `public/models/` (one per variant key), loaded at boot. Each GLB node is one of the kind's `assemble` parts
+(its translation the pivot, vertex colours only), so the Horde still instances it and the kind's `animate()` is unchanged;
+a kind without a loaded GLB falls back to its procedural spec, and `?procmon` forces that for A/B shots. Built so far: the
+Bamboo Grove's takenoko, kodama and kamaitachi; Momiji Hollow's kuri, kakashi (and its flying crow) and momiji wisp; the
+Tidepools' kappa, heike-gani and kurage; Yukimi Onsen's yuki-warashi, yuki-daruma and tsurara; the zone tanks (iwa-bōzu,
+tesso, sazae-oni, akaname) and the Haunted yūrei; and every region boss (regions/bosses/*.js swap each part's geometry
+onto the kit's groups: tengu.js glbTengu, tanuki.js glbDanza, umibozu.js buildUmibozuGlb, yukionna.js glbMasters). The Tidepools' kinds bend on the GPU (`vhook`), so `tidepool.js` merges their GLB
+parts into one body and stamps each part's hook channel (`glbBody`), with the hook's pivots read from the base file; the
+kurage's `bell` node becomes its see-through bell. Captain Brineclaw has his own crab file (variant 3) and claw axle.
+The pipeline: `.claude/skills/codex-blender/SKILL.md` "Enemies".
+
 ### 3.5 Files and ownership
 | Owner | Files |
 |---|---|

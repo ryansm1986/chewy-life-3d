@@ -90,7 +90,7 @@ export class Prewarm {
     // 1. the active hero: the hotbar's and the K panel's icons; the bag, the worn gear (the I and C panels)
     const all = skillList(), hero = G?.player?.hero || st.activeHero || 'chewy';
     const mine = all.filter(s => s.raw?.cls === hero || s.cls === hero).map(s => s.id), others = all.map(s => s.id).filter(id => !mine.includes(id));
-    add('icons:hotbar', () => { for (const id of ['attack', 'attack_ball', 'attack_staff', 'attack_fuma']) skillIconURL(id); hotbarIconURL('attack', G?.derived); });
+    add('icons:hotbar', () => { for (const id of ['attack', 'attack_ball', 'attack_staff', 'attack_fuma', 'attack_flail', 'attack_lance', 'attack_parasol']) skillIconURL(id); hotbarIconURL('attack', G?.derived); });
     icons('icons:skills', mine, skillIconURL, 2);
     const items = [];
     for (const it of st.inventory || []) if (it) items.push(it);

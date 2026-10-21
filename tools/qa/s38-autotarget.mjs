@@ -336,8 +336,10 @@ try {
     const fl = await page.evaluate(() => { const G = window.G, T = window.CT8; T.park(); const c = T.spot(9); T.hero(c.x, c.z, 0); const a = T.pack(c.x + 3, c.z, 1)[0], b = T.pack(c.x - 6, c.z + 2, 1)[0]; T.reset(); window.__fa = a; window.__fb = b; return { from: c, b: { x: b.pos.x, z: b.pos.z } }; });
     await waitG(page, () => window.G.padAim.lock === window.__fa, null, 1500);
     const ff = await fingerFor(fl.b.x - fl.from.x, fl.b.z - fl.from.z);
-    await F.down(1, stickXY.x, stickXY.y); await F.move(1, stickXY.x + ff[0] * 70, stickXY.y + ff[1] * 70, 2); await F.up(1); await F.frame();
-    const flk = await page.evaluate(() => ({ lock: window.G.padAim.lock === window.__fb, manual: window.G.padAim.manual === window.__fb }));
+    await page.evaluate(async () => { window.__flk = null; if (!window.__flkOn) { window.__flkOn = 1; const { Events } = await import('/src/core/events.js'); Events.on('touch:flick', () => { window.__flk = true; }); } });
+    const fT0 = Date.now();
+    await F.down(1, stickXY.x, stickXY.y); await F.move(1, stickXY.x + ff[0] * 70, stickXY.y + ff[1] * 70, 2); await F.up(1); const fMs = Date.now() - fT0; await F.frame();
+    const flk = await page.evaluate(ms => ({ lock: window.G.padAim.lock === window.__fb, manual: window.G.padAim.manual === window.__fb, fired: !!window.__flk, ms }), fMs); // (fired / ms: the flick has to land inside touch.js's 250 ms)
     R.check(`d) ${hero}: a quick flick of the touch stick toward a farther foe picks it (a manual pick over the nearer lock)`, flk.lock && flk.manual, JSON.stringify(flk));
     await browser.close();
   }

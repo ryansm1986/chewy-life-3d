@@ -24,7 +24,7 @@ const SHOTS = !!process.env.SHOTS, OUT = 'tools/qa/tmp/s29', PART = process.env.
 if (SHOTS) fs.mkdirSync(OUT, { recursive: true });
 const shot = async name => { if (SHOTS) await page.screenshot({ path: `${OUT}/${name}.png` }); };
 const quiet = () => ev(() => { const G = window.G; G.sim.tickT = -1e9; clearInterval(window.__freeze); window.__freeze = setInterval(() => { G.sim.tickT = -1e9; }, 200); G.state.flags.hints = { ...(G.state.flags.hints || {}), garden: 1, build: 1, travel: 1, skills: 1, stats: 1, loot: 1, potion: 1, fight: 1 }; });
-const stzIn = () => ev(() => { const G = window.G; for (const id of ['moka', 'poe', 'shihtzu']) { G.state.flags[`${id}Joined`] = true; const v = G.heroes.villagers[id]; if (v) { v.frozen = false; v.waitingToJoin = false; } } });
+const stzIn = () => ev(() => { const G = window.G; for (const id of ['moka', 'poe', 'shihtzu', 'stella']) { G.state.flags[`${id}Joined`] = true; const v = G.heroes.villagers[id]; if (v) { v.frozen = false; v.waitingToJoin = false; } } });
 /** the Onsen open (level 26), the arrivals before his behind us (Poe's, Floofy's, Captain Kaizo's visit; their quests
  *  done): Foosy's arrival is due (actors/arrivals.js) */
 const opened = () => ev(() => { const G = window.G, F = G.state.flags, A = (F.arrivals ||= {}); for (const z of ['bamboo', 'maple', 'tidepool']) A[z] = { how: 'scene', quest: 'start', day: 1 }; G.state.quests.done.push('hq_takemori', 'hq_akane', 'hq_shiokaze'); G.state.quests.active = G.state.quests.active.filter(q => q.id !== 'welcome'); G.state.quests.cards = []; G.state.player.lvl = 26; G.actions.recompute(); G.heroes.spawnBench?.(); if (G.day) G.day.paused = true; });
@@ -97,7 +97,7 @@ try {
     await page.keyboard.press('Escape'); await sleep(page, 400); // (his quest's card)
     const a7 = await ev(() => { const G = window.G, v = G.heroes.villagers.golden, h = G.heroes.homeSpot('golden'); return { v: !!v, near: v ? Math.round(Math.hypot(v.pos.x - h.x, v.pos.z - h.z)) : -1, bench: G.heroes.bench(), lance: !!v?.rig?.parts?.lance, ball: !!G.heroes.gldJoin.ball }; });
     const a8 = await ev(() => window.G.state.quests.active.some(q => q.id === 'hq_yukimi') || window.G.state.quests.done.includes('hq_yukimi'));
-    R.check('he lives at the cottage at once (a villager, his lance on his back), four heroes on the bench; nothing of the scene left; "The Siege of Yukimi" started', a7.v && a7.near < 12 && a7.bench.length === 4 && a7.lance && !a7.ball && a8, JSON.stringify({ a7, a8 }));
+    R.check('he lives at the cottage at once (a villager, his lance on his back), five heroes on the bench (Stella came before him); nothing of the scene left; "The Siege of Yukimi" started', a7.v && a7.near < 12 && a7.bench.length === 5 && a7.lance && !a7.ball && a8, JSON.stringify({ a7, a8 }));
   }
   if (PART.includes('b')) { // ================================================================ b) a reset mid-scene; an old save's rumour
     await boot(page, 'fresh&nointro&notut&arrive&qcard&hour=11'); await quiet(); await stzIn();
@@ -112,22 +112,22 @@ try {
     R.check('leaving town mid-scene resets it (no knight, no ball, no lance on the ground, Shadow undressed); back in town his arrival comes again', b0.state === 'off' && !b0.knight && !b0.ball && !b0.groundLance && !b0.whelp && !b0.joined && ['march', 'guard'].includes(b1.state), JSON.stringify({ b0, b1 }));
     await ev(() => { // an old save from before Foosy: Floofy joined, no heroes.golden at all
       const G = window.G; G.save(); const s = JSON.parse(localStorage.getItem('chewy3d.save'));
-      delete s.heroes.golden; delete s.flags.goldenJoined; if (s.flags.hints) delete s.flags.hints.gldRumour; for (const id of ['moka', 'poe', 'shihtzu']) s.flags[`${id}Joined`] = true;
+      delete s.heroes.golden; delete s.flags.goldenJoined; if (s.flags.hints) delete s.flags.hints.gldRumour; for (const id of ['moka', 'poe', 'shihtzu', 'stella']) s.flags[`${id}Joined`] = true; // (Stella before him since H-6: his rumour waits for her)
       for (const h of Object.values(s.heroes)) if (h?.player) h.player.lvl = 20; if (s.player) s.player.lvl = 20; // (the Onsen shut: the rumour, not the arrival)
       window.__ignoreSave = true; localStorage.setItem('chewy3d.save', JSON.stringify(s)); removeEventListener('beforeunload', G.save); G.save = () => {};
     });
     await boot(page, 'notitle&notut'); await quiet();
     const bOld = await ev(() => { const G = window.G, st = G.state; return { lvl: st.heroes.golden?.player?.lvl, joined: !!st.flags.goldenJoined, v: !!G.heroes.villagers.golden, bench: G.heroes.bench().join() }; });
-    R.check('an old save (Floofy joined, no Foosy in it) loads with him new and not joined: no villager, three heroes on the bench', bOld.lvl === 1 && !bOld.joined && !bOld.v && bOld.bench === 'moka,poe,shihtzu', JSON.stringify(bOld));
+    R.check('an old save (Stella joined, no Foosy in it) loads with him new and not joined: no villager, four heroes on the bench', bOld.lvl === 1 && !bOld.joined && !bOld.v && bOld.bench === 'moka,poe,shihtzu,stella', JSON.stringify(bOld));
     await ev(() => { delete window.G.state.flags.hints.gldRumour; window.G.heroes.gldJoin.hintT = 0; });
     await page.waitForFunction(() => window.G.state.flags.hints?.gldRumour, null, { timeout: 30000 }).catch(() => {});
     await sleep(page, 300); await shot('8-rumour');
     const b3 = await ev(() => ({ rumour: !!window.G.state.flags.hints?.gldRumour, wheel: window.G.heroes.roster().find(h => h.id === 'golden').why }));
-    R.check('in town (Floofy joined, him not, the Onsen shut): Shadow passes on the rumour about the knight guarding the hot springs, once; the wheel says when he\'ll come', b3.rumour && b3.wheel === 'Will arrive when the Onsen opens', JSON.stringify(b3));
+    R.check('in town (Stella joined, him not, the Onsen shut): Shadow passes on the rumour about the knight guarding the hot springs, once; the wheel says when he\'ll come', b3.rumour && b3.wheel === 'Will arrive when the Onsen opens', JSON.stringify(b3));
   }
   if (PART.includes('c')) { // ================================================================ c) the Meet guide
     await boot(page, 'fresh&nointro&tut&hour=11'); await quiet(); await stzIn();
-    await ev(() => { const G = window.G, T = (G.state.flags.tutorials ||= {}); for (const id of ['house', 'switch', 'fishing', 'makeHome', 'remodel', 'charge', 'meetPoe', 'meetShihtzu']) T[id] = { done: true }; G.heroes.spawnBench(); G.heroes.joinGolden(); });
+    await ev(() => { const G = window.G, T = (G.state.flags.tutorials ||= {}); for (const id of ['house', 'switch', 'fishing', 'makeHome', 'remodel', 'charge', 'meetPoe', 'meetShihtzu', 'meetStella']) T[id] = { done: true }; G.heroes.spawnBench(); G.heroes.joinGolden(); });
     await page.waitForFunction(() => window.G.tutorials.cur?.id === 'meetGolden', null, { timeout: 25000 }).catch(() => {});
     await sleep(page, 900); await shot('g1-hold');
     const c0 = await ev(() => ({ id: window.G.tutorials.cur?.id, step: window.G.tutorials.cur?.step?.id, title: window.G.tutorials.cur?.guide?.title }));
@@ -154,7 +154,7 @@ try {
     }
     await sleep(page, 600);
     const c2 = await ev(() => ({ cur: window.G.tutorials.cur?.id || null, rec: window.G.state.flags.tutorials?.meetGolden, whelp: window.G.companion.whelp.on }));
-    R.check(`the "Meet ${name}" guide: hold Tab → the wheel with five, his card, a pick by key; the lance, the javelin, Shadow the whelp taking off, the trees; done`, c0.id === 'meetGolden' && c0.title === `Meet ${name}` && c0.step === 'hold' && wheel.golden && wheel.cards === 5 && c1.step === 'lance' && c1.hero === 'golden' && steps.join() === 'lance,javelin,whelp,wrap' && !c2.cur && c2.rec?.done && c2.whelp, JSON.stringify({ c0, wheel, c1, steps, c2 }));
+    R.check(`the "Meet ${name}" guide: hold Tab → the wheel with six, his card, a pick by key; the lance, the javelin, Shadow the whelp taking off, the trees; done`, c0.id === 'meetGolden' && c0.title === `Meet ${name}` && c0.step === 'hold' && wheel.golden && wheel.cards === 6 && c1.step === 'lance' && c1.hero === 'golden' && steps.join() === 'lance,javelin,whelp,wrap' && !c2.cur && c2.rec?.done && c2.whelp, JSON.stringify({ c0, wheel, c1, steps, c2 }));
   }
   if (PART.includes('d')) { // ================================================================ d) every skill tapped; a real charge
     await boot(page, 'fresh&nointro&notut&hero=golden'); await ev(() => { window.G.state.flags.burrowTut = true; window.G.enterDungeon(3); }); await waitMode(page, 'dungeon'); await sleep(page, 1200);

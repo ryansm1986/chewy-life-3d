@@ -16,6 +16,7 @@
 import * as THREE from 'three';
 import { assemble, mdef, act, tele, hitArea, roll, sfx, puff, playerIn, ell, cyl, tubeC, blob, cheeks, eyesCute, paint, V, col, INK } from '../../regions/monsters/bamboo.js';
 import { rand, clamp, TAU, ease } from '../../core/util.js';
+import { enemySpec, enemyPivot } from '../../regions/monsters/enemyModels.js';
 
 const TS = { DIG: 0.5, UNDER_MAX: 1.7, UNDER_V: 2.7, SURF: 0.8, BURST_R: 1.6, DAZE: 1.1, GNAW_WIND: 0.42, GNAW_T: 0.42, GNAW_R: 1.5, GNAW_ARC: 0.7 };
 const TELE = '#ff3a7a'; // (the hollow's telegraph colour: maple.js)
@@ -94,7 +95,7 @@ function tessoSpec(v) {
   ] };
 }
 function buildTesso(v) {
-  const M = assemble('tesso:' + v.key, () => tessoSpec(v));
+  const M = assemble('tesso:' + v.key, () => enemySpec('tesso', v.key, null, { outline: 0.02, parent: { mound: 'root' }, part: { mound: { outline: 0.012 } } }) || tessoSpec(v)); // (the Blender model: ROADMAP EN-1)
   const I = M.inner, H = M.g.head, Pw = M.g.paws, Md = M.g.mound;
   let hop = 0;
   M.variant = v;

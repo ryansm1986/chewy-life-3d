@@ -12,6 +12,7 @@ import { makeToon, makeOutline } from '../../gfx/materials.js';
 import { paint, merge } from '../../gfx/geom.js';
 import { ell } from '../../dungeon/monsters.js';
 import { splatTexture } from './kitB.js';
+import { enemyPartGeo } from '../monsters/enemyModels.js';
 import { clamp, TAU } from '../../core/util.js';
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _s = new THREE.Vector3(), _p = new THREE.Vector3();
@@ -24,7 +25,20 @@ export const UMI = { body: '#236b7b', deep: '#15475a', belly: '#3894a3', sheen: 
 
 // ================================================================== arms + hands
 const NA = 16; // spheres per arm
+/** the Blender mitten (ROADMAP EN-1: umibozu-hand.glb, metres, wrist at the origin, fingers +z, palm −y, thumb +x),
+ *  mirrored for a thumb on −x; null without the file */
+function handGlb(thumbSide) {
+  const g = enemyPartGeo('umibozuHand', 0, 'body');
+  if (!g) return null;
+  if (thumbSide < 0) { // mirror x and flip the winding so the faces still point out
+    g.scale(-1, 1, 1);
+    if (g.index) { const a = g.index.array; for (let i = 0; i < a.length; i += 3) { const t = a[i + 1]; a[i + 1] = a[i + 2]; a[i + 2] = t; } g.index.needsUpdate = true; }
+    else for (const at of Object.values(g.attributes)) { const n = at.itemSize, A = at.array; for (let v = 0; v < at.count; v += 3) for (let c = 0; c < n; c++) { const t = A[(v + 1) * n + c]; A[(v + 1) * n + c] = A[(v + 2) * n + c]; A[(v + 2) * n + c] = t; } at.needsUpdate = true; }
+  }
+  return g;
+}
 function handGeo(thumbSide) {
+  const G = handGlb(thumbSide); if (G) return G;
   const P = [];
   P.push(ell(0.92, 0.36, 0.86, UMI.body, [0, 0, 0.92], [0, 0, 0], 22)); // palm
   for (const [x, yaw] of [[-0.52, -0.16], [0, 0], [0.52, 0.16]]) P.push(ell(0.3, 0.27, 0.56, UMI.body, [x * 1.02, -0.02, 1.62 + (x ? -0.08 : 0)], [0, yaw, 0], 14));

@@ -7,6 +7,7 @@ import { mixHex } from '../core/util.js';
 import { drawFuma, drawPoeSkill, POE_SKILL_TREE, POE_SKILL_BG, POE_PASSIVE } from './iconsPoe.js'; // Poe's fūma + skill art (docs/POE.md)
 import { drawFlail, drawShihtzuSkill, STZ_SKILL_TREE, STZ_SKILL_BG, STZ_PASSIVE } from './iconsShihtzu.js'; // the Shih Tzu's flail + skill art (docs/SHIHTZU.md)
 import { drawLance, drawGoldenSkill, GLD_SKILL_TREE, GLD_SKILL_BG, GLD_PASSIVE } from './iconsGolden.js'; // the dragoon's lance + skill art (docs/GOLDEN.md)
+import { drawParasol, drawStellaSkill, STL_SKILL_TREE, STL_SKILL_BG, STL_PASSIVE } from './iconsStella.js'; // Stella's sun wagasa + skill art (docs/STELLA.md)
 import { drawSamuraiSkill, drawKatanaItem } from './samuraiIcons.js'; // (Chewy the samurai: the Bone Katana, the Bone Blade / Pack Spirit art)
 
 const INK = '#4a2c2a';
@@ -1244,12 +1245,13 @@ const SKILL_BG = {
   ...POE_SKILL_BG,
   ...STZ_SKILL_BG,
   ...GLD_SKILL_BG,
+  ...STL_SKILL_BG,
 };
 const SKILL_TREE = { chomp: 'bone', boneMastery: 'bone', whirl: 'bone', dig: 'bone', guard: 'bone', frenzy: 'bone', bonestorm: 'bone', throw: 'fetch', fetchMastery: 'fetch', ricochet: 'fetch', multi: 'fetch', decoy: 'fetch', blaze: 'fetch', fetchstorm: 'fetch', woof: 'spirit', goodboy: 'spirit', zoom: 'spirit', packcall: 'spirit', treat: 'spirit', howl: 'spirit', moonhowl: 'spirit',
   splash: 'tide', tideMastery: 'tide', bubble: 'tide', shake: 'tide', puddleHop: 'tide', whirlpool: 'tide', greatWave: 'tide',
   kibble: 'star', starMastery: 'star', squeak: 'star', pawRune: 'star', moonbeam: 'star', constellation: 'star', meteor: 'star',
-  duckDecoy: 'duck', retriever: 'duck', fetchLeash: 'duck', feathers: 'duck', duckCall: 'duck', spiritRetriever: 'duck', mallards: 'duck', ...POE_SKILL_TREE, ...STZ_SKILL_TREE, ...GLD_SKILL_TREE };
-const PASSIVE = new Set(['boneMastery', 'guard', 'frenzy', 'fetchMastery', 'goodboy', 'tideMastery', 'starMastery', 'retriever', ...POE_PASSIVE, ...STZ_PASSIVE, ...GLD_PASSIVE]);
+  duckDecoy: 'duck', retriever: 'duck', fetchLeash: 'duck', feathers: 'duck', duckCall: 'duck', spiritRetriever: 'duck', mallards: 'duck', ...POE_SKILL_TREE, ...STZ_SKILL_TREE, ...GLD_SKILL_TREE, ...STL_SKILL_TREE };
+const PASSIVE = new Set(['boneMastery', 'guard', 'frenzy', 'fetchMastery', 'goodboy', 'tideMastery', 'starMastery', 'retriever', ...POE_PASSIVE, ...STZ_PASSIVE, ...GLD_PASSIVE, ...STL_PASSIVE]);
 const CREAM = '#fffaf0';
 function tennis(g, x, y, r, col = '#e8362a') {
   circ(g, x, y, r); paint(g, volR(g, col, x, y, r, 0.5, 0.35), Math.max(1.2, r * 0.14));
@@ -1285,6 +1287,7 @@ function drawSkill(g, id) {
   if (drawPoeSkill(g, id, ICON_KIT)) return;
   if (drawShihtzuSkill(g, id, ICON_KIT)) return;
   if (drawGoldenSkill(g, id, ICON_KIT)) return;
+  if (drawStellaSkill(g, id, ICON_KIT)) return;
   if (drawSamuraiSkill(g, id, ICON_KIT)) return;
   switch (id) {
     case 'attack': {
@@ -1487,7 +1490,7 @@ function skillTile(g, tree, passive) {
 }
 
 // ================================================================== public API
-const SHAPES = { sword: drawSword, ball: drawBall, staff: drawStaff, fuma: (g, v, c, ns) => drawFuma(g, v, c, ns, ICON_KIT), flail: (g, v, c, ns) => drawFlail(g, v, c, ns, ICON_KIT), lance: (g, v, c, ns) => drawLance(g, v, c, ns, ICON_KIT), hat: drawHat, outfit: drawOutfit, collar: drawCollar, charm: drawCharm, boots: drawBoots, paws: drawPaws };
+const SHAPES = { sword: drawSword, ball: drawBall, staff: drawStaff, fuma: (g, v, c, ns) => drawFuma(g, v, c, ns, ICON_KIT), flail: (g, v, c, ns) => drawFlail(g, v, c, ns, ICON_KIT), lance: (g, v, c, ns) => drawLance(g, v, c, ns, ICON_KIT), parasol: (g, v, c, ns) => drawParasol(g, v, c, ns, ICON_KIT), hat: drawHat, outfit: drawOutfit, collar: drawCollar, charm: drawCharm, boots: drawBoots, paws: drawPaws };
 /** Icon for an Item (gear, gem, material item, potion item). Cached by shape+variant+colors+rarity. */
 export function itemIcon(item) {
   if (!item) return '';

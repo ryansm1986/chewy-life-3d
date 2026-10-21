@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
-const ALL = ['gen-fuzz', 's1-roundtrip', 's2-combat', 's3-bosses', 's4-death', 's5-village-save', 's7-inventory', 's8-dialogue', 's9-input', 's10-misc', 's11-story-title', 's12-heroes', 's13-regions', 's14-village-plan', 's15-homestead', 's16-tutorials', 's17-housing', 's18-furniture-sources', 's19-charge', 's20-poe', 's21-zones', 's22-zone-dungeons', 's23-zone-villages', 's24-render-health', 's25-gamepad', 's26-deck', 's27-touch', 's28-shihtzu', 's29-golden', 's30-tiers', 's31-expeditions', 's32-peaceful', 's33-scavenge', 's34-guild', 's35-debug', 's36-autosave', 's37-cozy-story', 's38-autotarget', 's39-shadow-leads', 's40-pad-menus', 's41-maps', 's42-burrow-dens', 's43-town-portal', 's44-stash', 's45-inventory-grid', 's46-quest-moments', 's47-hero-arrivals', 'profile-horde'];
+const ALL = ['gen-fuzz', 's1-roundtrip', 's2-combat', 's3-bosses', 's4-death', 's5-village-save', 's7-inventory', 's8-dialogue', 's9-input', 's10-misc', 's11-story-title', 's12-heroes', 's13-regions', 's14-village-plan', 's15-homestead', 's16-tutorials', 's17-housing', 's18-furniture-sources', 's19-charge', 's20-poe', 's21-zones', 's22-zone-dungeons', 's23-zone-villages', 's24-render-health', 's25-gamepad', 's26-deck', 's27-touch', 's28-shihtzu', 's29-golden', 's30-tiers', 's31-expeditions', 's32-peaceful', 's33-scavenge', 's34-guild', 's35-debug', 's36-autosave', 's37-cozy-story', 's38-autotarget', 's39-shadow-leads', 's40-pad-menus', 's41-maps', 's42-burrow-dens', 's43-town-portal', 's44-stash', 's45-inventory-grid', 's46-quest-moments', 's47-hero-arrivals', 's48-stella', 's49-coop', 's50-coop-panes', 's51-simple-stats', 'profile-horde'];
 // s31-expeditions: the cozy path's phase A (docs/COZY.md): the cozy route end to end with no fighting (Takemori saved by
 // Moka alone), away heroes, the hold rule, time away, the pad and the phone; shots in tools/qa/tmp/s31-expeditions/.
 // s33-scavenge: scavenging, the cozy path's phase C (docs/COZY.md §7): the nodes at home and in the zones, a gather, Shadow's
@@ -50,6 +50,16 @@ const ALL = ['gen-fuzz', 's1-roundtrip', 's2-combat', 's3-bosses', 's4-death', '
 // migrations; shots in tools/qa/tmp/s45-inventory-grid/.
 // s46-quest-moments: quests as moments (ROADMAP UX-2; docs/QUESTS.md): the quest card on accept (keys, pad, touch; queued
 // in a fight, a dialogue, build mode; kept over a reload), a request's slip, the quiet QA sessions' banner, the place titles.
+// s48-stella: Stella, the sixth hero (docs/STELLA.md): her arrival and an old save (Kaizo's quest running), playing her in the
+// village, a zone, the Burrow and a horde fight, every active tapped and charged with every perk, heals and sun shells on
+// her and Shadow (Sun Dog, the 6 s wake), the `ally` aim, the wagasa's carry and casts, the pad and touch, a save and reload.
+// s49-coop: couch co-op (docs/COOP.md): joining from a spare pad, players 2-4 walking and fighting as their heroes,
+// the camera and the on-screen leash, monsters choosing a hero, shared XP, switching, downed and revived, the pack moving
+// together (stairs, a zone, a house, home), a lost controller, a villager talking to player 2, leaving, save and reload.
+// s50-coop-panes: couch co-op's shared bag panes (docs/COOP.md §5): one, two and four at once on the Deck's 1280×800,
+// equip to the right hero, a carry seen live in another pane, drops at that hero, stats (Y Shadow picks), skills, leaving.
+// s51-simple-stats: simple stats (docs/STATS.md, ROADMAP UX-3): Shadow picks the points, the Character screen's Power, six
+// numbers, Start over and drawer, the bag's green arrows, simple item tooltips, Shift, Settings › Item details, L3 on a pad.
 // s47-hero-arrivals: the heroes arrive in Blossom Hollow (ROADMAP Z-H3; docs/ZONES.md §3.1): the triggers and the order, the
 // island scene end to end, the card, the homeland quest by you, a crew and the hero you play, old saves, the pad, touch.
 // s26-deck: the Steam Deck profile (CONTROLS §10). Its full panel sweep (tools/qa/deck-ui.mjs) and the frame times
@@ -62,12 +72,13 @@ const ALL = ['gen-fuzz', 's1-roundtrip', 's2-combat', 's3-bosses', 's4-death', '
 // prefixes), `run-all profile` runs it alone.
 const want = process.argv.slice(2);
 const OPT_IN = { 's37-full': { file: 's37-cozy-story', env: { S37_FULL: '1' }, timeout: 150 } }; // (named entries, only when asked for)
-const list = want.length ? [...ALL.filter(n => want.some(w => n.startsWith(w)) && !want.includes('s37-full')), ...Object.keys(OPT_IN).filter(n => want.includes(n))] : ALL;
+const SLOW = { 's47-hero-arrivals': 30 }; // (minutes: suites that need more than the 15 by default: s47 plays four whole arrivals and their old saves)
+const list = want.length ? [...ALL.filter(n => want.some(w => n.startsWith(w)) && !(n === 's37-cozy-story' && want.includes('s37-full'))), ...Object.keys(OPT_IN).filter(n => want.includes(n))] : ALL;
 const summary = [];
 for (const name of list) {
   const t0 = Date.now();
   const O = OPT_IN[name];
-  const r = spawnSync(process.execPath, [path.join(dir, (O?.file || name) + '.mjs')], { encoding: 'utf8', timeout: (O?.timeout || 15) * 60 * 1000, maxBuffer: 64 * 1024 * 1024, env: { ...process.env, ...(O?.env || {}) } });
+  const r = spawnSync(process.execPath, [path.join(dir, (O?.file || name) + '.mjs')], { encoding: 'utf8', timeout: (O?.timeout || SLOW[name] || 15) * 60 * 1000, maxBuffer: 64 * 1024 * 1024, env: { ...process.env, ...(O?.env || {}) } });
   const out = (r.stdout || '') + (r.stderr || '');
   process.stdout.write(out);
   const fails = out.split('\n').filter(l => /^\s+FAIL\s/.test(l)).map(l => l.replace(/^\s+FAIL\s+/, '').split('  — ')[0]);

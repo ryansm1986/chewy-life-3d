@@ -25,7 +25,7 @@ export function itemIconURL(item) {
   if (f) { try { const u = f(item); if (u) return typeof u === 'string' ? u : u.toDataURL?.() || ''; } catch (e) { /* fall through */ } }
   const kind = item.kind;
   let g = SLOT_GLYPH[item.slot] || 'gift';
-  if (item.slot === 'weapon') g = item.wtype === 'ball' ? 'ball' : item.wtype === 'staff' ? 'staff' : item.wtype === 'fuma' ? 'fuma' : item.wtype === 'flail' ? 'flail' : item.wtype === 'lance' ? 'lance' : 'sword';
+  if (item.slot === 'weapon') g = item.wtype === 'ball' ? 'ball' : item.wtype === 'staff' ? 'staff' : item.wtype === 'fuma' ? 'fuma' : item.wtype === 'flail' ? 'flail' : item.wtype === 'lance' ? 'lance' : item.wtype === 'parasol' ? 'parasol' : 'sword';
   if (kind === 'gem') g = 'gem'; else if (kind === 'key') g = 'key'; else if (kind === 'gift') g = 'gift';
   else if (kind === 'material') g = item.base in MATERIAL_G ? MATERIAL_G[item.base] : 'petal';
   return glyphURL(g);
@@ -52,9 +52,9 @@ export function materialIconURL(k) {
 }
 export function potionInfo(k) { const P = rpg.items.POTIONS?.[k]; return P ? { name: P.name, desc: P.desc, price: P.price, color: P.color } : null; }
 
-const SKILL_FALLBACK_G = { attack: 'swords', attack_ball: 'ball', attack_staff: 'staff', attack_fuma: 'fuma', attack_flail: 'flail', chomp: 'bone', fetch: 'ball' };
+const SKILL_FALLBACK_G = { attack: 'swords', attack_ball: 'ball', attack_staff: 'staff', attack_fuma: 'fuma', attack_flail: 'flail', attack_lance: 'lance', attack_parasol: 'parasol', chomp: 'bone', fetch: 'ball' };
 // hotbar / popover icon: the basic 'attack' follows the equipped weapon (bone katana vs tennis ball)
-export function hotbarIconURL(id, derived) { return skillIconURL(id === 'attack' && derived?.weaponType === 'ball' ? 'attack_ball' : id === 'attack' && derived?.weaponType === 'staff' ? 'attack_staff' : id === 'attack' && derived?.weaponType === 'fuma' ? 'attack_fuma' : id === 'attack' && derived?.weaponType === 'flail' ? 'attack_flail' : id === 'attack' && derived?.weaponType === 'lance' ? 'attack_lance' : id); }
+export function hotbarIconURL(id, derived) { return skillIconURL(id === 'attack' && derived?.weaponType === 'ball' ? 'attack_ball' : id === 'attack' && derived?.weaponType === 'staff' ? 'attack_staff' : id === 'attack' && derived?.weaponType === 'fuma' ? 'attack_fuma' : id === 'attack' && derived?.weaponType === 'flail' ? 'attack_flail' : id === 'attack' && derived?.weaponType === 'lance' ? 'attack_lance' : id === 'attack' && derived?.weaponType === 'parasol' ? 'attack_parasol' : id); }
 export const plural = (n, word, pl = word + 's') => `${n} ${n === 1 ? word : pl}`;
 export function skillIconURL(id) {
   if (!id) return '';
@@ -63,7 +63,7 @@ export function skillIconURL(id) {
   const def = skillDef(id);
   if (def?.glyph) return glyphURL(def.glyph);
   const tree = def?.tree;
-  return glyphURL(SKILL_FALLBACK_G[id] || ({ fetch: 'ball', spirit: 'paw', bone: 'bone', tide: 'drop', star: 'star', duck: 'duck', shuriken: 'fuma', jutsu: 'smoke', shadow: 'kunai', flail: 'flail', hex: 'hex', tome: 'tome' })[tree] || 'sparkle');
+  return glyphURL(SKILL_FALLBACK_G[id] || ({ fetch: 'ball', spirit: 'paw', bone: 'bone', tide: 'drop', star: 'star', duck: 'duck', shuriken: 'fuma', jutsu: 'smoke', shadow: 'kunai', flail: 'flail', hex: 'hex', tome: 'tome', lance: 'lance', javelin: 'javelin', whelp: 'whelp', ray: 'ray', flare: 'flare', dawn: 'dawn' })[tree] || 'sparkle');
 }
 
 // ------------------------------------------------------------------ skills
@@ -87,6 +87,10 @@ export const TREES = [
   { id: 'lance', cls: 'golden', name: 'Lance Arts', jp: '槍術', color: '#2f8a5c', bg: ['#f0faf3', '#d6efde'], glyph: 'lance' },
   { id: 'javelin', cls: 'golden', name: 'Javelins', jp: '投げ槍', color: '#b8862e', bg: ['#fffaee', '#f6e8c8'], glyph: 'javelin' },
   { id: 'whelp', cls: 'golden', name: 'Whelp Bond', jp: '竜の絆', color: '#d8603a', bg: ['#fff4ee', '#fbdccc'], glyph: 'whelp' },
+  // Stella, the Sun Oracle (docs/STELLA.md)
+  { id: 'ray', cls: 'stella', name: 'Radiance', jp: '光輝', color: '#c88a1a', bg: ['#fffbea', '#fbecc0'], glyph: 'ray' },
+  { id: 'flare', cls: 'stella', name: 'Corona', jp: '光冠', color: '#d0603a', bg: ['#fff5ec', '#fcdcc8'], glyph: 'flare' },
+  { id: 'dawn', cls: 'stella', name: 'Dawn', jp: '暁', color: '#c8687a', bg: ['#fff3f1', '#fbdcd6'], glyph: 'dawn' },
 ];
 /** The skill trees of the hero being played. */
 export const treesFor = cls => TREES.filter(t => t.cls === (cls || 'chewy'));
@@ -239,7 +243,7 @@ export function meetsReq(item, state, derived) {
   if (r.dex && r.dex > (d.dex ?? st.dex ?? 0)) { res.ok = false; res.dex = false; }
   if (r.ene && r.ene > (d.ene ?? st.ene ?? 0)) { res.ok = false; res.ene = false; }
   // weapons are class-bound (sword / ball: Chewy, staff: Moka) — the bag is shared, so this shows up a lot
-  const WC = M('classes').WEAPON_CLASS || { sword: 'chewy', ball: 'chewy', staff: 'moka', fuma: 'poe', flail: 'shihtzu', lance: 'golden' };
+  const WC = M('classes').WEAPON_CLASS || { sword: 'chewy', ball: 'chewy', staff: 'moka', fuma: 'poe', flail: 'shihtzu', lance: 'golden', parasol: 'stella' };
   if (item.wtype && WC[item.wtype] !== (state?.player?.cls || 'chewy')) { res.ok = false; res.other = true; }
   return res;
 }

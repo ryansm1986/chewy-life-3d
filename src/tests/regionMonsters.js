@@ -1,6 +1,7 @@
 // Region monster stage: /?test=regionMonsters
 //   &biome=bamboo|maple|tidepool|onsen   model sheet of that biome's three monsters (rows = variants)      [default: all 12, variant 0]
 //   &id=<id>                             one monster, all its variants side by side
+//                                        (also the siege captains: captainGaleclaw / captainStrawgrin / captainBrineclaw / captainFrostbelly)
 //   &act=<pose>                          hold a pose (wind, spin, dash, roll, …; whatever the model's animate knows), &move=1 walk cycle
 //   &spin=<rad/s>                        turntable speed (default 0.35; 0 = fixed, &yaw=<rad> start angle)
 //   &fight=1[&n=3][&walk=1][&lvl=10]     live AI vs a dummy Chewy (takes the hits but never dies): telegraphs, projectiles, zones
@@ -10,6 +11,8 @@ import * as THREE from 'three';
 import { makeStage } from './_stage.js';
 import { MONSTERS, buildMonster, MonsterAnim } from '../dungeon/monsters.js';
 import { REGION_MONSTER_MODULES } from '../regions/monsters/index.js';
+import { loadEnemyModels } from '../regions/monsters/enemyModels.js';
+import '../regions/village/captains.js'; // (the siege captains, &id=captainBrineclaw …: their own looks on the base builders)
 import { contactShadow, buildHumanoid, CAST } from '../actors/charKit.js';
 import { Animator } from '../actors/animator.js';
 import { VFX } from '../gfx/vfx.js';
@@ -21,7 +24,8 @@ import { Events } from '../core/events.js';
 
 const BIOMES = { bamboo: ['takenoko', 'kodama', 'kamaitachi'], maple: ['kuri', 'kakashi', 'momijiWisp'], tidepool: ['kappa', 'heikegani', 'kurage'], onsen: ['yukiwarashi', 'yukidaruma', 'tsurara'] };
 
-export default function () {
+export default async function () {
+  await loadEnemyModels(); // (the Blender models, ROADMAP EN-1; ?procmon = the procedural ones)
   const Q = new URLSearchParams(location.search);
   const id = Q.get('id'), biome = Q.get('biome'), fight = Q.has('fight');
   const ids = id ? [id] : biome ? BIOMES[biome] : Object.values(BIOMES).flat();

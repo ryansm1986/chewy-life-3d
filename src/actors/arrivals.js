@@ -3,9 +3,9 @@
 //
 // When a zone opens and the arrival before it is done, its arrival is due. The next calm moment in town (no dialogue,
 // panel, banner, card, guide, scene, build mode, fishing or dig; a few seconds of it) its island scene starts
-// (SCENES[entry.scene]: actors/poeJoin.js today, the others in checkpoint 2), plays its gag, asks for help, joins the
-// hero (heroes.js joinPoe…) and calls finished(): the arrival is recorded (state.flags.arrivals[zone]) and the zone's
-// main story quest starts with its card. A scene that's interrupted before its locked part (leaving town, a hero switch,
+// (the scene registered for entry.scene: actors/poeJoin.js, shihtzuJoin.js, stellaJoin.js, goldenJoin.js), plays its gag,
+// asks for help, joins the hero (heroes.js joinPoe…) and calls finished(): the arrival is recorded
+// (state.flags.arrivals[zone] = { how, quest, day, by }) and the zone's main story quest starts with its card. A scene that's interrupted before its locked part (leaving town, a hero switch,
 // a knock-out) drops itself; the arrival is due again a little later.
 //   - The village saved before they came (a crew, an old save): the scene's plea becomes a thank-you and no quest starts.
 //   - A hero who joined some other way (an old save's zone scene, ?hero=, the debug menu): no arrival; their quest starts
@@ -19,7 +19,7 @@
 import { Events } from '../core/events.js';
 import { CLASSES } from '../rpg/classes.js';
 import { regionUnlocked } from '../regions/index.js';
-import { ARRIVALS, arrivalOf, arrivalDue, arrivalDone, arrivalRec, questPlan, questsOwed, arrivalHint, HERO_QUESTS, heroQuestOf, whoName } from '../world/heroQuests.js';
+import { ARRIVALS, arrivalOf, arrivalDue, arrivalDone, arrivalRec, questPlan, questsOwed, arrivalHint, heroQuestDef, heroQuestOf, whoName } from '../world/heroQuests.js';
 import { memberInfo } from '../cozy/expeditions.js';
 import { registerDebug } from '../debug/registry.js';
 
@@ -94,11 +94,12 @@ export class Arrivals {
     Events.emit('arrival:start', { zone: a.zone, who: a.who, plan });
     return true;
   }
-  /** the scene is over (the hero has joined, or the messenger has asked): record it and start the quest */
-  finished(who) {
+  /** the scene is over (the hero has joined, or the messenger has asked): record it (by: who came; extra: the scene's own
+   *  notes, Stella's keeps Kaizo's old record) and start the quest */
+  finished(who, extra = null) {
     const a = arrivalOf(who) || this.cur?.a; if (!a) return;
     const plan = this.cur?.a === a ? this.cur.plan : questPlan(this.st, a);
-    (this.st.flags.arrivals ||= {})[a.zone] = { how: 'scene', quest: plan, day: this.G.day?.day || 1 };
+    (this.st.flags.arrivals ||= {})[a.zone] = { how: 'scene', quest: plan, day: this.G.day?.day || 1, by: a.who, ...(extra || {}) };
     this.cur = null; this.coolT = 4; this.stats.finished++;
     if (plan === 'start') this.startQuest(a, 'arrival');
     Events.emit('arrival:done', { zone: a.zone, who: a.who, plan });
@@ -108,7 +109,7 @@ export class Arrivals {
     const S = this.G.story; if (!S || questPlan(this.st, a) !== 'start') return false;
     if (how === 'owed') this.stats.owed++;
     S.start(a.quest); // (not silent: its card on the next calm moment, world/questMoments.js)
-    if (how === 'owed') (this.st.flags.arrivals ||= {})[a.zone] ||= { how: 'old', quest: 'start', day: this.G.day?.day || 1 };
+    if (how === 'owed') (this.st.flags.arrivals ||= {})[a.zone] ||= { how: 'old', quest: 'start', day: this.G.day?.day || 1, by: a.who };
     Events.emit('arrival:quest', { zone: a.zone, quest: a.quest, how });
     return true;
   }
@@ -121,7 +122,7 @@ export class Arrivals {
   onSaved(e) {
     if (!e?.crew) return;
     const id = heroQuestOf(e.zone), q = id && this.st.quests?.active?.find(x => x.id === id); if (!q) return;
-    const d = HERO_QUESTS[id], keys = this.st.zones?.[e.zone]?.celebrateCrew || [];
+    const d = heroQuestDef(this.st, id, q), keys = this.st.zones?.[e.zone]?.celebrateCrew || [];
     const names = keys.map(k => memberInfo(this.st, k)?.name).filter(Boolean);
     const lead = names[0] || 'Your crew';
     q.crewBy = names.length > 1 ? `${lead}'s crew` : lead;
@@ -133,7 +134,7 @@ export class Arrivals {
   /** a hero quest waiting for its hand-in whose giver is the hero you're playing → its record, or null */
   selfDue() {
     const act = this.st.activeHero || 'chewy';
-    for (const q of this.st.quests?.active || []) { const d = HERO_QUESTS[q.id]; if (d && q.handIn && d.giver === act) return q; }
+    for (const q of this.st.quests?.active || []) { const d = heroQuestDef(this.st, q.id, q); if (d && q.handIn && d.giver === act) return q; }
     return null;
   }
   selfTick(dt) {
@@ -147,12 +148,12 @@ export class Arrivals {
    *  hostBenched), or null */
   handInGiver() {
     const act = this.st.activeHero || 'chewy';
-    for (const q of this.st.quests?.active || []) { const d = HERO_QUESTS[q.id]; if (d && q.handIn && d.giver !== act && this.H.villagers[d.giver]) return d.giver; }
+    for (const q of this.st.quests?.active || []) { const d = heroQuestDef(this.st, q.id, q); if (d && q.handIn && d.giver !== act && this.H.villagers[d.giver]) return d.giver; }
     return null;
   }
   /** their happy hop and hearts, their line to Shadow, the reward from their paws and the stamp */
   async selfHandIn(q) {
-    const G = this.G, P = G.player, d = HERO_QUESTS[q.id], sh = G.companion; if (!P || !d || !G.questMoments?.handInScene) return;
+    const G = this.G, P = G.player, d = heroQuestDef(this.st, q.id, q), sh = G.companion; if (!P || !d || !G.questMoments?.handInScene) return;
     this.selfBusy = true; this.stats.self++;
     P.controlLocked = true; P.moveTarget = null; G.skills?.charge?.cancel?.('scene', true);
     try {

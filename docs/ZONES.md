@@ -279,7 +279,8 @@ services in `talk.js`, the quests in `world/zoneQuests.js`.
 The owner (2026-10-12): "I want to be able to unlock the new characters in the main island. Maybe we can have them
 trigger the main story quest to help their island." Before Z-H3 the heroes joined in their zones and no main story quest
 sent you to the zones at all. The owner's picks: **they join on arrival**; **the old join scenes move to the island**;
-the Tide Pool's hero (Stella, H-6) is still a concept, so **Captain Kaizo brings its news** for now.
+the Tide Pool's hero (Stella, H-6) was still a concept, so **Captain Kaizo brought its news** at first; since H-6
+checkpoint 2 (2026-10-15) **he rows Stella over** (docs/STELLA.md §6).
 
 - **The arrivals** (data: `world/heroQuests.js ARRIVALS`, one entry a zone, `{ zone, who, scene, quest, hero }`):
 
@@ -287,13 +288,17 @@ the Tide Pool's hero (Stella, H-6) is still a concept, so **Captain Kaizo brings
   |---|---|---|---|
   | Bamboo | Poe (joins) | she tails you round the plaza, freezes when you look, sneezes (`actors/poeJoin.js`) | Takemori Under Siege |
   | Maple | Floofy (joins) | he lights paper lanterns on the Shrine Road's paving by the jizo or a stone lantern; "Halt, traveller…", the ghost pup licks him (`actors/shihtzuJoin.js`; the dusk rule: docs/SHIHTZU.md §5) | The Gloom over Akane |
-  | Tide Pool | Captain Kaizo (asks, goes home) | his rowboat pulled up on the beach below Beach Lane; "Ahoy there!"; he rows home (`actors/kaizoArrive.js`) | Trouble at Shiokaze Port |
+  | Tide Pool | Stella (joins) | Captain Kaizo's rowboat pulled up on the beach below Beach Lane, her kneeling in its bow under her open wagasa; she floats down; the dawn greeting with Shadow's play-bow, the zoomies; Kaizo rows home (`actors/stellaJoin.js`, his staging `actors/kaizoArrive.js`) | Trouble at Shiokaze Port |
   | Onsen | Foosy (joins) | he marches in and stands guard by the fountain; his vow, interrupted by a tennis ball from Rosie's Treats; the whelp costume for Shadow (`actors/goldenJoin.js`) | The Siege of Yukimi |
 
-  Stella replaces Kaizo with one change to his entry (`who: 'stella', scene: 'stella', hero: true`) and her scene
-  (registered with `Arrivals.register('stella', …)` as the others are in `heroes.js`); his quest becomes hers by its
-  `giver`. Kaizo's hand-in is at his lookout in Shiokaze Port (`regions/village/talk.js`: a zone villager takes in a
-  quest that waits for them).
+  Stella replaced Kaizo with one change to his entry (`who: 'stella', scene: 'stella', hero: true`) and her scene
+  (registered with `Arrivals.register('stella', …)` as the others are in `heroes.js`); his quest became hers by its
+  `giver`. `kaizoArrive.js` is now the shared boat-and-captain staging (`KaizoBoat`: his rig, the boat, the shore search,
+  his row home). A messenger entry (`hero: false`) still works: they ask and go home, their visit recorded.
+  An **old save's** Kaizo quest stays his: `Story.def` reads `q.giver || d.giver` (`heroQuestGiver`: the record's
+  `q.giver`, or, for a quest that came before its hero, a zone record without `by`, the old giver's lines `d.kaizo`); his
+  hand-in is at his lookout in Shiokaze Port (`regions/village/talk.js`: a zone villager takes in a quest that waits for
+  them).
 - **When**: an arrival is **due** once its zone is open (`regionUnlocked`: a hero's level, or the zone before cleared by
   you or a crew) and the arrival before it is done (Moka joined, for Poe; a hero joined, or a messenger's visit
   recorded). They come in the zones' order: the first not done blocks the rest. A due arrival waits for a calm moment in
@@ -308,15 +313,16 @@ the Tide Pool's hero (Stella, H-6) is still a concept, so **Captain Kaizo brings
   and Shadow on a mark. **On the paving** where it can be: the scenes pick paved ground (the plaza, the paths, the
   Shrine Road, the beach's sand) and fall back to grass only when no paved spot frames cleanly (the grass leans over feet
   and legs from up here). Each ends with the plea for help, the join (the banner, after the vanish) and the quest's
-  card; Kaizo's card waits until he has rowed home (`questMoments.js why`: an arrival's scene busy).
-- **The quests** (`world/heroQuests.js HERO_QUESTS`, the giver the hero, or Kaizo; docs/QUESTS.md §9): travel to the zone
+  card; Stella's card waits until Kaizo has rowed home (`questMoments.js why`: an arrival's scene busy).
+- **The quests** (`world/heroQuests.js HERO_QUESTS`, the giver the hero, or Kaizo on an old save; docs/QUESTS.md §9): travel to the zone
   (the `visit` step: done on arriving there by the Wayfarer's Post, or once its village is saved), save its village
   (`villageSaved`), then the hand-in to whoever asked (a skill point, coins, XP and a keepsake from their home):
   - a benched hero in town: talk to them (`heroes.js talk`: the hand-in scene first: their hop, a line about the crew if
     one did it, their thanks, the stamp); the arrow, the pin, their `!` and Shadow point at them;
   - the hero you're playing: their own little scene at the next calm moment wherever you are (`Arrivals.selfHandIn`: the
     hop, their line to Shadow, `selfThanks`), often right after the village's celebration;
-  - a hero away on an expedition: it waits until they're home; Kaizo: back at his lookout in Shiokaze Port.
+  - a hero away on an expedition: it waits until they're home; an old save's Kaizo: back at his lookout in Shiokaze Port
+    (afterwards, Stella's quest done: "Stella told me everything. Twice. The second time with zoomies.").
 - **The cozy path**: a crew that relieves the village while the quest runs finishes it at once (the hand-in waits); the
   quest's record names the crew (`Arrivals.onSaved`), so the giver's first line is about them ("Moka snuck into
   Takemori…", or "Moka and I…" when the giver went too), and Shadow says no way-home line. A village relieved **before**
@@ -325,24 +331,30 @@ the Tide Pool's hero (Stella, H-6) is still a concept, so **Captain Kaizo brings
   quest starts quietly with its card while their village still needs saving and their zone is open (`questsOwed`; the
   record `how: 'old'`). A zone whose village is saved gets no new quest. A hero not yet joined whose zone is open arrives
   the next time you're in Blossom Hollow. The old zone scenes never play (Poe's grove scene, Floofy's on the maple road and
-  Foosy's at the hot spring are gone). A messenger's visit is recorded the same way: Kaizo comes once even for a save where
-  Foosy joined at the Onsen long ago (his quest is the Tide Pool's). Records: `state.flags.arrivals[zone] = { how: 'scene' | 'old', quest: 'start' | 'saved' | 'had', day }`.
+  Foosy's at the hot spring are gone). Stella comes even for a save where Foosy joined at the Onsen long ago, and Foosy,
+  due but not yet come, now waits for her. A save where Kaizo came alone (his visit recorded, no `by`): she still comes
+  (he rows her over); his quest running stays his (she writes `q.giver = 'sk_kaizo'`; her plea "Captain Kaizo told me he'd
+  already found you…", no second quest or card); his quest done: her thank-you (docs/STELLA.md §6.2). Records:
+  `state.flags.arrivals[zone] = { how: 'scene' | 'old', quest: 'start' | 'saved' | 'had', day, by }` (`by`: who came;
+  Stella's keeps Kaizo's old record as `kaizo`).
 - **The hints**: the hero wheel's card for a hero not met yet says when they'll come (`arrivalHint`: "Will arrive when the
-  Bamboo opens", "Will arrive after Poe joins", "Will arrive after Old Captain Kaizo comes by", "On the way to Blossom
+  Bamboo opens", "Will arrive after Poe joins", "Will arrive after Stella joins", "On the way to Blossom
   Hollow…", "Arriving in Blossom Hollow now!"); Shadow's rumour in town plays only before their zone opens, never over an
   arrival's scene ("…I bet they'll come and find us!"); Shadow notices each arrival once it can show (a "?" and a tip:
-  "Ghostlights, up the Shrine Road!", "Salt, tar and old rope!", "…Is he a statue?"). On the maps an arriving hero (or
-  Kaizo) is a person while they're about (`mapData.js people` ← `Arrivals.people`), and the pointer shows where.
+  "Ghostlights, up the Shrine Road!", "Salt, tar and old rope… and something warm", "…Is he a statue?"). On the maps an
+  arriving hero is a person while they're about (`mapData.js people` ← `Arrivals.people`), and the pointer shows where.
 - **QA**: the arrivals are off in the QA's quiet sessions (`?nointro` without `?arrive`, or `?noarrive`; remembered for the
   tab), so the flows that set heroes' flags by hand never meet one; the hand-ins work everywhere. `tools/qa/s47-hero-arrivals.mjs`
   (a–i Poe: the triggers and the order, the scene end to end, the card, the quest by you, by a crew and by the hero you
-  play, old saves with a second reload, the pad, touch, the debug actions; j–p Floofy, Kaizo and Foosy: their triggers
-  and the order, each scene end to end, the dusk rule, the quests by you with Kaizo's hand-in at his lookout, the crews,
-  old saves with a second reload, the pad, touch), s20 a)–b) (Poe's scene in town), s28 a)–b) (Floofy's), s29 a)–b)
+  play, old saves with a second reload, the pad, touch, the debug actions; j–r Floofy, Stella and Foosy: their triggers
+  and the order, each scene end to end (Stella's beat by beat: the float, the bow, the zoomies, the warmth), the dusk rule,
+  the quests by you (Stella's hand-in in town, Kaizo's line at his lookout), the crews, old saves with a second reload
+  (Kaizo's quest running and done), the pad, touch, Stella's debug actions), s20 a)–b) (Poe's scene in town), s28 a)–b) (Floofy's), s29 a)–b)
   (Foosy's), s37 a) (the cozy path: Takemori relieved before she came), test-rpg "HERO ARRIVALS", prod-smoke `arrival`;
-  the look review `node tools/qa/arrival-shots.mjs [poe shihtzu kaizo golden] [desktop deck phone ipad] [day dusk]
-  [saved]` → `tools/qa/tmp/arrivals/`.
-- **Debug**: Heroes › *Play an arrival*, *Reset the arrivals*, *Arrivals on* (docs/DEBUG.md).
+  the look review `node tools/qa/arrival-shots.mjs [poe shihtzu stella golden] [desktop deck phone ipad] [day dusk
+  night] [saved] [kaizo]` → `tools/qa/tmp/arrivals/`.
+- **Debug**: Heroes › *Play an arrival*, *Reset the arrivals*, *Arrivals on*; Stella's *Unlock Stella*, *Play her
+  arrival*, *Her arrival with Kaizo's quest running* (docs/DEBUG.md).
 
 ## 4. The zone dungeon (2 floors + the boss)
 - **Per zone**, a `DungeonDef`:

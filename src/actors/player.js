@@ -15,6 +15,8 @@ import { installShihtzuGear, dressShihtzu } from './shihtzuGear.js';
 import { SHIHTZU_ROOTED } from './shihtzuPoses.js';
 import { installGoldenGear, dressGolden } from './goldenGear.js';
 import { GOLDEN_ROOTED } from './goldenPoses.js';
+import { installStellaGear, dressStella } from './stellaGear.js';
+import { STELLA_ROOTED } from './stellaPoses.js';
 import { reach } from './armIK.js';
 import { Sprint } from './sprint.js';
 import { Actions } from '../core/actions.js';
@@ -27,7 +29,7 @@ import { CLASSES } from '../rpg/classes.js';
 const STAFF_UP = STAFF_GRIP.rotation[0];
 const STAFF_CASTS = new Set(['staffBolt', 'staffCast', 'skyCast', 'wetShake', 'summon', 'yank', 'puddleHop', 'surf', 'beam', 'duckCall', 'cast', 'swing', 'swing2', 'throw']);
 // actions that root the player (WASD won't walk out of them); Moka's staff casts included (animator.js ACTIONS)
-const BUSY = new Set(['swing', 'swing2', 'throw', 'cast', 'bark', 'slam', 'pickup', 'drink', 'staffBolt', 'staffCast', 'skyCast', 'wetShake', 'summon', 'yank', 'puddleHop', 'surf', 'beam', 'duckCall', ...SAMURAI_ROOTED, ...POE_ROOTED, ...SHIHTZU_ROOTED, ...GOLDEN_ROOTED]);
+const BUSY = new Set(['swing', 'swing2', 'throw', 'cast', 'bark', 'slam', 'pickup', 'drink', 'staffBolt', 'staffCast', 'skyCast', 'wetShake', 'summon', 'yank', 'puddleHop', 'surf', 'beam', 'duckCall', ...SAMURAI_ROOTED, ...POE_ROOTED, ...SHIHTZU_ROOTED, ...GOLDEN_ROOTED, ...STELLA_ROOTED]);
 // the Bone Katana's geometry per item tint (charKit.js katanaGeo): shared by every rig the player ever gets
 const KATANAS = new Map();
 const katanaFor = (colors, hilt = false) => { const k = `${(colors || []).join(',')}|${hilt ? 'h' : 'b'}|${katanaVariant()}`; let g = KATANAS.get(k); if (!g) KATANAS.set(k, g = katanaGeo({ colors, hilt })); return g; };
@@ -77,6 +79,7 @@ export class Player extends Actor {
     if (hero === 'poe') dressPoe(rig); // (her fūma rides on her back: poeGear.js — the villager Poe too)
     if (hero === 'shihtzu') dressShihtzu(rig); // (his toy flail on his back: shihtzuGear.js — the villager too)
     if (hero === 'golden') dressGolden(rig); // (his toy lance on his back: goldenGear.js — the villager too)
+    if (hero === 'stella') dressStella(rig); // (her sun wagasa over her shoulder: stellaGear.js — the villager too)
     return rig;
   }
   /** Become another hero (heroes.js): new rig, animator, weapons, name — same position, facing and nav state. */
@@ -88,7 +91,7 @@ export class Player extends Actor {
   }
   replaceRig(rig) {
     const old = this.rig;
-    this.dropStaff(); this.dropFuma(); this.dropFlail(); this.dropLance();
+    this.dropStaff(); this.dropFuma(); this.dropFlail(); this.dropLance(); this.dropParasol();
     this.world.scene.remove(old.root); old.dispose?.();
     this.rig = rig; this.anim = new Animator(rig);
     enableXray(rig, '#ffc890', 0.6);
@@ -158,6 +161,8 @@ export class Player extends Actor {
     this.dropFlail();
     if (type === 'lance') { this.holdLance(); return; } // the dragoon: his toy lance on his back / in his paws (goldenGear.js)
     this.dropLance();
+    if (type === 'parasol') { this.holdParasol(); return; } // Stella: her sun wagasa over her shoulder / in her paw (stellaGear.js)
+    this.dropParasol();
     if (type === 'staff') { // Moka: the staff in hand; the (Chewy-only) sword and ball stay parked and hidden
       this.showStaff(look.colors ? look : this.equippedLook());
       this.sword.scale.setScalar(0.0001); this.sword.castShadow = false;
@@ -185,7 +190,7 @@ export class Player extends Actor {
   readMoveInput() {
     const d = this.inputDir.set(0, 0, 0);
     this.moveMag = 1;
-    if (this.controlLocked || this.G.ui?.anyModal?.()) return d;
+    if (this.controlLocked || this.paneOpen || this.G.ui?.anyModal?.()) return d; // (paneOpen: couch co-op, this player's bag is open: ui/coopPanes.js)
     const { f, r } = this.G.engine.rig.groundAxes();
     const m = Actions.move();
     if (!m.mag || (m.pad && Actions.vcursor.on)) return d; // (in build mode the pad's left stick drives the virtual cursor: ui/padCursor.js)
@@ -210,7 +215,7 @@ export class Player extends Actor {
     let moved = 0;
     // external speed modifiers (buffs, chill auras)
     this.slowT = Math.max(0, (this.slowT || 0) - dt);
-    this.speedMul = (G.combat?.moveMul?.() || 1) * (G.derived?.moveMul || 1) * (this.slowT > 0 ? 1 - (this.slowAmt || 0.3) : 1) * (G.combat?.buffs?.shrineZoom ? 1.35 : 1) * (this.chargeSlow || 1) * (this.poeSpeed || 1); // (chargeSlow: winding up a charged skill, docs/CHARGE.md; poeSpeed: Poe's Vanish)
+    this.speedMul = (G.combat?.moveMul?.() || 1) * (G.derived?.moveMul || 1) * (this.slowT > 0 ? 1 - (this.slowAmt || 0.3) : 1) * (G.combat?.buffs?.shrineZoom ? 1.35 : 1) * (this.chargeSlow || 1) * (this.poeSpeed || 1) * (this.stlSpeed || 1); // (chargeSlow: winding up a charged skill, docs/CHARGE.md; poeSpeed: Poe's Vanish; stlSpeed: Stella's Zoomies! and Solar Ray's walk, combat/stellaSkills.js)
     if (this.navWorld !== this.world) { this.navWorld = this.world; const nav = navFor(this.world); if (nav && !nav.built) nav.build(); } // ~5-8 ms, once per world (behind the load / iris)
     if (G.playerDead) { this.sprint.reset(false); this.anim.sprint = 0; super.update(dt); return; }
     if (this.knock && this.knock.lengthSq() > 0.01) { const b = this.pos.clone(); this.pos.addScaledVector(this.knock, dt); this.knock.multiplyScalar(Math.exp(-10 * dt)); this.world.collision?.resolve(this.pos, this.radius, b); }
@@ -252,13 +257,14 @@ export class Player extends Actor {
     if (this.stepAcc > 0.62 * (1 + 0.3 * this.sprint.k)) { this.stepAcc = 0; Events.emit('footstep', this.pos); this.sprint.step(); }
     this.anim.sprint = this.sprint.k; // the sprint run pose: lean, stride, arm pump
     // grass bending around Chewy
-    U.uBenders.value[0].set(this.pos.x, this.pos.y, this.pos.z, 0.55);
+    U.uBenders.value[this._coopSlot?.primary === false ? this._coopSlot.n : 0].set(this.pos.x, this.pos.y, this.pos.z, 0.55); // (couch co-op: players 2-4 bend it too, slots 2-4)
     super.update(dt);
     this.carrySword(dt);
     this.carryStaff(dt);
     this.carryFuma(dt);
     this.carryFlail(dt);
     this.carryLance(dt);
+    this.carryParasol(dt);
     if (this.staff) tickStaff(this.staff, dt);
   }
   /** the right forearm's bend off its rest (the sprint pumps the elbows: animator.js), for the carry angles below */
@@ -376,3 +382,4 @@ export class Player extends Actor {
 installPoeGear(Player.prototype); // holdFuma / dropFuma / carryFuma / setFumaOut (poeGear.js)
 installShihtzuGear(Player.prototype); // holdFlail / dropFlail / carryFlail / setFlailDrawn (shihtzuGear.js)
 installGoldenGear(Player.prototype); // holdLance / dropLance / carryLance (goldenGear.js)
+installStellaGear(Player.prototype); // holdParasol / dropParasol / carryParasol (stellaGear.js)

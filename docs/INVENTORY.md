@@ -73,6 +73,11 @@ a pair, and on a 4-row bag two 1 × 2 pairs crowded the weapons' columns. Materi
   A long press shows the tooltip (as before).
 - Socket dots wear their treat's colour.
 
+## 6b. The green arrow and Power (UX-3)
+- A cell with gear that is better for the hero being played, or fills an empty slot, and that the hero can wear now
+  shows a bobbing green ▲ in its corner. This applies to the bag, the stash and Lost & Found. Each item tooltip leads with
+  its Power and a better / worse verdict. See docs/STATS.md §1.
+
 ## 7. Sort (R-21)
 - A **Sort** button on the bag (its old one, now this) and on the open stash tab; **R3** on the pad in either (the hint
   bar says "R3 Sort"). Touch: the buttons (44 px).

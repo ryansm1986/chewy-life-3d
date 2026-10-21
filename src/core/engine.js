@@ -29,6 +29,8 @@ export class CameraRig {
     // follow speed multiplier for the target / distance easing: a slow-motion moment (boss roar) sets 1 / timeScale so
     // the camera still moves at real-time speed while the world crawls
     this.followMul = 1;
+    // couch co-op (coop/coop.js frame): extra distance as the pack spreads out, eased on its own like the bias
+    this.extraDist = 0; this.extraDistTarget = 0;
     this._f = new THREE.Vector3();
   }
   snap() { this.bias.copy(this.biasTarget); this.distBias = this.distBiasTarget; this.target.copy(this.focus).add(this.bias); this.dist = this.distTarget; this.yaw = this.yawTarget; this.update(0); }
@@ -41,9 +43,10 @@ export class CameraRig {
     if (dt > 0) { const kb = 1 - Math.exp(-this.biasRate * dt); this.bias.lerp(this.biasTarget, kb); this.distBias += (this.distBiasTarget - this.distBias) * kb; } // (snap() jumps)
     this.target.lerp(this._f.copy(this.focus).add(this.bias), k);
     this.dist = dt > 0 ? damp(this.dist, this.distTarget, 8 * fm, dt) : this.distTarget;
+    this.extraDist = dt > 0 ? damp(this.extraDist, this.extraDistTarget, 2.2, dt) : this.extraDistTarget;
     this.yaw = dt > 0 ? damp(this.yaw, this.yawTarget, 7, dt) : this.yawTarget;
     const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
-    this._off.set(Math.sin(this.yaw) * cp, sp, Math.cos(this.yaw) * cp).multiplyScalar(this.dist + this.distBias);
+    this._off.set(Math.sin(this.yaw) * cp, sp, Math.cos(this.yaw) * cp).multiplyScalar(this.dist + this.distBias + this.extraDist);
     this.camera.position.copy(this.target).add(this._off);
     this.shakeT += dt * 60;
     this.shakeAmt = Math.max(0, this.shakeAmt - dt * 2.5);

@@ -1,0 +1,1058 @@
+{
+ "source": "refs/sheet.png (1536x1024), Option C with blue eyes",
+ "views_px": {
+  "front": {
+   "crown_y": 88,
+   "ground_y": 460.5,
+   "height_px": 372.5
+  },
+  "three_quarter": {
+   "crown_y": 88,
+   "ground_y": 461.5,
+   "height_px": 373.5
+  },
+  "side_left": {
+   "crown_y": 84,
+   "ground_y": 460.5,
+   "height_px": 376.5
+  },
+  "back": {
+   "crown_y": 84,
+   "ground_y": 460.5,
+   "height_px": 376.5
+  }
+ },
+ "head_closeup_front_px": {
+  "crown_y": 559,
+  "chin_y": 737,
+  "centre_x": 157.75
+ },
+ "face_W": {
+  "W_px": 172.0,
+  "H_px": 178.0,
+  "W_over_H": 0.966,
+  "crown_z_W": 1.035,
+  "face_edge_rows_px(left,right)": [
+   [
+    72.0,
+    244.0
+   ],
+   [
+    72.0,
+    244.0
+   ],
+   [
+    71.0,
+    244.0
+   ],
+   [
+    71.0,
+    244.0
+   ],
+   [
+    71.0,
+    244.0
+   ],
+   [
+    72.0,
+    243.0
+   ],
+   [
+    72.0,
+    242.0
+   ]
+  ],
+  "eye_centre_x_W": 0.277,
+  "eye_centre_z_W": 0.465,
+  "eye_opening_W(w,h)": [
+   0.262,
+   0.267
+  ],
+  "iris_W(w,h)": [
+   0.213,
+   0.244
+  ],
+  "iris_of_opening_width": 0.816,
+  "iris_offset_to_nose_of_halfwidth": 0.184,
+  "iris_bottom_z_W": 0.331,
+  "pupil_of_iris_width": 0.518,
+  "nose_W(w,h)": [
+   0.233,
+   0.157
+  ],
+  "nose_centre_z_W": 0.259,
+  "nose_top_z_W": 0.337,
+  "mouth_corner_x_W": 0.23,
+  "mouth_corner_z_W": 0.188,
+  "mouth_centre_z_W": 0.106,
+  "brow_centre_W(x,z)": [
+   -0.254,
+   0.785
+  ],
+  "blush_centre_W(x,z)": [
+   -0.423,
+   0.302
+  ],
+  "ear_outer_x_W(L,R)": [
+   -0.859,
+   0.85
+  ],
+  "ear_span_W": 1.709,
+  "ear_widest_z_W": 0.14,
+  "ear_bottom_z_W": -0.34,
+  "ear_root_inner_x_W": 0.337,
+  "pearl_big_diameter_W": 0.192,
+  "pearl_small_diameter_W": 0.128
+ },
+ "side_W": {
+  "crown_y": 84,
+  "chin_y": 205,
+  "nose_tip_x": 702,
+  "W_side_px": 116.9,
+  "profile_b(z)": {
+   "1.018": 0.727,
+   "0.984": 0.607,
+   "0.949": 0.53,
+   "0.915": 0.479,
+   "0.881": 0.436,
+   "0.847": 0.393,
+   "0.813": 0.368,
+   "0.778": 0.351,
+   "0.744": 0.334,
+   "0.710": 0.325,
+   "0.676": 0.316,
+   "0.641": 0.308,
+   "0.607": 0.299,
+   "0.573": 0.299,
+   "0.539": 0.299,
+   "0.505": 0.291,
+   "0.470": 0.291,
+   "0.436": 0.291,
+   "0.402": 0.282,
+   "0.368": 0.265,
+   "0.334": 0.214,
+   "0.299": 0.128,
+   "0.265": 0.026,
+   "0.231": 0.0,
+   "0.197": 0.0,
+   "0.163": 0.009,
+   "0.128": 0.026,
+   "0.094": 0.06,
+   "0.060": 0.068,
+   "0.026": 0.103,
+   "-0.009": 0.163,
+   "-0.043": 0.18,
+   "-0.077": 0.239
+  },
+  "muzzle_depth_W(nose tip to the stop at z 0.37-0.40)": 0.282,
+  "eye_side_x_px": [
+   744,
+   767
+  ],
+  "ear_side_px(front x, back x, top y, bottom y)": [
+   785,
+   893,
+   85,
+   255
+  ],
+  "note": "the eye and brow form the near-vertical face front (b 0.30-0.33) from z 0.40 to 0.68; the muzzle projects ahead of it"
+ },
+ "body_T": {
+  "T_px": 372.5,
+  "chin_z_T": 0.6897,
+  "heads_crown_to_chin": 3.22,
+  "turnaround_head_W_px": 122.0,
+  "turnaround_W_over_H": 1.055,
+  "collar_top_z_T": 0.6188,
+  "shoulder_z_T": 0.6027,
+  "shoulder_halfwidth_T": 0.1651,
+  "pearls_z_T": [
+   0.5651,
+   0.643
+  ],
+  "pearl_big_diameter_T": 0.043,
+  "pearl_small_diameter_T": 0.0295,
+  "obi_z_T": [
+   0.4362,
+   0.5087
+  ],
+  "obi_halfwidth_T": 0.1275,
+  "beads_T(x, z, diameter)": [
+   [
+    0.0196,
+    0.4674,
+    0.0483
+   ],
+   [
+    0.0658,
+    0.4497,
+    0.043
+   ],
+   [
+    0.0577,
+    0.3917,
+    0.0537
+   ]
+  ],
+  "obi_tail_bottom_z_T(long, short)": [
+   0.1796,
+   0.3128
+  ],
+  "sleeve_cuff_z_T": [
+   0.3369,
+   0.4792
+  ],
+  "sleeve_cuff_width_T": 0.1477,
+  "paw_T(x0, x1, z0, z1)": [
+   -0.3718,
+   -0.2564,
+   0.345,
+   0.447
+  ],
+  "peri_hem_z_T(lobe bottoms, notch tops)": [
+   0.2054,
+   0.2403
+  ],
+  "peri_hem_halfwidth_T": 0.2779,
+  "pink_hem_z_T(lobe bottoms, notch tops)": [
+   0.106,
+   0.1678
+  ],
+  "pink_hem_halfwidth_T": 0.298,
+  "inner_skirt_bottom_z_T": 0.0953,
+  "inner_skirt_halfwidth_T": 0.2188,
+  "leg_centre_x_T": 0.1101,
+  "leg_width_T": 0.0993,
+  "foot_width_T": 0.1587,
+  "foot_centre_x_T": 0.122,
+  "foot_height_T": 0.0577,
+  "side_depths_T(from the leg centre; - = front)": {
+   "chest_front": -0.1477,
+   "hem_front": -0.247,
+   "hem_back": 0.2228,
+   "toe": -0.1557,
+   "heel": 0.1047
+  },
+  "tail_side_path_T(y back, z)": [
+   [
+    0.1074,
+    0.3503
+   ],
+   [
+    0.2953,
+    0.2966
+   ],
+   [
+    0.4161,
+    0.3503
+   ],
+   [
+    0.4483,
+    0.4362
+   ]
+  ],
+  "tail_thickness_T(root, tip)": [
+   0.0376,
+   0.0268
+  ],
+  "bow_back_T(width, height)": [
+   0.2362,
+   0.0966
+  ],
+  "bow_centre_z_T": 0.4604,
+  "bow_tails_bottom_z_T": 0.2832,
+  "back_ear_span_over_skull": 2.031,
+  "front_rows(z_T: extents of periwinkle / pink / fur, x_T)": {
+   "0.6054": {
+    "periwinkle": [
+     -0.1114,
+     0.1087
+    ],
+    "fur": [
+     -0.3289,
+     0.3235
+    ]
+   },
+   "0.5919": {
+    "periwinkle": [
+     -0.1302,
+     0.1302
+    ],
+    "pink": [
+     -0.0819,
+     0.0819
+    ],
+    "fur": [
+     -0.3235,
+     0.3181
+    ]
+   },
+   "0.5785": {
+    "periwinkle": [
+     -0.149,
+     0.1463
+    ],
+    "pink": [
+     -0.0738,
+     0.0738
+    ],
+    "fur": [
+     -0.3181,
+     0.3128
+    ]
+   },
+   "0.5651": {
+    "periwinkle": [
+     -0.1651,
+     0.1624
+    ],
+    "pink": [
+     -0.0631,
+     0.0631
+    ],
+    "fur": [
+     -0.3101,
+     0.3047
+    ]
+   },
+   "0.5517": {
+    "periwinkle": [
+     -0.1812,
+     0.1785
+    ],
+    "pink": [
+     -0.0523,
+     0.0523
+    ],
+    "fur": [
+     -0.2966,
+     0.2913
+    ]
+   },
+   "0.5383": {
+    "periwinkle": [
+     -0.1946,
+     0.1919
+    ],
+    "pink": [
+     -0.0416,
+     0.0416
+    ],
+    "fur": [
+     -0.2617,
+     -0.251
+    ]
+   },
+   "0.5248": {
+    "periwinkle": [
+     -0.2081,
+     0.2081
+    ],
+    "pink": [
+     -0.0309,
+     0.0309
+    ]
+   },
+   "0.5114": {
+    "periwinkle": [
+     -0.2268,
+     0.2242
+    ],
+    "pink": [
+     -0.0282,
+     0.0201
+    ],
+    "fur": [
+     -0.0228,
+     0.0067
+    ]
+   },
+   "0.498": {
+    "periwinkle": [
+     -0.2483,
+     0.2456
+    ],
+    "pink": [
+     -0.106,
+     0.106
+    ],
+    "fur": [
+     -0.0416,
+     0.0631
+    ]
+   },
+   "0.4846": {
+    "periwinkle": [
+     -0.2698,
+     0.2671
+    ],
+    "pink": [
+     -0.1141,
+     0.1168
+    ]
+   },
+   "0.4711": {
+    "periwinkle": [
+     -0.2591,
+     0.2617
+    ],
+    "pink": [
+     -0.2913,
+     0.2886
+    ]
+   },
+   "0.4577": {
+    "periwinkle": [
+     -0.243,
+     0.2483
+    ],
+    "pink": [
+     -0.2993,
+     0.2966
+    ],
+    "fur": [
+     -0.0067,
+     0.0497
+    ]
+   },
+   "0.4443": {
+    "periwinkle": [
+     -0.2295,
+     0.2376
+    ],
+    "pink": [
+     -0.2349,
+     0.1544
+    ],
+    "fur": [
+     -0.302,
+     0.2966
+    ]
+   },
+   "0.4309": {
+    "periwinkle": [
+     -0.2188,
+     0.2242
+    ],
+    "pink": [
+     -0.1624,
+     0.1678
+    ],
+    "fur": [
+     -0.3262,
+     0.3208
+    ]
+   },
+   "0.4174": {
+    "periwinkle": [
+     -0.2054,
+     0.2134
+    ],
+    "pink": [
+     -0.1624,
+     0.2215
+    ],
+    "fur": [
+     -0.345,
+     0.3396
+    ]
+   },
+   "0.404": {
+    "periwinkle": [
+     -0.1946,
+     0.2
+    ],
+    "pink": [
+     -0.1973,
+     0.2134
+    ],
+    "fur": [
+     -0.3584,
+     0.353
+    ]
+   },
+   "0.3906": {
+    "periwinkle": [
+     -0.1839,
+     0.1919
+    ],
+    "pink": [
+     -0.2,
+     0.2054
+    ],
+    "fur": [
+     -0.3691,
+     0.3611
+    ]
+   },
+   "0.3772": {
+    "periwinkle": [
+     -0.1785,
+     0.1812
+    ],
+    "pink": [
+     -0.2027,
+     0.2054
+    ],
+    "fur": [
+     -0.3745,
+     0.3691
+    ]
+   },
+   "0.3638": {
+    "periwinkle": [
+     -0.1651,
+     0.1678
+    ],
+    "pink": [
+     -0.2081,
+     0.2027
+    ],
+    "fur": [
+     -0.3772,
+     0.3691
+    ]
+   },
+   "0.3503": {
+    "periwinkle": [
+     -0.1732,
+     0.1705
+    ],
+    "pink": [
+     -0.2027,
+     0.2054
+    ],
+    "fur": [
+     -0.3745,
+     0.3664
+    ]
+   },
+   "0.3369": {
+    "periwinkle": [
+     -0.1839,
+     0.1812
+    ],
+    "pink": [
+     -0.2161,
+     0.2027
+    ],
+    "fur": [
+     -0.3477,
+     0.3423
+    ]
+   },
+   "0.3235": {
+    "periwinkle": [
+     -0.1973,
+     0.1893
+    ],
+    "pink": [
+     -0.0604,
+     0.0738
+    ],
+    "fur": [
+     0.1919,
+     0.1973
+    ]
+   },
+   "0.3101": {
+    "periwinkle": [
+     -0.2107,
+     0.2
+    ],
+    "pink": [
+     0.0201,
+     0.0765
+    ],
+    "fur": [
+     0.0765,
+     0.2081
+    ]
+   },
+   "0.2966": {
+    "periwinkle": [
+     -0.2188,
+     0.2107
+    ],
+    "pink": [
+     -0.0094,
+     0.0738
+    ],
+    "fur": [
+     -0.2215,
+     0.2188
+    ]
+   },
+   "0.2832": {
+    "periwinkle": [
+     -0.2295,
+     0.2268
+    ],
+    "pink": [
+     -0.0389,
+     0.0792
+    ]
+   },
+   "0.2698": {
+    "periwinkle": [
+     -0.2403,
+     0.2349
+    ],
+    "pink": [
+     -0.0523,
+     0.0819
+    ]
+   },
+   "0.2564": {
+    "periwinkle": [
+     -0.2483,
+     0.2456
+    ],
+    "pink": [
+     -0.0685,
+     0.0872
+    ]
+   },
+   "0.243": {
+    "periwinkle": [
+     -0.2591,
+     0.2564
+    ],
+    "pink": [
+     -0.1436,
+     0.1034
+    ]
+   },
+   "0.2295": {
+    "periwinkle": [
+     -0.2698,
+     0.2698
+    ],
+    "pink": [
+     -0.1597,
+     0.2054
+    ]
+   },
+   "0.2161": {
+    "periwinkle": [
+     -0.2805,
+     0.2752
+    ],
+    "pink": [
+     -0.251,
+     0.2242
+    ],
+    "fur": [
+     -0.2617,
+     -0.2456
+    ]
+   },
+   "0.2027": {
+    "pink": [
+     -0.2698,
+     0.2295
+    ],
+    "fur": [
+     -0.2537,
+     0.0067
+    ]
+   },
+   "0.1893": {
+    "pink": [
+     -0.2671,
+     0.2456
+    ],
+    "fur": [
+     -0.2671,
+     0.0094
+    ]
+   },
+   "0.1758": {
+    "pink": [
+     -0.2752,
+     0.2591
+    ],
+    "fur": [
+     -0.0174,
+     0.0067
+    ]
+   },
+   "0.1624": {
+    "pink": [
+     -0.2832,
+     0.2725
+    ],
+    "fur": [
+     -0.0255,
+     0.0174
+    ]
+   },
+   "0.149": {
+    "pink": [
+     -0.2913,
+     0.2805
+    ],
+    "fur": [
+     -0.2107,
+     0.0282
+    ]
+   },
+   "0.1356": {
+    "pink": [
+     -0.2993,
+     0.2966
+    ],
+    "fur": [
+     -0.1732,
+     0.055
+    ]
+   },
+   "0.1221": {
+    "pink": [
+     -0.2886,
+     0.2671
+    ],
+    "fur": [
+     -0.302,
+     0.0013
+    ]
+   },
+   "0.1087": {
+    "pink": [
+     -0.1087,
+     0.2671
+    ],
+    "fur": [
+     -0.2698,
+     0.1866
+    ]
+   },
+   "0.0953": {
+    "pink": [
+     -0.0282,
+     0.0362
+    ]
+   },
+   "0.0819": {
+    "fur": [
+     -0.1597,
+     0.157
+    ]
+   },
+   "0.0685": {
+    "fur": [
+     -0.1597,
+     0.1597
+    ]
+   },
+   "0.055": {
+    "fur": [
+     -0.1651,
+     0.1651
+    ]
+   },
+   "0.0416": {
+    "fur": [
+     -0.1893,
+     0.1866
+    ]
+   },
+   "0.0282": {
+    "fur": [
+     -0.2,
+     0.1973
+    ]
+   },
+   "0.0148": {
+    "fur": [
+     -0.2027,
+     0.2027
+    ]
+   },
+   "0.0013": {
+    "fur": [
+     -0.2027,
+     0.1732
+    ]
+   }
+  }
+ },
+ "ruled_face_px": {
+  "eye_R_opening_x": [
+   87.7,
+   132.7
+  ],
+  "eye_L_opening_x": [
+   184.0,
+   227.0
+  ],
+  "eye_opening_y": [
+   637.0,
+   683.0
+  ],
+  "eye_lash_top_y": 632.0,
+  "eye_centre_y": 657.0,
+  "iris_R_x": [
+   96.0,
+   132.7
+  ],
+  "iris_L_x": [
+   184.0,
+   221.0
+  ],
+  "iris_y": [
+   638.0,
+   680.0
+  ],
+  "pupil_R_centre": [
+   119.0,
+   659.0
+  ],
+  "pupil_diameter_px": 19.0,
+  "catchlight_big_R": [
+   124.0,
+   650.0
+  ],
+  "catchlights_L": [
+   [
+    194.0,
+    650.0
+   ],
+   [
+    206.0,
+    650.0
+   ]
+  ],
+  "nose_x": [
+   139.0,
+   179.0
+  ],
+  "nose_y": [
+   679.0,
+   706.0
+  ],
+  "mouth_corners": [
+   [
+    120.0,
+    704.6
+   ],
+   [
+    199.0,
+    704.6
+   ]
+  ],
+  "mouth_centre_bottom_y": 718.8,
+  "brow_R_centre": [
+   114.0,
+   602.0
+  ],
+  "blush_R_centre": [
+   85.0,
+   685.0
+  ],
+  "blush_radii_px": [
+   20.0,
+   17.0
+  ],
+  "ear_L_outer_x": 10.0,
+  "ear_R_outer_x": 304.0,
+  "ear_widest_y": 713.0,
+  "ear_bottom_y": 795.5,
+  "ear_root_inner_x_at_crown_side": [
+   100.0,
+   216.0
+  ],
+  "ear_inner_edge_bottom_x": [
+   50.0,
+   266.0
+  ],
+  "pearl_centre_big": [
+   159.0,
+   778.0
+  ],
+  "pearl_big_diameter_px": 33.0,
+  "pearl_small_diameter_px": 22.0
+ },
+ "ruled_body_px": {
+  "chin_y": 203.6,
+  "collar_top_y": 230.0,
+  "shoulder_y": 236.0,
+  "shoulder_x": [
+   118.0,
+   241.0
+  ],
+  "pearls_y": [
+   221.0,
+   250.0
+  ],
+  "pearl_centre_big": [
+   179.5,
+   241.4
+  ],
+  "pearl_big_diameter_px": 16.0,
+  "pearl_small_diameter_px": 11.0,
+  "obi_y": [
+   271.0,
+   298.0
+  ],
+  "obi_x_front": [
+   130.0,
+   225.0
+  ],
+  "beads": [
+   [
+    186.8,
+    286.4,
+    18.0
+   ],
+   [
+    204.0,
+    293.0,
+    16.0
+   ],
+   [
+    201.0,
+    314.6,
+    20.0
+   ]
+  ],
+  "obi_tail_long_bottom_y": 393.6,
+  "obi_tail_short_bottom_y": 344.0,
+  "sleeve_cuff_y": [
+   282.0,
+   335.0
+  ],
+  "sleeve_cuff_x_R": [
+   68.0,
+   123.0
+  ],
+  "paw_R": [
+   41.0,
+   84.0,
+   294.0,
+   332.0
+  ],
+  "peri_hem_y(top of notches, lobe bottoms)": [
+   371.0,
+   384.0
+  ],
+  "peri_hem_x": [
+   75.0,
+   282.0
+  ],
+  "peri_lobes_across_front": 6,
+  "pink_hem_y(top of notches, lobe bottoms)": [
+   398.0,
+   421.0
+  ],
+  "pink_hem_x": [
+   68.0,
+   290.0
+  ],
+  "pink_lobes_across_front": 7,
+  "inner_skirt_bottom_y": 425.0,
+  "inner_skirt_x": [
+   98.0,
+   261.0
+  ],
+  "leg_x_R": [
+   120.0,
+   157.0
+  ],
+  "leg_x_L": [
+   202.0,
+   239.0
+  ],
+  "foot_x_R": [
+   104.5,
+   163.6
+  ],
+  "foot_y": [
+   439.0,
+   460.5
+  ],
+  "side_chest_front_x": 755.0,
+  "side_hem_front_x": 718.0,
+  "side_hem_back_x": 893.0,
+  "side_leg_centre_x": 810.0,
+  "side_toe_x": 752.0,
+  "side_heel_x": 849.0,
+  "side_tail_path": [
+   [
+    850,
+    330
+   ],
+   [
+    920,
+    350
+   ],
+   [
+    965,
+    330
+   ],
+   [
+    977,
+    298
+   ]
+  ],
+  "side_tail_thickness_px(root, tip)": [
+   14.0,
+   10.0
+  ],
+  "side_bow_x": [
+   835.0,
+   872.0
+  ],
+  "side_beads": [
+   [
+    745,
+    287,
+    9
+   ],
+   [
+    737,
+    312,
+    9
+   ]
+  ],
+  "back_bow_centre": [
+   1151.0,
+   289.0
+  ],
+  "back_bow_x": [
+   1108.0,
+   1196.0
+  ],
+  "back_bow_y": [
+   271.0,
+   307.0
+  ],
+  "back_knot_x": [
+   1142.0,
+   1160.0
+  ],
+  "back_bow_tails_bottom_y": 355.0,
+  "back_tail_root": [
+   1151.0,
+   316.0
+  ],
+  "back_tail_tip": [
+   1246.0,
+   364.0
+  ],
+  "back_ear_span_x": [
+   1027.0,
+   1285.0
+  ],
+  "back_skull_x": [
+   1092.0,
+   1219.0
+  ],
+  "back_ear_bottom_y": 257.0
+ },
+ "decisions": [
+  "The sheet draws 3.2 heads in the turnaround but says 2.4 heads; the brief and the cast (chewy-b, Foosy, Floofy at about 2.3-2.4) say about 2.4: the head is built at 2.4 heads (crown to chin) and the body below the chin is shortened to fit (widths kept).",
+  "The turnaround head is wider (W/H 1.06) and its ears wider (span 2.0 W) than the head close-up (W/H 0.97, ear span 1.71 W): the face and ears follow the close-up, the body follows the turnaround (as the brief says).",
+  "The front view shows three sea-glass beads on the obi (two side by side, one below); the 3/4 and side views show two. The brief says two: built as two (stacked, as in the 3/4 view), constant BEADS in the build."
+ ]
+}

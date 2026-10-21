@@ -1,0 +1,249 @@
+{
+  "units": "metres. Blender Z-up / front -Y; game axes = (x, z, -y). The wagasa lies along its local +Z (game +Y), the canopy at +Z.",
+  "stella-parasol.glb": {
+    "prop": "the sun wagasa (phase 3; replaces the jellyfish parasol)",
+    "pivot": "the grip (the origin), on the shaft just above the crook",
+    "axis_blender": [
+      0,
+      0,
+      1
+    ],
+    "axis_game": [
+      0,
+      1,
+      0
+    ],
+    "grip": [
+      0,
+      0,
+      0
+    ],
+    "grip_radius_m": 0.021,
+    "grip_length_m": 0.15,
+    "finial_blender": [
+      0.0,
+      0.0,
+      0.63
+    ],
+    "finial_game": [
+      0.0,
+      0.63,
+      -0.0
+    ],
+    "top_game": [
+      0.0,
+      0.646,
+      0.0
+    ],
+    "top_pearl_game": [
+      0.0,
+      0.646,
+      0.0
+    ],
+    "hook_bottom_blender": [
+      0,
+      0,
+      -0.2115
+    ],
+    "canopy_rim_z_m": 0.43,
+    "canopy_radius_m": 0.375,
+    "canopy_across_m": 0.796,
+    "shaft_length_m": 0.811,
+    "overall_height_m": 0.857,
+    "tassels": [
+      {
+        "name": "tassel_0",
+        "hang_point_blender": [
+          0.385,
+          0.0,
+          0.412
+        ],
+        "length_m": 0.117,
+        "hang_point_game": [
+          0.385,
+          0.412,
+          -0.0
+        ]
+      },
+      {
+        "name": "tassel_1",
+        "hang_point_blender": [
+          0.2722,
+          0.2722,
+          0.412
+        ],
+        "length_m": 0.107,
+        "hang_point_game": [
+          0.2722,
+          0.412,
+          -0.2722
+        ]
+      },
+      {
+        "name": "tassel_2",
+        "hang_point_blender": [
+          0.0,
+          0.385,
+          0.412
+        ],
+        "length_m": 0.124,
+        "hang_point_game": [
+          0.0,
+          0.412,
+          -0.385
+        ]
+      },
+      {
+        "name": "tassel_3",
+        "hang_point_blender": [
+          -0.2722,
+          0.2722,
+          0.412
+        ],
+        "length_m": 0.112,
+        "hang_point_game": [
+          -0.2722,
+          0.412,
+          -0.2722
+        ]
+      },
+      {
+        "name": "tassel_4",
+        "hang_point_blender": [
+          -0.385,
+          0.0,
+          0.412
+        ],
+        "length_m": 0.12,
+        "hang_point_game": [
+          -0.385,
+          0.412,
+          -0.0
+        ]
+      },
+      {
+        "name": "tassel_5",
+        "hang_point_blender": [
+          -0.2722,
+          -0.2722,
+          0.412
+        ],
+        "length_m": 0.108,
+        "hang_point_game": [
+          -0.2722,
+          0.412,
+          0.2722
+        ]
+      },
+      {
+        "name": "tassel_6",
+        "hang_point_blender": [
+          -0.0,
+          -0.385,
+          0.412
+        ],
+        "length_m": 0.122,
+        "hang_point_game": [
+          -0.0,
+          0.412,
+          0.385
+        ]
+      },
+      {
+        "name": "tassel_7",
+        "hang_point_blender": [
+          0.2722,
+          -0.2722,
+          0.412
+        ],
+        "length_m": 0.111,
+        "hang_point_game": [
+          0.2722,
+          0.412,
+          0.2722
+        ]
+      }
+    ],
+    "nodes": {
+      "stella_parasol": "canopy, ribs, rim, shaft, grip, crook (the 512 atlas)",
+      "sun_disc_glow": "the gold sun disc (material Stella_wagasa_sun_glow)",
+      "finial": "an empty at the sun disc centre: where her light leaves the wagasa",
+      "tassel_0..7": "one mesh each, its origin where it hangs"
+    },
+    "use": "held in one paw over the shoulder when walking (the canopy behind the head), raised overhead to cast"
+  },
+  "stats": {
+    "stella_parasol": {
+      "triangles": 3850,
+      "z_range_m": [
+        -0.2105,
+        0.63
+      ]
+    },
+    "sun_disc_glow": {
+      "triangles": 144,
+      "z_range_m": [
+        0.621,
+        0.646
+      ]
+    },
+    "tassel_0": {
+      "triangles": 217,
+      "z_range_m": [
+        0.2818,
+        0.412
+      ]
+    },
+    "tassel_1": {
+      "triangles": 217,
+      "z_range_m": [
+        0.2918,
+        0.412
+      ]
+    },
+    "tassel_2": {
+      "triangles": 217,
+      "z_range_m": [
+        0.2748,
+        0.412
+      ]
+    },
+    "tassel_3": {
+      "triangles": 217,
+      "z_range_m": [
+        0.2868,
+        0.412
+      ]
+    },
+    "tassel_4": {
+      "triangles": 217,
+      "z_range_m": [
+        0.2788,
+        0.412
+      ]
+    },
+    "tassel_5": {
+      "triangles": 217,
+      "z_range_m": [
+        0.2908,
+        0.412
+      ]
+    },
+    "tassel_6": {
+      "triangles": 217,
+      "z_range_m": [
+        0.2768,
+        0.412
+      ]
+    },
+    "tassel_7": {
+      "triangles": 217,
+      "z_range_m": [
+        0.2878,
+        0.412
+      ]
+    },
+    "total_triangles": 5730,
+    "canopy_across_m": 0.796
+  }
+}

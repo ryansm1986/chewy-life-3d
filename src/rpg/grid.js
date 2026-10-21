@@ -18,7 +18,7 @@ export const SIZES_ON = true;
 
 const ONE = Object.freeze([1, 1]);
 /** the footprints by weapon type and gear slot, [w, h] in cells (nothing over 4 cells; docs/INVENTORY.md §3) */
-export const WEAPON_SIZE = { sword: [1, 2], ball: [1, 1], staff: [1, 3], fuma: [2, 2], flail: [1, 2], lance: [1, 3] };
+export const WEAPON_SIZE = { sword: [1, 2], ball: [1, 1], staff: [1, 3], fuma: [2, 2], flail: [1, 2], lance: [1, 3], parasol: [2, 2] }; // (parasol: Stella's open sun wagasa, round and wide like the fūma)
 export const SLOT_SIZE = { hat: [2, 1], outfit: [2, 2], boots: [2, 1], paws: [2, 1], collar: [1, 1], charm: [1, 1] };
 /** an item's footprint, [w, h] in cells: gear by its weapon type or slot; treats (gems), keys, gifts and the rest 1 × 1 */
 export function itemSize(it) {

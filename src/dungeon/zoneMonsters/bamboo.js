@@ -13,10 +13,13 @@
 import * as THREE from 'three';
 import { assemble, mdef, act, tele, hitArea, roll, sfx, puff, playerIn, ell, cyl, tubeC, blob, cheeks, paint, V, col, INK } from '../../regions/monsters/bamboo.js';
 import { rand, clamp, TAU, ease } from '../../core/util.js';
+import { enemySpec, enemyPivot, ownEnemyModel } from '../../regions/monsters/enemyModels.js';
 
 const IW = { WAKE: 0.75, SLAM_WIND: 0.8, SLAM_R: 2.3, TUCK: 0.55, ROLL_T: 0.95, ROLL_V: 8.5, ROLL_LEN: 7.5, DIZZY: 1.1 };
 const _c = new THREE.Vector3();
 const nzs = (x, y, z) => Math.sin(x * 9.1 + y * 3.7) * Math.cos(z * 7.3 - x * 2.1) * 0.5 + Math.sin(x * 23 + z * 19) * 0.25;
+/** the Lantern monk's lantern glows: warm bright vertex colours (high red and green, low blue) */
+const iwaMat = v => ({ fragOut: v.lantern ? 'outgoingLight += diffuseColor.rgb * 0.9 * step(0.9, diffuseColor.r) * step(0.6, diffuseColor.g) * step(diffuseColor.b, 0.45);' : '' });
 function iwaSpec(v) {
   const stone = col(v.stone), stoneHi = col(v.stoneHi), moss = col(v.moss), mossHi = col(v.mossHi);
   const R = 0.5, H = 0.43, Y = 0.44;
@@ -88,15 +91,15 @@ function iwaSpec(v) {
   const face = [ell(0.04, 0.026, 0.02, INK, [0, 0.43, 0.468], [-0.2, 0, 0], 10), ell(0.024, 0.012, 0.012, '#ff8a9a', [0, 0.418, 0.478], [-0.2, 0, 0], 8), ...cheeks(0.465, 0.445, 0.25, 1.1)]; // (a small round "oh" mouth)
   // stubby stone arms with round fists (their own parts: they swing for the slam)
   const arm = k => [tubeC([[0, 0, 0, 0.075], [k * 0.08, -0.12, 0.06, 0.07], [k * 0.1, -0.22, 0.12, 0.06]], v.stone, 7), ell(0.085, 0.08, 0.085, v.stoneHi, [k * 0.1, -0.26, 0.14], [0, 0, 0], 10)];
-  const glow = v.lantern ? 'outgoingLight += diffuseColor.rgb * 0.9 * step(0.9, diffuseColor.r) * step(0.6, diffuseColor.g) * step(diffuseColor.b, 0.45);' : '';
-  return { mat: { fragOut: glow }, outline: 0.02, parts: [
+  return { mat: iwaMat(v), outline: 0.02, parts: [
     { name: 'body', geo: [...body, ...face, ...eyes] },
     { name: 'lids', geo: lids, outline: 0 }, // (no ink ring: a lid, not goggles)
     { name: 'armL', geo: arm(1), at: [0.42, 0.5, 0.06] }, { name: 'armR', geo: arm(-1), at: [-0.42, 0.5, 0.06] },
   ] };
 }
 function buildIwa(v) {
-  const M = assemble('iwabozu:' + v.key, () => iwaSpec(v));
+  const M = assemble('iwabozu:' + v.key, () => enemySpec('iwabozu', v.key, iwaMat(v), { outline: 0.02, part: { lids: { outline: 0 } } }) || iwaSpec(v)); // (the Blender model: ROADMAP EN-1)
+  const CY = ownEnemyModel('iwabozu', v.key) ? 0.405 : 0.44; // (the boulder's centre: the roll turns about it)
   const I = M.inner, lids = M.g.lids, aL = M.g.armL, aR = M.g.armR;
   let rollA = 0, hop = 0, armK = 1;
   M.variant = v;
@@ -122,8 +125,8 @@ function buildIwa(v) {
     if (a !== 'roll' && a !== 'tuck') { const tgt = Math.round(rollA / TAU) * TAU; rollA += (tgt - rollA) * Math.min(1, dt * 9); if (a !== 'slamWind' && a !== 'slam' && a !== 'dizzy') rx = rollA; }
     // (rolls and wobbles turn about the boulder's middle, not its feet)
     I.scale.set(sx, sy, sx); I.rotation.set(rx, 0, rz);
-    _c.set(0, 0.44 * sy, 0).applyEuler(I.rotation);
-    I.position.set(-_c.x, 0.44 * sy - _c.y + y + (a === 'roll' || a === 'tuck' ? 0.04 : 0), -_c.z);
+    _c.set(0, CY * sy, 0).applyEuler(I.rotation);
+    I.position.set(-_c.x, CY * sy - _c.y + y + (a === 'roll' || a === 'tuck' ? 0.04 : 0), -_c.z);
     armK += ((a === 'roll' || a === 'tuck' ? 0.3 : 1) - armK) * Math.min(1, dt * 12); // (arms pulled into the boulder to roll)
     aL.rotation.set(al, 0, alz); aR.rotation.set(ar, 0, arz); aL.scale.setScalar(armK); aR.scale.setScalar(armK);
   };

@@ -23,6 +23,7 @@ import { makeToon } from '../../gfx/materials.js';
 import { spellFx, PAL, F } from '../../gfx/spellFx.js';
 import { TAU, clamp, rand, ease, dampAngle, angleDiff } from '../../core/util.js';
 import { BossRuntime, V, C, hitCircle, roll, sfx, pickId, summonAt, playerIn } from './kitB.js';
+import { enemyParts, hasEnemyModel } from '../monsters/enemyModels.js';
 import { UMI, arms, waveRingMesh, layoutWave, inkBlobMesh, inkPuddleMesh, floodMesh, seaPoolMesh, foamRingMesh, sheetMesh } from './fx_umibozu.js';
 
 const S = 4.4;              // model scale (unit body → ~5.2 m above the water)
@@ -65,7 +66,33 @@ function bodyGeo() {
     o.lerp(cD, smooth(0.14, -0.12, q.y) * 0.55); // wet, darker at the waterline
   });
 }
+/** the Blender Umibōzu (ROADMAP EN-1; tools/blender/codex/assets/umibozu): the body, the eyes and pupils, the three mouth
+ *  pieces as its parts, the eyes kept on the unlit glow material; the hands are their own file (fx_umibozu.js) */
+function buildUmibozuGlb() {
+  const P = enemyParts('umibozu', 0), at = n => P[n].at, geo = n => { const g = P[n].geos; return g.length === 1 ? g[0].clone() : merge(g.map(x => x.clone())); };
+  const body = geo('body').translate(...at('body'));
+  const M = finish([body], { mat: { fragOut: LUM_CAP } });
+  const lift = new THREE.Group(), wl = new THREE.Group();
+  M.pivot.remove(M.body, M.outline); lift.add(M.body, M.outline); M.pivot.add(lift, wl);
+  const eyeMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+  const eyes = [], pupils = [];
+  for (const k of ['L', 'R']) {
+    const wg = boost(geo('eye' + k), 0.85, 1.1); // (the whites a little over 1: the bloom gives them a soft glow)
+    const e = new THREE.Mesh(wg, eyeMat); e.position.set(...at('eye' + k));
+    const pu = new THREE.Mesh(boost(geo('pupil' + k), 0.9, 1.3), eyeMat);
+    const pp = at('pupil' + k), ep = at('eye' + k); pu.position.set(pp[0] - ep[0], pp[1] - ep[1], pp[2] - ep[2]);
+    e.add(pu); lift.add(e); eyes.push(e); pupils.push(pu);
+  }
+  const mouth = new THREE.Group(); mouth.position.set(...at('mouthSmile')); lift.add(mouth);
+  const piece = n => { const m = new THREE.Mesh(geo(n), M.mat); const a = at(n), b = at('mouthSmile'); m.position.set(a[0] - b[0], a[1] - b[1], a[2] - b[2]); mouth.add(m); return m; };
+  const smileM = piece('mouthSmile'), openM = piece('mouthOpen'), cheekM = piece('cheeks');
+  openM.scale.setScalar(0.001); cheekM.scale.setScalar(0.001);
+  const sheet = sheetMesh(body); sheet.visible = false; lift.add(sheet);
+  const foam = foamRingMesh(); foam.scale.setScalar(1.35); wl.add(foam);
+  return { ...M, lift, wl, eyes, pupils, mouth: { smile: smileM, open: openM, cheeks: cheekM }, sheet, foam, eyeMat };
+}
 function buildUmibozu() {
+  if (hasEnemyModel('umibozu', 0)) return buildUmibozuGlb();
   const body = bodyGeo();
   const parts = [body];
   // shoulder masses the arms grow out of

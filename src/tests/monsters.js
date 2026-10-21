@@ -5,8 +5,11 @@ import { makeStage } from './_stage.js';
 import { MONSTERS, buildMonster, MonsterAnim } from '../dungeon/monsters.js';
 import { contactShadow } from '../actors/charKit.js';
 import { Animator } from '../actors/animator.js';
+import { loadEnemyModels } from '../regions/monsters/enemyModels.js';
+import { loadHeroModels } from '../actors/heroModels.js';
 
-export default function () {
+export default async function () {
+  await Promise.all([loadEnemyModels(), loadHeroModels(['tanukiBandit', 'tanukiBanditMaroon', 'tamamo'])]); // (the Blender models, ROADMAP EN-1; ?procmon = the procedural ones)
   const P = new URLSearchParams(location.search);
   const only = P.get('only');
   const ids = only ? [only] : Object.keys(MONSTERS);

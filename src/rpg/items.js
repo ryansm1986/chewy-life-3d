@@ -75,6 +75,7 @@ const staff = (id, name, tier, lvl, dmg, aspd, req, sockets, variant, colors) =>
 const fuma = (id, name, tier, lvl, dmg, aspd, req, sockets, variant, colors) => addBase(id, { name, slot: 'weapon', wtype: 'fuma', tier, lvl, dmg, aspd, req, sockets, icon: { shape: 'fuma', variant, colors } });
 const flail = (id, name, tier, lvl, dmg, aspd, req, sockets, variant, colors) => addBase(id, { name, slot: 'weapon', wtype: 'flail', tier, lvl, dmg, aspd, req, sockets, icon: { shape: 'flail', variant, colors } });
 const lance = (id, name, tier, lvl, dmg, aspd, req, sockets, variant, colors) => addBase(id, { name, slot: 'weapon', wtype: 'lance', tier, lvl, dmg, aspd, req, sockets, icon: { shape: 'lance', variant, colors } });
+const parasol = (id, name, tier, lvl, dmg, aspd, req, sockets, variant, colors) => addBase(id, { name, slot: 'weapon', wtype: 'parasol', tier, lvl, dmg, aspd, req, sockets, icon: { shape: 'parasol', variant, colors } });
 const armor = (slot, id, name, tier, lvl, def, req, sockets, variant, colors) => addBase(id, { name, slot, tier, lvl, def, req, sockets, icon: { shape: slot, variant, colors } });
 const jewel = (slot, id, name, tier, lvl, variant, colors) => addBase(id, { name, slot, tier, lvl, sockets: 0, icon: { shape: slot, variant, colors } });
 
@@ -180,6 +181,22 @@ lance('sunspear', 'Sunspear', 2, 40, [26, 54], 1.1, { str: 72 }, 3, 'sun', ['#ff
 lance('dragonGuardLance', 'Dragon Guard Lance', 2, 45, [32, 66], 1.1, { str: 82 }, 3, 'flame', ['#2f7a5a', '#f4e8d0', '#c8a050']);
 lance('starfallPike', 'Starfall Pike', 2, 50, [40, 80], 1.05, { str: 95 }, 3, 'star', ['#e6f0ff', '#3a3a6a', '#ffcf4a']);
 lance('emberleafLance', 'Emberleaf Lance', 2, 55, [38, 76], 1.2, { str: 104 }, 3, 'leaf', ['#3a9a6a', '#e0a868', '#d8603a']);
+// ---- Wagasa: sun parasols (Stella the Sun Oracle; Energy scaling, docs/STELLA.md §2) — [canopy, rays, finial]. About
+// 0.92 of a staff's damage at the same tier, a touch quicker: her basic attack is the Sunsweep (two sweeps throwing
+// crescents of sunlight, then a twirl's ring of light). 2 × 2 in the grids (rpg/grid.js). Every base is the same Blender
+// prop tinted by its colours (actors/stellaGear.js setParasolLook); the Paper Wagasa is the prop as painted.
+parasol('paperWagasa', 'Paper Wagasa', 0, 1, [3, 6], 1.15, {}, 2, 'paper', ['#d9573e', '#f0c24e', '#dfa23c']);
+parasol('morningWagasa', 'Morning Wagasa', 0, 5, [4, 9], 1.2, {}, 2, 'morning', ['#ffe6b0', '#f0c24e', '#e07a5a']);
+parasol('marigoldWagasa', 'Marigold Wagasa', 0, 9, [5, 13], 1.1, { ene: 20 }, 3, 'marigold', ['#f8b440', '#ffe08a', '#c8501e']);
+parasol('lanternWagasa', 'Lantern Wagasa', 0, 13, [6, 16], 1.15, { ene: 26 }, 3, 'lantern', ['#e85a3a', '#ffd36a', '#ffe8a0']);
+parasol('festivalWagasa', 'Festival Wagasa', 1, 20, [11, 25], 1.15, { ene: 38 }, 3, 'festival', ['#d9573e', '#f0c24e', '#fff4dc']);
+parasol('goldenHourWagasa', 'Golden Hour Wagasa', 1, 24, [12, 27], 1.2, { ene: 44 }, 2, 'golden', ['#ffcf6a', '#ff9a5a', '#fff6e0']);
+parasol('shrineWagasa', 'Shrine Wagasa', 1, 28, [16, 32], 1.1, { ene: 52 }, 3, 'shrine', ['#c8382e', '#fff4dc', '#f0c24e']);
+parasol('sunburstWagasa', 'Sunburst Wagasa', 1, 33, [17, 38], 1.15, { ene: 60 }, 3, 'sunburst', ['#f0c24e', '#d9573e', '#fff8e0']);
+parasol('daystarWagasa', 'Daystar Wagasa', 2, 40, [23, 46], 1.2, { ene: 72 }, 3, 'daystar', ['#fff0c0', '#ffd36a', '#ffffff']);
+parasol('coronaWagasa', 'Corona Wagasa', 2, 45, [29, 57], 1.15, { ene: 82 }, 3, 'corona', ['#ffb070', '#fff1b8', '#d9573e']);
+parasol('solsticeWagasa', 'Solstice Wagasa', 2, 50, [35, 70], 1.05, { ene: 95 }, 3, 'solstice', ['#7a3a8a', '#ffd36a', '#ffb070']);
+parasol('dawnbringer', 'Dawnbringer', 2, 55, [33, 66], 1.25, { ene: 104 }, 3, 'dawn', ['#f7b8a8', '#ffd36a', '#fffaf0']);
 ball('planetBall', 'Ringed Planet Ball', 2, 50, [34, 70], 1.2, { dex: 95 }, 3, 'planet', ['#8fd0ff', '#ffbcd6', '#ffffff']);
 ball('supernovaBall', 'Supernova Ball', 2, 55, [36, 76], 1.3, { dex: 105 }, 3, 'nova', ['#c86aff', '#ffe0ff', '#ffcf4a']);
 // ---- Hats — [main, band, accent]
@@ -256,30 +273,32 @@ export const SOCKETABLE_SLOTS = ['weapon', 'hat', 'outfit'];
 // ================================================================== stat text
 const sgn = v => (v >= 0 ? '+' + v : '' + v);
 const TREE_NAMES = { bone: 'Bone Blade', fetch: 'Fetch Mastery', spirit: 'Pack Spirit' };
+// (plain words, for young players: docs/STATS.md §2. The tooltips build each line again from these, so old saves read
+// the same; affix.text keeps the words it was made with)
 export const STAT_TEXT = {
-  str: v => `${sgn(v)} to Strength`, dex: v => `${sgn(v)} to Dexterity`, vit: v => `${sgn(v)} to Vitality`, ene: v => `${sgn(v)} to Energy`,
-  lifeMax: v => `${sgn(v)} to Life`, zoomMax: v => `${sgn(v)} to Zoom`,
-  lifeRegen: v => `Replenish Life ${sgn(v)} per second`, zoomRegen: v => `Regenerate Zoom ${v}%`,
-  dmgMin: v => `${sgn(v)} to Minimum Damage`, dmgMax: v => `${sgn(v)} to Maximum Damage`,
-  dmgPct: (v, a, it) => (it && it.slot === 'weapon' && !(a && a.gem) ? `${sgn(v)}% Enhanced Damage` : `${sgn(v)}% Damage`),
-  atkSpeed: v => `${sgn(v)}% Increased Attack Speed`, castSpeed: v => `${sgn(v)}% Faster Bark Rate`, moveSpeed: v => `${sgn(v)}% Faster Zoomies (Run)`,
-  crit: v => `${sgn(v)}% Critical Chomp Chance`, critDmg: v => `${sgn(v)}% Critical Chomp Damage`,
-  def: (v, a) => (a && a.pct ? `${sgn(a.pct)}% Enhanced Defense` : `${sgn(v)} Defense`),
-  block: v => `${sgn(v)}% Chance to Block`,
-  resFire: v => `Fire Resist ${sgn(v)}%`, resFrost: v => `Frost Resist ${sgn(v)}%`, resZap: v => `Zap Resist ${sgn(v)}%`, resStink: v => `Stink Resist ${sgn(v)}%`,
-  resAll: v => `All Resistances ${sgn(v)}%`,
-  lifeSteal: v => `${v}% Life Stolen per Hit`, zoomSteal: v => `${v}% Zoom Stolen per Hit`,
-  fireDmg: v => `Adds ${v[0]}-${v[1]} Fire Damage`, frostDmg: v => `Adds ${v[0]}-${v[1]} Frost Damage`,
-  zapDmg: v => `Adds ${v[0]}-${v[1]} Zap Damage`, stinkDmg: v => `Adds ${v[0]}-${v[1]} Stink Damage`,
-  mf: v => `${v}% Better Chance of Finding Magic Items`, gf: v => `${v}% Extra Coins from Yokai`,
-  thorns: v => `Attackers Take ${v} Damage (Prickly!)`, allSkills: v => `${sgn(v)} to All Skills`,
-  xpBonus: v => `${sgn(v)}% Experience Gained`, pierce: v => `Balls Pierce ${sgn(v)} ${Math.abs(v) === 1 ? 'Enemy' : 'Enemies'}`,
-  cdr: v => `${v}% Faster Cooldowns`, lifeOnKill: v => `${sgn(v)} Life after each Kill`,
-  shadowDmg: v => `Shadow Deals ${sgn(v)}% Damage`, shadowLife: v => `Shadow Gains ${sgn(v)}% Life`,
+  str: v => `${sgn(v)} Strength`, dex: v => `${sgn(v)} Dexterity`, vit: v => `${sgn(v)} Vitality`, ene: v => `${sgn(v)} Energy`,
+  lifeMax: v => `${sgn(v)} Life`, zoomMax: v => `${sgn(v)} Zoom`,
+  lifeRegen: v => `${sgn(v)} Life back every second`, zoomRegen: v => `Zoom refills ${v}% faster`,
+  dmgMin: v => `${sgn(v)} to your weakest hits`, dmgMax: v => `${sgn(v)} to your strongest hits`,
+  dmgPct: (v, a, it) => (it && it.slot === 'weapon' && !(a && a.gem) ? `Weapon hits ${v}% harder` : `Hits ${v}% harder`),
+  atkSpeed: v => `Attacks ${v}% faster`, castSpeed: v => `Uses skills ${v}% faster`, moveSpeed: v => `Runs ${v}% faster (zoomies!)`,
+  crit: v => `${sgn(v)}% chance of a big hit`, critDmg: v => `Big hits deal ${v}% more`,
+  def: (v, a) => (a && a.pct ? `${sgn(a.pct)}% Defense` : `${sgn(v)} Defense`),
+  block: v => `${sgn(v)}% chance to block a hit`,
+  resFire: v => `Fire hurts ${v}% less`, resFrost: v => `Frost hurts ${v}% less`, resZap: v => `Zap hurts ${v}% less`, resStink: v => `Stink hurts ${v}% less`,
+  resAll: v => `Fire, frost, zap and stink hurt ${v}% less`,
+  lifeSteal: v => `Hits heal you (${v}% of the damage)`, zoomSteal: v => `Hits refill Zoom (${v}% of the damage)`,
+  fireDmg: v => `Adds ${v[0]}-${v[1]} fire damage`, frostDmg: v => `Adds ${v[0]}-${v[1]} frost damage`,
+  zapDmg: v => `Adds ${v[0]}-${v[1]} zap damage`, stinkDmg: v => `Adds ${v[0]}-${v[1]} stink damage`,
+  mf: v => `Lucky: finds better treasure (+${v}%)`, gf: v => `Finds ${v}% more coins`,
+  thorns: v => `Prickly: attackers take ${v} damage`, allSkills: v => `${sgn(v)} to every skill`,
+  xpBonus: v => `Learns ${v}% faster (more XP)`, pierce: v => `Balls fly through ${v} more ${Math.abs(v) === 1 ? 'foe' : 'foes'}`,
+  cdr: v => `Skills come back ${v}% sooner`, lifeOnKill: v => `${sgn(v)} Life for every yokai beaten`,
+  shadowDmg: v => `Shadow bites ${v}% harder`, shadowLife: v => `Shadow gets ${v}% more Life`,
 };
 /** Human text for a stat/value pair (affix.text is pre-baked with this). */
 export function statText(stat, value, affix, item) {
-  if (stat.startsWith('treeSkills.')) return `${sgn(value)} to ${TREE_NAMES[stat.slice(11)]} Skills`;
+  if (stat.startsWith('treeSkills.')) return `${sgn(value)} to ${TREE_NAMES[stat.slice(11)]} skills`;
   if (stat.startsWith('skillBonus.')) { const s = SKILLS[stat.slice(11)]; return `${sgn(value)} to ${s ? s.name : stat.slice(11)}`; }
   const f = STAT_TEXT[stat];
   return f ? f(value, affix, item) : `${stat} ${value}`;
@@ -457,13 +476,13 @@ const SLOT_WEIGHT = { weapon: 1.5, hat: 1, outfit: 1, boots: 0.9, paws: 0.9, col
 // Weapon drops favour the hero being played (docs/HEROES.md §2): set by HeroManager on every switch.
 let LOOT_CLASS = 'chewy';
 export function setLootClass(cls) { LOOT_CLASS = cls || 'chewy'; }
-const CLASS_WTYPES = { chewy: ['sword', 'ball'], moka: ['staff'], poe: ['fuma'], shihtzu: ['flail'], golden: ['lance'] };
+const CLASS_WTYPES = { chewy: ['sword', 'ball'], moka: ['staff'], poe: ['fuma'], shihtzu: ['flail'], golden: ['lance'], stella: ['parasol'] };
 export function pickBase(ilvl, slot, wtype, rng) {
   rng = toRng(rng);
   let slots = slot ? [slot] : SLOTS;
   const byslot = s => GEAR_BASE_IDS.map(id => ITEM_BASES[id]).filter(b => b.slot === s && b.lvl <= Math.max(1, ilvl) && (!wtype || b.wtype === wtype));
   slots = slots.filter(s => byslot(s).length);
-  if (!slots.length) return ITEM_BASES[wtype === 'ball' ? 'redTennisBall' : wtype === 'staff' ? 'driftwoodStaff' : wtype === 'fuma' ? 'boneFuma' : wtype === 'flail' ? 'toyFlail' : wtype === 'lance' ? 'toyLance' : 'boneSword'];
+  if (!slots.length) return ITEM_BASES[wtype === 'ball' ? 'redTennisBall' : wtype === 'staff' ? 'driftwoodStaff' : wtype === 'fuma' ? 'boneFuma' : wtype === 'flail' ? 'toyFlail' : wtype === 'lance' ? 'toyLance' : wtype === 'parasol' ? 'paperWagasa' : 'boneSword'];
   const s = rng.weighted(slots.map(x => ({ x, w: SLOT_WEIGHT[x] || 1 }))).x;
   let pool = byslot(s);
   if (s === 'weapon' && !wtype) {
@@ -543,6 +562,7 @@ const RARE_B = {
   fuma: ['Pinwheel', 'Whirl', 'Shuriken', 'Snort', 'Sneeze', 'Star', 'Shadow', 'Twirl'],
   flail: ['Thumper', 'Squeaker', 'Wallop', 'Knot', 'Sigh', 'Bonker', 'Gloom', 'Tug'],
   lance: ['Lance', 'Pike', 'Poker', 'Glaive', 'Spear', 'Wingtip', 'Fetcher', 'Sunbeam'],
+  parasol: ['Wagasa', 'Parasol', 'Canopy', 'Sunshade', 'Halo', 'Daystar', 'Dawn', 'Ray'],
   hat: ['Crown', 'Topper', 'Brow', 'Visage', 'Hood', 'Cap'], outfit: ['Coat', 'Shell', 'Wrap', 'Cozy', 'Robe', 'Hide'],
   collar: ['Chime', 'Loop', 'Promise', 'Tag', 'Choker', 'Ring'], charm: ['Trinket', 'Token', 'Wish', 'Spark', 'Knot', 'Omen'],
   boots: ['Stride', 'Tread', 'Pounce', 'Scamper', 'Trot', 'Hop'], paws: ['Grip', 'Swipe', 'Mitt', 'Clutch', 'Paw', 'Knuckle'],
@@ -717,6 +737,13 @@ export function socketGem(item, gem) {
   return { ok: true, why: '' };
 }
 
+/** Stella's starter: a plain Paper Wagasa (the sun wagasa as painted). */
+export function starterParasol() {
+  const it = blankItem(ITEM_BASES.paperWagasa, 'normal', 1, toRng(new RNG(23)));
+  finalize(it);
+  return it;
+}
+
 /** The Golden Retriever dragoon's starter: a plain Toy Lance. */
 export function starterLance() {
   const it = blankItem(ITEM_BASES.toyLance, 'normal', 1, toRng(new RNG(19)));
@@ -776,7 +803,7 @@ export function shopStock(lvl, seed = 1) {
   const ilvl = () => clamp(lvl + rng.int(-2, 3), 1, 60);
   const add = it => { it.price = buyPrice(it); out.push(it); };
   // two weapons for whoever is shopping (Chewy: a sword and a ball; Moka: two staffs; Poe: two fūma)
-  for (const wtype of LOOT_CLASS === 'moka' ? ['staff', 'staff'] : LOOT_CLASS === 'poe' ? ['fuma', 'fuma'] : LOOT_CLASS === 'shihtzu' ? ['flail', 'flail'] : LOOT_CLASS === 'golden' ? ['lance', 'lance'] : ['sword', 'ball']) add(generateItem({ ilvl: ilvl(), slot: 'weapon', wtype, rarity: rng.chance(0.5) ? 'magic' : 'normal', rng }));
+  for (const wtype of LOOT_CLASS === 'moka' ? ['staff', 'staff'] : LOOT_CLASS === 'poe' ? ['fuma', 'fuma'] : LOOT_CLASS === 'shihtzu' ? ['flail', 'flail'] : LOOT_CLASS === 'golden' ? ['lance', 'lance'] : LOOT_CLASS === 'stella' ? ['parasol', 'parasol'] : ['sword', 'ball']) add(generateItem({ ilvl: ilvl(), slot: 'weapon', wtype, rarity: rng.chance(0.5) ? 'magic' : 'normal', rng }));
   for (const slot of ['hat', 'outfit', 'boots', 'paws']) add(generateItem({ ilvl: ilvl(), slot, rarity: rng.chance(0.45) ? 'magic' : 'normal', rng }));
   add(generateItem({ ilvl: ilvl(), slot: rng.chance(0.5) ? 'collar' : 'charm', rarity: 'magic', rng }));
   add(generateItem({ ilvl: ilvl(), slot: 'charm', rarity: 'magic', rng }));
@@ -805,6 +832,7 @@ export function itemKindName(it) {
   if (it.wtype === 'fuma') return 'Fūma';
   if (it.wtype === 'flail') return 'Flail';
   if (it.wtype === 'lance') return 'Lance';
+  if (it.wtype === 'parasol') return 'Wagasa';
   return SLOT_NAMES[it.slot] || 'Item';
 }
 /** Does the player meet the item's requirements? */
@@ -836,10 +864,10 @@ export function targetSlot(it, state) {
 }
 
 const CMP_KEYS = [
-  ['dmgAvg', 'Damage', 1], ['aspd', 'Attacks/sec', 100], ['def', 'Defense', 1], ['lifeMax', 'Life', 1], ['zoomMax', 'Zoom', 1],
-  ['crit', 'Crit Chance', 1, '%'], ['resFire', 'Fire Res', 1, '%'], ['resFrost', 'Frost Res', 1, '%'], ['resZap', 'Zap Res', 1, '%'],
-  ['resStink', 'Stink Res', 1, '%'], ['moveSpeed', 'Zoomies', 1, '%'], ['lifeSteal', 'Life Steal', 1, '%'], ['mf', 'Magic Find', 1, '%'],
-  ['allSkills', 'All Skills', 1], ['block', 'Block', 1, '%'], ['lifeRegen', 'Life Regen', 10],
+  ['dmgAvg', 'Damage', 1], ['aspd', 'Hits a second', 100], ['def', 'Defense', 1], ['lifeMax', 'Life', 1], ['zoomMax', 'Zoom', 1],
+  ['crit', 'Big hit chance', 1, '%'], ['resFire', 'Fire guard', 1, '%'], ['resFrost', 'Frost guard', 1, '%'], ['resZap', 'Zap guard', 1, '%'],
+  ['resStink', 'Stink guard', 1, '%'], ['moveSpeed', 'Run speed', 1, '%'], ['lifeSteal', 'Heal on hit', 1, '%'], ['mf', 'Treasure luck', 1, '%'],
+  ['allSkills', 'Every skill', 1], ['block', 'Block', 1, '%'], ['lifeRegen', 'Life back a second', 10],
 ];
 /** Stat deltas of equipping `it` vs what's currently equipped. → [{text, delta}] */
 export function compareItem(it, state) {
@@ -858,7 +886,7 @@ export function compareItem(it, state) {
   for (const e of ['fire', 'frost', 'zap', 'stink']) {
     const a = cur[e + 'Dmg'], b = alt[e + 'Dmg'];
     const dlt = Math.round((b[0] + b[1] - a[0] - a[1]) / 2);
-    if (dlt) out.push({ text: `${dlt > 0 ? '+' : ''}${dlt} ${e[0].toUpperCase() + e.slice(1)} Dmg`, delta: dlt });
+    if (dlt) out.push({ text: `${dlt > 0 ? '+' : ''}${dlt} ${e[0].toUpperCase() + e.slice(1)} damage`, delta: dlt });
   }
   return out.slice(0, 10);
 }
@@ -892,9 +920,9 @@ export function itemTooltip(it, state, derived) {
   const subtitle = (it.rarity === 'rare' || it.rarity === 'unique' || it.rarity === 'set' ? b.name + ' · ' : '') + tierName + kind + (it.rarity !== 'normal' ? ` · ${RARITY[it.rarity].name}` : '');
   if (it.dmg) {
     const d = itemDamage(it);
-    L(`${it.wtype === 'ball' ? 'Throw' : it.wtype === 'staff' ? 'Spell' : it.wtype === 'fuma' ? 'Slash' : it.wtype === 'flail' ? 'Wallop' : it.wtype === 'lance' ? 'Thrust' : 'Swing'} Damage: ${d[0]} to ${d[1]}`, d[2] ? C.blue : C.white);
+    L(`${it.wtype === 'ball' ? 'Throw' : it.wtype === 'staff' ? 'Spell' : it.wtype === 'fuma' ? 'Slash' : it.wtype === 'flail' ? 'Wallop' : it.wtype === 'lance' ? 'Thrust' : it.wtype === 'parasol' ? 'Sunlight' : 'Swing'} Damage: ${d[0]} to ${d[1]}`, d[2] ? C.blue : C.white);
     L(`Attack Speed: ${speedLabel(it.aspd)} (${it.aspd.toFixed(2)}/s)`, C.white);
-    L(it.wtype === 'ball' ? 'Thrown · bounces back to you · scales with Dexterity' : it.wtype === 'staff' ? 'Sparkle bolt · powers every spell · scales with Energy' : it.wtype === 'fuma' ? 'Quick slashes · Fūma Throw sends it out and back · scales with Dexterity' : it.wtype === 'flail' ? 'Heavy swings · long reach · scales with Strength' : it.wtype === 'lance' ? 'Long thrusts · the longest reach · scales with Strength' : 'Melee · wide swing · scales with Strength', C.grey);
+    L(it.wtype === 'ball' ? 'Thrown · bounces back to you · Dexterity makes it hit harder' : it.wtype === 'staff' ? 'Sparkle bolt · powers every spell · Energy makes it hit harder' : it.wtype === 'fuma' ? 'Quick slashes · Fūma Throw sends it out and back · Dexterity makes it hit harder' : it.wtype === 'flail' ? 'Heavy swings · long reach · Strength makes it hit harder' : it.wtype === 'lance' ? 'Long thrusts · the longest reach · Strength makes it hit harder' : it.wtype === 'parasol' ? 'Sweeps and a twirl of sunlight · Energy makes it shine brighter' : 'Up close · wide swing · Strength makes it hit harder', C.grey);
   }
   if (it.def) {
     let ed = 0; for (const a of it.affixes) if (a.stat === 'def') ed += a.value;
@@ -904,8 +932,8 @@ export function itemTooltip(it, state, derived) {
   const own = it.affixes.filter(a => !a.gem);
   const gemAff = it.affixes.filter(a => a.gem);
   let first = true;
-  for (const a of own) { L(a.text, affColor, first ? { gap: true } : undefined); first = false; }
-  for (const a of gemAff) L(a.text, C.blue);
+  for (const a of own) { L(statText(a.stat, a.value, a, it), affColor, first ? { gap: true } : undefined); first = false; }
+  for (const a of gemAff) L(statText(a.stat, a.value, a, it), C.blue);
   if (it.sockets) L(`Sockets: ${(it.gems || []).length} / ${it.sockets}` + ((it.gems || []).length ? '  (' + it.gems.map(g => g.name).join(', ') + ')' : ''), C.grey, { gap: true });
   if (it.setId) {
     const S = SETS[it.setId];

@@ -13,6 +13,7 @@ import { installChargedSkills } from './chargedSkills.js';
 import { installPoeSkills } from './poeSkills.js';
 import { installShihtzuSkills } from './shihtzuSkills.js';
 import { installGoldenSkills } from './goldenSkills.js';
+import { installStellaSkills } from './stellaSkills.js';
 import { bladeFx } from '../gfx/bladeFx.js';
 import { spectralBladeGeo, stormBladeMaterial } from '../gfx/samuraiProps.js';
 import { SAMURAI_CUTS } from '../actors/samuraiPoses.js';
@@ -211,6 +212,7 @@ export class SkillRunner {
     if (p.fuma) return this.cast_fumaSlash(R, aim, target); // Poe's fūma: the one-paw slash combo (poeSkills.js)
     if (p.flail) return this.cast_flailSwing(R, aim, target); // the Shih Tzu's flail: the three-swing combo (shihtzuSkills.js)
     if (p.lance) return this.cast_lancePoke(R, aim, target); // the dragoon's lance: two thrusts and a swat (goldenSkills.js)
+    if (p.parasol) return this.cast_parasolSweep(R, aim, target); // Stella's wagasa: two sweeps of sunlight and a twirl (stellaSkills.js)
     if (p.projectile) {
       P.anim.play('throw', { speed: this.animSpeed(0.5), onEvent: ev => { if (ev === 'release') this.throwBall({ dmgPct: p.dmgPct, speed: p.speed, range: p.range, pierce: p.pierce, returns: true }, aim); } });
       return;
@@ -640,6 +642,7 @@ export class SkillRunner {
     this.updatePoe(dt);
     this.updateShihtzu(dt);
     this.updateGolden(dt);
+    this.updateStella(dt);
     this.keepOutOfBigBodies();
   }
   /** a charged Whirlwind Stance winds down: one last full turn of the blade, a ring of petals, the dizzy burst */
@@ -672,6 +675,7 @@ export class SkillRunner {
     this.clearPoe();
     this.clearShihtzu();
     this.clearGolden();
+    this.clearStella();
   }
 }
 installMokaSpells(SkillRunner.prototype);
@@ -679,3 +683,4 @@ installChargedSkills(SkillRunner.prototype);
 installPoeSkills(SkillRunner.prototype);
 installShihtzuSkills(SkillRunner.prototype);
 installGoldenSkills(SkillRunner.prototype);
+installStellaSkills(SkillRunner.prototype);

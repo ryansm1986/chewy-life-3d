@@ -11,14 +11,16 @@ A cozy 3D browser action-RPG and village sim (Three.js + Vite), starring Chewy, 
   - [ZONES](docs/ZONES.md): the zone, village, dungeon and tier loop;
   - [CONTROLS](docs/CONTROLS.md): gamepad, Steam Deck desktop app, touch;
   - [ARCHITECTURE](docs/ARCHITECTURE.md): the code map;
-  - [REGIONS](docs/REGIONS.md), [HEROES](docs/HEROES.md), [POE](docs/POE.md), [CHARGE](docs/CHARGE.md),
-    [HOUSING](docs/HOUSING.md), [HOMESTEAD](docs/HOMESTEAD.md), [TUTORIALS](docs/TUTORIALS.md),
+  - [REGIONS](docs/REGIONS.md), [HEROES](docs/HEROES.md), [POE](docs/POE.md), [STELLA](docs/STELLA.md),
+    [CHARGE](docs/CHARGE.md), [HOUSING](docs/HOUSING.md), [HOMESTEAD](docs/HOMESTEAD.md), [TUTORIALS](docs/TUTORIALS.md),
     [VILLAGE_PLAN](docs/VILLAGE_PLAN.md), [ITCH](docs/ITCH.md), [MULTIPLAYER](docs/MULTIPLAYER.md),
     [DEBUG](docs/DEBUG.md): the password-gated debug menu (`?debug`, or seven taps on the version); new features add
     their actions with `registerDebug` (`src/debug/registry.js`);
   - [COZY](docs/COZY.md): the no-combat story path (expeditions, the Guild, scavenging);
   - [MAP](docs/MAP.md): the map and minimap (layers, markers, People and Places, the pin);
   - [INVENTORY](docs/INVENTORY.md): the bag and stash grids, stash tabs, item sizes, sort and filter;
+  - [STATS](docs/STATS.md): simple stats for young players (Power, the better / worse verdict, Shadow picks the points,
+    plain words, the Character screen's drawer);
   - [QUESTS](docs/QUESTS.md): quest moments (the quest card, place titles, Shadow's lines, the hand-in) and how to write a quest;
   - [DESKTOP](docs/DESKTOP.md): the Electron app for Windows and the Deck, and its in-app updates.
 - Releases:

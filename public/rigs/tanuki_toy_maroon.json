@@ -1,0 +1,396 @@
+{
+ "name": "tanuki_toy_maroon",
+ "contract": "hero",
+ "scale": 1.0,
+ "height": 1.0,
+ "bones": [
+  {
+   "name": "root",
+   "parent": null,
+   "pos": [
+    0.0,
+    0.0,
+    0.00833
+   ]
+  },
+  {
+   "name": "hips",
+   "parent": "root",
+   "pos": [
+    0.0,
+    0.25,
+    -0.00333
+   ]
+  },
+  {
+   "name": "spine",
+   "parent": "hips",
+   "pos": [
+    0.0,
+    0.33333,
+    -0.00167
+   ]
+  },
+  {
+   "name": "chest",
+   "parent": "spine",
+   "pos": [
+    0.0,
+    0.43333,
+    -0.0
+   ]
+  },
+  {
+   "name": "neck",
+   "parent": "chest",
+   "pos": [
+    0.0,
+    0.53333,
+    -0.00333
+   ]
+  },
+  {
+   "name": "head",
+   "parent": "neck",
+   "pos": [
+    0.0,
+    0.56417,
+    -0.06351
+   ]
+  },
+  {
+   "name": "jaw",
+   "parent": "head",
+   "pos": [
+    0.0,
+    0.66458,
+    0.12869
+   ]
+  },
+  {
+   "name": "eye_L",
+   "parent": "head",
+   "pos": [
+    0.1165,
+    0.71747,
+    0.17659
+   ]
+  },
+  {
+   "name": "lidU_L",
+   "parent": "head",
+   "pos": [
+    0.12301,
+    0.71347,
+    0.04907
+   ]
+  },
+  {
+   "name": "lidD_L",
+   "parent": "head",
+   "pos": [
+    0.12301,
+    0.82927,
+    -0.10187
+   ]
+  },
+  {
+   "name": "brow_L",
+   "parent": "head",
+   "pos": [
+    0.10724,
+    0.83459,
+    0.19011
+   ]
+  },
+  {
+   "name": "lip_L",
+   "parent": "head",
+   "pos": [
+    0.05337,
+    0.66868,
+    0.24719
+   ]
+  },
+  {
+   "name": "ear_L",
+   "parent": "head",
+   "pos": [
+    0.16889,
+    0.9339,
+    -0.03405
+   ]
+  },
+  {
+   "name": "earTip_L",
+   "parent": "ear_L",
+   "pos": [
+    0.18788,
+    1.00095,
+    -0.04423
+   ]
+  },
+  {
+   "name": "upperarm_L",
+   "parent": "chest",
+   "pos": [
+    0.16,
+    0.4875,
+    0.00333
+   ]
+  },
+  {
+   "name": "forearm_L",
+   "parent": "upperarm_L",
+   "pos": [
+    0.2402,
+    0.39192,
+    0.01082
+   ]
+  },
+  {
+   "name": "hand_L",
+   "parent": "forearm_L",
+   "pos": [
+    0.28833,
+    0.33457,
+    0.01531
+   ]
+  },
+  {
+   "name": "thigh_L",
+   "parent": "hips",
+   "pos": [
+    0.09167,
+    0.25,
+    -0.00333
+   ]
+  },
+  {
+   "name": "shin_L",
+   "parent": "thigh_L",
+   "pos": [
+    0.13333,
+    0.15833,
+    0.00333
+   ]
+  },
+  {
+   "name": "foot_L",
+   "parent": "shin_L",
+   "pos": [
+    0.14667,
+    0.075,
+    -0.0
+   ]
+  },
+  {
+   "name": "eye_R",
+   "parent": "head",
+   "pos": [
+    -0.1165,
+    0.71747,
+    0.17659
+   ]
+  },
+  {
+   "name": "lidU_R",
+   "parent": "head",
+   "pos": [
+    -0.12301,
+    0.71347,
+    0.04907
+   ]
+  },
+  {
+   "name": "lidD_R",
+   "parent": "head",
+   "pos": [
+    -0.12301,
+    0.82927,
+    -0.10187
+   ]
+  },
+  {
+   "name": "brow_R",
+   "parent": "head",
+   "pos": [
+    -0.10724,
+    0.83459,
+    0.19011
+   ]
+  },
+  {
+   "name": "lip_R",
+   "parent": "head",
+   "pos": [
+    -0.04769,
+    0.66048,
+    0.25555
+   ]
+  },
+  {
+   "name": "ear_R",
+   "parent": "head",
+   "pos": [
+    -0.16889,
+    0.9339,
+    -0.03405
+   ]
+  },
+  {
+   "name": "earTip_R",
+   "parent": "ear_R",
+   "pos": [
+    -0.18788,
+    1.00095,
+    -0.04423
+   ]
+  },
+  {
+   "name": "upperarm_R",
+   "parent": "chest",
+   "pos": [
+    -0.16,
+    0.4875,
+    0.00333
+   ]
+  },
+  {
+   "name": "forearm_R",
+   "parent": "upperarm_R",
+   "pos": [
+    -0.2402,
+    0.39192,
+    0.01082
+   ]
+  },
+  {
+   "name": "hand_R",
+   "parent": "forearm_R",
+   "pos": [
+    -0.28833,
+    0.33457,
+    0.01531
+   ]
+  },
+  {
+   "name": "thigh_R",
+   "parent": "hips",
+   "pos": [
+    -0.09167,
+    0.25,
+    -0.00333
+   ]
+  },
+  {
+   "name": "shin_R",
+   "parent": "thigh_R",
+   "pos": [
+    -0.13333,
+    0.15833,
+    0.00333
+   ]
+  },
+  {
+   "name": "foot_R",
+   "parent": "shin_R",
+   "pos": [
+    -0.14667,
+    0.075,
+    -0.0
+   ]
+  },
+  {
+   "name": "tail1",
+   "parent": "hips",
+   "pos": [
+    -0.00513,
+    0.24956,
+    -0.16057
+   ]
+  },
+  {
+   "name": "tail2",
+   "parent": "tail1",
+   "pos": [
+    -0.01386,
+    0.25305,
+    -0.28382
+   ]
+  },
+  {
+   "name": "tail3",
+   "parent": "tail2",
+   "pos": [
+    -0.0273,
+    0.26365,
+    -0.38617
+   ]
+  },
+  {
+   "name": "tail4",
+   "parent": "tail3",
+   "pos": [
+    -0.04093,
+    0.27185,
+    -0.45975
+   ]
+  }
+ ],
+ "layout": [
+  {
+   "name": "position",
+   "type": "f4",
+   "itemSize": 3,
+   "normalized": false,
+   "offset": 0,
+   "count": 48057
+  },
+  {
+   "name": "normal",
+   "type": "i2",
+   "itemSize": 3,
+   "normalized": true,
+   "offset": 192228,
+   "count": 48057
+  },
+  {
+   "name": "uv",
+   "type": "f4",
+   "itemSize": 2,
+   "normalized": false,
+   "offset": 288344,
+   "count": 32038
+  },
+  {
+   "name": "skinIndex",
+   "type": "u1",
+   "itemSize": 4,
+   "normalized": false,
+   "offset": 416496,
+   "count": 64076
+  },
+  {
+   "name": "skinWeight",
+   "type": "u1",
+   "itemSize": 4,
+   "normalized": true,
+   "offset": 480572,
+   "count": 64076
+  },
+  {
+   "name": "index",
+   "type": "u4",
+   "itemSize": 1,
+   "normalized": false,
+   "offset": 544648,
+   "count": 92946
+  }
+ ],
+ "vertexCount": 16019,
+ "outlineIndexCount": 82068,
+ "bin": "tanuki_toy_maroon.bin",
+ "tex": "tanuki_toy_maroon.png",
+ "normalTex": "tanuki_toy_maroon_n.png"
+}

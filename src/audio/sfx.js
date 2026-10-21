@@ -12,6 +12,7 @@ import { SFX as POE_SFX } from './poe.sfx.js'; // Poe: fūma swishes and whirrs,
 import { SFX as SAMURAI_SFX } from './samurai.sfx.js'; // Chewy the samurai: the katana's draw, its sheath's click, a clang (docs/HEROES.md)
 import { SFX as SHIHTZU_SFX } from './shihtzu.sfx.js'; // the Shih Tzu: the flail's whoosh and thud, squeaky bonks, hexes, his awoo (docs/SHIHTZU.md)
 import { SFX as GOLDEN_SFX } from './golden.sfx.js'; // the dragoon: the lance's whoosh and thok, javelin fwips and bonks, the whelp's poof and flaps (docs/GOLDEN.md)
+import { SFX as STELLA_SFX } from './stella.sfx.js'; // Stella the Sun Oracle: the wagasa's whoosh and fwump, glassy chimes, a choir "aah", suzu bells (docs/STELLA.md)
 
 const R = (a, b) => a + Math.random() * (b - a);
 const mf = m => 440 * Math.pow(2, (m - 69) / 12);
@@ -681,6 +682,7 @@ for (const k in POE_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k
 for (const k in SAMURAI_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = SAMURAI_SFX[k]; }
 for (const k in SHIHTZU_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = SHIHTZU_SFX[k]; }
 for (const k in GOLDEN_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = GOLDEN_SFX[k]; }
+for (const k in STELLA_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = STELLA_SFX[k]; }
 
 export const SFX_NAMES = Object.keys(SFX);
 
@@ -699,4 +701,5 @@ export const SFX_GROUPS = {
   Samurai: Object.keys(SAMURAI_SFX),
   'Shih Tzu': Object.keys(SHIHTZU_SFX),
   Dragoon: Object.keys(GOLDEN_SFX),
+  Stella: Object.keys(STELLA_SFX),
 };

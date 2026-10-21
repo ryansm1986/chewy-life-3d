@@ -88,7 +88,7 @@ export class Projectile {
     if (this.team === 'ally') {
       if (this.c.enemiesNear) { const near = this.c.enemiesNear(this.pos.x, this.pos.z, this.radius + 0.3); for (let i = 0; i < near.length; i++) if (near[i].team === 'enemy') out.push(near[i]); this.c.doneNear(); }
       else for (const e of this.c.entities) if (e.alive && e.team === 'enemy') out.push(e);
-    } else { const p = this.G.player; if (p && !this.G.playerDead) out.push(p); for (const e of (this.c.allies || this.c.entities)) if (e.alive && e.team === 'ally') out.push(e); }
+    } else { const C = this.G.coop; if (C?.active) C.pushBodies(out); else { const p = this.G.player; if (p && !this.G.playerDead) out.push(p); } for (const e of (this.c.allies || this.c.entities)) if (e.alive && e.team === 'ally') out.push(e); } // (couch co-op: every standing hero)
     return out;
   }
   update(dt) {
@@ -133,7 +133,7 @@ export class Projectile {
         const d = Math.hypot(e.pos.x - this.pos.x, e.pos.z - this.pos.z);
         if (d < this.radius + (e.radius || 0.3)) {
           this.hitSet.add(e);
-          this.o.onHit?.(e, this);
+          if (e._coopSlot && this.G.coop?.active) this.G.coop.with(e._coopSlot, () => this.o.onHit?.(e, this)); else this.o.onHit?.(e, this); // (a hero is hit as themselves: hitPlayer reads G.player)
           if ((this.kind === 'ball' || this.kind === 'zapball' || this.kind === 'pitball') && this.o.ricochet > 0) { // bounce toward the next nearest enemy
             this.o.ricochet--;
             const next = this.c.nearest(this.pos, this.team, this.o.bounceRange || 6, x => !this.hitSet.has(x));

@@ -104,6 +104,12 @@ NOSE = [[0, _yf - .006 - NOSE_FWD, .262], [.046, .031, .038]]; K_N = .013    # t
 # the set-in socket: only the socket dips; its falloff stops short of the midline (the bridge stays the ball) and
 # above the brows (the forehead stays the ball); the brow and cheek fullness come from the ball's own masses
 RECESS = dict(delta=.045, F_out=.20, F_nas=.085, F_up=.13, F_dn=.14)
+# round 8 (2026-10-17, the owner: "Rosie's face seemed sunken in"): the socket warp pushed the skin 0.045 W (23 mm) straight
+# back over each eye, out to the temples, but not at the bridge or above the brows, so the mid-face read dished (concave
+# across the bridge, above and below the eyes) and the eyes sat in a recessed plate. Off: the face is the ball, convex
+# through the middle, and the eyes sit on its own curve (same front-view place, size and facing).
+CONVEX = bool(int(os.environ.get('ROSIE_CONVEX', '1'))) if 'os' in globals() else True
+if CONVEX: RECESS['delta'] = 0.
 def smoother(a, b, x):
     t = clamp((np.asarray(x, float) - a) / (b - a)); return t * t * t * (t * (6 * t - 15) + 10)
 def eye_recess(q):

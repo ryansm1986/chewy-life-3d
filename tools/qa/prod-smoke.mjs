@@ -21,6 +21,7 @@ const POE_FUMA = fs.existsSync(new URL('../../public/models/poe-fuma.glb', impor
 const TOY_STZ = fs.existsSync(new URL('../../public/rigs/shihtzu_toy.json', import.meta.url)); // the Toybox Shih Tzu ships: playing him must use it (docs/SHIHTZU.md)
 const STZ_FLAIL = fs.existsSync(new URL('../../public/models/shihtzu-flail.glb', import.meta.url)); // his Blender flail ships: his flail must be it (actors/shihtzuGear.js)
 const has = f => fs.existsSync(new URL('../../public/' + f, import.meta.url));
+const TOY_STELLA = has('rigs/stella_toy.json'), STL_WAGASA = has('models/stella-parasol.glb'); // Stella ships: playing her must use her rig and the sun wagasa (docs/STELLA.md)
 const TOY_GOLDEN = has('rigs/golden_toy.json'), GLD_PROPS = has('models/golden-lance.glb') && has('models/golden-javelin.glb'); // Foosy ships: playing him must use his rig and props (docs/GOLDEN.md)
 const WHELP = has('rigs/shadow_whelp.json') && has('models/shadow-whelp-wing.glb'); // the whelp outfit ships: Shadow must wear it (and fly) while Foosy is played
 
@@ -31,12 +32,12 @@ const url = server.resolvedUrls.local[0].replace(/\/$/, '');
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true, args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] });
 let failed = 0;
 const ONLY = process.argv.slice(2).filter(a => !a.startsWith('--'));
-for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['poe', '/?fresh&nointro&hero=poe'], ['shihtzu', '/?fresh&nointro&hero=shihtzu'], ['golden', '/?fresh&nointro&hero=golden'], ['home', '/?fresh&nointro'], ['tooltip', '/?fresh&nointro&notut'], ['charge', '/?fresh&nointro&notut'], ['pad', '/?fresh&nointro&notut'], ['deck', '/?fresh&nointro&notut'], ['touch', '/?fresh&nointro&notut'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`]), ...Object.values(DUNGEONS).filter(dd => dd.gate).map(dd => ['zone:' + dd.id, '/?fresh&nointro']), ['tier:bambooDepths', '/?fresh&nointro&notut'], ['tier:burrowDeep', '/?fresh&nointro&notut'], ['pinnacle:bambooDepths', '/?fresh&nointro&notut'], ['debug', '/?fresh&nointro&notut&debug'], ['cozy', '/?fresh&nointro&notut'], ['guild', '/?fresh&nointro&notut'], ['dig', '/?fresh&nointro&notut'], ['fish', '/?fresh&nointro&notut&hour=10'], ['peaceful', '/?fresh&nointro&notut&villagesaved=bamboo'], ['crewclear', '/?fresh&nointro&notut&villagesaved=bamboo'], ['lead', '/?fresh&nointro&notut&hour=10'], ['dens', '/?fresh&nointro&notut'], ['portal', '/?fresh&nointro&notut'], ['quest', '/?fresh&nointro&notut&qcard&hour=10'], ['arrival', '/?fresh&nointro&notut&arrive&qcard&hour=11']]) { // (every zone dungeon that has its gate: its kit, a dense floor, the arena)
+for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro'], ['moka', '/?fresh&nointro&hero=moka'], ['poe', '/?fresh&nointro&hero=poe'], ['shihtzu', '/?fresh&nointro&hero=shihtzu'], ['golden', '/?fresh&nointro&hero=golden'], ['stella', '/?fresh&nointro&hero=stella'], ['home', '/?fresh&nointro'], ['tooltip', '/?fresh&nointro&notut'], ['charge', '/?fresh&nointro&notut'], ['pad', '/?fresh&nointro&notut'], ['deck', '/?fresh&nointro&notut'], ['touch', '/?fresh&nointro&notut'], ...['bamboo', 'maple', 'tidepool', 'onsen'].map(id => ['region:' + id, `/?fresh&nointro&region=${id}`]), ...Object.values(DUNGEONS).filter(dd => dd.gate).map(dd => ['zone:' + dd.id, '/?fresh&nointro']), ['tier:bambooDepths', '/?fresh&nointro&notut'], ['tier:burrowDeep', '/?fresh&nointro&notut'], ['pinnacle:bambooDepths', '/?fresh&nointro&notut'], ['debug', '/?fresh&nointro&notut&debug'], ['cozy', '/?fresh&nointro&notut'], ['guild', '/?fresh&nointro&notut'], ['dig', '/?fresh&nointro&notut'], ['fish', '/?fresh&nointro&notut&hour=10'], ['peaceful', '/?fresh&nointro&notut&villagesaved=bamboo'], ['crewclear', '/?fresh&nointro&notut&villagesaved=bamboo'], ['lead', '/?fresh&nointro&notut&hour=10'], ['dens', '/?fresh&nointro&notut'], ['portal', '/?fresh&nointro&notut'], ['quest', '/?fresh&nointro&notut&qcard&hour=10'], ['arrival', '/?fresh&nointro&notut&arrive&qcard&hour=11']]) { // (every zone dungeon that has its gate: its kit, a dense floor, the arena)
   if (ONLY.length && !ONLY.includes(label)) continue; // (node tools/qa/prod-smoke.mjs tooltip home: just those cases)
   const page = await browser.newPage(label === 'touch' ? { viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true } : { viewport: label === 'deck' ? { width: 1280, height: 800 } : { width: 1600, height: 900 } }); // (deck: the Steam Deck's screen; touch: a phone in landscape)
   const errs = [];
   page.on('pageerror', e => errs.push('pageerror: ' + e.message));
-  page.on('console', m => { if (m.type() === 'error' || /optional module missing|\[rigs\]|\[chewy\]|\[heroes\]|\[shadow\]|\[rosie\]|\[moka\]|\[poe\]|\[shihtzu\]|\[golden\]|\[whelp\]/.test(m.text())) errs.push(m.type() + ': ' + m.text()); }); // ([heroes]: a baked hero model missing from the bundle)
+  page.on('console', m => { if (m.type() === 'error' || /optional module missing|\[rigs\]|\[chewy\]|\[heroes\]|\[shadow\]|\[rosie\]|\[moka\]|\[poe\]|\[shihtzu\]|\[golden\]|\[stella\]|\[whelp\]/.test(m.text())) errs.push(m.type() + ': ' + m.text()); }); // ([heroes]: a baked hero model missing from the bundle)
   await page.goto(url + q);
   await page.waitForFunction(() => window.__ready === true, null, { timeout: 60000 }).catch(() => errs.push('never became ready'));
   await page.waitForTimeout(2500);
@@ -98,6 +99,42 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
       G.heroes.cd = 0; r.switch = G.heroes.switchTo('chewy', { quiet: true });
       await until(() => G.state.activeHero === 'chewy' && !G.heroSwitching, 6000);
       r.after = G.state.activeHero; r.whelpOff = !S.whelp.on && S.rig.model !== 'shadow_whelp'; r.villager = !!G.heroes.villagers.golden?.rig?.parts?.lance?.glb;
+      return r;
+    });
+  }
+  if (label === 'stella') { // the sixth hero in the bundle (docs/STELLA.md): her baked rig + the Blender sun wagasa, the Sunsweep, Golden Ray, Morning Light's heal and sun shells, a charged ray, the Burrow: a flare and Hinata, a switch
+    s.stella = await page.evaluate(async () => {
+      const G = window.G, P = G.player;
+      const until = async (f, ms) => { const t0 = performance.now(); while (!f() && performance.now() - t0 < ms) await new Promise(q => requestAnimationFrame(q)); return f(); };
+      await until(() => P.parasol?.glb, 3000); // (the wagasa loads after boot)
+      const r = { hero: P.hero, baked: !!P.rig.bakedDisney && P.rig.hero === 'stella', model: P.rig.model, wagasa: !!P.parasol?.glb, tassels: P.parasol?.tassels?.length || 0, wt: G.derived.weaponType, revive: G.derived.shadowRevive };
+      r.icons = [...document.querySelectorAll('.hotbar .hb-ic')].slice(0, 3).every(i => /^data:image\/png/.test(i.src));
+      const at = () => P.pos.clone().add(new P.pos.constructor(Math.sin(P.facing) * 3, 0, Math.cos(P.facing) * 3)), st = G.state.player;
+      G.skills.cds = {}; st.zoom = null; r.sweep = G.skills.tryCast('attack', at(), null) && /parasolSweep/.test(P.anim.action?.name || '');
+      await until(() => !P.anim.action, 2000);
+      G.skills.cds = {}; st.zoom = null; r.ray = G.skills.tryCast('goldenRay', at(), null);
+      await until(() => !P.anim.action, 2000);
+      G.actions.damage(G.derived.lifeMax * 0.05); const l0 = G.actions.life(); // (a small hurt: a level-1 Morning Light (12%) mends it and its overheal becomes a sun shell)
+      G.skills.cds = {}; st.zoom = null; r.light = G.skills.tryCast('morningLight', P.pos.clone(), null);
+      r.healed = await until(() => G.actions.life() > l0 + 1, 3000);
+      r.shell = await until(() => G.skills.stlShell('player') > 0, 4000); // (overheal: a sun shell)
+      await until(() => !P.anim.action, 2000);
+      G.skills.cds = {}; st.zoom = null; r.charged = G.skills.tryCast('goldenRay', at(), null, { stage: 1 }) && P.anim.action?.name === 'parasolAim';
+      await until(() => !P.anim.action, 2000);
+      // the Burrow: a Solar Flare on its monsters, Hinata out
+      st.lvl = 30; st.skills.solarFlare = 3; st.skills.skippingSun = 1; st.skills.littleSun = 1; G.actions.recompute(); G.state.flags.burrowTut = true;
+      G.enterDungeon(3); await until(() => G.mode === 'dungeon' && !G.ui?.iris?.active && G.dungeon?.monsters?.length, 15000);
+      const foe = G.combat.nearest(P.pos, 'ally', 60, e => e.team === 'enemy' && !e.breakable);
+      if (foe) { P.setPos(foe.pos.x - 3, foe.pos.z); P.pos.y = G.world.heightAt(P.pos.x, P.pos.z); }
+      const life0 = foe?.life ?? 0;
+      G.skills.cds = {}; st.zoom = null; r.flare = G.skills.tryCast('solarFlare', foe ? foe.pos.clone() : at(), foe);
+      r.flareHit = await until(() => foe && (foe.life < life0 || !foe.alive), 3000);
+      await until(() => !P.anim.action, 2000);
+      G.skills.cds = {}; st.zoom = null; r.sun = G.skills.tryCast('littleSun', P.pos.clone(), null) && await until(() => (G.skills.stlSuns || []).some(x => x.alive), 3000);
+      await until(() => !P.anim.action, 2000);
+      G.heroes.cd = 0; r.switch = G.heroes.switchTo('chewy', { quiet: true });
+      await until(() => G.state.activeHero === 'chewy' && !G.heroSwitching, 6000);
+      r.after = G.state.activeHero; r.cleared = !(G.skills.stlSuns || []).some(x => x.alive);
       return r;
     });
   }
@@ -264,7 +301,7 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
   const regionId = label.startsWith('region:') ? label.slice(7) : null;
   if (regionId) { // every outdoor region in the bundle (docs/REGIONS.md): built, populated, with its own boss (or its dungeon gate)
     await page.waitForFunction(() => window.G?.dungeon?.isRegion && !window.G.ui?.iris?.active, null, { timeout: 30000 }).catch(() => errs.push('region never loaded'));
-    s.region = await page.evaluate(() => ({ id: window.G.dungeon?.regionId, monsters: window.G.dungeon?.monsters?.length || 0, boss: !!window.G.dungeon?.boss, gate: !!window.G.dungeon?.gate }));
+    s.region = await page.evaluate(() => ({ id: window.G.dungeon?.regionId, monsters: window.G.dungeon?.monsters?.length || 0, boss: !!window.G.dungeon?.boss, gate: !!window.G.dungeon?.gate, glb: window.__enemyModels?.() || [] }));
     if (regionId === 'onsen') { // since Z-H3 Foosy arrives in Blossom Hollow (docs/GOLDEN.md §5): the old scene at the big spring never plays (his scene in town: the arrival case)
       await new Promise(q => setTimeout(q, 4000));
       s.region.gld = await page.evaluate(() => { const S = window.G.heroes.gldJoin, k = S.knight; return { state: S.state, vis: !!k?.visible }; });
@@ -272,7 +309,7 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
   }
   // (a zone whose boss moved into its dungeon has the dungeon gate at the trail's end instead: docs/ZONES.md §8.2)
   const rg = s.region?.gld, gldSceneOk = regionId !== 'onsen' || (rg?.state === 'off' && !rg.vis);
-  const regionOk = !s.region || (s.region.id === regionId && s.region.monsters >= 10 && (s.region.boss || s.region.gate) && gldSceneOk);
+  const regionOk = !s.region || (s.region.id === regionId && s.region.monsters >= 10 && (s.region.boss || s.region.gate) && gldSceneOk && ({ bamboo: ['takenoko', 'kodama', 'kamaitachi'], maple: ['kuri', 'kakashi', 'kakashi_crow', 'momiji-wisp'], tidepool: ['kappa', 'heikegani', 'kurage'], onsen: ['yukiwarashi', 'yukidaruma', 'tsurara'] }[regionId] || []).every(f => s.region.glb.includes(f))); // (the Blender enemies in the bundle: ROADMAP EN-1)
   const zoneId = label.startsWith('zone:') ? label.slice(5) : null;
   if (zoneId) { // a zone dungeon in the bundle (docs/ZONES.md §8.2): its cave kit, a dense floor, the arena with its boss
     s.zone = await page.evaluate(async id => {
@@ -372,7 +409,7 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
       return r;
     });
   }
-  if (label === 'arrival') { // ROADMAP Z-H3 in the bundle (actors/arrivals.js, poeJoin.js, shihtzuJoin.js, kaizoArrive.js, goldenJoin.js, sceneStage.js; docs/ZONES.md §3.1): the Bamboo open, Poe arrives in town: she tails you round the plaza (her baked rig), the scene's view of the scenery is built, the sneeze and the staging, the dialogue and her plea, she joins and her quest's card opens; then Floofy kneels on the Shrine Road by his lanterns (his baked rig), Captain Kaizo's boat comes ashore, and Foosy marches in to guard the fountain (his baked rig and the Blender lance) and plays to the end: the vow, the ball, the whelp, his plea, he joins, his card
+  if (label === 'arrival') { // ROADMAP Z-H3 in the bundle (actors/arrivals.js, poeJoin.js, shihtzuJoin.js, stellaJoin.js + kaizoArrive.js, goldenJoin.js, sceneStage.js; docs/ZONES.md §3.1): the Bamboo open, Poe arrives in town: she tails you round the plaza (her baked rig), the scene's view of the scenery is built, the sneeze and the staging, the dialogue and her plea, she joins and her quest's card opens; then Floofy kneels on the Shrine Road by his lanterns (his baked rig), Captain Kaizo's boat comes ashore with Stella in its bow, and Foosy marches in to guard the fountain (his baked rig and the Blender lance) and plays to the end: the vow, the ball, the whelp, his plea, he joins, his card
     s.arrival = await page.evaluate(async () => {
       const G = window.G, sl = ms => new Promise(q => setTimeout(q, ms)), r = {}, J = G.heroes.poeJoin, P = G.player, F = G.world.landmarks.fountain;
       G.sim.tickT = -1e9; G.state.quests.active = G.state.quests.active.filter(q => q.id !== 'welcome'); G.state.quests.cards = []; G.state.flags.hints = { all: true, scavDig: 1, travel: 1 };
@@ -406,8 +443,8 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
       past('bamboo', 'hq_takemori'); G.state.player.lvl = 26; G.actions.recompute(); Q.cards = [];
       const S1 = G.heroes.stzJoin; r.stz = (await wait(() => S1.state === 'kneel' && S1.lanterns.length === 3, 600)) ? (S1.knight?.rig?.model || 'kit') : null;
       S1.reset(true); past('maple', 'hq_akane', 'shihtzu');
-      const S2 = G.heroes.kaizoArrive; r.kaizo = await wait(() => S2.state === 'land' && !!S2.boat?.parent && !!S2.kaizo?.visible, 600);
-      S2.reset(true); past('tidepool', 'hq_shiokaze');
+      const S2 = G.heroes.stlJoin; r.kaizo = await wait(() => S2.state === 'land' && !!S2.boat?.parent && !!S2.kaizo?.visible && !!S2.stella?.visible, 600); // (Stella in the bow of Captain Kaizo's boat: stellaJoin.js)
+      S2.reset(true); past('tidepool', 'hq_shiokaze', 'stella');
       const S3 = G.heroes.gldJoin; await wait(() => S3.state === 'guard', 600); await sl(1500);
       const k3 = S3.knight; r.gld = { state: S3.state, model: k3?.rig?.model || null, glb: !!k3?.lance?.glb, act: k3?.anim.action?.name || null };
       if (k3) P.setPos(k3.pos.x + Math.sin(k3.facing) * 3.6, k3.pos.z + Math.cos(k3.facing) * 3.6);
@@ -521,12 +558,14 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
   const sz = s.shihtzu, stzOk = !sz || (sz.hero === 'shihtzu' && (!TOY_STZ || (s.model === 'shihtzu_toy' && sz.baked)) && (!STZ_FLAIL || (sz.flail === 'glb' && sz.links && sz.villager === 'glb')) && sz.chain && sz.wt === 'flail' && sz.dr >= 5 && sz.icons && sz.kit?.pups >= 2 && sz.kit.gp && sz.kit.lantern && sz.switch && sz.after === 'chewy');
   const gd = s.golden, gldOk = !gd || (gd.hero === 'golden' && (!TOY_GOLDEN || (gd.model === 'golden_toy' && gd.baked)) && (!GLD_PROPS || (gd.lance && gd.villager)) && gd.wt === 'lance' && gd.shadowLife >= 20
     && gd.whelp && (!WHELP || (gd.whelpModel === 'shadow_whelp' && gd.wings)) && gd.flying && gd.icons && gd.thrust && gd.dart && gd.javelin && gd.landed && gd.jump && gd.air && gd.crash && gd.breath && gd.puffed && gd.charged && gd.switch && gd.after === 'chewy' && gd.whelpOff);
+  const sl = s.stella, stlOk = !sl || (sl.hero === 'stella' && (!TOY_STELLA || (sl.model === 'stella_toy' && sl.baked)) && (!STL_WAGASA || (sl.wagasa && sl.tassels >= 4)) && sl.wt === 'parasol' && sl.revive === 6
+    && sl.icons && sl.sweep && sl.ray && sl.light && sl.healed && sl.shell && sl.charged && sl.flare && sl.flareHit && sl.sun && sl.switch && sl.after === 'chewy' && sl.cleared);
   const dg = s.dig, digOk = !dg || (dg.nodes === 10 && dg.draws === 3 && dg.gathered && dg.nose && dg.dug && dg.perfect === 1);
   const ld = s.lead, leadOk = !ld || (ld.led && ld.setting === 1 && ld.plans === 1 && ld.prints > 3 && ld.ahead > 0.5 && ld.trail && /This way!/.test(ld.said) && ld.tracker === '0' && ld.stopped);
   const pc = s.peaceful, peaceOk = !pc || (pc.board && pc.cards >= 1 && pc.css === '760px' && pc.peace && pc.wild === 2 && pc.allWild && pc.edge && pc.glades >= 2 && pc.zoneBoard && (!pc.sight || pc.bounty));
   const gl = s.guild, guildOk = !gl || (gl.built && gl.model && gl.hachi && gl.css === '960px' && gl.cands === 3 && gl.hired && gl.out === 1 && gl.away && gl.back && gl.xp > 0 && gl.inTown);
   const cc = s.crewclear, crewOk = !cc || (cc.offered && cc.out === 1 && cc.result === 'success' && cc.crew === 1 && cc.cleared === 0 && cc.t1 === 1 && cc.maple && cc.fan === 1 && cc.ribbon && cc.stamp === '救' && cc.lit);
-  const cz = s.cozy, cozyOk = !cz || (cz.board && cz.css === '1010px' && cz.cards >= 6 && cz.out === 1 && cz.away && cz.back && /success|partial|setback/.test(cz.report) && cz.xp > 0 && cz.chip && cz.inTown && cz.card && cz.log >= 1 && cz.guides === 12);
+  const cz = s.cozy, cozyOk = !cz || (cz.board && cz.css === '1010px' && cz.cards >= 6 && cz.out === 1 && cz.away && cz.back && /success|partial|setback/.test(cz.report) && cz.xp > 0 && cz.chip && cz.inTown && cz.card && cz.log >= 1 && cz.guides === 13); // (13 since H-6: Meet Stella)
   const db = s.debug, debugOk = (label !== 'village' || s.noDebug) && (!db || (db.refused && db.on && db.chunk && db.tabs >= 10 && db.css === '760px' && db.coins === 1000 && db.used && db.closed));
   const pd = s.pad, padOk = !pd || (pd.dev === 'pad' && pd.moved > 1.5 && pd.glyphs >= 6 && pd.cursor && pd.cast >= 1 && pd.focus);
   const tc = s.touch, touchOk = !tc || (tc.dev === 'touch' && tc.on && tc.slots === 6 && tc.preset === 4 && tc.pr === 1 && tc.phone && tc.moved > 1 && tc.manifest && tc.burrow?.gone > 0 && tc.burrow.calls > 0 && tc.burrow2?.gone > 0 && tc.burrow2.calls > 0);
@@ -537,7 +576,7 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
   const av = s.arrival, arrivalOk = !av || (av.due === 'poe' && av.tail && (!TOY_POE || av.model === 'poe_toy') && av.view > 1000 && av.staged && av.speaker === 'Poe' && av.plea && av.joined && av.villager && av.card && av.title === 'Takemori Under Siege' && av.face && av.quest && av.rec === 'start'
     && !!av.stz && (!TOY_STZ || av.stz === 'shihtzu_toy') && av.kaizo && av.gld?.state === 'guard' && (!TOY_GOLDEN || av.gld.model === 'golden_toy') && (!GLD_PROPS || av.gld.glb) && av.gldBall && av.gldPlea && av.gldJoined && av.gldCard);
   const qm = s.quest, questOk = !qm || (qm.card && qm.title === 'The King of Squish' && qm.face && qm.chips === 4 && qm.css && qm.goH >= 40 && qm.closed && qm.lead === 'king' && /festival mochi/.test(qm.thanks || '') && qm.stamp && qm.stampCss && qm.kingDone && qm.next === 'A Shrine for Wishes' && qm.place === 'Floor 1 of 2 · Find the stairs down to floor 2' && qm.placeCss && !qm.area && qm.sting);
-  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && questOk && arrivalOk && densOk && portalOk && ttOk && chgOk && debugOk && cozyOk && crewOk && guildOk && peaceOk && digOk && leadOk && fishOk && mokaOk && padOk && touchOk && deckOk && poeOk && stzOk && gldOk && regionOk && zoneOk && homeOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!CHEWY_MODEL || s.model === CHEWY_MODEL) && (!SAMURAI_CHEWY || s.saya) && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
+  const ok = s.ui > 0 && s.hasUI && s.audio && !errs.length && questOk && arrivalOk && densOk && portalOk && ttOk && chgOk && debugOk && cozyOk && crewOk && guildOk && peaceOk && digOk && leadOk && fishOk && mokaOk && padOk && touchOk && deckOk && poeOk && stzOk && gldOk && stlOk && regionOk && zoneOk && homeOk && (label !== 'title' || s.title) && (label !== 'village' || (s.mode === 'village' && s.refinedRigs && s.disney && (!CHEWY_MODEL || s.model === CHEWY_MODEL) && (!SAMURAI_CHEWY || s.saya) && (!TOY_SHADOW || s.pet === 'shadow_toy') && (!TOY_ROSIE || s.rosie === 'rosie_toy'))) && (!regionId || s.mode === 'dungeon'); // Blender skins + the Disney Chewy shipped in public/rigs
   console.log(`${ok ? 'PASS' : 'FAIL'}  production ${label}: ${JSON.stringify(s)}${errs.length ? '\n   ' + [...new Set(errs)].slice(0, 8).join('\n   ') : ''}`);
   if (!ok) failed++;
   await page.close();

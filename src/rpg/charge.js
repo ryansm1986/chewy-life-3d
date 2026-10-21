@@ -18,6 +18,7 @@ import { SKILLS, skillRuntime } from './skills.js';
 import { poeCharge } from './chargePoe.js';
 import { shihtzuCharge } from './chargeShihtzu.js';
 import { goldenCharge } from './chargeGolden.js';
+import { stellaCharge } from './chargeStella.js';
 
 export const GRACE = 0.18;
 export const SLOW = 0.45;
@@ -425,6 +426,8 @@ Object.assign(C, poeCharge({ STAGES, QUICK, FOCUS, SPLIT, WIDE, ECHO, UNIQUE, se
 Object.assign(C, shihtzuCharge({ STAGES, QUICK, FOCUS, SPLIT, WIDE, ECHO, UNIQUE, set, STAGE_MULT, by, r1, r2, pct, x }));
 // =================================================================== FOOSY THE DRAGOON (his 15 tables: rpg/chargeGolden.js, the same perk families)
 Object.assign(C, goldenCharge({ STAGES, QUICK, FOCUS, SPLIT, WIDE, ECHO, UNIQUE, set, STAGE_MULT, by, r1, r2, pct, x }));
+// =================================================================== STELLA THE SUN ORACLE (her 15 tables: rpg/chargeStella.js, the same perk families)
+Object.assign(C, stellaCharge({ STAGES, QUICK, FOCUS, SPLIT, WIDE, ECHO, UNIQUE, set, STAGE_MULT, by, r1, r2, pct, x }));
 
 for (const id in C) {
   const c = C[id]; c.id = id;

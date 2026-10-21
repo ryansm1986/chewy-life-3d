@@ -185,7 +185,7 @@ async function flow(V, v, say) {
   // a quest's closing talk step: the thank-you line, then the reward (Story.complete via markTalk)
   const turnIn = (st.quests.active || []).filter(q => { const d = ZONE_QUESTS[q.id], s = d?.steps[q.step]; return s?.type === 'talk' && s.npc === id; });
   // (and a quest that waits for them once its steps are done: a homeland quest they asked for in Blossom Hollow, Captain
-  //  Kaizo's "Trouble at Shiokaze Port": world/heroQuests.js)
+  //  an old save's Captain Kaizo's "Trouble at Shiokaze Port", from before Stella came: world/heroQuests.js heroQuestGiver)
   const waits = (G.story?.handInsFor?.(id) || []).filter(h => h.q.handIn && !ZONE_QUESTS[h.q.id]);
   if (turnIn.length || waits.length) { // (the hand-in: their happy hop, the thank-you, the reward from their paws, the stamp: docs/QUESTS.md §4)
     if (G.questMoments?.handInScene) { await G.questMoments.handInScene(v, [...turnIn.map(q => ({ q, d: ZONE_QUESTS[q.id] })), ...waits], say); return; }
@@ -198,6 +198,10 @@ async function flow(V, v, say) {
   const seen = (V.Z.quests.met ||= {});
   const intro = !seen[id] && lines(id, 'saved0');
   if (intro) { seen[id] = day; await say(intro); }
+  // Captain Kaizo at his lookout once Stella's quest is done (hers: her arrival, or her quest started for her, started it;
+  // not his own from an old save): she told him all about it (docs/STELLA.md §6.1)
+  const tide = st.flags.arrivals?.tidepool;
+  if (id === 'sk_kaizo' && !seen.stellaTold && st.quests.done.includes('hq_shiokaze') && tide?.by === 'stella' && (tide.quest === 'start' || tide.how === 'old')) { seen.stellaTold = day; await say(['Stella told me everything. Twice. The second time with zoomies.']); }
   // an offer
   const offers = offersFor(st, id, V.saved);
   if (offers.length) {
@@ -301,16 +305,16 @@ const SERVICES = {
     label: b => `Train at the ${b.name} 🥷`,
     async run(V, b, say) {
       const G = V.G, A = G.actions, P = G.state.player, lvl = P.lvl || 1;
-      const respecCost = 40 + lvl * 25, trainCost = 60 + lvl * 20, trained = V.Z.quests.trained === (G.day?.day || 1);
+      const trainCost = 60 + lvl * 20, trained = V.Z.quests.trained === (G.day?.day || 1);
       const c = await say(['Three lessons I teach: forgetting, practising, and dressing like you mean it.'], [
-        { text: `Forget and relearn (refund every point) — ${respecCost} coins` },
+        { text: 'Forget and relearn (every point back) — free!' }, // (free, like the Character screen's Start over: docs/STATS.md §4)
         { text: trained ? 'Spar (come back tomorrow)' : `Spar with the sensei (experience) — ${trainCost} coins` },
         { text: 'Ninja gear 🗡️' }, { text: 'Not today' }]);
       if (c === 0) {
-        if (!A.spendCoins(respecCost)) { Events.emit('sfx', 'ui_error'); return say(['Even forgetting has a price, little one. Come back with more coins.']); }
         const r = A.respec(); Events.emit('sfx', 'ui_levelup');
         G.vfx?.sparkle?.(G.player.pos.clone().setY(G.player.pos.y + 1), { n: 24, color: '#b8a8ff', r: 0.8 });
-        await say([`Breathe out… and let it go. (${r.statPts} stat and ${r.skillPts} skill points returned — press C and K to spend them anew.)`]);
+        const auto = G.state.player.autoStats !== false;
+        await say([`Breathe out… and let it go. (${r.skillPts} skill points back: press K to learn anew. ${auto ? 'Shadow has placed your stat points again.' : `${r.statPts} stat points back: press C to spend them.`})`]);
       } else if (c === 1 && !trained) {
         if (!A.spendCoins(trainCost)) { Events.emit('sfx', 'ui_error'); return say(['Sparring costs bruises AND coins. Bring the coins.']); }
         V.Z.quests.trained = G.day?.day || 1;

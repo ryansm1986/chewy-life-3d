@@ -12,9 +12,12 @@
 import * as THREE from 'three';
 import { assemble, mdef, act, tele, hitArea, roll, sfx, puff, playerIn, chill, ell, tubeC, blob, cheeks, paint, V, col, INK } from '../../regions/monsters/bamboo.js';
 import { rand, clamp, TAU, ease } from '../../core/util.js';
+import { enemySpec, enemyPivot } from '../../regions/monsters/enemyModels.js';
 
 const YR = { RISE: 0.95, WIND: 0.55, R: 1.35, BOO: 0.45, FLOAT: 0.3 };
 const R0 = 0.3, CY = 0.56; // the head dome's radius and centre height (model space, before the float)
+/** a soft, matte cloth (no plastic sheen); the flame's very pale cyan vertices glow */
+const YUREI_MAT = () => ({ fragOut: 'outgoingLight += diffuseColor.rgb * 1.15 * step(0.85, diffuseColor.g) * step(0.85, diffuseColor.b) * step(diffuseColor.r, 0.9);', rim: 0.3, brush: 0.05, term: [-0.12, 0.42], shadowSat: 0.45 });
 function yureiSpec(v) {
   const white = col(v.sheet), shade = col(v.shade), hem = col(v.hem);
   const B = [];
@@ -62,15 +65,14 @@ function yureiSpec(v) {
   // the hitodama: a ball of spirit fire, cyan and glowing (the material's fragOut lights the cyan vertices); its wispy tail
   // is a trail of glow motes the def's update() leaves behind it round the orbit
   const flame = [ell(0.06, 0.066, 0.06, '#9ff4ff', [0, 0, 0], [0, 0, 0], 12), ell(0.035, 0.038, 0.035, '#d8ffff', [0, 0.008, 0.012], [0, 0, 0], 10)];
-  const glow = 'outgoingLight += diffuseColor.rgb * 1.15 * step(0.85, diffuseColor.g) * step(0.85, diffuseColor.b) * step(diffuseColor.r, 0.9);';
-  return { mat: { fragOut: glow, rim: 0.3, brush: 0.05, term: [-0.12, 0.42], shadowSat: 0.45 }, outline: 0.02, parts: [ // (a soft, matte cloth: no plastic sheen)
+  return { mat: YUREI_MAT(), outline: 0.02, parts: [
     { name: 'body', geo: B },
     { name: 'armL', geo: arm(1), at: [0.22, 0.47, 0.06] }, { name: 'armR', geo: arm(-1), at: [-0.22, 0.47, 0.06] },
     { name: 'flame', geo: flame, outline: 0, shadow: false, parent: 'pivot' },
   ] };
 }
 function buildYurei(v) {
-  const M = assemble('yurei:' + v.key, () => yureiSpec(v));
+  const M = assemble('yurei:' + v.key, () => enemySpec('yurei', v.key, YUREI_MAT(), { outline: 0.02, parent: { flame: 'pivot' }, part: { flame: { outline: 0, shadow: false } } }) || yureiSpec(v)); // (the Blender model: ROADMAP EN-1)
   const I = M.inner, aL = M.g.armL, aR = M.g.armR, fl = M.g.flame;
   M.variant = v;
   const ph = rand(0, TAU);

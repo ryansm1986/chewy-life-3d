@@ -116,10 +116,37 @@ export const HERO_MODELS = {
   goldenToy: { file: 'golden_toy', name: 'Foosy', outline: '#3a2212', earGain: 0.5, wave: 'out', palm: [-0.0405, -0.0288, 0.0029], back: [0, 0.1, -0.3],
     warmGrade: [0.15, 6, 8, 18, 18, 36], warmCap: 1.05,
     lanceMount: { pos: [0.17, 0.63, -0.43], quat: [-0.0277, 0.0114, 0.38, 0.9245], bone: 'chest', scale: 1 } },
+  // the Toybox Weimaraner tide healer, Stella (docs/STELLA.md §8; tools/blender/work/codex/stella-toy, the toybox-character
+  // skill, Opus builder; sheet C2, blue eyes; since the owner's 2026-10-13 review the Sun Oracle, her robe recoloured to
+  // sunrise colours): the 37-bone biped rig public/rigs/stella_toy.*, the big back bow and the pearls baked in, her
+  // parasol (a sun wagasa, replacing the jellyfish one) a separate prop (public/models/stella-parasol.glb:
+  // actors/stellaGear.js). lidTilt: her eyes face 32° outward, so the lids hinge about each eye's own tilted axis
+  // (animator.js lidTurn; without it the lids turn about world X, which the rig isn't built for); the default squint
+  // (+0.488 / −0.24: her lids are sized for it); earGain 0.8 (her long floppy ears, the builder's swing); wave 'front';
+  // sitThigh −1.0 keeps the scalloped hems from flaring into rings in the sit (as the samurai's hakama). palm: the right
+  // mitten's grip centre off hand_R (prop_mount.rig.json palms.R palm_offset_in_hand_frame_game; the left mirrors it).
+  // back: a spot between her shoulder blades above the bow (the generic weapon fallbacks only). parasolMount: the
+  // parasol's over-the-shoulder carry when her arm swings free (prop_mount.rig.json carry_over_shoulder.or_on_chest:
+  // model space, game axes, like lanceMount; the shaft on her right shoulder, the canopy behind and above her head).
+  // The coat: her silver-grey fur (#A9A6A2) keeps its colour in the game's light, but where it falls into shade (the
+  // insides of her long ears, under her chin) the grade's lift (post.js uLift) turned it plum, and her nose wine-magenta.
+  // darkFur alone (no darkNeutral: nothing of hers is black cloth) counters the lift on her lit darks, so the shade reads
+  // a neutral grey and the nose brown; the gated darkGrade with no offset only turns that pass on. whiteCap (as the Shih
+  // Tzu's): under the Burrow's warm key light her pale sash and hems, pearls and the lit fur blew out to salmon and
+  // cream; it holds them under their own colour. Measured in game:
+  // docs/STELLA.md §8.
+  stellaToy: { file: 'stella_toy', name: 'Stella', outline: '#2c2f3a', earGain: 0.8, lidTilt: 0.5585, wave: 'front', anim: { sitThigh: -1.0 },
+    palm: [-0.03976, -0.03183, 0.0025], back: [0, 0.05, -0.17], darkGrade: [0, 0, 0, 0, 0.04], darkFur: 1, whiteCap: 1,
+    parasolMount: { pos: [-0.37931, 0.56792, 0.17561], quat: [-0.421275, 0.170075, 0.333494, 0.826065], bone: 'chest', scale: 1 } },
   // Shadow in his dragon whelp outfit (tools/blender/codex/assets/shadow-whelp: a re-dress of shadow_toy, the same quad
   // skeleton and face; ROADMAP H-5): worn only while the dragoon is the active hero (actors/whelp.js swaps it in with a
   // poof). earDamp: his own ears come up through slits in the hood, so their spring swing is held to this fraction (the
   // flight damps it further); the wings are props (public/models/shadow-whelp-wing.glb) flapped by whelp.js.
+  // the Toybox enemies rigged like the heroes (ROADMAP EN-1; tools/blender/codex/assets/<id>-toy): dungeon/monsters.js builds
+  // them in place of the kit humanoids when loaded (BUILD.tanuki / BUILD.tamamo)
+  tanukiBandit: { file: 'tanuki_toy', name: 'Tanuki Bandit', outline: '#2a1a16', earGain: 1.0, palm: [-0.042, -0.05, 0.006], back: [0, 0.08, -0.2] },
+  tanukiBanditMaroon: { file: 'tanuki_toy_maroon', name: 'Tanuki Bandit', outline: '#2a1a16', earGain: 1.0, palm: [-0.042, -0.05, 0.006], back: [0, 0.08, -0.2] },
+  tamamo: { file: 'tamamo_toy', name: 'Tamamo', outline: '#2a1a3a', earGain: 0.5, lidTilt: 0.5236, palm: [-0.04, -0.05, 0.006], back: [0, 0.08, -0.2] }, // (lidTilt: her eyes face 30° outward)
   shadowWhelp: { file: 'shadow_whelp', name: 'Shadow', outline: '#1c181e', earGain: 0, earDamp: 0.6, sitDrop: 0.08, darkGrade: [1, -4, 14, -9] },
 };
 
@@ -163,7 +190,7 @@ export const toyHeroes = (m = chewyModel()) => m === 'samurai' || m === 'toy';
 // The Toybox heroes, and the samurai Chewy falling back to the Toybox one (chewy_b). Never a Storybook model on the
 // Toybox cast: a hero whose Toybox rig is missing or still loading plays its kit build (Toybox style) instead. Only
 // ?chewymodel=disney reaches the Storybook models.
-const TOY = { chewy: 'chewyToy', moka: 'mokaToy', poe: 'poeToy', shihtzu: 'shihtzuToy', golden: 'goldenToy' };
+const TOY = { chewy: 'chewyToy', moka: 'mokaToy', poe: 'poeToy', shihtzu: 'shihtzuToy', golden: 'goldenToy', stella: 'stellaToy' };
 const cfgFor = id => (id === 'chewy' && chewyModel() === 'samurai' ? ['chewySamurai', 'chewyToy'] : TOY[id] && toyHeroes() ? [TOY[id]] : [id])
   .map(k => HERO_MODELS[k]).filter(c => c && !c.pending); // (a hero with no model, or one still pending, plays its kit)
 
@@ -372,9 +399,10 @@ export function buildHeroModel(id, spec = null) {
   const fumaMount = !quad && cfg.fumaMount ? propMount('fumaMount', cfg.fumaMount, B, abs, S) : null; // (Poe's fūma on her back: see HERO_MODELS)
   const flailMount = !quad && cfg.flailMount ? propMount('flailMount', cfg.flailMount, B, abs, S) : null; // (the Shih Tzu's flail on his back: shihtzuGear.js)
   const lanceMount = !quad && cfg.lanceMount ? propMount('lanceMount', cfg.lanceMount, B, abs, S) : null; // (the dragoon's lance on his back: goldenGear.js)
+  const parasolMount = !quad && cfg.parasolMount ? propMount('parasolMount', cfg.parasolMount, B, abs, S) : null; // (Stella's parasol over her shoulder: stellaGear.js)
   root.updateMatrixWorld(true);
 
-  const dg = OFF_DARK ? null : cfg.darkGrade, gated = dg?.[4] != null, fg = gated && cfg.furGrade, neutral = gated && cfg.darkNeutral, wc = cfg.whiteCap, wg = OFF_DARK ? null : cfg.warmGrade;
+  const dg = OFF_DARK ? null : cfg.darkGrade, gated = dg?.[4] != null, fg = gated && cfg.furGrade, neutral = gated && (cfg.darkNeutral || cfg.darkFur), wc = cfg.whiteCap, wg = OFF_DARK ? null : cfg.warmGrade;
   const v4 = a => new THREE.Vector4(a[0], a[1] / 255, a[2] / 255, a[3] / 255);
   const pars = dg ? ['uniform vec4 uDarkGrade;', gated && 'float cDark = 0.0;', fg && 'uniform vec4 uFurGrade;', neutral && 'uniform vec3 uGradeLift;\nuniform float uDarkNeutral;\nuniform float uDarkLift;\nuniform float uDarkFur;'] : [];
   if (wc) pars.push('uniform float uWhiteCap;');
@@ -388,7 +416,7 @@ export function buildHeroModel(id, spec = null) {
     ...(outs.length && { fragOut: outs.join('\n') }),
     uniforms: {
       ...(dg && { uDarkGrade: { value: v4(dg) } }), ...(fg && { uFurGrade: { value: v4(fg) } }),
-      ...(neutral && { uDarkNeutral: { value: cfg.darkNeutral }, uDarkLift: { value: 1 }, uDarkFur: { value: cfg.darkFur ?? 0 } }),
+      ...(neutral && { uDarkNeutral: { value: cfg.darkNeutral || 0 }, uDarkLift: { value: 1 }, uDarkFur: { value: cfg.darkFur ?? 0 } }),
       ...(wc && { uWhiteCap: { value: wc } }),
       ...(wg && { uWarmGrade: { value: v4(wg) }, uWarmHue: { value: new THREE.Vector2(wg[4] ?? 18, wg[5] ?? 36) }, uWarmCap: { value: cfg.warmCap ?? 0 } }),
     },
@@ -417,7 +445,7 @@ export function buildHeroModel(id, spec = null) {
   } : {
     body: B.spine, head: B.head, armL: B.upperarm_L, armR: B.upperarm_R, handL: palm('handL'), handR: palm('handR'),
     foreL: B.forearm_L, foreR: B.forearm_R, wristL: B.hand_L, wristR: B.hand_R, saya, // (elbows / wrists: the samurai cuts bend them; animator.js)
-    legL: B.thigh_L, legR: B.thigh_R, earL: B.ear_L, earR: B.ear_R, tail: B.tail1, back, hatAnchor, wave: cfg.wave, anim: cfg.anim, fumaMount, flailMount, lanceMount,
+    legL: B.thigh_L, legR: B.thigh_R, earL: B.ear_L, earR: B.ear_R, tail: B.tail1, back, hatAnchor, wave: cfg.wave, anim: cfg.anim, fumaMount, flailMount, lanceMount, parasolMount,
     jaw: B.jaw, lids: [B.lidU_L, B.lidU_R], lidsLow: [B.lidD_L, B.lidD_R], lips: [B.lip_L, B.lip_R], eyes: [], brows: [],
     eyeballs: [B.eye_L, B.eye_R],
   };

@@ -17,6 +17,7 @@ import { MOKA_TREES, MOKA_SKILLS } from './skillsMoka.js';
 import { POE_TREES, POE_SKILLS } from './skillsPoe.js';
 import { SHIHTZU_TREES, SHIHTZU_SKILLS } from './skillsShihtzu.js';
 import { GOLDEN_TREES, GOLDEN_SKILLS } from './skillsGolden.js';
+import { STELLA_TREES, STELLA_SKILLS } from './skillsStella.js';
 
 export const MAX_SKILL_LVL = 20;
 export const ROW_REQ = [1, 6, 12, 18, 24, 30];
@@ -30,6 +31,7 @@ export const TREES = [
   ...POE_TREES,
   ...SHIHTZU_TREES,
   ...GOLDEN_TREES,
+  ...STELLA_TREES,
 ];
 export const treesFor = cls => TREES.filter(t => (t.cls || 'chewy') === (cls || 'chewy'));
 
@@ -318,6 +320,8 @@ for (const id in POE_SKILLS) { if (DEFS[id]) throw new Error(`skill id clash: ${
 for (const id in SHIHTZU_SKILLS) { if (DEFS[id]) throw new Error(`skill id clash: ${id}`); DEFS[id] = SHIHTZU_SKILLS[id]; }
 // the Golden Retriever dragoon's skills live in skillsGolden.js (same format; docs/GOLDEN.md)
 for (const id in GOLDEN_SKILLS) { if (DEFS[id]) throw new Error(`skill id clash: ${id}`); DEFS[id] = GOLDEN_SKILLS[id]; }
+// Stella the Sun Oracle's skills live in skillsStella.js (same format; docs/STELLA.md)
+for (const id in STELLA_SKILLS) { if (DEFS[id]) throw new Error(`skill id clash: ${id}`); DEFS[id] = STELLA_SKILLS[id]; }
 
 /** Bind info/params so they also work when destructured (no reliance on `this`). */
 function bindDef(d) {
@@ -348,6 +352,7 @@ export const ATTACK = bindDef({
     if (d && d.weaponType === 'staff') return { dmgPct: 100, speed: 15, range: 11, pierce: 0, returns: false, projectile: true, bolt: true }; // Moka: a free little sparkle bolt
     if (d && d.weaponType === 'flail') return { dmgPct: 95 * (1 + ((d.treeDmgPct && d.treeDmgPct.flail) || 0) / 100), radius: 2.2, arc: 150, knockback: 0.4, projectile: false, flail: true }; // the Shih Tzu: heavy flail swings (a three-swing combo, the last an overhead slam: combat/shihtzuSkills.js)
     if (d && d.weaponType === 'lance') return { dmgPct: 100 * (1 + ((d.treeDmgPct && d.treeDmgPct.lance) || 0) / 100), radius: 2.75, width: 0.5, arc: 150, sweepRadius: 2.55, knockback: 0.3, projectile: false, lance: true }; // the dragoon: the reach combo (two long thrusts, then a sweeping swat: combat/goldenSkills.js)
+    if (d && d.weaponType === 'parasol') return { dmgPct: 100 * (1 + ((d.treeDmgPct && d.treeDmgPct.ray) || 0) / 100), radius: 2.6, arc: 90, ringRadius: 2.2, ringMul: 1.1, knockback: 0.3, projectile: false, parasol: true, element: 'fire' }; // Stella: the Sunsweep (two sweeps throwing crescents of sunlight, then a twirl's ring of light: combat/stellaSkills.js)
     if (d && d.weaponType === 'fuma') return { dmgPct: 80 * (1 + ((d.treeDmgPct && d.treeDmgPct.shuriken) || 0) / 100), radius: 1.9, arc: 130, knockback: 0.25, projectile: false, fuma: true }; // Poe: quick one-paw fūma slashes (a three-hit combo, combat/poeSkills.js)
     return { dmgPct: 100, radius: 1.8, arc: 110, knockback: 0.25, projectile: false };
   },
@@ -356,6 +361,7 @@ export const ATTACK = bindDef({
     if (p.fuma) return [`Damage: ${pct(p.dmgPct)} weapon damage${dmgRange(p.dmgPct, d)}`, 'Quick fūma slashes: a three-hit combo'];
     if (p.flail) return [`Damage: ${pct(p.dmgPct)} weapon damage${dmgRange(p.dmgPct, d)}`, 'Heavy flail swings: a three-swing combo, the last an overhead slam'];
     if (p.lance) return [`Damage: ${pct(p.dmgPct)} weapon damage${dmgRange(p.dmgPct, d)}`, `Long lance pokes: two thrusts reaching ${p.radius} m, then a sweeping swat`];
+    if (p.parasol) return [`Damage: ${pct(p.dmgPct)} weapon damage${dmgRange(p.dmgPct, d)} fire`, `The Sunsweep: two sweeps that throw crescents of sunlight ${p.radius} m, then a twirl's ring of light (${p.ringRadius} m)`];
     return [`Damage: 100% weapon damage${dmgRange(100, d)}`, p.bolt ? 'A sparkly magic bolt from your staff' : p.projectile ? 'Thrown — bounces back to you' : 'Katana cuts: a three-cut combo, then a flourish'];
   },
 });
@@ -434,7 +440,7 @@ export function usable(id, state, derived, curZoom) {
   if (id !== 'attack' && effectiveLevel(id, state, derived) <= 0) return { ok: false, why: 'Not learned' };
   if (d.cls && state.player?.cls && d.cls !== state.player.cls) return { ok: false, why: 'Not your skill!' };
   if (d.training) return { ok: false, why: 'Still in training!' };
-  if (d.wep && derived && derived.weaponType !== d.wep) return { ok: false, why: d.wep === 'sword' ? 'Needs a Bone Katana (X to swap)' : d.wep === 'staff' ? 'Needs a staff' : d.wep === 'fuma' ? 'Needs a fūma' : d.wep === 'flail' ? 'Needs a flail' : d.wep === 'lance' ? 'Needs a lance' : 'Needs a Ball (X to swap)' };
+  if (d.wep && derived && derived.weaponType !== d.wep) return { ok: false, why: d.wep === 'sword' ? 'Needs a Bone Katana (X to swap)' : d.wep === 'staff' ? 'Needs a staff' : d.wep === 'fuma' ? 'Needs a fūma' : d.wep === 'flail' ? 'Needs a flail' : d.wep === 'lance' ? 'Needs a lance' : d.wep === 'parasol' ? 'Needs a wagasa' : 'Needs a Ball (X to swap)' };
   const lvl = effectiveLevel(id, state, derived);
   const zoom = curZoom != null ? curZoom : (state.player.zoom == null ? (derived ? derived.zoomMax : 1e9) : state.player.zoom);
   if (d.kind !== 'channel' && zoom < skillCost(d, lvl, derived)) return { ok: false, why: 'Not enough zoom!' };

@@ -19,6 +19,7 @@ import { makeToon, makeOutline, U as SHARED_U } from '../../gfx/materials.js';
 import { Events } from '../../core/events.js';
 import { dampAngle, angleDiff } from '../../core/util.js';
 import { tenguFx, TENGU_COL } from './fx_tengu.js';
+import { enemyParts, enemyMarker } from '../monsters/enemyModels.js';
 import { roll, hitWhere, pushPlayer, summonAdds, pickId, sfx, arenaOf, clamp, rand, TAU, ease, F } from './kitA.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -67,6 +68,27 @@ function fanGeo() { // the hauchiwa: hawk feathers fanned round a gold boss, on 
   }
   P.push(ell(0.055, 0.055, 0.022, PAL.gold, [base.x, base.y, base.z + 0.012], [0, 0, 0], 14), ell(0.03, 0.03, 0.02, PAL.handle, [base.x, base.y, base.z + 0.026], [0, 0, 0], 10));
   return merge(P);
+}
+/** a Blender model's part geometry (node-local, the part's pivot at its origin), or null */
+function glbGeo(P, n) { const g = P?.[n]?.geos; return g ? (g.length === 1 ? g[0].clone() : merge(g.map(x => x.clone()))) : null; }
+/** swap a mesh's geometry, and its ink hull's (the sibling mesh sharing it) */
+function swapGeo(mesh, geo) {
+  if (!mesh || !geo) return;
+  const old = mesh.geometry;
+  for (const c of mesh.parent.children) if (c.isMesh && c.geometry === old) c.geometry = geo;
+  old.dispose();
+}
+const firstMesh = g => g.children.find(c => c.isMesh);
+/** the Blender Master Tengu (ROADMAP EN-1; tools/blender/codex/assets/tengu-master): the same parts on the same pivots as
+ *  the kit's, so only their geometry changes (and the fan tip marker) */
+function glbTengu(p) {
+  const P = enemyParts('tenguMaster', 0); if (!P) return;
+  swapGeo(p.body, glbGeo(P, 'body')); swapGeo(p.headMesh, glbGeo(P, 'head'));
+  swapGeo(firstMesh(p.jaw), glbGeo(P, 'jaw')); swapGeo(firstMesh(p.lids), glbGeo(P, 'lids'));
+  swapGeo(firstMesh(p.fanArm), glbGeo(P, 'fanArm'));
+  swapGeo(firstMesh(p.wings[0]), glbGeo(P, 'wingL')); swapGeo(firstMesh(p.wings[1]), glbGeo(P, 'wingR'));
+  const ft = enemyMarker('tenguMaster', 0, 'fanTip', null), fa = P.fanArm.at;
+  if (ft) p.fanTip.position.set(ft[0] - fa[0], ft[1] - fa[1], ft[2] - fa[2]);
 }
 function buildTengu(v) {
   const mat = makeToon({ vertexColors: true, objectBrush: true, brush: 0.1, rim: 0.7, term: [-0.02, 0.3], fragOut: TENGU_OUT + LUM_CAP });
@@ -155,6 +177,7 @@ function buildTengu(v) {
   const wings = [];
   for (const s of [-1, 1]) { const w = new THREE.Group(); w.position.set(s * 0.1, 0.63, -0.14); hover.add(w); add(w, wing(s)); wings.push(w); }
   lids.visible = false;
+  glbTengu({ body, headMesh, jaw, lids, fanArm, fanTip, wings });
   const pose = { hover: 0.3, bob: 0.05, flap: 1.1, flapAmp: 0.1, wingY: 1.2, wingZ: 0.0, fanX: 0, fanZ: 0, fanY: 0, head: 0, tilt: 0, jaw: 0, lean: 0, crouch: 0, spin: 0, laugh: 0, fanSelf: 0, lids: 0, rate: 7, hoverRate: 5, direct: -1 };
   const cur = { hover: 0.3, wingY: 1.2, wingZ: 0, fanX: 0, fanZ: 0, fanY: 0, head: 0, tilt: 0, jaw: 0, lean: 0, crouch: 0, flapA: 0.1, flapF: 1.1, ph: 0, spinA: 0 };
   const scale = 2.3;
@@ -211,6 +234,8 @@ function buildKozo(v) { // a crow-tengu disciple: small, round, fierce, with fla
     const wg = merge([ell(0.14, 0.05, 0.03, PAL.feather, [s * 0.1, 0, 0], [0, 0, s * 0.3], 12), ell(0.1, 0.035, 0.012, PAL.featherHi, [s * 0.2, -0.02, -0.01], [0, 0, -s * 0.2], 10)]);
     const wm = new THREE.Mesh(wg, mat); wm.castShadow = true; g.add(wm, new THREE.Mesh(wg, ol)); pivot.add(g); wings.push(g);
   }
+  { const K = enemyParts('karasuKozo', v.robe === '#dfe8f4' ? 1 : 0); // (the Blender disciple, ROADMAP EN-1)
+    if (K) { swapGeo(body, glbGeo(K, 'body')); swapGeo(firstMesh(wings[0]), glbGeo(K, 'wingL')); swapGeo(firstMesh(wings[1]), glbGeo(K, 'wingR')); } }
   const animate = (dt, t, moving, anim) => {
     const f = moving ? 14 : 6, a = Math.sin(t * f) * (moving ? 0.6 : 0.25) + (anim.wind > 0 ? 0.6 : 0);
     wings[1].rotation.set(0, 0.35, 0.2 + a); wings[0].rotation.set(0, -0.35, -(0.2 + a));

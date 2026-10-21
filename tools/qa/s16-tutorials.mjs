@@ -186,7 +186,7 @@ try {
   await sleep(page, 2400);
   const miss = { ...(await T()), phase: await G(() => window.G.life.fishing.s?.phase || null) };
   // (the housing guides, Make it home and Remodel, are listed too: tools/qa/s17-housing.mjs runs them; Hold to power up!: s19-charge; and Meet Poe: s20-poe)
-  R.check('the Guides tab lists all twelve (the first three done ✓) and replays one; a missed bite in the guide brings the fish back (no recast) with a kind word', gl.length === 12 && ['Two heroes', 'Home, sweet home', 'Fishing with Kero'].every(t => gl.some(x => /^done/.test(x) && x.endsWith(t))) && miss.step === 'wait' && miss.phase === 'wait' && /slow|back/i.test(miss.say), JSON.stringify({ gl, miss }));
+  R.check('the Guides tab lists all thirteen (the first three done ✓; Meet Stella since H-6) and replays one; a missed bite in the guide brings the fish back (no recast) with a kind word', gl.length === 13 && ['Two heroes', 'Home, sweet home', 'Fishing with Kero'].every(t => gl.some(x => /^done/.test(x) && x.endsWith(t))) && miss.step === 'wait' && miss.phase === 'wait' && /slow|back/i.test(miss.say), JSON.stringify({ gl, miss }));
   await clickSel('.to-skip'); await sleep(page, 400);
   const sk = await G(() => ({ active: window.G.tutorials.active, rec: window.G.state.flags.tutorials.fishing, tut: window.G.life.fishing.tut, dock: document.querySelector('.tut').classList.contains('on'), toast: window.QA.toasts.some(t => /Guide skipped/.test(t)) }));
   R.check('Skip ends the guide at once (normal fishing restored) and says where to replay it', !sk.active && sk.rec.skipped && sk.tut === null && !sk.dock && sk.toast, JSON.stringify(sk));

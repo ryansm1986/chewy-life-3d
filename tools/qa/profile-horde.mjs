@@ -100,6 +100,7 @@ async function run(world, hero) {
       moka: ['splash', 'tideMastery', 'bubble', 'shake', 'puddleHop', 'whirlpool', 'greatWave', 'kibble', 'starMastery', 'squeak', 'pawRune', 'moonbeam', 'constellation', 'meteor', 'duckDecoy', 'retriever', 'fetchLeash', 'feathers', 'duckCall', 'spiritRetriever', 'mallards'],
       poe: ['fumaThrow', 'shurikenMastery', 'kunaiFan', 'shadowStitch', 'whirlingFuma', 'shurikenRain', 'thousandStars', 'smokeBomb', 'ninjutsuMastery', 'puffBall', 'shadowClone', 'substitution', 'thunderPaw', 'smokeDragon', 'caltropFlip', 'phantomBarrage'],
       shihtzu: ['woefulWallop', 'weightOfWorld', 'tugOfWoe', 'maelstrom', 'ironTopknot', 'steadfastSulk', 'heaviestSigh', 'drippingPaw', 'lingeringGloom', 'grumbleCloud', 'caseOfMopes', 'grudgeLedger', 'mournfulAwoo', 'everlastingGloom', 'ghostPups', 'veryGoodGhosts', 'borrowedWarmth', 'boneWard', 'midnightReading', 'wayhomeLantern', 'grandpawsGhost'],
+      stella: ['goldenRay', 'innerLight', 'glint', 'prism', 'sunlit', 'solarRay', 'sundial', 'solarFlare', 'sunKissed', 'skippingSun', 'sunspot', 'sunburn', 'littleSun', 'risingSun', 'morningLight', 'sunnyDisposition', 'kindLight', 'halo', 'stlZoomies', 'sunDog', 'daybreak'],
       golden: ['sunbeamThrust', 'knightsVow', 'sunfallJump', 'pinwheelSweep', 'steadyPaws', 'gallantCharge', 'starfallLance', 'bonkDart', 'keenNose', 'tailwagVolley', 'trueFlight', 'goodRetriever', 'emberleafJavelin', 'sunshower', 'emberBreath', 'bestFriends', 'divebombSwoop', 'wingShield', 'warmHeart', 'mightyRoar', 'dragonHeart'] }[G.player.hero] || [];
     for (const id of tree) P.skills[id] = 10;
     G.actions.recompute(); P.life = null; P.zoom = null;
@@ -167,6 +168,10 @@ async function run(world, hero) {
       // javelins (a volley, the rain, an Emberleaf), the lance moves (the Jump, the pinwheel, the charge, the star)
       golden: ['dragonHeart', 'emberBreath', 'attack', 'divebombSwoop', 'sunbeamThrust', 'emberBreath', 'tailwagVolley', 'wingShield', 'sunshower', 'emberleafJavelin', 'attack', 'pinwheelSweep',
         'emberBreath', 'divebombSwoop', 'starfallLance', 'mightyRoar', 'trueFlight', 'sunfallJump', 'emberBreath', 'gallantCharge', 'bonkDart', 'divebombSwoop'],
+      // Stella's full kit (docs/STELLA.md §3): Hinata and the sun dog out, the gilding rays, a sunspot and the flares, the Sundial and the
+      // Rising Sun, the Dawn's heals and halos on her and Shadow, Daybreak
+      stella: ['littleSun', 'goldenRay', 'attack', 'solarFlare', 'prism', 'sunspot', 'sunDog', 'glint', 'attack', 'skippingSun', 'halo', 'goldenRay', 'risingSun', 'morningLight',
+        'kindLight', 'sundial', 'attack', 'solarFlare', 'daybreak', 'prism', 'goldenRay'],
     }[P.hero] || ['attack'];
     const BALL = new Set(['blaze', 'fetchstorm', 'multi', 'throw']);
     // TARGET=auto: the lock (padAim.update, every frame) and every cast's aim (autoAim.aimFor) are timed

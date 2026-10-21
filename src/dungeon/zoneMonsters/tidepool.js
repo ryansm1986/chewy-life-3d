@@ -18,6 +18,7 @@ import * as THREE from 'three';
 import { assemble, mdef, act, tele, hitArea, roll, sfx, puff, playerIn, ell, cyl, tubeC, blob, cheeks, eyesCute, smile, paint, take, give, bolt, V, col, INK } from '../../regions/monsters/bamboo.js';
 import { makeToon } from '../../gfx/materials.js';
 import { rand, clamp, TAU, ease } from '../../core/util.js';
+import { enemySpec, enemyPivot } from '../../regions/monsters/enemyModels.js';
 
 const SZ = { WAKE: 0.6, BRISTLE: 0.95, FIRE: 0.35, NSP: 8, SP_V: 9.5, SP_LEN: 7.5, SPIN_WIND: 0.8, SPIN_T: 0.95, SPIN_R: 2.2, SPIN_V: 1.8, DIZZY: 1.15 };
 const PI = Math.PI;
@@ -33,6 +34,8 @@ function shellAt(a, t, out = new THREE.Vector3()) {
   const R = shellR(t) * w * (1 - mouth), y = Y0 + t * HS;
   return out.set(Math.cos(a) * R, y, Math.sin(a) * R * 0.94 - (y - Y0) * 0.1);
 }
+/** the Hotaru shell's plankton glows: pale cyan vertex colours (high blue, red under 0.75) */
+const sazaeMat = v => ({ fragOut: v.glow ? 'outgoingLight += diffuseColor.rgb * 1.15 * step(0.85, diffuseColor.b) * step(diffuseColor.r, 0.75);' : '' });
 function sazaeSpec(v) {
   const shC = col(v.shell), bandC = col(v.band), darkC = col(v.shell).multiplyScalar(0.55), glowC = col('#9ff8ff');
   // the shell: whorl bands with a dark suture between them, a lighter crest on every whorl, a mottle, plankton spots
@@ -87,8 +90,7 @@ function sazaeSpec(v) {
   const lid = [lidG, lidF].map(g0 => { g0.scale(1, 0.86, 1); g0.rotateX(-0.2); g0.translate(0, 0.3, 0.39); return paint(g0, (p, n, o) => {
     const dx = p.x, dy = (p.y - 0.3) / 0.86, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx), sp = ((r * 15 - a / TAU + 9) % 1 + 1) % 1;
     o.set(v.lid).lerp(col('#fff4e0'), clamp(1 - r / 0.2) * 0.35); if (sp < 0.3 && n.z > 0.5) o.lerp(col('#8a6a4a'), 0.5); if (n.z < 0.5) o.multiplyScalar(0.8); }); });
-  const glow = v.glow ? 'outgoingLight += diffuseColor.rgb * 1.15 * step(0.85, diffuseColor.b) * step(diffuseColor.r, 0.75);' : '';
-  return { mat: { fragOut: glow }, outline: 0.02, parts: [
+  return { mat: sazaeMat(v), outline: 0.02, parts: [
     { name: 'body', geo: body },
     { name: 'spines', geo: spines },
     { name: 'head', geo: head, at: [0, 0.3, 0.32] }, // (its geometry is authored round its pivot in the mouth)
@@ -96,7 +98,8 @@ function sazaeSpec(v) {
   ] };
 }
 function buildSazae(v) {
-  const M = assemble('sazaeOni:' + v.key, () => sazaeSpec(v));
+  const M = assemble('sazaeOni:' + v.key, () => enemySpec('sazaeOni', v.key, sazaeMat(v), { outline: 0.02, part: { lid: { outline: 0.012 } } }) || sazaeSpec(v)); // (the Blender model: ROADMAP EN-1)
+  const HP = enemyPivot('sazaeOni', v.key, 'head', [0, 0.3, 0.32]); // (where the head sits, popped out)
   const I = M.inner, head = M.g.head, lid = M.g.lid, sp = M.g.spines;
   let spinA = 0, hS = 0.12, spS = 1, rate = 0;
   M.variant = v;
@@ -123,7 +126,7 @@ function buildSazae(v) {
     if (want > 0 || rate > 0.5) spinA += rate * dt; else { const tgt = Math.round(spinA / TAU) * TAU; spinA += (tgt - spinA) * Math.min(1, dt * 8); }
     hS += (hw - hS) * Math.min(1, dt * (hw > hS ? 14 : 22)); spS += (sw - spS) * Math.min(1, dt * 12);
     I.scale.set(sx, sy, sx); I.rotation.set(rx, spinA, rz); I.position.y = y;
-    head.scale.setScalar(hS); head.position.set(0, 0.3 + hy * hS, 0.32 + (hS - 0.12) * 0.08); head.rotation.set(0, 0, hr);
+    head.scale.setScalar(hS); head.position.set(HP[0], HP[1] + hy * hS, HP[2] + (hS - 0.12) * 0.08); head.rotation.set(0, 0, hr);
     head.visible = hS > 0.14; lid.visible = shut || hS < 0.2;
     sp.scale.setScalar(spS);
   };

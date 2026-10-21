@@ -11,7 +11,7 @@ The owner's pick, four moments:
 3. **The place title** when you arrive where the step is (§3). Built (checkpoint 1).
 4. **Handing the quest in** to its giver (§4). Built (checkpoint 2).
 
-Since ROADMAP Z-H3 the heroes' homeland quests (§9) use all four, with a hero (or Captain Kaizo) as the giver.
+Since ROADMAP Z-H3 the heroes' homeland quests (§9) use all four, with a hero (or, on an old save, Captain Kaizo) as the giver.
 
 Later, not in UX-2: a storybook Journal with chapters, the journey on the Travel Map, a livelier tracker.
 
@@ -319,14 +319,20 @@ for sending them."
 ## 9. The heroes' homeland quests (ROADMAP Z-H3; docs/ZONES.md §3.1)
 When a zone opens, its hero arrives in Blossom Hollow, asks for help and joins; their arrival starts the zone's **main
 story quest** (`world/heroQuests.js HERO_QUESTS`, read through `Story.def`; `heroQuest: true`). All four are live: Poe's
-(checkpoint 1), Floofy's, Kaizo's and Foosy's (checkpoint 2).
+(checkpoint 1), Floofy's and Foosy's (checkpoint 2), and Stella's (H-6 checkpoint 2: "Trouble at Shiokaze Port" was Captain
+Kaizo's, a messenger's, until she came; docs/STELLA.md §6.1).
+- **Whose it is** (`heroQuestGiver` / `heroQuestDef`; `Story.def` reads `q.giver || d.giver`): the table's giver, unless the
+  quest's record names its own (`q.giver`) or it came before its hero (an old save: Kaizo's visit recorded without `by`,
+  his quest running or done). Then the quest is the old giver's, with his own lines (`HERO_QUESTS.hq_shiokaze.kaizo`: the
+  hook, desc, hand-in words, thanks, crew line, Shadow's lines); its hand-in step is cached per giver. Stella's arrival
+  writes `q.giver = 'sk_kaizo'` on a running Kaizo quest, so it stays his after her record is written.
 - **The card**: the story card (a rose wash, "A new quest 冒険"), the hero's 3D face and name (`Story.nameOf` knows the
   heroes), their hook.
 - **The steps**: `visit` (travel to the zone: the pointer to the Wayfarer's Post from town; done on arriving there, or once
   its village is saved) and `villageSaved`. Both steps' place is the zone, so arriving shows the place title for the
   village step ("Takemori Under Siege · Whispering Bamboo Grove · Save Takemori Village") and Shadow's line.
 - **The hand-in** (`Story.handInFor`: a hero's homeland quest waits for whoever asked): to the benched hero in town
-  (`heroes.js talk` runs `handInScene` before their chat), to Kaizo in his village, or, when you're playing the giver,
+  (`heroes.js talk` runs `handInScene` before their chat), to Kaizo in his village (an old save's), or, when you're playing the giver,
   their own scene at the next calm moment (`Arrivals.selfHandIn` → `handInScene(…, { self: true })`: no turning to you,
   their `selfThanks` to Shadow). Shadow's way-home line isn't said when you play the giver.
 - **Crews**: a crew's relief marks the quest's record (`crewBy`, and `crewWith` when the giver went too), so the hand-in
@@ -337,18 +343,22 @@ story quest** (`world/heroQuests.js HERO_QUESTS`, read through `Story.def`; `her
 |---|---|---|---|---|---|---|
 | **Takemori Under Siege** (`hq_takemori`) | Poe | "Takemori is under siege! I… came to fetch help. Very stealthily." | "Takemori is safe? You saved my whole village… *sniff* That's not crying. A shinobi's eyes just leak when she's proud. Take this scroll, it's from the dojo." | "We did it, Shadow! Takemori is safe, and nobody saw us coming. …Everybody saw us coming. Good boy anyway." | "{crew} snuck into Takemori and chased the siege off! Almost as quietly as I would have." | "{others} and I chased the siege out of Takemori! I was the stealthy part. Thank you for sending us." |
 | **The Gloom over Akane** (`hq_akane`) | Floofy | "Akane Hamlet has fallen under the gloom. Not the good kind. The ghostlights cannot hold it back alone." | "Akane is free of the gloom. …Knights do not cry. It is the lantern smoke. Take this lantern. It winks. I did not teach it that." | "It is done, Shadow. The gloom has lifted over Akane. …You may lick my face. Once. Solemnly." | "{crew} lifted the gloom over Akane. The ghost pups followed them home. They follow everyone home." | "{others} and I lifted the gloom over Akane. I was very hard to knock over. Thank you for sending us." |
-| **Trouble at Shiokaze Port** (`hq_shiokaze`) | Captain Kaizo | "Shiokaze Port's under siege, matey! Crabs in the nets, kappa on the roofs. I rowed all night to find you." | "The nets are clear and the kappa are off my roof! You've the heart of a sea dog, matey. Take this lantern, it hung on my old ship." | — | "{crew} sailed in and chased the siege back to sea! You know how to pick a crew, matey." | — |
+| **Trouble at Shiokaze Port** (`hq_shiokaze`) | Stella | "Shiokaze Port is under siege, and the sun comes up grey. I'd like my sunrise back. Will you come?" | "The port is safe, and tomorrow the sun will come up gold over the shrine. I'll greet it twice, once for you. Take this lantern. It hung on Captain Kaizo's ship; he says you've earned it." | "We did it, Shadow. Tomorrow's sunrise will be a good one. …Bow with me? Good boy. Perfect form." | "{crew} sailed in and chased the siege back to sea. The shrine steps are clear. I bowed to them. They seemed embarrassed." | "{others} and I chased the siege back to sea. I kept everyone warm. Thank you for sending us." |
+| (an old save's) **Trouble at Shiokaze Port** | Captain Kaizo | "Shiokaze Port's under siege, matey! Crabs in the nets, kappa on the roofs. I rowed all night to find you." | "The nets are clear and the kappa are off my roof! You've the heart of a sea dog, matey. Take this lantern, it hung on my old ship." | — | "{crew} sailed in and chased the siege back to sea! You know how to pick a crew, matey." | — |
 | **The Siege of Yukimi** (`hq_yukimi`) | Foosy | "Yukimi Spa is besieged by snow and yokai! I guarded the springs alone as long as I could. Will you come?" | "The springs are safe! I knew it. I absolutely knew it. …A knight does not wag. It is the wind. Take this daruma; I painted in one eye for you." | "The springs are safe, Shadow! My vow is kept. …Mostly kept. We fetched a ball in the middle of it." | "{crew} broke the siege of Yukimi! I shall write them a ballad. A short one. With a ball in it." | "{others} and I broke the siege of Yukimi! I guarded everyone with my whole heart. Thank you for sending us." |
 
 - **Shadow's lines**: Takemori: arrive "Takemori is just up the trail! I can smell yokai camping in the square. Let's go!" · home
   "Takemori is safe! Let's tell Poe. She'll say she isn't crying." Akane: arrive "Akane is just down the maple road. The gloom
   is thickest in the square. Ears up!" · home "Akane is safe! Let's tell Floofy. He'll say it's the lantern smoke." Shiokaze:
-  arrive "I can smell the sea! Shiokaze Port is just down the shore. Let's help Captain Kaizo!" · home "The port is safe!
-  Let's tell Captain Kaizo. Can I be first mate now?" Yukimi: arrive "Brrr, snow! Yukimi Spa is just up the trail. I can
+  arrive "I can smell the sea! Shiokaze Port is just down the shore. Let's give Stella her sunrise back!" · home "The port is
+  safe! Let's tell Stella. Maybe she'll bow again. I'll bow too!" (Kaizo's: "…Let's help Captain Kaizo!" · "…Let's tell
+  Captain Kaizo. Can I be first mate now?"); afterwards, at his lookout: "Stella told me everything. Twice. The second time
+  with zoomies." Yukimi: arrive "Brrr, snow! Yukimi Spa is just up the trail. I can
   smell yokai in the hot springs!" · home "The springs are safe! Let's tell Foosy. He'll say a knight doesn't wag."
-- **The hand-in words**: "Tell Poe that Takemori is safe" · "Tell Floofy that Akane is safe" · "Tell Captain Kaizo the port is
-  safe" · "Tell Foosy the springs are safe". **Rewards**: Takemori 400 coins, 500 XP, a skill point, the Hanging Scroll;
+- **The hand-in words**: "Tell Poe that Takemori is safe" · "Tell Floofy that Akane is safe" · "Tell Stella the port is safe"
+  (Kaizo's: "Tell Captain Kaizo the port is safe") · "Tell Foosy the springs are safe". **Rewards**: Takemori 400 coins, 500 XP, a skill point, the Hanging Scroll;
   Akane 1,000 coins, 3,000 XP, a skill point, the Yokai Lantern; Shiokaze 1,800 coins, 7,000 XP, a skill point, the Festival
   Chochin; Yukimi 2,600 coins, 14,000 XP, a skill point, the Daruma.
-- QA: s47 (the card, the quest by you, by a crew, by the hero you play, the old saves), test-rpg "HERO ARRIVALS" (the
-  writers' contract as QUEST MOMENTS, the `visit` step, the crew lines), prod-smoke `arrival`.
+- QA: s47 (the card, the quest by you, by a crew, by the hero you play, the old saves, Kaizo's quest kept his), test-rpg
+  "HERO ARRIVALS" (the writers' contract as QUEST MOMENTS, the `visit` step, the crew lines, whose quest it is), prod-smoke
+  `arrival`.

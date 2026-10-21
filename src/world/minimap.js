@@ -254,6 +254,16 @@ export class ArtMap {
     }
     // ---- Shadow and you
     if (sh?.pos && sh.world === G.world) { const [sx, sy] = S(sh.pos.x, sh.pos.z); if (inside(sx, sy)) { const img = shadowMark(mini ? 4.6 : 5.6); ctx.drawImage(img, sx - img.cssW / 2, sy - img.cssH / 2, img.cssW, img.cssH); hits.push({ x: sx, y: sy, r: 8, e: L.people.find(e => e.shadow) }); } }
+    // couch co-op: players 2-4's heroes, a dot each in their player's colour with their number (off the disc: on its rim)
+    if (G.coop?.active) for (const s of G.coop.others) {
+      const B = s.body; if (!B?.pos || B.world !== G.world) continue;
+      let [sx, sy] = S(B.pos.x, B.pos.z);
+      if (mini && Math.hypot(sx - half, sy - half) > disc - 6) { const a = Math.atan2(sy - half, sx - half); sx = half + Math.cos(a) * (disc - 6); sy = half + Math.sin(a) * (disc - 6); }
+      else if (!inside(sx, sy, -6)) continue;
+      const r = mini ? 6.2 : 7.5, img = pip(s.color, String(s.n), r);
+      ctx.save(); ctx.globalAlpha = 0.4; ctx.fillStyle = s.color; ctx.beginPath(); ctx.arc(sx, sy, r + 4, 0, Math.PI * 2); ctx.fill(); ctx.restore(); // (a soft halo: apart from the townsfolk's pips)
+      ctx.drawImage(img, sx - img.cssW / 2, sy - img.cssH / 2, img.cssW, img.cssH);
+    }
     { const [sx, sy] = S(P.x, P.z), f = G.player.facing; if (inside(sx, sy, -20)) drawArrow(ctx, sx, sy, rot + Math.atan2(Math.cos(f), Math.sin(f)) + Math.PI / 2, mini ? 1 : 1.15); }
     if (!mini) this.labels(ctx, size, S, zoom);
     ctx.restore();

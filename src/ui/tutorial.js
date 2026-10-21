@@ -34,7 +34,7 @@ const visRect = e => {
   }
   return { left: L, top: T, right: R, bottom: B, width: Math.max(0, R - L), height: Math.max(0, B - T) };
 };
-const NAMES = { shadow: 'Shadow', kero: 'Kero', moka: 'Moka', rosie: 'Rosie', usagi: 'Usagi', tanu: 'Tanu', poe: 'Poe', shihtzu: CLASSES.shihtzu.name, golden: CLASSES.golden.name, hachi: 'Old Hachi' }; // (the Shih Tzu's name is the owner's to pick: classes.js)
+const NAMES = { shadow: 'Shadow', kero: 'Kero', moka: 'Moka', rosie: 'Rosie', usagi: 'Usagi', tanu: 'Tanu', poe: 'Poe', shihtzu: CLASSES.shihtzu.name, golden: CLASSES.golden.name, stella: CLASSES.stella.name, kaizo: 'Old Captain Kaizo', hachi: 'Old Hachi' }; // (the Shih Tzu's name is the owner's to pick: classes.js)
 
 export class TutorialUI {
   constructor(ui, layer) {

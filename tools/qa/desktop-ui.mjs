@@ -1,6 +1,6 @@
 // The desktop UI check (ROADMAP R-13): the mouse-and-keys layout at 1280×720, 1600×900 and 1920×1080, each at the UI
 // sizes 80, 100 and 125 % (Settings › UI size), every panel with a header in turn: the bag's views, character, the skill
-// trees of all five heroes (the long names: "Starlight Kibble", "Ghostlight Tome"), the Journal, the map, the game menu's
+// trees of all six heroes (the long names: "Starlight Kibble", "Ghostlight Tome"), the Journal, the map, the game menu's
 // pages, Rosie's shop, the stash, cooking, the workbench, the Travel Map, a house card, remodel, the cozy path's Board
 // and Guild, build and decorate. A header button (a title-row button, tab or badge, or a tab row heading the body) whose
 // visible part runs outside its panel's frame fails (tools/qa/ui-audit-lib.mjs headerOutside; the ✕ on the corner and
@@ -25,7 +25,7 @@ fs.mkdirSync(OUT, { recursive: true });
 const SIZES = (process.env.SIZES || '1280x720,1600x900,1920x1080').split(',').map(s => s.split('x').map(Number));
 const SCALES = (process.env.SCALES || '0.8,1,1.25').split(',').map(Number);
 const ONLY = new Set(process.argv.slice(2).filter(a => !a.startsWith('--')));
-const HEROES = ['chewy', 'moka', 'poe', 'shihtzu', 'golden'];
+const HEROES = ['chewy', 'moka', 'poe', 'shihtzu', 'golden', 'stella'];
 const fails = [];
 let bad = 0, checked = 0;
 

@@ -8,7 +8,7 @@ import './home.css';
 import { Events as CoreEvents } from '../core/events.js';
 import { el, clamp, isTyping, esc, rarityColor } from './dom.js';
 import { glyph } from './glyphs.js';
-import { Tooltip } from './tooltip.js';
+import { Tooltip, TIP } from './tooltip.js';
 import { Hud } from './hud.js';
 import { Floats, Toasts, Banners, LootLabels, Iris, burst, flyToBag } from './fx.js';
 import { ItemDrag, InventoryPanel } from './inventory.js';
@@ -59,7 +59,7 @@ import { installMinimapUI } from './minimapUI.js';
 import { Vector3 } from 'three';
 
 const SETTINGS_KEY = 'chewy3d.settings';
-const DEFAULT_SETTINGS = { quality: 2, music: 0.7, sfx: 0.8, uiScale: 1, shake: true, showFps: false, chargeMode: 0, sprintMode: 0, rumble: true, aimAssist: 0.7, padGlyphs: 0, binds: null, fpsCap: 0, touchSize: 1, touchOpacity: 0.85, touchLeft: false, touchAim: 0, haptics: true, shadowLead: 1, mmZoom: 1, mmNorth: 0 }; // shadowLead: Settings › Shadow leads the way, 0 off · 1 when a quest says so · 2 always (actors/shadowLead.js); touch*: Settings › Controls › Touch (ui/touch.js: button size, opacity, left-handed, aim 0 auto · 1 drag), haptics; chargeMode: 0 hold to charge · 1 off · 2 toggle (docs/CHARGE.md); sprintMode: 0 hold Shift · 1 toggle (actors/sprint.js); rumble, aimAssist (0..1), padGlyphs (0 auto · 1 Xbox · 2 PlayStation), binds ({ kbm, pad } overrides): Settings › Controls (core/actions.js, docs/CONTROLS.md); quality 3 is the Steam Deck preset, fpsCap 0 off · 1 60 · 2 40 (core/deck.js)
+const DEFAULT_SETTINGS = { quality: 2, music: 0.7, sfx: 0.8, uiScale: 1, shake: true, showFps: false, chargeMode: 0, sprintMode: 0, rumble: true, aimAssist: 0.7, padGlyphs: 0, binds: null, fpsCap: 0, touchSize: 1, touchOpacity: 0.85, touchLeft: false, touchAim: 0, haptics: true, shadowLead: 1, mmZoom: 1, mmNorth: 0, itemTips: 0, statsAll: false }; // itemTips: Settings › Item details, 0 simple · 1 full; statsAll: the Character panel's "All the numbers" drawer open (docs/STATS.md); shadowLead: Settings › Shadow leads the way, 0 off · 1 when a quest says so · 2 always (actors/shadowLead.js); touch*: Settings › Controls › Touch (ui/touch.js: button size, opacity, left-handed, aim 0 auto · 1 drag), haptics; chargeMode: 0 hold to charge · 1 off · 2 toggle (docs/CHARGE.md); sprintMode: 0 hold Shift · 1 toggle (actors/sprint.js); rumble, aimAssist (0..1), padGlyphs (0 auto · 1 Xbox · 2 PlayStation), binds ({ kbm, pad } overrides): Settings › Controls (core/actions.js, docs/CONTROLS.md); quality 3 is the Steam Deck preset, fpsCap 0 off · 1 60 · 2 40 (core/deck.js)
 const CONTROL_SETTINGS = new Set(['rumble', 'padGlyphs', 'binds']);
 const PAD_SLOTS = ['attack', 'skillAlt', 'skill1', 'skill2', 'skill3', 'skill4'];
 const NON_BLOCKING = new Set(['build', 'decorate']); // panels that don't pause gameplay input
@@ -173,7 +173,7 @@ export const UI = {
     on('coins:changed', () => { this.panels.shop.refresh(); this.panels.inventory.refresh(); this.panels.build.refresh(); });
     on('materials:changed', () => this.panels.build.refresh());
     on('skill:learned', () => this.panels.skills.refresh());
-    on('player:levelup', p => this.levelUp(p?.lvl ?? this.G?.state?.player?.lvl));
+    on('player:levelup', p => { this.levelUp(p?.lvl ?? this.G?.state?.player?.lvl); this.autoPoints(p?.auto); });
     on('item:pickup', p => { const it = p?.item || p; if (!it || it.kind === 'material' || it.kind === 'potion') return; requestAnimationFrame(() => this.pickup(it, p?.pos || p?.worldPos, true)); });
     on('quest:update', () => { this.hud.cache.qAcc = 0; this.panels.quests.refresh(); });
     on('toast', p => (typeof p === 'string' ? this.toast(p) : p?.text && this.toast(p.text, p)));
@@ -329,6 +329,8 @@ export const UI = {
     if (act('lootLabels') && !e.ctrlKey && !e.metaKey && !e.altKey) { this.labels.setVisible(true); return; } // hold Z: every loot label (Ctrl+Z stays the decorate undo)
     if (this.mode === 'title') { if (k === 'Escape' && this.isOpen('menu')) this.close('menu'); return; }
     if (this.dlg.active) { if (this.dlg.key(k, e)) e.preventDefault(); return; }
+    const CP = this.G?.coop?.active && !this.isOpen('menu') ? this.G.coop.panes : null; // (couch co-op: I / C / K open player 1's pane, and while it's up it has the keys, Esc closing it: ui/coopPanes.js)
+    if (CP?.key && (CP.isOpen(this.G.coop.p1) || !this.anyModal()) && CP.key(k, ['inventory', 'character', 'skills'].find(act))) { e.preventDefault(); return; }
     if (k === 'Escape') { e.preventDefault(); this.back(); return; }
     if (this.isOpen('menu')) return;
     const panel = ['inventory', 'character', 'skills', 'quests', 'map'].find(act); // (Tab switches heroes: game.js)
@@ -380,7 +382,7 @@ export const UI = {
       A.consume('menu', 'pad');
       if (this.tutorial?.offering) this.tutorial.answerOffer(false);
       else if (this.padMenu?.active) this.padMenu.close();
-      else if (this.padMenu && !this.drag.held && !this.pop.classList.contains('show') && !this._order.some(n => this.panels[n]?.isOpen && !NON_BLOCKING.has(n))) this.padMenu.open();
+      else if (this.padMenu && !this.drag.held && !this.pop.classList.contains('show') && !this._order.some(n => this.panels[n]?.isOpen && !NON_BLOCKING.has(n))) { if (this.G?.coop?.active && this.G.coop.panes?.open) this.G.coop.panes.open(this.G.coop.p1); else this.padMenu.open(); } // (couch co-op: player 1's pane, the game menu inside it: ui/coopPanes.js)
       else this.back();
       return;
     }
@@ -447,6 +449,7 @@ export const UI = {
   saveBinds() { this.setSetting('binds', JSON.parse(JSON.stringify(Actions.over))); },
   applySettings() {
     this.fpsEl.classList.toggle('show', !!this.settings.showFps);
+    TIP.full = this.settings.itemTips === 1; // (Settings › Item details: Simple 0 · Full 1, docs/STATS.md §1)
     this.applyScale();
   },
   applyScale() {
@@ -492,6 +495,12 @@ export const UI = {
     return all ? list : list.filter(q => !q.done || q.objectives.length);
   },
   // HUD celebration for a level-up (the big banner is shown by whoever calls UI.banner(..., {style:'levelup'}))
+  /** Shadow picked the level up's points (docs/STATS.md §3): a toast says where they went */
+  autoPoints(g) {
+    const N = { str: 'Strength', dex: 'Dexterity', vit: 'Vitality', ene: 'Energy' };
+    const parts = Object.keys(N).filter(k => g?.[k] > 0).map(k => `+${g[k]} ${N[k]}`);
+    if (parts.length) this.toast('Shadow picked your points!', { icon: 'paw', color: '#ffcf4a', sub: parts.join(' · ') });
+  },
   levelUp(lvl) {
     const r = this.hud.life.el.getBoundingClientRect(), r2 = this.hud.$.xp.getBoundingClientRect();
     this.burst(r.left + r.width / 2, r.top + r.height / 2, { n: 20, spread: 110 });

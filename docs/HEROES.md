@@ -1,4 +1,4 @@
-# Heroes: Chewy & Moka (playable roster, switching, NPC mode)
+# Heroes: the playable roster of six, switching, NPC mode
 
 Status: **shipped** (Moka update; QA: tools/qa/s12-heroes.mjs, spell perf: tools/qa/profile-moka.mjs, test pages
 `/?test=moka`, `/?test=spells&cast=<id>`). Chewy is the Bone-Katana samurai with a tennis ball (§8); **Moka** is a Boykin Spaniel mage
@@ -11,7 +11,21 @@ main quest (§6, docs/ZONES.md §3.1). The fourth,
 **the Shih Tzu** (a black-and-white dark knight with a toy flail and dark dog magic; Floofy), has docs/SHIHTZU.md
 (class, skills, charge, his arrival in Blossom Hollow; QA tools/qa/s28-shihtzu.mjs). The fifth, **Foosy** (a Golden Retriever
 dragoon with a toy lance and javelins; Shadow flies beside him as a dragon whelp), has docs/GOLDEN.md (class, skills,
-charge, the whelp, his arrival in Blossom Hollow; QA tools/qa/s29-golden.mjs).
+charge, the whelp, his arrival in Blossom Hollow; QA tools/qa/s29-golden.mjs). The sixth, **Stella** (a Weimaraner
+Sun Oracle with a sun wagasa: two sunlight trees and a support tree), has docs/STELLA.md (class, skills, charge, her
+arrival with Captain Kaizo's rowboat; QA tools/qa/s48-stella.mjs).
+
+| key | id | hero | class | weapon (`wtype`) | trees | doc |
+|---|---|---|---|---|---|---|
+| 1 | `chewy` | Chewy, a chocolate Lab mix | Bone Katana Samurai | `sword`, `ball` | Bone Blade, Fetch Mastery, Pack Spirit | §8 |
+| 2 | `moka` | Moka, a Boykin Spaniel | Tidewater Mage | `staff` | Tidewater, Starlight Kibble, Duck Hunt | §3 |
+| 3 | `poe` | Poe, a black pug | Bamboo Shinobi | `fuma` | Shuriken Arts, Ninjutsu, Shadow Step | POE |
+| 4 | `shihtzu` | Floofy, a Shih Tzu | Gloomhowl Knight | `flail` | Flail Arts, Gloom Hexes, Ghostlight Tome | SHIHTZU |
+| 5 | `golden` | Foosy, a Golden Retriever | Emberleaf Dragoon | `lance` | Lance Arts, Javelins, Whelp Bond | GOLDEN |
+| 6 | `stella` | Stella, a Weimaraner | Oracle | `parasol` | Radiance, Corona, Dawn | STELLA |
+
+`HERO_IDS` follows `CLASSES` (`src/rpg/classes.js`): the key is the hero's place in the roster (the wheel's number key);
+a new hero is added last.
 
 ## 1. Who is Moka
 - Boykin Spaniel (South Carolina's retriever): rich chocolate/liver wavy-curly coat, long pendant wavy ears, golden
@@ -96,12 +110,23 @@ free little sparkle bolt. Hotbar hints on first join. Staff bases span tiers lik
   Poe); **holding** Tab (≥ 0.26 s) opens the **hero wheel** (`src/ui/heroWheel.js`: a card per hero; point the mouse
   or press 1–9, let go to confirm, Esc closes; a wider ring past four). The HUD shows a mini portrait per benched hero
   (a click switches). Poe's "Meet Poe" guide teaches both; the Shih Tzu's "Meet <name>" guide the wheel with four.
+- **Six heroes** (Stella, docs/STELLA.md §10): the wheel's keys 1–6 follow the roster (Stella last, key 6). Six or more
+  cards sit on an ellipse (250 × 196 px), wider than tall, so the top and bottom cards stay off the HUD's top row and the
+  hotbar on a 1280 × 800 Deck; the mouse and the right stick pick by each card's real direction. On touch the wheel is
+  fitted into the free play area (`ui/touch.js fitWheel`): a ring on a tablet, a row on a phone; the row's cards drop
+  their class titles and their dim tags ("Just a moment…", which ran into each other at six) and the hub's pill shows
+  the picked hero's title and why instead. The HUD's bench minis (`hud.js benchTick`) take a row of four beside the Tab
+  one; on touch the hero button and its wheel replace them.
 
 ## 5. The inactive hero as a villager
 - A `Villager` built with the hero's rig (`opts.rig`) and `hero: true`: daily routines through VillageLife (benches,
   fishing, chatting, flower beds, shops…), home = Chewy's house (they share it), bedtimes.
 - Talking to them: context lines (level, what the other hero is doing, the Burrow) and a **"Let's switch!"** choice.
 - Excluded from friendship hearts, gifts and quest targeting.
+- Each hero has their own likes (`npc.js` LIKES), bedtime (BED) and nightcap (CAP_COLOR). **Stella** greets the sun on
+  the beach once a morning (5:30–8:30: a virtual `sunrise` slot on the wet sand by the beach landmark, facing the open sea, an admiring pose and
+  a solemn bow or two: `Villager.sunriseSpot`), sits by the fountain and on the benches, and twirls her wagasa while she
+  sits (`Villager.wagasaTwirl`: two eased turns about its shaft, ending square); she's up first (out at 5:24).
 
 ## 6. Moka joining (story)
 - New game: after Rosie's welcome, Moka arrives at the plaza (a bookish spaniel mage who read about the Burrow) and
@@ -111,16 +136,16 @@ free little sparkle bolt. Hotbar hints on first join. Staff bases span tiers lik
   §3.1): once a hero's zone opens (the level, or the zone before cleared by you or a crew) and the hero before them has
   joined, they come to Blossom Hollow on a calm moment, play their old gag in town, ask for help for their home village,
   **join at once** and start its main quest (travel to the zone, save the village, the hand-in to them). In order: Moka →
-  Poe → Floofy → (Captain Kaizo, the Tide Pool's messenger, until Stella) → Foosy. Before their zone opens the wheel says
+  Poe → Floofy → Stella (rowed over by Captain Kaizo) → Foosy. Before their zone opens the wheel says
   when they'll come ("Will arrive when the Bamboo opens") and Shadow passes on a rumour.
 - Poe arrives once the Bamboo opens: she tails you (badly) round the plaza, freezes when you look, sneezes, gets caught,
   pleads for Takemori and joins (`src/actors/poeJoin.js`, docs/POE.md §5).
 - Floofy arrives once Momiji Hollow opens: kneeling on the Shrine Road's paving, lighting ghostlight lanterns (at golden
   hour, or early and saying so); he rises to proclaim and a ghost pup licks his face mid-word; he pleads for Akane and
   joins (`src/actors/shihtzuJoin.js`, docs/SHIHTZU.md §5).
-- Captain Kaizo, Shiokaze Port's old captain, rows over once the Tide Pool opens: his boat on the beach, "Ahoy there!", his
-  plea for the port; he rows home and the quest's hand-in is his, at his lookout (`src/actors/kaizoArrive.js`; Stella
-  takes his place in the arrival table when she's built, ROADMAP H-6).
+- Stella arrives once the Tide Pool opens: Captain Kaizo, Shiokaze Port's old captain, rows her over to the beach; she
+  greets the sun, pleads for the port and joins, and the quest's hand-in is hers (`src/actors/stellaJoin.js`, the boat's
+  staging `kaizoArrive.js`; docs/STELLA.md §6, old saves where Kaizo came alone §6.2).
 - Foosy arrives once the Onsen opens and Kaizo has been: he marches in and stands guard by the fountain, begins a solemn
   vow and a tennis ball from Rosie's Treats undoes it; he gives Shadow a dragon whelp costume, pleads for Yukimi and joins
   (`src/actors/goldenJoin.js`, docs/GOLDEN.md §5).

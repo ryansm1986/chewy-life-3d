@@ -133,6 +133,7 @@ export function padWording(html) {
   if (Actions.device === 'touch' && html) return touchWording(html);
   if (Actions.device !== 'pad' || !html) return html;
   return String(html)
+    .replace(/<b>Shift<\/b> details/g, () => `${CAP('L3')} details`) // (an item tooltip's details: docs/STATS.md §1)
     .replace(/<b>(Shift\+Right-click|Shift\+Click|Ctrl\+Click)<\/b>/g, () => CAP('X'))
     .replace(/<b>Right-click<\/b>\s*\/\s*<b>1–4<\/b>/g, () => CAP('Y'))
     .replace(/<b>Right-click<\/b>/g, () => CAP('Y'))

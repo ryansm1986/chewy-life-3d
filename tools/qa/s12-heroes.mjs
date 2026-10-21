@@ -1,4 +1,4 @@
-// Scenario 12: the hero roster (docs/HEROES.md, docs/POE.md §6) — Chewy, Moka and Poe.
+// Scenario 12: the hero roster (docs/HEROES.md, docs/POE.md §6) — Chewy, Moka and Poe, then all six.
 //  a) a fresh game: Moka waits by the fountain ('!'), switching is refused until she joins; the join scene
 //  b) Tab switch in the village: transition locks input + invulnerable, state relinks, the old hero stays in town
 //  c) switch cooldown; per-hero skill cooldowns survive a round trip
@@ -9,6 +9,7 @@
 //  h) repeated switches don't leak GPU geometry / textures / villagers
 //  i) three heroes: Poe joins, a Tab tap cycles the joined heroes in order, holding Tab opens the hero wheel (pick by key),
 //     the HUD shows a mini portrait per benched hero
+//  j) six heroes (Stella the sixth, docs/STELLA.md §10): the wheel's six cards and key 6, the HUD's five bench minis, playing her
 import { launch, boot, waitMode, sleep, makeReport, drainDialogue, tap } from './lib.mjs';
 
 const R = makeReport('S12 heroes: join, switch (village + Burrow), gear, XP, save/migrate, leaks');
@@ -22,7 +23,7 @@ try {
     const G = window.G, v = G.heroes.villagers.moka;
     return { hasMoka: !!v, frozen: !!v?.frozen, marker: G.story.markerFor('moka'), inNpcs: G.npcs.includes(v), why: G.heroes.canSwitch(), active: G.state.activeHero, heroes: Object.keys(G.state.heroes), poeV: !!G.heroes.villagers.poe }; // (Poe isn't in town until she joins: she's in the bamboo)
   });
-  R.check('fresh game: Chewy active, Moka waits in town with a "!" marker', a.active === 'chewy' && a.hasMoka && a.frozen && a.marker === '!' && a.inNpcs && a.heroes.join() === 'chewy,moka,poe,shihtzu,golden' && !a.poeV, JSON.stringify(a));
+  R.check('fresh game: Chewy active, Moka waits in town with a "!" marker', a.active === 'chewy' && a.hasMoka && a.frozen && a.marker === '!' && a.inNpcs && a.heroes.join() === 'chewy,moka,poe,shihtzu,golden,stella' && !a.poeV, JSON.stringify(a));
   R.check('switching is refused before Moka joins', /waiting/i.test(a.why), a.why);
   await page.evaluate(() => { const G = window.G; G.heroes.talk(G.heroes.villagers.moka); });
   await sleep(page, 300);
@@ -111,7 +112,7 @@ try {
 
   // g) save / reload
   const g0 = await page.evaluate(() => { const G = window.G; G.save(); const s = JSON.parse(localStorage.getItem('chewy3d.save')); return { v: s.version, act: s.activeHero, top: 'player' in s || 'equipment' in s, heroes: Object.keys(s.heroes), mokaLvl: s.heroes.moka.player.lvl }; });
-  R.check('save format v2: heroes hold the progressions, no duplicated top-level player/equipment', g0.v === 2 && g0.act === 'moka' && !g0.top && g0.heroes.join() === 'chewy,moka,poe,shihtzu,golden', JSON.stringify(g0));
+  R.check('save format v2: heroes hold the progressions, no duplicated top-level player/equipment', g0.v === 2 && g0.act === 'moka' && !g0.top && g0.heroes.join() === 'chewy,moka,poe,shihtzu,golden,stella', JSON.stringify(g0));
   await boot(page, 'notitle');
   const g1 = await page.evaluate(() => { const G = window.G, st = G.state; return { act: st.activeHero, hero: G.player.hero, linked: st.player === st.heroes.moka.player, lvl: st.player.lvl, chewyV: !!G.heroes.villagers.chewy, mokaV: !!G.heroes.villagers.moka, wt: G.derived.weaponType }; });
   R.check('reload: still Moka (her level), Chewy lives in town', g1.act === 'moka' && g1.hero === 'moka' && g1.linked && g1.lvl === g0.mokaLvl && g1.chewyV && !g1.mokaV && g1.wt === 'staff', JSON.stringify(g1));
@@ -177,6 +178,30 @@ try {
   await page.waitForFunction(() => window.G.state.activeHero === 'poe' && !window.G.heroes.switching, null, { timeout: 12000 }).catch(() => {});
   const pz = await page.evaluate(() => { const G = window.G, P = G.player; return { hero: P.hero, wt: G.derived.weaponType, back: !!P.rig.parts.fumaBack, backVis: !!P.rig.parts.fumaBack?.visible, hand: !!P.fumaHand, linked: G.state.player === G.state.heroes.poe.player }; });
   R.check('playing Poe: her state relinked, the fūma on her back', pz.hero === 'poe' && pz.wt === 'fuma' && pz.back && pz.backVis && pz.hand && pz.linked, JSON.stringify(pz));
+
+  // j) six heroes (docs/STELLA.md §10): Floofy, Foosy and Stella join. The wheel shows six cards, Stella's last on key 6,
+  //    all on screen, none overlapping; the HUD shows a mini per benched hero (five), none overlapping and none on the
+  //    quest tracker; key 6 plays Stella (her wagasa, her class); she lives in town with her own day (the villagers)
+  await page.evaluate(async () => { const G = window.G, H = G.heroes; await H.joinShihtzu?.(); await H.joinGolden?.(); if (H.joinStella) await H.joinStella(); else { G.state.flags.stellaJoined = true; H.spawnBench(); } H.cd = 0; if (G.state.activeHero !== 'chewy') H.switchTo('chewy', { quiet: true }); });
+  await page.waitForFunction(() => window.G.state.activeHero === 'chewy' && !window.G.heroes.switching, null, { timeout: 12000 }).catch(() => {});
+  await page.waitForFunction(() => [...document.querySelectorAll('.hsw')].filter(b => !b.hidden).length >= 5, null, { timeout: 5000 }).catch(() => {});
+  const box = r => ({ l: r.left, t: r.top, r: r.right, b: r.bottom });
+  const hit = (a, b) => a.l < b.r - 1 && b.l < a.r - 1 && a.t < b.b - 1 && b.t < a.b - 1;
+  const six = await page.evaluate(() => { const G = window.G, B = r => ({ l: r.left, t: r.top, r: r.right, b: r.bottom }); return { roster: G.heroes.roster().map(h => h.id), minis: [...document.querySelectorAll('.hsw')].filter(b => !b.hidden).map(b => B(b.getBoundingClientRect())), quest: B(document.querySelector('.qtrack')?.getBoundingClientRect() || { left: 0, top: 0, right: 0, bottom: 0 }), stellaV: !!G.heroes.villagers.stella }; });
+  const miniHit = six.minis.some((a, i) => six.minis.some((b, k) => k > i && hit(a, b)) || (six.quest.r > 0 && hit(a, six.quest)));
+  await page.evaluate(() => { window.G.heroes.cd = 0; }); // (the switch back to Chewy started the cooldown)
+  R.check('six heroes: the roster ends with Stella; the HUD shows five bench minis, none overlapping each other or the quest tracker; she lives in town', six.roster.join() === 'chewy,moka,poe,shihtzu,golden,stella' && six.minis.length === 5 && !miniHit && six.stellaV, JSON.stringify(six));
+  await page.keyboard.down('Tab');
+  await page.waitForFunction(() => window.G.heroes.wheelOpen, null, { timeout: 4000 }).catch(() => {});
+  await sleep(page, 400); // (the cards' pop-in transition, so their boxes are where they settle)
+  const ws = await page.evaluate(() => [...document.querySelectorAll('.hero-wheel .hw-card')].map(c => { const r = c.getBoundingClientRect(); return { id: c.dataset.id, k: c.querySelector('.hw-k')?.textContent, l: r.left, t: r.top, r: r.right, b: r.bottom, in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight }; }));
+  const cardHit = ws.some((a, i) => ws.some((b, k) => k > i && hit(a, b)));
+  await page.keyboard.press('6');
+  await page.keyboard.up('Tab');
+  await page.waitForFunction(() => window.G.state.activeHero === 'stella' && !window.G.heroes.switching, null, { timeout: 12000 }).catch(() => {});
+  await sleep(page, 300);
+  const st = await page.evaluate(() => { const G = window.G; return { active: G.state.activeHero, cls: G.state.player.cls, wt: G.derived.weaponType, parasol: !!G.player.rig.parts.parasol, hud: document.querySelector('.pc-name')?.textContent || '', open: G.heroes.wheelOpen }; });
+  R.check('six heroes: the wheel shows six cards on screen, none overlapping, the last card (key 6) is Stella; key 6 plays her (her wagasa)', ws.length === 6 && ws[5].id === 'stella' && ws[5].k === '6' && ws.every(c => c.in) && !cardHit && st.active === 'stella' && st.wt === 'parasol' && st.parasol && /Stella/.test(st.hud) && !st.open, JSON.stringify({ ws: ws.map(c => [c.id, c.k, Math.round(c.l), Math.round(c.t), Math.round(c.r), Math.round(c.b), c.in]), cardHit, st }));
 } catch (e) { errors.push('[harness] ' + e.stack); }
 const failed = R.finish(errors, warns);
 await browser.close();

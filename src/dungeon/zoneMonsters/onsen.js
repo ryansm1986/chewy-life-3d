@@ -17,6 +17,7 @@
 import * as THREE from 'three';
 import { assemble, mdef, act, tele, hitArea, roll, sfx, puff, playerIn, ell, cyl, tubeC, blob, cheeks, paint, cone, eyesCute, V, col, INK } from '../../regions/monsters/bamboo.js';
 import { rand, clamp, TAU, ease } from '../../core/util.js';
+import { enemySpec, enemyPivot, ownEnemyModel } from '../../regions/monsters/enemyModels.js';
 
 const AK = { LICK_WIND: 0.62, LICK_OUT: 0.14, LICK_HOLD: 0.1, LICK_BACK: 0.18, LICK_LEN: 6.5, LICK_R: 0.42, PANT: 0.95, STEAM_WIND: 0.7, STEAM_R: 2.1, YANK: 7.5 };
 const TC = { lick: '#ff3f7a', steam: '#ff7a2a' };
@@ -98,13 +99,14 @@ function akaSpec(v) {
   ] };
 }
 function buildAka(v) {
-  const M = assemble('akaname:' + v.key, () => akaSpec(v));
+  const M = assemble('akaname:' + v.key, () => enemySpec('akaname', v.key, null, { outline: 0.019, part: { tongue: { outline: 0.008 } } }) || akaSpec(v)); // (the Blender model: ROADMAP EN-1; its tongue is TL long along +z)
+  const DROOP = ownEnemyModel('akaname', v.key) ? 0.75 : 0.42; // (the idle tongue's droop: the Blender tongue lolls down like the sheet's)
   const I = M.inner, Tg = M.g.tongue, aL = M.g.armL, aR = M.g.armR;
   let hop = 0;
   M.variant = v; M.tongueLen = TONGUE; // (the AI sets tongueLen during a lick; animate eases toward it otherwise)
   M.animate = (dt, t, moving) => {
     const a = M.act, k = (M.actT += dt);
-    let y = 0, sx = 1, sy = 1, rx = 0, rz = 0, al = -0.1, ar = -0.1, alz = 0.35, arz = -0.35, tl = TONGUE + Math.sin(t * 3.1) * 0.08, tx = 0.42 + Math.sin(t * 2.3) * 0.06, ty = 0.3 + Math.sin(t * 2.7) * 0.12;
+    let y = 0, sx = 1, sy = 1, rx = 0, rz = 0, al = -0.1, ar = -0.1, alz = 0.35, arz = -0.35, tl = TONGUE + Math.sin(t * 3.1) * 0.08, tx = DROOP + Math.sin(t * 2.3) * 0.06, ty = 0.3 + Math.sin(t * 2.7) * 0.12;
     switch (a) {
       case 'lickWind': { const p = ease.outCubic(clamp(k / AK.LICK_WIND)); sy = 1 - 0.14 * p; sx = 1 + 0.06 * p; rx = -0.22 * p; al = ar = 0.5 * p; alz = 0.8; arz = -0.8; tl = TONGUE * (1 - p * 0.9); rz = Math.sin(t * 40) * 0.025 * p; break; }
       case 'lick': { tl = M.tongueLen; tx = -0.04; ty = 0; rx = 0.18; sy = 1.06; sx = 0.97; al = ar = -0.6; alz = 0.9; arz = -0.9; break; }

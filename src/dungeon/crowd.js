@@ -73,6 +73,7 @@ export function updateMonsters(mode, dt) {
     }
   }
   let slept = 0;
+  const C = G.coop?.active ? G.coop : null; // (couch co-op: each monster runs as the hero it's after, coop/coop.js foeUpdate)
   for (let i = 0; i < run.length; i++) {
     const m = run[i];
     const sl = lod && m.alive && !m.aggro && !m.def.boss && sleepy(m, px, pz, allies);
@@ -81,11 +82,11 @@ export function updateMonsters(mode, dt) {
       m._lodDt = (m._lodDt || 0) + dt;
       if ((frame + (m._lodK ??= (Math.random() * SLEEP_EVERY) | 0)) % SLEEP_EVERY) { slept++; continue; }
       const d = Math.min(m._lodDt, 0.25); m._lodDt = 0;
-      m.update(d);
+      if (C) C.foeUpdate(m, d); else m.update(d);
       continue;
     }
-    if (m._lodDt) { const d = Math.min(m._lodDt + dt, 0.25); m._lodDt = 0; m.update(d); continue; } // (just woke: catch up)
-    m.update(dt);
+    if (m._lodDt) { const d = Math.min(m._lodDt + dt, 0.25); m._lodDt = 0; if (C) C.foeUpdate(m, d); else m.update(d); continue; } // (just woke: catch up)
+    if (C) C.foeUpdate(m, dt); else m.update(dt);
   }
   mode.lodSlept = slept;
 }

@@ -1,0 +1,582 @@
+{
+ "rule": "skirt_poke_mm: how far a leg / foot vertex lies outside each skirt layer (horizontal rays from the skirt axis); layer_cross_mm: an inner layer outside the next one (above the outer hem), relative to rest; new_overlap_tris: triangle pairs intersecting that do not at the neutral pose (contact sliding counts too); shell_cross_mm: the deepest vertex now on the other side of a thin shell it was clearly (>= 4 mm) clear of at the neutral pose",
+ "poses": {
+  "rest": {
+   "label": "REST (ALL BONES AT REST)",
+   "skirt_poke_mm": {
+    "legL x inner": 0.0,
+    "legR x inner": 0.0,
+    "legL x mid": 0.0,
+    "legR x mid": 0.0,
+    "legL x outer": 0.0,
+    "legR x outer": 0.0
+   },
+   "layer_cross_mm": {
+    "inner outside mid": 0.0,
+    "mid outside outer": 0.0
+   },
+   "new_overlap_tris": {
+    "sleeve_L x robe": 26,
+    "sleeve_R x robe": 26
+   },
+   "shell_cross_mm": {},
+   "ear_new_depth_into_head_mm": 0.0,
+   "pearl_new_depth_into_head_mm": 0.0
+  },
+  "walk-a": {
+   "label": "WALK EXTREME A (THIGHS +-0.8, ARMS -+0.6)",
+   "skirt_poke_mm": {
+    "legL x inner": 0.0,
+    "legR x inner": 21.5,
+    "legL x mid": 0.0,
+    "legR x mid": 0.0,
+    "legL x outer": 0.0,
+    "legR x outer": 0.0
+   },
+   "layer_cross_mm": {
+    "inner outside mid": 1.7,
+    "mid outside outer": 2.9
+   },
+   "new_overlap_tris": {
+    "ear_R x sleeve_R": 138,
+    "tail x skirt_outer": 5,
+    "tail x bow": 19,
+    "sleeve_L x robe": 82,
+    "sleeve_R x robe": 81,
+    "obi_tails x skirt_outer": 20
+   },
+   "shell_cross_mm": {
+    "ear_R through sleeve_R": 3.0,
+    "sleeve_R through ear_R": 12.3,
+    "obi_tails through skirt_outer": 49.5,
+    "tail through bow_tails": 2.6,
+    "bow_tails through tail": 6.9
+   },
+   "ear_new_depth_into_head_mm": 0.0,
+   "pearl_new_depth_into_head_mm": 0.0
+  },
+  "walk-b": {
+   "label": "WALK EXTREME B",
+   "skirt_poke_mm": {
+    "legL x inner": 21.5,
+    "legR x inner": 0.0,
+    "legL x mid": 0.0,
+    "legR x mid": 0.0,
+    "legL x outer": 0.0,
+    "legR x outer": 0.0
+   },
+   "layer_cross_mm": {
+    "inner outside mid": 2.4,
+    "mid outside outer": 5.6
+   },
+   "new_overlap_tris": {
+    "ear_L x sleeve_L": 144,
+    "tail x skirt_outer": 8,
+    "tail x bow": 18,
+    "sleeve_L x robe": 81,
+    "sleeve_R x robe": 82,
+    "obi_tails x skirt_outer": 19
+   },
+   "shell_cross_mm": {
+    "ear_L through sleeve_L": 3.0,
+    "sleeve_L through ear_L": 13.0,
+    "obi_tails through skirt_outer": 52.3,
+    "tail through bow_tails": 2.9,
+    "bow_tails through tail": 6.9,
+    "tail through skirt_outer": 0.3
+   },
+   "ear_new_depth_into_head_mm": 0.0,
+   "pearl_new_depth_into_head_mm": 0.0
+  },
+  "run": {
+   "label": "RUN (THIGHS +-1.0, LEAN 0.3)",
+   "skirt_poke_mm": {
+    "legL x inner": 0.0,
+    "legR x inner": 47.3,
+    "legL x mid": 0.0,
+    "legR x mid": 0.0,
+    "legL x outer": 0.0,
+    "legR x outer": 0.0
+   },
+   "layer_cross_mm": {
+    "inner outside mid": 2.2,
+    "mid outside outer": 3.9
+   },
+   "new_overlap_tris": {
+    "ear_R x sleeve_R": 212,
+    "tail x skirt_outer": 15,
+    "tail x bow": 22,
+    "sleeve_L x robe": 96,
+    "sleeve_R x robe": 94,
+    "obi_tails x skirt_outer": 37
+   },
+   "shell_cross_mm": {
+    "sleeve_R through ear_R": 18.3,
+    "obi_tails through skirt_outer": 58.4,
+    "tail through bow_tails": 12.6,
+    "bow_tails through tail": 29.4,
+    "tail through skirt_outer": 1.5
+   },
+   "ear_new_depth_into_head_mm": 0.0,
+   "pearl_new_depth_into_head_mm": 0.0
+  },
+  "run-b": {
+   "label": "RUN B",
+   "skirt_poke_mm": {
+    "legL x inner": 47.5,
+    "legR x inner": 0.0,
+    "legL x mid": 0.0,
+    "legR x mid": 0.0,
+    "legL x outer": 0.0,
+    "legR x outer": 0.0
+   },
+   "layer_cross_mm": {
+    "inner outside mid": 3.0,
+    "mid outside outer": 6.7
+   },
+   "new_overlap_tris": {
+    "ear_L x sleeve_L": 228,
+    "tail x skirt_outer": 13,
+    "tail x bow": 18,
+    "sleeve_L x robe": 96,
+    "sleeve_R x robe": 96,
+    "obi_tails x skirt_outer": 33
+   },
+   "shell_cross_mm": {
+    "sleeve_L through ear_L": 18.3,
+    "obi_tails through skirt_outer": 59.4,
+    "tail through bow_tails": 12.9,
+    "bow_tails through tail": 29.4,
+    "tail through skirt_outer": 2.8
+   },
+   "ear_new_depth_into_head_mm": 0.0,
+   "pearl_new_depth_into_head_mm": 0.0
+  },
+  "raised": {
+   "label": "ARMS RAISED Z +-1.3",
+   "skirt_poke_mm": {
+    "legL x inner": 0.0,
+    "legR x inner": 0.0,
+    "legL x mid": 0.0,
+    "legR x mid": 0.0,
+    "legL x outer": 0.0,
+    "legR x outer": 0.0
+   },
+   "layer_cross_mm": {
+    "inner outside mid": 0.0,
+    "mid outside outer": 0.0
+   },
+   "new_overlap_tris": {
+    "ear_L x sleeve_L": 132,
+    "ear_R x sleeve_R": 138,
+    "sleeve_L x robe": 129,
+    "sleeve_R x robe": 131
+   },
+   "shell_cross_mm": {},
+   "ear_new_depth_into_head_mm": 0.0,
+   "pearl_new_depth_into_head_mm": 0.0
+  },
+  "cast": {
+   "label": "CAST (RIGHT UPPER ARM -2.4 X, PARASOL)",
+   "skirt_poke_mm": {
+    "legL x inner": 0.0,
+    "legR x inner": 0.0,
+    "legL x mid": 0.0,
+    "legR x mid": 0.0,
+    "legL x outer": 0.0,
+    "legR x outer": 0.0
+   },
+   "layer_cross_mm": {
+    "inner outside mid": 0.0,
+    "mid outside outer": 0.0
+   },
+   "new_overlap_tris": {
+    "sleeve_R x robe": 123
+   },
+   "shell_cross_mm": {},
+   "ear_new_depth_into_head_mm": 0.0,
+   "pearl_new_depth_into_head_mm": 0.0
+  },
+  "carry": {
+   "label": "CARRY (PARASOL OVER THE SHOULDER)",
+   "skirt_poke_mm": {
+    "legL x inner": 0.0,
+    "legR x inner": 0.0,
+    "legL x mid": 0.0,
+    "legR x mid": 0.0,
+    "legL x outer": 0.0,
+    "legR x outer": 0.0
+   },
+   "layer_cross_mm": {
+    "inner outside mid": 0.8,
+    "mid outside outer": 1.4
+   },
+   "new_overlap_tris": {
+    "tail x skirt_outer": 2,
+    "tail x bow": 9,
+    "sleeve_R x robe": 82,
+    "obi_tails x skirt_outer": 7
+   },
+   "shell_cross_mm": {},
+   "ear_new_depth_into_head_mm": 0.0,
+   "pearl_new_depth_into_head_mm": 0.0
+  },
+  "head": {
+   "label": "HEAD TURNED +0.45 Y, NODDED +0.3 X",
+   "skirt_poke_mm": {
+    "legL x inner": 0.0,
+    "legR x inner": 0.0,
+    "legL x mid": 0.0,
+    "legR x mid": 0.0,
+    "legL x outer": 0.0,
+    "legR x outer": 0.0
+   },
+   "layer_cross_mm": {
+    "inner outside mid": 0.0,
+    "mid outside outer": 0.0
+   },
+   "new_overlap_tris": {
+    "ear_R x sleeve_R": 126,
+    "pearls x head": 209
+   },
+   "shell_cross_mm": {
+    "ear_R through sleeve_R": 5.5,
+    "sleeve_R through ear_R": 5.9
+   },
+   "ear_new_depth_into_head_mm": 0.0,
+   "pearl_new_depth_into_head_mm": 31.1
+  },
+  "lean": {
+   "label": "SPINE LEAN +-0.35 X, TWIST 0.4 Y",
+   "skirt_poke_mm": {
+    "legL x inner": 0.0,
+    "legR x inner": 0.0,
+    "legL x mid": 0.0,
+    "legR x mid": 0.0,
+    "legL x outer": 0.0,
+    "legR x outer": 0.0
+   },
+   "layer_cross_mm": {
+    "inner outside mid": 0.0,
+    "mid outside outer": 0.0
+   },
+   "new_overlap_tris": {
+    "tail x bow": 19,
+    "obi_tails x skirt_outer": 26
+   },
+   "shell_cross_mm": {
+    "obi_tails through skirt_outer": 58.5,
+    "skirt_outer through obi_tails": 4.5,
+    "tail through bow_tails": 15.0,
+    "bow_tails through tail": 43.9
+   },
+   "ear_new_depth_into_head_mm": 0.0,
+   "pearl_new_depth_into_head_mm": 0.0
+  },
+  "ears-up": {
+   "label": "EAR TIPS -1.05, EARS -0.35 X",
+   "skirt_poke_mm": {
+    "legL x inner": 0.0,
+    "legR x inner": 0.0,
+    "legL x mid": 0.0,
+    "legR x mid": 0.0,
+    "legL x outer": 0.0,
+    "legR x outer": 0.0
+   },
+   "layer_cross_mm": {
+    "inner outside mid": 0.0,
+    "mid outside outer": 0.0
+   },
+   "new_overlap_tris": {},
+   "shell_cross_mm": {},
+   "ear_new_depth_into_head_mm": 2.4,
+   "pearl_new_depth_into_head_mm": 0.0
+  },
+  "ears-down": {
+   "label": "EAR TIPS +0.6, EARS +0.35 X",
+   "skirt_poke_mm": {
+    "legL x inner": 0.0,
+    "legR x inner": 0.0,
+    "legL x mid": 0.0,
+    "legR x mid": 0.0,
+    "legL x outer": 0.0,
+    "legR x outer": 0.0
+   },
+   "layer_cross_mm": {
+    "inner outside mid": 0.0,
+    "mid outside outer": 0.0
+   },
+   "new_overlap_tris": {},
+   "shell_cross_mm": {},
+   "ear_new_depth_into_head_mm": 1.0,
+   "pearl_new_depth_into_head_mm": 0.0
+  },
+  "ears-z": {
+   "label": "EARS Z +-0.3 (OUT)",
+   "skirt_poke_mm": {
+    "legL x inner": 0.0,
+    "legR x inner": 0.0,
+    "legL x mid": 0.0,
+    "legR x mid": 0.0,
+    "legL x outer": 0.0,
+    "legR x outer": 0.0
+   },
+   "layer_cross_mm": {
+    "inner outside mid": 0.0,
+    "mid outside outer": 0.0
+   },
+   "new_overlap_tris": {},
+   "shell_cross_mm": {},
+   "ear_new_depth_into_head_mm": 24.1,
+   "pearl_new_depth_into_head_mm": 0.0
+  },
+  "tail-l": {
+   "label": "TAIL WAG -0.7",
+   "skirt_poke_mm": {
+    "legL x inner": 0.0,
+    "legR x inner": 0.0,
+    "legL x mid": 0.0,
+    "legR x mid": 0.0,
+    "legL x outer": 0.0,
+    "legR x outer": 0.0
+   },
+   "layer_cross_mm": {
+    "inner outside mid": 0.0,
+    "mid outside outer": 0.0
+   },
+   "new_overlap_tris": {},
+   "shell_cross_mm": {},
+   "ear_new_depth_into_head_mm": 0.0,
+   "pearl_new_depth_into_head_mm": 0.0
+  },
+  "tail-r": {
+   "label": "TAIL WAG +0.7 (DROOP -0.3)",
+   "skirt_poke_mm": {
+    "legL x inner": 0.0,
+    "legR x inner": 0.0,
+    "legL x mid": 0.0,
+    "legR x mid": 0.0,
+    "legL x outer": 0.0,
+    "legR x outer": 0.0
+   },
+   "layer_cross_mm": {
+    "inner outside mid": 0.0,
+    "mid outside outer": 0.0
+   },
+   "new_overlap_tris": {},
+   "shell_cross_mm": {},
+   "ear_new_depth_into_head_mm": 0.0,
+   "pearl_new_depth_into_head_mm": 0.0
+  },
+  "face: jaw .42": {
+   "pearl_new_depth_into_head_mm": 0.0,
+   "new_overlap_tris": {}
+  },
+  "face: jaw .42 + head nod .3": {
+   "pearl_new_depth_into_head_mm": 24.0,
+   "new_overlap_tris": {
+    "pearls x head": 151
+   }
+  },
+  "face: head nod .25 (the game max)": {
+   "pearl_new_depth_into_head_mm": 19.1,
+   "new_overlap_tris": {
+    "pearls x head": 124
+   }
+  },
+  "face: head turn .45": {
+   "pearl_new_depth_into_head_mm": 10.7,
+   "new_overlap_tris": {
+    "ear_R x sleeve_R": 84,
+    "pearls x head": 63
+   }
+  }
+ },
+ "earGain_sweep_full": {
+  "1.00": {
+   "ear_new_depth_into_head_mm_max": 1.6,
+   "ear_sleeve_cross_mm_max": 7.4,
+   "worst_at_Sa_tip_ear": [
+    0.87,
+    0.58,
+    0.194
+   ]
+  },
+  "0.80": {
+   "ear_new_depth_into_head_mm_max": 2.0,
+   "ear_sleeve_cross_mm_max": 4.9,
+   "worst_at_Sa_tip_ear": [
+    -0.16,
+    -0.181,
+    -0.033
+   ]
+  },
+  "0.60": {
+   "ear_new_depth_into_head_mm_max": 4.1,
+   "ear_sleeve_cross_mm_max": 0,
+   "worst_at_Sa_tip_ear": [
+    -1.2,
+    -0.781,
+    -0.166
+   ]
+  },
+  "0.50": {
+   "ear_new_depth_into_head_mm_max": 5.3,
+   "ear_sleeve_cross_mm_max": 0,
+   "worst_at_Sa_tip_ear": [
+    -1.2,
+    -0.697,
+    -0.141
+   ]
+  },
+  "0.40": {
+   "ear_new_depth_into_head_mm_max": 6.6,
+   "ear_sleeve_cross_mm_max": 0,
+   "worst_at_Sa_tip_ear": [
+    -1.2,
+    -0.593,
+    -0.116
+   ]
+  },
+  "0.30": {
+   "ear_new_depth_into_head_mm_max": 8.1,
+   "ear_sleeve_cross_mm_max": 0,
+   "worst_at_Sa_tip_ear": [
+    -1.2,
+    -0.469,
+    -0.088
+   ]
+  }
+ },
+ "largest_safe_earGain_full_range": 0.8,
+ "earGain_sweep_walk": {
+  "1.00": {
+   "ear_new_depth_into_head_mm_max": 1.7,
+   "ear_sleeve_cross_mm_max": 0,
+   "worst_at_Sa_tip_ear": [
+    0.91,
+    0.583,
+    0.201
+   ]
+  },
+  "0.80": {
+   "ear_new_depth_into_head_mm_max": 1.8,
+   "ear_sleeve_cross_mm_max": 5.8,
+   "worst_at_Sa_tip_ear": [
+    -0.23,
+    -0.251,
+    -0.045
+   ]
+  },
+  "0.60": {
+   "ear_new_depth_into_head_mm_max": 2.9,
+   "ear_sleeve_cross_mm_max": 2.5,
+   "worst_at_Sa_tip_ear": [
+    -0.23,
+    -0.19,
+    -0.034
+   ]
+  },
+  "0.50": {
+   "ear_new_depth_into_head_mm_max": 3.9,
+   "ear_sleeve_cross_mm_max": 0,
+   "worst_at_Sa_tip_ear": [
+    -0.8,
+    -0.512,
+    -0.097
+   ]
+  },
+  "0.40": {
+   "ear_new_depth_into_head_mm_max": 4.8,
+   "ear_sleeve_cross_mm_max": 0,
+   "worst_at_Sa_tip_ear": [
+    -0.8,
+    -0.423,
+    -0.079
+   ]
+  },
+  "0.30": {
+   "ear_new_depth_into_head_mm_max": 5.7,
+   "ear_sleeve_cross_mm_max": 0,
+   "worst_at_Sa_tip_ear": [
+    -0.8,
+    -0.325,
+    -0.059
+   ]
+  }
+ },
+ "largest_safe_earGain_walk": 1.0,
+ "closed_eye_eyeball_rays_per_view_of_7200": {
+  "L front": 0,
+  "L front back faces": 1,
+  "L 34in": 0,
+  "L 34in back faces": 0,
+  "L 34out": 5,
+  "L 34out back faces": 3,
+  "L game+45": 0,
+  "L game+45 back faces": 0,
+  "L game-45": 0,
+  "L game-45 back faces": 0,
+  "R front": 0,
+  "R front back faces": 0,
+  "R 34in": 0,
+  "R 34in back faces": 0,
+  "R 34out": 5,
+  "R 34out back faces": 2,
+  "R game+45": 0,
+  "R game+45 back faces": 0,
+  "R game-45": 0,
+  "R game-45 back faces": 0
+ },
+ "open_mouth_rays_of_3000": {
+  "smile 0.4 front": {
+   "back_face_rays (holes)": 0,
+   "cavity_or_tongue_rays": 518
+  },
+  "smile 0.4 34L": {
+   "back_face_rays (holes)": 0,
+   "cavity_or_tongue_rays": 473
+  },
+  "smile 0.4 34R": {
+   "back_face_rays (holes)": 0,
+   "cavity_or_tongue_rays": 473
+  },
+  "smile 0.4 game+45": {
+   "back_face_rays (holes)": 0,
+   "cavity_or_tongue_rays": 7
+  },
+  "smile 0.4 game-45": {
+   "back_face_rays (holes)": 0,
+   "cavity_or_tongue_rays": 7
+  },
+  "smile 0.4 below": {
+   "back_face_rays (holes)": 0,
+   "cavity_or_tongue_rays": 786
+  },
+  "smile 1.0 front": {
+   "back_face_rays (holes)": 0,
+   "cavity_or_tongue_rays": 518
+  },
+  "smile 1.0 34L": {
+   "back_face_rays (holes)": 0,
+   "cavity_or_tongue_rays": 476
+  },
+  "smile 1.0 34R": {
+   "back_face_rays (holes)": 0,
+   "cavity_or_tongue_rays": 476
+  },
+  "smile 1.0 game+45": {
+   "back_face_rays (holes)": 0,
+   "cavity_or_tongue_rays": 12
+  },
+  "smile 1.0 game-45": {
+   "back_face_rays (holes)": 0,
+   "cavity_or_tongue_rays": 12
+  },
+  "smile 1.0 below": {
+   "back_face_rays (holes)": 0,
+   "cavity_or_tongue_rays": 790
+  }
+ },
+ "hole_points_sample": []
+}

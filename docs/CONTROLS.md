@@ -68,6 +68,9 @@ The default mapping uses Xbox names (the Deck's face buttons match):
   - D-pad or the left stick moves focus, **A** selects, **B** goes back, **LB / RB** switch tabs, and **X / Y** act per
     panel (drop, compare, learn).
   - Tooltips follow the focus.
+  - **L3** on a piece of gear (the bag, the stash, worn slots, a shop) shows its tooltip's details, and again hides them.
+    They stay shown until pressed again. The hint bar says "L3 Details" or "L3 Less" (docs/STATS.md §1). With the
+    mouse: hold Shift.
 - **Drag-and-drop actions** (the inventory, hotbar assignment) get controller equivalents, such as "A to pick up, A to place"
   or a context menu.
 - **The dialogue typewriter**: A advances, B skips.
@@ -1259,6 +1262,7 @@ radius.
 | `dash` (Flash Draw, Puddle Hop, Afterimage Dash, Gallant Charge, Substitution, Caltrop Flip) | **escape first**: with the move stick (or WASD) pushed, where it points, the full distance; with no move input, its attack form: Flash Draw, Afterimage Dash and Gallant Charge cut the line through the most foes, Puddle Hop lands on the cluster, Substitution blinks away from the lock (its log stays to taunt), Caltrop Flip flips away from the lock (the caltrops fall between) |
 | `heal` (Onigiri Toss, Wayhome Lantern) | beside the hero, leaning up to 1.2 m toward the lock, so the hero is always in it |
 | `self` (shouts, novas, stances, buffs, wards, summons, the channels Whirlwind Stance and Melancholy Maelstrom) | no aim; the hero still turns to the lock as the cast starts |
+| `ally` (Stella's Kind Light, Halo, Sun Dog: docs/STELLA.md §5.1) | the **ally who needs it most** among her pack in range (her, Shadow awake, Hinata; co-op heroes later): the lowest life after shells, × 0.85 if hit in the last 1.5 s, × 0.7 under 35%, Hinata only when nobody else is under 95%. Kind Light with every ally over 90% **falls back to a foe** by the `line` rule (`fallback: 'line'`) and fires as a Golden Ray; Halo goes to an ally without one, the one under attack first (foes within 2.5 m going for them), else to her; Sun Dog is always Shadow (a fainted Shadow too: it wakes him) |
 
 - **Running away** (the core case): the lock is all round, so a skill pressed with the stick pointing away still goes at
   the lock or its cluster. The cast turns the hero to it (`tryCast` faces the aim) and roots him for the cast's frames
@@ -1288,6 +1292,9 @@ radius.
   Lance, Sunshower, Ember Breath, Divebomb Swoop (the whelp flies to the cluster); `line` True Flight; `cone` Tailwag
   Volley; `leap` Sunfall Jump; `dash` Gallant Charge; `self` Pinwheel Sweep, Wing Shield, Mighty Little Roar, Dragon
   Heart.
+- **Stella**: the wagasa's Sunsweep is `melee`. `target` Solar Ray (the beam follows the lock); `ground` Solar Flare,
+  Sunspot, Rising Sun (her marker is gold: `markerTex(r, gold)`); `line` Golden Ray, Skipping Sun; `cone` Glint, Prism; `ally`
+  Kind Light (falls back to `line`), Halo, Sun Dog; `self` Sundial, Little Sun, Morning Light, Daybreak.
 
 **The dashes and leaps, one by one** (the owner's judgement call: a movement skill while fleeing goes where the stick
 points; an attack-leap goes at the cluster):
@@ -1308,6 +1315,11 @@ points; an attack-leap goes at the cluster):
 - **A manual pick holds 5 s**, or until it dies or is left 1.6 × the lock range behind. Each cast at it keeps it at least
   2.5 s from that cast, so a foe you are fighting stays picked.
 
+- **Her heals by hand** (Stella, `ally`): the mouse in any mode: a heal cast with an ally under the cursor (Shadow, or
+  herself within 0.5 m) goes to them (`stlAllyFor`). Touch: a tap on Shadow picks him for her heals for 5 s (game.js
+  `touchTap` → `G.skills.stlPickAlly`; "Heals: Shadow" floats). The pad: smart in solo; co-op will add an ally ring (R3
+  cycles allies while a heal is held).
+
 ### 13.5 Feedback
 - **The lock ring** (§8.3): cream and gold, opacity 0.9, normal blending, in every device's Auto.
 - **The AoE marker**: while a `ground` or `leap` skill charges, in Assist and Auto, a thin dashed cream ring (an ink edge)
@@ -1321,6 +1333,9 @@ points; an attack-leap goes at the cluster):
     the drop. Aimed off the ground itself (the mouse over the sea), it lies flat and whole, as before.
 - **Shadow's tip**, once, at the first auto lock in a fight: the ring is your target, and how to pick another on this
   device.
+
+- **The ally ring** (Stella): while an `ally` skill charges, a soft rose-gold ring (normal blended) sits under the ally
+  it will go to (`gfx/stellaFx.js allyRing`, driven from `combat/stellaArts.js`).
 
 ### 13.6 Assist on the mouse (the PC default)
 - The mouse aims as before; a foe under the cursor is still the target. Otherwise a skill snaps:

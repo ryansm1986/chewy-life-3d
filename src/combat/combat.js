@@ -24,6 +24,7 @@ const bySeq = (a, b) => a._cseq - b._cseq;
 // (ui/fx.js merges consecutive totals there, so a long burst reads as one growing number). A Great Wave through 40 foes
 // shows a handful of numbers, the crits and a total instead of 40 overlapping ones. Below the budget nothing changes.
 const FLOAT_FREE = 8, FLOAT_CRITS = 6;
+const SUN_GOLD = '#ffd36a'; // (Stella's fire numbers: sun gold, not fire orange)
 
 export class Combat {
   constructor(G, world) {
@@ -204,10 +205,11 @@ export class Combat {
     C.bad++; C.kinds[kind] = (C.kinds[kind] || 0) + 1;
     if (C.bad <= 5) console.warn(`[gridcheck] ${kind} mismatch: scan ${want.length} vs grid ${got.length}`);
   }
-  playerBonusPct() { let b = 0; if (this.buffs.howl?.t > 0) b += this.buffs.howl.dmg; if (this.buffs.roar?.t > 0) b += this.buffs.roar.dmg; return b; } // (roar: the dragoon's Mighty Little Roar)
+  playerBonusPct() { let b = 0; if (this.buffs.howl?.t > 0) b += this.buffs.howl.dmg; if (this.buffs.roar?.t > 0) b += this.buffs.roar.dmg; if (this.buffs.daybreak?.t > 0) b += this.buffs.daybreak.dmg; return b; } // (roar: the dragoon's Mighty Little Roar; daybreak: Stella's Daybreak, combat/stellaArts.js)
   // Player (or ally) hits a monster with a skill-scaled hit
-  // critAdd / critX / forceCrit: Poe's strikes from behind and Vanish's double crit (stats.js rollHit)
-  hitMonster(m, { dmgPct = 100, element = 'phys', knock = 0, stun = 0, from = null, noCrit = false, flat = 0, source = 'player', mult = 1, silent = false, critAdd = 0, critX = 1, forceCrit = false } = {}) {
+  // critAdd / critX / forceCrit: Poe's strikes from behind and Vanish's double crit (stats.js rollHit); look: 'sun' (Stella's
+  // fire drawn as sunlight: its number in sun gold, its spark gold, never a flame: docs/STELLA.md §4.1)
+  hitMonster(m, { dmgPct = 100, element = 'phys', knock = 0, stun = 0, from = null, noCrit = false, flat = 0, source = 'player', mult = 1, silent = false, critAdd = 0, critX = 1, forceCrit = false, look = null } = {}) {
     if (!m.alive) return 0;
     const G = this.G, D = G.derived;
     const r = rollHit({ derived: D, skillDmgPct: dmgPct, element, target: { def: m.stats.def, res: m.stats.res, level: m.stats.level }, bonusPct: this.playerBonusPct(), noCrit, critAdd, critX, forceCrit });
@@ -219,17 +221,17 @@ export class Combat {
       const fr = G.state.player.skills.frenzy;
       if (fr) { const p = G.skillParams?.('frenzy'); if (p) { const b = this.buffs.frenzy ||= { stacks: 0, t: 0 }; b.stacks = Math.min(p.maxStacks, b.stacks + 1); b.t = p.duration; b.per = p.perStack; } }
     }
-    this.applyDamageToMonster(m, dmg, { element: r.element || element, crit: r.crit, knock, stun, from, silent });
+    this.applyDamageToMonster(m, dmg, { element: r.element || element, crit: r.crit, knock, stun, from, silent, look });
     return dmg;
   }
-  applyDamageToMonster(m, dmg, { element = 'phys', crit = false, knock = 0, stun = 0, from = null, silent = false } = {}) {
+  applyDamageToMonster(m, dmg, { element = 'phys', crit = false, knock = 0, stun = 0, from = null, silent = false, look = null } = {}) {
     const G = this.G;
     // per-monster damage filter (region monsters: Heike-gani's armoured front) — docs/REGIONS.md §3.4
     // (m.def?: pots and other breakables are hit through here too and have no def)
     if (m.def?.damageTaken) { dmg = m.def.damageTaken(m, dmg, { element, crit, from }); if (!(dmg > 0)) return; dmg = Math.max(1, Math.round(dmg)); }
     m.takeDamage(dmg, { element, crit, knock, stun, from });
     if (!silent) {
-      this.dmgFloat(m.pos.x, m.pos.y + (m.height || 1) + 0.2, m.pos.z, dmg, crit, crit ? `${dmg}!` : `${dmg}`, { kind: crit ? 'crit' : 'dmg', color: element !== 'phys' ? ELEMENT_COLORS[element] : undefined, ref: minorHit(m) });
+      this.dmgFloat(m.pos.x, m.pos.y + (m.height || 1) + 0.2, m.pos.z, dmg, crit, crit ? `${dmg}!` : `${dmg}`, { kind: crit ? 'crit' : 'dmg', color: look === 'sun' ? SUN_GOLD : element !== 'phys' ? ELEMENT_COLORS[element] : undefined, ref: minorHit(m) });
       if (m.big) {
         // big bodies: burst on the side facing the attacker at chest height (not over the face), small flash, rate-limited
         const t = G.engine.time || 0;
@@ -237,12 +239,12 @@ export class Combat {
           m._hitFxT = t;
           const src = from || G.player?.pos || m.pos;
           _v.set(src.x - m.pos.x, 0, src.z - m.pos.z); if (_v.lengthSq() < 1e-4) _v.set(0, 0, 1); _v.normalize().multiplyScalar((m.bodyR || m.radius || 1) * 0.85);
-          G.vfx.hit(new THREE.Vector3(m.pos.x + _v.x, m.pos.y + Math.min((m.height || 1) * 0.4, 1.1), m.pos.z + _v.z), { crit, element, soft: true });
+          G.vfx.hit(new THREE.Vector3(m.pos.x + _v.x, m.pos.y + Math.min((m.height || 1) * 0.4, 1.1), m.pos.z + _v.z), { crit, element: look === 'sun' ? 'holy' : element, soft: true });
         }
       } else {
         // rapid repeat hits on one foe (barrages, ricochets, ticks) get the soft burst, so the stacked flashes don't white it out
         const t = G.engine.time || 0, rapid = !crit && t - (m._hitFxT || -9) < 0.09; m._hitFxT = t;
-        G.vfx.hit(m.pos.clone().setY(m.pos.y + (m.height || 1) * 0.5), { crit, element, soft: rapid, r: m.bodyR || m.radius || 0.45 }); // (r: the glow stays the foe's size)
+        G.vfx.hit(m.pos.clone().setY(m.pos.y + (m.height || 1) * 0.5), { crit, element: look === 'sun' ? 'holy' : element, soft: rapid, r: m.bodyR || m.radius || 0.45 }); // (r: the glow stays the foe's size; Stella's sunlight: the soft gold spark, never flames)
       }
       Events.emit('sfx', crit ? 'hit_crit' : 'hit_flesh', { pos: m.pos });
       if (crit) { G.engine.rig.shake(0.35); G.engine.hitStop = Math.max(G.engine.hitStop, 0.05); }
@@ -259,7 +261,8 @@ export class Combat {
     let dmg = playerDamageTaken(G.derived, raw, element, level);
     if (this.buffs.cursed?.t > 0) dmg *= 1 + this.buffs.cursed.pct / 100;
     if (G.skills?.shihtzuGuard) { dmg = G.skills.shihtzuGuard(dmg, src); if (dmg < 0.5) return 0; }
-    if (G.skills?.goldenGuard) { dmg = G.skills.goldenGuard(dmg, src); if (dmg < 0.5) return 0; } // (the dragoon: the Wing Shield's absorb, Steady Paws' brace — combat/goldenArts.js) // (the Shih Tzu: his damage reduction, the Gloom Blanket, Bone Ward's barrier, the lantern's rekindle — combat/shihtzuSkills.js; 0: soaked whole)
+    if (G.skills?.goldenGuard) { dmg = G.skills.goldenGuard(dmg, src); if (dmg < 0.5) return 0; }
+    if (G.skills?.stellaGuard) { dmg = G.skills.stellaGuard(dmg, src); if (dmg < 0.5) return 0; } // (Stella: the Zoomies' dodge, her halo and sun shell, Hope Springs — combat/stellaSkills.js) // (the dragoon: the Wing Shield's absorb, Steady Paws' brace — combat/goldenArts.js) // (the Shih Tzu: his damage reduction, the Gloom Blanket, Bone Ward's barrier, the lantern's rekindle — combat/shihtzuSkills.js; 0: soaked whole)
     // a charged Sakura Storm's Blade Wall: a blade shatters instead (docs/CHARGE.md)
     if (G.skills?.boneBlock?.()) { G.ui?.float?.(p.pos.clone().setY(p.pos.y + 1.4), 'Bonk!', { kind: 'status', color: '#fff0c8' }); return 0; }
     // Moka's Bubble Barrier soaks the hit first (mokaSpells.absorb → what gets through)
@@ -280,7 +283,8 @@ export class Combat {
     if (G.derived.thorns && src?.alive) this.applyDamageToMonster(src, Math.round(G.derived.thorns), { element: 'phys', silent: false });
     return r?.dead ? -1 : dmg;
   }
-  hitAlly(a, raw, { element = 'phys', from = null } = {}) {
+  hitAlly(a, raw, { element = 'phys', from = null, level = 1 } = {}) {
+    if (a._coopSlot && this.G.coop?.active) return this.G.coop.with(a._coopSlot, () => this.hitPlayer(raw, { element, from, level })); // (couch co-op: a hero caught as an "ally" is hit as themselves)
     if (!a.alive) return;
     const dmg = Math.max(1, Math.round(raw * (1 - (a.res?.[element] || 0) / 100)));
     a.takeDamage(dmg, { element, from });
@@ -293,11 +297,11 @@ export class Combat {
       this.spawn({ team: 'enemy', kind: 'spark', pos: m.pos.clone().setY(0.6), dir: new THREE.Vector3(Math.cos(a), 0, Math.sin(a)), speed: 6, range: 5, radius: 0.25, dmg: m.stats.zapBurst?.dmg || [1, 5], element: 'zap', level: m.stats.level });
     }
   }
-  spawn(opts) { const p = new Projectile(this, opts); this.projectiles.push(p); return p; }
+  spawn(opts) { const p = new Projectile(this, opts); p._slot = this.G.coop?.cur || null; this.projectiles.push(p); return p; }
   /** a fresh mesh of every projectile look (for the floor prewarm in game.js) */
   projectileLooks() { const looks = projectileLooks(), sc = this.G.world?.scene; for (const m of looks) adoptSprites(m, sc); return looks; } // (their glows go through the sprite batch, which gets compiled and drawn with them)
   // ground zones: {pos, radius, t, life, tick, onTick(zone), team, visual}
-  addZone(z) { z.t = 0; z.acc = 0; this.zones.push(z); return z; }
+  addZone(z) { z.t = 0; z.acc = 0; z._slot ??= this.G.coop?.cur || null; this.zones.push(z); return z; } // (_slot: couch co-op, it ticks as the hero it was made by or aimed at)
   /** a damage number over a monster, within the frame's budget (see FLOAT_FREE) */
   dmgFloat(x, y, z, dmg, crit, text, opts) {
     const B = this.fb ||= { n: 0, c: 0, k: 0, sum: 0, x: 0, y: 0, z: 0 };
@@ -318,22 +322,27 @@ export class Combat {
       if (!e.alive || !e.status) continue;
       const s = e.status;
       for (const k of ['stun', 'fear', 'freeze', 'blind']) if (s[k] > 0) s[k] -= dt; // (blind: Poe's smoke — monsters miss, dungeon/monster.js)
+      if (s.blindMiss && !(s.blind > 0)) s.blindMiss = 0; // (a dazzle's miss chance ends with it: Stella's Glint / Daybreak)
       if (s.slow?.t > 0) s.slow.t -= dt;
-      if (s.burn?.t > 0) { s.burn.t -= dt; s.burn.acc = (s.burn.acc || 0) + dt; if (s.burn.acc > 0.5) { s.burn.acc = 0; this.applyDamageToMonster(e, Math.max(1, Math.round(s.burn.dps * 0.5)), { element: 'fire', silent: true }); G.vfx.fire(e.pos.clone().setY(e.pos.y + 0.5), 2); this.dmgFloat(e.pos.x, e.pos.y + 1.2, e.pos.z, Math.round(s.burn.dps * 0.5), false, `${Math.round(s.burn.dps * 0.5)}`, { kind: 'dmg', color: '#ff9a3c', ref: minorHit(e) }); } }
+      if (s.burn?.t > 0) { s.burn.t -= dt; s.burn.acc = (s.burn.acc || 0) + dt; if (s.burn.acc > 0.5) { s.burn.acc = 0; const sun = s.burn.sun; this.applyDamageToMonster(e, Math.max(1, Math.round(s.burn.dps * 0.5)), { element: 'fire', silent: true }); if (sun) G.vfx.stl?.shimmer(e); else G.vfx.fire(e.pos.clone().setY(e.pos.y + 0.5), 2); this.dmgFloat(e.pos.x, e.pos.y + 1.2, e.pos.z, Math.round(s.burn.dps * 0.5), false, `${Math.round(s.burn.dps * 0.5)}`, { kind: 'dmg', color: sun ? SUN_GOLD : '#ff9a3c', ref: minorHit(e) }); } } // (sun: Stella's sunburn, a golden shimmer: combat/stellaSkills.js)
       if (s.poison?.t > 0) { s.poison.t -= dt; s.poison.acc = (s.poison.acc || 0) + dt; if (s.poison.acc > 0.5) { s.poison.acc = 0; this.applyDamageToMonster(e, Math.max(1, Math.round(s.poison.dps * 0.5)), { element: 'stink', silent: true }); G.vfx.stink(e.pos.clone().setY(e.pos.y + 0.4), 1); } }
     }
     // player buffs
     for (const k of Object.keys(this.buffs)) { const b = this.buffs[k]; if (b.t !== undefined) { b.t -= dt; if (b.t <= 0) { if (k === 'frenzy') b.stacks = 0; delete this.buffs[k]; } } }
     // projectiles
-    for (let i = this.projectiles.length - 1; i >= 0; i--) { const p = this.projectiles[i]; if (!p.update(dt)) { p.dispose(); this.projectiles.splice(i, 1); } }
+    const C = G.coop; // (couch co-op: a projectile or zone made in a hero's context flies and ticks in it, coop/coop.js)
+    for (let i = this.projectiles.length - 1; i >= 0; i--) { const p = this.projectiles[i]; if (!(p._slot && C ? C.with(p._slot, () => p.update(dt)) : p.update(dt))) { p.dispose(); this.projectiles.splice(i, 1); } }
     // zones
     for (let i = this.zones.length - 1; i >= 0; i--) {
       const z = this.zones[i]; z.t += dt; z.acc += dt;
-      if (z.update) z.update(dt, z);
-      if (z.tick && z.acc >= z.tick) { z.acc = 0; z.onTick?.(z); }
+      if (z._slot && C) { if (z.update) C.with(z._slot, () => z.update(dt, z)); if (z.tick && z.acc >= z.tick) { z.acc = 0; C.with(z._slot, () => z.onTick?.(z)); } }
+      else {
+        if (z.update) z.update(dt, z);
+        if (z.tick && z.acc >= z.tick) { z.acc = 0; z.onTick?.(z); }
+      }
       if (z.t >= z.life) { z.dispose?.(); this.zones.splice(i, 1); }
     }
   }
-  moveMul() { let m = 1; if (this.buffs.howl?.t > 0) m += this.buffs.howl.move / 100; if (this.buffs.roar?.move && this.buffs.roar.t > 0) m += this.buffs.roar.move / 100; /* (a charged roar's Pep Talk) */ if (this.buffs.frenzy?.stacks) m += (this.buffs.frenzy.stacks * (this.buffs.frenzy.per || 6)) / 100; return m; }
+  moveMul() { let m = 1; if (this.buffs.howl?.t > 0) m += this.buffs.howl.move / 100; if (this.buffs.daybreak?.t > 0) m += this.buffs.daybreak.move / 100; if (this.buffs.chorus?.t > 0) m += this.buffs.chorus.move / 100; /* (Stella's Daybreak and Dawn Chorus) */ if (this.buffs.roar?.move && this.buffs.roar.t > 0) m += this.buffs.roar.move / 100; /* (a charged roar's Pep Talk) */ if (this.buffs.frenzy?.stacks) m += (this.buffs.frenzy.stacks * (this.buffs.frenzy.per || 6)) / 100; return m; }
   atkMul() { let m = 1; if (this.buffs.frenzy?.stacks) m += (this.buffs.frenzy.stacks * (this.buffs.frenzy.per || 6)) / 100; if (this.buffs.roar?.t > 0) m += this.buffs.roar.aspd / 100; if (this.buffs.retrieve?.t > 0) m += this.buffs.retrieve.aspd / 100; return m; } // (roar, retrieve: the dragoon's roar and Good Retriever)
 }

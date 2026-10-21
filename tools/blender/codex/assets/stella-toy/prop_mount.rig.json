@@ -1,0 +1,151 @@
+{
+  "units": "metres; game axes [x, y, z] = Blender [x, z, -y]; the game rebuilds bones without rotation, so a bone frame is the model frame translated to the bone head",
+  "parasol": {
+    "prop": "/models/stella-parasol.glb (the sun wagasa)",
+    "prop_axis": "the shaft runs along the prop's +Y (game), the canopy at +Y; origin = the grip, just above the hooked handle",
+    "grip_radius_m": 0.021,
+    "canopy_top_prop_y_m": 0.646,
+    "hook_bottom_prop_y_m": -0.2115,
+    "finial_prop_game": [
+      0.0,
+      0.63,
+      -0.0
+    ],
+    "canopy_across_m": 0.796,
+    "in_right_paw": {
+      "bone": "hand_R",
+      "position_in_bone_frame": [
+        -0.03976,
+        -0.03183,
+        0.0025
+      ],
+      "upright_quaternion_xyzw": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "cast_quaternion_xyzw": [
+        0.831517,
+        -0.078793,
+        0.117034,
+        0.537283
+      ],
+      "note": "quaternions map the prop's game axes into the hand bone's frame (bones carry no rest rotation). upright: the shaft vertical with the arm at rest; cast: with the right upper arm at (-2.4, 0, -0.12) the wagasa is raised over her head, leaning about 30 deg out and back (the canopy clear of her face from yaws 0 to +-45)"
+    },
+    "carry_over_shoulder": {
+      "pose": {
+        "upperarm_R": [
+          -0.55,
+          0,
+          -0.1
+        ],
+        "forearm_R": [
+          -1.0,
+          0,
+          0
+        ]
+      },
+      "in_hand_R": {
+        "position_in_bone_frame": [
+          -0.03976,
+          -0.03183,
+          0.0025
+        ],
+        "quaternion_xyzw": [
+          0.264693,
+          -0.141442,
+          0.392361,
+          0.869474
+        ]
+      },
+      "or_on_chest": {
+        "bone": "chest",
+        "position_in_bone_frame": [
+          -0.37931,
+          -0.02008,
+          0.16161
+        ],
+        "position_model_game": [
+          -0.37931,
+          0.56792,
+          0.17561
+        ],
+        "quaternion_xyzw": [
+          -0.421275,
+          0.170075,
+          0.333494,
+          0.826065
+        ]
+      },
+      "shaft_axis_game": [
+        -0.69427,
+        0.42262,
+        -0.58256
+      ],
+      "carry_direction_deg": {
+        "tilt_from_vertical": 65.0,
+        "heading_from_back_toward_right": 50.0
+      },
+      "note": "walking: the paw beside her right shoulder holds the grip; the wagasa leans back and out past the shoulder, the canopy behind her head (none of her face covered from yaws 0 to +-90 at 45 deg elevation; the right ear cleared by 88 mm at rest). Use in_hand_R while the arm holds the pose, or the chest mount if the arm keeps swinging (the paw then floats near the grip)"
+    }
+  },
+  "palms": {
+    "R": {
+      "bone": "hand_R",
+      "hand_head_game": [
+        -0.32371,
+        0.4433,
+        0.02073
+      ],
+      "palm_centre_game": [
+        -0.36347,
+        0.41148,
+        0.02323
+      ],
+      "palm_offset_in_hand_frame_game": [
+        -0.03976,
+        -0.03183,
+        0.0025
+      ],
+      "fist_axis_game": [
+        0.0321,
+        0.03825,
+        0.99875
+      ],
+      "arm_axis_game": [
+        -0.64199,
+        -0.76509,
+        0.04994
+      ]
+    },
+    "L": {
+      "bone": "hand_L",
+      "hand_head_game": [
+        0.32371,
+        0.4433,
+        0.02073
+      ],
+      "palm_centre_game": [
+        0.36347,
+        0.41148,
+        0.02323
+      ],
+      "palm_offset_in_hand_frame_game": [
+        0.03976,
+        -0.03183,
+        0.0025
+      ],
+      "fist_axis_game": [
+        -0.0321,
+        0.03825,
+        0.99875
+      ],
+      "arm_axis_game": [
+        0.64199,
+        -0.76509,
+        0.04994
+      ]
+    }
+  }
+}

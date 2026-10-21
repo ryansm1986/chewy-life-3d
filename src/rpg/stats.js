@@ -27,7 +27,8 @@
 //   dodge (% chance a monster's hit misses the hero: Poe's class + Swift as Wind; 0 for the others), treeDmgPct{tree:%},
 //   treeCostCut{tree:%} and jutsuMul (Poe: skillsPoe.js poePassives); dmgReduce (% less damage taken: the Shih Tzu's class and
 //   Iron Topknot), hexMul, hexDur, hexStacks, pupBonus (the Shih Tzu: skillsShihtzu.js shihtzuPassives); javMul, whelpMul,
-//   brace, retrieve, burnDur, shadowRevive, shadowRegen (the Golden Retriever dragoon: skillsGolden.js goldenPassives).
+//   brace, retrieve, burnDur, shadowRevive, shadowRegen (the Golden Retriever dragoon: skillsGolden.js goldenPassives); healMul,
+//   shieldMul, sunlit, sunburn, zoomies, sunTrait (Stella: skillsStella.js stellaPassives).
 //
 // Affix value semantics (item affixes add into these; only computeStats interprets them):
 //   dmgMin/dmgMax = flat added to weapon base damage; def = flat defense (enhanced-defense affixes are pre-converted
@@ -40,6 +41,7 @@ import { mokaPassives } from './skillsMoka.js';
 import { poePassives } from './skillsPoe.js';
 import { shihtzuPassives } from './skillsShihtzu.js';
 import { goldenPassives } from './skillsGolden.js';
+import { stellaPassives } from './skillsStella.js';
 import { mealAcc, mealPost } from '../life/meals.js';
 import { soakAcc, soakPost } from './zoneBuffs.js';
 
@@ -139,7 +141,7 @@ export function computeStats(state) {
   d.allSkills = acc.allSkills;
   d.cls = CL.id;
   d.treeSkills = {};
-  for (const t of ['bone', 'fetch', 'spirit', 'tide', 'star', 'duck', 'shuriken', 'jutsu', 'shadow', 'flail', 'hex', 'tome', 'lance', 'javelin', 'whelp']) d.treeSkills[t] = acc.treeSkills[t] || 0;
+  for (const t of ['bone', 'fetch', 'spirit', 'tide', 'star', 'duck', 'shuriken', 'jutsu', 'shadow', 'flail', 'hex', 'tome', 'lance', 'javelin', 'whelp', 'ray', 'flare', 'dawn']) d.treeSkills[t] = acc.treeSkills[t] || 0;
   d.skillBonus = { ...acc.skillBonus };
 
   // skill levels & synergies
@@ -156,7 +158,7 @@ export function computeStats(state) {
   const w = eq[weaponSlot];
   d.weaponSlot = weaponSlot;
   d.unarmed = !w;
-  d.weaponType = w ? w.wtype : (CL.weapons[0] === 'staff' || CL.weapons[0] === 'fuma' || CL.weapons[0] === 'flail' || CL.weapons[0] === 'lance' ? CL.weapons[0] : 'sword'); // bare paws: the class's own style
+  d.weaponType = w ? w.wtype : (CL.weapons[0] === 'staff' || CL.weapons[0] === 'fuma' || CL.weapons[0] === 'flail' || CL.weapons[0] === 'lance' || CL.weapons[0] === 'parasol' ? CL.weapons[0] : 'sword'); // bare paws: the class's own style
   let masteryPct = 0, masteryCrit = 0;
   d.ballSpeed = 1;
   let extraPierce = 0;
@@ -234,6 +236,7 @@ export function computeStats(state) {
   d.dmgReduce = 0;
   if (CL.id === 'shihtzu') shihtzuPassives(d, L, CL); // (his masteries, Energy for the dark arts, Iron Topknot's life, the class's damage reduction)
   if (CL.id === 'golden') goldenPassives(d, L, CL); // (his masteries, Dexterity for the javelins, Energy for the whelp, Steady Paws, Shadow's bond)
+  if (CL.id === 'stella') stellaPassives(d, L, CL); // (her masteries, Sunlit, Sunburn, Sunny Disposition's healing, the Sunrise Blessing)
   mealPost(P.meal, d); // (Hearty's max life / regen, and d.meal for the UI)
   soakPost(P.soak, d);
   return d;

@@ -8,6 +8,7 @@ import { SAMURAI_ACTIONS, SAMURAI_OVERRIDES, SAMURAI_FLOURISH } from './samuraiP
 import { POE_ACTIONS } from './poePoses.js';
 import { SHIHTZU_ACTIONS } from './shihtzuPoses.js';
 import { GOLDEN_ACTIONS } from './goldenPoses.js';
+import { STELLA_ACTIONS } from './stellaPoses.js';
 
 // a lid's rest orientation, then a turn of `a` about the hinge axis (x, 0, z) (rig.lidTilt; no allocation per frame)
 const _lidAxis = new THREE.Vector3(), _lidQ = new THREE.Quaternion();
@@ -183,6 +184,9 @@ for (const k in SHIHTZU_ACTIONS) if (!ACTIONS[k]) ACTIONS[k] = SHIHTZU_ACTIONS[k
 // the Golden Retriever dragoon's lance thrusts, javelin throws and the Jump (goldenPoses.js, docs/GOLDEN.md); A.lanceDir /
 // A.lanceUp / A.lanceW aim his lance, A.lanceTwo puts the left paw on its shaft, A.javW / A.javDir show a javelin in his paw
 for (const k in GOLDEN_ACTIONS) if (!ACTIONS[k]) ACTIONS[k] = GOLDEN_ACTIONS[k];
+// Stella the Sun Oracle's sweeps, aims, raises and her arrival's scene poses (stellaPoses.js, docs/STELLA.md); A.parasolDir /
+// A.parasolUp / A.parasolW aim her wagasa (stellaGear.js), A.armLockR holds the right arm alone out of the walk swing
+for (const k in STELLA_ACTIONS) if (!ACTIONS[k]) ACTIONS[k] = STELLA_ACTIONS[k];
 export { ACTIONS };
 
 const zero = () => ({ x: 0, y: 0, z: 0 });
@@ -192,7 +196,7 @@ const zero = () => ({ x: 0, y: 0, z: 0 });
 // bladeW: point the katana that way instead (samuraiPoses.js); twoHand 0..1: the free paw joins the sword hilt
 // (actors/armIK.js); armLock 0..1 holds the arms out of the walk swing (a two-handed guard while walking)
 const LIMBS = ['body', 'head', 'armR', 'armL', 'legL', 'legR', 'foreR', 'foreL', 'wristR', 'wristL', 'blade', 'bladeDir', 'bladeEdge'];
-const SCALARS = ['y', 'sq', 'lean', 'mouth', 'earKick', 'roll', 'spin', 'eyesClosed', 'eyesHappy', 'happy', 'tailWag', 'flinch', 'twoHand', 'armLock', 'bladeW'];
+const SCALARS = ['y', 'sq', 'lean', 'mouth', 'earKick', 'roll', 'spin', 'eyesClosed', 'eyesHappy', 'happy', 'tailWag', 'flinch', 'twoHand', 'armLock', 'armLockR', 'bladeW'];
 function newPose() { const A = {}; for (const k of LIMBS) A[k] = zero(); for (const k of SCALARS) A[k] = 0; return A; }
 // (every field, so a pose that writes a new one of its own is cleared too: numbers to 0, {x, y, z} limbs to zero)
 function clearPose(A) {
@@ -316,13 +320,14 @@ export class Animator {
     this._set(P.legR, -swing * legAmp + A.legR.x, A.legR.y, A.legR.z);
     // arms
     const lock = 1 - A.armLock, armAmp = (0.55 + run * 0.4 + sp * 0.3) * mv * lock;
+    const ampR = armAmp * (1 - clamp(A.armLockR || 0)); // (armLockR: the right arm alone held out of the swing, e.g. a prop carried in that paw)
     const idleArm = Math.sin(t * 1.8) * 0.04 * (1 - mv);
     this._set(P.armL, -swing * armAmp + A.armL.x + idleArm, A.armL.y, 0.12 + 0.12 * run + A.armL.z);
-    this._set(P.armR, swing * armAmp + A.armR.x - idleArm, A.armR.y, -0.12 - 0.12 * run + A.armR.z + (A.armR.zWave || 0));
+    this._set(P.armR, swing * ampR + A.armR.x - idleArm * (1 - clamp(A.armLockR || 0)), A.armR.y, -0.12 - 0.12 * run + A.armR.z + (A.armR.zWave || 0));
     // elbows and wrists (baked heroes have the bones; at rest they sit at their bind pose). Sprinting bends the elbows.
     const elbow = -0.75 * sp * mv * lock;
     if (P.foreL) this._set(P.foreL, A.foreL.x + elbow, A.foreL.y, A.foreL.z);
-    if (P.foreR) this._set(P.foreR, A.foreR.x + elbow, A.foreR.y, A.foreR.z);
+    if (P.foreR) this._set(P.foreR, A.foreR.x + elbow * (1 - clamp(A.armLockR || 0)), A.foreR.y, A.foreR.z);
     if (P.wristL) this._set(P.wristL, A.wristL.x, A.wristL.y, A.wristL.z);
     if (P.wristR) this._set(P.wristR, A.wristR.x, A.wristR.y, A.wristR.z);
     this.twoHand = A.twoHand;

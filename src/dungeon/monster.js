@@ -303,7 +303,8 @@ export class Monster {
       px += dx / d * (mn - d); pz += dz / d * (mn - d);
     };
     if (P && !G.playerDead) keepOff(P, PLAYER_VR);
-    for (const e of this.mode.combat?.allies || this.mode.combat?.entities || []) if (e.team === 'ally' && e.alive && e !== P && e.pos && !e.untargetable) keepOff(e, Math.max(0.3, e.radius || 0.3));
+    if (G.coop?.active) for (const s of G.coop.slots) { const B = G.coop.bodyOf(s); if (B && B !== P && !G.coop.isDown(s)) keepOff(B, PLAYER_VR); } // (couch co-op: the other heroes have bodies too)
+    for (const e of this.mode.combat?.allies || this.mode.combat?.entities || []) if (e.team === 'ally' && e.alive && e !== P && e.pos && !e.untargetable && !e.noBody) keepOff(e, Math.max(0.3, e.radius || 0.3));
     const L = Math.hypot(px, pz);
     if (L < 1e-5) return;
     const k = Math.min(1, Math.max(0.05, dt * 10) / L);

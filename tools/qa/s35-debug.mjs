@@ -116,7 +116,7 @@ const page1 = async (qs, o) => { const L = await launch(o || { w: 1600, h: 900 }
   await page.evaluate(() => window.G.heroes.openWheel()); await sleep(page, 500);
   const wheel = await page.evaluate(() => [...document.querySelectorAll('.hw-card')].map(c => ({ id: c.dataset.id, q: !!c.querySelector('.hw-q') })));
   await page.evaluate(() => window.G.heroes.pickFromWheel(null));
-  R.check('d) join every hero: all five joined and in the wheel (no "?" cards)', ros.every(x => x.startsWith('true')) && wheel.length === 5 && wheel.every(c => !c.q), { ros, wheel });
+  R.check('d) join every hero: all six joined and in the wheel (no "?" cards)', ros.every(x => x.startsWith('true')) && wheel.length === 6 && wheel.every(c => !c.q), { ros, wheel });
   R.check('d) the save is marked as touched by debug (the badge, only in the menu)', await page.evaluate(() => window.G.state.debugUsed === true && !document.querySelector('.hud .dbg-badge')));
   // levels and skills
   await openMenu(page);

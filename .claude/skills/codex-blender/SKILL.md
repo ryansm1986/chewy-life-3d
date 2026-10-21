@@ -180,6 +180,50 @@ saw.
   - Check with `/?test=chars&only=chewy&walk=1` or `&act=swing`, then in the village, in the portraits, with
     `s12-heroes` and with prod-smoke.
 
+## Enemies (ROADMAP EN-1)
+Monsters are drawn by the hundred and instanced (`dungeon/horde.js`), so they follow their own contract,
+`templates/enemy-model-contract.md`: **vertex colours only (no textures), rigid named parts whose origins are the pivots,
+no rig**, about 3.5–5k triangles a variant, one GLB per variant key (`<kind>.glb`, `<kind>_<variant>.glb`).
+- **Concepts**: the brief = the kind's own part (`tools/blender/work/codex/<kind>-concept/brief-src.md`: what it does in a
+  fight, identity with hex, the moving parts, the attack pose, the variant strip, 3 directions) + `templates/enemy-concept-style.md`
+  (the shared style and sheet layout). Attach the hero lineup, the approved sheets so far, and the current in-game model.
+- **Model brief** per kind (`<kind>/brief.md`): sizes, the parts table (name, pivot, how the game moves it), variants,
+  budget. Read the kind's `…Spec` / `build…` in `src/regions/monsters/*.js` first: the part names and motions come from there.
+- **Integration**: add the kind to `ENEMY_MODELS` in `src/regions/monsters/enemyModels.js` and wrap its builder's spec as
+  `assemble(key, () => enemySpec(kind, v.key, mat) || procSpec(v))`. Hard-coded pivots in `animate()` become
+  `enemyPivot(kind, v.key, part, fallback)`. `?procmon` shows the procedural models for A/B shots.
+- **Review lessons** (the Bamboo trio): check in the game at 6 m and 13–16 m, not only in Blender. Eyes need a dark iris
+  to read at distance; thin pieces (sickles, ribbons, tails) read as sticks from 45° above, so turn their broad faces to the
+  camera; a "plume on a column" tail reads as a microphone, so use one continuous swelling volume; follow the sheet's
+  proportions over the brief's numbers when they disagree. Momiji Hollow added: a part that tucks into a hat or cup must
+  sit *inside* it (a tilted hat floats from 45°); open cups (the kuri's burr) shade grey in their own shadow, so turn off
+  `receiveShadow` on those meshes; a pivot that isn't the ground (a rolling ball) is the body node's translation, and
+  `enemySpec` hangs the other parts relative to it.
+- **GPU-deformed kinds** (the Tide Pool's kappa, heike-gani, kurage: `vhook` in `tidepool.js`): the parts are still
+  separate named nodes, but the game merges them into one mesh with `glbBody` and stamps each part's hook channel on the
+  uv attribute (head / arms / water, claws + one node per leg weighted hip → tip, the jelly's depth-weighted sway); the
+  hook's pivots come from the base file's node translations (`v3()` literals, under their own `…:glb` hook key), so the
+  brief must keep **pivots identical across variants**. `ownEnemyModel` (not `hasEnemyModel`) gates it, so a variant
+  without its own file (Captain Brineclaw's custom crab) stays procedural. Glow on those kinds is the `glow` material's
+  faces (`g.userData.glow` from `partsOf`). Lessons: hanging ribbons read as legs from 45° (curl the ends out and up,
+  stagger, glow them toward the tips); a translucent part (the kurage's bell) is its own mesh, and whatever is inside it
+  needs a clean backdrop (a membrane) and no ink hull; pointed fingers/toes turn into spikes under the ink outline (ball
+  tips, enough vertices).
+- **Single-mesh kinds** (the Burrow: `dungeon/monsters.js`): one `body` object; `buildMonster` merges the GLB (`glbGeo`) and
+  keeps the kind's builder for its material and extras. Their bosses come from a callout on the minion's sheet, built by
+  the same Opus agent in a second script (King Mochi, Lord Karakasa, Oni Chef).
+- **Bosses**: `.claude/skills/codex-blender/templates/boss-model-contract.md` (+ `templates/boss-rigs.md`, what each boss's code drives): flat rigid
+  parts named like the kit's groups, origins at their pivots, **markers as empties** (`enemyMarker`: the fan tip, the
+  spout), model units. Each boss file swaps the geometry onto its existing groups, so the fight code is untouched; where
+  the GLB moves a pivot or bakes a rest turn, the integration moves the group and clears its rotation (tanuki.js glbDanza).
+- **Skinned kinds** (Tanuki Bandit, Tamamo): the toybox-character pipeline (37-bone rig, `HERO_MODELS` entry, installed
+  with `install_rig.py`); `BUILD.<kind>` builds the baked rig fresh per spawn (never `cloneRig` it).
+- Lessons from the rest of the roster: a part the 45° camera sees from below (a pushed-back hat, a cup) shades in its own
+  shadow (receiveShadow off); rising ribbons read as horns (keep a shawl at shoulder height); a sheet callout is enough
+  for a boss when its minion's builder does it; check a test page actually shows the model (the captains needed
+  `captains.js` imported).
+- Finished: copy the build script, brief, sheet and feedback to `tools/blender/codex/assets/<kind>/` (with a README).
+
 ## Guardrails
 - **The Opus builder** writes only inside its task folder and `public/models/<task>.glb`. Its brief tells it not to edit
   `src/`, `public/rigs/` (you install rigs with `tools/blender/codex/install_rig.py`), not to run git, and not to install

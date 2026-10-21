@@ -29,7 +29,7 @@ const CAST = {
   pan: { color: '#f06a7c', role: 'Kemari champion', group: 'town' },
   kero: { color: '#4fb05a', role: 'Guardian of the koi pond', group: 'town' },
 };
-const HERO_COLOR = { chewy: '#2c3a6a', moka: '#3fb8a0', poe: '#6a9a3a', shihtzu: '#8a5aa8', golden: '#2f9a6a' };
+const HERO_COLOR = { chewy: '#2c3a6a', moka: '#3fb8a0', poe: '#6a9a3a', shihtzu: '#8a5aa8', golden: '#2f9a6a', stella: '#d9573e' };
 const FOLK_COLOR = ['#ff8fb0', '#8fd0ff', '#ffc14a', '#7ad8a8', '#b89aff', '#ff9a6a', '#6a8aff', '#ff6a7a', '#a0d060'];
 const colorOf = n => CAST[n.id]?.color || n.spec?.outfit?.topColor || n.spec?.outfit?.scarf || n.spec?.outfit?.hatColor || FOLK_COLOR[(n.id || '').length % FOLK_COLOR.length];
 

@@ -1,0 +1,451 @@
+{
+ "bones": {
+  "count": 37,
+  "contract_ok": true
+ },
+ "meshes": {
+  "Stella_arm_L": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 254,
+   "tris": 480,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 2
+  },
+  "Stella_arm_R": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 254,
+   "tris": 480,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 2
+  },
+  "Stella_body": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 2680,
+   "tris": 5152,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 3
+  },
+  "Stella_bow": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 704,
+   "tris": 1388,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 4
+  },
+  "Stella_ear_L": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 831,
+   "tris": 1652,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 2
+  },
+  "Stella_ear_R": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 831,
+   "tris": 1652,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 2
+  },
+  "Stella_eye_L": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 332,
+   "tris": 660,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Stella_eye_R": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 332,
+   "tris": 660,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Stella_head": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 3628,
+   "tris": 7066,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 3
+  },
+  "Stella_lidD_L": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 221,
+   "tris": 384,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Stella_lidD_R": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 221,
+   "tris": 384,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Stella_lidU_L": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 756,
+   "tris": 1404,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Stella_lidU_R": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 756,
+   "tris": 1404,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  },
+  "Stella_mouth_cavity": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 328,
+   "tris": 570,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 3
+  },
+  "Stella_obi_tails": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 284,
+   "tris": 560,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 4
+  },
+  "Stella_skirt_inner": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 440,
+   "tris": 880,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 3
+  },
+  "Stella_skirt_mid": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 1463,
+   "tris": 2926,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 3
+  },
+  "Stella_skirt_outer": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 1512,
+   "tris": 3024,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 3
+  },
+  "Stella_sleeve_L": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 594,
+   "tris": 1188,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 2
+  },
+  "Stella_sleeve_R": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 594,
+   "tris": 1188,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 2
+  },
+  "Stella_tail": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 202,
+   "tris": 400,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 2
+  },
+  "Stella_tongue": {
+   "hero": true,
+   "modifiers": [
+    "ARMATURE"
+   ],
+   "verts": 56,
+   "tris": 108,
+   "finite_positions": true,
+   "finite_unit_normals": true,
+   "degenerate_tris": 0,
+   "bad_weight_verts": 0,
+   "max_influences": 1
+  }
+ },
+ "hero_triangles": 33610,
+ "export": {
+  "name": "stella_toy",
+  "height": 1.24,
+  "bones": 37,
+  "verts": 17656,
+  "tris": 33610,
+  "finite": true,
+  "weight_sum_offenders": 0,
+  "skin_index_in_range": true,
+  "index_in_range": true,
+  "degenerate_tris": 0,
+  "normal_unit_ok": true,
+  "inward_wound_tris": 0,
+  "min_y": 0.002,
+  "max_y": 1.2399,
+  "tris_match_rig": true
+ },
+ "lock_vs_approved_glb": {
+  "Stella_arm_L": {
+   "max_delta_mm": 0.0
+  },
+  "Stella_arm_R": {
+   "max_delta_mm": 0.0
+  },
+  "Stella_body": {
+   "max_delta_mm": 0.0
+  },
+  "Stella_bow": {
+   "max_delta_mm": 0.0
+  },
+  "Stella_ear_L": {
+   "max_delta_mm": 0.0
+  },
+  "Stella_ear_R": {
+   "max_delta_mm": 0.0
+  },
+  "Stella_eye_L": {
+   "max_delta_mm": 0.0
+  },
+  "Stella_eye_R": {
+   "max_delta_mm": 0.0
+  },
+  "Stella_head": {
+   "max_delta_mm": 0.0
+  },
+  "Stella_obi_tails": {
+   "max_delta_mm": 0.0
+  },
+  "Stella_skirt_inner": {
+   "max_delta_mm": 0.0
+  },
+  "Stella_skirt_mid": {
+   "max_delta_mm": 0.0
+  },
+  "Stella_skirt_outer": {
+   "max_delta_mm": 0.0
+  },
+  "Stella_sleeve_L": {
+   "max_delta_mm": 0.0
+  },
+  "Stella_sleeve_R": {
+   "max_delta_mm": 0.0
+  },
+  "Stella_tail": {
+   "max_delta_mm": 0.0
+  }
+ },
+ "atlas_lock": {
+  "rig_vs_model_pixels_changed_outside_rig_charts": 0,
+  "vs_round4_pixels_changed_outside_costume": 0,
+  "vs_round4_costume_pixels_changed": 1525627
+ },
+ "model_vs_round4": {
+  "Stella_arm_L": {
+   "same_counts": true,
+   "max_pos_mm": 0.0,
+   "max_uv": 0.0
+  },
+  "Stella_arm_R": {
+   "same_counts": true,
+   "max_pos_mm": 0.0,
+   "max_uv": 0.0
+  },
+  "Stella_body": {
+   "same_counts": true,
+   "max_pos_mm": 0.0,
+   "max_uv": 0.0
+  },
+  "Stella_bow": {
+   "same_counts": true,
+   "max_pos_mm": 0.0,
+   "max_uv": 0.0
+  },
+  "Stella_ear_L": {
+   "same_counts": true,
+   "max_pos_mm": 0.0,
+   "max_uv": 0.0
+  },
+  "Stella_ear_R": {
+   "same_counts": true,
+   "max_pos_mm": 0.0,
+   "max_uv": 0.0
+  },
+  "Stella_eye_L": {
+   "same_counts": true,
+   "max_pos_mm": 0.0,
+   "max_uv": 0.0
+  },
+  "Stella_eye_R": {
+   "same_counts": true,
+   "max_pos_mm": 0.0,
+   "max_uv": 0.0
+  },
+  "Stella_head": {
+   "same_counts": true,
+   "max_pos_mm": 0.0,
+   "max_uv": 0.0
+  },
+  "Stella_obi_tails": {
+   "same_counts": true,
+   "max_pos_mm": 0.0,
+   "max_uv": 0.0
+  },
+  "Stella_skirt_inner": {
+   "same_counts": true,
+   "max_pos_mm": 0.0,
+   "max_uv": 0.0
+  },
+  "Stella_skirt_mid": {
+   "same_counts": true,
+   "max_pos_mm": 0.0,
+   "max_uv": 0.0
+  },
+  "Stella_skirt_outer": {
+   "same_counts": true,
+   "max_pos_mm": 0.0,
+   "max_uv": 0.0
+  },
+  "Stella_sleeve_L": {
+   "same_counts": true,
+   "max_pos_mm": 0.0,
+   "max_uv": 0.0
+  },
+  "Stella_sleeve_R": {
+   "same_counts": true,
+   "max_pos_mm": 0.0,
+   "max_uv": 0.0
+  },
+  "Stella_tail": {
+   "same_counts": true,
+   "max_pos_mm": 0.0,
+   "max_uv": 0.0
+  }
+ },
+ "problems": [],
+ "ok": true
+}

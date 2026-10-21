@@ -46,6 +46,7 @@ export class Companion extends Actor {
   heal(n) { if (this.fainted > 0) return; this.life = Math.min(this.lifeMax, this.life + n); }
   takeDamage(dmg) {
     if (this.fainted > 0) return;
+    if (this.G.skills?.stlGuardAlly) { dmg = this.G.skills.stlGuardAlly(this, dmg); if (!(dmg > 0)) return; } // (Stella: his sun shell and halo, Sun Dog's catch — combat/stellaArts.js)
     this.life -= dmg; this.anim.hit('#ff8a8a');
     if (this.life <= 0) {
       this.life = 0; this.fainted = this.G.derived?.shadowRevive ?? 10; this.untargetable = true; this.anim.play('die'); // (Warm Heart wakes him sooner: skillsGolden.js)
@@ -75,7 +76,8 @@ export class Companion extends Actor {
         this.biteCd = 0.9 / (this.frenzyT > 0 ? 1.3 : 1);
         this.anim.play('bark', { force: true });
         const pw = G.combat.buffs.shadowPower;
-        G.combat.hitMonster(tgt, { dmgPct: 55 * (1 + ((G.derived?.shadowDmg || 0) + (pw?.dmg || 0) + (G.combat.buffs.roar?.t > 0 ? G.combat.buffs.roar.dmg : 0)) / 100), source: 'shadow', from: this.pos, knock: 0.2 }); // (roar: the Mighty Little Roar's courage)
+        G.combat.hitMonster(tgt, { dmgPct: 55 * (1 + ((G.derived?.shadowDmg || 0) + (pw?.dmg || 0) + (G.combat.buffs.roar?.t > 0 ? G.combat.buffs.roar.dmg : 0) + (G.skills?.stlDogBuff?.() || 0)) / 100), source: 'shadow', from: this.pos, knock: 0.2 }); // (roar: the Mighty Little Roar's courage; Stella's Sun Dog. Daybreak's courage comes in through playerBonusPct)
+        G.skills?.stlDogBite?.(tgt); // (a sun dog's bite sears: combat/stellaArts.js)
         Events.emit('sfx', 'bark_small', { pos: this.pos });
       }
     }
@@ -142,7 +144,7 @@ export class Companion extends Actor {
   }
   barkTick(dt) { this.barkT -= dt; if (this.barkT < 0) { this.barkT = rand(10, 25); this.bark(); } }
   /** Dragon Heart: a dragon-sized Shadow draws the foes near him (monster.pickTarget) */
-  tauntFor(m) { return this.G.skills?.gldBig && Math.hypot(m.pos.x - this.pos.x, m.pos.z - this.pos.z) < 5 ? 99 : 0; }
+  tauntFor(m) { return (this.G.skills?.gldBig && Math.hypot(m.pos.x - this.pos.x, m.pos.z - this.pos.z) < 5) || this.G.skills?.stlHeel?.(m) ? 99 : 0; } // (and Heel!: a charged sun dog's bites draw the foe off Stella)
   // moveTo that detours round walls when the straight line is blocked (line of sight re-checked 4x a second; a route is
   // only searched while it is blocked, at most every 0.4 s)
   follow(x, z, dt, mul, stop) {

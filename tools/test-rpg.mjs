@@ -52,8 +52,8 @@ const lpad = (s, n) => String(s).padStart(n);
 hr('SKILLS');
 // five heroes (docs/HEROES.md, docs/POE.md, docs/SHIHTZU.md, docs/GOLDEN.md): Chewy's three trees (bone / fetch / spirit),
 // Moka's (tide / star / duck), Poe's (shuriken / jutsu / shadow), the Shih Tzu's (flail / hex / tome) and Foosy's (lance /
-// javelin / whelp), 21 skills each
-ok(SKILL_IDS.length === 105 && TREES.length === 15, 'exactly 105 skills in 15 trees');
+// javelin / whelp), and Stella's (ray / flare / dawn: docs/STELLA.md), 21 skills each
+ok(SKILL_IDS.length === 126 && TREES.length === 18, 'exactly 126 skills in 18 trees');
 for (const h of HERO_IDS) ok(SKILL_IDS.filter(id => SKILLS[id].cls === h).length === 21, `${h} has 21 skills`);
 for (const t of TREES) {
   const ids = SKILL_IDS.filter(id => SKILLS[id].tree === t.id);
@@ -99,7 +99,7 @@ for (const id of GEAR_BASE_IDS) {
   tierCount[b.tier]++;
   ok(['weapon', 'hat', 'outfit', 'collar', 'charm', 'boots', 'paws'].includes(b.slot), `base ${id} slot`);
   ok(b.icon && b.icon.shape && b.icon.variant && b.icon.colors.length === 3, `base ${id} icon`);
-  if (b.slot === 'weapon') ok(['sword', 'ball', 'staff', 'fuma', 'flail', 'lance'].includes(b.wtype) && fin(b.dmg[0]) && b.dmg[1] > b.dmg[0] && fin(b.aspd), `weapon ${id} stats`);
+  if (b.slot === 'weapon') ok(['sword', 'ball', 'staff', 'fuma', 'flail', 'lance', 'parasol'].includes(b.wtype) && fin(b.dmg[0]) && b.dmg[1] > b.dmg[0] && fin(b.aspd), `weapon ${id} stats`);
   if (['hat', 'outfit', 'boots', 'paws'].includes(b.slot)) ok(b.def && b.def[1] >= b.def[0], `armor ${id} def`);
   ok(b.tier === 0 ? b.lvl < 20 : b.tier === 1 ? b.lvl >= 20 && b.lvl < 40 : b.lvl >= 40, `base ${id} tier/lvl consistent`);
 }
@@ -439,7 +439,8 @@ hr('ACTIONS');
   S.player.skillPts = 5;
   ok(!canLearn('whirl', S).ok && /level 6/.test(canLearn('whirl', S).why), 'whirl needs lvl 6');
   ok(!canLearn('chomp', S).ok && /level 2/.test(canLearn('chomp', S).why), 'D2 gate: 2nd point needs lvl 2');
-  // xp
+  // xp (points by hand here: Shadow's auto points are tested under SIMPLE STATS)
+  S.player.autoStats = false;
   const gained = A.addXp(xpToNext(1) + xpToNext(2) + xpToNext(3) + 10);
   ok(S.player.lvl === 4 && S.player.statPts === 15 && S.player.skillPts === 8, 'multi-level-up grants points');
   ok(evs['player:levelup'] === 1 && evs['player:levelup:last'].lvl === 4, 'single levelup event with final lvl');
@@ -1120,6 +1121,35 @@ hr('FOOSY THE DRAGOON (the fifth hero, docs/GOLDEN.md)');
   ok(R.params.lance && R.params.radius > 2.6 && R.params.radius > (ATTACK.params(1, { weaponType: 'flail' }).radius || 0), `golden: the reach combo reaches ${R.params.radius} m (the longest melee reach)`);
 }
 
+hr('STELLA THE SUN ORACLE (the sixth hero, docs/STELLA.md)');
+{
+  const HB = await import('./hero-balance.mjs'), Ch = await import('../src/rpg/charge.js'), { STELLA_TRAINING, STELLA_RAYS } = await import('../src/rpg/skillsStella.js');
+  const st6 = Object.values(SKILLS).filter(s => s.cls === 'stella');
+  ok(st6.length === 21 && STELLA_TRAINING.size === 0 && st6.every(s => !s.training) && st6.every(s => s.element === 'fire'), `stella: all ${st6.length} skills are built and fire (none in training)`);
+  ok(CLASSES.stella && CLASSES.stella.title === 'Oracle' && HERO_IDS[HERO_IDS.length - 1] === 'stella' && WEAPON_CLASS.parasol === 'stella' && canWield('stella', 'parasol') && !canWield('moka', 'parasol'), 'stella: the Oracle, the sixth (last) hero, the wagasa hers alone');
+  const pw = GEAR_BASE_IDS.filter(id => ITEM_BASES[id].wtype === 'parasol');
+  ok(pw.length >= 12 && [0, 1, 2].every(t => pw.some(id => ITEM_BASES[id].tier === t)) && pw.every(id => ITEM_BASES[id].icon.colors?.length === 3 && ITEM_BASES[id].icon.shape === 'parasol'), `stella: ${pw.length} wagasa bases over three tiers, each with canopy, ray and finial colours`);
+  ok(WEAPON_SIZE.parasol?.[0] === 2 && WEAPON_SIZE.parasol?.[1] === 2, 'stella: the wagasa is 2 × 2 in the grids');
+  // the trait and her passives (stats.js stellaPassives)
+  const h1 = HB.buildHero('stella·dawn', 30), d1 = h1.d;
+  ok(d1.sunTrait?.shell === 20 && d1.sunTrait.shellT === 8 && d1.shadowRevive === 6, `stella: Sunrise Blessing (shells up to ${d1.sunTrait?.shell}% for ${d1.sunTrait?.shellT}s; Shadow wakes in ${d1.shadowRevive}s)`);
+  ok(d1.healMul > 1 && d1.shieldMul > 1 && d1.treeDmgPct.dawn > 0, `stella: Sunny Disposition (healing ×${d1.healMul}, Dawn +${d1.treeDmgPct.dawn}%)`);
+  const A1 = skillRuntime('attack', h1.st, d1);
+  ok(d1.weaponType === 'parasol' && A1.params.parasol && A1.params.element === 'fire' && A1.params.radius > 2 && A1.params.ringRadius > 2, 'stella: the Sunsweep (a parasol basic attack: sweeps and a twirl, fire)');
+  // guard rails (STELLA §7): Kind Light's fallback ray never beats Golden Ray per zoom; a charged heal never heals less than a tap
+  for (const L of [1, 10, 20]) { const S = { player: { ...h1.st.player, skills: { goldenRay: L, kindLight: L, morningLight: 1 } }, equipment: h1.st.equipment }, d = computeStats(S), /* (like with like: no mastery in either tree) */ g = skillRuntime('goldenRay', S, d), k = skillRuntime('kindLight', S, d); ok(k.params.rayPct / k.cost <= g.params.dmgPct / g.cost * 1.0001, `stella: Kind Light's fallback never beats Golden Ray per zoom (L${L}: ${(k.params.rayPct / k.cost).toFixed(1)} ≤ ${(g.params.dmgPct / g.cost).toFixed(1)})`); }
+  for (const id of ['morningLight', 'kindLight', 'halo']) { const S = h1.st; S.player.skills[id] = Math.max(1, S.player.skills[id] || 0); S.player.chargePerks = {}; const T = skillRuntime(id, S, computeStats(S)), key = id === 'halo' ? 'absorbPct' : 'healPct', tot = R => R.params[key] * (R.params.rays || 1); const R3 = Ch.chargeRuntime(id, S, computeStats(S), 3); ok(R3 && tot(R3) >= tot(T) * 0.999, `stella: a charged ${id} never heals / shields less than a tap (${tot(T)} → ${R3 ? tot(R3) : '?'}, all its rays)`); }
+  ok(STELLA_RAYS.has('goldenRay') && STELLA_RAYS.has('kindLight'), 'stella: the rays that gild');
+  // ---- hero balance (tools/hero-balance.mjs): her builds vs the five-hero mean (STELLA §7)
+  const sb = HB.stlBand([6, 15, 30, 45]);
+  for (const b of sb) ok(b.ray.clear >= 0.93 && b.ray.clear <= 1.05, `stella: level ${b.lvl} Radiance (Golden Ray): clear ×${b.ray.clear.toFixed(2)} of the mean (single ×${b.ray.single.toFixed(2)})`);
+  for (const b of sb) ok(b.flare.clear >= 0.88 && b.flare.clear <= 1.05, `stella: level ${b.lvl} Corona (Solar Flare, Hinata): clear ×${b.flare.clear.toFixed(2)} of the mean`);
+  for (const b of sb) ok(b.heal.clear >= 0.78 && b.heal.clear <= 0.97 && b.heal.falls >= 1.3, `stella: level ${b.lvl} a fire build with a heal budget (Morning Light every 8 s): clear ×${b.heal.clear.toFixed(2)}, falls ×${b.heal.falls.toFixed(2)} later than the mean`);
+  for (const b of sb) ok(b.dawn.clear >= 0.42 && b.dawn.clear <= 0.7 && b.dawn.falls >= 2.5, `stella: level ${b.lvl} the Dawn (the support): clear ×${b.dawn.clear.toFixed(2)}, outlasts the fight (falls ×${b.dawn.falls.toFixed(2)})`);
+  for (const b of sb.filter(x => x.lvl >= 30)) ok(b.solar.single >= 0.9 && b.solar.single <= 1.25, `stella: level ${b.lvl} the Solar Ray build against one big foe: single ×${b.solar.single.toFixed(2)} of the mean`);
+  for (const b of sb) ok(b.ray.life >= 0.9 && b.ray.life <= 1.1, `stella: level ${b.lvl} life ×${b.ray.life.toFixed(2)} of the mean`);
+}
+
 hr('CHARGED ABILITIES');
 // docs/CHARGE.md: the tables, the rules (stage times, costs, gating), the balance layer and the DPS-band sim
 {
@@ -1163,9 +1193,9 @@ hr('CHARGED ABILITIES');
   const R0 = skillRuntime('chomp', st, d), R1 = Ch.chargeRuntime('chomp', st, d, 1), R3 = Ch.chargeRuntime('chomp', st, d, 3), R9 = Ch.chargeRuntime('chomp', st, d, 9);
   ok(R1.charge.stage === 1 && R3.charge.stage === 3 && R9.charge.stage === 3 && R3.cost === Ch.chargeCost(R0.cost, 3, Ch.perksOf(st, 'chomp')), 'charge: chargeRuntime (stage clamp, cost)');
   ok(R3.params.dmgPct > R1.params.dmgPct && R1.params.dmgPct >= R0.params.dmgPct * 0.999 && R3.params.radius >= R1.params.radius, 'charge: a charged Chomp hits harder and wider than a tap, more at Ⅲ');
-  const sx = Sim.simHero('chewy'), sm = Sim.simHero('moka'), sp = Sim.simHero('poe'), sz = Sim.simHero('shihtzu'), sg = Sim.simHero('golden');
+  const sx = Sim.simHero('chewy'), sm = Sim.simHero('moka'), sp = Sim.simHero('poe'), sz = Sim.simHero('shihtzu'), sg = Sim.simHero('golden'), sl = Sim.simHero('stella');
   for (const id of ids) {
-    const H = SKILLS[id].cls === 'moka' ? sm : SKILLS[id].cls === 'poe' ? sp : SKILLS[id].cls === 'shihtzu' ? sz : SKILLS[id].cls === 'golden' ? sg : sx, S = H.st;
+    const H = SKILLS[id].cls === 'moka' ? sm : SKILLS[id].cls === 'poe' ? sp : SKILLS[id].cls === 'shihtzu' ? sz : SKILLS[id].cls === 'golden' ? sg : SKILLS[id].cls === 'stella' ? sl : sx, S = H.st;
     S.player.chargePerks = {}; const T0 = skillRuntime(id, S, H.d);
     S.player.chargePerks = { [id]: Object.fromEntries(Object.entries(CHARGE[id].perks).map(([k, p]) => [k, p.ranks])) };
     const Rs = [1, 2, 3].map(s => Ch.chargeRuntime(id, S, H.d, s));
@@ -2020,7 +2050,8 @@ hr('COZY: THE WORLD CLOCK, TIME AWAY, STATE, OBJECTIVES, EXPEDITIONS (docs/COZY.
     const off = Events.on('hero:levelup', e => ev.push(e)), off2 = Events.on('player:levelup', e => ev.push({ player: e }));
     st.heroes.chewy.player.lvl = 10;
     const g = A.addXpTo('moka', xpToNext(1) * 0.6);
-    ok(g.gained === Math.round(xpToNext(1) * 1.2) && g.from === 1 && g.lvl === 2 && st.heroes.moka.player.statPts === 5 && st.heroes.moka.player.skillPts === 2 && ev.length === 1 && ev[0].id === 'moka' && ev[0].lvl === 2, 'addXpTo: a benched hero far behind gets double XP and levels (points, a hero:levelup, no player banner)');
+    const mk = st.heroes.moka.player, mb = CLASSES.moka.base;
+    ok(g.gained === Math.round(xpToNext(1) * 1.2) && g.from === 1 && g.lvl === 2 && mk.statPts === 0 && mk.stats.ene === mb.ene + 3 && mk.stats.vit === mb.vit + 2 && mk.skillPts === 2 && ev.length === 1 && ev[0].id === 'moka' && ev[0].lvl === 2, 'addXpTo: a benched hero far behind gets double XP and levels (Shadow spends the points, a hero:levelup, no player banner)');
     ok(st.player === st.heroes.chewy.player && st.player.lvl === 10, 'addXpTo: the hero being played is untouched');
     const g2 = A.addXpTo('chewy', 10); ok(g2.gained >= 10 && g2.from === 10, 'addXpTo: the active hero goes through addXp');
     ok(A.addXpTo('nobody', 50).gained === 0 && A.addXpTo('moka', 0).gained === 0, 'addXpTo: nothing for an unknown hero or 0 XP');
@@ -2523,9 +2554,9 @@ hr('HERO ARRIVALS: THE HEROES COME TO BLOSSOM HOLLOW (ROADMAP Z-H3: world/heroQu
   const fresh = () => CS.normalizeCozy(Z.normalizeZones(normalizeHeroes(newGameState())));
   const lv = (st, n) => { st.player.lvl = n; for (const h of Object.values(st.heroes)) h.player.lvl = Math.max(h.player.lvl || 1, 1); st.heroes.chewy.player.lvl = n; return st; };
   // ---- the table: one arrival per zone, in the zones' order; each brings its zone's quest
-  ok(HQ.ARRIVALS.map(a => a.zone).join() === REGION_IDS.join() && HQ.ARRIVALS.map(a => a.who).join() === 'poe,shihtzu,sk_kaizo,golden', 'arrivals: one a zone in order (Poe, Floofy, Captain Kaizo for the Tide Pool until Stella, Foosy)');
+  ok(HQ.ARRIVALS.map(a => a.zone).join() === REGION_IDS.join() && HQ.ARRIVALS.map(a => a.who).join() === 'poe,shihtzu,stella,golden', 'arrivals: one a zone in order (Poe, Floofy, Stella for the Tide Pool, Foosy)');
   ok(HQ.ARRIVALS.every(a => HQ.HERO_QUESTS[a.quest]?.zone === a.zone && (a.hero ? !!CLASSES[a.who] && HQ.HERO_QUESTS[a.quest].giver === a.who : !!ZONE_NPCS[a.who] && HQ.HERO_QUESTS[a.quest].giver === a.who) && typeof a.scene === 'string'), 'arrivals: each { zone, who, scene, quest }, the quest its zone\'s and given by whoever comes');
-  ok(HQ.ARRIVALS.filter(a => !a.hero).every(a => a.zone === 'tidepool'), 'arrivals: the only messenger is the Tide Pool\'s (Stella replaces him with one entry)');
+  ok(HQ.ARRIVALS.every(a => a.hero) && HQ.arrivalOf('tidepool').who === 'stella' && HQ.arrivalOf('tidepool').scene === 'stella', 'arrivals: every one a hero now (Stella came for the Tide Pool: Captain Kaizo rows her over)');
   // ---- the quests: the writers' contract (as QUEST MOMENTS), the steps and the hand-in
   for (const [id, d] of Object.entries(HQ.HERO_QUESTS)) {
     ok(typeof d.hook === 'string' && d.hook.length >= 20 && d.hook.length <= 130, `${id}: a hook in the giver's voice (${d.hook?.length} chars)`);
@@ -2546,22 +2577,24 @@ hr('HERO ARRIVALS: THE HEROES COME TO BLOSSOM HOLLOW (ROADMAP Z-H3: world/heroQu
     ok(!Q.visitDone(s, st, { home: true, zone: null, dungeon: null }) && !Q.visitDone(s, st, { zone: 'maple', dungeon: null }) && !Q.visitDone(s, st, { zone: 'bamboo', dungeon: 'bambooDepths' }) && Q.visitDone(s, st, { zone: 'bamboo', dungeon: null }), 'visit: done outdoors in its zone (not in town, another zone or the dungeon)');
     Z.saveVillage(st, 'bamboo', 'crew'); ok(Q.visitDone(s, st, { home: true }) && Q.zoneStepHave(s, st) === 1, 'visit: done once the village is saved (a crew got there first)'); }
   // ---- when an arrival is due: in order, by level or the zone before it cleared (by you or a crew)
-  { const all = { poe: 1, shihtzu: 1, kaizo: 1, golden: 1 }, due = (st, scenes = all) => HQ.arrivalDue(st, { scenes })?.who || null;
+  { const all = { poe: 1, shihtzu: 1, stella: 1, golden: 1 }, due = (st, scenes = all) => HQ.arrivalDue(st, { scenes })?.who || null;
     const st = fresh();
     ok(due(lv(st, 6)) === null, 'arrivals: none before Moka has joined (she comes first)');
     st.flags.mokaJoined = true;
     ok(due(lv(st, 3)) === null && due(lv(st, 4)) === 'poe', 'arrivals: Poe once the Bamboo opens (level 4)');
-    ok(due(lv(st, 4), { kaizo: 1 }) === null, 'arrivals: an arrival whose scene isn\'t built waits (and so do the ones after it)');
+    ok(due(lv(st, 4), { stella: 1 }) === null, 'arrivals: an arrival whose scene isn\'t built waits (and so do the ones after it)');
     st.flags.poeJoined = true; lv(st, 6);
     ok(due(st) === null, 'arrivals: Floofy waits for Momiji Hollow');
     Z.zoneOf(st, 'bamboo').dungeon.crew = 1; ok(due(st) === 'shihtzu', 'arrivals: the zone before cleared by a crew opens it: Floofy is due');
     Z.zoneOf(st, 'bamboo').dungeon.crew = 0; Z.zoneOf(st, 'bamboo').dungeon.cleared = 1; ok(due(st) === 'shihtzu', '…or cleared by you');
     st.flags.shihtzuJoined = true; lv(st, 26);
-    ok(due(st) === 'sk_kaizo', 'arrivals: the Tide Pool\'s messenger before Foosy, though both zones are open');
-    (st.flags.arrivals ||= {}).tidepool = { how: 'scene' }; ok(due(st) === 'golden', 'arrivals: then Foosy');
+    ok(due(st) === 'stella', 'arrivals: Stella before Foosy, though both zones are open');
+    (st.flags.arrivals ||= {}).tidepool = { how: 'scene', quest: 'start' }; ok(due(st) === 'stella', 'arrivals: an old save with Captain Kaizo\'s visit recorded: Stella still comes (Kaizo rows her over)');
+    st.flags.stellaJoined = true; ok(due(st) === 'golden', 'arrivals: then Foosy (he waits for her)');
     const old = fresh(); old.flags.mokaJoined = old.flags.goldenJoined = true; lv(old, 30);
     ok(due(old) === 'poe' && HQ.arrivalDone(old, HQ.arrivalOf('golden')), 'an old save with Foosy joined first: no arrival for him; the others still come, in order');
-    old.flags.poeJoined = old.flags.shihtzuJoined = true; old.flags.arrivals = { tidepool: { how: 'scene' } }; ok(due(old) === null, '…and once they all have, none is due'); }
+    old.flags.poeJoined = old.flags.shihtzuJoined = true; old.flags.arrivals = { tidepool: { how: 'scene' } }; ok(due(old) === 'stella', '…Kaizo came, Stella not yet: she is due');
+    old.flags.stellaJoined = true; ok(due(old) === null, '…and once they all have, none is due'); }
   // ---- what an arrival brings: its quest, a thank-you (the village saved before they came), or nothing more (an old save)
   { const st = fresh(), a = HQ.arrivalOf('poe'); st.flags.mokaJoined = true; lv(st, 6);
     ok(HQ.questPlan(st, a) === 'start', 'the plan: the village besieged, their quest starts');
@@ -2576,7 +2609,112 @@ hr('HERO ARRIVALS: THE HEROES COME TO BLOSSOM HOLLOW (ROADMAP Z-H3: world/heroQu
     ok(h('poe') === 'Will arrive when the Bamboo opens' && h('shihtzu') === 'Will arrive when Momiji Hollow opens' && h('golden') === 'Will arrive when the Onsen opens', 'the wheel: before a zone opens, when they\'ll come');
     lv(st, 6); ok(h('poe') === 'Will arrive after Moka joins', 'the wheel: the zone open, Moka not joined yet');
     st.flags.mokaJoined = true; ok(h('poe') === 'On the way to Blossom Hollow…' && h('poe', { inTown: false }) === 'Will be waiting in Blossom Hollow' && h('poe', { running: true }) === 'Arriving in Blossom Hollow now!', 'the wheel: due (in town, out of town, arriving)');
-    lv(st, 26); ok(h('shihtzu') === 'Will arrive after Poe joins' && h('golden') === 'Will arrive after Old Captain Kaizo comes by', 'the wheel: waiting for the one before'); }
+    lv(st, 17); ok(h('stella') === 'Will arrive when the Tide Pool opens', 'the wheel: Stella before the Tide Pool opens');
+    lv(st, 26); ok(h('shihtzu') === 'Will arrive after Poe joins' && h('stella') === 'Will arrive after Floofy joins' && h('golden') === 'Will arrive after Stella joins', 'the wheel: waiting for the one before'); }
+  // ---- Stella and Captain Kaizo: whose "Trouble at Shiokaze Port" it is (docs/STELLA.md §6.1, §6.2: q.giver || d.giver)
+  { const d = HQ.HERO_QUESTS.hq_shiokaze, st = fresh(), g = () => HQ.heroQuestGiver(st, 'hq_shiokaze'), def = () => Story.prototype.def.call({ G: { state: st }, Q: st.quests }, 'hq_shiokaze');
+    ok(d.giver === 'stella' && d.handIn.text === 'Tell Stella the port is safe' && /greet it twice, once for you/.test(d.thanks) && /Perfect form/.test(d.selfThanks) && d.kaizo?.giver === 'sk_kaizo', 'hq_shiokaze: Stella gives it (her lines); Captain Kaizo\'s old lines kept for old saves');
+    st.quests.active.push({ id: 'hq_shiokaze', step: 0, prog: 0 });
+    ok(g() === 'stella' && def() === d, 'giver: a new save\'s quest is Stella\'s');
+    st.flags.arrivals = { tidepool: { how: 'scene', quest: 'start', day: 1 } };
+    const k = def(), hs = (dd, id) => Story.prototype.handInStep.call({ nameOf: Story.prototype.nameOf }, dd, id);
+    ok(g() === 'sk_kaizo' && k.giver === 'sk_kaizo' && k.handIn.text === 'Tell Captain Kaizo the port is safe' && /The nets are clear/.test(k.thanks) && k.title === d.title && k.reward === d.reward && !k.selfThanks && !k.crewSelf, 'giver: an old save (Kaizo\'s visit recorded, no `by`, his quest running): it stays his, his own lines');
+    ok(hs(k, 'hq_shiokaze').npc === 'sk_kaizo' && hs(d, 'hq_shiokaze').npc === 'stella' && /Captain Kaizo/.test(hs(k, 'hq_shiokaze').text) && /Stella/.test(hs(d, 'hq_shiokaze').text), 'the hand-in step: per giver (his at his lookout, hers in town)');
+    ok(HQ.questPlan(st, HQ.arrivalOf('stella')) === 'had' && !HQ.questsOwed((st.flags.stellaJoined = true, st), { opened: () => true }).length, '…her arrival brings no second quest; joined some other way, none is owed');
+    st.flags.stellaJoined = false;
+    st.flags.arrivals.tidepool = { how: 'scene', quest: 'had', day: 2, by: 'stella', kaizo: { how: 'scene', quest: 'start', day: 1 } }; st.quests.active[0].giver = 'sk_kaizo';
+    ok(g() === 'sk_kaizo', 'giver: after her arrival (the record hers, keeping Kaizo\'s) the running quest stays his (q.giver)');
+    delete st.quests.active[0].giver; ok(g() === 'stella', '…a quest without q.giver after her arrival is hers');
+    const o = fresh(); o.flags.arrivals = { tidepool: { how: 'scene', quest: 'start', day: 1 } }; o.quests.done.push('hq_shiokaze');
+    ok(HQ.heroQuestGiver(o, 'hq_shiokaze') === 'sk_kaizo' && HQ.questPlan(o, HQ.arrivalOf('stella')) === 'had', 'an old save with Kaizo\'s quest done: his (the thank-you, no quest)');
+    ok(HQ.crewThanks(d, 'Moka') === 'Moka sailed in and chased the siege back to sea. The shrine steps are clear. I bowed to them. They seemed embarrassed.' && /matey/.test(HQ.crewThanks(k, 'Moka')), 'the crew lines: hers, and his for his quest'); }
+}
+
+hr('SIMPLE STATS: POWER, PLAIN WORDS, SHADOW PICKS (ROADMAP UX-3: rpg/power.js, docs/STATS.md)');
+{
+  const PW = await import('../src/rpg/power.js');
+  const IT = await import('../src/rpg/items.js');
+  const mkG = () => { const G = { state: normalizeHeroes(newGameState()) }; G.actions = createActions(G); return G; };
+  const sumUp = (P, cls) => { const b = CLASSES[cls].base, o = {}; for (const k of ['str', 'dex', 'vit', 'ene']) o[k] = P.stats[k] - b[k]; return o; };
+  // the plan: each point where the hero is furthest behind it
+  { const P = { cls: 'chewy', stats: { ...CLASSES.chewy.base }, statPts: 25 };
+    const g = PW.spendAuto(P, { weapon: { wtype: 'sword' } });
+    ok(P.statPts === 0 && g.str === 10 && g.vit === 10 && g.dex === 5 && !g.ene, 'auto: Chewy with the katana, 2 Strength 2 Vitality 1 Dexterity per 5');
+    const Q = { cls: 'chewy', stats: { ...CLASSES.chewy.base }, statPts: 10 }; PW.spendAuto(Q, { weapon: { wtype: 'ball' } });
+    ok(Q.stats.dex - CLASSES.chewy.base.dex === 4 && Q.stats.str - CLASSES.chewy.base.str === 2, 'auto: the ball in his main hand puts Dexterity first');
+    for (const cls of HERO_IDS) { const R = { cls, stats: { ...CLASSES[cls].base }, statPts: 50 }; PW.spendAuto(R, {}); const u = sumUp(R, cls); ok(R.statPts === 0 && Object.values(u).reduce((a, b) => a + b, 0) === 50 && u.vit === 20, `auto: ${cls} spends all 50, 20 into Vitality`); }
+    const M = { cls: 'moka', stats: { ...CLASSES.moka.base }, statPts: 10 }; PW.spendAuto(M, {});
+    ok(M.stats.ene - CLASSES.moka.base.ene === 6 && M.stats.vit - CLASSES.moka.base.vit === 4 && M.stats.str === CLASSES.moka.base.str, 'auto: Moka 3 Energy 2 Vitality');
+    const E = { cls: 'chewy', stats: { ...CLASSES.chewy.base, vit: CLASSES.chewy.base.vit + 10 }, statPts: 10 }; PW.spendAuto(E, {});
+    ok(E.stats.vit === CLASSES.chewy.base.vit + 10 && E.stats.str - CLASSES.chewy.base.str >= 6, 'auto: points placed by hand even out (no more Vitality until the others catch up)');
+    ok(PW.mainStat('chewy', {}) === 'str' && PW.mainStat('moka', {}) === 'ene' && PW.mainStat('poe', {}) === 'dex' && PW.mainStat('stella', {}) === 'ene', 'the star attribute: the plan\'s first');
+    ok(HERO_IDS.every(h => ['str', 'dex', 'vit', 'ene'].every(k => PW.attrFx(h, k).length > 4)), 'every attribute says what it does for every hero');
+  }
+  // level ups, on and off, Start over, the dojo's respec
+  { const G = mkG(), A = G.actions, P = G.state.player, evs = [];
+    const off = Events.on('player:levelup', e => evs.push(e));
+    ok(PW.autoOn(P), 'auto points are on for a new hero');
+    A.addXp(xpToNext(1) + xpToNext(2) + 5);
+    const u = sumUp(P, 'chewy');
+    ok(P.lvl === 3 && P.statPts === 0 && u.str === 4 && u.vit === 4 && u.dex === 2 && evs[0]?.auto?.str === 4, 'level ups: Shadow spends the 10 points by the plan, and the event says where');
+    A.setAutoStats(false); A.addXp(xpToNext(3) + 5);
+    ok(P.lvl === 4 && P.statPts === 5 && !evs[1]?.auto, 'auto off: the points wait for you');
+    const g = A.setAutoStats(true);
+    ok(P.statPts === 0 && Object.values(g).reduce((a, b) => a + b, 0) === 5, 'auto back on: the waiting points are spent at once');
+    const n = A.resetStats();
+    ok(n === 15 && P.statPts === 0 && Object.values(sumUp(P, 'chewy')).reduce((a, b) => a + b, 0) === 15, 'Start over (free): every point back, and Shadow places them again');
+    A.setAutoStats(false); const n2 = A.resetStats();
+    ok(n2 === 15 && P.statPts === 15 && Object.values(sumUp(P, 'chewy')).every(v => v === 0), 'Start over with auto off: the 15 points to spend again');
+    ok(A.spendAutoNow().str > 0 && P.statPts === 0, 'Pick for me: Shadow spends them once');
+    A.setAutoStats(true); P.skills.chomp = 2; P.skillPts = 0;
+    const r = A.respec();
+    ok(r.statPts === 15 && r.skillPts >= 2 && P.statPts === 0 && P.skillPts >= 2, 'respec (the dojo, free): skill points back, Shadow re-places the stat points');
+    if (typeof off === 'function') off();
+  }
+  // Power
+  { const G = mkG(), st = G.state, d0 = computeStats(st), p0 = PW.heroPower(d0);
+    ok(fin(p0) && p0 > 30 && p0 < 400, `Power: a new Chewy is ${Math.round(p0)}`);
+    st.player.stats.vit += 20; const p1 = PW.heroPower(computeStats(st)); st.player.stats.vit -= 20;
+    st.player.stats.str += 20; const p2 = PW.heroPower(computeStats(st)); st.player.stats.str -= 20;
+    ok(p1 > p0 && p2 > p0, 'Power grows with Vitality and with Strength');
+    const s = PW.statSummary(d0);
+    ok(['power', 'attack', 'crit', 'life', 'zoom', 'defense', 'hurtLess', 'speed', 'run', 'luck', 'coins'].every(k => fin(s[k])) && s.life === d0.lifeMax, 'the six friendly numbers are all there');
+    // a level 60 hero in good gear is far stronger
+    const H = mkG().state; H.player.lvl = 60; H.player.stats = { str: 150, dex: 80, vit: 200, ene: 40 };
+    H.equipment.weapon = generateItem({ ilvl: 60, slot: 'weapon', wtype: 'sword', rarity: 'rare', rng: new RNG(7) });
+    for (const sl of ['hat', 'outfit', 'boots', 'paws']) H.equipment[sl] = generateItem({ ilvl: 60, slot: sl, rarity: 'rare', rng: new RNG(sl.length * 31) });
+    const p60 = PW.heroPower(computeStats(H));
+    ok(p60 > p0 * 8, `Power: level 60 in rare gear ${Math.round(p60)} vs ${Math.round(p0)} at level 1`);
+  }
+  // items: better / worse / empty / worn / another hero's
+  { const G = mkG(), st = G.state, rng = new RNG(11);
+    const cur = st.equipment.weapon;
+    const good = generateItem({ ilvl: 1, base: cur.base, rarity: 'normal', rng }); good.dmg = [cur.dmg[0] + 10, cur.dmg[1] + 14]; good.req = { lvl: 1 };
+    const bad = generateItem({ ilvl: 1, base: cur.base, rarity: 'normal', rng }); bad.dmg = [1, 2]; bad.affixes = []; bad.req = { lvl: 1 };
+    const pg = PW.itemPower(good, st), pb = PW.itemPower(bad, st);
+    ok(pg.verdict === 'better' && pg.delta > 0 && pg.power > 0 && PW.isUpgrade(good, st), 'a stronger katana: better, and the bag\'s green arrow');
+    ok(pb.verdict === 'worse' && pb.delta < 0 && !PW.isUpgrade(bad, st), 'a weaker one: not as good, no arrow');
+    ok(PW.itemPower(cur, st).verdict === 'worn' && PW.itemPower(cur, st).power > 0, 'the katana worn: "wearing it", with what it adds');
+    const hat = generateItem({ ilvl: 1, slot: 'hat', rarity: 'magic', rng }); hat.req = { lvl: 1 };
+    st.equipment.hat = null;
+    ok(PW.itemPower(hat, st).verdict === 'empty' && PW.isUpgrade(hat, st), 'a hat with nothing on the head: wear it!');
+    const big = generateItem({ ilvl: 40, slot: 'boots', rarity: 'magic', rng }); big.req = { lvl: 40 };
+    const pbig = PW.itemPower(big, st);
+    ok(pbig.locked === 'Needs level 40' && !PW.isUpgrade(big, st), 'too high a level: "Needs level 40", no arrow');
+    const staff = generateItem({ ilvl: 1, slot: 'weapon', wtype: 'staff', rarity: 'normal', rng });
+    ok(PW.itemPower(staff, st).verdict === 'none' && PW.itemPower(staff, st).hero === 'moka', 'Moka\'s staff before Moka joins: just "Moka\'s weapon"');
+    st.flags.mokaJoined = true;
+    const ps = PW.itemPower(staff, st);
+    ok(ps.other && ps.hero === 'moka' && ps.verdict !== 'none' && !PW.isUpgrade(staff, st), 'after she joins: Power for Moka, no arrow for Chewy');
+    const ball = generateItem({ ilvl: 1, slot: 'weapon', wtype: 'ball', rarity: 'normal', rng });
+    ok(PW.itemPower(ball, st).slot === 'weaponAlt' && PW.itemPower(ball, st).power > 0, 'a ball counts in the ball hand (with that hand out)');
+    ok(PW.itemPower(hat, st) === PW.itemPower(hat, st), 'Power is cached while nothing changes');
+  }
+  // plain words
+  ok(IT.statText('crit', 4) === '+4% chance of a big hit' && IT.statText('mf', 10) === 'Lucky: finds better treasure (+10%)' && IT.statText('resFire', 12) === 'Fire hurts 12% less', 'plain words for the bonuses');
+  ok(Object.keys(IT.STAT_TEXT).every(k => !/Resist|Critical|Steal|Enhanced|Replenish/.test(IT.STAT_TEXT[k](k.endsWith('Dmg') ? [1, 2] : 5, null, null))), 'no Diablo words left in the bonuses');
+  { const it = generateItem({ ilvl: 20, slot: 'hat', rarity: 'rare', rng: new RNG(5) }); for (const a of it.affixes) a.text = 'Old Words'; const tt = itemTooltip(it, null, null);
+    ok(!tt.lines.some(l => l.text === 'Old Words'), 'tooltips write a save\'s old affix text again in the new words'); }
 }
 
 hr('RESULT');

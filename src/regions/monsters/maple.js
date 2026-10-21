@@ -20,6 +20,7 @@ import { mergeVertices, RoundedBox } from '../../gfx/geom.js';
 import { makeToon, makeOutline } from '../../gfx/materials.js';
 import { rand, clamp, TAU, dist, angleDiff, ease } from '../../core/util.js';
 import { mapleFx, MCOL, F } from '../bosses/fx_tanuki.js';
+import { enemySpec, enemyPivot, enemyParts, hasEnemyModel } from './enemyModels.js';
 
 const TELE = '#ff3a7a'; // pink-red: the veil + ink contour read on straw, earth and red leaf litter
 const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), UP = new THREE.Vector3(0, 1, 0);
@@ -85,7 +86,7 @@ const KU = { R: 0.44, C: 0.46, OPEN: 0.5, CURL: 0.72, SPD: 10.5, W: 0.56, DIZZY:
 const KU_PROF = [[0.001, 0.035], [0.15, 0.045], [0.25, 0.09], [0.3, 0.18], [0.315, 0.3], [0.3, 0.42], [0.255, 0.54], [0.19, 0.65], [0.12, 0.74], [0.06, 0.81], [0.02, 0.855], [0.001, 0.87]];
 function kuriR(y) { for (let i = 1; i < KU_PROF.length; i++) if (y <= KU_PROF[i][1]) { const [r0, y0] = KU_PROF[i - 1], [r1, y1] = KU_PROF[i]; return r0 + (r1 - r0) * (y - y0) / (y1 - y0); } return 0.001; }
 const kuriZ = (x, y) => Math.sqrt(Math.max(0, kuriR(y) ** 2 - x * x));
-const EMBER = 'outgoingLight += diffuseColor.rgb * 0.9 * step(0.85, diffuseColor.r) * step(0.5, diffuseColor.g) * step(diffuseColor.b, 0.35);';
+const EMBER = 'outgoingLight += diffuseColor.rgb * 0.9 * step(0.85, diffuseColor.r) * step(0.35, diffuseColor.g) * step(diffuseColor.b, 0.35);'; // (the Roasted tips, #ffae3a: linear green 0.42)
 function kuriSpec(v) {
   const C0 = KU.C, R = KU.R, H = R * 0.9;
   const nut = col(v.nut), grain = col(v.nut).multiplyScalar(0.78), base = col(v.base || '#f2dcae');
@@ -132,12 +133,14 @@ function kuriSpec(v) {
   return { mat: v.glow ? { fragOut: EMBER } : {}, parts: [{ name: 'body', geo: [...B, ...FE] }, { name: 'bl', geo: half(-1), at: [0, 0, -H] }, { name: 'br', geo: half(1), at: [0, 0, -H] }] };
 }
 function buildKuri(v) {
-  const M = assemble('kuri:' + v.key, () => kuriSpec(v));
-  const I = M.inner, BL = M.g.bl, BR = M.g.br;
-  let spin = 0, hop = 0, open = KU.OPEN;
+  const M = assemble('kuri:' + v.key, () => enemySpec('kuri', v.key, v.glow ? { fragOut: EMBER } : null) || kuriSpec(v)); // (the Blender model when it's loaded: enemyModels.js)
+  const I = M.inner, BL = M.g.bl, BR = M.g.br, C = enemyPivot('kuri', v.key, 'body', [0, KU.C, 0])[1]; // (the ball's centre: it rolls about it)
+  for (const h of [BL, BR]) for (const o of h.children) if (o.isMesh) o.receiveShadow = false; // (the shell's own shadow turned the cream lining grey)
+  const OPEN = hasEnemyModel('kuri', v.key) ? 1.0 : KU.OPEN; // (the Blender burr opens wider, as its sheet: the face clear from the side)
+  let spin = 0, hop = 0, open = OPEN;
   M.animate = (dt, t, moving) => {
     const a = M.act, k = (M.actT += dt);
-    let y = 0, sx = 1, sy = 1, rz = 0, lean = 0, want = KU.OPEN + Math.sin(t * 2.1) * 0.05, rate = 10, spinV = 0;
+    let y = 0, sx = 1, sy = 1, rz = 0, lean = 0, want = OPEN + Math.sin(t * 2.1) * 0.05, rate = 10, spinV = 0;
     switch (a) {
       case 'curl': { // the burr slams shut, it rocks back and winds itself backwards like a bowling ball
         const p = clamp(k / (KU.CURL * 0.45)); want = 0; rate = 12; lean = -0.28 * ease.outCubic(p); sy = 1 - 0.1 * p; sx = 1 + 0.07 * p;
@@ -147,9 +150,9 @@ function buildKuri(v) {
       }
       case 'roll': want = 0; rate = 30; spinV = KU.SPD / KU.R; y = Math.abs(Math.sin(t * 17)) * 0.05; break;
       case 'bonk': { const p = clamp(k / 0.22); want = 0; sx = 1 + 0.2 * Math.sin(p * Math.PI); sy = 1 - 0.18 * Math.sin(p * Math.PI); break; }
-      case 'dizzy': want = KU.OPEN * 1.5; rate = 14; rz = Math.sin(t * 7) * 0.16; lean = Math.cos(t * 7) * 0.08; break;
-      case 'snapWind': { const p = ease.outCubic(clamp(k / KU.SNAP_WIND)); want = KU.OPEN + 0.6 * p; lean = -0.14 * p; sy = 1 - 0.08 * p; rz = Math.sin(t * 50) * 0.03 * p; break; }
-      case 'snap': { const p = clamp(k / 0.32); want = p < 0.35 ? 0 : KU.OPEN * ease.outBack((p - 0.35) / 0.65); rate = 40; sy = 1 + 0.12 * Math.sin(p * Math.PI); lean = 0.22 * Math.sin(p * Math.PI); break; }
+      case 'dizzy': want = OPEN * 1.5; rate = 14; rz = Math.sin(t * 7) * 0.16; lean = Math.cos(t * 7) * 0.08; break;
+      case 'snapWind': { const p = ease.outCubic(clamp(k / KU.SNAP_WIND)); want = OPEN + 0.6 * p; lean = -0.14 * p; sy = 1 - 0.08 * p; rz = Math.sin(t * 50) * 0.03 * p; break; }
+      case 'snap': { const p = clamp(k / 0.32); want = p < 0.35 ? 0 : OPEN * ease.outBack((p - 0.35) / 0.65); rate = 40; sy = 1 + 0.12 * Math.sin(p * Math.PI); lean = 0.22 * Math.sin(p * Math.PI); break; }
       default: {
         hop = (hop + dt * (moving ? 3.4 : 1.2)) % 1; const h = Math.sin(hop * Math.PI);
         y = moving ? h * 0.12 : 0; sy = 1 + (moving ? (h - 0.4) * 0.12 : Math.sin(t * 2.4) * 0.025); sx = 1 / Math.sqrt(sy);
@@ -159,7 +162,7 @@ function buildKuri(v) {
     }
     open += (want - open) * Math.min(1, dt * rate);
     if (spinV) spin += dt * spinV; else spin += (Math.round(spin / TAU) * TAU - spin) * Math.min(1, dt * 8);
-    I.position.set(0, KU.C + y, 0); I.rotation.set(lean + spin, 0, rz); I.scale.set(sx, sy, sx);
+    I.position.set(0, C + y, 0); I.rotation.set(lean + spin, 0, rz); I.scale.set(sx, sy, sx);
     BL.rotation.y = -open; BR.rotation.y = open;
   };
   M.animate(0, 0, false);
@@ -320,7 +323,7 @@ function kakashiSpec(v) {
   return { parts };
 }
 function buildKakashi(v) {
-  const M = assemble('kakashi:' + v.key, () => kakashiSpec(v));
+  const M = assemble('kakashi:' + v.key, () => enemySpec('kakashi', v.key) || kakashiSpec(v)); // (the crows' perches come from the model)
   const I = M.inner, crows = ['crowA', 'crowB', 'crowC'].map(n => M.g[n]).filter(Boolean);
   crows.forEach((c, i) => { c.rotation.y = i === 1 ? 0.3 : -0.9; });
   M.crows = crows; M.crowY = crows.map(c => c.position.y);
@@ -354,15 +357,18 @@ function buildKakashi(v) {
 let CROW = null;
 function crowFly() {
   if (!CROW) {
-    const c = '#2a2c44', hi = '#454a78';
+    const c = '#2a2c44', hi = '#454a78', P = enemyParts('kakashiCrow'); // (the Blender crow: body, wing_L, wing_R, each at its pivot)
     const wing = s => merge([ell(0.13, 0.018, 0.07, c, [s * 0.12, 0, -0.01], [0, 0, 0], 10), ell(0.07, 0.014, 0.05, hi, [s * 0.2, 0.004, -0.03], [0, s * 0.3, 0], 8)]);
-    CROW = { body: shared(merge(crowParts(c, hi, true))), wl: shared(wing(-1)), wr: shared(wing(1)),
-      mat: makeToon({ vertexColors: true, objectBrush: true, brush: 0.1, rim: 0.7, term: [-0.02, 0.3], fragOut: EDGE_OUT }), ol: makeOutline(INK, 0.018) };
+    CROW = P?.wing_L && P.wing_R ? { body: shared(merge(P.body.geos.map(g => g.clone()))), wl: shared(merge(P.wing_R.geos.map(g => g.clone()))), wr: shared(merge(P.wing_L.geos.map(g => g.clone()))), wlAt: P.wing_R.at, wrAt: P.wing_L.at, bodyAt: P.body.at } : { body: shared(merge(crowParts(c, hi, true))), wl: shared(wing(-1)), wr: shared(wing(1)) };
+    Object.assign(CROW, {
+      mat: makeToon({ vertexColors: true, objectBrush: true, brush: 0.1, rim: 0.7, term: [-0.02, 0.3], fragOut: EDGE_OUT }), ol: makeOutline(INK, 0.018) });
   }
   const g = new THREE.Group(); g.rotation.order = 'YXZ';
   const mk = (geo, parent) => { const me = new THREE.Mesh(geo, CROW.mat); me.castShadow = true; parent.add(me, new THREE.Mesh(geo, CROW.ol)); };
   mk(CROW.body, g);
-  const wl = new THREE.Group(), wr = new THREE.Group(); wl.position.set(-0.07, 0.11, 0); wr.position.set(0.07, 0.11, 0);
+  const wl = new THREE.Group(), wr = new THREE.Group(), b = CROW.bodyAt || [0, 0, 0];
+  if (CROW.wlAt) { wl.position.set(CROW.wlAt[0] - b[0], CROW.wlAt[1] - b[1], CROW.wlAt[2] - b[2]); wr.position.set(CROW.wrAt[0] - b[0], CROW.wrAt[1] - b[1], CROW.wrAt[2] - b[2]); }
+  else { wl.position.set(-0.07, 0.11, 0); wr.position.set(0.07, 0.11, 0); }
   mk(CROW.wl, wl); mk(CROW.wr, wr); g.add(wl, wr);
   g.userData.wl = wl; g.userData.wr = wr;
   return g;
@@ -504,12 +510,13 @@ function wispSpec(v) {
   for (const g of T) g.translate(0, CY - 0.12, 0);
   // the orbiting ring: leaves laid back, tips leading round the orbit
   for (let i = 0; i < 5; i++) { const a = i / 5 * TAU; O.push(place(leaf(0.18, i % 2 ? L0 : L1), [Math.sin(a) * 0.52, Math.sin(i * 2.1) * 0.06, Math.cos(a) * 0.52], -Math.PI / 2 + 0.3, a - Math.PI / 2, 0, 'YXZ')); }
-  const glow = `outgoingLight += diffuseColor.rgb * 0.7 * step(0.9, diffuseColor.r) * step(${(v.gMin ?? 0.8).toFixed(2)}, diffuseColor.g) * step(diffuseColor.b, 0.72);`;
-  return { mat: { fragOut: glow }, parts: [{ name: 'body', geo: [...B, ...T] }, { name: 'orb', geo: O, at: [0, CY, 0] }] };
+  return { mat: wispMat(v), parts: [{ name: 'body', geo: [...B, ...T] }, { name: 'orb', geo: O, at: [0, CY, 0] }] };
 }
+// the core's warm glow (any bright warm-yellow colour on the model)
+const wispMat = v => ({ fragOut: `outgoingLight += diffuseColor.rgb * 0.7 * step(0.9, diffuseColor.r) * step(${(v.gMin ?? 0.8).toFixed(2)}, diffuseColor.g) * step(diffuseColor.b, 0.72);` });
 function buildWisp(v) {
-  const M = assemble('momijiWisp:' + v.key, () => wispSpec(v));
-  const I = M.inner, O = M.g.orb;
+  const M = assemble('momijiWisp:' + v.key, () => enemySpec('momijiWisp', v.key, wispMat(v), { rename: { orbit: 'orb' } }) || wispSpec(v));
+  const I = M.inner, O = M.g.orb, OY = enemyPivot('momijiWisp', v.key, 'orbit', [0, WS.CY, 0])[1];
   let orb = rand(0, TAU), rad = 1, lean = 0;
   M.animate = (dt, t, moving) => {
     const a = M.act, k = (M.actT += dt);
@@ -524,7 +531,7 @@ function buildWisp(v) {
     orb += dt * spinV; rad += (wantR - rad) * Math.min(1, dt * 8); lean += (wantLean - lean) * Math.min(1, dt * 6);
     const ws = s / Math.sqrt(sq);
     I.position.y = WS.FLOAT + Math.sin(t * 2.3) * 0.07; I.rotation.set(lean, 0, rz); I.scale.set(ws, s * sq, ws);
-    O.rotation.y = orb; O.scale.set(rad, 1, rad); O.position.y = WS.CY + Math.sin(t * 3.1) * 0.03;
+    O.rotation.y = orb; O.scale.set(rad, 1, rad); O.position.y = OY + Math.sin(t * 3.1) * 0.03;
   };
   M.animate(0, 0, false);
   return M;

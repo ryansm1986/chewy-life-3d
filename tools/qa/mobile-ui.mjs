@@ -5,7 +5,7 @@
 // house card and remodel, a dialogue with choices, a guide line, the reel bar, build mode, decorate mode, the title and
 // the portrait rotate overlay. For each: a screenshot, text drawn under the floor (12 CSS px: ui/mobile.css raises what
 // was under), a panel that runs off the screen (it must fit, or scroll inside), a header button outside its panel's
-// frame (R-13: tools/qa/ui-audit-lib.mjs; all five heroes' trees), and tappables under 44 px. R-14: a guide's objective
+// frame (R-13: tools/qa/ui-audit-lib.mjs; all six heroes' trees), and tappables under 44 px. R-14: a guide's objective
 // card over the panels the guides open (the Board, the Guild, the Journal, the menu, the pantry, Skills, a house card,
 // remodel, the stash), with what it spotlights: on a phone it must cover none of the panel's tabs, buttons or ✕, nor the
 // spotlit target (ui-audit-lib guideOverlap; a tablet's are listed, not failed: its panels keep their desktop layout).
@@ -144,11 +144,11 @@ try {
   await scene('bag', () => ev(() => window.G.ui.open('inventory', { view: 'bag' })), ['.p-inv']);
   await scene('character', () => ev(() => window.G.ui.open('character')), ['.p-char']);
   await scene('skills', () => ev(() => window.G.ui.open('skills')), ['.p-skills']);
-  for (const cls of ['moka', 'poe', 'shihtzu', 'golden']) // (the other heroes' trees: the panel draws the class on state.player; restored after)
+  for (const cls of ['moka', 'poe', 'shihtzu', 'golden', 'stella']) // (the other heroes' trees: the panel draws the class on state.player; restored after)
     await scene('skills-' + cls, () => ev(c => { const p = window.G.state.player; window.__cls0 ??= p.cls; p.cls = c; window.G.ui.open('skills'); }, cls), ['.p-skills'],
       () => ev(() => { const U = window.G.ui; U.close('skills'); window.G.state.player.cls = window.__cls0; }));
   // R-16: the Charge drawer opened (a phone's sheet over the tree) for each hero: its skill strip's buttons, the text
-  for (const cls of ['chewy', 'moka', 'poe', 'shihtzu', 'golden'])
+  for (const cls of ['chewy', 'moka', 'poe', 'shihtzu', 'golden', 'stella'])
     await scene('charge-' + cls, async () => { await ev(c => { const p = window.G.state.player; window.__cls0 ??= p.cls; p.cls = c; window.G.ui.open('skills'); }, cls); await sleep(page, 900); // (a phone: a tap on the drawer's tag opens the sheet)
       const t = await ev(() => { const e = window.G.ui.root.classList.contains('m-phone') && document.querySelector('.chg-drawer:not(.m-open) .chg-tag'); if (!e) return null; const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }); if (t) await F.tap(t[0], t[1]); }, ['.p-skills'],
       () => ev(() => { const U = window.G.ui; document.querySelector('.chg-drawer')?.classList.remove('m-open'); U.close('skills'); window.G.state.player.cls = window.__cls0; }));

@@ -20,6 +20,8 @@
 //  - meetGolden: Foosy, in town after he joins (docs/GOLDEN.md §5): the hero wheel with five, his lance (the reach combo,
 //            Sunbeam Thrust), Bonk Dart, Shadow the dragon whelp taking off beside him (keyed on his flight), his trees.
 //            His name reads CLASSES.golden.name.
+//  - meetStella: Stella, in town after she joins (docs/STELLA.md §6): the hero wheel with six, her wagasa (the Sunsweep
+//            combo, Golden Ray), Morning Light (you and Shadow both), the sun shell (she shows one on herself), her trees.
 import * as THREE from 'three';
 import { POND } from './layout.js';
 import { SKILLS } from '../rpg/skills.js';
@@ -417,6 +419,35 @@ const meetGolden = {
   ],
 };
 
+// ------------------------------------------------------------------ six heroes: Stella the Sun Oracle (docs/STELLA.md §6)
+const STL = CLASSES.stella?.name || 'Stella';
+/** her sun shell now (combat/stellaArts.js; 0 before it's there) */
+const stlShell = G => { try { return G.skills?.stlShell?.('player') || 0; } catch (e) { return 0; } };
+const meetStella = {
+  title: `Meet ${STL}`, narrator: 'stella', color: '#e0a030', priority: 1,
+  blurb: `The hero wheel with six, ${STL}'s sun wagasa, Morning Light and her sun shells.`,
+  offer: `${STL} can show you her wagasa, her morning light and her sun shells.`,
+  icon: null,
+  trigger: G => !!G.heroes?.joined('stella') && G.state.activeHero !== 'stella',
+  past: G => !!G.heroes?.joined('stella'),
+  locked: G => (G.heroes?.joined('stella') ? null : 'Captain Kaizo rows her over once the Tide Pool opens'),
+  steps: [
+    { id: 'hold', say: G => (G.state.activeHero === 'stella' ? 'Good morning. *Hold Tab* whenever the pack needs another paw. I\'ll be here, keeping things warm.' : `Six of us now, ${me(G)}. *Hold Tab*: the hero wheel. Choose me, the one in saffron. …Or press my number. The sun doesn't mind which.`),
+      objective: 'Hold *Tab*, pick her, let go', allow: { switching: true },
+      highlight: G => (G.heroSwitching ? null : wheelOpen(G) ? '.hero-wheel .hw-card[data-id="stella"]' : '.hud .hsw'),
+      done: G => G.state.activeHero === 'stella' && !G.heroSwitching },
+    { id: 'combo', say: 'Left-click: my *Sunsweep*. Two sweeps of the wagasa throw crescents of sunlight, then a twirl rings out round me. Up close, where the light reaches. Right-click: *Golden Ray*, through every foe in a line.',
+      objective: 'Her wagasa: left-click, right-click', allow: { switching: true }, highlight: G => (G.heroSwitching ? null : '.hud .hb.mouse'), ack: true },
+    { id: 'light', say: 'Press *1*: *Morning Light*. The first light of morning, over you and Shadow both. It mends whoever stands in it.',
+      objective: 'Press 1: Morning Light, you and Shadow both', allow: { switching: true }, highlight: G => (G.heroSwitching ? null : '.hud .hb[data-i="2"]'), ack: true },
+    { id: 'shell', say: "And light is never wasted on a full belly: past full life it becomes a *sun shell*, a thin golden film that takes the next knocks for a while. There, on me. See?",
+      objective: 'Healing past full life: a sun shell', allow: { switching: true }, ack: true,
+      onEnter: G => { if (G.state.activeHero === 'stella' && !stlShell(G)) { try { G.skills?.stlFillShell?.(G.player); } catch (e) { /* (her shells: combat/stellaArts.js) */ } } } }, // (she shows it on herself)
+    { id: 'wrap', say: 'My trees are Radiance, Corona and Dawn (*K*). Kind Light finds whoever needs it. If nobody does, it finds someone who deserves it.',
+      objective: 'K: Radiance, Corona, Dawn', ack: true, highlight: () => '.hud .mb[data-open="skills"]' },
+  ],
+};
+
 // ------------------------------------------------------------------ the cozy path (docs/COZY.md §11; ROADMAP CZ-11)
 // Every line follows the device: keys (*F* is the pad's A through keyHint), the pad's own words, and touch's ("tap",
 // "the attack button"); the director says a function's line again when the device changes.
@@ -583,5 +614,5 @@ const guildGuide = {
   ],
 };
 
-export const GUIDES = { switch: sw, house, fishing, makeHome, remodel, charge, meetPoe, meetShihtzu, meetGolden, board, nose, guild: guildGuide };
+export const GUIDES = { switch: sw, house, fishing, makeHome, remodel, charge, meetPoe, meetShihtzu, meetGolden, meetStella, board, nose, guild: guildGuide };
 export const GUIDE_IDS = Object.keys(GUIDES);

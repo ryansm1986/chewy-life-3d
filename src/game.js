@@ -17,6 +17,7 @@ import { Villager } from './actors/npc.js';
 import { CAST, REFINED_CAST, prebuildHumanoid } from './actors/charKit.js';
 import { loadRefinedRigs } from './actors/refinedRigs.js';
 import { loadHeroModels, heroModelReady, buildHeroModel } from './actors/heroModels.js';
+import { loadEnemyModels } from './regions/monsters/enemyModels.js';
 import { VILLAGERS, randomVillagerSpec } from './actors/roster.js';
 import { U } from './gfx/materials.js';
 import { glowTexture } from './gfx/textures.js';
@@ -47,6 +48,7 @@ import { HeroManager } from './actors/heroes.js';
 import { arrivalsOn } from './actors/arrivals.js';
 import { loadWhelp, dressWings } from './actors/whelp.js';
 import { loadGoldenProps } from './actors/goldenGear.js';
+import { loadStellaProps } from './actors/stellaGear.js';
 import { skillRuntime } from './rpg/skills.js';
 import { disposeScene } from './gfx/dispose.js';
 import { VillageSim } from './world/village.js';
@@ -75,6 +77,7 @@ import { installPeaceful } from './cozy/peacefulRun.js';
 import { installGuild } from './cozy/guildRun.js';
 import { installCozyGuide } from './cozy/cozyGuide.js';
 import { installShadowLead } from './actors/shadowLead.js'; // (Shadow leads the way: ROADMAP R-17)
+import { installCoop } from './coop/coop.js'; // (couch co-op: 2-4 controllers, docs/COOP.md)
 
 // UI and audio load in parallel with the world. The import() paths must be literal so Vite bundles them for the
 // production build (a variable path with @vite-ignore worked on the dev server but 404'd in dist: no UI, no sound).
@@ -105,9 +108,11 @@ export async function boot() {
   G.actions = createActions(G);
   G.actions.recompute();
   G.skillParams = (id) => skillRuntime(id, G.state, G.derived)?.params;
+  G.qaModule = (name) => (name === 'items' ? import('./rpg/items.js') : Promise.reject(new Error('no module ' + name))); // (QA on the production bundle: tools/qa/s50-coop-panes.mjs makes items with it)
 
   // Blender-refined skins for Chewy and Shadow must be in memory before their rigs (and portraits) are built
-  const [uiMod, audioMod] = await Promise.all([P.has('noui') ? null : tryImport('ui', () => import('./ui/ui.js')), P.has('noaudio') ? null : tryImport('audio', () => import('./audio/audio.js')), loadRefinedRigs(REFINED_CAST), loadHeroModels(['chewy', 'moka', 'poe', 'shihtzu', 'golden', 'shadow', 'rosie']), loadWhelp()]); // (loadWhelp: Shadow's dragon whelp outfit and its wing prop, worn while the dragoon is played: actors/whelp.js)
+  const [uiMod, audioMod] = await Promise.all([P.has('noui') ? null : tryImport('ui', () => import('./ui/ui.js')), P.has('noaudio') ? null : tryImport('audio', () => import('./audio/audio.js')), loadRefinedRigs(REFINED_CAST), loadHeroModels(['chewy', 'moka', 'poe', 'shihtzu', 'golden', 'stella', 'shadow', 'rosie', 'tanukiBandit', 'tanukiBanditMaroon', 'tamamo']), loadWhelp(), loadEnemyModels()]); // (loadWhelp: Shadow's dragon whelp outfit and its wing prop, worn while the dragoon is played: actors/whelp.js)
+  loadStellaProps(); // (Stella's sun wagasa: actors/stellaGear.js; a procedural stand-in until it lands)
   loadGoldenProps(); // (the dragoon's lance and javelin props: actors/goldenGear.js; procedural stand-ins until they land) // (poe: while her model is pending, heroModels.js fetches nothing)
   G.audio = audioMod?.Audio || null;
   try { G.audio?.init?.(); } catch (e) { console.warn('[audio] init failed', e); }
@@ -198,6 +203,7 @@ export async function boot() {
   portraits.register('poe', CAST.poe);
   portraits.register('shihtzu', CAST.shihtzu);
   portraits.register('golden', CAST.golden);
+  portraits.register('stella', CAST.stella);
   portraits.dresser('shadowWhelp', dressWings); // (the whelp's bust: his wings peek over his shoulders)
   // Shadow's face is the whelp's while the dragoon is played (his tips, the HUD's companion card: actors/whelp.js)
   G.portrait = (id) => portraits.get(id === 'shadow' && G.companion?.whelp?.on ? 'shadowWhelp' : id);
@@ -206,7 +212,7 @@ export async function boot() {
   G.thumbs = new BuildingThumbs(engine);
   try {
     const pm = await import('./ui/portraits.js');
-    for (const id of ['chewy', 'shadow', 'rosie', 'moka', 'poe', 'shihtzu', 'golden']) { const url = portraits.get(id); if (url) pm.PORTRAITS[id] = () => `<img class="p3d" src="${url}" alt="" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block">`; }
+    for (const id of ['chewy', 'shadow', 'rosie', 'moka', 'poe', 'shihtzu', 'golden', 'stella']) { const url = portraits.get(id); if (url) pm.PORTRAITS[id] = () => `<img class="p3d" src="${url}" alt="" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block">`; }
     { // Shadow's bust follows his outfit (the whelp while the dragoon is played); a swap re-renders the HUD's companion face
       const img = url => (url ? `<img class="p3d" src="${url}" alt="" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block">` : '');
       const plain = pm.PORTRAITS.shadow;
@@ -278,12 +284,12 @@ export async function boot() {
   Events.on('footstep', (p) => { G.audio?.play?.(stepSound(), { vol: 0.35 }); if (Math.random() < 0.5) G.vfx.dust(p, { n: 1, size: 0.18 }); });
   Events.on('emote', ({ actor, kind }) => G.vfx.emote(actor, kind));
   Events.on('player:levelup', ({ lvl }) => { G.vfx.levelUp(player.pos.clone()); G.ui?.banner?.('Level Up!', `${player.name} is now level ${lvl}`, { style: 'levelup' }); G.audio?.play?.('ui_levelup'); G.actions.restoreAll(); shadow.recalc(); });
-  Events.on('player:dead', () => onPlayerDeath());
-  Events.on('item:drop', ({ item }) => {
+  Events.on('player:dead', () => { if (!G.coop?.onP1Dead()) onPlayerDeath(); }); // (couch co-op: with a teammate standing, player 1 is only downed: coop/coop.js)
+  Events.on('item:drop', ({ item, pos }) => { // (pos: couch co-op, the hero who dropped it: coop/coop.js)
     if (!item) return;
     if (G.mode === 'interior') { if (!G.actions.pickup(item)) G.story?.giveItem?.(item); G.ui?.toast?.('No dropping things indoors — it went back in your bag', { color: '#ffd8a8' }); return; } // (houses have no ground loot)
     const loot = G.mode === 'dungeon' ? G.dungeon?.loot : vLoot;
-    const p = player.pos.clone();
+    const p = (pos || player.pos).clone();
     loot?.drop(p, [item.kind === 'gem' ? { type: 'gem', item } : { type: 'item', item }]);
     // don't instantly re-grab what we just dropped
     setTimeout(() => { for (const e of loot?.list || []) if (e.d.item === item) e.triedAuto = true; }, 700);
@@ -302,6 +308,7 @@ export async function boot() {
     G.world = world; G.vfx = vfx; G.combat = combat;
     engine.setWorld(world);
     player.changeWorld(world); shadow.changeWorld(world);
+    G.coop?.changeWorld(world); // (couch co-op: the other heroes come too; mode:changed puts them beside player 1)
   };
   G.swapWorld = swapWorld; // (housing: the interiors swap in and out the same way)
   // tear down a finished floor completely (entities, loot, lights, GPU resources) so nothing leaks between visits
@@ -362,7 +369,7 @@ export async function boot() {
       Events.emit('mode:changed', { mode: 'dungeon', floor: floor == null ? null : dungeon.floor, region, ...dungeon.where() }); // (+ zone, dungeon, tier: docs/ZONES.md §8)
       save();
       // first visit: one short, non-blocking tip from Shadow; the rest arrive when they become useful (see hints())
-      if (tip && !G.state.flags.burrowTut) { G.state.flags.burrowTut = true; setTimeout(() => G.mode === 'dungeon' && hint('fight', player.hero === 'moka' ? '*Yip!* Click a monster to zap it — right-click for Splash Bolt!' : player.hero === 'poe' ? '*Yip!* Click a monster to slash it — right-click to throw your fūma (it comes back)!' : player.hero === 'shihtzu' ? '*Yip!* Click a monster to wallop it with your flail — right-click for Woeful Wallop, 1 for a Dripping Paw hex!' : player.hero === 'golden' ? '*Rawr!* (a very small rawr) Click a monster to poke it with your lance — right-click for Sunbeam Thrust, 1 to toss a Bonk Dart!' : '*Yip!* Click a monster to slice it — right-click for Crescent Chomp!'), 1800); }
+      if (tip && !G.state.flags.burrowTut) { G.state.flags.burrowTut = true; setTimeout(() => G.mode === 'dungeon' && hint('fight', player.hero === 'moka' ? '*Yip!* Click a monster to zap it — right-click for Splash Bolt!' : player.hero === 'poe' ? '*Yip!* Click a monster to slash it — right-click to throw your fūma (it comes back)!' : player.hero === 'shihtzu' ? '*Yip!* Click a monster to wallop it with your flail — right-click for Woeful Wallop, 1 for a Dripping Paw hex!' : player.hero === 'golden' ? '*Rawr!* (a very small rawr) Click a monster to poke it with your lance — right-click for Sunbeam Thrust, 1 to toss a Bonk Dart!' : player.hero === 'stella' ? '*Yip!* Click a monster to sweep it with sunlight — right-click for Golden Ray, 1 for Morning Light (Shadow too)!' : '*Yip!* Click a monster to slice it — right-click for Crescent Chomp!'), 1800); }
     };
     if (G.ui?.transition) G.ui.transition(go); else go();
   }
@@ -428,17 +435,18 @@ export async function boot() {
   };
   // the Burrow door: pick one of its four dens (world/burrowDoor.js G.burrow, the panel ui/dens.js; docs/ZONES.md §4.1)
   G.openBurrowMenu = (opts = {}) => G.burrow?.open(opts);
-  function onPlayerDeath() {
+  function onPlayerDeath(pack = false) {
     if (G.playerDead) return;
     G.playerDead = true; skills.clearAll();
     player.anim.play('die'); engine.timeScale = 0.4; engine.post.pulse('#3a2040', 0.3);
-    G.ui?.banner?.('Oof!', `${player.name} needs a nap… Shadow will drag ${CLASSES[player.hero]?.pron.obj || 'him'} home.`, { style: 'area' });
+    G.ui?.banner?.('Oof!', pack ? 'The whole pack needs a nap… Shadow will drag everyone home.' : `${player.name} needs a nap… Shadow will drag ${CLASSES[player.hero]?.pron.obj || 'him'} home.`, { style: 'area' });
     G.audio?.play?.('player_die');
     const lost = Math.floor(G.state.coins * 0.1); if (lost > 0) { G.state.coins -= lost; Events.emit('coins:changed', { coins: G.state.coins }); }
     setTimeout(() => { engine.timeScale = 1; if (!G.zoneRespawn()) G.returnToVillage(true); }, 2600);
   }
   // A knock-out in a zone or its dungeon whose village is saved wakes at that village's inn, not at home
   // (src/regions/village; docs/ZONES.md §2): the zone is rebuilt and RegionMode.start puts the hero at the inn door.
+  G.partyWipe = () => { G.playerDead = false; onPlayerDeath(true); }; // (couch co-op: everyone is down, coop/coop.js wipe)
   G.zoneRespawn = () => {
     const zone = G.mode === 'dungeon' ? G.dungeon?.zoneId : null;
     if (!zone || !REGIONS[zone] || !villageReady(zone) || G.state.zones?.[zone]?.village !== 'saved') return false;
@@ -488,8 +496,9 @@ export async function boot() {
   G.ui?.minimap?.setProvider?.(vMap);
   G.talkTo = (npc) => {
     if (npc.talking) return;
-    npc.talking = true; player.controlLocked = true;
-    const done = () => { npc.talking = false; player.controlLocked = false; G.interactCooldown = performance.now() + 350; Actions.consume('interact'); };
+    const body = G.player; // (couch co-op: whoever walked up, coop/coop.js interact)
+    npc.talking = true; body.controlLocked = true;
+    const done = () => { npc.talking = false; body.controlLocked = false; G.interactCooldown = performance.now() + 350; Actions.consume('interact'); };
     (npc.hero ? heroes.talk(npc) : G.story.talk(npc)).then(done, (e) => { console.error(e); done(); }); // the other hero: chat / switch / join
   };
   function nearestInteract() {
@@ -518,6 +527,10 @@ export async function boot() {
   // a touch tap on the world (CT-5, docs/CONTROLS.md §12): a foe is locked (the attack and skills go at it), someone or
   // something to use is walked to and used (as a click does), anything else is walked to
   function touchTap(tp) {
+    if (player.hero === 'stella' && G.companion?.pos && !(G.companion.fainted > 0) && G.mode === 'dungeon' && !G.combat.pickAtScreen(tp.x, tp.y, engine.camera, 40)) { // (Stella: a tap on Shadow picks him for her heals for 5 s: docs/STELLA.md §5.1; a foe right under the tap is locked instead)
+      const sp = _v.copy(G.companion.pos).setY(G.companion.pos.y + 0.35).project(engine.camera), sx = (sp.x * 0.5 + 0.5) * innerWidth, sy = (-sp.y * 0.5 + 0.5) * innerHeight;
+      if (Math.hypot(sx - tp.x, sy - tp.y) < 48 && skills.stlPickAlly?.('shadow', 5)) { G.ui?.touch?.ping?.(tp.x, tp.y, 'use'); G.ui?.float?.(G.companion.pos.clone().setY(G.companion.pos.y + 1.1), 'Heals: Shadow', { kind: 'status', color: '#f7b8a8' }); return; }
+    }
     const foe = G.mode === 'dungeon' ? G.combat.pickAtScreen(tp.x, tp.y, engine.camera, 60) : null;
     if (foe) { if (padAim.target(foe)) { hoverEnemy = foe; G.audio?.play?.('ui_click', { vol: 0.45 }); G.ui?.touch?.ping?.(tp.x, tp.y, 'foe'); } return; }
     const it = pickInteractAt(tp.x, tp.y, 64);
@@ -537,6 +550,8 @@ export async function boot() {
   const slotHeld = i => !!SLOT_ACTS[i] && Actions.held(SLOT_ACTS[i]);
   const skillInput = { holding(id) { const hb = G.state.player.hotbar; return hb.some((s, i) => s === id && slotHeld(i)); } };
   skills.charge.bindKeys(slotHeld); // hold-to-charge polls the hotbar buttons (combat/charge.js, docs/CHARGE.md)
+  // couch co-op (docs/COOP.md): players 2-4 on their own pads, the shared camera, the downed, the join cards → G.coop
+  installCoop(G, { skillInput, interactList: () => (G.mode === 'village' ? [...npcs.filter(n => n.visible).map(n => n.interact), ...G.world.interactables] : G.world.interactables) });
 
   // occlusion fade: tell shaders where Chewy is on screen
   const _o = new THREE.Vector3();
@@ -561,6 +576,7 @@ export async function boot() {
     pupRing.material.opacity = 0.18 * dark;
     const rim = 0.55 + 0.75 * dark;
     for (const r of [player.rig, shadow.rig]) { const u = r.mat.userData.u; if (u) u.uRimStr.value = r === shadow.rig ? Math.max(1.25, rim + 0.4) : rim; }
+    if (G.coop?.active) for (const s of G.coop.others) { const u = s.body?.rig?.mat?.userData?.u; if (u) u.uRimStr.value = rim; } // (couch co-op: every hero reads in the dark)
   }
 
   function updateOcclusion() {
@@ -574,6 +590,7 @@ export async function boot() {
     // title, build and overview views)
     const occR = innerHeight * pr * 0.15 * Math.min(1, 26 / Math.max(1, rig.dist + rig.distBias));
     U.uOccl.value.set((_o.x * 0.5 + 0.5) * innerWidth * pr, (_o.y * 0.5 + 0.5) * innerHeight * pr, occR, depth);
+    G.coop?.occlusion(U.uOcclB.value, occR, pr); // (couch co-op: players 2-4 get their own cut-away)
   }
 
   // ---- per-frame input
@@ -606,7 +623,7 @@ export async function boot() {
     }
     if (G.buildFocus) { G.buildFocus = null; }
     const modal = G.ui?.anyModal?.() || (Actions.device === 'pad' && G.ui?.tutorial?.offering); // (the pad answers a guide's offer card with A / B: ui/padNav.js)
-    if (modal || player.controlLocked || G.playerDead) { G.ui?.setInteract?.(null); padAim.clear(); padA = Actions.held('attack', 'pad') || Actions.held('attack', 'touch'); return; }
+    if (modal || player.controlLocked || G.playerDead || G.coop?.p1.pane) { G.ui?.setInteract?.(null); padAim.clear(); padA = Actions.held('attack', 'pad') || Actions.held('attack', 'touch'); return; }
     // Tab / LB: a tap switches to the next hero, holding it opens the hero wheel (heroes.js); the wheel takes the input while open
     if (heroes.tabInput(dt)) { G.ui?.setInteract?.(null); return; }
     // touch (CT-5, docs/CONTROLS.md §12) plays like the pad: its stick and drag-to-aim feed padAim, the attack button is A
@@ -713,6 +730,7 @@ export async function boot() {
     if (G.questMoments?.speaking) return true; // (one of Shadow's quest lines is up: his tip waits its turn, never stacks under it)
     if (G.life?.fishing?.s || G.cozy?.scav?.busy) return true; // (a cast, a bite or a reel, or a dig: tips wait; on a phone a tip covers the reel bar / the dig ring)
     if (G.build?.active || G.housing?.decor?.active) return true; // (building or decorating: a tip would cover the palette, CT-11)
+    if (G.coop?.slots.some(s => s.pane)) return true; // (couch co-op: a bag pane is open, a tip would cover it)
     const now = performance.now();
     if (ui?.banners?.busy) hintBannerT = now; // (a beat of calm after a banner, e.g. the victory, before any tip)
     if (ui?.anyModal?.() || now - hintBannerT < 3000 || ui?.toasts?.busy) return true;
@@ -769,7 +787,7 @@ export async function boot() {
 
   // ---- save / load
   function save() { if (G.saveBlocked) return; /* (the debug menu's Restore is reloading onto the backup) */ try { if (G.playerDead || G.state.player.life === 0) G.state.player.life = null; /* never persist a knocked-out Chewy */ G.state.hour = day.hour; G.state.day = day.day; writeSave(saveableState(G.state)); /* (the old save → .prev first) */ } catch (e) { /* storage unavailable */ } }
-  G.save = save;
+  G.save = () => (G.coop?.cur ? G.coop.primary(save) : save()); // (couch co-op: always player 1's view of the state)
   installAutosave(G, { indicator: makeSaveGlyph(G.ui) }); // the timed and event autosaves, the page-hide / unload saves, the paw glyph (core/autosave.js, ROADMAP R-11)
 
   // ambience: water proximity + day/night music swaps (village only)
@@ -886,7 +904,7 @@ export async function boot() {
     Actions.poll(); // the gamepad's buttons and sticks for this frame (core/actions.js)
     G.debug?.frame(rdt); // (debug tools: Select+Start, the menu's session toggles: src/debug)
     // pause gameplay for the pause menu, and in the Burrow while reading dialogue (nothing should hit Chewy mid-sentence)
-    const paused = G.ui?.isPaused?.() || (G.mode === 'dungeon' && G.ui?.dlg?.active);
+    const paused = G.ui?.isPaused?.() || (G.mode === 'dungeon' && (G.ui?.dlg?.active || G.coop?.allPaned())); // (couch co-op: everyone in their bag pauses a fight too)
     const dt = paused ? 0 : rdt;
     if (G.mode === 'village') day.update(dt);
     else if (G.mode === 'interior') day.tick(dt); // (time passes inside; home/housing.js lights the room for the hour)
@@ -901,17 +919,22 @@ export async function boot() {
     G.mapPin?.tick(rdt); // (the map pin: you got there)
     shadow.update(dt);
     skills.update(dt, skillInput);
+    G.coop?.update(dt, rdt); // (players 2-4: their pads, heroes and skills, the downed, the leash: coop/coop.js)
     G.combat.update(dt);
     if (G.mode === 'village') for (const n of npcs) n.update(dt);
     heroes.update(rdt);
     // camera follows with a little look-ahead
+    rig.extraDistTarget = 0; // (couch co-op's pull-back: coop/coop.js frame sets it again below)
     if (G.heroFocus) rig.focus.set(G.heroFocus.x, (G.heroFocus.y || player.pos.y) + 0.6, G.heroFocus.z); // hero switch: the camera glides between them
     else if (G.introFocus) rig.focus.set(G.introFocus.x, player.pos.y + 0.6, G.introFocus.z);
     else if (buildMode.active && G.buildFocus) rig.focus.set(G.buildFocus.x, player.pos.y + 0.6, G.buildFocus.z);
     else if (G.decorFocus) rig.focus.set(G.decorFocus.x, 0.6, G.decorFocus.z); // (decorate mode pans over the room)
     else if (!G.titleActive) {
-      const lead = new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing)).multiplyScalar(Math.min(1, player.anim.speed / 4) * 1.2);
-      rig.focus.set(player.pos.x + lead.x, player.pos.y + 0.6, player.pos.z + lead.z);
+      if (G.coop?.active) G.coop.frame(rig); // (couch co-op: the middle of the pack, pulled back as it spreads)
+      else {
+        const lead = new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing)).multiplyScalar(Math.min(1, player.anim.speed / 4) * 1.2);
+        rig.focus.set(player.pos.x + lead.x, player.pos.y + 0.6, player.pos.z + lead.z);
+      }
       G.life?.fishing?.frameFocus?.(rig.focus); // (fishing: the camera leans toward the float, life/fishing.js)
     }
     if (G.mode === 'interior') { if (!G.decorFocus) G.housing.biasFocus(rig.focus); G.housing.clampFocus(rig.focus, G.decorFocus ? -1.2 : 1.2); } // (the camera leans to the back walls and stays over the room)
