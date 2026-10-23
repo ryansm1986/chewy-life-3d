@@ -3,7 +3,7 @@
 // wild areas for the scavenging (CZ-5's setWild), and the Cozy debug tab's "Peaceful zones and the wild" actions.
 //   G.peaceful = {
 //     isPeaceful(zone)            the zone spawns only its wild packs (cozy/peaceful.js isPeaceful)
-//     wildAreas(zone)             its wild areas [{ id, name, jp, x, z, r, packs, entry }] (from the cached plan)
+//     wildAreas(zone)             its wild areas [{ id, name, x, z, r, packs, entry }] (from the cached plan)
 //     wildAt(zone, x, z, pad)     the area at a point, or null
 //     override(zone, v)           the debug override (true / false / null), applied on the next visit
 //     sightings(force)            today's sightings (re-rolled when the world day turns: cozy/sightings.js)

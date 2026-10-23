@@ -30,7 +30,6 @@
 .pc-bub.heroswap .pc-face, .hsw.heroswap .hsw-face { animation: heroSwap .7s var(--pop); }
 @keyframes heroSwap { 0% { transform: scale(.4) rotate(-40deg); opacity: 0; } 60% { transform: scale(1.12) rotate(6deg); opacity: 1; } 100% { transform: none; } }
 .hud[data-hero="moka"] .pc-face { background: radial-gradient(circle at 50% 30%, #fff 0, #e4fbf6 50%, #a8e6da 100%); box-shadow: 0 5px 0 rgba(74, 44, 42, .35), inset 0 -6px 0 rgba(92, 224, 208, .3); }
-.hud[data-hero="moka"] .pc-name .jp { color: #9ff0e4; }
 /* the hero card that sweeps across while the camera changes heroes */
 .hero-card { position: absolute; left: 50%; top: 22%; display: flex; align-items: center; gap: 14px; padding: 10px 26px 10px 12px; border: 4px solid var(--ink); border-radius: 60px;
   background: linear-gradient(100deg, #fffaf2 0%, #fff 55%, color-mix(in srgb, var(--hc) 30%, #fff) 100%); box-shadow: 0 6px 0 rgba(74, 44, 42, .35), 0 0 0 5px color-mix(in srgb, var(--hc) 55%, #fff) inset;
@@ -43,7 +42,6 @@
 .hc-t { display: flex; flex-direction: column; line-height: 1.05; }
 .hc-t small { font: 600 12px var(--font); color: var(--ink2); letter-spacing: .6px; text-transform: uppercase; }
 .hc-t b { font: 700 32px/1 var(--font); color: #fff; -webkit-text-stroke: 7px var(--ink); paint-order: stroke fill; text-shadow: 0 3px 0 var(--ink); display: flex; align-items: baseline; gap: 8px; }
-.hc-t b .jp { font-size: 14px; -webkit-text-stroke: 4px var(--ink); color: var(--hc); }
 .hc-t span { font: 600 15px var(--font); color: var(--ink); }
 .pc-bub { position: relative; width: 88px; height: 88px; pointer-events: auto; cursor: pointer; transition: transform .3s var(--spring); }
 .pc-bub:hover { transform: scale(1.06) rotate(-4deg); }
@@ -58,7 +56,6 @@
 @keyframes lvPop { 0% { transform: scale(1); } 20% { transform: scale(1.6) rotate(-20deg); box-shadow: 0 0 0 6px #fff, 0 0 30px #ffcf4a; } 100% { transform: scale(1); } }
 .pc-info { display: flex; flex-direction: column; gap: 4px; }
 .pc-name { font: 700 23px/1 var(--font); color: #fff; -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill; text-shadow: 0 3px 0 var(--ink); letter-spacing: .4px; display: flex; align-items: baseline; gap: 6px; }
-.pc-name .jp { font-size: 12px; -webkit-text-stroke: 3.5px var(--ink); color: var(--pink2); }
 .pc-xp { width: 118px; height: 8px; border-radius: 6px; border: 2px solid var(--ink); background: rgba(255, 246, 232, .85); overflow: hidden; }
 .pc-xp i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #c3a6ff, #ff8fb0); transition: width .6s var(--soft); }
 .hud .pal { display: flex; align-items: center; gap: 6px; pointer-events: auto; margin-top: 2px; }
@@ -86,7 +83,6 @@
 .hud .qtrack.none { display: none; }
 .hud .qt-h { display: flex; align-items: center; gap: 6px; font: 700 15px/1 var(--font); }
 .hud .qt-h .gl { width: 22px; height: 22px; }
-.hud .qt-h .jp { font-size: 10px; color: var(--ink2); opacity: .7; }
 .hud .qt-tog { margin-left: auto; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--ink); background: #fff; font: 700 14px/1 var(--font); cursor: pointer; padding: 0; display: grid; place-items: center; transition: transform .25s var(--spring); }
 .hud .qt-tog:hover { transform: scale(1.15); }
 .hud .qtrack.collapsed .qt-list { display: none; }
@@ -112,7 +108,6 @@
 .mm-ring { position: absolute; inset: 0; width: 100%; height: 100%; filter: drop-shadow(0 5px 0 rgba(74, 44, 42, .3)); pointer-events: none; }
 .mm-n { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; width: 32px; height: 32px; justify-content: center;
   border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffc0d3, #ff8fb0); border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink); color: #fff; font: 700 13px/1 var(--font); -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
-.mm-n span { font: 800 7px/1 var(--jp); -webkit-text-stroke: 2px var(--ink); margin-top: -1px; }
 .hud .clock { position: absolute; left: -22px; bottom: -6px; width: 74px; height: 74px; border-radius: 50%; overflow: hidden; border: 4px solid var(--ink); box-shadow: 0 4px 0 rgba(74, 44, 42, .35); background: #bfe6ff; }
 .ck-sky { position: absolute; inset: 0; transition: background 2s; }
 .ck-stars { position: absolute; inset: 0; opacity: 0; transition: opacity 2s;
@@ -131,7 +126,6 @@
 .hud .floor { position: absolute; left: -22px; bottom: -6px; width: 74px; height: 74px; border-radius: 50%; border: 4px solid var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center;
   background: radial-gradient(circle at 40% 30%, #8a6ab8, #3a2c5a); box-shadow: 0 4px 0 rgba(74, 44, 42, .35), inset 0 0 0 3px rgba(255, 246, 232, .5); }
 .hud .floor b { font: 700 22px/1 var(--font); color: #fff; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; }
-.hud .floor span { font: 800 9px/1 var(--jp); color: #ffd6e6; margin-top: 2px; }
 .hud[data-mode="dungeon"] .clock, .hud[data-mode="village"] .floor { display: none; }
 .hud[data-mode="dungeon"] .mm-disc { background: #2a2038; }
 .hud .loc { display: flex; align-items: baseline; gap: 4px; margin-top: 2px; padding: 4px 12px 5px; background: linear-gradient(#fffdf8, #fff1e0); border: 3px solid var(--ink); border-radius: 14px; box-shadow: 0 3px 0 rgba(74, 44, 42, .35); pointer-events: auto; }
@@ -302,7 +296,6 @@
 .hud[data-mode="village"] .vtools { display: flex; }
 .hud .rci { pointer-events: auto; padding: 6px 10px 8px; cursor: help; background: var(--paper-noise), linear-gradient(#fffdf8, #fff0de); border: 3px solid var(--ink); border-radius: 16px; box-shadow: 0 4px 0 rgba(74, 44, 42, .35); }
 .hud .rci-h { font: 700 11px/1 var(--font); text-align: center; margin-bottom: 5px; display: flex; gap: 4px; justify-content: center; align-items: baseline; }
-.hud .rci-h .jp { font-size: 9px; color: var(--ink2); }
 .hud .rci-cols { display: flex; gap: 9px; }
 .hud .rci-c { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .hud .rci-track { position: relative; width: 16px; height: 50px; border: 2.5px solid var(--ink); border-radius: 8px; background: #f3e3cf; overflow: hidden; }

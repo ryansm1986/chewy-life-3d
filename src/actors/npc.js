@@ -652,6 +652,7 @@ export class Villager extends Actor {
   }
   // the nightcap (the day hat, if any, goes on the hook: its baked bone is scaled away) — on the head's hat anchor
   setNightcap(on) {
+    if (on && this.rig.noNightcap) return; // (a baked day hat that can't come off: heroModels.js noNightcap)
     const P = this.rig.parts, head = P.head, anchor = P.hatAnchor;
     if (on && !this.cap && head) {
       const f = ((parseInt(this.id.replace(/\D/g, ''), 10) || this.id.length) * 7) % CAP_FOLK.length;

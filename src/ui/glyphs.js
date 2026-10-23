@@ -185,15 +185,15 @@ export const GLYPHS = {
 
 // Material → glyph, name, and Japanese flavour label
 export const MATERIALS = {
-  wood: { name: 'Wood', jp: '木', g: 'wood' },
-  stone: { name: 'Stone', jp: '石', g: 'stone' },
-  petal: { name: 'Sakura Petal', jp: '花びら', g: 'petal' },
-  crystal: { name: 'Crystal', jp: '水晶', g: 'crystal' },
-  bone: { name: 'Bone', jp: '骨', g: 'bone' },
-  mochi: { name: 'Mochi', jp: '餅', g: 'mochi' },
-  silk: { name: 'Silk', jp: '絹', g: 'silk' },
-  lantern: { name: 'Lantern', jp: '提灯', g: 'lantern' },
-  coins: { name: 'Coins', jp: '小判', g: 'coin' },
+  wood: { name: 'Wood', g: 'wood' },
+  stone: { name: 'Stone', g: 'stone' },
+  petal: { name: 'Sakura Petal', g: 'petal' },
+  crystal: { name: 'Crystal', g: 'crystal' },
+  bone: { name: 'Bone', g: 'bone' },
+  mochi: { name: 'Mochi', g: 'mochi' },
+  silk: { name: 'Silk', g: 'silk' },
+  lantern: { name: 'Lantern', g: 'lantern' },
+  coins: { name: 'Coins', g: 'coin' },
 };
 
 export const SLOT_GLYPH = { weapon: 'sword', weaponAlt: 'ball', hat: 'hat', outfit: 'outfit', collar: 'collar', charm: 'charm', charm1: 'charm', charm2: 'charm', boots: 'boots', paws: 'paws' };

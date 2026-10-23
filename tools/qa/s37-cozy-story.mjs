@@ -6,7 +6,7 @@
 //      Mochi's crown cushion, his unique owed to your own win); Takemori relieved by a crew; the arrival in Bamboo: the
 //      crew's celebration in the square; Poe arrives in Blossom Hollow (ROADMAP Z-H3: Takemori already relieved, so a
 //      thank-you and no quest); "Clear the Bamboo Depths" by Moka and Poe: the
-//      Maple Hollow opens, the Travel Map's 救 stamp, Tier 1 at the Depths' Spirit Lantern, the Tengu's fan; no kills,
+//      Maple Hollow opens, the Travel Map's Saved stamp, Tier 1 at the Depths' Spirit Lantern, the Tengu's fan; no kills,
 //      no boss fallen, Bamboo's dungeon.cleared still 0 (the boss unique waits for your own first clear)
 //   b) the keepsakes placed in Chewy's cottage (the decorate mode), a shot at the game camera
 //   c) all four sieges: their gates, the camps you broke shrinking the relief, each relief and its celebration on arrival
@@ -246,12 +246,12 @@ if (want('a')) {
   }
   const dc = await ev(page, () => { const G = window.G, d = G.state.zones.bamboo.dungeon; return { crew: d.crew, cleared: d.cleared, t1: d.tier.unlocked, maple: G.travel.list().find(x => x.id === 'maple').unlocked, fan: G.state.furniture?.trophyTenguFan || 0, kills: window.__fights.kills, bosses: window.__fights.bosses.slice(), ev: window.__ev.filter(e => e[0] === 'dungeon:cleared' || e[0] === 'tier:unlocked') }; });
   R.check('a) THE HEADLINE: "Clear the Bamboo Depths" by Moka and Poe: dungeon.crew 1 (cleared stays 0: the boss unique waits for you), the Maple Hollow open, Tier 1 at its Spirit Lantern, the Tengu\'s fan; zero kills, no boss fallen', dc.crew === 1 && dc.cleared === 0 && dc.t1 === 1 && dc.maple && dc.fan === 1 && dc.kills === 0 && !dc.bosses.length && dc.ev.some(e => e[0] === 'dungeon:cleared' && e[1] === 'crew') && dc.ev.some(e => e[0] === 'tier:unlocked') && /Bamboo Depths is clear/.test(clear?.ribbon || ''), { dc, clear, dTry });
-  // the Travel Map's 救 stamp
+  // the Travel Map's Saved stamp
   await ev(page, () => { window.G.ui.closeAll(); window.G.openTravel({ select: 'bamboo' }); }); await sleep(page, 900);
   const tv = await ev(page, () => ({ stamp: document.querySelector('.tv-pin[data-id="bamboo"] .tv-stamp')?.textContent, crew: document.querySelector('.tv-pin[data-id="bamboo"] .tv-stamp')?.classList.contains('crew'), card: document.querySelector('.tv-card')?.textContent || '' }));
   await shot(page, 'a10-travel-stamp');
   await ev(page, () => window.G.ui.closeAll());
-  R.check('a) the Travel Map stamps Bamboo 救 (relieved by a crew), its card says "cleared by a crew"', tv.stamp === '救' && tv.crew && /cleared by a crew/.test(tv.card), tv);
+  R.check('a) the Travel Map stamps Bamboo Saved (relieved by a crew), its card says "cleared by a crew"', tv.stamp === 'Saved' && tv.crew && /cleared by a crew/.test(tv.card), tv);
   const hx = await ev(page, () => window.__hxp);
   R.check('a) homestead XP: the farming, cooking and building along the way paid the hero you walk with (COZY §3.3)', hx > 0, { hxp: hx });
   const swap = await ev(page, () => { const G = window.G, n = G.npcs.find(x => x.id === 'usagi'), t = G.story.scavengeRequest(n); return { type: t.steps[0].type, mat: t.steps[0].mat, n: t.steps[0].n, text: t.text }; });

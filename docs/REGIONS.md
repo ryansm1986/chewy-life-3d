@@ -167,7 +167,7 @@ dense obstacles (bamboo clumps, big rocks, pools), so monsters path around them.
 
 ### 3.3 The biome recipe (`src/regions/biomes/<id>.js`, default export)
 ```js
-{ id, name, jp, sub, color, levels: [min, max], unlock: { level, after },
+{ id, name, sub, color, levels: [min, max], unlock: { level, after },
   mood: { sky: { top, horizon }, fog: { color, near, far }, sun: { color, intensity, dir: [x, y, z] },
           hemi: { sky, ground, intensity }, rim, night /*0..1*/, grade: { lift, gain, sat, vignette, vigColor },
           bloom: { intensity, threshold }, wind: { dir: [x, z], strength } },

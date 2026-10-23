@@ -6,13 +6,13 @@
 import { PANTRY } from './pantry.js';
 
 export const SPOTS = {
-  pond: { name: 'Koi Pond', jp: '鯉の池' },
-  river: { name: 'River', jp: '川' },
-  sea: { name: 'Seaside', jp: '海辺' },
-  bamboo: { name: 'Bamboo Creeks', jp: '竹の小川' },
-  maple: { name: 'Maple Ponds', jp: '紅葉の池' },
-  tidepool: { name: 'Tide Pools', jp: '潮だまり' },
-  onsen: { name: 'Frozen Pond', jp: '氷の池' }, // (Yukimi Onsen's water is ice or hot springs: you fish through a hole in the ice)
+  pond: { name: 'Koi Pond' },
+  river: { name: 'River' },
+  sea: { name: 'Seaside' },
+  bamboo: { name: 'Bamboo Creeks' },
+  maple: { name: 'Maple Ponds' },
+  tidepool: { name: 'Tide Pools' },
+  onsen: { name: 'Frozen Pond' }, // (Yukimi Onsen's water is ice or hot springs: you fish through a hole in the ice)
 };
 export const TIMES = { day: 'Day (6–17)', evening: 'Evening (17–21)', night: 'Night (21–6)' };
 export const timeOf = h => (h >= 6 && h < 17 ? 'day' : h >= 17 && h < 21 ? 'evening' : 'night');

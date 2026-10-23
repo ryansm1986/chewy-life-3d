@@ -80,7 +80,7 @@ function addSeedStall(G, village) {
     if (!G.ui?.open) return;
     const rank = G.sim?.stats?.rank || 1, next = CROP_IDS.find(c => CROPS[c].rank > rank);
     G.ui.open('shop', {
-      name: "Usagi's Seed Stall", jp: 'たね屋', keeper: 'usagi', portrait: G.portrait?.('usagi'),
+      name: "Usagi's Seed Stall", keeper: 'usagi', portrait: G.portrait?.('usagi'),
       greeting: next ? `Fresh seeds, hop hop! When the village grows I'll get ${PANTRY[next].name.toLowerCase()} seeds too~` : 'Every seed on the island, right here! What shall we grow today?',
       pantry: G.seedStock(), potions: [], stock: [], sellKinds: ['crop'], buyer: 'usagi', noBagSell: true,
       thanks: ['Grow big and strong, little seeds!', 'Water them every day~', 'Happy planting, Chewy!', 'Hop hop, thank you!'],

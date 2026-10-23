@@ -5,7 +5,7 @@
 // wheel, the reel bar, build mode, decorate mode and the title. For each: a screenshot, the text drawn under the floor (11 px on
 // screen: "about 12 px", the design's 12 px at the Deck's 0.92; ui/deck.css raises what was under), a panel that
 // doesn't fit on the screen, and anything the safe area should hold that reaches within 8 px of the screen's edge.
-// Decorative text is left out: the Japanese subtitles (.jp), the compass's 北, the portrait's "Lv", glyph art (svg).
+// Decorative text is left out: the compass's N, the portrait's "Lv", glyph art (svg).
 // CT-10 (the owner's Deck: Settings ran off the screen, and the bottom-right buttons and the pad's glyph footer sat on the
 // hotbar): the page plays the desktop app on a Deck (a window.pawhaven stub: Settings' Full screen row, About's Check
 // for updates, the pause menu's Quit game; APP=0 for a plain browser), and every scene is also checked with the shared
@@ -39,7 +39,7 @@ if (process.env.APP !== '0') await page.addInitScript(() => {
 });
 let bad = 0;
 const small = [], edges = [], clipped = [], overlaps = [], reach = [];
-const DECOR = /\.jp\b|mm-n > span|pc-lv > small|chg-jp|\.floor > span/; // (decorative: see the header; .floor > span: a dungeon floor's 地下4階 under its B4F)
+const DECOR = /pc-lv > small/; // (decorative: see the header)
 
 // text under the floor inside `scopes` (selectors), grouped by where it sits; the on-screen size is the computed font
 // size times the element's effective CSS zoom (the UI layers' --ui-scale)

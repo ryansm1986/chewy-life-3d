@@ -25,7 +25,7 @@ const sizeText = d => (d.mount === 'wall' ? `${d.size[0] * CELL} × ${d.size[1] 
 const DUST = 9;
 
 export class CraftPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'craft', title: 'Workbench', jp: 'さぎょうだい', side: 'left', cls: 'p-cook p-craft', icon: 'hammer' }); this.sel = null; this.qty = 1; this.queue = []; }
+  constructor(ui) { super(ui, { name: 'craft', title: 'Workbench', side: 'left', cls: 'p-cook p-craft', icon: 'hammer' }); this.sel = null; this.qty = 1; this.queue = []; }
   init() {
     this.extra.innerHTML = `<div class="tabs ck-tabs cr-tabs"><button class="tab on" style="--tc:#ffb07a">${glyph('scroll')}Recipes<span class="tab-n">0</span></button></div>`;
     this.body.innerHTML = `<div class="ck cr">
@@ -69,7 +69,7 @@ export class CraftPanel extends Panel {
     };
   }
   onOpen() {
-    this.setTitle(this.opts.title || 'Workbench', this.opts.jp || 'さぎょうだい');
+    this.setTitle(this.opts.title || 'Workbench');
     this.panel.dataset.where = this.opts.where || 'home';
     workbenchOf(this.st);
     this.busy = false; this.$.work.className = 'cr-work';
@@ -128,7 +128,7 @@ export class CraftPanel extends Panel {
       : `<div class="ck-how">${glyph(R.learn === 'shop' ? 'shop' : 'heart')}<span>Not on your workbench yet: <b>${esc(H.how)}</b>${R.learn === 'shop' ? " — look for the scroll at Tanu's Trinkets on Market Street." : ' — help them make their home lovely.'}</span></div>`;
     this.$.det.innerHTML = `<div class="ck-hero cr-hero" style="--bc:${set?.color || '#ffb07a'};--rc:#fff">
         <div class="ck-art cr-art ${known ? '' : 'unk'}">${this.thumb(R.out, true).replace('class="', `class="${known ? '' : 'sil '}`)}</div>
-        <div class="ck-info"><div class="ck-name"><b>${known ? esc(d.name) : '???'}</b>${known ? `<span class="jp">${esc(d.jp || '')}</span>` : ''}<i class="cr-set">${esc(set?.name || '')}</i></div>
+        <div class="ck-info"><div class="ck-name"><b>${known ? esc(d.name) : '???'}</b><i class="cr-set">${esc(set?.name || '')}</i></div>
           <div class="ck-desc">${known ? esc(d.desc || '') : 'A piece you have yet to learn to make.'}</div>
           <div class="ck-eff"><span class="ck-chip">${glyph('home')}<b>${esc(CATS[d.cat]?.name || '')}</b>· ${esc(sizeText(d))}</span>${d.light ? `<span class="ck-chip cr-glow">${glyph('lantern')}<b>Glows</b></span>` : ''}</div>
           ${known && d.tags?.length ? `<div class="cr-tags">${d.tags.map(t => `<span>${TAG_NAME[t] || t}</span>`).join('')}</div>` : ''}

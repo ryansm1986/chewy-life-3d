@@ -76,11 +76,12 @@ for (const f of files.filter(f => /\.(html|css|js)$/.test(f))) {
   if (ext.length) notes.push(`${rel(f)} mentions ${ext.slice(0, 4).join(', ')}${ext.length > 4 ? ' …' : ''} (fine unless the game fetches it: the test below fails on any external request)`);
 }
 // the UI fonts are subset to the characters the source used when they were built (src/ui/fonts/chars.txt): new
-// Japanese text or symbols since then would render in a fallback font until `npm run fonts` is re-run
+// symbols since then would render in a fallback font until `npm run fonts` is re-run (Japanese is skipped: the game has
+// none, only code comments do)
 const built = new Set(fs.readFileSync(path.join(ROOT, 'src/ui/fonts/chars.txt'), 'utf8'));
 const srcFiles = [path.join(ROOT, 'index.html'), ...walk(path.join(ROOT, 'src')).filter(f => /\.(js|css|html)$/.test(f))];
 const fresh = new Set();
-for (const f of srcFiles) for (const c of fs.readFileSync(f, 'utf8')) if (c.codePointAt(0) > 0x7e && !built.has(c)) fresh.add(c);
+for (const f of srcFiles) for (const c of fs.readFileSync(f, 'utf8')) if (c.codePointAt(0) > 0x7e && !/[\u3000-\u30ff\u3400-\u9fff\uff00-\uffef]/.test(c) && !built.has(c)) fresh.add(c);
 if (fresh.size) notes.push(`${fresh.size} characters in the source are newer than the font subset (${[...fresh].slice(0, 20).join('')}${fresh.size > 20 ? '…' : ''}): run \`npm run fonts\``);
 console.log(`   ${files.length} files, ${MB(total)} (limits: ${LIMITS.files} files, ${MB(LIMITS.total)})`);
 for (const n of notes) console.log('   note:', n);

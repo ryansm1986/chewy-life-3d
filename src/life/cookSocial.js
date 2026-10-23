@@ -54,7 +54,7 @@ export function installCookSocial(G, kitchen) {
     const st = G.state, rank = G.sim?.stats?.rank || 1;
     cookbookOf(st);
     const goods = COOKBOOK.filter(p => !knows(st, p.id)).map(p => ({
-      id: 'recipe:' + p.id, name: `Recipe: ${PANTRY[p.id].name}`, jp: 'レシピ', desc: `A page from Rosie's cookbook. Teaches ${PANTRY[p.id].name} (${PANTRY[p.id].desc})`,
+      id: 'recipe:' + p.id, name: `Recipe: ${PANTRY[p.id].name}`, desc: `A page from Rosie's cookbook. Teaches ${PANTRY[p.id].name} (${PANTRY[p.id].desc})`,
       icon: recipeIcon(p.id), price: p.price, once: true, locked: p.rank > rank ? `Rosie is still writing this page… (village rank ${p.rank})` : null,
       onBuy: () => teach(p.id, { from: 'rosie', src: 'book' }),
     }));

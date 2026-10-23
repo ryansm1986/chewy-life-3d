@@ -318,7 +318,7 @@ function interactables(ctx) {
 }
 
 export default {
-  id: 'maple', name: 'Momiji Hollow', jp: '紅葉谷', sub: 'Golden light and a thousand falling leaves', color: '#e8743a',
+  id: 'maple', name: 'Momiji Hollow', sub: 'Golden light and a thousand falling leaves', color: '#e8743a',
   levels: [11, 19], unlock: { level: 11, after: 'bamboo' },
   monsters: ['kuri', 'kakashi', 'momijiWisp'], boss: 'danzaburo',
   // Burrow stand-ins until the region's own monsters / boss are registered (src/regions/monsters, src/regions/bosses)
@@ -355,8 +355,8 @@ export default {
     avoid: [...FIELDS.map(([x, z, r]) => [x, z, r - 1]), [ORCHARD.x, ORCHARD.z, 1], [FALL.x, FALL.z, 5], ...RIVER.slice(0, 9).map(([x, z]) => [x, z, 3.4])], // (+ the site's own radius)
     // the wild areas (docs/COZY.md §6.2): they keep their yokai once Akane is saved; off the trail, on side paths
     wild: [
-      { id: 'scarecrowFields', name: 'the Scarecrow Fields', jp: '案山子の田', at: [84, 32], r: 14, packs: 3, spur: [[75, 57], [80, 47]] }, // (the side path climbs east of the waterfall)
-      { id: 'oldRoot', name: 'Old Root Hollow', jp: '古根の窪', at: [16, 64], r: 12, packs: 2 },
+      { id: 'scarecrowFields', name: 'the Scarecrow Fields', at: [84, 32], r: 14, packs: 3, spur: [[75, 57], [80, 47]] }, // (the side path climbs east of the waterfall)
+      { id: 'oldRoot', name: 'Old Root Hollow', at: [16, 64], r: 12, packs: 2 },
     ],
   },
   populate, effects, interactables,

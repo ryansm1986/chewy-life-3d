@@ -11,10 +11,10 @@ import { HERO_TEXT, CLASSES } from '../rpg/classes.js';
 import { statSummary, attrFx, mainStat, autoOn } from '../rpg/power.js';
 
 const ATTR = [
-  { k: 'str', n: 'Strength', jp: '力', g: 'swords', c: '#ff8f7a', tip: 'Makes Strength weapons (katana, flail, lance) hit harder, and lets heroes wear heavy gear.' },
-  { k: 'dex', n: 'Dexterity', jp: '速', g: 'ball', c: '#ffcf4a', tip: 'Makes balls, the fūma and javelins hit harder, and gives a few more big hits and a little Defense.' },
-  { k: 'vit', n: 'Vitality', jp: '体', g: 'heart', c: '#ff8fb0', tip: 'Every point gives more Life, and Life comes back a little faster.' },
-  { k: 'ene', n: 'Energy', jp: '気', g: 'bolt', c: '#8fd0ff', tip: 'Every point gives more Zoom for skills. Staffs, the wagasa and magic (jutsu, hexes, the whelp) hit harder with it too.' },
+  { k: 'str', n: 'Strength', g: 'swords', c: '#ff8f7a', tip: 'Makes Strength weapons (katana, flail, lance) hit harder, and lets heroes wear heavy gear.' },
+  { k: 'dex', n: 'Dexterity', g: 'ball', c: '#ffcf4a', tip: 'Makes balls, the fūma and javelins hit harder, and gives a few more big hits and a little Defense.' },
+  { k: 'vit', n: 'Vitality', g: 'heart', c: '#ff8fb0', tip: 'Every point gives more Life, and Life comes back a little faster.' },
+  { k: 'ene', n: 'Energy', g: 'bolt', c: '#8fd0ff', tip: 'Every point gives more Zoom for skills. Staffs, the wagasa and magic (jutsu, hexes, the whelp) hit harder with it too.' },
 ];
 // the six big numbers: [key, name, glyph, colour, value(s), sub line(s), tip]
 const TILES = [
@@ -34,7 +34,7 @@ const has = v => (Array.isArray(v) ? v[0] || v[1] : +v);
 
 // "All the numbers" (the drawer)
 const GROUPS = [
-  { id: 'off', name: 'Attack', jp: '攻撃', g: 'swords', rows: [
+  { id: 'off', name: 'Attack', g: 'swords', rows: [
     ['Damage', d => `${n0(d.dmgMin)}–${n0(d.dmgMax)}`, 'From your weakest to your strongest hit with this weapon.', 1],
     ['Hits harder', d => `+${pct(d.dmgPct)}`, 'Extra damage for every attack and skill.', 1],
     ['Hits a second', d => (d.aspd ? `${(+d.aspd).toFixed(2)}` : pct(d.atkSpeed)), 'How many attacks you make every second.', 1],
@@ -49,7 +49,7 @@ const GROUPS = [
     ['Stink damage', d => range(d.stinkDmg), 'Stink that keeps hurting for a while. Pee-yew.', 0, d => has(d.stinkDmg), '#9ad86a'],
     ['Fly-through', d => n0(d.pierce), 'How many yokai a thrown ball flies through.', 0, d => d.pierce],
   ] },
-  { id: 'def', name: 'Toughness', jp: '防御', g: 'shield', rows: [
+  { id: 'def', name: 'Toughness', g: 'shield', rows: [
     ['Life', d => n0(d.lifeMax), 'How many bumps you can take.', 1],
     ['Zoom', d => n0(d.zoomMax), 'The energy your skills use.', 1],
     ['Defense', d => n0(d.def), 'Yokai bumps hurt less.', 1],
@@ -59,10 +59,10 @@ const GROUPS = [
     ['Prickly', d => n0(d.thorns), 'Yokai that bump you up close get hurt too.', 0, d => d.thorns],
     ['Life per yokai', d => n0(d.lifeOnKill), 'Life back for every yokai you beat.', 0, d => d.lifeOnKill],
   ] },
-  { id: 'res', name: 'Guards', jp: '耐性', g: 'sakura', res: true, rows: [
+  { id: 'res', name: 'Guards', g: 'sakura', res: true, rows: [
     ['Fire', 'resFire', '#ff9a3c', 'fire'], ['Frost', 'resFrost', '#8fd0ff', 'frost'], ['Zap', 'resZap', '#ffe44a', 'zap'], ['Stink', 'resStink', '#9ad86a', 'stink'],
   ] },
-  { id: 'misc', name: 'Other', jp: 'その他', g: 'clover', rows: [
+  { id: 'misc', name: 'Other', g: 'clover', rows: [
     ['Run speed', d => `+${pct(d.moveSpeed)}`, 'How fast you trot around.', 1],
     ['Treasure luck', d => `+${pct(d.mf)}`, 'Better treasure: more Magic, Rare and Unique finds.', 1],
     ['Coin luck', d => `+${pct(d.gf)}`, 'More coins from yokai and chests.', 1],
@@ -75,14 +75,14 @@ const GROUPS = [
 ];
 
 export class CharacterPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'character', title: 'Character', jp: 'ステータス', side: 'left', cls: 'p-char', icon: 'star' }); }
+  constructor(ui) { super(ui, { name: 'character', title: 'Character', side: 'left', cls: 'p-char', icon: 'star' }); }
   init() {
     const b = this.body;
     b.innerHTML = `
       <div class="ch-head">
         <div class="ch-por">${portrait('chewy')}</div>
         <div class="ch-id">
-          <div class="ch-name">Chewy <span class="jp">チューイ</span></div>
+          <div class="ch-name">Chewy</div>
           <div class="ch-cls">Level <b class="ch-lv">1</b> · Pup of the Blossom Dojo</div>
           <div class="ch-xp"><i></i></div>
           <div class="ch-xpl"><span>Experience</span><b class="ch-xpt"></b></div>
@@ -109,7 +109,7 @@ export class CharacterPanel extends Panel {
         </div>
       </div>
       <button class="ch-more">${glyph('scroll')}<span>All the numbers</span><i class="ch-chev"></i></button>
-      <div class="dgroups">${GROUPS.map(g => `<div class="dg dg-${g.id}"><div class="dg-h">${glyph(g.g)}${g.name}<span class="jp">${g.jp}</span></div><div class="dg-rows"></div></div>`).join('')}</div>`;
+      <div class="dgroups">${GROUPS.map(g => `<div class="dg dg-${g.id}"><div class="dg-h">${glyph(g.g)}${g.name}</div><div class="dg-rows"></div></div>`).join('')}</div>`;
     this.$ = {
       lv: b.querySelector('.ch-lv'), xp: b.querySelector('.ch-xp i'), xpT: b.querySelector('.ch-xpt'), pts: b.querySelector('.ch-pts'), ptsN: b.querySelector('.ch-pts b'), ptsW: b.querySelector('.ch-pts-w'),
       pow: b.querySelector('.ch-pow'), powN: b.querySelector('.ch-pow b'), auto: b.querySelector('.ch-auto'), reset: b.querySelector('.ch-reset'), pick: b.querySelector('.ch-pick'), more: b.querySelector('.ch-more'), groups: b.querySelector('.dgroups'),
@@ -118,7 +118,7 @@ export class CharacterPanel extends Panel {
     tip.bind(this.$.pow, () => simpleTip(`${glyph('bolt')}Power`, 'Everything about your hero in one number: how hard they hit and how much they can take. Better gear and more levels make it grow!'));
     for (const [k, n, , , , , t] of TILES) tip.bind(b.querySelector(`.ch-tile[data-k="${k}"]`), () => simpleTip(n, t));
     for (const a of ATTR) {
-      const row = b.querySelector(`.attr[data-k="${a.k}"]`), fx = () => simpleTip(`${a.n} <span class="jp">${a.jp}</span>`, `<b>${esc(this.heroName())}:</b> ${esc(attrFx(this.hero(), a.k))}.${row.classList.contains('main') ? ` <b class="tt-best">★ The best one for ${esc(this.heroName())}</b>` : ''}<br><span class="tt-dim">${a.tip}</span>`);
+      const row = b.querySelector(`.attr[data-k="${a.k}"]`), fx = () => simpleTip(a.n, `<b>${esc(this.heroName())}:</b> ${esc(attrFx(this.hero(), a.k))}.${row.classList.contains('main') ? ` <b class="tt-best">★ The best one for ${esc(this.heroName())}</b>` : ''}<br><span class="tt-dim">${a.tip}</span>`);
       tip.bind(row.querySelector('.at-ic'), fx); tip.bind(row.querySelector('.at-n'), fx);
       row.querySelector('.at-plus').addEventListener('click', e => this.add(a.k, e.shiftKey ? 5 : 1, row));
     }
@@ -196,7 +196,7 @@ export class CharacterPanel extends Panel {
       this._hero = hero;
       const b = this.body;
       b.querySelector('.ch-por').innerHTML = portrait(hero);
-      b.querySelector('.ch-name').innerHTML = `${esc(p.name || 'Chewy')} <span class="jp">${HERO_TEXT[hero]?.jp || (hero === 'moka' ? 'モカ' : 'チューイ')}</span>`;
+      b.querySelector('.ch-name').textContent = p.name || 'Chewy';
       b.querySelector('.ch-cls').innerHTML = `Level <b class="ch-lv">${p.lvl || 1}</b> · ${HERO_TEXT[hero]?.motto || (hero === 'moka' ? 'Tidewater Mage of the Hollow' : 'Pup of the Blossom Dojo')}`;
       this.$.lv = b.querySelector('.ch-lv');
       b.dataset.hero = hero;

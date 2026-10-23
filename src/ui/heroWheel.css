@@ -23,7 +23,6 @@
 .hw-card.active .hw-face { filter: none; }
 .hw-t { display: flex; flex-direction: column; align-items: center; line-height: 1.05; padding: 4px 10px; border-radius: 14px; background: rgba(255, 250, 242, .94); border: 3px solid var(--ink); }
 .hw-t b { font: 700 18px/1 var(--font); color: var(--ink); display: flex; align-items: baseline; gap: 5px; }
-.hw-t b .jp { font-size: 11px; color: var(--hc); }
 .hw-t span { font: 600 11px/1.15 var(--font); color: var(--ink2, #7a5a50); }
 .hw-t em { font: 700 11px/1 var(--font); font-style: normal; color: var(--hc); margin-top: 2px; }
 .hw-k { position: absolute; left: 6px; top: 4px; }

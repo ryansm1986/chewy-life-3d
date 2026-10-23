@@ -62,6 +62,6 @@ export class CozyChip {
     const C = this.C; if (!C) return '';
     const list = C.exp.list(), unread = C.exp.unread();
     const rows = list.map(e => `<div class="cz-tr"><b>${esc(e.crew.map(nm).join(' & '))}</b> · ${esc(e.name)}<br><span class="tt-dim">${e.hold ? 'Camped at the edge of the village' : esc(backIn(C.exp.left(e)))}</span></div>`).join('');
-    return simpleTip('Crews <span class="jp">遠征</span>', `${rows || '<div class="cz-tr">No crews out.</div>'}${unread ? `<div class="cz-tr news">${unread} report${unread > 1 ? 's' : ''} waiting on the Expedition Board</div>` : ''}<div class="cz-tr tt-dim">Click to see the board's ${unread ? 'reports' : 'crews'}</div>`);
+    return simpleTip('Crews', `${rows || '<div class="cz-tr">No crews out.</div>'}${unread ? `<div class="cz-tr news">${unread} report${unread > 1 ? 's' : ''} waiting on the Expedition Board</div>` : ''}<div class="cz-tr tt-dim">Click to see the board's ${unread ? 'reports' : 'crews'}</div>`);
   }
 }

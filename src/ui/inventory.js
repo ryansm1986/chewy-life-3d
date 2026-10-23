@@ -387,7 +387,7 @@ export class ItemDrag {
 // Three views: the Bag (gear, 40 slots + the paper doll), the Pantry (docs/HOMESTEAD.md §1, ui/pantry.js) and the
 // Furniture storage (docs/HOUSING.md §2, ui/furniture.js).
 export class InventoryPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'inventory', title: 'Bag', jp: 'かばん', side: 'right', cls: 'p-inv', icon: 'bag' }); this.view = 'bag'; }
+  constructor(ui) { super(ui, { name: 'inventory', title: 'Bag', side: 'right', cls: 'p-inv', icon: 'bag' }); this.view = 'bag'; }
   init() {
     const b = this.body;
     this.extra.innerHTML = `<div class="tabs inv-tabs"><button class="tab on" data-v="bag">${glyph('bag')}Bag</button><button class="tab" data-v="pantry" style="--tc:#8fcf6a">${glyph('leaf')}Pantry<span class="kc sm">P</span></button><button class="tab" data-v="furniture" style="--tc:#ffb07a">${glyph('home')}Furniture</button></div>`;
@@ -439,7 +439,7 @@ export class InventoryPanel extends Panel {
     this.panel.classList.toggle('v-pantry', P);
     this.panel.classList.toggle('v-furn', F);
     for (const t of this.extra.querySelectorAll('.inv-tabs .tab')) t.classList.toggle('on', t.dataset.v === this.view);
-    this.setTitle(P ? 'Pantry' : F ? 'Furniture' : 'Bag', P ? '食料庫' : F ? '家具' : 'かばん');
+    this.setTitle(P ? 'Pantry' : F ? 'Furniture' : 'Bag');
     this.ui.tip.hide();
     if (!quiet) { this.pv._sig = null; replay(this.panel, 'vswap', 400); }
     this.render();

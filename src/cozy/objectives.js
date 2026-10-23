@@ -3,8 +3,8 @@
 //
 //   objective(state, id) → the objective, built from its id (any id the table knows, errands of any day included), or
 //   null. Its shape (COZY §4.10):
-//     { id, kind: 'errand' | 'quest' | 'burrowBoss' | 'siege' | 'dungeon', name, jp, desc, story,
-//       place: { area, zone?, label, jp, color }, level, power (the full need, before progress), hours,
+//     { id, kind: 'errand' | 'quest' | 'burrowBoss' | 'siege' | 'dungeon', name, desc, story,
+//       place: { area, zone?, label, color }, level, power (the full need, before progress), hours,
 //       gates: [{ kind: 'rank' | 'pop' | 'built' | 'guild' | 'heroes' | 'any', n?, type?, any?, label }],
 //       supplies: { meals: per member (0: optional), potions?: max, mealSure?: a packed lunch makes it a sure thing },
 //       binds: { village: zone } | null,        // what a success completes (cozy/expeditionRun.js applies it)
@@ -40,15 +40,15 @@ export const killXp = L => Math.round(8 * Math.pow(Math.max(1, L), 1.35) + 4);
 // ------------------------------------------------------------------ the places errands go
 // level: the content's level; find: the furniture table its finds come from (home/finds.js)
 export const AREAS = {
-  home: { label: "Blossom Hollow's outskirts", short: 'Blossom Hollow', jp: 'さくら村', color: '#ff8fb0', level: 2, find: 'burrow' },
-  burrow: { label: 'The Burrow: the Mossy Burrow', short: 'The Burrow', jp: '巣穴', color: '#c9925a', level: 4, find: 'burrow' },
+  home: { label: "Blossom Hollow's outskirts", short: 'Blossom Hollow', color: '#ff8fb0', level: 2, find: 'burrow' },
+  burrow: { label: 'The Burrow: the Mossy Burrow', short: 'The Burrow', color: '#c9925a', level: 4, find: 'burrow' },
   bamboo: { zone: 'bamboo', find: 'bamboo' }, maple: { zone: 'maple', find: 'maple' }, tidepool: { zone: 'tidepool', find: 'tidepool' }, onsen: { zone: 'onsen', find: 'onsen' },
 };
 export function areaInfo(area) {
   const A = AREAS[area]; if (!A) return null;
   if (!A.zone) return { area, ...A };
   const R = REGIONS[A.zone];
-  return { area, zone: A.zone, label: R?.name || A.zone, short: R?.name?.split(' ').slice(-2).join(' ') || A.zone, jp: R?.jp || '', color: R?.color || '#8fe0c0', level: (R?.levels?.[0] || 1) + 1, find: A.find };
+  return { area, zone: A.zone, label: R?.name || A.zone, short: R?.name?.split(' ').slice(-2).join(' ') || A.zone, color: R?.color || '#8fe0c0', level: (R?.levels?.[0] || 1) + 1, find: A.find };
 }
 // the errands of each area (COZY §4.7): mats are weights, pantry are forage the crew brings home
 export const ERRANDS = {
@@ -107,9 +107,9 @@ function reliefObjective(zone) {
   const V = VILLAGES[zone], R = RELIEFS[zone], reg = REGIONS[zone]; if (!V || !R || !reg) return null;
   const level = zoneBand(zone)[0] + 2, camps = V.camps.length || 3, fodder = V.camps.reduce((a, c) => a + (c.n || 5), 0);
   return {
-    id: `relief:${zone}`, kind: 'siege', story: true, name: `Relieve ${V.name.replace(/ (Village|Hamlet|Port|Spa Village)$/, '')}`, jp: V.jp,
+    id: `relief:${zone}`, kind: 'siege', story: true, name: `Relieve ${V.name.replace(/ (Village|Hamlet|Port|Spa Village)$/, '')}`,
     desc: `Yokai camps ring ${V.name} and ${R.captain} holds the square. A crew can break the camps, open the cages and drive the captain off.`,
-    place: { area: zone, zone, label: `${V.name}, ${reg.name}`, jp: V.jp, color: reg.color },
+    place: { area: zone, zone, label: `${V.name}, ${reg.name}`, color: reg.color },
     level, power: level * KIND_FACTOR.siege, hours: 6, camps,
     gates: R.gates, supplies: { meals: 1, potions: 3 },
     binds: { village: zone }, captain: R.captain,
@@ -127,7 +127,7 @@ function reliefObjective(zone) {
 // Rosie's lunch is good odds); trophy: the boss's keepsake (home/furniture.js); boss: whose quest unique waits for your
 // own first win (Story owes it).
 const FLOOR_BOSS = [{ type: 'floor' }, { type: 'boss' }];
-const BURROW_PLACE = { area: 'burrow', zone: null, jp: '巣穴', color: '#c9925a' };
+const BURROW_PLACE = { area: 'burrow', zone: null, color: '#c9925a' };
 export const BURROW_ROUTES = {
   burrow1: { name: 'Peek into the Burrow', title: 'Something Squishy', giver: 'rosie', den: 'mossyBurrow', level: 2, power: 12, hours: 2, kind: 'quest', freeLunch: true, mochi: 3, gates: [], trophy: null, boss: null, steps: [{ type: 'kill', n: 8 }, { type: 'collect', mat: 'mochi', n: 3 }],
     desc: 'Strange squeaks from the Burrow on the shrine hill. A friend can take a peek for you (Rosie packs the lunch), and bring back the Mochi Jelly she wants.' },
@@ -148,7 +148,7 @@ function burrowObjective(state, qid) {
   const level = B.level, kind = B.kind, power = B.power || level * KIND_FACTOR[kind];
   const boss = kind === 'burrowBoss';
   return {
-    id: `quest:${qid}`, kind, story: true, name: B.name, jp: DUNGEONS[B.den]?.jp || '巣穴', desc: B.desc, quest: qid, questTitle: B.title, giver: B.giver,
+    id: `quest:${qid}`, kind, story: true, name: B.name, desc: B.desc, quest: qid, questTitle: B.title, giver: B.giver,
     place: { ...BURROW_PLACE, dungeon: B.den, label: `The Burrow: ${theDen(B.den)}` },
     level, power, hours: B.hours,
     gates: B.gates, supplies: boss ? { meals: 1, potions: 3 } : { meals: 0, potions: 0, freeLunch: !!B.freeLunch },
@@ -182,9 +182,9 @@ function dungeonObjective(zone) {
   const R = DUNGEON_ROUTES[zone], did = ZONE_DUNGEON[zone], D = DUNGEONS[did], reg = REGIONS[zone]; if (!R || !D || !reg) return null;
   const level = zoneBand(zone)[0] + 4;
   return {
-    id: `dungeon:${zone}`, kind: 'dungeon', story: true, name: `Clear the ${D.name}`, jp: reg.jp,
+    id: `dungeon:${zone}`, kind: 'dungeon', story: true, name: `Clear the ${D.name}`,
     desc: `The yokai of ${reg.name} came up out of the ${D.name}. A strong crew can fight down both floors and drive its boss off: the way on opens, and the Spirit Lantern at its gate wakes.`,
-    place: { area: zone, zone, dungeon: did, label: `The ${D.name}, ${reg.name}`, jp: reg.jp, color: reg.color },
+    place: { area: zone, zone, dungeon: did, label: `The ${D.name}, ${reg.name}`, color: reg.color },
     level, power: level * KIND_FACTOR.dungeon, hours: 10, gates: R.gates, supplies: { meals: 1, potions: 3, potionsNeed: 2 },
     binds: { dungeon: zone }, dungeonId: did,
     rewards: { kills: 50, coins: [Math.round(0.6 * (60 + 40 * level)), Math.round(0.6 * (90 + 55 * level))], items: ['magic', 'magic', 'rare'],
@@ -235,8 +235,8 @@ function errandObjective(id, state = null) {
   const name = t.name.replace('{den}', den ? theDen(den) : '');
   const label = den ? `The Burrow: ${theDen(den)}` : A.label;
   return {
-    id, kind: 'errand', story: false, name, jp: A.jp, desc: t.line, day,
-    place: { area, zone: A.zone || null, label, jp: A.jp, color: A.color },
+    id, kind: 'errand', story: false, name, desc: t.line, day,
+    place: { area, zone: A.zone || null, label, color: A.color },
     level, power: level * KIND_FACTOR.errand, hours,
     gates: [], supplies: { meals: 0, potions: 0, mealSure: true }, binds: null,
     rewards: { kills: 15, coins: [4 + level * 3, 8 + level * 5], items: [], itemChance: { magic: 0.1 }, mats: { n: [6, 14].map(v => Math.round(v * (hours === 3 ? 1.2 : 1))), pool: t.mats },
@@ -275,9 +275,9 @@ function zoneQuestObjective(state, qid, i) {
   const kills = s.type === 'kill' ? s.n : s.type === 'dungeonFloor' ? 18 : boss ? 40 : 12;
   const pr = state.cozy?.exp?.progress?.[`zq:${qid}:${i}`];
   return {
-    id: `zq:${qid}:${i}`, kind: boss ? 'dungeon' : 'quest', story: true, village: true, name, jp: reg.jp, quest: qid, questTitle: Q.title, giver: Q.giver,
+    id: `zq:${qid}:${i}`, kind: boss ? 'dungeon' : 'quest', story: true, village: true, name, quest: qid, questTitle: Q.title, giver: Q.giver,
     desc: `${Q.desc} ${giver} will want to hear it from you when they're back.`,
-    place: { area: zone, zone, dungeon: did, label: `The ${D.name}${s.floor ? `, floor ${s.floor}` : ''}`, jp: reg.jp, color: reg.color },
+    place: { area: zone, zone, dungeon: did, label: `The ${D.name}${s.floor ? `, floor ${s.floor}` : ''}`, color: reg.color },
     level: boss ? level + 1 : level, power: (boss ? level + 1 : level) * KIND_FACTOR[boss ? 'dungeon' : 'quest'], hours: boss ? 8 : 4,
     gates: [], supplies: { meals: 1, potions: 3 }, binds: { zq: qid, step: i }, step: s,
     trail: !!pr?.trail, // (a partial found the trail: the next try is a sure thing at r ≥ 0.9, COZY §4.3)

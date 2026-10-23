@@ -86,7 +86,7 @@ export class Prewarm {
       add('paint:' + n, () => this.ghost(p));
     };
     const icons = (name, list, fn, per) => { for (let i = 0; i < list.length; i += per) { const part = list.slice(i, i + per); add(name, () => { for (const x of part) fn(x); }); } };
-    add('fonts', () => { for (const f of FONTS) document.fonts?.load?.(f, 'Aaあ').catch(() => {}); }, true);
+    add('fonts', () => { for (const f of FONTS) document.fonts?.load?.(f, 'Aa').catch(() => {}); }, true);
     // 1. the active hero: the hotbar's and the K panel's icons; the bag, the worn gear (the I and C panels)
     const all = skillList(), hero = G?.player?.hero || st.activeHero || 'chewy';
     const mine = all.filter(s => s.raw?.cls === hero || s.cls === hero).map(s => s.id), others = all.map(s => s.id).filter(id => !mine.includes(id));

@@ -49,7 +49,7 @@ export class ChargeDrawer {
     this.sp = panel; this.ui = panel.ui; this.id = null; this.hover = null; this.sig = null;
     this.sel = {}; // (each tree's pick: { [tree]: skillId })
     const d = this.el = el('div', 'chg-drawer');
-    d.innerHTML = `<div class="chg-tag">${glyph('zap')}<span>Charge</span><i class="chg-jp">溜め</i></div>
+    d.innerHTML = `<div class="chg-tag">${glyph('zap')}<span>Charge</span></div>
       <div class="chg-pl"><span class="chg-plt">${PICK_HTML}</span><i class="chg-plc"></i><span class="chg-plk pad-only"><span class="kc sm pad">${padGlyph('RS')}</span></span></div>
       <div class="chg-pick" role="group" aria-label="${PICK_LABEL}"></div>
       <div class="chg-head"><div class="chg-ic"><img alt="" draggable="false"></div><div class="chg-ht"><b class="chg-name"></b><span class="chg-sub"></span></div></div>

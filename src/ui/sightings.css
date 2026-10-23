@@ -1,5 +1,5 @@
 /* The Sightings board (ui/sightings.js; docs/COZY.md §6.3, §10): wanted notes pinned on dark wood, each zone's colour
-   (--pc), the kind badge, the bounty chips, a red 討伐 stamp once claimed. Phones (.m-phone): one column, every target
+   (--pc), the kind badge, the bounty chips, a red Done! stamp once claimed. Phones (.m-phone): one column, every target
    52 design px (44 on screen at the phone's 0.86), text ≥ 14 design px (12 on screen). Also the map legend's swatches
    for the wild areas, the sightings and the scavenging marks (ui/map.js LEGEND_REGION). */
 .p-sight { width: 760px; }

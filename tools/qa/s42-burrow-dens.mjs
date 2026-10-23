@@ -99,7 +99,7 @@ try {
     await waitMode(page, 'village', 40000);
     await openPicker();
     const p1 = await pickerState();
-    R.check(`b) ${id}: the portal where the boss fell leads home; the picker shows it cleared (踏破)${next ? ` and ${next} open` : ', every den open'}`, p1.cleared.includes(id) && (!next || !p1.locked.includes(next)) && p1.mode === 'village', { cleared: p1.cleared, locked: p1.locked, sel: p1.sel });
+    R.check(`b) ${id}: the portal where the boss fell leads home; the picker shows it Cleared${next ? ` and ${next} open` : ', every den open'}`, p1.cleared.includes(id) && (!next || !p1.locked.includes(next)) && p1.mode === 'village', { cleared: p1.cleared, locked: p1.locked, sel: p1.sel });
     await ev(() => window.G.ui.close('burrow', true));
   }
   const allClear = await ev(() => { const G = window.G; return { n: G.burrow.list().filter(d => d.done).length, lantern: G.burrowLantern?.lit ?? null, pick: G.burrow.pick() }; });

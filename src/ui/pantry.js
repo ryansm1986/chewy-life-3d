@@ -31,7 +31,7 @@ export function pantryTipHTML(id, st, extra = {}) {
   const hints = extra.hints?.length ? `<div class="tt-hints">${extra.hints.map(h => `<span>${h}</span>`).join('')}</div>` : '';
   const price = extra.price ? `<div class="tt-price ${extra.price.afford === false ? 'bad' : ''}">${extra.price.label}: ${glyph('coin')}<b>${fmt(extra.price.value)}</b></div>` : '';
   return `<div class="tt-item tt-pantry" style="--rc:${rc}"><div class="tt-name">${esc(d.name)}</div>
-    <div class="tt-kind"><span>${K.one}${d.rare ? ` · ${RARE_NAMES[d.rare]}` : ''}</span><span class="jp">${esc(d.jp)}</span></div>
+    <div class="tt-kind"><span>${K.one}${d.rare ? ` · ${RARE_NAMES[d.rare]}` : ''}</span></div>
     <div class="tt-d">${esc(d.desc)}</div>${pantryFacts(id, st).map(f => `<div class="tt-l tt-fact">${f}</div>`).join('')}
     <div class="tt-dim">You have ${n} · worth ${glyph('coin')}${d.value}</div>${price}${hints}</div>`;
 }
@@ -43,10 +43,10 @@ export class PantryView {
     const root = this.root = el('div', 'pantry');
     root.innerHTML = `
       <div class="tabs pt-tabs">${['all', ...KINDS].map(k => `<button class="tab" data-k="${k}" style="--tc:${k === 'all' ? '#ff8fb0' : KIND_INFO[k].color}"><img class="pt-ti" src="${pantryIcon(TAB_ICON[k])}" alt="">${k === 'all' ? 'All' : KIND_INFO[k].name}<span class="tab-n">0</span></button>`).join('')}</div>
-      <div class="pt-card"><div class="pt-art"><img alt=""></div><div class="pt-info"><div class="pt-name"><b></b><span class="jp"></span><i class="pt-kind"></i></div><div class="pt-desc"></div><div class="pt-facts"></div></div><div class="pt-act"></div></div>
+      <div class="pt-card"><div class="pt-art"><img alt=""></div><div class="pt-info"><div class="pt-name"><b></b><i class="pt-kind"></i></div><div class="pt-desc"></div><div class="pt-facts"></div></div><div class="pt-act"></div></div>
       <div class="grid g10 pt-grid"></div>
       <div class="pt-empty">${glyph('sakura')}<span>Your pantry is empty — grow, fish and cook to fill it!</span></div>`;
-    this.$ = { tabs: root.querySelector('.pt-tabs'), card: root.querySelector('.pt-card'), art: root.querySelector('.pt-art img'), name: root.querySelector('.pt-name b'), jp: root.querySelector('.pt-name .jp'), kind: root.querySelector('.pt-kind'), desc: root.querySelector('.pt-desc'), facts: root.querySelector('.pt-facts'), act: root.querySelector('.pt-act'), grid: root.querySelector('.pt-grid'), empty: root.querySelector('.pt-empty') };
+    this.$ = { tabs: root.querySelector('.pt-tabs'), card: root.querySelector('.pt-card'), art: root.querySelector('.pt-art img'), name: root.querySelector('.pt-name b'), kind: root.querySelector('.pt-kind'), desc: root.querySelector('.pt-desc'), facts: root.querySelector('.pt-facts'), act: root.querySelector('.pt-act'), grid: root.querySelector('.pt-grid'), empty: root.querySelector('.pt-empty') };
     this.$.tabs.addEventListener('click', e => { const t = e.target.closest('.tab'); if (!t || t.dataset.k === this.kind) return; this.kind = t.dataset.k; this._sig = null; this.render(); replay(this.$.grid, 'swap', 400); this.ui.sfx?.('tab'); });
     const G = this.$.grid;
     G.addEventListener('click', e => { const s = e.target.closest('.pslot'); if (s?.dataset.id) { this.select(s.dataset.id); this.ui.sfx?.('select'); } });
@@ -104,7 +104,7 @@ export class PantryView {
     const K = KIND_INFO[d.kind];
     this.$.card.style.setProperty('--kc', d.rare ? RARE_COLORS[d.rare] : K.color);
     this.$.art.src = pantryIcon(id);
-    setText(this.$.name, d.name); setText(this.$.jp, d.jp);
+    setText(this.$.name, d.name);
     this.$.kind.textContent = d.rare ? RARE_NAMES[d.rare] : K.one;
     this.$.desc.textContent = d.desc;
     const n = st.pantry?.[id] || 0;
@@ -120,7 +120,7 @@ export class PantryView {
 
 // ------------------------------------------------------------------ the seed picker (F on tilled soil)
 export class SeedPickerPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'seeds', title: 'Plant Seeds', jp: 'たねまき', side: 'center', cls: 'p-seeds', icon: 'leaf' }); }
+  constructor(ui) { super(ui, { name: 'seeds', title: 'Plant Seeds', side: 'center', cls: 'p-seeds', icon: 'leaf' }); }
   init() {
     this.body.innerHTML = `<div class="sp-row"></div><div class="sp-foot kbm-only"><span><span class="kc sm">1</span>–<span class="kc sm">9</span> pick</span><span><span class="kc sm">F</span> / <span class="kc sm">Enter</span> plant</span><span><span class="kc sm">Esc</span> not now</span></div><div class="sp-foot pad-only"><span><span class="kc sm pad">${padGlyph('DRight')}</span> choose</span><span><span class="kc sm pad">${padGlyph('A')}</span> plant</span><span><span class="kc sm pad">${padGlyph('B')}</span> not now</span></div>`;
     this.row = this.body.querySelector('.sp-row');

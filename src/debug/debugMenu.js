@@ -19,7 +19,7 @@ const lab = c => (c && typeof c === 'object' && 'label' in c ? c.label : String(
 const same = (a, b) => a === b || (a && b && typeof a === 'object' && JSON.stringify(a) === JSON.stringify(b));
 
 class DebugPanel extends Panel {
-  constructor(ui, M) { super(ui, { name: 'debug', title: 'Debug', jp: 'デバッグ', side: 'center', cls: 'p-debug', icon: 'key' }); this.M = M; this.tab = null; this.forms = {}; this.armed = null; }
+  constructor(ui, M) { super(ui, { name: 'debug', title: 'Debug', side: 'center', cls: 'p-debug', icon: 'key' }); this.M = M; this.tab = null; this.forms = {}; this.armed = null; }
   init() {
     this.extra.innerHTML = '<span class="dbg-badge" title="This save has been changed with the debug tools">Debug save</span>';
     this.body.addEventListener('click', e => this.onClick(e));

@@ -54,7 +54,6 @@ export function replay(e, cls, ms) {
 
 export const RARITY = { normal: '#f4efe6', magic: '#6ea8ff', rare: '#ffd84a', unique: '#ff9a3c', set: '#5ee07a', champion: '#8fd0ff', boss: '#ff6a7a', minion: '#f4efe6' };
 export const rarityColor = r => RARITY[r] || RARITY.normal;
-export const RARITY_JP = { normal: 'ふつう', magic: 'まほう', rare: 'レア', unique: 'ユニーク', set: 'セット' };
 
 export const cap = s => (s ? s[0].toUpperCase() + s.slice(1) : '');
 

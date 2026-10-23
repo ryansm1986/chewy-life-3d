@@ -292,15 +292,15 @@ export class Animator {
       // happy squint: upper lids +0.488 (0.4 of a blink), lower lids −0.24 (held at −0.1 otherwise); rig.squint = [upper, lower]
       // overrides it per model (a tall wrapped eye like the Toybox Rosie's reads happier with less upper lid)
       const sq = this.rig.squint, up = A.eyesHappy ? (sq ? sq[0] : 0.488) : 0, low = A.eyesHappy ? (sq ? sq[1] : -0.24) : -0.1;
-      const tilt = this.rig.lidTilt;
+      const tilt = this.rig.lidTilt, shut = this.rig.lidClose || 1.22; // (rig.lidClose: a lid built to close at a smaller angle; VL-1 Kero)
       if (!tilt) {
-        for (const l of P.lids) { const r = this.rest.get(l); l.rotation.x = r.r.x + Math.max(blink * 1.22, up); }
+        for (const l of P.lids) { const r = this.rest.get(l); l.rotation.x = r.r.x + Math.max(blink * shut, up); }
         for (const l of P.lidsLow || []) { const r = this.rest.get(l); l.rotation.x = r.r.x + low; }
       } else {
         // rig.lidTilt (radians): eyes that face that far outward hinge their lids about the eye's own sideways axis, not
         // world X (a rigid lid on a 31°-out eye can't sweep the opening about world X). [0] = the character's left (+X)
         // eye, whose hinge is (cos t, 0, −sin t); the right eye mirrors it. Same angles as above, about the tilted axes.
-        const c = Math.cos(tilt), s = Math.sin(tilt), a = Math.max(blink * 1.22, up);
+        const c = Math.cos(tilt), s = Math.sin(tilt), a = Math.max(blink * shut, up);
         P.lids.forEach((l, i) => lidTurn(l, this.rest.get(l), c, i ? s : -s, a));
         (P.lidsLow || []).forEach((l, i) => lidTurn(l, this.rest.get(l), c, i ? s : -s, low));
       }

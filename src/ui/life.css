@@ -32,7 +32,6 @@
 .pt-info { flex: 1; min-width: 0; z-index: 1; }
 .pt-name { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
 .pt-name b { font: 700 21px/1.1 var(--font); }
-.pt-name .jp { font-size: 12.5px; color: color-mix(in srgb, var(--kc) 60%, var(--ink)); }
 .pt-kind { margin-left: auto; font: 700 11px/1 var(--font); font-style: normal; padding: 3px 8px 4px; border-radius: 999px; color: #fff; background: var(--kc); border: 2px solid var(--ink); -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; letter-spacing: .3px; }
 .pt-desc { font: 500 13px/1.35 var(--font); color: var(--ink2); margin: 4px 0 5px; }
 .pt-facts { display: grid; gap: 2px; font: 500 12.5px/1.3 var(--font); }
@@ -196,7 +195,6 @@
 .fl-art img { width: 98px; height: 98px; animation: bob 2.4s ease-in-out infinite; }
 .fl-art.unseen { background: radial-gradient(circle at 50% 35%, #fff, #e6e0d8); }
 .fl-name { text-align: center; font: 700 21px/1.15 var(--font); }
-.fl-name .jp { font-size: 12.5px; color: #3a8ac8; margin-left: 4px; }
 .fl-rare { width: max-content; margin: 3px auto 6px; padding: 2px 10px 3px; border-radius: 999px; font: 700 11px var(--font); color: #fff; background: color-mix(in srgb, var(--rc) 85%, #6a6a6a); border: 2px solid var(--ink); -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
 .fl-desc { font: 500 13.5px/1.35 var(--font); color: var(--ink2); text-align: center; margin-bottom: 7px; }
 .fl-desc.dim { opacity: .7; font-style: italic; }
@@ -253,7 +251,6 @@
 .ck-info { flex: 1; min-width: 0; z-index: 1; }
 .ck-name { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
 .ck-name b { font: 700 22px/1.1 var(--font); }
-.ck-name .jp { font-size: 12.5px; color: color-mix(in srgb, var(--bc) 55%, var(--ink)); }
 .ck-rare { margin-left: auto; font: 700 10.5px/1 var(--font); font-style: normal; padding: 3px 8px 4px; border-radius: 999px; background: var(--rc); border: 2px solid var(--ink); }
 .ck-desc { font: 500 12.5px/1.3 var(--font); color: var(--ink2); margin: 3px 0 6px; }
 .ck-eff { display: flex; gap: 6px; flex-wrap: wrap; }

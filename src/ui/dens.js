@@ -20,7 +20,7 @@ const MOUTH = { x: 0.5, y: 0.158 };
 const FIT = { hard: 'A bit tough for you yet', easy: 'An easy stroll for you now', good: 'Just right for your level' };
 
 export class DenPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'burrow', title: 'The Burrow', jp: '巣穴', side: 'center', cls: 'p-burrow', icon: 'torii' }); this.sel = null; }
+  constructor(ui) { super(ui, { name: 'burrow', title: 'The Burrow', side: 'center', cls: 'p-burrow', icon: 'torii' }); this.sel = null; }
   init() {
     this.body.innerHTML = `<div class="tv-wrap dn-wrap">
       <div class="tv-map dn-map"><canvas class="tv-cv"></canvas><div class="tv-pins"></div><div class="dn-hill"><b>${glyph('torii')}Shrine Hill</b></div></div>
@@ -61,7 +61,7 @@ export class DenPanel extends Panel {
       const cls = ['tv-pin', 'dn-pin', d.open ? 'open' : 'locked', d.id === this.sel ? 'sel' : '', d.done ? 'cleared' : ''].join(' ');
       return `<button class="${cls}" data-id="${d.id}" style="left:${s.x * 100}%;top:${s.y * 100}%;--pc:${d.colors.accent || '#ffb070'}" title="${esc(d.open ? d.name : d.why || 'Sealed')}">
         <span class="tv-pin-ic">${glyph(d.open ? d.icon : 'lock')}</span><span class="tv-pin-n"><b>${d.n}</b>${esc(d.name)}</span>
-        ${d.done ? `<span class="tv-stamp${d.cleared ? '' : ' crew'}" title="${d.cleared ? `Cleared ×${d.cleared}` : 'Cleared by a crew'}">${d.cleared ? '踏破' : '救'}</span>` : ''}${d.quest && d.open ? '<span class="dn-q" title="A story quest leads here">!</span>' : ''}</button>`;
+        ${d.done ? `<span class="tv-stamp${d.cleared ? '' : ' crew'}" title="${d.cleared ? `Cleared ×${d.cleared}` : 'Cleared by a crew'}">${d.cleared ? 'Cleared' : 'Saved'}</span>` : ''}${d.quest && d.open ? '<span class="dn-q" title="A story quest leads here">!</span>' : ''}</button>`;
     }).join('');
     const d = L.find(x => x.id === this.sel) || L[0]; if (!d) { this.card.innerHTML = ''; return; }
     const beat = d.cleared ? `<em class="tv-beat">beaten ×${d.cleared}</em>` : d.crew ? '<em class="tv-beat">beaten by a crew</em>' : '';
@@ -69,7 +69,7 @@ export class DenPanel extends Panel {
     const status = !d.open ? `<div class="tv-st locked">${glyph('lock')}<span>${esc(d.why || 'Sealed for now')}</span></div>`
       : `<button class="btn tv-go dn-go${d.the.length > 18 ? ' long' : ''}">${glyph(d.icon)}<span>Into ${esc(d.the)}!</span></button>`;
     this.card.style.setProperty('--pc', d.colors.accent || '#ffb070');
-    this.card.innerHTML = `<div class="tv-wm">${glyph(d.icon)}</div><div class="tv-hd"><span class="tv-ic">${glyph(d.open ? d.icon : 'lock')}</span><div><b>${esc(d.name)}</b><span class="jp">${esc(d.jp || '')} · den ${d.n} of ${L.length}</span></div></div>
+    this.card.innerHTML = `<div class="tv-wm">${glyph(d.icon)}</div><div class="tv-hd"><span class="tv-ic">${glyph(d.open ? d.icon : 'lock')}</span><div><b>${esc(d.name)}</b><span class="tv-sub">Den ${d.n} of ${L.length}</span></div></div>
       <p class="tv-sub">${esc(d.blurb)}</p>
       <div class="tv-rows">
         <div><span>Floors</span><b>${d.floors}, then the boss's chamber</b></div>

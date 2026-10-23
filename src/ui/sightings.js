@@ -14,7 +14,7 @@ const ZONE = { bamboo: ['Bamboo Grove', '#6fbf73'], maple: ['Momiji Hollow', '#e
 const KIND_IC = { unique: 'star', champion: 'shield', swarm: 'oni' };
 
 export class SightingsPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'sightings', title: 'Sightings', jp: '目撃情報', side: 'center', cls: 'p-sight', icon: 'pin' }); }
+  constructor(ui) { super(ui, { name: 'sightings', title: 'Sightings', side: 'center', cls: 'p-sight', icon: 'pin' }); }
   init() {
     this.body.addEventListener('click', e => {
       const b = e.target.closest('.sg-go'); if (!b || b.disabled) return;
@@ -28,7 +28,7 @@ export class SightingsPanel extends Panel {
     const card = (s, i) => {
       const Z = ZONE[s.zone] || [s.zone, '#c8a0ff'], K = KINDS[s.kind] || { label: s.kind }, B = s.bounty || {};
       const mats = Object.entries(B.mats || {}).map(([k, n]) => `<span class="sg-chip" title="${esc(k)}">${glyph(k)}${n}</span>`).join('');
-      const act = s.done ? '<span class="sg-stamp">討伐<small>Bounty claimed</small></span>'
+      const act = s.done ? '<span class="sg-stamp">Done!<small>Bounty claimed</small></span>'
         : here === s.zone ? `<button class="btn sm sg-go here" data-zone="${s.zone}" disabled>${glyph('pin')}You're here</button>`
         : `<button class="btn sm sky sg-go" data-zone="${s.zone}">${glyph('map')}Travel Map</button>`;
       return `<div class="sg-card${s.done ? ' done' : ''}" style="--pc:${Z[1]};--i:${i}" data-id="${esc(s.id)}">

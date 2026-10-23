@@ -48,7 +48,7 @@ const VIEWS = [['hire', 'Hire', 'hire', '#e8a05a'], ['roster', 'Roster', 'roster
 
 export class GuildPanel extends Panel {
   constructor(ui) {
-    super(ui, { name: 'guild', title: "Adventurers' Guild", jp: '冒険者ギルド', side: 'center', cls: 'p-guild', icon: 'paw' });
+    super(ui, { name: 'guild', title: "Adventurers' Guild", side: 'center', cls: 'p-guild', icon: 'paw' });
     this.view = 'hire'; this.armed = null;
   }
   get C() { return this.G?.cozy?.guild; }
@@ -100,7 +100,7 @@ export class GuildPanel extends Panel {
     B.innerHTML = `<div class="gd" data-view="${this.view}">
       <div class="gd-hd">
         <span class="gd-hachi">${hachi}</span>
-        <div class="gd-say"><b>Old Hachi <span class="jp">ハチ</span></b><p>${esc(say)}</p></div>
+        <div class="gd-say"><b>Old Hachi</b><p>${esc(say)}</p></div>
         <div class="gd-stats">
           <span class="gd-lv" title="The Guild's level">${gIcon('lodge')}<b>Level ${L}</b></span>
           <span class="gd-st" title="Hires on the roster / the roster's cap">${gIcon('roster')}<b>${roster.length}/${cap}</b><em>hires</em></span>
@@ -130,7 +130,7 @@ export class GuildPanel extends Panel {
       const btn = c.taken ? `<span class="gd-signed">${glyph('check')}Signed on</span>`
         : `<button class="btn gd-sign${ok ? '' : ' no'}" data-hire="${c.i}" ${ok ? '' : 'disabled'} title="${esc(c.check.why || '')}">${gIcon('hire')}<span><b>Sign on</b><small>${glyph('coin')}${c.fee}${ok ? '' : ` · ${esc(c.check.why)}`}</small></span></button>`;
       return `<div class="gd-cand${c.taken ? ' taken' : ''}" style="--cc:${K.color}" data-card="${c.key}">
-        <div class="gd-ribbon">${gIcon(c.cls)}<b>${esc(K.name)}</b><span class="jp">${K.jp}</span></div>
+        <div class="gd-ribbon">${gIcon(c.cls)}<b>${esc(K.name)}</b></div>
         ${this.face(c.key, false, K.color)}
         <div class="gd-nm"><b>${esc(c.name)}</b><span>Level ${c.lvl}</span></div>
         <div class="gd-rows">

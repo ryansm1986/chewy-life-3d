@@ -52,15 +52,15 @@ export const moraleWord = m => (m < 0.9 ? 'Gloomy' : m < 0.97 ? 'A bit low' : m 
 // ------------------------------------------------------------------ the five classes (COZY §5.2)
 //   suits: the objective kinds / tags it adds +15% to; perk: its special rule; look: its prop and accent (cozy/hires.js)
 export const HIRE_CLASSES = {
-  guard: { name: 'Guard', jp: '守', color: '#5a8ad8', suits: ['siege'], suitWord: 'sieges', perk: null, perkWord: '', look: 'A pot-lid shield and a headband',
+  guard: { name: 'Guard', color: '#5a8ad8', suits: ['siege'], suitWord: 'sieges', perk: null, perkWord: '', look: 'A pot-lid shield and a headband',
     lines: ['Nobody gets past the pot lid.', 'I stood very still and looked very large. It worked!', 'Walls are just slow guards.'] },
-  archer: { name: 'Archer', jp: '弓', color: '#5aa860', suits: ['dungeon'], suitWord: 'dungeon clears', perk: null, perkWord: '', look: 'A toy bow and a quiver',
+  archer: { name: 'Archer', color: '#5aa860', suits: ['dungeon'], suitWord: 'dungeon clears', perk: null, perkWord: '', look: 'A toy bow and a quiver',
     lines: ['Every arrow came home. Some of them with snacks.', 'I hit the lantern from forty paces. On purpose.', 'Deep places need sharp eyes.'] },
-  scout: { name: 'Scout', jp: '斥', color: '#e0952a', suits: ['find', 'errand'], suitWord: 'finds and errands', perk: 'fast', perkWord: 'The crew travels 15% faster', look: 'A bandana and a spyglass',
+  scout: { name: 'Scout', color: '#e0952a', suits: ['find', 'errand'], suitWord: 'finds and errands', perk: 'fast', perkWord: 'The crew travels 15% faster', look: 'A bandana and a spyglass',
     lines: ['I found a shortcut. And then a shorter shortcut.', 'Spyglass says: home by dinner.', 'I saw it before it saw me. Mostly.'] },
-  healer: { name: 'Healer', jp: '癒', color: '#e07a98', suits: ['rescue'], suitWord: 'rescues', perk: 'soft', perkWord: 'A setback comes back as a partial instead', look: 'A satchel with a cross-stitched paw',
+  healer: { name: 'Healer', color: '#e07a98', suits: ['rescue'], suitWord: 'rescues', perk: 'soft', perkWord: 'A setback comes back as a partial instead', look: 'A satchel with a cross-stitched paw',
     lines: ['Bandages for everyone! Even the ones who were fine.', 'Nobody scraped a paw. I checked twice.', 'A warm tea fixes most things.'] },
-  porter: { name: 'Porter', jp: '運', color: '#b07a4a', suits: ['errand'], suitWord: 'errands', perk: 'haul', perkWord: '25% more materials', look: 'A big backpack',
+  porter: { name: 'Porter', color: '#b07a4a', suits: ['errand'], suitWord: 'errands', perk: 'haul', perkWord: '25% more materials', look: 'A big backpack',
     lines: ['I carried it all. Twice, because I forgot the first lot.', 'My pack is a little heavier. That means it went well.', 'Wood, stone, one interesting pebble.'] },
 };
 export const CLASS_IDS = Object.keys(HIRE_CLASSES);
@@ -307,6 +307,6 @@ export function levelPerks(level) {
 }
 /** the Guild's two tools (COZY §7.1), sold by Old Hachi; flags in state.cozy.scav.tools (scavenge.js reads them) */
 export const GUILD_TOOLS = {
-  basket: { name: "Forager's Basket", jp: '籠', desc: '+1 on every gather node', cost: { coins: 240, wood: 8, silk: 2 } },
-  bandana: { name: "Shadow's Bandana", jp: '布', desc: "Shadow's nose reaches 18 m, and he finds one more dig spot a day", cost: { coins: 320, silk: 3, petal: 4 } },
+  basket: { name: "Forager's Basket", desc: '+1 on every gather node', cost: { coins: 240, wood: 8, silk: 2 } },
+  bandana: { name: "Shadow's Bandana", desc: "Shadow's nose reaches 18 m, and he finds one more dig spot a day", cost: { coins: 320, silk: 3, petal: 4 } },
 };

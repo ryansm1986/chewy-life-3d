@@ -22,7 +22,7 @@ const pct = v => `${Math.round(v * 100)}%`;
 const REWARD_SHORT = { qty: 'quantity', rarity: 'rarity', xp: 'XP', boss: 'boss loot' }, REWARD_PHONE = { qty: 'qty', rarity: 'rarity', xp: 'XP', boss: 'boss' };
 
 export class LanternPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'lantern', title: 'Spirit Lantern', jp: '霊灯', side: 'center', cls: 'p-lantern', icon: 'lantern' }); this.sel = null; this.id = null; }
+  constructor(ui) { super(ui, { name: 'lantern', title: 'Spirit Lantern', side: 'center', cls: 'p-lantern', icon: 'lantern' }); this.sel = null; this.id = null; }
   init() {
     this.body.addEventListener('click', e => {
       const b = e.target.closest('button'); if (!b || b.disabled) return;
@@ -51,7 +51,7 @@ export class LanternPanel extends Panel {
     if (L && (L.spirit > 0 ? L.spirit <= this.info.spiritMax : L.tier >= 1 && L.tier <= open)) this.sel = { tier: L.spirit > 0 ? TIER_MAX : L.tier, spirit: L.spirit || 0, mods: L.mods.slice() };
     else this.sel = { tier: Math.max(1, open), spirit: 0, mods: [] };
     this.sel.mods = cleanMods(this.sel.mods, this.run);
-    this.setTitle('Spirit Lantern', '霊灯');
+    this.setTitle('Spirit Lantern');
     this.render();
   }
   setTier(t) {
@@ -91,7 +91,7 @@ export class LanternPanel extends Panel {
     const tiers = [1, 2, 3, 4, 5].map(t => {
       const open = t <= I.tierOpen, on = !run.spirit && run.tier === t, done = I.cleared.includes(t);
       return `<button class="tab ln-tier${on ? ' on' : ''}${open ? '' : ' locked'}" data-t="${t}" ${open ? '' : 'disabled'} title="${open ? `Tier ${t}` : 'Clear the tier below to open it'}">${open ? '' : glyph('lock')}<b>T${t}</b>${done ? '<i class="ln-done">✓</i>' : ''}</button>`;
-    }).join('') + (I.spiritOpen ? `<button class="tab ln-tier spirit${run.spirit ? ' on' : ''}" data-t="S"><b>霊</b><span>Spirit</span></button>` : '');
+    }).join('') + (I.spiritOpen ? `<button class="tab ln-tier spirit${run.spirit ? ' on' : ''}" data-t="S">${glyph('lantern')}<span>Spirit</span></button>` : '');
     const spiritRow = run.spirit ? `<div class="ln-spirit"><button class="btn sm" data-sp="-1" ${run.spirit <= 1 ? 'disabled' : ''}>−</button><div><b>Spirit ${run.spirit}</b><span>open to ${I.spiritMax}${R.pinnacle ? ' · <em>the Four Seasons await</em>' : ''}</span></div><button class="btn sm" data-sp="1" ${run.spirit >= I.spiritMax ? 'disabled' : ''}>+</button></div>` : '';
     const slots = Array.from({ length: nS }, (_, i) => {
       const id = mods[i], m = id && ZONE_MODS[id];

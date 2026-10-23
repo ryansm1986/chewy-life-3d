@@ -298,7 +298,7 @@ function interactables(ctx) {
 }
 
 export default {
-  id: 'onsen', name: 'Yukimi Onsen', jp: '雪見温泉', sub: 'Snowfall, lanterns and steaming springs', color: '#9ac8ff',
+  id: 'onsen', name: 'Yukimi Onsen', sub: 'Snowfall, lanterns and steaming springs', color: '#9ac8ff',
   levels: [26, 35], unlock: { level: 26, after: 'tidepool' },
   monsters: ['yukiwarashi', 'yukidaruma', 'tsurara'], boss: 'yukiOnna',
   // Burrow stand-ins until the region's own monsters / boss are registered (src/regions/monsters, src/regions/bosses)
@@ -336,8 +336,8 @@ export default {
     avoid: [[INN.x, INN.z, 4], ...SPRINGS.map(s => [s.x, s.z, s.r]), [FALL.x, FALL.z, 4]], // (camps may sit out on the frozen pond)
     // the wild areas (docs/COZY.md §6.2): they keep their yokai once Yukimi is saved; off the trail, on side paths
     wild: [
-      { id: 'snowmanSlope', name: 'the Snowman Slope', jp: '雪だるま坂', at: [92, 82], r: 13, packs: 3 },
-      { id: 'frozenFalls', name: 'the Frozen Falls', jp: '凍て滝', at: [38, 38], r: 13, packs: 2 },
+      { id: 'snowmanSlope', name: 'the Snowman Slope', at: [92, 82], r: 13, packs: 3 },
+      { id: 'frozenFalls', name: 'the Frozen Falls', at: [38, 38], r: 13, packs: 2 },
     ],
   },
   populate, effects, interactables,

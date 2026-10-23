@@ -16,7 +16,7 @@
 import './coopHud.css';
 import * as THREE from 'three';
 import { PLAYER_COLORS } from '../coop/coop.js';
-import { CLASSES, HERO_TEXT } from '../rpg/classes.js';
+import { CLASSES } from '../rpg/classes.js';
 import { Actions } from '../core/actions.js';
 import { Events } from '../core/events.js';
 import { padGlyph } from './padGlyphs.js';
@@ -228,7 +228,7 @@ class Card {
       this.hero = c.hero;
       $.face.innerHTML = H.face(c.hero);
       this.el.style.setProperty('--hc', CLASSES[c.hero]?.color || '#ff8fb0');
-      $.name.innerHTML = `${esc(c.name || heroName(c.hero))}<span class="jp">${HERO_TEXT[c.hero]?.jp || ''}</span>`;
+      $.name.textContent = c.name || heroName(c.hero);
       this.lvl = null; this.lf = -1;
       for (const k of this.sk) k.key = '';
       if (!first) this.flash();
@@ -352,7 +352,7 @@ class JoinCard {
         f.style.setProperty('--d', d); setCls(f, 'sel', d === 0); setCls(f, 'far', Math.abs(d) > 1);
       });
       const id = J.list[J.i], C = CLASSES[id], lvl = H.G.state.heroes?.[id]?.player?.lvl || 1;
-      $.whoB.innerHTML = `${esc(C?.name || id)}<span class="jp">${HERO_TEXT[id]?.jp || ''}</span>`;
+      $.whoB.textContent = C?.name || id;
       $.whoS.innerHTML = `${esc(C?.title || '')} · <em>Lv ${lvl}</em>`;
       this.el.style.setProperty('--hc', C?.color || '#ff8fb0');
       if (prev >= 0) replay($.who, 'swap', 320);

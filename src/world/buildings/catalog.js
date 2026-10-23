@@ -41,7 +41,7 @@ export const BUILDINGS = {
   // (buildMode RANK_REQ); level 1 needs no combat-only material (petal: home's sakura drifts); levels 2 and 3 at ranks 3
   // and 4 (cozy/guild.js GUILD_RANK). glb: a slot for a later Blender centrepiece (the toybox / codex-blender pipeline).
   guild: {
-    name: "Adventurers' Guild", jp: '冒険者ギルド', cat: 'special', size: [4, 3], levels: 3, unique: true, jobs: [2, 3, 4], glb: null,
+    name: "Adventurers' Guild", cat: 'special', size: [4, 3], levels: 3, unique: true, jobs: [2, 3, 4], glb: null,
     cost: { coins: 400, wood: 30, stone: 16, petal: 4 }, levelCost: [null, { coins: 900, wood: 40, stone: 30, silk: 4, lantern: 2 }, { coins: 1800, wood: 60, stone: 40, crystal: 4, lantern: 4 }],
     variants: ["Adventurers' Guild", "Adventurers' Guild Hall", "Grand Adventurers' Guild"],
     desc: 'Old Hachi signs on adventurers for your crews, and the Expedition Board hangs inside the door.',
@@ -93,7 +93,7 @@ export const BUILDINGS = {
   school: { name: 'Village School', cat: 'service', size: [4, 3], levels: 1, cost: { coins: 380, wood: 26, stone: 10, silk: 2 }, ...cov(['learn', 12]), jobs: [2], desc: 'Reading, writing and advanced napping. The bell tower rings at noon.' },
   // the outdoor stash (ROADMAP R-18; docs/HOUSING.md "The stash"): build as many as you like, every one opens the same
   // shared stash (world/village.js interactionFor, G.openStash). The model: buildings/stashChest.js
-  stashChest: { name: 'Stash Chest', jp: '宝箱', cat: 'service', size: [2, 1], levels: 1, cost: { coins: 150, wood: 10, stone: 6 }, desc: 'The pack\'s gold-banded chest under its own little roof. It opens the same stash as the one at home.' },
+  stashChest: { name: 'Stash Chest', cat: 'service', size: [2, 1], levels: 1, cost: { coins: 150, wood: 10, stone: 6 }, desc: 'The pack\'s gold-banded chest under its own little roof. It opens the same stash as the one at home.' },
   // ------------------------------------------------------------------ decor
   bench: { name: 'Park Bench', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 15, wood: 3 }, ...cov(['joy', 3]), desc: 'Perfect for sitting, snacking and people-watching.' },
   flowerBed: { name: 'Flower Bed', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 12, petal: 2 }, ...cov(['joy', 3]), desc: 'A tidy burst of colour. Bees approve.' },

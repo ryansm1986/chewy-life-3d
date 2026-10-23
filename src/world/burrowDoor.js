@@ -36,7 +36,7 @@ export function installBurrowDoor(G) {
     const q = (st().quests?.active || []).find(x => x.id === d.quest || (i === 0 && x.id === 'burrow1'));
     const qd = q && G.story?.def?.(q.id), qs = qd?.steps?.[q.step];
     return {
-      id, n: i + 1, name: d.name, the: theDen(id), jp: d.jp, blurb: DEN_CARD[id]?.blurb || '', icon: DEN_CARD[id]?.icon || 'paw', floors: d.floors,
+      id, n: i + 1, name: d.name, the: theDen(id), blurb: DEN_CARD[id]?.blurb || '', icon: DEN_CARD[id]?.icon || 'paw', floors: d.floors,
       levels: lv, hero, fit, boss: MONSTERS[d.boss]?.name || d.boss, bossShort: BOSS_SHORT[d.boss] || MONSTERS[d.boss]?.name || '', monsters: kinds,
       colors: { floor: T0.floor?.[0], wall: T0.wall?.[0], top: T0.top?.[0], accent: T.accent, light: T.light, fog: T.fog, floor2: T.floor?.[0], wall2: T.wall?.[0], top2: T.top?.[2] || T.top?.[0] },
       open, cleared: r.cleared, crew: r.crew, bestFloor: r.bestFloor, done: r.cleared > 0 || r.crew > 0,

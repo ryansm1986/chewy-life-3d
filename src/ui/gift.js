@@ -15,7 +15,7 @@ import { portraitHTML } from './portraits.js';
 const PER = 12;
 
 export class GiftPickerPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'gift', title: 'Give a gift', jp: 'プレゼント', side: 'center', cls: 'p-gift', icon: 'gift' }); this.page = 0; }
+  constructor(ui) { super(ui, { name: 'gift', title: 'Give a gift', side: 'center', cls: 'p-gift', icon: 'gift' }); this.page = 0; }
   init() {
     this.body.innerHTML = `<div class="gf-to"><div class="gf-por"></div><div class="gf-tt"><b></b><small></small></div></div>
       <div class="gf-pages"><button class="btn sm gf-prev">${glyph('play')}</button><div class="gf-grid"></div><button class="btn sm gf-next">${glyph('play')}</button></div>

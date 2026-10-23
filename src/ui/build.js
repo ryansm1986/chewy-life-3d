@@ -9,12 +9,12 @@ import { Panel } from './panel.js';
 import { Actions } from '../core/actions.js';
 
 const CATS = {
-  home: { name: 'Homes', jp: '家', g: 'home', c: '#8fe0c0' },
-  shop: { name: 'Shops', jp: '店', g: 'shop', c: '#8fd0ff' },
-  craft: { name: 'Crafts', jp: '工房', g: 'craft', c: '#ffcf4a' },
-  service: { name: 'Services', jp: '施設', g: 'service', c: '#c3b3ff' },
-  decor: { name: 'Decor', jp: '飾り', g: 'decor', c: '#ffbcd6' },
-  special: { name: 'Special', jp: '特別', g: 'special', c: '#ff9a7a' },
+  home: { name: 'Homes', g: 'home', c: '#8fe0c0' },
+  shop: { name: 'Shops', g: 'shop', c: '#8fd0ff' },
+  craft: { name: 'Crafts', g: 'craft', c: '#ffcf4a' },
+  service: { name: 'Services', g: 'service', c: '#c3b3ff' },
+  decor: { name: 'Decor', g: 'decor', c: '#ffbcd6' },
+  special: { name: 'Special', g: 'special', c: '#ff9a7a' },
 };
 const ZONES = [['R', 'Homes zone', 'home', '#5ec79a'], ['C', 'Shops zone', 'shop', '#5aa8ff'], ['W', 'Workshop zone', 'craft', '#e8a92a']];
 const COVERS = { water: ['#5aaaff', 'Water'], light: ['#ffd24a', 'Light'], joy: ['#ff82be', 'Joy'], health: ['#5ed69a', 'Health'], learn: ['#a88cff', 'Learning'] };
@@ -33,7 +33,7 @@ const toolCard = z => TOOL_CARDS.find(t => t[0] === z);
 const toolArt = (g, c) => (g === 'pth' || g === 'pth0' ? `<i class="pth"></i>${g === 'pth0' ? glyph('x', 'mini') : ''}` : g === 'home' || g === 'shop' || g === 'craft' ? `<b class="tz" style="--zc:${c}">${{ home: 'R', shop: 'C', craft: 'W' }[g]}</b>${glyph(g)}` : glyph(g));
 
 export class BuildPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'build', title: 'Build', jp: '建てる', side: 'bottom', cls: 'p-build', icon: 'hammer' }); this.cat = null; this.sel = null; this.tool = null; }
+  constructor(ui) { super(ui, { name: 'build', title: 'Build', side: 'bottom', cls: 'p-build', icon: 'hammer' }); this.cat = null; this.sel = null; this.tool = null; }
   /** a building thumbnail rendered after the palette opened (world/buildMode.js fillThumbs): into its item and its card */
   setIcon(id, url) {
     if (!url) return;
@@ -129,7 +129,7 @@ export class BuildPanel extends Panel {
   tip(it) {
     const lock = it.locked ? `<div class="tt-l tt-req bad">${glyph('lock')} ${esc(typeof it.locked === 'string' ? it.locked : it.req || 'Locked')}</div>` : '';
     const miss = Object.keys(this.afford(it.cost));
-    return `<div class="tt-simple"><div class="tt-h">${esc(it.name)}${it.jp ? ` <span class="jp">${esc(it.jp)}</span>` : ''}</div>
+    return `<div class="tt-simple"><div class="tt-h">${esc(it.name)}</div>
       ${it.desc ? `<div class="tt-d">${esc(it.desc)}</div>` : ''}
       ${it.size ? `<div class="tt-l tt-dim">Size ${it.size[0]}×${it.size[1]}</div>` : ''}
       ${it.effect ? `<div class="tt-l" style="color:#8fe0c0">${esc(it.effect)}</div>` : ''}
@@ -173,7 +173,7 @@ export class BuildPanel extends Panel {
     const tabsSig = cats.map(c => c.id + (c.items || []).length).join() + '|' + tools.length;
     if (tabsSig !== this._tabsSig) {
       this._tabsSig = tabsSig;
-      this.$.tabs.innerHTML = cats.map(c => { const C = CATS[c.id] || { g: 'sparkle', c: '#ffcf4a' }; return `<button class="tab" data-c="${c.id}" style="--tc:${C.c}" title="${esc(C.jp || '')}">${glyph(C.g)}<span>${esc(c.name || C.name)}</span></button>`; }).join('')
+      this.$.tabs.innerHTML = cats.map(c => { const C = CATS[c.id] || { g: 'sparkle', c: '#ffcf4a' }; return `<button class="tab" data-c="${c.id}" style="--tc:${C.c}">${glyph(C.g)}<span>${esc(c.name || C.name)}</span></button>`; }).join('')
         + (tools.length ? `<button class="tab bd-tooltab pad-only" data-c="tools" style="--tc:#ff9a7a">${glyph('shovel')}<span>Tools</span></button>` : '');
     }
     for (const t of this.$.tabs.children) t.classList.toggle('on', t.dataset.c === this.cat);

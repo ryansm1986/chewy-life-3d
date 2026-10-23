@@ -68,29 +68,29 @@ export function skillIconURL(id) {
 
 // ------------------------------------------------------------------ skills
 export const TREES = [
-  { id: 'bone', cls: 'chewy', name: 'Bone Blade', jp: '骨の刀', color: '#ffb36a', bg: ['#fff3e0', '#ffe0c2'], glyph: 'bone' },
-  { id: 'fetch', cls: 'chewy', name: 'Fetch Mastery', jp: '取ってこい', color: '#5ec79a', bg: ['#effff6', '#cdf3e0'], glyph: 'ball' },
-  { id: 'spirit', cls: 'chewy', name: 'Pack Spirit', jp: '群れの魂', color: '#9a8cff', bg: ['#f3f0ff', '#dcd6ff'], glyph: 'paw' },
+  { id: 'bone', cls: 'chewy', name: 'Bone Blade', color: '#ffb36a', bg: ['#fff3e0', '#ffe0c2'], glyph: 'bone' },
+  { id: 'fetch', cls: 'chewy', name: 'Fetch Mastery', color: '#5ec79a', bg: ['#effff6', '#cdf3e0'], glyph: 'ball' },
+  { id: 'spirit', cls: 'chewy', name: 'Pack Spirit', color: '#9a8cff', bg: ['#f3f0ff', '#dcd6ff'], glyph: 'paw' },
   // Moka (docs/HEROES.md §3)
-  { id: 'tide', cls: 'moka', name: 'Tidewater', jp: '潮の術', color: '#3cc4b4', bg: ['#eafffb', '#c8f2ea'], glyph: 'drop' },
-  { id: 'star', cls: 'moka', name: 'Starlight Kibble', jp: '星のおやつ', color: '#9a7ae8', bg: ['#f6f0ff', '#e2d8ff'], glyph: 'star' },
-  { id: 'duck', cls: 'moka', name: 'Duck Hunt', jp: '鴨狩り', color: '#e8902a', bg: ['#fff6e8', '#ffe2bc'], glyph: 'duck' },
+  { id: 'tide', cls: 'moka', name: 'Tidewater', color: '#3cc4b4', bg: ['#eafffb', '#c8f2ea'], glyph: 'drop' },
+  { id: 'star', cls: 'moka', name: 'Starlight Kibble', color: '#9a7ae8', bg: ['#f6f0ff', '#e2d8ff'], glyph: 'star' },
+  { id: 'duck', cls: 'moka', name: 'Duck Hunt', color: '#e8902a', bg: ['#fff6e8', '#ffe2bc'], glyph: 'duck' },
   // Poe (docs/POE.md)
-  { id: 'shuriken', cls: 'poe', name: 'Shuriken Arts', jp: '手裏剣術', color: '#c99a2a', bg: ['#fffaec', '#f6ebc8'], glyph: 'fuma' },
-  { id: 'jutsu', cls: 'poe', name: 'Ninjutsu', jp: '忍術', color: '#7a6aa8', bg: ['#f6f2ff', '#e4dcf4'], glyph: 'smoke' },
-  { id: 'shadow', cls: 'poe', name: 'Shadow Step', jp: '影歩き', color: '#4f7a44', bg: ['#f2f8ee', '#dceccf'], glyph: 'kunai' },
+  { id: 'shuriken', cls: 'poe', name: 'Shuriken Arts', color: '#c99a2a', bg: ['#fffaec', '#f6ebc8'], glyph: 'fuma' },
+  { id: 'jutsu', cls: 'poe', name: 'Ninjutsu', color: '#7a6aa8', bg: ['#f6f2ff', '#e4dcf4'], glyph: 'smoke' },
+  { id: 'shadow', cls: 'poe', name: 'Shadow Step', color: '#4f7a44', bg: ['#f2f8ee', '#dceccf'], glyph: 'kunai' },
   // the Shih Tzu (docs/SHIHTZU.md)
-  { id: 'flail', cls: 'shihtzu', name: 'Flail Arts', jp: '鎖鉄球', color: '#8a4a8a', bg: ['#fbf4fb', '#ecdcec'], glyph: 'flail' },
-  { id: 'hex', cls: 'shihtzu', name: 'Gloom Hexes', jp: '憂いの呪い', color: '#2f9a86', bg: ['#effcf8', '#d2f2e8'], glyph: 'hex' },
-  { id: 'tome', cls: 'shihtzu', name: 'Ghostlight Tome', jp: '鬼火の書', color: '#5a7a9a', bg: ['#f2f6fb', '#dce6f2'], glyph: 'tome' },
+  { id: 'flail', cls: 'shihtzu', name: 'Flail Arts', color: '#8a4a8a', bg: ['#fbf4fb', '#ecdcec'], glyph: 'flail' },
+  { id: 'hex', cls: 'shihtzu', name: 'Gloom Hexes', color: '#2f9a86', bg: ['#effcf8', '#d2f2e8'], glyph: 'hex' },
+  { id: 'tome', cls: 'shihtzu', name: 'Ghostlight Tome', color: '#5a7a9a', bg: ['#f2f6fb', '#dce6f2'], glyph: 'tome' },
   // the Golden Retriever dragoon (docs/GOLDEN.md)
-  { id: 'lance', cls: 'golden', name: 'Lance Arts', jp: '槍術', color: '#2f8a5c', bg: ['#f0faf3', '#d6efde'], glyph: 'lance' },
-  { id: 'javelin', cls: 'golden', name: 'Javelins', jp: '投げ槍', color: '#b8862e', bg: ['#fffaee', '#f6e8c8'], glyph: 'javelin' },
-  { id: 'whelp', cls: 'golden', name: 'Whelp Bond', jp: '竜の絆', color: '#d8603a', bg: ['#fff4ee', '#fbdccc'], glyph: 'whelp' },
+  { id: 'lance', cls: 'golden', name: 'Lance Arts', color: '#2f8a5c', bg: ['#f0faf3', '#d6efde'], glyph: 'lance' },
+  { id: 'javelin', cls: 'golden', name: 'Javelins', color: '#b8862e', bg: ['#fffaee', '#f6e8c8'], glyph: 'javelin' },
+  { id: 'whelp', cls: 'golden', name: 'Whelp Bond', color: '#d8603a', bg: ['#fff4ee', '#fbdccc'], glyph: 'whelp' },
   // Stella, the Sun Oracle (docs/STELLA.md)
-  { id: 'ray', cls: 'stella', name: 'Radiance', jp: '光輝', color: '#c88a1a', bg: ['#fffbea', '#fbecc0'], glyph: 'ray' },
-  { id: 'flare', cls: 'stella', name: 'Corona', jp: '光冠', color: '#d0603a', bg: ['#fff5ec', '#fcdcc8'], glyph: 'flare' },
-  { id: 'dawn', cls: 'stella', name: 'Dawn', jp: '暁', color: '#c8687a', bg: ['#fff3f1', '#fbdcd6'], glyph: 'dawn' },
+  { id: 'ray', cls: 'stella', name: 'Radiance', color: '#c88a1a', bg: ['#fffbea', '#fbecc0'], glyph: 'ray' },
+  { id: 'flare', cls: 'stella', name: 'Corona', color: '#d0603a', bg: ['#fff5ec', '#fcdcc8'], glyph: 'flare' },
+  { id: 'dawn', cls: 'stella', name: 'Dawn', color: '#c8687a', bg: ['#fff3f1', '#fbdcd6'], glyph: 'dawn' },
 ];
 /** The skill trees of the hero being played. */
 export const treesFor = cls => TREES.filter(t => t.cls === (cls || 'chewy'));

@@ -18,7 +18,7 @@ const names = crew => { const n = crew.map(k => hireName(k) || CLASSES[who(k)]?.
 const face = k => (k.startsWith('hire:') ? globalThis.G?.cozy?.guild?.faceHTML?.(k) || '' : portrait(who(k)));
 
 export class AwayCardPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'awayCard', title: 'Welcome back', jp: 'おかえり', side: 'center', cls: 'p-away', icon: 'home' }); }
+  constructor(ui) { super(ui, { name: 'awayCard', title: 'Welcome back', side: 'center', cls: 'p-away', icon: 'home' }); }
   init() {
     this.body.addEventListener('click', e => {
       const b = e.target.closest('button'); if (!b) return;

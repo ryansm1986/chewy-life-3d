@@ -9,7 +9,7 @@
 // card over the panels the guides open (the Board, the Guild, the Journal, the menu, the pantry, Skills, a house card,
 // remodel, the stash), with what it spotlights: on a phone it must cover none of the panel's tabs, buttons or ✕, nor the
 // spotlit target (ui-audit-lib guideOverlap; a tablet's are listed, not failed: its panels keep their desktop layout).
-// Decorative text is left out: the Japanese subtitles (.jp), the compass's 北, the portrait's "Lv", glyph art (svg).
+// Decorative text is left out: the compass's N, the portrait's "Lv", glyph art (svg).
 //   CT-7: "cut off" is measured against the safe area (--sa-*: a notch, CT-6's itch insets, the full-screen top edge), not
 //   the bare screen; a body whose content runs past it must scroll; Settings is audited with every row it can show (the
 //   debug row too) and every Controls tab (touch, keyboard, controller), from the game and from the title; and the same
@@ -44,7 +44,7 @@ const { browser, page, errors, F } = await launchTouch({ w: W, h: H, dpr: DPR, u
 const ev = (f, a) => page.evaluate(f, a);
 let bad = 0;
 const small = [], tiny = [], clipped = [], covered = [], overlaps = [];
-const DECOR = /\.jp\b|mm-n > span|pc-lv > small|chg-jp|ph-jp|\.kc\b/; // (key caps are glyph art: ui/mobile.js's text floor skips them too)
+const DECOR = /pc-lv > small|\.kc\b/; // (key caps are glyph art: ui/mobile.js's text floor skips them too)
 
 const audit = (name, scopes) => ev(([scopes, floor, tap]) => {
   const vis = el => { for (let e = el; e && e !== document.body; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity < 0.05) return false; } return true; };

@@ -1,5 +1,5 @@
 // Cursor-following tooltip + item/skill tooltip builders.
-import { el, esc, rarityColor, RARITY_JP, cap, fmt } from './dom.js';
+import { el, esc, rarityColor, cap, fmt } from './dom.js';
 import { glyph } from './glyphs.js';
 import { itemName, baseName, meetsReq, rpgItemTooltip, equipSlotsFor } from './rpg.js';
 import { padWording } from './padGlyphs.js';
@@ -154,7 +154,7 @@ function simpleGearTip(item, ctx) {
   const hintsH = hints.length ? `<div class="tt-hints">${hints.map(h => `<span>${h}</span>`).join('')}</div>` : '';
   return `<div class="tt-item tt-simple-item r-${item.rarity || 'normal'}" style="--rc:${col}">
     <div class="tt-name">${esc(itemName(item))}</div>
-    <div class="tt-kind"><span>${sub}</span><span class="jp">${RARITY_JP[item.rarity] || ''}</span></div>
+    <div class="tt-kind"><span>${sub}</span></div>
     ${body}${price}${hintsH}</div>`;
 }
 
@@ -222,7 +222,7 @@ export function itemTipHTML(item, ctx = {}) {
   const hints = ctx.hints?.length ? `<div class="tt-hints">${ctx.hints.map(h => `<span>${h}</span>`).join('')}</div>` : '';
   return `<div class="tt-item r-${item.rarity || 'normal'}" style="--rc:${titleColor}">
     <div class="tt-name">${esc(name)}</div>
-    <div class="tt-kind"><span>${sub}</span>${item.ilvl ? `<span class="tt-il">iLvl ${item.ilvl}</span>` : ''}<span class="jp">${RARITY_JP[item.rarity] || ''}</span></div>
+    <div class="tt-kind"><span>${sub}</span>${item.ilvl ? `<span class="tt-il">iLvl ${item.ilvl}</span>` : ''}</div>
     ${item.kind === 'gear' ? powerBox(item, ctx) : ''}${body}${cmp}${price}${hints}</div>`;
 }
 

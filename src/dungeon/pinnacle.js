@@ -99,7 +99,7 @@ export class Pinnacle {
     this.k++; this.busy = true; this.wait = 3.6; this.echoT = ECHO.first;
     const N = this.season;
     G.engine.post.pulse(N.glow, 0.1);
-    setTimeout(() => { if (G.dungeon === M && !this.done) G.ui?.banner?.(`${N.name} ${N.jp}`, N.sub, { style: 'quest', duration: 2.2 }); }, 900);
+    setTimeout(() => { if (G.dungeon === M && !this.done) G.ui?.banner?.(N.name, N.sub, { style: 'quest', duration: 2.2 }); }, 900);
     Events.emit('pinnacle:season', { season: N.key, n: this.k + 1, from: S.key, ...M.where?.() });
     Events.emit('sfx', 'portal');
     return true;

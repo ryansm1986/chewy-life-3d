@@ -9,10 +9,10 @@
 const CELL = 2; // (gen.js CELL)
 /** the four seasons in order: each one's boss (its own fight, retuned in the ring: regions/bosses/*), colour and card */
 export const SEASONS = [
-  { key: 'spring', name: 'Spring', jp: '春', boss: 'tenguMaster', color: '#ffb0cc', glow: '#ffd6e6', sub: 'The mountain wind carries the first petals.' },
-  { key: 'summer', name: 'Summer', jp: '夏', boss: 'umibozu', color: '#4ec8e0', glow: '#bff4ff', sub: 'The tide comes in, warm and enormous.' },
-  { key: 'autumn', name: 'Autumn', jp: '秋', boss: 'danzaburo', color: '#ff9446', glow: '#ffd6a8', sub: 'The leaves turn, and so does a very round tanuki.' },
-  { key: 'winter', name: 'Winter', jp: '冬', boss: 'yukiOnna', color: '#a8dcff', glow: '#eef8ff', sub: 'The snow falls, and the Frost Princess waits.' },
+  { key: 'spring', name: 'Spring', boss: 'tenguMaster', color: '#ffb0cc', glow: '#ffd6e6', sub: 'The mountain wind carries the first petals.' },
+  { key: 'summer', name: 'Summer', boss: 'umibozu', color: '#4ec8e0', glow: '#bff4ff', sub: 'The tide comes in, warm and enormous.' },
+  { key: 'autumn', name: 'Autumn', boss: 'danzaburo', color: '#ff9446', glow: '#ffd6a8', sub: 'The leaves turn, and so does a very round tanuki.' },
+  { key: 'winter', name: 'Winter', boss: 'yukiOnna', color: '#a8dcff', glow: '#eef8ff', sub: 'The snow falls, and the Frost Princess waits.' },
 ];
 export const PINNACLE_BOSSES = SEASONS.map(s => s.boss);
 /** each season's share of its boss's life (on top of the Spirit tier's life multiplier): four fights, one pinnacle */

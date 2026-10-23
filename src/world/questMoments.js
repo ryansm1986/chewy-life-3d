@@ -189,13 +189,13 @@ export class QuestMoments {
   here() {
     const G = this.G, D = G.mode === 'dungeon' ? G.dungeon : null, P = G.player;
     let w;
-    if (D?.kind === 'region') w = { mode: 'region', zone: D.zoneId, name: D.region?.name || this.zoneName(D.zoneId), jp: D.region?.jp || '' };
-    else if (D) { const def = D.def || {}; w = { mode: 'dungeon', dungeon: def.id, floor: D.floor, name: def.name || '', jp: def.jp || '', floors: def.floors, tier: D.tr?.label || '' }; }
+    if (D?.kind === 'region') w = { mode: 'region', zone: D.zoneId, name: D.region?.name || this.zoneName(D.zoneId) };
+    else if (D) { const def = D.def || {}; w = { mode: 'dungeon', dungeon: def.id, floor: D.floor, name: def.name || '', floors: def.floors, tier: D.tr?.label || '' }; }
     else if (G.mode === 'village' && P) {
-      const k = districtAt(P.pos.x, P.pos.z); w = { mode: 'village', district: k, name: districtName(k), jp: 'さくら村', givers: [] };
+      const k = districtAt(P.pos.x, P.pos.z); w = { mode: 'village', district: k, name: districtName(k), givers: [] };
       for (const q of this.Q.active) { const s = G.story?.stepOf?.(q); if ((s?.type === 'talk' || s?.type === 'deliver') && s.npc && !ZONE_NPCS[s.npc] && !w.givers.includes(s.npc) && this.withGiver(s.npc, k)) w.givers.push(s.npc); } // (the villagers a talk or a hand-in step wants: with them now)
     }
-    else if (G.mode === 'interior') { const H = G.housing?.home; w = { mode: 'interior', room: H?.owner || (H?.household ? 'home' : null), name: H?.name || '', jp: '' }; }
+    else if (G.mode === 'interior') { const H = G.housing?.home; w = { mode: 'interior', room: H?.owner || (H?.household ? 'home' : null), name: H?.name || '' }; }
     else w = { mode: G.mode };
     w.keys = areasHere(w);
     return w;
@@ -241,18 +241,18 @@ export class QuestMoments {
   }
   /** the words: the quest on the ribbon, the place, the floor and the step */
   titleOf(q, d, s, a, w) {
-    let name = w.name, jp = w.jp;
-    if (a.kind === 'zone' && s.type === 'talk' && VILLAGES[a.zone]) { name = VILLAGES[a.zone].name; jp = VILLAGES[a.zone].jp || jp; } // (the way home: the giver's village)
+    let name = w.name;
+    if (a.kind === 'zone' && s.type === 'talk' && VILLAGES[a.zone]) name = VILLAGES[a.zone].name; // (the way home: the giver's village)
     if (a.kind === 'giver') name = this.giverPlace(a.npc); // (where the giver is now: "Rosie's Treats", "Koi Pond")
     const floor = w.mode === 'dungeon' && w.floor ? `${w.tier ? w.tier + ' · ' : ''}Floor ${w.floor}${Number.isFinite(w.floors) ? ` of ${w.floors}` : ''}` : '';
     // (a floor step seen from a floor above it: where to go now)
     const n = s.type === 'floor' ? (s.n || 1) : s.type === 'dungeonFloor' ? (s.n || 1) : 0;
     const what = n && w.mode === 'dungeon' && w.floor < n ? `Find the stairs down to floor ${n}` : heroText(bare(s.text), this.G.state);
-    return { kicker: d.title, title: name || d.title, jp, sub: [floor, what].filter(Boolean).join(' · ') };
+    return { kicker: d.title, title: name || d.title, sub: [floor, what].filter(Boolean).join(' · ') };
   }
   showTitle(q, d, s, a, w) {
     const G = this.G, ui = G.ui, t = this.titleOf(q, d, s, a, w);
-    ui.banner?.(t.title, t.sub, { style: 'place', kicker: t.kicker, jp: t.jp, onShow: () => this.sting() });
+    ui.banner?.(t.title, t.sub, { style: 'place', kicker: t.kicker, onShow: () => this.sting() });
     this.stats.titles++; this.stats.lastTitle = { quest: q.id, step: q.step, key: a.key, ...t };
     if (!(s.type === 'talk' && s.npc === d.giver && (s.handIn || q.step === d.steps.length - 1))) this.queueLine(q, d, s, 'arrive', 25); // (Shadow's line for it, once the title's gone; the way home has its own)
     Events.emit('quest:place', { quest: q.id, step: q.step, area: a.key, title: t.title });
@@ -438,7 +438,7 @@ export class QuestMoments {
         const w = self.here(), q = G.state.quests.active.find(x => self.def(x.id) && !self.def(x.id).request), d = q && self.def(q.id);
         if (!d) return 'No quest running';
         const s = d.steps[q.step] || d.steps[0], t = self.titleOf(q, d, s, stepArea(s) || { kind: '' }, w);
-        G.ui.banner(t.title, t.sub, { style: 'place', kicker: t.kicker, jp: t.jp, onShow: () => self.sting() }); return ''; } },
+        G.ui.banner(t.title, t.sub, { style: 'place', kicker: t.kicker, onShow: () => self.sting() }); return ''; } },
       { label: 'Forget the titles shown', hint: 'Each step shows its place titles again', run: G => { for (const q of G.state.quests.active) delete q.tt; return 'Place titles reset'; } },
       { group: "Shadow's lines", label: "Say Shadow's line", hint: "The first running quest's line for a beat, now", choices: LINE_BEATS.map(b => ({ label: b, value: b })), run: (G, beat) => {
         const q = G.state.quests.active.find(x => self.def(x.id) && !self.def(x.id).request), d = q && self.def(q.id); if (!d) return 'No quest running';

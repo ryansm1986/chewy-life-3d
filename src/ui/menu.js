@@ -27,7 +27,7 @@ const SET_2C = 1160, SET_2C_MIN = 700; // (Settings' two columns: the panel's 11
 const QUICK = [['inventory', 'bag', 'Bag'], ['character', 'star', 'Character'], ['skills', 'sparkle', 'Skills'], ['quests', 'book', 'Journal'], ['map', 'map', 'Map']];
 
 export class MenuPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'menu', title: 'Paused', jp: '一時停止', side: 'center', cls: 'p-menu', icon: 'gear' }); this.view = 'main'; }
+  constructor(ui) { super(ui, { name: 'menu', title: 'Paused', side: 'center', cls: 'p-menu', icon: 'gear' }); this.view = 'main'; }
   build() {
     super.build();
     this.back = el('div', 'modal-bg');
@@ -143,7 +143,7 @@ export class MenuPanel extends Panel {
     if (v !== 'controls') this.cancelWait();
     this.view = v;
     this.panel.dataset.view = v;
-    this.setTitle(v === 'settings' ? 'Settings' : v === 'controls' ? 'Controls' : v === 'update' ? 'Update' : 'Paused', v === 'settings' ? '設定' : v === 'controls' ? '操作' : v === 'update' ? 'アップデート' : '一時停止');
+    this.setTitle(v === 'settings' ? 'Settings' : v === 'controls' ? 'Controls' : v === 'update' ? 'Update' : 'Paused');
     if (v === 'update') { const u = this.body.querySelector('.mn-update'); if (u) u.innerHTML = updateHTML(); }
     const vv = this.body.querySelector('.mn-' + v);
     if (vv) replay(vv, 'enter', 500);

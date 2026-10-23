@@ -57,7 +57,7 @@ export function rewardChips(list = []) {
 }
 
 export class QuestCardPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'questCard', title: 'New quest', jp: '冒険', side: 'center', cls: 'p-qcard', icon: 'scroll' }); }
+  constructor(ui) { super(ui, { name: 'questCard', title: 'New quest', side: 'center', cls: 'p-qcard', icon: 'scroll' }); }
   init() {
     this.body.addEventListener('click', e => { if (e.target.closest('[data-a="go"]')) this.go(); });
     this.onKey = e => {
@@ -92,7 +92,7 @@ export class QuestCardPanel extends Panel {
         <div class="qc-name"><span>${esc(o.name || '')}</span></div>
       </div>
       <div class="qc-page">
-        <div class="qc-kick">${glyph('scroll')}<span>${o.kind === 'zone' ? 'A favour' : 'A new quest'}</span><b class="jp">${o.kind === 'zone' ? 'お願い' : '冒険'}</b></div>
+        <div class="qc-kick">${glyph('scroll')}<span>${o.kind === 'zone' ? 'A favour' : 'A new quest'}</span></div>
         <h2 class="qc-title">${esc(o.title || '')}</h2>
         <p class="qc-hook"><span class="qc-q o">“</span>${esc(o.hook || '')}<span class="qc-q c">”</span></p>
         <div class="qc-goal"><span class="qc-gi">${glyph('pin')}</span><div><b>${esc(act)}</b>${where ? `<span>${esc(where)}</span>` : ''}</div></div>

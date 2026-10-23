@@ -128,7 +128,7 @@ function installTrinkets(G) {
     const greeting = h >= 21 || h < 6 ? "*yawn* Burning the midnight oil, Chewy? Quick, before Tanu nods off~" : fresh && st.flags?.trinketsSeen ? TANU.greetNew : pick(TANU.greet);
     (st.flags ||= {}).trinketsSeen = true;
     G.ui.open('shop', {
-      name: "Tanu's Trinkets", jp: 'たぬき屋', keeper: 'tanu', portrait: G.portrait?.('tanu'), greeting,
+      name: "Tanu's Trinkets", keeper: 'tanu', portrait: G.portrait?.('tanu'), greeting,
       furniture, potions: [], stock: [], noBagSell: true, sellFurniture: true, tab: o.tab,
       thanks: TANU.thanks, sellThanks: TANU.sold, emptySell: TANU.nothing,
       onBuyFurniture: buy, onSellFurniture: sell, furnitureSellPrice: buyBackPrice,
@@ -141,7 +141,7 @@ function installTrinkets(G) {
 }
 
 // ------------------------------------------------------------------ the workbench
-const WHERE = { home: ['Workbench', 'さぎょうだい'], lumber: ['Lumber Yard Workbench', 'もくざいば'] };
+const WHERE = { home: ['Workbench'], lumber: ['Lumber Yard Workbench'] };
 function installWorkbench(G) {
   const WB = G.workbench = {
     busy: false, where: null, at: null,
@@ -181,8 +181,8 @@ function installWorkbench(G) {
     if (!G.ui?.open) return false;
     workbenchOf(G.state);
     WB.where = WHERE[where] ? where : 'home';
-    const [title, jp] = WHERE[WB.where];
-    G.ui.open('craft', { where: WB.where, title, jp });
+    const [title] = WHERE[WB.where];
+    G.ui.open('craft', { where: WB.where, title });
     Events.emit('sfx', 'ui_open');
     Events.emit('workbench:open', { where: WB.where });
     return true;

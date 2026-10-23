@@ -29,7 +29,7 @@ export function furnitureTipHTML(id, n = null, fav = null) { // fav: 'your' | 't
   const d = FURNITURE[id] || SURFACES[id]; if (!d) return '';
   const set = SETS[d.set], cat = d.kind ? (d.kind === 'wall' ? 'Wallpaper' : 'Floor') : CATS[d.cat]?.name;
   const size = d.kind ? '' : d.mount === 'wall' ? `${d.size[0] * CELL} × ${d.size[1] * CELL} m on a wall` : `${d.size[0] * CELL} × ${d.size[1] * CELL} m`;
-  return `<div class="tt-simple tt-furn"><div class="tt-h">${esc(d.name)} <span class="jp">${esc(d.jp || '')}</span></div>
+  return `<div class="tt-simple tt-furn"><div class="tt-h">${esc(d.name)}</div>
     <div class="tt-l tt-dim">${esc(cat || '')}${size ? ' · ' + size : ''}${set ? ` · <b style="color:${set.color}">${esc(set.name)}</b>` : ''}</div>
     <div class="tt-d">${esc(d.desc || '')}</div>
     ${(d.tags || []).length ? `<div class="tt-l fu-tags">${d.tags.map(t => `<span>${TAG_NAME[t] || t}</span>`).join('')}</div>` : ''}
@@ -38,7 +38,7 @@ export function furnitureTipHTML(id, n = null, fav = null) { // fav: 'your' | 't
 }
 
 export class DecoratePanel extends Panel {
-  constructor(ui) { super(ui, { name: 'decorate', title: 'Decorate', jp: '模様替え', side: 'bottom', cls: 'p-build p-decor', icon: 'home' }); this.tab = 'all'; this.queue = []; }
+  constructor(ui) { super(ui, { name: 'decorate', title: 'Decorate', side: 'bottom', cls: 'p-build p-decor', icon: 'home' }); this.tab = 'all'; this.queue = []; }
   init() {
     this.extra.innerHTML = `<span class="bd-bump pad-only" data-pg="LB"></span><div class="tabs bd-tabs dc-tabs">${TABS.map(t => `<button class="tab" data-t="${t.id}" style="--tc:${t.color}">${glyph(t.glyph)}<span>${esc(t.name)}</span><span class="tab-n">0</span></button>`).join('')}</div><span class="bd-bump pad-only" data-pg="RB"></span><div class="bd-held pad-only"></div>`;
     this.body.innerHTML = `<div class="bd-main"><div class="bd-cards dc-cards"></div>

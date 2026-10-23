@@ -1,6 +1,7 @@
 """Self-hosted UI fonts: downloads Fredoka (variable) and M PLUS Rounded 1c (500/700/800) from the google/fonts repo
 (both SIL Open Font License 1.1), subsets them to what the game uses and writes woff2 files to src/ui/fonts/.
-  python tools/fonts/build-fonts.py          (re-run when new Japanese text or symbols are added to the game)
+  python tools/fonts/build-fonts.py          (re-run when new symbols are added to the game)
+The game has no Japanese text (the owner, 2026-10-21): the kana and kanji left in code comments are skipped.
 Source TTFs are cached in tools/fonts/src/ (git-ignored). Needs fontTools + brotli (pip install fonttools brotli)."""
 import os
 import sys
@@ -32,8 +33,13 @@ def fetch():
             urllib.request.urlretrieve(url, p)
 
 
+def is_cjk(c):
+    o = ord(c)
+    return 0x3000 <= o <= 0x30ff or 0x3400 <= o <= 0x9fff or 0xff00 <= o <= 0xffef
+
+
 def used_chars():
-    """Every non-ASCII character in the game's source text (UI strings, labels, CSS content)."""
+    """Every non-ASCII character in the game's source text (UI strings, labels, CSS content), Japanese aside."""
     chars = set()
     for base in (os.path.join(ROOT, 'src'), ROOT):
         for dirpath, dirnames, files in os.walk(base):
@@ -45,7 +51,7 @@ def used_chars():
                 if not f.endswith(('.js', '.css', '.html')):
                     continue
                 with open(os.path.join(dirpath, f), encoding='utf-8', errors='ignore') as fh:
-                    chars.update(c for c in fh.read() if ord(c) > 0x7e)
+                    chars.update(c for c in fh.read() if ord(c) > 0x7e and not is_cjk(c))
     return chars
 
 
@@ -74,8 +80,8 @@ def main():
     latin = ranges((0x20, 0x7e), (0xa0, 0x17f), (0x2010, 0x2027), (0x2030, 0x203a), (0x20ac, 0x20ac), (0x2122, 0x2122))
     # Fredoka: Latin text + whatever symbols the game uses that it has (missing ones fall back to M PLUS / system)
     write(os.path.join(SRC, 'fredoka.ttf'), os.path.join(OUT, 'fredoka.woff2'), latin + extra)
-    # M PLUS Rounded 1c: Japanese labels (every kana, CJK punctuation, full-width forms, plus the kanji the game uses)
-    jp = latin + ranges((0x3000, 0x303f), (0x3040, 0x309f), (0x30a0, 0x30ff), (0xff00, 0xffef)) + extra
+    # M PLUS Rounded 1c: the fallback for the symbols Fredoka lacks (Latin + the same extras)
+    jp = latin + extra
     for w in (500, 700, 800):
         write(os.path.join(SRC, f'mplus-{w}.ttf'), os.path.join(OUT, f'mplus-{w}.woff2'), jp)
     # licences: Fredoka's OFL.txt as published; M PLUS's folder has no OFL.txt (METADATA.pb says OFL), so write its
@@ -91,8 +97,7 @@ def main():
     # the characters this subset was built for: tools/build-itch.mjs warns when the source gains ones that aren't here
     with open(os.path.join(OUT, 'chars.txt'), 'w', encoding='utf-8', newline=NL) as f:
         f.write(''.join(chr(c) for c in extra) + NL)
-    kanji = [c for c in extra if 0x4e00 <= c <= 0x9fff]
-    print(f'{len(extra)} non-ASCII characters from the source ({len(kanji)} kanji)')
+    print(f'{len(extra)} non-ASCII characters from the source')
 
 
 if __name__ == '__main__':

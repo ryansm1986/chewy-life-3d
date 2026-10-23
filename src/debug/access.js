@@ -20,7 +20,7 @@ const store = on => { try { if (on) localStorage.setItem(KEY, '1'); else localSt
 /** The password prompt: a text field (touch keyboards; the pad's A focuses it), Unlock / Not now, a gentle shake on a
  *  wrong password and a short breather after five. */
 class DebugGatePanel extends Panel {
-  constructor(ui, api) { super(ui, { name: 'debugGate', title: 'Debug tools', jp: 'デバッグ', side: 'center', cls: 'p-dbg-gate', icon: 'key' }); this.api = api; this.wrong = 0; this.until = 0; this.overTitle = true; } // (overTitle: it can ask on the title screen too)
+  constructor(ui, api) { super(ui, { name: 'debugGate', title: 'Debug tools', side: 'center', cls: 'p-dbg-gate', icon: 'key' }); this.api = api; this.wrong = 0; this.until = 0; this.overTitle = true; } // (overTitle: it can ask on the title screen too)
   build() {
     super.build();
     this.back = el('div', 'modal-bg'); this.wrap.prepend(this.back);

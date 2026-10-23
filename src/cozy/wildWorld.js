@@ -113,7 +113,7 @@ export class WildRuntime {
         if (!(this.told[a.id] > this.t)) {
           this.told[a.id] = this.t + TOAST_GAP;
           const live = (this.packs.get(a.id) || []).some(m => m.alive);
-          this.G.ui?.toast?.(live ? `${titled(a.name)}: wild yokai about!` : `${titled(a.name)}: quiet, for now`, { icon: 'oni', color: '#c8a0ff', sub: a.jp || '' });
+          this.G.ui?.toast?.(live ? `${titled(a.name)}: wild yokai about!` : `${titled(a.name)}: quiet, for now`, { icon: 'oni', color: '#c8a0ff' });
         }
       }
     }

@@ -117,7 +117,7 @@ Paths are relative to the repo. A full report is in the session; these are the l
   - ceiling and lights: paper lanterns, pendants;
   - surfaces: wallpaper and floor sets.
   Each item has:
-  - `{ id, name, jp, cat, size [w, d] in 0.5 m cells, h, mount: 'floor'|'wall'|'table'|'rug', surface? (a tabletop height), tags,
+  - `{ id, name, cat, size [w, d] in 0.5 m cells, h, mount: 'floor'|'wall'|'table'|'rug', surface? (a tabletop height), tags,
     set, price, craft?, drop?, light? }`;
   - `tags` such as cozy, warm, nature, water, lantern, bookish, sweet, music, retro, festive, elegant, cute;
   - a **set**: Cottage Basics, Tea House, Bamboo Grove, Maple Hollow, Tidepool, Onsen Lodge or Festival.

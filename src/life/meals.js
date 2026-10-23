@@ -5,11 +5,11 @@
 
 // per tier 1..3
 export const BUFFS = {
-  hearty: { name: 'Hearty', jp: 'ほかほか', color: '#ff8fb0', glyph: 'heart', text: t => `+${[8, 12, 18][t - 1]}% max life, +${[1, 1.6, 2.4][t - 1]} life/s` },
-  swift: { name: 'Swift', jp: 'すばやい', color: '#8fe0c0', glyph: 'bolt', text: t => `+${[8, 12, 18][t - 1]}% move and attack speed` },
-  strong: { name: 'Strong', jp: 'ちからもち', color: '#ff9a6a', glyph: 'sword', text: t => `+${[10, 16, 25][t - 1]}% damage` },
-  lucky: { name: 'Lucky', jp: 'ラッキー', color: '#ffd84a', glyph: 'clover', text: t => `+${[20, 35, 60][t - 1]}% magic find and coins` },
-  zen: { name: 'Zen', jp: 'おちつき', color: '#8fd0ff', glyph: 'sparkle', text: t => `+${[25, 40, 60][t - 1]}% zoom regen, -${[5, 8, 12][t - 1]}% cooldowns` },
+  hearty: { name: 'Hearty', color: '#ff8fb0', glyph: 'heart', text: t => `+${[8, 12, 18][t - 1]}% max life, +${[1, 1.6, 2.4][t - 1]} life/s` },
+  swift: { name: 'Swift', color: '#8fe0c0', glyph: 'bolt', text: t => `+${[8, 12, 18][t - 1]}% move and attack speed` },
+  strong: { name: 'Strong', color: '#ff9a6a', glyph: 'sword', text: t => `+${[10, 16, 25][t - 1]}% damage` },
+  lucky: { name: 'Lucky', color: '#ffd84a', glyph: 'clover', text: t => `+${[20, 35, 60][t - 1]}% magic find and coins` },
+  zen: { name: 'Zen', color: '#8fd0ff', glyph: 'sparkle', text: t => `+${[25, 40, 60][t - 1]}% zoom regen, -${[5, 8, 12][t - 1]}% cooldowns` },
 };
 export const TIER_NAMES = ['', 'I', 'II', 'III'];
 export const buffInfo = m => (m && BUFFS[m.buff]) || null;

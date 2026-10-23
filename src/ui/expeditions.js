@@ -38,7 +38,7 @@ const fmtN = n => (n >= 10000 ? `${Math.round(n / 1000)}k` : String(Math.round(n
 
 export class ExpeditionPanel extends Panel {
   constructor(ui) {
-    super(ui, { name: 'expeditions', title: 'Expedition Board', jp: '遠征', side: 'center', cls: 'p-exp', icon: 'map' });
+    super(ui, { name: 'expeditions', title: 'Expedition Board', side: 'center', cls: 'p-exp', icon: 'map' });
     this.view = 'story'; this.sel = {}; this.crew = []; this.lunch = false; this.potions = 0; this.armed = null;
   }
   get C() { return this.G?.cozy; }
@@ -258,7 +258,7 @@ export class ExpeditionPanel extends Panel {
     const goSub = I?.ok ? `${esc(this.crewNames(this.crew))} · ${esc(backBy(hour, hrs))}` : esc(why);
     const cb = I?.crewPower?.cls, bonus = cb?.mul ? `<span class="ex-cb" title="${esc(HIRE_CLASSES[cb.cls]?.name || '')}: this job suits them">${esc(HIRE_CLASSES[cb.cls]?.name || 'Class')} +15%</span>` : '';
     return `<div class="ex-det" style="--pc:${o.place.color}">
-        <div class="ex-dh"><span class="ex-dic">${cozyIcon(o.kind === 'errand' ? 'errand' : 'story')}</span><div class="ex-dt"><b>${esc(o.name)}</b><span class="ex-dp">${o.questTitle ? `${esc(o.questTitle)} · ` : ''}${esc(o.place.label)}${o.place.jp ? ` <span class="jp">${esc(o.place.jp)}</span>` : ''}</span></div><span class="ex-kind">${o.kind === 'errand' ? 'Errand' : 'Story'}</span></div>
+        <div class="ex-dh"><span class="ex-dic">${cozyIcon(o.kind === 'errand' ? 'errand' : 'story')}</span><div class="ex-dt"><b>${esc(o.name)}</b><span class="ex-dp">${o.questTitle ? `${esc(o.questTitle)} · ` : ''}${esc(o.place.label)}</span></div><span class="ex-kind">${o.kind === 'errand' ? 'Errand' : 'Story'}</span></div>
         <p class="ex-desc">${esc(o.desc || '')}</p>
         <div class="ex-facts"><div${fast ? ' class="fast" title="A Scout knows the shortcuts: 15% off the trip"' : ''}>${cozyIcon('clock')}<b>${esc(aboutHours(hrs))}</b><span>${esc(backBy(hour, hrs))}</span></div><div>${cozyIcon('power')}<b>${need}</b><span>power needed</span></div><div${by ? ' class="packed"' : ''}>${cozyIcon('lunch')}<b>${by ? 'packed' : o.supplies?.meals ? '1 each' : 'optional'}</b><span>${by ? `by ${esc(by)}` : 'lunches'}</span></div></div>
         ${gates ? `<div class="ex-gates">${gates}</div>` : ''}
@@ -308,8 +308,8 @@ export class ExpeditionPanel extends Panel {
     const xp = r.crew.map(k => { const lv = r.levels?.[k]; return r.xp?.[k] ? `<span class="ex-xp">${this.face(k, true)}<b>+${fmtN(r.xp[k])} XP</b>${lv ? `<em>Lv ${lv[0]} → ${lv[1]}!</em>` : ''}</span>` : ''; }).join('');
     return `<div class="ex-det ex-rep" style="--pc:${R[2]}">
         <div class="ex-dh"><span class="ex-stamp">${cozyIcon(R[1])}<b>${esc(R[0])}</b></span><div class="ex-dt"><b>${esc(r.name)}</b><span class="ex-dp">${esc(r.place?.label || '')}</span></div></div>
-        ${r.saved ? `<div class="ex-saved">${glyph('star')}<div><b>${esc(r.saved.village)} is saved!</b><span>${r.saved.freed?.length ? `${esc(listNames(r.saved.freed))} ${r.saved.freed.length > 1 ? 'are' : 'is'} free · ` : ''}${esc(r.saved.captain)} fled into the Depths</span></div>${r.saved.jp ? `<i class="jp">${esc(r.saved.jp)}</i>` : ''}</div>` : ''}
-        ${r.cleared ? `<div class="ex-saved">${glyph('star')}<div><b>The ${esc(r.cleared.dungeon)} is clear!</b><span>${esc(r.cleared.boss)} fled${r.cleared.opened ? ` · ${esc(r.cleared.opened)} is open on the Travel Map` : ''}${r.cleared.lantern ? ' · Tier 1 wakes at its Spirit Lantern' : ''}</span></div><i class="jp">救</i></div>` : ''}
+        ${r.saved ? `<div class="ex-saved">${glyph('star')}<div><b>${esc(r.saved.village)} is saved!</b><span>${r.saved.freed?.length ? `${esc(listNames(r.saved.freed))} ${r.saved.freed.length > 1 ? 'are' : 'is'} free · ` : ''}${esc(r.saved.captain)} fled into the Depths</span></div></div>` : ''}
+        ${r.cleared ? `<div class="ex-saved">${glyph('star')}<div><b>The ${esc(r.cleared.dungeon)} is clear!</b><span>${esc(r.cleared.boss)} fled${r.cleared.opened ? ` · ${esc(r.cleared.opened)} is open on the Travel Map` : ''}${r.cleared.lantern ? ' · Tier 1 wakes at its Spirit Lantern' : ''}</span></div></div>` : ''}
         ${r.quest?.turnIn ? `<div class="ex-saved">${glyph('scroll')}<div><b>${esc(r.quest.title)}: ${r.quest.rescued ? `${esc(r.quest.rescued)} is safe!` : r.quest.item ? `${esc(r.quest.item)} found!` : 'done!'}</b><span>${r.quest.rescued ? `${esc(r.quest.rescued)} walked home to the village · ` : ''}Go and tell ${esc(r.quest.giver || 'them')} yourself</span></div></div>` : ''}
         ${r.quest?.done ? `<div class="ex-saved">${glyph('scroll')}<div><b>${esc(r.quest.title)}: done!</b><span>${r.quest.handIn ? `${esc(r.quest.giver || 'Its giver')} wants to hear all about it: bring the news` : 'The quest is complete'}${r.quest.owed ? ' · the boss\'s own treasure waits for the day you beat it yourself' : ''}${r.den?.opened ? ` · ${esc(r.den.opened)} opens at the Burrow door` : ''}${r.deep?.lantern ? ' · the Spirit Lantern by the Burrow door wakes' : ''}</span></div></div>` : ''}
         ${r.desc ? `<p class="ex-desc ex-flav">${esc(r.desc)}</p>` : ''}

@@ -25,10 +25,10 @@ export const DUNGEONS = {
   // end of floor 2; the first is open from the start, each next one when the den before it is cleared (rpg/dens.js).
   // levels: the old floors' monster levels (2–6, 7–11, 12–16, 17–21): floor 1 at the band with the hero clamped to
   // [lo, hi], floor 2 one more, the boss two over that. sub: a floor's own name under the den's in the banner.
-  mossyBurrow: { id: 'mossyBurrow', kind: 'burrow', den: 0, name: 'Mossy Burrow', jp: '苔の巣穴', zone: null, theme: 'burrow', themes: ['burrow', 'burrow'], monsters: null, boss: 'mochiKing', levels: [2, 5], floors: 2, waypoints: false, quest: 'king' },
-  foxShrine: { id: 'foxShrine', kind: 'burrow', den: 1, name: 'Fox Shrine', jp: '狐の社', zone: null, theme: 'shrine', themes: ['shrine', 'shrine'], monsters: null, boss: 'kasaLord', levels: [7, 10], floors: 2, waypoints: false, quest: 'umbrella' },
-  oniKitchen: { id: 'oniKitchen', kind: 'burrow', den: 2, name: "Oni's Kitchen", jp: '鬼の台所', zone: null, theme: 'kitchen', themes: ['kitchen', 'kitchen'], monsters: null, boss: 'oniChef', levels: [12, 15], floors: 2, waypoints: false, quest: 'oni' },
-  moonSanctum: { id: 'moonSanctum', kind: 'burrow', den: 3, name: 'Moonlit Sanctum', jp: '月の社', zone: null, theme: 'crystal', themes: ['crystal', 'moon'], sub: ['Crystal Grotto', 'Moonlit Fox Sanctum'], monsters: null, boss: 'nineTails', levels: [17, 20], floors: 2, waypoints: false, quest: 'tails' },
+  mossyBurrow: { id: 'mossyBurrow', kind: 'burrow', den: 0, name: 'Mossy Burrow', zone: null, theme: 'burrow', themes: ['burrow', 'burrow'], monsters: null, boss: 'mochiKing', levels: [2, 5], floors: 2, waypoints: false, quest: 'king' },
+  foxShrine: { id: 'foxShrine', kind: 'burrow', den: 1, name: 'Fox Shrine', zone: null, theme: 'shrine', themes: ['shrine', 'shrine'], monsters: null, boss: 'kasaLord', levels: [7, 10], floors: 2, waypoints: false, quest: 'umbrella' },
+  oniKitchen: { id: 'oniKitchen', kind: 'burrow', den: 2, name: "Oni's Kitchen", zone: null, theme: 'kitchen', themes: ['kitchen', 'kitchen'], monsters: null, boss: 'oniChef', levels: [12, 15], floors: 2, waypoints: false, quest: 'oni' },
+  moonSanctum: { id: 'moonSanctum', kind: 'burrow', den: 3, name: 'Moonlit Sanctum', zone: null, theme: 'crystal', themes: ['crystal', 'moon'], sub: ['Crystal Grotto', 'Moonlit Fox Sanctum'], monsters: null, boss: 'nineTails', levels: [17, 20], floors: 2, waypoints: false, quest: 'tails' },
   // The four zone dungeons: 2 floors and a boss each (docs/ZONES.md §4, §8.2): zone floors (zoneGen.js: ~8 chambers, the
   // dense packs, the round boss arena on floor 2), the zone's roster and its region boss. `gate`: the dungeon is entered
   // from its gate at the end of the zone's trail (regions/dungeonGate.js), and its boss no longer spawns outdoors.

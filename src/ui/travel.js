@@ -17,7 +17,7 @@ const SPOT = {
 const W = 560, H = 440;
 
 export class TravelPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'travel', title: 'Travel Map', jp: '旅の地図', side: 'center', cls: 'p-travel', icon: 'map' }); this.sel = null; }
+  constructor(ui) { super(ui, { name: 'travel', title: 'Travel Map', side: 'center', cls: 'p-travel', icon: 'map' }); this.sel = null; }
   init() {
     this.body.innerHTML = `<div class="tv-wrap">
       <div class="tv-map"><canvas class="tv-cv"></canvas><div class="tv-pins"></div><div class="tv-compass">${glyph('sakura')}<b>N</b></div></div>
@@ -63,7 +63,7 @@ export class TravelPanel extends Panel {
       const cls = ['tv-pin', p.unlocked ? 'open' : 'locked', p.here ? 'here' : '', p.id === this.sel ? 'sel' : '', p.cleared ? 'cleared' : ''].join(' ');
       return `<button class="${cls}" data-id="${p.id}" style="left:${s.x * 100}%;top:${s.y * 100}%;--pc:${p.color}">
         <span class="tv-pin-ic">${glyph(p.unlocked ? s.g : 'lock')}</span><span class="tv-pin-n"><b>${i + 1}</b>${esc(p.short || p.name)}</span>
-        ${p.cleared ? `<span class="tv-stamp${p.dungeon && !p.dungeon.cleared ? ' crew' : ''}" title="${p.dungeon ? (p.dungeon.cleared ? 'Cleared' : 'Relieved by a crew') : 'Defeated'}">${p.dungeon ? (p.dungeon.cleared ? '踏破' : '救') : '討伐'}</span>` : ''}${p.here ? `<span class="tv-here">${glyph('paw')}</span>` : ''}${live ? '<span class="tv-sight" title="A sighting today"></span>' : ''}</button>`;
+        ${p.cleared ? `<span class="tv-stamp${p.dungeon && !p.dungeon.cleared ? ' crew' : ''}" title="${p.dungeon ? (p.dungeon.cleared ? 'Cleared' : 'Relieved by a crew') : 'Defeated'}">${p.dungeon ? (p.dungeon.cleared ? 'Cleared' : 'Saved') : 'Beaten'}</span>` : ''}${p.here ? `<span class="tv-here">${glyph('paw')}</span>` : ''}${live ? '<span class="tv-sight" title="A sighting today"></span>' : ''}</button>`;
     }).join('');
     const p = L.find(x => x.id === this.sel) || L[0]; if (!p) { this.card.innerHTML = ''; return; }
     const lv = p.levels ? `Lv ${p.levels[0]}–${p.levels[1]}` : 'Home';
@@ -74,7 +74,7 @@ export class TravelPanel extends Panel {
       : `<button class="btn tv-go">${glyph('map')}${p.id === 'village' ? 'Head home' : 'Set off!'}</button>`;
     this.card.style.setProperty('--pc', p.color);
     const pc = card(p.id), sights = (pc?.sightings || []).filter(q => !q.done);
-    this.card.innerHTML = `<div class="tv-wm">${glyph(SPOT[p.id]?.g || 'map')}</div><div class="tv-hd"><span class="tv-ic">${glyph(SPOT[p.id]?.g || 'map')}</span><div><b>${esc(p.name)}</b><span class="jp">${esc(p.jp || '')}</span></div></div>
+    this.card.innerHTML = `<div class="tv-wm">${glyph(SPOT[p.id]?.g || 'map')}</div><div class="tv-hd"><span class="tv-ic">${glyph(SPOT[p.id]?.g || 'map')}</span><div><b>${esc(p.name)}</b></div></div>
       <p class="tv-sub">${esc(p.sub || '')}</p>
       <div class="tv-rows">
         <div><span>Level</span><b>${lv}</b></div>

@@ -27,7 +27,7 @@ import { glyph } from './glyphs.js';
 
 const PSCALE = 0.86, FLOOR = 12.1, LONG_MS = 430, DOUBLE_MS = 330;
 const FLOOR_SCOPE = '.l-panels .pw, .l-dlg, .tt-wrap, .pop-wrap, .tut-dock, .hero-wheel, .toasts, .reel, .m-flip';
-const FLOOR_SKIP = /\bjp\b|\bkc\b|\bmm-n\b|\bpc-lv\b|\bph-jp\b/;
+const FLOOR_SKIP = /\bkc\b|\bmm-n\b|\bpc-lv\b/;
 // CT-6. EDGE_TOP: in full screen nothing to touch in the top 24 px (iPadOS exits full screen on a swipe down from there).
 // ITCH: itch.io's own buttons over an embedded game, in the frame's CSS px, measured on itch's game page (2026-10-08,
 // game.css and the page's markup; ITCH.md "Mobile"): a column of three action buttons ("View all by …", "Follow …",
@@ -282,7 +282,7 @@ export class Mobile {
       const w = document.createTreeWalker(sc, NodeFilter.SHOW_TEXT);
       for (let n = w.nextNode(); n; n = w.nextNode()) {
         const e = n.parentElement; if (!e || !n.textContent.trim() || e.closest('svg')) continue;
-        if (FLOOR_SKIP.test(e.className) || e.closest('.jp')) continue;
+        if (FLOOR_SKIP.test(e.className)) continue;
         const z = e.currentCSSZoom ?? zoomOf(e), fs = parseFloat(getComputedStyle(e).fontSize);
         if (fs * z < FLOOR - 0.05) e.style.fontSize = (FLOOR / z).toFixed(2) + 'px';
       }

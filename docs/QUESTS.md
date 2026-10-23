@@ -156,7 +156,7 @@ entering all of it.
 the same floor with the same step: nothing. Requests never get one.
 
 **What it shows**: a banner of style `place` (`ui/fx.js`, `ui/quest.css`), in the area banner's spot: the quest's title
-on a little gold ribbon, the place's Japanese name, the place in the storybook letters, a gold and pink brush stroke, and
+on a little gold ribbon, the place in the storybook letters, a gold and pink brush stroke, and
 the floor and the step. About 2.6 s, then it drifts up and fades. No rays, no tint, no glow: text with its ink outline over
 the world, as the area banner. With a soft sting (`STINGS.place`: a harp run, two koto notes, a short flute phrase over a
 pad, a rin; the music ducks under it). On an arrival it **takes the area banner's place** (`banners.drop('area')` behind

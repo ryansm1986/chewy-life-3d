@@ -49,7 +49,6 @@
 .chg-tag { position: absolute; left: 18px; top: -16px; display: flex; align-items: center; gap: 6px; padding: 4px 14px 6px 8px; color: #fff; font: 700 17px/1 var(--font);
   background: linear-gradient(color-mix(in srgb, var(--tc) 55%, #fff), var(--tc)); border: 3px solid var(--ink); border-radius: 13px 15px 15px 6px; box-shadow: 0 3px 0 var(--ink); -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; transform: rotate(-2deg); }
 .chg-tag .gl { width: 22px; height: 22px; }
-.chg-jp { font-style: normal; font-size: 11px; -webkit-text-stroke: 3px var(--ink); }
 /* R-16: the skill strip under the tag: which skill the drawer shows, one button per chargeable skill of the tree */
 .chg-pl { position: absolute; top: 8px; right: 16px; left: 148px; display: flex; align-items: center; justify-content: flex-end; gap: 3px; font: 700 11.5px/1.1 var(--font); color: var(--ink2); white-space: nowrap; pointer-events: none; }
 .chg-plt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }

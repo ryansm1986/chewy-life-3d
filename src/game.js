@@ -111,7 +111,7 @@ export async function boot() {
   G.qaModule = (name) => (name === 'items' ? import('./rpg/items.js') : Promise.reject(new Error('no module ' + name))); // (QA on the production bundle: tools/qa/s50-coop-panes.mjs makes items with it)
 
   // Blender-refined skins for Chewy and Shadow must be in memory before their rigs (and portraits) are built
-  const [uiMod, audioMod] = await Promise.all([P.has('noui') ? null : tryImport('ui', () => import('./ui/ui.js')), P.has('noaudio') ? null : tryImport('audio', () => import('./audio/audio.js')), loadRefinedRigs(REFINED_CAST), loadHeroModels(['chewy', 'moka', 'poe', 'shihtzu', 'golden', 'stella', 'shadow', 'rosie', 'tanukiBandit', 'tanukiBanditMaroon', 'tamamo']), loadWhelp(), loadEnemyModels()]); // (loadWhelp: Shadow's dragon whelp outfit and its wing prop, worn while the dragoon is played: actors/whelp.js)
+  const [uiMod, audioMod] = await Promise.all([P.has('noui') ? null : tryImport('ui', () => import('./ui/ui.js')), P.has('noaudio') ? null : tryImport('audio', () => import('./audio/audio.js')), loadRefinedRigs(REFINED_CAST), loadHeroModels(['chewy', 'moka', 'poe', 'shihtzu', 'golden', 'stella', 'shadow', 'rosie', 'mochi', 'kuma', 'usagi', 'kitsune', 'pan', 'tanu', 'kero', 'tanukiBandit', 'tanukiBanditMaroon', 'tamamo']), loadWhelp(), loadEnemyModels()]); // (loadWhelp: Shadow's dragon whelp outfit and its wing prop, worn while the dragoon is played: actors/whelp.js)
   loadStellaProps(); // (Stella's sun wagasa: actors/stellaGear.js; a procedural stand-in until it lands)
   loadGoldenProps(); // (the dragoon's lance and javelin props: actors/goldenGear.js; procedural stand-ins until they land) // (poe: while her model is pending, heroModels.js fetches nothing)
   G.audio = audioMod?.Audio || null;
@@ -152,7 +152,7 @@ export async function boot() {
   const rosieAnchor = shopRec ? { x: shopRec.door.x + 0.9, z: shopRec.door.z + 0.9 } : { x: L.rosieShop.x - 2.4, z: L.rosieShop.z + 0.5 };
   const rosie = new Villager(village, G, CAST.rosie, { id: 'rosie', anchor: rosieAnchor, wander: 1.4, role: 'shop', rig: heroModelReady('rosie') ? buildHeroModel('rosie') : null }); // the Toybox Rosie when it's loaded
   rosie.speed = 1.8; npcs.push(rosie);
-  for (const v of VILLAGERS) npcs.push(new Villager(village, G, v.spec, { id: v.id, anchor: v.anchor, wander: v.wander || 5 }));
+  for (const v of VILLAGERS) npcs.push(new Villager(village, G, v.spec, { id: v.id, anchor: v.anchor, wander: v.wander || 5, rig: heroModelReady(v.id) ? buildHeroModel(v.id) : null })); // (the Toybox villagers when loaded: ROADMAP VL-1)
   const skills = G.skills = new SkillRunner(G);
   // the heroes nobody is playing live in town (Moka waits by the fountain until she joins)
   const heroes = G.heroes = new HeroManager(G);
@@ -381,20 +381,20 @@ export async function boot() {
   };
   G.enterRegion = (id) => {
     const def = REGIONS[id]; if (!def) return;
-    enterCombatWorld(() => new RegionMode(G, id), undefined, { location: () => def.name, sub: def.jp, region: id });
+    enterCombatWorld(() => new RegionMode(G, id), undefined, { location: () => def.name, sub: `Lv ${def.levels[0]}`, region: id });
   };
   // The Travel Map (ui/travel.js) reads places from here: Blossom Hollow + the four regions (docs/REGIONS.md §1)
   // a gated zone's Travel Map card: its dungeon (cleared stamp, the boss inside) instead of the outdoor boss (docs/ZONES.md §8.2)
-  const zoneCard = id => { const gd = gateDef(id); if (!gd) return {}; const n = G.state.zones?.[id]?.dungeon?.cleared || 0, crew = G.state.zones?.[id]?.dungeon?.crew || 0; return { cleared: n || crew, dungeon: { name: gd.name, cleared: n, crew, boss: MONSTERS[gd.boss]?.name || null } }; }; // (crew: cleared by a crew, the 救 stamp: docs/COZY.md §3.2)
+  const zoneCard = id => { const gd = gateDef(id); if (!gd) return {}; const n = G.state.zones?.[id]?.dungeon?.cleared || 0, crew = G.state.zones?.[id]?.dungeon?.crew || 0; return { cleared: n || crew, dungeon: { name: gd.name, cleared: n, crew, boss: MONSTERS[gd.boss]?.name || null } }; }; // (crew: cleared by a crew, the Saved stamp: docs/COZY.md §3.2)
   G.travel = {
     list: () => {
       const R = regionState(G.state), here = G.mode === 'village' ? 'village' : G.dungeon?.regionId;
-      const home = { id: 'village', name: 'Blossom Hollow', short: 'Blossom Hollow', jp: 'さくら村', sub: "Home: the cottage, Rosie's treats and a nap by the fountain.", color: '#ff8fb0', unlocked: G.mode !== 'dungeon' || G.dungeon?.kind === 'region', here: here === 'village', why: 'Use a portal to leave the Burrow' };
+      const home = { id: 'village', name: 'Blossom Hollow', short: 'Blossom Hollow', sub: "Home: the cottage, Rosie's treats and a nap by the fountain.", color: '#ff8fb0', unlocked: G.mode !== 'dungeon' || G.dungeon?.kind === 'region', here: here === 'village', why: 'Use a portal to leave the Burrow' };
       return [home, ...REGION_IDS.map(id => {
         const d = REGIONS[id], u = regionUnlocked(G.state, id), mon = id => MONSTERS[id]?.name;
-        return { id, name: d.name, short: d.name.split(' ').slice(-2).join(' '), jp: d.jp, sub: d.sub, color: d.color, levels: d.levels, unlocked: u.ok, why: u.why,
+        return { id, name: d.name, short: d.name.split(' ').slice(-2).join(' '), sub: d.sub, color: d.color, levels: d.levels, unlocked: u.ok, why: u.why,
           here: here === id, visits: R.visits[id] || 0, cleared: R.cleared[id] || 0, boss: mon(d.boss) || null, monsters: d.monsters.map(mon).filter(Boolean),
-          ...zoneCard(id), village: villageReady(id) ? { name: VILLAGES[id].name, jp: VILLAGES[id].jp, saved: G.state.zones?.[id]?.village === 'saved' } : null };
+          ...zoneCard(id), village: villageReady(id) ? { name: VILLAGES[id].name, saved: G.state.zones?.[id]?.village === 'saved' } : null };
       })];
     },
     go: (id) => {

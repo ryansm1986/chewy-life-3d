@@ -329,7 +329,7 @@ export class Banners {
     if (style === 'boss' || style === 'victory') this.drop('place');
     const key = style + '|' + title + '|' + sub;
     if (this.q.some(b => b.key === key) || (this.busy && this.cur === key)) return;
-    const item = { key, title, sub, style, dur: opts.duration, jp: opts.jp, xp: opts.xp, lvl: opts.lvl, top: opts.top, kicker: opts.kicker, onShow: opts.onShow, chips: opts.chips };
+    const item = { key, title, sub, style, dur: opts.duration, xp: opts.xp, lvl: opts.lvl, top: opts.top, kicker: opts.kicker, onShow: opts.onShow, chips: opts.chips };
     if (style === 'victory') {
       // Victory owns the moment: it jumps the queue; a level-up banner that popped up a beat earlier, or a boss intro
       // banner still up after a very quick kill, yields to it
@@ -374,16 +374,15 @@ export class Banners {
     const L = letters(b.title, 'lt');
     if (b.style === 'victory') {
       n.innerHTML = `<div class="bn-vrays"></div><div class="bn-conf">${showerHTML(58)}</div>
-        <div class="bn-jp">${glyph('sparkle')}しょうり！${glyph('sparkle')}</div>
         <div class="bn-vcore"><div class="bn-ribbon"><i></i><i></i></div><div class="bn-title">${L}</div>${b.sub ? `<div class="bn-sub">${esc(b.sub)}</div>` : ''}</div>
         <div class="bn-chips">${b.xp ? `<div class="bn-chip chip-xp">${glyph('sparkle')}<span>+${fmt(b.xp)} xp</span></div>` : ''}</div>
         ${[[-330, -18, 30, 0], [310, -34, 24, 0.35], [-250, 58, 20, 0.7], [270, 52, 26, 1.05], [-40, -70, 18, 0.5], [120, -64, 16, 0.9]].map(([x, y, s, d]) => `<i class="bn-tw" style="--x:${x}px;--y:${y}px;--s:${s}px;--d:${d}s">${glyph('star')}</i>`).join('')}`;
       if (b.lvl) this.levelChip(n, b.lvl);
     } else if (b.style === 'levelup') {
       n.innerHTML = `<div class="bn-rays"></div><div class="bn-ring"></div><div class="bn-conf">${confettiHTML()}</div>
-        <div class="bn-jp">レベルアップ！</div><div class="bn-title">${L}</div>${b.sub ? `<div class="bn-sub">${esc(b.sub)}</div>` : ''}`;
+        <div class="bn-title">${L}</div>${b.sub ? `<div class="bn-sub">${esc(b.sub)}</div>` : ''}`;
     } else if (b.style === 'area') {
-      n.innerHTML = `${b.jp ? `<div class="bn-jp">${esc(b.jp)}</div>` : ''}<div class="bn-title">${L}</div>
+      n.innerHTML = `<div class="bn-title">${L}</div>
         <svg class="bn-brush" viewBox="0 0 400 30" preserveAspectRatio="none"><path d="M8 18 C80 8 160 22 230 14 S350 10 392 16" pathLength="1"/><path class="thin" d="M40 24 C120 20 220 26 330 21" pathLength="1"/></svg>
         ${b.sub ? `<div class="bn-sub">${esc(b.sub)}</div>` : ''}`;
     } else if (b.style === 'boss') {
@@ -391,12 +390,12 @@ export class Banners {
     } else if (b.style === 'quest') {
       n.innerHTML = `<div class="bn-rays gold"></div><div class="bn-scroll">${glyph('scroll')}</div><div class="bn-title">${L}</div>${b.sub ? `<div class="bn-sub">${esc(b.sub)}</div>` : ''}<div class="bn-conf">${confettiHTML(24)}</div>`;
     } else if (b.style === 'place') { // a quest's place title (ROADMAP UX-2, ui/quest.css): the quest on a ribbon, the place, the step
-      n.innerHTML = `${b.kicker ? `<div class="bn-pk">${PK_TAIL}<span>${glyph('scroll')}${esc(b.kicker)}</span>${PK_TAIL.replace('bn-pk-t', 'bn-pk-t r')}</div>` : ''}${b.jp ? `<div class="bn-jp">${esc(b.jp)}</div>` : ''}<div class="bn-title">${L}</div>
+      n.innerHTML = `${b.kicker ? `<div class="bn-pk">${PK_TAIL}<span>${glyph('scroll')}${esc(b.kicker)}</span>${PK_TAIL.replace('bn-pk-t', 'bn-pk-t r')}</div>` : ''}<div class="bn-title">${L}</div>
         <svg class="bn-brush" viewBox="0 0 400 30" preserveAspectRatio="none"><path d="M14 17 C90 9 170 21 236 14 S344 11 386 16" pathLength="1"/><path class="thin" d="M60 23 C140 19 230 25 322 20" pathLength="1"/></svg>
         ${b.sub ? `<div class="bn-sub">${esc(b.sub)}</div>` : ''}`;
     } else if (b.style === 'stamp') { // a quest handed in (ROADMAP UX-2, ui/quest.css): its storybook card and the red "done" stamp
       n.innerHTML = `<div class="st-card"><div class="st-k">${glyph('scroll')}<span>Quest complete</span></div><div class="st-t">${esc(b.title)}</div>${b.sub ? `<div class="st-s">${glyph('heart')}<span>${esc(b.sub)}</span></div>` : ''}${b.chips ? `<div class="st-chips">${b.chips}</div>` : ''}<div class="bn-chips st-lvl"></div>
-        <div class="st-hanko" aria-hidden="true"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44"/><circle class="in" cx="50" cy="50" r="36"/></svg><b>完了</b><i>DONE!</i></div></div>`;
+        <div class="st-hanko" aria-hidden="true"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44"/><circle class="in" cx="50" cy="50" r="36"/></svg><i>DONE!</i></div></div>`;
       if (b.lvl) this.levelChip(n, b.lvl); // (a level-up its XP brought: a chip on the card)
     } else {
       n.innerHTML = `<div class="bn-title">${L}</div>${b.sub ? `<div class="bn-sub">${esc(b.sub)}</div>` : ''}`;

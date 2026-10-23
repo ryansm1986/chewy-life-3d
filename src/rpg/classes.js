@@ -104,14 +104,14 @@ export const CLASSES = {
   },
 };
 export const HERO_IDS = Object.keys(CLASSES);
-/** Per-hero flavour for the panels and the hero wheel: the name in kana and the character sheet's class line. */
+/** Per-hero flavour for the panels and the hero wheel: the character sheet's class line. */
 export const HERO_TEXT = {
-  chewy: { jp: 'チューイ', motto: 'Pup of the Blossom Dojo' },
-  moka: { jp: 'モカ', motto: 'Tidewater Mage of the Hollow' },
-  poe: { jp: 'ポー', motto: 'Shinobi of the Bamboo Grove' },
-  shihtzu: { jp: 'フルーフィ', motto: 'Warlock-Knight of the Gloomhowl' },
-  golden: { jp: 'フージー', motto: 'Dragoon of the Emberleaf Guard' },
-  stella: { jp: 'ステラ', motto: 'Oracle of the Sunrise Shrine' },
+  chewy: { motto: 'Pup of the Blossom Dojo' },
+  moka: { motto: 'Tidewater Mage of the Hollow' },
+  poe: { motto: 'Shinobi of the Bamboo Grove' },
+  shihtzu: { motto: 'Warlock-Knight of the Gloomhowl' },
+  golden: { motto: 'Dragoon of the Emberleaf Guard' },
+  stella: { motto: 'Oracle of the Sunrise Shrine' },
 };
 export const classOf = state => CLASSES[state?.player?.cls || state?.activeHero || 'chewy'] || CLASSES.chewy;
 /** Which class may wield a weapon type ('sword' / 'ball' → Chewy, 'staff' → Moka, 'fuma' → Poe, 'flail' → the Shih Tzu,

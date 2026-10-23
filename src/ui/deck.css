@@ -2,7 +2,7 @@
    .deck-ui on the UI root) the UI starts at 1.15 — 0.92 of the 1600×900 design at 1280×800 — inside a safe area, with a
    text floor: what the design sets under 12 px is raised to 12 (11 px on the Deck's screen). tools/qa/deck-ui.mjs opens
    every panel at 1280×800 and lists anything still under (s26-deck checks the HUD, bag, skills and build mode with
-   the keyboard's caps). The Japanese subtitles, the compass's 北, the portrait's tiny "Lv" and the glyph art keep
+   the keyboard's caps). The compass's N, the portrait's tiny "Lv" and the glyph art keep
    their sizes. */
 .ui-root.deck-ui { --safe-x: 18px; --safe-y: 12px; }
 .ui-root.deck-ui .l-hud, .ui-root.deck-ui .l-dlg, .ui-root.deck-ui .l-msg { inset: var(--safe-y) var(--safe-x); }

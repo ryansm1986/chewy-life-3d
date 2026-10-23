@@ -7,8 +7,8 @@ import { SPOTS, MILESTONES, fishingOf, fishLogOf } from './fishData.js';
 import { toolIcon } from './pantryIcons.js';
 
 export const RODS = {
-  1: { name: 'Bamboo Rod', jp: '竹の釣り竿', price: 150, desc: 'A springy bamboo rod with a red reel. Everything a beginner needs.' },
-  2: { name: 'Moonlit Rod', jp: '月夜の釣り竿', price: 650, rank: 3, desc: 'Navy lacquer and gold fittings. A bigger catch zone, a slower-draining meter and rare fish bite more often.' },
+  1: { name: 'Bamboo Rod', price: 150, desc: 'A springy bamboo rod with a red reel. Everything a beginner needs.' },
+  2: { name: 'Moonlit Rod', price: 650, rank: 3, desc: 'Navy lacquer and gold fittings. A bigger catch zone, a slower-draining meter and rare fish bite more often.' },
 };
 const MILESTONE_GIFTS = {
   5: { coins: 300, pantry: { grilledFish: 2 }, text: "Five kinds already! Here — grilled fish, still warm. And a little pocket money, ribbit." },
@@ -69,12 +69,12 @@ export function installFishingSocial(G, fishing) {
     const f = F(), rank = G.sim?.stats?.rank || 1, goods = [];
     for (const t of [1, 2]) {
       const R = RODS[t]; if (f.rod >= t) continue;
-      goods.push({ id: 'rod' + t, name: R.name, jp: R.jp, desc: R.desc, icon: toolIcon('rod' + t), price: R.price, once: true,
+      goods.push({ id: 'rod' + t, name: R.name, desc: R.desc, icon: toolIcon('rod' + t), price: R.price, once: true,
         locked: R.rank && rank < R.rank ? `Kero orders these in when the village reaches rank ${R.rank}.` : null,
         onBuy: () => { if (F().rod >= t) return false; F().rod = t; Events.emit('fishing:rod', { rod: t }); G.ui?.toast?.(`Got the ${R.name}!`, { iconURL: toolIcon('rod' + t), color: '#8fd0ff', sub: "Face water and press F to fish" }); return true; } });
     }
     G.ui.open('shop', {
-      name: "Kero's Fishing Hut", jp: '釣り小屋', keeper: 'kero', portrait: G.portrait?.('kero'),
+      name: "Kero's Fishing Hut", keeper: 'kero', portrait: G.portrait?.('kero'),
       greeting: f.rod ? 'Ribbit. Bring me fish and I pay well — better than anyone in the Hollow.' : "A rod? Ribbit. Every pond guardian needs an apprentice. Or a customer.",
       goods, potions: [], stock: [], sellKinds: ['fish'], buyer: 'kero', noBagSell: true,
       thanks: ['Ribbit! Fine fish.', 'The koi approve.', 'Pleasure, apprentice.', 'Ribbit ribbit!'],

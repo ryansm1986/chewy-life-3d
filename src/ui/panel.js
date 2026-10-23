@@ -3,8 +3,8 @@ import { el } from './dom.js';
 import { glyph } from './glyphs.js';
 
 export class Panel {
-  constructor(ui, { name, title, jp = '', side = 'left', cls = '', icon = 'sakura', width = null }) {
-    this.ui = ui; this.name = name; this.title = title; this.jp = jp; this.side = side; this.cls = cls; this.icon = icon; this.width = width;
+  constructor(ui, { name, title, side = 'left', cls = '', icon = 'sakura', width = null }) {
+    this.ui = ui; this.name = name; this.title = title; this.side = side; this.cls = cls; this.icon = icon; this.width = width;
     this.isOpen = false; this.opts = {}; this.built = false;
   }
   get G() { return this.ui.G; }
@@ -14,7 +14,7 @@ export class Panel {
     const w = this.wrap = el('div', `pw side-${this.side}`);
     w.dataset.name = this.name;
     w.innerHTML = `<div class="panel ${this.cls}"${this.width ? ` style="width:${this.width}px"` : ''}>
-      <div class="ph"><div class="ph-tag">${glyph(this.icon)}<span class="ph-t"></span><span class="jp ph-jp"></span></div><div class="ph-extra"></div><button class="ph-x" title="Close (Esc)">${glyph('x')}</button></div>
+      <div class="ph"><div class="ph-tag">${glyph(this.icon)}<span class="ph-t"></span></div><div class="ph-extra"></div><button class="ph-x" title="Close (Esc)">${glyph('x')}</button></div>
       <div class="pb"></div>
       <i class="deco d1">${glyph('sakura')}</i><i class="deco d2">${glyph('sakura')}</i>
     </div>`;
@@ -22,7 +22,7 @@ export class Panel {
     this.head = this.panel.querySelector('.ph');
     this.body = this.panel.querySelector('.pb');
     this.extra = this.panel.querySelector('.ph-extra');
-    this.setTitle(this.title, this.jp);
+    this.setTitle(this.title);
     this.panel.querySelector('.ph-x').addEventListener('click', () => { this.ui._user = true; try { this.ui.close(this.name); } finally { this.ui._user = false; } });
     this.panel.addEventListener('mousedown', () => this.ui._raise(this));
     this.initDrag();
@@ -30,9 +30,8 @@ export class Panel {
     this.built = true;
     this.init?.();
   }
-  setTitle(t, jp) {
+  setTitle(t) {
     this.panel.querySelector('.ph-t').textContent = t;
-    this.panel.querySelector('.ph-jp').textContent = jp || '';
   }
   initDrag() {
     let sx = 0, sy = 0, ox = 0, oy = 0, on = false;

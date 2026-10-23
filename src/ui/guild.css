@@ -12,7 +12,6 @@
 .gd-hachi .p3d, .gd-face .p3d { position: absolute; left: -8%; top: 4%; width: 116% !important; height: 116% !important; object-fit: cover; }
 .gd-say { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .gd-say b { font: 700 16px/1.1 var(--font); color: #b0582a; }
-.gd-say b .jp { font-size: 12px; opacity: .7; margin-left: 4px; }
 .gd-say p { margin: 0; font: 500 14px/1.32 var(--font); color: var(--ink); }
 .gd-stats { display: flex; flex-direction: column; gap: 3px; flex: none; }
 .gd-lv, .gd-st { display: flex; align-items: center; gap: 5px; font: 600 12px/1 var(--font); color: var(--ink2); white-space: nowrap; }
@@ -50,7 +49,6 @@
 .gd-ribbon { align-self: stretch; display: flex; align-items: center; justify-content: center; gap: 6px; margin: 0 -10px; padding: 6px 8px 5px; background: linear-gradient(color-mix(in srgb, var(--cc) 60%, #fff), var(--cc)); border-bottom: 3px solid var(--ink); }
 .gd-ribbon .gl { width: 26px; height: 26px; }
 .gd-ribbon b { font: 700 17px/1 var(--font); color: #fff; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; }
-.gd-ribbon .jp { font: 700 13px var(--font); color: #fff; opacity: .9; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
 .gd-cand .gd-face { margin-top: 2px; }
 .gd-nm { display: flex; flex-direction: column; align-items: center; gap: 1px; }
 .gd-nm b { font: 700 19px/1.05 var(--font); }

@@ -282,7 +282,7 @@ function interactables(ctx) {
 }
 
 export default {
-  id: 'bamboo', name: 'Whispering Bamboo Grove', jp: '竹林', sub: 'Misty paths through singing bamboo', color: '#6fbf73',
+  id: 'bamboo', name: 'Whispering Bamboo Grove', sub: 'Misty paths through singing bamboo', color: '#6fbf73',
   levels: [4, 12], unlock: { level: 4, after: null },
   monsters: ['takenoko', 'kodama', 'kamaitachi'], boss: 'tenguMaster',
   // Burrow stand-ins until the region's own monsters / boss are registered (src/regions/monsters, src/regions/bosses)
@@ -322,8 +322,8 @@ export default {
     avoid: [[POND.x, POND.z, POND.r + 6], ...STREAM.slice(1, 8).map(([x, z]) => [x, z, 5])],
     // the wild areas (docs/COZY.md §6.2): they keep their yokai once Takemori is saved; off the trail, on side paths
     wild: [
-      { id: 'thicket', name: 'the Kamaitachi Thicket', jp: '鎌鼬の藪', at: [94, 70], r: 12, packs: 3 },
-      { id: 'fallenShrine', name: 'the Fallen Shrine', jp: '崩れ社', at: [16, 24], r: 12, packs: 2 },
+      { id: 'thicket', name: 'the Kamaitachi Thicket', at: [94, 70], r: 12, packs: 3 },
+      { id: 'fallenShrine', name: 'the Fallen Shrine', at: [16, 24], r: 12, packs: 2 },
     ],
   },
   populate, effects, interactables,

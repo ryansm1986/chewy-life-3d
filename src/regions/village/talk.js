@@ -276,7 +276,7 @@ const SERVICES = {
       if (store.key !== key) store.key = key, store.items = shopStock(lvl, day * 977 + lvl * 13 + (V.def.id.length * 31));
       const forage = { bamboo: ['bamboo', 'shiitake'], maple: ['shiitake', 'honey'], tidepool: ['seaweed'], onsen: ['shiitake', 'honey'] }[V.zone] || [];
       G.ui.open('shop', {
-        name: b.name, jp: b.jp, keeper: keeper.id, portrait: G.portrait?.(keeper.id),
+        name: b.name, keeper: keeper.id, portrait: G.portrait?.(keeper.id),
         greeting: lines(keeper.id, 'greet') || 'Welcome, welcome! Fresh from the grove — and the yokai didn\'t get the good stuff!',
         stock: store.items, potions: ['heart', 'zoom', 'rejuv'],
         pantry: forage.filter(id => PANTRY[id]).map(id => ({ id, price: Math.round((PANTRY[id].value || 20) * 1.4) })),
@@ -297,7 +297,7 @@ const SERVICES = {
         V.Z.quests.innRest = G.day?.day || 1;
       } else if (c === 1 && G.ui?.open) {
         const menu = ['onigiri', 'misoSoup', 'grilledFish', 'salmonOnigiri'].filter(id => PANTRY[id]);
-        G.ui.open('shop', { name: `${b.name} Kitchen`, jp: '台所', keeper: keeper.id, portrait: G.portrait?.(keeper.id), greeting: 'Eat up! A full belly fights better.', pantry: menu.map(id => ({ id, price: Math.round((PANTRY[id].value || 40) * 1.2) })), stock: [] });
+        G.ui.open('shop', { name: `${b.name} Kitchen`, keeper: keeper.id, portrait: G.portrait?.(keeper.id), greeting: 'Eat up! A full belly fights better.', pantry: menu.map(id => ({ id, price: Math.round((PANTRY[id].value || 40) * 1.2) })), stock: [] });
       }
     },
   },
@@ -332,7 +332,7 @@ const SERVICES = {
           for (const slot of ['hat', 'outfit', 'boots', 'paws']) store.items.push(generateItem({ ilvl, slot, rarity: 'magic', rng: mulberry32(seed * 13 + slot.length * 7) }));
           for (const it of store.items) { it.flavor = 'Kaze Dojo issue: light, quiet, and very slightly singed.'; it.price = buyPrice(it); }
         }
-        G.ui.open('shop', { name: `${b.name} — Ninja Gear`, jp: '忍具', keeper: b.keeper, portrait: G.portrait?.(b.keeper), greeting: 'Soft soles, dark cloth. Poe wore this size once.', stock: store.items,
+        G.ui.open('shop', { name: `${b.name} — Ninja Gear`, keeper: b.keeper, portrait: G.portrait?.(b.keeper), greeting: 'Soft soles, dark cloth. Poe wore this size once.', stock: store.items,
           onBuy: (item, price) => { const ok = A.buyItem(item, price); if (ok) { const i = store.items.indexOf(item); if (i >= 0) store.items.splice(i, 1); } return ok; } });
       }
     },
@@ -360,7 +360,7 @@ const SERVICES = {
         return say([pick(['There. Drink slowly — the warmth lasts longer that way.', 'Three sips, then admire the bowl. That is the whole secret.', 'The sweet first, then the tea. The bitterness becomes kind.'])]);
       }
       if (c === sets.length && G.ui?.open) {
-        G.ui.open('shop', { name: `${b.name} — Tea Things`, jp: '茶道具', keeper: keeper.id, portrait: G.portrait?.(keeper.id), greeting: 'For tea at home. Use it often; a tea set gets lonely.',
+        G.ui.open('shop', { name: `${b.name} — Tea Things`, keeper: keeper.id, portrait: G.portrait?.(keeper.id), greeting: 'For tea at home. Use it often; a tea set gets lonely.',
           furniture: [{ id: 'teaSet', price: 260 }, { id: 'mapleWreath', price: 180 }, { id: 'acornStool', price: 140 }].filter(f => FURNITURE[f.id]),
           pantry: ['strawberryMochi', 'honeyCake', 'pumpkinStew'].filter(id => PANTRY[id]).map(id => ({ id, price: Math.round((PANTRY[id].value || 60) * 1.3) })) });
         Events.emit('sfx', 'ui_open');
@@ -377,7 +377,7 @@ const SERVICES = {
       const c = await say([lines(keeper.id, 'market') || 'Fresh from the bay, still blinking! Buying or selling?'],
         [{ text: 'Buy fish and seafood 🛒' }, { text: n ? `Sell my catch — ${n} fish for ${value} coins (the market pays ×${FISH_MUL})` : 'Sell my catch (no fish in the pantry)' }, { text: 'Just looking' }]);
       if (c === 0 && G.ui?.open) {
-        G.ui.open('shop', { name: b.name, jp: b.jp, keeper: keeper.id, portrait: G.portrait?.(keeper.id), greeting: 'Today\'s catch! Sea bream for luck, mackerel for lunch, octopus for courage.',
+        G.ui.open('shop', { name: b.name, keeper: keeper.id, portrait: G.portrait?.(keeper.id), greeting: 'Today\'s catch! Sea bream for luck, mackerel for lunch, octopus for courage.',
           pantry: ['seaBream', 'mackerel', 'flounder', 'octopus', 'salmon', 'seaweed', 'grilledFish', 'sushiPlatter', 'fishermansFeast'].filter(id => PANTRY[id]).map(id => ({ id, price: Math.round((PANTRY[id].value || 30) * 1.25) })),
           furniture: [{ id: 'fishTank', price: 320 }].filter(f => FURNITURE[f.id]) });
         Events.emit('sfx', 'ui_open');
@@ -421,7 +421,7 @@ const SERVICES = {
         return say([pick(['Ahh. Your ears are pink. Perfect.', 'There — warm right through. That glow will keep the cold off for a good while.', 'See? "A little too hot" is just right.'])]);
       }
       if (c === 1 && G.ui?.open) {
-        G.ui.open('shop', { name: `${b.name} — Bath Goods`, jp: '湯道具', keeper: keeper.id, portrait: G.portrait?.(keeper.id), greeting: 'A cypress bucket for home — it smells like the mountains.',
+        G.ui.open('shop', { name: `${b.name} — Bath Goods`, keeper: keeper.id, portrait: G.portrait?.(keeper.id), greeting: 'A cypress bucket for home — it smells like the mountains.',
           furniture: [{ id: 'cypressBucket', price: 160 }, { id: 'onsenNoren', price: 220 }, { id: 'lilyTub', price: 280 }].filter(f => FURNITURE[f.id]),
           pantry: ['honey', 'shiitake', 'misoSoup'].filter(id => PANTRY[id]).map(id => ({ id, price: Math.round((PANTRY[id].value || 30) * 1.3) })) });
         Events.emit('sfx', 'ui_open');

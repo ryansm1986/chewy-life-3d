@@ -363,7 +363,7 @@ class CozyRun {
     Z.celebrate = true;
     Events.emit('village:saved', { zone, village: V.id, crew: true });
     void quiet; void e;
-    return { village: V.name, jp: V.jp, zone, captain: objective(st, `relief:${zone}`)?.captain || 'The captain', freed };
+    return { village: V.name, zone, captain: objective(st, `relief:${zone}`)?.captain || 'The captain', freed };
   }
   breakCamps(zone, n) {
     const Z = zoneOf(this.st, zone), V = VILLAGES[zone]; if (!V) return;
@@ -459,7 +459,7 @@ class CozyRun {
         const V = VILLAGES[zone];
         setTimeout(() => {
           if (G.mode !== 'dungeon' || G.dungeon?.kind !== 'region' || G.dungeon?.zoneId !== zone) return; // (only ever in that zone, outdoors)
-          G.ui?.banner?.(`${V?.name || 'The village'} is saved!`, `${V?.jp || ''} · your crew drove the siege off`, { style: 'quest' });
+          G.ui?.banner?.(`${V?.name || 'The village'} is saved!`, 'Your crew drove the siege off', { style: 'quest' });
           Events.emit('sfx', 'ui_levelup');
           const p = G.dungeon.villagePos || G.player.pos;
           for (let i = 0; i < 4; i++) setTimeout(() => G.vfx?.sparkle?.(new THREE.Vector3(p.x + (Math.random() - 0.5) * 6, (G.player.pos.y || 0) + 2 + Math.random(), p.z + (Math.random() - 0.5) * 6), { n: 16, color: ['#ff8fb0', '#ffd24a', '#8fe0c0', '#8fd0ff'][i], r: 0.8, rise: 1.2 }), i * 400);

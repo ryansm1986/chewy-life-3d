@@ -10,9 +10,9 @@ import { PANTRY } from './pantry.js';
 
 // stations: 'kitchen' (Chewy's cottage), 'campfire' (the Burrow / region camps: simple recipes only), 'oven' (Rosie's)
 export const STATIONS = {
-  kitchen: { name: "Chewy's Kitchen", jp: 'だいどころ', icon: 'home' },
-  campfire: { name: 'Campfire', jp: 'たき火', icon: 'fire' },
-  oven: { name: "Rosie's Oven", jp: 'オーブン', icon: 'shop' },
+  kitchen: { name: "Chewy's Kitchen", icon: 'home' },
+  campfire: { name: 'Campfire', icon: 'fire' },
+  oven: { name: "Rosie's Oven", icon: 'shop' },
 };
 
 // learn: how it's learned — 'starter' | { from: villager, hearts: n } | { quest } | { book: price, rank? } | { request: villager }.
@@ -38,7 +38,7 @@ export const RECIPES = {
 };
 /** recipes that make a building material instead of a dish (their name and words: MAKES) */
 export const MAKES = {
-  poundMochi: { name: 'Pound Mochi', jp: 'もちつき', desc: 'Steamed rice pounded with the big mallet into soft, stretchy mochi: 2 Mochi for building (the Paw Clinic wants 3).', value: 30, mat: 'mochi', n: 2 },
+  poundMochi: { name: 'Pound Mochi', desc: 'Steamed rice pounded with the big mallet into soft, stretchy mochi: 2 Mochi for building (the Paw Clinic wants 3).', value: 30, mat: 'mochi', n: 2 },
 };
 /** a recipe's dish card: the pantry dish it makes, or for a material recipe a card in the same shape (no meal buff) */
 export const dishDef = id => PANTRY[id] || (MAKES[id] ? { id, kind: 'make', ...MAKES[id], rare: 0, food: { heal: 0, buff: null, tier: 1, mins: 0 } } : null);

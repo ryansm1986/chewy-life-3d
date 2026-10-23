@@ -543,7 +543,7 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   read before the den's clear); the bosses' title lines are by boss id (`DEN_BOSS_LINES`). The HUD's location is the
   den's name (game.js). The stairs say "Burrow deeper (Floor 2)".
 - **The door** (`world/burrowDoor.js`, `installBurrowDoor(G)` from game.js): `G.burrow.list()` (one card per den: name,
-  jp, blurb, icon, levels, the hero's fit, the boss, up to four yokai, the theme's colours for the art, open / cleared /
+  blurb, icon, levels, the hero's fit, the boss, up to four yokai, the theme's colours for the art, open / cleared /
   crew / bestFloor, why it's sealed, the story quest step that points there, the Deep Burrow's note), `pick()` (the den
   to show first), `open(opts)` (`ui.open('burrow', { select })`; `G.openBurrowMenu` is it), `enter(id)` (an open den's
   floor 1). The Dens debug tab is registered here (`registerDebug('dens', …)`); its Travel rows are in
@@ -1091,7 +1091,7 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
 ## The cozy path, phase B: the peaceful overworld (src/cozy/ — design and as built: docs/COZY.md §6, §13.2; ROADMAP CZ-3, CZ-4)
 - **Pure modules** (test-rpg "COZY: THE PEACEFUL OVERWORLD", "COZY: THE SIGHTINGS BOARD"):
   - `peaceful.js`: `WILD` (radius, packs, the level rule, ranks, leash 6 m, trail gap 3 m), `normArea` / `wildAreas`
-    (recipe `layout.wild` → `{ id, name, jp, x, z, r, packs, spur }`), `wildAt` / `inWild`, `areaIssues` / `wildIssues`
+    (recipe `layout.wild` → `{ id, name, x, z, r, packs, spur }`), `wildAt` / `inWild`, `areaIssues` / `wildIssues`
     (the trail check), `isPeaceful` (+ the session `setPeacefulOverride`), `peacefulFilter`, `wildRank`, `wildLevel`
     (clamp(hero + 2, band low + 2, band top + 1)), `pastLeash`, `titled`.
   - `sightings.js`: `rollSightings(day, zones)` (3 a world day, seeded), `bountyFor` / `packCoins`, `sightingsToday`,

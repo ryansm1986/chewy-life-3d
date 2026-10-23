@@ -12,7 +12,7 @@ export class Dialogue {
     const r = this.root = el('div', 'dlg');
     r.innerHTML = `<div class="dlg-box">
         <div class="dlg-por"><div class="dlg-por-in"></div></div>
-        <div class="dlg-name"><span class="dn-t"></span><span class="jp dn-jp"></span></div>
+        <div class="dlg-name"><span class="dn-t"></span></div>
         <div class="dlg-tx"></div>
         <div class="dlg-ch"></div>
         <div class="dlg-more">${glyph('paw')}</div>
@@ -20,7 +20,7 @@ export class Dialogue {
         <i class="dlg-deco">${glyph('sakura')}</i>
       </div>`;
     ui.layers.dlg.appendChild(r);
-    this.$ = { box: r.querySelector('.dlg-box'), por: r.querySelector('.dlg-por'), porIn: r.querySelector('.dlg-por-in'), name: r.querySelector('.dlg-name'), nt: r.querySelector('.dn-t'), njp: r.querySelector('.dn-jp'), tx: r.querySelector('.dlg-tx'), ch: r.querySelector('.dlg-ch'), more: r.querySelector('.dlg-more'), count: r.querySelector('.dlg-count') };
+    this.$ = { box: r.querySelector('.dlg-box'), por: r.querySelector('.dlg-por'), porIn: r.querySelector('.dlg-por-in'), name: r.querySelector('.dlg-name'), nt: r.querySelector('.dn-t'), tx: r.querySelector('.dlg-tx'), ch: r.querySelector('.dlg-ch'), more: r.querySelector('.dlg-more'), count: r.querySelector('.dlg-count') };
     this.active = false;
     this.$.box.addEventListener('click', e => { if (e.target.closest('.dlg-ch')) return; this.advance(); });
     this.$.ch.addEventListener('click', e => { const b = e.target.closest('button'); if (b) this.choose(+b.dataset.i); });
@@ -50,7 +50,6 @@ export class Dialogue {
     const col = line.color || o.color || SPEAKER_COLORS[key] || '#ff8fb0';
     this.root.style.setProperty('--sc', col);
     this.$.nt.textContent = speaker;
-    this.$.njp.textContent = line.jp || o.jp || '';
     this.$.name.style.display = speaker ? '' : 'none';
     const bg = portraitBg(p);
     this.$.por.style.setProperty('--pbg', bg || '');

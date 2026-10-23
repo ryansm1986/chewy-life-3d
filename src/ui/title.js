@@ -19,7 +19,6 @@ export class Title {
     const paws = Array.from({ length: 9 }, (_, i) => `<i style="--i:${i};left:${6 + i * 11}%;top:${i % 2 ? 8 : 0}px;transform:rotate(${80 + (i % 2 ? 12 : -12)}deg)">${glyph('paw')}</i>`).join('');
     r.innerHTML = `<div class="ti-vig"></div><div class="ti-petals">${petals}</div>
       <div class="ti-center">
-        <div class="ti-kana"><span>ポーヘイブン</span></div>
         <div class="ti-logo">
           <div class="ti-chewy">${portrait('chewy')}</div>
           <div class="ti-shadow">${portrait('shadow')}</div>

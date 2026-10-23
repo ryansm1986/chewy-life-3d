@@ -184,7 +184,7 @@ try {
     await waitMode(page, 'dungeon', 60000);
     await until(() => window.G.questMoments.stats.lastTitle?.quest === 'tk_ledger' && window.G.ui.banners.live?.style === 'place', null, 15000);
     const tz = await ev(() => ({ t: window.G.questMoments.stats.lastTitle, area: !!document.querySelector('.banners .bn-area') }));
-    R.check('g) the Whispering Bamboo Grove with Chiku\'s ledger to bring home: "The Missing Ledger" · Takemori Village (竹守村) · "Bring the ledger back to Chiku", in the zone banner\'s place', tz.t.title === 'Takemori Village' && tz.t.jp === '竹守村' && tz.t.sub === 'Bring the ledger back to Chiku' && !tz.area, tz);
+    R.check('g) the Whispering Bamboo Grove with Chiku\'s ledger to bring home: "The Missing Ledger" · Takemori Village · "Bring the ledger back to Chiku", in the zone banner\'s place', tz.t.title === 'Takemori Village' && tz.t.sub === 'Bring the ledger back to Chiku' && !tz.area, tz);
     await ev(() => window.G.returnToVillage()); await waitMode(page, 'village', 60000);
   }
 

@@ -8,6 +8,7 @@ import { makeToon } from '../gfx/materials.js';
 import { loadRefinedRigs } from '../actors/refinedRigs.js';
 import { loadDisneyChewy, disneyReady, buildDisneyChewy } from '../actors/disneyChewy.js';
 import { loadHeroModel, heroModelReady, buildHeroModel } from '../actors/heroModels.js';
+const TOY_VILLAGERS = ['mochi', 'kuma', 'usagi', 'kitsune', 'pan', 'tanu', 'kero']; // (the Blender villagers, ROADMAP VL-1: the lineup shows them baked when loaded)
 import { VILLAGERS, randomVillagerSpec } from '../actors/roster.js';
 
 // the named villagers (roster.js) plus a duck and a dog, the townsfolk species without a named villager
@@ -19,7 +20,7 @@ export const VILLAGER_SPECS = [
 
 export default async function () {
   const P0 = new URLSearchParams(location.search); // (&only=<hero>: any baked hero for the face check, e.g. stella)
-  await Promise.all([loadRefinedRigs(REFINED_CAST), loadDisneyChewy(), loadHeroModel('shadow'), loadHeroModel('rosie'), loadHeroModel('moka'), loadHeroModel('poe'), P0.get('only') ? loadHeroModel(P0.get('only')) : null]); // &procrigs: procedural skins, &chewy=classic: toon Chewy
+  await Promise.all([loadRefinedRigs(REFINED_CAST), loadDisneyChewy(), loadHeroModel('shadow'), loadHeroModel('rosie'), loadHeroModel('moka'), loadHeroModel('poe'), ...TOY_VILLAGERS.map(id => loadHeroModel(id)), P0.get('only') ? loadHeroModel(P0.get('only')) : null]); // &procrigs: procedural skins, &chewy=classic: toon Chewy
   const P = new URLSearchParams(location.search);
   const S = makeStage({ ground: 30, hour: +(P.get('hour') ?? 10), dist: +(P.get('dist') ?? 11), center: [0, 0] });
   const only = P.get('only');
@@ -45,7 +46,7 @@ export default async function () {
   let i = 0;
   const lineup = only ? specs.filter(([k]) => k === only) : specs;
   for (const [k, spec] of lineup) {
-    const rig = (k === 'rosie' || k === 'moka' || k === 'poe' || (k === only && k !== 'chewy')) && heroModelReady(k) ? buildHeroModel(k) : k === 'chewy' && disneyReady() ? buildDisneyChewy() : buildHumanoid(spec);
+    const rig = (k === 'rosie' || k === 'moka' || k === 'poe' || TOY_VILLAGERS.includes(k) || (k === only && k !== 'chewy')) && heroModelReady(k) ? buildHeroModel(k) : k === 'chewy' && disneyReady() ? buildDisneyChewy() : buildHumanoid(spec);
     const cols = hats ? 9 : folk ? 4 : 5, col = i % cols, row = Math.floor(i / cols);
     const x = only ? 0 : hats ? (col - 4) * 0.95 : folk ? (col - 1.5) * 1.1 : (col - 2) * 1.3 + row * 0.6, z = only ? 0 : hats ? row * 1.1 - 2.75 : folk ? row * 1.3 - 1.3 : row * 1.5 - 0.6;
     if (k === 'chewy') {

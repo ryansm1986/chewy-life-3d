@@ -205,7 +205,7 @@ export function generateRegion(def, { visit = 0, mlvl = def.levels[0], heroLvl =
     paths: [plan.trail, ...plan.spurs], arena: { x: plan.arena.x, z: plan.arena.z, r: plan.arena.r }, pois,
     camps: sites.map(s => ({ x: s.x, z: s.z, r: s.r })), plan, visit,
     village: plan.village, // (the zone village's clearing { x, z, r } or null: src/regions/village)
-    wild: plan.wild || [], // (the wild areas [{ id, name, jp, x, z, r, packs, entry }]: docs/COZY.md §6.2)
+    wild: plan.wild || [], // (the wild areas [{ id, name, x, z, r, packs, entry }]: docs/COZY.md §6.2)
   };
   Object.defineProperty(L, 'terrain', { value: T, enumerable: false }); // (not serialised; RegionWorld reuses it)
   return L;

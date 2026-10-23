@@ -88,8 +88,7 @@ Status: **built** (2026-10-03; the cozy path's three guides 2026-10-09). The gui
     a card with both *Got it!* and *Skip step*, or the Guild on 667×375). A build or decorate palette along the bottom
     leaves the card at the top.
   - *Got it!* and *Skip step* reach 44 px on touch through a taller hit area (`mobile.css`).
-  - A tablet keeps the desktop layout (the title on top): the card sits in the panel's title row and covers no tappable;
-    on the Board it reaches over the end of the panel's Japanese subtitle.
+  - A tablet keeps the desktop layout (the title on top): the card sits in the panel's title row and covers no tappable.
   - Not covered by the rule (no panel up): on 667×375 Shadow's long gather line wraps tall in the top band and pushes the
     card over half of the gather prompt it spotlights (`cozy-guide-shots.mjs` logs it as a note).
   - QA: `tools/qa/cozy-guide-shots.mjs` (both phones, 844×390 and 667×375: every cozy guide step, and a second pass

@@ -1,6 +1,6 @@
 // Shop (Rosie's Treats, Usagi's Seed Stall...): keeper bubble, Buy / Sell tabs, price tags, fly-to-bag on purchase.
-// opts: { name, jp, keeper, portrait, greeting, stock|items (Items), potions: [key], pantry: [{ id, price }] (seeds and
-// other pantry goods, life/pantry.js; Shift+click buys 5), goods: [{ id, name, jp?, desc, icon (URL), price, locked?, once?,
+// opts: { name, keeper, portrait, greeting, stock|items (Items), potions: [key], pantry: [{ id, price }] (seeds and
+// other pantry goods, life/pantry.js; Shift+click buys 5), goods: [{ id, name, desc, icon (URL), price, locked?, once?,
 // onBuy() -> ok }] (one-off wares such as Kero's rods), onBuy(item, price, entry), onBuyPantry(id, price, n),
 // sellKinds: ['fish', ...] (the Sell tab lists those pantry goods first, at the buyer's prices; Shift+click sells them all),
 // buyer: 'kero' | 'rosie' | 'usagi' (life/pantry.js sellPrice), noBagSell (the Sell tab shows only those goods),
@@ -28,7 +28,7 @@ const THANKS = ['Thank you!! ♡', 'Enjoy, Chewy!', 'Good choice~', 'Come back s
 const POTIONS = { heart: ['potionHeart', 'Heart Potion', 'Restores a chunk of Life.'], zoom: ['potionZoom', 'Zoom Potion', 'Restores a chunk of Zoom.'], rejuv: ['potionRejuv', 'Rejuv Potion', 'Restores Life and Zoom.'] };
 
 export class ShopPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'shop', title: "Rosie's Treats", jp: 'おやつ屋', side: 'left', cls: 'p-shop', icon: 'shop' }); this.tab = 'buy'; }
+  constructor(ui) { super(ui, { name: 'shop', title: "Rosie's Treats", side: 'left', cls: 'p-shop', icon: 'shop' }); this.tab = 'buy'; }
   init() {
     this.body.innerHTML = `
       <div class="sh-keeper"><div class="sh-por"></div><div class="sh-bub"><span class="sh-say"></span></div></div>
@@ -45,7 +45,7 @@ export class ShopPanel extends Panel {
   }
   onOpen() {
     const o = this.opts;
-    this.setTitle(o.name || "Rosie's Treats", o.jp || 'おやつ屋');
+    this.setTitle(o.name || "Rosie's Treats");
     this.$.por.innerHTML = portraitHTML(o.portrait || o.keeper || 'rosie');
     this.say(o.greeting || 'Welcome, Chewy! Fresh treats today~');
     const pots = (o.potions || []).map(k => (typeof k === 'string' ? { potion: k } : k));
@@ -148,7 +148,7 @@ export class ShopPanel extends Panel {
     if (e.pantry) return pantryTipHTML(e.pantry, st, { price: { label: 'Price', value: p, afford }, hints: afford ? ['<b>Click</b> buy', '<b>Shift+Click</b> buy 5'] : ["Can't afford yet"] });
     if (e.goods) {
       const g = e.goods;
-      return `<div class="tt-item tt-pantry" style="--rc:#ffd84a"><div class="tt-name">${esc(g.name)}</div><div class="tt-kind"><span>Tool</span><span class="jp">${esc(g.jp || '')}</span></div><div class="tt-d">${esc(g.desc || '')}</div>${g.locked ? `<div class="tt-req bad">${esc(g.locked)}</div>` : ''}<div class="tt-price ${afford ? '' : 'bad'}">Price: ${glyph('coin')}<b>${fmt(p)}</b></div><div class="tt-hints"><span>${g.locked ? 'Not yet' : afford ? '<b>Click</b> buy' : "Can't afford yet"}</span></div></div>`;
+      return `<div class="tt-item tt-pantry" style="--rc:#ffd84a"><div class="tt-name">${esc(g.name)}</div><div class="tt-kind"><span>Tool</span></div><div class="tt-d">${esc(g.desc || '')}</div>${g.locked ? `<div class="tt-req bad">${esc(g.locked)}</div>` : ''}<div class="tt-price ${afford ? '' : 'bad'}">Price: ${glyph('coin')}<b>${fmt(p)}</b></div><div class="tt-hints"><span>${g.locked ? 'Not yet' : afford ? '<b>Click</b> buy' : "Can't afford yet"}</span></div></div>`;
     }
     if (e.potion) { const P = POTIONS[e.potion] || [], I = potionInfo(e.potion) || {}; return simpleTip(e.name || I.name || P[1] || 'Potion', `${esc(e.desc || I.desc || P[2] || '')}<div class="tt-dim">You have ${st.potions?.[e.potion] || 0}</div><div class="tt-price ${afford ? '' : 'bad'}">Price: ${glyph('coin')}<b>${fmt(p)}</b></div><div class="tt-hints"><span><b>Click</b> buy</span></div>`); }
     return itemTipHTML(e.item, { state: st, derived: this.d, compare: x => this.ui.drag.equippedFor(x), price: { label: 'Price', value: fmt(p), afford }, hints: [afford ? '<b>Click</b> buy' : "Can't afford yet"] });

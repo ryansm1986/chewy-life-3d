@@ -12,7 +12,7 @@ import { TERRAIN, LAYOUT, coastDist } from '../assets/tidepoolTerrain.js';
 import { tidepoolPopulate, tidepoolEffects, tidepoolInteractables } from '../assets/tidepoolWorld.js';
 
 export default {
-  id: 'tidepool', name: 'Shiokaze Tidepools', jp: '潮溜まり', sub: 'Turquoise coves, salty spray and sleepy giants', color: '#2fb8c8',
+  id: 'tidepool', name: 'Shiokaze Tidepools', sub: 'Turquoise coves, salty spray and sleepy giants', color: '#2fb8c8',
   levels: [18, 27], unlock: { level: 18, after: 'maple' },
   monsters: ['kappa', 'heikegani', 'kurage'], boss: 'umibozu',
   // Burrow stand-ins until the region's own monsters / boss are registered (src/regions/monsters, src/regions/bosses)

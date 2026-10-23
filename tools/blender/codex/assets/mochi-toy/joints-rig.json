@@ -1,0 +1,717 @@
+{
+  "bones": [
+    {
+      "name": "root",
+      "parent": null,
+      "head_blender_m": [
+        0.0,
+        -0.01,
+        0.0
+      ]
+    },
+    {
+      "name": "hips",
+      "parent": "root",
+      "head_blender_m": [
+        0.0,
+        0.004,
+        0.3
+      ]
+    },
+    {
+      "name": "spine",
+      "parent": "hips",
+      "head_blender_m": [
+        0.0,
+        0.006,
+        0.36
+      ]
+    },
+    {
+      "name": "chest",
+      "parent": "spine",
+      "head_blender_m": [
+        0.0,
+        0.01,
+        0.43
+      ]
+    },
+    {
+      "name": "neck",
+      "parent": "chest",
+      "head_blender_m": [
+        0.0,
+        0.015,
+        0.505
+      ]
+    },
+    {
+      "name": "head",
+      "parent": "neck",
+      "head_blender_m": [
+        0.0,
+        0.055,
+        0.525
+      ]
+    },
+    {
+      "name": "jaw",
+      "parent": "head",
+      "head_blender_m": [
+        0.0,
+        -0.11137,
+        0.61348
+      ]
+    },
+    {
+      "name": "eye_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.14268,
+        -0.15972,
+        0.6952
+      ]
+    },
+    {
+      "name": "lidU_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.08903,
+        -0.06238,
+        0.6914
+      ]
+    },
+    {
+      "name": "lidD_L",
+      "parent": "head",
+      "head_blender_m": [
+        -0.02731,
+        0.13438,
+        0.98826
+      ]
+    },
+    {
+      "name": "brow_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.13824,
+        -0.14977,
+        0.8522
+      ]
+    },
+    {
+      "name": "lip_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.04736,
+        -0.24047,
+        0.61348
+      ]
+    },
+    {
+      "name": "ear_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.18581,
+        0.09003,
+        0.94463
+      ]
+    },
+    {
+      "name": "earTip_L",
+      "parent": "ear_L",
+      "head_blender_m": [
+        0.21131,
+        0.08091,
+        1.02801
+      ]
+    },
+    {
+      "name": "upperarm_L",
+      "parent": "chest",
+      "head_blender_m": [
+        0.128,
+        0.025,
+        0.452
+      ]
+    },
+    {
+      "name": "forearm_L",
+      "parent": "upperarm_L",
+      "head_blender_m": [
+        0.188,
+        0.025,
+        0.34808
+      ]
+    },
+    {
+      "name": "hand_L",
+      "parent": "forearm_L",
+      "head_blender_m": [
+        0.243,
+        0.025,
+        0.25281
+      ]
+    },
+    {
+      "name": "thigh_L",
+      "parent": "hips",
+      "head_blender_m": [
+        0.104,
+        0.004,
+        0.225
+      ]
+    },
+    {
+      "name": "shin_L",
+      "parent": "thigh_L",
+      "head_blender_m": [
+        0.104,
+        0.0,
+        0.15
+      ]
+    },
+    {
+      "name": "foot_L",
+      "parent": "shin_L",
+      "head_blender_m": [
+        0.104,
+        -0.004,
+        0.07
+      ]
+    },
+    {
+      "name": "eye_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.14268,
+        -0.15972,
+        0.6952
+      ]
+    },
+    {
+      "name": "lidU_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.08903,
+        -0.06238,
+        0.6914
+      ]
+    },
+    {
+      "name": "lidD_R",
+      "parent": "head",
+      "head_blender_m": [
+        0.02731,
+        0.13438,
+        0.98826
+      ]
+    },
+    {
+      "name": "brow_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.13824,
+        -0.14977,
+        0.8522
+      ]
+    },
+    {
+      "name": "lip_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.04736,
+        -0.24047,
+        0.61348
+      ]
+    },
+    {
+      "name": "ear_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.18581,
+        0.09003,
+        0.94463
+      ]
+    },
+    {
+      "name": "earTip_R",
+      "parent": "ear_R",
+      "head_blender_m": [
+        -0.21131,
+        0.08091,
+        1.02801
+      ]
+    },
+    {
+      "name": "upperarm_R",
+      "parent": "chest",
+      "head_blender_m": [
+        -0.128,
+        0.025,
+        0.452
+      ]
+    },
+    {
+      "name": "forearm_R",
+      "parent": "upperarm_R",
+      "head_blender_m": [
+        -0.188,
+        0.025,
+        0.34808
+      ]
+    },
+    {
+      "name": "hand_R",
+      "parent": "forearm_R",
+      "head_blender_m": [
+        -0.243,
+        0.025,
+        0.25281
+      ]
+    },
+    {
+      "name": "thigh_R",
+      "parent": "hips",
+      "head_blender_m": [
+        -0.104,
+        0.004,
+        0.225
+      ]
+    },
+    {
+      "name": "shin_R",
+      "parent": "thigh_R",
+      "head_blender_m": [
+        -0.104,
+        0.0,
+        0.15
+      ]
+    },
+    {
+      "name": "foot_R",
+      "parent": "shin_R",
+      "head_blender_m": [
+        -0.104,
+        -0.004,
+        0.07
+      ]
+    },
+    {
+      "name": "tail1",
+      "parent": "hips",
+      "head_blender_m": [
+        -0.00391,
+        0.18104,
+        0.2686
+      ]
+    },
+    {
+      "name": "tail2",
+      "parent": "tail1",
+      "head_blender_m": [
+        -0.03121,
+        0.31538,
+        0.16571
+      ]
+    },
+    {
+      "name": "tail3",
+      "parent": "tail2",
+      "head_blender_m": [
+        -0.0565,
+        0.38938,
+        0.17046
+      ]
+    },
+    {
+      "name": "tail4",
+      "parent": "tail3",
+      "head_blender_m": [
+        -0.07214,
+        0.42836,
+        0.20041
+      ]
+    }
+  ],
+  "triangles": 33748,
+  "lidTilt": 0.534,
+  "lid_hinge_blender": {
+    "L": [
+      0.86078,
+      0.50898,
+      0.0
+    ],
+    "R": [
+      0.86078,
+      -0.50898,
+      0.0
+    ]
+  },
+  "lids": {
+    "Mochi_lidU_L": {
+      "pivot": [
+        0.08902926364531577,
+        -0.06237769750318055,
+        0.6914
+      ],
+      "pivot_eye_frame": [
+        0.15566866494066584,
+        -0.0459816815451482,
+        0.6914
+      ],
+      "hinge_blender": [
+        0.86078,
+        0.50898,
+        0.0
+      ],
+      "pivot_offset_m": 0.0,
+      "score": -0.0175,
+      "closed_edge_above_rim_mm": -1.08,
+      "squint_coverage": 0.14,
+      "closed_standoff_centre_mm": 13.03,
+      "radius_centre_m": 0.1555914819659481,
+      "target": 1.22
+    },
+    "Mochi_lidD_L": {
+      "pivot": [
+        -0.027314956937107476,
+        0.13438140626754785,
+        0.988264
+      ],
+      "pivot_eye_frame": [
+        0.15566866494066584,
+        0.18260117559770894,
+        0.988264
+      ],
+      "hinge_blender": [
+        0.86078,
+        0.50898,
+        0.0
+      ],
+      "pivot_offset_m": 0.32,
+      "score": 0.0232,
+      "closed_edge_above_rim_mm": null,
+      "squint_coverage": null,
+      "closed_standoff_centre_mm": null,
+      "radius_centre_m": 0.4796538817857818,
+      "target": -0.24
+    },
+    "Mochi_lidU_R": {
+      "pivot": [
+        -0.08902926364531577,
+        -0.06237769750318055,
+        0.6914
+      ],
+      "pivot_eye_frame": [
+        -0.15566866494066584,
+        -0.0459816815451482,
+        0.6914
+      ],
+      "hinge_blender": [
+        0.86078,
+        -0.50898,
+        0.0
+      ],
+      "pivot_offset_m": 0.0,
+      "score": -0.0175,
+      "closed_edge_above_rim_mm": -1.08,
+      "squint_coverage": 0.14,
+      "closed_standoff_centre_mm": 13.03,
+      "radius_centre_m": 0.1555914819659481,
+      "target": 1.22
+    },
+    "Mochi_lidD_R": {
+      "pivot": [
+        0.027314956937107476,
+        0.13438140626754785,
+        0.988264
+      ],
+      "pivot_eye_frame": [
+        -0.15566866494066584,
+        0.18260117559770894,
+        0.988264
+      ],
+      "hinge_blender": [
+        0.86078,
+        -0.50898,
+        0.0
+      ],
+      "pivot_offset_m": 0.32,
+      "score": 0.0225,
+      "closed_edge_above_rim_mm": null,
+      "squint_coverage": null,
+      "closed_standoff_centre_mm": null,
+      "radius_centre_m": 0.4796538817857818,
+      "target": -0.24
+    }
+  },
+  "lids_hidden_check": {
+    "Mochi_lidU_L@0.0": {
+      "max_sdf_mm": -20.05,
+      "outside_count": 0
+    },
+    "Mochi_lidD_L@0.0": {
+      "max_sdf_mm": -32.68,
+      "outside_count": 0
+    },
+    "Mochi_lidD_L@-0.1": {
+      "max_sdf_mm": -47.55,
+      "outside_count": 0
+    },
+    "Mochi_lidU_R@0.0": {
+      "max_sdf_mm": -20.05,
+      "outside_count": 0
+    },
+    "Mochi_lidD_R@0.0": {
+      "max_sdf_mm": -32.23,
+      "outside_count": 0
+    },
+    "Mochi_lidD_R@-0.1": {
+      "max_sdf_mm": -47.27,
+      "outside_count": 0
+    },
+    "Mochi_tongue@rest": {
+      "max_sdf_mm": -8.82,
+      "outside_count": 0
+    }
+  },
+  "lid_sweep": {
+    "Mochi_lidU_L": {
+      "0.0": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "0.102": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "0.203": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "0.305": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "0.407": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "0.508": [
+        1,
+        34,
+        0,
+        0.4
+      ],
+      "0.61": [
+        0,
+        65,
+        0,
+        0
+      ],
+      "0.712": [
+        7,
+        92,
+        0,
+        3.6
+      ],
+      "0.813": [
+        25,
+        102,
+        0,
+        9.4
+      ],
+      "0.915": [
+        61,
+        77,
+        0,
+        12.2
+      ],
+      "1.017": [
+        76,
+        82,
+        0,
+        10.1
+      ],
+      "1.118": [
+        93,
+        82,
+        0,
+        16.9
+      ],
+      "1.22": [
+        155,
+        96,
+        0,
+        19.7
+      ]
+    },
+    "Mochi_lidD_L": {
+      "-0.1": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "-0.18": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "-0.26": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "Mochi_lidU_R": {
+      "0.0": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "0.102": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "0.203": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "0.305": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "0.407": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "0.508": [
+        1,
+        34,
+        0,
+        0.4
+      ],
+      "0.61": [
+        0,
+        65,
+        0,
+        0
+      ],
+      "0.712": [
+        7,
+        92,
+        0,
+        3.6
+      ],
+      "0.813": [
+        25,
+        102,
+        0,
+        9.4
+      ],
+      "0.915": [
+        61,
+        77,
+        0,
+        12.2
+      ],
+      "1.017": [
+        76,
+        82,
+        0,
+        10.1
+      ],
+      "1.118": [
+        93,
+        82,
+        0,
+        16.9
+      ],
+      "1.22": [
+        155,
+        96,
+        0,
+        19.7
+      ]
+    },
+    "Mochi_lidD_R": {
+      "-0.1": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "-0.18": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "-0.26": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  "normals": {
+    "corner_normals_vs_analytic_deg": {
+      "n": 20266,
+      "mean": 0.008,
+      "p95": 0.024,
+      "p99": 0.028,
+      "max": 0.222,
+      "over_2deg": 0
+    }
+  },
+  "mouth_seam_points": 17,
+  "objects": {
+    "Mochi_head": 9720,
+    "Mochi_eye_R": 720,
+    "Mochi_eye_L": 720,
+    "Mochi_ear_R": 2376,
+    "Mochi_ear_L": 2376,
+    "Mochi_body": 7216,
+    "Mochi_arm_R": 1796,
+    "Mochi_arm_L": 1796,
+    "Mochi_leg_R": 1016,
+    "Mochi_leg_L": 1016,
+    "Mochi_tail": 1280,
+    "Mochi_mouth_cavity": 236,
+    "Mochi_tongue": 120,
+    "Mochi_lidU_L": 1152,
+    "Mochi_lidD_L": 528,
+    "Mochi_lidU_R": 1152,
+    "Mochi_lidD_R": 528
+  },
+  "notes": [
+    "Game axes: X = Blender +X, Y = Blender +Z, Z = Blender -Y; pose bones use YZX Euler = three.js XYZ.",
+    "Head pivot at the skull base (back of the neck, chin height), not the head centre.",
+    "Lids are surfaces of revolution about their bone X axis: a rotation slides them along themselves.",
+    "Weights quantized to an exact 255 sum; <= 4 influences. Ears: ear_* blending to earTip_* over the top half; tail: tail1-4 along its length; brush and obi knot rigid to spine; skirt on hips + up to 40% thighs at the hem, its top 35% on spine under the obi."
+  ]
+}

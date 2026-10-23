@@ -14,10 +14,10 @@ export class FurnitureView {
     const root = this.root = el('div', 'fu-view');
     root.innerHTML = `
       <div class="tabs pt-tabs fu-tabs">${TABS.map(t => `<button class="tab" data-t="${t.id}" style="--tc:${t.color}" title="${esc(t.name)}">${glyph(t.glyph)}<span>${esc(t.id === 'surface' ? 'Surfaces' : t.name)}</span><span class="tab-n">0</span></button>`).join('')}</div>
-      <div class="pt-card fu-card"><div class="pt-art"><img alt=""></div><div class="pt-info"><div class="pt-name"><b></b><span class="jp"></span><i class="pt-kind"></i></div><div class="pt-desc"></div><div class="pt-facts"></div></div><div class="pt-act"></div></div>
+      <div class="pt-card fu-card"><div class="pt-art"><img alt=""></div><div class="pt-info"><div class="pt-name"><b></b><i class="pt-kind"></i></div><div class="pt-desc"></div><div class="pt-facts"></div></div><div class="pt-act"></div></div>
       <div class="grid g10 pt-grid fu-grid"></div>
       <div class="pt-empty">${glyph('sakura')}<span>Nothing in storage — it's all out in your home!</span></div>`;
-    this.$ = { tabs: root.querySelector('.fu-tabs'), card: root.querySelector('.fu-card'), art: root.querySelector('.pt-art img'), name: root.querySelector('.pt-name b'), jp: root.querySelector('.pt-name .jp'), kind: root.querySelector('.pt-kind'), desc: root.querySelector('.pt-desc'), facts: root.querySelector('.pt-facts'), act: root.querySelector('.pt-act'), grid: root.querySelector('.fu-grid'), empty: root.querySelector('.pt-empty') };
+    this.$ = { tabs: root.querySelector('.fu-tabs'), card: root.querySelector('.fu-card'), art: root.querySelector('.pt-art img'), name: root.querySelector('.pt-name b'), kind: root.querySelector('.pt-kind'), desc: root.querySelector('.pt-desc'), facts: root.querySelector('.pt-facts'), act: root.querySelector('.pt-act'), grid: root.querySelector('.fu-grid'), empty: root.querySelector('.pt-empty') };
     this.$.tabs.addEventListener('click', e => { const t = e.target.closest('.tab'); if (!t || t.dataset.t === this.tab) return; this.tab = t.dataset.t; this._sig = null; this.render(); replay(this.$.grid, 'swap', 400); this.ui.sfx?.('tab'); });
     const Gd = this.$.grid;
     Gd.addEventListener('click', e => { const s = e.target.closest('.pslot'); if (s?.dataset.id) { this.select(s.dataset.id); this.ui.sfx?.('select'); } });
@@ -80,7 +80,7 @@ export class FurnitureView {
     const set = SETS[d.set];
     this.$.card.style.setProperty('--kc', set?.color || '#ffb07a');
     this.$.art.src = this.icon(id) || glyphURL('home');
-    setText(this.$.name, d.name); setText(this.$.jp, d.jp || '');
+    setText(this.$.name, d.name);
     this.$.kind.textContent = d.kind ? (d.kind === 'wall' ? 'Wallpaper' : 'Floor') : CATS[d.cat]?.name || '';
     this.$.desc.textContent = d.desc || '';
     const n = st.furniture?.[id] || 0;

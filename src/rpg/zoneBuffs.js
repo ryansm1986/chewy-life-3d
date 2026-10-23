@@ -5,7 +5,7 @@
 // Pure but for tickSoak's recompute / event (node-tested in tools/test-rpg.mjs).
 import { Events } from '../core/events.js';
 
-export const SOAK = { name: 'Onsen Glow', jp: '湯上がり', color: '#ffb08a', glyph: 'heart', mins: 20, lifePct: 12, regen: 2, frost: 25 };
+export const SOAK = { name: 'Onsen Glow', color: '#ffb08a', glyph: 'heart', mins: 20, lifePct: 12, regen: 2, frost: 25 };
 export const soakText = () => `+${SOAK.lifePct}% max life, +${SOAK.regen} life/s, +${SOAK.frost}% frost resist`;
 export const soakActive = s => !!(s && s.left > 0);
 

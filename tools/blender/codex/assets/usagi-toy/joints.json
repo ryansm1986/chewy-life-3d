@@ -1,0 +1,212 @@
+{
+  "units": "metres (final, ear tips 1.10 m)",
+  "coordinate_system": "Blender Z-up, front -Y; character left is +X",
+  "hips": [
+    0.0,
+    0.004,
+    0.2
+  ],
+  "spine": [
+    0.0,
+    0.002,
+    0.28
+  ],
+  "chest": [
+    0.0,
+    0.0,
+    0.36
+  ],
+  "neck": [
+    0.0,
+    0.0,
+    0.425
+  ],
+  "head": [
+    0.0,
+    0.00064,
+    0.59424
+  ],
+  "head_nod_pivot_suggested": [
+    0.0,
+    0.0432,
+    0.43996
+  ],
+  "jaw_pivot": [
+    0.0,
+    -0.12704,
+    0.49582
+  ],
+  "eyes": {
+    "R": [
+      -0.12339,
+      -0.19882,
+      0.60136
+    ],
+    "L": [
+      0.12339,
+      -0.19882,
+      0.60136
+    ]
+  },
+  "eye_axes": {
+    "R": {
+      "out_deg": 25.6,
+      "down_deg": -7.1
+    },
+    "L": {
+      "out_deg": 25.6,
+      "down_deg": -7.1
+    }
+  },
+  "ears": {
+    "R": {
+      "base": [
+        -0.11172,
+        0.05916,
+        0.70064
+      ],
+      "mid": [
+        -0.15856,
+        0.06514,
+        0.89994
+      ],
+      "tip": [
+        -0.20539,
+        0.07112,
+        1.09925
+      ]
+    },
+    "L": {
+      "base": [
+        0.11172,
+        0.05916,
+        0.70064
+      ],
+      "mid": [
+        0.15856,
+        0.06514,
+        0.89994
+      ],
+      "tip": [
+        0.20539,
+        0.07112,
+        1.09925
+      ]
+    }
+  },
+  "hat_anchor": [
+    0.0,
+    0.04852,
+    0.75384
+  ],
+  "hat_tilt_back_deg": 12.0,
+  "arms": {
+    "L": {
+      "shoulder": [
+        0.12,
+        -0.004,
+        0.362
+      ],
+      "elbow": [
+        0.18764,
+        -0.00949,
+        0.27543
+      ],
+      "wrist": [
+        0.22207,
+        -0.01229,
+        0.23135
+      ]
+    },
+    "R": {
+      "shoulder": [
+        -0.12,
+        -0.004,
+        0.362
+      ],
+      "elbow": [
+        -0.18764,
+        -0.00949,
+        0.27543
+      ],
+      "wrist": [
+        -0.22207,
+        -0.01229,
+        0.23135
+      ]
+    }
+  },
+  "legs": {
+    "L": {
+      "hip": [
+        0.092,
+        0.004,
+        0.2
+      ],
+      "knee": [
+        0.1,
+        -0.004,
+        0.13
+      ],
+      "ankle": [
+        0.104,
+        0.0,
+        0.07
+      ],
+      "toe": [
+        0.13628,
+        -0.19088,
+        0.03
+      ]
+    },
+    "R": {
+      "hip": [
+        -0.092,
+        0.004,
+        0.2
+      ],
+      "knee": [
+        -0.1,
+        -0.004,
+        0.13
+      ],
+      "ankle": [
+        -0.104,
+        0.0,
+        0.07
+      ],
+      "toe": [
+        -0.13628,
+        -0.19088,
+        0.03
+      ]
+    }
+  },
+  "tail": [
+    [
+      0.0,
+      0.18807,
+      0.225
+    ]
+  ],
+  "palm_R": [
+    -0.24617,
+    -0.01489,
+    0.18427
+  ],
+  "palm_L": [
+    0.24617,
+    -0.01489,
+    0.18427
+  ],
+  "notes": [
+    "Phase 1: no rig, weights or animations. Same keys as the Tanuki / Poe joints.json (final metres).",
+    "head = the head centre (the radial origin); head_nod_pivot_suggested = base of the skull, for the rig.",
+    "Head skin = zero surface of one convex implicit ball (dome skull + full jaw + soft muzzle + nose), analytic normals, toon-band refinement; no eye sockets.",
+    "Eyelid holes ringed by 6 loops each with the rim rolled in behind separate lens eyeballs; 3 loops round the mouth, 4 round the nose.",
+    "Ears: separate pieces (Usagi_ear_L / _R), 27 rings along the axis (bend loops), pivot = ears.base (buried in the skull, under the hat).",
+    "Hat: a separate piece (Usagi_hat: dome + 6 petals), pivot = hat_anchor; it rides the head bone.",
+    "Tail: Usagi_tail, a small closed ball, pivot = tail[0].",
+    "The shorts are one closed piece with a split between the legs; the sleeves are open tubes; arms carry rings along the forearm and wrist."
+  ]
+}

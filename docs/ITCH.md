@@ -87,13 +87,13 @@ that storage belongs to itch's game-hosting domain, not to itch.io, so:
 The UI fonts are self-hosted from `src/ui/fonts/`, which `src/ui/fonts.css` imports from `main.js`:
 
 - **Fredoka**, a variable font covering every weight;
-- **M PLUS Rounded 1c** in 500, 700 and 800, for the Japanese labels.
+- **M PLUS Rounded 1c** in 500, 700 and 800, the fallback for the symbols Fredoka lacks.
 
 Both are under the SIL Open Font License 1.1. `tools/fonts/build-fonts.py` downloads them from the google/fonts repo and
-subsets them to Latin, kana, CJK punctuation and every non-ASCII character used in `src/` and `index.html`. That keeps
-them to about 290 KB instead of several MB for full Japanese fonts.
+subsets them to Latin and every non-ASCII character used in `src/` and `index.html`, about 130 KB together. The game has
+no Japanese text (the owner, 2026-10-21), so kana and kanji, which only code comments still hold, are skipped.
 
-After adding Japanese text or new symbols, run `npm run fonts`, which needs `pip install fonttools brotli`.
+After adding new symbols, run `npm run fonts`, which needs `pip install fonttools brotli`.
 `build:itch` reminds you when it's due. Characters missing from the subset still show, but in a fallback system font.
 
 ## Licences

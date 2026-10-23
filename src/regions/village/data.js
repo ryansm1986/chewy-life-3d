@@ -8,7 +8,7 @@
 // the far side (|a| ≤ ~85°); the camera side (|a| > 100°) gets low camps, fences and stalls (biomeKit.viewGuard's rule).
 // Moving the site (phase F's terrain rework) moves the whole village.
 //
-//   VILLAGES[zone] = { id, zone, name, jp, sub, theme, ready, square: { r }, buildings: [{ id, kind, name, jp, a, d, w, dp,
+//   VILLAGES[zone] = { id, zone, name, sub, theme, ready, square: { r }, buildings: [{ id, kind, name, a, d, w, dp,
 //     keeper }], camps: [{ id, a, d, r, cage, kinds? }], captain: { id, a, d }, villagers: [{ id, name, role, home, camp?,
 //     rescue?, spec, likes, lines }], folk: { n, seed } }
 //   building kinds: elder | shop | inn | waypoint | dojo | craft (bamboo); teaHouse (maple); fishmonger, boatwright
@@ -23,15 +23,15 @@ const V = (o) => ({ ready: false, square: { r: 5.2 }, buildings: [], camps: [], 
 
 export const VILLAGES = {
   bamboo: V({
-    id: 'takemori', zone: 'bamboo', name: 'Takemori Village', jp: '竹守村', sub: 'The village of the bamboo keepers', theme: 'bamboo', ready: true,
+    id: 'takemori', zone: 'bamboo', name: 'Takemori Village', sub: 'The village of the bamboo keepers', theme: 'bamboo', ready: true,
     square: { r: 5.2 },
     buildings: [
-      { id: 'elder', kind: 'elder', name: "Grandma Sasa's House", jp: '笹の家', a: 0, d: 9.4, keeper: 'tk_sasa' },
-      { id: 'inn', kind: 'inn', name: 'Sasanoha Inn', jp: '笹の葉宿', a: -40, d: 9.6, keeper: 'tk_fuku' },
-      { id: 'shop', kind: 'shop', name: "Chiku's General Store", jp: '竹屋', a: 39, d: 9.3, keeper: 'tk_chiku' },
-      { id: 'dojo', kind: 'dojo', name: 'Kaze Ninja Dojo', jp: '風の道場', a: 78, d: 10.4, keeper: 'tk_kazemaru' },
-      { id: 'craft', kind: 'craft', name: 'Bamboo Craftshop', jp: '竹細工', a: -73, d: 9.9, keeper: 'tk_takumi' },
-      { id: 'waypoint', kind: 'waypoint', name: 'Waypoint Shrine', jp: '道祖神', a: -158.5, d: 8.2, face: 'camera' }, // (low, below the road, between the west camp and the garden; it faces the camera)
+      { id: 'elder', kind: 'elder', name: "Grandma Sasa's House", a: 0, d: 9.4, keeper: 'tk_sasa' },
+      { id: 'inn', kind: 'inn', name: 'Sasanoha Inn', a: -40, d: 9.6, keeper: 'tk_fuku' },
+      { id: 'shop', kind: 'shop', name: "Chiku's General Store", a: 39, d: 9.3, keeper: 'tk_chiku' },
+      { id: 'dojo', kind: 'dojo', name: 'Kaze Ninja Dojo', a: 78, d: 10.4, keeper: 'tk_kazemaru' },
+      { id: 'craft', kind: 'craft', name: 'Bamboo Craftshop', a: -73, d: 9.9, keeper: 'tk_takumi' },
+      { id: 'waypoint', kind: 'waypoint', name: 'Waypoint Shrine', a: -158.5, d: 8.2, face: 'camera' }, // (low, below the road, between the west camp and the garden; it faces the camera)
     ],
     // siege camps inside the village bounds: the two road barricades and the trampled garden on the camera side. Camp
     // pieces are screen offsets [u (m, screen-right), v (m, screen-up), yaw (degrees, 0 = along screen-right)] from the
@@ -76,14 +76,14 @@ export const VILLAGES = {
   // ---------------------------------------------------------------- Akane Hamlet (maple): the road climbs the screen
   // through the square (it enters at the camera side, leaves between the Elder's house and the tea house)
   maple: V({
-    id: 'akane', zone: 'maple', name: 'Akane Hamlet', jp: '茜の里', sub: 'Red leaves and warm tea', theme: 'maple', ready: true,
+    id: 'akane', zone: 'maple', name: 'Akane Hamlet', sub: 'Red leaves and warm tea', theme: 'maple', ready: true,
     square: { r: 5.0 },
     buildings: [
-      { id: 'elder', kind: 'elder', name: "Elder Kaede's House", jp: '楓の家', a: -36, d: 9.7, keeper: 'ak_kaede' },
-      { id: 'teaHouse', kind: 'teaHouse', name: 'Momiji Tea House', jp: '紅葉茶屋', a: 50, d: 10.0, keeper: 'ak_ochiyo' },
-      { id: 'inn', kind: 'inn', name: 'Kurikaze Inn', jp: '栗風亭', a: -77, d: 9.8, keeper: 'ak_yae' },
-      { id: 'shop', kind: 'shop', name: "Benji's Sundries", jp: '紅葉堂', a: 90, d: 9.6, keeper: 'ak_benji' },
-      { id: 'waypoint', kind: 'waypoint', name: 'Waypoint Shrine', jp: '道祖神', a: -150, d: 8.2, face: 'camera' },
+      { id: 'elder', kind: 'elder', name: "Elder Kaede's House", a: -36, d: 9.7, keeper: 'ak_kaede' },
+      { id: 'teaHouse', kind: 'teaHouse', name: 'Momiji Tea House', a: 50, d: 10.0, keeper: 'ak_ochiyo' },
+      { id: 'inn', kind: 'inn', name: 'Kurikaze Inn', a: -77, d: 9.8, keeper: 'ak_yae' },
+      { id: 'shop', kind: 'shop', name: "Benji's Sundries", a: 90, d: 9.6, keeper: 'ak_benji' },
+      { id: 'waypoint', kind: 'waypoint', name: 'Waypoint Shrine', a: -150, d: 8.2, face: 'camera' },
     ],
     camps: [
       { id: 'west', name: 'the burned granary', at: [-7.6, -3.6], r: 3.0, cage: 'ak_benji', n: 5, saved: 'persimmons', pieces: { fire: [-7.4, -3.8], cage: [-6.0, -6.6, 0], tent: [-9.8, -5.8, 30], banner: [-5.2, -2.6] } },
@@ -123,15 +123,15 @@ export const VILLAGES = {
   // ---------------------------------------------------------------- Shiokaze Port (tidepool): the bay is screen-left (the
   // pier and the boatyard), the road crosses the square diagonally from the bottom-left to the top-right
   tidepool: V({
-    id: 'shiokaze', zone: 'tidepool', name: 'Shiokaze Port', jp: '潮風港', sub: 'Salt wind and fishing boats', theme: 'tidepool', ready: true,
+    id: 'shiokaze', zone: 'tidepool', name: 'Shiokaze Port', sub: 'Salt wind and fishing boats', theme: 'tidepool', ready: true,
     square: { r: 5.0 },
     buildings: [
-      { id: 'elder', kind: 'elder', name: "Captain Kaizo's Lookout", jp: '望楼', a: 0, d: 9.4, keeper: 'sk_kaizo' },
-      { id: 'fishmonger', kind: 'fishmonger', name: "Saba's Fish Market", jp: '魚市', a: 28, d: 11.0, keeper: 'sk_saba' },
-      { id: 'boatwright', kind: 'boatwright', name: 'Funaki Boatyard', jp: '船大工', a: -90, d: 10.6, keeper: 'sk_funaki' },
-      { id: 'inn', kind: 'inn', name: 'Shinju Inn', jp: '真珠屋', a: -36, d: 10.6, keeper: 'sk_shinju' },
-      { id: 'shop', kind: 'shop', name: "Nami's Port Store", jp: '浜屋', a: 84, d: 9.6, keeper: 'sk_nami' },
-      { id: 'waypoint', kind: 'waypoint', name: 'Waypoint Shrine', jp: '道祖神', a: 160, d: 8.2, face: 'camera' },
+      { id: 'elder', kind: 'elder', name: "Captain Kaizo's Lookout", a: 0, d: 9.4, keeper: 'sk_kaizo' },
+      { id: 'fishmonger', kind: 'fishmonger', name: "Saba's Fish Market", a: 28, d: 11.0, keeper: 'sk_saba' },
+      { id: 'boatwright', kind: 'boatwright', name: 'Funaki Boatyard', a: -90, d: 10.6, keeper: 'sk_funaki' },
+      { id: 'inn', kind: 'inn', name: 'Shinju Inn', a: -36, d: 10.6, keeper: 'sk_shinju' },
+      { id: 'shop', kind: 'shop', name: "Nami's Port Store", a: 84, d: 9.6, keeper: 'sk_nami' },
+      { id: 'waypoint', kind: 'waypoint', name: 'Waypoint Shrine', a: 160, d: 8.2, face: 'camera' },
     ],
     camps: [
       { id: 'pier', name: 'the pier barricade', at: [-6.8, -3.0], r: 3.0, cage: 'sk_saba', n: 5, saved: 'nets', pieces: { fire: [-6.9, -2.8], cage: [-6.4, -5.6, 0], tent: [-8.0, -6.6, 30], banner: [-5.4, -1.0] } },
@@ -171,17 +171,17 @@ export const VILLAGES = {
   // ---------------------------------------------------------------- Yukimi Spa Village (onsen): the road runs across the
   // screen through the square; the hot springs steam behind the bathhouse at the top
   onsen: V({
-    id: 'yukimi', zone: 'onsen', name: 'Yukimi Spa Village', jp: '雪見の湯', sub: 'Steam over the snow', theme: 'onsen', ready: true,
+    id: 'yukimi', zone: 'onsen', name: 'Yukimi Spa Village', sub: 'Steam over the snow', theme: 'onsen', ready: true,
     square: { r: 5.0 },
     buildings: [
-      { id: 'bathhouse', kind: 'bathhouse', name: 'Yukimi Bathhouse', jp: '雪見湯', a: 0, d: 8.0, keeper: 'yk_yuzu' }, // (top centre: the small spring steams behind it, the big one beside its bamboo screen)
-      { id: 'elder', kind: 'elder', name: "Granny Shirayuki's Cottage", jp: '白雪庵', a: -38, d: 9.8, keeper: 'yk_shirayuki' },
-      { id: 'inn', kind: 'inn', name: 'Ryokan Tsubaki', jp: '椿旅館', a: 48, d: 10.2, keeper: 'yk_tsubaki' },
+      { id: 'bathhouse', kind: 'bathhouse', name: 'Yukimi Bathhouse', a: 0, d: 8.0, keeper: 'yk_yuzu' }, // (top centre: the small spring steams behind it, the big one beside its bamboo screen)
+      { id: 'elder', kind: 'elder', name: "Granny Shirayuki's Cottage", a: -38, d: 9.8, keeper: 'yk_shirayuki' },
+      { id: 'inn', kind: 'inn', name: 'Ryokan Tsubaki', a: 48, d: 10.2, keeper: 'yk_tsubaki' },
       // the far side only fits three past the road and the springs: the low forge and shop stand by the two gates on the
       // camera side, fronts to the camera
-      { id: 'smith', kind: 'smith', name: "Tetsu's Snow Forge", jp: '雪鉄の鍛冶', a: -100, d: 10.4, face: 'camera', keeper: 'yk_tetsu' },
-      { id: 'shop', kind: 'shop', name: "Mikan's Warm Goods", jp: '蜜柑屋', a: 100, d: 10.2, face: 'camera', keeper: 'yk_mikan' },
-      { id: 'waypoint', kind: 'waypoint', name: 'Waypoint Shrine', jp: '道祖神', a: -160, d: 9.6, face: 'camera' },
+      { id: 'smith', kind: 'smith', name: "Tetsu's Snow Forge", a: -100, d: 10.4, face: 'camera', keeper: 'yk_tetsu' },
+      { id: 'shop', kind: 'shop', name: "Mikan's Warm Goods", a: 100, d: 10.2, face: 'camera', keeper: 'yk_mikan' },
+      { id: 'waypoint', kind: 'waypoint', name: 'Waypoint Shrine', a: -160, d: 9.6, face: 'camera' },
     ],
     camps: [
       { id: 'west', name: 'the woodshed barricade', at: [-6.4, -6.9], r: 2.5, cage: 'yk_tetsu', n: 5, saved: 'woodpile', pieces: { fire: [-6.3, -7.0], cage: [-6.9, -9.4, 0], tent: [-8.9, -7.4, 30], banner: [-5.0, -5.1], spikes: [-4.5, -6.6, 75] } },

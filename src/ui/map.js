@@ -47,14 +47,14 @@ const KEY_HOME = [
 const CHIPS = [['people', 'People', 'chat'], ['shops', 'Shops', 'shop'], ['services', 'Services', 'special'], ['quests', 'Quests', 'scroll'], ['gather', 'Gathering', 'leaf'], ['wild', 'Wild', 'draw:claw']];
 const ZMIN = 0.8, ZMAX = 6;
 export class MapPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'map', title: 'Map', jp: '地図', side: 'center', cls: 'p-map', icon: 'map' }); this.sel = null; this.hover = null; this.view = null; this.areaKey = ''; this.ptrs = new Map(); }
+  constructor(ui) { super(ui, { name: 'map', title: 'Map', side: 'center', cls: 'p-map', icon: 'map' }); this.sel = null; this.hover = null; this.view = null; this.areaKey = ''; this.ptrs = new Map(); }
   init() {
     this.body.innerHTML = `<div class="mp-wrap"><div class="mp-frame"><canvas class="mp-cv"></canvas><div class="mp-vig"></div><div class="mp-compass"><i class="mp-rose">${glyph('sakura')}</i><b>N</b></div>
         <div class="mp-cross pad-only"></div>
         <div class="mp-ctl"><button class="mp-b mp-zin" title="Zoom in">${glyph('plus')}</button><button class="mp-b mp-zout" title="Zoom out"><i class="mp-minus"></i></button><button class="mp-b mp-me" title="Back to you">${glyph('paw')}</button></div>
         <div class="mp-chips">${CHIPS.map(([k, n, ic]) => `<button class="mp-chip on" data-l="${k}" title="Show or hide: ${n}">${iconSVG(ic)}<span>${n}</span></button>`).join('')}</div>
         <div class="mp-tip kbm-only">${glyph('paw')}Drag to move · the wheel zooms · click someone to pin them</div><div class="mp-tip touch-only">${glyph('paw')}Drag to move · pinch to zoom · tap someone to pin them</div><div class="mp-tip pad-only"><span class="kc sm pad">${padGlyph('LS')}</span>move <span class="kc sm pad">${padGlyph('LT')}</span><span class="kc sm pad">${padGlyph('RT')}</span>zoom <span class="kc sm pad">${padGlyph('A')}</span>pin</div></div>
-      <div class="mp-side"><div class="mp-loc"><b class="mp-name">Blossom Hollow</b><span class="jp mp-jp">さくら村</span></div><div class="mp-dir"></div></div></div>`;
+      <div class="mp-side"><div class="mp-loc"><b class="mp-name">Blossom Hollow</b></div><div class="mp-dir"></div></div></div>`;
     const q = s => this.body.querySelector(s);
     this.cv = q('.mp-cv'); this.frame = q('.mp-frame'); this.rose = q('.mp-compass');
     this.dir = new MapDirectory(this, q('.mp-dir'));
@@ -229,7 +229,6 @@ export class MapPanel extends Panel {
     const dun = this.ui.mode === 'dungeon', home = this.ui.mode === 'interior';
     const loc = this.ui.hud?.cache.loc;
     this.body.querySelector('.mp-name').textContent = dun ? (loc?.name || this.G?.dungeon?.def?.name || 'Down below') : home ? (loc?.name || 'Home') : 'Blossom Hollow'; // (the floor's name from its mode: the HUD's, else its dungeon's)
-    this.body.querySelector('.mp-jp').textContent = dun ? (loc?.sub || '地下') : home ? 'おうち' : 'さくら村';
     this.frame.classList.toggle('pans', this.pans());
     this.dir?.render(true);
   }
@@ -310,7 +309,7 @@ export class MapPanel extends Panel {
 }
 
 export class QuestPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'quests', title: 'Journal', jp: 'クエスト帳', side: 'left', cls: 'p-quests', icon: 'book' }); this.sel = null; this.tab = 'active'; }
+  constructor(ui) { super(ui, { name: 'quests', title: 'Journal', side: 'left', cls: 'p-quests', icon: 'book' }); this.sel = null; this.tab = 'active'; }
   init() {
     this.body.innerHTML = `<div class="tabs q-tabs"><button class="tab on" data-t="active">${glyph('scroll')}Active <b class="tab-n">0</b></button><button class="tab" data-t="done">${glyph('check')}Done <b class="tab-n">0</b></button><button class="tab fl-tab" data-t="fish" style="--tc:#6ab8ff"><img class="pt-ti" src="${pantryIcon('koi')}" alt="">Fish Log <b class="tab-n">0</b></button><button class="tab cl-tab" data-t="crews" style="--tc:#8fc0f0">${cozyIcon('pack')}Crews <b class="tab-n">0</b></button><button class="tab gd-tab" data-t="guides" style="--tc:#c3b3ff">${glyph('book')}Guides</button></div>
       <div class="q-wrap"><div class="q-list"></div><div class="q-detail"></div></div>`;

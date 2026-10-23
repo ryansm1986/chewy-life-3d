@@ -13,12 +13,12 @@ const COLW = 118, ROWH = 80, NODE = 64, PADX = 64, PADY = 26;
 const SLOT_NAMES = ['LMB', 'RMB', '1', '2', '3', '4'];
 
 export class SkillsPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'skills', title: 'Skills', jp: 'スキル', side: 'left', cls: 'p-skills', icon: 'sparkle' }); this.tree = 'bone'; this.hoverId = null; }
+  constructor(ui) { super(ui, { name: 'skills', title: 'Skills', side: 'left', cls: 'p-skills', icon: 'sparkle' }); this.tree = 'bone'; this.hoverId = null; }
   init() {
     const b = this.body;
     this.extra.innerHTML = `<div class="sk-pts">${glyph('star')}<b>0</b><span>points</span></div>`;
     b.innerHTML = `<div class="tabs sk-tabs">${TREES.map(t => `<button class="tab" data-t="${t.id}" style="--tc:${t.color}">${glyph(t.glyph)}<span>${t.name}</span><b class="tab-n">0</b></button>`).join('')}</div>
-      <div class="tree-wrap"><div class="tree"><div class="tree-title"><span class="tt-jp"></span></div><svg class="links"></svg><div class="rows"></div><div class="nodes"></div></div></div>
+      <div class="tree-wrap"><div class="tree"><div class="tree-title"></div><svg class="links"></svg><div class="rows"></div><div class="nodes"></div></div></div>
       <div class="sk-foot kbm-only">${glyph('mouseL')}Learn <span class="sep">·</span>${glyph('mouseR')}Assign <span class="sep">·</span><span class="kc sm">1</span>–<span class="kc sm">4</span> while hovering <span class="sep">·</span> Drag to hotbar</div><div class="sk-foot pad-only"><span class="kc sm pad">${padGlyph('A')}</span>Learn <span class="sep">·</span><span class="kc sm pad">${padGlyph('Y')}</span>Assign <span class="sep">·</span><span class="kc sm pad">${padGlyph('X')}</span>Charge perks <span class="sep">·</span><span class="kc sm pad">${padGlyph('LT')}</span><span class="kc sm pad">${padGlyph('RT')}</span>Trees</div>`;
     this.$ = { pts: this.extra.querySelector('.sk-pts b'), ptsW: this.extra.querySelector('.sk-pts span'), ptsBox: this.extra.querySelector('.sk-pts'), tree: b.querySelector('.tree'), links: b.querySelector('.links'), nodes: b.querySelector('.nodes'), rows: b.querySelector('.rows'), title: b.querySelector('.tree-title') };
     this.chg = new ChargeDrawer(this); // (the Charge drawer docked to the tree's right: docs/CHARGE.md §4)
@@ -103,7 +103,7 @@ export class SkillsPanel extends Panel {
     const sig = T.id + '|' + list.map(s => s.id + this.lvl(s.id) + this.state(s)).join() + '|' + (p.hotbar || []).join() + '|' + JSON.stringify(p.chargePerks || {}) + '|' + pts + '|' + this.chg.id;
     if (sig === this._treeSig) return;
     this._treeSig = sig;
-    this.$.title.innerHTML = `<span class="tr-wm">${glyph(T.glyph)}</span><span class="tr-jp">${T.jp}</span>`;
+    this.$.title.innerHTML = `<span class="tr-wm">${glyph(T.glyph)}</span>`;
     // row level labels
     const rowReq = [];
     for (const s of list) rowReq[s.row] = Math.min(rowReq[s.row] ?? 99, s.reqLvl);
@@ -201,7 +201,7 @@ export class SkillsPanel extends Panel {
     const wep = s.wep === 'sword' ? ' · Bone Katana' : s.wep === 'ball' ? ' · Ball' : '';
     return `<div class="tt-skill" style="--tc:${T.color}">
       <div class="tt-name">${esc(s.name)}</div>
-      <div class="tt-kind"><span>${esc(T.name)} · ${KIND[s.kind] || 'Active'}${wep}</span><span class="jp">${T.jp || ''}</span></div>
+      <div class="tt-kind"><span>${esc(T.name)} · ${KIND[s.kind] || 'Active'}${wep}</span></div>
       ${s.desc ? `<div class="tt-desc">${esc(s.desc)}</div>` : ''}
       ${!s.passive && aimLine(id) ? `<div class="tt-aim">${esc(aimLine(id))}</div>` : ''}
       <div class="tt-lvrow"><span>Level <b>${lvl}</b>/${s.maxLvl}</span>${bonus > 0 && lvl ? `<span class="tt-bonus">+${bonus} from gear</span>` : ''}${hot >= 0 ? `<span class="kc sm">${SLOT_NAMES[hot]}</span>` : ''}</div>

@@ -594,7 +594,7 @@ hr('HOMESTEAD');
   ok(PANTRY_IDS.length === 50 && byKind('seed') === 8 && byKind('crop') === 8 && byKind('fish') === 15 && byKind('forage') === 4 && byKind('dish') === 15, 'pantry: 50 goods (8 seeds, 8 crops, 15 fish, 4 forage, 15 dishes)');
   for (const id of PANTRY_IDS) {
     const d = PANTRY[id];
-    ok(PKINDS.includes(d.kind) && d.name && d.jp && d.desc && fin(d.value) && d.value > 0, `pantry ${id} complete`);
+    ok(PKINDS.includes(d.kind) && d.name && d.desc && fin(d.value) && d.value > 0, `pantry ${id} complete`);
     if (d.kind === 'seed') ok(!!CROPS[d.crop] && fin(d.price) && d.price > 0, `seed ${id} grows a crop, has a price`);
     if (d.kind === 'dish') ok(d.food && d.food.heal > 0 && d.food.heal <= 1 && !!BUFFS[d.food.buff] && d.food.tier >= 1 && d.food.tier <= 3 && d.food.mins >= 5, `dish ${id} food valid`);
   }
@@ -738,7 +738,7 @@ hr('HOUSING');
   ok(Object.keys(FSETS).every(s => FURNITURE_IDS.some(id => FURNITURE[id].set === s)), 'furniture: every set has items');
   for (const id of FURNITURE_IDS) {
     const d = FURNITURE[id];
-    ok(d.id === id && d.name && d.jp && d.desc && FCATS[d.cat] && FSETS[d.set] && MOUNTS.includes(d.mount), `furniture ${id}: complete`);
+    ok(d.id === id && d.name && d.desc && FCATS[d.cat] && FSETS[d.set] && MOUNTS.includes(d.mount), `furniture ${id}: complete`);
     ok(Array.isArray(d.size) && d.size.length === 2 && d.size.every(n => Number.isInteger(n) && n >= 1 && n <= 4) && fin(d.h) && d.h > 0 && d.h <= 2, `furniture ${id}: size in cells, height`);
     ok(d.tags.length >= 1 && d.tags.every(t => TAGS.includes(t)), `furniture ${id}: tags`);
     ok(fin(d.price) && d.price > 0, `furniture ${id}: price`);
@@ -905,7 +905,7 @@ hr('EXTERIORS & GROWTH');
   ok(S.STYLE_SET_IDS.join() === 'machiya,cottage,teaHouse,seaside', 'styles: the four style sets');
   for (const id of S.STYLE_SET_IDS) {
     const set = S.STYLE_SETS[id], st = S.setStyle(id);
-    ok(set.name && set.jp && set.desc && set.cost?.coins > 0 && set.rank >= 1, `style set ${id}: complete`);
+    ok(set.name && set.desc && set.cost?.coins > 0 && set.rank >= 1, `style set ${id}: complete`);
     ok(Object.entries(set.style).every(([k, v]) => S.FIELDS[k]?.opts[v]) && st.set === id && Object.keys(set.style).every(k => st[k] === set.style[k]), `style set ${id}: every field a real option`);
     ok(['roof', 'roofType', 'wall', 'trim', 'door', 'window', 'fence'].every(k => set.style[k]), `style set ${id}: sets the main parts`);
   }
@@ -1477,7 +1477,7 @@ hr('ZONE VILLAGES: DATA, QUESTS, THE DUNGEON PROVIDER');
   const VD = await import('../src/regions/village/data.js'), ZQ = await import('../src/world/zoneQuests.js'), Q = await import('../src/world/questSteps.js'), Z = await import('../src/rpg/zones.js');
   const { FURNITURE } = await import('../src/home/furniture.js'), { PANTRY } = await import('../src/life/pantry.js'), { DUNGEONS, ZONE_DUNGEON } = await import('../src/dungeon/defs.js');
   // ---- the villages' data
-  ok(['bamboo', 'maple', 'tidepool', 'onsen'].every(z => VD.VILLAGES[z]?.name && VD.VILLAGES[z].jp && VD.VILLAGES[z].zone === z), 'villages: every zone has a named village (names in data)');
+  ok(['bamboo', 'maple', 'tidepool', 'onsen'].every(z => VD.VILLAGES[z]?.name && VD.VILLAGES[z].zone === z), 'villages: every zone has a named village (names in data)');
   ok(VD.VILLAGES.bamboo.name === 'Takemori Village' && VD.VILLAGES.maple.name === 'Akane Hamlet' && VD.VILLAGES.tidepool.name === 'Shiokaze Port' && VD.VILLAGES.onsen.name === 'Yukimi Spa Village', 'villages: the director\'s default names');
   const TK = VD.VILLAGES.bamboo, kinds = TK.buildings.map(b => b.kind);
   ok(TK.ready && TK.buildings.length >= 5 && TK.buildings.length <= 7 && VD.STANDARD.every(k => kinds.includes(k)) && kinds.includes('dojo') && kinds.includes('craft'), 'villages: Takemori has 5–7 buildings — the 4 standard ones, the Ninja Dojo and the Bamboo Craftshop');
@@ -1529,7 +1529,7 @@ hr('ZONE VILLAGES: DATA, QUESTS, THE DUNGEON PROVIDER');
   for (const [zone, sp] of Object.entries(SPECIALS)) {
     const Vz = VD.VILLAGES[zone], kz = Vz.buildings.map(b => b.kind), dz = ZONE_DUNGEON?.[zone];
     ok(Vz.ready && Vz.buildings.length >= 5 && Vz.buildings.length <= 7 && VD.STANDARD.every(k => kz.includes(k)) && sp.every(k => kz.includes(k)), `villages: ${Vz.name} has 5–7 buildings — the 4 standard ones and ${sp.join(' + ')}`);
-    ok(Vz.buildings.filter(b => b.kind !== 'waypoint').every(b => Math.abs(b.a) <= 100) && Vz.buildings.every(b => b.name && b.jp), `villages: ${Vz.name}'s buildings are named and stand round the far side`);
+    ok(Vz.buildings.filter(b => b.kind !== 'waypoint').every(b => Math.abs(b.a) <= 100) && Vz.buildings.every(b => b.name), `villages: ${Vz.name}'s buildings are named and stand round the far side`);
     const nz = Vz.villagers.filter(v => !v.rescue);
     ok(nz.length >= 3 && nz.length <= 5 && Vz.villagers.filter(v => v.rescue).length === 1 && Vz.villagers.every(v => v.id && v.name && v.spec?.species && v.role && v.bio), `villages: ${Vz.name} has ${nz.length} named villagers and one to rescue from its dungeon`);
     ok(Vz.camps.length >= 2 && Vz.camps.length <= 3 && Vz.camps.every(c => Vz.villagers.some(v => v.id === c.cage && v.camp === c.id) && c.saved), `villages: ${Vz.name} has 2–3 siege camps, each caging a villager, each with its saved dressing`);
@@ -1616,7 +1616,7 @@ hr('ZONE TIERS: SCALING, MODIFIERS, REWARDS, SAVE');
   // ---- the modifiers: the catalogue and the cleaning
   const mods = ZM.MOD_IDS;
   ok(mods.length === 17 && ['swarming', 'teeming', 'rally', 'uniqueHunt', 'fierce', 'stout', 'quick', 'elementalFire', 'elementalFrost', 'elementalZap', 'warded', 'haunted', 'nightMarch', 'hardGround', 'bossWrath', 'treasureTrove', 'cursedShrines'].every(id => ZM.ZONE_MODS[id]), 'mods: the first 15 of ZONES §5 (Elemental as fire / frost / zap) are data');
-  ok(mods.every(id => { const m = ZM.ZONE_MODS[id]; return m.name && m.desc && m.icon && m.color && m.jp && Number.isFinite(m.risk) && (m.layout || m.monster || m.run || m.boss) && Object.keys(m.reward).every(k => ZM.REWARD_KEYS.includes(k)); }), 'mods: each has a name, kanji, icon, colour, effect text, risk, a hook and a reward');
+  ok(mods.every(id => { const m = ZM.ZONE_MODS[id]; return m.name && m.desc && m.icon && m.color && Number.isFinite(m.risk) && (m.layout || m.monster || m.run || m.boss) && Object.keys(m.reward).every(k => ZM.REWARD_KEYS.includes(k)); }), 'mods: each has a name, kanji, icon, colour, effect text, risk, a hook and a reward');
   ok(ZM.cleanMods(['swarming', 'swarming', 'nope', 'elementalFire', 'elementalZap', 'stout', 'quick'], { tier: 5 }).join() === 'swarming,elementalFire,stout' && ZM.cleanMods(['haunted', 'stout'], { tier: 1 }).join() === 'haunted' && ZM.cleanMods(['haunted'], { tier: 0 }).length === 0 && ZM.cleanMods(mods, { spirit: 10 }).length === 6, 'mods: cleaned to known ids, no repeats, one Elemental, at most the run\'s slots (T0 none)');
   const n5 = D.normRun({ id: 'tideCaves', floor: 2, tier: 9, mods: ['fierce', 'quick', 'stout', 'warded'] }), nS = D.normRun({ id: 'mapleRoots', tier: 2, spirit: 4, mods: mods }), nB = D.normRun({ id: 'burrow', floor: 3, tier: 3, mods: ['fierce'] });
   ok(n5.tier === 5 && n5.mods.length === 3 && nS.tier === 5 && nS.spirit === 4 && nS.mods.length === 4 && nB.tier === 0 && nB.spirit === 0 && nB.mods.length === 0, 'runs: normRun caps the tier at 5, a Spirit run is T5, the Burrow\'s dens have no tiers (their tier runs are the Deep Burrow\'s)');
@@ -2067,7 +2067,7 @@ hr('COZY: THE PEACEFUL OVERWORLD AND THE WILD AREAS (docs/COZY.md §6, cozy/peac
   // ---- the recipe data: 2 named wild areas a zone, as data the terrain rework (Z-F) carries
   for (const id of REGION_IDS) {
     const def = REGIONS[id], raw = def.layout.wild || [], A = PZ.wildAreas(def), P = LG.regionPlan(def);
-    ok(raw.length === 2 && A.length === 2 && A.every(a => a.name && a.jp && a.r >= 12 && a.r <= 16 && a.packs >= 2 && a.packs <= 3) && new Set(A.map(a => a.id)).size === 2, `wild: ${id} has 2 named wild areas (r 12–16, 2–3 packs) in its recipe`);
+    ok(raw.length === 2 && A.length === 2 && A.every(a => a.name && a.r >= 12 && a.r <= 16 && a.packs >= 2 && a.packs <= 3) && new Set(A.map(a => a.id)).size === 2, `wild: ${id} has 2 named wild areas (r 12–16, 2–3 packs) in its recipe`);
     ok(P.wild.length === 2 && !P.wildIssues.length, `wild: ${id}'s plan keeps both areas with no issues (${JSON.stringify(P.wildIssues)})`);
     // the hard rule: every main-trail point at least r + 3 m from each disc (the walk to the village and the gate never crosses one)
     const worst = Math.min(...P.wild.map(a => Math.min(...P.trail.map(([x, z]) => D2(a, x, z) - a.r))));
@@ -2092,7 +2092,7 @@ hr('COZY: THE PEACEFUL OVERWORLD AND THE WILD AREAS (docs/COZY.md §6, cozy/peac
   }
   // ---- the check is enforced: an area on the trail is dropped and reported
   { const def = REGIONS.bamboo, P0 = LG.regionPlan(def), [tx, tz] = P0.trail[Math.round(P0.trail.length * 0.15)];
-    const bad = { ...def, layout: { ...def.layout, wild: [...def.layout.wild, { id: 'onTheTrail', name: 'the bad idea', jp: '', at: [tx, tz], r: 12 }] } };
+    const bad = { ...def, layout: { ...def.layout, wild: [...def.layout.wild, { id: 'onTheTrail', name: 'the bad idea', at: [tx, tz], r: 12 }] } };
     const P = LG.regionPlan(bad);
     ok(P.wild.length === 2 && !P.wild.some(a => a.id === 'onTheTrail') && P.wildIssues.some(e => e.id === 'onTheTrail' && e.kind === 'trail'), 'wild: layoutGen drops an area that sits on the trail (and lists why)');
     ok(PZ.areaIssues({ id: 'x', x: 56, z: 56, r: 12 }, { trail: [[56, 56], [60, 60]] }).some(e => e.kind === 'trail') && !PZ.areaIssues({ id: 'y', x: 20, z: 20, r: 12 }, { trail: [[80, 80], [90, 90]] }).length, 'wild: areaIssues flags a disc on the trail, passes one far off it'); }

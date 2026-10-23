@@ -7,7 +7,7 @@
 // wildlife glades (RegionMode: layout.glades), and the scavenging phase (CZ-5) can put its clusters there.
 //
 // Wild areas (§6.2) are recipe data, so the terrain rework (Z-F) carries them like the village's site:
-//   layout.wild: [{ id, name, jp, at: [x, z], r, packs, spur? }]
+//   layout.wild: [{ id, name, at: [x, z], r, packs, spur? }]
 //     name   display name with its article ("the Kamaitachi Thicket"; titled() capitalises it for a toast)
 //     r      the disc's radius (12–16 m)
 //     packs  monster packs per visit (2–3)
@@ -43,7 +43,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 /** "the Kamaitachi Thicket" → "The Kamaitachi Thicket" (a toast, a heading) */
 export const titled = s => (s ? s[0].toUpperCase() + s.slice(1) : '');
 
-/** one recipe entry → { id, name, jp, x, z, r, packs, spur } (or null when it isn't usable) */
+/** one recipe entry → { id, name, x, z, r, packs, spur } (or null when it isn't usable) */
 export function normArea(w, i = 0) {
   if (!w || typeof w !== 'object') return null;
   const at = Array.isArray(w.at) ? w.at : [w.x, w.z];
@@ -52,7 +52,6 @@ export function normArea(w, i = 0) {
   return {
     id: typeof w.id === 'string' && w.id ? w.id : `wild${i + 1}`,
     name: typeof w.name === 'string' && w.name ? w.name : 'the wild',
-    jp: typeof w.jp === 'string' ? w.jp : '',
     x, z, r: clamp(num(w.r, 13), WILD.r[0], WILD.r[1]),
     packs: clamp(Math.round(num(w.packs, 3)), WILD.packs[0], WILD.packs[1]),
     spur: Array.isArray(w.spur) ? w.spur.filter(p => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1])).map(p => [p[0], p[1]]) : [],

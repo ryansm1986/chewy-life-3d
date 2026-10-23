@@ -5,7 +5,7 @@ import { VILLAGERS } from '../actors/roster.js';
 import { loadHeroModels } from '../actors/heroModels.js';
 
 export default async function () {
-  await loadHeroModels(['chewy', 'moka', 'shadow', 'rosie']); // the baked heroes, as in the game (portraits.js prefers them when loaded)
+  await loadHeroModels(['chewy', 'moka', 'shadow', 'rosie', 'mochi', 'kuma', 'usagi', 'kitsune', 'pan', 'tanu', 'kero']); // the baked heroes, as in the game (portraits.js prefers them when loaded)
   const engine = new Engine();
   const P = new Portraits(engine);
   for (const v of VILLAGERS) P.register(v.id, v.spec);

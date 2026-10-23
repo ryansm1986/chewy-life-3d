@@ -57,13 +57,13 @@ export const FIELD_IDS = Object.keys(FIELDS);
 
 // the four style sets (they set many fields at once) — docs/HOUSING.md §6
 export const STYLE_SETS = {
-  machiya: { name: 'Machiya', jp: '町家', desc: 'A Kyoto townhouse: charcoal tiles, dark cedar lattice, an indigo noren.', cost: { coins: 320, wood: 10, stone: 4 }, rank: 2,
+  machiya: { name: 'Machiya', desc: 'A Kyoto townhouse: charcoal tiles, dark cedar lattice, an indigo noren.', cost: { coins: 320, wood: 10, stone: 4 }, rank: 2,
     style: { roof: 'charcoal', roofType: 'gable', wall: 'linen', trim: 'dark', door: 'lattice', doorColor: 'dark', window: 'lattice', noren: 'indigo', norenSym: 'wave', fence: 'bamboo', fenceColor: 'natural' } },
-  cottage: { name: 'Cottage', jp: 'こや', desc: 'Storybook cosy: terracotta, cream walls, a round door and a white picket fence.', cost: { coins: 240, wood: 8 }, rank: 1,
+  cottage: { name: 'Cottage', desc: 'Storybook cosy: terracotta, cream walls, a round door and a white picket fence.', cost: { coins: 240, wood: 8 }, rank: 1,
     style: { roof: 'terracotta', roofType: 'hip', wall: 'cream', trim: 'honey', door: 'round', doorColor: 'red', window: 'round', noren: 'none', fence: 'picket', fenceColor: 'white' } },
-  teaHouse: { name: 'Tea House', jp: '茶屋', desc: 'Mossy irimoya eaves, shoji everywhere, a pine-green noren and a hedge.', cost: { coins: 300, wood: 10, petal: 2 }, rank: 2,
+  teaHouse: { name: 'Tea House', desc: 'Mossy irimoya eaves, shoji everywhere, a pine-green noren and a hedge.', cost: { coins: 300, wood: 10, petal: 2 }, rank: 2,
     style: { roof: 'moss', roofType: 'irimoya', wall: 'butter', trim: 'timber', door: 'shoji', doorColor: 'natural', window: 'shoji', noren: 'pine', norenSym: 'leaf', fence: 'hedge', fenceColor: 'natural' } },
-  seaside: { name: 'Seaside', jp: '浜辺', desc: 'Breezy blues and whitewash, round windows and a rope fence.', cost: { coins: 280, wood: 8, stone: 2 }, rank: 2,
+  seaside: { name: 'Seaside', desc: 'Breezy blues and whitewash, round windows and a rope fence.', cost: { coins: 280, wood: 8, stone: 2 }, rank: 2,
     style: { roof: 'sea', roofType: 'gable', wall: 'sky', trim: 'white', door: 'wood', doorColor: 'blue', window: 'round', noren: 'none', fence: 'rope', fenceColor: 'sea' } },
 };
 export const STYLE_SET_IDS = Object.keys(STYLE_SETS);

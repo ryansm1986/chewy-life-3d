@@ -1,0 +1,75 @@
+{
+  "W_m": 0.64,
+  "chin_z_m": 0.513,
+  "head_width_W": 1.0,
+  "crown_above_chin_W": 0.755,
+  "head_depth_W": 0.891,
+  "ear_tip_z_m": 1.1126,
+  "ear_tip_above_crown_W": 0.182,
+  "ear_tip_x_W": 0.358,
+  "eye_centre_W": [
+    0.238,
+    0.285
+  ],
+  "eye_opening_W": [
+    0.22,
+    0.212
+  ],
+  "nose_tip_z_W": 0.205,
+  "nose_tip_y_m": -0.2615,
+  "nose_proud_of_face_W": 0.051,
+  "skin_fill_points": 4060,
+  "nose_chart_faces": 195,
+  "skin_vertices": 4888,
+  "skin_faces": 9600,
+  "eye_axis_R": {
+    "out_deg": 30.6,
+    "down_deg": -0.6
+  },
+  "eye_axis_L": {
+    "out_deg": 30.6,
+    "down_deg": -0.6
+  },
+  "ear_R": {
+    "tip_m": [
+      -0.2368,
+      0.0718,
+      1.1114
+    ],
+    "base_on_skin_m": [
+      -0.1858,
+      0.09,
+      0.9446
+    ],
+    "L_W": 0.267,
+    "half_angle_deg": 31.6
+  },
+  "ear_L": {
+    "tip_m": [
+      0.2368,
+      0.0718,
+      1.1114
+    ],
+    "base_on_skin_m": [
+      0.1858,
+      0.09,
+      0.9446
+    ],
+    "L_W": 0.267,
+    "half_angle_deg": 31.6
+  },
+  "part_triangles": {
+    "head": 9688,
+    "eye.L": 720,
+    "eye.R": 720,
+    "ear.L": 2376,
+    "ear.R": 2376,
+    "body": 7216,
+    "arm.L": 1796,
+    "arm.R": 1796,
+    "leg.L": 1016,
+    "leg.R": 1016,
+    "tail": 1280
+  },
+  "triangles": 30000
+}

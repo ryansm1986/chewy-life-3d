@@ -46,7 +46,6 @@
 .qc-page { grid-area: page; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding-top: 2px; }
 .qc-kick { display: flex; align-items: center; gap: 6px; font: 700 13px/1 var(--font); color: #d8456e; letter-spacing: 1.4px; text-transform: uppercase; }
 .qc-kick .gl { width: 20px; height: 20px; }
-.qc-kick .jp { font-size: 12px; letter-spacing: 3px; color: #e88aa6; margin-left: 2px; }
 .qc-title { margin: 0; font: 700 31px/1.04 var(--font); color: var(--ink); letter-spacing: .2px; text-shadow: 0 2px 0 #fff; }
 .qc-hook { position: relative; margin: 0; padding: 2px 0 0 25px; font: 500 17px/1.38 var(--font); color: #5c3b36; }
 .qc-q.o { position: absolute; left: -1px; top: -5px; font: 700 48px/1 var(--font); color: #ff9ab8; }
@@ -107,7 +106,6 @@
 .bn-place .bn-pk-t { display: block; width: 26px; height: 28px; margin: 9px -7px 0; flex: none; overflow: visible; }
 .bn-place .bn-pk-t.r { transform: scaleX(-1); }
 .bn-place .bn-pk span { position: relative; z-index: 1; } /* (over its tails: no negative z-index, which an animating ancestor's stacking context hides) */
-.bn-place .bn-jp { color: #fff; font-size: 16px; letter-spacing: 9px; animation-duration: 1.1s; margin: 2px 0 2px; }
 .bn-place .bn-title { font: 600 56px/1.1 var(--font); color: #fff6e8; -webkit-text-stroke: 9px var(--ink); text-shadow: 0 6px 0 rgba(74, 44, 42, .85); letter-spacing: 3px; }
 .bn-place .bn-title .lt { animation: qpLetter .5s cubic-bezier(.2, .9, .3, 1) both; animation-delay: calc(.1s + min(var(--i) * .03s, .45s)); } /* (quick and never blurred: every letter crisp by about 1 s, held for the rest) */
 @keyframes qpLetter { from { opacity: 0; transform: translateY(10px) scale(1.06); } }
@@ -123,7 +121,6 @@ body.touch-active .ui-root:has(.banners[data-style="place"] .bn-place:not(.out))
 .ui-root.m-phone .banners[data-style="place"] { top: 10%; }
 .ui-root.m-phone .bn-place .bn-pk span { font-size: 16px; padding: 4px 13px 6px 8px; }
 .ui-root.m-phone .bn-place .bn-pk .gl { width: 19px; height: 19px; }
-.ui-root.m-phone .bn-place .bn-jp { font-size: 14px; letter-spacing: 7px; }
 .ui-root.m-phone .bn-place .bn-title { font-size: 42px; -webkit-text-stroke-width: 8px; text-shadow: 0 5px 0 rgba(74, 44, 42, .85); }
 .ui-root.m-phone .bn-place .bn-brush { width: 330px; height: 24px; }
 .ui-root.m-phone .bn-place .bn-sub { font-size: 17px; margin-top: 6px; }
@@ -152,14 +149,12 @@ body.touch-active .ui-root:has(.banners[data-style="place"] .bn-place:not(.out))
 .st-hanko svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .st-hanko circle { fill: rgba(255, 236, 236, .55); stroke: currentColor; stroke-width: 6; stroke-dasharray: 210 6 40 4; }
 .st-hanko circle.in { fill: none; stroke-width: 2.5; stroke-dasharray: none; opacity: .85; }
-.st-hanko b { position: relative; margin-top: -12px; font: 800 30px/1 var(--jp); letter-spacing: 2px; }
-.st-hanko i { position: absolute; bottom: 22px; font: 800 13px/1 var(--font); font-style: normal; letter-spacing: 2px; }
+.st-hanko i { position: relative; font: 800 21px/1 var(--font); font-style: normal; letter-spacing: 2px; }
 @keyframes stPress { 0% { opacity: 0; transform: rotate(-24deg) scale(2.1); } 60% { opacity: 1; transform: rotate(-12deg) scale(.94); } 100% { opacity: 1; transform: rotate(-14deg) scale(1); } }
 .ui-root.m-phone .st-card { min-width: 340px; padding: 10px 84px 10px 16px; }
 .ui-root.m-phone .st-t { font-size: 23px; }
 .ui-root.m-phone .st-hanko { width: 80px; height: 80px; margin-top: -42px; right: -4px; }
-.ui-root.m-phone .st-hanko b { font-size: 24px; }
-.ui-root.m-phone .st-hanko i { bottom: 17px; font-size: 11px; }
+.ui-root.m-phone .st-hanko i { font-size: 17px; }
 body.touch-active .ui-root:has(.banners[data-style="stamp"] .bn-stamp:not(.out)) .toasts { opacity: 0; transition: opacity .25s; }
 /* a level-up the quest's XP brought: a chip on the stamp's card (Banners.foldLevel), not a banner over the giver */
 .st-card .st-lvl { justify-content: flex-start; min-height: 0; margin-top: 6px; }

@@ -7,7 +7,6 @@ import './heroWheel.css';
 import { Input } from '../core/input.js';
 import { Actions } from '../core/actions.js';
 import { keyCap } from './padGlyphs.js';
-import { HERO_TEXT } from '../rpg/classes.js';
 import { el, esc } from './dom.js';
 import { portrait } from './portraits.js';
 import { cozyIcon } from './cozyIcons.js';
@@ -37,9 +36,8 @@ export class HeroWheel {
       c.style.setProperty('--hc', h.color); c.style.setProperty('--x', `${x.toFixed(1)}px`); c.style.setProperty('--y', `${y.toFixed(1)}px`); c.style.setProperty('--i', i);
       c.classList.toggle('active', h.active); c.classList.toggle('locked', !h.joined); c.classList.toggle('blocked', h.joined && !h.active && !h.ready); c.classList.toggle('away', !!h.away); // (away: out on an expedition, docs/COZY.md §4.8)
       const url = this.G.portrait?.(h.id), face = url ? `<img class="p3d" src="${url}" alt="" draggable="false">` : portrait(h.id);
-      const jp = h.joined ? HERO_TEXT[h.id]?.jp || '' : '';
       c.innerHTML = `<div class="hw-face">${face}${h.joined ? '' : '<i class="hw-q">?</i>'}</div>${h.away ? `<i class="cz-away-badge" title="Away on an expedition">${cozyIcon('pack')}</i>` : ''}
-        <div class="hw-t"><b>${esc(h.name)}${jp ? `<span class="jp">${jp}</span>` : ''}</b><span>${esc(h.title)}</span>${h.joined ? `<em>Lv ${h.lvl}</em>` : ''}</div>
+        <div class="hw-t"><b>${esc(h.name)}</b><span>${esc(h.title)}</span>${h.joined ? `<em>Lv ${h.lvl}</em>` : ''}</div>
         <span class="kc sm hw-k">${i + 1}</span>${h.active ? '<span class="hw-tag">Playing</span>' : !h.ready && h.joined ? `<span class="hw-tag dim">${esc(h.away ? awayTag(h.away) : h.why)}</span>` : !h.joined ? `<span class="hw-tag dim">${esc(h.why)}</span>` : ''}`;
       c.addEventListener('pointerenter', () => this.select(i));
       c.addEventListener('click', e => { e.stopPropagation(); this.select(i); this.confirm(); });

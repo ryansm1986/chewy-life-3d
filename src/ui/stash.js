@@ -41,7 +41,7 @@ function hintTo(e, t) { if (!e) return; const h = padWording(esc(t)); if (e._h !
 
 export class StashPanel extends Panel {
   constructor(ui) {
-    super(ui, { name: 'stash', title: 'Stash', jp: '倉庫', side: 'left', cls: 'p-stash', icon: 'chest' }); this.tab = 0;
+    super(ui, { name: 'stash', title: 'Stash', side: 'left', cls: 'p-stash', icon: 'chest' }); this.tab = 0;
     this.filter = 'all'; try { const f = localStorage.getItem(FILTER_KEY); if (STASH_FILTERS.some(x => x.id === f)) this.filter = f; } catch (e) { /* private mode */ }
   }
   init() {

@@ -17,7 +17,7 @@ import { runInfo, slotsFor } from './tiers.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 /**
- * id → { name, jp, icon, color, desc (the effect), reward: { qty?, rarity?, xp?, boss? } (fractions), risk (0–3: how much
+ * id → { name, icon, color, desc (the effect), reward: { qty?, rarity?, xp?, boss? } (fractions), risk (0–3: how much
  *   harder it makes the run: the Lantern's "recommended" picks the gentle ones), group? (only one per group),
  *   layout?: { pack (× pack size), extraPacks (per room), champX (× champion packs), uniques (+ unique packs),
  *              chests (+ golden chests), shrines (+ shrines) },
@@ -26,23 +26,23 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
  *   run?: { haunted: { normal, elite, cap }, night, alertR, regen, curse: { pct, t } } }
  */
 export const ZONE_MODS = {
-  swarming: { name: 'Swarming', jp: '群れ', icon: 'swarm', color: '#ff9a5a', desc: 'Packs are 40% bigger', reward: { qty: 0.15, xp: 0.10 }, risk: 2, layout: { pack: 1.4 } },
-  teeming: { name: 'Teeming', jp: '満員', icon: 'teem', color: '#ffb84a', desc: 'One extra pack in every room', reward: { qty: 0.10 }, risk: 2, layout: { extraPacks: 1 } },
-  rally: { name: 'Rally', jp: '集結', icon: 'rally', color: '#6aa8ff', desc: 'Twice as many champion packs', reward: { rarity: 0.10 }, risk: 2, layout: { champX: 2 } },
-  uniqueHunt: { name: 'Unique Hunt', jp: '大物', icon: 'crown', color: '#ffb030', desc: 'Two more unique packs on every floor', reward: { rarity: 0.15 }, risk: 2, layout: { uniques: 2 } },
-  fierce: { name: 'Fierce', jp: '猛者', icon: 'fang', color: '#ff5a5a', desc: 'Monsters deal 30% more damage', reward: { xp: 0.10 }, risk: 3, monster: { dmg: 1.3 } },
-  stout: { name: 'Stout', jp: '頑丈', icon: 'stout', color: '#c89a6a', desc: 'Monsters have 40% more life', reward: { qty: 0.10 }, risk: 2, monster: { life: 1.4 } },
-  quick: { name: 'Quick', jp: '疾風', icon: 'quick', color: '#8fe0c0', desc: 'Monsters move and attack 25% faster', reward: { xp: 0.10 }, risk: 3, monster: { speed: 1.25, atk: 1.25 } },
-  elementalFire: { name: 'Elemental: Fire', short: 'Fire-touched', jp: '火', icon: 'fire', color: '#ff8a3c', group: 'elemental', desc: 'Monsters deal 35% extra damage as fire', reward: { rarity: 0.08 }, risk: 2, monster: { el: 'fire', elPct: 0.35 } },
-  elementalFrost: { name: 'Elemental: Frost', short: 'Frost-touched', jp: '氷', icon: 'frost', color: '#8fd0ff', group: 'elemental', desc: 'Monsters deal 35% extra damage as frost, and their hits chill', reward: { rarity: 0.08 }, risk: 2, monster: { el: 'frost', elPct: 0.35 } },
-  elementalZap: { name: 'Elemental: Zap', short: 'Zap-touched', jp: '雷', icon: 'zap', color: '#ffe44a', group: 'elemental', desc: 'Monsters deal 35% extra damage as zap', reward: { rarity: 0.08 }, risk: 2, monster: { el: 'zap', elPct: 0.35 } },
-  warded: { name: 'Warded', jp: '結界', icon: 'ward', color: '#b8a8ff', desc: 'Monsters have +20% to every resistance', reward: { qty: 0.08 }, risk: 1, monster: { res: 20 } },
-  haunted: { name: 'Haunted', jp: '幽霊', icon: 'ghost', color: '#cfe8ff', desc: 'Spirit ghosts rise from fallen monsters', reward: { qty: 0.12 }, risk: 2, run: { haunted: { normal: 0.2, elite: 1, cap: 24 } } },
-  nightMarch: { name: 'Night March', jp: '夜行', icon: 'night', color: '#7a6ae8', desc: 'Darker halls; monsters spot you from further off and fight harder', reward: { xp: 0.10 }, risk: 2, monster: { atk: 1.12, speed: 1.08 }, run: { night: true, alertR: 14 } },
-  hardGround: { name: 'Hard Ground', jp: '荒地', icon: 'ground', color: '#b88a5a', desc: 'You regenerate life and zoom 30% slower', reward: { rarity: 0.10 }, risk: 1, run: { regen: 0.7 } },
-  bossWrath: { name: "Boss's Wrath", jp: '怒髪', icon: 'wrath', color: '#ff4a6a', desc: 'The boss has 50% more life, hits 20% harder and gains a wrath phase', reward: { boss: 0.20 }, risk: 2, boss: { life: 1.5, dmg: 1.2, wrath: 0.4 } },
-  treasureTrove: { name: 'Treasure Trove', jp: '宝の山', icon: 'chest', color: '#ffd84a', desc: 'Two more golden chests on every floor', reward: {}, risk: 0, layout: { chests: 2 } },
-  cursedShrines: { name: 'Cursed Shrines', jp: '祟り', icon: 'curse', color: '#c88aff', desc: 'Shrines also curse you (+25% damage taken for 20 s); one more shrine a floor', reward: { rarity: 0.10 }, risk: 1, layout: { shrines: 1 }, run: { curse: { pct: 25, t: 20 } } },
+  swarming: { name: 'Swarming', icon: 'swarm', color: '#ff9a5a', desc: 'Packs are 40% bigger', reward: { qty: 0.15, xp: 0.10 }, risk: 2, layout: { pack: 1.4 } },
+  teeming: { name: 'Teeming', icon: 'teem', color: '#ffb84a', desc: 'One extra pack in every room', reward: { qty: 0.10 }, risk: 2, layout: { extraPacks: 1 } },
+  rally: { name: 'Rally', icon: 'rally', color: '#6aa8ff', desc: 'Twice as many champion packs', reward: { rarity: 0.10 }, risk: 2, layout: { champX: 2 } },
+  uniqueHunt: { name: 'Unique Hunt', icon: 'crown', color: '#ffb030', desc: 'Two more unique packs on every floor', reward: { rarity: 0.15 }, risk: 2, layout: { uniques: 2 } },
+  fierce: { name: 'Fierce', icon: 'fang', color: '#ff5a5a', desc: 'Monsters deal 30% more damage', reward: { xp: 0.10 }, risk: 3, monster: { dmg: 1.3 } },
+  stout: { name: 'Stout', icon: 'stout', color: '#c89a6a', desc: 'Monsters have 40% more life', reward: { qty: 0.10 }, risk: 2, monster: { life: 1.4 } },
+  quick: { name: 'Quick', icon: 'quick', color: '#8fe0c0', desc: 'Monsters move and attack 25% faster', reward: { xp: 0.10 }, risk: 3, monster: { speed: 1.25, atk: 1.25 } },
+  elementalFire: { name: 'Elemental: Fire', short: 'Fire-touched', icon: 'fire', color: '#ff8a3c', group: 'elemental', desc: 'Monsters deal 35% extra damage as fire', reward: { rarity: 0.08 }, risk: 2, monster: { el: 'fire', elPct: 0.35 } },
+  elementalFrost: { name: 'Elemental: Frost', short: 'Frost-touched', icon: 'frost', color: '#8fd0ff', group: 'elemental', desc: 'Monsters deal 35% extra damage as frost, and their hits chill', reward: { rarity: 0.08 }, risk: 2, monster: { el: 'frost', elPct: 0.35 } },
+  elementalZap: { name: 'Elemental: Zap', short: 'Zap-touched', icon: 'zap', color: '#ffe44a', group: 'elemental', desc: 'Monsters deal 35% extra damage as zap', reward: { rarity: 0.08 }, risk: 2, monster: { el: 'zap', elPct: 0.35 } },
+  warded: { name: 'Warded', icon: 'ward', color: '#b8a8ff', desc: 'Monsters have +20% to every resistance', reward: { qty: 0.08 }, risk: 1, monster: { res: 20 } },
+  haunted: { name: 'Haunted', icon: 'ghost', color: '#cfe8ff', desc: 'Spirit ghosts rise from fallen monsters', reward: { qty: 0.12 }, risk: 2, run: { haunted: { normal: 0.2, elite: 1, cap: 24 } } },
+  nightMarch: { name: 'Night March', icon: 'night', color: '#7a6ae8', desc: 'Darker halls; monsters spot you from further off and fight harder', reward: { xp: 0.10 }, risk: 2, monster: { atk: 1.12, speed: 1.08 }, run: { night: true, alertR: 14 } },
+  hardGround: { name: 'Hard Ground', icon: 'ground', color: '#b88a5a', desc: 'You regenerate life and zoom 30% slower', reward: { rarity: 0.10 }, risk: 1, run: { regen: 0.7 } },
+  bossWrath: { name: "Boss's Wrath", icon: 'wrath', color: '#ff4a6a', desc: 'The boss has 50% more life, hits 20% harder and gains a wrath phase', reward: { boss: 0.20 }, risk: 2, boss: { life: 1.5, dmg: 1.2, wrath: 0.4 } },
+  treasureTrove: { name: 'Treasure Trove', icon: 'chest', color: '#ffd84a', desc: 'Two more golden chests on every floor', reward: {}, risk: 0, layout: { chests: 2 } },
+  cursedShrines: { name: 'Cursed Shrines', icon: 'curse', color: '#c88aff', desc: 'Shrines also curse you (+25% damage taken for 20 s); one more shrine a floor', reward: { rarity: 0.10 }, risk: 1, layout: { shrines: 1 }, run: { curse: { pct: 25, t: 20 } } },
 };
 export const MOD_IDS = Object.keys(ZONE_MODS);
 export const REWARD_KEYS = ['qty', 'rarity', 'xp', 'boss'];

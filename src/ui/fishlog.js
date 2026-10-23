@@ -34,7 +34,7 @@ export class FishLogView {
     }).join('');
     const id = this.sel, e = L[id], d = PANTRY[id], where = fishHabits(id);
     this.$.det.innerHTML = `<div class="fl-art ${e ? '' : 'unseen'}" style="--rc:${RARE_COLORS[d.rare || 0]}"><img class="${e ? '' : 'sil'}" src="${pantryIcon(id)}" alt=""></div>
-      <div class="fl-name">${e ? esc(d.name) : '???'} ${e ? `<span class="jp">${esc(d.jp)}</span>` : ''}</div>
+      <div class="fl-name">${e ? esc(d.name) : '???'}</div>
       <div class="fl-rare" style="--rc:${RARE_COLORS[d.rare || 0]}">${d.rare ? RARE_NAMES[d.rare] : 'Common'}</div>
       ${e ? `<div class="fl-desc">${esc(d.desc)}</div>
         <div class="fl-stats"><div>${glyph('star')}<span>Best</span><b>${e.best} cm</b></div><div>${glyph('wave')}<span>Caught</span><b>×${e.n}</b></div><div>${glyph('sun')}<span>First</span><b>Day ${e.day} · ${esc(SPOTS[e.spot]?.name || '?')}</b></div></div>`

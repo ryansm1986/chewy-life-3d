@@ -422,7 +422,7 @@ CT-11 replaced the pad controls below for both modes with §14.5 and §14.6 (the
   That covers about 40 selectors: the HUD badges, the skill tree's levels and charge perks, the recipe and craft
   lists, the Travel Map pins, the gift and seed cards, the house card, remodel, the guide's header, the reel bar and
   build mode's cards and side panel, and the keyboard's small keycaps. They are listed in one `:is()` rule.
-  - Left as they are: the Japanese subtitles, the compass's 北, the portrait's tiny "Lv" and the glyph art.
+  - Left as they are: the compass's N, the portrait's tiny "Lv" and the glyph art.
   - The glyph footer (`.pad-hints`) and the tooltips are in the unscaled overlay layer: 14 px and up.
 - **Toasts** move up above the hotbar row: at 1280 wide the health orb reached in under them.
 - **The glyph footer** (`padNav`) for a panel as tall as the screen (Settings) now sits beside the panel's bottom
@@ -825,7 +825,7 @@ inside the safe area (`env(safe-area-inset-*)`).
 - **The text floor**: anything still under 12 px gets an inline size. That covers the panels, dialogue, tooltips,
   popovers, the guide dock, the hero wheel, toasts, the reel bar and the flip chip.
   - A MutationObserver marks it dirty, and it runs at most once a frame.
-  - The Japanese subtitles, key caps, minimap names and level pips are exempt.
+  - Key caps, minimap names and level pips are exempt.
 - **Fit**: a phone shows one panel at a time, centred between the safe area's top and bottom margins.
   - Its body scrolls inside the panel (`pan-y`, overscroll contained), and the panel is never off the top.
   - Its title, tabs and ✕ (52 px) sit at the bottom, by the thumbs.

@@ -12,10 +12,8 @@ import { keyCap, capInner } from './padGlyphs.js';
 import { pantryIcon } from '../life/pantryIcons.js';
 import { PANTRY } from '../life/pantry.js';
 import { BUFFS, TIER_NAMES } from '../life/meals.js';
-import { HERO_TEXT } from '../rpg/classes.js';
 
 const TAU = Math.PI * 2;
-const HERO_JP = Object.fromEntries(Object.entries(HERO_TEXT).map(([k, v]) => [k, v.jp])); // (each hero's kana: classes.js HERO_TEXT, the one place)
 const SLOT_KEYS = ['LMB', 'RMB', '1', '2', '3', '4'];
 const SLOT_ACTS = ['attack', 'skillAlt', 'skill1', 'skill2', 'skill3', 'skill4']; // (their caps follow the device and the bindings: ui/padGlyphs.js)
 
@@ -188,7 +186,7 @@ export class Hud {
         <div class="pc-bub" data-open="character"><div class="pc-face">${portrait(this.G?.state?.activeHero || 'chewy')}</div><div class="pc-lv"><small>Lv</small><span>1</span></div></div>
         <button class="hsw" hidden><div class="hsw-face"></div><svg class="hsw-cd" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17.5"/></svg><span class="hsw-lv"></span><span class="kc sm" data-act="hero">Tab</span></button>
         <div class="pc-info">
-          <div class="pc-name">Chewy<span class="jp">チューイ</span></div>
+          <div class="pc-name">Chewy</div>
           <div class="pc-xp"><i></i></div>
           <div class="pal">
             <div class="pal-b"><div class="pal-face">${portrait('shadow')}</div></div>
@@ -197,19 +195,19 @@ export class Hud {
         </div>
       </div>
       <div class="buffs"></div>
-      <div class="qtrack"><div class="qt-h">${glyph('scroll')}<span>Quests</span><span class="jp">クエスト</span><button class="qt-tog" title="Collapse">–</button></div><div class="qt-list"></div></div>
+      <div class="qtrack"><div class="qt-h">${glyph('scroll')}<span>Quests</span><button class="qt-tog" title="Collapse">–</button></div><div class="qt-list"></div></div>
     </div>
     <div class="hud-tr">
       <div class="mm-wrap">
         <div class="mm-disc"><canvas class="mm-cv"></canvas></div>
         <svg class="mm-ring" viewBox="0 0 200 200"><circle cx="100" cy="100" r="93" fill="none" stroke="#4a2c2a" stroke-width="5"/><circle cx="100" cy="100" r="86" fill="none" stroke="#fff6e8" stroke-width="10"/><circle cx="100" cy="100" r="80.5" fill="none" stroke="#4a2c2a" stroke-width="3.5"/>${Array.from({ length: 24 }, (_, i) => { const a = i / 24 * TAU; return `<circle cx="${(100 + Math.cos(a) * 86).toFixed(1)}" cy="${(100 + Math.sin(a) * 86).toFixed(1)}" r="${i % 6 ? 1.3 : 2.4}" fill="${i % 6 ? '#e2c7a6' : '#ff8fb0'}"/>`; }).join('')}</svg>
-        <div class="mm-n">N<span>北</span></div>
+        <div class="mm-n">N</div>
         <div class="clock">
           <div class="ck-sky"></div><div class="ck-stars"></div>
           <div class="ck-hand"><div class="ck-sun">${glyph('sun')}</div><div class="ck-moon">${glyph('moon')}</div></div>
           <div class="ck-hills"></div><div class="ck-rim"></div>
         </div>
-        <div class="floor"><b>B1F</b><span>地下1階</span></div>
+        <div class="floor"><b>B1F</b></div>
       </div>
       <div class="loc"><span class="loc-t">Day 1 · 8:30</span><span class="loc-s">am</span></div>
       <div class="hud-res">
@@ -247,7 +245,7 @@ export class Hud {
     <div class="hud-br">
       <div class="vtools">
         <div class="rci">
-          <div class="rci-h">Demand<span class="jp">需要</span></div>
+          <div class="rci-h">Demand</div>
           <div class="rci-cols">
             ${['R', 'C', 'W'].map(k => `<div class="rci-c" data-k="${k}"><div class="rci-track"><i></i></div><div class="rci-l">${glyph(k === 'R' ? 'home' : k === 'C' ? 'shop' : 'craft')}</div></div>`).join('')}
           </div>
@@ -280,13 +278,13 @@ export class Hud {
     tip.bind(this.$.hsw, () => {
       const H = this.ui.G?.heroes, id = H?.next(); if (!id) return '';
       const hp = this.st.heroes?.[id]?.player || {}, C = H.cls(id);
-      return simpleTip(`${esc(C.name)} <span class="jp">${HERO_JP[id] || ''}</span>`, `Level ${hp.lvl || 1} ${esc(C.title)} · hanging out in town.<br><span class="tt-dim">Press ${keyCap('hero', { sm: true })} or click to play as ${esc(C.name)}.</span>`);
+      return simpleTip(`${esc(C.name)}`, `Level ${hp.lvl || 1} ${esc(C.title)} · hanging out in town.<br><span class="tt-dim">Press ${keyCap('hero', { sm: true })} or click to play as ${esc(C.name)}.</span>`);
     });
     // orbs
     this.life = new Orb('life'); this.zoom = new Orb('zoom');
     q('.orb-slot.l').appendChild(this.life.el); q('.orb-slot.r').appendChild(this.zoom.el);
-    tip.bind(this.life.el, () => simpleTip(`<span style="color:#ff8fb0">Life</span> <span class="jp">いのち</span>`, `${this.life.cur} / ${this.life.max}<br><span class="tt-dim">Regen ${(+this.d.lifeRegen || 0).toFixed(1)}/s · Q drinks a Heart Potion</span>`));
-    tip.bind(this.zoom.el, () => simpleTip(`<span style="color:#8fd0ff">Zoom</span> <span class="jp">げんき</span>`, `${this.zoom.cur} / ${this.zoom.max}<br><span class="tt-dim">Skills spend Zoom · E drinks a Zoom Potion</span>`));
+    tip.bind(this.life.el, () => simpleTip(`<span style="color:#ff8fb0">Life</span>`, `${this.life.cur} / ${this.life.max}<br><span class="tt-dim">Regen ${(+this.d.lifeRegen || 0).toFixed(1)}/s · Q drinks a Heart Potion</span>`));
+    tip.bind(this.zoom.el, () => simpleTip(`<span style="color:#8fd0ff">Zoom</span>`, `${this.zoom.cur} / ${this.zoom.max}<br><span class="tt-dim">Skills spend Zoom · E drinks a Zoom Potion</span>`));
     // hotbar + belt
     const hb = this.$.hotbar;
     this.slots = SLOT_KEYS.map((k, i) => {
@@ -336,9 +334,9 @@ export class Hud {
     tip.bind(q('.pc-bub'), () => { const C = this.ui.G?.heroes?.cls(); return simpleTip(esc(this.pl.name || 'Chewy'), `Level ${this.pl.lvl || 1} ${esc(C?.title || 'adventurer pup')}.<br><span class="tt-dim">Click for character sheet (C)</span>`); });
     tip.bind(this.$.pal, () => { const s = this.shadowHP(); return simpleTip('Shadow', `Loyal Boston terrier sidekick.<br>Life ${Math.ceil(s.cur)} / ${Math.round(s.max)}`); });
     tip.bind(this.$.xp, () => { const x = xpProgress(this.pl); return simpleTip(`Level ${this.pl.lvl || 1}`, `Experience ${fmt(x.cur)} / ${fmt(x.need)} <span class="tt-dim">(${Math.floor(x.frac * 100)}%)</span>`); });
-    tip.bind(this.$.coins, () => simpleTip(`${glyph('coin')} Coins <span class="jp">小判</span>`, `Spend at Rosie's Treats and on village buildings.`));
+    tip.bind(this.$.coins, () => simpleTip(`${glyph('coin')} Coins`, `Spend at Rosie's Treats and on village buildings.`));
     tip.bind(this.$.rci, () => { const r = this.cache.rci || { R: 0, C: 0, W: 0 }; return simpleTip('Village demand', `<div class="tt-rci"><span style="color:#5ec79a">Homes ${pct(r.R)}</span><span style="color:#5aa8ff">Shops ${pct(r.C)}</span><span style="color:#e8a92a">Workshops ${pct(r.W)}</span></div><span class="tt-dim">Tall bars mean villagers want more of that kind of building.</span>`); });
-    tip.bind(this.$.mats, () => simpleTip('Materials <span class="jp">素材</span>', `<div class="tt-mats">${Object.entries(this.st.materials || {}).map(([k, v]) => `<span><img src="${materialIconURL(k)}" alt="">${MATERIALS[k]?.name || k}<b>${fmt(v)}</b></span>`).join('')}</div>`));
+    tip.bind(this.$.mats, () => simpleTip('Materials', `<div class="tt-mats">${Object.entries(this.st.materials || {}).map(([k, v]) => `<span><img src="${materialIconURL(k)}" alt="">${MATERIALS[k]?.name || k}<b>${fmt(v)}</b></span>`).join('')}</div>`));
     q('.qt-tog').addEventListener('click', e => { e.stopPropagation(); this.$.qt.classList.toggle('collapsed'); });
     this.mmCtx = this.$.mmCv.getContext('2d');
     // interaction prompt click → press F for the game
@@ -360,7 +358,7 @@ export class Hud {
       const first = this.cache.hero === undefined;
       this.cache.hero = key;
       this.$.face.innerHTML = portrait(id);
-      this.$.name.innerHTML = `${esc(this.pl.name || 'Chewy')}<span class="jp">${HERO_JP[id] || ''}</span>`;
+      this.$.name.textContent = this.pl.name || 'Chewy';
       this.root.dataset.hero = id;
       this.$.hsw.hidden = !nx;
       if (nx) this.$.hswFace.innerHTML = portrait(nx);
@@ -393,8 +391,8 @@ export class Hud {
       this.ui.tip.bind(b, () => {
         const G2 = this.ui.G, id = b.dataset.hero; if (!id) return '';
         const hp = this.st.heroes?.[id]?.player || {}, C = G2.heroes.cls(id), aw = G2.cozy?.awayInfo?.(id);
-        if (aw) return simpleTip(`${esc(C.name)} <span class="jp">${HERO_JP[id] || ''}</span>`, `Level ${hp.lvl || 1} ${esc(C.title)} · away on an expedition: ${esc(aw.obj)}.<br><span class="tt-dim">${esc(aw.label)}</span>`);
-        return simpleTip(`${esc(C.name)} <span class="jp">${HERO_JP[id] || ''}</span>`, `Level ${hp.lvl || 1} ${esc(C.title)} · hanging out in town.<br><span class="tt-dim">Click to play as ${esc(C.name)} · hold <span class="kc sm">Tab</span> for the hero wheel.</span>`);
+        if (aw) return simpleTip(`${esc(C.name)}`, `Level ${hp.lvl || 1} ${esc(C.title)} · away on an expedition: ${esc(aw.obj)}.<br><span class="tt-dim">${esc(aw.label)}</span>`);
+        return simpleTip(`${esc(C.name)}`, `Level ${hp.lvl || 1} ${esc(C.title)} · hanging out in town.<br><span class="tt-dim">Click to play as ${esc(C.name)} · hold <span class="kc sm">Tab</span> for the hero wheel.</span>`);
       });
       L.push(b);
     }
@@ -421,7 +419,7 @@ export class Hud {
     let c = this.heroCardEl;
     if (!c) { c = this.heroCardEl = el('div', 'hero-card'); this.root.appendChild(c); }
     c.style.setProperty('--hc', color || '#ff8fb0');
-    c.innerHTML = `<div class="hc-face">${portrait(id)}</div><div class="hc-t"><small>Now playing</small><b>${esc(name)}<span class="jp">${HERO_JP[id] || ''}</span></b><span>${esc(title || '')}</span></div>`;
+    c.innerHTML = `<div class="hc-face">${portrait(id)}</div><div class="hc-t"><small>Now playing</small><b>${esc(name)}</b><span>${esc(title || '')}</span></div>`;
     replay(c, 'show', 1700);
   }
 
@@ -607,11 +605,7 @@ export class Hud {
     this.cache.loc = name ? { name, sub: sub || '' } : null;
     this.cache.clockSig = null;
     if (sub) {
-      const f = this.$.floor, b = f.querySelector('b'), jp = /[^ -]/.test(sub);
-      b.textContent = sub; f.querySelector('span').textContent = floorJP(sub);
-      // an outdoor region's badge carries its Japanese name (3-4 kanji): shrink to fit the round badge
-      b.style.fontSize = jp && sub.length >= 4 ? '13px' : jp && sub.length === 3 ? '17px' : '';
-      b.style.letterSpacing = jp && sub.length >= 3 ? '-1px' : '';
+      this.$.floor.querySelector('b').textContent = sub;
     }
   }
 
@@ -834,7 +828,6 @@ export class Hud {
 }
 
 const pct = v => `${v >= 0 ? '+' : ''}${Math.round(v * 100)}%`;
-function floorJP(sub) { const m = /(\d+)/.exec(sub || ''); return m ? `地下${m[1]}階` : ''; }
 
 // sky gradient for the clock dial
 const SKY = [[0, '#2a2f6a', '#141638'], [5, '#4a4a8a', '#1e2050'], [6.5, '#ffb3a0', '#8a7ac8'], [8, '#bfe6ff', '#6ab0f0'], [16, '#bfe6ff', '#5aa0e8'], [18, '#ffc48a', '#e87a8a'], [19.5, '#8a6ab8', '#3a3478'], [21, '#2a2f6a', '#141638'], [24, '#2a2f6a', '#141638']];

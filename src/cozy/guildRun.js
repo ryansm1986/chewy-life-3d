@@ -259,7 +259,7 @@ class GuildRun {
     v.talking = true; if (P) P.controlLocked = true;
     const done = () => { v.talking = false; if (P) P.controlLocked = false; G.interactCooldown = performance.now() + 350; };
     try {
-      const portrait = G.portrait?.('hachi'), say = (lines, choices) => ui.dialogue({ speaker: 'Old Hachi', jp: 'ハチ', portrait, color: '#d4834a', lines, choices, voice: HACHI_SPEC.voice });
+      const portrait = G.portrait?.('hachi'), say = (lines, choices) => ui.dialogue({ speaker: 'Old Hachi', portrait, color: '#d4834a', lines, choices, voice: HACHI_SPEC.voice });
       const g = this.g;
       if (!g.met) {
         g.met = true;

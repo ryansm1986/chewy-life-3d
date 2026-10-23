@@ -68,7 +68,7 @@ class Preview {
 
 // ------------------------------------------------------------------ the house card
 export class HouseCardPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'houseCard', title: 'House', jp: 'いえ', side: 'center', cls: 'p-house', icon: 'home', width: 440 }); }
+  constructor(ui) { super(ui, { name: 'houseCard', title: 'House', side: 'center', cls: 'p-house', icon: 'home', width: 440 }); }
   get H() { return this.G?.housing; }
   init() {
     this.body.innerHTML = `<div class="hc">
@@ -89,7 +89,7 @@ export class HouseCardPanel extends Panel {
   render() {
     const rec = this.rec, H = this.H; if (!rec || !H) return;
     const b = rec.data, def = BUILDINGS[b.type], st = this.st;
-    this.setTitle(H.houseName(b), b.type === 'chewyHouse' ? 'おうち' : 'いえ');
+    this.setTitle(H.houseName(b));
     const key = `${b.type}:${b.level}:${b.seed}:${JSON.stringify(b.style || {})}`;
     if (this._pic !== key) { this._pic = key; this.$.img.src = this.ui.remodelPreview().show(b.type, b.level, b.seed, b.style) || ''; this.ui.remodelPreview().drop(); }
     this.$.lv.textContent = `Lv ${b.level}`;
@@ -114,7 +114,7 @@ export class HouseCardPanel extends Panel {
 
 // ------------------------------------------------------------------ the Remodel panel
 export class RemodelPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'remodel', title: 'Remodel', jp: 'リフォーム', side: 'center', cls: 'p-remodel', icon: 'sparkle', width: 1060 }); }
+  constructor(ui) { super(ui, { name: 'remodel', title: 'Remodel', side: 'center', cls: 'p-remodel', icon: 'sparkle', width: 1060 }); }
   get H() { return this.G?.housing; }
   init() {
     this.body.innerHTML = `<div class="rm">
@@ -155,14 +155,14 @@ export class RemodelPanel extends Panel {
   render() {
     const rec = this.rec, H = this.H; if (!rec || !H) return;
     const b = rec.data, st = this.st, rank = H.rank(), d = this.draft || {};
-    this.setTitle(`Remodel ${H.houseName(b)}`, 'リフォーム');
+    this.setTitle(`Remodel ${H.houseName(b)}`);
     // the live preview
     const key = JSON.stringify(d);
     if (this._pv !== key) { this._pv = key; this.$.img.src = this.ui.remodelPreview().show(b.type, b.level, b.seed, this.draft) || ''; replay(this.$.img, 'swap', 300); }
     this.$.badge.textContent = d.set ? STYLE_SETS[d.set].name : Object.keys(d).length ? 'Your own mix' : 'Its own look';
     // style sets
     this.$.sets.innerHTML = [`<div class="rm-set ${!Object.keys(d).length ? 'on' : ''}" data-id="own"><b>Its own look</b><small>As the village built it</small></div>`,
-      ...STYLE_SET_IDS.map(id => { const S = STYLE_SETS[id], lock = S.rank > rank; return `<div class="rm-set ${d.set === id ? 'on' : ''} ${lock ? 'locked' : ''}" data-id="${id}" title="${esc(S.desc)}"><b>${esc(S.name)} <span class="jp">${esc(S.jp)}</span></b><small>${lock ? `${glyph('lock')}Rank ${S.rank}` : esc(S.desc)}</small></div>`; })].join('');
+      ...STYLE_SET_IDS.map(id => { const S = STYLE_SETS[id], lock = S.rank > rank; return `<div class="rm-set ${d.set === id ? 'on' : ''} ${lock ? 'locked' : ''}" data-id="${id}" title="${esc(S.desc)}"><b>${esc(S.name)}</b><small>${lock ? `${glyph('lock')}Rank ${S.rank}` : esc(S.desc)}</small></div>`; })].join('');
     // the parts
     this.$.fields.innerHTML = FIELD_IDS.map(k => {
       const F = FIELDS[k];

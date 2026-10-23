@@ -55,7 +55,7 @@ There's no player farming, fishing, cooking, crafting, seasons or weather. Usefu
 - `state.pantry = { [id]: qty }` is a shared, unlimited counter map, like materials, but **not** on the HUD strip and **not** in the
   gear bag (the 40 slots stay for gear).
 - A definitions table, `src/life/pantry.js`. Each entry:
-  `{ id, kind: 'seed'|'crop'|'fish'|'forage'|'dish', name, jp, desc, icon, sell, value, likedBy?, food? }`.
+  `{ id, kind: 'seed'|'crop'|'fish'|'forage'|'dish', name, desc, icon, sell, value, likedBy?, food? }`.
 - Actions:
   - `addPantry(id, n)`, `hasPantry(req)`, `spendPantry(req)`, emitting `pantry:changed`;
   - `eat(id)`;

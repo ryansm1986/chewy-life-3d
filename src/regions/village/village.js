@@ -521,7 +521,7 @@ export class ZoneVillage {
     if (this.crew) { this.crew.update(dt, C.stage >= 1 && C.t < 8); if (C.crew && C.t > 8.2) this.crew.leave(); }
     if (C.stage === 0 && C.t > (C.crew ? 2.2 : 1.5)) {
       C.stage = 1;
-      G.ui?.banner?.(`${this.def.name} is saved!`, C.crew ? `${this.def.jp} · ${this.partyBy} drove the siege off` : `${this.def.jp} · ${this.def.sub}`, { style: 'quest' });
+      G.ui?.banner?.(`${this.def.name} is saved!`, C.crew ? `${this.partyBy} drove the siege off` : this.def.sub, { style: 'quest' });
       this.emitSaved();
       Events.emit('sfx', 'ui_levelup');
       // the siege comes down: banners crumple, boards pop off in puffs

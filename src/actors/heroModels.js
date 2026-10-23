@@ -68,6 +68,23 @@ export const HERO_MODELS = {
   // the Toybox Rosie (tools/blender/codex/assets/rosie-toy, built by an Opus agent with the toybox-character skill): a
   // villager, not a playable hero (game.js hands her Villager this rig); hat: the nightcap anchor on her curls [x, y, z, scale]; wave: 'out' waves and cheers outward, squint: her happy lids [upper, lower] (animator.js);
   // darkGrade: the warm grade turned her chocolate hair maroon (a tint would grey her skin), so only the dark texels shift
+  // the Toybox villagers of Blossom Hollow (ROADMAP VL-1; tools/blender/codex/assets/<id>-toy, Opus builders, from the
+  // sheets the owner approved for the Toybox kit): game.js hands each roster Villager its rig when it's loaded, else the
+  // kit builds them as before. lidTilt: their eyes face outward, so the lids hinge on each eye's own axis (animator.js
+  // lidTurn); wave: 'out', since big heads on short arms hide the paws when they wave inward
+  // hat: the nightcap anchor off the head bone [x, y, z, scale] (npc.js setNightcap); noNightcap: a baked day hat (Kuma's
+  // toque, Usagi's petal hat) that can't be hidden, so no nightcap goes over it
+  mochi: { file: 'mochi_toy', name: 'Mochi', outline: '#5a3a2a', earGain: 0.5, lidTilt: 0.534, squint: [0.30, -0.24], wave: 'out', hat: [0, 0.46, 0.0, 1.3], palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  kuma: { file: 'kuma_toy', name: 'Kuma', outline: '#3a2418', earGain: 0.3, lidTilt: 0.328, squint: [0.30, -0.30], wave: 'out', noNightcap: true, palm: [0, -0.05, 0.012], back: [0, 0.1, -0.2] },
+  usagi: { file: 'usagi_toy', name: 'Usagi', outline: '#5a3a3a', earGain: 0.6, lidTilt: 0.4467, squint: [0.488, -0.30], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  kitsune: { file: 'kitsune_toy', name: 'Kitsune', outline: '#3a2030', earGain: 0.5, lidTilt: 0.5236, wave: 'out', hat: [0, 0.47, 0.08, 1.3], palm: [0, -0.045, 0.01], back: [0, 0.08, -0.18] },
+  // pan: his sleepy rest lid is baked in (a static ledge; the rig's eye hole is cut to that opening, so nothing may drive
+  // his lidU below 0: a wider-eyed expression needs a new lid design); darkGrade keeps the black patches and limbs from going violet in the grade
+  pan: { file: 'pan_toy', name: 'Pan', outline: '#1c181e', earGain: 0.3, lidTilt: 0.541, squint: [0.26, -0.26], wave: 'out', hat: [0, 0.45, 0.04, 1.25], darkGrade: [1, -4, 14, -9], palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  tanu: { file: 'tanu_toy', name: 'Tanu', outline: '#2a1e1a', earGain: 0.3, darkGrade: [0.3, 8, 4, -10], lidTilt: 0.361, squint: [0.26, -0.30], wave: 'out', hat: [0, 0.47, 0.0, 1.3], palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  // kero: no ears or tail (their bones are unweighted); lidClose 1.10: his tall frog eye can't be swept cleanly by a rigid
+  // lid to the usual 1.22, so his lids are built to close at 1.10 (a soft, puffy closed lid on the eye dome)
+  kero: { file: 'kero_toy', name: 'Kero', outline: '#2a3a20', earGain: 0, lidTilt: 0.485, lidClose: 1.10, squint: [0.30, -0.34], wave: 'out', hat: [0, 0.52, 0.04, 1.3], palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
   rosie: { file: 'rosie_toy', name: 'Rosie', outline: '#4e2a18', earGain: 0, darkGrade: [0.4, -10, 6, 4], wave: 'out', squint: [0.40, -0.26], palm: [0, -0.05, 0.012], back: [0, 0.1, -0.15], hat: [0, 0.44, -0.03, 1.15] },
   // the Toybox Moka (tools/blender/codex/assets/moka-toy, the toybox-character skill, Opus builder): the Moka; the
   // Storybook one below is only for ?chewymodel=disney. Its attach points and grade are set when the rig lands.
@@ -450,8 +467,8 @@ export function buildHeroModel(id, spec = null) {
     eyeballs: [B.eye_L, B.eye_R],
   };
   return {
-    spec: spec || { name: cfg.name }, hero: id, root, parts, mat, outMat, propMat, meshes: [skin], skin, outline, skeleton, height: meta.height,
-    disney: true, bakedDisney: true, sharedGeo: true, earGain: cfg.earGain, model: cfg.file, quadruped: quad, sitDrop: cfg.sitDrop, squint: cfg.squint, lidTilt: cfg.lidTilt, earDamp: cfg.earDamp,
+    spec: spec || { name: cfg.name }, hero: id, root, parts, mat, outMat, propMat, meshes: [skin], skin, outline, skeleton, height: meta.height, noNightcap: !!cfg.noNightcap,
+    disney: true, bakedDisney: true, sharedGeo: true, earGain: cfg.earGain, model: cfg.file, quadruped: quad, sitDrop: cfg.sitDrop, squint: cfg.squint, lidTilt: cfg.lidTilt, lidClose: cfg.lidClose, earDamp: cfg.earDamp,
     dispose() { skeleton.dispose(); mat.dispose(); outMat.dispose(); propMat.dispose(); },
   };
 }

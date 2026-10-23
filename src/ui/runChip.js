@@ -31,6 +31,6 @@ export class RunChip {
   tip() {
     const tr = this.tr; if (!tr) return '';
     const list = tr.R.mods.map(id => `<div class="rc-tm"><b>${esc(ZONE_MODS[id].name)}</b> — ${esc(ZONE_MODS[id].desc)}</div>`).join('') || '<div class="rc-tm">No modifiers</div>';
-    return simpleTip(`${esc(tr.label)} <span class="jp">霊灯</span>`, `${list}<div class="rc-rw">${esc(rewardText(tr.rewards))}</div>`);
+    return simpleTip(esc(tr.label), `${list}<div class="rc-rw">${esc(rewardText(tr.rewards))}</div>`);
   }
 }

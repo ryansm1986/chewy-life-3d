@@ -411,7 +411,7 @@ state.cozy = {
   nothing changes. The Burrow and the zone dungeons are untouched.
 
 ### 6.2 Wild areas
-- **Two per zone**, fixed, named, as recipe data: `layout.wild: [{ id, name, jp, at: [x, z], r, packs: 2–3 }]`.
+- **Two per zone**, fixed, named, as recipe data: `layout.wild: [{ id, name, at: [x, z], r, packs: 2–3 }]`.
   Proposed: Bamboo **the Kamaitachi Thicket**, **the Fallen Shrine**; Maple **the Scarecrow Fields**, **Old Root
   Hollow**; Tidepool **the Crab Flats**, **the Wreck Shoals**; Onsen **the Snowman Slope**, **the Frozen Falls**.
 - **How they're chosen**: off the main trail, on a spur or a side clearing (layoutGen already makes `spurs`), so the

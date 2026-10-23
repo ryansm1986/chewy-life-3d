@@ -23,7 +23,7 @@ const MAKE_B = { name: 'For building', glyph: 'mochi', color: '#ff9ec4', text: (
 const buffOf = d => BUFFS[d.food.buff] || MAKE_B;
 
 export class CookPanel extends Panel {
-  constructor(ui) { super(ui, { name: 'cook', title: 'Cooking', jp: 'りょうり', side: 'left', cls: 'p-cook', icon: 'fire' }); this.tab = 'book'; this.sel = null; this.qty = 1; this.picks = {}; }
+  constructor(ui) { super(ui, { name: 'cook', title: 'Cooking', side: 'left', cls: 'p-cook', icon: 'fire' }); this.tab = 'book'; this.sel = null; this.qty = 1; this.picks = {}; }
   get K() { return this.G?.life?.kitchen; }
   init() {
     this.extra.innerHTML = `<div class="tabs ck-tabs"><button class="tab on" data-t="book" style="--tc:#ff8fb0">${glyph('book')}Recipes<span class="tab-n">0</span></button><button class="tab" data-t="mix" style="--tc:#8fe0c0">${glyph('sparkle')}Try a mix</button></div>`;
@@ -77,7 +77,7 @@ export class CookPanel extends Panel {
   get station() { return this.opts.station || 'kitchen'; }
   onOpen() {
     const S = STATIONS[this.station];
-    this.setTitle(S.name, S.jp);
+    this.setTitle(S.name);
     this.panel.dataset.station = this.station;
     this.cooking = false; this.$.pot.className = 'ck-pot';
     cookbookOf(this.st);
@@ -135,7 +135,7 @@ export class CookPanel extends Panel {
       : !known ? `<div class="ck-how">${glyph('book')}<span>Not in your cookbook yet: <b>${esc(H.how)}</b>. Or try mixing ${esc(H.ingredients.join(' + '))} in <b>Try a mix</b>…</span></div>` : '';
     this.$.det.innerHTML = `<div class="ck-hero" style="--rc:${rc};--bc:${B.color}">
         <div class="ck-art ${known ? '' : 'unk'}"><img class="${known ? '' : 'sil'}" src="${pantryIcon(id)}" alt="" draggable="false"></div>
-        <div class="ck-info"><div class="ck-name"><b>${known ? esc(d.name) : '???'}</b>${known ? `<span class="jp">${esc(d.jp)}</span>` : ''}${d.rare ? `<i class="ck-rare" style="--rc:${rc}">${RARE_NAMES[d.rare]}</i>` : ''}</div>
+        <div class="ck-info"><div class="ck-name"><b>${known ? esc(d.name) : '???'}</b>${d.rare ? `<i class="ck-rare" style="--rc:${rc}">${RARE_NAMES[d.rare]}</i>` : ''}</div>
           <div class="ck-desc">${known ? esc(d.desc) : 'A dish you have yet to learn.'}</div>
           <div class="ck-eff">${d.kind === 'make' ? `<span class="ck-chip buff">${glyph(d.mat)}Makes <b>${d.n * (known ? this.qty : 1)} ${esc(d.mat[0].toUpperCase() + d.mat.slice(1))}</b></span>` : `<span class="ck-chip heal">${glyph('heart')}Heals <b>${Math.round(d.food.heal * 100)}%</b></span><span class="ck-chip buff">${glyph(B.glyph)}<b>${B.name} ${TIER_NAMES[d.food.tier]}</b>· ${d.food.mins} min</span>`}</div>
           <div class="ck-btext">${esc(B.text(d.food.tier))}${known && (st.cookbook.cooked?.[id] || 0) ? `${d.kind === 'make' ? 'Pounded' : ' · cooked'} ×${st.cookbook.cooked[id]}` : ''}</div></div></div>
