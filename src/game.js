@@ -78,10 +78,20 @@ import { installGuild } from './cozy/guildRun.js';
 import { installCozyGuide } from './cozy/cozyGuide.js';
 import { installShadowLead } from './actors/shadowLead.js'; // (Shadow leads the way: ROADMAP R-17)
 import { installCoop } from './coop/coop.js'; // (couch co-op: 2-4 controllers, docs/COOP.md)
+import { importWithRetry, reloadOnce, chunksLoaded, showLoadError } from './core/chunkRetry.js';
+import { InteractShine } from './gfx/interactShine.js';
 
 // UI and audio load in parallel with the world. The import() paths must be literal so Vite bundles them for the
 // production build (a variable path with @vite-ignore worked on the dev server but 404'd in dist: no UI, no sound).
-async function tryImport(name, load) { try { return await load(); } catch (e) { console.warn('[boot] optional module missing', name, e.message); return null; } }
+// A chunk the server failed to send is tried again (core/chunkRetry.js); without the UI the page reloads once, then a card
+// asks the player to reload (0.8.1: itch's CDN answered 520 for a UI chunk and the game had no UI at all)
+async function tryImport(name, load) {
+  try { return await importWithRetry(load); } catch (e) {
+    console.warn('[boot] optional module missing', name, e.message);
+    if (name === 'ui') { if (reloadOnce()) await new Promise(() => {}); showLoadError(); }
+    return null;
+  }
+}
 
 export async function boot() {
   const engine = new Engine();
@@ -595,6 +605,10 @@ export async function boot() {
 
   // ---- per-frame input
   let hoverEnemy = null, padA = false; // padA: the pad's A press went to an interactable (no swing until A comes up)
+  // the interact shine (gfx/interactShine.js): what F would use, and what a click would (the mouse over it), glow
+  const shine = G.shine = new InteractShine();
+  let shineNear = null, shineHover = null;
+  const shineWarm = { renderer: engine.renderer, list: () => (G.mode === 'village' ? [...npcs.filter(n => n.visible).map(n => n.interact), ...G.world.interactables] : G.world.interactables) };
   // the gamepad's aim, soft lock and target ring (combat/padAim.js, docs/CONTROLS.md §2)
   const padAim = G.padAim = new PadAim(G);
   // auto targeting (CT-8, docs/CONTROLS.md §13): Settings › Controls › Targeting per device, the all-round lock, where each
@@ -696,6 +710,7 @@ export async function boot() {
     const it = pad ? padIt : nearestInteract();
     G.ui?.setInteract?.(it ? it.label : null, dev === 'touch' && it ? { key: null } : pad && it ? { act: aCtx ? 'interact' : 'interactAlt' } : undefined); // (the pad's prompt: A, or the D-pad when A would swing; touch: no key, the prompt is tapped: ui/touch.js)
     if (it && Actions.pressed('interact') && performance.now() > (G.interactCooldown || 0)) it.onInteract();
+    shineNear = it; shineHover = !pad && !Input.mouse.overUI && !hoverEnemy ? pickInteractAtMouse() : null;
     if (Input.mouse.wheel) rig.zoom(Input.mouse.wheel);
     // target frame
     const tf = hoverEnemy || (auto ? padAim.lock : null); // (the mouse in Auto: the lock's frame when nothing is under the cursor)
@@ -802,8 +817,8 @@ export async function boot() {
   }
 
   // ---- title screen & intro
-  const skip = sessionStorage.getItem('chewy3d.skipTitle');
-  sessionStorage.removeItem('chewy3d.skipTitle');
+  let skip = null;
+  try { skip = sessionStorage.getItem('chewy3d.skipTitle'); sessionStorage.removeItem('chewy3d.skipTitle'); } catch (e) { /* storage unavailable */ }
   G.titleActive = false;
   const showTitle = G.ui?.setMode && !skip && !P.has('fresh') && !P.has('floor') && !P.has('region') && !P.has('notitle');
   if (showTitle) {
@@ -812,8 +827,8 @@ export async function boot() {
     G.audio?.music?.('title');
     rig.distTarget = 52; rig.focus.set(L.plaza.x, 1, L.plaza.z); rig.snap();
     G.ui.onTitle({
-      hasSave: () => !!localStorage.getItem('chewy3d.save'),
-      newGame: () => { try { localStorage.removeItem('chewy3d.save'); } catch (e) { /* */ } sessionStorage.setItem('chewy3d.skipTitle', 'new'); location.reload(); },
+      hasSave: () => { try { return !!localStorage.getItem('chewy3d.save'); } catch (e) { return false; } },
+      newGame: () => { try { localStorage.removeItem('chewy3d.save'); } catch (e) { /* */ } try { sessionStorage.setItem('chewy3d.skipTitle', 'new'); } catch (e) { /* */ } location.reload(); },
       continue: () => startGame(false),
     });
   } else if (skip === 'new' || (P.has('fresh') && !P.has('floor') && !P.has('region') && !P.has('nointro'))) setTimeout(() => intro(), 1200);
@@ -909,8 +924,10 @@ export async function boot() {
     if (G.mode === 'village') day.update(dt);
     else if (G.mode === 'interior') day.tick(dt); // (time passes inside; home/housing.js lights the room for the hour)
     G.cozy?.tick(dt); // the world clock runs in every mode at the day clock's rate (stopped while paused), crews come home (cozy/expeditionRun.js)
+    shineNear = shineHover = null;
     if (G.titleActive) { rig.yawTarget += dt * 0.06; rig.yaw = rig.yawTarget; }
     else handleInput(dt);
+    shine.update(rdt, G.world?.scene || null, engine.camera, shineNear, shineHover, shineWarm);
     G.actions.tickRegen(dt);
     player.update(dt);
     G.life?.update(dt);
@@ -977,7 +994,7 @@ export async function boot() {
   requestAnimationFrame(frame);
   if (P.has('floor')) setTimeout(() => G.enterDungeon(+P.get('floor')), 100);
   else if (P.has('region') && REGIONS[P.get('region')]) setTimeout(() => G.enterRegion(P.get('region')), 100);
-  setTimeout(() => { window.__ready = true; const b = document.getElementById('boot'); if (b) { b.classList.add('gone'); setTimeout(() => b.remove(), 700); } }, P.has('floor') || P.has('region') ? 2500 : 400);
+  setTimeout(() => { window.__ready = true; if (G.ui) chunksLoaded(); const b = document.getElementById('boot'); if (b) { b.classList.add('gone'); setTimeout(() => b.remove(), 700); } }, P.has('floor') || P.has('region') ? 2500 : 400);
 }
 
 function loadSave() { // the main save, else .prev when the main one won't parse or normalize (core/autosave.js; normalizing twice is harmless)

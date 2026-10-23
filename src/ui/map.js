@@ -341,10 +341,16 @@ export class QuestPanel extends Panel {
     const can = this.tab === 'active' && this.sel && !!this.ui.G?.story?.target?.(this.sel) && this.ui.G?.mode !== 'interior';
     const sig = this.tab + this.sel + JSON.stringify(list) + can + leadQ;
     if (sig === this._sig) return; this._sig = sig;
-    this.$.list.innerHTML = list.map((q, i) => {
-      const n = q.objectives.length, k = q.objectives.filter(o => o.done).length;
-      return `<div class="q-item ${q.id === this.sel ? 'on' : ''} ${q.done ? 'done' : ''}" data-id="${esc(q.id)}" style="--i:${i}"><div class="qi-ic">${glyph(q.done ? 'check' : q.main ? 'star' : 'scroll')}</div><div class="qi-t"><b>${esc(q.name)}</b><span>${q.giver ? esc(q.giver) + ' · ' : ''}${k}/${n}</span></div></div>`;
-    }).join('') || `<div class="bd-empty">${glyph('sakura')}${this.tab === 'active' ? 'No quests yet — talk to villagers!' : 'Nothing finished yet.'}</div>`;
+    // the list is rebuilt (and its items' entrance plays) only when the quests or the tab change; picking another quest
+    // just moves the highlight
+    const listSig = this.tab + JSON.stringify(list);
+    if (listSig !== this._listSig) {
+      this._listSig = listSig;
+      this.$.list.innerHTML = list.map((q, i) => {
+        const n = q.objectives.length, k = q.objectives.filter(o => o.done).length;
+        return `<div class="q-item ${q.id === this.sel ? 'on' : ''} ${q.done ? 'done' : ''}" data-id="${esc(q.id)}" style="--i:${i}"><div class="qi-ic">${glyph(q.done ? 'check' : q.main ? 'star' : 'scroll')}</div><div class="qi-t"><b>${esc(q.name)}</b><span>${q.giver ? esc(q.giver) + ' · ' : ''}${k}/${n}</span></div></div>`;
+      }).join('') || `<div class="bd-empty">${glyph('sakura')}${this.tab === 'active' ? 'No quests yet — talk to villagers!' : 'Nothing finished yet.'}</div>`;
+    } else for (const el of this.$.list.querySelectorAll('.q-item')) el.classList.toggle('on', el.dataset.id === this.sel);
     const q = list.find(x => x.id === this.sel);
     this.$.det.innerHTML = q ? `<div class="qd-h"><div class="qd-n">${esc(q.name)}</div>${q.giver ? `<div class="qd-g">from <b>${esc(q.giver)}</b></div>` : ''}</div>
       ${q.desc ? `<div class="qd-desc">${esc(q.desc)}</div>` : ''}

@@ -82,6 +82,10 @@ that storage belongs to itch's game-hosting domain, not to itch.io, so:
 - itch appears to serve all HTML games from one shared domain, which would mean one shared storage quota. Keep the save
   small and the keys prefixed, as they are now.
 
+## A chunk that fails to download
+
+itch's CDN can answer a request with an error (0.8.1: one HTTP 520 for a UI chunk, and the game had no UI at all). `src/core/chunkRetry.js` handles it: a failed boot import is tried once more, then the page reloads once per tab session (Chrome keeps a failed import failed for the page's life), then a card asks the player to reload. To test it, serve the itch build and answer 520 for one chunk (the scratch harness used `FAIL=inventory- FAILN=2`).
+
 ## Fonts
 
 The UI fonts are self-hosted from `src/ui/fonts/`, which `src/ui/fonts.css` imports from `main.js`:

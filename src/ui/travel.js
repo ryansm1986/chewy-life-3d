@@ -6,15 +6,38 @@ import { glyph } from './glyphs.js';
 import { padGlyph } from './padGlyphs.js';
 import { Panel } from './panel.js';
 
-// where each place sits on the painted map (0..1) and its map glyph
-const SPOT = {
-  village: { x: 0.5, y: 0.56, g: 'sakura' },
-  bamboo: { x: 0.2, y: 0.5, g: 'bamboo' },
-  maple: { x: 0.77, y: 0.34, g: 'maple' },
-  tidepool: { x: 0.56, y: 0.86, g: 'wave' },
-  onsen: { x: 0.36, y: 0.15, g: 'snowflake' },
-};
 const W = 560, H = 440;
+// The islands make a paw (the owner's ask): Blossom Hollow is the big pad, the four regions its toes, left to right in
+// the order you open them (and their 2-5 keys). Each island in map pixels: centre, radii, and the glyph on its pin.
+const ISLE = {
+  village: { cx: 280, cy: 312, rx: 120, ry: 92, g: 'sakura' },
+  bamboo: { cx: 100, cy: 198, rx: 52, ry: 62, g: 'bamboo' },
+  maple: { cx: 212, cy: 104, rx: 55, ry: 64, g: 'maple' },
+  tidepool: { cx: 348, cy: 104, rx: 55, ry: 64, g: 'wave' },
+  onsen: { cx: 460, cy: 198, rx: 52, ry: 62, g: 'snowflake' },
+};
+// where each place's pin sits on the painted map (0..1) and its map glyph
+const SPOT = Object.fromEntries(Object.entries(ISLE).map(([id, s]) => [id, { x: s.cx / W, y: s.cy / H, g: s.g }]));
+/** an island's coast: the pad (a wide oval with a soft dip in the top edge, as on a paw) or a toe (an oval leaning out
+ *  from the pad, as toes splay), with a little wobble so it reads as a coastline */
+function islePath(id, grow = 0) {
+  const s = ISLE[id], P = ISLE.village, pad = id === 'village', seed = s.cx * 0.013 + s.cy * 0.007;
+  const tilt = pad ? 0 : Math.atan2(s.cy - P.cy, s.cx - P.cx) + Math.PI / 2;
+  const path = new Path2D(), N = 64;
+  for (let k = 0; k <= N; k++) {
+    const a = k / N * Math.PI * 2;
+    let r = 1 + 0.018 * Math.sin(a * 5 + seed) + 0.014 * Math.sin(a * 9 + seed * 3);
+    if (pad) { // (the dip between the two middle toes, and a soft three-lobed heel)
+      const d = Math.atan2(Math.sin(a + Math.PI / 2), Math.cos(a + Math.PI / 2)), lo = Math.max(0, Math.sin(a));
+      r += -0.17 * Math.exp(-((d / 0.45) ** 2)) + 0.05 * lo + 0.04 * lo * lo * Math.cos(6 * (a - Math.PI / 2));
+    }
+    const lx = Math.cos(a) * (s.rx * r + grow), ly = Math.sin(a) * (s.ry * r + grow);
+    const x = s.cx + lx * Math.cos(tilt) - ly * Math.sin(tilt), y = s.cy + lx * Math.sin(tilt) + ly * Math.cos(tilt);
+    if (k) path.lineTo(x, y); else path.moveTo(x, y);
+  }
+  path.closePath();
+  return path;
+}
 
 export class TravelPanel extends Panel {
   constructor(ui) { super(ui, { name: 'travel', title: 'Travel Map', side: 'center', cls: 'p-travel', icon: 'map' }); this.sel = null; }
@@ -90,7 +113,8 @@ export class TravelPanel extends Panel {
       </div>
       ${status}`;
   }
-  // a painted parchment map: sea, the Hollow's island, and each region's land in its colour, joined by dotted roads
+  // a painted parchment map: sea, and the islands in the shape of a paw (the Hollow the pad, the regions its toes), each
+  // in its colour, ringed by shallows and joined to the pad by dotted roads
   drawMap() {
     const cv = this.cv, dpr = Math.min(2, devicePixelRatio || 1);
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
@@ -101,39 +125,35 @@ export class TravelPanel extends Panel {
     g.fillStyle = sea; g.fillRect(0, 0, W, H);
     g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 2; g.lineCap = 'round';
     for (let i = 0; i < 26; i++) { const x = (i * 97) % W, y = (i * 61) % H; g.beginPath(); g.arc(x, y, 7, Math.PI * 1.1, Math.PI * 1.9); g.stroke(); g.beginPath(); g.arc(x + 12, y, 7, Math.PI * 1.1, Math.PI * 1.9); g.stroke(); }
-    // land blobs
-    const blob = (cx, cy, r, fill, seed) => {
-      g.beginPath();
-      for (let k = 0; k <= 24; k++) { const a = k / 24 * Math.PI * 2, rr = r * (1 + 0.16 * Math.sin(a * 3 + seed) + 0.08 * Math.sin(a * 5 + seed * 2)); const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr * 0.8; k ? g.lineTo(x, y) : g.moveTo(x, y); }
-      g.closePath(); g.fillStyle = fill; g.fill(); g.lineWidth = 3; g.strokeStyle = 'rgba(74,44,42,.55)'; g.stroke();
-    };
     const tint = { village: '#bfe8a8', bamboo: '#a8dca0', maple: '#f4c08a', tidepool: '#f4e2b0', onsen: '#eef4ff' };
-    const R = { village: 70, bamboo: 70, maple: 66, tidepool: 62, onsen: 66 };
-    // roads first (under the land edges)
-    const V = SPOT.village;
+    const isles = L.filter(p => ISLE[p.id]);
+    // the shallows round each island (pale water), then the roads across the channels (under the land edges)
+    g.fillStyle = 'rgba(236,252,250,.55)';
+    for (const p of isles) g.fill(islePath(p.id, 11));
+    const V = ISLE.village;
     g.setLineDash([3, 7]); g.lineWidth = 3.2; g.strokeStyle = 'rgba(122,78,54,.85)';
-    for (const p of L) {
+    for (const p of isles) {
       if (p.id === 'village') continue;
-      const s = SPOT[p.id]; if (!s) continue;
-      g.beginPath(); g.moveTo(V.x * W, V.y * H);
-      g.quadraticCurveTo((V.x + s.x) / 2 * W + 30, (V.y + s.y) / 2 * H - 20, s.x * W, s.y * H);
+      const s = ISLE[p.id];
+      g.beginPath(); g.moveTo(V.cx + (s.cx - V.cx) * 0.3, V.cy + (s.cy - V.cy) * 0.3); g.lineTo(s.cx, s.cy);
       g.globalAlpha = p.unlocked ? 1 : 0.35; g.stroke(); g.globalAlpha = 1;
     }
     g.setLineDash([]);
-    L.forEach((p, i) => {
-      const s = SPOT[p.id]; if (!s) return;
+    for (const p of isles) {
       g.globalAlpha = p.unlocked ? 1 : 0.55;
-      blob(s.x * W, s.y * H, R[p.id] || 60, tint[p.id] || '#e8dcc0', i * 1.7 + 0.4);
+      const path = islePath(p.id);
+      g.fillStyle = tint[p.id] || '#e8dcc0'; g.fill(path);
+      g.lineWidth = 3; g.strokeStyle = 'rgba(74,44,42,.55)'; g.stroke(path);
       g.globalAlpha = 1;
-    });
+    }
     // little painted motifs on each land (trees / peaks / waves), soft so the pins stay readable
     const dot = (x, y, r, c) => { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fillStyle = c; g.fill(); };
-    const at = id => [SPOT[id].x * W, SPOT[id].y * H];
-    { const [x, y] = at('village'); for (let k = 0; k < 7; k++) dot(x - 40 + k * 13, y + 28 + (k % 2) * 6, 7, '#ffb8cc'); }
-    { const [x, y] = at('bamboo'); g.strokeStyle = '#5aa04a'; g.lineWidth = 4; for (let k = 0; k < 8; k++) { g.beginPath(); g.moveTo(x - 44 + k * 12, y + 34); g.lineTo(x - 40 + k * 12, y - 2 - (k % 3) * 8); g.stroke(); } }
-    { const [x, y] = at('maple'); for (let k = 0; k < 7; k++) dot(x - 38 + k * 12, y + 30 - (k % 2) * 8, 9, ['#ff7a4a', '#ffb03a', '#e8503a'][k % 3]); }
-    { const [x, y] = at('tidepool'); g.strokeStyle = '#3cb8c8'; g.lineWidth = 3; for (let k = 0; k < 4; k++) { g.beginPath(); g.arc(x - 30 + k * 20, y + 22, 8, Math.PI, 0); g.stroke(); } }
-    { const [x, y] = at('onsen'); for (let k = 0; k < 3; k++) { const px = x - 36 + k * 28, py = y + 34; g.beginPath(); g.moveTo(px - 18, py); g.lineTo(px, py - 34 - k * 4); g.lineTo(px + 18, py); g.closePath(); g.fillStyle = '#c8d4f0'; g.fill(); g.beginPath(); g.moveTo(px - 7, py - 22 - k * 2); g.lineTo(px, py - 34 - k * 4); g.lineTo(px + 7, py - 22 - k * 2); g.closePath(); g.fillStyle = '#ffffff'; g.fill(); } }
+    const at = id => [ISLE[id].cx, ISLE[id].cy];
+    { const [x, y] = at('village'); for (const [dx, dy] of [[-78, 8], [-62, 36], [-34, 52], [0, 58], [34, 52], [62, 36], [78, 8], [-88, -22], [88, -22]]) dot(x + dx, y + dy, 7, '#ffb8cc'); } // (a ring of blossom round the pad)
+    { const [x, y] = at('bamboo'); g.strokeStyle = '#5aa04a'; g.lineWidth = 4; for (let k = 0; k < 6; k++) { g.beginPath(); g.moveTo(x - 30 + k * 12, y + 40 - Math.abs(k - 2.5) * 3); g.lineTo(x - 27 + k * 12, y + 8 - (k % 3) * 7); g.stroke(); } }
+    { const [x, y] = at('maple'); for (let k = 0; k < 5; k++) dot(x - 26 + k * 13, y + 36 - (k % 2) * 8, 8, ['#ff7a4a', '#ffb03a', '#e8503a'][k % 3]); }
+    { const [x, y] = at('tidepool'); g.strokeStyle = '#3cb8c8'; g.lineWidth = 3; for (let k = 0; k < 3; k++) { g.beginPath(); g.arc(x - 22 + k * 22, y + 34, 8, Math.PI, 0); g.stroke(); } }
+    { const [x, y] = at('onsen'); for (let k = 0; k < 2; k++) { const px = x - 14 + k * 28, py = y + 44; g.beginPath(); g.moveTo(px - 16, py); g.lineTo(px, py - 28 - k * 4); g.lineTo(px + 16, py); g.closePath(); g.fillStyle = '#c8d4f0'; g.fill(); g.beginPath(); g.moveTo(px - 6, py - 18 - k * 2); g.lineTo(px, py - 28 - k * 4); g.lineTo(px + 6, py - 18 - k * 2); g.closePath(); g.fillStyle = '#ffffff'; g.fill(); } }
     // paper vignette
     const vg = g.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.8); vg.addColorStop(0, 'rgba(255,246,232,0)'); vg.addColorStop(1, 'rgba(160,120,80,.28)');
     g.fillStyle = vg; g.fillRect(0, 0, W, H);

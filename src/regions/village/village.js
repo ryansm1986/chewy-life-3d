@@ -321,6 +321,7 @@ export class ZoneVillage {
   // ------------------------------------------------------------------ the buildings' doors (their services: talk.js)
   addBuildingInteract(b) {
     const it = { pos: b.doorPos, radius: b.kind === 'waypoint' ? 1.6 : 1.2, building: b, onInteract: () => buildingAction(this, b) };
+    if (b.kind === 'waypoint') Object.defineProperty(it, 'obj', { get: () => this.shrineModel || null }); // (the interact shine lights the Blender shrine; doors get its star)
     Object.defineProperty(it, 'label', { get: () => (this.saved ? b.label || this.doorLabel(b) : b.kind === 'waypoint' ? 'The Waypoint Shrine is dark — break the siege' : `${b.name} — boarded up`), configurable: true });
     this.inter.push(it);
   }

@@ -95,7 +95,7 @@ function sightingSpawn(layout, s, lvl) {
 function zoneBoard(G, mode) {
   const v = mode.village; if (!v?.saved) return null;
   const sp = (v.decor?.spots || []).find(s => s.pose === 'read'); if (!sp) return null;
-  const it = { pos: new THREE.Vector3(sp.x, mode.world.heightAt(sp.x, sp.z), sp.z), radius: 1.5, label: 'Read the Sightings board', onInteract: () => G.ui?.open?.('sightings', { at: mode.regionId }) };
+  const it = { pos: new THREE.Vector3(sp.x, mode.world.heightAt(sp.x, sp.z), sp.z), radius: 1.5, label: 'Read the Sightings board', onInteract: () => G.ui?.open?.('sightings', { at: mode.regionId }), obj: null }; // (obj null: the board is in the village's merged props, so the interact shine's star)
   mode.world.interactables.push(it);
   return it;
 }

@@ -254,6 +254,28 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
   WASD stays direct. Collider changes are detected lazily (collision objects carry a `_nid`).
 - Input: a press released before the next frame stays down for exactly one frame, so every poller sees taps.
 
+## The interact shine (src/gfx/interactShine.js)
+- **What glows**: the interactable in F's reach (the pad's highlighted one, a touch's) and the one under the mouse
+  (`pickInteractAtMouse`, what a click would use), set each frame in game.js `handleInput` and cleared whenever input is
+  locked (dialogue, menus, build and decorate). `G.shine.update(dt, scene, camera, near, hover, warm)` in the frame loop.
+- **The look**: a gold outline (an inverted hull, the back faces pushed out 3.2 px in clip space), a warm rim and a band
+  of light sweeping up across the object (1.1 s, then a 0.6 s rest), at 0.8 strength for the mouse. Each mesh gets two
+  copies sharing its geometry, skeleton and morphs, drawn with a copy of its own material whose output is replaced
+  (`copyOf`): the toon shader's wind, cut-outs, cutaway and skinning still apply, so the copy fits exactly. No copy can
+  be made by `material.clone()`: its JSON userData copy serialised the depth material's textures (100+ ms a villager).
+- **Which meshes** (`targets`): `it.actor` (a villager's rig), `it.obj` (an Object3D, a list, an InstancedMesh part
+  `{ inst, i, matrix }` or a BatchedMesh instance `{ batch, id }`: the scavenge nodes and dig mounds; `obj: null` asks
+  for the star), else `findProp`: the nearest prop-sized mesh or instance around `it.pos` (not effects, shadow-only
+  masses, outline hulls, moving instances or crowds over 256), grown to its prop-sized group; an instance brings its
+  item's other batches (the same matrix). A `building` interactable looks only at placed buildings: a small one (the
+  notice board, the workbench: at most 2.3 m tall) glows whole, a house's door gets the star. `noShine: true`: nothing.
+- **The star**: a twinkling four-point sprite 1.8 m over the spot when there's nothing to light (doors, the door mat,
+  the zone villages' merged decor).
+- **Cost**: the resolve walks the scene once per interactable (cached, ~0.1 ms); attaching is under 1 ms (skinned copies
+  take the source's bounds; no CPU skinning). The copies' shaders compile in the background 1 s and 8 s into each world
+  (`prewarm`: compileAsync, then drawn for two frames at zero strength, since ANGLE builds a program's native shader on its
+  first draw). QA: `node tools/qa/shine-shots.mjs [village|interior|dungeon|region] [label-regex] [--list]`.
+
 ## Shadow leads the way (src/actors/shadowLead.js, src/gfx/pawTrail.js, src/ui/leadUI.js — ROADMAP R-17)
 - **What he leads to**: `G.questTarget()`, the quest pointer's own objective, so the arrow, the minimap pin and Shadow
   agree. Its result carries where it came from: `Tutorials.target()` adds `{ guide, step, lead }`, `Story.target(only)`

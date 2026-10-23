@@ -7,8 +7,9 @@ toon look as the village and the Burrow (see ARCHITECTURE.md "Visual style guide
 
 ## 1. Player flow
 - **Travel post**: a "Wayfarer's Post" at the west end of the village path (by the bamboo, `LANDMARKS.travel`). Its
-  interaction opens the **Travel Map**: a painted map with Blossom Hollow in the middle and the four regions around it.
-  Each card shows a vignette, the name (with Japanese), the level range, locked/unlocked, visits and a boss-defeated
+  interaction opens the **Travel Map**: a painted map whose islands make a paw. Blossom Hollow is the big pad, and the
+  four regions are its toes, left to right in the order they open (Bamboo, Maple, Tide Pool, Onsen: keys 2-5; `ISLE` in
+  src/ui/travel.js). Each card shows a vignette, the name, the level range, locked/unlocked, visits and a boss-defeated
   stamp. Pick one and an iris transition carries you there.
 - **Unlocks**: a region opens when the active hero reaches `unlock.level`, or when the previous region's boss is
   defeated (whichever comes first). Order: Bamboo Grove → Momiji Hollow → Shiokaze Tidepools → Yukimi Onsen.

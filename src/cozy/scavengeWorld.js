@@ -129,10 +129,11 @@ class ScavRun {
     const veg = world.veg;
     if (veg?.recordsIn) for (const p of [...v.nodes, ...(v.cands || [])]) veg.recordsIn(p.x - 1.1, p.z - 1.1, p.x + 1.1, p.z + 1.1, rec => { if (rec.alive && !rec.keep && !rec.big && Math.hypot(rec.x - p.x, rec.z - p.z) < 1.0) veg._kill(rec); });
     this.buildMesh(v);
-    // the interactables: one per node, plus a fixed pool for the day's dig spots (the village's list stays stable: s1)
-    for (const n of v.nodes) { n.it = { pos: new THREE.Vector3(n.x, n.y, n.z), radius: 1.05, scav: n.id, label: NODE_KINDS[n.kind].verb, onInteract: () => this.gatherStart(v, n) }; v.inters.push(n.it); world.interactables.push(n.it); }
+    // the interactables: one per node, plus a fixed pool for the day's dig spots (the village's list stays stable: s1);
+    // obj: the batch instance the interact shine lights (gfx/interactShine.js)
+    for (const n of v.nodes) { n.it = { pos: new THREE.Vector3(n.x, n.y, n.z), radius: 1.05, scav: n.id, label: NODE_KINDS[n.kind].verb, onInteract: () => this.gatherStart(v, n), get obj() { return v.mesh ? { batch: v.mesh, id: n.inst } : null; } }; v.inters.push(n.it); world.interactables.push(n.it); }
     v.pool = [];
-    for (let i = 0; i < 4; i++) { const it = { pos: PARK.clone(), radius: 1.0, scavDig: true, label: 'Dig with Shadow', onInteract: () => this.digStart(v, it.spot) }; v.pool.push(it); world.interactables.push(it); }
+    for (let i = 0; i < 4; i++) { const it = { pos: PARK.clone(), radius: 1.0, scavDig: true, label: 'Dig with Shadow', onInteract: () => this.digStart(v, it.spot), get obj() { return v.mesh && v.spotInst ? { batch: v.mesh, id: v.spotInst[i] } : null; } }; v.pool.push(it); world.interactables.push(it); }
     this.views.set(world, v);
     if (area !== 'home') world.disposers?.push(() => this.detach(v)); // (before the region's scene is disposed: our material stays alive)
     this.refresh(v);
