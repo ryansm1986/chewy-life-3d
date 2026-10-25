@@ -178,6 +178,24 @@
 .ex-recall b { font: 700 17px/1.05 var(--font); }
 .ex-recall small { font: 600 12px var(--font); color: var(--ink2); }
 .ex-recall.armed { background: linear-gradient(#fff, #ffd8c8); }
+/* Receive rewards (a report holding its haul): the gold button, the chips waiting with a soft shimmer, the list's gift */
+.ex-claim { align-self: stretch; justify-content: center; gap: 12px; padding: 8px 14px; min-height: 58px; background: linear-gradient(#fffbe8, #ffe58a 55%, #f6c548); animation: exGlow 1.8s ease-in-out infinite; }
+.ex-claim > .gl { width: 36px; height: 36px; animation: exWiggle 1.8s ease-in-out infinite; }
+.ex-claim span { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+.ex-claim b { font: 700 20px/1.05 var(--font); }
+.ex-claim small { font: 600 12.5px/1.15 var(--font); color: var(--ink2); white-space: normal; }
+@keyframes exGlow { 50% { box-shadow: 0 4px 0 rgba(74, 44, 42, .3), 0 0 0 4px rgba(255, 210, 74, .45), 0 0 18px rgba(255, 200, 60, .55); } }
+@keyframes exWiggle { 0%, 70%, 100% { transform: none; } 78% { transform: rotate(-10deg) scale(1.08); } 86% { transform: rotate(9deg) scale(1.08); } 94% { transform: rotate(-4deg); } }
+.ex-loot.pend .ex-lt { box-shadow: 0 0 0 2px #fff, 0 0 10px rgba(255, 200, 60, .55); }
+.ex-got { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 58px; padding: 8px 14px; border-radius: 16px; border: 2.5px dashed rgba(47, 138, 78, .45); background: rgba(232, 248, 236, .8); color: #2f8a4e; }
+.ex-got > .gl { width: 30px; height: 30px; }
+.ex-got span { display: flex; flex-direction: column; align-items: flex-start; }
+.ex-got b { font: 700 18px/1.05 var(--font); }
+.ex-got small { font: 600 12.5px/1.15 var(--font); color: var(--ink2); }
+.ui-root.m-phone .p-exp .ex-got { min-height: 52px; padding: 4px 10px; }
+.ui-root.m-phone .p-exp .ex-got small { font-size: 14px; }
+.ex-gift { position: absolute; right: 6px; top: 6px; display: grid; place-items: center; width: 24px; height: 24px; animation: exWiggle 1.8s ease-in-out infinite; }
+.ex-gift .gl { width: 22px; height: 22px; }
 /* the Reports view */
 .ex-stamp { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; width: 88px; height: 70px; flex: none; transform: rotate(-6deg); border: 3px solid var(--pc); border-radius: 12px; background: color-mix(in srgb, var(--pc) 12%, #fff); box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--ink); }
 .ex-stamp .gl { width: 30px; height: 30px; }
@@ -290,9 +308,9 @@
 .ui-root.m-phone .p-exp .ex-odds { min-width: 0; }
 .ui-root.m-phone .p-exp .ex-odds b { font-size: 16px; }
 .ui-root.m-phone .p-exp .ex-odds em { font-size: 14px; }
-.ui-root.m-phone .p-exp .ex-go, .ui-root.m-phone .p-exp .ex-recall { min-height: 52px; padding: 4px 10px; }
+.ui-root.m-phone .p-exp .ex-go, .ui-root.m-phone .p-exp .ex-recall, .ui-root.m-phone .p-exp .ex-claim { min-height: 52px; padding: 4px 10px; }
 .ui-root.m-phone .p-exp .ex-go b { font-size: 18px; }
-.ui-root.m-phone .p-exp .ex-go small, .ui-root.m-phone .p-exp .ex-recall small { font-size: 14px; }
+.ui-root.m-phone .p-exp .ex-go small, .ui-root.m-phone .p-exp .ex-recall small, .ui-root.m-phone .p-exp .ex-claim small { font-size: 14px; }
 .ui-root.m-phone .p-exp .ex-foot { display: none; }
 .ui-root.m-phone .p-exp .ex-progt span, .ui-root.m-phone .p-exp .ex-supl, .ui-root.m-phone .p-exp .ex-wm span, .ui-root.m-phone .p-exp .ex-xp, .ui-root.m-phone .p-exp .ex-wait { font-size: 14px; }
 .ui-root.m-phone .p-exp .ex-stamp b { font-size: 14px; }

@@ -46,7 +46,7 @@ export class CrewLogView {
       return `<button class="cl-rep${r.read ? '' : ' unread'}" data-rep="${esc(r.uid)}" style="--rc:${R[2]}">
         <span class="cl-st">${cozyIcon(R[1])}</span>
         <span class="cl-t"><b>${esc(r.name)}</b><span>${esc(R[0])} · ${esc(this.names(r.crew))}${r.place?.label ? ` · ${esc(r.place.label)}` : ''}</span>${news ? `<em>${glyph('star')}${esc(news)}</em>` : ''}</span>
-        <span class="cl-side"><small>${esc(ago(Math.max(0, now - (r.at || 0))))}</small><span class="cl-loot">${loot}</span></span>${r.read ? '' : '<i class="cl-dot"></i>'}</button>`;
+        <span class="cl-side"><small>${esc(ago(Math.max(0, now - (r.at || 0))))}</small><span class="cl-loot">${loot}</span></span>${r.pending ? `<i class="cl-gift" title="Rewards to receive on the Expedition Board">${glyph('gift')}</i>` : r.read ? '' : '<i class="cl-dot"></i>'}</button>`;
     }).join('');
     this.root.innerHTML = `<div class="cl-top"><span class="cl-ic">${cozyIcon('board')}</span>
         <div class="cl-nums"><div><b>${reps.length}</b><span>reports</span></div><div><b>${wins}</b><span>successes</span></div><div><b>${out.length}</b><span>out now</span></div><div><b>${keep}</b><span>keepsakes</span></div></div>

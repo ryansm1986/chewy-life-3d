@@ -27,7 +27,7 @@ const START = {
   quests: '.q-item, .gd-card .btn, .fl-card', cook: '.ck-row.sel, .ck-row', craft: '.ck-row.sel, .ck-row', travel: '.tv-pin.sel, .tv-pin.here, .tv-pin', gift: '.gf-card', seeds: '.sp-card',
   houseCard: '.btn.pink, .btn', remodel: '.rm-set.on, .rm-set', lantern: '.ln-go',
   burrow: '.dn-go, .dn-pin.sel', // (the Burrow door's den picker: docs/ZONES.md §4.1)
-  expeditions: '.ex-go:not([disabled]), .ex-mem.can, .ex-obj.sel, .ex-recall, .ex-obj', awayCard: '.aw-ok', // (the cozy path: docs/COZY.md §10)
+  expeditions: '.ex-claim, .ex-go:not([disabled]), .ex-mem.can, .ex-obj.sel, .ex-recall, .ex-obj', awayCard: '.aw-ok', // (the cozy path: docs/COZY.md §10)
   sightings: '.sg-go:not([disabled])', // (the Sightings board: docs/COZY.md §6.3)
   questCard: '.qc-go', // (the quest card's "Let's go!": docs/QUESTS.md §1)
   map: '.mp-row.sel, .mp-row', // (the big map's directory: ROADMAP UX-1)
@@ -408,7 +408,7 @@ const HANDLERS = [
     y(e, nav) { const P = nav.ui.panels.expeditions; if (P.view === 'story' || P.view === 'village' || P.view === 'errands') P.best(); },
     label(e, nav) {
       const P = nav.ui.panels.expeditions, pick = P.view === 'story' || P.view === 'village' || P.view === 'errands'; // (village: the zone villagers' quests, docs/COZY.md §3.2)
-      const a = e.matches('.ex-mem') ? (e.classList.contains('on') ? 'Remove' : 'Add') : e.matches('.ex-go') ? 'Send off' : e.matches('.ex-recall') ? 'Call home' : e.matches('.ex-obj') ? (P.view === 'reports' ? 'Read' : 'Pick') : e.matches('.ex-tog') ? 'Lunches' : 'Select';
+      const a = e.matches('.ex-mem') ? (e.classList.contains('on') ? 'Remove' : 'Add') : e.matches('.ex-go') ? 'Send off' : e.matches('.ex-recall') ? 'Call home' : e.matches('.ex-claim') ? 'Receive' : e.matches('.ex-obj') ? (P.view === 'reports' ? 'Read' : 'Pick') : e.matches('.ex-tog') ? 'Lunches' : 'Select';
       return { a, x: pick ? 'Clear' : '', y: pick ? 'Best crew' : '' };
     },
   },

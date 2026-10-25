@@ -558,9 +558,9 @@ const nose = {
       done: (G, T) => !T.data.crew || !peekOut(G) },
     { id: 'report', allow: { panels: ['expeditions', 'menu'] }, skippable: true,
       objective: "Read the crew's report", // (short: on a phone it sits in the board's title band; the line says how)
-      say: G => `They're back! ${dev() === 'touch' ? 'Tap the backpack chip' : dev() === 'pad' ? 'Open the menu and pick *Crews*' : 'Click the backpack chip'} to read their report.`,
-      highlight: G => (expOpen(G) ? '.p-exp .ex-rep' : dev() === 'pad' && G.ui?.isOpen?.('menu') ? '.p-menu [data-a="crews"]' : '.hud .cz-chip.on'),
-      done: (G, T) => !T.data.crew || !peekReport(G) || (peekReport(G).read && (!expOpen(G) || T.cur.t > 4)) },
+      say: G => (expOpen(G) && peekReport(G)?.pending ? `They're back, and they brought presents! ${dev() === 'touch' ? 'Tap' : dev() === 'pad' ? 'Press *A* on' : 'Click'} *Receive rewards* to put it all in your bag.` : `They're back! ${dev() === 'touch' ? 'Tap the backpack chip' : dev() === 'pad' ? 'Open the menu and pick *Crews*' : 'Click the backpack chip'} to read their report.`),
+      highlight: G => (expOpen(G) ? (peekReport(G)?.pending ? '.p-exp .ex-claim' : '.p-exp .ex-rep') : dev() === 'pad' && G.ui?.isOpen?.('menu') ? '.p-menu [data-a="crews"]' : '.hud .cz-chip.on'),
+      done: (G, T) => !T.data.crew || !peekReport(G) || (peekReport(G).read && !peekReport(G).pending && (!expOpen(G) || T.cur.t > 4)) },
     { id: 'wrap', ack: true,
       // (on the crew path the quest waits for its hand-in to Rosie, who has the last word there: docs/QUESTS.md §4, COZY
       //  §11. Shadow says so once the board is closed: a phone hides the speech card while a panel is up)

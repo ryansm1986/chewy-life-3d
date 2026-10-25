@@ -309,8 +309,11 @@ try {
     const r0 = { ring: await ringOn('.hud .cz-chip.on') };
     await page.click('.hud .cz-chip.on');
     await page.waitForFunction(() => window.G.ui.isOpen('expeditions') && window.G.ui.panels.expeditions.view === 'reports', null, { timeout: 5000 });
-    await sleep(page, 600); const r1 = { ring: await ringOn('.p-exp .ex-rep') }; await snap('cozy_nose_report');
-    await sleep(page, 3500); await page.keyboard.press('Escape'); // (read, then the board closed: Rosie's line follows)
+    await sleep(page, 600); const r1 = { ring: await ringOn('.p-exp .ex-claim') }; await snap('cozy_nose_report'); // (the haul waits: Receive rewards spotlit, docs/COZY.md §4.5)
+    const c0 = await G(() => window.G.state.materials.mochi || 0);
+    await clickSel('.p-exp .ex-claim'); await sleep(page, 600);
+    r1.got = (await G(() => window.G.state.materials.mochi || 0)) > c0;
+    await sleep(page, 3000); await page.keyboard.press('Escape'); // (read and received, then the board closed: Rosie's line follows)
     await stepIs('nose', 'wrap', 12000); await sleep(page, 600);
     const w1 = await G(() => ({ who: document.querySelector('.ts-name')?.textContent, say: document.querySelector('.ts-tx')?.textContent || '', burrow1: !!window.G.state.quests.active.find(q => q.id === 'burrow1')?.handIn }));
     await snap('cozy_nose_wrap');
@@ -322,7 +325,7 @@ try {
     const w3 = await G(() => ({ crew: /crew|Moka/.test(window.G.ui.dlg.lines?.map(l => l.text).join(' ') || '') }));
     await drainDialogue(page); await sleep(page, 400);
     w3.done = await G(() => window.G.state.quests.done.includes('burrow1'));
-    R.check("g) Moka's crew comes home: the chip spotlit, the report spotlit on the board; Shadow: Rosie wants to hear all about it (burrow1 done by the crew, its hand-in waiting); the Nose guide done; Rosie's hand-in with a line about the crew finishes burrow1", r0.ring && r1.ring && w1.who === 'Shadow' && /Mochi Jelly/.test(w1.say) && /Rosie/.test(w1.say) && w1.burrow1 && w2.rec.done && !w2.active && w3.crew && w3.done, JSON.stringify({ r0, r1, w1, w2, w3 }));
+    R.check("g) Moka's crew comes home: the chip spotlit, Receive rewards spotlit on the board (the Mochi Jelly in); Shadow: Rosie wants to hear all about it (burrow1 done by the crew, its hand-in waiting); the Nose guide done; Rosie's hand-in with a line about the crew finishes burrow1", r0.ring && r1.ring && r1.got && w1.who === 'Shadow' && /Mochi Jelly/.test(w1.say) && /Rosie/.test(w1.say) && w1.burrow1 && w2.rec.done && !w2.active && w3.crew && w3.done, JSON.stringify({ r0, r1, w1, w2, w3 }));
     await G(() => window.G.ui.closeAll());
   }
 

@@ -280,8 +280,16 @@ home" line, and no door, arrival or boss lines fire for places you never walked 
   ("Poe: I was very stealthy. Mostly."), the outcome, the loot row, the XP, and "Read it to Rosie" for the story ones.
   A finished quest's report adds "Rosie wants to hear all about it: bring the news" (the giver's name); the quest
   completes at its hand-in to the giver, not at the report (docs/QUESTS.md §4).
-  Loot goes straight to the bag / materials / pantry; if the bag is full, the items wait in the report until there's
-  room ("Take all").
+  **Receive rewards** (the owner's request 2026-10-25: "When an expedition comes back you should have a receive
+  rewards button to get the items and things from the expedition"): the loot (coins, materials, pantry finds, items,
+  a furniture find, a keepsake) waits in the report (`pending`) until you press the report's gold **Receive rewards**
+  (Enter, a tap, the pad's A; the pad's focus starts on it). The chips fly into the purse and the bag; the button's
+  place then reads "Received! All in your bag and purse". If the bag is full, the items wait in the report until
+  there's room ("Take all"). The XP, the level-ups and the world's changes still come at once (the crew earned them
+  on the road). While a haul waits: the board's "!", the HUD chip ("Rewards to receive", with its "!"), a gift on the
+  report's card and in the Journal's crew log, "Get rewards" on the away card, and the return toast says "their haul
+  waits on the Expedition Board". A report holding a haul is never trimmed from the list of 24 (`trimReports`).
+  Code: `cozy/expeditionRun.js` `claim(uid)`, `ui/expeditions.js` `claim`; QA s53.
 - **Results that change the world** apply at once: the quest step, `saveVillage`, the zone unlock, the dungeon count.
   **One exception**: if you are inside that zone when its relief crew returns, the result **waits** until you leave
   the zone ("Your crew is camped at the edge of Takemori, they'll move in when you step back"). Any camps you broke in

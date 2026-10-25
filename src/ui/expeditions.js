@@ -9,12 +9,15 @@
 //     Enter sends;
 //   - Away: the crews out with their progress ("back in about 2 h"), and "Call them home";
 //   - Reports: each crew's report (the outcome, a line from each member, the loot, the XP); unread ones carry a dot.
+//     The haul waits in the report until Receive rewards (Enter, or the pad's A on it): it flies into the purse and the
+//     bag (cozy/expeditionRun.js claim); a report still holding its haul carries a gift.
 // Phones: two columns like the Spirit Lantern: the objective on the left (a ◀ ▶ picker instead of the list), unscrolled;
 // the crew scrolling on the right; 44 px targets, the 12 px floor (expeditions.css).
 import './expeditions.css';
 import './cozy.css';
 import { esc, rarityColor } from './dom.js';
-import { glyph } from './glyphs.js';
+import { glyph, glyphURL } from './glyphs.js';
+import { flyToBag } from './fx.js';
 import { padGlyph } from './padGlyphs.js';
 import { Panel } from './panel.js';
 import { portrait } from './portraits.js';
@@ -55,11 +58,13 @@ export class ExpeditionPanel extends Panel {
       else if (b.dataset.pot) this.stepPotions(+b.dataset.pot);
       else if (b.dataset.a === 'go') this.go();
       else if (b.dataset.a === 'recall') this.recall(b.dataset.u);
+      else if (b.dataset.a === 'claim') this.claim(b.dataset.u);
       else if (b.dataset.a === 'take') { const n = this.C?.exp.take(b.dataset.u); if (n) this.ui.sfx('bag'); this.render(); }
     });
     this.onKey = e => {
       if (!this.isOpen || this.ui.dlg?.active || this.ui._order[this.ui._order.length - 1] !== 'expeditions') return;
       if (e.key === 'Enter' && OBJ_VIEWS.has(this.view)) { this.go(); e.preventDefault(); }
+      else if (e.key === 'Enter' && this.view === 'reports' && this.current()?.pending) { this.claim(this.current().uid); e.preventDefault(); }
     };
     addEventListener('keydown', this.onKey);
     this.G?.events?.on?.('cozy:changed', () => { if (this.isOpen) this.render(); });
@@ -69,7 +74,7 @@ export class ExpeditionPanel extends Panel {
     this.atBoard = this.opts.at === 'board' || this.opts.at === 'guild'; // (the board by the Post, or the one inside the Guild's door: cozy/guildRun.js)
     const want = this.opts.view;
     if (want) this.view = want;
-    else if (C.exp.unread()) this.view = 'reports';
+    else if (C.exp.unread() || C.exp.pending()) this.view = 'reports';
     else if (this.view === 'away' || this.view === 'reports' || !this.list(this.view).length) this.view = this.list('story').length ? 'story' : 'errands';
     if (this.opts.report) this.sel.reports = this.opts.report;
     else this.newestUnread();
@@ -103,8 +108,9 @@ export class ExpeditionPanel extends Panel {
   info(o = this.current()) { if (!o?.id || !this.C) return null; return this.C.exp.info(o.id, this.crew, this.supplies(o)); }
   // ---------------------------------------------------------------- actions
   setView(v) { if (v === this.view) return; this.view = v; this.armed = null; if (v === 'reports') this.newestUnread(); this.ui.sfx('tab'); this.render(); }
-  /** a report waiting to be read is the one shown (the newest), not whichever was read last time */
-  newestUnread() { const u = [...(this.C?.exp.reports() || [])].reverse().find(r => !r.read); if (u) this.sel.reports = u.uid; }
+  /** a report waiting to be read is the one shown (the newest), else the newest still holding its haul, not whichever
+   *  was read last time */
+  newestUnread() { const R = [...(this.C?.exp.reports() || [])].reverse(), u = R.find(r => !r.read) || R.find(r => r.pending); if (u) this.sel.reports = u.uid; }
   pick(id) {
     if (this.sel[this.view] === id) return;
     this.sel[this.view] = id; this.armed = null; this.ui.sfx('pick');
@@ -160,6 +166,25 @@ export class ExpeditionPanel extends Panel {
     if (rep) { this.sel.reports = rep.uid; this.view = 'reports'; this.C.exp.read(rep.uid); }
     this.render();
   }
+  /** Receive rewards: the haul into the purse, the materials and the bag, each chip flying to where it goes */
+  claim(uid) {
+    const C = this.C, ui = this.ui; if (!C) return;
+    const chips = [...this.body.querySelectorAll('.ex-loot .ex-lt[data-fly]')].map(el => { const r = el.getBoundingClientRect(); return { k: el.dataset.fly, src: el.dataset.src, x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+    const it = chips.find(c => c.k === 'item'), br = this.body.querySelector('.ex-claim')?.getBoundingClientRect();
+    if (it) ui._flyFromScreen = { at: { x: it.x, y: it.y }, until: performance.now() + 500 }; // (the items fly as themselves, from their chip: ui.pickup)
+    const got = C.exp.claim(uid);
+    if (!got) { ui._flyFromScreen = null; return; }
+    const bag = ui.hud?.bagRect?.(), coin = ui.hud?.$?.coins?.getBoundingClientRect?.();
+    let k = 0;
+    for (const c of chips) {
+      if (c.k === 'item' || !c.src) continue;
+      const to = c.k === 'coin' ? coin : bag; if (!to?.width) continue;
+      for (let i = 0, n = c.k === 'coin' ? 4 : 1; i < n; i++) setTimeout(() => flyToBag(ui.layers.fx, c.src, { x: c.x + (Math.random() - 0.5) * 18, y: c.y + (Math.random() - 0.5) * 8 }, to, () => { if (c.k !== 'coin') ui.hud?.bumpBag?.(); }), 60 * k++);
+    }
+    if (br) ui.burst(br.left + br.width / 2, br.top + br.height / 2, { n: 18, spread: 90, kind: 'star', colors: ['#ffd24a', '#fff3b8', '#8fe0c0'] });
+    ui.sfx('coin');
+    this.render(); this.flash('.ex-loot'); this.flash('.ex-got');
+  }
   flash(sel) { const e = this.body.querySelector(sel); if (!e) return; e.classList.remove('ex-flash'); void e.offsetWidth; e.classList.add('ex-flash'); }
   /** once a second while open: the Away view's bars and words (no re-render: the focus stays put) */
   live() {
@@ -177,8 +202,8 @@ export class ExpeditionPanel extends Panel {
     const v = this.view, L = this.list(), cur = this.current(L), idx = cur ? Math.max(0, L.findIndex(x => this.keyOf(x) === this.keyOf(cur))) : 0;
     if (cur) this.sel[v] = this.keyOf(cur);
     if (v === 'reports' && cur && !cur.read) C.exp.read(cur.uid);
-    const counts = { story: this.list('story').length, village: this.list('village').length, errands: this.list('errands').length, away: C.exp.list().length, reports: C.exp.reports().length }, unread = C.exp.unread();
-    const tabs = VIEWS.filter(([k]) => k !== 'village' || counts.village).map(([k, label, ic]) => `<button class="tab ex-tab${v === k ? ' on' : ''}" data-v="${k}" style="--tc:${{ story: '#e8a05a', village: '#c08ad8', errands: '#6ac08a', away: '#6aa0e0', reports: '#d8789a' }[k]}">${cozyIcon(ic)}<span class="ex-tl">${label}</span>${k === 'reports' && unread ? `<i class="tab-n ex-new">${unread}</i>` : counts[k] ? `<i class="tab-n">${counts[k]}</i>` : ''}</button>`).join('');
+    const counts = { story: this.list('story').length, village: this.list('village').length, errands: this.list('errands').length, away: C.exp.list().length, reports: C.exp.reports().length }, unread = C.exp.unread(), pending = C.exp.pending();
+    const tabs = VIEWS.filter(([k]) => k !== 'village' || counts.village).map(([k, label, ic]) => `<button class="tab ex-tab${v === k ? ' on' : ''}" data-v="${k}" style="--tc:${{ story: '#e8a05a', village: '#c08ad8', errands: '#6ac08a', away: '#6aa0e0', reports: '#d8789a' }[k]}">${cozyIcon(ic)}<span class="ex-tl">${label}</span>${k === 'reports' && (unread || pending) ? `<i class="tab-n ex-new">${unread || pending}</i>` : counts[k] ? `<i class="tab-n">${counts[k]}</i>` : ''}</button>`).join('');
     const items = L.map(x => this.card(x, cur)).join('') || `<div class="ex-empty">${this.emptyText(v)}</div>`;
     const pick = L.length ? `<div class="ex-pick"><button class="btn sm ex-arr" data-step="-1" ${L.length < 2 ? 'disabled' : ''} aria-label="Previous">‹</button><div><b>${esc(cur ? cur.name : '')}</b><span>${idx + 1} of ${L.length}</span></div><button class="btn sm ex-arr" data-step="1" ${L.length < 2 ? 'disabled' : ''} aria-label="Next">›</button></div>` : '';
     let main = '';
@@ -209,7 +234,7 @@ export class ExpeditionPanel extends Panel {
       return `<button class="ex-obj ex-awc${on}" data-o="${esc(x.uid)}" style="--pc:${x.place?.color || '#8fd0ff'}"><span class="ex-faces">${x.crew.map(k => this.face(k, true)).join('')}</span><span class="ex-ot"><b>${esc(x.name)}</b><span class="ex-op">${x.hold ? 'Camped at the edge of the village' : esc(backIn(left))}</span><span class="ex-mini" data-prog="${x.uid}" style="--f:${f.toFixed(3)}"><i></i></span></span></button>`;
     }
     const R = RESULT[x.result] || RESULT.success;
-    return `<button class="ex-obj ex-repc${on}${x.read ? '' : ' unread'}" data-o="${esc(x.uid)}" style="--pc:${R[2]}"><span class="ex-oic">${cozyIcon(R[1])}</span><span class="ex-ot"><b>${esc(x.name)}</b><span class="ex-op">${esc(R[0])} · ${esc(this.crewNames(x.crew))}</span></span>${x.read ? '' : '<i class="ex-dot"></i>'}</button>`;
+    return `<button class="ex-obj ex-repc${on}${x.read ? '' : ' unread'}" data-o="${esc(x.uid)}" style="--pc:${R[2]}"><span class="ex-oic">${cozyIcon(R[1])}</span><span class="ex-ot"><b>${esc(x.name)}</b><span class="ex-op">${esc(R[0])} · ${esc(this.crewNames(x.crew))}</span></span>${x.pending ? `<i class="ex-gift" title="Rewards to receive">${glyph('gift')}</i>` : x.read ? '' : '<i class="ex-dot"></i>'}</button>`;
   }
   face(k, sm = false) {
     const m = this.member(k), id = m?.id || k.split(':')[1];
@@ -298,13 +323,14 @@ export class ExpeditionPanel extends Panel {
   reportMain(r) {
     const R = RESULT[r.result] || RESULT.success, L = r.loot || {};
     const lines = (r.lines || []).map(l => `<div class="ex-line">${this.face(l.who)}<p><b>${esc(l.name || this.member(l.who)?.name || '')}</b>${esc(l.text)}</p></div>`).join('');
-    const loot = [];
-    if (L.coins) loot.push(`<span class="ex-lt">${glyph('coin')}<b>${L.coins}</b></span>`);
-    for (const [k, n] of Object.entries(L.mats || {})) loot.push(`<span class="ex-lt" title="${esc(MATERIALS[k]?.name || k)}">${matIcon(k)}<b>${n}</b></span>`);
-    for (const [k, n] of Object.entries(L.pantry || {})) loot.push(`<span class="ex-lt" title="${esc(PANTRY[k]?.name || k)}"><img class="ex-mi" src="${pantryIcon(k)}" alt=""><b>${n}</b></span>`);
-    for (const it of L.items || []) loot.push(`<span class="ex-lt item" style="--rc:${rarityColor(it.rarity)}">${glyph('gift')}<b>${esc(it.name)}</b></span>`);
-    if (L.furniture) loot.push(`<span class="ex-lt">${glyph('home')}<b>A furniture find!</b></span>`);
-    if (L.trophy) loot.push(`<span class="ex-lt trophy" title="A keepsake: in your furniture storage">${glyph('home')}<b>${esc(FURNITURE[L.trophy]?.name || 'A keepsake')}</b></span>`);
+    const loot = [], pend = !!r.pending, fly = (k, src) => (pend ? ` data-fly="${k}"${src ? ` data-src="${src}"` : ''}` : ''); // (data-fly: where Receive rewards sends it)
+    if (L.coins) loot.push(`<span class="ex-lt"${fly('coin', glyphURL('coin'))}>${glyph('coin')}<b>${L.coins}</b></span>`);
+    for (const [k, n] of Object.entries(L.mats || {})) loot.push(`<span class="ex-lt" title="${esc(MATERIALS[k]?.name || k)}"${fly('bag', materialIconURL(k))}>${matIcon(k)}<b>${n}</b></span>`);
+    for (const [k, n] of Object.entries(L.pantry || {})) loot.push(`<span class="ex-lt" title="${esc(PANTRY[k]?.name || k)}"${fly('bag', pantryIcon(k))}><img class="ex-mi" src="${pantryIcon(k)}" alt=""><b>${n}</b></span>`);
+    for (const it of L.items || []) loot.push(`<span class="ex-lt item" style="--rc:${rarityColor(it.rarity)}"${fly('item')}>${glyph('gift')}<b>${esc(it.name)}</b></span>`);
+    if (L.furniture) loot.push(`<span class="ex-lt" title="${esc(FURNITURE[L.furniture]?.name || '')}: in your furniture storage"${fly('bag', glyphURL('home'))}>${glyph('home')}<b>A furniture find!</b></span>`);
+    if (L.trophy) loot.push(`<span class="ex-lt trophy" title="A keepsake: in your furniture storage"${fly('bag', glyphURL('home'))}>${glyph('home')}<b>${esc(FURNITURE[L.trophy]?.name || 'A keepsake')}</b></span>`);
+    const nI = (L.items || []).length, what = [L.coins ? `${L.coins} coins` : '', Object.keys(L.mats || {}).length || Object.keys(L.pantry || {}).length ? 'materials' : '', nI ? (nI > 1 ? `${nI} items` : 'an item') : '', L.furniture || L.trophy ? 'something for your home' : ''].filter(Boolean);
     const xp = r.crew.map(k => { const lv = r.levels?.[k]; return r.xp?.[k] ? `<span class="ex-xp">${this.face(k, true)}<b>+${fmtN(r.xp[k])} XP</b>${lv ? `<em>Lv ${lv[0]} → ${lv[1]}!</em>` : ''}</span>` : ''; }).join('');
     return `<div class="ex-det ex-rep" style="--pc:${R[2]}">
         <div class="ex-dh"><span class="ex-stamp">${cozyIcon(R[1])}<b>${esc(R[0])}</b></span><div class="ex-dt"><b>${esc(r.name)}</b><span class="ex-dp">${esc(r.place?.label || '')}</span></div></div>
@@ -316,9 +342,11 @@ export class ExpeditionPanel extends Panel {
         ${r.note ? `<p class="ex-note">${esc(r.note)}</p>` : ''}
         <div class="ex-lines">${lines}</div>
         <div class="ex-sh">${glyph('chest')}<b>Brought home</b></div>
-        <div class="ex-loot">${loot.join('') || '<span class="ex-dim">Nothing this time, just stories.</span>'}</div>
+        <div class="ex-loot${pend ? ' pend' : ''}">${loot.join('') || '<span class="ex-dim">Nothing this time, just stories.</span>'}</div>
         ${xp ? `<div class="ex-xps">${xp}</div>` : ''}
-        ${r.items?.length ? `<div class="ex-wait">${glyph('bag')}<span>${r.items.length} item${r.items.length > 1 ? 's wait' : ' waits'} here: your bag was full.</span><button class="btn sm mint" data-a="take" data-u="${r.uid}">Take all</button></div>` : ''}
-      </div>`;
+        ${!pend && r.items?.length ? `<div class="ex-wait">${glyph('bag')}<span>${r.items.length} item${r.items.length > 1 ? 's wait' : ' waits'} here: your bag was full.</span><button class="btn sm mint" data-a="take" data-u="${r.uid}">Take all</button></div>` : ''}
+      </div>
+      ${pend ? `<div class="ex-gobar"><button class="btn ex-claim" data-a="claim" data-u="${r.uid}">${glyph('gift')}<span><b>Receive rewards</b><small>${esc(listNames(what))}</small></span></button></div>`
+        : loot.length ? `<div class="ex-gobar"><div class="ex-got">${glyph('check')}<span><b>Received!</b><small>${r.items?.length ? 'The rest waits for room in your bag' : 'All in your bag and purse'}</small></span></div></div>` : ''}`; // (the same place as the button, so the board holds still)
   }
 }

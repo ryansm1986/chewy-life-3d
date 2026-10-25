@@ -6,7 +6,8 @@
 //     clock: { h, wall },                       // the world clock (cozy/clock.js)
 //     exp: {
 //       active:  [{ uid, obj, crew: ['hero:moka', 'hire:h3'], start, hours, power, need, odds, p, supplies, hold?, seed }],
-//       reports: [{ uid, obj, name, place, kind, result, crew, loot, xp, levels, lines, read, at, items? }],
+//       reports: [{ uid, obj, name, place, kind, result, crew, loot, xp, levels, lines, read, at, items?, pending? }],
+//                 // (pending: the loot waits for the report's Receive rewards; items: the bag's share, still to take)
 //       progress: { [obj]: { camps?, floor?, trail? } },   // a partial success's kept progress
 //       done:     { [obj]: n },                           // successes per objective
 //       errands:  { day, taken: [errand id] },           // today's errands already sent
@@ -66,7 +67,16 @@ function fillReport(r) {
   r.lines = arr(r.lines).filter(l => obj(l) && str(l.text));
   r.items = arr(r.items).filter(it => obj(it) && str(it.uid));
   r.read = !!r.read; r.at = Math.max(0, num(r.at));
+  if (r.pending) r.pending = true; else delete r.pending;
   return r;
+}
+/** the report list kept to MAX_REPORTS: the oldest go first, but never one whose rewards still wait (pending, or items
+ *  the bag had no room for) → the same array */
+export const MAX_REPORTS = 24;
+export const holdsRewards = r => !!r?.pending || !!r?.items?.length;
+export function trimReports(list) {
+  for (let i = 0; list.length > MAX_REPORTS && i < list.length;) { if (holdsRewards(list[i])) i++; else list.splice(i, 1); }
+  return list;
 }
 /** Make state.cozy whole (idempotent; a type-checked fill, never loses good data) → state */
 export function normalizeCozy(state) {
@@ -77,7 +87,7 @@ export function normalizeCozy(state) {
   const E = c.exp = obj(c.exp) || {};
   const seen = new Set();
   E.active = arr(E.active).map(fillExp).filter(e => e && !seen.has(e.uid) && seen.add(e.uid));
-  E.reports = arr(E.reports).map(fillReport).filter(Boolean).slice(-24);
+  E.reports = trimReports(arr(E.reports).map(fillReport).filter(Boolean));
   E.progress = obj(E.progress) || {};
   E.done = obj(E.done) || {};
   for (const k of Object.keys(E.done)) E.done[k] = Math.max(0, Math.floor(num(E.done[k])));
@@ -116,3 +126,5 @@ export function tiredLeft(state, key) {
 export const awayHeroes = state => expOf(state).active.flatMap(e => e.crew).map(parseMember).filter(m => m?.type === 'hero').map(m => m.id);
 /** unread reports */
 export const unreadReports = state => expOf(state).reports.filter(r => !r.read).length;
+/** reports whose rewards are still to collect (Receive rewards, or items waiting for room in the bag) */
+export const pendingRewards = state => expOf(state).reports.filter(holdsRewards).length;

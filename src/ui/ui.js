@@ -521,8 +521,10 @@ export const UI = {
     let from = { x: innerWidth / 2, y: innerHeight / 2 };
     const cam = this.G?.engine?.camera;
     const ff = this._flyFrom && performance.now() < this._flyFrom.until ? this._flyFrom.pos : null; // (a hand-in's reward: from the giver, world/story.js complete)
+    const fs = !worldPos && this._flyFromScreen && performance.now() < this._flyFromScreen.until ? this._flyFromScreen.at : null; // (a spot on the screen: an expedition report's Receive rewards, ui/expeditions.js)
     const wp = worldPos || ff || this.hud.playerPos();
-    if (cam && wp) { const v = new Vector3(wp.x, (wp.y || 0) + (worldPos ? 0 : 0.8), wp.z).project(cam); from = { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight }; }
+    if (fs) from = { ...fs };
+    else if (cam && wp) { const v = new Vector3(wp.x, (wp.y || 0) + (worldPos ? 0 : 0.8), wp.z).project(cam); from = { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight }; }
     this.flyToBag(itemIconURL(item), from, item);
     if (item.rarity && item.rarity !== 'normal' || item.kind === 'gem' || item.kind === 'gift' || item.kind === 'key') {
       this.toast(itemName(item), { iconURL: itemIconURL(item), color: rarityColor(item.rarity), rarity: item.rarity, sub: item.rarity === 'unique' ? 'Unique find!' : item.rarity === 'set' ? 'Set item!' : item.rarity === 'rare' ? 'Rare find!' : 'Picked up', silent: true });

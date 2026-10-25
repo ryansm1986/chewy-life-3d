@@ -28,7 +28,7 @@ export class CozyChip {
   get C() { return this.ui.G?.cozy; }
   open() {
     const C = this.C; if (!C) return;
-    this.ui.open('expeditions', { view: C.exp.unread() ? 'reports' : 'away', at: 'chip' });
+    this.ui.open('expeditions', { view: C.exp.unread() || C.exp.pending() ? 'reports' : 'away', at: 'chip' });
   }
   /** the HUD's away minis (ui/hud.js greys them and adds the backpack): their time left as a pill, "~2 h" (COZY §4.8) */
   minis() {
@@ -46,22 +46,22 @@ export class CozyChip {
     try { this.minis(); } catch (e) { /* the HUD may not be built yet */ }
     const C = this.C, E = this.el;
     if (!C || this.ui.mode === 'title') { E.classList.remove('on'); this.sig = ''; return; }
-    const list = C.exp.list(), unread = C.exp.unread();
-    if (!list.length && !unread) { E.classList.remove('on'); this.sig = ''; return; }
+    const list = C.exp.list(), unread = C.exp.unread(), pend = C.exp.pending?.() || 0, news = unread || pend; // (pend: a haul still to receive)
+    if (!list.length && !news) { E.classList.remove('on'); this.sig = ''; return; }
     const next = list.length ? Math.min(...list.map(e => (e.hold ? 0 : C.exp.left(e)))) : null;
-    const words = list.length ? `${list.length} crew${list.length > 1 ? 's' : ''} out · ${list.some(e => e.hold) && next <= 0 ? 'one is camped' : backIn(next).replace(/^back in /, 'next back in ')}` : `${unread} report${unread > 1 ? 's' : ''} waiting`;
-    const sig = words + '|' + unread;
+    const words = list.length ? `${list.length} crew${list.length > 1 ? 's' : ''} out · ${list.some(e => e.hold) && next <= 0 ? 'one is camped' : backIn(next).replace(/^back in /, 'next back in ')}` : unread ? `${unread} report${unread > 1 ? 's' : ''} waiting` : `Rewards to receive`;
+    const sig = words + '|' + unread + '|' + pend;
     if (sig !== this.sig) {
       this.sig = sig;
-      E.innerHTML = `<span class="cz-ic">${cozyIcon('pack')}</span><b>${esc(words)}</b>${unread ? '<i class="cz-bang">!</i>' : ''}`;
+      E.innerHTML = `<span class="cz-ic">${cozyIcon('pack')}</span><b>${esc(words)}</b>${news ? '<i class="cz-bang">!</i>' : ''}`;
     }
-    E.classList.toggle('news', !!unread);
+    E.classList.toggle('news', !!news);
     E.classList.add('on');
   }
   tip() {
     const C = this.C; if (!C) return '';
-    const list = C.exp.list(), unread = C.exp.unread();
+    const list = C.exp.list(), unread = C.exp.unread(), pend = C.exp.pending?.() || 0;
     const rows = list.map(e => `<div class="cz-tr"><b>${esc(e.crew.map(nm).join(' & '))}</b> · ${esc(e.name)}<br><span class="tt-dim">${e.hold ? 'Camped at the edge of the village' : esc(backIn(C.exp.left(e)))}</span></div>`).join('');
-    return simpleTip('Crews', `${rows || '<div class="cz-tr">No crews out.</div>'}${unread ? `<div class="cz-tr news">${unread} report${unread > 1 ? 's' : ''} waiting on the Expedition Board</div>` : ''}<div class="cz-tr tt-dim">Click to see the board's ${unread ? 'reports' : 'crews'}</div>`);
+    return simpleTip('Crews', `${rows || '<div class="cz-tr">No crews out.</div>'}${unread ? `<div class="cz-tr news">${unread} report${unread > 1 ? 's' : ''} waiting on the Expedition Board</div>` : ''}${pend ? `<div class="cz-tr news">${pend === 1 ? 'A crew\'s haul is' : `${pend} crews' hauls are`} waiting: Receive rewards on the board</div>` : ''}<div class="cz-tr tt-dim">Click to see the board's ${unread || pend ? 'reports' : 'crews'}</div>`);
   }
 }

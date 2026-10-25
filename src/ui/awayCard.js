@@ -38,7 +38,7 @@ export class AwayCardPanel extends Panel {
     const time = h > 0 ? `You were away ${realSpan(ms)}. ${hrs} passed${o.capped ? ', the most an absence counts' : ''}.` : 'Here is what your crews have been up to.';
     const reps = (o.reports || []).map(r => {
       const R = RES[r.result] || RES.success;
-      return `<div class="aw-row" data-r="${r.result}"><span class="aw-faces">${r.crew.map(k => `<span class="aw-face">${face(k)}</span>`).join('')}</span><div class="aw-t"><b>${esc(names(r.crew))}</b><span>${esc(R[0])}: ${esc(r.name)}</span></div><span class="aw-ic">${cozyIcon(R[1])}</span><button class="btn sm sky" data-rep="${r.uid}">See report</button></div>`;
+      return `<div class="aw-row" data-r="${r.result}"><span class="aw-faces">${r.crew.map(k => `<span class="aw-face">${face(k)}</span>`).join('')}</span><div class="aw-t"><b>${esc(names(r.crew))}</b><span>${esc(R[0])}: ${esc(r.name)}</span></div><span class="aw-ic">${cozyIcon(R[1])}</span><button class="btn sm ${r.pending ? 'mint' : 'sky'}" data-rep="${r.uid}">${r.pending ? 'Get rewards' : 'See report'}</button></div>`;
     }).join('');
     const out = (o.out || []).map(e => `<div class="aw-row out"><span class="aw-faces">${e.crew.map(k => `<span class="aw-face">${face(k)}</span>`).join('')}</span><div class="aw-t"><b>${esc(names(e.crew))}</b><span>still out: ${esc(e.name)}</span></div><em class="aw-left">${e.hold ? 'camped by the village' : esc(backIn(e.left))}</em></div>`).join('');
     // scavenging (phase C, cozy/scavengeWorld.js): the areas a crossed world day refilled

@@ -275,6 +275,9 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
       r.out = G.cozy.exp.list().length; G.ui.closeAll();
       G.cozy.clock.add(10.2); await sleep(900);
       const d = G.state.zones.bamboo.dungeon, rep = G.cozy.exp.reports().at(-1);
+      r.fan0 = G.state.furniture?.trophyTenguFan || 0; // (the keepsake waits in the report: Receive rewards, docs/COZY.md §4.5)
+      G.ui.open('expeditions', { view: 'reports', report: rep?.uid }); await sleep(500);
+      r.claim = !!document.querySelector('.p-exp .ex-claim'); document.querySelector('.p-exp .ex-claim')?.click(); await sleep(400); G.ui.closeAll();
       Object.assign(r, { result: rep?.result, crew: d.crew, cleared: d.cleared, t1: G.lantern?.info?.('bambooDepths')?.tierOpen, maple: G.travel.list().find(x => x.id === 'maple')?.unlocked, fan: G.state.furniture?.trophyTenguFan || 0, ribbon: !!rep?.cleared });
       if (rep?.result !== 'success') return r;
       G.openTravel({ select: 'bamboo' }); await sleep(600); r.stamp = document.querySelector('.tv-pin[data-id="bamboo"] .tv-stamp')?.textContent; G.ui.closeAll();
@@ -569,7 +572,7 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
   const ld = s.lead, leadOk = !ld || (ld.led && ld.setting === 1 && ld.plans === 1 && ld.prints > 3 && ld.ahead > 0.5 && ld.trail && /This way!/.test(ld.said) && ld.tracker === '0' && ld.stopped);
   const pc = s.peaceful, peaceOk = !pc || (pc.board && pc.cards >= 1 && pc.css === '760px' && pc.peace && pc.wild === 2 && pc.allWild && pc.edge && pc.glades >= 2 && pc.zoneBoard && (!pc.sight || pc.bounty));
   const gl = s.guild, guildOk = !gl || (gl.built && gl.model && gl.hachi && gl.css === '960px' && gl.cands === 3 && gl.hired && gl.out === 1 && gl.away && gl.back && gl.xp > 0 && gl.inTown);
-  const cc = s.crewclear, crewOk = !cc || (cc.offered && cc.out === 1 && cc.result === 'success' && cc.crew === 1 && cc.cleared === 0 && cc.t1 === 1 && cc.maple && cc.fan === 1 && cc.ribbon && cc.stamp === 'Saved' && cc.lit);
+  const cc = s.crewclear, crewOk = !cc || (cc.offered && cc.out === 1 && cc.result === 'success' && cc.crew === 1 && cc.cleared === 0 && cc.t1 === 1 && cc.maple && cc.fan0 === 0 && cc.claim && cc.fan === 1 && cc.ribbon && cc.stamp === 'Saved' && cc.lit);
   const cz = s.cozy, cozyOk = !cz || (cz.board && cz.css === '1010px' && cz.cards >= 6 && cz.out === 1 && cz.away && cz.back && /success|partial|setback/.test(cz.report) && cz.xp > 0 && cz.chip && cz.inTown && cz.card && cz.log >= 1 && cz.guides === 13); // (13 since H-6: Meet Stella)
   const db = s.debug, debugOk = (label !== 'village' || s.noDebug) && (!db || (db.refused && db.on && db.chunk && db.tabs >= 10 && db.css === '760px' && db.coins === 1000 && db.used && db.closed));
   const pd = s.pad, padOk = !pd || (pd.dev === 'pad' && pd.moved > 1.5 && pd.glyphs >= 6 && pd.cursor && pd.cast >= 1 && pd.focus);

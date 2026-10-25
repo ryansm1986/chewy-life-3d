@@ -14,7 +14,7 @@
 //   startExpedition / finishExpedition   the pure state changes (the active list, the report, tired, done, progress)
 import { PANTRY } from '../life/pantry.js';
 import { CLASSES } from '../rpg/classes.js';
-import { cozyOf, expOf, parseMember, memberAway, tiredLeft } from './state.js';
+import { cozyOf, expOf, parseMember, memberAway, tiredLeft, trimReports } from './state.js';
 import { objectivePower, campsStanding } from './objectives.js';
 import { xpToNext } from '../rpg/stats.js';
 import { hirePower, classBonus, crewCap, hireWhy, scoutHours, crewClasses, hireLine, HIRE_CLASSES } from './guild.js';
@@ -266,8 +266,9 @@ export function finishExpedition(state, e, o, out) {
     result: out.result, crew: [...e.crew], loot: out.loot || {}, xp: out.xp || {}, levels: out.levels || {}, lines: out.lines || [],
     items: out.items || [], note: out.note || '', progress: out.progress || null, read: false, at: C.clock.h, hours: e.hours,
   };
+  if (out.pending) rep.pending = true; // (the loot waits for the report's Receive rewards: expeditionRun.js claim)
   E.reports.push(rep);
-  if (E.reports.length > 24) E.reports.splice(0, E.reports.length - 24);
+  trimReports(E.reports);
   return rep;
 }
 /** Expeditions saved mid-trip that can't go on (COZY §9): the objective gone, a hero not joined, the hero being played

@@ -5,14 +5,16 @@
 //   installCozy(G, village) → G.cozy = {
 //     clock: { h, day, add(h) },
 //     exp: { send(objId, crew, supplies), cancel(uid), list(), reports(), objectives(view), info(objId, crew, supplies),
-//            read(uid), take(uid), unread(), finishAll() },
+//            read(uid), claim(uid), take(uid), unread(), pending(), finishAll() },
 //     guild: null, scav: null,                     // phases D and C
 //     tick(dt), heroAway(id), awayInfo(id), pulse(now?), awayNow(), board,
 //   }
 //   game.js calls G.cozy.tick(dt) every frame (dt is 0 while paused: the clock stops like the day clock); services.js's
 //   sleep adds the hours it skips (G.cozy.clock.add).
-//   Events: 'expedition:sent' { uid, obj, crew }, 'expedition:back' { uid, obj, result }, 'cozy:changed' (the board,
-//   the chip), 'hero:away' { id, away }.
+//   Events: 'expedition:sent' { uid, obj, crew }, 'expedition:back' { uid, obj, result }, 'expedition:claimed' { uid },
+//   'cozy:changed' (the board, the chip), 'hero:away' { id, away }.
+//   The haul (COZY §4.5): a crew's coins, materials, pantry finds, items, furniture find and keepsake wait in its report
+//   (pending) until you press Receive rewards on the board (claim); the XP and the world's changes come at once.
 //   The story side (COZY §3, §12; CZ-9): G.story.crewObjectives(state) lists the story's crew routes (world/story.js);
 //   a quest route completes its fight steps through G.story.crewResult (a boss's quest unique waits for your own win);
 //   a siege relief saves the village through rpg/zones.js saveVillage(…, 'crew') and 'village:saved' { crew: true },
@@ -36,7 +38,7 @@ import { MONSTERS } from '../dungeon/monsters.js';
 import { pickFind } from '../home/finds.js';
 import { VILLAGES, ZONE_NPCS } from '../regions/village/data.js';
 import { tickClock, addHours, catchUp, markWall, worldDay, backIn, backBy, aboutHours, SECS_PER_HOUR, OFFLINE_CAP_H } from './clock.js';
-import { normalizeCozy, cozyOf, expOf, heroAway, heroKey, parseMember, unreadReports, tiredLeft, memberAway } from './state.js';
+import { normalizeCozy, cozyOf, expOf, heroAway, heroKey, parseMember, unreadReports, pendingRewards, tiredLeft, memberAway } from './state.js';
 import { objective, storyObjectives, villageObjectives, errandsFor, objectivePower, reliefOpen, objectiveOpen } from './objectives.js';
 import { ZONE_QUESTS, questItemName } from '../world/zoneQuests.js';
 import { canSend, resolve, partialProgress, rollLoot, xpFor, crewLines, startExpedition, finishExpedition, hoursLeft, brokenExpeditions, memberInfo, pickMeals, mealsNeeded, heroPower, tripHours, crewSoft, crewHaul, mealsPacked } from './expeditions.js';
@@ -66,8 +68,10 @@ class CozyRun {
         objectives: view => self.objectives(view),
         info: (id, crew, supplies) => self.info(id, crew, supplies),
         read: uid => self.read(uid),
+        claim: uid => self.claim(uid),
         take: uid => self.takeItems(uid),
         unread: () => unreadReports(G.state),
+        pending: () => pendingRewards(G.state),
         finishAll: () => self.finishAll(),
         town: () => self.town(),
         left: e => hoursLeft(G.state, e),
@@ -134,7 +138,7 @@ class CozyRun {
     if ((this.boardMarkT -= Math.max(dt, 1 / 60)) <= 0) { this.boardMarkT = 0.4; this.board?.setMark?.(this.boardMark()); }
     this.board?.update?.(dt);
   }
-  boardMark() { const E = expOf(this.st); return unreadReports(this.st) ? '!' : E.active.length ? 'busy' : null; }
+  boardMark() { const E = expOf(this.st); return unreadReports(this.st) || pendingRewards(this.st) ? '!' : E.active.length ? 'busy' : null; }
   /** crews whose time is up come home (quiet: they came home while you were away: the card tells it) */
   check(quiet = false) {
     const E = expOf(this.st);
@@ -282,13 +286,11 @@ class CozyRun {
       const n = xpFor(o, P.lvl, result, e.frac || 1);
       if (n > 0) { const g = A.addXpTo ? A.addXpTo(m.id, n) : { gained: 0 }; xp[k] = g.gained; if (g.lvl > g.from) levels[k] = [g.from, g.lvl]; }
     }
-    if (loot.coins) A.addCoins(loot.coins);
-    for (const [k, n] of Object.entries(loot.mats)) A.addMaterial(k, n);
-    for (const [k, n] of Object.entries(loot.pantry)) A.addPantry(k, n, { src: 'expedition' });
+    // the haul waits in the report for Receive rewards (claim): the coins, materials, pantry, items, find and keepsake
     let furniture = null;
-    if (loot.find && o?.rewards?.findWhere) { furniture = pickFind(o.rewards.findWhere, G.sim?.stats?.rank || 1, rng); A.addFurniture?.(furniture, 1, { src: 'expedition' }); }
+    if (loot.find && o?.rewards?.findWhere) furniture = pickFind(o.rewards.findWhere, G.sim?.stats?.rank || 1, rng);
     const items = loot.items.map(x => generateItem({ ilvl: x.ilvl, rarity: x.rarity, rng }));
-    const waiting = items.filter(it => !A.pickup(it));
+    const pending = !!(loot.coins || Object.keys(loot.mats).length || Object.keys(loot.pantry).length || items.length || furniture || loot.trophy);
     // the world: a siege's relief or its broken camps
     let saved = null, story = null, cleared = null, deep = null, den = null;
     if (o?.kind === 'siege') {
@@ -313,12 +315,11 @@ class CozyRun {
       if (result === 'success') cleared = this.crewClear(o.binds.dungeon, label);
       else if (result === 'partial') { noteFloor(st, o.binds.dungeon, 2); note = `They made it down to floor 2 of the ${DUNGEONS[o.dungeonId]?.name || 'dungeon'}. The next try needs 30% less.`; }
     }
-    if (loot.trophy) A.addFurniture?.(loot.trophy, 1, { src: 'trophy' }); // (a keepsake for your home: COZY §4.6)
     const lines = crewLines(st, e.crew, result === 'recalled' ? 'setback' : result, rng);
     if (result === 'partial' && o?.kind === 'siege' && progress?.camps) note = `${progress.camps} camp${progress.camps > 1 ? 's' : ''} broken. The captain still holds the square.`;
     if (result === 'beaten') note = 'You beat us to it! The lunches are back in the pantry.';
     if (result === 'recalled') note = 'Called home early: no rewards, and the lunches are back in the pantry.';
-    const rep = finishExpedition(st, e, o, { result, progress, xp, levels, lines, items: waiting, note, loot: { coins: loot.coins, mats: loot.mats, pantry: loot.pantry, items: items.map(it => ({ name: it.name, rarity: it.rarity, uid: it.uid })), furniture, trophy: loot.trophy || null } });
+    const rep = finishExpedition(st, e, o, { result, progress, xp, levels, lines, items, pending, note, loot: { coins: loot.coins, mats: loot.mats, pantry: loot.pantry, items: items.map(it => ({ name: it.name, rarity: it.rarity, uid: it.uid })), furniture, trophy: loot.trophy || null } });
     if (story) rep.quest = story; // (the story news: the quest done, or what's left; the Journal names the crew)
     if (cleared) rep.cleared = cleared;
     if (deep) rep.deep = deep;
@@ -342,7 +343,7 @@ class CozyRun {
     const word = { success: 'is back', partial: 'is back (partly done)', setback: 'is back, muddy and tired', beaten: 'is back early', recalled: 'came home' }[rep.result] || 'is back';
     const ups = Object.entries(rep.levels || {}).map(([k, [, to]]) => `${memberInfo(this.st, k)?.name || ''} is level ${to} now!`);
     const news = rep.saved ? `${rep.saved.village} is saved! ` : rep.cleared ? `The ${rep.cleared.dungeon} is clear! ` : rep.quest?.done ? `${rep.quest.title}: done!${rep.quest.handIn ? ` ${rep.quest.giver} wants to hear all about it.` : ''} ` : ''; // (handIn: it waits for you to bring the news: docs/QUESTS.md §4)
-    G.ui?.toast?.(`${rep.crew.length > 1 ? `${lead}'s crew` : lead} ${word}: ${rep.kind === 'errand' ? where : rep.name}!`, { icon: 'map', color: rep.result === 'success' ? '#8fe0c0' : '#ffd8a8', sub: `${news}${ups.length ? `${ups.join(' ')} · the report is on the board` : `${names} · the report is on the Expedition Board`}`, duration: 6 });
+    G.ui?.toast?.(`${rep.crew.length > 1 ? `${lead}'s crew` : lead} ${word}: ${rep.kind === 'errand' ? where : rep.name}!`, { icon: 'map', color: rep.result === 'success' ? '#8fe0c0' : '#ffd8a8', sub: `${news}${ups.length ? `${ups.join(' ')} · ` : `${names} · `}${rep.pending ? 'their haul waits on the Expedition Board' : ups.length ? 'the report is on the board' : 'the report is on the Expedition Board'}`, duration: 6 });
     Events.emit('sfx', rep.result === 'success' ? 'ui_quest_done' : 'rune_chime');
     void e;
   }
@@ -476,6 +477,28 @@ class CozyRun {
     this.changed();
   }
   read(uid) { const r = expOf(this.st).reports.find(x => x.uid === uid); if (r && !r.read) { r.read = true; this.changed(); } return r || null; }
+  /** Receive rewards: a report's haul into the purse, the materials, the pantry, the furniture storage and the bag (the
+   *  items the bag has no room for wait in the report: Take all) → { coins, mats, pantry, items, furniture, trophy, waiting }
+   *  or null (nothing waiting) */
+  claim(uid) {
+    const G = this.G, A = G.actions, r = expOf(this.st).reports.find(x => x.uid === uid);
+    if (!r?.pending) return null;
+    delete r.pending;
+    const L = r.loot || {}, got = { coins: L.coins || 0, mats: { ...(L.mats || {}) }, pantry: { ...(L.pantry || {}) }, items: 0, furniture: L.furniture || null, trophy: L.trophy || null, waiting: 0 };
+    if (got.coins) A.addCoins(got.coins);
+    for (const [k, n] of Object.entries(got.mats)) A.addMaterial(k, n);
+    for (const [k, n] of Object.entries(got.pantry)) A.addPantry(k, n, { src: 'expedition' });
+    if (got.furniture) A.addFurniture?.(got.furniture, 1, { src: 'expedition' });
+    if (got.trophy) A.addFurniture?.(got.trophy, 1, { src: 'trophy' }); // (a keepsake for your home: COZY §4.6)
+    const n0 = r.items?.length || 0;
+    r.items = (r.items || []).filter(it => !A.pickup(it));
+    got.items = n0 - r.items.length; got.waiting = r.items.length;
+    if (got.waiting) G.ui?.toast?.(`Your bag is full: ${got.waiting === 1 ? 'one item waits' : `${got.waiting} items wait`} in the report`, { color: '#ffd8a8' });
+    Events.emit('expedition:claimed', { uid });
+    G.save?.();
+    this.changed();
+    return got;
+  }
   takeItems(uid) {
     const r = expOf(this.st).reports.find(x => x.uid === uid); if (!r?.items?.length) return 0;
     const before = r.items.length;

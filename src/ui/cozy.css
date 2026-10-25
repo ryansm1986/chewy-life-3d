@@ -100,6 +100,8 @@
 .cl-loot .gl { width: 15px; height: 15px; }
 .cl-rep.unread .cl-t > b { color: #c83a6a; }
 .cl-dot { position: absolute; right: -5px; top: -5px; width: 13px; height: 13px; border-radius: 50%; background: #ff5a7a; border: 2px solid var(--ink); }
+.cl-gift { position: absolute; right: -7px; top: -9px; width: 24px; height: 24px; } /* (a haul still to receive: docs/COZY.md §4.5) */
+.cl-gift .gl { width: 24px; height: 24px; }
 .cl-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 28px 20px; text-align: center; font: 500 14.5px/1.4 var(--font); color: var(--ink2); }
 .cl-empty .gl { width: 54px; height: 54px; opacity: .75; }
 .ui-root.m-phone .cl-wrap { height: auto; min-height: 0; }

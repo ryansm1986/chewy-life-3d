@@ -52,7 +52,9 @@ async function sendVia(page, view, objId, members, { potions = 0, lunch = false,
   await ev(page, () => window.G.ui.closeAll());
   return { ...info, sent: !!sent && n > n0 };
 }
-const skip = (page, h) => ev(page, h => window.G.cozy.clock.add(h), h);
+// (the debug clock; then every crew's haul received, as a player collecting at the board would: Receive rewards,
+//  COZY §4.5, the same G.cozy.exp.claim the button calls; s53 covers the button itself)
+const skip = (page, h) => ev(page, h => { const C = window.G.cozy, x = C.clock.add(h); for (const r of C.exp.reports()) if (r.pending) C.exp.claim(r.uid); return x; }, h);
 /** an errand sent the quick way after the first few by clicks: the same G.cozy.exp.send the Board's Send off calls */
 let clicked = 0;
 async function sendErrand(page, id, crew) {

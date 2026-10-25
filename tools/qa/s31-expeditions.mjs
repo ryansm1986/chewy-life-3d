@@ -271,6 +271,12 @@ if (want('f')) {
   await ev(page, () => { window.G.ui.open('expeditions', { view: 'reports' }); }); await sleep(page, 800);
   const b3 = await audit();
   await shot(page, 'f-phone-report');
+  // Receive rewards by a tap (COZY §4.5): the haul in, and the received state fits too
+  const cl = await ev(page, () => { const b = document.querySelector('.p-exp .ex-claim'); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, coins: window.G.state.coins }; });
+  if (cl) { await F.tap(cl.x, cl.y); await sleep(page, 700); }
+  const b4 = { ...(await audit()), claimed: !!cl && (await ev(page, c => window.G.state.coins > c && !!document.querySelector('.p-exp .ex-got'), cl.coins)) };
+  await shot(page, 'f-phone-received');
+  R.check('f) the phone: the report holds Receive rewards; a tap receives the haul, and the received report fits (44 px targets, the 12 px floor)', b4.claimed && b4.fits && !b4.small.length && !b4.tiny.length, { b4 });
   await ev(page, () => { window.G.ui.closeAll(); const c = window.G.state.cozy.clock; c.wall = Date.now() - 300e3; }); await sleep(page, 2500);
   await ev(page, () => { if (!window.G.ui.isOpen('awayCard')) window.G.cozy.showAway(); }); await sleep(page, 900);
   await shot(page, 'f-phone-away-card');
