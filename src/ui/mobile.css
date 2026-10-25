@@ -172,7 +172,7 @@ body.touch-active .ch-pts .tt-dim { display: none; }
 .ui-root.m-phone .reel .rl-tap { width: 34px; height: 34px; border-width: 3px; }
 .ui-root.m-phone .reel .rl-tap .gl { width: 20px; height: 20px; }
 .ui-root.m-phone .reel .rl-name { font-size: 20px; }
-.ui-root.m-touch :is(.ti-center, .ti-foot) { zoom: var(--m-pscale); }
+.ui-root.m-touch :is(.ti-center, .ti-foot, .ti-slots) { zoom: var(--m-pscale); }
 .ui-root.m-touch .ti-btns .btn { min-height: 52px; }
 /* a phone's title: the logo a little smaller, the three buttons in a row under it */
 .ui-root.m-phone .ti-center { top: 47%; }
@@ -181,6 +181,9 @@ body.touch-active .ch-pts .tt-dim { display: none; }
 .ui-root.m-phone .ti-btns { flex-direction: row; width: auto; gap: 12px; }
 .ui-root.m-phone .ti-btns .btn { padding: 12px 22px; font-size: 21px; }
 .ui-root.m-phone .ti-foot { bottom: calc(var(--sa-b, 0px) / var(--m-pscale) + 6px); }
+.ui-root.m-phone .ti-slots { zoom: calc(var(--m-pscale) * .8); gap: 10px; }
+.ui-root.m-phone :is(.sl-face, .sl-team) { display: none; }
+.ui-root.m-phone .sl-head { font-size: 28px; }
 /* small buttons are at least as wide as they are tall (the cook's − / +), the zone and path tools too; a guide's dock
    is the menus' size, not the HUD's */
 .ui-root.m-touch .pw .btn.sm { min-width: 52px; justify-content: center; }

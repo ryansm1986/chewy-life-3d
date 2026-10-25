@@ -310,7 +310,9 @@ The default mapping uses Xbox names (the Deck's face buttons match):
   Home in a dungeon. It is the pad's way into every panel.
 - **Settings**: the menu's Settings page links to Controls.
 - **Guides**: View answers "Got it!" (a View glyph shows on the button). The offer card takes the focus.
-- **Title and dialogue**: the title's buttons and dialogue choices keep their small CT-1 handlers.
+- **Title and dialogue**: the title's buttons and dialogue choices keep their small CT-1 handlers. The title's
+  save-slot picker (SL-1) has its own: left / right walk the cards' buttons, down goes to Back, B backs out
+  (`Title.pad` in `src/ui/title.js`).
 
 ### 9.3 Build and decorate: the virtual cursor (`src/ui/padCursor.js`, `ui.padCursor`)
 CT-11 replaced the pad controls below for both modes with §14.5 and §14.6 (the bumpers, the grid, three states).

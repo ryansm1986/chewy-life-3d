@@ -17,6 +17,14 @@ function lidTurn(l, rest, x, z, a) {
   l.quaternion.multiply(_lidQ.setFromAxisAngle(_lidAxis.set(x, 0, z), a));
 }
 
+// the planted walk (Animator.poseGait): stride, a step's length × the hip-to-ankle leg; soft, the planted leg's reach
+// (a knee never quite straight); reach, how far fore and aft of the hip the foot goes (× the reach); lift, the swinging
+// foot's rise (× the leg); give, the hips' extra dip as a heel strikes; squash, the root's squash then; toeOff /
+// toeSwing, the foot's toe-down at push-off and through the swing (rad); maxSteps, the most steps a second (the
+// shortest legs slide a little rather than scurry). kit*: the straight-legged kit rigs, whose feet
+// turn with the whole leg (a long reach digs the toes in) and can't take the give
+export const GAIT = { stride: 1.9, soft: 0.97, reach: 0.6, lift: 0.28, give: 0.035, squash: 0.03, toeOff: 0.45, toeSwing: 0.2, kitStride: 1.4, kitReach: 0.42, kitLift: 0.12, maxSteps: 3.6 };
+
 // action library: dur (s), events {name: t01}, pose(t01, P, A) applies additive offsets
 const ACTIONS = {
   swing: { dur: 0.46, ev: { hit: 0.42 }, pose: (t, P, A) => {
@@ -246,7 +254,8 @@ export class Animator {
     // a gallop the same way above 4.5 m/s (Shadow pacing a sprinting hero).
     this.sprintAmt = damp(this.sprintAmt || 0, (this.sprint || 0) * clamp((this.speed - 3) / 2.5), 10, dt);
     this.gallop = this.quad ? clamp((this.speed - 4.5) / 4) : 0;
-    const stride = this.quad ? 0.36 + this.gallop * 0.3 : 0.62 + this.runAmt * 0.25 + this.sprintAmt * 0.22;
+    const gait = this.plant && !this.quad && this.gaitRig();
+    const stride = this.quad ? 0.36 + this.gallop * 0.3 : gait ? (this._gaitStride = Math.max((gait.knee ? GAIT.stride : GAIT.kitStride) * gait.H * (this.rig.spec.scale || 1), this.speed / GAIT.maxSteps)) : 0.62 + this.runAmt * 0.25 + this.sprintAmt * 0.22; // (the planted walk: a step as long as the legs allow, see poseGait)
     this.phase += (this.speed / stride) * dt * Math.PI;
     // action timing
     const A = this.A || (this.A = newPose()); clearPose(A);
@@ -311,13 +320,104 @@ export class Animator {
     }
   }
   _set(o, rx, ry, rz) { const r = this.rest.get(o); o.rotation.set(r.r.x + rx, r.r.y + ry, r.r.z + rz); }
+  // ---- the planted walk (anim.plant: the villagers and the townsfolk, npc.js / zoneVillagers.js). The stiff-legged
+  // swing above glides: its feet sweep a third of the ground the body covers, so they skate, and the body rides level.
+  // Here each foot holds the ground through its stance, sweeping back under the hip at the body's pace as far as the leg
+  // reaches, then steps forward through the air; the hips sink so the planted leg reaches the ground (lowest at each
+  // footfall, highest as the feet pass) with a little give at the strike; the step is as long as the legs allow
+  // (GAIT.stride × the leg, so short legs take quick little steps). Rigs with knees (the baked 37-bone rigs' shin_* /
+  // foot_*) bend them through the swing by two-bone IK and keep the soles flat; the kit rigs (straight legs) shorten the
+  // swinging leg a touch so it clears the ground.
+  /** the legs the planted walk works with (null: it can't) */
+  gaitRig() {
+    if (this._gait !== undefined) return this._gait;
+    const P = this.P, B = this.rig.skeleton?.bones, bone = n => B?.find(b => b.name === n);
+    const shin = [bone('shin_L'), bone('shin_R')], foot = [bone('foot_L'), bone('foot_R')];
+    let g = null;
+    if (P.legL && P.legR && shin.every(Boolean) && foot.every(Boolean)) {
+      // per leg, in the leg's side plane (rotation.x turns it; a turn adds to a bone vector's angle φ = atan2(−z, −y)):
+      // the bone lengths, their rest angles, where the ankle rests under the hip, the foot's rest angle (kept flat)
+      const phi = v => Math.atan2(-v.z, -v.y), rx = o => this.rest.get(o).r.x;
+      const legs = [P.legL, P.legR].map((th, i) => {
+        const sv = shin[i].position, fv = foot[i].position, a = Math.hypot(sv.y, sv.z), b = Math.hypot(fv.y, fv.z);
+        const ps = phi(sv), pf = phi(fv), t0 = rx(th), s0 = rx(shin[i]), u1 = t0 + ps, u2 = t0 + s0 + pf;
+        return { a, b, ps, pf, y0: -(a * Math.cos(u1) + b * Math.cos(u2)), z0: -(a * Math.sin(u1) + b * Math.sin(u2)), flat: t0 + s0 + rx(foot[i]) };
+      });
+      if (legs.every(l => l.a > 0.01 && l.b > 0.01)) g = { knee: true, legs, H: -legs[0].y0, shin, foot };
+    } else if (P.legL && P.legR) {
+      const H = this.rest.get(P.legL)?.p.y || 0; // (a kit leg, one bone, hangs from its hip pivot to the sole: toyKit.js HIP)
+      if (H > 0.05) g = { knee: false, a: H, b: 0, H };
+    }
+    if (g) { g.feet = [{ st: true, s: 0, z: 0, y: 0 }, { st: true, s: 0, z: 0, y: 0 }]; g.out = { drop: 0, strike: 0 }; } // (scratch: no allocation a frame)
+    return (this._gait = g);
+  }
+  /** the planted walk's legs → the hips' drop (rig units) and how hard a heel just struck (0..1) */
+  poseGait(g, A) {
+    const P = this.P, w = clamp(this.move * 2.2); // (eases in from a standstill)
+    if (w < 0.001) { // standing: the legs exactly as the stiff-legged pose has them (rest + the action's), knees and feet at rest
+      this._set(P.legL, A.legL.x, A.legL.y, A.legL.z); this._set(P.legR, A.legR.x, A.legR.y, A.legR.z);
+      for (let i = 0; i < 2; i++) {
+        if (g.knee) { g.shin[i].rotation.copy(this.rest.get(g.shin[i]).r); g.foot[i].rotation.copy(this.rest.get(g.foot[i]).r); }
+        else { const l = i ? P.legR : P.legL; l.scale.y = this.rest.get(l).s.y; }
+      }
+      g.out.drop = 0; g.out.strike = 0;
+      return g.out;
+    }
+    const strideL = this._gaitStride / (this.rig.spec.scale || 1), R = g.H * (g.knee ? GAIT.soft : 1); // (a soft knee on the planted leg)
+    const half = Math.min(strideL * 0.5, R * (g.knee ? GAIT.reach : GAIT.kitReach)) * w, lift = g.H * (g.knee ? GAIT.lift : GAIT.kitLift) * w;
+    const feet = g.feet;
+    for (let i = 0; i < 2; i++) {
+      const f = feet[i], u = (((this.phase + Math.PI / 2 + i * Math.PI) / TAU) % 1 + 1) % 1; // (0: this heel strikes, 0.5: it lifts)
+      if (u < 0.5) { f.st = true; f.s = u / 0.5; f.z = half * (1 - 2 * f.s); f.y = 0; }
+      else { f.st = false; f.s = (u - 0.5) / 0.5; const e = f.s * f.s * (3 - 2 * f.s); f.z = -half + 2 * half * e; f.y = lift * Math.sin(Math.PI * f.s); }
+    }
+    // the hips sink until the planted leg reaches its foot (for the knee rigs: within the soft reach of its own bones)
+    let drop = 0, strike = 0;
+    for (let i = 0; i < 2; i++) {
+      const f = feet[i]; if (!f.st) continue;
+      const L = g.knee ? g.legs[i] : null, zz = (L ? L.z0 : 0) + f.z, r = L ? (L.a + L.b) * GAIT.soft : R;
+      drop = Math.max(drop, g.H - Math.sqrt(Math.max(0, r * r - zz * zz)));
+      strike = Math.max(strike, (1 - f.s) ** 3);
+    }
+    drop = drop * w + (g.knee ? g.H * GAIT.give * strike * w : 0);
+    const Hg = g.H - drop; // the hip's height over the ankles' ground line
+    for (let i = 0; i < 2; i++) {
+      const f = feet[i], leg = i ? P.legR : P.legL, Al = i ? A.legR : A.legL;
+      if (g.knee) {
+        // two-bone IK in the leg's plane, from the bones' own rest angles: the thigh along the hip → ankle line less the
+        // knee's share, the shin bent back, the foot turned to keep the sole at its rest angle (the toes dip a little
+        // at push-off and through the swing)
+        const L = g.legs[i], ty = -Hg + f.y, tz = L.z0 + f.z, d = Math.min(Math.hypot(ty, tz), (L.a + L.b) * 0.9999);
+        const th = Math.atan2(-tz, -ty);
+        const bend = Math.PI - Math.acos(clamp((L.a * L.a + L.b * L.b - d * d) / (2 * L.a * L.b), -1, 1));
+        const beta = Math.acos(clamp((L.a * L.a + d * d - L.b * L.b) / (2 * L.a * d), -1, 1));
+        const thigh = th - beta - L.ps, shin = bend + L.ps - L.pf;
+        const toe = (f.st ? GAIT.toeOff * clamp((f.s - 0.7) / 0.3) ** 2 : GAIT.toeSwing * Math.sin(Math.PI * f.s)) * w;
+        const rt = this.rest.get(leg).r;
+        leg.rotation.set(thigh + Al.x, rt.y + Al.y, rt.z + Al.z);
+        const rs = this.rest.get(g.shin[i]).r; g.shin[i].rotation.set(shin, rs.y, rs.z);
+        const rf = this.rest.get(g.foot[i]).r; g.foot[i].rotation.set(L.flat - thigh - shin + toe, rf.y, rf.z);
+      } else {
+        // straight legs: the swinging foot mirrors the planted one (so it can't dip under the ground) and the leg
+        // shortens as it passes
+        const z = f.st ? f.z : -feet[1 - i].z;
+        this._set(leg, Math.asin(clamp(-z / g.H, -1, 1)) + Al.x, Al.y, Al.z);
+        const r = this.rest.get(leg); leg.scale.y = r.s.y * (1 - f.y / g.H);
+      }
+    }
+    g.out.drop = drop; g.out.strike = strike * w;
+    return g.out;
+  }
   poseBiped(dt, A) {
     const P = this.P, mv = this.move, run = this.runAmt, ph = this.phase, t = this.t;
     const sp = this.sprintAmt || 0; // the sprint run: a deeper lean, a longer stride, pumping arms (see update)
     const swing = Math.sin(ph), bob = Math.abs(Math.sin(ph));
-    const legAmp = (0.62 + run * 0.35 + sp * 0.24) * mv;
-    this._set(P.legL, swing * legAmp + A.legL.x, A.legL.y, A.legL.z); // (z: a wide stance, + spreads the left leg out)
-    this._set(P.legR, -swing * legAmp + A.legR.x, A.legR.y, A.legR.z);
+    const gait = this.plant && this.gaitRig(), gs = gait ? this.poseGait(gait, A) : null; // (the planted walk: see poseGait)
+    if (!gait) {
+      const legAmp = (0.62 + run * 0.35 + sp * 0.24) * mv;
+      this._set(P.legL, swing * legAmp + A.legL.x, A.legL.y, A.legL.z); // (z: a wide stance, + spreads the left leg out)
+      this._set(P.legR, -swing * legAmp + A.legR.x, A.legR.y, A.legR.z);
+    }
     // arms
     const lock = 1 - A.armLock, armAmp = (0.55 + run * 0.4 + sp * 0.3) * mv * lock;
     const ampR = armAmp * (1 - clamp(A.armLockR || 0)); // (armLockR: the right arm alone held out of the swing, e.g. a prop carried in that paw)
@@ -334,13 +434,13 @@ export class Animator {
     // body
     const rb = this.rest.get(P.body);
     const breathe = Math.sin(t * 2.3) * 0.014 * (1 - mv);
-    P.body.position.y = rb.p.y + bob * (0.04 + run * 0.05 + sp * 0.025) * mv + A.y * 0 ;
+    P.body.position.y = rb.p.y + (gait ? 0 : bob * (0.04 + run * 0.05 + sp * 0.025) * mv); // (the planted walk sinks the whole rig instead: offsetY below)
     P.body.rotation.set(rb.r.x + (0.1 + run * 0.16 + sp * 0.22) * mv + A.body.x + A.lean + (A.roll || 0), rb.r.y + A.body.y + (A.spin || 0), rb.r.z + Math.sin(ph) * 0.05 * mv + A.body.z);
     // squash & stretch on root
-    const sq = A.sq + breathe - bob * 0.03 * mv * (1 + run + sp);
+    const sq = A.sq + breathe + (gait ? GAIT.squash * gs.strike : -bob * 0.03 * mv * (1 + run + sp)); // (a heel strike squashes a little)
     const root = this.rig.root, sc = this.rig.spec.scale || 1;
     root.scale.set(sc * (1 + sq * 0.5), sc * (1 - sq), sc * (1 + sq * 0.5));
-    this.rig.offsetY = A.y + (A.roll ? 0 : 0);
+    this.rig.offsetY = A.y - (gait ? gs.drop * sc : 0);
     // head
     const lookY = Math.sin(t * 0.37) * 0.18 * (1 - mv) * (1 - this.talk * 0.5);
     this._set(P.head, (-0.05 - sp * 0.08) * mv + Math.sin(ph * 2) * 0.03 * mv + A.head.x + (this.talk ? Math.sin(t * 9) * 0.04 : 0), lookY + A.head.y, Math.sin(t * 0.71) * 0.05 * (1 - mv) + A.head.z); // (sprinting: the head lifts against the lean, eyes ahead)

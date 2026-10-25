@@ -1,8 +1,12 @@
 // Autosave (ROADMAP R-11, docs/ARCHITECTURE.md § Save flow). game.js keeps save() (state → saveableState → here) and
 // installs this module, which owns:
-//   - the storage write, writeSave(): the save goes to localStorage['chewy3d.save'] and the one it replaces is copied
-//     to 'chewy3d.save.prev' first (a rotating backup, apart from the debug menu's 'chewy3d.save.debugBackup');
-//     a full storage drops .prev to make room, then toasts once if the save still can't fit
+//   - the save slots (SL-1): SLOTS adventures, each its own save. Slot 1 keeps the first keys, 'chewy3d.save' and
+//     'chewy3d.save.prev' (a save from before slots is slot 1, and so are the QA's fixtures); slot n is
+//     'chewy3d.save.<n>' and its '.prev'. 'chewy3d.slot' remembers the slot played last: the page loads it at boot and
+//     writes only it (the title's picker switches slot by reloading). Settings, volumes and controls stay per device.
+//   - the storage write, writeSave(): the save goes to the slot's main key and the one it replaces is copied to its
+//     .prev first (a rotating backup, apart from the debug menu's 'chewy3d.save.debugBackup'); a full storage drops
+//     .prev (this slot's, then the others') to make room, then toasts once if the save still can't fit
 //   - the read, loadSave(validate): the main save, or .prev when the main one fails to parse or to normalize (a gentle
 //     toast once the UI is up). A missing main save is a new game: .prev is NOT used then (New Game removes the main)
 //   - the timed autosave: every 1 / 2 / 5 min of play (Settings › Autosave, default 2 min; Off stops it), counted only
@@ -21,6 +25,8 @@
 import { Events } from './events.js';
 
 export const SAVE_KEY = 'chewy3d.save', PREV_KEY = 'chewy3d.save.prev';
+export const SLOTS = 3;
+const SLOT_KEY = 'chewy3d.slot';
 /** Settings › Autosave: the setting holds the index (Off / 1 / 2 / 5 min) */
 export const AUTOSAVE_MIN = [0, 1, 2, 5], AUTOSAVE_LABELS = ['Off', '1 min', '2 min', '5 min'], AUTOSAVE_DEFAULT = 2;
 const EVENT_GAP = 20;      // s between event autosaves
@@ -29,6 +35,47 @@ const IDLE_MS = 4;         // a save that took longer than this waits for an idl
 const LIFE_GAP = 600;      // ms: the lifecycle saves of one burst (hide → pagehide → beforeunload) write once
 const BIG_BUY = 300;       // coins: a purchase this big is progress
 const BIG_LOOT = new Set(['unique', 'set']);
+
+// ---------------------------------------------------------------- the slots
+/** slot n's storage keys */
+export const slotKeys = n => (n === 1 ? { main: SAVE_KEY, prev: PREV_KEY } : { main: `${SAVE_KEY}.${n}`, prev: `${SAVE_KEY}.${n}.prev` });
+const okSlot = n => Number.isInteger(n) && n >= 1 && n <= SLOTS;
+const get = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+/** the slot this page loaded and saves to: the one played last (1 when none was ever picked) */
+let deleted = false;       // the picker deleted the slot this page holds
+const slot = (() => { const n = +get(SLOT_KEY); return okSlot(n) ? n : 1; })();
+export const currentSlot = () => slot;
+/** the slot the next boot loads (the page reloads onto it) */
+export function setSlot(n) { if (okSlot(n)) try { localStorage.setItem(SLOT_KEY, String(n)); } catch (e) { /* */ } }
+export const slotUsed = n => !!get(slotKeys(n).main);
+/** slot n at a glance, for the title's picker (null: empty). A save that won't parse shows as damaged; its .prev
+ *  still loads it */
+export function slotInfo(n) {
+  const raw = get(slotKeys(n).main);
+  if (!raw) return null;
+  try {
+    const st = JSON.parse(raw), hs = st.heroes || {}, act = hs[st.activeHero] ? st.activeHero : 'chewy';
+    const P = hs[act]?.player || st.player || {};
+    const team = Object.keys(hs).filter(id => id === 'chewy' || st.flags?.[`${id}Joined`]);
+    return { n, hero: act, name: P.name || 'Chewy', lvl: P.lvl || 1, team, day: st.day || 1, coins: st.coins || 0, playSec: st.playSec, at: st.savedAt || 0 };
+  } catch (e) { return { n, damaged: true, at: 0 }; }
+}
+/** the slot Continue plays: the one played last when it has a save, else the one saved most recently (0: none) */
+export function lastSlot() {
+  const p = +get(SLOT_KEY), mine = okSlot(p) ? p : 1;
+  if (slotUsed(mine)) return mine;
+  let best = 0, at = -1;
+  for (let n = 1; n <= SLOTS; n++) { const i = slotInfo(n); if (i && i.at > at) { best = n; at = i.at; } }
+  return best;
+}
+/** wipe slot n (and its backup). The slot this page holds stops saving: its state would bring it back */
+export function deleteSlot(n) {
+  if (!okSlot(n)) return;
+  const k = slotKeys(n);
+  try { localStorage.removeItem(k.main); localStorage.removeItem(k.prev); } catch (e) { /* */ }
+  if (n === slot) { mainGood = false; deleted = true; }
+}
+export const slotDeleted = () => deleted;
 
 // ---------------------------------------------------------------- storage
 let mainGood = false;      // the stored main save is one we read fine or wrote: safe to rotate into .prev
@@ -44,10 +91,12 @@ function warnQuota() {
   try { ui?.toast?.("Your browser's storage is full, so the game couldn't save. Free up some space and it'll try again ♡", { icon: 'save', color: '#ffb0a0', duration: 8 }); } catch (e) { /* */ }
 }
 
-/** the save object → the main slot (the one it replaces → .prev). → true when it was written */
+/** the save object → this slot's main key (the one it replaces → .prev). → true when it was written */
 export function writeSave(data) {
+  if (deleted) return false; // (the title's picker deleted this slot: nothing may write it back)
   const t0 = performance.now();
-  const json = JSON.stringify(data);
+  const json = JSON.stringify({ ...data, savedAt: Date.now() }); // (savedAt: the picker's "last played")
+  const { main: SAVE_KEY, prev: PREV_KEY } = slotKeys(slot);
   let ok = false;
   try {
     if (mainGood) {
@@ -58,7 +107,11 @@ export function writeSave(data) {
     catch (e) {
       if (!isQuota(e)) throw e;
       try { localStorage.removeItem(PREV_KEY); localStorage.setItem(SAVE_KEY, json); ok = true; } // (the main save matters more than its backup)
-      catch (e2) { if (isQuota(e2)) warnQuota(); else throw e2; }
+      catch (e2) {
+        if (!isQuota(e2)) throw e2;
+        for (let n = 1; n <= SLOTS; n++) if (n !== slot) localStorage.removeItem(slotKeys(n).prev); // (then the other slots' backups)
+        try { localStorage.setItem(SAVE_KEY, json); ok = true; } catch (e3) { if (isQuota(e3)) warnQuota(); else throw e3; }
+      }
     }
   } catch (e) { /* storage unavailable (a private window, blocked site data) */ }
   const ms = performance.now() - t0;
@@ -78,6 +131,7 @@ export function loadSave(validate = st => st) {
     if (!v || typeof v !== 'object' || !(v.player || v.heroes)) throw new Error('the save did not normalize');
     return v;
   };
+  const { main: SAVE_KEY, prev: PREV_KEY } = slotKeys(slot);
   let raw = null;
   try { raw = localStorage.getItem(SAVE_KEY); } catch (e) { return null; }
   if (!raw) return null; // (no save: a new game; .prev belongs to whatever came before)
@@ -196,9 +250,12 @@ export function installAutosave(G, { indicator } = {}) {
   // ---- the real clock: play time counts while the page is visible and the game runs
   const playingNow = () => !document.hidden && !G.titleActive && !G.ui?.isPaused?.();
   let last = performance.now();
+  // the play time on the picker's card: counted for a game started since slots came in (an older save has no playSec,
+  // and a part count would read wrong)
+  const playClock = dt => { if (typeof G.state?.playSec === 'number') G.state.playSec += dt; };
   setInterval(() => {
     const t = performance.now(), dt = Math.min(5, (t - last) / 1000); last = t; // (a throttled background tab doesn't bank minutes)
-    if (!A.manual) tick(dt, playingNow());
+    if (!A.manual) { const p = playingNow(); tick(dt, p); if (p) G.coop?.cur ? G.coop.primary(() => playClock(dt)) : playClock(dt); }
   }, 1000);
 
   // ---- the page lifecycle, every platform: one save per burst (hide → pagehide → beforeunload, or Quit then close)

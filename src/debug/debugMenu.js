@@ -11,9 +11,11 @@ import { debugSections, registryVersion } from './registry.js';
 import { registerCoreSections } from './debugActions.js';
 import { installToggles, tickToggles, resetToggles } from './debugToggles.js';
 import { BUG_SVG } from './access.js';
+import { slotKeys, currentSlot } from '../core/autosave.js';
 import './debug.css';
 
-const SAVE_KEY = 'chewy3d.save', BACKUP_KEY = 'chewy3d.save.debugBackup';
+const BACKUP_KEY = 'chewy3d.save.debugBackup';
+const SAVE_KEY = () => slotKeys(currentSlot()).main; // (the slot this page plays: one backup, of whichever slot made it)
 const val = c => (c && typeof c === 'object' && 'value' in c ? c.value : c);
 const lab = c => (c && typeof c === 'object' && 'label' in c ? c.label : String(c));
 const same = (a, b) => a === b || (a && b && typeof a === 'object' && JSON.stringify(a) === JSON.stringify(b));
@@ -108,13 +110,13 @@ export function installDebugMenu(G, access) {
     backupInfo() { try { const b = JSON.parse(localStorage.getItem(BACKUP_KEY) || 'null'); return b?.save ? b : null; } catch (e) { return null; } },
     /** the save as it is now, into the backup slot */
     backup() {
-      try { G.save?.(); const s = localStorage.getItem(SAVE_KEY); if (!s) return 'Nothing saved yet to back up'; localStorage.setItem(BACKUP_KEY, JSON.stringify({ at: Date.now(), save: s })); return 'Save backed up ♡'; }
+      try { G.save?.(); const s = localStorage.getItem(SAVE_KEY()); if (!s) return 'Nothing saved yet to back up'; localStorage.setItem(BACKUP_KEY, JSON.stringify({ at: Date.now(), save: s })); return 'Save backed up ♡'; }
       catch (e) { return `Couldn't back up: ${e.message}`; }
     },
     /** the backup back as the save, and a reload onto it (nothing saves over it on the way out) */
     restore() {
       const b = M.backupInfo(); if (!b) return 'No backup to restore';
-      try { G.saveBlocked = true; localStorage.setItem(SAVE_KEY, b.save); sessionStorage.setItem('chewy3d.skipTitle', 'debug'); } catch (e) { G.saveBlocked = false; return `Couldn't restore: ${e.message}`; }
+      try { G.saveBlocked = true; localStorage.setItem(SAVE_KEY(), b.save); sessionStorage.setItem('chewy3d.skipTitle', 'debug'); } catch (e) { G.saveBlocked = false; return `Couldn't restore: ${e.message}`; }
       const u = new URL(location.href); u.searchParams.delete('fresh'); // (a ?fresh page would ignore the save)
       setTimeout(() => location.replace(u.toString()), 350);
       return 'Restoring the backup…';

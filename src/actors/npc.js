@@ -86,6 +86,7 @@ export class Villager extends Actor {
   constructor(world, G, spec, { id, anchor, home = null, wander = 5, role = 'villager', rig = null } = {}) {
     super(world, rig || buildHumanoid(spec), { radius: 0.28, speed: 1.6, name: spec.name });
     this.G = G; this.id = id || spec.name.toLowerCase(); this.spec = spec;
+    this.anim.plant = true; // (the planted walk: feet that hold the ground, actors/animator.js poseGait)
     this.anchor = new THREE.Vector3(anchor.x, 0, anchor.z);
     this.home = home; this.wanderR = wander; this.role = role;
     this.state = 'idle'; this.t = rand(0, 3); this.target = null;

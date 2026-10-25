@@ -57,8 +57,8 @@ try {
   if (ng >= 0) {
     await page.evaluate(i => document.querySelectorAll('.l-title button')[i].click(), ng);
     await sleep(page, 800);
-    // a confirm dialog may appear ("overwrite save?")
-    await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find(x => /yes|start|confirm|new game/i.test(x.textContent) && x.offsetParent); b?.click(); });
+    // with a save, New Game opens the save-slot picker (SL-1, ui/title.js): an empty slot's New Game
+    await page.evaluate(() => { const b = document.querySelector('.sl-card.empty [data-s="new"]'); b?.click(); }).catch(() => {}); // (the reload can tear the evaluate down)
     await page.waitForFunction(() => window.__ready === true && window.G?.player && !window.G.titleActive, null, { timeout: 60000 }).catch(() => {});
     await sleep(page, 2500);
     const intro = await page.evaluate(() => ({ dlg: window.G.ui.dlg.active, speaker: window.G.ui.dlg.active && window.G.ui.dlg.opts.speaker, locked: window.G.player.controlLocked, coins: window.G.state.coins, lvl: window.G.state.player.lvl }));

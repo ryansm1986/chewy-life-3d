@@ -209,6 +209,23 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
   into ONE rigidly skinned mesh + one outline (the groups become the skeleton's bones; the mouth becomes a bone that the
   animator scales). ~3 draw calls per character. The `Animator` keeps driving `rig.parts.*` groups exactly as before.
 - Summons/repeats: `cloneRig(template)` shares the baked geometry, with its own bones, skeleton and materials (spirit pups).
+- **The planted walk** (`anim.plant`, set for the villagers, townsfolk and zone villagers in npc.js / zoneVillagers.js;
+  `Animator.poseGait`, tuned by `GAIT` in animator.js). The heroes keep the stiff-legged swing. Its feet sweep about a
+  third of the ground the body covers, so NPC feet skated and the body rode level: it looked floaty.
+  - Each foot holds the ground through its stance, sweeping back under the hip as far as the leg reaches, then steps
+    forward through the air.
+  - The whole rig sinks (`rig.offsetY`) so the planted leg reaches the ground: lowest at each footfall, highest as the
+    feet pass, with a little give and squash at the strike.
+  - The step is `GAIT.stride` × the hip-to-ankle leg, capped at `GAIT.maxSteps` a second: short legs take quick little
+    steps and the shortest slide a little rather than scurry.
+  - Rigs with knees (the baked 37-bone rigs' `shin_*` / `foot_*`) bend them by two-bone IK from each bone's own rest
+    angle and keep the soles flat, with a toe-off. The kit rigs (one bone a leg) keep straight legs, a shorter reach and
+    no give; the swinging leg shortens a touch to clear the ground.
+  - Standing still, the legs are exactly the old pose (rest + the action's), so sitting and the other actions are
+    untouched.
+  - Measured on the plaza at ~1.3 m/s: the planted foot slides at 0.4–0.7 × the body's speed (was 1.0–1.16), the
+    hips bob 3–7 cm (was 0), 3.1–3.6 steps a second (was 2.1). Probe: `tools/qa/tmp/walk-probe.mjs <id> [speed]
+    [--strip] [--old]` (scratch).
 - `rig.dispose()` frees a throwaway rig (skips shared geometry). Don't store Object3Ds in `userData` (clone deep-copies it via JSON).
 - `enableXray(rig)` adds skinned silhouette twins bound to the same skeleton.
 - **Disney style (always, since CT-7 removed the Settings toggle; `?kit=classic` / `?chewy=classic` for the QA)**:
@@ -1364,6 +1381,31 @@ state = {
   safe area / itch inset / Deck margins; ~1.6 s; no toast; `prefers-reduced-motion` drops the paw steps.
 - **Test hooks**: `G.autosave` — `manual = true` (the real 1 s clock stops), `advance(s, { play })`, `state()`, `log`,
   `life`, `stat`. QA: `tools/qa/s36-autosave.mjs`.
+
+## Save slots (src/core/autosave.js, src/ui/title.js — ROADMAP SL-1)
+- **Three adventures** (`SLOTS`), each its own save and `.prev`. Slot 1 keeps the first keys, `chewy3d.save` and
+  `chewy3d.save.prev`, so a save from before slots is slot 1, and the QA's fixtures still load. Slot n is
+  `chewy3d.save.<n>` and `chewy3d.save.<n>.prev` (`slotKeys(n)`). Settings, volumes, controls and the debug menu's one
+  backup stay per device.
+- **One slot a page**: `chewy3d.slot` remembers the slot played last; the page reads it once at boot
+  (`currentSlot()`, also `G.saveSlot`) and loads and writes only that slot. Playing another slot, or a new game, sets
+  the pointer and reloads (`sessionStorage chewy3d.skipTitle` = `load` / `new`, `G.saveBlocked` on the way out).
+  Continue plays `lastSlot()` (the pointer's slot when it has a save, else the newest `savedAt`), without a reload
+  when the page already holds it.
+- **The save** gains `savedAt` (every write) and `playSec` (new games only: `newGameState` starts it at 0 and the
+  autosave's real clock adds play time; an older save has none, so its card shows no play time rather than a wrong one).
+- **The title** (`ui.onTitle` hooks from game.js: `hasSave`, `slots`, `last`, `newGame(n)`, `play(n)`, `continue`,
+  `remove(n)`): New Game · Continue (its sub-line names the adventure) · Load Game · Settings. New Game with no save
+  anywhere goes straight in; otherwise it opens the picker for an empty slot (or Start over, when all are full). The
+  picker's cards: the hero's portrait, name and level, the friends who've joined, the day, the coins, the play time
+  and when it was last played; Play / New Game / Start over and a delete. A delete or a Start over asks first. A card
+  whose save won't parse reads "A little scrambled", and Play loads its `.prev`. The pad: left / right walk the
+  buttons, down is Back, B backs out; Escape too.
+- **Deleting the held slot** (`deleteSlot`) stops this page writing: `writeSave` returns false, so no lifecycle save
+  brings it back.
+- **Storage**: a fat late-game save is ~151 KB, so three slots and their backups stay under 1 MB. A full storage drops
+  this slot's `.prev`, then the other slots', before it gives up.
+- QA: `tools/qa/s52-save-slots.mjs`; s11 picks an empty slot for its New Game.
 
 ## Items
 ```js

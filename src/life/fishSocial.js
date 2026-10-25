@@ -20,6 +20,7 @@ export function installFishingSocial(G, fishing) {
   const F = () => fishingOf(G.state), story = () => G.story;
   const offer = () => {
     const S = story(); if (!S) return;
+    if (G.titleActive) { setTimeout(offer, 1500); return; } // (not over the title screen: once the player is in)
     const Q = S.Q, day = G.day?.day || G.state.day || 1;
     if (day >= 2 && !Q.done.includes('keroRod') && !Q.active.some(q => q.id === 'keroRod')) S.start('keroRod');
   };

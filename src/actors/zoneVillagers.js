@@ -44,6 +44,7 @@ export class ZoneVillager extends Actor {
   constructor(world, G, def, o = {}) {
     const spec = zoneSpec(def.id);
     super(world, buildHumanoid(spec), { radius: 0.28, speed: 1.5, name: def.name || spec.name });
+    this.anim.plant = true; // (the planted walk: feet that hold the ground, actors/animator.js poseGait)
     this.G = G; this.def = def; this.id = def.id; this.spec = spec; this.folk = !!def.folk; this.zone = o.zone;
     this.village = o.village; this.home = o.home || null; this.spots = o.spots || [];
     this.state = 'life'; this.t = rand(0.5, 3); this.goal = null; this.route = null; this.act = null;

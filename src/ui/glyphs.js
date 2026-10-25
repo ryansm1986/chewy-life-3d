@@ -149,6 +149,7 @@ export const GLYPHS = {
   save: st('M5 5h17l5 5v17H5z', '#8fd0ff') + st('M9.5 5h11v7h-11z', '#fff6e8', 1.8) + st('M9 17h14v10H9z', '#fff6e8', 1.8),
   exit: st('M13 5H6v22h7', 'none', 2.8) + '<path d="M13 16h14M22 11l5 5-5 5" fill="none" stroke="#4a2c2a" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>',
   play: st('M10 6l16 10-16 10z', '#8fe0c0'),
+  bin: st('M12.5 8V5.5h7V8', 'none', 2.4) + st('M8.5 9.5l1.6 17h11.8l1.6-17z', '#ffc4b0') + st('M5.5 8.5h21', 'none', 2.8) + '<path d="M13.6 13.5l.4 9.5M18.4 13.5l-.4 9.5" stroke="#4a2c2a" stroke-width="1.8" stroke-linecap="round"/>', // (the title picker's delete)
   question: st('M16 29a13 13 0 1 1 0-26 13 13 0 0 1 0 26z', '#c3b3ff') + '<path d="M12.3 12.5a3.8 3.8 0 1 1 5.5 3.4c-1.2.6-1.8 1.4-1.8 2.6v.7" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="16" cy="23" r="1.6" fill="#fff"/>',
   fire: st('M16 29c-6 0-9-4-9-8.5C7 14 13 12 13 5c4 2 6 6 5.5 9.5 1.5-1 2.3-2.6 2.3-4.2C24 12.8 25 17 25 20.5 25 25 22 29 16 29z', '#ff9a3c') + st('M16 28c-2.8 0-4.3-1.8-4.3-4 0-2.8 2.5-4 3.3-6.5 2.2 1.4 5.3 3.8 5.3 6.5 0 2.2-1.5 4-4.3 4z', '#ffdf6a', 1.4),
   frost: '<g stroke="#4a2c2a" stroke-width="5" stroke-linecap="round"><path d="M16 3v26M4.7 9.5l22.6 13M4.7 22.5l22.6-13"/></g><g stroke="#aee0ff" stroke-width="2.6" stroke-linecap="round"><path d="M16 3v26M4.7 9.5l22.6 13M4.7 22.5l22.6-13"/></g>',

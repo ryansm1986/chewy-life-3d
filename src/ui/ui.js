@@ -327,7 +327,7 @@ export const UI = {
     if (this.iris.active) { e.preventDefault(); return; }
     if (k === 'Alt') return;
     if (act('lootLabels') && !e.ctrlKey && !e.metaKey && !e.altKey) { this.labels.setVisible(true); return; } // hold Z: every loot label (Ctrl+Z stays the decorate undo)
-    if (this.mode === 'title') { if (k === 'Escape' && this.isOpen('menu')) this.close('menu'); return; }
+    if (this.mode === 'title') { if (k === 'Escape') { if (this.isOpen('menu')) this.close('menu'); else this.titleScreen.escape(); } return; } // (the save-slot picker backs out: ui/title.js)
     if (this.dlg.active) { if (this.dlg.key(k, e)) e.preventDefault(); return; }
     const CP = this.G?.coop?.active && !this.isOpen('menu') ? this.G.coop.panes : null; // (couch co-op: I / C / K open player 1's pane, and while it's up it has the keys, Esc closing it: ui/coopPanes.js)
     if (CP?.key && (CP.isOpen(this.G.coop.p1) || !this.anyModal()) && CP.key(k, ['inventory', 'character', 'skills'].find(act))) { e.preventDefault(); return; }
@@ -395,9 +395,11 @@ export const UI = {
     }
   },
   nonBlocking(n) { return NON_BLOCKING.has(n); },
-  /** the title screen: the D-pad / stick moves a focus over New Game · Continue · Settings (Continue first), A presses it */
+  /** the title screen: the D-pad / stick moves a focus over New Game · Continue · Load Game · Settings (Continue first),
+   *  A presses it; the save-slot picker has its own (ui/title.js pad) */
   padTitle() {
     const A = Actions, T = this.titleScreen;
+    if (T.pad(A)) return;
     const btns = [...T.root.querySelectorAll('.ti-btns .btn')].filter(b => !b.disabled);
     if (!btns.length) return;
     if (T._padSel == null || !btns[T._padSel]) T._padSel = Math.max(0, btns.findIndex(b => b.dataset.a === 'continue'));

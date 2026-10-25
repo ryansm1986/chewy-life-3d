@@ -67,7 +67,7 @@ import { installLife } from './life/index.js';
 import { Tutorials } from './world/tutorials.js';
 import { installHousing } from './home/housing.js';
 import { installDebugAccess } from './debug/access.js';
-import { installAutosave, writeSave, loadSave as readSave } from './core/autosave.js';
+import { installAutosave, writeSave, loadSave as readSave, SLOTS, currentSlot, setSlot, slotInfo, slotUsed, lastSlot, deleteSlot, slotDeleted } from './core/autosave.js';
 import { makeSaveGlyph } from './ui/saveGlyph.js';
 import { normalizeCozy } from './cozy/state.js';
 import { installCozy } from './cozy/expeditionRun.js';
@@ -803,6 +803,7 @@ export async function boot() {
   // ---- save / load
   function save() { if (G.saveBlocked) return; /* (the debug menu's Restore is reloading onto the backup) */ try { if (G.playerDead || G.state.player.life === 0) G.state.player.life = null; /* never persist a knocked-out Chewy */ G.state.hour = day.hour; G.state.day = day.day; writeSave(saveableState(G.state)); /* (the old save → .prev first) */ } catch (e) { /* storage unavailable */ } }
   G.save = () => (G.coop?.cur ? G.coop.primary(save) : save()); // (couch co-op: always player 1's view of the state)
+  G.saveSlot = currentSlot(); // (the save slot this page plays and writes: core/autosave.js; the title's picker reloads to switch)
   installAutosave(G, { indicator: makeSaveGlyph(G.ui) }); // the timed and event autosaves, the page-hide / unload saves, the paw glyph (core/autosave.js, ROADMAP R-11)
 
   // ambience: water proximity + day/night music swaps (village only)
@@ -826,10 +827,18 @@ export async function boot() {
     G.ui.setMode('title');
     G.audio?.music?.('title');
     rig.distTarget = 52; rig.focus.set(L.plaza.x, 1, L.plaza.z); rig.snap();
+    // the save slots (core/autosave.js, docs/ARCHITECTURE.md § Save slots): this page holds one slot's state, so
+    // playing another, or a new game, reloads onto it
+    const reloadInto = (n, why) => { G.saveBlocked = true; setSlot(n); try { sessionStorage.setItem('chewy3d.skipTitle', why); } catch (e) { /* */ } location.reload(); };
+    const play = n => (n === currentSlot() && slotUsed(n) && !slotDeleted() ? startGame(false) : reloadInto(n, 'load'));
     G.ui.onTitle({
-      hasSave: () => { try { return !!localStorage.getItem('chewy3d.save'); } catch (e) { return false; } },
-      newGame: () => { try { localStorage.removeItem('chewy3d.save'); } catch (e) { /* */ } try { sessionStorage.setItem('chewy3d.skipTitle', 'new'); } catch (e) { /* */ } location.reload(); },
-      continue: () => startGame(false),
+      hasSave: () => !!lastSlot(),
+      slots: () => Array.from({ length: SLOTS }, (_, i) => slotInfo(i + 1)),
+      last: () => lastSlot(),
+      newGame: n => { if (!(n >= 1)) n = Array.from({ length: SLOTS }, (_, i) => i + 1).find(k => !slotUsed(k)) || currentSlot(); deleteSlot(n); reloadInto(n, 'new'); },
+      play,
+      continue: () => { const n = lastSlot(); if (n) play(n); },
+      remove: n => deleteSlot(n),
     });
   } else if (skip === 'new' || (P.has('fresh') && !P.has('floor') && !P.has('region') && !P.has('nointro'))) setTimeout(() => intro(), 1200);
   function startGame(isNew) {

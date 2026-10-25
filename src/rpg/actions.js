@@ -91,7 +91,7 @@ export function newGameState() {
     friends: {},
     village: {},
     dungeon: { deepest: 0, waypoints: [1] },
-    day: 1, hour: 8.5, flags: {},
+    day: 1, hour: 8.5, playSec: 0, flags: {}, // (playSec: the play time on the title picker's card, core/autosave.js)
   };
 }
 

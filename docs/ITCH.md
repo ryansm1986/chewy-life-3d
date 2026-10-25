@@ -71,7 +71,8 @@ itch's command-line uploader, **butler**, uploads only what changed since the la
 
 ## Saves on itch
 
-The game saves to `localStorage` under the keys `chewy3d.save` and the settings (`chewy.style` and `chewy.model` were
+The game saves to `localStorage` under the keys `chewy3d.save` (slot 1; slots 2 and 3 are `chewy3d.save.2` and
+`chewy3d.save.3`, and `chewy3d.slot` remembers the last played: docs/ARCHITECTURE.md § Save slots) and the settings (`chewy.style` and `chewy.model` were
 the old hero choices, dropped since CT-7). On itch
 that storage belongs to itch's game-hosting domain, not to itch.io, so:
 
