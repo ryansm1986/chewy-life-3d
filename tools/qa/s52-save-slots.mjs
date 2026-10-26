@@ -25,6 +25,11 @@ async function clickReload(sel) {
   await nav;
   await page.waitForFunction(() => window.__ready === true && window.G?.player && !window.G.titleActive, null, { timeout: 60000 });
 }
+// a new game opens on the cinematic (world/opening.js): Esc skips it
+async function skipOpening() {
+  await page.waitForFunction(() => window.G.opening?.active, null, { timeout: 10000 }).catch(() => {});
+  for (let i = 0; i < 8 && await page.evaluate(() => !!window.G.opening?.active); i++) { await page.keyboard.press('Escape'); await sleep(page, 400); }
+}
 const cards = () => page.evaluate(() => [...document.querySelectorAll('.sl-card')].map(c => ({ n: +c.dataset.n, empty: c.classList.contains('empty'), last: c.classList.contains('last'), asking: c.classList.contains('asking'), name: c.querySelector('.sl-name')?.textContent, text: c.innerText.replace(/\s+/g, ' ').trim(), btns: [...c.querySelectorAll('[data-s]')].map(b => b.dataset.s) })));
 
 try {
@@ -61,6 +66,7 @@ try {
   c = await cards();
   R.check('New Game with a save opens the picker: filled cards say Start over, empties New Game', hd === 'Where should the new adventure go?' && c[0].btns.join() === 'over,del' && c[1].btns.join() === 'new', JSON.stringify({ hd, c: c.map(x => x.btns) }));
   await clickReload('.sl-card[data-n="2"] [data-s="new"]');
+  await skipOpening(); // (a new game's opening first: world/opening.js)
   await page.waitForFunction(() => window.G.ui.dlg.active, null, { timeout: 15000 }); // (Rosie's intro: a new game)
   await drainDialogue(page); await sleep(page, 400); await drainDialogue(page);
   const g2 = await page.evaluate(() => ({ slot: window.G.saveSlot, coins: window.G.state.coins, lvl: window.G.state.player.lvl, playSec: window.G.state.playSec }));
@@ -140,6 +146,7 @@ try {
   c = await cards();
   R.check('Start over asks first', c[2].asking && c[2].btns.join() === 'yes,no', JSON.stringify(c[2]));
   await clickReload('.sl-card[data-n="3"] [data-s="yes"]');
+  await skipOpening();
   await page.waitForFunction(() => window.G.ui.dlg.active, null, { timeout: 15000 });
   await drainDialogue(page); await sleep(page, 400); await drainDialogue(page);
   const g3 = await page.evaluate(() => ({ slot: window.G.saveSlot, coins: window.G.state.coins }));

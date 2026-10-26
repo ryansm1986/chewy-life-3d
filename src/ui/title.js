@@ -5,6 +5,7 @@ import { el, esc } from './dom.js';
 import { glyph } from './glyphs.js';
 import { DESKTOP, quitGame } from './desktop.js';
 import { portrait } from './portraits.js';
+import { TitleArt } from './titleArt.js'; // (the animated painting behind it: ROADMAP TA-1)
 import { version as VERSION } from '../../package.json'; // (the footer names the running version, as the desktop app's does: CT-10)
 
 const LETTER_COLORS = ['#fff6e8', '#ffc4d6', '#ffe79a', '#c9f5e4', '#cfeaff', '#e4dcff'];
@@ -31,8 +32,15 @@ export class Title {
       const x = Math.random() * 100, d = 7 + Math.random() * 8, dl = -Math.random() * 15, s = 0.55 + Math.random() * 0.8, sw = 30 + Math.random() * 80;
       return `<i class="pt" style="left:${x.toFixed(1)}%;--d:${d.toFixed(1)}s;--dl:${dl.toFixed(1)}s;--s:${s.toFixed(2)};--sw:${sw.toFixed(0)}px;--r:${(Math.random() * 360).toFixed(0)}deg"></i>`;
     }).join('');
+    // (with the painting: petals blown off its cherry tree, from the crown across the hill on the wind; a few big soft
+    //  ones close to us, for depth)
+    const blown = Array.from({ length: 16 }, (_, i) => {
+      const near = i < 3, x = 2 + Math.random() * 30, y = 4 + Math.random() * 30, d = (near ? 5 : 8) + Math.random() * 6, dl = -Math.random() * 14;
+      const s = near ? 2 + Math.random() * 0.8 : 0.55 + Math.random() * 0.7, dx = 45 + Math.random() * 45, dy = 55 + Math.random() * 35;
+      return `<i class="pt bl${near ? ' near' : ''}" style="left:${x.toFixed(1)}%;top:${y.toFixed(1)}%;--d:${d.toFixed(1)}s;--dl:${dl.toFixed(1)}s;--s:${s.toFixed(2)};--dx:${dx.toFixed(0)}vw;--dy:${dy.toFixed(0)}vh;--r:${(Math.random() * 360).toFixed(0)}deg"></i>`;
+    }).join('');
     const paws = Array.from({ length: 9 }, (_, i) => `<i style="--i:${i};left:${6 + i * 11}%;top:${i % 2 ? 8 : 0}px;transform:rotate(${80 + (i % 2 ? 12 : -12)}deg)">${glyph('paw')}</i>`).join('');
-    r.innerHTML = `<div class="ti-vig"></div><div class="ti-petals">${petals}</div>
+    r.innerHTML = `<div class="ti-vig"></div><div class="ti-petals">${petals}<span class="ti-blown">${blown}</span></div>
       <div class="ti-center">
         <div class="ti-logo">
           <div class="ti-chewy">${portrait('chewy')}</div>
@@ -41,7 +49,6 @@ export class Title {
           <div class="ti-spark s1">${glyph('sparkle')}</div><div class="ti-spark s2">${glyph('sparkle')}</div><div class="ti-spark s3">${glyph('sakura')}</div>
         </div>
         <div class="ti-paws">${paws}</div>
-        <div class="ti-sub">A Cozy Blossom Village Adventure</div>
         <div class="ti-btns">
           <button class="btn big pink" data-a="newGame">${glyph('sakura')}New Game</button>
           <button class="btn big ti-cont" data-a="continue">${glyph('paw')}<span class="ti-bl">Continue<small class="ti-bsub"></small></span></button>
@@ -57,6 +64,7 @@ export class Title {
     this.picking = null;   // the picker's mode while it's up: 'load' | 'new'
     this.ask = null;       // a card asking first: { n, what: 'del' | 'over' }
     ui.layers.title.appendChild(r);
+    this.art = new TitleArt(r); r.classList.add('has-art'); // (the painting has Chewy and Shadow in it: the logo's portraits step aside)
     r.addEventListener('click', e => {
       const sb = e.target.closest('[data-s]');
       if (sb && !sb.disabled) { sb.classList.remove('pressed'); void sb.offsetWidth; sb.classList.add('pressed'); ui.sfx?.('select'); this.slotAction(sb.dataset.s, +sb.closest('.sl-card')?.dataset.n); return; }
@@ -178,11 +186,13 @@ export class Title {
     this.sync();
     this.root.classList.remove('out');
     this.root.classList.add('show');
+    this.art?.start();
   }
   hide() {
     if (!this.root.classList.contains('show')) return;
     this.root.classList.add('out');
+    if (this.art) this.art.covers = false; // (the 3D world draws again under the fade)
     clearTimeout(this._t);
-    this._t = setTimeout(() => this.root.classList.remove('show', 'out'), 900);
+    this._t = setTimeout(() => { this.root.classList.remove('show', 'out'); this.art?.stop(); }, 900);
   }
 }

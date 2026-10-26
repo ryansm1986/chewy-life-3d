@@ -80,6 +80,7 @@ import { installShadowLead } from './actors/shadowLead.js'; // (Shadow leads the
 import { installCoop } from './coop/coop.js'; // (couch co-op: 2-4 controllers, docs/COOP.md)
 import { importWithRetry, reloadOnce, chunksLoaded, showLoadError } from './core/chunkRetry.js';
 import { InteractShine } from './gfx/interactShine.js';
+import { Opening } from './world/opening.js'; // (a new game's cinematic: ROADMAP CN-1)
 
 // UI and audio load in parallel with the world. The import() paths must be literal so Vite bundles them for the
 // production build (a variable path with @vite-ignore worked on the dev server but 404'd in dist: no UI, no sound).
@@ -840,7 +841,8 @@ export async function boot() {
       continue: () => { const n = lastSlot(); if (n) play(n); },
       remove: n => deleteSlot(n),
     });
-  } else if (skip === 'new' || (P.has('fresh') && !P.has('floor') && !P.has('region') && !P.has('nointro'))) setTimeout(() => intro(), 1200);
+  } else if (skip === 'new' && !P.has('nocine') || P.has('cine')) setTimeout(() => opening(), 30); // (a New Game from the title: the cinematic, then Rosie)
+  else if (skip === 'new' || (P.has('fresh') && !P.has('floor') && !P.has('region') && !P.has('nointro'))) setTimeout(() => intro(), 1200);
   function startGame(isNew) {
     const go = () => {
       G.titleActive = false; player.controlLocked = false;
@@ -848,40 +850,77 @@ export async function boot() {
       rig.yawTarget = Math.PI / 4; rig.yaw = rig.yawTarget; rig.distTarget = 22;
       rig.focus.copy(player.pos); rig.snap();
       G.audio?.music?.(day.isNight() ? 'village_night' : 'village_day');
-      if (isNew) setTimeout(() => intro(), 900);
+      if (isNew) setTimeout(() => opening(), 30);
     };
     if (G.ui?.transition) G.ui.transition(go); else go();
   }
-  async function intro() {
-    if (!G.ui?.dialogue) return;
-    const rosie = npcs[0];
-    player.controlLocked = true;
-    rosie.talking = true; rosie.state = 'idle';
-    // side by side across the screen, both turned a little toward the camera so faces read, with Shadow in front of the
-    // pair. Pick the nearest spot where all three stand on open ground: no benches, lamps, walls or trees in the shot.
-    { const { f, r } = rig.groundAxes();
-      const clear = (x, z, rad) => {
+  // the opening (world/opening.js): Chewy and Shadow on their intro spots, the shots, the camera's push in to Chewy;
+  // then the intro with Rosie trotting in
+  async function opening() {
+    if (!G.ui?.dialogue || !G.world?.terrain) { intro(); return; }
+    player.controlLocked = true; player.moveTarget = null;
+    rig.yaw = rig.yawTarget = Math.PI / 4; // (the spots are laid out across the game camera's screen)
+    const spots = introSpots(), cy = Math.PI / 4;
+    player.setPos(spots.chewy.x, spots.chewy.z); player.faceTo(spots.chewy.x + Math.sin(cy) * 5, spots.chewy.z + Math.cos(cy) * 5); player.facing = player.faceTarget; // (toward the camera)
+    shadow.setPos(spots.shadow.x, spots.shadow.z); shadow.hold = { x: spots.shadow.x, z: spots.shadow.z, face: spots.face };
+    G.opening = new Opening(G);
+    await G.opening.play({ at: spots.chewy });
+    intro({ spots, walkIn: true });
+  }
+  /** where Chewy, Rosie and Shadow stand for Rosie's welcome: side by side across the screen, both turned a little toward
+   *  the camera so faces read, with Shadow in front of the pair; the nearest spot where all three stand on open ground
+   *  (no benches, lamps, walls or trees in the shot) and no tree's crown between them and the game camera (the opening
+   *  ends close on Chewy: a crown in the way would be a big x-rayed blob) */
+  function introSpots() {
+    const { f, r } = rig.groundAxes();
+    const veg = []; G.world.scene.traverse(o => { if (o.visible && /^veg:/.test(o.name || '') && (o.isMesh || o.isBatchedMesh)) veg.push(o); });
+    const ray = new THREE.Raycaster(), up = new THREE.Vector3(Math.sin(Math.PI / 4) * Math.cos(0.62), Math.sin(0.62), Math.cos(Math.PI / 4) * Math.cos(0.62)); ray.far = 26;
+    const seen = p => { for (const y of [0.5, 1.2]) { ray.set(new THREE.Vector3(p.x, G.world.terrain.heightAt(p.x, p.z) + y, p.z), up); if (ray.intersectObjects(veg, false).length) return false; } return true; };
+    const clear = (x, z, rad) => {
         for (let a = 0; a < 8; a++) for (const d of [0, rad * 0.5, rad]) {
           const px = x + Math.cos(a * 0.785) * d, pz = z + Math.sin(a * 0.785) * d;
           if (!G.world.walkable(px, pz) || G.world.collision.solidAt(px, pz, 0.1) || G.sim.buildingAt(px, pz)) return false;
         }
-        return true;
-      };
-      const spots = (c) => ({ chewy: c.clone().addScaledVector(r, -0.8), rosie: c.clone().addScaledVector(r, 0.8).addScaledVector(f, 0.35), shadow: c.clone().addScaledVector(f, -1.0) });
-      let best = null;
-      for (let ring = 0; ring <= 8 && !best; ring++) for (let k = 0; k < Math.max(1, ring * 6) && !best; k++) {
-        const a = k / Math.max(1, ring * 6) * Math.PI * 2, c = player.pos.clone().add(new THREE.Vector3(Math.cos(a) * ring * 0.9, 0, Math.sin(a) * ring * 0.9));
-        const s = spots(c);
-        if (clear(s.chewy.x, s.chewy.z, 1.1) && clear(s.rosie.x, s.rosie.z, 1.1) && clear(s.shadow.x, s.shadow.z, 0.8)) best = s;
-      }
-      best ||= spots(player.pos.clone().addScaledVector(r, 0.8));
-      player.setPos(best.chewy.x, best.chewy.z); rosie.setPos(best.rosie.x, best.rosie.z);
-      shadow.setPos(best.shadow.x, best.shadow.z); shadow.hold = { x: best.shadow.x, z: best.shadow.z, face: Math.atan2(-f.x, -f.z) }; }
+      return true;
+    };
+    const spots = (c) => ({ chewy: c.clone().addScaledVector(r, -0.8), rosie: c.clone().addScaledVector(r, 0.8).addScaledVector(f, 0.35), shadow: c.clone().addScaledVector(f, -1.0) });
+    let best = null, open = null;
+    for (let ring = 0; ring <= 10 && !best; ring++) for (let k = 0; k < Math.max(1, ring * 6) && !best; k++) {
+      const a = k / Math.max(1, ring * 6) * Math.PI * 2, c = player.pos.clone().add(new THREE.Vector3(Math.cos(a) * ring * 0.9, 0, Math.sin(a) * ring * 0.9));
+      const s = spots(c);
+      if (!(clear(s.chewy.x, s.chewy.z, 1.1) && clear(s.rosie.x, s.rosie.z, 1.1) && clear(s.shadow.x, s.shadow.z, 0.8))) continue;
+      open ||= s; // (the nearest open ground, if no spot has a clear view)
+      if (seen(s.chewy) && seen(s.rosie)) best = s;
+    }
+    best ||= open || spots(player.pos.clone().addScaledVector(r, 0.8));
+    // (from: where Rosie comes trotting in from after the opening, off the side of the close shot on open ground)
+    best.from = null;
+    for (const d of [6.5, 7.5, 5.5, 4.5, 3.6]) for (const b of [0.8, -0.8, 2]) { const p = best.rosie.clone().addScaledVector(r, d).addScaledVector(f, b); if (!best.from && clear(p.x, p.z, 0.45)) best.from = p; }
+    best.face = Math.atan2(-f.x, -f.z);
+    return best;
+  }
+  async function intro({ spots = null, walkIn = false } = {}) {
+    if (!G.ui?.dialogue) return;
+    const rosie = npcs[0];
+    player.controlLocked = true;
+    rosie.state = 'idle';
+    const best = spots || introSpots();
+    player.setPos(best.chewy.x, best.chewy.z);
+    shadow.setPos(best.shadow.x, best.shadow.z); shadow.hold = { x: best.shadow.x, z: best.shadow.z, face: best.face };
+    if (walkIn && best.from) { // (after the opening: she trots up from the side, and Chewy turns to her)
+      rosie.setPos(best.from.x, best.from.z); rosie.frozen = true; rosie.talking = false; rosie.visible = true;
+      G.introFocus = player.pos.clone().lerp(best.rosie, 0.5); rig.distTarget = 20;
+      G.opening?.settle(G.introFocus, 20, 2.6); // (a slow pull back to the two of them as she comes)
+      await new Promise(res => { rosie.scriptWalk = { x: best.rosie.x, z: best.rosie.z, speed: 2.6, t: 0, done: res }; setTimeout(res, 4000); });
+      rosie.scriptWalk = null; rosie.frozen = false;
+    }
+    rosie.talking = true;
+    rosie.setPos(best.rosie.x, best.rosie.z);
     rosie.faceTo(player.pos.x, player.pos.z); player.faceTo(rosie.pos.x, rosie.pos.z);
     rosie.faceBias = 0.5; player.faceTarget -= 0.5; player.facing = player.faceTarget;
     rosie.anim.play('wave'); G.vfx.emote(rosie, 'heart', 2.2);
     // frame both of them
-    const prevDist = rig.distTarget; G.introFocus = player.pos.clone().lerp(rosie.pos, 0.5); rig.distTarget = 20;
+    const prevDist = walkIn ? 22 : rig.distTarget; G.introFocus = player.pos.clone().lerp(rosie.pos, 0.5); rig.distTarget = 20;
     const pr = G.portrait('rosie');
     await G.ui.dialogue({ speaker: 'Rosie', portrait: pr, lines: ["Good morning, Chewy! ♡ Did you sleep well? Shadow did. He snored like a tiny tractor.", "Welcome to *Blossom Hollow*! The sakura are blooming and everyone is so happy you're here."] });
     await G.ui.dialogue({ speaker: 'Rosie', portrait: pr, lines: ['Walk with *WASD* or click the ground, and hold *Shift* to sprint. Press *F* near friends to chat.', 'Press *B* to plan the village — paint zones for homes, shops and workshops, then watch it grow!', "And… there's something squeaky in *the Burrow* on the shrine hill. Take your Bone Katana — and your red tennis ball!", "Some folks march into the Burrow with a sword. Others send a friend with a packed lunch and keep the kettle on. Both help!"] }); // (the cozy path's line: docs/COZY.md §11)
@@ -964,6 +1003,7 @@ export async function boot() {
       G.life?.fishing?.frameFocus?.(rig.focus); // (fishing: the camera leans toward the float, life/fishing.js)
     }
     if (G.mode === 'interior') { if (!G.decorFocus) G.housing.biasFocus(rig.focus); G.housing.clampFocus(rig.focus, G.decorFocus ? -1.2 : 1.2); } // (the camera leans to the back walls and stays over the room)
+    if (G.opening?.active || G.opening?.settling) G.opening.frame(rig, rdt); // (the opening's camera: world/opening.js)
     rig.update(dt);
     updateOcclusion();
     updateHero(rdt);
@@ -994,7 +1034,7 @@ export async function boot() {
     hints(rdt);
     G.audio?.update?.(dt, { pos: player.pos, camera: engine.camera });
     G.ui?.update?.(rdt);
-    engine.render();
+    if (!(G.titleActive && G.ui?.titleScreen?.art?.covers)) engine.render(); // (the title's painting covers the screen: no 3D to draw under it)
     Input.endFrame();
     if (fpsEl) { fpsEl.style.display = fpsOn ? '' : 'none'; fpsAcc += dt; fpsN++; if (fpsAcc > 0.5) { fpsEl.textContent = `${Math.round(fpsN / fpsAcc)} fps`; fpsAcc = 0; fpsN = 0; } }
     requestAnimationFrame(frame);

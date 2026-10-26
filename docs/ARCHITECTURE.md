@@ -923,6 +923,47 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
 - **Meshes that visit combat worlds** (the float, line, catch, ice hole, campfire, stove pot) use their own materials,
   never the village's shared `MATS()`, because a combat world's teardown disposes what it finds.
 
+## The title painting (src/ui/titleArt.js, tools/title/ — ROADMAP TA-1)
+- **The art**: a storybook painting by Codex (`--kind art`, the codex-blender runner: Chewy and Shadow on a hill under a
+  cherry tree, Blossom Hollow and the sea at sunrise), the owner's pick of three directions (2026-10-25). The source is
+  `tools/title/painting.png` (1536 × 1024); `python tools/title/build-mask.py tools/title/painting.png` writes the game's
+  `public/title/painting.jpg` and `public/title/mask.png` (half size, RGB: **R** the water, **G** what the wind moves —
+  the crown's blossoms, the near grass — **B** the sky and the valley's mist; the friends are a hole: they never warp).
+- **Brought to life** in one WebGL pass (`TitleArt`, its own small canvas, `.ti-art`, first in the title): cover-fit on
+  `FOCUS`, a slow push in and out (36 s), ripples and the sun's glitter road on the water (`SUN`), gusts in the tree and
+  the grass, the clouds breathing, the mist drifting, and **blinks**: a painted lid over each eye (`EYES`, measured on
+  the painting: centre, half-size, the fur's colour, a tilt), every 2.4–6 s, sometimes twice. The title's CSS petals fall
+  over it, and with the art more blow off the tree (`.pt.bl`, a few big soft ones near us).
+- **While it covers the screen** (`art.covers`) game.js skips `engine.render()`: no 3D world under it. Hiding the title
+  clears `covers` at once (the world draws under the fade) and stops the loop after it.
+- The logo's two portraits step aside (`.title.has-art`). On a phone the logo and a 2 × 2 menu move right of the friends.
+- **Reduce motion**: still (the blinks stay). **No WebGL**: the still painting as the title's CSS background.
+- QA: `tools/qa/s55-title-art.mjs`; shots `node tools/qa/title-art-shots.mjs [w] [h]` (a blink held shut: `art.holdShut`),
+  a clip `node tools/qa/title-art-video.mjs [s]` (frame by frame, 30 fps → `tools/qa/tmp/title-art/title.webm`).
+
+## The opening (src/world/opening.js + opening.css — ROADMAP CN-1)
+- **When**: a New Game from the title (`sessionStorage chewy3d.skipTitle = 'new'`), or `?cine` in any fresh session.
+  `?nocine` turns it off; the QA's own `?fresh` sessions don't get it (Rosie's welcome starts as before).
+- **What**: letterbox bars, the HUD, world labels, toasts and touch controls away (`.ui-root.cine`), three shots of
+  the island on its own morning: the shrine hill's maples to the torii (a slow drift), the pond park (a slow arc), the
+  town high over the plaza with the "Welcome to Blossom Hollow" card, then one long crane down and push in to Chewy,
+  who yawns and stretches as it arrives. About 22 s. Dips to black between shots.
+- **The camera** is the game's own rig: each frame (game.js, before `rig.update`) the shot sets the rig's target, yaw,
+  pitch, distance and the lens (keys `{ t, x, y, z, yaw, pitch, dist, fov }`, a Hermite per channel, the distance in log
+  space; still at both ends). The last key is the game camera itself (yaw π/4, pitch 0.62, lens 20°) at 10.5 m, so
+  the hand-off is seamless; `settle()` then eases out to the intro's two-shot over 2.6 s (the rig's own easing would
+  snap back from the close-up in half a second) while Rosie trots in from the side (`intro({ walkIn })`).
+- **The spot**: `introSpots()` (game.js) now also wants no tree crown between Chewy, Rosie and the game camera (a ray
+  against the `veg:*` BatchedMeshes): a crown in the way of the close-up would be a big x-rayed blob. Rosie's welcome
+  without the opening uses the same spot.
+- **Quiet**: `G.cutscene = 'opening'` while it plays (the guides, quest cards, place titles, arrivals and the autosave
+  wait; the place title also waits through the intro now), `player.controlLocked`.
+- **Skip**: Esc, Enter, Space, a click or tap, the pad's A, B or Start (a capture-phase key listener: Esc never opens
+  the menu under it): a 0.3 s dip to black, then the last frame. The hint ("Skip Esc" / "Skip A" / "Skip Tap") comes
+  up after 1.6 s in the bottom bar.
+- QA: `tools/qa/s54-opening.mjs`; the filmstrip `node tools/qa/opening-shots.mjs [w] [h]` (each shot frozen on its
+  moments, `op.hold`) → `tools/qa/tmp/opening/sheet.png`.
+
 ## Guided tutorials (src/world/tutorials.js + guides.js, src/ui/tutorial.js — design: docs/TUTORIALS.md)
 - `G.tutorials` runs one guide at a time. A guide is a list of steps (say / objective / target / highlight /
   callouts / flash / waitFor / done / on / allow). The step's world target becomes `G.questTarget` (3D arrow, edge

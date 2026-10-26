@@ -173,6 +173,19 @@
 /* ---------------------------------------------------------------- title */
 .title { position: absolute; inset: 0; display: none; pointer-events: auto; overflow: hidden; }
 .title.show { display: block; }
+.ti-art { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity .9s ease; } /* (the animated painting: ui/titleArt.js) */
+.ti-art.ready { opacity: 1; }
+.title.has-art .ti-chewy, .title.has-art .ti-shadow { display: none; }
+.ti-blown { display: none; }
+.title.has-art .ti-blown { display: contents; }
+/* (blown off the painting's cherry tree: out of the crown, across and down on the wind, turning; fading in and out) */
+.pt.bl { animation: blown var(--d) cubic-bezier(.3, .1, .6, 1) var(--dl) infinite; opacity: 0; }
+.pt.bl.near { filter: blur(1.6px); }
+@keyframes blown { 0% { opacity: 0; transform: translate(0, 0) rotate(var(--r)) scale(.7); } 8% { opacity: .95; }
+  35% { transform: translate(calc(var(--dx) * .3), calc(var(--dy) * .22)) rotate(calc(var(--r) + 140deg)) scale(1); }
+  70% { transform: translate(calc(var(--dx) * .68), calc(var(--dy) * .6)) rotate(calc(var(--r) + 260deg)) scale(.95); }
+  88% { opacity: .9; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(calc(var(--r) + 380deg)) scale(.9); } }
+@media (prefers-reduced-motion: reduce) { .pt.bl { animation: none; display: none; } }
 .ti-vig { position: absolute; inset: 0; background: radial-gradient(ellipse 70% 65% at 50% 45%, rgba(255, 246, 232, 0) 35%, rgba(90, 40, 70, .38) 100%), linear-gradient(rgba(255, 214, 230, .28), transparent 35%, transparent 70%, rgba(74, 44, 42, .28)); animation: fadeIn 1.2s both; }
 .ti-petals { position: absolute; inset: 0; pointer-events: none; }
 .pt { position: absolute; top: -40px; width: calc(20px * var(--s)); height: calc(15px * var(--s)); border-radius: 100% 0 100% 0; background: linear-gradient(135deg, #ffe0ec, #ff9fc0); opacity: .92;
@@ -197,11 +210,10 @@
 .ti-spark { position: absolute; width: 38px; height: 38px; color: #fff3a0; animation: twinkle 1.8s ease-in-out infinite; filter: drop-shadow(0 0 6px rgba(255, 240, 150, .9)); z-index: 3; }
 .ti-spark .gl { width: 100%; height: 100%; }
 .ti-spark.s1 { left: 57%; top: 2px; } .ti-spark.s2 { right: 16%; top: 4px; width: 26px; height: 26px; animation-delay: .6s; } .ti-spark.s3 { left: 22%; bottom: -10px; width: 34px; height: 34px; animation: spinSlow 6s linear infinite; filter: none; }
-.ti-paws { position: relative; width: 520px; height: 34px; margin-top: 14px; }
+.ti-paws { position: relative; width: 520px; height: 34px; margin: 14px 0 26px; }
 .ti-paws i { position: absolute; width: 24px; height: 24px; color: rgba(255, 246, 232, .95); filter: drop-shadow(0 2px 0 rgba(74, 44, 42, .6)); opacity: 0; animation: pawStep 5s linear infinite; animation-delay: calc(1.6s + var(--i) * .28s); }
 .ti-paws i .gl { width: 100%; height: 100%; }
 @keyframes pawStep { 0% { opacity: 0; scale: .3; } 3% { opacity: 1; scale: 1.25; } 6% { scale: 1; } 50% { opacity: 1; } 62%, 100% { opacity: 0; } }
-.ti-sub { font: 700 27px/1.2 var(--font); color: #fff; -webkit-text-stroke: 7px var(--ink); paint-order: stroke fill; text-shadow: 0 4px 0 var(--ink); margin: 4px 0 28px; letter-spacing: .5px; animation: fadeUp .9s 1.15s both; }
 .ti-btns { display: flex; flex-direction: column; gap: 14px; width: 310px; }
 .ti-btns .btn { justify-content: center; font-size: 23px; padding: 14px 26px; animation: btnIn .7s var(--pop) both; }
 .ti-btns .btn:nth-child(1) { animation-delay: 1.4s; } .ti-btns .btn:nth-child(2) { animation-delay: 1.52s; } .ti-btns .btn:nth-child(3) { animation-delay: 1.64s; }

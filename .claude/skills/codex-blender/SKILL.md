@@ -23,6 +23,7 @@ Everything lives in the repo:
 | The Blender contract every builder follows (conventions, deliverables, style) | `.claude/skills/codex-blender/templates/codex-preamble.md` |
 | The Opus builder prompt (fill it in; for props, swap the character references in "Read first") | `.claude/skills/toybox-character/templates/opus-builder.md` |
 | Contract for concept sheets (`--kind concept`: image generation, model-sheet rules) | `.claude/skills/codex-blender/templates/concept-preamble.md` |
+| Contract for finished game art (`--kind art`: title screens, key art, UI pictures; on-model, no text, cut-outs) | `.claude/skills/codex-blender/templates/art-preamble.md` |
 | Brief template you fill in | `.claude/skills/codex-blender/templates/brief.md` |
 | Standard preview renderer (same angles and lights every time) | `tools/blender/codex/preview.py` |
 | Task folders (git-ignored) | `tools/blender/work/codex/<task>/` |
@@ -64,6 +65,10 @@ node .claude/skills/codex-blender/scripts/codex-blender.mjs start --kind concept
 - The picked sheet becomes the blueprint of the modelling task: copy it to `<task>/refs/sheet.png` for the Opus builder.
   Its proportions and hex swatches go straight into the model brief.
 - The runner's `--kind model` mode (Codex building in Blender) is **retired**: don't use it.
+- **Finished art** (not model sheets): `--kind art` with `templates/art-preamble.md`. Name the files, sizes and empty
+  space for the game's text in the brief; attach the characters' model sheets as the law. Mock each option into the real
+  screen before the owner picks (the title: `tools/qa/title-mock.mjs`). An edit round ("change only Chewy") keeps the
+  picture close, not identical: diff it against the original. First use: the title painting (ROADMAP TA-1).
 - Codex CLI 0.159+ is needed for `gpt-6.1-sol`. The runner uses the global `codex` if it's new enough, and otherwise
   `npx -y @openai/codex@latest`, which is slower to start. `npm i -g @openai/codex@latest` fixes that. `CODEX_BIN`
   overrides both. Run it with `run_in_background: true` and wait for the notification.

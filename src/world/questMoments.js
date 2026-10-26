@@ -236,6 +236,7 @@ export class QuestMoments {
     const G = this.G, ui = G.ui; if (!ui?.ready || G.titleActive || G.playerDead) return 'busy';
     if (ui.iris?.active || G.leavingDungeon) return 'transition'; // (behind a transition: when it opens)
     if (ui.dlg?.active) return 'dialogue';
+    if (G.cutscene || G.introFocus) return 'scene'; // (the opening and Rosie's welcome: world/opening.js, game.js intro)
     if (ui.isOpen?.('burrow') || ui.anyModal?.()) return 'panel'; // (never over a dialogue, the den picker or a panel)
     const L = ui.banners?.live; return L?.style === 'boss' || L?.style === 'victory' ? 'boss' : null; // (never over a boss's card or its Victory)
   }

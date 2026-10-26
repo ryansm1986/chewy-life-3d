@@ -69,7 +69,9 @@ try {
   // ---------------------------------------------------------------- c) it plays, on a pad
   await page.evaluate(() => document.querySelector('.l-title [data-a="newGame"]')?.click());
   await page.waitForFunction(() => window.G && !window.G.titleActive && window.G.mode === 'village' && window.G.ui && !window.G.ui.iris?.active, null, { timeout: 60000 }).catch(() => {});
-  await page.waitForTimeout(2500);
+  await page.waitForFunction(() => !!window.G.opening, null, { timeout: 10000 }).catch(() => {}); // (a New Game's opening: world/opening.js; Esc skips it)
+  for (let i = 0; i < 10 && await page.evaluate(() => !!window.G.opening?.active); i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(400); }
+  await page.waitForFunction(() => window.G.ui.dlg?.active, null, { timeout: 15000 }).catch(() => {});
   for (let i = 0; i < 30 && await page.evaluate(() => window.G.ui.dlg?.active); i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(250); } // (the intro's lines)
   const pads0 = await page.evaluate(() => { try { return [...navigator.getGamepads()].filter(Boolean).map(p => p.id); } catch (e) { return 'threw: ' + e.message; } });
   const focus = { doc: await page.evaluate(() => document.hasFocus() && document.visibilityState), win: (await winState(app)).focused };

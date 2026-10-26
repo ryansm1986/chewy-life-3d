@@ -60,11 +60,13 @@ try {
     // with a save, New Game opens the save-slot picker (SL-1, ui/title.js): an empty slot's New Game
     await page.evaluate(() => { const b = document.querySelector('.sl-card.empty [data-s="new"]'); b?.click(); }).catch(() => {}); // (the reload can tear the evaluate down)
     await page.waitForFunction(() => window.__ready === true && window.G?.player && !window.G.titleActive, null, { timeout: 60000 }).catch(() => {});
-    await sleep(page, 2500);
-    const intro = await page.evaluate(() => ({ dlg: window.G.ui.dlg.active, speaker: window.G.ui.dlg.active && window.G.ui.dlg.opts.speaker, locked: window.G.player.controlLocked, coins: window.G.state.coins, lvl: window.G.state.player.lvl }));
+    // the opening plays first (world/opening.js, ~22 s): the shots, then Rosie trots in and her welcome starts
+    const op = await page.waitForFunction(() => window.G.opening?.active && window.G.cutscene === 'opening' && window.G.ui.root.classList.contains('cine'), null, { timeout: 15000 }).then(() => true).catch(() => false);
+    await page.waitForFunction(() => window.G.ui.dlg.active, null, { timeout: 60000 }).catch(() => {});
+    const intro = await page.evaluate(op => ({ op, opDone: !window.G.opening?.active && !window.G.cutscene, dlg: window.G.ui.dlg.active, speaker: window.G.ui.dlg.active && window.G.ui.dlg.opts.speaker, locked: window.G.player.controlLocked, coins: window.G.state.coins, lvl: window.G.state.player.lvl }), op);
     await drainDialogue(page); await sleep(page, 600); await drainDialogue(page); await sleep(page, 400);
     const post = await page.evaluate(() => ({ locked: window.G.player.controlLocked, dlg: window.G.ui.dlg.active, active: window.G.state.quests.active.map(q => q.id) }));
-    R.check('New Game -> fresh state + Rosie intro, controls unlocked afterwards', intro.dlg && intro.speaker === 'Rosie' && intro.lvl === 1 && !post.locked && !post.dlg, JSON.stringify({ intro, post }));
+    R.check('New Game -> the opening (the shots, the bars, the HUD away), then a fresh state + Rosie intro, controls unlocked afterwards', intro.op && intro.opDone && intro.dlg && intro.speaker === 'Rosie' && intro.lvl === 1 && !post.locked && !post.dlg, JSON.stringify({ intro, post }));
   } else R.note('no New Game button');
 } catch (e) { errors.push('[harness] ' + e.stack); }
 const failed = R.finish(errors, warns);

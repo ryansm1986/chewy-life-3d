@@ -127,6 +127,8 @@ try {
   await page.evaluate(() => window.G.ui.close('menu'));
   await page.evaluate(() => document.querySelector('.l-title [data-a="newGame"]')?.click());
   await page.waitForFunction(() => window.__ready === true && window.G && !window.G.titleActive && window.G.mode === 'village', null, { timeout: 90000 });
+  for (let i = 0; i < 10 && await page.evaluate(() => !!window.G.opening?.active); i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(400); } // (the opening: world/opening.js)
+  await page.waitForFunction(() => window.G.ui.dlg?.active, null, { timeout: 15000 }).catch(() => {});
   for (let i = 0; i < 30 && await page.evaluate(() => window.G.ui.dlg?.active); i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(200); }
   const XP = await page.evaluate(() => { window.G.state.player.xp += 13; window.G.save(); localStorage.setItem('pawhaven.qa.marker', 'still here'); return window.G.state.player.xp; });
   const settings0 = await page.evaluate(() => localStorage.getItem('chewy3d.settings') || localStorage.getItem('chewy3d.ui') || '');

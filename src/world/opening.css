@@ -1,0 +1,34 @@
+/* The opening (world/opening.js): letterbox bars, the dip to black between shots, the title card, the skip hint. While
+   it plays the root carries .cine: the HUD, the world labels and the toasts step away. */
+.ui-root.cine :is(.l-hud, .l-world, .l-msg, .l-touch) { opacity: 0; pointer-events: none; }
+.ui-root.cine-out :is(.l-hud, .l-world, .l-msg, .l-touch) { transition: opacity 1s ease .85s; } /* (coming back as the bars go) */
+.op { position: absolute; inset: 0; z-index: 40; pointer-events: auto; cursor: default; overflow: hidden; }
+.op.out { pointer-events: none; }
+.op-bar { position: absolute; left: 0; right: 0; height: 11.5vh; background: #0b0710; z-index: 2; transition: transform 1.1s cubic-bezier(.6, 0, .3, 1); }
+.op-bar.t { top: 0; } .op-bar.b { bottom: 0; }
+.op.out .op-bar.t { transform: translateY(-101%); } .op.out .op-bar.b { transform: translateY(101%); }
+.op-black { position: absolute; inset: 0; background: #0b0710; opacity: 1; z-index: 1; }
+/* the title: a storybook card over the town shot */
+.op-title { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 4px; zoom: var(--ui-scale, 1); pointer-events: none; text-align: center; }
+.op-title small { font: 700 28px/1 var(--font); letter-spacing: .32em; text-transform: uppercase; color: #fff8ee; text-shadow: 0 2px 0 rgba(74, 44, 42, .55), 0 0 18px rgba(74, 44, 42, .45); opacity: 0; transform: translateY(10px); transition: opacity 1s ease, transform 1.4s cubic-bezier(.2, .8, .3, 1); }
+.op-title b { display: flex; font: 700 104px/1.05 var(--font); color: #fff3f6; -webkit-text-stroke: 12px #4a2c2a; paint-order: stroke fill; text-shadow: 0 9px 0 #4a2c2a, 0 18px 40px rgba(40, 16, 30, .45); white-space: nowrap; }
+.op-title b span { display: inline-block; opacity: 0; transform: translateY(26px) scale(.9); transition: opacity .8s ease, transform 1.1s cubic-bezier(.25, 1.5, .5, 1); transition-delay: calc(.25s + var(--i) * .055s); }
+.op-title em { font: 700 30px/1.2 var(--font); font-style: normal; color: #fff8ee; -webkit-text-stroke: 6px #4a2c2a; paint-order: stroke fill; text-shadow: 0 3px 0 #4a2c2a, 0 0 18px rgba(40, 16, 30, .5); opacity: 0; transition: opacity 1.2s ease 1.15s; margin-top: 12px; }
+/* (a soft shade behind the card, so it reads over a busy town) */
+.op-title::before { content: ''; position: absolute; left: -18%; right: -18%; top: -40%; bottom: -40%; z-index: -1; background: radial-gradient(closest-side, rgba(40, 16, 30, .34), rgba(40, 16, 30, 0)); opacity: 0; transition: opacity 1.2s ease; }
+.op.titled .op-title::before { opacity: 1; }
+.op.titled .op-title small { opacity: 1; transform: none; }
+.op.titled .op-title b span { opacity: 1; transform: none; }
+.op.titled .op-title em { opacity: 1; }
+/* (going: everything fades together, quickly) */
+.op:not(.titled) .op-title small, .op:not(.titled) .op-title b span, .op:not(.titled) .op-title em { transition-duration: .7s; transition-delay: 0s; }
+/* the skip hint: quiet, bottom right, inside the bar */
+.op-skip { position: absolute; right: 3vw; bottom: calc(11.5vh / 2); transform: translateY(50%); z-index: 4; display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 14px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .08);
+  color: rgba(255, 246, 236, .78); font: 600 16px/1 var(--font); letter-spacing: .04em; opacity: 0; transition: opacity .8s ease, background .2s; cursor: pointer; zoom: var(--ui-scale, 1); }
+.op-skip kbd { font: 700 13px/1 var(--font); padding: 4px 8px; border-radius: 7px; border: 1.5px solid rgba(255, 246, 236, .5); }
+.op-skip:hover { background: rgba(255, 255, 255, .16); }
+.op.hint .op-skip { opacity: 1; }
+.op.out .op-skip { opacity: 0; transition-duration: .3s; }
+.ui-root.m-phone .op-title b { font-size: 78px; -webkit-text-stroke-width: 10px; }
+.ui-root.m-phone .op-skip { font-size: 18px; min-height: 44px; }
+@media (prefers-reduced-motion: reduce) { .op-title b span { transition-delay: 0s; transform: none; } }

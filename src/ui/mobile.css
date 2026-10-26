@@ -177,9 +177,13 @@ body.touch-active .ch-pts .tt-dim { display: none; }
 /* a phone's title: the logo a little smaller, the three buttons in a row under it */
 .ui-root.m-phone .ti-center { top: 47%; }
 .ui-root.m-phone .ti-logo { zoom: .78; }
-.ui-root.m-phone .ti-sub { margin: 2px 0 16px; font-size: 24px; }
+.ui-root.m-phone .ti-paws { margin-bottom: 14px; }
 .ui-root.m-phone .ti-btns { flex-direction: row; width: auto; gap: 12px; }
 .ui-root.m-phone .ti-btns .btn { padding: 12px 22px; font-size: 21px; }
+/* (the title's painting, ui/titleArt.js: Chewy and Shadow sit low on the left, so on a phone the logo and a 2 × 2 menu move right of them) */
+.ui-root.m-phone .title.has-art .ti-center { left: 61%; }
+.ui-root.m-phone .ti-bsub { font-size: 15px; } /* (Continue's sub-line, "Adventure 1 · Chewy, level 12": the 12 px floor under the phone's zoom) */
+.ui-root.m-phone .title.has-art .ti-btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
 .ui-root.m-phone .ti-foot { bottom: calc(var(--sa-b, 0px) / var(--m-pscale) + 6px); }
 .ui-root.m-phone .ti-slots { zoom: calc(var(--m-pscale) * .8); gap: 10px; }
 .ui-root.m-phone :is(.sl-face, .sl-team) { display: none; }

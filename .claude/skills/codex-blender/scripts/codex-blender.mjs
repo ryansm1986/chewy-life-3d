@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Run a Blender asset task on the Codex CLI (GPT-6.1-Sol by default), directed by Claude.
 //
-//   node .claude/skills/codex-blender/scripts/codex-blender.mjs start  --task NAME --brief BRIEF.md [--kind model|concept] [--image REF.png]... [--effort high] [--model gpt-6.1-sol]
+//   node .claude/skills/codex-blender/scripts/codex-blender.mjs start  --task NAME --brief BRIEF.md [--kind model|concept|art] [--image REF.png]... [--effort high] [--model gpt-6.1-sol]
 //   node .claude/skills/codex-blender/scripts/codex-blender.mjs resume --task NAME --message FEEDBACK.md [--image SHOT.png]...
 //   node .claude/skills/codex-blender/scripts/codex-blender.mjs status --task NAME
 //
@@ -12,6 +12,7 @@
 // --kind concept: Codex generates model-sheet images with its image-generation tool, working from
 // templates/concept-preamble.md, instead of Blender files. The images land in NAME/concepts/; everything the
 // thread generated is also copied from Codex's generated_images folder, as a fallback.
+// --kind art: the same, for finished illustrations (title screens, key art, UI art), from templates/art-preamble.md.
 // Codex runs in the workspace-write sandbox (the unelevated Windows variant). Its working root is the task folder,
 // and public/models/ is its only other writable folder. It can read the whole repo.
 import { spawn, spawnSync } from 'node:child_process';
@@ -77,14 +78,16 @@ if (cmd === 'start') {
   if (readSess()) die(`task ${opt.task} already has a session: use resume (or delete ${dir} to start over)`);
   const brief = fill(fs.readFileSync(opt.brief, 'utf8'));
   fs.writeFileSync(path.join(dir, 'brief.md'), brief);
-  if (opt.kind && !['model', 'concept'].includes(opt.kind)) die('--kind model | concept');
-  const pre = fill(fs.readFileSync(path.join(SKILL, opt.kind === 'concept' ? 'templates/concept-preamble.md' : 'templates/codex-preamble.md'), 'utf8'));
+  if (opt.kind && !['model', 'concept', 'art'].includes(opt.kind)) die('--kind model | concept | art');
+  const pre = fill(fs.readFileSync(path.join(SKILL, { concept: 'templates/concept-preamble.md', art: 'templates/art-preamble.md' }[opt.kind] || 'templates/codex-preamble.md'), 'utf8'));
   prompt = pre + '\n\n---\n\n# The brief\n\n' + brief;
 } else {
   if (!readSess()) die('no session for task ' + opt.task + ': use start');
   if (!opt.message || !fs.existsSync(opt.message)) die('--message FILE (the director\'s feedback)');
+  const drawn = ['concept', 'art'].includes(readSess()?.kind); // (image tasks: no Blender files to re-export)
   prompt = '# Feedback from the director (round ' + n + ')\n\n' + fill(fs.readFileSync(opt.message, 'utf8')) +
-    '\n\nApply it, re-export, re-render the preview, look at it yourself, and update report.md. End with the same report format as before.';
+    (drawn ? '\n\nApply it: regenerate the images it asks for, copy them into concepts/ under the names it gives, look at them yourself, and update notes.md. End with the same report format as before.'
+      : '\n\nApply it, re-export, re-render the preview, look at it yourself, and update report.md. End with the same report format as before.');
 }
 for (const im of opt.images) if (!fs.existsSync(im)) die('image not found: ' + im);
 fs.writeFileSync(path.join(dir, `prompt-${n}.md`), prompt);
