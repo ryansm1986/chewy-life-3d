@@ -32,6 +32,7 @@ export const RECIPES = {
   melonBread: { ing: [{ k: 'melon', n: 1 }, { k: 'honey', n: 1 }], at: ['oven'], learn: { from: 'pan', hearts: 3 } },
   sushiPlatter: { ing: [{ k: 'rice', n: 1 }, { k: 'fish', n: 3 }], at: ['kitchen'], learn: { from: 'mochi', hearts: 3, request: 'mochi' } },
   fishermansFeast: { ing: [{ k: 'fish', n: 2 }, { k: 'rice', n: 1 }, { k: 'daikon', n: 1 }], at: ['kitchen'], learn: { request: 'tanu', book: 600, rank: 3 } },
+  greenTea: { ing: [{ k: 'bamboo', n: 1 }], at: ['kitchen'], learn: { book: 80 } }, // (the Bamboo Tea Garden pours it free once a day: world/outskirts/pois/tea.js)
   moonKoiBento: { ing: [{ k: 'moonKoi', n: 1 }, { k: 'rice', n: 2 }, { k: 'seaweed', n: 1 }], at: ['kitchen'], learn: { from: 'kitsune', hearts: 3 } },
   // Pound Mochi (docs/COZY.md §7.2, §8: the cozy path's mochi): not a dish but the building material, 2 rice → 2 Mochi
   poundMochi: { ing: [{ k: 'rice', n: 2 }], at: ['kitchen', 'oven'], learn: 'starter', out: { mat: 'mochi', n: 2 } },

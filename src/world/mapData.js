@@ -7,6 +7,7 @@
 //            sub, icon, color, pos, prio, b? (the building record) }
 // Groups and categories double as the filter chips' layers (People, Shops, Services, Quests, Gathering, Wild).
 import { DISTRICTS, plotAt } from './plots.js';
+import { POIS } from './outskirtsPlan.js';
 import { LANDMARKS, nearestOnStreets, POND, BAMBOO, HILL, WORLD } from './layout.js';
 import { BUILDINGS } from './buildings/index.js';
 import { variantName } from './mapArt.js';
@@ -143,6 +144,11 @@ export function places(G) {
   let nodes = []; try { nodes = G.mode === 'village' ? G.cozy?.scav?.nodes?.() || [] : []; } catch (e) { nodes = []; }
   for (const n of nodes) if (!n.taken) out.push({ key: `n:${n.id}`, kind: 'place', cat: 'gather', id: n.kind, name: NODE_NAME[n.kind] || 'Gather spot', sub: 'Gather it', icon: n.kind === 'driftwood' ? 'wood' : n.kind === 'riverStone' ? 'stone' : n.kind === 'mulberry' ? 'silk' : 'petal', color: CAT_COLOR.gather, pos: at(G, n.x, n.z), prio: 2, node: true, area: 'village' });
   for (const [id, name, sub, icon, cat, p, prio] of LANDMARK_PLACES) out.push({ key: `l:${id}`, kind: 'place', cat, id, name, sub, icon, color: CAT_COLOR[cat], pos: at(G, p.x, p.z), prio, landmark: true, area: 'village' });
+  // the outskirts' places (world/outskirts/, ROADMAP HP-1): named once found, a "???" to go and look for until then
+  const found = G.state?.outskirts?.found || {};
+  for (const p of POIS) out.push(found[p.id]
+    ? { key: `o:${p.id}`, kind: 'place', cat: 'landmark', id: p.id, name: p.name, sub: p.sub, icon: p.icon, color: CAT_COLOR.landmark, pos: at(G, p.x, p.z), prio: 3, landmark: true, outskirts: true, area: 'village' }
+    : { key: `o:${p.id}`, kind: 'place', cat: 'landmark', id: p.id, name: '???', sub: 'Somewhere along the Ramble', icon: 'sparkle', color: CAT_COLOR.landmark, pos: at(G, p.x, p.z), prio: 1, landmark: true, outskirts: true, unknown: true, area: 'village' });
   return out;
 }
 

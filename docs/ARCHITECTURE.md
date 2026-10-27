@@ -964,6 +964,63 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
 - QA: `tools/qa/s54-opening.mjs`; the filmstrip `node tools/qa/opening-shots.mjs [w] [h]` (each shot frozen on its
   moments, `op.hold`) → `tools/qa/tmp/opening/sheet.png`.
 
+## The waterfall (src/world/waterfall.js, fallsGarden.js, koi.js — ROADMAP WB-1)
+- **The look**: the owner's pick of three Codex mockups (2026-10-26, the "chunky toy diorama":
+  `tools/blender/work/codex/falls-bridge-style/concepts/option-C-falls.png`, its build list in `notes.md` there).
+- **The shape**: `FALLS` (layout.js) is four steps, each a lip `{ x, z, y, w }` stepping down and a little sideways from
+  the plateau (6.62 m) to the pool; `islandShape.js` cuts a staircase notch into the cliff under them, so the ledge
+  stones stand in it. The plunge pool is shallow (-0.8 to -1.15 m): the water shader paints it clear turquoise.
+- **The rock garden** (`buildFallsGarden`): one kit build (`buildings/kit.js` Builder → `instantiate`, ~33k triangles):
+  candy-smooth boulders with plump moss cushions (its own `mossyStone`: the cushion lifted out of the stone, a darker
+  rim, a sunny crown), a flat-topped ledge stone under each lip, courses up the cliff and down both walls of the pool,
+  a lantern island (a squat stone lantern, a LightPool light at night) with stepping stones, lily pads with lotuses,
+  cattails, ferns, flowers on the rim rocks, wisteria over the falls, and a rope-lashed **lookout** on the west rim that
+  is a walkable deck (`world.decks`). Rim rocks on walkable ground get colliders. The terrain paints the cliff between
+  the boulders in deep shade (`fallsK` in terrain.js), so the old strata don't show through the gaps.
+- **The water** (`Waterfall`): a curtain per step (a ShaderMaterial: ribbon lobes, scrolling streaks, a gloss band, a
+  glassy sheen over the lip and a boiling hem; the lip throws it out by the square root of the drop), still shelf water
+  behind each lip, ripple rings round the foot, instanced foam balls that breathe in the vertex shader **only where the
+  water lands** (a cluster on each shelf below a curtain, a broken collar in the pool; the owner: no foam on the lips),
+  spray and mist near the player. The unlit
+  water takes the sky's tint and dims with it (`lit()`, from `uSkyHor` and `uNight`).
+- **Koi** (`Koi`): one instanced mesh per school; the loop, the heading and the tail's wag are all in the vertex shader
+  (no CPU); they swim just at the surface (any deeper the water hides them). Four in the pool.
+- **The view**: the pool and its camera side are a tree sightline (`basin` in layout.js `SIGHTLINES`): no tree crown
+  stands between the falls and the game camera.
+- QA: `tools/qa/s56-falls.mjs`; shots `node tools/qa/falls-bridge-shots.mjs [tag] [hour]` (the falls and the red
+  bridge at the game camera) → `tools/qa/tmp/falls-bridge/`.
+- **All the water** (`gfx/water.js`, the village's sea, river and ponds and every region's): clear in the shallows so
+  the bed shows (terrain.js paints a pale pebbly bed under the water), a three-stop depth ramp (a green-aqua rim, the
+  shallow turquoise, the deep blue), broad flowing waves (lighter crests, darker troughs, bent by noise), a moving
+  cellular caustic net on the bed that fades with depth, long soft white ripple arcs on the surface, a thin lapping
+  shoreline, sun glints. The village passes candy aqua and lagoon blue (`#3cc6da`, `#1288c2`); regions keep their own
+  colours. Costs about 0.4–0.6 ms a frame more than the old water at 1600 × 900 on the dev machine. Shots:
+  `node tools/qa/water-shots.mjs [tag] [hour]` → `tools/qa/tmp/water/`.
+
+## The outskirts (src/world/outskirtsPlan.js, src/world/outskirts/ — ROADMAP HP-1)
+- **The plan** (`outskirtsPlan.js`, pure data, imported by layout.js): the **Ramble**, a ~2 m packed-earth trail looping
+  round the island outside the town (up the western peninsula from the travel post, a footbridge over the river below
+  the waterfall, the northern shelf, the north-east lagoon, down the east coast over the shrine hill's seaward shoulder,
+  the south shore to the beach, a second footbridge over the river mouth, back up the peninsula), its two `FOOTBRIDGES`,
+  and the ten `POIS` beside it: Lighthouse Point, the Bamboo Tea Garden, the Tide Pools, Kite Hill (the Wishing Tree),
+  the Windmill Orchard, the Firefly Moon Pond, the Lagoon Pier, the Sea Arch Lookout, the Bee Meadow, Driftwood Cove.
+  The owner's picks of Codex concepts in the chunky toy style (`tools/blender/work/codex/hollow-pois/concepts/`).
+- **In the world**: `layout.js` keeps trees off the trail and the clearings (`treeKeepOut` → `outskirtsKeepOut`, with a
+  sweep toward the camera) and all vegetation off the trail itself (`reservedAt`); `paintRamble` paints the trail into
+  `Terrain.wear` (worn earth down to the shore); `details.js` marks the trail and the clearings occupied (no shrubs, rocks
+  or clumps on them); the maps draw the trail and the footbridges (`mapArt.js`) and list each place, a "???" until it's
+  found (`mapData.js`).
+- **The runtime** (`outskirts/index.js`, `installOutskirts(G, world)` → `G.outskirts`): the footbridges (`footbridge.js`,
+  turned decks: `world.deckAt` honours a deck's `inside()`), each place's `pois/<id>.js` `build(ctx)` with the toolkit
+  documented at the top of index.js (`kit`, `collide`, `deck`, `interact`, `say`, `give`, `daily`, `pose`, `sit`,
+  `rest`, `treat`, `onUpdate`…), discovery (walking into a place: the place card, `state.outskirts.found`), sitting (the
+  bench pose; moving stands you up), the kit anims, and debug actions (Outskirts › Go to …).
+- **State**: `G.state.outskirts = { found: { id: day }, done: { 'id:key': day } }` (a daily thing is keyed by the day).
+- **Pantry**: peaches and persimmons (the orchard), Green Tea (a Zen dish: the tea garden pours one a day; its recipe,
+  one bamboo shoot, from the cookbook).
+- QA: `node tools/qa/outskirts-check.mjs` (the plan against the real heightfield, in Node), `tools/qa/s57-outskirts.mjs`;
+  shots `node tools/qa/outskirts-shots.mjs [tag] [ids] [dusk]` (each place beside its concept) → `tools/qa/tmp/outskirts/`.
+
 ## Guided tutorials (src/world/tutorials.js + guides.js, src/ui/tutorial.js — design: docs/TUTORIALS.md)
 - `G.tutorials` runs one guide at a time. A guide is a list of steps (say / objective / target / highlight /
   callouts / flash / waitFor / done / on / allow). The step's world target becomes `G.questTarget` (3D arrow, edge

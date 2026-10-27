@@ -2,7 +2,7 @@
 // the northern cliff terraces, the shrine hill, the bamboo rise, the river channel, the waterfall's plunge pool and the
 // koi pond. Terrain samples it at boot; tools (the plan preview, QA) can call it from Node too.
 import { smoothstep, lerp } from '../core/util.js';
-import { ISLAND, PLATEAU, NORTH, HILL, BAMBOO, POND, BASIN, RIVER, RIVER_W, TERRACES } from './layout.js';
+import { ISLAND, PLATEAU, NORTH, HILL, BAMBOO, POND, BASIN, FALLS, RIVER, RIVER_W, TERRACES } from './layout.js';
 
 function segDist(px, pz, ax, az, bx, bz) {
   const vx = bx - ax, vz = bz - az, wx = px - ax, wz = pz - az;
@@ -65,7 +65,13 @@ export function islandHeight(n, x, z) {
   }
   // the waterfall's plunge pool at the foot of the cliff
   const wb = Math.hypot(x - BASIN.x, z - BASIN.z);
-  if (wb < BASIN.r1) h = lerp(h, -1.0, smoothstep(BASIN.r1, BASIN.r0, wb));
+  if (wb < BASIN.r1) h = lerp(h, -0.8 - smoothstep(BASIN.r0, 0.5, wb) * 0.35, smoothstep(BASIN.r1, BASIN.r0, wb)); // (a clear turquoise pool, a touch deeper in the middle)
+  // the falls' staircase notch in the cliff: under each step's ledge stone (a little below its top, the stone covers it)
+  const fx = Math.abs(x - FALLS.x), S0 = FALLS.steps;
+  if (fx < 3.4 && z > S0[0].z - 1.4 && z < S0[S0.length - 1].z + 0.2) {
+    let top = -1; for (let i = S0.length - 1; i >= 0; i--) if (z < S0[i].z + 0.1) top = S0[i].y - 0.45;
+    h = lerp(h, Math.min(h, top), smoothstep(3.4, 2.5, fx));
+  }
   // koi pond
   const pd = Math.hypot(x - POND.x, z - POND.z) + n.n2(x * 0.15, z * 0.15) * 0.9;
   if (pd < POND.r + 3.2) h = lerp(h, -0.75, smoothstep(POND.r + 3.0, POND.r - 1.6, pd));

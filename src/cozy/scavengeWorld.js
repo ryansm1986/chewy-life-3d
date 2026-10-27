@@ -53,7 +53,7 @@ const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vect
 export const HOME_SITES = [
   { kind: 'driftwood', x: 84, z: 200, rot: 0.4 }, { kind: 'driftwood', x: 104, z: 207.5, rot: 2.1 }, { kind: 'driftwood', x: 126, z: 204, rot: 1.2 },
   { kind: 'riverStone', x: 78, z: 84, rot: 0.3 }, { kind: 'riverStone', x: 70, z: 138, rot: 1.9 }, { kind: 'riverStone', x: 53.5, z: 153, rot: 0.9 },
-  { kind: 'petalDrift', x: 134, z: 100, rot: 0.2 }, { kind: 'petalDrift', x: 120, z: 136, rot: 1.4 }, { kind: 'petalDrift', x: 136, z: 174, rot: 2.6 },
+  { kind: 'petalDrift', x: 134, z: 100, rot: 0.2 }, { kind: 'petalDrift', x: 120, z: 136, rot: 1.4 }, { kind: 'petalDrift', x: 130, z: 170, rot: 2.6 },
   { kind: 'mulberry', x: 74, z: 102, rot: 0.6 },
 ];
 // where Shadow's dig spots can be at home (a day's 2–3 are picked from these, spread out): open ground 3–9 m off a street

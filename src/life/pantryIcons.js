@@ -280,6 +280,24 @@ function seaweed(g) {
   sparkle(g, 15, -14, 2.8, '#ffffff');
 }
 
+function peach(g) {
+  shadow(g, 22, 16, 3.2);
+  g.beginPath(); g.moveTo(0, -12); g.bezierCurveTo(-20, -16, -20, 18, 0, 18); g.bezierCurveTo(20, 18, 20, -16, 0, -12); g.closePath();
+  paint(g, volR(g, '#ffb088', -6, -4, 22, 0.45, 0.25), 2);
+  g.beginPath(); g.moveTo(0, -11); g.quadraticCurveTo(-3, 3, 1, 17); stroke(g, hexA('#e8704a', 0.6), 1.6); // (the crease)
+  ell(g, 7, 4, 7, 8); g.fillStyle = hexA('#ff6a70', 0.35); g.fill(); // (the blush)
+  g.save(); g.translate(3, -13); g.rotate(-0.5); g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(7, -8, 15, -3); g.quadraticCurveTo(8, 3, 0, 0); g.closePath(); paint(g, vol(g, '#6ab04e', 0, -8, 15, 3), 1.6); g.restore();
+  rr(g, -1.2, -17, 2.4, 6, 1); paint(g, '#8a5a3a', 1.2);
+  shine(g, -8, -5, 3.4, 2, -0.6, 0.75);
+}
+function persimmon(g) {
+  shadow(g, 22, 15, 3.2);
+  ell(g, 0, 4, 17, 14); paint(g, volR(g, '#ff8a2a', -6, -2, 20, 0.45, 0.25), 2);
+  g.beginPath(); for (let i = 0; i < 4; i++) { const a = i * TAU / 4 + 0.4; g.moveTo(0, -9); g.quadraticCurveTo(Math.cos(a) * 6 - 2, -9 + Math.sin(a) * 3 - 3, Math.cos(a) * 10, -9 + Math.sin(a) * 4); g.quadraticCurveTo(Math.cos(a) * 5 + 2, -9 + Math.sin(a) * 2 + 2, 0, -9); } paint(g, '#5a9a3a', 1.6);
+  rr(g, -1.4, -15, 2.8, 6, 1); paint(g, '#7a4a2a', 1.2);
+  shine(g, -8, -1, 4, 2.2, -0.5, 0.75);
+}
+
 // ================================================================== dishes
 function plate(g, w = 24, h = 10, y = 9, rim = '#7ab8ff') {
   ell(g, 0, y + 2, w, h); paint(g, vol(g, '#e8e0d6', -w, y - h, w, y + h + 2, 0.2, 0.2), 2);
@@ -345,6 +363,14 @@ const DISH = {
     g.beginPath(); g.moveTo(-14.6, 11.2); g.bezierCurveTo(-14.6, 0.5, -4.4, 0.5, -4.4, 11.2); g.closePath(); paint(g, lin(g, -9, 1, -9, 11, [[0, '#ff4a5e'], [1, '#ff7a8a']]), 1.2);
     ell(g, -9.5, 7.5, 1.8, 3); g.fillStyle = '#fff0f2'; g.fill();
     shine(g, 3, -1, 3, 1.4, -0.5, 0.7); shine(g, -14, 0, 2.4, 1.2, -0.6, 0.6);
+  },
+  greenTea(g) {
+    shadow(g, 22, 18, 3.2);
+    for (const x of [-5, 3]) { g.beginPath(); g.moveTo(x, -10); g.bezierCurveTo(x - 5, -15, x + 5, -19, x, -25); stroke(g, hexA('#ffffff', 0.85), 2.2); }
+    g.beginPath(); g.moveTo(-15, -6); g.lineTo(-12, 14); g.bezierCurveTo(-11, 19, 11, 19, 12, 14); g.lineTo(15, -6); g.closePath(); paint(g, vol(g, '#7ab86a', -15, -6, 15, 18, 0.35, 0.25), 2);
+    g.strokeStyle = hexA('#e8f4d8', 0.7); g.lineWidth = 1.4; g.beginPath(); g.moveTo(-14, 2); g.lineTo(14, 2); g.stroke();
+    ell(g, 0, -6, 15, 4.6); paint(g, '#5a9a4a', 2); ell(g, 0, -5.6, 12.5, 3.2); g.fillStyle = '#b8e07a'; g.fill();
+    shine(g, -9, 5, 1.8, 5, 0.1, 0.6);
   },
   honeyCake(g) {
     shadow(g, 23, 19, 3.2);
@@ -422,7 +448,7 @@ export function drawPantry(g, id) {
   if (d.kind === 'seed') return seedPacket(g, d.crop);
   if (d.kind === 'crop') { shadow(g, 22, 16, 3.4); return CROP_ART[id]?.(g); }
   if (d.kind === 'fish') return id === 'octopus' ? octopus(g) : id === 'pufferfish' ? pufferfish(g) : id === 'flounder' ? flounder(g) : fish(g, id);
-  if (d.kind === 'forage') return ({ honey, bamboo, shiitake, seaweed })[id]?.(g);
+  if (d.kind === 'forage') return ({ honey, bamboo, shiitake, seaweed, peach, persimmon })[id]?.(g);
   if (d.kind === 'dish') return DISH[id]?.(g);
 }
 const RARE_FX = { 2: 'rare', 3: 'unique' };

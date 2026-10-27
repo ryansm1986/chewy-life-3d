@@ -366,68 +366,237 @@ export function fence(B) {
   B.height = 0.9;
 }
 
-// Arched vermilion taiko bridge spanning z ∈ [-4.5, 4.5]; deck top = bridgeDeckHeight(z)
-export function bridge(B) {
-  const W = 2.0, half = BRIDGE.half, n = 36;
-  const verm = C.vermilion;
-  // deck planks following the arch
-  for (let i = 0; i < n; i++) {
-    const z0 = -half + i * (2 * half / n), z1 = z0 + 2 * half / n, zm = (z0 + z1) / 2;
-    const y0 = bridgeDeckHeight(z0), y1 = bridgeDeckHeight(z1);
-    const L = Math.hypot(z1 - z0, y1 - y0), ang = Math.atan2(y1 - y0, z1 - z0);
-    const pl = G.box(W, 0.08, L - 0.015, 0); pl.rotateX(-ang); pl.translate(0, (y0 + y1) / 2 - 0.04, zm);
-    const pc = B.pick([C.woodLight, '#d8a070', '#c8905e']);
-    B.add(pl, (p, nn, o) => { o.set(pc); if (nn.y > 0.5) o.multiplyScalar(0.95 + 0.08 * Math.sin(p.x * 17 + i * 2.3)); }); // grain
-    for (const sx of [-1, 1]) { // iron nail heads over the side beams
-      const nl = G.disc(0.014, 4); nl.rotateX(-PI / 2 - ang); nl.translate(sx * (W / 2 - 0.08), (y0 + y1) / 2 + 0.001, zm); B.add(nl, '#4a4650');
-    }
-  }
-  // side beams (curved) under the deck
-  for (const sx of [-1, 1]) {
-    const pts = []; for (let i = 0; i <= 18; i++) { const z = -half + i * (2 * half / 18); pts.push({ p: V(sx * (W / 2 - 0.02), bridgeDeckHeight(z) - 0.16, z), r: 0.09 }); }
-    B.add(tube(pts, 6, false), verm);
-  }
-  // railings with giboshi posts
-  const posts = 7;
-  for (const sx of [-1, 1]) {
-    const rail = [], rail2 = [];
-    for (let i = 0; i <= 18; i++) { const z = -half + 0.15 + i * ((2 * half - 0.3) / 18); rail.push({ p: V(sx * (W / 2 + 0.02), bridgeDeckHeight(z) + 0.62, z), r: 0.045 }); rail2.push({ p: V(sx * (W / 2 + 0.02), bridgeDeckHeight(z) + 0.3, z), r: 0.03 }); }
-    B.add(tube(rail, 6, false), verm); B.add(tube(rail2, 5, false), verm);
-    for (let i = 0; i < posts; i++) {
-      const z = -half + 0.15 + i * ((2 * half - 0.3) / (posts - 1)), y = bridgeDeckHeight(z);
-      const p = G.box(0.1, 0.72, 0.1, 0.02); p.translate(sx * (W / 2 + 0.02), y + 0.32, z); B.add(p, verm);
-      const gib = G.lathe([[0.001, 0], [0.07, 0], [0.08, 0.06], [0.05, 0.12], [0.001, 0.2]], 8); gib.translate(sx * (W / 2 + 0.02), y + 0.68, z); B.add(gib, C.gold);
-    }
-  }
-  // pillars into the river + cross beams
-  for (const z of [-2.6, -0.9, 0.9, 2.6]) {
-    const y = bridgeDeckHeight(z) - 0.2;
-    for (const sx of [-1, 1]) { const p = G.cyl(0.09, 0.11, y + 1.3, 8); p.translate(sx * (W / 2 - 0.15), (y - 1.3) / 2, z); B.add(p, (pp, nn, o) => o.set(pp.y < 0.05 ? '#5a4a44' : verm)); }
-    const cb = G.box(W - 0.1, 0.1, 0.12, 0.02); cb.translate(0, y - 0.05, z); B.add(cb, verm);
-  }
-  // stone abutments + end steps down to ground
+// The arched bridge, a chunky toy playset (WB-1, direction C: tools/blender/work/codex/falls-bridge-style/concepts/
+// option-C-bridge.png). Spans local z ∈ [-4.5, 4.5]; deck top = bridgeDeckHeight(z) (village.js addBridgeDeck walks
+// it); everything else stays at |x| >= 1 (off the walkway). Broad honey planks over a dark seam board, pegged at the
+// ends; thick lacquer side beams with dark cherry undersides; stout rounded-square posts with bronze acorn caps and
+// thick round rails; rope-lashed round end posts with big bronze onion finials; on the far side (local -x, away from
+// the south-east camera) three tall posts carry a sagging cord of round paper lanterns that glow at night; red legs in
+// broad mossy stone sockets with ripple collars; abutments of big rounded interlocking blocks; two bracketed flower
+// boxes outside the near-side (+x) rail.
+const BR = { lac: '#e13c28', dark: '#a12c2b', hi: '#f2684a', planks: ['#e3b077', '#daa76c', '#e8b981'], seam: '#3e261c', peg: '#8a7a70',
+  rope: '#d4b474', bronze: '#a78646', iron: '#4a4650', stones: ['#dcd6d6', '#cec8ce', '#e0d9d4', '#d4cdd2', '#ddd5cc'] };
+// a block with all twelve edges chamfered (44 flat triangles: a chunky rounded-looking stone for a fraction of a
+// RoundedBox's 108), centred
+function chamferBox(w, h, d, c) {
+  const X = w / 2, Y = h / 2, Z = d / 2, pos = [];
+  const q = (a, b, cc, dd) => pos.push(...a, ...b, ...cc, ...a, ...cc, ...dd);
   for (const s of [-1, 1]) {
-    const zE = s * (half - 0.3);
-    const ab = G.box(W + 0.5, BRIDGE.end + 0.9, 0.9, 0.08); ab.translate(0, (BRIDGE.end - 0.9) / 2 - 0.02, zE);
-    B.add(faceColors(ab, (p, n, o, c) => { // cut-stone courses with staggered joints, moss creeping over the top
-      const row = Math.floor((c.y + 1) / 0.3), u = (Math.abs(n.x) > 0.7 ? c.z : c.x) / 0.45 + (row % 2) * 0.5;
-      o.set(STONES[(row * 3 + Math.floor(u) * 5 + 99) % STONES.length]).multiplyScalar(0.9 + 0.1 * clamp(n.y));
-      if (n.y > 0.7) o.lerp(col(C.moss), 0.35 + 0.3 * clamp(nz(c.x * 3, c.z * 3)));
-    }), null);
-    for (const sx of [-1, 1]) {
-      const cap = G.cyl(0.14, 0.17, 0.95, 8); cap.translate(sx * (W / 2 + 0.2), BRIDGE.end + 0.2, zE); B.add(cap, verm);
-      const top = G.lathe([[0.001, 0], [0.13, 0], [0.15, 0.08], [0.08, 0.18], [0.001, 0.28]], 8); top.translate(sx * (W / 2 + 0.2), BRIDGE.end + 0.67, zE); B.add(top, C.gold);
+    q([s * X, -Y + c, -Z + c], [s * X, Y - c, -Z + c], [s * X, Y - c, Z - c], [s * X, -Y + c, Z - c]);
+    q([-X + c, s * Y, -Z + c], [X - c, s * Y, -Z + c], [X - c, s * Y, Z - c], [-X + c, s * Y, Z - c]);
+    q([-X + c, -Y + c, s * Z], [X - c, -Y + c, s * Z], [X - c, Y - c, s * Z], [-X + c, Y - c, s * Z]);
+    for (const t of [-1, 1]) {
+      q([s * X, t * (Y - c), -Z + c], [s * (X - c), t * Y, -Z + c], [s * (X - c), t * Y, Z - c], [s * X, t * (Y - c), Z - c]); // edges along z
+      q([s * X, -Y + c, t * (Z - c)], [s * (X - c), -Y + c, t * Z], [s * (X - c), Y - c, t * Z], [s * X, Y - c, t * (Z - c)]); // along y
+      q([-X + c, s * Y, t * (Z - c)], [-X + c, s * (Y - c), t * Z], [X - c, s * (Y - c), t * Z], [X - c, s * Y, t * (Z - c)]); // along x
+      for (const u of [-1, 1]) pos.push(s * X, t * (Y - c), u * (Z - c), s * (X - c), t * Y, u * (Z - c), s * (X - c), t * (Y - c), u * Z); // corners
     }
-    B.at([s * 0.0, 0, 0], 0, () => {});
   }
-  // lanterns on the end posts
-  for (const s of [-1, 1]) B.at([s * (W / 2 + 0.2), BRIDGE.end + 0.66, s * (half - 0.3) - s * 0.0], 0, () => {});
-  B.light([W / 2 + 0.2, BRIDGE.peak + 0.8, 0], { color: '#ffb070', intensity: 2.4, radius: 5, flicker: 0.6 });
-  B.at([W / 2 + 0.02, bridgeDeckHeight(0) + 0.66, 0], 0, () => chochin(B, { r: 0.1, h: 0.2, cord: 0.02 }));
-  B.at([-W / 2 - 0.02, bridgeDeckHeight(0) + 0.66, 0], 0, () => chochin(B, { r: 0.1, h: 0.2, cord: 0.02 }));
-  B.warpAmt = 0.02;
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const p = g.attributes.position, A = new THREE.Vector3(), Bv = new THREE.Vector3(), Cv = new THREE.Vector3(), n = new THREE.Vector3(), e = new THREE.Vector3();
+  for (let i = 0; i < p.count; i += 3) { // wind every face outward
+    A.fromBufferAttribute(p, i); Bv.fromBufferAttribute(p, i + 1); Cv.fromBufferAttribute(p, i + 2);
+    n.subVectors(Bv, A).cross(e.subVectors(Cv, A));
+    if (n.dot(A.add(Bv).add(Cv)) < 0) { p.setXYZ(i + 1, Cv.x, Cv.y, Cv.z); p.setXYZ(i + 2, Bv.x, Bv.y, Bv.z); }
+  }
+  g.computeVertexNormals();
+  return g;
+}
+// a closed profile [[x, y]...] (counter-clockwise seen from +z) swept along the arch from z0 to z1, square to the deck:
+// x across, y along the deck's normal, offset to x0 and to yOf(z); both ends capped
+function archSweep(prof, x0, yOf, z0, z1, segs) {
+  const pos = [], idx = [], P = prof.length;
+  for (let i = 0; i <= segs; i++) {
+    const z = z0 + (z1 - z0) * i / segs, y = yOf(z), dy = (yOf(z + 1e-3) - yOf(z - 1e-3)) / 2e-3, k = 1 / Math.hypot(1, dy);
+    for (const [px, py] of prof) pos.push(x0 + px, y + k * py, z - dy * k * py);
+  }
+  for (let i = 0; i < segs; i++) for (let k = 0; k < P; k++) { const a = i * P + k, b = i * P + (k + 1) % P; idx.push(a, b, a + P, b, b + P, a + P); }
+  for (const [i, s] of [[0, -1], [segs, 1]]) { // caps (their own vertices: flat normals, the sides stay round)
+    const c0 = pos.length / 3; let cx = 0, cy = 0, cz = 0;
+    for (let k = 0; k < P; k++) { const j = (i * P + k) * 3; pos.push(pos[j], pos[j + 1], pos[j + 2]); cx += pos[j] / P; cy += pos[j + 1] / P; cz += pos[j + 2] / P; }
+    pos.push(cx, cy, cz);
+    for (let k = 0; k < P; k++) { const a = c0 + k, b = c0 + (k + 1) % P; if (s > 0) idx.push(c0 + P, a, b); else idx.push(c0 + P, b, a); }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+// rounded rectangle profile, centred, counter-clockwise (k segments per corner)
+function rrect(w, h, r, k = 2) {
+  const pts = [], hw = w / 2 - r, hh = h / 2 - r;
+  for (const [cx, cy, a0] of [[hw, -hh, -PI / 2], [hw, hh, 0], [-hw, hh, PI / 2], [-hw, -hh, PI]]) for (let j = 0; j <= k; j++) { const a = a0 + PI / 2 * j / k; pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); }
+  return pts;
+}
+// bronze giboshi standing at local y = 0: a big onion (end posts) or a small acorn (rail posts)
+function bridgeFinial(B, big) {
+  const pr = big
+    ? [[0.2, 0], [0.205, 0.035], [0.185, 0.055], [0.13, 0.066], [0.152, 0.095], [0.174, 0.14], [0.172, 0.19], [0.145, 0.24], [0.09, 0.28], [0.045, 0.305], [0.04, 0.325], [0.064, 0.36], [0.046, 0.4], [0.016, 0.44], [0.001, 0.455]]
+    : [[0.12, 0], [0.122, 0.03], [0.09, 0.042], [0.104, 0.078], [0.098, 0.115], [0.068, 0.152], [0.03, 0.185], [0.001, 0.212]];
+  // polished bronze: deep brown at the waist and underneath, warm bronze on the flanks, a gold sheen on the shoulders
+  // (the profiles start at the collar's rim: the underside sits on the post, unseen)
+  const BZ = col('#9c7a3c'), HI = col('#f0cf7e'), SP = col('#fff4cc'), LO = col('#4e3818');
+  B.add(G.lathe(pr, big ? 10 : 8), (p, n, o) => {
+    o.copy(BZ).lerp(LO, clamp(-n.y * 1.4 + 0.35) * 0.8).lerp(HI, clamp(n.y * 1.5 - 0.35) * 0.8);
+    if (n.y > 0.6 && n.y < 0.88) o.lerp(SP, 0.5);
+    if (p.y < (big ? 0.07 : 0.045)) o.multiplyScalar(0.72);
+  });
+}
+// round paper lantern hanging with its hook at local y = 0: ribbed cream / pale yellow / peach paper, dark caps
+function bridgeLantern(B, { r = 0.17, h = 0.27, color = '#fff1d6', cord = 0.05 } = {}) {
+  const cs = G.cyl(0.009, 0.009, cord, 3); cs.translate(0, -cord / 2, 0); B.add(cs, '#3a2c2a');
+  const y0 = -cord - 0.03, top = G.cyl(r * 0.4, r * 0.46, 0.045, 8); top.translate(0, y0 + 0.012, 0); B.add(top, '#3a2a26');
+  const pts = [], N = 10;
+  for (let k = N; k >= 0; k--) { const t = k / N; pts.push([Math.max(0.001, r * (0.38 + 0.62 * Math.pow(Math.sin(t * PI), 0.32)) * (k % 2 ? 1 : 0.95)), y0 - t * h]); }
+  const cc = col(color), rib = cc.clone().multiplyScalar(0.76), lit = cc.clone().lerp(col('#ffffff'), 0.25);
+  B.glow(G.lathe(pts, 10), (p, n, o) => { const t = (y0 - p.y) / h, k = Math.round(t * N); o.copy(k % 2 ? cc : rib).lerp(lit, clamp(Math.sin(t * PI)) * 0.3 * (k % 2)); }, { flicker: 0.6, tint: 0.6 });
+  const bot = G.cyl(r * 0.46, r * 0.4, 0.045, 8); bot.translate(0, y0 - h - 0.008, 0); B.add(bot, '#3a2a26');
+}
+// a bracketed wooden flower box, centred at local (0, 0, 0) with its back against x = -0.16, length along z
+function bridgeFlowerBox(B, rr) {
+  const L = 1.0;
+  for (const [y, c] of [[-0.068, '#a46d3e'], [0.068, '#b37a48']]) { const pl = G.box(0.3, 0.13, L, 0.03); pl.translate(0, y, 0); B.add(pl, (p, n, o) => o.set(c).multiplyScalar(n.y > 0.6 ? 1.08 : n.x > 0.6 ? 1 : 0.86)); }
+  for (const z of [-0.34, 0.34]) {
+    const band = G.box(0.316, 0.28, 0.045, 0); band.translate(0, 0, z); B.add(band, BR.iron);
+    for (const y of [-0.07, 0.07]) { const rv = G.sph(0.013, 4, 3); rv.translate(0.16, y, z); B.add(rv, '#8a8690'); }
+    const arm = G.box(0.27, 0.035, 0.05, 0); arm.translate(-0.015, -0.155, z); B.add(arm, BR.iron); // the bracket: an arm under the box,
+    const plate = G.box(0.035, 0.24, 0.05, 0); plate.translate(-0.165, -0.21, z); B.add(plate, BR.iron); // a plate on the beam,
+    const brace = G.box(0.03, 0.25, 0.045, 0); brace.rotateZ(-0.72); brace.translate(-0.07, -0.24, z); B.add(brace, BR.iron); // and a brace
+  }
+  const soil = G.box(0.26, 0.03, L - 0.04, 0); soil.translate(0, 0.128, 0); B.add(soil, '#5a3f2e');
+  const leaves = ['#5aa84a', '#6ab854', '#4e9a44'];
+  for (const z of [-0.22, 0.22]) { // a leafy mound filling the box
+    const md = puff(V(0, 0, 0), 0.16, { detail: 1, noise: 0.3, squash: 0.5, seed: Math.floor(rr() * 99) }); md.scale(1.0, 1.05, 1.55); md.translate(0, 0.14, z);
+    B.add(md, (p, n, o) => o.set(leaves[(z > 0) + 0]).lerp(col('#8ccf6a'), clamp(n.y * 0.6 - 0.1) * 0.5).multiplyScalar(0.86 + 0.14 * clamp(n.y + 0.3)), 'leaf');
+  }
+  for (let i = 0; i < 5; i++) { // round leaves spilling over the front lip
+    const z = -0.36 + i * 0.18 + (rr() - 0.5) * 0.05, lf = G.sph(0.075, 7, 4); lf.scale(0.34, 1, 1); lf.rotateX((rr() - 0.5) * 0.8); lf.rotateZ(-0.45); lf.translate(0.17, 0.1 - (i % 2) * 0.04, z);
+    B.add(lf, (p, n, o) => o.set(leaves[i % 3]).multiplyScalar(0.9 + 0.2 * clamp(n.y + 0.3)), 'leaf');
+  }
+  const pinks = ['#ff9dc1', '#ffb4d0', '#fff4f8', '#ff8fb6', '#ffc8dc', '#fff4f8', '#ff9dc1', '#ffb4d0', '#fff4f8', '#ff8fb6'];
+  for (let i = 0; i < 10; i++) { // five-petal blossoms in two staggered rows, faces turned up and toward the camera
+    const z = -0.41 + i * 0.091 + (rr() - 0.5) * 0.03, R = 0.095 + rr() * 0.025, x = (i % 2 ? 0.06 : -0.05) + (rr() - 0.5) * 0.03, y = 0.22 + (i % 2 ? 0 : 0.045) + rr() * 0.03;
+    B.at([x, y, z], 0, () => {
+      const f = blossomGeo(R, 5, 0.5, false, 4); f.rotateY(rr() * TAU);
+      { const fp = f.attributes.position; for (let k = 0; k < fp.count; k++) { const d = Math.hypot(fp.getX(k), fp.getZ(k)); fp.setY(k, 0.4 * d * d / R); } f.computeVertexNormals(); } // cupped
+      B.add(f, (p, n, o) => o.set(pinks[i]).lerp(col('#ffffff'), clamp(1 - Math.hypot(p.x, p.z) / R) * 0.35), 'leaf');
+      const ey = G.sph(0.022, 5, 3); ey.scale(1, 0.6, 1); ey.translate(0, 0.008, 0); B.add(ey, '#ffd24a', 'leaf');
+    }, 1, -0.25, -0.35);
+  }
+}
+export function bridge(B) {
+  const half = BRIDGE.half, dh = bridgeDeckHeight, XB = 1.14, XE = 1.22, rr = lrng(B); // (posts, beams and rails all clear |x| < 1)
+  const slope = z => (dh(z + 1e-3) - dh(z - 1e-3)) / 2e-3;
+  const LAC = col(BR.lac), DARK = col(BR.dark), HI = col(BR.hi);
+  const lac = (p, n, o) => { o.copy(LAC).lerp(DARK, clamp(-n.y * 1.25 + 0.12)); if (n.y > 0.7) o.lerp(HI, 0.16); };
+  // deck: broad honey planks (bevelled long edges, lighter where the bevel catches the sun) over a dark seam board,
+  // a peg at each end over the side beams
+  const NP = 22, step = 2 * half / NP;
+  for (let i = 0; i < NP; i++) {
+    const z0 = -half + i * step, z1 = z0 + step, zm = (z0 + z1) / 2, y0 = dh(z0), y1 = dh(z1);
+    const ang = Math.atan2(y1 - y0, z1 - z0), L = Math.hypot(z1 - z0, y1 - y0);
+    const pl = G.beam(2.06, 0.1, L - 0.036, 0.026); pl.rotateX(-ang); pl.translate(0, (y0 + y1) / 2 - 0.05, zm);
+    const pc = col(BR.planks[(i * 7) % 3]).offsetHSL(0, 0, (rr() - 0.5) * 0.035);
+    B.add(pl, (p, n, o) => o.copy(pc).multiplyScalar(n.y > 0.92 ? 1 : n.y > 0.3 ? 1.07 : 0.74));
+    for (const sx of [-1, 1]) { const pg = G.disc(0.026, 6); pg.rotateX(-PI / 2 - ang); pg.translate(sx * 0.84, (y0 + y1) / 2 + 0.004, zm); B.add(pg, BR.peg); }
+  }
+  B.add(archSweep([[1.0, -0.02], [1.0, 0.02], [-1.0, 0.02], [-1.0, -0.02]], 0, z => dh(z) - 0.125, -half + 0.02, half - 0.02, 20), BR.seam);
+  // thick rounded side beams (a low curb at the deck's edge), dark cherry underneath; they end in the end posts
+  for (const sx of [-1, 1]) B.add(archSweep(rrect(0.24, 0.36, 0.075, 2), sx * XB, z => dh(z) - 0.12, -half + 0.2, half - 0.2, 20), lac);
+  // rails: thick round top rail and a mid rail, end post to end post
+  const ZE = half - 0.25;
+  for (const sx of [-1, 1]) {
+    const top = [], mid = [];
+    for (let i = 0; i <= 20; i++) { const z = -ZE + i * (2 * ZE / 20); top.push({ p: V(sx * XB, dh(z) + 0.76, z), r: 0.066 }); mid.push({ p: V(sx * XB, dh(z) + 0.42, z), r: 0.05 }); }
+    B.add(tube(top, 8, false), lac); B.add(tube(mid, 7, false), lac);
+  }
+  // rail posts: stout rounded-square, bronze acorn caps; on the far side three tall ones carry the lantern cord
+  const PZ = [-2.8, -1.4, 0, 1.4, 2.8], TALL = 1.92, tops = {};
+  for (const sx of [-1, 1]) for (const z of PZ) {
+    const y = dh(z), tall = sx < 0 && z !== -1.4 && z !== 1.4, t = y + (tall ? TALL : 0.9), b = y - 0.04;
+    const p = G.beam(tall ? 0.19 : 0.18, t - b, tall ? 0.19 : 0.18, 0.05); p.translate(sx * XB, (t + b) / 2, z); B.add(p, lac);
+    B.at([sx * XB, t, z], 0, () => bridgeFinial(B, false));
+    if (tall) {
+      tops[z] = V(sx * (XB + 0.09), t - 0.16, z); // (the cord hangs off the posts' outer faces: the lanterns clear the walkway)
+      for (const yy of [y + 0.9, t - 0.16]) { const band = G.torus(0.106, 0.021, 4, 10); band.rotateX(PI / 2); band.translate(sx * XB, yy, z); B.add(band, (pp, n, o) => o.set(BR.rope).multiplyScalar(0.84 + 0.2 * clamp(n.y + 0.5))); }
+    }
+  }
+  // round end posts on the abutments: thick tan rope lashings, big bronze onion finials
+  for (const s of [-1, 1]) for (const sx of [-1, 1]) {
+    const z = s * ZE, y = dh(z), b = 0.78, t = y + 0.94; // (at x = ±1.22 the rope's inner side stays just off the walkway)
+    const p = G.cyl(0.15, 0.158, t - b, 12); p.translate(sx * XE, (t + b) / 2, z); B.add(p, lac);
+    const ring = G.cyl(0.164, 0.164, 0.05, 12); ring.translate(sx * XE, t - 0.03, z); B.add(ring, (pp, n, o) => o.copy(DARK).lerp(LAC, 0.4));
+    B.at([sx * XE, t, z], 0, () => bridgeFinial(B, true));
+    for (let k = 0; k < 3; k++) {
+      const rp = G.torus(0.16, 0.034, 4, 12); rp.rotateX(PI / 2); rp.rotateY(k * 0.7); rp.translate(sx * XE, y + 0.1 + k * 0.064, z);
+      B.add(rp, (pp, n, o) => o.set(BR.rope).multiplyScalar(0.8 + 0.26 * clamp(n.y * 0.6 + 0.5) + 0.06 * Math.sin(Math.atan2(pp.z - z, pp.x - sx * XE) * 6 + k)));
+    }
+  }
+  // the lantern cord: one sagging dark cord between the tall posts, three round lanterns per bay, swaying a touch
+  const LC = ['#fff4e0', '#ffecb0', '#ffd4b4', '#ffecb0', '#fff4e0', '#ffd4b4'];
+  [[-2.8, 0], [0, 2.8]].forEach(([za, zb], bay) => {
+    const A = tops[za], E = tops[zb], dir = E.clone().sub(A).normalize();
+    B.anim({ p: [A.x, A.y, A.z], kind: 'swing', axis: [dir.x, dir.y, dir.z], speed: 1.1, amp: 0.05 }, () => {
+      const at = t => A.clone().lerp(E, t).sub(A).add(V(0, -Math.sin(t * PI) * 0.3, 0)), cord = [];
+      for (let k = 0; k <= 12; k++) cord.push({ p: at(k / 12), r: 0.015 });
+      B.add(tube(cord, 4, false), '#3a2c2a');
+      [0.24, 0.5, 0.76].forEach((t, i) => { const q = at(t); B.at([q.x, q.y, q.z], 0, () => bridgeLantern(B, { color: LC[bay * 3 + i], r: i === 1 ? 0.2 : 0.185, h: i === 1 ? 0.3 : 0.28 })); });
+    });
+    B.light([-XB - 0.2, dh((za + zb) / 2) + 1.4, (za + zb) / 2], { color: '#ffc27a', intensity: 1.7, radius: 4.4, flicker: 0.5 });
+  });
+  // legs: thick red rounded-square legs under the posts, in broad mossy stone sockets with ripple collars at the
+  // waterline; dark cross beams tie each pair under the deck
+  // (the kit's groundShade darkens everything below 0.5 m as ground AO: over water that only greys the stones, so lift it back part way)
+  const lift = y => Math.pow(1 / (0.74 + 0.26 * clamp(y / 0.5)), 0.75);
+  const STONE = col('#bdb7bc'), STONE_HI = col('#dcd6d4'), MOSS = col(C.moss), MOSS_D = col('#5e9446');
+  // (painted per facet in the socket's own frame: moss covers whole facets at the waterline on a few of its eight sides)
+  const socketPaint = mossy => (v, n, o, c) => {
+    o.copy(STONE).lerp(STONE_HI, clamp(n.y * 0.7 + 0.15));
+    const side = Math.round((Math.atan2(c.z, c.x) / TAU + 1) * 8) % 8; // (facet centres sit on the eighths)
+    if (mossy.includes(side) && ((c.y > -0.16 && c.y < 0.1) || (c.y > 0.1 && c.y < 0.16 && side === mossy[0]))) o.lerp(side === mossy[1] ? MOSS_D : MOSS, 0.85);
+    o.multiplyScalar(lift(c.y));
+  };
+  for (const z of [-2.8, -1.4, 1.4, 2.8]) {
+    const y = dh(z), lt = y - 0.26, lb = 0.1;
+    for (const sx of [-1, 1]) {
+      const lg = G.beam(0.22, lt - lb, 0.22, 0.055); lg.translate(sx * XB, (lt + lb) / 2, z); B.add(lg, lac);
+      const so = G.lathe([[0.31, -1.3], [0.31, -0.16], [0.33, -0.02], [0.315, 0.1], [0.27, 0.16], [0.16, 0.18], [0.001, 0.18]], 8);
+      so.rotateY(PI / 8); const k0 = Math.floor(rr() * 8), sp = faceColors(so, socketPaint([k0, (k0 + 1) % 8, (k0 + 4 + Math.floor(rr() * 2)) % 8]));
+      sp.translate(sx * XB, 0, z); B.add(sp, null);
+      const rip = new THREE.RingGeometry(0.37, 0.43, 18, 1); rip.rotateX(-PI / 2); rip.translate(sx * XB, 0.012, z); B.add(rip, (p, n, o) => o.setRGB(1.06, 1.14, 1.2));
+    }
+    const cb = G.beam(2.46, 0.16, 0.18, 0.04); cb.translate(0, y - 0.36, z); B.add(cb, BR.dark);
+  }
+  // abutments: courses of big chunky blocks, joints staggered both ways, each a touch proud or shy of the face; moss on
+  // the chamfers along the waterline and on some top-course shoulders
+  // (moss in whole chamfer strips: along the waterline joint, and on the shoulders of some top-course blocks)
+  const blockPaint = (tint, ci, mossy) => (v, n, o, c) => {
+    o.copy(tint).lerp(STONE_HI, clamp(n.y) * 0.25).multiplyScalar(0.9 + 0.1 * clamp(n.y + 0.4));
+    const mx = Math.max(Math.abs(n.x), Math.abs(n.y), Math.abs(n.z)), edge = mx < 0.95 && mx > 0.62;
+    if (edge && ((ci === 0 && n.y > 0.3) || (ci === 1 && n.y < -0.3 && mossy) || (ci === 2 && n.y > 0.3 && mossy))) o.lerp(ci === 1 ? MOSS_D : MOSS, 0.82);
+    o.multiplyScalar(lift(c.y));
+  };
+  const courses = [[-0.36, 0.04, [1.05, 0.9, 1.05], [0.6, 0.5]], [0.04, 0.42, [0.75, 0.8, 0.7, 0.75], [0.48, 0.62]], [0.42, 0.8, [0.95, 1.1, 0.95], [0.56, 0.54]]];
+  for (const s of [-1, 1]) {
+    const zf = 3.62, zb = 4.72;
+    const fd = chamferBox(3.0, 0.96, zb - zf, 0.1); fd.translate(0, -0.85, s * (zf + zb) / 2); B.add(faceColors(fd, blockPaint(col(BR.stones[1]), -1, false)), null);
+    courses.forEach(([y0, y1, ws, ds], ci) => {
+      let x = -1.5;
+      for (const w of ws) {
+        let z = zf;
+        for (const d of ds) {
+          const tint = col(BR.stones[Math.floor(rr() * BR.stones.length)]), mossy = rr() < (ci === 2 ? 0.35 : 0.65), jx = (rr() - 0.5) * 0.04, jz = (rr() - 0.5) * 0.05;
+          const blk = chamferBox(w - 0.04 + (rr() - 0.5) * 0.03, y1 - y0 - 0.035, d - 0.04, 0.075); blk.translate(x + w / 2 + jx, (y0 + y1) / 2, s * (z + d / 2 + jz));
+          B.add(faceColors(blk, blockPaint(tint, ci, mossy)), null);
+          z += d;
+        }
+        x += w;
+      }
+    });
+  }
+  // flower boxes on brackets outside the near-side rail, in the second bay from each end
+  for (const zc of [-2.1, 2.1]) B.at([XB + 0.12 + 0.16, dh(zc) + 0.02, zc], 0, () => bridgeFlowerBox(B, rr), 1, -Math.atan(slope(zc)));
+  B.warpAmt = 0.015;
   B.door.set(0, 0, half + 0.3);
-  B.height = BRIDGE.peak + 1.0;
+  B.height = BRIDGE.peak + 1.2;
 }
 
 export function chewyStatue(B) {

@@ -8,6 +8,7 @@
 //    pips with an initial, the map pin, the quest star, the player's arrow, Shadow), each pre-rendered once into a small
 //    canvas, so a frame is a handful of drawImage calls.
 import { WORLD, T, PATHS, CHEWY_GARDEN } from './layout.js';
+import { RAMBLE, RAMBLE_W, FOOTBRIDGES } from './outskirtsPlan.js';
 import { DISTRICTS, PLOTS } from './plots.js';
 import { BUILDINGS, variantOf } from './buildings/index.js';
 import { ROOFS, ROOF_LIST } from './buildings/kit.js';
@@ -161,6 +162,16 @@ export class VillageArt {
     g.save(); g.globalAlpha = 0.09; g.strokeStyle = '#a08060'; g.lineWidth = 1; g.beginPath();
     for (let z = 0; z < WORLD; z += 2) for (let x = 0; x < WORLD; x += 2) if (tiles[z * WORLD + x] === T.PLAZA) { g.rect(x * K, z * K, 2 * K, 2 * K); }
     g.stroke(); g.restore();
+    // the outskirts' Ramble (outskirtsPlan.js, ROADMAP HP-1): a packed-earth trail with a soft darker edge, and its
+    // footbridges as planks
+    g.save(); g.lineCap = 'round'; g.lineJoin = 'round';
+    for (const [col, w] of [['rgba(150, 112, 72, .55)', RAMBLE_W * K * 0.95], ['rgba(226, 196, 150, .95)', RAMBLE_W * K * 0.62]]) {
+      g.strokeStyle = col; g.lineWidth = Math.max(2, w);
+      for (const R of RAMBLE) { g.beginPath(); R.pts.forEach(([x, z], i) => (i ? g.lineTo(x * K, z * K) : g.moveTo(x * K, z * K))); g.stroke(); }
+    }
+    g.lineCap = 'butt';
+    for (const F of FOOTBRIDGES) for (const [col, w] of [['#7a4a30', F.w * K * 1.15], ['#e6ab61', F.w * K * 0.8]]) { g.strokeStyle = col; g.lineWidth = Math.max(2, w); g.beginPath(); g.moveTo(F.a[0] * K, F.a[1] * K); g.lineTo(F.b[0] * K, F.b[1] * K); g.stroke(); }
+    g.restore();
     // the stub streets of the rings not opened yet: dashed, faint
     const ring = G.sim?.ringRank?.() || 1;
     g.save(); g.setLineDash([K * 1.2, K * 1.1]); g.lineCap = 'round'; g.strokeStyle = 'rgba(120, 104, 140, .55)';

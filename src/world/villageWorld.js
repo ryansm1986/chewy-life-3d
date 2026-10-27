@@ -29,7 +29,7 @@ export class VillageWorld {
     this.terrainMesh = this.terrain.mesh();
     scene.add(this.terrainMesh);
     scene.add(this.terrain.skirt());
-    this.water = makeWater({ heightTex: this.terrain.heightTex, worldSize: WORLD, center: [WORLD / 2, WORLD / 2], size: WORLD * 3.75 });
+    this.water = makeWater({ heightTex: this.terrain.heightTex, worldSize: WORLD, center: [WORLD / 2, WORLD / 2], size: WORLD * 3.75, deep: '#1288c2', shallow: '#3cc6da' }); // (candy aqua to lagoon blue: the falls-bridge mockups)
     scene.add(this.water);
 
     // lights

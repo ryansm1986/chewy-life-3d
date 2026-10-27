@@ -11,6 +11,7 @@
 // material) and registered as vegetation records, so a building, path or zone that claims the ground clears them
 // exactly like flowers and bushes -- their colliders and lamp lights go with them (VillageWorld.onVegRemoved).
 import * as THREE from 'three';
+import { RAMBLE, RAMBLE_W, POIS } from './outskirtsPlan.js';
 import { Batch, vegToon } from './vegetation.js';
 import { puff, tube, paint, merge } from '../gfx/geom.js';
 import { brushTexture } from '../gfx/textures.js';
@@ -716,6 +717,12 @@ export class Details {
       const r = TREE_KINDS.has(rec.kind) ? 0.55 : rec.kind === 'bamboo' ? 0.9 : rec.kind === 'susuki' ? 0.45 : rec.kind === 'rock' ? 0.55 * rec.s + 0.2 : 0.6 * (rec.s || 1);
       this.mark(rec.x, rec.z, r);
     }
+    // the outskirts' Ramble and its places' clearings (outskirtsPlan.js, ROADMAP HP-1): no shrubs, rocks or clumps on them
+    for (const R of RAMBLE) for (let i = 0; i < R.pts.length - 1; i++) {
+      const [ax, az] = R.pts[i], [bx, bz] = R.pts[i + 1], L = Math.hypot(bx - ax, bz - az);
+      for (let u = 0; u <= L; u += 0.75) this.mark(ax + (bx - ax) * u / L, az + (bz - az) * u / L, RAMBLE_W / 2 + 0.2);
+    }
+    for (const p of POIS) this.mark(p.x, p.z, p.r);
   }
   // ---------------------------------------------------------------- helpers
   H(x, z) { return this.terrain.heightAt(x, z); }
@@ -1097,43 +1104,107 @@ export class Details {
     }
   }
   // ---------------------------------------------------------------- the river crossing: bank rocks, reeds, lanterns
+  // (dressed to the toy-playset bridge, WB-1 concept option C: round mossy boulders half sunk at the west bank, cattails
+  // hugging the abutments, big thick lily pads with pink lotus upstream by the east bank)
   bridge() {
     const br = LANDMARKS.bridgeW, rnd = mulberry32(2828);
     const x0 = br.x - br.len / 2, x1 = br.x + br.len / 2; // deck x range; the river runs north-south under it
-    const boulders = [0, 1, 2].map(v => this.geo('boulder' + v, () => boulderGeo(v * 11 + 5)));
+    // a round, smooth boulder whose moss grows out of it as a soft raised cushion on top (the puff's normals are already
+    // smooth and shared by coincident corners, so lifting along them opens no cracks; cf. props.mossyStone)
+    const roundBoulder = seed => {
+      const g = puff(V(0, 0.22, 0), 0.55, { detail: 2, noise: 0.13, squash: 0.76, seed });
+      const nzb = new Noise(seed * 13 + 1), p = g.attributes.position, n = g.attributes.normal, w = new Float32Array(p.count);
+      for (let i = 0; i < p.count; i++) {
+        const m = clamp((mossLine(n.getY(i), p.getX(i), p.getZ(i), 0.5, 2.2, seed) + 0.05) * 7); w[i] = m;
+        const k = m * m * (3 - 2 * m) * 0.04; p.setXYZ(i, p.getX(i) + n.getX(i) * k, p.getY(i) + n.getY(i) * k, p.getZ(i) + n.getZ(i) * k);
+      }
+      const moss = col('#74a852'), mhi = col('#a6cc68'), t = new THREE.Color();
+      return paint(g, (pp, nn, o, i) => {
+        o.set('#b6aebc').lerp(col('#e4dcde'), clamp(nn.y * 0.5 + 0.35)).multiplyScalar(0.95 + 0.07 * nzb.n2(pp.x * 6, pp.y * 7 + pp.z * 4));
+        if (pp.y < 0.08) o.multiplyScalar(0.86);
+        t.copy(moss).lerp(mhi, clamp(nn.y * 0.9 - 0.2) * 0.5).multiplyScalar(0.9 + 0.14 * nzb.n2(pp.x * 15, pp.z * 15));
+        o.lerp(t, w[i]);
+      });
+    };
+    // a big lily pad with some thickness: a notched disc on a dark rim, darker at the heart
+    const thickPad = seed => {
+      const r = mulberry32(seed * 53 + 7), R = 0.34 + r() * 0.08, notch = 0.26;
+      const top = new THREE.CircleGeometry(R, 20, notch, TAU - notch * 2); layFlat(top); top.translate(0, 0.04, 0);
+      paint(top, (p, n, o) => o.set('#4c9a44').lerp(col('#8acb68'), clamp(Math.hypot(p.x, p.z) / R)));
+      const rim = new THREE.CylinderGeometry(R, R * 0.96, 0.04, 20, 1, true, notch + PI / 2, TAU - notch * 2); rim.translate(0, 0.02, 0);
+      paint(rim, (p, n, o) => o.set('#3e7c3a'));
+      return merge([top, rim]);
+    };
+    // a pink lotus: eight cupped outer petals and six upright inner ones, white at the base, a gold seed head
+    const lotus = seed => {
+      const r = mulberry32(seed * 31 + 5), parts = [];
+      for (const [np, len, up, w, c0, c1, a0] of [[8, 0.13, 0.5, 0.055, '#ff86b8', '#fff2f8', r()], [6, 0.1, 1.0, 0.045, '#ff9cc6', '#ffeaf3', r() + 0.4]]) for (let k = 0; k < np; k++) {
+        const pg = new THREE.SphereGeometry(1, 7, 4); pg.scale(w, 0.022, len); pg.translate(0, 0, len * 0.85); pg.rotateX(-up); pg.rotateY(k / np * TAU + a0); pg.translate(0, 0.06, 0);
+        paint(pg, (p, n, o) => o.set(c1).lerp(col(c0), clamp(Math.hypot(p.x, p.z) / (len * 1.3)))); parts.push(pg);
+      }
+      const c = new THREE.CylinderGeometry(0.035, 0.04, 0.04, 8); c.translate(0, 0.09, 0); paint(c, (p, n, o) => o.set('#ffd84a').lerp(col('#c8a030'), clamp(-n.y))); parts.push(c);
+      return merge(parts);
+    };
+    const boulders = [0, 1, 2].map(v => this.geo('brBoulder' + v, () => roundBoulder(v * 7 + 3)));
+    const waterline = (z, side, lvl) => { let x = br.x; while (Math.abs(x - br.x) < 9 && this.H(x, z) < lvl) x += side * 0.1; return x; };
+    // (in the water a boulder shows its top 0.35 s above the surface and stretches down to the bed: none float)
+    const boulder = (x, z, s, sink, rec) => {
+      const h = this.H(x, z), wet = h < -0.05, sy = wet ? Math.max(0.95 * s, (0.35 * s - h) / 0.84) : 0.95 * s;
+      rec ||= this.rec(x, z, { kind: 'bankRock', big: true, col: h > -0.2 ? 0.42 * s : 0 });
+      this.put('stone', boulders[Math.floor(rnd() * 3)], x, wet ? 0.35 * s - 0.64 * sy : h - sink * s, z, { rot: rnd() * TAU, s: [s * 1.15, sy, s * 1.05], color: STONE_TINTS[Math.floor(rnd() * 6)], rec });
+      this.mark(x, z, 0.45 * s);
+      return rec;
+    };
     // rocks at the four bridge heads, on the bank beside the abutments
-    for (const [bx, sz] of [[x0 + 0.1, -1], [x0 + 0.1, 1], [x1 - 0.1, -1], [x1 - 0.1, 1]]) {
+    for (const [bx, sz] of [[x0 + 0.1, -1], [x1 - 0.1, -1], [x1 - 0.1, 1]]) { // (the south-west head: the boulder family below)
       const z = br.z + sz * 2.1, x = bx + (bx < br.x ? 0.4 : -0.4);
-      const s = 0.6 + rnd() * 0.35;
-      const rec = this.rec(x, z, { kind: 'bankRock', big: true, col: this.H(x, z) > -0.2 ? 0.34 * s : 0 });
-      this.put('stone', boulders[Math.floor(rnd() * 3)], x, Math.max(-0.3, this.H(x, z)) - 0.1, z, { rot: rnd() * TAU, s: [s * 1.2, s * 0.9, s], color: STONE_TINTS[Math.floor(rnd() * 6)], rec });
+      const rec = boulder(x, z, 0.55 + rnd() * 0.3, 0.12);
       const qx = x + (rnd() - 0.5) * 0.9, qz = z + sz * (0.5 + rnd() * 0.4);
-      this.put('stone', boulders[Math.floor(rnd() * 3)], qx, Math.max(-0.3, this.H(qx, qz)) - 0.06, qz, { rot: rnd() * TAU, s: 0.3 + rnd() * 0.15, color: STONE_TINTS[Math.floor(rnd() * 6)], rec });
+      boulder(qx, qz, 0.28 + rnd() * 0.12, 0.1, rec);
+      this.count('bankRock');
+    }
+    // a family of round mossy boulders half sunk in the shallows off the west bank, downstream of the bridge
+    for (const [dz, dx, s] of [[3.0, 0.45, 0.85], [4.15, 0.3, 0.7], [3.6, 1.0, 0.42], [4.85, -0.15, 0.45], [2.5, -0.2, 0.32]]) {
+      const z = br.z + dz, x = waterline(z, -1, -0.05) + dx, h = this.H(x, z);
+      if (distToPaths(x, z) < 0.9 || h > 0.45 || (0.35 * s - h) / 0.84 > 1.6 * s || !this.free(x, z, 0.3 * s)) continue;
+      boulder(x, z, s, 0.12);
       this.count('bankRock');
     }
     // reeds along both banks up- and downstream (march sideways from the river centre to the waterline)
     const reeds = [0, 1, 2, 3].map(v => this.geo('reed' + v, () => reedGeo(v)));
+    const reed = (px, pz) => {
+      const rec = this.rec(px, pz, { kind: 'reeds' });
+      this.put('reed', reeds[Math.floor(rnd() * 4)], px, Math.max(-0.08, this.H(px, pz)) - 0.02, pz, { rot: rnd() * TAU, s: 0.8 + rnd() * 0.4, rec });
+      this.count('reeds');
+    };
     for (let z = br.z - 11; z < br.z + 12; z += 1.4) {
       if (Math.abs(z - br.z) < 2.8) continue;
       for (const side of [-1, 1]) {
         if (rnd() < 0.45) continue;
-        let x = br.x; while (Math.abs(x - br.x) < 9 && this.H(x, z) < 0) x += side * 0.1;
+        const x = waterline(z, side, 0);
         const px = x - side * (rnd() * 0.35), pz = z + (rnd() - 0.5) * 0.8;
         if (this.H(px, pz) > 0.25 || distToPaths(px, pz) < 0.8) continue;
-        const rec = this.rec(px, pz, { kind: 'reeds' });
-        this.put('reed', reeds[Math.floor(rnd() * 4)], px, Math.max(-0.08, this.H(px, pz)) - 0.02, pz, { rot: rnd() * TAU, s: 0.8 + rnd() * 0.4, rec });
-        this.count('reeds');
+        reed(px, pz);
       }
     }
-    // lily pads in the slow shallows along the banks
-    const pads = [0, 1, 2, 3].map(v => this.geo('lily' + v, () => lilyGeo(v, false))), lotus = this.geo('lotus0', () => lilyGeo(10, true));
-    for (const [z, side] of [[br.z + 4.2, -1], [br.z - 4.6, 1], [br.z + 8.5, 1]]) {
-      let x = br.x; while (Math.abs(x - br.x) < 9 && this.H(x, z) < -0.3) x += side * 0.1;
-      const cx = x - side * 0.8, rec = this.rec(cx, z, { kind: 'lilies' });
-      for (let i = 0; i < 4; i++) {
-        const px = cx + (rnd() - 0.5) * 1.1 - side * rnd() * 0.5, pz = z + (rnd() - 0.5) * 1.6;
-        if (this.H(px, pz) > -0.2) continue;
-        this.put('flat', i === 1 ? lotus : pads[Math.floor(rnd() * 4)], px, 0.02, pz, { rot: rnd() * TAU, s: 0.8 + rnd() * 0.4, rec });
+    // cattails hugging the abutments: the west bank either side of the bridge, the east bank upstream
+    for (const [dz, side] of [[1.95, -1], [2.35, -1], [-2.1, -1], [-2.3, 1]]) {
+      const pz = br.z + dz + (rnd() - 0.5) * 0.2, px = waterline(pz, side, 0) - side * 0.15;
+      if (this.H(px, pz) > 0.25 || this.H(px, pz) < -0.3 || distToPaths(px, pz) < 0.8 || !this.free(px, pz, 0.2)) continue;
+      reed(px, pz); this.mark(px, pz, 0.3);
+    }
+    // big thick lily pads in the slow shallows: a broad raft with two lotus upstream by the east bank, smaller rafts
+    // elsewhere
+    const pads = [0, 1, 2, 3].map(v => this.geo('brPad' + v, () => thickPad(v))), flower = [0, 1].map(v => this.geo('brLotus' + v, () => lotus(v)));
+    for (const [z, side, n, s0, nl] of [[br.z - 4.4, 1, 7, 1.25, 2], [br.z + 5.6, -1, 3, 0.95, 0], [br.z + 8.5, 1, 4, 1.0, 1]]) {
+      const x = waterline(z, side, -0.3), cx = x - side * 1.0, rec = this.rec(cx, z, { kind: 'lilies' });
+      const laid = [];
+      for (let i = 0, lo = 0; i < n * 4 && laid.length < n; i++) { // (pads may overlap a little, never stack: each lies a few mm above the last)
+        const px = cx + (rnd() - 0.5) * 1.5 - side * rnd() * 0.6, pz = z + (rnd() - 0.5) * 2.2, s = s0 * (0.8 + rnd() * 0.5);
+        if (this.H(px, pz) > -0.2 || laid.some(([qx, qz, qs]) => Math.hypot(px - qx, pz - qz) < (s + qs) * 0.3)) continue;
+        laid.push([px, pz, s]);
+        this.put('body', pads[Math.floor(rnd() * 4)], px, laid.length * 0.007, pz, { rot: rnd() * TAU, s: [s, 1, s], rec });
+        if (lo < nl && laid.length % 2 === 1) { lo++; this.put('body', flower[lo % 2], px + (rnd() - 0.5) * 0.1 * s, laid.length * 0.007, pz + (rnd() - 0.5) * 0.1 * s, { rot: rnd() * TAU, s: 0.9 + rnd() * 0.3, rec }); }
       }
     }
     // a rowboat pulled up on the sandy bank downstream of the bridge

@@ -138,14 +138,6 @@ class Orb {
 
 function ORB_FRAME(kind) {
   const ink = '#4a2c2a';
-  const ears = kind === 'life'
-    ? `<path d="M40 30 C34 12 20 8 12 17 C6 24 9 38 18 43 C26 42 34 37 40 30Z" fill="#8a4a2c" stroke="${ink}" stroke-width="4" stroke-linejoin="round"/>
-       <path d="M110 30 C116 12 130 8 138 17 C144 24 141 38 132 43 C124 42 116 37 110 30Z" fill="#8a4a2c" stroke="${ink}" stroke-width="4" stroke-linejoin="round"/>
-       <path d="M20 22 C25 17 31 19 34 25" fill="none" stroke="#b86a42" stroke-width="3" stroke-linecap="round"/>`
-    : `<path d="M38 36 C28 24 22 10 22 -2 C38 2 50 14 56 28Z" fill="#232132" stroke="${ink}" stroke-width="4" stroke-linejoin="round"/>
-       <path d="M112 36 C122 24 128 10 128 -2 C112 2 100 14 94 28Z" fill="#232132" stroke="${ink}" stroke-width="4" stroke-linejoin="round"/>
-       <path d="M36 26 C32 20 29 12 29 6 C38 9 44 16 47 24Z" fill="#ff9ab8" opacity=".75"/>
-       <path d="M114 26 C118 20 121 12 121 6 C112 9 106 16 103 24Z" fill="#ff9ab8" opacity=".75"/>`;
   const dots = Array.from({ length: 10 }, (_, i) => {
     const a = (i / 10) * TAU + 0.31; const x = 75 + Math.cos(a) * 63.5, y = 75 + Math.sin(a) * 63.5;
     return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.3" fill="${i % 2 ? '#ffcf4a' : kind === 'life' ? '#ff8fb0' : '#8fd0ff'}" stroke="${ink}" stroke-width="1.2"/>`;
@@ -154,7 +146,6 @@ function ORB_FRAME(kind) {
     ? `<path d="M75 146C63 138.5 59.5 131.5 62.8 125.6 65.8 120.5 71.6 121.3 75 126 78.4 121.3 84.2 120.5 87.2 125.6 90.5 131.5 87 138.5 75 146Z" fill="#ff7fa6" stroke="${ink}" stroke-width="3.2" stroke-linejoin="round"/><ellipse cx="68.5" cy="127" rx="3" ry="1.8" transform="rotate(-35 68.5 127)" fill="#fff" opacity=".8"/>`
     : `<circle cx="75" cy="134" r="12" fill="#8fd0ff" stroke="${ink}" stroke-width="3.2"/><path d="M77.5 124.5l-8 11h5.5l-2.5 8.5 9-12h-5.5l2.5-7.5z" fill="#fff" stroke="${ink}" stroke-width="1.6" stroke-linejoin="round"/>`;
   return `<svg class="orb-frame" viewBox="0 -8 150 162" xmlns="http://www.w3.org/2000/svg">
-    ${ears}
     <path fill-rule="evenodd" d="M75 6a69 69 0 1 1 0 138a69 69 0 1 1 0-138zM75 18a57 57 0 1 0 0 114a57 57 0 1 0 0-114z" fill="#fff6e8" stroke="${ink}" stroke-width="4"/>
     <circle cx="75" cy="75" r="62.8" fill="none" stroke="#f0d9bd" stroke-width="3"/>
     ${dots}${emb}

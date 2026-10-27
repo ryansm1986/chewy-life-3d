@@ -58,6 +58,7 @@ import { Portraits } from './gfx/portraits.js';
 import { BuildingThumbs } from './gfx/thumbs.js';
 import { installServices } from './world/services.js';
 import { Waterfall } from './world/waterfall.js';
+import { installOutskirts } from './world/outskirts/index.js';
 import { VillageMinimap, DungeonMinimap, RegionMinimap } from './world/minimap.js';
 import { installMapPin } from './world/mapPin.js';
 import { installQuestMoments } from './world/questMoments.js';
@@ -137,7 +138,8 @@ export async function boot() {
   G.vfx = vVfx;
   const ambient = new Ambient(G, village, vVfx);
   setTimeout(() => vVfx.prewarm(engine.renderer, engine.camera), 200);
-  const waterfall = new Waterfall(village, vVfx); // (at LANDMARKS.waterfall)
+  const waterfall = G.waterfall = new Waterfall(village, vVfx); // (at LANDMARKS.waterfall; its rock garden, koi and lookout: world/waterfall.js, fallsGarden.js)
+  const outskirts = installOutskirts(G, village); // (the Ramble, its footbridges and ten cozy places: world/outskirts/, ROADMAP HP-1)
   const vCombat = new Combat(G, village);
   const vLoot = new GroundLoot(G, village);
   G.villageLoot = vLoot;
@@ -1016,6 +1018,7 @@ export async function boot() {
       buildMode.update(dt);
       ambient.update(dt, engine.time);
       if (Math.hypot(player.pos.x - L.waterfall.x, player.pos.z - L.waterfall.z) < 70) waterfall.update(dt, engine.time, day); // (mist + spray only nearby)
+      outskirts.update(dt, engine.time);
       villageAmbience(dt);
       G.burrowLantern?.update(dt, engine.time, vVfx, player.pos); // (the Deep Burrow's Spirit Lantern by the Burrow door)
       G.townPortal?.update(dt, engine.time, vVfx); // (the Town Portal's other end by the plaza, while one is open)

@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { Noise, clamp, lerp } from '../core/util.js';
 import { makeToon, POOL_GLSL } from '../gfx/materials.js';
-import { WORLD, T, LANDMARKS, POND, RIVER, PLATEAU } from './layout.js';
+import { WORLD, T, LANDMARKS, POND, RIVER, PLATEAU, BASIN } from './layout.js';
 import { islandHeight, riverDist } from './islandShape.js';
 
 export { WORLD, T, riverDist };
@@ -259,10 +259,10 @@ const TERRAIN_FRAG_COLOR = /* glsl */`
   grass = mix(grass, g3, smoothstep(0.52, 0.72, n2) * 0.7);
   grass = mix(grass, g4, smoothstep(0.55, 0.75, 1.0 - n2) * 0.5);
   // trodden earth: worn grass tiles (alpha < 1, see Terrain.wear) and the yards under buildings (alpha 0), patchy
-  float wornA = clamp((1.0 - tl.a) * 1.6 - (tl.r + tl.g + tl.b) * 4.0, 0.0, 1.0) * smoothstep(0.6, 0.8, h);
+  float wornA = clamp((1.0 - tl.a) * 1.6 - (tl.r + tl.g + tl.b) * 4.0, 0.0, 1.0) * smoothstep(0.12, 0.32, h); // (down to the shore: the outskirts' Ramble)
   float wornN = smoothstep(0.3, 0.8, wornA + (n1 - 0.5) * 0.55 + (n3 - 0.5) * 0.4);
   vec3 earth = mix(vec3(0.62, 0.53, 0.40), vec3(0.72, 0.62, 0.46), n3);
-  grass = mix(grass, mix(grass * 0.86, earth, 0.7), wornN * 0.9);
+  grass = mix(grass, mix(grass * 0.86, earth * vec3(1.06, 1.0, 0.9), 0.7 + 0.25 * smoothstep(0.7, 1.0, wornA)), wornN * 0.92); // (fully worn, the Ramble: warm packed earth)
   vec3 sand = mix(vec3(0.97, 0.88, 0.68), vec3(0.93, 0.80, 0.62), n3);
   float sandAmt = 1.0 - smoothstep(0.3, 0.75, h + (n1 - 0.5) * 0.5);
   // painted cliff faces: wavy sediment bands (warm sandstone / cool slate), dark seams between them, embedded stones,
@@ -281,12 +281,21 @@ const TERRAIN_FRAG_COLOR = /* glsl */`
   float drip = smoothstep(0.55, 0.95, sin(along * 7.0 + n1 * 5.0) * 0.5 + 0.5) * smoothstep(0.8, 0.35, slope);
   rock = mix(rock, vec3(0.42, 0.62, 0.34), drip * 0.7);                           // moss drips under the lip
   rock *= mix(0.78, 1.0, smoothstep(-0.2, 0.6, h));                               // damp, darker foot
+  // the waterfall's rock garden (world/fallsGarden.js): between its boulders the cliff is deep shade, not strata
+  float fallsK = 1.0 - smoothstep(11.0, 15.0, length((wp.xz - vec2(${BASIN.x.toFixed(1)}, ${(BASIN.z - 1).toFixed(1)})) * vec2(1.0, 0.8)));
+  rock = mix(rock, vec3(0.27, 0.26, 0.3) * (0.9 + 0.2 * n3), fallsK);
   float rockAmt = smoothstep(0.30, 0.5, slope + (n2 - 0.5) * 0.25);
   vec3 col = grass;
   col = mix(col, sand, sandAmt);
   col = mix(col, rock, rockAmt);
   // underwater
-  col = mix(col, vec3(0.62, 0.72, 0.58), smoothstep(0.1, -0.4, h));
+  // the bed under the water (it shows through the clear shallows): pale sand with rounded pebbles, a little moss deeper
+  vec2 pb = voronoi(wp.xz * 1.7);
+  vec3 bed = mix(vec3(0.86, 0.82, 0.68), vec3(0.78, 0.76, 0.66), n3);
+  bed = mix(bed, mix(vec3(0.72, 0.7, 0.66), vec3(0.88, 0.84, 0.76), pb.y), (1.0 - smoothstep(0.2, 0.36, pb.x)) * smoothstep(0.35, 0.7, n2) * 0.8);
+  bed = mix(bed, vec3(0.6, 0.7, 0.55), smoothstep(-0.5, -1.4, h) * 0.5);
+  bed *= vec3(0.82, 0.97, 0.93); // (seen through the water: a touch of aqua)
+  col = mix(col, bed, smoothstep(0.1, -0.4, h));
   // dirt / field
   float fieldAmt = smoothstep(0.3, 0.6, tl.b + (n3 - 0.5) * 0.3);
   vec3 soil = mix(vec3(0.55, 0.36, 0.24), vec3(0.64, 0.44, 0.30), smoothstep(-0.3, 0.3, sin(wp.x * 3.1416 * 2.0)));

@@ -4,6 +4,7 @@
 // moves everything tied to it. Pure data + helpers: no three.js, and nothing imported from terrain.js (terrain imports
 // this; plots.js holds the plot table and imports nothing).
 import { PLOTS, plotSpot, DOOR_DIR } from './plots.js';
+import { outskirtsKeepOut, distToRamble, poiAt, RAMBLE_W, RAMBLE } from './outskirtsPlan.js';
 
 export const WORLD = 224; // tiles = metres
 export const T = { GRASS: 0, PATH: 1, PLAZA: 2, FIELD: 3, SAND: 4, ROCK: 5, WATER: 6 };
@@ -16,6 +17,9 @@ export const HILL = { x: 176, z: 84, top: 13, foot: 24, h: 3.4 }; // the shrine 
 export const BAMBOO = { x: 36, z: 104, r: 32, h: 0.9 };      // the bamboo rise west of the river
 export const POND = { x: 142, z: 146, r: 9 };
 export const BASIN = { x: 100, z: 32, r0: 4.5, r1: 8 };      // the waterfall's plunge pool
+// the waterfall's four steps (world/waterfall.js, fallsGarden.js): each lip's z and height, the curtain's width there;
+// the cliff is notched to a staircase under them (islandShape.js) and the pool's surface (y 0) takes the last one
+export const FALLS = { x: 100, steps: [{ x: 100.5, z: 23.0, y: 6.62, w: 2.9 }, { x: 100.2, z: 24.15, y: 4.97, w: 3.4 }, { x: 99.85, z: 25.3, y: 3.32, w: 3.9 }, { x: 99.5, z: 26.45, y: 1.67, w: 4.4 }], foot: { z: 27.2 } };
 // the North-West Terraces (rank 4): two shelves above the farms; steps: [riser top z, riser foot z, height]
 export const TERRACES = { x0: 85, x1: 109, z0: 58, z1: 82, edge: 3, steps: [[80, 78.5, 1.1], [70, 68.5, 2.2]] };
 // river control points (x, z) from the waterfall pool down to the sea
@@ -58,7 +62,7 @@ export const LANDMARKS = {
   bridgeW: { x: Math.round(riverX(BRIDGE_Z) - 4.5) + 4.5, z: BRIDGE_Z, len: 9, rot: Math.PI / 2 },
   pond: { x: POND.x, z: POND.z },
   waterfall: { x: BASIN.x, z: 25 },
-  basin: { x: BASIN.x, z: BASIN.z },
+  basin: { x: BASIN.x, z: BASIN.z, w: 11, d: 15 }, // (w, d: the pool and its rock garden, kept clear of trees toward the camera: SIGHTLINES)
   beach: { x: 96, z: 205 },                                     // (the sand: the coast runs ~10 m south of 2x the old one)
   travel: { x: 43, z: 106, rot: 0.35 },                          // the Wayfarer's Post at the end of the west trail (docs/REGIONS.md)
   bamboo: { x: BAMBOO.x, z: BAMBOO.z },
@@ -176,7 +180,22 @@ export function applyLayout(terrain, rank = 1) {
     }
   }
   for (const P of openPaths(rank)) paintStreet(tiles, P);
+  if (terrain.wear) paintRamble(terrain);
   terrain.syncTiles();
+}
+// the Ramble (outskirtsPlan.js) as packed earth: worn grass tiles (Terrain.wear: the grass thins away and the terrain
+// paints trodden earth), full down its middle and fading at its edges
+export function paintRamble(terrain) {
+  const { tiles, wear } = terrain, r = RAMBLE_W / 2 + 0.7;
+  for (const R of RAMBLE) for (let i = 0; i < R.pts.length - 1; i++) {
+    const [ax, az] = R.pts[i], [bx, bz] = R.pts[i + 1];
+    for (let z = Math.max(0, Math.floor(Math.min(az, bz) - r)); z <= Math.min(WORLD - 1, Math.ceil(Math.max(az, bz) + r)); z++)
+      for (let x = Math.max(0, Math.floor(Math.min(ax, bx) - r)); x <= Math.min(WORLD - 1, Math.ceil(Math.max(ax, bx) + r)); x++) {
+        const k = z * WORLD + x; if (tiles[k] !== T.GRASS) continue;
+        const d = segDist(x + 0.5, z + 0.5, ax, az, bx, bz), w = d < RAMBLE_W / 2 - 0.3 ? 255 : d < r ? Math.round(255 * (1 - (d - RAMBLE_W / 2 + 0.3) / (r - RAMBLE_W / 2 + 0.3)) * 0.85) : 0;
+        if (w > wear[k]) wear[k] = w;
+      }
+  }
 }
 
 // ------------------------------------------------------------------ green belts (tree lines between the districts)
@@ -208,7 +227,7 @@ export function beltAt(x, z) {
 export const CAMERA_SIDE = 7;
 const SIGHTLINES = [
   // [landmark key, extra side clearance, camera-side reach]
-  ['townHall', 2.5, CAMERA_SIDE], ['rosieShop', 2.5, CAMERA_SIDE + 1], ['chewyHouse', 2.5, CAMERA_SIDE], ['dungeon', 2, CAMERA_SIDE], ['travel', 1.2, CAMERA_SIDE - 1],
+  ['townHall', 2.5, CAMERA_SIDE], ['rosieShop', 2.5, CAMERA_SIDE + 1], ['chewyHouse', 2.5, CAMERA_SIDE], ['dungeon', 2, CAMERA_SIDE], ['travel', 1.2, CAMERA_SIDE - 1], ['basin', 1, CAMERA_SIDE + 4],
 ];
 const sweep = (x, z, cx, cz, hw, hd, side, reach, canopy) => {
   const dx = x - cx, dz = z - cz;
@@ -232,6 +251,7 @@ function plotsNear(x, z) {
   return i < 0 || j < 0 || i >= IDX_N || j >= IDX_N ? [] : plotBins[j * IDX_N + i];
 }
 export function treeKeepOut(x, z, canopy = 2) {
+  if (outskirtsKeepOut(x, z, canopy)) return true; // (the Ramble and its places, outskirtsPlan.js)
   for (const S of Object.values(SQUARES)) if (squareDist(S, x, z) < 3 + canopy) return true; // the squares stay open
   for (const [k, side, reach] of SIGHTLINES) {
     const Lk = LANDMARKS[k];
@@ -254,6 +274,7 @@ export function reservedAt(x, z) {
   for (const S of Object.values(SQUARES)) if (squareDist(S, x, z) < 1.5) return true;
   if (Math.hypot(x - BR.x, z - BR.z) < 5.5) return true;
   if (Math.hypot(x - L.travel.x, z - L.travel.z) < 3.2) return true;
+  if (distToRamble(x, z) < RAMBLE_W / 2 + 0.5 || poiAt(x, z, 0.5)) return true; // (the outskirts' trail and clearings)
   return false;
 }
 // is (x, z) inside the town (the plateau and the districts around it)? Dense ground layers thin out beyond it.

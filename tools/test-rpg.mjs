@@ -591,7 +591,7 @@ hr('HOMESTEAD');
   const seq = seed => { const r = new RNG(seed); return () => r.next(); };
   // ---- the pantry
   const byKind = k => PANTRY_IDS.filter(id => PANTRY[id].kind === k).length;
-  ok(PANTRY_IDS.length === 50 && byKind('seed') === 8 && byKind('crop') === 8 && byKind('fish') === 15 && byKind('forage') === 4 && byKind('dish') === 15, 'pantry: 50 goods (8 seeds, 8 crops, 15 fish, 4 forage, 15 dishes)');
+  ok(PANTRY_IDS.length === 53 && byKind('seed') === 8 && byKind('crop') === 8 && byKind('fish') === 15 && byKind('forage') === 6 && byKind('dish') === 16, 'pantry: 53 goods (8 seeds, 8 crops, 15 fish, 6 forage, 16 dishes)');
   for (const id of PANTRY_IDS) {
     const d = PANTRY[id];
     ok(PKINDS.includes(d.kind) && d.name && d.desc && fin(d.value) && d.value > 0, `pantry ${id} complete`);
@@ -613,7 +613,7 @@ hr('HOMESTEAD');
     ok([...fk].every(k => PANTRY[k].kind === 'forage') && fk.has('seaweed') && forageDrops('nowhere', 'boss', seq(1)).length === 0, 'forage drops: the region\'s own finds (none outside the regions)'); }
 
   // ---- recipes and mixes
-  ok(RECIPE_IDS.length === 16 && RECIPE_IDS.every(id => PANTRY[id]?.kind === 'dish' || RECIPES[id].out?.mat) && PANTRY_IDS.filter(id => PANTRY[id].kind === 'dish').every(id => RECIPES[id]), 'recipes: one per dish (and Pound Mochi, which makes a material)');
+  ok(RECIPE_IDS.length === 17 && RECIPE_IDS.every(id => PANTRY[id]?.kind === 'dish' || RECIPES[id].out?.mat) && PANTRY_IDS.filter(id => PANTRY[id].kind === 'dish').every(id => RECIPES[id]), 'recipes: one per dish (and Pound Mochi, which makes a material)');
   ok(STARTERS.join() === 'grilledFish,roastedVeggies,onigiri,poundMochi', 'recipes: the three starters, and Pound Mochi (COZY §7.2)');
   const MATS = new Set(MATERIAL_KEYS);
   for (const id of RECIPE_IDS) {

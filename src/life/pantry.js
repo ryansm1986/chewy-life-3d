@@ -69,6 +69,7 @@ const DISHES = [
   ['melonBread', 'Melon Bread', 'A crunchy cookie-crust bun. Pan naps better after one.', 140, { heal: 0.45, buff: 'zen', tier: 2, mins: 12 }],
   ['sushiPlatter', 'Sushi Platter', 'Three kinds of nigiri on a little wooden board.', 260, { heal: 0.7, buff: 'strong', tier: 3, mins: 15 }],
   ['fishermansFeast', "Fisherman's Feast", 'A whole tray: grilled fish, rice, soup and pickles.', 320, { heal: 0.85, buff: 'hearty', tier: 3, mins: 15 }],
+  ['greenTea', 'Green Tea', 'A warm cup from the Bamboo Tea Garden. Calm settles in like a cat on a lap.', 20, { heal: 0.25, buff: 'zen', tier: 1, mins: 10 }],
   ['moonKoiBento', 'Moon Koi Bento', 'A legendary bento that glows faintly. You feel very lucky.', 1200, { heal: 1, buff: 'lucky', tier: 3, mins: 15 }, 3],
 ];
 
@@ -96,6 +97,8 @@ def({ id: 'honey', kind: 'forage', name: 'Honey', desc: 'Golden and sticky. Kuma
 def({ id: 'bamboo', kind: 'forage', name: 'Bamboo Shoot', desc: 'A tender spring shoot from the bamboo groves. Pan\'s favourite snack.', value: 22 });
 def({ id: 'shiitake', kind: 'forage', name: 'Shiitake', desc: 'A plump brown mushroom that smells of the forest after rain.', value: 26 });
 def({ id: 'seaweed', kind: 'forage', name: 'Nori Seaweed', desc: 'Crisp green seaweed from the tide pools. Wraps rice beautifully.', value: 18 });
+def({ id: 'peach', kind: 'forage', name: 'Peach', desc: 'A blushing peach from the Windmill Orchard, soft and sweet. Rosie wants a basket.', value: 28 });
+def({ id: 'persimmon', kind: 'forage', name: 'Persimmon', desc: 'A glossy orange persimmon from the orchard. Wait until it is soft, then: bliss.', value: 26 });
 for (const [id, name, desc, value, food, rare] of DISHES) def({ id, kind: 'dish', name, desc, value, food, rare: rare || (food.tier >= 3 ? 2 : food.tier - 1) });
 
 // ------------------------------------------------------------------ villager tastes (story.js giftFlow, phase 3)
