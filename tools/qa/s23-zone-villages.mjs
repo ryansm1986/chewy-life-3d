@@ -16,7 +16,7 @@
 //  h) the other three: besieged → camps → their captain (its intro, the boss slot) → saved, villagers out; their
 //     specials (the tea house's tea sets, the fish market, the boatyard, the bathhouse's soak, the smith's forge and
 //     re-fold); the square's draw calls besieged and saved; all three stay saved over a reload
-import { launch, boot, waitMode, sleep, makeReport, BASE, drainDialogue } from './lib.mjs';
+import { launch, boot, waitMode, sleep, makeReport, BASE, drainDialogue, warmFolk } from './lib.mjs';
 
 const R = makeReport('S23 zone villages');
 const { browser, page, errors, warns } = await launch({ w: 1600, h: 900 });
@@ -190,6 +190,7 @@ try {
   const trips = async n => { for (let i = 0; i < n; i++) { await enterZone(); await ev(() => window.G.returnToVillage()); await waitMode(page, 'village'); await sleep(page, 600); } };
   // (a warm-up pair first: the Blender townsfolk's atlases, heroModels FOLK_TOY, upload the first time each design walks on,
   //  live textures the town sync brings in, not a leak; the baseline is taken once the trips have shown them)
+  await warmFolk(page);
   await trips(2);
   const m0 = await mem();
   await trips(2); const m1 = await mem();

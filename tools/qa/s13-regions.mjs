@@ -10,7 +10,7 @@
 //  f) every region builds and runs a few seconds with no errors
 //  g) home again: arrival by the post, the village mood restored; save / reload keeps state.regions
 //  h) round trips village ⇄ region don't leak GPU memory
-import { launch, boot, waitMode, sleep, makeReport } from './lib.mjs';
+import { launch, boot, waitMode, sleep, makeReport, warmFolk } from './lib.mjs';
 
 const R = makeReport('S13 regions: travel, unlocks, fights, boss, region hopping, round-trip leaks');
 const { browser, page, errors, warns } = await launch();
@@ -106,6 +106,7 @@ try {
   // (eight trips, judged on the last three: each trip may show a townsfolk design for the first time, whose Blender rig
   //  (heroModels FOLK_TOY) uploads its cached geometry and atlases once, bounded growth, not a leak. Traced 2026-11-05:
   //  the counts climb to trip 5 and then hold exactly, 450g/301t through trip 11)
+  await warmFolk(page);
   const mem = [];
   for (let k = 0; k < 8; k++) {
     await page.evaluate(() => window.G.travel.go('bamboo')); await inRegion('bamboo'); await sleep(page, 800);

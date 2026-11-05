@@ -1,0 +1,245 @@
+{
+  "design": "c",
+  "units": "metres (final, crown 1.05 m)",
+  "coordinate_system": "Blender Z-up, front -Y; character left is +X",
+  "hips": [
+    0.0,
+    0.006,
+    0.22
+  ],
+  "spine": [
+    0.0,
+    0.004,
+    0.32
+  ],
+  "chest": [
+    0.0,
+    0.0,
+    0.41
+  ],
+  "neck": [
+    0.0,
+    0.0,
+    0.515
+  ],
+  "head": [
+    0.0,
+    0.03782,
+    0.72812
+  ],
+  "head_nod_pivot_suggested": [
+    0.0,
+    0.0891,
+    0.54223
+  ],
+  "jaw_pivot": [
+    0.0,
+    -0.11602,
+    0.60954
+  ],
+  "eyes": {
+    "R": [
+      -0.1302,
+      -0.19671,
+      0.72934
+    ],
+    "L": [
+      0.1302,
+      -0.19671,
+      0.72934
+    ]
+  },
+  "eye_axes": {
+    "R": {
+      "out_deg": 19.2,
+      "down_deg": -8.4
+    },
+    "L": {
+      "out_deg": 19.2,
+      "down_deg": -8.4
+    }
+  },
+  "lash": {
+    "R": {
+      "tip": [
+        -0.2243,
+        -0.1514,
+        0.765
+      ],
+      "root": [
+        -0.0726,
+        -0.2211,
+        0.7513
+      ],
+      "flick_tip": [
+        -0.2026,
+        -0.1551,
+        0.798
+      ],
+      "max_proud_W": 0.007
+    },
+    "L": {
+      "tip": [
+        0.2243,
+        -0.1514,
+        0.765
+      ],
+      "root": [
+        0.0726,
+        -0.2211,
+        0.7513
+      ],
+      "flick_tip": [
+        0.2026,
+        -0.1551,
+        0.798
+      ],
+      "max_proud_W": 0.007
+    }
+  },
+  "ears": {
+    "R": {
+      "base": [
+        -0.16025,
+        0.06987,
+        0.87235
+      ],
+      "mid": [
+        -0.19317,
+        0.06658,
+        0.97111
+      ],
+      "tip": [
+        -0.2261,
+        0.06329,
+        1.06988
+      ]
+    },
+    "L": {
+      "base": [
+        0.16025,
+        0.06987,
+        0.87235
+      ],
+      "mid": [
+        0.19317,
+        0.06658,
+        0.97111
+      ],
+      "tip": [
+        0.2261,
+        0.06329,
+        1.06988
+      ]
+    }
+  },
+  "arms": {
+    "L": {
+      "shoulder": [
+        0.152,
+        -0.004,
+        0.468
+      ],
+      "elbow": [
+        0.20493,
+        -0.00899,
+        0.3833
+      ],
+      "wrist": [
+        0.23668,
+        -0.01199,
+        0.33248
+      ]
+    },
+    "R": {
+      "shoulder": [
+        -0.152,
+        -0.004,
+        0.468
+      ],
+      "elbow": [
+        -0.20493,
+        -0.00899,
+        0.3833
+      ],
+      "wrist": [
+        -0.23668,
+        -0.01199,
+        0.33248
+      ]
+    }
+  },
+  "legs": {
+    "L": {
+      "hip": [
+        0.114,
+        0.004,
+        0.24
+      ],
+      "knee": [
+        0.116,
+        0.0,
+        0.14
+      ],
+      "ankle": [
+        0.122,
+        0.018,
+        0.08
+      ],
+      "toe": [
+        0.13925,
+        -0.1761,
+        0.038
+      ]
+    },
+    "R": {
+      "hip": [
+        -0.114,
+        0.004,
+        0.24
+      ],
+      "knee": [
+        -0.116,
+        0.0,
+        0.14
+      ],
+      "ankle": [
+        -0.122,
+        0.018,
+        0.08
+      ],
+      "toe": [
+        -0.13925,
+        -0.1761,
+        0.038
+      ]
+    }
+  },
+  "tail": [
+    [
+      0.0,
+      0.16363,
+      0.25
+    ]
+  ],
+  "palm_R": [
+    -0.25615,
+    -0.01463,
+    0.28246
+  ],
+  "palm_L": [
+    0.25615,
+    -0.01463,
+    0.28246
+  ],
+  "notes": [
+    "Phase 1: no rig, weights or animations. Same keys as the folk-bunny / Usagi joints.json (final metres).",
+    "head = the head centre (the radial origin); head_nod_pivot_suggested = base of the skull, for the rig.",
+    "Head skin = zero surface of one convex implicit ball (squircle skull + jaw + muzzle cushions + nose), analytic normals, toon-band refinement; no eye sockets.",
+    "Upper lash lines: separate ribbons (DogC_lash_L / _R: the line, its wing and a flick), origin at the eye centre, for the upper lids.",
+    "Eyelid holes ringed by 6 loops each with the rim rolled in behind separate lens eyeballs; 3 loops round the mouth, 4 round the nose.",
+    "Ears: separate upright wedges (DogC_ear_L / _R), 26 rings along the axis (bend loops), pivot = ears.base (buried in the skull).",
+    "No head accessory.",
+    "Tail: DogC_tail, a thick swept bean (22 rings, bend loops), root = tail[0]."
+  ]
+}

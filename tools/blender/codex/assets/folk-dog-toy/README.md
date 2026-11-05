@@ -1,0 +1,5 @@
+# Townsfolk dogs (folk-dog-toy): Blender source (Z-D6, 2026-11-05)
+
+Two random townsfolk dogs, picked by Claude when the owner asked for dogs too ("You decide"): A (Mugi, tan floppy ears, green overalls, a leaf) and C (Sora, a black-and-tan shiba, yellow shirt, shorts, a satchel) from the Codex sheet `sheet.png` (folk-dog-concept); B was left out as too close to the lop bunny and the beret designs. Game ids `folk_dog_a`, `folk_dog_c` (HERO_MODELS lidTilt 0.4595 / 0.3356, lidClose 0.482 / 0.52, squint [0.055 / 0.06, -0.24], shutLash y -0.068; C darkGrade [1, -4, 14, -9] and no light shutLashColor: her eyes sit on the tan, not the dark cap); a random townsfolk dog is one of them by its seed (heroModels FOLK_TOY).
+
+Build: `build_folk-dog-toy.py`, rig: `rig_folk-dog-toy.py` with `rig_lids.py` (`go.sh` builds, previews and compares). Lid notes: deep hinges 27-29 cm behind the eye; `skin_dist_dirs` must reach past the hinge (raised to 0.40 m, or the shut lid sinks under the skin; folk-bunny's copy still has 0.25 m, fine for its 23 cm hinge). Known: A's ear roots show a small rounded fold at the head's top corners.

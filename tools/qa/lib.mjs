@@ -34,6 +34,20 @@ export async function boot(page, qs = 'fresh&nointro') {
   await installProbes(page);
 }
 
+/** show every Blender townsfolk design once (heroModels FOLK_TOY): each uploads its cached geometry and atlases the first
+ *  time it walks on, in bounded steps as the designs turn up, so a leak check warms them first and then measures only leaks */
+export async function warmFolk(page) {
+  await page.evaluate(async () => {
+    const H = await import('/src/actors/heroModels.js'), G = window.G, ids = Object.values(H.FOLK_TOY).flat();
+    await H.loadHeroModels(ids);
+    for (const id of ids) {
+      const rig = H.buildHeroModel(id); if (!rig) continue;
+      rig.root.position.copy(G.player.pos); G.world.scene.add(rig.root);
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      G.world.scene.remove(rig.root);
+    }
+  });
+}
 export const sleep = (page, ms) => page.waitForTimeout(ms);
 
 // wait until the iris transition is finished and G.mode === mode
