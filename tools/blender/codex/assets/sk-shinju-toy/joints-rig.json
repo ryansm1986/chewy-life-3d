@@ -1,0 +1,999 @@
+{
+  "bones": [
+    {
+      "name": "root",
+      "parent": null,
+      "head_blender_m": [
+        0.0,
+        -0.01,
+        0.0
+      ]
+    },
+    {
+      "name": "hips",
+      "parent": "root",
+      "head_blender_m": [
+        0.0,
+        -0.02,
+        0.28
+      ]
+    },
+    {
+      "name": "spine",
+      "parent": "hips",
+      "head_blender_m": [
+        0.0,
+        -0.025,
+        0.36
+      ]
+    },
+    {
+      "name": "chest",
+      "parent": "spine",
+      "head_blender_m": [
+        0.0,
+        -0.03,
+        0.465
+      ]
+    },
+    {
+      "name": "neck",
+      "parent": "chest",
+      "head_blender_m": [
+        0.0,
+        -0.02,
+        0.585
+      ]
+    },
+    {
+      "name": "head",
+      "parent": "neck",
+      "head_blender_m": [
+        0.0,
+        0.03,
+        0.622
+      ]
+    },
+    {
+      "name": "jaw",
+      "parent": "head",
+      "head_blender_m": [
+        0.0,
+        -0.14958,
+        0.71018
+      ]
+    },
+    {
+      "name": "eye_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.11072,
+        -0.20069,
+        0.82822
+      ]
+    },
+    {
+      "name": "lidU_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.08065,
+        -0.12816,
+        0.8198
+      ]
+    },
+    {
+      "name": "lidD_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.00426,
+        0.05651,
+        0.87155
+      ]
+    },
+    {
+      "name": "brow_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.12908,
+        -0.14399,
+        0.95172
+      ]
+    },
+    {
+      "name": "lip_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.10526,
+        -0.27977,
+        0.72126
+      ]
+    },
+    {
+      "name": "ear_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.1662,
+        0.0,
+        0.98164
+      ]
+    },
+    {
+      "name": "earTip_L",
+      "parent": "ear_L",
+      "head_blender_m": [
+        0.1812,
+        0.0,
+        1.02664
+      ]
+    },
+    {
+      "name": "upperarm_L",
+      "parent": "chest",
+      "head_blender_m": [
+        0.14,
+        -0.03,
+        0.545
+      ]
+    },
+    {
+      "name": "forearm_L",
+      "parent": "upperarm_L",
+      "head_blender_m": [
+        0.22169,
+        -0.03719,
+        0.4574
+      ]
+    },
+    {
+      "name": "hand_L",
+      "parent": "forearm_L",
+      "head_blender_m": [
+        0.27275,
+        -0.04168,
+        0.40264
+      ]
+    },
+    {
+      "name": "thigh_L",
+      "parent": "hips",
+      "head_blender_m": [
+        0.125,
+        -0.02,
+        0.255
+      ]
+    },
+    {
+      "name": "shin_L",
+      "parent": "thigh_L",
+      "head_blender_m": [
+        0.133,
+        -0.025,
+        0.16
+      ]
+    },
+    {
+      "name": "foot_L",
+      "parent": "shin_L",
+      "head_blender_m": [
+        0.137,
+        -0.03,
+        0.062
+      ]
+    },
+    {
+      "name": "eye_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.11072,
+        -0.20069,
+        0.82822
+      ]
+    },
+    {
+      "name": "lidU_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.08065,
+        -0.12816,
+        0.8198
+      ]
+    },
+    {
+      "name": "lidD_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.00426,
+        0.05651,
+        0.87155
+      ]
+    },
+    {
+      "name": "brow_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.12908,
+        -0.14399,
+        0.95172
+      ]
+    },
+    {
+      "name": "lip_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.10526,
+        -0.27977,
+        0.72126
+      ]
+    },
+    {
+      "name": "ear_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.1662,
+        0.0,
+        0.98164
+      ]
+    },
+    {
+      "name": "earTip_R",
+      "parent": "ear_R",
+      "head_blender_m": [
+        -0.1812,
+        0.0,
+        1.02664
+      ]
+    },
+    {
+      "name": "upperarm_R",
+      "parent": "chest",
+      "head_blender_m": [
+        -0.14,
+        -0.03,
+        0.545
+      ]
+    },
+    {
+      "name": "forearm_R",
+      "parent": "upperarm_R",
+      "head_blender_m": [
+        -0.22169,
+        -0.03719,
+        0.4574
+      ]
+    },
+    {
+      "name": "hand_R",
+      "parent": "forearm_R",
+      "head_blender_m": [
+        -0.27275,
+        -0.04168,
+        0.40264
+      ]
+    },
+    {
+      "name": "thigh_R",
+      "parent": "hips",
+      "head_blender_m": [
+        -0.125,
+        -0.02,
+        0.255
+      ]
+    },
+    {
+      "name": "shin_R",
+      "parent": "thigh_R",
+      "head_blender_m": [
+        -0.133,
+        -0.025,
+        0.16
+      ]
+    },
+    {
+      "name": "foot_R",
+      "parent": "shin_R",
+      "head_blender_m": [
+        -0.137,
+        -0.03,
+        0.062
+      ]
+    },
+    {
+      "name": "tail1",
+      "parent": "hips",
+      "head_blender_m": [
+        0.0,
+        0.1353,
+        0.25032
+      ]
+    },
+    {
+      "name": "tail2",
+      "parent": "tail1",
+      "head_blender_m": [
+        0.0,
+        0.16581,
+        0.28551
+      ]
+    },
+    {
+      "name": "tail3",
+      "parent": "tail2",
+      "head_blender_m": [
+        0.0,
+        0.18553,
+        0.32595
+      ]
+    },
+    {
+      "name": "tail4",
+      "parent": "tail3",
+      "head_blender_m": [
+        0.0,
+        0.20088,
+        0.35741
+      ]
+    }
+  ],
+  "triangles": 33934,
+  "lidTilt": 0.393,
+  "squint_designed_for": [
+    0.15,
+    -0.28
+  ],
+  "lid_hinge_blender": {
+    "L": [
+      0.92376,
+      0.38296,
+      0.0
+    ],
+    "R": [
+      0.92376,
+      -0.38296,
+      0.0
+    ]
+  },
+  "lids": {
+    "Shinju_lidU_L": {
+      "pivot": [
+        0.08065,
+        -0.12816,
+        0.8198
+      ],
+      "cap": {
+        "capped": 318,
+        "max_shrink_mm": 0.4
+      },
+      "eye_clear_min_mm": 0.6,
+      "out_of_skin_mm_by_angle": {
+        "0.0": -0.8,
+        "0.102": -0.8,
+        "0.203": -0.8,
+        "0.305": -0.8,
+        "0.407": -0.8,
+        "0.508": -0.5,
+        "0.61": -0.5,
+        "0.712": -0.5,
+        "0.813": -0.6,
+        "0.915": -0.8,
+        "1.017": -0.8,
+        "1.118": -0.7,
+        "1.22": -0.3
+      },
+      "shut_edge_rel_lowrim_EHH": [
+        -0.98,
+        -0.25,
+        -0.08
+      ],
+      "rest_edge_minus_holetop_EHH_min": -0.707,
+      "r_b_mm_range": [
+        85.6,
+        105.2
+      ]
+    },
+    "Shinju_lidD_L": {
+      "pivot": [
+        0.00426,
+        0.05651,
+        0.87155
+      ],
+      "cap": {
+        "capped": 252,
+        "max_shrink_mm": 5.0
+      }
+    },
+    "Shinju_lidU_R": {
+      "pivot": [
+        -0.08065,
+        -0.12816,
+        0.8198
+      ],
+      "cap": {
+        "capped": 318,
+        "max_shrink_mm": 0.4
+      },
+      "eye_clear_min_mm": 0.6,
+      "out_of_skin_mm_by_angle": {
+        "0.0": -0.8,
+        "0.102": -0.8,
+        "0.203": -0.8,
+        "0.305": -0.8,
+        "0.407": -0.8,
+        "0.508": -0.5,
+        "0.61": -0.5,
+        "0.712": -0.5,
+        "0.813": -0.6,
+        "0.915": -0.8,
+        "1.017": -0.8,
+        "1.118": -0.7,
+        "1.22": -0.3
+      },
+      "shut_edge_rel_lowrim_EHH": [
+        -0.98,
+        -0.25,
+        -0.08
+      ],
+      "rest_edge_minus_holetop_EHH_min": -0.707,
+      "r_b_mm_range": [
+        85.6,
+        105.2
+      ]
+    },
+    "Shinju_lidD_R": {
+      "pivot": [
+        -0.00426,
+        0.05651,
+        0.87155
+      ],
+      "cap": {
+        "capped": 252,
+        "max_shrink_mm": 5.0
+      }
+    }
+  },
+  "lids_hidden_check": {
+    "Shinju_lidU_L@0.0": {
+      "max_sdf_mm": -0.12,
+      "outside_count": 1,
+      "over_opening_count": 2
+    },
+    "Shinju_lidD_L@0.0": {
+      "max_sdf_mm": -17.1,
+      "outside_count": 0,
+      "over_opening_count": 0
+    },
+    "Shinju_lidD_L@-0.1": {
+      "max_sdf_mm": -9.05,
+      "outside_count": 0,
+      "over_opening_count": 0
+    },
+    "Shinju_lidU_R@0.0": {
+      "max_sdf_mm": -0.12,
+      "outside_count": 1,
+      "over_opening_count": 2
+    },
+    "Shinju_lidD_R@0.0": {
+      "max_sdf_mm": -17.1,
+      "outside_count": 0,
+      "over_opening_count": 0
+    },
+    "Shinju_lidD_R@-0.1": {
+      "max_sdf_mm": -9.05,
+      "outside_count": 0,
+      "over_opening_count": 0
+    },
+    "tongue@rest": {
+      "max_sdf_mm": -3.66,
+      "outside_count": 0
+    },
+    "bill_lower@jaw0.15": {
+      "lowest_z_m": 0.6583,
+      "tip_drop_mm": 15.9
+    },
+    "bill_lower@jaw0.42": {
+      "lowest_z_m": 0.6245,
+      "tip_drop_mm": 49.6
+    }
+  },
+  "lash_sweep": {
+    "L": {
+      "0.0": {
+        "proud_max_mm": 3.7,
+        "buried_frac": 0.328,
+        "Z_range_EHH": [
+          -0.68,
+          1.29
+        ]
+      },
+      "0.15": {
+        "proud_max_mm": 9.6,
+        "buried_frac": 0.35,
+        "Z_range_EHH": [
+          -0.92,
+          1.08
+        ]
+      },
+      "0.488": {
+        "proud_max_mm": 12.9,
+        "buried_frac": 0.328,
+        "Z_range_EHH": [
+          -1.42,
+          0.5
+        ]
+      },
+      "0.8": {
+        "proud_max_mm": 10.9,
+        "buried_frac": 0.52,
+        "Z_range_EHH": [
+          -1.75,
+          -0.09
+        ]
+      },
+      "1.0": {
+        "proud_max_mm": 10.1,
+        "buried_frac": 0.644,
+        "Z_range_EHH": [
+          -1.89,
+          -0.41
+        ]
+      },
+      "1.22": {
+        "proud_max_mm": 6.1,
+        "buried_frac": 0.853,
+        "Z_range_EHH": [
+          -1.96,
+          -0.73
+        ]
+      }
+    },
+    "R": {
+      "0.0": {
+        "proud_max_mm": 3.7,
+        "buried_frac": 0.328,
+        "Z_range_EHH": [
+          -0.68,
+          1.29
+        ]
+      },
+      "0.15": {
+        "proud_max_mm": 9.6,
+        "buried_frac": 0.35,
+        "Z_range_EHH": [
+          -0.92,
+          1.08
+        ]
+      },
+      "0.488": {
+        "proud_max_mm": 12.9,
+        "buried_frac": 0.328,
+        "Z_range_EHH": [
+          -1.42,
+          0.5
+        ]
+      },
+      "0.8": {
+        "proud_max_mm": 10.9,
+        "buried_frac": 0.52,
+        "Z_range_EHH": [
+          -1.75,
+          -0.09
+        ]
+      },
+      "1.0": {
+        "proud_max_mm": 10.1,
+        "buried_frac": 0.644,
+        "Z_range_EHH": [
+          -1.89,
+          -0.41
+        ]
+      },
+      "1.22": {
+        "proud_max_mm": 6.1,
+        "buried_frac": 0.853,
+        "Z_range_EHH": [
+          -1.96,
+          -0.73
+        ]
+      }
+    }
+  },
+  "shut_U_band": {
+    "lidU.L": {
+      "cols": 20
+    },
+    "lidU.R": {
+      "cols": 20
+    }
+  },
+  "happy_edge_screen": {
+    "0.1": {
+      "L": {
+        "front": {
+          "outer_minus_inner_W": 0.0243,
+          "mid_minus_inner_W": 0.0497
+        },
+        "game0": {
+          "outer_minus_inner_W": 0.0633,
+          "mid_minus_inner_W": 0.0627
+        },
+        "game+45": {
+          "outer_minus_inner_W": -0.0101,
+          "mid_minus_inner_W": 0.0254
+        },
+        "game-45": {
+          "outer_minus_inner_W": 0.1112,
+          "mid_minus_inner_W": 0.087
+        },
+        "covers_mid_frac": 0.053
+      },
+      "R": {
+        "front": {
+          "outer_minus_inner_W": 0.0243,
+          "mid_minus_inner_W": 0.0497
+        },
+        "game0": {
+          "outer_minus_inner_W": 0.0633,
+          "mid_minus_inner_W": 0.0627
+        },
+        "game+45": {
+          "outer_minus_inner_W": 0.1112,
+          "mid_minus_inner_W": 0.087
+        },
+        "game-45": {
+          "outer_minus_inner_W": -0.0101,
+          "mid_minus_inner_W": 0.0254
+        },
+        "covers_mid_frac": 0.053
+      }
+    },
+    "0.15": {
+      "L": {
+        "front": {
+          "outer_minus_inner_W": 0.015,
+          "mid_minus_inner_W": 0.0497
+        },
+        "game0": {
+          "outer_minus_inner_W": 0.0575,
+          "mid_minus_inner_W": 0.0642
+        },
+        "game+45": {
+          "outer_minus_inner_W": -0.0201,
+          "mid_minus_inner_W": 0.0224
+        },
+        "game-45": {
+          "outer_minus_inner_W": 0.1087,
+          "mid_minus_inner_W": 0.0922
+        },
+        "covers_mid_frac": 0.093
+      },
+      "R": {
+        "front": {
+          "outer_minus_inner_W": 0.015,
+          "mid_minus_inner_W": 0.0497
+        },
+        "game0": {
+          "outer_minus_inner_W": 0.0575,
+          "mid_minus_inner_W": 0.0642
+        },
+        "game+45": {
+          "outer_minus_inner_W": 0.1087,
+          "mid_minus_inner_W": 0.0922
+        },
+        "game-45": {
+          "outer_minus_inner_W": -0.0201,
+          "mid_minus_inner_W": 0.0224
+        },
+        "covers_mid_frac": 0.093
+      }
+    },
+    "0.2": {
+      "L": {
+        "front": {
+          "outer_minus_inner_W": 0.0029,
+          "mid_minus_inner_W": 0.0375
+        },
+        "game0": {
+          "outer_minus_inner_W": 0.0447,
+          "mid_minus_inner_W": 0.0475
+        },
+        "game+45": {
+          "outer_minus_inner_W": -0.0367,
+          "mid_minus_inner_W": 0.0064
+        },
+        "game-45": {
+          "outer_minus_inner_W": 0.1013,
+          "mid_minus_inner_W": 0.0786
+        },
+        "covers_mid_frac": 0.131
+      },
+      "R": {
+        "front": {
+          "outer_minus_inner_W": 0.0029,
+          "mid_minus_inner_W": 0.0375
+        },
+        "game0": {
+          "outer_minus_inner_W": 0.0447,
+          "mid_minus_inner_W": 0.0475
+        },
+        "game+45": {
+          "outer_minus_inner_W": 0.1013,
+          "mid_minus_inner_W": 0.0786
+        },
+        "game-45": {
+          "outer_minus_inner_W": -0.0367,
+          "mid_minus_inner_W": 0.0064
+        },
+        "covers_mid_frac": 0.131
+      }
+    },
+    "0.488": {
+      "L": {
+        "front": {
+          "outer_minus_inner_W": -0.0201,
+          "mid_minus_inner_W": 0.0103
+        },
+        "game0": {
+          "outer_minus_inner_W": 0.0229,
+          "mid_minus_inner_W": 0.0172
+        },
+        "game+45": {
+          "outer_minus_inner_W": -0.0619,
+          "mid_minus_inner_W": -0.0272
+        },
+        "game-45": {
+          "outer_minus_inner_W": 0.0847,
+          "mid_minus_inner_W": 0.0565
+        },
+        "covers_mid_frac": 0.379
+      },
+      "R": {
+        "front": {
+          "outer_minus_inner_W": -0.0201,
+          "mid_minus_inner_W": 0.0103
+        },
+        "game0": {
+          "outer_minus_inner_W": 0.0229,
+          "mid_minus_inner_W": 0.0172
+        },
+        "game+45": {
+          "outer_minus_inner_W": 0.0847,
+          "mid_minus_inner_W": 0.0565
+        },
+        "game-45": {
+          "outer_minus_inner_W": -0.0619,
+          "mid_minus_inner_W": -0.0272
+        },
+        "covers_mid_frac": 0.379
+      }
+    }
+  },
+  "proud_outside_opening(count, max_mm)": {
+    "Shinju_lidU_L": {
+      "0.0": [
+        0,
+        -0.8
+      ],
+      "0.102": [
+        0,
+        -0.8
+      ],
+      "0.203": [
+        0,
+        -0.8
+      ],
+      "0.305": [
+        0,
+        -0.8
+      ],
+      "0.407": [
+        0,
+        -0.8
+      ],
+      "0.508": [
+        0,
+        -0.5
+      ],
+      "0.61": [
+        0,
+        -0.5
+      ],
+      "0.712": [
+        0,
+        -0.5
+      ],
+      "0.813": [
+        0,
+        -0.6
+      ],
+      "0.915": [
+        0,
+        -0.8
+      ],
+      "1.017": [
+        0,
+        -0.8
+      ],
+      "1.118": [
+        0,
+        -0.7
+      ],
+      "1.22": [
+        0,
+        -0.3
+      ]
+    },
+    "Shinju_lidD_L": {
+      "0.0": [
+        0,
+        -17.1
+      ],
+      "-0.1": [
+        0,
+        -9.0
+      ],
+      "-0.18": [
+        0,
+        -3.4
+      ],
+      "-0.24": [
+        0,
+        -3.3
+      ],
+      "-0.28": [
+        0,
+        -2.4
+      ],
+      "-0.34": [
+        0,
+        -2.0
+      ]
+    },
+    "Shinju_lidU_R": {
+      "0.0": [
+        0,
+        -0.8
+      ],
+      "0.102": [
+        0,
+        -0.8
+      ],
+      "0.203": [
+        0,
+        -0.8
+      ],
+      "0.305": [
+        0,
+        -0.8
+      ],
+      "0.407": [
+        0,
+        -0.8
+      ],
+      "0.508": [
+        0,
+        -0.5
+      ],
+      "0.61": [
+        0,
+        -0.5
+      ],
+      "0.712": [
+        0,
+        -0.5
+      ],
+      "0.813": [
+        0,
+        -0.6
+      ],
+      "0.915": [
+        0,
+        -0.8
+      ],
+      "1.017": [
+        0,
+        -0.8
+      ],
+      "1.118": [
+        0,
+        -0.7
+      ],
+      "1.22": [
+        0,
+        -0.3
+      ]
+    },
+    "Shinju_lidD_R": {
+      "0.0": [
+        0,
+        -17.1
+      ],
+      "-0.1": [
+        0,
+        -9.0
+      ],
+      "-0.18": [
+        0,
+        -3.4
+      ],
+      "-0.24": [
+        0,
+        -3.3
+      ],
+      "-0.28": [
+        0,
+        -2.4
+      ],
+      "-0.34": [
+        0,
+        -2.0
+      ]
+    }
+  },
+  "lid_pivot_L": {
+    "pivot": [
+      0.0807,
+      -0.1282,
+      0.8198
+    ],
+    "fit_err_mm": 7.88
+  },
+  "lid_pivot_search_L": {
+    "cost_mm": 15.2,
+    "land_EHH": -1.019,
+    "shift_mm": [
+      -0.0,
+      -0.0
+    ]
+  },
+  "lid_pivot_R": {
+    "pivot": [
+      -0.0807,
+      -0.1282,
+      0.8198
+    ],
+    "fit_err_mm": 7.88
+  },
+  "lid_pivot_search_R": {
+    "cost_mm": 15.2,
+    "land_EHH": -1.019,
+    "shift_mm": [
+      -0.0,
+      -0.0
+    ]
+  },
+  "objects": {
+    "Shinju_head": 6630,
+    "Shinju_eye_R": 576,
+    "Shinju_eye_L": 576,
+    "Shinju_bill": 3072,
+    "Shinju_bill_lower": 1200,
+    "Shinju_lash_R": 696,
+    "Shinju_lash_L": 696,
+    "Shinju_body": 3360,
+    "Shinju_obi": 1872,
+    "Shinju_apron": 1884,
+    "Shinju_collar": 1020,
+    "Shinju_sleeve_R": 1020,
+    "Shinju_arm_R": 1464,
+    "Shinju_sleeve_L": 1020,
+    "Shinju_arm_L": 1464,
+    "Shinju_leg_R": 1228,
+    "Shinju_leg_L": 1228,
+    "Shinju_tail": 1728,
+    "Shinju_tongue": 224,
+    "Shinju_lidU_L": 960,
+    "Shinju_lidD_L": 528,
+    "Shinju_lidU_R": 960,
+    "Shinju_lidD_R": 528
+  },
+  "notes": [
+    "Game axes: X = Blender +X, Y = Blender +Z, Z = Blender -Y; pose bones use YZX Euler = three.js XYZ.",
+    "Head pivot at the skull base (back of the neck, chin height), not the head centre.",
+    "Lids turn about the tilted hinge (cos t, +-sin t, 0) through their bone head (HERO_MODELS lidTilt = t).",
+    "The lash rolls (Shinju_lash_L/R) are weighted 100% to lidU_L/R and ride the upper lid, whose rest edge runs just under the roll.",
+    "Mouth: Shinju_bill_lower 100% jaw (rigid), the tongue on jaw; the skin under the bill is the painted back wall.",
+    "No ears: ear_* / earTip_* unweighted (as Kero). lip_* sit at the bill corners, unweighted (the bill is rigid).",
+    "Skirt: hips, each side following its thigh toward the hem (0.80 at the hem). Apron: hips, the thighs up to 0.38 at its hem.",
+    "Obi, waistband and knot on the hips and spine. Collar on the chest riding with the neck toward the top. Wing-hands rigid on hand_*.",
+    "Tail (a fan): its base on tail1 with half the hips at the very root, the upper half blending onto tail2; tail3-4 unweighted."
+  ]
+}

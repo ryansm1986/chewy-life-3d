@@ -53,6 +53,23 @@ const SHADOW_LINE = 'Shadow must be awake (not knocked out)';
 
 const DEFS = {
   // =================================================================== LANCE ARTS (Strength; long reach, narrow and deep)
+  // Eager Jabs: the close, quick one beside Sunbeam Thrust's one long lunge: three short jabs in a narrow cone (the last a
+  // bigger poke that bumps the foe back), over 1.1 attacks' time. Its tap damage a second against one foe is Sunbeam
+  // Thrust's (3.5 jabs' worth over 1.1 attacks: lin(49, 5) ≈ 1.1 × lin(155, 16) / 3.5), its zoom a second too; the narrow
+  // cone catches far fewer of a pack than the sunbeam's line (tools/hero-balance.mjs golden·jabs).
+  eagerJabs: {
+    tree: 'lance', name: 'Eager Jabs', row: 0, col: 0, pre: [], wep: 'lance', kind: 'active', element: 'phys',
+    cost: l => r1(3.8 + 0.18 * (l - 1)), cd: () => 0,
+    desc: 'Up on his toes, tail going like mad, he pokes as fast as it wags: jab, jab, and one big happy JAB that bumps the foe back a step. Not far, not wide, but very, very keen.',
+    syn: [{ id: 'knightsVow', p: 2 }, { id: 'sunbeamThrust', p: 3 }],
+    params(l, d) {
+      return { dmgPct: lin(49, 5)(l) * Lm('eagerJabs', d), jabs: 3, lastPct: 150, radius: r2(2.3 + 0.02 * l), arc: 50, knockback: 0.9 };
+    },
+    info(l, d) {
+      const p = DEFS.eagerJabs.params(l, d), big = p.dmgPct * p.lastPct / 100;
+      return [`Damage: ${pct(p.dmgPct)}${dmgRange(p.dmgPct, d)} a jab, ${p.jabs} jabs`, `The last jab: ${pct(big)}${dmgRange(big, d)}, and it knocks back`, `A ${p.arc}° cone, ${p.radius} m reach`, costLine(DEFS.eagerJabs, l, d), ...synLine('eagerJabs', d), ...mastLine('lance', d)];
+    },
+  },
   sunbeamThrust: {
     tree: 'lance', name: 'Sunbeam Thrust', row: 0, col: 1, pre: [], wep: 'lance', kind: 'active', element: 'phys',
     cost: l => r1(3.5 + 0.17 * (l - 1)), cd: () => 0,
@@ -309,7 +326,7 @@ const DEFS = {
 };
 
 /** Skills whose real cast isn't built yet: greyed in the K panel ("In training"), can't be learned (skills.js canLearn)
- *  or cast (usable). Empty since checkpoint 2: all 21 are built (docs/GOLDEN.md §3). */
+ *  or cast (usable). Empty since checkpoint 2: all 22 are built (docs/GOLDEN.md §3). */
 export const GOLDEN_TRAINING = new Set();
 
 for (const id in DEFS) {

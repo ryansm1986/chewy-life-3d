@@ -12,6 +12,7 @@
 import * as THREE from 'three';
 import { Batch, SH, M, MD, col, tplOf } from './dungeonWorld.js';
 import { clamp, TAU } from '../core/util.js';
+import { propGeo } from './propModels.js';
 
 const TPL = new Map();
 const tpl = (k, make, flat) => { let t = TPL.get(k); if (!t) TPL.set(k, t = tplOf(make(), flat)); return t; };
@@ -39,6 +40,7 @@ const woodP = (c, seed) => (px, py, pz, nx, ny, nz, o, lx, ly, lz) => {
 const metalP = (c, hi) => (px, py, pz, nx, ny, nz, o) => o.copy(col(c)).lerp(col(hi), clamp(ny * 0.55 + 0.15));
 export function chestGeometry(gold) {
   const k = gold ? 'gold' : 'wood';
+  { const body = propGeo('chest-' + k, 'body'), lid = propGeo('chest-' + k, 'lid'); if (body && lid) return { body, lid }; } // (the Blender chest: propModels.js)
   let t = TPL.get('chest:' + k);
   if (!t) TPL.set('chest:' + k, t = buildChest(CHEST[k], gold));
   return { body: t.body.clone(), lid: t.lid.clone() };
@@ -118,6 +120,7 @@ export function potLook(theme) { return POTS[theme] ? theme : 'burrow'; }
 export function potColor(theme) { return POTS[potLook(theme)].colA; }
 export function potGeometry(theme) {
   const k = potLook(theme);
+  { const g = propGeo('pot-' + k, 'pot'); if (g) return g; } // (the Blender pot: propModels.js)
   let g = TPL.get('pot:' + k);
   if (!g) TPL.set('pot:' + k, g = buildPot(k));
   return g.clone();

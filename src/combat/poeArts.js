@@ -1,4 +1,4 @@
-// Poe's Shuriken Arts (docs/POE.md §3): Kunai Fan, Shadow Stitch, Whirling Fūma, Shuriken Rain, Thousand Star Flurry —
+// Poe's Shuriken Arts (docs/POE.md §3): Fūma Flurry, Kunai Fan, Shadow Stitch, Whirling Fūma, Shuriken Rain, Thousand Star Flurry —
 // and the little machinery her other trees share: her own thrown things (kunai, shards, fireballs: `poeShoot`, cheaper
 // than combat projectiles and never spun about), lobbed props, and her zones (traps and fields that tick in updatePoe).
 // Mixed into SkillRunner by poeSkills.js installPoeSkills; R.params are the skill's numbers (or the charged ones:
@@ -7,13 +7,19 @@ import * as THREE from 'three';
 import { Events } from '../core/events.js';
 import { rand, TAU, clamp, dist } from '../core/util.js';
 import '../gfx/poeFxArts.js';
-import { POE_COL } from '../gfx/poeFx.js';
+import { POE_COL, PF, streakFn } from '../gfx/poeFx.js';
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _h = new THREE.Vector3(), _t = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
 const sfx = (n, o) => Events.emit('sfx', n, o);
 const isFoe = e => e.alive && e.team === 'enemy' && !e.breakable;
 const hits = e => e.alive && e.team === 'enemy'; // (pots too)
+const FLURRY_CUTS = ['cut1', 'cut2', 'cut3']; // (actors/poePoses.js fumaFlurry's hit frames)
+// vfx.slash(p, dir, { arc }) centres its crescent on dir + arc − π (its ring starts at the yaw it's given), so a cut aimed
+// at facing f passes f + π − arc: the crescent then sits square on her facing whatever its arc
+const cutDir = (f, arc) => f + Math.PI - arc;
+const DIRT = '#ccb48c', CLOD = new THREE.Color('#5a3c24'); // (the groove's kicked-up earth and its clods)
+export const FLURRY_SPEED = 0.62; // (the action's speed per attack a second: one flurry takes one attack's time, 1 / aspd)
 
 export const M = {
   // ================================================================== shared machinery
@@ -104,6 +110,104 @@ export const M = {
     this.poeShots = [];
     for (const z of this.poeZones || []) { try { z.end?.(z, true); } catch (e) { /* ignore */ } }
     this.poeZones = []; this.poeTraps = [];
+  },
+
+  // ================================================================== Fūma Flurry
+  // The fūma stays in her paw, whirling (actors/poeGear.js: a buzz-saw blur past ~14 rad/s), through three quick close cuts
+  // in a short cone: a forehand, a backhand on a skip, and a front flip that lands in a chop (knockback). The melee assist
+  // is hers (poeSkills.js poeMelee: a short lunge while she cuts, a snap-in at each hit frame). o (the charged release,
+  // combat/chargedPoe.js): { charged, groove: { len, pct }, spin: Spin Cycle's perk }.
+  cast_fumaFlurry(R, aim, target, o = {}) {
+    const P = this.G.player;
+    this.poeBreakStealth();
+    const m = this.melee; this.melee = null;
+    this.poeMelee = m ? { target: m.target, reach: m.reach, budget: m.budget } : null;
+    sfx('saw_whirr', { vol: o.charged ? 0.7 : 0.45, pitch: 1.3 });
+    P.anim.play('fumaFlurry', { speed: this.animSpeed(FLURRY_SPEED), onEvent: ev => {
+      const i = FLURRY_CUTS.indexOf(ev);
+      if (i >= 0) this.poeFlurryCut(R, i, target, o);
+      else if (ev === 'end' && o.spin && !this.G.playerDead) this.poeSpinCycle(R, o.spin);
+    } });
+  },
+  /** one cut of the flurry (i: 0 forehand, 1 backhand, 2 the flip's chop) */
+  poeFlurryCut(R, i, target, o) {
+    const G = this.G, P = G.player, p = R.params, fx = this.pfx(), last = i === FLURRY_CUTS.length - 1;
+    this.poeSnapIn(target, p.radius);
+    const f = P.facing, arc = p.arc * Math.PI / 180, gold = o.charged ? '#ffd860' : '#ffe08a';
+    if (!last) {
+      // flat crescents, alternating sides, a touch tilted the way the paw travels
+      G.vfx.slash(P.pos, cutDir(f, arc), { arc, r: p.radius * 0.96, width: 0.62, color: '#fff8e8', life: 0.16, reverse: i === 1, tilt: i ? 0.22 : -0.22, y: 0.6 });
+      G.vfx.slash(P.pos, cutDir(f, arc * 0.78), { arc: arc * 0.78, r: p.radius * 0.66, width: 0.34, color: gold, life: 0.13, reverse: i === 1, tilt: i ? 0.22 : -0.22, y: 0.6, glow: false });
+    } else {
+      // the chop off the flip: a narrower, chunkier crescent and a puff of dust where she lands
+      G.vfx.slash(P.pos, cutDir(f, arc * 0.85), { arc: arc * 0.85, r: p.radius * 1.02, width: 0.9, color: '#fff8e8', life: 0.2, y: 0.45 });
+      G.vfx.slash(P.pos, cutDir(f, arc * 0.6), { arc: arc * 0.6, r: p.radius * 0.7, width: 0.42, color: gold, life: 0.16, y: 0.45, glow: false });
+      G.vfx.dust(P.pos, { n: 4 });
+    }
+    // sawdust: cream streaks spat off the spinning rim, tangent to the cut
+    const hand = this.poeHand(_h), side = i === 1 ? -1 : 1;
+    for (let n = 0; n < (o.charged ? 7 : 4); n++) {
+      const a = f + side * (Math.PI / 2) + rand(-0.5, 0.5), sp = rand(3, 5.5);
+      fx.pn.spawn({ frame: PF.STREAK, x: hand.x, y: hand.y + rand(-0.05, 0.05), z: hand.z, vx: Math.sin(a) * sp, vy: rand(0.2, 1.2), vz: Math.cos(a) * sp, life: rand(0.14, 0.22), size: rand(0.22, 0.34), size1: 0.06, color: POE_COL.cream, alpha: 0.8, alpha1: 0, drag: 4, fn: streakFn });
+    }
+    sfx('fuma_slash', { pitch: 1.1 + i * 0.09, vol: last ? 0.9 : 0.75 });
+    let hit = 0;
+    this.arcHit(P.pos, f, p.radius, p.arc, e => {
+      this.poeHit(e, { dmgPct: p.dmgPct, knock: last ? p.lastKnock : p.knockback, from: P.pos });
+      if (!e.breakable) fx.flecks(_t.set(e.pos.x, e.pos.y + (e.height || 1) * 0.5, e.pos.z), last ? 4 : 2);
+      hit++;
+    }, target);
+    if (hit) { sfx('fuma_hit', { pos: P.pos, vol: 0.5, pitch: 1.15 + i * 0.1 }); G.engine.rig.shake(last ? 0.14 : 0.06); }
+    this.poeCloneEcho?.('slash', { arc: p.arc, radius: p.radius, dmgPct: p.dmgPct }); // (her shadow clones cut with her)
+    if (last) { this.poeMelee = null; if (o.groove) this.poeGroove(R, o.groove); }
+  },
+  /** a charged flurry's last chop bites the floor: the revved saw rips a groove out along her facing (len m at 16 m/s),
+   *  spitting sawdust, hitting each foe in its path once (pct% of a cut) */
+  poeGroove(R, g) {
+    const G = this.G, P = G.player, W = G.world, p = R.params, fx = this.pfx();
+    const dir = this.forward(), from = P.pos.clone().addScaledVector(dir, 0.55), hit = new Set(), yaw = Math.atan2(dir.x, dir.z);
+    let s = 0, mark = 0;
+    sfx('saw_plant', { pos: from, vol: 0.8, pitch: 1.1 }); sfx('saw_whirr', { pos: from, vol: 0.7, pitch: 1.5 });
+    G.engine.rig.shake(0.16);
+    this.poeZone({ life: g.len / 16 + 0.1, update: (dt) => {
+      s = Math.min(g.len, s + 16 * dt);
+      _v.copy(from).addScaledVector(dir, s);
+      if (W.collision?.solidAt?.(_v.x, _v.z, 0.2)) return false;
+      _v.y = W.heightAt(_v.x, _v.z);
+      for (; mark <= s; mark += 0.2) {
+        // the scar: overlapping dark blobs make one strip, a lighter rim of turned-up earth either side every other step
+        _w.copy(from).addScaledVector(dir, mark); _w.y = W.heightAt(_w.x, _w.z);
+        G.vfx.decal(_w, { r: 0.27, color: '#3a2616', life: 1.6, opacity: 0.62 });
+        const odd = Math.round(mark / 0.2) % 2;
+        if (odd) for (const sd of [-1, 1]) { _t.set(_w.x + Math.cos(yaw) * sd * 0.26, _w.y, _w.z - Math.sin(yaw) * sd * 0.26); G.vfx.decal(_t, { r: 0.13, color: '#d8c098', life: 1.4, opacity: 0.5 }); }
+        // earth dust kicked up, and sawdust spat out sideways off the saw (cream streaks, a bone chip or two)
+        G.vfx.dust(_w, { n: odd ? 1 : 2, color: DIRT, size: 0.36 });
+        for (const sd of [-1, 1]) { const a = yaw + sd * (Math.PI / 2 + rand(-0.4, 0.2)); fx.pn.spawn({ frame: PF.STREAK, x: _w.x, y: _w.y + 0.12, z: _w.z, vx: Math.sin(a) * 4.5, vy: rand(1, 2.4), vz: Math.cos(a) * 4.5, life: 0.22, size: 0.28, size1: 0.05, color: POE_COL.cream, alpha: 0.8, alpha1: 0, drag: 3, grav: 6, fn: streakFn }); }
+        if (odd) fx.flecks(_t.set(_w.x, _w.y + 0.15, _w.z), 1);
+        for (let c = 0; c < 3; c++) { const a = rand(0, TAU), sp = rand(0.6, 1.8); fx.pn.spawn({ frame: PF.DOT, x: _w.x, y: _w.y + 0.1, z: _w.z, vx: Math.cos(a) * sp, vy: rand(2, 3.6), vz: Math.sin(a) * sp, life: rand(0.38, 0.5), size: rand(0.1, 0.15), size1: 0.07, color: CLOD, alpha: 1, alpha1: 0.6, grav: 10 }); } // (clods of earth: dark, so the rip reads on grass)
+      }
+      // the bite at its head: a small cream glint where the saw chews in (additive, small: never a flash)
+      fx.pa.spawn({ frame: PF.SPARK, x: _v.x, y: _v.y + 0.15, z: _v.z, life: 0.1, size: 0.34, size1: 0.12, color: POE_COL.cream, alpha: 0.7, alpha1: 0, spin: 9 });
+      this.poeNova(_v.x, _v.z, 0.8, e => {
+        if (hit.has(e)) return; hit.add(e);
+        this.poeHit(e, { dmgPct: p.dmgPct * g.pct / 100, knock: 0.35, from: P.pos });
+        if (!e.breakable) { fx.flecks(_t.set(e.pos.x, e.pos.y + 0.4, e.pos.z), 3); sfx('fuma_hit', { pos: e.pos, vol: 0.5, pitch: 0.9 }); }
+      });
+      if (s >= g.len) return false;
+    } });
+  },
+  /** Spin Cycle (a Stage Ⅲ frenzy's perk): one full twirl of the revved fūma round her (pct% of a cut to all in r m) */
+  poeSpinCycle(R, perk) {
+    const G = this.G, P = G.player, p = R.params, fx = this.pfx();
+    P.anim.play('fumaTwirl', { speed: this.attacksPerSec() * 0.55, onEvent: ev => {
+      if (ev !== 'hit') return;
+      G.vfx.slash(P.pos, P.facing, { arc: 6.0, r: perk.r * 0.95, width: 0.8, color: '#fff8e8', life: 0.24 });
+      G.vfx.slash(P.pos, P.facing + 1.4, { arc: 5.0, r: perk.r * 0.7, width: 0.45, color: '#ffd860', life: 0.2, reverse: true, glow: false });
+      sfx('fuma_slash', { pitch: 0.95 }); sfx('saw_whirr', { vol: 0.6, pitch: 1.6 });
+      let n = 0;
+      this.poeNova(P.pos.x, P.pos.z, perk.r, e => { this.poeHit(e, { dmgPct: p.dmgPct * perk.pct / 100, knock: 0.6, from: P.pos }); if (!e.breakable) fx.flecks(_t.set(e.pos.x, e.pos.y + 0.5, e.pos.z), 3); n++; });
+      if (n) G.engine.rig.shake(0.16);
+    } });
   },
 
   // ================================================================== Kunai Fan

@@ -11,6 +11,10 @@ export function poeSim({ area, line, fan, rk, pp, RP }) {
   const DMG = {
     fumaThrow: (p, k, s, sc, c) => p.dmgPct * passFoes(p.radius, sc) * (1 + p.backPct / 100) * (1 + (s && rk(k, 'split') ? rk(k, 'split') * pp(c, s, 'split') / 100 * 0.75 : 0))
       + (rk(k, 'orbit') ? p.dmgPct * pp(c, s, 'orbit') / 100 * (c.perks.orbit.t[Math.max(0, s - 1)] / c.perks.orbit.every) * area(c.perks.orbit.r, sc) : 0),
+    // Fūma Flurry: three cuts in a short cone (a lone foe takes all three), the charged chop's groove down a line, Spin Cycle
+    fumaFlurry: (p, k, s, sc, c) => p.dmgPct * p.cuts * (sc.n <= 1 ? 1 : area(p.radius, sc) * Math.min(1, p.arc / 200))
+      + (p.groove ? p.dmgPct * (p.groovePct || 0) / 100 * line(Math.min(p.groove / 1.5, 4), sc) : 0)
+      + (s >= 3 && rk(k, 'spinCycle') ? p.dmgPct * pp(c, s, 'spinCycle') / 100 * area(c.perks.spinCycle.r, sc) : 0),
     kunaiFan: (p, k, s, sc, c) => { const n = p.count + (p.extra || 0); return p.dmgPct * fan(n, p.spread, sc) * (sc.n <= 1 ? 1 : 1 + 0.5 * (p.pierce || 0))
       + (rk(k, 'tags') ? fan(n, p.spread, sc) * p.dmgPct * pp(c, s, 'tags') / 100 * Math.min(2, area(c.perks.tags.r, sc)) : 0); },
     shadowStitch: (p, k, s, sc) => p.dmgPct * (1 + 0.5 * (area(p.radius, sc) - 1)),

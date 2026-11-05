@@ -1,0 +1,250 @@
+{
+  "design": "b",
+  "units": "metres (final, crown 1.05 m)",
+  "coordinate_system": "Blender Z-up, front -Y; character left is +X",
+  "hips": [
+    0.0,
+    0.006,
+    0.24
+  ],
+  "spine": [
+    0.0,
+    0.004,
+    0.35
+  ],
+  "chest": [
+    0.0,
+    0.0,
+    0.46
+  ],
+  "neck": [
+    0.0,
+    0.0,
+    0.575
+  ],
+  "head": [
+    0.0,
+    0.0023,
+    0.7858
+  ],
+  "head_nod_pivot_suggested": [
+    0.0,
+    0.0515,
+    0.60745
+  ],
+  "jaw_pivot": [
+    0.0,
+    -0.1453,
+    0.67202
+  ],
+  "eyes": {
+    "R": [
+      -0.11575,
+      -0.22874,
+      0.81268
+    ],
+    "L": [
+      0.11575,
+      -0.22874,
+      0.81268
+    ]
+  },
+  "eye_axes": {
+    "R": {
+      "out_deg": 18.8,
+      "down_deg": -6.2
+    },
+    "L": {
+      "out_deg": 18.8,
+      "down_deg": -6.2
+    }
+  },
+  "lash": {
+    "R": {
+      "tip": [
+        -0.1974,
+        -0.197,
+        0.841
+      ],
+      "root": [
+        -0.0664,
+        -0.252,
+        0.8301
+      ],
+      "flick_tip": [
+        -0.1786,
+        -0.2022,
+        0.8674
+      ],
+      "max_proud_W": 0.007
+    },
+    "L": {
+      "tip": [
+        0.1974,
+        -0.197,
+        0.841
+      ],
+      "root": [
+        0.0664,
+        -0.252,
+        0.8301
+      ],
+      "flick_tip": [
+        0.1786,
+        -0.2022,
+        0.8674
+      ],
+      "max_proud_W": 0.007
+    }
+  },
+  "ears": {
+    "R": {
+      "base": [
+        -0.20828,
+        0.03662,
+        0.87854
+      ],
+      "mid": [
+        -0.32212,
+        0.04166,
+        0.74209
+      ],
+      "tip": [
+        -0.33517,
+        0.0269,
+        0.53058
+      ]
+    },
+    "L": {
+      "base": [
+        0.20828,
+        0.03662,
+        0.87854
+      ],
+      "mid": [
+        0.32212,
+        0.04166,
+        0.74209
+      ],
+      "tip": [
+        0.33517,
+        0.0269,
+        0.53058
+      ]
+    }
+  },
+  "beret": [
+    -0.00908,
+    0.02919,
+    1.01227
+  ],
+  "arms": {
+    "L": {
+      "shoulder": [
+        0.16,
+        -0.004,
+        0.495
+      ],
+      "elbow": [
+        0.23686,
+        -0.01024,
+        0.39662
+      ],
+      "wrist": [
+        0.28298,
+        -0.01399,
+        0.33759
+      ]
+    },
+    "R": {
+      "shoulder": [
+        -0.16,
+        -0.004,
+        0.495
+      ],
+      "elbow": [
+        -0.23686,
+        -0.01024,
+        0.39662
+      ],
+      "wrist": [
+        -0.28298,
+        -0.01399,
+        0.33759
+      ]
+    }
+  },
+  "legs": {
+    "L": {
+      "hip": [
+        0.116,
+        0.004,
+        0.21
+      ],
+      "knee": [
+        0.118,
+        0.0,
+        0.125
+      ],
+      "ankle": [
+        0.124,
+        -0.01,
+        0.08
+      ],
+      "toe": [
+        0.1435,
+        -0.19881,
+        0.04
+      ]
+    },
+    "R": {
+      "hip": [
+        -0.116,
+        0.004,
+        0.21
+      ],
+      "knee": [
+        -0.118,
+        0.0,
+        0.125
+      ],
+      "ankle": [
+        -0.124,
+        -0.01,
+        0.08
+      ],
+      "toe": [
+        -0.1435,
+        -0.19881,
+        0.04
+      ]
+    }
+  },
+  "tail": [
+    [
+      0.0,
+      0.2675,
+      0.225
+    ]
+  ],
+  "palm_R": [
+    -0.31568,
+    -0.01728,
+    0.27949
+  ],
+  "palm_L": [
+    0.31568,
+    -0.01728,
+    0.27949
+  ],
+  "notes": [
+    "Phase 1: no rig, weights or animations. Same keys as the Usagi / Chiku joints.json (final metres).",
+    "head = the head centre (the radial origin); head_nod_pivot_suggested = base of the skull, for the rig.",
+    "Head skin = zero surface of one convex implicit ball (squircle skull + jaw + two muzzle cushions + nose), analytic normals, toon-band refinement; no eye sockets.",
+    "Upper lash lines: separate ribbons (BunnyB_lash_L / _R: the line, its wing and a flick), origin at the eye centre, for the upper lids.",
+    "Eyelid holes ringed by 6 loops each with the rim rolled in behind separate lens eyeballs; 3 loops round the mouth, 4 round the nose.",
+    "Ears: separate lop pieces (BunnyB_ear_L / _R), 26 rings along a curved centreline (bend loops), pivot = ears.base (inside the skull under the beret band).",
+    "Beret: BunnyB_beret (band, dome, nub) rides the head bone, pivot = beret (the band top on the beret axis).",
+    "Tail: BunnyB_tail, a small closed ball, pivot = tail[0]."
+  ]
+}

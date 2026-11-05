@@ -23,6 +23,8 @@ A cozy 3D browser action-RPG and village sim (Three.js + Vite), starring Chewy, 
     plain words, the Character screen's drawer);
   - [QUESTS](docs/QUESTS.md): quest moments (the quest card, place titles, Shadow's lines, the hand-in) and how to write a quest;
   - [DESKTOP](docs/DESKTOP.md): the Electron app for Windows and the Deck, and its in-app updates.
+  - [COMBO](docs/COMBO.md): the Combo tree beside Charge (tap a weapon strike again to chain it to a finisher; perks only
+    make chains cheaper and faster, never move speed).
 - Releases:
   - itch: `node tools/push-itch.mjs`;
   - the desktop app on GitHub Releases, which the Deck updates from inside the game: `npm run release:desktop`.

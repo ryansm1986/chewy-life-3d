@@ -66,7 +66,7 @@ fūma while she's the active hero; the tooltip reads "Slash Damage" and "Quick s
 · scales with Dexterity". The fūma's shape changes by variant (bamboo nodes, crescent bends, star tips…) and is tinted by
 the item's colours, on her back, in her paw, in flight and in the icons.
 
-## 3. Skills (3 trees × 7, the D2 framework: rows 0–5 gated at levels 1/6/12/18/24/30, prerequisites, synergies)
+## 3. Skills (3 trees: 8 in Shuriken Arts, 7 in the others; the D2 framework: rows 0–5 gated at levels 1/6/12/18/24/30, prerequisites, synergies)
 `src/rpg/skillsPoe.js`; numbers are at skill level `l`; `lin(a, b)` = a + b·(l − 1); `dim(l, max, half)` =
 max·l/(l + half). Damage is % of her rolled fūma damage, synergies folded in. **Shuriken Arts** multiply by Shuriken
 Mastery; **Ninjutsu** by Ninjutsu Mastery and `jutsuMul` = (100 + %dmg + Energy) / (100 + %dmg + Dexterity);
@@ -76,7 +76,8 @@ existing ones: phys, fire, zap, frost, holy, stink.
 **Shuriken Arts** (`shuriken`, Dex, bone `#f6ecd0` / mustard `#d8b040`)
 | skill | row | what | numbers |
 |---|---|---|---|
-| `fumaThrow` Fūma Throw | 0 | the fūma whirls out on a curve, swings round and comes home: hits every foe on the way out AND back (once per pass); the next throw waits for the catch | lin(75, 13)% per pass · range 6.5 + 0.12l m · speed scales with range (round trip ≈ 0.95 s at every level) · cost 3 + 0.15(l−1) · syn Kunai Fan 5%, Whirling Fūma 4% |
+| `fumaFlurry` Fūma Flurry | 0 (col 0) | the fūma kept in her paw, whirling like a buzz-saw: three quick close cuts in a short cone (a forehand, a backhand on a skip, a front flip that lands in a chop with a knockback); the melee answer to the throw, fast and focused | lin(32, 5.5)% per cut · 3 cuts · 1.85 m, 110° · one flurry takes one attack's time (0.62 s action at animSpeed 0.62) · cost 2 + 0.1(l−1) · no cooldown · waits for a thrown fūma to come home · syn Fūma Throw 4%, Whirling Fūma 5% |
+| `fumaThrow` Fūma Throw | 0 (col 1) | the fūma whirls out on a curve, swings round and comes home: hits every foe on the way out AND back (once per pass); the next throw waits for the catch | lin(75, 13)% per pass · range 6.5 + 0.12l m · speed scales with range (round trip ≈ 0.95 s at every level) · cost 3 + 0.15(l−1) · syn Kunai Fan 5%, Whirling Fūma 4% |
 | `shurikenMastery` Shuriken Mastery | 1 | passive | +30 + 12(l−1)% Shuriken Arts and slash damage · +2 + 0.5(l−1)% crit |
 | `kunaiFan` Kunai Fan | 1 | a fan of kunai | min(11, 4 + ⌊l/2⌋) kunai in min(75°, 45 + 1.5l°) · lin(55, 6)% each · cost 6 + 0.3(l−1) |
 | `shadowStitch` Shadow Stitch | 2 | three kunai pin a foe's shadow: roots it and its neighbours | lin(120, 13)% · root 1.4 + 0.06l s in 1.6 + 0.04l m · cost 8 + 0.4(l−1) · cd max(0.6, 1.6 − 0.04l) |
@@ -108,6 +109,16 @@ existing ones: phys, fire, zap, frost, holy, stink.
 
 Synergies stay inside a tree (as Chewy's and Moka's). Every skill has its own move (`actors/poePoses.js`), effects
 (`gfx/poeFx.js`, `gfx/poeFxArts.js`), sounds (`audio/poe.sfx.js`) and painted icon (`rpg/iconsPoe.js`):
+- **Fūma Flurry** (2026-11-03, the second level-1 weapon attack): she keeps the fūma in her paw and it whirls (30 rad/s)
+  inside a swept cream blur disc with a thin ink rim (`poeGear.js` `fuma_saw`, opacity ≤ 0.5, normal blend). While she
+  cuts, the paw fūma is turned in world space (`sawAxis`): a flat, slightly tipped disc for the two sweeps (the camera
+  sees an ellipse, not an edge), up on its edge along her facing for the flip's chop. The `fumaFlurry` action (0.62 s):
+  a crouch with it cocked out right, a forehand whip across (cut1), a backhand back out on a skip (cut2), a front flip
+  with it overhead that lands in a chop (cut3, knockback), a happy "ta-da". Each cut: a cream crescent and a thin gold
+  one inside (alternating sides; the chop's chunkier), cream sawdust streaks spat off the rim, bone flecks on a hit,
+  rising `fuma_slash` pitches and a `saw_whirr` under it; her shadow clones cut with her. Her own melee assist (a short
+  lunge while she cuts, a snap-in at each hit frame: `poeSkills.js` `poeMelee`). The icon: her paw on the hub of a
+  whirling fūma, three cut arcs round it.
 - **Kunai Fan**: paws crossed at the chest, then flung wide; kunai (grey leaf blades, cream-wrapped grips, mustard
   rings) streak out and thunk into the floor where they land. Her shadow clones fan theirs too.
 - **Shadow Stitch**: an overhand whip; three kunai land round the foe's feet, a thread zips tight, and every foe in reach
@@ -146,15 +157,17 @@ Synergies stay inside a tree (as Chewy's and Moka's). Every skill has its own mo
   a note) held back the skills whose cast wasn't built; it is empty now and stays for any skill added later.
 
 ### 3b. Charged abilities (docs/CHARGE.md §7: the generated table; tables `src/rpg/chargePoe.js`)
-All 18 actives charge with the shared rules (hold past 0.18 s, Stage Ⅰ, Deeper Charge for Ⅱ/Ⅲ, +50% zoom per stage).
+All 19 actives charge with the shared rules (hold past 0.18 s, Stage Ⅰ, Deeper Charge for Ⅱ/Ⅲ, +50% zoom per stage).
 Her wind-up families (`actors/poePoses.js` POE_CHARGE_POSES, registered into `chargePoses.js`): `poeFuma` (the fūma
 coiled back across her body), `poeKunai` (kunai fanned at the chest), `poeSeal` (a hand seal, eyes closed, rising on
 the smoke), `poePuff` (cheeks filling), `poeThunder` (a crackling paw held high), `poeDragon` (three seals cycling
-faster), `poeCrouch` (a low ninja crouch), `poeStars`, `poeBrush`; motes of each one's element gather on her while
+faster), `poeCrouch` (a low ninja crouch), `poeStars`, `poeBrush`, `poeSaw` (the fūma cocked out right in a low crouch, revving in
+her paw: it spins up with the charge, `_sawRev`, and spits sparks); motes of each one's element gather on her while
 charging (`poeFxArts.gather`). The releases (`combat/chargedPoe.js`) ride on her real casts from the wound-back frame.
 
 | skill → release | the payoff | perks beyond Deeper Charge / Quick Wind-up |
 |---|---|---|
+| Fūma Flurry → Buzz-saw Frenzy | three harder cuts (×1.1 / 1.44 / 1.46 a tap), a slightly wider cone (+5° a stage, 1.05× reach at Ⅲ); the last chop bites the floor and rips a 2.5 / 3.5 / 4.5 m groove ahead of her (sawdust, a scar; 50% of a cut to each foe on it) | Wider Whirl (+10% reach a rank); ★ Spin Cycle (Ⅲ: one full twirl of the revved fūma, 50% of a cut to all within 2 m) |
 | Fūma Throw → Great Fūma | bigger, further, faster, wider cut | Twin Fūma (smoky fūma on wider curves, 50%); ★ Orbiting Fūma (circles at the far end 0.6 / 0.9 / 1.2 s) |
 | Kunai Fan → Kunai Storm | +2 / 4 / 6 kunai (up to twice the fan at Ⅲ), tighter, faster | Bigger Pawful (+1 / +2 kunai per stage reached); ★ Exploding Tags (25% fire pops) |
 | Shadow Stitch → Grand Stitch | longer roots, a wider patch | Wide Arc; ★ Needle and Thread (pulls the pinned together) |
@@ -178,7 +191,8 @@ charging (`poeFxArts.gather`). The releases (`combat/chargedPoe.js`) ride on her
 skill's full charge is +21–24% sustained (Ⅲ, every perk; Ⅰ / Ⅱ at ×0.95–1.24), bursts ×1.6–4.1 a tap. Shadow Step's
 charge pays on single targets as on packs (×1.20 / ×1.21), and so does Kunai Fan's now (×1.17 / ×1.17 / ×1.21; pack
 ×1.23, single ×1.15: the extra kunai land on a lone foe too, no tune needed); the other AoE ones charge at a loss against
-a lone foe (Puff Ball ×0.36, Shadow Stitch ×0.79): tap those on bosses. Her summon and buffs are reported, not banded:
+a lone foe (Puff Ball ×0.36, Shadow Stitch ×0.79, Fūma Flurry ×0.73: its groove pays on a pack, ×1.41): tap those on
+bosses. Her summon and buffs are reported, not banded:
 Shadow Clone ×1.04 / 1.5 / 1.39, Vanish ×1.21 / 1.17 / 1.28, Bullseye Mark ×0.95 / 1.48 / 1.38.
 
 ### 3c. The phase-1 review fixes
@@ -234,6 +248,11 @@ spammable opener, zoom-bound before), synergies 5% / 4% → **10% / 8%** (the tr
 test-rpg asserts dps ×0.85–1.2 and eHP ×0.9–1.15 of the mean at levels 6/15/30/45, the Shadow Step build's clear ≥ ×0.6
 and single target ×1.15–1.6, and that a throw's round trip stays under ~1 s. Fūma Throw's out-and-back flight is
 integrated by `fumaFlight()` (the same equations as `poeSkills.js updateFuma`).
+
+**Fūma Flurry** (the `poe·flurry` reference build: Fūma Flurry, Shuriken Mastery, then Fūma Throw for its synergy) is the
+focused one of her two level-1 fūma attacks: against one target it matches the Fūma Throw build's tap dps (×1.02 / 1.03
+/ 0.95 / 1.00 at levels 1 / 6 / 30 / 45), against a pack it does ×0.38–0.42 of it (the throw cuts through every foe twice;
+the flurry's cone catches about one a cut). test-rpg asserts single ×0.9–1.1 and pack < ×0.7 at levels 6/15/30/45.
 
 ## 5. Joining: her arrival in Blossom Hollow (`src/actors/poeJoin.js`; ROADMAP Z-H3, docs/ZONES.md §3.1)
 Since Z-H3 the scene plays **in town**, not in the Bamboo Grove (the grove scene is gone). `G.arrivals`
@@ -309,8 +328,8 @@ has a calm moment (no dialogue, panel, banner, card, guide or scene). `heroes.po
   Phase 2: `src/combat/poeArts.js` (Shuriken Arts + her shared machinery: `poeShoot` — her own kunai / shards /
   fireballs, `poeLob`, `poeZone` traps and fields, `poeNova`), `src/combat/poeJutsu.js` (Ninjutsu; the `ShadowClone` and
   `SubLog` allies; `poeCloneEcho`), `src/combat/poeShadow.js` (Shadow Step tree; the Bullseye marks, read by `poeHit`),
-  `src/combat/chargedPoe.js` (her 18 charged releases). `player.js` speedMul reads `poeSpeed` (Vanish).
-- Charging: `src/rpg/chargePoe.js` (her 18 tables; `charge.js` merges them with its perk families), wind-ups
+  `src/combat/chargedPoe.js` (her 19 charged releases). `player.js` speedMul reads `poeSpeed` (Vanish).
+- Charging: `src/rpg/chargePoe.js` (her 19 tables; `charge.js` merges them with its perk families), wind-ups
   `POE_CHARGE_POSES` (`actors/poePoses.js`, registered by `chargePoses.js addChargePoses`), the sim's models
   `tools/charge-sim-poe.mjs` (merged by `charge-sim.mjs`).
 - Looks: `src/actors/poeKit.js` (the Toybox kit's extras: hood, cowl, scroll, pouch, sleeves, shorts, wraps, the fox
@@ -321,7 +340,7 @@ has a calm moment (no dialogue, panel, banner, card, guide or scene). `heroes.po
   shadows, zone rings, falling and spiralling shuriken, the Puff Ball, the log, Thunder Paw's bolt and paw prints, the
   Smoke Dragon, the Bullseye), `src/actors/poeProps.js` (kunai, tiny shuriken, the log, caltrops; `smokeCopy` — the
   clone / afterimage rig copies), `src/audio/poe.sfx.js` (35 synth sounds), `src/rpg/iconsPoe.js` (fūma item art and all
-  21 skill icons).
+  22 skill icons).
 - Joining: `src/actors/poeJoin.js` (her island scene and the rumour; `heroes.js` owns it, `actors/arrivals.js` starts it, `actors/sceneStage.js` stages it), the `sneakWalk` / `ninjaFreeze`
   holds in `poePoses.js`, the `meetPoe` guide in `src/world/guides.js`.
 - UI: `src/ui/heroWheel.js` + `.css`, `src/ui/hud.js` (the second mini portrait, the fūma weapon badge),

@@ -12,6 +12,8 @@
 //            swatch, the cost.
 //  - charge: Shadow, back in town after the first Burrow trip (docs/CHARGE.md §4): hold right-click to charge a skill to
 //            Stage Ⅰ and let go, the charge perks in the K panel's Charge card, tap vs hold.
+//  - combo: Shadow, back in town after a fight where a combo strike was cast, once the charge guide is done
+//            (docs/COMBO.md §4): tap right-click three times to chain to a finisher, then the K panel's Combo tab.
 //  - meetPoe: Poe, in town after she joins (docs/POE.md §6): tap Tab for the next hero, hold Tab for the hero wheel and
 //            pick her, her fūma and her trees, and the mini portraits.
 //  - meetShihtzu: the Shih Tzu, in town after he joins (docs/SHIHTZU.md §5): the hero wheel with four, his flail (the
@@ -340,6 +342,35 @@ const charge = {
   ],
 };
 
+// ------------------------------------------------------------------ tap, tap, finish! (Shadow, docs/COMBO.md §4)
+const comboRmb = G => !!rmbSkill(G) && !!SKILLS[rmbSkill(G)]?.combo;
+const combo = {
+  title: 'Tap, tap, finish!', narrator: 'shadow', color: '#ffb46a', priority: 6,
+  blurb: 'Tap a weapon strike three times in a row for a finisher, and the combo perks in the Skills panel.',
+  offer: 'Shadow knows how to chain your strikes into a finisher.',
+  icon: null,
+  // (the hero has cast a combo strike in a fight since the charge guide: combat/combo.js sets the flag)
+  trigger: G => !!G.state.flags.tutorials?.charge?.done && !!G.state.flags.comboTut && comboRmb(G),
+  steps: [
+    { id: 'chain', objective: 'Tap right-click three times in a row', skippable: true,
+      say: G => `Ooh, one more trick, ${me(G)}! *Tap* right-click, then tap again right after the swing: *tap, tap, tap!* The third one is a *finisher*.`,
+      highlight: () => '.hud .hb.mouse',
+      on: {
+        'combo:drop': (p, T) => { if (p.reason === 'window') T.say('A little quicker! Tap again as soon as the swing is done.'); else if (p.reason === 'roll') T.say('A roll drops the chain. Start again: tap, tap, tap!'); },
+        'charge:release': (p, T) => { if (p.stage >= 1 && p.ok) T.say('That was a hold! Holding charges. For a chain, *tap* quickly instead.'); },
+      },
+      waitFor: { event: 'combo:finish' } },
+    { id: 'perks', say: "A finisher! It hits harder. Hold the third one and it's a charged finisher. Skill points buy *combo perks* too: quicker chains and cheaper ones. Press *K*!",
+      objective: 'Open your Skills (*K*)', allow: { panels: ['skills'] },
+      highlight: G => (skillsOpen(G) ? null : '.hud .mb[data-open="skills"]'), done: G => skillsOpen(G) },
+    { id: 'card', resumeAt: 'perks', say: "Here, beside *Charge*: the *Combo* tab! It shows a strike's chain and its four perks: Quick Hands, Light Touch, Free Finisher and Tempo.", objective: 'The Combo tab', allow: { panels: ['skills'] },
+      highlight: G => (skillsOpen(G) ? (G.ui?.panels?.skills?.chg?.mode === 'combo' ? '.p-skills .chg-drawer' : '.p-skills .cmb-tab') : '.hud .mb[data-open="skills"]'),
+      callouts: G => (skillsOpen(G) && G.ui?.panels?.skills?.chg?.mode === 'combo' ? [{ el: '.p-skills .cmb-steps', text: 'Tap · Chain · Finisher', side: 'right' }, { el: '.p-skills .cmb-perks', text: 'Perks: click to buy', side: 'right' }] : []),
+      ack: true },
+    { id: 'wrap', say: 'Tap for a chain, hold for a charge: your weapon strikes do both. Another skill or a roll drops a chain. Woof!', objective: 'Chain a strike to its finisher', ack: true, allow: { panels: ['skills'] } },
+  ],
+};
+
 // ------------------------------------------------------------------ three heroes: tap Tab, hold Tab (Poe, docs/POE.md §6)
 const wheelOpen = G => !!G.heroes?.wheelOpen;
 const meetPoe = {
@@ -614,5 +645,5 @@ const guildGuide = {
   ],
 };
 
-export const GUIDES = { switch: sw, house, fishing, makeHome, remodel, charge, meetPoe, meetShihtzu, meetGolden, meetStella, board, nose, guild: guildGuide };
+export const GUIDES = { switch: sw, house, fishing, makeHome, remodel, charge, combo, meetPoe, meetShihtzu, meetGolden, meetStella, board, nose, guild: guildGuide };
 export const GUIDE_IDS = Object.keys(GUIDES);

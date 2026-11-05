@@ -320,7 +320,10 @@ const memo = (k, fn) => { if (!_M.has(k)) _M.set(k, fn()); return _M.get(k); };
 export function M(key) {
   switch (key) {
     case 'bark': return memo(key, () => VEG_MATS.bark());
+    // a tree's snow (the Blender snow fir / birch caps): the detail body look, swaying with the tree like its bark
+    case 'snowTree': return memo(key, () => vegToon({ vertexColors: true, wind: 'tree', sway: 1, occluder: true, brush: 0.16, brushScale: 0.5, rim: 0.34, term: [-0.06, 0.34], shadowSat: 0.35 }));
     case 'foliage': return memo(key, () => VEG_MATS.foliage());
+    case 'foliage:shadow': return memo(key, () => VEG_MATS.foliage({ shadowOnly: true })); // (a Blender tree's masses: world/treeGlb.js)
     case 'bushFoliage': return memo(key, () => VEG_MATS.foliage({ occluder: false }));
     case 'rock': return memo(key, () => VEG_MATS.rock());
     case 'susuki': return memo(key, () => VEG_MATS.susuki());

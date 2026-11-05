@@ -10,7 +10,9 @@
 import * as THREE from 'three';
 import { Events } from '../core/events.js';
 import { instantiate } from '../world/buildings/kit.js';
-import { trinketStallTemplate } from './stallModel.js';
+import { trinketStallTemplate as kitStall } from './stallModel.js';
+import { withExtGlb } from './extGlb.js';
+const trinketStallTemplate = () => withExtGlb('trinketStall', kitStall()); // (its Blender model once built and loaded)
 import { itemDef, SETS, SURFACES } from './furniture.js';
 import { surfaceSwatch } from './surfaces.js';
 import { trinketsOf, stockLeft, sellOne, buyBackPrice, TANU } from './trinkets.js';

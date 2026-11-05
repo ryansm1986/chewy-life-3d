@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { G, V, C, PI, shade, bar } from '../../world/buildings/kit.js';
 import * as A from '../assets/tidepoolAssets.js';
-import { slotAt, slotOf, screenAt, screenYaw } from './data.js';
+import { slotAt, slotOf, screenAt, screenYaw, PIECE_GLB } from './data.js';
 import { TP_SITES } from '../assets/tidepoolTerrain.js';
 import { roof } from '../../world/buildings/roofs.js';
 import { foundation, walls, onFace, shoji, latticeWindow, door, STONES, noren as norenPart, norenMark } from '../../world/buildings/parts.js';
@@ -925,7 +925,7 @@ function fishingBoat(B, { L = 3.5, beam = 1.2, color = '#f4eee2', trim = '#2c6ab
  *  piles into the sea bed (wet and barnacled below the tide line `tide`), stringers, cross planks each its own tone, the
  *  head's tall bollard piles with rope turns, a ladder down its outer side, a lamp post, the fishermen's gear; Funaki's
  *  boat moored along the head's outer side (normal n) with its bow and stern lines. → { lamp: [x, y, z] } */
-function pierAlong(B, { pts, w = 1.4, hw = 2.2, n, dir, tide = -0.7, bed = -2.6, skip = 0.6 }) {
+function pierAlong(B, { pts, w = 1.4, hw = 2.2, n, dir, tide = -0.7, bed = -2.6, skip = 0.6, boatModel = false }) {
   const wet = new THREE.Color('#2e3a36'), wood = new THREE.Color(T.pile), barn = new THREE.Color('#e8e2d4');
   const pile = (x, z, top, r = 0.09) => { const g = G.cyl(r, r * 1.1, top - bed, 7); g.translate(x, (top + bed) / 2, z); B.add(g, (p, nn, o) => { o.copy(wood).multiplyScalar(0.85 + 0.15 * Math.sin(p.y * 8 + x * 9) ** 2); const k = clamp((tide + 0.05 - p.y) * 3); if (k > 0) o.lerp(wet, k * 0.85); if (p.y < tide + 0.12 && p.y > tide - 0.3 && nz(p.y * 15 + z * 3, x * 9) > 0.15) o.lerp(barn, 0.7); }); };
   const segs = []; let acc = 0;
@@ -958,11 +958,11 @@ function pierAlong(B, { pts, w = 1.4, hw = 2.2, n, dir, tide = -0.7, bed = -2.6,
   { const [x, z] = hp(0.45, 0.35); B.at([x, 0, z], 0.5, () => crabPot(B, 0.2)); }
   // Funaki's boat alongside the head, its bow out to sea, its lines made fast to the outer bollards
   const by = tide - 0.13, [bcx, bcz] = hp(H.L * 0.5 - 1.25, hw / 2 + 0.62), byaw = Math.atan2(dir[0], dir[1]) - PI / 2;
-  B.at([bcx, by, bcz], byaw, () => fishingBoat(B, { L: 3.5 }));
+  if (!boatModel) B.at([bcx, by, bcz], byaw, () => fishingBoat(B, { L: 3.5 })); // (boatModel: the Blender boat stands in, placed by decor)
   const onBoat = (x) => V(bcx + dir[0] * x, by + 0.66, bcz + dir[1] * x);
   for (const [bi, x] of [[1, 1.3], [0, -1.35]]) { const a = V(...bol[bi]), e = onBoat(x), m = a.clone().lerp(e, 0.5); m.y -= 0.22; B.add(tube([{ p: a, r: 0.016 }, { p: m, r: 0.016 }, { p: e, r: 0.016 }], 3, false), T.rope); }
   const [lx, lz] = hp(H.L - 0.3, -hw / 2 + 0.12);
-  return { lamp: [lx, lz] };
+  return { lamp: [lx, lz], boat: [bcx, by, bcz, byaw] };
 }
 
 // ------------------------------------------------------------------ the square, the pier, the gates, fences, the shore
@@ -992,6 +992,7 @@ export function decor(VL, ctx, PL, h0) {
   const memo = (k, fn) => (ctx.memo ? ctx.memo('village:' + k, fn) : fn());
   const asset = (k, fn) => memo(k, () => normAsset(fn()));
   const prop = (fn, x, z, rot = 0, o = {}) => ctx.prop(fn, { x, z, y: o.y ?? H(x, z), rot, seed: o.seed ?? ((x * 131 + z * 17) | 0), warp: o.warp ?? 0.02 });
+  const propOr = (kind, fn, x, z, rot = 0, o = {}) => VL.decorGlb(kind, { x, z, y: o.y ?? H(x, z), rot }, fn) || prop(fn, x, z, rot, o); // (Z-D6: a gate / lantern post's Blender model, if built)
   // the biome's landmarks in and by the clearing (the wreck, the net rack, the tide pools) keep their room
   const taken = [[TP_SITES.wreck[0], TP_SITES.wreck[1], 2.4], [TP_SITES.wreck[0] + 1.2, TP_SITES.wreck[1] - 0.9, 1.6], ...TP_SITES.nets.map(([x, z]) => [x, z, 2.2]), ...TP_SITES.pools.map(([x, z, r]) => [x, z, r + 0.6])];
   const free = (x, z, r) => taken.every(t => Math.hypot(t[0] - x, t[1] - z) > t[2] + r), take = (x, z, r) => taken.push([x, z, r]);
@@ -1015,7 +1016,7 @@ export function decor(VL, ctx, PL, h0) {
   for (const a of [-40, 30, 172]) {
     const p = at(a, sq + 0.9); if (inBuilding(p.x, p.z, 0.3) || inCamp(p.x, p.z, 0) || ctx.pathDist(p.x, p.z) < ctx.plan.trailW + 0.5 || !free(p.x, p.z, 0.3)) continue;
     const rot = face(p) + PI / 2; let hook = null;
-    prop(B => { hook = lanternPost(B); }, p.x, p.z, rot, { y: h0, seed: 51 + a });
+    propOr('lanternPost', B => { hook = lanternPost(B); }, p.x, p.z, rot, { y: h0, seed: 51 + a });
     solid(p.x, p.z, 0.18); take(p.x, p.z, 0.5);
     const c = Math.cos(rot), s = Math.sin(rot);
     out.lamps.push({ x: p.x + hook[0] * c + hook[2] * s, y: h0 + hook[1], z: p.z - hook[0] * s + hook[2] * c, color: '#f0a050' });
@@ -1025,7 +1026,9 @@ export function decor(VL, ctx, PL, h0) {
   if (yard) {
     const BY = BOATYARD, P = BY.pier, Fz = BY.zc + BY.d / 2, Bk = BY.zc - BY.d / 2, W = (x, z) => { const q = VL.local(yard, x, z); return [q.x, q.z]; };
     let info = null;
-    prop(B => { info = pierAlong(B, { pts: P.pts, w: P.w, hw: P.hw, n: P.n, dir: P.dir, tide: -0.3 - h0 - 0.05 }); }, yard.x, yard.z, yard.rot, { y: h0, seed: 61, warp: 0.008 });
+    const boatModel = !!(PIECE_GLB.boat && VL.addPieceGlb);
+    prop(B => { info = pierAlong(B, { pts: P.pts, w: P.w, hw: P.hw, n: P.n, dir: P.dir, tide: -0.3 - h0 - 0.05, boatModel }); }, yard.x, yard.z, yard.rot, { y: h0, seed: 61, warp: 0.008 });
+    if (boatModel) { const [bx, by, bz, byaw] = info.boat, q = VL.local(yard, bx, bz); VL.addPieceGlb(PIECE_GLB.boat, q.x, h0 + by, q.z, yard.rot + byaw); } // (Funaki's Blender boat, ROADMAP Z-D6)
     const y = h0 + BY.floor;
     ctx.addDeck({ pts: [W(BY.walkX, Fz + 0.45), W(BY.walkX, Bk - 0.15)], y: [y, y], w: 0.9 });
     ctx.addDeck({ pts: P.pts.slice(0, 3).map(([x, z]) => W(x, z)), y: [y, y, y], w: P.w });
@@ -1033,7 +1036,7 @@ export function decor(VL, ctx, PL, h0) {
     // the workshop strip beside the walkway is solid too (the yard's footprint covers the hull side only)
     for (let z = Fz - 0.1; z >= Bk + 0.1; z -= 0.45) for (const x of [BY.walkX + 0.68, BY.walkX + 1.2, BY.x1 - 0.25]) { const [cx, cz] = W(x, z); ctx.addCollider(cx, cz, 0.22); }
     // the lamp post at the head (its hook joins the village lamps)
-    { const [lx, lz] = W(info.lamp[0], info.lamp[1]), r2 = yard.rot + Math.atan2(P.dir[0], P.dir[1]) + PI / 2; let hook = null; prop(B => { hook = lanternPost(B); }, lx, lz, r2, { y, seed: 67 }); const c = Math.cos(r2), s = Math.sin(r2); out.lamps.push({ x: lx + hook[0] * c + hook[2] * s, y: y + hook[1], z: lz - hook[0] * s + hook[2] * c, color: '#f0a050' }); ctx.addCollider(lx, lz, 0.16); }
+    { const [lx, lz] = W(info.lamp[0], info.lamp[1]), r2 = yard.rot + Math.atan2(P.dir[0], P.dir[1]) + PI / 2; let hook = null; propOr('lanternPost', B => { hook = lanternPost(B); }, lx, lz, r2, { y, seed: 67 }); const c = Math.cos(r2), s = Math.sin(r2); out.lamps.push({ x: lx + hook[0] * c + hook[2] * s, y: y + hook[1], z: lz - hook[0] * s + hook[2] * c, color: '#f0a050' }); ctx.addCollider(lx, lz, 0.16); }
     // kelp swaying round the piles
     const kv = [0, 1, 2].map(v => asset('kelp' + v, () => A.kelp(v, 0.6)));
     for (let i = 0; i < 30; i++) {
@@ -1053,7 +1056,7 @@ export function decor(VL, ctx, PL, h0) {
   for (let k = 0; k < rings[0].length; k++) cross.push(rings.map(r => r[k]).find(c => c && postsClear(c)) || rings[0][k]);
   for (const c of cross) {
     const L = Math.hypot(c.tx, c.tz) || 1, tx = c.tx / L, tz = c.tz / L, rot = Math.atan2(tx, tz);
-    prop(B => gate(B, { w: 3.6 }), c.x, c.z, rot, { seed: 51 });
+    propOr('gate', B => gate(B, { w: 3.6 }), c.x, c.z, rot, { seed: 51 });
     for (const s of [-1, 1]) solid(c.x + tz * s * 1.8, c.z - tx * s * 1.8, 0.24);
     take(c.x, c.z, 2.2);
   }
@@ -1068,7 +1071,7 @@ export function decor(VL, ctx, PL, h0) {
     const x = x1 + nx * (ctx.plan.trailW + 1.0), z = z1 + nz2 * (ctx.plan.trailW + 1.0);
     if (inBuilding(x, z, 0.6) || inCamp(x, z, 0) || !free(x, z, 0.5)) continue;
     const rot = Math.atan2(-nx, -nz2) + PI / 2; let hook = null;
-    prop(B => { hook = lanternPost(B); }, x, z, rot, { seed: 61 + i });
+    propOr('lanternPost', B => { hook = lanternPost(B); }, x, z, rot, { seed: 61 + i });
     solid(x, z, 0.16); take(x, z, 0.5);
     const c = Math.cos(rot), s = Math.sin(rot);
     out.lamps.push({ x: x + hook[0] * c + hook[2] * s, y: H(x, z) + hook[1], z: z - hook[0] * s + hook[2] * c, color: '#f0c860' });

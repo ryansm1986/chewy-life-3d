@@ -19,6 +19,17 @@ export function poeCharge({ STAGES, QUICK, FOCUS, SPLIT, WIDE, ECHO, UNIQUE, set
     perks: set(STAGES(), QUICK(), SPLIT({ name: 'Twin Fūma', what: 'smoky fūma', pct: 50 }),
       UNIQUE('orbit', 'Orbiting Fūma', 10, 'At the end of its flight the charged fūma circles there for 0.6 / 0.9 / 1.2s by stage, cutting everything within 1.6 m every 0.3s (50%).', { extra: { t: [0.6, 0.9, 1.2], r: 1.6, every: 0.3, pct: 50 } })),
   };
+  C.fumaFlurry = {
+    ready: true, tune: { dmg: [0.73, 0.72, 0.53], shape: [1, 1, 1] }, base: 0.7, color: '#ffe8a0', pose: 'poeSaw', title: 'Buzz-saw Frenzy',
+    blurb: 'Rev the fūma in your paw until it whines: three harder cuts in a little wider cone, and the last chop bites the floor and rips a groove out ahead of her.',
+    // (the payoff is in the cuts and the groove, not a bigger cone: the tap stays the focused one. A full charge pays most on a
+    //  pack — the groove runs through it — and at a loss on a lone foe (×0.72 sustained): tap it on a boss. tools/charge-sim.mjs)
+    radius: [1, 1, 1.05], groove: [2.5, 3.5, 4.5],
+    apply(p, s, k) { p.dmgPct *= by(STAGE_MULT, s); p.radius = r2(p.radius * by(this.radius, s) * (1 + (k.wide || 0) * 0.1)); p.arc = p.arc + 5 * s; p.lastKnock = r2(p.lastKnock * 1.6); p.groove = by(this.groove, s); p.groovePct = 50; return p; },
+    lines(p) { return [`Cuts: ${pct(p.dmgPct)} ×${p.cuts} in a ${p.arc}° cone, ${p.radius} m`, `The last chop rips a ${p.groove} m groove (${p.groovePct}% to each foe on it)`]; },
+    perks: set(STAGES(), QUICK(), WIDE({ name: 'Wider Whirl', what: 'cone', pct: 10 }),
+      UNIQUE('spinCycle', 'Spin Cycle', 10, 'A Stage Ⅲ frenzy ends with one full twirl of the revved fūma: 50% of a cut to every foe within 2 m.', { needs: { stages: 2 }, extra: { pct: 50, r: 2 } })),
+  };
   C.kunaiFan = {
     ready: true, base: 0.75, color: '#f6ecd0', pose: 'poeKunai', title: 'Kunai Storm',
     blurb: 'A much bigger pawful of kunai, fanned tighter and flung harder: up to twice as many at Stage Ⅲ.',

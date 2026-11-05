@@ -1,6 +1,7 @@
 // Procedural animation for kit characters: locomotion cycles, idle life, secondary motion (ears, tails, scarf),
 // timed actions with hit events, squash & stretch and hit flashes.
 import * as THREE from 'three';
+import { traversePose } from './traverse.js';
 import { clamp, lerp, ease, TAU, damp } from '../core/util.js';
 import { LIFE_ACTIONS } from './lifePoses.js';
 import { CHARGE_ACTIONS } from './chargePoses.js';
@@ -42,12 +43,19 @@ const ACTIONS = {
     A.body.y += lerp(lerp(0, -0.6, wind), 0.8, strike) * (1 - rec);
     A.sq += -0.05 * strike * (1 - rec);
   } },
+  // a baseball throw (the owner, 2026-10-27): the left paw up in front at the target, the ball arm cocked back and the
+  // shoulders turned away; then the arm comes over the top (its angle runs on past π and is wrapped: the same turn),
+  // lets go out in front, follows through across the body as the shoulders turn back square
   throw: { dur: 0.5, ev: { release: 0.44 }, pose: (t, P, A) => {
-    const wind = ease.outCubic(clamp(t / 0.38)), rel = ease.outQuad(clamp((t - 0.38) / 0.14)), rec = ease.inOutQuad(clamp((t - 0.55) / 0.45));
-    A.armR.x += lerp(lerp(0, -2.9, wind), 1.3, rel) * (1 - rec); A.armR.z += -0.3 * wind * (1 - rec);
-    A.armL.x += lerp(-0.2, 0.9, wind) * (1 - rec);
-    A.body.y += lerp(lerp(0, 0.5, wind), -0.4, rel) * (1 - rec); A.body.x += lerp(-0.1 * wind, 0.25, rel) * (1 - rec);
-    A.sq += 0.05 * wind * (1 - rel) - 0.05 * rel * (1 - rec);
+    const wind = ease.outCubic(clamp(t / 0.3)), whip = ease.inOutQuad(clamp((t - 0.34) / 0.12)), fol = ease.outQuad(clamp((t - 0.46) / 0.16)), rec = ease.inOutQuad(clamp((t - 0.62) / 0.38));
+    let a = whip > 0 ? lerp(lerp(2.25, 4.58, whip), 5.48, fol) : 2.25 * wind; if (a > Math.PI) a -= TAU;
+    A.armR.x += a * (1 - rec); A.armR.z += lerp(lerp(-0.35 * wind, 0.1, whip), 0.35, fol) * (1 - rec);
+    A.armL.x += lerp(-2.0 * wind, 0.3, whip) * (1 - rec); A.armL.z += lerp(-0.1 * wind, 0.25, whip) * (1 - rec);
+    const turn = lerp(-0.4 * wind, 0.3, whip);
+    A.body.y += turn * (1 - rec); A.head.y += -0.7 * turn * (1 - rec); // (the eyes stay on the target)
+    A.body.x += lerp(-0.12 * wind, 0.3, whip) * (1 - rec);
+    A.legL.x += lerp(-0.3 * wind, -0.15, whip) * (1 - rec); A.legR.x += 0.15 * wind * (1 - rec); // (the front foot steps toward it)
+    A.sq += 0.04 * wind * (1 - whip) - 0.05 * whip * (1 - rec);
   } },
   cast: { dur: 0.55, ev: { cast: 0.45 }, pose: (t, P, A) => {
     const up = ease.outBack(clamp(t / 0.4)), fw = ease.outQuad(clamp((t - 0.4) / 0.15)), rec = ease.inOutQuad(clamp((t - 0.6) / 0.4));
@@ -274,6 +282,7 @@ export class Animator {
       a.def.pose(a.def.hold ? a.t : u, this.P, A, a);
       if (!a.def.hold && a.t >= a.dur) { this.action = null; a.onEvent?.('end'); }
     }
+    this.travK = traversePose(this, A, this.t); // (swimming and climbing: actors/traverse.js; damps the walk cycle below)
     if (this.quad) this.poseQuad(dt, A); else this.poseBiped(dt, A);
     // blink
     this.blinkT -= dt;
@@ -314,6 +323,7 @@ export class Animator {
         (P.lidsLow || []).forEach((l, i) => lidTurn(l, this.rest.get(l), c, i ? s : -s, low));
       }
     }
+    if (P.shutLash) { const on = blink > 0.8; P.shutLash[0].visible = P.shutLash[1].visible = on; } // (the closed eye's ∪ lash: heroModels shutLashes)
     if (P.lips) {
       this.smile = damp(this.smile ?? 0.4, A.happy || this.mood ? 1 : 0.4, 6, dt);
       for (const l of P.lips) { const r = this.rest.get(l); l.position.set(r.p.x, r.p.y + 0.007 * this.smile, r.p.z - 0.004 * this.smile); }
@@ -409,10 +419,10 @@ export class Animator {
     return g.out;
   }
   poseBiped(dt, A) {
-    const P = this.P, mv = this.move, run = this.runAmt, ph = this.phase, t = this.t;
+    const P = this.P, tk = this.travK || 0, mv = this.move * (1 - 0.9 * tk), run = this.runAmt * (1 - tk), ph = this.phase, t = this.t; // (tk: swimming / climbing take over the limbs)
     const sp = this.sprintAmt || 0; // the sprint run: a deeper lean, a longer stride, pumping arms (see update)
     const swing = Math.sin(ph), bob = Math.abs(Math.sin(ph));
-    const gait = this.plant && this.gaitRig(), gs = gait ? this.poseGait(gait, A) : null; // (the planted walk: see poseGait)
+    const gait = this.plant && tk < 0.05 && this.gaitRig(), gs = gait ? this.poseGait(gait, A) : null; // (the planted walk: see poseGait)
     if (!gait) {
       const legAmp = (0.62 + run * 0.35 + sp * 0.24) * mv;
       this._set(P.legL, swing * legAmp + A.legL.x, A.legL.y, A.legL.z); // (z: a wide stance, + spreads the left leg out)
@@ -458,10 +468,10 @@ export class Animator {
     // in the air (Shadow the dragon whelp: actors/whelp.js sets fly 0..1, flyLift m, flyPitch / flyBank rad on a rig whose
     // root turns 'YXZ'): the legs tuck (the front ones folded under the chest, the hind ones trailing, paddling a little),
     // the whole rig lifts and pitches nose-down with speed, the head counters it to look ahead, the tail streams back
-    const fly = this.fly || 0;
-    const amp = (0.75 + gal * 0.2) * mv * (1 - fly); // (a gallop reaches further: see update's stride)
+    const fly = this.fly || 0, sw = this.swim || 0;
+    const amp = (0.75 + gal * 0.2) * mv * (1 - fly) * (1 - sw) + sw * (0.55 + 0.25 * mv); // (a gallop reaches further: see update's stride; swimming: a quick paddle, even treading water)
     const [FL, FR, BL, BR] = P.legs;
-    const s = Math.sin(ph);
+    const s = sw > 0.5 ? Math.sin(t * (10 + 4 * mv)) : Math.sin(ph);
     const sitting = this.action?.name === 'sit';
     const pf = fly * (0.95 + Math.sin(t * 6.5) * 0.08), pb = fly * (1.2 + Math.sin(t * 6.5 + 1.4) * 0.12);
     this._set(FL, s * amp + pf, 0, -0.08 * fly); this._set(BR, s * amp + pb, 0, 0.1 * fly);

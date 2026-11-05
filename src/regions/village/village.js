@@ -10,13 +10,13 @@
 // (camps stay cleared between visits), zones[zone].quests.freed [npc ids] (freed captives stay freed) and
 // zones[zone].quests.rescued [npc ids] (villagers rescued in the dungeon, who then live in the village).
 import * as THREE from 'three';
-import { VILLAGES, slotAt, slotOffset, slotOf, screenAt, screenYaw, ZONE_NPCS, WAYSTONE, WAYSTONE_TINTS } from './data.js';
+import { VILLAGES, slotAt, slotOffset, slotOf, screenAt, screenYaw, ZONE_NPCS, WAYSTONE, WAYSTONE_TINTS, WAYSTONE_CAPS, BUILDING_GLB } from './data.js';
 import * as Bamboo from './artBamboo.js';
 import * as Maple from './artMaple.js';
 import * as Tidepool from './artTidepool.js';
 import * as Onsen from './artOnsen.js';
-import { loadGlb, glbInstance } from '../../gfx/glbAssets.js';
-import { makeOutline } from '../../gfx/materials.js';
+import { loadGlb, glbInstance, glbReady } from '../../gfx/glbAssets.js';
+import { makeOutline, markOccluder } from '../../gfx/materials.js';
 import { villageMats, tplGroup, animateParts, cageTpl, captainGearTpl, arenaRing, warBanner, spikes, tent, campfire, debris, bones, scorchMesh, litLantern, tornLantern, bunting } from './art.js';
 import { Builder } from '../../world/buildings/kit.js';
 import { merge } from '../../gfx/geom.js';
@@ -84,10 +84,12 @@ export class ZoneVillage {
       const at = slotAt(S, b.a, b.d);
       if (b.face === 'camera') at.rot = Math.PI / 4; // (a low camera-side piece shows its front: +z toward the camera)
       let info = null;
-      if (b.kind === 'waypoint' && WAYSTONE.glb) { const KB = new Builder(1); info = build(KB); KB.finish(); } // (Z-D6: a Blender shrine stands in: attach places it)
+      const glb = BUILDING_GLB[this.zone]?.[b.kind];
+      if ((b.kind === 'waypoint' && WAYSTONE.glb) || glb) { const KB = new Builder(1); info = build(KB); KB.finish(); } // (Z-D6: a Blender shrine / building stands in: attach places it; the kit still gives its footprint, door and lamps)
       else ctx.prop(B => { B.yaw0 = at.rot; info = build(B); if (this.saved && !this.party) info.saved?.(B); }, { x: at.x, z: at.z, y: h0, rot: at.rot, seed: hashStr(this.def.id + b.id) % 9973, occluder: true }); // (saved: its overlay in the same prop, so it warps with the walls it hangs on; a crew's party grows it in: attach)
-      const rec = { ...b, ...at, info };
+      const rec = { ...b, ...at, info, glb };
       this.buildings.push(rec);
+      if (glb) this.placeBuildingGlb(rec, glb, h0);
       this.solidRect(rec, info.fp);
       const dr = this.local(rec, info.door[0], info.door[1]);
       rec.doorPos = V3(dr.x, h0, dr.z);
@@ -151,14 +153,50 @@ export class ZoneVillage {
     for (const b of this.buildings) this.addBuildingInteract(b);
     for (const it of this.inter) world.interactables.push(it);
     if (WAYSTONE.glb) for (const b of this.buildings) if (b.kind === 'waypoint') this.placeShrineGlb(b);
+    this.placePieceGlbs();
   }
-  /** ROADMAP Z-D6: the Blender Waypoint Shrine (data.js WAYSTONE.glb) at the kit shrine's slot, its 'tint…' materials in the zone colour */
+  /** ROADMAP Z-D6: a Blender set piece (data.js PIECE_GLB) where the theme would have built its kit piece (world space;
+   *  saved: shown only with the saved look, like the saved dressing it replaces). → the record (rec.obj once loaded) */
+  addPieceGlb(url, x, y, z, yaw, { saved = false, onLoad = null } = {}) { const rec = { url, x, y, z, yaw, saved, onLoad, obj: null }; (this.glbPieces ||= []).push(rec); return rec; }
+  /** a Blender village building (data.js BUILDING_GLB) at its kit slot: an occluder like the kit walls (the hero shows
+   *  through it), its `saved` object shown with the saved look and its `siege` object without it (setSavedLook) */
+  placeBuildingGlb(rec, url, h0) {
+    rec.piece = this.addPieceGlb(url, rec.x, h0, rec.z, rec.rot, { onLoad: o => {
+      o.traverse(m => { if (!m.isMesh || m.userData.isInk) return; const u = m.material?.userData?.u; if (u?.uOcclOn && !u.uOcclOn.value) { u.uOcclOn.value = 1; markOccluder(m.material); } });
+      rec.savedNode = o.getObjectByName('saved') || null; rec.siegeNode = o.getObjectByName('siege') || null;
+      this.buildingLook(rec, !!this.savedOn);
+    } });
+  }
+  buildingLook(rec, on) { if (rec.savedNode) rec.savedNode.visible = on; if (rec.siegeNode) rec.siegeNode.visible = !on; }
+  /** a zone decor piece's Blender model (data.js BUILDING_GLB: 'gate', 'lanternPost') where the theme's decor() would
+   *  build the kit's: o = the kit prop's placement ({ x, z, y, rot }); kit(B) still runs on a throwaway Builder for the
+   *  hooks it returns (the lantern points). → true when the model stands in */
+  decorGlb(kind, o, kit) {
+    const url = BUILDING_GLB[this.zone]?.[kind]; if (!url) return false;
+    if (kit) { const KB = new Builder(1); kit(KB); KB.finish(); }
+    this.addPieceGlb(url, o.x, o.y ?? this.ctx.heightAt(o.x, o.z), o.z, o.rot || 0);
+    return true;
+  }
+  placePieceGlbs() {
+    const world = this.world;
+    const place = (p, tpl) => {
+      if (this.world !== world || !world.scene) return;
+      const o = p.obj = glbInstance(tpl, { outline: true }); o.position.set(p.x, p.y, p.z); o.rotation.y = p.yaw;
+      if (p.saved) o.visible = !!this.savedOn;
+      world.scene.add(o); p.onLoad?.(o);
+    };
+    // (a model the zone entry already waited for stands now, before the scavenge nodes look for open ground; others pop in)
+    for (const p of this.glbPieces || []) { const t = glbReady(p.url); if (t) place(p, t); else loadGlb(p.url).then(tpl => place(p, tpl)).catch(e => console.warn('[village] piece model', p.url, e)); }
+  }
+  /** ROADMAP Z-D6: the Blender Waypoint Shrine (data.js WAYSTONE.glb) at the kit shrine's slot: `tintCap` in the zone's cap
+   *  colour, the other 'tint…' materials in its roof colour, the `rune` lit only in a saved village (setSavedLook) */
   placeShrineGlb(b) {
     const world = this.world;
     loadGlb(WAYSTONE.glb).then(tpl => {
       if (this.world !== world || !world.scene) return;
-      const o = glbInstance(tpl, { outline: true }), tint = new THREE.Color(WAYSTONE_TINTS[this.zone] || '#5a9a88');
-      o.traverse(m => { if (m.isMesh && /^tint/i.test(m.material?.name || '')) { m.material = m.material.clone(); m.material.color?.copy(tint); } });
+      const o = glbInstance(tpl, { outline: true }), tint = new THREE.Color(WAYSTONE_TINTS[this.zone] || '#5a9a88'), cap = new THREE.Color(WAYSTONE_CAPS[this.zone] || '#86a856');
+      o.traverse(m => { if (m.isMesh && /^tint/i.test(m.material?.name || '')) { m.material = m.material.clone(); m.material.color?.copy(/^tintcap/i.test(m.material.name) ? cap : tint); } });
+      this.shrineRune = o.getObjectByName('rune') || null; if (this.shrineRune) this.shrineRune.visible = this.saved && !this.party;
       o.position.set(b.x, this.h0, b.z); o.rotation.y = b.rot + (WAYSTONE.yaw || 0); o.scale.setScalar(WAYSTONE.scale || 1);
       world.scene.add(o); this.shrineModel = o;
     }).catch(e => console.warn('[village] shrine model', e));
@@ -214,7 +252,7 @@ export class ZoneVillage {
   /** a world-space template plus every building's overlay of that kind, bucket by bucket */
   withOverlays(tpl, which) {
     const add = {};
-    for (const b of this.buildings) { const o = this.overlayTpl(b, which); if (o) for (const k of Object.keys(o.geos)) (add[k] ||= []).push(o.geos[k]); }
+    for (const b of this.buildings) { if (b.glb) continue; /* (a Blender building carries its own `siege` / `saved` objects) */ const o = this.overlayTpl(b, which); if (o) for (const k of Object.keys(o.geos)) (add[k] ||= []).push(o.geos[k]); }
     for (const k of Object.keys(add)) { const list = [tpl.geos[k], ...add[k]].filter(Boolean); tpl.geos[k] = list.length > 1 ? merge(list) : list[0]; tpl.geos[k].computeBoundingSphere(); }
     return tpl;
   }
@@ -222,7 +260,7 @@ export class ZoneVillage {
    *  props / overlay templates: buildings: false), lit lanterns, bunting, the theme's saved decor */
   savedDressing(B, { buildings = true } = {}) {
     const h0 = this.h0;
-    if (buildings) for (const b of this.buildings) if (b.info.saved) B.at([b.x, h0, b.z], b.rot, () => b.info.saved(B));
+    if (buildings) for (const b of this.buildings) if (b.info.saved && !b.glb) B.at([b.x, h0, b.z], b.rot, () => b.info.saved(B));
     for (const l of this.lamps) B.at([l.x, l.y, l.z], 0, () => litLantern(B, { r: 0.14, h: 0.3, color: l.color || '#e8503a' }));
     // festival bunting across the top of the square, between the lantern posts / building eaves
     const pts = [-58, -30, 0, 30, 58].map(a => { const p = this.at(a, this.def.square.r + 1.2); return [p.x, h0 + 2.55 + (a === 0 ? 0.25 : 0), p.z]; });
@@ -232,6 +270,9 @@ export class ZoneVillage {
   /** show the saved look (lit lanterns, open shops, the waystone's rune) — instant, or grown in by the celebration */
   setSavedLook(on, instant = false) {
     if (this.savedGroup) this.savedGroup.visible = on;
+    if (this.shrineRune) this.shrineRune.visible = on;
+    this.savedOn = on; for (const p of this.glbPieces || []) if (p.saved && p.obj) p.obj.visible = on;
+    for (const b of this.buildings) if (b.glb) this.buildingLook(b, on);
     if (on) {
       if (!this.lampLights) {
         this.lampLights = [];

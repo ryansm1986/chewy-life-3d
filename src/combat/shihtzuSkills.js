@@ -1,5 +1,5 @@
 // The Shih Tzu's skills (docs/SHIHTZU.md): SkillRunner cast implementations (`cast_<id>(R, aim, target)`) plus the
-// per-frame state they need: the three-swing flail combo and its lunge, Woeful Wallop, Dripping Paw's flying curse and
+// per-frame state they need: the three-swing flail combo and its lunge, Glum Bonk, Woeful Wallop, Dripping Paw's flying curse and
 // the hexes (gloom damage over time, stacking on a foe), the guard (combat.hitPlayer asks shihtzuGuard() before a blow
 // lands: the class's damage reduction, Iron Topknot and the Gloom Blanket). installShihtzuSkills(proto) mixes these
 // into SkillRunner; skillRunner.js routes the flail basic attack here (cast_flailSwing) and calls updateShihtzu(dt) /
@@ -19,7 +19,7 @@ const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _h = new THREE.Vector3
 const sfx = (n, o) => Events.emit('sfx', n, o);
 const SWINGS = ['flailSwing1', 'flailSwing2', 'flailSlam'];
 const SWING_DUR = [0.5, 0.48, 0.62]; // (the actions' own durations: each swing takes one attack at his attack speed; the slam a little longer)
-const SWING_SET = new Set([...SWINGS, 'wallop']);
+const SWING_SET = new Set([...SWINGS, 'wallop', 'glumBonk']);
 const TRAIL_SET = new Set([...SWING_SET, 'sulkSpin', 'sigh', 'tugThrow', 'stzWhirl']); // (the moves whose ball draws a trail)
 const LUNGE_SPEED = 9;
 const GLOOM = '#5ce0c0';
@@ -96,6 +96,60 @@ const M = {
     const moved = Math.hypot(P.pos.x - _t.x, P.pos.z - _t.z);
     m.budget = moved < step * 0.3 ? 0 : m.budget - moved;
   },
+
+  // ================================================================== FLAIL ARTS · Glum Bonk
+  /** the quick, precise one: one overhead bonk on the aimed-at foe (the 'glumBonk' action, 0.46 at his attack speed × 0.6).
+   *  o (the charged release, chargedShihtzu.js): { big, echo: { pct, delay }, crit } */
+  cast_glumBonk(R, aim, target, o = {}) {
+    const G = this.G, P = G.player;
+    const m = this.melee; this.melee = null;
+    this.stzMelee = m ? { target: m.target, reach: m.reach, budget: m.budget } : null;
+    this.stzCombo = 0;
+    sfx('flail_whoosh', { pitch: o.big ? 1.05 : 1.3, vol: 0.55 });
+    P.anim.play('glumBonk', { speed: this.animSpeed(0.6), onEvent: ev => {
+      if (ev !== 'hit') return;
+      this.stzSnapIn(target, R.params.radius);
+      const main = this.stzBonk(R, target, o, 1);
+      if (o.echo) { const at = this.stzBonkSpot().clone(); this.after?.(o.echo.delay, () => this.stzBonk(R, main?.alive ? main : null, o, o.echo.pct / 100, at)); } // (Bonk Bonk: the ball bounces and comes down again)
+      this.stzMelee = null;
+    } });
+  },
+  /** one bonk: on the aimed-at foe when it's in reach (else the foe nearest the spot just in front of him); k scales it (the
+   *  echo), at: a fixed spot (the echo comes down where the first one did). → the foe bonked (or null) */
+  stzBonk(R, target, o, k = 1, at = null) {
+    const G = this.G, P = G.player, p = R.params, fx = this.stzFx(), f = P.facing, echo = k < 1;
+    const inReach = e => e?.alive && dist(e.pos.x, e.pos.z, P.pos.x, P.pos.z) <= p.radius + (e.radius || 0.3) + 0.35;
+    // the spot: in front of him on his facing (or where the first bonk landed), then snapped onto the foe being bonked
+    const spot = at ? at.clone() : new THREE.Vector3(P.pos.x + Math.sin(f) * p.radius * 0.85, 0, P.pos.z + Math.cos(f) * p.radius * 0.85); // (its own: the sound and the echo keep it)
+    let main = !echo && inReach(target) && (target.team === 'enemy' || target.breakable) ? target : null;
+    if (echo && target?.alive && dist(target.pos.x, target.pos.z, spot.x, spot.z) < p.splash + (target.radius || 0.3)) main = target;
+    if (!main) { let bd = p.splash + 0.5; this.combat.inRadius(spot.x, spot.z, bd, 'ally', e => { if (!e.alive || !(e.team === 'enemy' || e.breakable)) return; const dd = dist(e.pos.x, e.pos.z, spot.x, spot.z) - (e.radius || 0.3); if (dd < bd) { bd = dd; main = e; } }); }
+    if (main) { // (on the foe's near side, where the ball meets it)
+      const dx = main.pos.x - P.pos.x, dz = main.pos.z - P.pos.z, dd = Math.hypot(dx, dz) || 1, back = Math.min((main.radius || 0.3) * 0.6, dd * 0.3);
+      spot.set(main.pos.x - dx / dd * back, 0, main.pos.z - dz / dd * back);
+    }
+    spot.y = G.world.heightAt?.(spot.x, spot.z) ?? P.pos.y;
+    if (!at) this.stzBonkSpot().copy(spot);
+    const big = !!o.big && !echo;
+    fx.bonk(spot, p.splash * (echo ? 0.8 : 1), big);
+    sfx('glum_bonk', { big, pitch: echo ? 1.15 : 1, vol: echo ? 0.7 : 1, pos: spot });
+    if (main) {
+      this.combat.hitMonster(main, { dmgPct: p.dmgPct * k, stun: echo ? p.daze * 0.5 : p.daze, knock: p.knockback, from: P.pos, forceCrit: !!o.crit && !echo });
+      if (main.alive && !main.breakable && !main.def?.boss) this.fx?.()?.dizzy?.(main, echo ? p.daze * 0.5 : p.daze);
+      if (!main.breakable) fx.gloomPuff(_h.set(main.pos.x, main.pos.y + (main.height || 1) * 0.85, main.pos.z), 2, 0.2, STZ_COL.gloomLt);
+    }
+    // the splat: a share to everyone else close round the spot (a little nudge away from it)
+    this.combat.inRadius(spot.x, spot.z, p.splash, 'ally', e => {
+      if (e === main || !e.alive || !(e.team === 'enemy' || e.breakable)) return;
+      this.combat.hitMonster(e, { dmgPct: p.dmgPct * p.splashPct / 100 * k, knock: 0.35, from: spot });
+    });
+    G.engine.rig.shake(big ? 0.24 : echo ? 0.08 : 0.14);
+    if (main) G.engine.hitStop = Math.max(G.engine.hitStop || 0, big ? 0.07 : echo ? 0.02 : 0.05);
+    return main;
+  },
+
+  /** where the last bonk landed (the echo's spot) */
+  stzBonkSpot() { return this._stzBonkSpot || (this._stzBonkSpot = new THREE.Vector3()); },
 
   // ================================================================== FLAIL ARTS · Woeful Wallop
   cast_woefulWallop(R, aim, target, o = {}) {
@@ -290,11 +344,11 @@ const M = {
 };
 
 /** Mix the Shih Tzu's cast implementations into SkillRunner.prototype (skillRunner.js does this at import). Woeful
- *  Wallop is a melee swing too: the reach assist walks him up to a far target and lunges at a near one. */
+ *  Wallop and Glum Bonk are melee swings too: the reach assist walks him up to a far target and lunges at a near one. */
 export function installShihtzuSkills(proto) {
   for (const k in M) if (!(k in proto)) proto[k] = M[k];
   installShihtzuArts(proto);
   installChargedShihtzu(proto);
   const isMelee = proto.isMelee;
-  proto.isMelee = function (id, R) { return id === 'woefulWallop' || isMelee.call(this, id, R); };
+  proto.isMelee = function (id, R) { return id === 'woefulWallop' || id === 'glumBonk' || isMelee.call(this, id, R); };
 }

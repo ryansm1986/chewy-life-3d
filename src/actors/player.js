@@ -8,6 +8,7 @@ import { registerDebug } from '../debug/registry.js';
 import { buildHeroModel, heroModelReady } from './heroModels.js';
 import { makeStaff, attachStaff, tickStaff, disposeStaff, STAFF_GRIP } from './heroGear.js';
 import { Animator } from './animator.js';
+import { LIFE_ACTIONS } from './lifePoses.js';
 import { SAMURAI_ROOTED } from './samuraiPoses.js';
 import { POE_ROOTED } from './poePoses.js';
 import { installPoeGear, dressPoe } from './poeGear.js';
@@ -19,6 +20,7 @@ import { installStellaGear, dressStella } from './stellaGear.js';
 import { STELLA_ROOTED } from './stellaPoses.js';
 import { reach } from './armIK.js';
 import { Sprint } from './sprint.js';
+import { Traverse } from './traverse.js';
 import { Actions } from '../core/actions.js';
 import { navFor, PathFollow } from '../core/nav.js';
 import { Events } from '../core/events.js';
@@ -30,6 +32,8 @@ const STAFF_UP = STAFF_GRIP.rotation[0];
 const STAFF_CASTS = new Set(['staffBolt', 'staffCast', 'skyCast', 'wetShake', 'summon', 'yank', 'puddleHop', 'surf', 'beam', 'duckCall', 'cast', 'swing', 'swing2', 'throw']);
 // actions that root the player (WASD won't walk out of them); Moka's staff casts included (animator.js ACTIONS)
 const BUSY = new Set(['swing', 'swing2', 'throw', 'cast', 'bark', 'slam', 'pickup', 'drink', 'staffBolt', 'staffCast', 'skyCast', 'wetShake', 'summon', 'yank', 'puddleHop', 'surf', 'beam', 'duckCall', ...SAMURAI_ROOTED, ...POE_ROOTED, ...SHIHTZU_ROOTED, ...GOLDEN_ROOTED, ...STELLA_ROOTED]);
+// everyday actions that don't draw the katana in the village (carrySword): the life poses, a wave, a pick-up, a drink
+const CALM = new Set([...Object.keys(LIFE_ACTIONS), 'wave', 'happy', 'pickup', 'drink', 'dig']);
 // the Bone Katana's geometry per item tint (charKit.js katanaGeo): shared by every rig the player ever gets
 const KATANAS = new Map();
 const katanaFor = (colors, hilt = false) => { const k = `${(colors || []).join(',')}|${hilt ? 'h' : 'b'}|${katanaVariant()}`; let g = KATANAS.get(k); if (!g) KATANAS.set(k, g = katanaGeo({ colors, hilt })); return g; };
@@ -69,6 +73,7 @@ export class Player extends Actor {
     this.setWeapon('sword');
     this.speedMul = 1;
     this.sprint = new Sprint(this); // hold Shift: +40% (sprint.js, docs/ZONES.md §9)
+    this.trav = new Traverse(this, { kind: 'biped' }); // swimming and climbing (traverse.js, ROADMAP TR-1)
   }
   /** the speed the hero walks at right now (m/s, every multiplier in, the sprint included) */
   get moveSpeed() { return this.speed * this.speedMul; }
@@ -99,6 +104,7 @@ export class Player extends Actor {
     this.makeSwords(rig); this.setWeapon(this.weaponType);
     this.rollT = 0; this.invuln = !!this.G?.heroSwitching; // (a hero hand-off swaps the rig mid-switch: stay invulnerable through it)
     this.sprint?.reset();
+    this.trav?.settle();
     this.sync();
   }
   // The Bone Katana (charKit.js katanaGeo), tinted like the equipped sword item: one in the paw, and the sheathed one —
@@ -229,9 +235,9 @@ export class Player extends Actor {
       this.invuln = !!G.heroSwitching; // (nothing lands during a hero hand-off)
       const dir = this.readMoveInput();
       if (dir.lengthSq() > 0) { this.moveTarget = null; this.interactTarget = null; }
-      this.speedMul *= this.sprint.update(dt, dir.lengthSq() > 0 || !!this.moveTarget); // Shift / L3: the sprint (sprint.js)
+      this.speedMul *= this.sprint.update(dt, (dir.lengthSq() > 0 || !!this.moveTarget) && !this.trav.busy); // Shift / L3: the sprint (sprint.js; not swimming or climbing)
       if (dir.lengthSq() > 0 && this.moveMag < 1) this.speedMul *= this.moveMag; // (the stick's tilt: analogue walking speed)
-      if (Actions.pressed('roll', Actions.vcursor.on ? 'kbm' : undefined) && !this.controlLocked && !G.ui?.anyModal?.()) { // (the pad's B cancels in build mode)
+      if (Actions.pressed('roll', Actions.vcursor.on ? 'kbm' : undefined) && !this.controlLocked && !this.trav.busy && !G.ui?.anyModal?.()) { // (the pad's B cancels in build mode; no roll swimming or climbing)
         if (this.roll(dir.lengthSq() ? dir : new THREE.Vector3())) Actions.consume('roll');
       }
       const navWas = this.navOn; this.navOn = false;
@@ -286,7 +292,7 @@ export class Player extends Actor {
     // In the village the sword rides on his back (he was leaning on it like a cane); it comes out for any attack or
     // skill and goes back a few seconds later. In the Burrow it stays in hand.
     // (a model with a saya also sheathes at the end of a combo, samuraiPoses.js 'noto', until the next draw)
-    if (this.anim.action && !this.toolOut) this._drawnT = 3;
+    if (this.anim.action && !this.toolOut && !CALM.has(this.anim.action.name)) this._drawnT = 3; // (a yawn, a wave or a chat leaves it on his back)
     this._drawnT = Math.max(0, (this._drawnT || 0) - dt);
     const sheathed = ((this.G.mode === 'village' || this.G.mode === 'interior') && this._drawnT <= 0) || !!this.toolOut || (this.saya && this._noto); // (a homestead tool is in the paw: life/tools.js; indoors it stays on his back)
     if (sheathed !== this._sheathed) {

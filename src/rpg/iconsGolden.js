@@ -3,7 +3,7 @@
 // paint, vol, volR, shine, sparkle, glow, …), so this module imports nothing from it (no import cycle). Art is drawn
 // around 0,0 in a 64 box.
 export const GLD_SKILL_TREE = {
-  sunbeamThrust: 'lance', knightsVow: 'lance', sunfallJump: 'lance', pinwheelSweep: 'lance', steadyPaws: 'lance', gallantCharge: 'lance', starfallLance: 'lance',
+  eagerJabs: 'lance', sunbeamThrust: 'lance', knightsVow: 'lance', sunfallJump: 'lance', pinwheelSweep: 'lance', steadyPaws: 'lance', gallantCharge: 'lance', starfallLance: 'lance',
   bonkDart: 'javelin', keenNose: 'javelin', tailwagVolley: 'javelin', trueFlight: 'javelin', goodRetriever: 'javelin', emberleafJavelin: 'javelin', sunshower: 'javelin',
   emberBreath: 'whelp', bestFriends: 'whelp', divebombSwoop: 'whelp', wingShield: 'whelp', warmHeart: 'whelp', mightyRoar: 'whelp', dragonHeart: 'whelp',
 };
@@ -132,6 +132,16 @@ export function drawGoldenSkill(g, id, K) {
       g.beginPath(); g.moveTo(-26, 16); g.lineTo(26, -14); g.lineTo(26, -4); g.lineTo(-26, 22); g.closePath(); g.fillStyle = K.lin(g, -26, 0, 26, 0, [[0, 'rgba(255,240,180,0)'], [1, 'rgba(255,240,180,0.85)']]); g.fill();
       rays(g, K, 20, -12, 8, 15, 7);
       lance(g, K, -24, 20, 22, -14);
+      return true;
+    }
+    case 'eagerJabs': { // the flurry: the lance poking out with quick short speed lines either side of it, two little bonks
+      // flecking off the tip and one big bonk right in front of it (jab, jab, JAB)
+      const ux = 0.79, uy = -0.61, vx = 0.61, vy = 0.79; // (along the lance, and across it)
+      for (const [s, a, b] of [[-8, -14, -2], [8, -16, -4], [-15, -8, 2]]) swoosh(g, K, () => { g.beginPath(); g.moveTo(ux * a + vx * s, 4 + uy * a + vy * s); g.lineTo(ux * b + vx * s, 4 + uy * b + vy * s); }, 2.2);
+      lance(g, K, -26, 22, 8, -4, null, 'flame', 3.6);
+      for (const [x, y, s] of [[6, -20, 5], [22, 2, 5]]) { K.sparkle?.(g, x, y, s, '#fff2c8'); K.circ(g, x, y, s * 0.42); K.paint(g, '#ffe08a', 1.2); }
+      K.glow(g, 17, -12, 13, '#ffe9a0', 0.55);
+      K.sparkle?.(g, 17, -12, 12, '#fff8e8'); K.circ(g, 17, -12, 4.8); K.paint(g, K.volR(g, '#ffd84a', 17, -12, 4.8, 0.4, 0.3), 1.4);
       return true;
     }
     case 'knightsVow': { // a paw on the heart, a sunny little crest: his promise

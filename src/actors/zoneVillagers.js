@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { Actor } from './actor.js';
 import { buildHumanoid } from './charKit.js';
+import { heroModelReady, buildHeroModel } from './heroModels.js';
 import { randomVillagerSpec } from './roster.js';
 import { SEAT_LIFT } from './lifePoses.js';
 import { rand, pick, chance, dist, damp, mulberry32 } from '../core/util.js';
@@ -34,7 +35,7 @@ export function zoneSpec(id) {
 }
 /** a fresh Toybox rig for a zone villager (G.zoneNpcBuilder: phase C's caged villager in the dungeon). The caller owns
  *  it (rig.dispose()). */
-export function zoneNpcRig(id) { return buildHumanoid({ ...zoneSpec(id), outfit: { ...zoneSpec(id).outfit } }); }
+export function zoneNpcRig(id) { return heroModelReady(id) ? buildHeroModel(id) : buildHumanoid({ ...zoneSpec(id), outfit: { ...zoneSpec(id).outfit } }); }
 
 const PLAYER_VR = 0.36;
 const _d = new THREE.Vector3();
@@ -43,7 +44,7 @@ export class ZoneVillager extends Actor {
   /** def: the villager record (data.js) or { id, name, folk: true }; o: { village (runtime), home: { x, z, face }, spots } */
   constructor(world, G, def, o = {}) {
     const spec = zoneSpec(def.id);
-    super(world, buildHumanoid(spec), { radius: 0.28, speed: 1.5, name: def.name || spec.name });
+    super(world, (!def.folk && heroModelReady(def.id) && buildHeroModel(def.id)) || buildHumanoid(spec), { radius: 0.28, speed: 1.5, name: def.name || spec.name }); // (the Blender villager when its rig is loaded: ROADMAP VL-2)
     this.anim.plant = true; // (the planted walk: feet that hold the ground, actors/animator.js poseGait)
     this.G = G; this.def = def; this.id = def.id; this.spec = spec; this.folk = !!def.folk; this.zone = o.zone;
     this.village = o.village; this.home = o.home || null; this.spots = o.spots || [];

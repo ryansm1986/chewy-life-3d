@@ -61,6 +61,21 @@ const DEFS = {
       return [`Damage: ${pct(p.dmgPct)}${dmgRange(p.dmgPct, d)} per pass`, `Flies ${p.range} m out and back: hits on the way out AND back`, 'Passes through every foe', costLine(DEFS.fumaThrow, l, d), ...synLine('fumaThrow', d), ...mastLine('shuriken', d)];
     },
   },
+  fumaFlurry: {
+    tree: 'shuriken', name: 'Fūma Flurry', row: 0, col: 0, pre: [], wep: 'fuma', kind: 'active', element: 'phys',
+    cost: l => r1(2 + 0.1 * (l - 1)), cd: () => 0,
+    desc: 'Why let go of a perfectly good fūma? Keep it in your paw, let it whirl like a buzz-saw and zip-zip-ZIP: three quick cuts at whoever is closest, the last one with a flip. (Ears in, please.)',
+    syn: [{ id: 'fumaThrow', p: 4 }, { id: 'whirlingFuma', p: 5 }],
+    params(l, d) {
+      // (three cuts in ~0.75 s: single-target tap dps within ±10% of Fūma Throw's two passes a ~1.25 s round trip —
+      //  tools/hero-balance.mjs flurry; a short cone, so a pack gets far less of it than the throw's pass-through)
+      return { dmgPct: lin(32, 5.5)(l) * S('fumaFlurry', d), cuts: 3, radius: 1.85, arc: 110, knockback: 0.12, lastKnock: 0.55 };
+    },
+    info(l, d) {
+      const p = DEFS.fumaFlurry.params(l, d);
+      return [`Damage: ${pct(p.dmgPct)}${dmgRange(p.dmgPct, d)} per cut`, `${p.cuts} quick cuts in a ${p.arc}° cone, ${p.radius} m`, 'The last cut flips in and knocks foes back', costLine(DEFS.fumaFlurry, l, d), ...synLine('fumaFlurry', d), ...mastLine('shuriken', d)];
+    },
+  },
   shurikenMastery: {
     tree: 'shuriken', name: 'Shuriken Mastery', row: 1, col: 0, pre: [], wep: 'fuma', kind: 'passive', element: 'phys',
     cost: () => 0, cd: () => 0,

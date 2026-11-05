@@ -52,14 +52,17 @@ const lpad = (s, n) => String(s).padStart(n);
 hr('SKILLS');
 // five heroes (docs/HEROES.md, docs/POE.md, docs/SHIHTZU.md, docs/GOLDEN.md): Chewy's three trees (bone / fetch / spirit),
 // Moka's (tide / star / duck), Poe's (shuriken / jutsu / shadow), the Shih Tzu's (flail / hex / tome) and Foosy's (lance /
-// javelin / whelp), and Stella's (ray / flare / dawn: docs/STELLA.md), 21 skills each
-ok(SKILL_IDS.length === 126 && TREES.length === 18, 'exactly 126 skills in 18 trees');
-for (const h of HERO_IDS) ok(SKILL_IDS.filter(id => SKILLS[id].cls === h).length === 21, `${h} has 21 skills`);
+// javelin / whelp), and Stella's (ray / flare / dawn: docs/STELLA.md), 21 skills each; the four weapon heroes' weapon
+// trees have an 8th, a second level-1 weapon attack at row 0 col 0 (Swallow Return, Fūma Flurry, Glum Bonk, Eager Jabs)
+const WIDE_TREES = ['bone', 'shuriken', 'flail', 'lance'];
+ok(SKILL_IDS.length === 130 && TREES.length === 18, 'exactly 130 skills in 18 trees');
+for (const h of HERO_IDS) { const n = ['chewy', 'poe', 'shihtzu', 'golden'].includes(h) ? 22 : 21; ok(SKILL_IDS.filter(id => SKILLS[id].cls === h).length === n, `${h} has ${n} skills`); }
 for (const t of TREES) {
-  const ids = SKILL_IDS.filter(id => SKILLS[id].tree === t.id);
-  ok(ids.length === 7, `tree ${t.id} has 7 skills`);
+  const ids = SKILL_IDS.filter(id => SKILLS[id].tree === t.id), n = WIDE_TREES.includes(t.id) ? 8 : 7;
+  ok(ids.length === n, `tree ${t.id} has ${n} skills`);
   const cells = new Set(ids.map(id => SKILLS[id].row + ':' + SKILLS[id].col));
-  ok(cells.size === 7, `tree ${t.id} cells unique`);
+  ok(cells.size === n, `tree ${t.id} cells unique`);
+  if (n === 8) { const r0 = ids.filter(id => SKILLS[id].row === 0); ok(r0.length === 2 && r0.every(id => SKILLS[id].wep && SKILLS[id].kind === 'active' && !SKILLS[id].pre.length), `tree ${t.id}: two level-1 weapon attacks (${r0.join(', ')})`); }
 }
 for (const id of ['chomp', 'boneMastery', 'whirl', 'dig', 'frenzy', 'bonestorm', 'throw', 'fetchMastery', 'ricochet', 'multi', 'blaze', 'fetchstorm', 'woof', 'goodboy', 'zoom', 'packcall', 'howl', 'moonhowl'])
   ok(!!SKILLS[id], `ported skill ${id} exists`);
@@ -321,6 +324,29 @@ for (let i = 0; i < 400; i++) {
   ok(Math.abs(synergyMult('chomp', st) - (1 + 0.18 + 0.10)) < 1e-9, 'synergy math');
   ok(effectiveLevel('whirl', st, { allSkills: 2 }) === 0, 'effLvl 0 without base');
   ok(effectiveLevel('chomp', st, { allSkills: 2, treeSkills: { bone: 1 } }) === 4, 'effLvl adds bonuses');
+}
+// Swallow Return: Chewy's second level-1 weapon attack (docs/HEROES.md §8), the quick narrow two-cut beside Crescent Chomp
+{
+  const S = SKILLS.swallow, C = SKILLS.chomp, { CHARGE, chargeRuntime } = await import('../src/rpg/charge.js');
+  ok(S && S.cls === 'chewy' && S.tree === 'bone' && S.row === 0 && S.col === 0 && !S.pre.length && S.wep === 'sword' && S.kind === 'active' && S.cd(1) === 0 && S.req === 1, 'swallow: Bone Blade, row 0 col 0 beside Crescent Chomp, a level-1 Bone Katana active, no cooldown');
+  ok(S.syn.length === 2 && S.syn.every(y => SKILLS[y.id].tree === 'bone'), 'swallow: two synergies from its own tree');
+  ok(S.cost(1) <= C.cost(1) && S.cost(20) <= C.cost(20) && S.cost(20) > S.cost(1), `swallow: a cheap zoom cost, below Chomp's (${S.cost(1)} / ${S.cost(20)})`);
+  const p1 = S.params(1), p10 = S.params(10), p20 = S.params(20);
+  ok(p1.hits === 2 && p1.arc <= 100 && p1.arc < C.params(1).arc && p10.dmgPct > p1.dmgPct && p20.dmgPct > p10.dmgPct, `swallow: two cuts in a narrow arc, harder with each level (${[p1, p10, p20].map(p => Math.round(p.dmgPct)).join(' / ')}% each)`);
+  const st = newGameState(); st.player.skillPts = 1;
+  ok(canLearn('swallow', st).ok, 'swallow: learnable at level 1');
+  st.player.skills.swallow = 1; st.player.skills.chomp = 1; const d = computeStats(st);
+  ok(usable('swallow', st, d).ok && (() => { st.player.activeWeapon = 1; const r = !usable('swallow', st, computeStats(st)).ok; st.player.activeWeapon = 0; return r; })(), 'swallow: usable with the Bone Katana only');
+  // tap damage a second (the cast's speed: skillRunner animSpeed 0.6 to the iai's 0.5): a lone foe the same as Chomp's
+  // (±10%), a pack less (each narrow cut catches fewer); its zoom a second about Chomp's too
+  for (const L of [1, 10, 20]) {
+    const a = C.params(L), b = S.params(L), cA = 0.46 / 0.5, cB = 0.46 / 0.6, area = r => Math.min(5, 5 * (r / 3) ** 2);
+    const single = (b.dmgPct * 2 / cB) / (a.dmgPct / cA), pack = (b.dmgPct * 2 * area(b.radius) * Math.min(1, b.arc / 200) / cB) / (a.dmgPct * area(a.radius) * Math.min(1, a.arc / 200) / cA), zoom = (S.cost(L) / cB) / (C.cost(L) / cA);
+    ok(single > 0.9 && single < 1.1 && pack < 0.9 && zoom > 0.9 && zoom < 1.1, `swallow L${L}: tap dps ×${single.toFixed(2)} Chomp's on one foe, ×${pack.toFixed(2)} on a pack; zoom a second ×${zoom.toFixed(2)}`);
+  }
+  const c = CHARGE.swallow; st.player.skills.swallow = 10; st.player.chargePerks = { swallow: { stages: 2 } };
+  const d2 = computeStats(st), R0 = skillRuntime('swallow', st, d2), R3 = chargeRuntime('swallow', st, d2, 3);
+  ok(c && c.ready && c.pose === 'gedan' && c.perks.split && c.perks.dart?.kind === 'unique' && R3.params.fly >= 5 && R3.params.flyPct > 0 && R3.params.dmgPct >= R0.params.dmgPct, `swallow: its charge (${c?.title}): the cuts at least a tap's, a swallow flying ${R3?.params.fly} m; Swallow Flock and Darting Swallow`);
 }
 
 // ------------------------------------------------------------------ actions
@@ -1036,7 +1062,8 @@ hr('POE (the third hero, docs/POE.md)');
   ok(['shuriken', 'jutsu', 'shadow'].every(t => TREES.some(x => x.id === t && x.cls === 'poe')) && C.trees.join() === 'shuriken,jutsu,shadow', 'poe: three trees');
   for (const t of C.trees) {
     const ids = SKILL_IDS.filter(id => SKILLS[id].tree === t), rows = ids.map(id => SKILLS[id].row).sort().join('');
-    ok(ids.length === 7 && rows === '0112345'.slice(0, 7) && ids.filter(id => SKILLS[id].kind === 'passive').length === 1, `poe ${t}: 7 skills on rows 0-5 with one passive (${rows})`);
+    const want = t === 'shuriken' ? '00112345' : '0112345'; // (Shuriken Arts: Fūma Flurry beside Fūma Throw)
+    ok(ids.length === want.length && rows === want && ids.filter(id => SKILLS[id].kind === 'passive').length === 1, `poe ${t}: ${want.length} skills on rows 0-5 with one passive (${rows})`);
     for (const id of ids) for (const y of SKILLS[id].syn) ok(SKILLS[y.id].tree === t, `poe ${id}: synergy ${y.id} in its own tree`);
   }
   ok(canWield('poe', 'fuma') && !canWield('poe', 'sword') && !canWield('chewy', 'fuma') && !canWield('moka', 'fuma'), 'poe: the fūma is hers alone');
@@ -1080,12 +1107,22 @@ hr('POE (the third hero, docs/POE.md)');
   for (const b of band) ok(b.dps >= 0.85 && b.dps <= 1.2 && b.ehp >= 0.9 && b.ehp <= 1.15 && b.life < 1.02, `poe: level ${b.lvl} clear speed ×${b.dps.toFixed(2)} and eHP ×${b.ehp.toFixed(2)} of the Chewy–Moka mean (life ×${b.life.toFixed(2)}: fragile, but she dodges)`); for (const b of band) ok(b.step.clear >= 0.6 && b.step.single >= 1.15 && b.step.single <= 1.6, `poe: level ${b.lvl} Shadow Step build: clear ×${b.step.clear.toFixed(2)}, single target ×${b.step.single.toFixed(2)} of the mean (a single-target opener)`);
   { const { POE_TRAINING } = await import('../src/rpg/skillsPoe.js'), { canLearn } = await import('../src/rpg/skills.js'); const S2 = { player: { ...S.player, skillPts: 5, skills: { ...S.player.skills } } }; const before = canLearn('vanish', S2).ok; POE_TRAINING.add('vanish'); const lk = canLearn('vanish', S2), us = usable('vanish', { player: { ...S2.player, skills: { ...S2.player.skills, vanish: 3 } } }, d2); POE_TRAINING.delete('vanish'); ok(before && !lk.ok && /training/.test(lk.why) && !us.ok && POE_TRAINING.size === 0, `poe: a skill still in training can't be learned or cast ("${lk.why}"); none are in training now`); }
   ok(HB.fumaFlight(sk.fumaThrow.params(1, d2)) < 1.05 && Math.abs(HB.fumaFlight(sk.fumaThrow.params(20, d2)) - HB.fumaFlight(sk.fumaThrow.params(1, d2))) < 0.08, 'poe: a Fūma Throw round trip stays under ~1 s at every level');
+  // ---- Fūma Flurry (the second level-1 weapon attack): the slot, the def, the charge table, the balance vs Fūma Throw
+  { const F = sk.fumaFlurry, T = sk.fumaThrow, { CHARGE: CH } = await import('../src/rpg/charge.js'), { AIM } = await import('../src/combat/autoTarget.js');
+    ok(F && F.tree === 'shuriken' && F.row === 0 && F.col === 0 && T.col === 1 && !F.pre.length && F.wep === 'fuma' && F.kind === 'active' && F.cd(1) === 0 && F.cd(20) === 0 && F.req === 1, 'poe: Fūma Flurry sits at row 0, col 0 of Shuriken Arts (beside Fūma Throw): a level-1 fūma active, no cooldown');
+    ok(F.syn.length === 2 && F.syn.every(y => SKILLS[y.id].tree === 'shuriken' && y.p > 0) && F.cost(1) <= T.cost(1) && F.cost(20) <= T.cost(20) && F.cost(20) > F.cost(1), `poe: Fūma Flurry has two Shuriken Arts synergies and costs about Fūma Throw's zoom (${F.cost(1)}–${F.cost(20)} vs ${T.cost(1)}–${T.cost(20)})`);
+    const p1 = F.params(1, d2), p10 = F.params(10, d2), p20 = F.params(20, d2);
+    ok(p1.cuts === 3 && p10.dmgPct > p1.dmgPct && p20.dmgPct > p10.dmgPct && p1.radius < 2.2 && p1.arc <= 120 && p1.lastKnock > p1.knockback && F.info(10, d2).every(l => typeof l === 'string' && !/NaN|undefined/.test(l)), `poe: Fūma Flurry: three cuts in a short cone (${p1.radius} m, ${p1.arc}°), ${Math.round(p1.dmgPct)}% → ${Math.round(p10.dmgPct)}% → ${Math.round(p20.dmgPct)}% a cut at levels 1 / 10 / 20`);
+    const c = CH.fumaFlurry;
+    ok(c?.ready === true && c.pose === 'poeSaw' && Object.keys(c.perks).join() === 'stages,quick,wide,spinCycle' && c.perks.spinCycle.kind === 'unique' && AIM.fumaFlurry?.kind === 'melee', 'poe: Fūma Flurry charges (Buzz-saw Frenzy: the poeSaw wind-up; Deeper Charge, Quick Wind-up, Wider Whirl, ★ Spin Cycle) and aims as a melee strike');
+    for (const L of [6, 15, 30, 45]) { const a = HB.heroAt('poe', L), b = HB.heroAt('poe·flurry', L), s = b.single / a.single, pk = b.pack / a.pack;
+      ok(s >= 0.9 && s <= 1.1 && pk < 0.7, `poe: level ${L} Fūma Flurry build vs the Fūma Throw build: single target ×${s.toFixed(2)} (±10%), a pack ×${pk.toFixed(2)} (the focused one)`); } }
 }
 
 hr('THE SHIH TZU (the fourth hero, docs/SHIHTZU.md)');
 {
   const HB = await import('./hero-balance.mjs'), { SHIHTZU_TRAINING, DR_CAP } = await import('../src/rpg/skillsShihtzu.js');
-  ok(SHIHTZU_TRAINING.size === 0 && Object.values(SKILLS).filter(s => s.cls === 'shihtzu').every(s => !s.training), 'shihtzu: all 21 skills are built (none in training)');
+  ok(SHIHTZU_TRAINING.size === 0 && Object.values(SKILLS).filter(s => s.cls === 'shihtzu').every(s => !s.training), 'shihtzu: all 22 skills are built (none in training)');
   const fl = GEAR_BASE_IDS.filter(id => ITEM_BASES[id].wtype === 'flail');
   ok(fl.length >= 12 && [0, 1, 2].every(t => fl.some(id => ITEM_BASES[id].tier === t)) && fl.every(id => ITEM_BASES[id].icon.colors?.length >= 2), `shihtzu: ${fl.length} flail bases over three tiers, each with its ball and rope colours`);
   // ---- hero balance (tools/hero-balance.mjs): the tank (Woeful Wallop) and the hex build vs the Chewy–Moka–Poe mean, same level and gear
@@ -1094,6 +1131,15 @@ hr('THE SHIH TZU (the fourth hero, docs/SHIHTZU.md)');
   for (const b of sb) ok(b.hex.clear >= 0.85 && b.hex.clear <= 1.05, `shihtzu: level ${b.lvl} hex build (Dripping Paw, Grumble Cloud, Mournful Awoo, Everlasting Gloom): clear ×${b.hex.clear.toFixed(2)} of the mean (single ×${b.hex.single.toFixed(2)})`);
   const { st, d } = HB.buildHero('shihtzu', 45);
   ok(d.dmgReduce > 0 && d.dmgReduce <= DR_CAP, `shihtzu: damage reduction ${d.dmgReduce}% (capped at ${DR_CAP}%)`);
+  // ---- Glum Bonk (the second level-1 flail attack, 2026-11-03): the quick, precise one beside Woeful Wallop
+  { const B = SKILLS.glumBonk, W = SKILLS.woefulWallop, C = (await import('../src/rpg/charge.js')).CHARGE.glumBonk;
+    ok(B && B.cls === 'shihtzu' && B.tree === 'flail' && B.row === 0 && B.col === 0 && B.req === 1 && !B.pre.length && B.wep === 'flail' && B.kind === 'active' && B.cd(1) === 0 && W.row === 0 && W.col === 1, 'shihtzu: Glum Bonk sits at row 0, col 0 of Flail Arts (level 1, no prerequisite, flail, no cooldown), beside Woeful Wallop');
+    ok(B.cost(1) < W.cost(1) && B.cost(20) > B.cost(1) && B.syn.length === 2 && B.syn.every(s => SKILLS[s.id]?.tree === 'flail'), `shihtzu: Glum Bonk is cheap (${B.cost(1)} zoom, Woeful Wallop ${W.cost(1)}) with two Flail Arts synergies`);
+    const p1 = B.params(1), p10 = B.params(10), p20 = B.params(20);
+    ok(p10.dmgPct > p1.dmgPct && p20.dmgPct > p10.dmgPct && p20.daze > p1.daze && p1.splash < 1.2 && p1.splashPct < 50 && p1.daze > 0, `shihtzu: Glum Bonk grows with level (${Math.round(p1.dmgPct)} / ${Math.round(p10.dmgPct)} / ${Math.round(p20.dmgPct)}%), a small splat (${p1.splash} m, ${p1.splashPct}%) and a daze`);
+    ok(C && C.ready && C.pose === 'stzBonk' && C.perks.echo && C.perks.noggin, 'shihtzu: Glum Bonk charges (The Glummest Bonk: stzBonk wind-up, Bonk Bonk, Right on the Noggin)');
+    ok(B.desc && !/[぀-ヿ一-鿿]/.test(B.desc + B.name + C.title + C.blurb), 'shihtzu: Glum Bonk reads in plain English');
+    for (const b of sb) ok(b.bonk.single >= 0.9 && b.bonk.single <= 1.1 && b.bonk.clear < 0.8, `shihtzu: level ${b.lvl} Glum Bonk build: single ×${b.bonk.single.toFixed(2)}, clear ×${b.bonk.clear.toFixed(2)} of the tank's (focused: weaker in a pack)`); }
 }
 
 hr('FOOSY THE DRAGOON (the fifth hero, docs/GOLDEN.md)');
@@ -1101,7 +1147,7 @@ hr('FOOSY THE DRAGOON (the fifth hero, docs/GOLDEN.md)');
   const HB = await import('./hero-balance.mjs'), { GOLDEN_TRAINING } = await import('../src/rpg/skillsGolden.js');
   // (checkpoint 2: all 21 are built: none left "in training")
   const gt = Object.values(SKILLS).filter(s => s.cls === 'golden');
-  ok(gt.length === 21 && GOLDEN_TRAINING.size === 0 && gt.every(s => !s.training), `golden: all ${gt.length} skills are built (none in training)`);
+  ok(gt.length === 22 && GOLDEN_TRAINING.size === 0 && gt.every(s => !s.training), `golden: all ${gt.length} skills are built (none in training)`);
   const { WHELP_ACTIVES } = await import('../src/rpg/skillsGolden.js');
   ok(WHELP_ACTIVES.size === 5 && [...WHELP_ACTIVES].every(id => SKILLS[id]?.tree === 'whelp' && SKILLS[id].kind === 'active'), 'golden: the Whelp Bond has 5 actives, each waiting on Shadow (castBlocked)');
   const ln = GEAR_BASE_IDS.filter(id => ITEM_BASES[id].wtype === 'lance');
@@ -1119,6 +1165,23 @@ hr('FOOSY THE DRAGOON (the fifth hero, docs/GOLDEN.md)');
   ok(d.weaponType === 'lance' && d.shadowLife >= 20 && d.shadowDmg >= 20 && d.javMul > 0 && d.whelpMul > 0, `golden: Shadow's bond (+${d.shadowLife}% life, +${d.shadowDmg}% damage), javMul ×${d.javMul}, whelpMul ×${d.whelpMul}`);
   const h1 = HB.buildHero('golden', 1), R = skillRuntime('attack', h1.st, h1.d);
   ok(R.params.lance && R.params.radius > 2.6 && R.params.radius > (ATTACK.params(1, { weaponType: 'flail' }).radius || 0), `golden: the reach combo reaches ${R.params.radius} m (the longest melee reach)`);
+  { // ---- Eager Jabs: his second level-1 lance attack (the quick close flurry beside Sunbeam Thrust's one long lunge)
+    const J = SKILLS.eagerJabs, S0 = SKILLS.sunbeamThrust, { CHARGE } = await import('../src/rpg/charge.js'), Ch = await import('../src/rpg/charge.js');
+    ok(J && J.cls === 'golden' && J.tree === 'lance' && J.row === 0 && J.col === 0 && !J.pre.length && J.wep === 'lance' && J.kind === 'active' && J.cd(1) === 0 && J.req === 1 && !J.training, 'golden: Eager Jabs sits at Lance Arts row 0 col 0 (level 1, no prerequisite, the lance, no cooldown), beside Sunbeam Thrust');
+    ok(J.syn.length === 2 && J.syn.every(y => SKILLS[y.id]?.tree === 'lance' && y.id !== 'eagerJabs'), `golden: Eager Jabs' two synergies are in Lance Arts (${J.syn.map(y => y.id + ' ' + y.p + '%').join(', ')})`);
+    { const h = HB.buildHero('golden', 1); h.st.player.skillPts = 1; const c = canLearn('eagerJabs', h.st); ok(c.ok, `golden: Eager Jabs can be learned at level 1 (${c.why || 'ok'})`); }
+    const pj = [1, 10, 20].map(l => J.params(l, {})), ps = [1, 10, 20].map(l => S0.params(l, {}));
+    ok(pj.every((p, i) => p.jabs === 3 && p.lastPct > 100 && p.arc <= 60 && p.radius < ps[i].length && (!i || (p.dmgPct > pj[i - 1].dmgPct && p.radius >= pj[i - 1].radius))), `golden: Eager Jabs grows with its level (a jab ${pj.map(p => Math.round(p.dmgPct)).join(' / ')}% at 1 / 10 / 20, three jabs, the last ×${pj[0].lastPct / 100}, a ${pj[0].arc}° cone ${pj[0].radius} m)`);
+    // tap DPS on one foe ≈ Sunbeam Thrust's (±10%): a flurry (3.5 jabs' worth) over 1.1 attacks vs one lunge over 1 attack; zoom a second too
+    const ratio = [1, 10, 20].map((l, i) => (pj[i].dmgPct * (pj[i].jabs - 1 + pj[i].lastPct / 100) / 1.1) / ps[i].dmgPct), zr = [1, 10, 20].map(l => (J.cost(l) / 1.1) / S0.cost(l));
+    ok(ratio.every(r => r >= 0.9 && r <= 1.1) && zr.every(r => r >= 0.85 && r <= 1.1), `golden: Eager Jabs' tap DPS on one foe is Sunbeam Thrust's (×${ratio.map(r => r.toFixed(2)).join(' / ')}), zoom a second ×${zr.map(r => r.toFixed(2)).join(' / ')}`);
+    ok(gb.every(b => b.jabs.single >= 0.9 && b.jabs.single <= 1.1 && b.jabs.clear < 0.85), `golden: an Eager Jabs build fights one foe like the lance build (×${gb.map(b => b.jabs.single.toFixed(2)).join(' / ')}) and clears packs slower (×${gb.map(b => b.jabs.clear.toFixed(2)).join(' / ')}): the focused one`);
+    const C = CHARGE.eagerJabs, h30 = HB.buildHero('golden', 30), S = h30.st; S.player.skills.eagerJabs = 10;
+    S.player.chargePerks = { eagerJabs: Object.fromEntries(Object.entries(C.perks).map(([k, p]) => [k, p.ranks])) };
+    const T0 = skillRuntime('eagerJabs', S, h30.d), Rs = [1, 2, 3].map(s => Ch.chargeRuntime('eagerJabs', S, h30.d, s));
+    ok(C && C.ready && C.pose === 'gldJabs' && SKILLS.eagerJabs.charge === C && C.perks.wide && C.perks.tailWind?.kind === 'unique', `golden: Eager Jabs charges (${C.title}: the gldJabs wind-up; Wider Wag, ★ Tail Wind)`);
+    ok(Rs.every((r, i) => Number.isInteger(r.params.jabs) && r.params.jabs > T0.params.jabs && (!i || r.params.jabs >= Rs[i - 1].params.jabs) && r.params.dmgPct >= T0.params.dmgPct * 0.995 && r.params.lastPct > T0.params.lastPct) && Rs[2].params.stun > 0, `golden: a charged flurry has more jabs (${Rs.map(r => r.params.jabs).join(' / ')}), each as hard as a tap's, the last bigger, a stagger at Ⅲ`);
+  }
 }
 
 hr('STELLA THE SUN ORACLE (the sixth hero, docs/STELLA.md)');
@@ -1160,11 +1223,11 @@ hr('CHARGED ABILITIES');
   // ---- every active skill of both heroes charges, with a full table
   const actives = SKILL_IDS.filter(id => !['passive', 'aura'].includes(SKILLS[id].kind));
   // (all four heroes: Poe's 18 tables are rpg/chargePoe.js, the Shih Tzu's 15 rpg/chargeShihtzu.js, merged into the table by charge.js)
-  // (and Foosy's 15: rpg/chargeGolden.js)
+  // (and Foosy's 16: rpg/chargeGolden.js)
   ok(actives.every(id => CHARGE[id]) && ids.every(id => actives.includes(id)), `charge: a table for every active skill (${ids.length})`);
-  ok(ids.filter(id => SKILLS[id].cls === 'poe').length === 18 && ids.filter(id => SKILLS[id].cls === 'poe').every(id => CHARGE[id].pose.startsWith('poe')), 'charge: Poe has 18 tables, each with one of her wind-up poses');
-  ok(ids.filter(id => SKILLS[id].cls === 'shihtzu').length === 15 && ids.filter(id => SKILLS[id].cls === 'shihtzu').every(id => CHARGE[id].pose.startsWith('stz')), 'charge: the Shih Tzu has 15 tables, each with one of his wind-up poses');
-  ok(ids.filter(id => SKILLS[id].cls === 'golden').length === 15 && ids.filter(id => SKILLS[id].cls === 'golden').every(id => CHARGE[id].pose.startsWith('gld')), 'charge: Foosy has 15 tables, each with one of his wind-up poses');
+  ok(ids.filter(id => SKILLS[id].cls === 'poe').length === 19 && ids.filter(id => SKILLS[id].cls === 'poe').every(id => CHARGE[id].pose.startsWith('poe')), 'charge: Poe has 19 tables, each with one of her wind-up poses');
+  ok(ids.filter(id => SKILLS[id].cls === 'shihtzu').length === 16 && ids.filter(id => SKILLS[id].cls === 'shihtzu').every(id => CHARGE[id].pose.startsWith('stz')), 'charge: the Shih Tzu has 16 tables, each with one of his wind-up poses');
+  ok(ids.filter(id => SKILLS[id].cls === 'golden').length === 16 && ids.filter(id => SKILLS[id].cls === 'golden').every(id => CHARGE[id].pose.startsWith('gld')), 'charge: Foosy has 16 tables, each with one of his wind-up poses');
   for (const id of ids) {
     const c = CHARGE[id];
     ok(c.ready === true && SKILLS[id].charge === c, `charge ${id}: ready and attached to its skill`);
@@ -2141,7 +2204,7 @@ hr('COZY: SCAVENGING (docs/COZY.md §7, §8, cozy/scavenge.js)');
     ok(two > one * 1.6, `dig: a Perfect dig rolls twice (${(two / 2000).toFixed(2)} vs ${(one / 2000).toFixed(2)} finds a dig)`);
     for (let i = 0; i < 3000; i++) { const y = SC.digYield('home', () => 0.999, { perfect: true }); if (y.find) finds2++; }
     ok(finds2 === 3000, 'dig: never two furniture finds from one dig (the second roll falls back)'); }
-  ok(SC.digResult(0.69) === 'normal' && SC.digResult(0.7) === 'perfect' && SC.digResult(0.85) === 'perfect' && SC.digResult(0.86) === 'normal' && SC.digResult(1) === 'normal' && SC.DIG_SECS === 1.4, 'dig: the golden band is 70–85% of a 1.4 s ring; anywhere else is a good dig (never a fail)');
+  ok(SC.digResult(0.54) === 'normal' && SC.digResult(0.55) === 'perfect' && SC.digResult(0.9) === 'perfect' && SC.digResult(0.91) === 'normal' && SC.digResult(1) === 'normal' && SC.DIG_SECS === 1.8, 'dig: the golden band is 55–90% of a 1.8 s ring (a 0.63 s window); anywhere else is a good dig (never a fail)');
   // ---- the state, the day's refill, time away
   { const st = fresh(); st.cozy.scav = { home: { day: 0, taken: ['home:1', 7], dug: 'x' }, tools: { basket: 1 }, stats: { streak: -3 } };
     const S = SC.scavState(st);
@@ -2715,6 +2778,79 @@ hr('SIMPLE STATS: POWER, PLAIN WORDS, SHADOW PICKS (ROADMAP UX-3: rpg/power.js, 
   ok(Object.keys(IT.STAT_TEXT).every(k => !/Resist|Critical|Steal|Enhanced|Replenish/.test(IT.STAT_TEXT[k](k.endsWith('Dmg') ? [1, 2] : 5, null, null))), 'no Diablo words left in the bonuses');
   { const it = generateItem({ ilvl: 20, slot: 'hat', rarity: 'rare', rng: new RNG(5) }); for (const a of it.affixes) a.text = 'Old Words'; const tt = itemTooltip(it, null, null);
     ok(!tt.lines.some(l => l.text === 'Old Words'), 'tooltips write a save\'s old affix text again in the new words'); }
+}
+
+// ------------------------------------------------------------------ combo chains (docs/COMBO.md; tools/combo-sim.mjs)
+hr('COMBO CHAINS: THE TABLE, PERKS, RUNTIME, MIGRATION, RESPEC, DPS BAND');
+{
+  const Co = await import('../src/rpg/combo.js'), Ch = await import('../src/rpg/charge.js'), CSim = await import('./combo-sim.mjs');
+  const { COMBO, COMBO_IDS, COMBO_LIST } = Co;
+  const r1c = v => Math.round(v * 10) / 10, padc = (s, n) => String(s).padEnd(n);
+  // ---- the table: the listed weapon strikes that exist, each cooldown-free, non-channel, an active
+  const missing = Co.comboMissing();
+  if (missing.length) log(`  (combo: not landed yet, skipped: ${missing.join(', ')})`);
+  ok(COMBO_LIST.length === 15 && COMBO_IDS.every(id => COMBO_LIST.includes(id)) && COMBO_IDS.length === COMBO_LIST.length - missing.length, `combo: the table covers every listed strike that exists (${COMBO_IDS.length}/${COMBO_LIST.length})`);
+  for (const id of COMBO_IDS) {
+    const d = SKILLS[id], c = COMBO[id];
+    ok(d.kind === 'active' && d.cd(1) === 0 && d.cd(20) === 0 && d.combo === c, `combo ${id}: a cooldown-free active strike, its table attached`);
+    ok(/^#[0-9a-f]{6}$/i.test(c.color) && c.keys.includes('dmgPct') && Object.keys(c.perks).join() === 'quick,light,free,tempo', `combo ${id}: colour, damage keys, the four perks`);
+    for (const p of Object.values(c.perks)) ok(p.req.length === p.ranks && p.req.every((v, i) => v >= 1 && (!i || v >= p.req[i - 1])) && p.name && p.desc && typeof p.info === 'function' && !/(?<!never )move speed|walk|run faster/i.test(p.desc + ' ' + p.info(p.ranks, 5)), `combo ${id}.${p.id}: gated per rank, worded, no move speed`);
+  }
+  ok(['whirl', 'dig', 'woof', 'packcall', 'moonhowl', 'howl'].every(id => !Co.comboable(id)), 'combo: shouts, leaps, summons, buffs and channels stay charge-only');
+  // ---- runtime math
+  const heroSt = (hero, skills, pts = 0) => { const g = normalizeHeroes(newGameState()), h = g.heroes[hero]; h.player.lvl = 30; Object.assign(h.player.skills, skills); h.player.skillPts = pts; h.player.comboPerks = {}; return { player: h.player, equipment: h.equipment }; };
+  const st = heroSt('chewy', { chomp: 10 }, 8), d = computeStats(st);
+  const fresh = () => skillRuntime('chomp', st, d), R0 = fresh();
+  const s1 = Co.comboRuntime(fresh(), 1), s2 = Co.comboRuntime(fresh(), 2), s3 = Co.comboRuntime(fresh(), 3);
+  ok(s1.combo.step === 1 && !s1.combo.fin && s1.cost === R0.cost && s1.params.dmgPct === R0.params.dmgPct && s1.combo.speed === 1, 'combo: step 1 is the plain tap');
+  ok(s2.cost === R0.cost && s2.params.dmgPct === R0.params.dmgPct && s3.combo.fin && Math.abs(s3.params.dmgPct / R0.params.dmgPct - (1 + Co.FINISH_PCT / 100)) < 1e-9 && s3.cost === R0.cost, `combo: no perks: step 2 is a tap, the finisher +${Co.FINISH_PCT}% damage at the same cost`);
+  const full = Co.fullComboPerks('chomp');
+  const f2 = Co.comboRuntime(fresh(), 2, full), f3 = Co.comboRuntime(fresh(), 3, full), f1 = Co.comboRuntime(fresh(), 1, full), ft = Co.comboRuntime(fresh(), 1, full, { tempo: true });
+  ok(Math.abs(f2.combo.speed - (1 + 3 * Co.QUICK_PER_RANK / 100)) < 1e-9 && Math.abs(f3.combo.speed - f2.combo.speed) < 1e-9 && f1.combo.speed === 1, `combo: Quick Hands 3: steps 2 and 3 play ×${1 + 3 * Co.QUICK_PER_RANK / 100} (step 1 unchanged)`);
+  ok(f2.cost === r1c(R0.cost * (1 - 2 * Co.LIGHT_PER_RANK / 100)) && f3.cost === 0 && f1.cost === R0.cost, `combo: Light Touch 2 −${2 * Co.LIGHT_PER_RANK}% on step 2; Free Finisher: the finisher costs nothing; step 1 full price`);
+  ok(Math.abs(ft.combo.speed - (1 + Co.TEMPO.pct / 100)) < 1e-9, `combo: Tempo quickens every step ×${1 + Co.TEMPO.pct / 100} while it lasts`);
+  const ch1 = () => Ch.chargeRuntime('chomp', st, d, 1), ch3 = Co.comboRuntime(ch1(), 3, full, { charged: true });
+  ok(ch3.combo.fin && ch3.combo.speed === 1 && ch3.cost === ch1().cost && Math.abs(ch3.params.dmgPct / ch1().params.dmgPct - (1 + Co.FINISH_PCT / 100)) < 1e-9, 'combo: a held charge as the finisher: the bonus on the charged hit, its charged cost and speed kept');
+  if (COMBO.fumaThrow) { const ps = heroSt('poe', { fumaThrow: 10 }), pd = computeStats(ps), a = skillRuntime('fumaThrow', ps, pd), b = Co.comboRuntime(skillRuntime('fumaThrow', ps, pd), 2, { quick: 3 }); ok(b.params.speed > a.params.speed * 1.14 && b.params.range === a.params.range, 'combo: Quick Hands also quickens the fūma\'s flight (its round trip gates the next throw)'); }
+  if (COMBO.kunaiFan) { const k = COMBO.kunaiFan; ok(k.light < Co.LIGHT_PER_RANK && k.free < 100 && Co.stepCost(10, 3, { free: 1, light: 2 }, k) > 0 && k.perks.free.name === 'Thrifty Finisher', 'combo: Kunai Fan\'s gentler cost perks (zoom-bound: the Thrifty Finisher, 40% off)'); }
+  { const ws = heroSt('chewy', { whirl: 3 }); ok(Co.comboRuntime(skillRuntime('whirl', ws, computeStats(ws)), 3)?.combo === undefined, 'combo: a skill with no table passes through untouched'); }
+  ok(Co.comboSteps('chomp', {}, R0).map(s => s.step).join() === '1,2,3' && Co.comboSteps('chomp', {}, R0)[2].dmgPct === Math.round(R0.params.dmgPct * 1.15), 'combo: comboSteps for the drawer and tooltips');
+  // ---- perks: gating, spending, migration, respec
+  st.player.skills.chomp = 2;
+  ok(Co.canLearnComboPerk('chomp', 'quick', st).ok && Co.learnComboPerk(st, 'chomp', 'quick').ok && st.player.skillPts === 7, 'combo: buying a perk spends one skill point');
+  ok(!Co.canLearnComboPerk('chomp', 'quick', st).ok && /level 3/.test(Co.canLearnComboPerk('chomp', 'quick', st).why), 'combo: Quick Hands 2 needs the skill at level 3');
+  ok(/level 8/.test(Co.canLearnComboPerk('chomp', 'free', st).why) && /level 10/.test(Co.canLearnComboPerk('chomp', 'tempo', st).why), 'combo: Free Finisher at 8, Tempo at 10');
+  ok(!Co.canLearnComboPerk('splash', 'quick', st).ok && /Another hero/.test(Co.canLearnComboPerk('splash', 'quick', st).why), "combo: Moka's combo perks are hers");
+  ok(Co.comboPerkPoints(st) === 1 && Co.hasComboPerks(st, 'chomp') && !Co.hasComboPerks(st, 'throw'), 'combo: points in perks; the hotbar badge test');
+  { const old = newGameState(); for (const h of Object.values(old.heroes)) delete h.player.comboPerks; normalizeHeroes(old);
+    ok(Object.values(old.heroes).every(h => h.player.comboPerks && typeof h.player.comboPerks === 'object' && !Object.keys(h.player.comboPerks).length), 'combo: an older save\'s heroes get an empty comboPerks (normalizeHeroes)'); }
+  { const G = { state: normalizeHeroes(newGameState()) }; const A = createActions(G); G.actions = A;
+    const pl = G.state.player; pl.skills.chomp = 10; pl.skillPts = 3; A.learnComboPerk('chomp', 'quick'); A.learnComboPerk('chomp', 'light');
+    const before = pl.skillPts, sk = Object.values(pl.skills).reduce((a, b) => a + b, 0); A.respec();
+    ok(!Object.keys(pl.comboPerks).length && pl.skillPts === before + sk + 2, `combo: a respec refunds combo perks (${pl.skillPts} points back)`); }
+  // ---- the DPS band (tools/combo-sim.mjs): chaining with every perk vs plain taps, the charge sim's 60 s skill-build fight
+  const rows = [];
+  for (const id of COMBO_IDS) {
+    const b = CSim.comboBand(id, { perks: {} }), f = CSim.comboBand(id, { perks: Co.fullComboPerks(id) });
+    if (!b || !f) { log(`  (combo band ${id}: no damage model in the charge sim yet: skipped)`); continue; }
+    rows.push({ id, b: b.blend, f: f.blend, long: f.long, burst: f.burst });
+    ok(b.blend >= CSim.BASE_BAND[0] && b.blend <= CSim.BASE_BAND[1], `combo band ${id}: the chain with no perks is about +5% (×${b.blend})`);
+    ok(f.blend >= CSim.BAND[0] && f.blend <= CSim.BAND[1], `combo band ${id}: every perk is +10–30% sustained (×${f.blend})`);
+    ok(f.long <= CSim.LONG_CAP && f.long >= CSim.BAND[0], `combo band ${id}: a long fight (the pool dry) stays sane (×${f.long})`);
+  }
+  if (rows.length) { const med = [...rows].sort((a, b) => a.f - b.f)[rows.length >> 1].f; ok(med >= 1.15 && med <= 1.27, `combo band: the median strike sits mid-band (×${med})`); }
+  if (!quiet) { log(`  ${padc('strike', 14)} ${padc('no perks', 9)} ${padc('every perk', 11)} ${padc('180 s', 7)} chain burst`); for (const r of rows) log(`  ${padc(r.id, 14)} ${padc('×' + r.b, 9)} ${padc('×' + r.f, 11)} ${padc('×' + r.long, 7)} ×${r.burst}`); }
+}
+
+hr('BLENDER MODELS: EVERY LISTED GLB EXISTS (ROADMAP Z-D6: catalog glb, village BUILDING_GLB / PIECE_GLB, furniture FURN_GLB_IDS)');
+{
+  const fs = await import('node:fs'), root = new URL('../public', import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1');
+  const { BUILDINGS } = await import('../src/world/buildings/catalog.js'), VD = await import('../src/regions/village/data.js');
+  const furn = (fs.readFileSync(new URL('../src/home/furnitureMesh.js', import.meta.url), 'utf8').match(/FURN_GLB_IDS = \[([^\]]*)\]/)?.[1] || '').match(/'[^']+'/g)?.map(s => `/models/furn-${s.slice(1, -1)}.glb`) || [];
+  const urls = [...Object.values(BUILDINGS).flatMap(d => (d.glb || []).filter(Boolean)), ...Object.entries(BUILDINGS).flatMap(([id, d]) => (d.glbVariants || []).flatMap((n, i) => Array.from({ length: n }, (_, k) => `/models/${id}-${i + 1}-v${k}.glb`))), ...Object.values(VD.BUILDING_GLB).flatMap(z => Object.values(z)), ...Object.values(VD.PIECE_GLB).filter(Boolean), ...(VD.WAYSTONE.glb ? [VD.WAYSTONE.glb] : []), ...furn, ...(fs.readFileSync(new URL('../src/regions/assets/glbPieces.js', import.meta.url), 'utf8').match(/\/models\/[rd]g-[\w-]+\.glb/g) || []), ...(fs.readFileSync(new URL('../src/home/extGlb.js', import.meta.url), 'utf8').match(/\/models\/ext-[\w-]+\.glb/g) || [])];
+  urls.push(...(await import('../src/world/treeGlb.js')).treeGlbUrls());
+  const missing = urls.filter(u => !fs.existsSync(root + u));
+  ok(urls.length > 20 && !missing.length, `blender models: all ${urls.length} listed GLBs exist in public/ (${missing.join(', ') || 'none missing'})`);
 }
 
 hr('RESULT');

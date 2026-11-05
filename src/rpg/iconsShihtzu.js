@@ -3,7 +3,7 @@
 // volR, shine, sparkle, glow, drawBone, …), so this module imports nothing from it (no import cycle). Art is drawn
 // around 0,0 in a 64 box.
 export const STZ_SKILL_TREE = {
-  woefulWallop: 'flail', weightOfWorld: 'flail', tugOfWoe: 'flail', maelstrom: 'flail', ironTopknot: 'flail', steadfastSulk: 'flail', heaviestSigh: 'flail',
+  glumBonk: 'flail', woefulWallop: 'flail', weightOfWorld: 'flail', tugOfWoe: 'flail', maelstrom: 'flail', ironTopknot: 'flail', steadfastSulk: 'flail', heaviestSigh: 'flail',
   drippingPaw: 'hex', lingeringGloom: 'hex', grumbleCloud: 'hex', caseOfMopes: 'hex', grudgeLedger: 'hex', mournfulAwoo: 'hex', everlastingGloom: 'hex',
   ghostPups: 'tome', veryGoodGhosts: 'tome', borrowedWarmth: 'tome', boneWard: 'tome', midnightReading: 'tome', wayhomeLantern: 'tome', grandpawsGhost: 'tome',
 };
@@ -128,6 +128,16 @@ export function drawShihtzuSkill(g, id, K) {
     case 'attack_flail': { // the basic attack with the flail: the flail mid-swing and two whooshes
       for (let i = 0; i < 2; i++) swoosh(g, K, () => { g.beginPath(); g.arc(-6, 8, 22 - i * 6, -2.4 + i * 0.15, -0.6 - i * 0.1); }, 2.6 - i * 0.6);
       drawFlail(g, 'nub', null, true, K, 0.8);
+      return true;
+    }
+    case 'glumBonk': { // the ball come straight down on a foe's head: a dizzy little gloom-blob, a bonk burst, speed lines, stars
+      K.circ(g, 0, 15, 13.5); K.paint(g, K.volR(g, '#d6cae4', 0, 15, 13.5, 0.5, 0.3), 1.8, INKC);
+      for (const ex of [-5.6, 5.6]) { g.beginPath(); for (let a = 0; a <= 4.2 * Math.PI; a += 0.3) { const r = 0.35 * a, x = ex + Math.cos(a) * r, y = 15 + Math.sin(a) * r; a ? g.lineTo(x, y) : g.moveTo(x, y); } K.stroke(g, INKC, 1.3); } // (dizzy eyes)
+      g.beginPath(); g.moveTo(-4.5, 22.5); g.quadraticCurveTo(-2, 20.7, 0, 22.5); g.quadraticCurveTo(2, 24.3, 4.5, 22.5); K.stroke(g, INKC, 1.4); // (a wobbly mouth)
+      K.starPath(g, 1, 0, 11, 5.2, 8, 0.2); K.paint(g, '#fff6e0', 1.6, INKC); // (the bonk)
+      nubBall(g, K, 1, -11.5, 9.5);
+      for (const [x, y0, y1] of [[-9, -29, -24], [1, -31, -26], [11, -29, -24]]) swoosh(g, K, () => { g.beginPath(); g.moveTo(x, y0); g.lineTo(x, y1); }, 1.1, '#f6eef8');
+      for (const [x, y, r] of [[-20, -1, 4.6], [21, -3, 4.2]]) { K.starPath(g, x, y, r, r * 0.45, 4, 0.2); K.paint(g, '#fff6e0', 1.3, INKC); }
       return true;
     }
     case 'woefulWallop': { // one huge sweeping wallop: a wide whoosh, the ball at its end, a sad little sigh-puff

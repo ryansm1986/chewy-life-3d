@@ -3,7 +3,9 @@
 // hidden grotto cache). See biomes/tidepool.js for the terrain and docs/REGIONS.md §3.3 / §3.6 for the contracts.
 import * as THREE from 'three';
 import { makeMats, disposeMats, Placer, hostOf, Occ, V, mulberry32, TAU, fbm, blobDisc } from './tidepoolKit.js';
-import * as A from './tidepoolAssets.js';
+import * as AKit from './tidepoolAssets.js';
+import { withGlb } from './glbPieces.js';
+const A = withGlb('tidepool', AKit); // (its landmark props drawn from their Blender models once loaded: ROADMAP Z-D6)
 import { TidepoolFx } from './tidepoolFx.js';
 
 import { TP_SITES, coastDist, LV, poolsFor } from './tidepoolTerrain.js';

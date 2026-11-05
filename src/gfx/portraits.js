@@ -45,7 +45,7 @@ export class Portraits {
     if (rig.bakedDisney) hp.y += 0.1; else if (rig.toy) hp.y += 0.17; else if (rig.disney) hp.y += 0.03;
     if (id === 'moka') { big *= rig.bakedDisney ? 1.1 : rig.disney ? 1.3 : 1.15; hp.y += rig.bakedDisney ? 0.05 : 0.07; } // her hat brim and long ears in frame
     if (rig.model === 'moka_toy') { big *= 1.12; hp.y += 0.1; } // the Toybox Moka: the tall hat and the moon charm in frame
-    if (id === 'rosie' && rig.bakedDisney) { big *= 1.08; hp.y += 0.08; } // the Toybox Rosie: her curls and bow stand tall above the head bone
+    if (id === 'rosie' && rig.bakedDisney) { big *= 1.2; hp.y += 0.16; } // the Toybox Rosie: her round head and the bow stand tall above the head bone
     if (rig.model === 'poe_toy') { big *= 1.1; hp.y += 0.13; } // the Toybox Poe: her big round head (the head bone sits at the neck) and the fox mask in frame
     if (rig.model === 'shihtzu_toy') { big *= 1.2; hp.y += 0.2; } // the Shih Tzu: his big head with its draping ears and the topknot in frame
     if (rig.model === 'golden_toy') { big *= 1.32; hp.y += 0.27; } // the dragoon: his big head, the feathered ears and the dragon crest in frame

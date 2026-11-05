@@ -27,7 +27,9 @@ import { mulberry32, clamp, TAU, rand } from '../../core/util.js';
 import { Events } from '../../core/events.js';
 import { makeToon } from '../../gfx/materials.js';
 import * as F from '../../regions/assets/bambooFlora.js';
-import * as Pr from '../../regions/assets/bambooProps.js';
+import * as PrKit from '../../regions/assets/bambooProps.js';
+import { withGlb, glbFn } from '../../regions/assets/glbPieces.js';
+const Pr = withGlb('bamboo', PrKit); // (the region props' Blender models, as the region draws them)
 import { CardSet, V, cols, UP } from '../../regions/assets/bambooKit.js';
 import { G as BG, C as BC } from '../../world/buildings/kit.js';
 import { roof } from '../../world/buildings/roofs.js';
@@ -324,7 +326,7 @@ function pole(B, a, b, r, color = '#8cbf5a', node = '#5e8e42') {
 }
 /** a little hokora: a stone plinth, a wooden shrine box with lattice doors, a mossy gable roof, shimenawa, an offering
  *  box and two round stone fox guardians in red bibs (local +z faces the visitor) */
-function hokora(seed = 0) {
+function hokoraKit(seed = 0) {
   return cached('hokora:' + seed, () => Pr.kit(seed * 13 + 5, B => {
     const base = BG.box(1.5, 0.32, 1.2, 0.05); base.translate(0, 0.16, 0); B.add(base, (p, n, o) => { o.set('#aaa4a8').multiplyScalar(n.y > 0.5 ? 1 : 0.84); if (n.y > 0.5 && Math.sin(p.x * 7 + p.z * 5) > 0.4) o.lerp(col(MOSS), 0.6); });
     const st = BG.box(1.0, 0.12, 0.3, 0.03); st.translate(0, 0.06, 0.74); B.add(st, '#9c96a0');
@@ -350,6 +352,7 @@ function hokora(seed = 0) {
     B.light([0, 0.9, 0.55], { color: '#ffd8a0', intensity: 1.2, radius: 4, flicker: 0.4, nightOnly: false });
   }, 0.02));
 }
+const hokora = glbFn('dg-bamboo', 'hokora', hokoraKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-bamboo'])
 /** a shimenawa rope with paper shide strung along local x between two wooden pegs (for a rock face; local +z = out) */
 function shideRope(L, seed = 0) {
   const k = Math.round(L * 4) / 4;
@@ -359,7 +362,7 @@ function shideRope(L, seed = 0) {
   }, 0.01));
 }
 /** stacked cut culms on two crossbars (the harvest camp) */
-function culmStack(seed = 0) {
+function culmStackKit(seed = 0) {
   return cached('stack:' + seed, () => Pr.kit(seed * 7 + 2, B => {
     const r = mulberry32(seed * 31 + 9);
     for (const x of [-0.6, 0.6]) { const b = BG.box(0.1, 0.12, 0.7, 0.02); b.translate(x, 0.06, 0); B.add(b, '#7a5a40'); }
@@ -372,8 +375,9 @@ function culmStack(seed = 0) {
     const rope = BG.torus(0.3, 0.02, 4, 12); rope.rotateY(Math.PI / 2); rope.translate(0.2, 0.33, 0); rope.scale(1, 1.25, 1); B.add(rope, '#d8c08a');
   }, 0.01));
 }
+const culmStack = glbFn('dg-bamboo', 'culmStack', culmStackKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-bamboo'])
 /** a woven basket heaped with takenoko shoots */
-function shootBasket(seed = 0) {
+function shootBasketKit(seed = 0) {
   return cached('basket:' + seed, () => Pr.kit(seed * 5 + 3, B => {
     const r = mulberry32(seed * 17 + 3);
     const bk = BG.lathe([[0.001, 0], [0.26, 0], [0.33, 0.12], [0.36, 0.3], [0.33, 0.32], [0.31, 0.14], [0.22, 0.04], [0.001, 0.04]], 12);
@@ -386,6 +390,7 @@ function shootBasket(seed = 0) {
     }
   }, 0.01));
 }
+const shootBasket = glbFn('dg-bamboo', 'shootBasket', shootBasketKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-bamboo'])
 /** a gohei: a wooden wand on a stone foot with zigzag paper streamers */
 function gohei(seed = 0, h = 1.5) {
   return cached(`gohei:${seed}:${h}`, () => Pr.kit(seed * 11 + 4, B => {
@@ -395,7 +400,7 @@ function gohei(seed = 0, h = 1.5) {
   }, 0.005));
 }
 /** a mossy standing stone with an ofuda charm pasted on its face */
-function stoneMarker(seed = 0) {
+function stoneMarkerKit(seed = 0) {
   return cached('marker:' + seed, () => Pr.kit(seed * 19 + 6, B => {
     const g0 = puff(V(0, 0.42, 0), 0.34, { detail: 2, noise: 0.24, squash: 1.0, seed: seed + 3 }); g0.scale(0.8, 1.6, 0.6); g0.translate(0, -0.3, 0);
     B.add(g0, (p, n, o) => { o.set('#aaa6a0').multiplyScalar(0.84 + 0.18 * clamp(n.y + 0.5)); if (n.y > 0.35 && Math.sin(p.x * 11 + p.z * 9) > -0.2) o.lerp(col(MOSS), 0.7); });
@@ -403,9 +408,10 @@ function stoneMarker(seed = 0) {
     for (let k = 0; k < 4; k++) { const a = k / 4 * TAU + 0.4, m = puff(V(Math.cos(a) * 0.3, 0.03, Math.sin(a) * 0.24), 0.08 + k * 0.01, { detail: 1, noise: 0.4, squash: 0.45, seed: seed + k }); B.add(m, MOSS); }
   }, 0.01));
 }
+const stoneMarker = glbFn('dg-bamboo', 'stoneMarker', stoneMarkerKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-bamboo'])
 
 /** a mossy rock pillar: three lumpy stones stacked off-true, thick moss on every ledge, a young culm leaning on it */
-function rockPillar(seed = 0) {
+function rockPillarKit(seed = 0) {
   return cached('pillar:' + seed, () => Pr.kit(seed * 29 + 7, B => {
     const r = mulberry32(seed * 41 + 5);
     let y = 0, x = 0, z = 0, k = 0;
@@ -418,9 +424,10 @@ function rockPillar(seed = 0) {
     for (let q = 0; q < 5; q++) { const a = r() * TAU, m = puff(V(Math.cos(a) * 0.9, 0.05, Math.sin(a) * 0.9), 0.14 + r() * 0.1, { detail: 1, noise: 0.4, squash: 0.45, seed: seed + q }); B.add(m, (p, n, o) => o.set(MOSS).lerp(col(MOSS_HI), clamp(n.y) * 0.4)); }
   }, 0.02));
 }
+const rockPillar = glbFn('dg-bamboo', 'rockPillar', rockPillarKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-bamboo'])
 
 /** a tangle of old roots (a thick dark tree root, pale bamboo rhizomes) spilling out of the wall foot; local -z = the wall */
-function rootTangle(seed = 0) {
+function rootTangleKit(seed = 0) {
   return cached('roots:' + seed, () => Pr.kit(seed * 23 + 9, B => {
     const r = mulberry32(seed * 53 + 1), m = 4 + Math.floor(r() * 3);
     for (let i = 0; i < m; i++) {
@@ -434,8 +441,9 @@ function rootTangle(seed = 0) {
     for (let k = 0; k < 3; k++) { const g0 = puff(V((r() - 0.5) * 1.4, 0.05, -0.1 + r() * 0.2), 0.12 + r() * 0.08, { detail: 1, noise: 0.35, squash: 0.7, seed: seed + 9 + k }); B.add(g0, (p, n, o) => o.set('#6e7266').lerp(col('#a2a496'), clamp(n.y))); }
   }, 0.01));
 }
+const rootTangle = glbFn('dg-bamboo', 'rootTangle', rootTangleKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-bamboo'])
 /** dry fallen bamboo: one culm leaning on the wall, two lying at its foot (a broken end with splinters), dead leaves */
-function fallenBamboo(seed = 0) {
+function fallenBambooKit(seed = 0) {
   return cached('fallen:' + seed, () => Pr.kit(seed * 31 + 4, B => {
     const r = mulberry32(seed * 61 + 7), dry = ['#b8b06a', '#a8a462', '#c4b878', '#9cae5e'];
     pole(B, V(-0.8 + r() * 0.3, 1.75, -0.28), V(0.35, 0.07, 0.95), 0.07, dry[0], '#7a7440');
@@ -445,6 +453,7 @@ function fallenBamboo(seed = 0) {
     for (let k = 0; k < 16; k++) { const lf = BG.plane(0.24, 0.05); lf.rotateX(-Math.PI / 2); lf.rotateY(r() * TAU); lf.translate((r() - 0.5) * 2.6, 0.012 + r() * 0.01, 0.2 + r() * 1.2); B.add(lf, ['#c8b46a', '#b09a58', '#a6b458', '#d6c47a'][k % 4]); }
   }, 0.01));
 }
+const fallenBamboo = glbFn('dg-bamboo', 'fallenBamboo', fallenBambooKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-bamboo'])
 
 // ------------------------------------------------------------------ geometry helpers
 const _cc = new THREE.Color();
@@ -1087,3 +1096,5 @@ export const BAMBOO_KIT = {
   rooms: ROOMS, extras, arrival, hoard, corridor,
   seal: { color: '#d6ff9a', rope: '#ecd8a0' }, // the arena seal's look (dungeon/zoneRun.js)
 };
+// the kit's own pieces, unwrapped (the Blender builders dump them for reference: tools/blender/work/codex/dg-bamboo)
+export const KIT_PIECES = { hokora: hokoraKit, culmStack: culmStackKit, shootBasket: shootBasketKit, stoneMarker: stoneMarkerKit, rockPillar: rockPillarKit, rootTangle: rootTangleKit, fallenBamboo: fallenBambooKit };

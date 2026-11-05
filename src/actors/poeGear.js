@@ -183,8 +183,46 @@ export function setFumaLook(mesh, look = {}) {
 // Held by the hub in the right paw, the fūma's plane turned to the side so its bones sweep through a slash; during the
 // combo it spins in the paw like a buzz-saw. In town (or ~1.6 s after the last swing in a fight) it goes back on her back.
 const HAND = { pos: [0, -0.035, 0.07], rot: [0, Math.PI / 2, 0] };
-const SPINNING = new Set(['fumaSlash', 'fumaSlash2', 'fumaTwirl', 'fumaCatch']);
-const DRAWN = new Set(['fumaSlash', 'fumaSlash2', 'fumaTwirl', 'fumaThrow', 'fumaCatch', 'shadowStepIn', 'shadowStrike']);
+const SPINNING = new Set(['fumaSlash', 'fumaSlash2', 'fumaTwirl', 'fumaCatch', 'fumaFlurry']);
+const DRAWN = new Set(['fumaSlash', 'fumaSlash2', 'fumaTwirl', 'fumaThrow', 'fumaCatch', 'shadowStepIn', 'shadowStrike', 'fumaFlurry']);
+// Fūma Flurry: the fūma whirls in her paw like a buzz-saw (SAW rad/s), revving up while she charges it (_sawRev 0..1, set by
+// combat/poeSkills.js updatePoe); past ~14 rad/s a swept blur disc shows round it so the spin reads at the game camera.
+const SAW = 30;
+let SAW_MAT = null;
+function sawMat() {
+  if (SAW_MAT) return SAW_MAT;
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), R = 62;
+  g.translate(64, 64);
+  // four swept cream wedges (the bone arms smeared round), fading toward their trailing edge, a clear hub
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 14; j++) {
+      const a0 = i * Math.PI / 2 + j * 0.07, al = 0.55 * (1 - j / 14) ** 1.6;
+      g.beginPath(); g.arc(0, 0, R * 0.94, a0, a0 + 0.08); g.arc(0, 0, R * 0.34, a0 + 0.08, a0, true); g.closePath();
+      g.fillStyle = `rgba(255,248,232,${al.toFixed(3)})`; g.fill();
+    }
+  }
+  // a thin ink rim and a cream one inside it: the saw's edge shows on sand and on grass
+  g.lineWidth = 3; g.strokeStyle = 'rgba(58,40,36,0.55)'; g.beginPath(); g.arc(0, 0, R * 0.97, 0, Math.PI * 2); g.stroke();
+  g.lineWidth = 2.5; g.strokeStyle = 'rgba(255,250,236,0.8)'; g.beginPath(); g.arc(0, 0, R * 0.9, 0, Math.PI * 2); g.stroke();
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  return (SAW_MAT = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, fog: false }));
+}
+let SAW_GEO = null;
+const sawGeo = () => SAW_GEO || (SAW_GEO = new THREE.CircleGeometry(FUMA_FIT_R * 1.04, 28));
+// During the flurry the paw fūma is turned in WORLD space (the paw's own frame swings about too much to read): a flat disc
+// for the two sweeping cuts, tipped a little the way it travels (the camera sees it as a big ellipse, not edge-on), and
+// up on its edge along her facing for the flip's chop; flat again, out in front, while she revs it in a charge.
+const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _qp = new THREE.Quaternion(), _ax = new THREE.Vector3(), _e = new THREE.Euler();
+const ZAX = new THREE.Vector3(0, 0, 1);
+const sm = (a, b, t) => { const x = Math.max(0, Math.min(1, (t - a) / (b - a))); return x * x * (3 - 2 * x); };
+/** the flurry's blade axis in the world (out: Vector3) for action progress u (-1: the charge's wind-up) and facing f */
+function sawAxis(out, u, f) {
+  const sx = Math.cos(f), sz = -Math.sin(f); // (her side axis, across her facing: the sweeps lean along it)
+  if (u < 0) return out.set(sx * 0.25, 1, sz * 0.25).normalize(); // (revving: flat, tipped a little to one side)
+  const tip = u < 0.3 ? 0.3 : -0.3, edge = sm(0.44, 0.54, u) * (1 - sm(0.84, 0.98, u)); // (the sweep's lean; then on edge for the chop)
+  out.set(sx * tip, 1, sz * tip).normalize();
+  return out.lerp(_ax.set(sx, 0, sz), edge).normalize();
+}
 const M = {
   /** the fūma for the equipped item: the back one (dressPoe) and the paw one; both share the look's geometry */
   holdFuma(look) {
@@ -196,6 +234,9 @@ const M = {
       m.position.set(...HAND.pos); m.rotation.set(...HAND.rot);
       if (rig.parts.fumaMount) m.scale.setScalar((rig.parts.fumaMount.userData.scale || 1) * bakedK()); // (the baked rig: as big as on her back)
       rig.parts.handR.add(m);
+      // the buzz-saw blur (beside the holder, not in it: fillFuma swaps the holder's first child for the Blender prop)
+      const sw = this.fumaSaw = new THREE.Mesh(sawGeo(), sawMat()); sw.name = 'fuma_saw'; sw.renderOrder = 11; sw.castShadow = false; sw.visible = false;
+      rig.parts.handR.add(sw);
     } else setFumaLook(this.fumaHand, look);
     this.fumaSpin = this.fumaSpin || 0; this._fumaDrawn = -1;
     // (Chewy's sword / ball and Moka's staff stay parked and hidden)
@@ -207,6 +248,7 @@ const M = {
   },
   dropFuma(keepBack = false) {
     const h = this.fumaHand; if (h) { h.parent?.remove(h); this.fumaHand = null; }
+    if (this.fumaSaw) { this.fumaSaw.parent?.remove(this.fumaSaw); this.fumaSaw = null; }
     if (!keepBack && this.rig?.parts?.fumaBack && !this.rig.parts.fumaBack.userData.baked) { /* the back mount goes with the rig */ }
   },
   /** thrown (poeSkills): neither the back nor the paw fūma shows until it's caught */
@@ -215,8 +257,8 @@ const M = {
   carryFuma(dt) {
     const back = this.rig?.parts?.fumaBack, hand = this.fumaHand;
     if (!back && !hand) return;
-    const a = this.anim?.action, G = this.G;
-    if (a && DRAWN.has(a.name)) this._drawnT = G?.mode === 'dungeon' ? 1.6 : 0.6;
+    const a = this.anim?.action, G = this.G, rev = this._sawRev ?? -1;
+    if ((a && DRAWN.has(a.name)) || rev >= 0) this._drawnT = G?.mode === 'dungeon' ? 1.6 : 0.6;
     this._drawnT = Math.max(0, (this._drawnT || 0) - dt);
     const ghost = this._ghost > 0.5;
     const state = this.fumaOut ? 0 : (this._drawnT > 0 && !this.toolOut ? 2 : 1); // 0 thrown, 1 back, 2 paw
@@ -225,11 +267,26 @@ const M = {
       if (back) back.visible = state === 1 && !ghost;
       if (hand) { hand.visible = state === 2 && !ghost; fumaShadow(hand, state === 2); }
     }
+    const saw = this.fumaSaw;
     if (hand && state === 2) {
-      const want = a && SPINNING.has(a.name) ? 16 : 0;
+      const fl = a?.name === 'fumaFlurry';
+      const want = fl ? SAW : a && SPINNING.has(a.name) ? 16 : rev >= 0 ? 10 + (SAW - 6) * rev : 0;
       this.fumaSpin = (this.fumaSpin || 0) + (want - (this.fumaSpin || 0)) * Math.min(1, dt * (want ? 10 : 4));
-      hand.rotation.z += this.fumaSpin * dt;
-    }
+      this._spinAng = ((this._spinAng || 0) + this.fumaSpin * dt) % (Math.PI * 2);
+      // the held frame (HAND, spinning about its own axis), turned toward the flurry's world-space blade while it plays
+      this._sawW = (this._sawW || 0) + ((fl || rev >= 0 ? 1 : 0) - (this._sawW || 0)) * Math.min(1, dt * (fl || rev >= 0 ? 18 : 7));
+      hand.quaternion.setFromEuler(_e.set(HAND.rot[0], HAND.rot[1], this._spinAng));
+      if (this._sawW > 0.01 && hand.parent) {
+        hand.parent.updateWorldMatrix(true, false); hand.parent.getWorldQuaternion(_qp).invert();
+        _q.setFromUnitVectors(ZAX, sawAxis(_ax, fl ? a.t / a.dur : -1, this.facing || 0)).multiply(_q2.setFromAxisAngle(ZAX, this._spinAng));
+        hand.quaternion.slerp(_qp.multiply(_q), Math.min(1, this._sawW));
+      }
+      if (saw) { // (the blur rides the paw fūma's frame, turning at half its speed: a smear, not a strobe)
+        const k = Math.max(0, Math.min(1, (this.fumaSpin - 14) / 14));
+        saw.visible = k > 0.02 && !ghost;
+        if (saw.visible) { saw.position.copy(hand.position); saw.quaternion.copy(hand.quaternion); saw.scale.copy(hand.scale); saw.rotateZ(-this._spinAng * 0.5); saw.material.opacity = 0.5 * k; }
+      }
+    } else if (saw) saw.visible = false;
   },
 };
 export function installPoeGear(proto) { for (const k in M) if (!proto[k]) proto[k] = M[k]; }

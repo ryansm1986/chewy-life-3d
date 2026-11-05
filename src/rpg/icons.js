@@ -1247,7 +1247,7 @@ const SKILL_BG = {
   ...GLD_SKILL_BG,
   ...STL_SKILL_BG,
 };
-const SKILL_TREE = { chomp: 'bone', boneMastery: 'bone', whirl: 'bone', dig: 'bone', guard: 'bone', frenzy: 'bone', bonestorm: 'bone', throw: 'fetch', fetchMastery: 'fetch', ricochet: 'fetch', multi: 'fetch', decoy: 'fetch', blaze: 'fetch', fetchstorm: 'fetch', woof: 'spirit', goodboy: 'spirit', zoom: 'spirit', packcall: 'spirit', treat: 'spirit', howl: 'spirit', moonhowl: 'spirit',
+const SKILL_TREE = { chomp: 'bone', swallow: 'bone', boneMastery: 'bone', whirl: 'bone', dig: 'bone', guard: 'bone', frenzy: 'bone', bonestorm: 'bone', throw: 'fetch', fetchMastery: 'fetch', ricochet: 'fetch', multi: 'fetch', decoy: 'fetch', blaze: 'fetch', fetchstorm: 'fetch', woof: 'spirit', goodboy: 'spirit', zoom: 'spirit', packcall: 'spirit', treat: 'spirit', howl: 'spirit', moonhowl: 'spirit',
   splash: 'tide', tideMastery: 'tide', bubble: 'tide', shake: 'tide', puddleHop: 'tide', whirlpool: 'tide', greatWave: 'tide',
   kibble: 'star', starMastery: 'star', squeak: 'star', pawRune: 'star', moonbeam: 'star', constellation: 'star', meteor: 'star',
   duckDecoy: 'duck', retriever: 'duck', fetchLeash: 'duck', feathers: 'duck', duckCall: 'duck', spiritRetriever: 'duck', mallards: 'duck', ...POE_SKILL_TREE, ...STZ_SKILL_TREE, ...GLD_SKILL_TREE, ...STL_SKILL_TREE };

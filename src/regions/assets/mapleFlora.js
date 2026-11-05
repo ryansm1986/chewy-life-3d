@@ -11,6 +11,7 @@
 //  leafPile(seed)           a heaped mound of fallen leaves (the burst-able POI and the arena dressing)
 //  mushrooms(seed, kind)    'shiitake' | 'amanita' | 'shimeji' clusters
 import * as THREE from 'three';
+import { treeGlb } from '../../world/treeGlb.js';
 import { VEG_BUILD } from '../../world/vegetation.js';
 import { tube, puff, merge, paint, branch } from '../../gfx/geom.js';
 import { mulberry32, TAU, clamp } from '../../core/util.js';
@@ -121,8 +122,8 @@ export function maple(style = 'tier', seed = 1, dye = 'scarlet') {
     if (style === 'tier') {
       const v = VEG_BUILD.tree('momiji', seed);
       const f = dyeFn(dye);
-      t = { bark: v.trunkGeo, foliage: recolor(v.foliage, f), 'cards:momiji': recolor(v.cardGeo, f) };
-    } else t = style === 'dome' ? domeMaple(seed, dye) : weepMaple(seed, dye);
+      t = { bark: v.trunkGeo, [v.massKey || 'foliage']: recolor(v.foliage, f), 'cards:momiji': recolor(v.cardGeo, f) };
+    } else { const g = treeGlb('maple-' + style, seed), f = dyeFn(dye); t = g?.['cards:maple'] ? { bark: g.bark, 'foliage:shadow': recolor(g['foliage:shadow'], f), 'cards:maple': recolor(g['cards:maple'], f) } : style === 'dome' ? domeMaple(seed, dye) : weepMaple(seed, dye); } // (a Blender maple in the scarlet palette, dyed like the kit's: world/treeGlb.js)
     for (const k in t) t[k].computeBoundingSphere();
     return t;
   });
@@ -130,7 +131,7 @@ export function maple(style = 'tier', seed = 1, dye = 'scarlet') {
 export function ginkgo(seed = 1) {
   return cached('ginkgo:' + seed, () => {
     const v = VEG_BUILD.tree('ginkgo', seed), f = o => o.offsetHSL(0.005, 0.05, 0.03);
-    const t = { bark: v.trunkGeo, foliage: recolor(v.foliage, f), 'cards:ginkgo': recolor(v.cardGeo, f) };
+    const t = { bark: v.trunkGeo, [v.massKey || 'foliage']: recolor(v.foliage, f), 'cards:ginkgo': recolor(v.cardGeo, f) };
     for (const k in t) t[k].computeBoundingSphere();
     return t;
   });
@@ -139,6 +140,7 @@ export function ginkgo(seed = 1) {
 // ------------------------------------------------------------------ persimmon
 export function persimmon(seed = 0) {
   return cached('kaki:' + seed, () => {
+    { const g = treeGlb('persimmon', seed); if (g?.bark) return g; } // (its Blender model once built and loaded: world/treeGlb.js)
     const r = mulberry32(seed * 977 + 41), trunk = [], masses = [], fruit = [], C = new CardSet();
     const lean = V((r() - 0.5) * 0.7, 1.5, (r() - 0.5) * 0.7);
     trunk.push(branch(V(0, -0.2, 0), lean, 0.26, 0.18, V((r() - 0.5) * 0.4, 0, (r() - 0.5) * 0.4), 6, 8));
@@ -185,6 +187,7 @@ export function persimmon(seed = 0) {
 // ------------------------------------------------------------------ chestnut
 export function chestnut(seed = 0) {
   return cached('kuri:' + seed, () => {
+    { const g = treeGlb('chestnut', seed); if (g?.bark) return g; }
     const r = mulberry32(seed * 733 + 9), trunk = [], masses = [], C = new CardSet();
     const top = V((r() - 0.5) * 0.3, 1.9, (r() - 0.5) * 0.3);
     trunk.push(branch(V(0, -0.2, 0), top, 0.34, 0.24, V((r() - 0.5) * 0.3, 0, (r() - 0.5) * 0.3), 6, 8));

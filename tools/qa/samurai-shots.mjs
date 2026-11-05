@@ -1,6 +1,6 @@
 // Review sheets for Chewy the samurai (docs/HEROES.md §8): runs tools/qa/pose-lab.mjs for each look and writes the
 // contact sheets to $SHOT_DIR (default: the session scratchpad's samurai/ folder).
-//   node tools/qa/samurai-shots.mjs [names...]      names: combo combo-far chomp chomp3 zoom zoom3 kiai kiai3 whirl whirl3 dig dig3
+//   node tools/qa/samurai-shots.mjs [names...]      names: combo combo-far chomp chomp3 swallow swallow-far swallow3 zoom zoom3 kiai kiai3 whirl whirl3 dig dig3
 //                                                   storm storm3 pack treat treat3 howl howl3 parry moon flourish saya zoom-noto katana
 // Each sheet is <name>.png; the frames are frozen at game-time milliseconds after the cast (see pose-lab's --ms).
 import { execFileSync } from 'node:child_process';
@@ -18,6 +18,10 @@ const RUNS = {
   'combo-far': ['--cast', 'attack', '--repeat', '3', '--ms', '350,390', '--view', 'right', '--dist', '22', '--crop', '700', '--cols', '6'],
   chomp: ['--cast', 'chomp', '--ms', '150,300,340,380,460', '--view', 'right', '--dist', '14', '--crop', '900', '--cols', '5'],
   chomp3: ['--cast', 'chomp', '--charge', '3', '--perks', 'all', '--ms', '60,140,220,320,450', '--view', 'right', '--dist', '16', '--crop', '1000', '--cols', '5'],
+  // Swallow Return: the low guard, the rising cut, the turn at the top, the return, the finish (and the far read)
+  swallow: ['--cast', 'swallow', '--ms', '70,130,175,215,265,300,380', '--view', 'right', '--dist', '14', '--crop', '900', '--cols', '4'],
+  'swallow-far': ['--cast', 'swallow', '--ms', '140,275', '--view', 'right', '--dist', '22', '--crop', '700', '--cols', '2'],
+  swallow3: ['--cast', 'swallow', '--charge', '3', '--perks', 'all', '--ms', '40,140,200,260,380,520', '--view', 'right', '--dist', '18', '--crop', '1100', '--cols', '3'],
   zoom: ['--cast', 'zoom', '--ms', '80,200,500,640,760', '--view', 'right', '--dist', '14', '--crop', '1000', '--cols', '5'],
   zoom3: ['--cast', 'zoom', '--charge', '3', '--perks', 'all', '--ms', '150,400,900,1150,1400', '--view', 'right', '--dist', '18', '--crop', '1100', '--cols', '5'],
   kiai: ['--cast', 'woof', '--ms', '100,150,200,300', '--view', 'right', '--dist', '14', '--crop', '900'],

@@ -62,11 +62,24 @@ export const BUILDS = {
   'poe·step': { hero: 'poe', ref: true, skill: 'shadowStep', mastery: 'afterimageDash', extra: ['vanish', 'swiftWind'], stat: 'dex', wtype: 'fuma',
     cycle: (R, d) => Math.max(R.cd, 0.24 + 0.36 / 1.05), hits: (p, n, d) => p.dmgPct * area(p.radius, n) * Math.min(1, p.arc / 200) * (1 + Math.min(1, (d.crit + p.critBonus) / 100) * 0.5) / (1 + d.crit / 100 * 0.5) / 100,
     attack: (p, n, d) => BUILDS.poe.attack(p, n, d) },
+  // a reference build, not in the band: Fūma Flurry on repeat (the 'fumaFlurry' action, 0.62 s at animSpeed 0.62: one attack's
+  // time), Shuriken Mastery, then Fūma Throw (its synergy). A lone foe takes all three cuts; a pack ~1 foe a cut (its 110° cone)
+  'poe·flurry': { hero: 'poe', ref: true, skill: 'fumaFlurry', mastery: 'shurikenMastery', extra: ['fumaThrow'], stat: 'dex', wtype: 'fuma',
+    cycle: (R, d) => 0.62 / (d.aspd * 0.62), hits: (p, n) => p.cuts * p.dmgPct * (n <= 1 ? 1 : area(p.radius, n) * Math.min(1, p.arc / 200)) / 100,
+    attack: (p, n, d) => BUILDS.poe.attack(p, n, d) },
   // the Shih Tzu (docs/SHIHTZU.md §4): Woeful Wallop on repeat (the 'wallop' action, 0.66 s at animSpeed 0.6), Weight of the World,
   // then its synergies; his basic attack is the three-swing combo (two swings at 1/aspd, the slam at 1/(0.85 aspd), ×1.35 on 110°)
   shihtzu: { skill: 'woefulWallop', mastery: 'weightOfWorld', extra: ['maelstrom', 'heaviestSigh'], stat: 'str', wtype: 'flail',
     cycle: (R, d) => 0.66 / (d.aspd * 0.6), hits: (p, n) => p.dmgPct * area(p.radius, n) * Math.min(1, p.arc / 200) / 100,
     attack: (p, n, d) => ({ per: p.dmgPct * (2 * area(p.radius, n) * Math.min(1, p.arc / 200) + 1.35 * area(p.radius * 0.92, n) * 0.55) / 3 / 100, cycle: (2 + 1 / 0.85) / 3 / d.aspd }) },
+  // a reference build, not in the band: Glum Bonk on repeat (the 'glumBonk' action, 0.46 at animSpeed 0.6), Weight of the World,
+  // then a point in Woeful Wallop to open Tug of Woe (its other synergy). One foe takes the bonk; in a pack the splat's share
+  // lands on the others crowded round it (×1.8 over a uniform spread, as lineArea). Its single-target dps should sit on the
+  // tank's (Woeful Wallop's), its clear well under it
+  'shihtzu·bonk': { hero: 'shihtzu', ref: true, skill: 'glumBonk', mastery: 'weightOfWorld', stat: 'str', wtype: 'flail',
+    plan: [['glumBonk', 20], ['weightOfWorld', 20], ['woefulWallop', 1], ['tugOfWoe', 20]],
+    cycle: (R, d) => 0.46 / (d.aspd * 0.6), hits: (p, n) => p.dmgPct * (1 + (n <= 1 ? 0 : p.splashPct / 100 * Math.min(n - 1, n * ((p.splash + 0.3) / RP) ** 2 * 1.8))) / 100,
+    attack: (p, n, d) => BUILDS.shihtzu.attack(p, n, d) },
   // the hex build (docs/SHIHTZU.md §4), also in the band: an Energy build that keeps its gloom up rather than casting one skill on
   // repeat. Points: one in each rotation skill first (and Case of the Mopes, the prerequisite), then Dripping Paw, Lingering Gloom,
   // Grumble Cloud, Mournful Awoo, Everlasting Gloom, Grudge Ledger. The fight is a rotation (rotation() below).
@@ -81,6 +94,12 @@ export const BUILDS = {
   golden: { skill: 'sunbeamThrust', mastery: 'knightsVow', extra: ['pinwheelSweep', 'sunfallJump', 'gallantCharge'], stat: 'str', wtype: 'lance',
     cycle: (R, d) => 0.62 / (d.aspd * 0.62), hits: (p, n) => p.dmgPct * lineArea(p.length, p.width, n) / 100,
     attack: (p, n, d) => ({ per: p.dmgPct * (2 * lineArea(p.radius, p.width, n) + 1.15 * area(p.sweepRadius, n) * Math.min(1, p.arc / 200)) / 3 / 100, cycle: (2 + 1 / 0.9) / 3 / d.aspd }) },
+  // a reference build, not in the band: Eager Jabs on repeat (the 'eagerJabs' flurry, 1.1 attacks' time: three jabs, the last
+  // ×lastPct) into its narrow cone (in a pack the cone's share of the area round him, arc/120, as the breath's), A Knight's Vow,
+  // then its synergies. Its single-target dps should sit on the lance build's (Sunbeam Thrust's), its clear well under it
+  'golden·jabs': { hero: 'golden', ref: true, skill: 'eagerJabs', mastery: 'knightsVow', extra: ['sunbeamThrust', 'sunfallJump'], stat: 'str', wtype: 'lance',
+    cycle: (R, d) => 1.1 / d.aspd, hits: (p, n) => p.dmgPct * (p.jabs - 1 + p.lastPct / 100) * (n <= 1 ? 1 : Math.max(1, Math.min(n, area(p.radius, n) * Math.min(1, p.arc / 120)))) / 100,
+    attack: (p, n, d) => BUILDS.golden.attack(p, n, d) },
   // the javelin build (a Dexterity build: 50% of the points in Dexterity, so javMul > 1): Tailwag Volley on repeat (the
   // 'javToss' action, 0.46 s at his cast speed; Bonk Dart while it fights better, at the low levels), Keen Nose, Bonk Dart,
   // True Flight. Each javelin of the fan bonks the first
@@ -280,8 +299,9 @@ export function poeBand(levels = [6, 15, 30, 45]) {
  *  tank: a little under the mean in damage, well over it in survivability); hex: the hex build's clear (blend) and single target */
 export function stzBand(levels = [6, 15, 30, 45]) {
   return compare(levels).map(r => {
-    const mean = k => (r.chewy[k] + r.moka[k] + r.poe[k]) / 3, X = r['shihtzu·hex'];
-    return { lvl: r.lvl, dps: r.shihtzu.dps / mean('dps'), ehp: r.shihtzu.ehp / mean('ehp'), life: r.shihtzu.life / mean('life'), hex: { clear: X.dps / mean('dps'), single: X.singleDps / mean('singleDps') } };
+    const mean = k => (r.chewy[k] + r.moka[k] + r.poe[k]) / 3, X = r['shihtzu·hex'], B = r['shihtzu·bonk'];
+    return { lvl: r.lvl, dps: r.shihtzu.dps / mean('dps'), ehp: r.shihtzu.ehp / mean('ehp'), life: r.shihtzu.life / mean('life'), hex: { clear: X.dps / mean('dps'), single: X.singleDps / mean('singleDps') },
+      bonk: { clear: B.dps / r.shihtzu.dps, single: B.singleDps / r.shihtzu.singleDps } }; // (Glum Bonk vs the tank's Woeful Wallop)
   });
 }
 
@@ -290,8 +310,9 @@ export function stzBand(levels = [6, 15, 30, 45]) {
 export function gldBand(levels = [6, 15, 30, 45]) {
   return compare(levels).map(r => {
     const ids = ['chewy', 'moka', 'poe', 'shihtzu'], mean = k => ids.reduce((a, id) => a + r[id][k], 0) / ids.length, X = r['golden·jav'];
-    const Y = r['golden·whelp'];
-    return { lvl: r.lvl, dps: r.golden.dps / mean('dps'), ehp: r.golden.ehp / mean('ehp'), life: r.golden.life / mean('life'), stzEhp: r.golden.ehp / r.shihtzu.ehp, jav: { clear: X.dps / mean('dps'), single: X.singleDps / mean('singleDps') }, whelp: { clear: Y.dps / mean('dps'), single: Y.singleDps / mean('singleDps') } };
+    const Y = r['golden·whelp'], J = r['golden·jabs'];
+    return { lvl: r.lvl, dps: r.golden.dps / mean('dps'), ehp: r.golden.ehp / mean('ehp'), life: r.golden.life / mean('life'), stzEhp: r.golden.ehp / r.shihtzu.ehp, jav: { clear: X.dps / mean('dps'), single: X.singleDps / mean('singleDps') }, whelp: { clear: Y.dps / mean('dps'), single: Y.singleDps / mean('singleDps') },
+      jabs: { clear: J.dps / r.golden.dps, single: J.singleDps / r.golden.singleDps } }; // (Eager Jabs vs the lance build's Sunbeam Thrust)
   });
 }
 
@@ -329,9 +350,11 @@ if (process.argv[1]?.replace(/\\/g, '/').endsWith('tools/hero-balance.mjs')) {
   const sb = stzBand(levels);
   console.log('shih tzu vs the chewy–moka–poe mean: ' + sb.map(b => `L${b.lvl} dps ×${b.dps.toFixed(2)} eHP ×${b.ehp.toFixed(2)} life ×${b.life.toFixed(2)}`).join(' · '));
   console.log('hex build vs the mean: ' + sb.map(b => `L${b.lvl} clear ×${b.hex.clear.toFixed(2)} single ×${b.hex.single.toFixed(2)}`).join(' · '));
+  console.log('glum bonk build vs the tank (woeful wallop): ' + sb.map(b => `L${b.lvl} clear ×${b.bonk.clear.toFixed(2)} single ×${b.bonk.single.toFixed(2)}`).join(' · '));
   const gb = gldBand(levels);
   console.log('foosy (lance) vs the chewy–moka–poe–shih tzu mean: ' + gb.map(b => `L${b.lvl} dps ×${b.dps.toFixed(2)} eHP ×${b.ehp.toFixed(2)} (×${b.stzEhp.toFixed(2)} the shih tzu's) life ×${b.life.toFixed(2)}`).join(' · '));
   console.log('javelin build vs the mean: ' + gb.map(b => `L${b.lvl} clear ×${b.jav.clear.toFixed(2)} single ×${b.jav.single.toFixed(2)}`).join(' · '));
+  console.log('eager jabs build vs the lance build (sunbeam thrust): ' + gb.map(b => `L${b.lvl} clear ×${b.jabs.clear.toFixed(2)} single ×${b.jabs.single.toFixed(2)}`).join(' · '));
   console.log('whelp build vs the mean: ' + gb.map(b => `L${b.lvl} clear ×${b.whelp.clear.toFixed(2)} single ×${b.whelp.single.toFixed(2)}`).join(' · '));
   for (const b of stlBand(levels)) console.log(`stella L${b.lvl} vs the five-hero mean (falls: × the mean's ${b.tMean.toFixed(1)} s): ` + ['ray', 'flare', 'dawn', 'heal', 'solar'].map(k => `${k} clear ×${b[k].clear.toFixed(2)} single ×${b[k].single.toFixed(2)} falls ×${b[k].falls.toFixed(2)}`).join(' · ') + ` · life ×${b.ray.life.toFixed(2)}`);
 }

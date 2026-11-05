@@ -20,6 +20,7 @@ import { BuildPanel, InspectCard } from './build.js';
 import { QuestArrow } from './questArrow.js';
 import { TutorialUI } from './tutorial.js';
 import { ChargeHud } from './chargeHud.js';
+import { ComboHud } from './comboHud.js';
 import { ShopPanel } from './shop.js';
 import { MapPanel, QuestPanel, normQuest } from './map.js';
 import { TravelPanel } from './travel.js';
@@ -124,6 +125,7 @@ export const UI = {
     };
     this.homeHud = new HomeHud(this); // (indoors: the house name, the Decorate button)
     this.chargeHud = new ChargeHud(this); // (the hotbar's charge ring + stage pips: docs/CHARGE.md)
+    this.comboHud = new ComboHud(this); // (the hotbar's chain pips + chain badge: docs/COMBO.md)
     this.runChip = new RunChip(this); // (a tier run's tier and modifiers, under the minimap: docs/ZONES.md §5.2)
     this.cozyChip = new CozyChip(this); // (crews out and reports waiting, under the run chip: docs/COZY.md §10)
     this.skills = this.panels.skills;
@@ -202,7 +204,7 @@ export const UI = {
     this.mmUI?.update(dt);
     this.qarrow.update(dt, cam);
     this.tutorial?.update(dt);
-    if (this.mode !== 'title') this.chargeHud?.update(dt);
+    if (this.mode !== 'title') { this.chargeHud?.update(dt); this.comboHud?.update(dt); }
     this.mobile?.update(dt); this.touch?.update(dt); this.fit?.update(dt);
     this.panels.map.update?.(dt);
     if (this.settings.showFps) {

@@ -187,8 +187,11 @@ try {
   // (the lowest of a few samples: toasts, floating text and pooled fx come and go by a texture or two while idle)
   const mem = async () => { let geo = 1e9, tex = 1e9; for (let i = 0; i < 4; i++) { const r = await ev(() => { const m = window.G.engine.renderer.info.memory; return { geo: m.geometries, tex: m.textures }; }); geo = Math.min(geo, r.geo); tex = Math.min(tex, r.tex); await sleep(page, 250); } return { geo, tex }; };
   await ev(() => window.G.returnToVillage()); await waitMode(page, 'village'); await sleep(page, 600);
-  const m0 = await mem();
   const trips = async n => { for (let i = 0; i < n; i++) { await enterZone(); await ev(() => window.G.returnToVillage()); await waitMode(page, 'village'); await sleep(page, 600); } };
+  // (a warm-up pair first: the Blender townsfolk's atlases, heroModels FOLK_TOY, upload the first time each design walks on,
+  //  live textures the town sync brings in, not a leak; the baseline is taken once the trips have shown them)
+  await trips(2);
+  const m0 = await mem();
   await trips(2); const m1 = await mem();
   await trips(2); const m2 = await mem();
   // (R-6, run down in CZ-12: no leak. Over 10 trips the count wanders 289–295 with no trend: the textures a trip leaves

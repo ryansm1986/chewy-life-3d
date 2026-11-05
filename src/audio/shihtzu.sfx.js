@@ -22,6 +22,16 @@ export const SFX = {
     s.tone({ at: 0.03, pts: [[0, 1150], [0.06, 1650], [0.14, 1250]], type: 'triangle', a: 0.004, d: 0.14, v: 0.07, vib: [24, 50] });
     s.tone({ at: 0.16, pts: [[0, 240], [0.05, 160]], a: 0.002, d: 0.06, v: 0.1 });
   } },
+  // Glum Bonk: a hard, hollow "bonk" right on the head (a woodblock knock in the rubber ball's thup), the squeaker
+  // squashed flat, and a small, glum "womp-womp" sliding down after it (opts.big: a charged one, deeper and longer)
+  glum_bonk: { vary: 0.05, max: 2, gap: 0.08, trim: 1.4, fn(s, o = {}) {
+    const b = o.big ? 1 : 0;
+    s.tone({ pts: [[0, 620], [0.03, 470]], type: 'triangle', a: 0.001, d: 0.07, v: 0.22 }); // (the knock)
+    s.tone({ pts: [[0, 200 - 30 * b], [0.09, 75]], a: 0.002, d: 0.14 + 0.06 * b, v: 0.34 });
+    s.noise({ ft: 'lowpass', f: 800, a: 0.001, d: 0.08, v: 0.26, color: 'brown' });
+    s.tone({ at: 0.02, pts: [[0, 1400], [0.05, 900]], type: 'triangle', a: 0.003, d: 0.07, v: 0.05 }); // (the squeaker, squashed)
+    s.tone({ at: 0.12, pts: [[0, 300], [0.12, 270], [0.14, 250], [0.3 + 0.1 * b, 190]], type: 'triangle', a: 0.02, d: 0.28 + 0.1 * b, v: 0.06, vib: [6, 6] }); // (womp-womp)
+  } },
   // the ball hits the floor: a dull thud and grit
   flail_thud: { vary: 0.07, max: 2, gap: 0.06, trim: 1.3, duck: [0.9, 0.3], fn(s) {
     s.tone({ pts: [[0, 110], [0.14, 52]], a: 0.003, d: 0.2, v: 0.4 });

@@ -373,17 +373,17 @@ try {
   await page.mouse.move(1200, 360); await page.keyboard.press('KeyK');
   await settled();
   const m0 = await drawer();
-  R.check('R-16 mouse: the Charge drawer leads with "Choose a skill to charge" over a strip of the tree\'s chargeable skills (learned bright, Sakura Storm dimmed, the shown one marked)', m0.id === 'chomp' && m0.strip.join() === 'chomp*,whirl,dig,bonestorm-' && /Choose a skill to charge/.test(m0.label), JSON.stringify(m0));
+  R.check('R-16 mouse: the Charge drawer leads with "Choose a skill to charge" over a strip of the tree\'s chargeable skills (learned bright, Swallow Return and Sakura Storm dimmed, the shown one marked)', m0.id === 'chomp' && m0.strip.join() === 'swallow-,chomp*,whirl,dig,bonestorm-' && /Choose a skill to charge/.test(m0.label), JSON.stringify(m0));
   const wb = await boxOf('.chg-sk[data-k="whirl"]');
   await page.mouse.move(wb.x, wb.y, { steps: 3 }); await until(() => /Whirlwind/.test(document.querySelector('.chg-plt')?.textContent || ''));
   const lab = (await drawer()).label;
   await page.mouse.down(); await page.mouse.up(); await shown('whirl');
   const m1 = await drawer();
-  R.check('…hovering a strip button names it; a click shows that skill (Gale Stance), marks it and rings its ⚡ chip in the tree', /Whirlwind Stance/.test(lab) && m1.id === 'whirl' && m1.name === 'Gale Stance' && m1.strip[1] === 'whirl*' && m1.chipSel === 'whirl', JSON.stringify({ lab, m1 }));
+  R.check('…hovering a strip button names it; a click shows that skill (Gale Stance), marks it and rings its ⚡ chip in the tree', /Whirlwind Stance/.test(lab) && m1.id === 'whirl' && m1.name === 'Gale Stance' && m1.strip[2] === 'whirl*' && m1.chipSel === 'whirl', JSON.stringify({ lab, m1 }));
   const wp = await ev(() => document.querySelector('.chg-pk.can')?.dataset.p || null);
   if (wp) { await mclick(`.chg-pk[data-p="${wp}"]`); await until(p => (window.G.state.player.chargePerks?.whirl?.[p] || 0) > 0, wp); }
   const m2 = await drawer();
-  R.check('…and a click on a ready perk buys it for Whirlwind Stance: one point, Crescent Chomp untouched, the strip counting it', wp && m2.pts === 5 && m2.perks.whirl?.[wp] === 1 && !m2.perks.chomp && m2.strip[1] === 'whirl*1' && m2.id === 'whirl', JSON.stringify({ wp, m2 }));
+  R.check('…and a click on a ready perk buys it for Whirlwind Stance: one point, Crescent Chomp untouched, the strip counting it', wp && m2.pts === 5 && m2.perks.whirl?.[wp] === 1 && !m2.perks.chomp && m2.strip[2] === 'whirl*1' && m2.id === 'whirl', JSON.stringify({ wp, m2 }));
   await mclick('.chg-sk[data-k="bonestorm"]'); await shown('bonestorm');
   await mclick('.chg-pk'); await until(() => !!document.querySelector('.chg-pk.deny'), null, 1500); // (the refusal's shake)
   const m3 = await drawer();
@@ -420,7 +420,7 @@ try {
   // the fit: 1280×720 at UI 125 %, every Bone Blade skill (the tallest tree) from the strip: the drawer on the screen, and put
   await ev(() => { const U = window.G.ui; U.setSetting('uiScale', 1.25); U.close('skills'); U.open('skills'); }); await settled();
   const fit = [];
-  for (const id of ['chomp', 'whirl', 'dig', 'bonestorm']) {
+  for (const id of ['swallow', 'chomp', 'whirl', 'dig', 'bonestorm']) {
     await mclick(`.chg-sk[data-k="${id}"]`); await shown(id); await page.mouse.move(1260, 400);
     fit.push(await ev(() => { const d = document.querySelector('.chg-drawer'), r = d.getBoundingClientRect(), t = d.querySelector('.chg-tag').getBoundingClientRect(); return [window.G.ui.panels.skills.chg.id, Math.round(t.top), Math.round(r.bottom), innerHeight, Math.round(d.querySelector('.chg-pick').getBoundingClientRect().top)]; }));
   }
@@ -438,11 +438,13 @@ try {
   const pR = (await drawer()).id;
   await flick(-0.9); await until(() => window.G.ui.panels.skills.chg.id === 'chomp');
   const pL = (await drawer()).id;
+  await flick(-0.9); await until(() => window.G.ui.panels.skills.chg.id === 'swallow');
+  const pS = (await drawer()).id;
   await flick(-0.9); await until(() => window.G.ui.panels.skills.chg.id === 'bonestorm');
   const pW = (await drawer()).id;
   const pHint = await ev(() => window.G.ui.padNav.hintsEl.textContent.replace(/\s+/g, ' '));
   const pCast = await ev(() => ({ charge: !!window.G.skills.charge.active, anim: window.G.player.anim.action?.name || null }));
-  R.check('R-16 pad: a right-stick flick steps the drawer through the strip (Crescent Chomp → Whirlwind Stance, back, and round to Sakura Storm); the hints say so; nothing casts', p0.id === 'chomp' && pR === 'whirl' && pL === 'chomp' && pW === 'bonestorm' && /Charge skill/.test(pHint) && !pCast.charge, JSON.stringify({ p0: p0.id, pR, pL, pW, pHint, pCast }));
+  R.check('R-16 pad: a right-stick flick steps the drawer through the strip (Crescent Chomp → Whirlwind Stance, back, on to Swallow Return and round to Sakura Storm); the hints say so; nothing casts', p0.id === 'chomp' && pR === 'whirl' && pL === 'chomp' && pS === 'swallow' && pW === 'bonestorm' && /Charge skill/.test(pHint) && !pCast.charge, JSON.stringify({ p0: p0.id, pR, pL, pS, pW, pHint, pCast }));
   const navTo = async (sel, max = 40) => {
     for (let i = 0; i < max; i++) {
       const s = await ev(sel => {
@@ -468,7 +470,7 @@ try {
   const onPk = await navTo('.chg-pk.can'), dp = await ev(() => window.G.ui.padNav.cur?.dataset.p || null);
   await padTap(page, 'A'); await until(p => (window.G.state.player.chargePerks?.dig?.[p] || 0) > 0, dp);
   const p2 = await drawer();
-  R.check('…the focus reaches the strip ("Show its perks"): A on Helmet Splitter shows it, and A on a ready perk buys it there (one point)', onDig && /Show its perks/.test(digHint) && p1.id === 'dig' && onPk && dp && p2.perks.dig?.[dp] === 1 && p2.pts === p1.pts - 1 && p2.strip[2] === 'dig*1', JSON.stringify({ onDig, digHint, p1: p1.id, onPk, dp, perks: p2.perks, pts: [p1.pts, p2.pts] }));
+  R.check('…the focus reaches the strip ("Show its perks"): A on Helmet Splitter shows it, and A on a ready perk buys it there (one point)', onDig && /Show its perks/.test(digHint) && p1.id === 'dig' && onPk && dp && p2.perks.dig?.[dp] === 1 && p2.pts === p1.pts - 1 && p2.strip[3] === 'dig*1', JSON.stringify({ onDig, digHint, p1: p1.id, onPk, dp, perks: p2.perks, pts: [p1.pts, p2.pts] }));
   const onNode = await navTo('.p-skills .node[data-id="whirl"]');
   await until(() => window.G.ui.tip.on, null, 1500);
   const tipN = (await drawer()).tip;
@@ -485,6 +487,9 @@ try {
       await boot(tp, `fresh&nointro&notut&hour=${HOUR}`); await seed(tp);
       await F.tap(dev.w / 2, dev.h / 2); await until(() => window.G.controls.device === 'touch', null, 4000, tp);
       await tev(() => window.G.ui.open('skills')); await settled(tp);
+      // (an open menu is when the menu prewarm runs its queue, ui/prewarm.js: let it finish, so a double-tap's two taps
+      //  aren't spread past the 330 ms window by a building thumbnail's one-off build in between)
+      await until(() => window.G.ui.prewarm?.done, null, 60000, tp);
       if (phone) { await tapSel('.chg-drawer .chg-tag'); await sheet(true); }
       const sizes = await tev(() => [...document.querySelectorAll('.chg-pick .chg-sk')].map(b => { const r = b.getBoundingClientRect(); return Math.round(Math.min(r.width, r.height) * 10) / 10; }));
       const tw = await tapSel('.chg-sk[data-k="whirl"]'); await shown('whirl', tp);
@@ -492,7 +497,7 @@ try {
       const tpk = await tev(() => document.querySelector('.chg-pk.can')?.dataset.p || null);
       if (tpk) { await tapSel(`.chg-pk[data-p="${tpk}"]`); await until(p => (window.G.state.player.chargePerks?.whirl?.[p] || 0) > 0, tpk, 4000, tp); }
       const t2 = await drawer(tp);
-      R.check(`R-16 touch (${dname}): the strip's buttons are 44 px or more; a tap on Whirlwind Stance shows it, and a tap on a ready perk buys it there`, sizes.length === 4 && Math.min(...sizes) >= 44 && t1.id === 'whirl' && tpk && t2.perks.whirl?.[tpk] === 1 && t2.pts === 5 && !t2.perks.chomp && (!phone || t2.open), JSON.stringify({ sizes, id: t1.id, tapped: tw && [Math.round(tw.x), Math.round(tw.y), tw.under], tpk, perks: t2.perks, pts: t2.pts, open: t2.open }));
+      R.check(`R-16 touch (${dname}): the strip's buttons are 44 px or more; a tap on Whirlwind Stance shows it, and a tap on a ready perk buys it there`, sizes.length === 5 && Math.min(...sizes) >= 44 && t1.id === 'whirl' && tpk && t2.perks.whirl?.[tpk] === 1 && t2.pts === 5 && !t2.perks.chomp && (!phone || t2.open), JSON.stringify({ sizes, id: t1.id, tapped: tw && [Math.round(tw.x), Math.round(tw.y), tw.under], tpk, perks: t2.perks, pts: t2.pts, open: t2.open }));
       // a press held past the long-press time on a strip button (nothing to show) is still its tap (a slow frame, a slow finger)
       await steady('.chg-sk[data-k="bonestorm"]', tp); const hb = await boxOf('.chg-sk[data-k="bonestorm"]', tp);
       if (hb) { await F.down(9, hb.x, hb.y); await tp.waitForTimeout(560); await F.up(9); } // (the hold is the input itself)

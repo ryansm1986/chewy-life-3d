@@ -85,17 +85,20 @@ Checkpoint 2 tints it per base like the flail (`goldenGear.js setLanceLook`): th
 [head], the rope's tan bands to [shaft], the tennis ball to [pommel], by hue on the prop's one texture (the painted shading
 kept); the Toy Lance is the texture as painted.
 
-## 3. Skills (3 trees × 7, the D2 framework: rows 0–5 gated at levels 1/6/12/18/24/30, prerequisites, synergies)
+## 3. Skills (3 trees × 7, Lance Arts × 8; the D2 framework: rows 0–5 gated at levels 1/6/12/18/24/30, prerequisites, synergies)
 `src/rpg/skillsGolden.js`; numbers at skill level `l`; `lin(a, b)` = a + b·(l − 1); `dim(l, max, half)` = max·l/(l + half).
 Damage is % of his rolled lance damage with synergies folded in. **Lance Arts** multiply by A Knight's Vow; **Javelins** by
 Keen Nose and `javMul`; the **Whelp Bond** by Best Friends and `whelpMul`. The **Whelp Bond's actives drive Shadow**: they
 wait while he's knocked out ("Shadow is resting!": `WHELP_ACTIVES`, `castBlocked` → `gldWhelpBlocked`), and Swoop, Wing
 Shield and Dragon Heart wait while he's dragon-sized. The lance moves (and the lance combo) wait while the lance is up in
-the air (Starfall Lance). All 21 are built (`GOLDEN_TRAINING` is empty).
+the air (Starfall Lance). All 22 are built (`GOLDEN_TRAINING` is empty). Lance Arts has two level-1 attacks side by side
+(row 0): **Eager Jabs** (col 0, the quick close flurry, added 2026-11-03 so he can spec into a second weapon attack right
+away) and **Sunbeam Thrust** (col 1, the one long lunge).
 
 **Lance Arts** (`lance`, Strength, emerald `#2f8a5c` / brass)
 | skill | row | what | numbers | charge (checkpoint 2) |
 |---|---|---|---|---|
+| `eagerJabs` Eager Jabs | 0 | up on his toes, tail going like mad: jab, jab, and one big happy JAB, as fast as his tail wags: three short jabs in a narrow cone, the last a bigger poke that bumps the foe back | lin(49, 5)% a jab, 3 jabs, the last ×1.5 · a 50° cone 2.3 + 0.02l m · knockback 0.9 on the last · 1.1 attacks' time · cost 3.8 + 0.18(l−1) · syn A Knight's Vow 2%, Sunbeam Thrust 3% | *Very Eager Jabs*: 4 / 5 / 5 jabs, wider and a little longer, the last bigger, a stagger from Ⅱ; ★ Tail Wind (the last jab blows a puff of leaves on past the lance) |
 | `sunbeamThrust` Sunbeam Thrust | 0 | both paws on the lance, one big earnest step and a lunge: the thrust flashes down a long line like a sunbeam | lin(155, 16)% to everything in a line 3.8 + 0.04l m long, 0.6 m either side · knockback 0.6 · cost 3.5 + 0.17(l−1) · syn A Knight's Vow 2%, Pinwheel Sweep 3% | *Noonday Thrust*: a longer, wider line, a sunbeam that lingers a beat; ★ Second Sun (a second beam 0.25 s later) |
 | `knightsVow` A Knight's Vow | 1 | passive: he promised, very solemnly | +25 + 9(l−1)% Lance Arts and lance attack damage · +1.5 + 0.4(l−1)% crit | — |
 | `sunfallJump` Sunfall Jump | 1 | **the dragoon's Jump**: a leap so high he's a speck against the sun, a hang, then a dive lance-first onto the spot, a shockwave | lin(200, 22)% in 2.4 + 0.04l m · leap ≤ 7 m · stun 0.5 + 0.03l s · untouchable in the air · cost 9 + 0.45(l−1) · cd max(1.5, 4 − 0.1l) · syn Sunbeam Thrust 5%, Starfall Lance 4% | *High Noon*: higher, longer hang, wider crash; ★ Embers Below (the crater smoulders) |
@@ -141,6 +144,14 @@ The charge column is the release's idea; the tables as built are §3b.
   0.2 s) and a small bonk on what it hits; the reach assist lunges like Chewy's.
 - **Sunbeam Thrust** (`sunbeamThrust`): a deep crouch with the lance drawn right back (eyes shut, ears pinned), then the
   biggest lunge he has: a wider, longer streak with its core, bonks on up to four foes, a hit-stop and a shake.
+- **Eager Jabs** (`eagerJabs`; charged `eagerJabs4` / `eagerJabs5`, built by `jabsAct(n)` in seconds so every flurry
+  keeps the same rhythm, a jab every 0.15 s): the lance pulled in close at his right hip (the chamber), then short jabs
+  driven out mostly through his paws (the slide) with a little lean, his feet staying under him and a small bounce on his
+  toes at each; the small jabs alternate a touch low / a touch high, the last draws back deeper and goes in with a real
+  step. His tail wags hard the whole way through and he looks pleased with himself after the big one. Each jab flicks a
+  short, narrow sunbeam (0.12 s, no core) and bonks up to two foes in the 50° cone; the last a fuller streak with its
+  core, leaves at the tip, dust at his feet, a small shake and hit-stop, the pommel's low "thok" and a happy "boof". The
+  reach assist lunges into range on the first jab and keeps him turned to the target through the flurry.
 - **Bonk Dart** (`javToss`): the lance goes to his left paw, upright like a standard; a javelin drawn from the quiver over
   his right shoulder appears in his paw, is cocked up and back past his ear drape, then hurled overhand with a step. It
   flies on a readable arc (gravity 16 m/s²: about a 1 m apex over 10 m), trailing soft cream motes, bonks the first foe it
@@ -206,6 +217,7 @@ in the left paw). Solved by `node tools/charge-sim.mjs --solve` (models `tools/c
 full charge is ×1.20–1.27 sustained (Ⅰ / Ⅱ ×1.01–1.14), the buffs and Dragon Heart ×1.09–1.28 value per zoom.
 | skill → release | wind-up | the charge | perks (besides Deeper Charge, Quick Wind-up) |
 |---|---|---|---|
+| Eager Jabs → *Very Eager Jabs* | the lance in close at his hip, bouncing on his toes faster and faster, tail wagging harder | 4 / 5 / 5 jabs at the tap's damage each (no stage multiplier: the flurry is the payoff), wider and a little longer, the last bigger; staggers from Ⅱ | Wider Wag; ★ Tail Wind (the last jab blows leaves on 1.5 m past the lance: 50%) |
 | Sunbeam Thrust → *Noonday Thrust* | crouched over the lance drawn right back | a longer, wider line, a stagger | Wide Beam; ★ Second Sun (a second beam 0.25 s later) |
 | Sunfall Jump → *High Noon* | coiled for the Jump | higher, a wider crash, longer stun; the star's crash from Ⅱ | Wide Arc; ★ Embers Below (the crater smoulders) |
 | Pinwheel Sweep → *Whirling Pinwheel* | the lance wound round behind him | wider, harder; a second turn (60%) from Ⅱ | Efficient Focus; ★ Leaf Gust |
@@ -240,6 +252,12 @@ Asserted: the lance build at **dps ×0.85–1.05 of the mean, eHP over the mean 
 and the Whelp Bond build at **clear ×0.85–1.05**.
 - **The lance build**: Sunbeam Thrust, A Knight's Vow, then Pinwheel Sweep, Sunfall Jump and Gallant Charge; Sunbeam Thrust
   on repeat at one attack's time, the reach combo filling the waits for zoom.
+- **Eager Jabs** (`golden·jabs`, a reference build, not in the band): Eager Jabs, A Knight's Vow, then Sunbeam Thrust and
+  Sunfall Jump; the flurry on repeat at 1.1 attacks' time into its narrow cone (in a pack the cone's share of the area
+  round him, arc/120). It is the focused one: against one foe it fights like the lance build (single ×1.00 / 1.01 / 1.00 /
+  0.98 at levels 6 / 15 / 30 / 45), against packs it clears slower (×0.70 / 0.70 / 0.69 / 0.68). Its numbers are set so a
+  tap's damage and zoom a second on one foe are Sunbeam Thrust's at the same level (3.5 jabs' worth over 1.1 attacks:
+  lin(49, 5) ≈ 1.1 × lin(155, 16) / 3.5; cost 1.1 × Sunbeam's); asserted in `tools/test-rpg.mjs`.
 - **The javelin build** (`golden·jav`, a Dexterity build: 50% of the points in Dexterity, so `javMul` > 1): Bonk Dart's
   point, then Tailwag Volley, Keen Nose, Bonk Dart, True Flight, Sunshower (`plan`); whichever of Bonk Dart and Tailwag
   Volley fights better at the level is on repeat (`alt`: Bonk Dart early). A fan's javelins each bonk the first foe they
@@ -447,9 +465,10 @@ Storybook set) has none, so he stays the kit there (`CAST.golden`), as he does i
 - Skills: `src/rpg/skillsGolden.js` (GOLDEN_TREES, GOLDEN_SKILLS, `GOLDEN_TRAINING`, `WHELP_ACTIVES`, `goldenPassives`),
   merged by `src/rpg/skills.js` (and the lance `ATTACK` params); `src/rpg/stats.js` (his tree keys, `goldenPassives`).
 - Casting: `src/combat/goldenSkills.js` (`installGoldenSkills(SkillRunner.prototype)`: `lineHit`, `cast_lancePoke` and its
-  lunge, `cast_sunbeamThrust`, `cast_bonkDart`, the javelins `gldThrow` / `updateGldJavelins` / `gldJavHit` (the rain, the
-  fling, the Emberleaf's stick and fuse, Good Retriever's scoop), `updateGolden` / `clearGolden`, the `castBlocked` wrapper;
-  Sunbeam Thrust joins the melee reach assist with its line as its reach); `src/combat/goldenArts.js` (the other Lance
+  lunge, `cast_sunbeamThrust`, `cast_eagerJabs` (`gldJab`, `gldJabFx`), `cast_bonkDart`, the javelins `gldThrow` /
+  `updateGldJavelins` / `gldJavHit` (the rain, the fling, the Emberleaf's stick and fuse, Good Retriever's scoop),
+  `updateGolden` / `clearGolden`, the `castBlocked` wrapper; Sunbeam Thrust and Eager Jabs join the melee reach assist, the
+  thrust with its line as its reach); `src/combat/goldenArts.js` (the other Lance
   Arts and Javelins, `gldHit` (the mark), `gldBurn`, `gldSmoulder`, `goldenGuard` (Steady Paws), Good Retriever);
   `src/combat/goldenWhelp.js` (the Whelp Bond: Shadow's moves through `Whelp.act`, the shield's soak, Dragon Heart);
   `src/combat/chargedGolden.js` (the charged releases); `skillRunner.js` routes the lance attack, calls update / clear and

@@ -24,7 +24,7 @@ const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _d = new THREE.Vector3
 const sfx = (n, o) => Events.emit('sfx', n, o);
 const isFoe = e => e.alive && e.team === 'enemy' && !e.breakable;
 const JAV_G = 16;
-const LANCE_IDS = new Set(['sunbeamThrust', 'sunfallJump', 'pinwheelSweep', 'gallantCharge', 'starfallLance']);
+const LANCE_IDS = new Set(['sunbeamThrust', 'eagerJabs', 'sunfallJump', 'pinwheelSweep', 'gallantCharge', 'starfallLance']);
 const EDGE = new THREE.Color('#ffd27a'), CORE = new THREE.Color('#fff6e0');
 
 const M = {

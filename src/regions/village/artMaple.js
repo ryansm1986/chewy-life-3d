@@ -12,7 +12,7 @@ import { Builder, G, V, C, PI, shade } from '../../world/buildings/kit.js';
 import { MODELS } from '../../world/buildings/models.js';
 import * as F from '../assets/mapleFlora.js';
 import * as Pr from '../assets/mapleProps.js';
-import { slotAt, slotOf, screenAt, screenYaw } from './data.js';
+import { slotAt, slotOf, screenAt, screenYaw, PIECE_GLB } from './data.js';
 import { roof } from '../../world/buildings/roofs.js';
 import { foundation, walls, onFace, shoji, roundWindow, latticeWindow, door, engawa, posts, noren as norenPart, STONES } from '../../world/buildings/parts.js';
 import { barrel, crate, toro } from '../../world/buildings/props.js';
@@ -736,7 +736,7 @@ export function decor(VL, ctx, PL, h0) {
   }
   for (const c of cross) {
     const L = Math.hypot(c.tx, c.tz) || 1, tx = c.tx / L, tz = c.tz / L, rot = Math.atan2(tx, tz), y = ctx.heightAt(c.x, c.z);
-    let hooks = []; ctx.prop(B => { hooks = gate(B, { w: 3.6 }); flatten(B); }, { x: c.x, z: c.z, y, rot, seed: 51, occluder: true });
+    let hooks = []; { const o = { x: c.x, z: c.z, y, rot, seed: 51, occluder: true }, k = B => { hooks = gate(B, { w: 3.6 }); flatten(B); }; VL.decorGlb('gate', o, k) || ctx.prop(k, o); } // (Z-D6: its Blender model, if built)
     const co = Math.cos(rot), si = Math.sin(rot);
     for (const hk of hooks) out.lamps.push({ x: c.x + hk[0] * co + hk[2] * si, y: y + hk[1], z: c.z - hk[0] * si + hk[2] * co });
     for (const s of [-1, 1]) solid(c.x + tz * s * 1.8, c.z - tx * s * 1.8, 0.26);
@@ -752,7 +752,7 @@ export function decor(VL, ctx, PL, h0) {
     const x = x1 + nx * (tw + 1.0), z = z1 + nz * (tw + 1.0);
     if (inBuilding(x, z, 0.6)) continue;
     const rot = Math.atan2(-nx, -nz) + PI / 2;
-    let hook = null; ctx.prop(B => { hook = lanternPost(B); flatten(B); }, { x, z, y: ctx.heightAt(x, z), rot, seed: 61 + i, occluder: true });
+    let hook = null; { const o = { x, z, y: ctx.heightAt(x, z), rot, seed: 61 + i, occluder: true }, k = B => { hook = lanternPost(B); flatten(B); }; VL.decorGlb('lanternPost', o, k) || ctx.prop(k, o); }
     solid(x, z, 0.16);
     const c = Math.cos(rot), s = Math.sin(rot);
     out.lamps.push({ x: x + hook[0] * c + hook[2] * s, y: ctx.heightAt(x, z) + hook[1], z: z - hook[0] * s + hook[2] * c, color: '#f6e2b0' });
@@ -882,7 +882,8 @@ export function savedDecor(VL, B, h0) {
     }
     const f = screenAt(S, u, v), yaw = screenYaw({ persimmons: 35, harvest: -30 }[c.saved] ?? 0); // (turned so neither camera yaw sees a rack edge-on)
     B.at([f.x, h0, f.z], yaw, () => {
-      if (c.saved === 'persimmons') { // a hoshigaki drying frame hung with persimmon strings, baskets of fresh fruit
+      if (c.saved === 'persimmons' && PIECE_GLB.hoshigaki) VL.addPieceGlb?.(PIECE_GLB.hoshigaki, f.x, h0, f.z, yaw, { saved: true }); // (the Blender frame, ROADMAP Z-D6)
+      else if (c.saved === 'persimmons') { // a hoshigaki drying frame hung with persimmon strings, baskets of fresh fruit
         for (const sx of [-1, 1]) { const p = G.beam(0.08, 1.55, 0.08, 0.015); p.translate(sx * 0.95, 0.78, -0.2); B.add(p, T.woodMid); }
         for (const y of [1.48, 1.0]) { const r = G.cyl(0.03, 0.03, 2.1, 6); r.rotateZ(PI / 2); r.translate(0, y, -0.2); B.add(r, '#c8b070'); }
         const cap = G.box(2.3, 0.05, 0.4, 0.015); cap.rotateX(0.18); cap.translate(0, 1.6, -0.22); B.add(cap, T.tile);

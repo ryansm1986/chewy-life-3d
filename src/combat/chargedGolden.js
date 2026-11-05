@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { perkAt } from '../rpg/charge.js';
 import { dist, clamp } from '../core/util.js';
+import { jabFrom } from '../actors/goldenPoses.js';
 
 const _v = new THREE.Vector3();
 const isFoe = e => e.alive && e.team === 'enemy' && !e.breakable;
@@ -15,6 +16,9 @@ const M = {
   // ================================================================== Lance Arts
   charged_sunbeamThrust(R, aim, target) {
     this.fromFrame(0.36, () => this.cast_sunbeamThrust(R, aim, target, { stun: R.params.stun || 0, secondSun: perkAt(R, 'secondSun') }));
+  },
+  charged_eagerJabs(R, aim, target) { // (from the chamber the wind-up held: the first jab snaps straight out of it)
+    this.fromFrame(jabFrom(R.params.jabs || 3), () => this.cast_eagerJabs(R, aim, target, { wind: perkAt(R, 'tailWind') }));
   },
   charged_sunfallJump(R, aim, target) {
     const p = R.params;

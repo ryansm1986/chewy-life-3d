@@ -21,9 +21,48 @@ const sfx = (n, o) => Events.emit('sfx', n, o);
 const isFoe = e => e.alive && e.team === 'enemy' && !e.breakable;
 const by = (arr, s) => (Array.isArray(arr) ? arr[Math.max(0, Math.min(arr.length - 1, s - 1))] : arr);
 const perkOf = perkAt; // (its pct scaled to the release's stage)
+/** a point's ground distance from the segment a–b */
+const segDist = (p, a, b) => { const abx = b.x - a.x, abz = b.z - a.z, L = abx * abx + abz * abz, t = L > 1e-9 ? Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.z - a.z) * abz) / L)) : 0; return Math.hypot(p.x - a.x - abx * t, p.z - a.z - abz * t); };
 
 const M = {
   // ================================================================== Bone Blade (the samurai: docs/HEROES.md §8)
+  /** Swallow Return → Swallow's Flight: the two cuts out of the held low guard, harder and a little wider, and the
+   *  return sends a bone-white swallow darting on down the line through every foe in its way (+ Swallow Flock: more of
+   *  them, fanned; + Darting Swallow: at the end of its flight it darts on to more foes nearby) */
+  charged_swallow(R, aim, target) {
+    const G = this.G, P = G.player, p = R.params, s = R.charge.stage, col = C(R.charge.color);
+    const flock = perkOf(R, 'split'), dart = perkOf(R, 'dart'), spread = (R.def.charge.perks.split.spread * Math.PI) / 180;
+    this.fromFrame(0.17, () => this.cast_swallow(R, aim, target), ev => {
+      if (ev === 'hit') { sfx('charge_whoosh', { stage: s, pitch: 1.25 }); return; }
+      if (ev !== 'hit2') return;
+      const o = P.pos.clone(), f = P.facing, fx = bladeFx(G);
+      chargeFx(G).burst(o, { r: p.radius * 0.9, life: 0.32, color: col, w: 0.1, a: 0.7 });
+      sfx('charge_slam', { stage: s, pitch: 1.2 - 0.06 * s });
+      G.engine.rig.shake(0.18 + 0.08 * s); G.engine.hitStop = Math.max(G.engine.hitStop, 0.05 + 0.012 * s);
+      // the swallows: one down the line (the flock: one more either side per rank, at its share of the damage)
+      const n = 1 + (R.charge.perks.split || 0);
+      for (let i = 0; i < n; i++) {
+        const a = n === 1 ? 0 : n === 2 ? (i - 0.5) * spread : (i - 1) * spread, main = n === 1 || i === (n === 2 ? 0 : 1); // (rank 1: a pair either side of the line; rank 2: one down it and one each side)
+        const pctOf = (main ? 1 : (flock?.pct ?? 50) / 100) * p.flyPct / 100, hits = new Set(), dir = _v.set(Math.sin(f + a), 0, Math.cos(f + a)).clone();
+        let darts = main && dart ? dart.n : 0, dartPct = 0;
+        const cut = (e, k) => { hits.add(e); this.combat.hitMonster(e, { dmgPct: p.dmgPct * k, knock: 0.35, from: P.pos }); fx.slash(_w.set(e.pos.x, e.pos.y + (e.height || 1) * 0.5, e.pos.z), _v.set(dir.z, 0.35, -dir.x), { len: 1, width: 0.24, sparks: 3 }); };
+        fx.swallowFly(o, dir, { len: p.fly, speed: 18, r: 0.5 + 0.08 * s, width: 0.26 + 0.03 * s, y: 0.75, onStep: (a0, b0) => {
+          this.combat.inRadius((a0.x + b0.x) / 2, (a0.z + b0.z) / 2, Math.hypot(b0.x - a0.x, b0.z - a0.z) / 2 + p.flyWidth, 'ally', e => {
+            if (hits.has(e) || !isFoe(e)) return;
+            if (segDist(e.pos, a0, b0) > p.flyWidth + (e.radius || 0.3)) return;
+            cut(e, dartPct || pctOf);
+          });
+        }, next: head => {
+          if (darts <= 0) return null;
+          let best = null, bd = dart.r;
+          for (const e of this.combat.entities) { if (!isFoe(e) || hits.has(e)) continue; const d = dist(e.pos.x, e.pos.z, head.x, head.z); if (d < bd) { bd = d; best = e; } }
+          if (!best) return null;
+          darts--; dartPct = dart.pct / 100; dir.set(best.pos.x - head.x, 0, best.pos.z - head.z).normalize();
+          return { dir, len: bd + 0.6 };
+        } });
+      }
+    });
+  },
   /** Helmet Splitter → Mountain Splitter: a longer leap into a bigger split that stuns longer (+ Aftershock: it cracks again) */
   charged_dig(R, aim, target) {
     const G = this.G, P = G.player, p = R.params, s = R.charge.stage, col = C(R.charge.color), after = perkOf(R, 'aftershock');

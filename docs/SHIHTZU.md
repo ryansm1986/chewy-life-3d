@@ -86,12 +86,14 @@ Damage is % of his rolled flail damage with synergies folded in. **Flail Arts** 
 `hexMul`. Hex durations stretch with Lingering Gloom (`d.hexDur`), the stack cap is 3 (+ Grudge Ledger: `d.hexStacks`).
 A hex is gloom damage over time: each stack ticks its dps every 0.5 s (no crits), a new stack refreshes the timer. One hex
 record per foe (`stzHex`): its dps is the strongest hex put on it, its stacks add up to the cap.
-All 21 are built (`SHIHTZU_TRAINING` is empty; it stays as the hook for a future skill held back).
+All 22 are built (`SHIHTZU_TRAINING` is empty; it stays as the hook for a future skill held back). Glum Bonk joined on
+2026-11-03 (the owner: every weapon hero gets a second level-1 weapon attack to spec into right away).
 
 **Flail Arts** (`flail`, Strength, plum `#7a4a7a` / silver)
 | skill | row | what | numbers |
 |---|---|---|---|
-| `woefulWallop` Woeful Wallop | 0 | a deep sigh, the flail wound all the way back, one huge level sweep that sends foes tumbling | lin(140, 15)% · arc min(220, 160 + 3l)° · 2.3 m · knockback 0.9 · cost 3.5 + 0.17(l−1) · syn Weight of the World 3%, Melancholy Maelstrom 3% |
+| `glumBonk` Glum Bonk | 0 (col 0) | the quick, precise one: a hop, the paw shot straight up, the ball brought straight down on the one foe in front of him; a brief daze and a small gloom splat | lin(88, 11)% to one foe · the splat 35% to others within 0.9 m · daze 0.3 + 0.01l s (bosses flinch) · reach 1.45 m · cost 2.6 + 0.1(l−1) · syn Weight of the World 3%, Tug of Woe 4% |
+| `woefulWallop` Woeful Wallop | 0 (col 1) | a deep sigh, the flail wound all the way back, one huge level sweep that sends foes tumbling | lin(140, 15)% · arc min(220, 160 + 3l)° · 2.3 m · knockback 0.9 · cost 3.5 + 0.17(l−1) · syn Weight of the World 3%, Melancholy Maelstrom 3% |
 | `weightOfWorld` Weight of the World | 1 | passive | +25 + 9(l−1)% Flail Arts and swing damage · +1.5 + 0.4(l−1)% crit |
 | `tugOfWoe` Tug of Woe | 1 | the ball flung out on its rope wraps the first foe and hauls it (and those beside it) up to him, dizzy | lin(90, 11)% · reach 8 + 0.15l m · +min(5, 2 + ⌊l/5⌋) foes within 1.6 m of it · daze 0.6 + 0.03l s (bosses flinch, aren't moved) · cost 6 + 0.3(l−1) · cd max(1, 3 − 0.08l) · syn Woeful Wallop 5%, Steadfast Sulk 4% |
 | `maelstrom` Melancholy Maelstrom | 2 | channel: the flail whirled round over his head, foes dragged in and bonked | lin(48, 6)% 3×/s in 2.2 + 0.03l m · pull 1.3 + 0.03l m/s · walk at 60% · 7 + 0.35(l−1) zoom/s · syn Woeful Wallop 5%, The Heaviest Sigh 5% |
@@ -128,6 +130,14 @@ Every skill has its own move (`actors/shihtzuPoses.js`), effects (`gfx/shihtzuFx
   wind-up, whips through the strike and swings on after the pull lets go. The slam's `whirl` leans its circle back
   (`back` 0.26, up 0.92) so the ball stays over the topknot, then comes over the top and down in front. The trail is a
   ribbon following the real ball, sampled every 0.11 m of its path, cream with a ghostlight edge.
+- **Glum Bonk**: `glumBonk` (0.46 at his attack speed × 0.6, about two thirds of the wallop's time): a little hop onto his
+  toes with the paw shot straight up and the ball flicked up behind the topknot, a beat, then the paw chopped straight down
+  the middle so the ball comes over the top onto the spot on his facing; a squash, ears flung, a grumpy mouth.
+  `stzBonk` (combat/shihtzuSkills.js) puts the bonk on the aimed-at foe (else the foe nearest the spot 1.2 m in front; the splat on its near side, where the ball meets it),
+  the splat's share on the others within 0.9 m; `fx.bonk`: a small lumpy gloom splat on the floor (gloom-grey with an ink
+  rim and teal droplets, ≤ 0.75 alpha, 0.9 s), a lilac squash ring, one cream impact star, flung drops, a puff; the daze is
+  the spell kit's dizzy stars. Sound `glum_bonk`: a hollow woodblock knock in the ball's thup, a squashed squeak and a
+  small glum "womp-womp" sliding down.
 - **Woeful Wallop**: `wallop` (eyes closed for the sigh, wound back, one level sweep, a follow-through that turns him half
   round); `fx.sweep`: a bright leading edge (cream to ghostlight) runs round the arc in 0.14 s along a thin band near the
   rim, a short smear behind it, the interior clear, gone by 0.25 s (a shader on a ring sector; the charged near-full circle
@@ -176,17 +186,19 @@ Every skill has its own move (`actors/shihtzuPoses.js`), effects (`gfx/shihtzuFx
   foes, and once rekindles him from a fatal blow ("Rekindled!", a bell chord, the lantern flares and gutters out).
 
 ### 3b. Charged abilities (`src/rpg/chargeShihtzu.js`, releases `src/combat/chargedShihtzu.js`)
-All 15 actives charge with the shared rules (docs/CHARGE.md §1–3): hold past 0.18 s, Stage Ⅰ, Deeper Charge for Ⅱ/Ⅲ,
+All 16 actives charge with the shared rules (docs/CHARGE.md §1–3): hold past 0.18 s, Stage Ⅰ, Deeper Charge for Ⅱ/Ⅲ,
 Quick Wind-up, +50% zoom per stage, a balance tune solved by `node tools/charge-sim.mjs --solve` (his models:
 `tools/charge-sim-shihtzu.mjs`). Each release rides on the real cast through `fromFrame` (the cast's first action starts
 from the frame the wind-up pose held) with its perks as the cast's extras. The wind-ups (`SHIHTZU_CHARGE_POSES`):
-`stzWallop` (the flail wound round behind him, the ball circling low, faster as it fills), `stzWhirlUp` (the ball whirled
+`stzBonk` (up on his toes, the flail held straight up, the ball bobbing in a tight circle behind the topknot, trembling,
+eyes screwed shut at full), `stzWallop` (the flail wound round behind him, the ball circling low, faster as it fills), `stzWhirlUp` (the ball whirled
 overhead), `stzSulk`, `stzSigh` (the held breath), `stzHex` (ghostlight gathering on the raised paw, trembling), `stzHexUp`
 (both paws up), `stzAwoo`, `stzTome`. The full table with every number is docs/CHARGE.md §7 (Flail Arts, Gloom Hexes,
 Ghostlight Tome).
 
 | skill → release | the payoff | perks beyond Deeper Charge / Quick Wind-up |
 |---|---|---|
+| Glum Bonk → *The Glummest Bonk* | a much harder bonk on the one foe, a wider splat (×1.15 / 1.3 / 1.45), a longer daze (+0.3 / 0.5 / 0.8 s), a thud | Bonk Bonk (Echo: the ball bounces and bonks the same spot again 0.35 s later at 50%); ★ Right on the Noggin (always a critical hit on the foe it lands on) |
 | Woeful Wallop → *Grand Wallop* | a wider (up to 330°), longer sweep, harder knockback, a wind at Ⅱ/Ⅲ | ★ Aftershock (the ball slams the floor after the sweep, 60%); ★ Wallop of Woe (everything hit is hexed) |
 | Tug of Woe → *The Big Haul* | further, more foes wrapped and hauled, longer daze | Efficient Focus; ★ Bonk Together (the hauled foes knock heads, 70%) |
 | Melancholy Maelstrom → *Gloom Maelstrom* (channel) | wider, a harder drag, whirls on after you let go | ★ Drifting Gloom (the whirl-out follows the cursor); ★ Last Bonk (a closing slam all round, 120% + daze) |
@@ -221,6 +233,10 @@ life / ((1 − dodge)(1 − block)(1 − armour)(1 − dr)).
 | 45 | dps ×1.02 · eHP ×1.21 · life ×1.19 | ×0.88 (×0.47) |
 
 Both are asserted: the tank at **dps ×0.85–1.05, eHP ×1.15–1.4**, the hex build at **clear ×0.85–1.05**.
+- **Glum Bonk** (`shihtzu·bonk`, a reference build: Glum Bonk, Weight of the World, a point in Woeful Wallop to open Tug of
+  Woe, then Tug of Woe) against the tank: single target ×1.06 / ×1.02 / ×1.01 / ×1.02 at levels 6 / 15 / 30 / 45 (asserted
+  ×0.9–1.1), clear ×0.65 / ×0.59 / ×0.58 / ×0.58 (asserted under ×0.8: the focused one). Its charge (Stage Ⅲ, every perk):
+  ×1.06 / ×1.13 / ×1.21 sustained, tune `dmg [0.75, 0.69, 0.55]`.
 - **The tank**: Woeful Wallop, Weight of the World, then Melancholy Maelstrom and The Heaviest Sigh, on repeat.
 - **The hex build** (`shihtzu·hex`, an Energy build: 50% of the points in Energy, so `hexMul` > 1): one point in each
   rotation skill first (and Case of the Mopes, the prerequisite), then Dripping Paw, Lingering Gloom, Grumble Cloud,
@@ -394,13 +410,13 @@ stays the kit there (`CAST.shihtzu`), as he does if the files are missing.
   `swing=1` loops the combo; `walk=1`; `flails=1` the prop alone; `portrait=1`; `dg=` / `dn=` live grade values; `face=`.
 - `/?test=shihtzu&tints=1` the twelve flail bases' tinted props with their item icons; `&ghosts=1` four pups, Grandpaw and
   the ward's bones on grass and on snow (`fx=` / `fz=` / `fy=` move the camera's focus, `howl` tips Grandpaw's head back).
-- `/?test=rpg&sec=skills&cls=shihtzu` his 21 skill icons.
-- `node tools/qa/shihtzu-shots.mjs [look] [baldric] [idle] [walk] [attack] [woefulWallop] [drippingPaw] [strip] [pack] [wheel]`
+- `/?test=rpg&sec=skills&cls=shihtzu` his 22 skill icons.
+- `node tools/qa/shihtzu-shots.mjs [look] [baldric] [idle] [walk] [attack] [glumBonk] [woefulWallop] [drippingPaw] [strip] [pack] [wheel]`
   — the review shots: the village round him at the game camera; `baldric`: the flail on his back walking and sprinting across
   the plaza, the camera at both rear and both front 45° yaws; the Burrow idle, walking, each move frozen through; `strip`:
   each swing frozen at ten moments (`--view game|front`, `--only swing1,slam,…`), then `python tools/qa/sheet.py
   tools/qa/tmp/shihtzu-shots/strip-<name>.txt <out.png> 5 320`; **`pack`**: real fights in Bamboo Depths B1F (a room away
-  from the entrance, a crowd of 18 of its kinds closing in), each of his 15 actives cast into the crowd and frozen at its
+  from the entrance, a crowd of 18 of its kinds closing in), each of his 16 actives cast into the crowd and frozen at its
   moment (`--stage 3`: the charged releases, every perk; `--only id,…`), and **`all`**: the pups, Grandpaw, the ward, the
   lantern, the cloud, the mopes, the great hex, a paw, the threads and the awoo up at once; the wheel and HUD with four heroes.
   Output `tools/qa/tmp/shihtzu-shots/` (gitignored).

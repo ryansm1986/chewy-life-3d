@@ -28,6 +28,7 @@ import { Events } from '../core/events.js';
 import { computeStats, xpToNext, LEVEL_CAP } from './stats.js';
 import { SKILLS, canLearn } from './skills.js';
 import { learnPerk as learnPerkIn, perkPoints } from './charge.js';
+import { learnComboPerk as learnComboPerkIn, comboPerkPoints, migrateComboPerks } from './combo.js';
 import { starterItems, starterStaff, starterFuma, starterFlail, starterLance, starterParasol, generateItem, EQUIP_SLOT_ITEM, meetsReq, socketGem, POTIONS, targetSlot, SET_ITEMS, renameLegacyItem, renameTreat } from './items.js';
 import { CLASSES, HERO_IDS, canWield, WEAPON_CLASS } from './classes.js';
 import { uid as rid } from '../core/util.js';
@@ -120,6 +121,7 @@ export function normalizeHeroes(st) {
   // gems became Treats (R-22): the old names follow, in every container and socketed in every hero's gear (items.js)
   for (const id in st.heroes) for (const k in st.heroes[id].equipment) renameTreat(st.heroes[id].equipment[k]);
   for (const list of [st.inventory, st.stash, st.lostFound]) for (const it of list || []) renameTreat(it);
+  migrateComboPerks(st); // (combo perks, per hero: an older save's heroes get {}; rpg/combo.js, docs/COMBO.md)
   migrateStash(st); // (the stash tabs, R-19: an old 60-slot stash is tab 1; rpg/stash.js)
   packSave(st); // (items take up space, R-20: an older save's bag and stash are packed once; rpg/stash.js)
   return st;
@@ -242,11 +244,11 @@ export function createActions(G) {
     const P = S().player, wt = setWeaponType(i);
     const pref = wt === 'ball' ? ['throw', 'ricochet', 'multi', 'blaze', 'fetchstorm', 'decoy']
       : wt === 'staff' ? ['splash', 'kibble', 'feathers', 'moonbeam', 'constellation', 'whirlpool', 'shake', 'greatWave', 'meteor']
-      : wt === 'fuma' ? ['fumaThrow', 'kunaiFan', 'puffBall', 'shadowStep', 'thunderPaw', 'shadowStitch', 'shurikenRain', 'smokeDragon', 'thousandStars']
-      : wt === 'flail' ? ['woefulWallop', 'drippingPaw', 'tugOfWoe', 'maelstrom', 'grumbleCloud', 'borrowedWarmth', 'mournfulAwoo', 'heaviestSigh', 'everlastingGloom']
-      : wt === 'lance' ? ['sunbeamThrust', 'bonkDart', 'pinwheelSweep', 'tailwagVolley', 'trueFlight', 'emberBreath', 'sunfallJump', 'gallantCharge', 'emberleafJavelin']
+      : wt === 'fuma' ? ['fumaThrow', 'fumaFlurry', 'kunaiFan', 'puffBall', 'shadowStep', 'thunderPaw', 'shadowStitch', 'shurikenRain', 'smokeDragon', 'thousandStars']
+      : wt === 'flail' ? ['woefulWallop', 'glumBonk', 'drippingPaw', 'tugOfWoe', 'maelstrom', 'grumbleCloud', 'borrowedWarmth', 'mournfulAwoo', 'heaviestSigh', 'everlastingGloom']
+      : wt === 'lance' ? ['sunbeamThrust', 'eagerJabs', 'bonkDart', 'pinwheelSweep', 'tailwagVolley', 'trueFlight', 'emberBreath', 'sunfallJump', 'gallantCharge', 'emberleafJavelin']
       : wt === 'parasol' ? ['goldenRay', 'solarFlare', 'kindLight', 'prism', 'skippingSun', 'glint', 'sunspot', 'morningLight', 'halo']
-      : ['chomp', 'dig', 'whirl', 'bonestorm'];
+      : ['chomp', 'swallow', 'dig', 'whirl', 'bonestorm'];
     let best = null;
     pref.forEach((id, k) => { if (!knows(id)) return; const sc = (P.skills[id] || 0) * 10 - k * (k < 4 ? 1 : 25); if (!best || sc > best.sc) best = { id, sc }; });
     return best ? best.id : null;
@@ -705,6 +707,14 @@ export function createActions(G) {
     emit('stats:changed', d());
     return r.rank;
   }
+  /** Spend a skill point on a skill's combo perk (docs/COMBO.md §3; rules in combo.js canLearnComboPerk). → rank | false */
+  function learnComboPerk(id, perkId) {
+    const r = learnComboPerkIn(S(), id, perkId);
+    if (!r.ok) { if (r.why && r.why !== 'Mastered!') toast(r.why, '#ff6a5a'); return false; }
+    emit('comboPerk:learned', { id, perk: perkId, rank: r.rank });
+    emit('stats:changed', d());
+    return r.rank;
+  }
   function addStat(key) {
     const P = S().player;
     if (!STAT_KEYS.includes(key) || P.statPts <= 0) return false;
@@ -791,6 +801,7 @@ export function createActions(G) {
     let kp = 0;
     for (const id in P.skills) kp += P.skills[id];
     kp += perkPoints(S()); P.chargePerks = {}; // (charge perks refund too)
+    kp += comboPerkPoints(S()); P.comboPerks = {}; // (and combo perks: docs/COMBO.md)
     P.skills = {};
     P.statPts += sp;
     P.skillPts += kp;
@@ -898,7 +909,7 @@ export function createActions(G) {
   const api = {
     // contract
     equip, unequip, swapWeapons, moveItem, dropItem, pickup, usePotion, sellItem, buyItem, learnSkill, addStat,
-    setHotbar, addXp, addXpTo, addCoins, spendCoins, addMaterial, hasMaterials, spendMaterials, recompute, learnPerk,
+    setHotbar, addXp, addXpTo, addCoins, spendCoins, addMaterial, hasMaterials, spendMaterials, recompute, learnPerk, learnComboPerk,
     // extras
     tickRegen, activeHots, addPotion, heal, restoreZoom, spendZoom, damage, restoreAll, life, zoom,
     addSkillPts, addStatPts, respec, resetStats, setAutoStats, spendAutoNow, socket, getItem, firstFree, canEquip, equipProblem, setPieces,

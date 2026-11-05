@@ -32,7 +32,7 @@ export function randomVillagerSpec(rng = Math.random) {
   const fur = pick(furs);
   const top = pick(TOPS);
   const spec = {
-    name: pick(NAMES), species, fur, fur2: '#fff8f0', voice: 0.8 + rng() * 0.8, seed: Math.floor(rng() * 1e6),
+    name: pick(NAMES), species, fur, fur2: '#fff8f0', townsfolk: true, voice: 0.8 + rng() * 0.8, seed: Math.floor(rng() * 1e6),
     outfit: { top, topColor: pick(COLORS), topColor2: '#ffffff', bottomColor: pick(['#4a4a6a', '#6a4a3a', '#3a5a8a', '#5a3a5a']), bottom: rng() < 0.3 ? 'shorts' : undefined, hat: pick(HATS), hatColor: pick(COLORS), sash: top === 'kimono' ? pick(COLORS) : undefined, apron: rng() < 0.12 ? '#fff6e8' : undefined },
   };
   if (top === 'none') { // fur + one signature accessory

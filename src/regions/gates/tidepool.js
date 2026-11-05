@@ -47,8 +47,8 @@ function poolMat() {
 export const TIDEPOOL_GATE = {
   seal: '#8ff4ff',
   lanternI: 2.0, // (dungeonGate's lantern lights when it opens: soft, the full 4.5 paints a pink pool on the bright sand)
-  glb: { url: null, scale: 1, yaw: 0, y: 0 },
-  build({ main, dress, lp, gx, gz, yaw, rim, W }) {
+  glb: { url: '/models/gate-tidepool.glb', scale: 1, yaw: 0, y: 0 },
+  build({ main, frame, dress, lp, gx, gz, yaw, rim, W }) {
     // the cliff: the grotto arch (open toward local +z, ~9 m wide), its throat glowing teal, sunk a little into the sand
     const arch = cached('arch', () => TA.grottoMouth(11));
     put(main, arch, gx, rim - 0.3, gz, yaw);
@@ -56,7 +56,7 @@ export const TIDEPOOL_GATE = {
     const rocks = [[-5.6, -1.6, 1.0, 2], [5.4, -1.8, 0.95, 3], [-2.2, -4.2, 1.25, 4], [2.6, -4.4, 1.2, 5], [0, -5.6, 1.4, 6]];
     for (const [lx, lz, s, v] of rocks) { const [x, z] = lp(lx, lz); put(main, cached('st' + v, () => TA.seaStack(60 + v, 4.2, 1.6)), x, Math.min(rim, W.heightAt(x, z)) - 0.4, z, v * 1.3, s); }
     // the driftwood rope gate before the mouth: two posts, a sagging shimenawa, glass floats in their nets
-    { const [x, z] = lp(0, 2.2); dress.piece(TA.arenaGate(8), x, z, yaw, { y: rim }); for (const e of [-1, 1]) { const [px, pz] = lp(e * 1.65, 2.2); W.collision.addCircle(px, pz, 0.3); } }
+    { const [x, z] = lp(0, 2.2); frame.piece(TA.arenaGate(8), x, z, yaw, { y: rim }); for (const e of [-1, 1]) { const [px, pz] = lp(e * 1.65, 2.2); W.collision.addCircle(px, pz, 0.3); } }
     // two shore lanterns (lit when the seal breaks)
     const lanterns = [];
     for (const e of [-1, 1]) { const [x, z] = lp(e * 2.55, 3.3); dress.piece(cached('lamp', () => TA.shoreLamp(1)), x, z, yaw - e * 0.5, { y: W.heightAt(x, z), lights: false }); W.collision.addCircle(x, z, 0.28); lanterns.push(V(x, W.heightAt(x, z) + 1.45, z)); }

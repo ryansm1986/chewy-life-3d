@@ -220,6 +220,7 @@ export class Combat {
       // frenzy stacks on hit
       const fr = G.state.player.skills.frenzy;
       if (fr) { const p = G.skillParams?.('frenzy'); if (p) { const b = this.buffs.frenzy ||= { stacks: 0, t: 0 }; b.stacks = Math.min(p.maxStacks, b.stacks + 1); b.t = p.duration; b.per = p.perStack; } }
+      if (G.skills?.chain?.fin) G.skills.chain.onHit(m); // (a combo finisher landing: its flourish, Tempo — combat/combo.js)
     }
     this.applyDamageToMonster(m, dmg, { element: r.element || element, crit: r.crit, knock, stun, from, silent, look });
     return dmg;

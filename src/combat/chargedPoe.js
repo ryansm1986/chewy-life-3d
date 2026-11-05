@@ -14,6 +14,10 @@ const M = {
     const o = { size: R.params.size, orbit: orbit ? { t: by(orbit.t, s), r: orbit.r, every: orbit.every, pct: orbit.pct } : null, twin: k.split ? { n: k.split, pct: split.pct } : null };
     this.fromFrame(0.4, () => this.cast_fumaThrow(R, aim, target, o));
   },
+  charged_fumaFlurry(R, aim, target) {
+    const s = R.charge.stage, p = R.params;
+    this.fromFrame(0.14, () => this.cast_fumaFlurry(R, aim, target, { charged: true, groove: { len: p.groove, pct: p.groovePct }, spin: s >= 3 ? perkAt(R, 'spinCycle') : null }));
+  },
   charged_kunaiFan(R, aim, target) {
     const o = { tags: perkAt(R, 'tags') }; // (Bigger Pawful's kunai are in R.params.extra)
     this.fromFrame(0.42, () => this.cast_kunaiFan(R, aim, target, o));

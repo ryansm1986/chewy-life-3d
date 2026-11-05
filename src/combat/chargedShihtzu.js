@@ -8,6 +8,9 @@ import { perkAt } from '../rpg/charge.js';
 
 const M = {
   // ================================================================== Flail Arts
+  charged_glumBonk(R, aim, target) {
+    this.fromFrame(0.36, () => this.cast_glumBonk(R, aim, target, { big: true, echo: perkAt(R, 'echo'), crit: !!perkAt(R, 'noggin') }));
+  },
   charged_woefulWallop(R, aim, target) {
     const p = R.params;
     this.fromFrame(0.5, () => this.cast_woefulWallop(R, aim, target, { stun: p.stun, aftershock: perkAt(R, 'aftershock'), woe: perkAt(R, 'woe') }));

@@ -1,0 +1,340 @@
+{
+  "units": "metres (final, crown 0.76 m, ear tips 0.95 m)",
+  "coordinate_system": "Blender Z-up, front -Y; character left is +X",
+  "hips": [
+    0.0,
+    0.002,
+    0.175
+  ],
+  "spine": [
+    0.0,
+    0.0,
+    0.27
+  ],
+  "chest": [
+    0.0,
+    0.0,
+    0.37
+  ],
+  "neck": [
+    0.0,
+    0.01,
+    0.45
+  ],
+  "head": [
+    0.0,
+    0.00808,
+    0.59028
+  ],
+  "head_nod_pivot_suggested": [
+    0.0,
+    0.00808,
+    0.47312
+  ],
+  "jaw_pivot": [
+    0.0,
+    -0.10504,
+    0.5216
+  ],
+  "eyes": {
+    "R": [
+      -0.0881,
+      -0.13358,
+      0.61652
+    ],
+    "L": [
+      0.0881,
+      -0.13358,
+      0.61652
+    ]
+  },
+  "eye_axes": {
+    "R": {
+      "out_deg": 22.3,
+      "down_deg": -8.3
+    },
+    "L": {
+      "out_deg": 22.3,
+      "down_deg": -8.3
+    }
+  },
+  "lash": {
+    "R": {
+      "top": [
+        -0.094,
+        -0.1322,
+        0.6619
+      ],
+      "root": [
+        -0.0491,
+        -0.152,
+        0.6296
+      ],
+      "outer_end": [
+        -0.126,
+        -0.1261,
+        0.5947
+      ],
+      "flick_tips": [
+        [
+          -0.144,
+          -0.0985,
+          0.6613
+        ],
+        [
+          -0.1596,
+          -0.0865,
+          0.6455
+        ]
+      ],
+      "max_proud_W": 0.0075
+    },
+    "L": {
+      "top": [
+        0.094,
+        -0.1322,
+        0.6619
+      ],
+      "root": [
+        0.0491,
+        -0.152,
+        0.6296
+      ],
+      "outer_end": [
+        0.126,
+        -0.1261,
+        0.5947
+      ],
+      "flick_tips": [
+        [
+          0.144,
+          -0.0985,
+          0.6613
+        ],
+        [
+          0.1596,
+          -0.0865,
+          0.6455
+        ]
+      ],
+      "max_proud_W": 0.0075
+    }
+  },
+  "ears": {
+    "R": {
+      "base": [
+        -0.0606,
+        0.02505,
+        0.68724
+      ],
+      "mid": [
+        -0.08349,
+        0.02886,
+        0.81442
+      ],
+      "tip": [
+        -0.10638,
+        0.03268,
+        0.9416
+      ]
+    },
+    "L": {
+      "base": [
+        0.0606,
+        0.02505,
+        0.68724
+      ],
+      "mid": [
+        0.08349,
+        0.02886,
+        0.81442
+      ],
+      "tip": [
+        0.10638,
+        0.03268,
+        0.9416
+      ]
+    }
+  },
+  "kerchief_knot": [
+    0.0,
+    -0.13374,
+    0.41
+  ],
+  "kerchief_ends": {
+    "R": {
+      "top": [
+        -0.00446,
+        -0.12782,
+        0.40601
+      ],
+      "tip": [
+        -0.07877,
+        -0.13481,
+        0.33946
+      ],
+      "centre": [
+        -0.04162,
+        -0.13131,
+        0.37273
+      ]
+    },
+    "L": {
+      "top": [
+        0.00446,
+        -0.12782,
+        0.40601
+      ],
+      "tip": [
+        0.07877,
+        -0.13481,
+        0.33946
+      ],
+      "centre": [
+        0.04162,
+        -0.13131,
+        0.37273
+      ]
+    }
+  },
+  "obi_plate": [
+    0.0,
+    0.14294,
+    0.309
+  ],
+  "sleeves": {
+    "L": {
+      "opening_centre": [
+        0.18147,
+        0.0,
+        0.34607
+      ],
+      "opening_half_sizes_m": [
+        0.062,
+        0.068
+      ]
+    },
+    "R": {
+      "opening_centre": [
+        -0.18147,
+        0.0,
+        0.34607
+      ],
+      "opening_half_sizes_m": [
+        0.062,
+        0.068
+      ]
+    }
+  },
+  "arms": {
+    "L": {
+      "shoulder": [
+        0.112,
+        0.0,
+        0.418
+      ],
+      "elbow": [
+        0.1641,
+        0.0,
+        0.36405
+      ],
+      "wrist": [
+        0.19536,
+        0.0,
+        0.33168
+      ]
+    },
+    "R": {
+      "shoulder": [
+        -0.112,
+        0.0,
+        0.418
+      ],
+      "elbow": [
+        -0.1641,
+        0.0,
+        0.36405
+      ],
+      "wrist": [
+        -0.19536,
+        0.0,
+        0.33168
+      ]
+    }
+  },
+  "legs": {
+    "L": {
+      "hip": [
+        0.075,
+        0.002,
+        0.175
+      ],
+      "knee": [
+        0.079,
+        -0.004,
+        0.115
+      ],
+      "ankle": [
+        0.084,
+        0.0,
+        0.058
+      ],
+      "toe": [
+        0.10316,
+        -0.12319,
+        0.026
+      ]
+    },
+    "R": {
+      "hip": [
+        -0.075,
+        0.002,
+        0.175
+      ],
+      "knee": [
+        -0.079,
+        -0.004,
+        0.115
+      ],
+      "ankle": [
+        -0.084,
+        0.0,
+        0.058
+      ],
+      "toe": [
+        -0.10316,
+        -0.12319,
+        0.026
+      ]
+    }
+  },
+  "tail": [
+    [
+      0.0,
+      0.15701,
+      0.222
+    ]
+  ],
+  "palm_R": [
+    -0.21883,
+    0.0,
+    0.29874
+  ],
+  "palm_L": [
+    0.21883,
+    0.0,
+    0.29874
+  ],
+  "notes": [
+    "Phase 1: no rig, weights or animations. Same keys as the Chiku / Usagi joints.json (final metres).",
+    "head = the head centre (the radial origin); head_nod_pivot_suggested = base of the skull, for the rig.",
+    "Head skin = zero surface of one convex implicit ball (mochi skull + full jaw + two muzzle puffs + nose), analytic normals, toon-band refinement; no eye sockets.",
+    "Upper lash lines: separate rolls with two flicks each (Shirayuki_lash_L / _R), origin at the eye centre, for the upper lids.",
+    "Eyelid holes ringed by 6 loops each with the rim rolled in behind separate lens eyeballs; 3 loops round the mouth (the puffs' lower edge), 4 round the nose.",
+    "Ears: separate pieces (Shirayuki_ear_L / _R), 32 rings along the axis (bend loops), pivot = ears.base (buried in the skull).",
+    "Kerchief: Shirayuki_kerchief (band + knot) rides the chest / neck, pivot = kerchief_knot; the two leaf ends are separate (Shirayuki_kerchief_end_L / _R), pivot = their top.",
+    "Kimono, obi, obi plate, lapel, under-collar, trousers and feet are Shirayuki_body; each sleeve rides its arm (Shirayuki_arm_L / _R).",
+    "Tail: Shirayuki_tail, a small closed ball, pivot = tail[0].",
+    "The trousers are one closed piece with a split between the legs; the arms carry rings along the forearm and wrist."
+  ]
+}

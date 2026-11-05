@@ -3,7 +3,8 @@
 //  - the region boss no longer spawns outdoors (it waits on the dungeon's floor 2: dungeon/zoneRun.js);
 //  - the gate stands on the clearing's far rim, facing the camera, in the zone's own look (./gates/<zone>.js: for the
 //    Bamboo Depths a mossy cave mouth in a rock outcrop with bamboo on top, a weathered torii, stone lanterns); a look
-//    can name a Blender model (look.glb.url, ROADMAP Z-D6) that replaces the kit gate's own mass when it loads;
+//    can name a Blender model (look.glb.url, ROADMAP Z-D6) that replaces the kit gate's own mass and its torii (the
+//    look's `main` and `frame` Placers) when it loads;
 //  - it is SEALED until the zone's village is saved (rpg/zones.js villageSaved): a curtain of light across the mouth,
 //    paper charms round it and a "!" over it; F says what's needed. 'village:saved' { zone } unseals it live: the
 //    charms fly off, the curtain bursts, the lanterns light;
@@ -42,18 +43,18 @@ export function installGate(mode) {
   const gx = A.x + fx * R, gz = A.z + fz * R, rim = W.heightAt(A.x + fx * (A.r - 0.5), A.z + fz * (A.r - 0.5)), yaw = Math.atan2(-fx, -fz);
   const lp = (lx, lz) => [gx + Math.cos(yaw) * lx + Math.sin(yaw) * lz, gz - Math.sin(yaw) * lx + Math.cos(yaw) * lz]; // local → world
   const look = gateLook(zone);
-  const main = new Placer({ heightAt: (x, z) => W.heightAt(x, z), name: 'dungeonGateMain' }), dress = new Placer({ heightAt: (x, z) => W.heightAt(x, z), name: 'dungeonGate' });
-  const built = look.build({ main, dress, lp, gx, gz, yaw, rim, W, V });
+  const main = new Placer({ heightAt: (x, z) => W.heightAt(x, z), name: 'dungeonGateMain' }), frame = new Placer({ heightAt: (x, z) => W.heightAt(x, z), name: 'dungeonGateFrame' }), dress = new Placer({ heightAt: (x, z) => W.heightAt(x, z), name: 'dungeonGate' });
+  const built = look.build({ main, frame, dress, lp, gx, gz, yaw, rim, W, V });
   const lanterns = built.lanterns || [], mouth = built.mouth || { lz: 0.2, w: 2.5, h: 2.7 };
-  const gMain = main.build(), gDress = dress.build(); W.scene.add(gMain, gDress);
-  W.disposers.push(() => { main.dispose(); dress.dispose(); });
+  const gMain = main.build(), gFrame = frame.build(), gDress = dress.build(); W.scene.add(gMain, gFrame, gDress);
+  W.disposers.push(() => { main.dispose(); frame.dispose(); dress.dispose(); });
   // the rock blocks: colliders round the gate's mass, the monsters' grid closed under it
   for (const [lx, lz, r] of built.colliders || []) { const [x, z] = lp(lx, lz); W.collision.addCircle(x, z, r); W.blockCells?.(x, z, r * 0.8); }
   // the Blender gate (when the look names one): it takes the kit gate's place once loaded
   if (look.glb?.url) loadGlb(look.glb.url).then(tpl => {
     if (G.dungeon !== mode || !W.scene) return;
     const o = glbInstance(tpl, { outline: true }); o.position.set(gx, rim + (look.glb.y || 0), gz); o.rotation.y = yaw + (look.glb.yaw || 0); o.scale.setScalar(look.glb.scale || 1);
-    W.scene.add(o); gMain.visible = false; W.disposers.push(() => o.removeFromParent());
+    W.scene.add(o); gMain.visible = gFrame.visible = false; W.disposers.push(() => o.removeFromParent());
   }).catch(e => console.warn('[gate] model', e));
   // ---- the seal: a curtain of light across the mouth, paper charms round it, a "!" over it
   const [mx, mz] = lp(0, mouth.lz);

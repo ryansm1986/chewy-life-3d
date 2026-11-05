@@ -8,12 +8,13 @@ import { instantiate, MATS, Builder } from '../world/buildings/kit.js';
 import { mailbox as mailboxProp } from '../world/buildings/props.js';
 import { FENCE_COLORS, cleanStyle } from '../world/buildings/styles.js';
 import { BUILDINGS } from '../world/buildings/index.js';
+import { withExtGlb } from './extGlb.js';
 
 // the new models (home/exteriorModels.js) when they're there; a stand-in until then
 const EXT = import.meta.glob('./exteriorModels.js', { eager: true })['./exteriorModels.js'] || {};
 let _stand = null;
 function mailboxTpl() {
-  if (EXT.mailboxTemplate) return EXT.mailboxTemplate();
+  if (EXT.mailboxTemplate) return withExtGlb('mailbox', EXT.mailboxTemplate()); // (its Blender model once built and loaded)
   if (_stand) return _stand;
   const B = new Builder(4711); mailboxProp(B, '#e8403a'); _stand = B.finish(); return _stand;
 }

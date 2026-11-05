@@ -16,7 +16,11 @@ shape. The owner moved the model to an Opus agent, which rebuilt the head as a b
   - 2–3 for the model;
   - 4 for the rig;
   - 5 for the face fixes: shading triangulation, blink and squint;
-  - 6 for the owner's "her head isn't round like the other chibis": a bigger, chubbier head (W 0.52 m) and a lower crown.
+  - 6 for the owner's "her head isn't round like the other chibis": a bigger, chubbier head (W 0.52 m) and a lower crown;
+  - 7 and 7c for the owner's "make the shape consistent to others", "more hair curls hanging" and "her face still
+    protrudes too far out": the face fills a round head (W 0.62 m), the hair hugs the skull, seven ringlets, the face
+    pulled back under the bangs;
+  - 8 for the rig of that head (and the in-game lid fixes, below).
 - `build_rosie-opus.py`: the deterministic model build.
   - It paints the atlas, saves `rosie-opus.blend`, writes `joints.json` and `measurements.json`, and exports
     `public/models/rosie-opus.glb` (an absolute path; a rebuild rewrites the same bytes).
@@ -35,15 +39,16 @@ Rebuild (from a copy of this folder, so the outputs don't land in git):
 ```bash
 cp -r tools/blender/codex/assets/rosie-toy tools/blender/work/codex/rosie-rebuild && cd tools/blender/work/codex/rosie-rebuild
 blender --background --factory-startup --python rig_rosie-opus.py
-blender --background rosie-opus_rig.blend --python ../../../codex/hero_export.py -- --out export --name rosie_toy --height 1.29
+blender --background rosie-opus_rig.blend --python ../../../codex/hero_export.py -- --out export --name rosie_toy --height 1.422
 python ../../../codex/install_rig.py export rosie_toy
 ```
 
 **In the game** (`HERO_MODELS.rosie` in `src/actors/heroModels.js`; `game.js` hands her Villager this rig when it's loaded):
 - **`darkGrade` [0.4, -10, 6, 4]**: the warm grade turned her chocolate hair maroon.
 - **`wave: 'out'`**: the wave and happy-hop raise her arms outward, since inward-up hid her hands in her curls.
-- **`squint` [0.40, -0.26]**: her happy lids.
-- **`hat`**: the nightcap anchor.
+- **`lidTilt` 0.4887**: her eyes face 28° outward, so the lids hinge on each eye's own axis.
+- **`squint` [0.30, -0.24]**: her happy lids (the lower lid is built for −0.24).
+- **`noNightcap`**: her big bow is part of the hair on the head bone and pokes through any cap, so she sleeps in her bow.
 
 The portrait framing is in `gfx/portraits.js`. Without these files she falls back to the kit `CAST.rosie`.
 
@@ -77,3 +82,24 @@ The portrait framing is in `gfx/portraits.js`. Without these files she falls bac
   `tools/blender/work/codex/rosie-opus/installed-backup-1017/` (the archive rebuilt it byte for byte before this round).
 - `public/models/rosie-opus.glb`, `joints.json` and `measurements.json` (the non-rig build's outputs) were not rebuilt.
   The game uses only the rig.
+
+**The round head (2026-10-28, Opus agents, feedback 7–8; working folder `tools/blender/work/codex/rosie-round/`).**
+- **Model (7, 7c, approved):**
+  - Face W 0.62 m, filling the head.
+  - Head plus hair 1.127 W wide and 0.998 W deep (Mochi ≈ 1.03).
+  - Nose to ear 0.41 W, the under-chin short and tucked, the eyes facing 28° out.
+  - Seven ringlets: four at the sides, three at the back.
+- **Rig (8):**
+  - The trim to the 38k cap: ringlets 12 → 10 sides, curls n 6 → 5, a coarser hair base. It's invisible at the game camera.
+  - The ringlets are rigid to the head: every blend toward the neck that cleared the sleeves smeared the coils. At a
+    ±0.6 turn they touch the sleeve tops by 1.5–1.9 cm, unseen.
+  - The bow is pinned to its approved seat.
+- **Lids, judged in the game (`tools/qa/villager-face.mjs`, `RIG_DIR=` an export):**
+  - The Blender renders hid a pale raised disc on the shut lid and pale squint patches.
+  - The cause: one normal per lid vertex can't match a near-flat face both shut and at squint (about 37° apart). The lid
+    colour was also baked with the blush off.
+  - The upper lid now carries the skin's exact normals when shut, and the skin's own paint, blush on.
+  - The lower lid is the eyeball's surface plus 1.2 mm at −0.24.
+  - That is why `squint` is [0.30, −0.24]: at 0.488 the pale patch returns.
+  - Known: a faint lid outline on her right eye at the 0.85 blink frame.
+- 21,169 vertices, 37,988 triangles, no export warnings; two exports are byte-identical.

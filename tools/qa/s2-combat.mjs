@@ -25,7 +25,7 @@ try {
   // in-page stress loop (keeps timing tight, no CDP round-trips per cast)
   await page.evaluate((DUR) => new Promise(res => {
     const G = window.G, QA = window.QA, V = G.THREE.Vector3;
-    const ids = ['attack', 'chomp', 'dig', 'bonestorm', 'throw', 'ricochet', 'multi', 'decoy', 'blaze', 'fetchstorm', 'woof', 'zoom', 'packcall', 'treat', 'howl', 'moonhowl'];
+    const ids = ['attack', 'chomp', 'swallow', 'dig', 'bonestorm', 'throw', 'ricochet', 'multi', 'decoy', 'blaze', 'fetchstorm', 'woof', 'zoom', 'packcall', 'treat', 'howl', 'moonhowl'];
     QA.stress = { casts: 0, ok: 0, byId: {}, anomalies: [], samples: 0, whirlTicks: 0, teleports: 0, castErr: [] };
     let k = 0, t0 = performance.now(), whirlUntil = 0;
     const S = QA.stress;
@@ -72,7 +72,7 @@ try {
   R.check('no exceptions thrown by tryCast/update during stress', !S.castErr.length, S.castErr.slice(0, 3).join(' | '));
   const anomalies = [...new Set(S.anomalies)];
   R.check('player never NaN / inside rock / off-map', !anomalies.length, anomalies.slice(0, 6).join(' | '));
-  const allFired = ['attack', 'chomp', 'dig', 'bonestorm', 'throw', 'ricochet', 'multi', 'decoy', 'blaze', 'fetchstorm', 'woof', 'zoom', 'packcall', 'treat', 'howl', 'moonhowl', 'whirl'].filter(id => !(S.started || {})[id] && !S.byId[id]);
+  const allFired = ['attack', 'chomp', 'swallow', 'dig', 'bonestorm', 'throw', 'ricochet', 'multi', 'decoy', 'blaze', 'fetchstorm', 'woof', 'zoom', 'packcall', 'treat', 'howl', 'moonhowl', 'whirl'].filter(id => !(S.started || {})[id] && !S.byId[id]);
   R.check('every skill was actually cast at least once', !allFired.length, allFired.length ? 'never started: ' + allFired.join(',') : '');
   await sleep(page, 2500);
   const after = await page.evaluate(() => ({ kills: window.QA.counts['monster:killed'] || 0, xp: window.G.state.player.xp + window.G.state.player.lvl * 1e7, xp0: window.QA.xp0, loot: window.G.dungeon.loot.list.length, drops: window.QA.sfx.filter(s => s === 'drop_item').length, alive: window.G.dungeon.monsters.filter(m => m.alive).length, orbits: window.G.skills.orbits.length, pups: (window.G.skills.pups || []).filter(p => p.alive).length, decoys: (window.G.skills.decoys || []).filter(d => d.alive).length, zones: window.G.combat.zones.length, proj: window.G.combat.projectiles.length }));

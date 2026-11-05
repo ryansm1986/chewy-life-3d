@@ -80,7 +80,7 @@ function setLevel(G, id, L) {
   if (L >= old) { P.statPts += 5 * (L - old); P.skillPts += L - old; }
   else {
     const f = newHeroState(id).player;
-    P.stats = { ...CLASSES[id].base }; P.skills = { ...f.skills }; P.hotbar = [...f.hotbar]; P.mouseSets = f.mouseSets.map(p => [...p]); P.chargePerks = {};
+    P.stats = { ...CLASSES[id].base }; P.skills = { ...f.skills }; P.hotbar = [...f.hotbar]; P.mouseSets = f.mouseSets.map(p => [...p]); P.chargePerks = {}; P.comboPerks = {};
     P.statPts = 5 * (L - 1); P.skillPts = f.skillPts + L - 1;
   }
   P.lvl = L; P.xp = 0; P.life = null; P.zoom = null;

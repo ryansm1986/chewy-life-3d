@@ -2,6 +2,7 @@
 // objective (this.lead: actors/shadowLead.js).
 import * as THREE from 'three';
 import { Actor } from './actor.js';
+import { Traverse } from './traverse.js';
 import { buildBoston, enableXray } from './charKit.js';
 import { heroModelReady, buildHeroModel } from './heroModels.js';
 import { Events } from '../core/events.js';
@@ -20,6 +21,7 @@ export class Companion extends Actor {
   constructor(world, G) {
     super(world, heroModelReady('shadow') ? buildHeroModel('shadow') : buildBoston(), { radius: 0.22, speed: 4.2, name: 'Shadow' }); // the baked Toybox Shadow when loaded
     this.G = G;
+    this.trav = new Traverse(this, { kind: 'quad' }); // (he paddles after the hero and climbs the cliffs too: actors/traverse.js)
     enableXray(this.rig, '#9fc8ff', 0.55);
     this.state = 'follow'; this.stateT = 0;
     this.wanderTarget = null;
@@ -148,6 +150,7 @@ export class Companion extends Actor {
   // moveTo that detours round walls when the straight line is blocked (line of sight re-checked 4x a second; a route is
   // only searched while it is blocked, at most every 0.4 s)
   follow(x, z, dt, mul, stop) {
+    if (this.G.player?.trav?.busy || this.trav?.busy) return this.moveTo(x, z, dt, mul, stop); // (the hero's swimming or climbing: straight after him, the routes don't cross water or rock)
     const nav = navFor(this.world);
     if (nav && (this.losT -= dt) <= 0) { this.losT = 0.25; this.routed = !nav.los(this.pos.x, this.pos.z, x, z); if (!this.routed) this.route.clear(); }
     if (!nav || !this.routed) return this.moveTo(x, z, dt, mul, stop);

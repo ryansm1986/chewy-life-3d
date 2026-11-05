@@ -9,13 +9,14 @@ import { Engine } from '../core/engine.js';
 import { makeToon, U } from '../gfx/materials.js';
 import { setNightAll } from '../world/buildings/index.js';
 import { FURNITURE, FURNITURE_IDS, SETS, CELL, footprint } from '../home/furniture.js';
-import { furnitureGroup, furnitureTemplate } from '../home/furnitureMesh.js';
+import { furnitureGroup, furnitureTemplate, loadFurnitureGlbs } from '../home/furnitureMesh.js';
 import { InteriorWorld, ORIGIN } from '../home/interiorWorld.js';
 import { VFX } from '../gfx/vfx.js';
 
 const P = new URLSearchParams(location.search);
 
-export default function () {
+export default async function () {
+  if (!P.has('kit')) await loadFurnitureGlbs(); // (the Blender furniture, as the game loads it at boot: &kit shows the kit builders)
   if (P.has('vignette')) return vignette(P.get('vignette'));
   return sheet();
 }

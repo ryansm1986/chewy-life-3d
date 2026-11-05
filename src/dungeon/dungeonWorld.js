@@ -1079,7 +1079,7 @@ export class DungeonWorld {
     this.hemi = new THREE.HemisphereLight(T.ambient[0], T.ambient[1], T.ambientI ?? 1.35); scene.add(this.hemi);
     const sun = this.sun = new THREE.DirectionalLight(T.sun || '#d8d0ff', T.sunI ?? 1.25);
     sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
-    const sc = sun.shadow.camera; sc.left = -26; sc.right = 26; sc.top = 26; sc.bottom = -26; sc.near = 1; sc.far = 120;
+    const sc = sun.shadow.camera; sc.left = -26; sc.right = 26; sc.top = 26; sc.bottom = -26; sc.near = 1; sc.far = 120; sc.layers.enable(1); // (vegetation.js SHADOW_ONLY_LAYER: the Blender trees' shadow-only crown masses)
     sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.04; sun.shadow.radius = 3;
     scene.add(sun, sun.target);
     this.sunDir = V(0.35, 1, 0.55).normalize();

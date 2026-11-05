@@ -275,7 +275,7 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
 - **What glows**: the interactable in F's reach (the pad's highlighted one, a touch's) and the one under the mouse
   (`pickInteractAtMouse`, what a click would use), set each frame in game.js `handleInput` and cleared whenever input is
   locked (dialogue, menus, build and decorate). `G.shine.update(dt, scene, camera, near, hover, warm)` in the frame loop.
-- **The look**: a gold outline (an inverted hull, the back faces pushed out 3.2 px in clip space), a warm rim and a band
+- **The look**: a soft cream outline (an inverted hull, the back faces pushed out 2.2 px in clip space, at 0.6 alpha), a faint rim and a band
   of light sweeping up across the object (1.1 s, then a 0.6 s rest), at 0.8 strength for the mouse. Each mesh gets two
   copies sharing its geometry, skeleton and morphs, drawn with a copy of its own material whose output is replaced
   (`copyOf`): the toon shader's wind, cut-outs, cutaway and skinning still apply, so the copy fits exactly. No copy can
@@ -381,6 +381,24 @@ Quality bar: **8.5/10 polish** — every screen should feel finished, animated a
     event `perk:learned`.
   - Tools: `tools/charge-table.mjs` (CHARGE.md §7), `tools/charge-sim.mjs` (the DPS band; `--solve` writes tunes), QA
     `tools/qa/s19-charge.mjs`, look review `tools/qa/charge-shots.mjs [ids] [--close | --pose]`.
+
+## Combo chains (design, numbers and as-built notes: docs/COMBO.md)
+- Tap a weapon strike again within the window to chain it: step 1 → 2 → the finisher (+15%); a held charge mid-chain is
+  the finisher. 15 strikes (`COMBO_LIST`), all six heroes.
+  - **Data + rules** `src/rpg/combo.js`: the `COMBO` table (attached as `SKILLS[id].combo`), `comboRuntime` (a step's cost,
+    the finisher's damage, `R.combo.speed`), `stepSpeed`, `stepCost`, `comboSteps`, `canLearnComboPerk` / `learnComboPerk`,
+    `comboPerkPoints`, `migrateComboPerks` (run by `normalizeHeroes`).
+  - **The chain** `src/combat/combo.js` (`G.skills.chain`): hooked into `SkillRunner.tryCast` once (`bufferFor`, `zoomFor`,
+    `plan` / `apply`, `commit`), its `update` from `SkillRunner.update`; a step's speed scales the animator action the cast
+    started (duration and clock together); `combat.hitMonster` reports player hits (`onHit`: the finisher landing, Tempo
+    as `combat.buffs.tempo`). Events `combo:step|finish|land|drop`. Debug section **Combo**.
+  - **Looks** `src/gfx/comboFx.js`, **sounds** `src/audio/combo.sfx.js`, **HUD** `src/ui/comboHud.js` (the chain pips, the
+    chain badge), **K panel** `src/ui/comboPanel.js` (the Combo tab and pane inside `ChargeDrawer`, the tree's chain chip,
+    the tooltip section), styles `src/ui/combo.css`, the guide `combo` in `src/world/guides.js`.
+  - State: `player.comboPerks = { [skillId]: { [perkId]: rank } }` (per hero; respec refunds). Action
+    `learnComboPerk(id, perkId)`, event `comboPerk:learned`.
+  - Tools: `tools/combo-sim.mjs` (the DPS band, on the charge sim's models), QA `tools/qa/s59-combo.mjs`, look review
+    `tools/qa/combo-shots.mjs`.
 
 ## Game context `G` (src/game.js)
 ```js
@@ -1020,6 +1038,24 @@ G = { engine, input, events, state /* persistent save */, derived /* computed st
   one bamboo shoot, from the cookbook).
 - QA: `node tools/qa/outskirts-check.mjs` (the plan against the real heightfield, in Node), `tools/qa/s57-outskirts.mjs`;
   shots `node tools/qa/outskirts-shots.mjs [tag] [ids] [dusk]` (each place beside its concept) → `tools/qa/tmp/outskirts/`.
+
+## Swimming and climbing (src/actors/traverse.js — ROADMAP TR-1; the controls: docs/CONTROLS.md §15)
+- **Who**: the hero bodies (`Player`: every hero, co-op players too) and Shadow (`Companion`) each own a `Traverse`
+  (`body.trav`). Villagers, monsters and critters don't: they still stop at the water and the cliffs.
+- **Where** (the worlds' contract): `world.travelOk(x, z)` (may a traversing body be here: the village, anywhere in the
+  map; a region, its walkable ground plus its deep water), `world.waterDepth(x, z)`, `world.waterSurface(x, z)`,
+  `world.climbable(x, z)` (the village only: natural slope past `CLIMB_SLOPE`, not a deck, not the waterfall's garden).
+  Worlds without them (dungeons, interiors) keep walking only.
+- **How**: `Actor.step` multiplies by `trav.mul`, resolves the collision with the body's own block (`trav.block`:
+  `Collision.resolve` takes an optional blockFn), then `trav.settle()` picks the mode from where it stands (swim when
+  deeper than 0.5 m, a biped, or 0.3 m, a quadruped; climb on a climbable face; else walk) and sets the height (the
+  feet `SINK` below the surface swimming), the speed and a small offset off the rock (`trav.off`, `Actor.sync`).
+  `trav.update` (in `Actor.update`) eases the pose weights (`Animator.swim` / `.climb`, the poses in `traversePose`;
+  the walk cycle and the planted gait step aside), faces the rock while climbing, makes the strokes' ripple rings and
+  hides the contact shadow in the water. A change of mode splashes and emits `traverse:mode`.
+- **Gates**: `SkillRunner.tryCast` and `Charge.feed` refuse while `trav.busy`; the roll and the sprint wait too.
+  Shadow follows straight (no nav route) while the hero or he is swimming or climbing.
+- QA: `tools/qa/s58-traverse.mjs`; shots `node tools/qa/traverse-shots.mjs [tag]` → `tools/qa/tmp/traverse/`.
 
 ## Guided tutorials (src/world/tutorials.js + guides.js, src/ui/tutorial.js — design: docs/TUTORIALS.md)
 - `G.tutorials` runs one guide at a time. A guide is a list of steps (say / objective / target / highlight /

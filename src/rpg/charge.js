@@ -92,6 +92,19 @@ C.chomp = {
   perks: set(STAGES(), QUICK(), WIDE({ what: 'cut reach', pct: 15 }),
     UNIQUE('seconds', 'Second Draw', 8, 'After a charged Crescent Chomp, your next one within 2s is a Stage Ⅰ Grand Crescent without holding (normal zoom cost).', { extra: { window: 2 } })),
 };
+C.swallow = {
+  ready: true, tune: { dmg: [0.67, 0.53, 0.4], shape: [0, 1, 1] }, base: 0.75, color: '#fff0c8', pose: 'gedan', title: 'Swallow’s Flight',
+  blurb: 'Hold the low guard, then cut: both cuts bite harder, and the return sends a bone-white swallow darting on down the line, through every foe in its way.',
+  arc: [0, 10, 20], radius: [1.05, 1.1, 1.15], fly: [5, 6.5, 8], flyPct: [60, 70, 80],
+  apply(p, s) {
+    p.dmgPct *= by(STAGE_MULT, s); p.arc += by(this.arc, s); p.radius = r2(p.radius * by(this.radius, s)); p.knockback = r2(p.knockback * (1 + 0.4 * s));
+    p.fly = by(this.fly, s); p.flyPct = by(this.flyPct, s); p.flyWidth = 0.75;
+    return p;
+  },
+  lines(p) { return [`Two cuts of ${pct(p.dmgPct)}, then a swallow flies ${p.fly} m: ${pct(p.dmgPct * p.flyPct / 100)}`, `The cuts: a ${p.arc}° arc (${p.radius} m); the swallow cuts every foe in its way`]; },
+  perks: set(STAGES(), QUICK(), SPLIT({ name: 'Swallow Flock', what: 'swallow', pct: 50, spread: 14 }),
+    UNIQUE('dart', 'Darting Swallow', 8, 'At the end of its flight the swallow darts on to 2 more foes within 5 m, cutting each for 60% of a cut.', { extra: { n: 2, r: 5, pct: 60 } })),
+};
 C.whirl = {
   ready: true, tune: { dmg: [1, 1, 1.01], shape: [0, 0.15, 0.55] }, base: 0.9, color: '#ffd98a', pose: 'stance', title: 'Gale Stance', channel: true,
   blurb: 'Hold to settle into the stance: at Stage Ⅰ a bigger whirlwind that pulls foes in starts by itself and quickens while held; let go and it spins on alone, then a dizzy burst.',

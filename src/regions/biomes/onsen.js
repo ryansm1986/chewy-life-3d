@@ -6,7 +6,9 @@
 // Assets: src/regions/assets/onsenFlora.js / onsenProps.js (drawn through the bambooKit Placer).
 import * as THREE from 'three';
 import * as F from '../assets/onsenFlora.js';
-import * as Pr from '../assets/onsenProps.js';
+import * as PrKit from '../assets/onsenProps.js';
+import { withGlb } from '../assets/glbPieces.js';
+const Pr = withGlb('onsen', PrKit); // (its landmark props drawn from their Blender models once loaded: ROADMAP Z-D6)
 import { jizo } from '../assets/mapleProps.js';
 import { Placer } from '../assets/bambooKit.js';
 import { paint, merge, xf } from '../../gfx/geom.js';

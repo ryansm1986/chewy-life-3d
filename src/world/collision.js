@@ -19,7 +19,7 @@ export class Collision {
   }
   // push point (p.x, p.z) with radius r out of all colliders; prev = last valid position for terrain blocking
   // (the cell walk is query()'s, inlined: no closures per call — monsters resolve twice a frame each, ROADMAP Z-B5)
-  resolve(p, r, prev) {
+  resolve(p, r, prev, blockFn = this.blockFn) { // (blockFn: a swimmer / climber passes its own, actors/traverse.js)
     const c = this.cell, rad = r + 1;
     for (let it = 0; it < 2; it++) {
       const s = ++this._stamp, x = p.x, z = p.z;
@@ -29,10 +29,10 @@ export class Collision {
         for (let n = 0; n < a.length; n++) { const o = a[n]; if (o._s === s) continue; o._s = s; this._push(p, r, o); }
       }
     }
-    if (this.blockFn && prev && this.blockFn(p.x, p.z)) {
+    if (blockFn && prev && blockFn(p.x, p.z)) {
       // slide along axes
-      if (!this.blockFn(p.x, prev.z)) p.z = prev.z;
-      else if (!this.blockFn(prev.x, p.z)) p.x = prev.x;
+      if (!blockFn(p.x, prev.z)) p.z = prev.z;
+      else if (!blockFn(prev.x, p.z)) p.x = prev.x;
       else { p.x = prev.x; p.z = prev.z; }
     }
     return p;

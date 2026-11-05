@@ -30,9 +30,11 @@ import { SH, M, MD, col } from '../dungeonWorld.js';
 import { tube, puff } from '../../gfx/geom.js';
 import { mulberry32, clamp, TAU, rand } from '../../core/util.js';
 import * as F from '../../regions/assets/onsenFlora.js';
-import * as Pr from '../../regions/assets/onsenProps.js';
+import * as PrKit from '../../regions/assets/onsenProps.js';
 import { kit, slab } from '../../regions/assets/bambooProps.js';
-import { jizo } from '../../regions/assets/mapleProps.js';
+import { jizo as jizoKit } from '../../regions/assets/mapleProps.js';
+import { withGlb, glbFn } from '../../regions/assets/glbPieces.js';
+const Pr = withGlb('onsen', PrKit), jizo = glbFn('maple', 'jizo', jizoKit); // (the region props' Blender models, as the regions draw them)
 import { V } from '../../regions/assets/bambooKit.js';
 import { G as BG, C as BC } from '../../world/buildings/kit.js';
 import { roof } from '../../world/buildings/roofs.js';
@@ -431,7 +433,7 @@ function iceCluster(seed = 0, { n = 6, H = 1.4, spread = 0.45 } = {}) {
   }, 0.008));
 }
 /** two frozen barrels and an oke under snow, icicles round their rims (an old storeroom's leftovers) */
-function frozenBarrels(seed = 0) {
+function frozenBarrelsKit(seed = 0) {
   return cached('fbar:' + seed, () => kit(seed * 11 + 7, B => {
     const r = mulberry32(seed * 31 + 9);
     for (const [x, z, s, tilt] of [[-0.32, -0.05, 1, 0], [0.36, 0.08, 0.86, 0], [0.0, 0.5, 0.72, 1.35]]) {
@@ -450,9 +452,10 @@ function frozenBarrels(seed = 0) {
     for (let k = 0; k < 3; k++) pillow(B, [(k - 1) * 0.5, 0.03, -0.32 + (k % 2) * 0.1], 0.3, 0.35, seed + 11 + k);
   }, 0.01));
 }
+const frozenBarrels = glbFn('dg-onsen', 'frozenBarrels', frozenBarrelsKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-onsen'])
 /** a little hokora under snow: a stone plinth, a wooden shrine box with lattice doors, a gable roof heaped with snow and
  *  fringed with icicles, a shimenawa, an offering box, two round stone foxes in red bibs with snow caps (+z faces in) */
-function snowHokora(seed = 0) {
+function snowHokoraKit(seed = 0) {
   return cached('shok:' + seed, () => kit(seed * 13 + 5, B => {
     const base = BG.box(1.5, 0.32, 1.2, 0.05); base.translate(0, 0.16, 0); B.add(base, (p, n, o) => { o.set('#8c94a6').multiplyScalar(n.y > 0.5 ? 1 : 0.84); if (n.y > 0.5) o.lerp(SNOW, 0.6); });
     const stp = BG.box(1.0, 0.12, 0.3, 0.03); stp.translate(0, 0.06, 0.74); B.add(stp, '#8a92a4');
@@ -481,6 +484,7 @@ function snowHokora(seed = 0) {
     B.light([0, 0.9, 0.55], { color: '#ffd0a0', intensity: 1.2, radius: 4, flicker: 0.4, nightOnly: false });
   }, 0.02));
 }
+const snowHokora = glbFn('dg-onsen', 'snowHokora', snowHokoraKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-onsen'])
 /** a shimenawa rope with paper shide strung along local x between two pegs, snow along its top (+z = out of the face) */
 function shideRope(L, seed = 0) {
   const k = Math.round(L * 4) / 4;
@@ -493,7 +497,7 @@ function shideRope(L, seed = 0) {
   }, 0.01));
 }
 /** the old bath's duckboard deck (sunoko) with two oke, a little wooden stool and a towel on it (+z faces in) */
-function bathDeck(seed = 0) {
+function bathDeckKit(seed = 0) {
   return cached('deck:' + seed, () => kit(seed * 7 + 2, B => {
     for (const x of [-0.72, 0, 0.72]) { const b = BG.box(0.08, 0.06, 1.3, 0.01); b.translate(x, 0.03, 0); B.add(b, '#6a4c38'); }
     for (let i = 0; i < 9; i++) { const s = BG.box(1.7, 0.035, 0.11, 0.01); s.translate(0, 0.075, -0.56 + i * 0.14); B.add(s, (p, n, o) => o.set(i % 3 ? '#b88a5e' : '#a87c52').multiplyScalar(n.y > 0.5 ? 1 : 0.8)); }
@@ -507,8 +511,9 @@ function bathDeck(seed = 0) {
     for (let k = 0; k < 3; k++) pillow(B, [-0.8 + k * 0.8, 0.1, -0.62], 0.2, 0.3, seed + k);
   }, 0.01));
 }
+const bathDeck = glbFn('dg-onsen', 'bathDeck', bathDeckKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-onsen'])
 /** a towel rack: two posts and a rail hung with tenugui (white with blue stripes, one red), snow along the rail */
-function towelRack(seed = 0) {
+function towelRackKit(seed = 0) {
   return cached('towel:' + seed, () => kit(seed * 5 + 9, B => {
     for (const sx of [-1, 1]) { const p = BG.cyl(0.04, 0.05, 1.3, 6); p.translate(sx * 0.6, 0.65, 0); B.add(p, '#6a4a36'); const f = BG.box(0.18, 0.06, 0.3, 0.02); f.translate(sx * 0.6, 0.03, 0); B.add(f, '#5a3e2e'); }
     const rail = BG.cyl(0.03, 0.03, 1.38, 6); rail.rotateZ(Math.PI / 2); rail.translate(0, 1.22, 0); B.add(rail, '#7a5640');
@@ -517,8 +522,9 @@ function towelRack(seed = 0) {
     for (let i = 0; i < 3; i++) { const x = -0.38 + i * 0.38, tw = BG.plane(0.3, 0.62, 1, 4); tw.translate(x, 0.9, 0.035); B.cloth(tw, (p, n, o) => o.set(cols[i]).lerp(_c1.set(i === 2 ? '#ffd0c0' : '#3a6ec0'), i === 2 ? (Math.abs(p.y - 0.74) < 0.03 ? 1 : 0) : (Math.abs(Math.sin(p.y * 22)) > 0.92 ? 0.85 : 0)), { x0: x - 0.15, x1: x + 0.15, yTop: 1.21, yBot: 0.59 }); }
   }, 0.01));
 }
+const towelRack = glbFn('dg-onsen', 'towelRack', towelRackKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-onsen'])
 /** a snow monkey soaking to the shoulders: a fluffy grey-brown head, a pink face, a snow cap (y = 0 at the water) */
-function snowMonkey(seed = 0) {
+function snowMonkeyKit(seed = 0) {
   return cached('monkey:' + seed, () => kit(seed + 31, B => {
     const fur = seed % 2 ? '#a89888' : '#9c8c80', face = '#f09a8a';
     const sp = (r, c, p, s = [1, 1, 1]) => { const gg = BG.sph(r, 10, 8); gg.scale(...s); gg.translate(...p); B.add(gg, c); };
@@ -530,9 +536,10 @@ function snowMonkey(seed = 0) {
     for (const k of [-1, 1]) sp(0.06, fur, [k * 0.2, 0.06, 0.12], [1, 0.6, 1]); // (arms on the rim of the water)
   }, 0.005));
 }
+const snowMonkey = glbFn('dg-onsen', 'snowMonkey', snowMonkeyKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-onsen'])
 /** an ice stalagmite: a tall faceted spike of blue ice over a dark rock core (the rock shows at the foot), drip ridges
  *  running down it, a pale tip, a smaller twin leaning off it, a snow mound and ice crystals round the foot */
-function iceSpire(seed = 0) {
+function iceSpireKit(seed = 0) {
   return cached('spire:' + seed, () => kit(seed * 29 + 7, B => {
     const r = mulberry32(seed * 41 + 5);
     const spike = (x, z, H, R0, lean, rot) => {
@@ -555,16 +562,18 @@ function iceSpire(seed = 0) {
     for (let q = 0; q < 4; q++) { const a = r() * TAU; pillow(B, [Math.cos(a) * 0.95, 0.03, Math.sin(a) * 0.9], 0.24 + r() * 0.12, 0.35, seed + q); }
   }, 0.012));
 }
+const iceSpire = glbFn('dg-onsen', 'iceSpire', iceSpireKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-onsen'])
 /** a cold brazier: an iron bowl on three legs heaped with snow over dead coals (the storeroom) */
-function coldBrazier(seed = 0) {
+function coldBrazierKit(seed = 0) {
   return cached('braz:' + seed, () => kit(seed + 41, B => {
     for (let i = 0; i < 3; i++) { const a = i / 3 * TAU, l = BG.cyl(0.03, 0.025, 0.5, 5); l.rotateZ(0.25); l.rotateY(-a); l.translate(Math.cos(a) * 0.2, 0.25, Math.sin(a) * 0.2); B.add(l, '#3a3a44'); }
     const bowl = BG.lathe([[0.001, 0], [0.18, 0.01], [0.3, 0.12], [0.32, 0.2], [0.29, 0.2], [0.17, 0.05], [0.001, 0.04]], 12); bowl.translate(0, 0.45, 0); B.add(bowl, '#4a4650');
     pillow(B, [0, 0.62, 0], 0.27, 0.45, seed);
   }, 0.01));
 }
+const coldBrazier = glbFn('dg-onsen', 'coldBrazier', coldBrazierKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-onsen'])
 /** a woodcutter's store under snow: firewood under a little roof, sacks and a crate (the storeroom) */
-function storePile(seed = 0) {
+function storePileKit(seed = 0) {
   return cached('store:' + seed, () => kit(seed * 3 + 51, B => {
     B.at([0, 0, -0.1], 0, () => firewood(B, { w: 1.2, h: 0.62, d: 0.34, roofed: true }));
     for (let i = 0; i < 3; i++) pillow(B, [(i - 1) * 0.42, 0.86, -0.1], 0.24, 0.3, seed + i);
@@ -575,8 +584,9 @@ function storePile(seed = 0) {
     for (let i = 0; i < 3; i++) pillow(B, [(i - 1) * 0.9, 0.02, 0.55], 0.36, 0.32, seed + 9 + i);
   }, 0.01));
 }
+const storePile = glbFn('dg-onsen', 'storePile', storePileKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-onsen'])
 /** a red paper chōchin hung from a short post with a snow cap (a warm accent along a trail) */
-function lanternPost(seed = 0) {
+function lanternPostKit(seed = 0) {
   return cached('lpost:' + seed, () => kit(seed + 61, B => {
     const post = BG.cyl(0.05, 0.06, 1.7, 6); post.translate(0, 0.85, 0); B.add(post, '#5e4434');
     const arm = BG.box(0.5, 0.05, 0.05, 0.01); arm.translate(0.22, 1.62, 0); B.add(arm, '#5e4434');
@@ -586,6 +596,7 @@ function lanternPost(seed = 0) {
     pillow(B, [0, 0.12, 0], 0.18, 0.4, seed + 3);
   }, 0.01));
 }
+const lanternPost = glbFn('dg-onsen', 'lanternPost', lanternPostKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-onsen'])
 
 // ------------------------------------------------------------------ hot-spring pools (the floor shader's uPools)
 function addPool(W, x, z, R, kind = 0, o = {}) {
@@ -1240,3 +1251,5 @@ export const ONSEN_KIT = {
   rooms: ROOMS, extras, arrival, hoard, corridor,
   seal: { color: '#bfe8ff', rope: '#ecd8a0' }, // the arena seal's look (dungeon/zoneRun.js)
 };
+// the kit's own pieces, unwrapped (the Blender builders dump them for reference: tools/blender/work/codex/dg-onsen)
+export const KIT_PIECES = { frozenBarrels: frozenBarrelsKit, snowHokora: snowHokoraKit, bathDeck: bathDeckKit, towelRack: towelRackKit, snowMonkey: snowMonkeyKit, iceSpire: iceSpireKit, coldBrazier: coldBrazierKit, storePile: storePileKit, lanternPost: lanternPostKit };

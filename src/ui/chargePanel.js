@@ -15,6 +15,8 @@ import { skillIconURL, treeInfo, effLevel } from './rpg.js';
 import { CHARGE, NUMERAL, stageTimes, chargeInfo, canLearnPerk, perksOf, maxStage, chargeable } from '../rpg/charge.js';
 import { SKILLS } from '../rpg/skills.js';
 import { aimWords } from '../combat/autoTarget.js';
+import { ComboPane, CHAIN_SVG } from './comboPanel.js';
+import { comboSkillsOf, comboable } from '../rpg/combo.js';
 
 const INK = '#4a2c2a';
 // perk family icons: chunky ink-outlined shapes in the tree colour (--tc) like the rest of the panel
@@ -48,6 +50,7 @@ export class ChargeDrawer {
   constructor(panel) {
     this.sp = panel; this.ui = panel.ui; this.id = null; this.hover = null; this.sig = null;
     this.sel = {}; // (each tree's pick: { [tree]: skillId })
+    this.mode = 'charge'; // (or 'combo': the Combo tab, docs/COMBO.md §4: ui/comboPanel.js)
     const d = this.el = el('div', 'chg-drawer');
     d.innerHTML = `<div class="chg-tag">${glyph('zap')}<span>Charge</span></div>
       <div class="chg-pl"><span class="chg-plt">${PICK_HTML}</span><i class="chg-plc"></i><span class="chg-plk pad-only"><span class="kc sm pad">${padGlyph('RS')}</span></span></div>
@@ -59,7 +62,19 @@ export class ChargeDrawer {
       <div class="chg-detail"><div class="chg-prev"></div><div class="chg-dt"></div></div>
       <div class="chg-foot">${glyph('mouseL')}Buy a rank <span class="sep">·</span> Hold the skill's key to charge <span class="sep">·</span> Rosie's tea refunds perks</div>`;
     panel.panel.appendChild(d);
-    this.$ = { ic: d.querySelector('.chg-ic img'), name: d.querySelector('.chg-name'), sub: d.querySelector('.chg-sub'), blurb: d.querySelector('.chg-blurb'), stages: d.querySelector('.chg-stages'), perks: d.querySelector('.chg-perks'), links: d.querySelector('.chg-links'), prev: d.querySelector('.chg-prev'), dt: d.querySelector('.chg-dt'), pick: d.querySelector('.chg-pick'), pl: d.querySelector('.chg-plt') };
+    // the Combo tab beside the Charge tag (trees with a combo skill), and its pane (docs/COMBO.md §4)
+    const tab = el('button', 'cmb-tab'); tab.type = 'button'; tab.innerHTML = `${CHAIN_SVG}<span>Combo</span>`; tab.setAttribute('aria-label', 'Combo perks');
+    d.insertBefore(tab, d.children[1]);
+    d.querySelector('.chg-tag').dataset.focus = '';
+    this.combo = new ComboPane(this); d.appendChild(this.combo.el);
+    d.addEventListener('click', e => {
+      const phone = this.ui.root?.classList.contains('m-phone'); // (a phone's folded sheet: a tab opens it on that card; the open card's own tab folds it — mobile.js toggles on the Charge tag first)
+      if (e.target.closest('.cmb-tab')) {
+        if (phone && this.mode === 'combo' && d.classList.contains('m-open')) { d.classList.remove('m-open'); return; }
+        this.setMode('combo'); if (phone) d.classList.add('m-open');
+      } else if (e.target.closest('.chg-tag') && this.mode === 'combo') { this.setMode('charge'); if (phone) d.classList.add('m-open'); }
+    });
+    this.$ = { tab: d.querySelector('.cmb-tab'), ic: d.querySelector('.chg-ic img'), name: d.querySelector('.chg-name'), sub: d.querySelector('.chg-sub'), blurb: d.querySelector('.chg-blurb'), stages: d.querySelector('.chg-stages'), perks: d.querySelector('.chg-perks'), links: d.querySelector('.chg-links'), prev: d.querySelector('.chg-prev'), dt: d.querySelector('.chg-dt'), pick: d.querySelector('.chg-pick'), pl: d.querySelector('.chg-plt') };
     const P = this.$.perks;
     P.addEventListener('mouseover', e => { const n = e.target.closest('.chg-pk'); if (!n || n.dataset.p === this.hover) return; this.hover = n.dataset.p; this.detail(); this.ui.sfx?.('hover'); });
     P.addEventListener('click', e => { const n = e.target.closest('.chg-pk'); if (n) this.learn(n.dataset.p, n); });
@@ -80,8 +95,24 @@ export class ChargeDrawer {
     }
     this.render();
   }
+  /** Charge or Combo (the drawer's two tabs) */
+  setMode(m) {
+    if (m === 'combo' && !comboSkillsOf(this.sp.tree).length) m = 'charge';
+    if (m === this.mode) return;
+    this.mode = m; this.sig = null; this.combo.sig = null; this._tall = null;
+    replay(this.el, 'swap', 420);
+    this.render(); this.sp._treeSig = null; this.sp.render();
+    this.ui.tip?.hide(); this.ui.sfx?.('tab');
+  }
+  /** the tree's chain chip / the pad: show a skill's Combo pane */
+  chooseCombo(id) {
+    if (!comboable(id)) return;
+    this.combo.show(id);
+    if (this.mode !== 'combo') this.setMode('combo'); else { this.render(); this.sp._treeSig = null; this.sp.render(); this.ui.tip?.hide(); this.ui.sfx?.('tab'); }
+  }
   /** a skill was learned, assigned or picked elsewhere: its tree's pick, and the drawer's when that tree is shown */
   select(id) {
+    if (id && comboable(id)) this.combo.select(id);
     if (!id || !chargeable(id)) return;
     if (SKILLS[id].tree === this.sp.tree) this.show(id); else this.sel[SKILLS[id].tree] = id;
   }
@@ -95,6 +126,7 @@ export class ChargeDrawer {
   }
   /** step through the shown tree's strip (the pad's right-stick flick: ui/padNav.js): d = ±1, wrapping */
   cycle(d) {
+    if (this.mode === 'combo') return this.combo.cycle(d);
     const ids = chargeSkillsOf(this.sp.tree); if (!ids.length) return;
     const i = ids.indexOf(this.id);
     this.choose(ids[((i < 0 ? 0 : i + d) % ids.length + ids.length) % ids.length]);
@@ -152,13 +184,25 @@ export class ChargeDrawer {
    *  until the tree, the hero's numbers or the drawer's width change) */
   tallest() {
     const d = this.el, tree = SKILLS[this.id]?.tree, pl = this.st.player || {};
-    const key = `${tree}|${pl.lvl}|${pl.skillPts}|${JSON.stringify(pl.skills || {})}|${JSON.stringify(pl.chargePerks || {})}|${d.offsetWidth}|${this.ui.root?.className}`; // (not the shown skill: switching inside a tree reuses it)
+    const shape = `${tree}|${this.mode}|${d.offsetWidth}|${this.ui.root?.className}`; // (not the shown skill: switching inside a tree reuses it)
+    const key = `${shape}|${pl.lvl}|${pl.skillPts}|${JSON.stringify(pl.skills || {})}|${JSON.stringify(pl.chargePerks || {})}|${JSON.stringify(pl.comboPerks || {})}`;
     if (this._tall?.key === key) return Math.max(this._tall.h, d.offsetHeight);
+    // only the hero's numbers changed (a point spent: a learn, a perk): the heights barely move, so measure them again a
+    // moment later instead of inside the click (drawing every skill of the tree forces a layout each: ~45 ms on a tablet,
+    // long enough to split a double-tap on a node into two taps)
+    if (this._tall?.shape === shape && !this._tallDefer) {
+      this._tallDefer = setTimeout(() => { this._tallDefer = null; if (this._tall) this._tall.key = null; if (this.sp.isOpen && !this.el.hidden) this.fit(); }, 400);
+      return Math.max(this._tall.h, d.offsetHeight);
+    }
+    if (this._tallDefer && this._tall?.shape === shape) return Math.max(this._tall.h, d.offsetHeight); // (a measure is due: the same tree and size wait for it)
     const keep = { id: this.id, hover: this.hover };
     let h = 0;
-    for (const id of chargeSkillsOf(tree)) { this.id = id; this.hover = null; this.sig = null; this.draw(); h = Math.max(h, d.offsetHeight); }
-    this.id = keep.id; this.hover = keep.hover; this.sig = null; this.draw();
-    this._tall = { key, h };
+    if (this.mode === 'combo') h = this.combo.tallest(d); // (the Combo pane: its own tallest skill)
+    else {
+      for (const id of chargeSkillsOf(tree)) { this.id = id; this.hover = null; this.sig = null; this.draw(); h = Math.max(h, d.offsetHeight); }
+      this.id = keep.id; this.hover = keep.hover; this.sig = null; this.draw();
+    }
+    this._tall = { key, shape, h };
     return Math.max(h, d.offsetHeight);
   }
   draw() {
@@ -166,6 +210,13 @@ export class ChargeDrawer {
     if (!c || !def) { this.el.hidden = true; return; }
     this.el.hidden = false;
     const st = this.st, pl = st.player || {}, k = perksOf(st, id), lvl = pl.skills?.[id] || 0, T = treeInfo(def.tree);
+    // the Combo tab: shown on trees with a combo skill; its pane drawn when it's the tab in front
+    const cmb = comboSkillsOf(def.tree).length > 0, cm = cmb && this.mode === 'combo'; // (DOM writes only on a change: tallest() measures between draws)
+    if (this.$.tab.hidden !== !cmb) this.$.tab.hidden = !cmb;
+    if (!cmb && this.mode === 'combo') this.mode = 'charge';
+    if (this.el.classList.contains('combo') !== cm) this.el.classList.toggle('combo', cm);
+    if (this.combo.el.hidden !== !cm) this.combo.el.hidden = !cm;
+    if (cm) { if (this._tcC !== T.color) { this._tcC = T.color; this.el.style.setProperty('--tc', T.color); } this.combo.pick(def.tree); this.combo.draw(); }
     this.renderPick(def.tree);
     const sig = `${id}|${lvl}|${pl.skillPts}|${JSON.stringify(k)}|${pl.lvl}`;
     if (sig === this.sig) return;

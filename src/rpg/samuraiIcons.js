@@ -131,6 +131,30 @@ export function drawSamuraiSkill(g, id, K) {
       sparkle(g, 22, -12, 3.6, '#ffffff'); sparkle(g, -18, -8, 2.2, '#fff6c0');
       return true;
     }
+    case 'swallow': { // Swallow Return: two cuts on one line, up and straight back, meeting in a point like a swallow's
+      // forked tail; the katana under them and the swallow itself darting off the point
+      glow(g, 0, -2, 25, '#fff4dc', 0.5);
+      const cut = (x0, y0, x1, y1, bulge, w) => { // a tapered sliver from (x0, y0) to (x1, y1), bowed by bulge, w thick in the middle
+        const mx = (x0 + x1) / 2, my = (y0 + y1) / 2, dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy), nx = -dy / l, ny = dx / l;
+        g.beginPath(); g.moveTo(x0, y0);
+        g.quadraticCurveTo(mx + nx * (bulge + w), my + ny * (bulge + w), x1, y1);
+        g.quadraticCurveTo(mx + nx * (bulge - w), my + ny * (bulge - w), x0, y0); g.closePath();
+      };
+      cut(-28, 12, 12, -13, -5, 7.5); paint(g, lin(g, -28, 12, 12, -13, [[0, '#fff2dc'], [1, '#ffffff']]), 2); // the rise
+      cut(12, -13, -19, 22, -4, 5.5); paint(g, lin(g, 12, -13, -19, 22, [[0, '#ffe09a'], [1, GOLD]]), 1.9); // the return
+      g.save(); g.translate(2, 17); g.rotate(-0.6); katanaShape(g, K, { x0: -21, x1: 17, scale: 0.72 }); g.restore();
+      // the swallow, darting up and to the right off the point
+      g.save(); g.translate(18, -19); g.rotate(-0.62); g.scale(1.22, 1.22);
+      g.beginPath(); g.moveTo(-4, -1.1); g.lineTo(-13.5, -5.2); g.lineTo(-8.5, 0); g.lineTo(-13.5, 5.2); g.lineTo(-4, 1.1); g.closePath(); paint(g, '#2c2c48', 1.3); // its forked tail
+      for (const s of [-1, 1]) { g.beginPath(); g.moveTo(2.5, s * 0.8); g.quadraticCurveTo(-0.5, s * 8.5, -9.5, s * 12.5); g.quadraticCurveTo(-3.5, s * 5.5, -3.5, s * 1.2); g.closePath(); paint(g, vol(g, '#3a3c66', -9, -12, 3, 12, 0.35, 0.3), 1.3); }
+      ell(g, 0.5, 0, 6.2, 2.9); paint(g, vol(g, '#3a3c66', -6, -3, 7, 3, 0.4, 0.3), 1.3);
+      ell(g, 1, 1.1, 3.6, 1.2); g.fillStyle = '#fff6e6'; g.fill(); // (the cream belly)
+      circ(g, 5.6, 0.6, 1.3); g.fillStyle = '#d8603e'; g.fill(); // (the rusty throat)
+      circ(g, 5, -1, 0.7); g.fillStyle = '#ffffff'; g.fill(); // (a bright eye)
+      g.restore();
+      sparkle(g, 11, -12, 3.8, '#ffffff'); sparkle(g, -24, 0, 2.2, '#fff6c0');
+      return true;
+    }
     case 'boneMastery': { // Way of the Bone: the katana over the dojo's gold star, its red cord tied in a knot
       roundStar(g, 0, 2, 17, 8.5, 5); paint(g, volR(g, '#ffcf4a', 0, 2, 17, 0.5, 0.3), 1.8);
       g.save(); g.rotate(-Math.PI / 4); katanaShape(g, K, { x0: -26, x1: 27, scale: 0.85 }); g.restore();

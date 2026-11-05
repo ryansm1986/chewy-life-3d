@@ -15,6 +15,13 @@ const POSES = {
     A.sq += 0.06 * k * e; A.y += -0.04 * k * e; A.body.x += 0.08 * k * e; A.legL.x += -0.12 * k * e; A.legR.x += 0.12 * k * e;
     A.head.x += -0.05 * k * e; A.earKick += -0.5 * k * e;
   },
+  // Swallow Return's wind-up: the low guard at the left hip, coiling tighter toward the saya and sinking as it fills
+  // (→ tsubame at 0.17, the guard it held)
+  gedan(t, k, A, e) {
+    SK.add(A, SK.TS_LOW, e);
+    A.sq += 0.05 * k * e; A.y += -0.035 * k * e; A.body.x += 0.06 * k * e; A.body.y += 0.1 * k * e; A.head.y += -0.08 * k * e;
+    A.legL.x += -0.1 * k * e; A.legR.x += 0.1 * k * e; A.earKick += -0.5 * k * e;
+  },
   // the same draw stance, but coiled lower and further forward for a dash (Flash Draw)
   iaiDash(t, k, A, e) {
     SK.add(A, SK.IAI, e);

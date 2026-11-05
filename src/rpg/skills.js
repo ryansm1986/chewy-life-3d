@@ -69,6 +69,22 @@ const DEFS = {
       return [`Damage: ${pct(p.dmgPct)} weapon damage${dmgRange(p.dmgPct, d)}`, `Arc: ${p.arc}°`, `Zoom cost: ${this.cost(l)}`, ...synLine('chomp', d)];
     },
   },
+  // Swallow Return (tsubame gaeshi): the quick, narrow one beside Crescent Chomp's slow, wide draw-cut. Two cuts on one
+  // line, a rising one out of the hip and the snap straight back down; at the cast's speed (skillRunner.cast_swallow,
+  // ~20% quicker than the iai) and zoom (~5/6 of Chomp's) a lone foe takes Chomp's damage a second; a pack takes less.
+  swallow: {
+    tree: 'bone', name: 'Swallow Return', row: 0, col: 0, pre: [], wep: 'sword', kind: 'active', element: 'phys',
+    cost: l => r1(2.5 + 0.125 * (l - 1)), cd: () => 0,
+    desc: 'Snap the blade up out of the hip, then straight back down the same line, quick as a swallow turning in the air. Two fast cuts on whatever is right in front of you.',
+    syn: [{ id: 'boneMastery', p: 6 }, { id: 'frenzy', p: 5 }],
+    params(l, d) {
+      return { dmgPct: lin(62, 7.5)(l) * syn('swallow', d), hits: 2, arc: 90, radius: 2.1, knockback: 0.5 };
+    },
+    info(l, d) {
+      const p = this.params(l, d);
+      return [`Damage: ${pct(p.dmgPct)} weapon damage${dmgRange(p.dmgPct, d)}, twice`, `Arc: ${p.arc}° · reach ${p.radius} m`, `Zoom cost: ${this.cost(l)}`, ...synLine('swallow', d)];
+    },
+  },
   boneMastery: {
     tree: 'bone', name: 'Way of the Bone', row: 1, col: 0, pre: [], wep: 'sword', kind: 'passive', element: 'phys',
     cost: () => 0, cd: () => 0,

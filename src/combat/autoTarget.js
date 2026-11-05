@@ -65,7 +65,7 @@ const K = (kind, o) => ({ kind, ...o });
 export const AIM_KINDS = ['melee', 'target', 'ground', 'line', 'cone', 'leap', 'dash', 'heal', 'self', 'ally'];
 export const AIM = {
   // Chewy: Bone Blade, Fetch Mastery, Pack Spirit
-  chomp: K('melee'), whirl: K('self'), dig: K('leap'), bonestorm: K('self'),
+  chomp: K('melee'), swallow: K('melee'), whirl: K('self'), dig: K('leap'), bonestorm: K('self'),
   throw: K('line'), ricochet: K('target', { range: () => 10 }), multi: K('cone'), decoy: K('ground', { radius: p => p.cloudRadius }),
   blaze: K('target'), fetchstorm: K('ground'),
   woof: K('self'), zoom: K('dash', { idle: 'line', width: p => p.width * 2 }), packcall: K('self'), treat: K('heal'), howl: K('self'), moonhowl: K('self'),
@@ -74,16 +74,16 @@ export const AIM = {
   kibble: K('target'), squeak: K('self'), pawRune: K('ground'), moonbeam: K('ground'), constellation: K('target'), meteor: K('ground'),
   duckDecoy: K('ground'), fetchLeash: K('target'), feathers: K('cone'), duckCall: K('ground'), spiritRetriever: K('self'), mallards: K('ground'),
   // Poe
-  fumaThrow: K('target'), kunaiFan: K('cone'), shadowStitch: K('target'), whirlingFuma: K('ground'), shurikenRain: K('ground'), thousandStars: K('self'),
+  fumaThrow: K('target'), fumaFlurry: K('melee'), kunaiFan: K('cone'), shadowStitch: K('target'), whirlingFuma: K('ground'), shurikenRain: K('ground'), thousandStars: K('self'),
   smokeBomb: K('self'), puffBall: K('target'), shadowClone: K('self'), substitution: K('dash', { idle: 'away' }), thunderPaw: K('target'), smokeDragon: K('line'),
   shadowStep: K('target'), afterimageDash: K('dash', { idle: 'line', width: p => p.width * 2 }), vanish: K('self'),
   caltropFlip: K('dash', { idle: 'lock', away: true, range: p => p.flip }), bullseyeMark: K('target'), phantomBarrage: K('target'),
   // Floofy (the Shih Tzu)
-  woefulWallop: K('melee'), tugOfWoe: K('line'), maelstrom: K('self'), steadfastSulk: K('self'), heaviestSigh: K('leap', { range: p => p.leap + 1.2 }),
+  woefulWallop: K('melee'), glumBonk: K('melee'), tugOfWoe: K('line'), maelstrom: K('self'), steadfastSulk: K('self'), heaviestSigh: K('leap', { range: p => p.leap + 1.2 }),
   drippingPaw: K('target'), grumbleCloud: K('ground'), caseOfMopes: K('ground'), mournfulAwoo: K('self'), everlastingGloom: K('ground'),
   ghostPups: K('self'), borrowedWarmth: K('target'), boneWard: K('self'), wayhomeLantern: K('heal'), grandpawsGhost: K('self'),
   // Foosy (the Golden dragoon) and the whelp
-  sunbeamThrust: K('melee', { reach: p => p.length }), sunfallJump: K('leap'), pinwheelSweep: K('self'), gallantCharge: K('dash', { idle: 'line' }), // (its width is the whole lane; Flash Draw's and Afterimage's are a radius round him)
+  sunbeamThrust: K('melee', { reach: p => p.length }), eagerJabs: K('melee'), sunfallJump: K('leap'), pinwheelSweep: K('self'), gallantCharge: K('dash', { idle: 'line' }), // (its width is the whole lane; Flash Draw's and Afterimage's are a radius round him)
   starfallLance: K('ground'), bonkDart: K('target'), tailwagVolley: K('cone'), trueFlight: K('line'), emberleafJavelin: K('target'), sunshower: K('ground'),
   emberBreath: K('ground', { range: () => 10, radius: p => p.range * 0.5 }), divebombSwoop: K('ground'), wingShield: K('self'), mightyRoar: K('self'), dragonHeart: K('self'),
   // Stella (docs/STELLA.md §5.1): `ally` goes to the ally who needs it most (her, Shadow, Hinata; co-op heroes); Kind Light

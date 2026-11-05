@@ -7,12 +7,13 @@
 // Labels show id, level, seed and triangle count. window.__info = { count, totalTris, per:{id:level:seed → tris} }.
 import * as THREE from 'three';
 import { makeStage } from './_stage.js';
-import { BUILDINGS, buildModel, setNight, CATEGORIES } from '../world/buildings/index.js';
+import { BUILDINGS, buildModel, setNight, CATEGORIES, loadBuildingGlbs } from '../world/buildings/index.js';
 import { makeToon } from '../gfx/materials.js';
 import { STYLE_SETS, setStyle, cleanStyle } from '../world/buildings/styles.js';
 import { smokeTexture } from '../gfx/textures.js';
 
-export default function () {
+export default async function () {
+  if (!new URLSearchParams(location.search).has('kit')) await loadBuildingGlbs(); // (the Blender centrepieces, as the game shows them; &kit: the kit models)
   const P = new URLSearchParams(location.search);
   const only = P.get('only')?.split(',');
   const lvl = P.has('level') ? +P.get('level') : null;

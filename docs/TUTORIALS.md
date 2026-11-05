@@ -170,6 +170,13 @@ Status: **built** (2026-10-03; the cozy path's three guides 2026-10-09). The gui
   3. The Charge card is spotlit, with callouts on the stages and the perks (Got it).
   4. Wrap-up: tap vs hold, a roll drops a charge, hits don't.
   - QA: `tools/qa/s19-charge.mjs` section g runs it end to end.
+- **Tap, tap, finish! (Shadow)** starts back in the village once the charge guide is done and the hero has cast a combo
+  strike in a fight (`flags.comboTut`, set by `combat/combo.js`), with a combo strike on right-click — docs/COMBO.md §4:
+  1. Tap right-click three times in a row (`combo:finish`; a chain that runs out, a roll or a hold gets a kind word).
+  2. A finisher hits harder; skill points buy combo perks: press K.
+  3. The Combo tab beside Charge is spotlit (callouts on the chain and the perks once it's open; Got it).
+  4. Wrap-up: tap for a chain, hold for a charge; another skill or a roll drops a chain.
+  - QA: `tools/qa/s59-combo.mjs` section f runs it end to end.
 - **Meet Poe (Poe)** starts in town once Poe has joined (docs/POE.md §5), while you play someone else; offered once
   to older saves past her join (`past`), locked in the Journal until then — docs/POE.md §6:
   1. Tap Tab (the switch button spotlit): the next hero (`done` once the active hero changed and the switch is over).
@@ -246,6 +253,7 @@ Status: **built** (2026-10-03; the cozy path's three guides 2026-10-09). The gui
 - `garden.js`: `facingDoor()`. Walking up to the cottage door now means the door, not the bed's corner tile beside it.
 - `hud.js`: a Pantry button in the menu bar.
 - `combat/charge.js`: `charge:release { id, stage, ok }`, `charge:cancel { id, reason }` (the charge guide).
+- `combat/combo.js`: `combo:finish { id, charged }`, `combo:drop { id, step, reason }` (the combo guide); `flags.comboTut`.
 - `actors/heroes.js`: `hero:wheel { open, id }` (the Meet Poe guide); `ui/heroWheel.js` cards carry `data-id`.
 - `game.js`: `G.tutorials`, `G.introJoinPending`; `questTarget` asks the director first. Moka's join toast is skipped
   when her guide will show it.

@@ -11,6 +11,16 @@ export function goldenCharge({ STAGES, QUICK, FOCUS, SPLIT, WIDE, ECHO, UNIQUE, 
   const C = {};
 
   // =================================================================== LANCE ARTS
+  C.eagerJabs = {
+    ready: true, tune: { dmg: [1, 1, 1], shape: [0.5, 0.55, 0.7] }, base: 0.7, color: '#ffe6a0', pose: 'gldJabs', title: 'Very Eager Jabs',
+    blurb: 'Bounce on your toes with the lance in close while your tail wags faster and faster: four or five jabs in the flurry instead of three, a little wider and longer, and the last one bigger still; from Stage Ⅱ it staggers.',
+    jabs: [4, 5, 5], radius: [1.1, 1.15, 1.2], arc: [10, 15, 20], last: [20, 35, 50], stun: [0, 0.25, 0.4],
+    // (the payoff is the flurry itself: more jabs at the tap's damage each, the last one bigger; no STAGE_MULT on a jab)
+    apply(p, s, k) { p.jabs = by(this.jabs, s); p.radius = r2(p.radius * by(this.radius, s)); p.arc = Math.round((p.arc + by(this.arc, s)) * (1 + (k.wide || 0) * 0.2)); p.lastPct += by(this.last, s); p.knockback = r2(p.knockback * (1 + 0.3 * s)); p.stun = by(this.stun, s); return p; },
+    lines(p) { return [`Flurry: ${p.jabs} jabs of ${pct(p.dmgPct)}, the last ${pct(p.dmgPct * p.lastPct / 100)}`, `A ${Math.round(p.arc)}° cone, ${p.radius} m reach`, ...(p.stun ? [`The last jab staggers for ${p.stun}s`] : [])]; },
+    perks: set(STAGES(), QUICK(), WIDE({ name: 'Wider Wag', what: 'flurry', pct: 20 }),
+      UNIQUE('tailWind', 'Tail Wind', 8, 'He wags so hard the last jab of a charged flurry blows a puff of leaves on past the lance: 50% to foes up to 1.5 m further, blown back.', { extra: { pct: 50, r: 1.5 } })),
+  };
   C.sunbeamThrust = {
     ready: true, tune: { dmg: [0.72, 0.6, 0.5], shape: [1, 1, 1] }, base: 0.8, color: '#fff2c8', pose: 'gldThrust', title: 'Noonday Thrust',
     blurb: 'Crouch lower and draw the lance further back while the sunbeam gathers: the thrust flashes further and wider down its line, hits much harder and staggers what it pokes.',

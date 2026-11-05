@@ -15,7 +15,7 @@ export function makeStage({ ground = 60, hour = 10, center = [0, 0], dist = 30, 
   const hemi = new THREE.HemisphereLight('#bcdcff', '#b4c28c', 1.0); scene.add(hemi);
   const sun = new THREE.DirectionalLight('#fff4e0', 2.5); sun.castShadow = true;
   sun.shadow.mapSize.set(4096, 4096);
-  const sc = sun.shadow.camera; sc.left = -40; sc.right = 40; sc.top = 40; sc.bottom = -40; sc.near = 1; sc.far = 200;
+  const sc = sun.shadow.camera; sc.left = -40; sc.right = 40; sc.top = 40; sc.bottom = -40; sc.near = 1; sc.far = 200; sc.layers.enable(1); // (vegetation.js SHADOW_ONLY_LAYER: the Blender trees' shadow-only crown masses)
   sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03; sun.shadow.radius = 3;
   scene.add(sun, sun.target);
   const lightPool = new LightPool(scene, 8);

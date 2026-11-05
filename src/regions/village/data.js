@@ -221,10 +221,25 @@ export const VILLAGES = {
 };
 export const VILLAGE_ZONES = Object.keys(VILLAGES);
 /** The Waypoint Shrine's model slot (ROADMAP Z-D6): glb null = the kit waystone (art.js waystone, tinted per zone); a
- *  .glb path (public/models) = that model at every village's shrine slot (village.js placeShrineGlb), its materials
- *  named 'tint…' coloured per zone (WAYSTONE_TINTS); the kit's footprint, door and rune hook are kept either way. */
-export const WAYSTONE = { glb: null, scale: 1, yaw: 0 };
+ *  .glb path (public/models) = that model at every village's shrine slot (village.js placeShrineGlb): its `tintRoof`
+ *  material (or any other 'tint…') takes the zone's roof colour (WAYSTONE_TINTS), `tintCap` the crown's cap (WAYSTONE_CAPS:
+ *  moss, red leaves, salt crust, snow), and its `rune` mesh shows only once the village is saved; the kit's footprint,
+ *  door and rune hook are kept either way. */
+export const WAYSTONE = { glb: '/models/waystone.glb', scale: 1, yaw: 0 };
 export const WAYSTONE_TINTS = { bamboo: '#5a9a88', maple: '#c8402e', tidepool: '#3a8ab8', onsen: '#6a7ac8' };
+/** The zone villages' Blender set pieces (ROADMAP Z-D6; public/models, built by tools/blender/work/codex/village-pieces):
+ *  a path swaps the kit piece for the model at the same place (village.js addPieceGlb), null keeps the kit piece. */
+export const PIECE_GLB = { hoshigaki: '/models/hoshigaki-frame.glb', shishiOdoshi: '/models/shishi-odoshi.glb', ashiyu: '/models/ashiyu.glb', boat: '/models/fishing-boat.glb' };
+// ROADMAP Z-D6 "Blender everything": a village building's Blender model by zone and kind (tools/blender/work/codex/zv-<zone>):
+// it stands where the kit building would (the kit still gives the footprint, door and lamps); its `saved` object shows
+// only with the saved look, its `siege` object only without it (village.js placeBuildingGlb)
+export const BUILDING_GLB = {
+  bamboo: { elder: '/models/zv-bamboo-elder.glb', shop: '/models/zv-bamboo-shop.glb', inn: '/models/zv-bamboo-inn.glb', dojo: '/models/zv-bamboo-dojo.glb', craft: '/models/zv-bamboo-craft.glb', gate: '/models/zv-bamboo-gate.glb', lanternPost: '/models/zv-bamboo-lanternPost.glb' },
+  maple: { elder: '/models/zv-maple-elder.glb', shop: '/models/zv-maple-shop.glb', inn: '/models/zv-maple-inn.glb', teaHouse: '/models/zv-maple-teaHouse.glb', gate: '/models/zv-maple-gate.glb', lanternPost: '/models/zv-maple-lanternPost.glb' },
+  tidepool: { elder: '/models/zv-tidepool-elder.glb', shop: '/models/zv-tidepool-shop.glb', inn: '/models/zv-tidepool-inn.glb', fishmonger: '/models/zv-tidepool-fishmonger.glb', boatwright: '/models/zv-tidepool-boatwright.glb', gate: '/models/zv-tidepool-gate.glb', lanternPost: '/models/zv-tidepool-lanternPost.glb' },
+  onsen: { elder: '/models/zv-onsen-elder.glb', shop: '/models/zv-onsen-shop.glb', inn: '/models/zv-onsen-inn.glb', bathhouse: '/models/zv-onsen-bathhouse.glb', smith: '/models/zv-onsen-smith.glb', gate: '/models/zv-onsen-gate.glb', lanternPost: '/models/zv-onsen-lanternPost.glb' },
+};
+export const WAYSTONE_CAPS = { bamboo: '#86a856', maple: '#d8582e', tidepool: '#e8f0ec', onsen: '#f4f8ff' }; // (art.js waystone's cap colours)
 
 /** every zone villager by id → { ...villager, zone } (story.js names them, the quests point at them) */
 export const ZONE_NPCS = Object.fromEntries(Object.values(VILLAGES).flatMap(v => v.villagers.map(n => [n.id, { ...n, zone: v.zone, village: v.id }])));

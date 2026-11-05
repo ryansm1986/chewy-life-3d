@@ -1,0 +1,74 @@
+/* Combo chains (docs/COMBO.md §4): the K panel's Combo tab and pane (ui/comboPanel.js, inside the Charge drawer of
+   ui/chargePanel.js), the tree's chain chip, the tooltip section, and the hotbar's chain pips + badge (ui/comboHud.js).
+   --tc = the tree colour, --cc = the skill's combo colour. */
+
+/* ---------------------------------------------------------------- the drawer's two tabs */
+.chg-drawer .chg-tag { cursor: pointer; transition: transform .2s var(--spring), filter .2s; }
+.cmb-tab { position: absolute; left: 138px; top: -19px; z-index: 1; display: flex; align-items: center; gap: 5px; height: 26px; padding: 2px 12px 3px 6px; cursor: pointer;
+  color: #fff; font: 700 14.5px/1 var(--font); -webkit-text-stroke: 3.5px var(--ink); paint-order: stroke fill;
+  background: linear-gradient(#fff8ee, #f1e0cc); border: 3px solid var(--ink); border-radius: 12px 14px 14px 6px; box-shadow: 0 3px 0 var(--ink); transform: rotate(1.5deg); transition: transform .2s var(--spring), filter .2s; }
+.cmb-tab[hidden] { display: none; }
+.cmb-tab .cmb-ln { width: 20px; height: 20px; flex: none; }
+.cmb-tab span { color: #e8d4c4; }
+.cmb-tab:hover { transform: rotate(1.5deg) translateY(-2px); }
+.chg-drawer:not(.combo) .cmb-tab:not([hidden])::after { content: ''; position: absolute; inset: -6px -5px; border-radius: 14px; } /* (a little more to hit than it shows) */
+/* combo shown: its tab in front in the tree colour, the Charge tag stepped back */
+.chg-drawer.combo .cmb-tab { z-index: 3; background: linear-gradient(color-mix(in srgb, var(--tc) 55%, #fff), var(--tc)); transform: rotate(-1deg) translateY(-2px) scale(1.06); }
+.chg-drawer.combo .cmb-tab span { color: #fff; }
+.chg-drawer.combo .chg-tag { filter: saturate(.25) brightness(1.12) opacity(.9); transform: rotate(-3deg) translateY(3px) scale(.9); }
+.chg-drawer.combo .chg-tag:hover { filter: saturate(.6) brightness(1.06); }
+.chg-drawer.combo > :not(.chg-tag, .cmb-tab, .cmb-pane) { display: none; }
+.chg-drawer:not(.combo) > .cmb-pane { display: none; }
+.chg-drawer.swap > .cmb-pane { animation: none; }
+.chg-drawer.swap > .cmb-pane > :not(.cmb-pl, .cmb-pick) { animation: chgSwap .42s var(--pop); }
+
+/* ---------------------------------------------------------------- the pane (the Charge card's classes, plus these) */
+.cmb-steps { gap: 3px; }
+.cmb-st { min-width: 64px; }
+.cmb-st b { font-size: 16px; }
+.cmb-st.fin { background: radial-gradient(circle at 50% 30%, #fffbe8, #ffe8b0); }
+.cmb-st.fin b { color: #ffd24a; }
+.cmb-fast { position: absolute; right: -9px; top: -9px; padding: 1px 4px 2px; font: 700 9.5px/1.2 var(--font); font-style: normal; color: #fff; background: var(--tc); border: 2px solid var(--ink); border-radius: 7px; -webkit-text-stroke: 2.5px var(--ink); paint-order: stroke fill; }
+
+/* ---------------------------------------------------------------- the tree's chain chip (top right of a combo node) */
+.nd-cmb { position: absolute; right: -13px; top: -11px; z-index: 2; display: none; align-items: center; gap: 1px; height: 21px; padding: 0 5px 0 2px; border: 2.5px solid var(--ink); border-radius: 10px;
+  background: linear-gradient(#fff, #f3e6d6); font: 700 10.5px/1 var(--font); cursor: pointer; box-shadow: 0 2px 0 rgba(74, 44, 42, .4); transition: transform .2s var(--spring); }
+.nd-cmb.on { display: flex; }
+.nd-cmb::after { content: ''; position: absolute; inset: -5px -4px; border-radius: 12px; }
+.nd-cmb .cmb-ln { width: 16px; height: 16px; }
+.nd-cmb b:empty { display: none; }
+.nd-cmb:hover { transform: scale(1.18); }
+.nd-cmb.spent { background: linear-gradient(color-mix(in srgb, var(--tc) 35%, #fff), var(--tc)); color: #fff; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
+.nd-cmb.can { animation: badgePulse 1.4s ease-in-out infinite; }
+.nd-cmb.sel { box-shadow: 0 0 0 3px #fff, 0 0 0 5.5px var(--tc), 0 2px 0 rgba(74, 44, 42, .4); }
+.node.locked .nd-cmb { display: none; } /* (the lock sits there; the chip shows once the skill can be learned) */
+.node.avail:not(.can) .nd-cmb { opacity: .6; }
+.ui-root.m-touch .nd-cmb::after { inset: -18px -16px 0 0; } /* (about 44 px to a finger, reaching only up and out past the node's corner: Chrome's touch adjustment snaps a finger near the node's middle onto anything clickable it overlaps, and a tap there must learn, a double-tap assign: s19 i) */
+
+/* ---------------------------------------------------------------- the tooltip */
+.tt-sect.cmb { background: rgba(255, 200, 140, .08); }
+.tt-sect.cmb .tt-sh { color: #ffcf9a; }
+.tt-sect.cmb b { color: #fff; }
+
+/* ---------------------------------------------------------------- the hotbar: chain pips along the slot's foot, a badge */
+.hb .hcm-pips { position: absolute; left: 57%; bottom: 3px; z-index: 3; display: flex; gap: 3px; transform: translateX(-50%) scale(.6); opacity: 0; pointer-events: none; transition: opacity .12s, transform .2s var(--spring); }
+.hb.chain .hcm-pips, .hb.chfin .hcm-pips { opacity: 1; transform: translateX(-50%) scale(1); }
+.hcm-pips i { width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--ink); background: rgba(255, 250, 240, .9); box-shadow: 0 1px 0 rgba(74, 44, 42, .4); }
+.hcm-pips i:last-child { width: 11px; height: 11px; margin-top: -1px; border-radius: 3px; transform: rotate(45deg) scale(.85); }
+.hcm-pips i.lit { background: var(--cc, #ffc24a); box-shadow: 0 0 0 1px #fff, 0 0 6px 1px var(--cc, #ffc24a); }
+.hcm-pips i.next { animation: hcmNext .5s ease-in-out infinite alternate; }
+@keyframes hcmNext { to { background: color-mix(in srgb, var(--cc, #ffc24a) 45%, #fff); } }
+.hb.chfin .hcm-pips i { background: var(--cc, #ffc24a); box-shadow: 0 0 0 1px #fff, 0 0 8px 2px var(--cc, #ffc24a); }
+.hb.chfin .hb-in { animation: hcmFin .45s var(--pop); }
+@keyframes hcmFin { 40% { transform: translateY(-3px) scale(1.1); box-shadow: 0 0 0 3px #fff, 0 0 14px 4px var(--cc, #ffc24a), 0 3px 0 var(--ink); } }
+.hb .hb-cmb { position: absolute; right: 13px; top: -7px; width: 21px; height: 21px; display: none; z-index: 4; pointer-events: none; border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, #fffdf8, #ffe0c4); border: 2.5px solid var(--ink); box-shadow: 0 2px 0 rgba(74, 44, 42, .3); }
+.hb .hb-cmb.on { display: grid; place-items: center; }
+.hb .hb-cmb .cmb-ln { width: 15px; height: 15px; }
+.hb .hb-cmb.pop { animation: pipPop .52s var(--pop); }
+.hb.empty .hb-cmb { display: none; }
+
+/* ---------------------------------------------------------------- a phone: the folded sheet keeps its one Charge tag (as
+   before: a second tag would push it left over the tree's right-hand nodes); the open sheet shows both tabs */
+.ui-root.m-phone .chg-drawer.m-open .cmb-tab { top: -6px; left: 116px; min-height: 44px; height: auto; z-index: 6; } /* (the open sheet scrolls: inside its edge, beside the Charge tag, a finger's height) */
+.ui-root.m-phone .chg-drawer.m-open .cmb-pl { left: 214px; z-index: 5; } /* (over the sticky strip's paper, as the Charge tag and label are: mobile.css) */

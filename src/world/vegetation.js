@@ -8,6 +8,7 @@ import { mulberry32, TAU, clamp, Noise } from '../core/util.js';
 import { T, WORLD, OVERLAY_GLSL } from './terrain.js';
 import { treeKeepOut, inTown, PLATEAU, NORTH, HILL, BAMBOO, GREEN_BELTS, STREET_TREES } from './layout.js';
 import { mossCap, mossLine, mossyStone } from './buildings/props.js';
+import { treeGlb } from './treeGlb.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const col = h => new THREE.Color(h);
@@ -540,6 +541,8 @@ function buildRound(B, seed, ginkgo) {
 }
 const BUILDERS = { pine: buildPine, sakura: buildSakura, momiji: buildMomiji, round: (B, s) => buildRound(B, s, false), ginkgo: (B, s) => buildRound(B, s, true) };
 function buildTree(kind, seed) {
+  const tg = treeGlb('village-' + kind, seed); // (its Blender model once built and loaded: world/treeGlb.js)
+  if (tg?.bark && tg['cards:' + kind]) return { trunkGeo: tg.bark, foliage: tg.foliage || tg.bark.clone(), cardGeo: tg['cards:' + kind], massKey: 'foliage:shadow' }; // (massKey: a region drawing it puts the rough masses in its shadow-only bucket)
   const B = { trunk: [], masses: [], cards: new CardSet() };
   BUILDERS[kind](B, seed);
   return { trunkGeo: paintBark(merge(B.trunk), kind), foliage: merge(B.masses), cardGeo: B.cards.geo() };
@@ -599,6 +602,7 @@ function buildBamboo(seed) {
 // shell of broadleaf cards, plus blooms from the sakura atlas tinted per species -- mophead hydrangea heads (blue or
 // pink, one colour per bush), clusters of azalea flowers -- or, on the box bushes, glossy red berries.
 function buildBush(kind, seed) {
+  { const g = treeGlb('village-bush-' + kind, Math.floor(seed / 3)); if (g?.foliage && g['cards:round']) return { mass: g.foliage, leaves: g['cards:round'], blooms: g['cards:sakura'], berries: g.berries }; } // (its Blender model: the village seeds are v * 3 + kind.length, so seed / 3 tells the variants apart)
   const r = mulberry32(seed + 77);
   const n = 3 + Math.floor(r() * 2), crown = V(0, 0.5, 0), M = [];
   for (let i = 0; i < n; i++) { const a = r() * TAU, d = i ? 0.26 + r() * 0.2 : 0; M.push({ c: V(Math.cos(a) * d, 0.42 + r() * 0.18 - d * 0.2, Math.sin(a) * d), r: (i ? 0.34 : 0.44) + r() * 0.12 }); }
@@ -689,6 +693,7 @@ function susukiGeo(seed) {
 }
 // Rock: lumpy stone with a raised moss cap draped over its top (ragged noise edge) and a few pebbles at its foot
 function rockGeo(seed) {
+  { const g = treeGlb('village-rock', seed); if (g?.rock) return g.rock; } // (its Blender model once listed: one welded part, material 'rock')
   // welded, round-shaded stone with a moss cushion growing out of its top (no flat facets, no saw-tooth cap edge)
   const g = mossyStone(puff(V(0, 0.15, 0), 0.6, { detail: 2, noise: 0.35, squash: 0.62, seed }), { amt: 0.4, sc: 3.2, seed, lift: 0.055, stone: ['#a8a0b4', '#d4ccd4'], moss: '#74a854', hi: '#a4cc68' });
   const r = mulberry32(seed * 3 + 1), parts = [g];
@@ -926,8 +931,23 @@ export class Batch {
     if (gi < 0) { gi = this.geos.length; this.geos.push(geo); }
     this.items.push({ gi, m: m4.clone(), c: color ? color.clone() : WHITE, rec });
   }
+  // a BatchedMesh takes every geometry in the shape of its first (the same attributes, all indexed or none): kit pieces
+  // and Blender models (ROADMAP Z-D6) can share a batch, so a mixed set is made uniform here, once, before it builds
+  _uniform() {
+    if (this._uni) return; this._uni = true;
+    const G = this.geos; if (G.length < 2) return;
+    const names = new Set(G.flatMap(g => Object.keys(g.attributes))), mixedIdx = G.some(g => g.index) && G.some(g => !g.index);
+    const odd = G.some(g => [...names].some(n => !g.attributes[n]));
+    if (!mixedIdx && !odd) return;
+    this.geos = G.map(g => {
+      let o = mixedIdx && g.index ? g.toNonIndexed() : (odd ? g.clone() : g);
+      for (const n of names) if (!o.attributes[n]) { const ref = G.find(x => x.attributes[n]).attributes[n]; o.setAttribute(n, new THREE.BufferAttribute(new ref.array.constructor(o.attributes.position.count * ref.itemSize), ref.itemSize, ref.normalized)); }
+      return o;
+    });
+  }
   // one BatchedMesh holding these items (and only the geometries they use)
   _mesh(items, group) {
+    this._uniform();
     const gis = [...new Set(items.map(it => it.gi))];
     const verts = gis.reduce((a, gi) => a + this.geos[gi].attributes.position.count, 0);
     const idx = gis.reduce((a, gi) => a + (this.geos[gi].index ? this.geos[gi].index.count : 0), 0);

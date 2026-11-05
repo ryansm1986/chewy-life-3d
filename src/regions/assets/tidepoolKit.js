@@ -117,7 +117,7 @@ export function makeMats({ night = 0 } = {}) {
   dm.glow.emissiveIntensity = lamp;
   const M = {
     ...dm,
-    bark: VEG_MATS.bark(), foliage: VEG_MATS.foliage(), bushFol: VEG_MATS.foliage({ occluder: false }),
+    bark: VEG_MATS.bark(), foliage: VEG_MATS.foliage(), 'foliage:shadow': VEG_MATS.foliage({ shadowOnly: true }), bushFol: VEG_MATS.foliage({ occluder: false }),
     'cards:pine': VEG_MATS.cards('pine'), 'cards:round': VEG_MATS.cards('round', { occluder: false }),
     'cards:bloom': VEG_MATS.cards('sakura', { occluder: false }), 'cards:pineLow': VEG_MATS.cards('pine', { occluder: false }),
     rock: VEG_MATS.rock(),

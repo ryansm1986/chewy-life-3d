@@ -10,6 +10,7 @@ import { theDen } from './defs.js';
 import { TierRun } from './tierRun.js';
 import { DungeonWorld, propCutMat } from './dungeonWorld.js';
 import { chestGeometry, potGeometry, potColor } from './lootModels.js';
+import { propGeo } from './propModels.js';
 import { Monster } from './monster.js';
 import { MONSTERS } from './monsters.js';
 import { updateMonsters } from './crowd.js';
@@ -430,7 +431,7 @@ export class DungeonMode {
     }[type];
     const base = new RoundedBox(0.8, 1.1, 0.8, 2, 0.12); base.translate(0, 0.55, 0); paint(base, (q, n, o) => o.set('#b8b0c4').lerp(new THREE.Color('#e0d8e8'), Math.max(0, n.y)));
     const roof = new THREE.ConeGeometry(0.7, 0.45, 4); roof.rotateY(Math.PI / 4); roof.translate(0, 1.32, 0); paint(roof, (q, n, o) => o.set('#6a5a8a'));
-    const sg = merge([base, roof]); sg.setAttribute('aAnchor', new THREE.Float32BufferAttribute(Array.from({ length: sg.attributes.position.count }, () => [p.x, p.z, 1.55]).flat(), 3)); // (cut away like the floor's props)
+    const sg = propGeo('shrine-' + type, 'base') || merge([base, roof]); sg.setAttribute('aAnchor', new THREE.Float32BufferAttribute(Array.from({ length: sg.attributes.position.count }, () => [p.x, p.z, 1.55]).flat(), 3)); // (cut away like the floor's props)
     const mesh = new THREE.Mesh(sg, propCutMat({ vertexColors: true, rim: 0.4 })); mesh.position.copy(p); mesh.castShadow = true; W.scene.add(mesh);
     const orb = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12), makeToon({ color: INFO.color, emissive: INFO.color, emissiveIntensity: 1.5 })); orb.position.copy(p).add(V(0, 0.8, 0.42)); W.scene.add(orb);
     const light = W.lightPool.addSource({ pos: orb.position.clone(), color: new THREE.Color(INFO.color), intensity: 5, radius: 5, flicker: 0.3 });

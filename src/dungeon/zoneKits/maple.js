@@ -30,9 +30,11 @@ import { SH, M, MD, col } from '../dungeonWorld.js';
 import { tube, puff, paint, merge } from '../../gfx/geom.js';
 import { mulberry32, clamp, TAU, rand } from '../../core/util.js';
 import * as F from '../../regions/assets/mapleFlora.js';
-import * as Pr from '../../regions/assets/mapleProps.js';
+import * as PrKit from '../../regions/assets/mapleProps.js';
 import * as BF from '../../regions/assets/bambooFlora.js';
-import * as BP from '../../regions/assets/bambooProps.js';
+import * as BPKit from '../../regions/assets/bambooProps.js';
+import { withGlb, glbFn } from '../../regions/assets/glbPieces.js';
+const Pr = withGlb('maple', PrKit), BP = withGlb('bamboo', BPKit); // (the region props' Blender models, as the regions draw them)
 import { V } from '../../regions/assets/bambooKit.js';
 import { G as BG, C as BC } from '../../world/buildings/kit.js';
 import { roof } from '../../world/buildings/roofs.js';
@@ -437,7 +439,7 @@ function chochinPost(seed = 0, h = 1.75) {
 }
 /** a little hollow-root shrine: a stone plinth, a weathered wooden hokora with lattice doors, a copper-green gable roof
  *  hung with shimenawa, an offering box, a tokkuri of sake and two tiny stone tanuki (local +z faces the visitor) */
-function hokora(seed = 0) {
+function hokoraKit(seed = 0) {
   return cached('hokora:' + seed, () => BP.kit(seed * 13 + 5, B => {
     const base = BG.box(1.5, 0.3, 1.2, 0.05); base.translate(0, 0.15, 0); B.add(base, (p, n, o) => o.set('#a49688').multiplyScalar(n.y > 0.5 ? 1 : 0.84));
     const st = BG.box(1.0, 0.12, 0.3, 0.03); st.translate(0, 0.06, 0.74); B.add(st, '#968878');
@@ -465,8 +467,9 @@ function hokora(seed = 0) {
     B.light([0, 0.9, 0.55], { color: '#ffd8a0', intensity: 1.2, radius: 4, flicker: 0.4, nightOnly: false });
   }, 0.02));
 }
+const hokora = glbFn('dg-maple', 'hokora', hokoraKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-maple'])
 /** a tangle of old maple roots spilling out of the wall foot, leaves and a mushroom cluster in it; local -z = the wall */
-function rootTangle(seed = 0) {
+function rootTangleKit(seed = 0) {
   return cached('roots:' + seed, () => BP.kit(seed * 23 + 9, B => {
     const r = mulberry32(seed * 53 + 1), m = 4 + Math.floor(r() * 3);
     for (let i = 0; i < m; i++) {
@@ -479,8 +482,9 @@ function rootTangle(seed = 0) {
     strewLeaves(B, r, 0, 0.4, 0.9, 10, 0.02);
   }, 0.01));
 }
+const rootTangle = glbFn('dg-maple', 'rootTangle', rootTangleKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-maple'])
 /** a fallen maple branch on the floor: a forked limb, twigs, a few leaves still on it and more around (along local x) */
-function fallenBranch(seed = 0) {
+function fallenBranchKit(seed = 0) {
   return cached('branch:' + seed, () => BP.kit(seed * 31 + 4, B => {
     const r = mulberry32(seed * 61 + 7), L = 2.4 + r() * 0.6;
     const main = []; for (let k = 0; k <= 6; k++) { const t = k / 6; main.push({ p: V(-L / 2 + t * L, 0.1 - t * 0.04 + Math.sin(t * Math.PI) * 0.06, Math.sin(t * 4 + seed) * 0.12), r: 0.11 * (1 - t * 0.55) }); }
@@ -494,6 +498,7 @@ function fallenBranch(seed = 0) {
     strewLeaves(B, r, 0, 0.2, 1.4, 16);
   }, 0.01));
 }
+const fallenBranch = glbFn('dg-maple', 'fallenBranch', fallenBranchKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-maple'])
 /** a root knee: a great root breaking the floor in a low arch and diving back in, rootlets either end (along local x) */
 function rootKnee(seed = 0, L = 2.0) {
   return cached(`knee:${seed}:${L}`, () => BP.kit(seed * 19 + 2, B => {
@@ -506,7 +511,7 @@ function rootKnee(seed = 0, L = 2.0) {
   }, 0.01));
 }
 /** a cut maple stump: ringed top, bark, glowing shelf fungus up one side, mushrooms at its foot */
-function stump(seed = 0) {
+function stumpKit(seed = 0) {
   return cached('stump:' + seed, () => BP.kit(seed * 29 + 7, B => {
     const r = mulberry32(seed * 43 + 1), R = 0.36 + r() * 0.1, H = 0.42 + r() * 0.2;
     const pts = [{ p: V(0, -0.05, 0), r: R * 1.2 }, { p: V(0, H * 0.3, 0), r: R }, { p: V(0, H, 0), r: R * 0.95 }];
@@ -518,9 +523,10 @@ function stump(seed = 0) {
     strewLeaves(B, r, 0, 0, 0.9, 8);
   }, 0.01));
 }
+const stump = glbFn('dg-maple', 'stump', stumpKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-maple'])
 function roots5(B, r, x, z, a) { B.add(barkGeo([{ p: V(x * 0.9, 0.12, z * 0.9), r: 0.07 }, { p: V(x * 1.3 + Math.cos(a) * 0.15, 0.03, z * 1.3 + Math.sin(a) * 0.15), r: 0.045 }, { p: V(x * 1.4 + Math.cos(a) * 0.4, -0.05, z * 1.4 + Math.sin(a) * 0.4), r: 0.015 }], { radial: 5 }), null); }
 /** a drying rack hung with strings of hoshigaki (dried persimmons) under a straw rain cover (along local x) */
-function hoshigakiRack(seed = 0) {
+function hoshigakiRackKit(seed = 0) {
   return cached('hoshi:' + seed, () => BP.kit(seed * 11 + 6, B => {
     const r = mulberry32(seed * 7 + 2), W = 1.5, H = 1.55;
     for (const sx of [-1, 1]) { const p = BG.cyl(0.04, 0.05, H + 0.1, 6); p.translate(sx * W / 2, (H + 0.1) / 2, 0); B.add(p, '#5a4232'); }
@@ -534,8 +540,9 @@ function hoshigakiRack(seed = 0) {
     strewLeaves(B, r, 0, 0.3, 0.8, 6);
   }, 0.01));
 }
+const hoshigakiRack = glbFn('dg-maple', 'hoshigakiRack', hoshigakiRackKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-maple'])
 /** a low table laid with a tokkuri and cups on a straw zabuton or two (the sake cellar) */
-function sakeTable(seed = 0) {
+function sakeTableKit(seed = 0) {
   return cached('stable:' + seed, () => BP.kit(seed * 5 + 9, B => {
     const top = BG.box(1.0, 0.07, 0.6, 0.02); top.translate(0, 0.32, 0); B.add(top, (p, n, o) => o.set('#7a5440').multiplyScalar(n.y > 0.5 ? 1 : 0.8));
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const l = BG.box(0.06, 0.3, 0.06, 0.01); l.translate(sx * 0.42, 0.15, sz * 0.24); B.add(l, '#4e3628'); }
@@ -544,6 +551,7 @@ function sakeTable(seed = 0) {
     for (const sz of [-1, 1]) { const zb = BG.box(0.5, 0.07, 0.5, 0.03); zb.translate(0, 0.035, sz * 0.62); B.add(zb, (p, n, o) => o.set(sz > 0 ? '#c8a058' : '#b8484a').multiplyScalar(0.9 + 0.1 * Math.sin(p.x * 50))); }
   }, 0.01));
 }
+const sakeTable = glbFn('dg-maple', 'sakeTable', sakeTableKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-maple'])
 /** two great roots rising out of the floor and twisting together into an arch overhead (a hollow-root doorway); local
  *  x across the arch, +z its face */
 function rootArch(seed = 0, w = 2.6, h = 2.8) {
@@ -1228,3 +1236,5 @@ export const MAPLE_KIT = {
   rooms: ROOMS, extras, arrival, hoard, corridor,
   seal: { color: '#ffc884', rope: '#e8d29a' }, // the arena seal's look (dungeon/zoneRun.js)
 };
+// the kit's own pieces, unwrapped (the Blender builders dump them for reference: tools/blender/work/codex/dg-maple)
+export const KIT_PIECES = { hokora: hokoraKit, rootTangle: rootTangleKit, fallenBranch: fallenBranchKit, stump: stumpKit, hoshigakiRack: hoshigakiRackKit, sakeTable: sakeTableKit };

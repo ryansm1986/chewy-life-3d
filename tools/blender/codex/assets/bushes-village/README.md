@@ -1,0 +1,3 @@
+# Blossom Hollow's bushes (bushes-village): Blender source (Z-D6, 2026-11-05)
+
+Hydrangea (blue / pink / lilac), azalea (magenta / coral / soft pink) and box (berried) bushes, 3 variants each: public/models/tree-village-bush-<kind>-v<k>.glb, TREE_GLB, vegetation.js buildBush (treeGlb('village-bush-' + kind, Math.floor(seed / 3)): the village seeds are v * 3 + kind.length). Parts by material: foliage (shadow-only masses), cards_round (leaf clumps, dark inner cards so no holes show), cards_sakura (bloom heads / azalea flowers), berries. Card UVs match the kit's inset atlas rects (uv_check.py). Build: build_bushes-village.py.

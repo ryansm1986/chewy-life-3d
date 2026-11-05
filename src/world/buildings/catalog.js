@@ -9,31 +9,31 @@ const cov = (...list) => ({ cover: { kind: list[0][0], r: list[0][1] }, covers: 
 
 export const BUILDINGS = {
   // ------------------------------------------------------------------ special / story
-  townHall: {
+  townHall: { glb: ['/models/townHall.glb'],
     name: 'Blossom Hall', cat: 'special', size: [6, 4], levels: 1, unique: true, prebuilt: true,
     cost: { coins: 1000, wood: 60, stone: 40, lantern: 4 }, jobs: [2],
     desc: 'The heart of the village — the bell rings every morning and the mayor naps upstairs.',
   },
-  chewyHouse: {
+  chewyHouse: { glb: ['/models/chewyHouse-1.glb', '/models/chewyHouse-2.glb', '/models/chewyHouse-3.glb'],
     name: "Chewy's Cottage", cat: 'special', size: [3, 3], levels: 3, unique: true, prebuilt: true,
     cost: { coins: 0 }, levelCost: [null, { coins: 450, wood: 20, stone: 8 }, { coins: 1000, wood: 36, stone: 16, lantern: 2 }],
     variants: ["Chewy's Cottage", "Chewy's Porch Cottage", "Chewy's Two-Storey Cottage"], desc: "Home sweet home! There's a bone-shaped sign and a very important mailbox.",
   },
-  rosieShop: {
+  rosieShop: { glb: ['/models/rosieShop.glb'],
     name: "Rosie's Treats", cat: 'special', size: [4, 3], levels: 1, unique: true, prebuilt: true,
     cost: { coins: 0 }, jobs: [1], desc: 'Cakes, candies and quests, served with a big smile and a red bow.',
   },
-  boneSmith: {
+  boneSmith: { glb: ['/models/boneSmith.glb'], glbKeep: ['hot'],
     name: 'Bonesmith Forge', cat: 'special', size: [3, 3], levels: 1, unique: true,
     cost: { coins: 260, wood: 12, stone: 18, bone: 4 }, jobs: [1],
     desc: 'Clang, clang! The forge glows day and night, polishing Bone Katanas to a shine.',
   },
-  dungeonGate: {
+  dungeonGate: { glb: ['/models/burrowGate.glb'], glbKeep: ['hot', 'anim'],
     name: 'The Burrow', cat: 'special', size: [4, 4], levels: 1, unique: true, prebuilt: true,
     cost: { coins: 0 }, ...cov(['light', 6]),
     desc: 'A vermilion torii before a mossy hill. Something purple and wiggly glows deep inside...',
   },
-  bulletinBoard: {
+  bulletinBoard: { glb: ['/models/bulletinBoard.glb'],
     name: 'Notice Board', cat: 'special', size: [1, 1], levels: 1,
     cost: { coins: 25, wood: 4 }, desc: 'Lost mittens, found kittens and brand-new quests — pinned with love.',
   },
@@ -41,19 +41,19 @@ export const BUILDINGS = {
   // (buildMode RANK_REQ); level 1 needs no combat-only material (petal: home's sakura drifts); levels 2 and 3 at ranks 3
   // and 4 (cozy/guild.js GUILD_RANK). glb: a slot for a later Blender centrepiece (the toybox / codex-blender pipeline).
   guild: {
-    name: "Adventurers' Guild", cat: 'special', size: [4, 3], levels: 3, unique: true, jobs: [2, 3, 4], glb: null,
+    name: "Adventurers' Guild", cat: 'special', size: [4, 3], levels: 3, unique: true, jobs: [2, 3, 4], glb: ['/models/guild-1.glb', '/models/guild-2.glb', '/models/guild-3.glb'],
     cost: { coins: 400, wood: 30, stone: 16, petal: 4 }, levelCost: [null, { coins: 900, wood: 40, stone: 30, silk: 4, lantern: 2 }, { coins: 1800, wood: 60, stone: 40, crystal: 4, lantern: 4 }],
     variants: ["Adventurers' Guild", "Adventurers' Guild Hall", "Grand Adventurers' Guild"],
     desc: 'Old Hachi signs on adventurers for your crews, and the Expedition Board hangs inside the door.',
   },
   // ------------------------------------------------------------------ zoned growth
-  home: {
+  home: { glbVariants: [8, 8, 8],
     name: 'Cozy Home', cat: 'home', zone: 'R', size: [2, 2], sizes: [[2, 2], [3, 3], [3, 3]], levels: 3,
     cost: { coins: 50, wood: 6 }, levelCost: [null, { coins: 320, wood: 14, stone: 6 }, { coins: 750, wood: 24, stone: 14, petal: 3 }], // (the player's Upgrade: ~3 days of early income for L2, ~a week for L3 — docs/HOUSING.md; the village's own growth is free)
     capacity: [2, 4, 6], variants: ['Tiny Cottage', 'Porch House', 'Blossom Villa'],
     desc: 'Villagers move in all by themselves when a home feels just right.',
   },
-  shop: {
+  shop: { glbVariants: [8, 8, 8], glbKeep: ['anim'],
     name: 'Market Shop', cat: 'shop', zone: 'C', size: [2, 2], sizes: [[2, 2], [3, 3], [3, 3]], levels: 3,
     cost: { coins: 70, wood: 8 }, levelCost: [null, { coins: 360, wood: 16, stone: 6, silk: 1 }, { coins: 800, wood: 26, stone: 14, lantern: 2 }],
     jobs: [2, 3, 5],
@@ -61,51 +61,51 @@ export const BUILDINGS = {
     desc: 'From humble snack carts to a grand teahouse — shops grow with the village.',
   },
   // ------------------------------------------------------------------ workshops
-  farm: {
+  farm: { glb: ['/models/farm-1.glb', '/models/farm-2.glb'],
     name: 'Veggie Patch', cat: 'craft', zone: 'W', size: [3, 3], levels: 2, jobs: [2, 3],
     cost: { coins: 80, wood: 6 }, levelCost: [null, { coins: 140, wood: 10, stone: 2 }],
     desc: 'Rows of round cabbages and cheeky carrots, guarded by a very polite scarecrow.',
   },
-  lumber: {
+  lumber: { glb: ['/models/lumber-1.glb', '/models/lumber-2.glb'], glbKeep: ['anim'],
     name: 'Lumber Workshop', cat: 'craft', zone: 'W', size: [3, 3], levels: 2, jobs: [2, 3],
     cost: { coins: 100, wood: 4, stone: 6 }, levelCost: [null, { coins: 180, wood: 8, stone: 8 }],
     desc: 'Sawdust, sweet cedar smell and neat stacks of logs. Produces wood.',
   },
-  kiln: {
+  kiln: { glb: ['/models/kiln-1.glb', '/models/kiln-2.glb'], glbKeep: ['hot'],
     name: 'Pottery Kiln', cat: 'craft', zone: 'W', size: [3, 3], levels: 2, jobs: [2, 3],
     cost: { coins: 140, stone: 16, wood: 4 }, levelCost: [null, { coins: 220, stone: 14, wood: 6, crystal: 1 }],
     desc: 'A toasty climbing kiln that turns clay into cups, bowls and stone bricks.',
   },
-  fishingHut: {
+  fishingHut: { glb: ['/models/fishingHut-1.glb', '/models/fishingHut-2.glb'],
     name: 'Fishing Hut', cat: 'craft', zone: 'W', size: [2, 3], levels: 2, jobs: [1, 2],
     cost: { coins: 90, wood: 10, silk: 1 }, levelCost: [null, { coins: 150, wood: 10, silk: 2 }],
     desc: 'Nets drying in the breeze and a bucket that is always suspiciously full.',
   },
   // ------------------------------------------------------------------ services (coverage)
-  well: { name: 'Village Well', cat: 'service', size: [1, 1], levels: 1, cost: { coins: 40, stone: 6 }, ...cov(['water', 6]), desc: 'Cool, clear water with a little roof and a creaky bucket.' },
-  waterTower: { name: 'Water Tower', cat: 'service', size: [2, 2], levels: 1, cost: { coins: 120, wood: 14, stone: 6 }, ...cov(['water', 12]), desc: 'A big wooden tank on tall legs keeps the whole neighbourhood splashy.' },
-  stoneLantern: { name: 'Stone Lantern', cat: 'service', size: [1, 1], levels: 1, cost: { coins: 30, stone: 5 }, ...cov(['light', 5]), desc: 'A mossy tōrō that glows softly after sunset.' },
-  streetLamp: { name: 'Lantern Post', cat: 'service', size: [1, 1], levels: 1, cost: { coins: 35, wood: 2, lantern: 1 }, ...cov(['light', 6]), desc: 'A cheerful paper lantern on a wooden post. Moths love it.' },
-  park: { name: 'Pocket Park', cat: 'service', size: [3, 3], levels: 1, cost: { coins: 150, wood: 6, petal: 6 }, ...cov(['joy', 8]), desc: 'Benches, a little sakura, flower beds and a pond full of lily pads.' },
-  shrine: { name: 'Blossom Shrine', cat: 'service', size: [3, 3], levels: 1, cost: { coins: 300, wood: 20, stone: 10, lantern: 2, petal: 4 }, ...cov(['joy', 12]), jobs: [1], desc: 'Ring the bell, clap twice and make a wish for good snacks.' },
-  onsen: { name: 'Hot Spring', cat: 'service', size: [4, 4], levels: 1, cost: { coins: 400, wood: 16, stone: 24, crystal: 2 }, ...cov(['joy', 10], ['health', 10]), jobs: [2], desc: 'Steamy, cozy and good for sore paws. Bamboo walls for privacy!' },
-  clinic: { name: 'Paw Clinic', cat: 'service', size: [3, 3], levels: 1, cost: { coins: 320, wood: 18, stone: 10, mochi: 3 }, ...cov(['health', 10]), jobs: [2], desc: 'Bandages, warm tea and gentle hugs for every villager.' },
-  school: { name: 'Village School', cat: 'service', size: [4, 3], levels: 1, cost: { coins: 380, wood: 26, stone: 10, silk: 2 }, ...cov(['learn', 12]), jobs: [2], desc: 'Reading, writing and advanced napping. The bell tower rings at noon.' },
+  well: { glb: ['/models/well.glb'], glbKeep: ['anim'], name: 'Village Well', cat: 'service', size: [1, 1], levels: 1, cost: { coins: 40, stone: 6 }, ...cov(['water', 6]), desc: 'Cool, clear water with a little roof and a creaky bucket.' },
+  waterTower: { glb: ['/models/waterTower.glb'], glbKeep: ['jet'], name: 'Water Tower', cat: 'service', size: [2, 2], levels: 1, cost: { coins: 120, wood: 14, stone: 6 }, ...cov(['water', 12]), desc: 'A big wooden tank on tall legs keeps the whole neighbourhood splashy.' },
+  stoneLantern: { glb: ['/models/stoneLantern.glb'], name: 'Stone Lantern', cat: 'service', size: [1, 1], levels: 1, cost: { coins: 30, stone: 5 }, ...cov(['light', 5]), desc: 'A mossy tōrō that glows softly after sunset.' },
+  streetLamp: { glb: ['/models/streetLamp.glb'], name: 'Lantern Post', cat: 'service', size: [1, 1], levels: 1, cost: { coins: 35, wood: 2, lantern: 1 }, ...cov(['light', 6]), desc: 'A cheerful paper lantern on a wooden post. Moths love it.' },
+  park: { glb: ['/models/park.glb'], name: 'Pocket Park', cat: 'service', size: [3, 3], levels: 1, cost: { coins: 150, wood: 6, petal: 6 }, ...cov(['joy', 8]), desc: 'Benches, a little sakura, flower beds and a pond full of lily pads.' },
+  shrine: { glb: ['/models/villageShrine.glb'], name: 'Blossom Shrine', cat: 'service', size: [3, 3], levels: 1, cost: { coins: 300, wood: 20, stone: 10, lantern: 2, petal: 4 }, ...cov(['joy', 12]), jobs: [1], desc: 'Ring the bell, clap twice and make a wish for good snacks.' },
+  onsen: { glb: ['/models/onsenHall.glb'], glbKeep: ['jet'], name: 'Hot Spring', cat: 'service', size: [4, 4], levels: 1, cost: { coins: 400, wood: 16, stone: 24, crystal: 2 }, ...cov(['joy', 10], ['health', 10]), jobs: [2], desc: 'Steamy, cozy and good for sore paws. Bamboo walls for privacy!' },
+  clinic: { glb: ['/models/clinic.glb'], name: 'Paw Clinic', cat: 'service', size: [3, 3], levels: 1, cost: { coins: 320, wood: 18, stone: 10, mochi: 3 }, ...cov(['health', 10]), jobs: [2], desc: 'Bandages, warm tea and gentle hugs for every villager.' },
+  school: { glb: ['/models/school.glb'], glbKeep: ['anim'], name: 'Village School', cat: 'service', size: [4, 3], levels: 1, cost: { coins: 380, wood: 26, stone: 10, silk: 2 }, ...cov(['learn', 12]), jobs: [2], desc: 'Reading, writing and advanced napping. The bell tower rings at noon.' },
   // the outdoor stash (ROADMAP R-18; docs/HOUSING.md "The stash"): build as many as you like, every one opens the same
   // shared stash (world/village.js interactionFor, G.openStash). The model: buildings/stashChest.js
-  stashChest: { name: 'Stash Chest', cat: 'service', size: [2, 1], levels: 1, cost: { coins: 150, wood: 10, stone: 6 }, desc: 'The pack\'s gold-banded chest under its own little roof. It opens the same stash as the one at home.' },
+  stashChest: { glb: ['/models/stashChest.glb'], glbKeep: ['anim'], name: 'Stash Chest', cat: 'service', size: [2, 1], levels: 1, cost: { coins: 150, wood: 10, stone: 6 }, desc: 'The pack\'s gold-banded chest under its own little roof. It opens the same stash as the one at home.' },
   // ------------------------------------------------------------------ decor
-  bench: { name: 'Park Bench', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 15, wood: 3 }, ...cov(['joy', 3]), desc: 'Perfect for sitting, snacking and people-watching.' },
-  flowerBed: { name: 'Flower Bed', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 12, petal: 2 }, ...cov(['joy', 3]), desc: 'A tidy burst of colour. Bees approve.' },
-  fountain: { name: 'Plaza Fountain', cat: 'decor', size: [2, 2], levels: 1, cost: { coins: 180, stone: 16, crystal: 1 }, ...cov(['joy', 6], ['water', 4]), desc: 'Sparkly water that makes the whole plaza feel fancy.' },
-  sakuraPlanter: { name: 'Sakura Planter', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 30, stone: 2, petal: 3 }, ...cov(['joy', 4]), desc: 'A little cherry tree in a stone box, forever in bloom.' },
-  miniTorii: { name: 'Mini Torii', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 40, wood: 4 }, ...cov(['joy', 4]), desc: 'A tiny gate for tiny wishes.' },
-  koiStatue: { name: 'Koi Statue', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 90, stone: 8 }, ...cov(['joy', 5]), desc: 'A leaping stone koi. Rub its nose for luck!' },
-  lanternString: { name: 'Lantern String', cat: 'decor', size: [2, 1], levels: 1, cost: { coins: 45, wood: 2, lantern: 2, silk: 1 }, ...cov(['light', 4], ['joy', 3]), desc: 'A row of paper lanterns swaying between two poles.' },
-  fence: { name: 'Picket Fence', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 6, wood: 1 }, desc: 'Keeps the chickens honest. Runs along x; rotate to turn.' },
-  sprinkler: { name: 'Garden Sprinkler', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 120, stone: 4, crystal: 1 }, desc: 'Waters the 8 garden tiles around it every morning. Put it in a garden bed or a farm field!' },
-  bridge: { name: 'Arched Bridge', cat: 'decor', size: [3, 9], levels: 1, cost: { coins: 200, wood: 24, stone: 8 }, desc: 'A vermilion taiko bridge: walk right over the river.' },
-  chewyStatue: { name: 'Chewy Statue', cat: 'special', size: [2, 2], levels: 1, unique: true, cost: { coins: 250, stone: 20, bone: 8 }, ...cov(['joy', 8]), desc: 'A stone Chewy proudly guarding his golden bone. Rub the paw plaque for luck!' },
+  bench: { glb: ['/models/bench.glb'], name: 'Park Bench', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 15, wood: 3 }, ...cov(['joy', 3]), desc: 'Perfect for sitting, snacking and people-watching.' },
+  flowerBed: { glbVariants: [2], name: 'Flower Bed', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 12, petal: 2 }, ...cov(['joy', 3]), desc: 'A tidy burst of colour. Bees approve.' },
+  fountain: { glb: ['/models/fountain.glb'], glbKeep: ['jet', 'anim'], name: 'Plaza Fountain', cat: 'decor', size: [2, 2], levels: 1, cost: { coins: 180, stone: 16, crystal: 1 }, ...cov(['joy', 6], ['water', 4]), desc: 'Sparkly water that makes the whole plaza feel fancy.' },
+  sakuraPlanter: { glb: ['/models/sakuraPlanter.glb'], name: 'Sakura Planter', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 30, stone: 2, petal: 3 }, ...cov(['joy', 4]), desc: 'A little cherry tree in a stone box, forever in bloom.' },
+  miniTorii: { glb: ['/models/miniTorii.glb'], name: 'Mini Torii', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 40, wood: 4 }, ...cov(['joy', 4]), desc: 'A tiny gate for tiny wishes.' },
+  koiStatue: { glb: ['/models/koiStatue.glb'], name: 'Koi Statue', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 90, stone: 8 }, ...cov(['joy', 5]), desc: 'A leaping stone koi. Rub its nose for luck!' },
+  lanternString: { glb: ['/models/lanternString.glb'], glbKeep: ['anim'], name: 'Lantern String', cat: 'decor', size: [2, 1], levels: 1, cost: { coins: 45, wood: 2, lantern: 2, silk: 1 }, ...cov(['light', 4], ['joy', 3]), desc: 'A row of paper lanterns swaying between two poles.' },
+  fence: { glbVariants: [4], name: 'Picket Fence', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 6, wood: 1 }, desc: 'Keeps the chickens honest. Runs along x; rotate to turn.' },
+  sprinkler: { glb: ['/models/sprinkler.glb'], glbKeep: ['anim'], name: 'Garden Sprinkler', cat: 'decor', size: [1, 1], levels: 1, cost: { coins: 120, stone: 4, crystal: 1 }, desc: 'Waters the 8 garden tiles around it every morning. Put it in a garden bed or a farm field!' },
+  bridge: { glb: ['/models/bridge.glb'], glbKeep: ['anim'], name: 'Arched Bridge', cat: 'decor', size: [3, 9], levels: 1, cost: { coins: 200, wood: 24, stone: 8 }, desc: 'A vermilion taiko bridge: walk right over the river.' },
+  chewyStatue: { glb: ['/models/chewyStatue.glb'], name: 'Chewy Statue', cat: 'special', size: [2, 2], levels: 1, unique: true, cost: { coins: 250, stone: 20, bone: 8 }, ...cov(['joy', 8]), desc: 'A stone Chewy proudly guarding his golden bone. Rub the paw plaque for luck!' },
 };
 
 export const CATEGORIES = { special: 'Landmarks', home: 'Homes', shop: 'Shops', craft: 'Workshops', service: 'Services', decor: 'Decor' };

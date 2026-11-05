@@ -12,7 +12,7 @@ import { applyRefined, patchSkinMaterial } from './refinedRigs.js';
 import { chewyStyle } from './disneyChewy.js';
 import { furMaterial, buildDisneyHead, headKind, speciesColors, disneyHand, disneyFoot, handKindFor, footKindFor, tag, paintFn, mergeIndexed, tubeGeo, disneyWizardHat } from './disneyKit.js';
 import { toyMaterial, buildToyBody, TOY_KINDS } from './toyKit.js';
-import { toyHeroes } from './heroModels.js';
+import { toyHeroes, FOLK_TOY, heroModelReady, buildHeroModel } from './heroModels.js';
 import { poeToyExtras, POE_PAL } from './poeKit.js';
 import { CLASSES } from '../rpg/classes.js';
 import { shihtzuToyExtras } from './shihtzuKit.js';
@@ -508,13 +508,19 @@ export function cloneRig(src) {
 // Rigs built ahead of time (prebuildHumanoid) are handed out by buildHumanoid for the same spec object, so a villager
 // can be constructed mid-play without the ~20 ms build.
 const PREBUILT = new WeakMap();
-export function prebuildHumanoid(spec) { if (!PREBUILT.has(spec)) PREBUILT.set(spec, makeAny(spec)); return spec; }
+// a random townsfolk (spec.townsfolk) of a species with Blender townsfolk (heroModels FOLK_TOY) is one of them, by its seed
+function folkToy(spec) {
+  const ids = spec.townsfolk && FOLK_TOY[spec.species]; if (!ids?.length) return null;
+  const id = ids[(((spec.seed | 0) % ids.length) + ids.length) % ids.length];
+  return heroModelReady(id) ? buildHeroModel(id) : null;
+}
+export function prebuildHumanoid(spec) { if (!PREBUILT.has(spec)) PREBUILT.set(spec, folkToy(spec) || makeAny(spec)); return spec; }
 export const rawHumanoid = spec => makeHumanoid(spec, true, false); // unbaked part meshes (Blender refine export, classic)
 export const rawDisneyHumanoid = spec => makeDisneyHumanoid(spec, true); // unbaked (tests)
 export function buildHumanoid(spec) {
   const r = PREBUILT.get(spec);
   if (r) { PREBUILT.delete(spec); return r; }
-  return makeAny(spec);
+  return folkToy(spec) || makeAny(spec);
 }
 const makeAny = spec => { const k = kitStyle(); return k === 'toy' ? makeToyHumanoid(spec) : k === 'disney' ? makeDisneyHumanoid(spec) : makeHumanoid(spec); };
 export const rawToyHumanoid = spec => makeToyHumanoid(spec, true); // unbaked (tests)

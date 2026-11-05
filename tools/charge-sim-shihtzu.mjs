@@ -9,6 +9,11 @@ export function shihtzuSim({ area, rk, pp, RP }) {
   const HEX_REAL = 0.5;
   const pack = (n, sc) => (sc.n <= 1 ? 1 : Math.min(n, sc.n));
   const DMG = {
+    // Glum Bonk: the one foe, plus the splat's share on the others crowded round it (a pack bunches up on a melee hero:
+    // ×1.8 over a uniform spread, as hero-balance's lineArea); Right on the Noggin: the main hit always crits (×1.45 over
+    // the average hit at his ~5% crit); Bonk Bonk (Echo): the bonk again at its pct, no crit
+    glumBonk: (p, k, s, sc, c) => { const others = sc.n <= 1 ? 0 : Math.min(sc.n - 1, sc.n * ((p.splash + 0.3) / RP) ** 2 * 1.8), splat = p.dmgPct * p.splashPct / 100 * others;
+      return p.dmgPct * (s && rk(k, 'noggin') ? 1.45 : 1) + splat + (s && rk(k, 'echo') ? pp(c, s, 'echo') / 100 * (p.dmgPct + splat) : 0); },
     woefulWallop: (p, k, s, sc, c) => p.dmgPct * area(p.radius, sc) * Math.min(1, p.arc / 200)
       + (rk(k, 'aftershock') ? p.dmgPct * pp(c, s, 'aftershock') / 100 * area(c.perks.aftershock.r, sc) * 0.7 : 0)
       + (rk(k, 'woe') ? c.perks.woe.dps * c.perks.woe.dur * HEX_REAL * 0.4 * area(p.radius, sc) * Math.min(1, p.arc / 200) : 0),

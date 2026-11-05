@@ -1,7 +1,7 @@
 // The Golden Retriever dragoon's review shots (docs/GOLDEN.md §9): the baked model, his lance and javelins at the game
 // camera, Shadow the dragon whelp (hovering, flapping, landing and sitting, indoors, the swap poof), a real Burrow fight
 // with each move frozen at a few moments, the five-hero wheel and the HUD.
-//   node tools/qa/golden-shots.mjs [look] [idle] [walk] [attack] [sunbeamThrust] [bonkDart] [whelp] [poof] [indoors] [wheel]
+//   node tools/qa/golden-shots.mjs [look] [idle] [walk] [attack] [sunbeamThrust] [eagerJabs] [bonkDart] [whelp] [poof] [indoors] [wheel]
 //     [coat] [pack [--stage 3] [--only a,b,all]] [--out dir] [--qs k=v]
 // Writes PNGs to tools/qa/tmp/golden-shots (gitignored) (or --out) and prints any runtime errors. Time is frozen per shot
 // (engine.timeScale 0) once a move has had `at` seconds to develop.
@@ -13,7 +13,7 @@
 //  wheel: all five heroes joined, Tab held (the hero wheel) and the HUD's mini portraits;
 //  coat: his fur measured in the village light (the p35 / p60 of the ear drapes' lit texels facing the camera);
 //  pack: real fights in a zone dungeon (Bamboo Depths B1F, as shihtzu-shots.mjs pack): a crowd of 18 closing in, each of
-//   his 15 actives cast into it at level 30 / skill 12 and frozen at its moment (--stage 3: the charged releases, every
+//   his 16 actives cast into it at level 30 / skill 12 and frozen at its moment (--stage 3: the charged releases, every
 //   perk), then everything at once (pack-all).
 import { launch, boot, waitMode, sleep } from './lib.mjs';
 import fs from 'node:fs';
@@ -27,6 +27,7 @@ const QS = val('--qs') ? '&' + val('--qs') : '';
 const ids = args.filter((a, i) => !a.startsWith('--') && !['--out', '--qs', '--only', '--stage'].includes(args[i - 1]));
 const PLAN = {
   attack: { at: [0.16, 0.3, 0.46, 0.7], rep: 3 }, sunbeamThrust: { at: [0.3, 0.45, 0.6, 0.85] }, bonkDart: { at: [0.25, 0.45, 0.6, 0.9] },
+  eagerJabs: { at: [0.05, 0.14, 0.22, 0.3, 0.39, 0.47, 0.6] }, // (the chamber, jab 1, the pull-back, jab 2, the big wind, the big jab, the follow-through)
   // checkpoint 2 (the hero at level 30, every skill at 12)
   sunfallJump: { at: [0.2, 0.55, 0.75, 1.0] }, pinwheelSweep: { at: [0.15, 0.25, 0.35, 0.5] }, gallantCharge: { at: [0.1, 0.25, 0.4, 0.6] }, starfallLance: { at: [0.25, 0.95, 1.2, 1.7] },
   tailwagVolley: { at: [0.2, 0.3, 0.45] }, trueFlight: { at: [0.25, 0.4, 0.55] }, emberleafJavelin: { at: [0.3, 0.8, 1.65] }, sunshower: { at: [0.35, 1.0, 1.8] },
@@ -193,7 +194,7 @@ try {
     await waitMode(page, 'dungeon');
     await sleep(page, 1500);
     await page.evaluate(async () => { const G = window.G, P = G.state.player, { SKILLS } = await import('/src/rpg/skills.js'); P.lvl = 30; for (const k of Object.keys(SKILLS)) if (SKILLS[k].cls === 'golden') P.skills[k] = 12; G.actions.recompute(); });
-    const moves = [['thrust1', 'attack', 0], ['thrust2', 'attack', 1], ['swat', 'attack', 2], ['sunbeam', 'sunbeamThrust', 0], ['bonk', 'bonkDart', 0],
+    const moves = [['thrust1', 'attack', 0], ['thrust2', 'attack', 1], ['swat', 'attack', 2], ['sunbeam', 'sunbeamThrust', 0], ['jabs', 'eagerJabs', 0, 0.075], ['bonk', 'bonkDart', 0],
       ['jump', 'sunfallJump', 0, 0.16], ['pinwheel', 'pinwheelSweep', 0], ['charge', 'gallantCharge', 0], ['starfall', 'starfallLance', 0], ['volley', 'tailwagVolley', 0], ['true', 'trueFlight', 0],
       ['shower', 'sunshowerThrow', 0], ['call', 'emberBreath', 0]].filter(x => !val('--only') || val('--only').split(',').includes(x[0]));
     for (const view of (val('--view') || 'front,side').split(',')) for (const [name, cast0, combo, step] of moves) {
@@ -275,7 +276,7 @@ try {
     // [shot name, skill, when to freeze: seconds after the cast, or 'action:u' (the hero's action at that progress)]
     const AREA = ['starfallLance', 'sunshower', 'wingShield', 'mightyRoar', 'dragonHeart'];
     const PLAN2 = [
-      ['sunbeamThrust', 'sunbeamThrust', 'sunbeamThrust:0.56'], ['sunfallJump-air', 'sunfallJump', 'sunfallJump:0.5'], ['sunfallJump', 'sunfallJump', 'sunfallJump:0.8'],
+      ['sunbeamThrust', 'sunbeamThrust', 'sunbeamThrust:0.56'], ['eagerJabs-jab', 'eagerJabs', 0.3], ['eagerJabs', 'eagerJabs', 0.47], ['sunfallJump-air', 'sunfallJump', 'sunfallJump:0.5'], ['sunfallJump', 'sunfallJump', 'sunfallJump:0.8'],
       ['pinwheelSweep', 'pinwheelSweep', 'pinwheel:0.56'], ['gallantCharge', 'gallantCharge', 'gallantCharge:0.42'], ['starfallLance-fall', 'starfallLance', 1.1], ['starfallLance', 'starfallLance', 1.28],
       ['bonkDart', 'bonkDart', 0.62], ['tailwagVolley', 'tailwagVolley', 0.5], ['trueFlight', 'trueFlight', 0.5], ['emberleafJavelin-glow', 'emberleafJavelin', 1.1], ['emberleafJavelin', 'emberleafJavelin', 1.75],
       ['sunshower', 'sunshower', 1.5], ['emberBreath', 'emberBreath', 1.0], ['divebombSwoop-dive', 'divebombSwoop', 0.62], ['divebombSwoop', 'divebombSwoop', 0.8],

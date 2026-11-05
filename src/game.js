@@ -16,8 +16,15 @@ import { Companion } from './actors/companion.js';
 import { Villager } from './actors/npc.js';
 import { CAST, REFINED_CAST, prebuildHumanoid } from './actors/charKit.js';
 import { loadRefinedRigs } from './actors/refinedRigs.js';
-import { loadHeroModels, heroModelReady, buildHeroModel } from './actors/heroModels.js';
+import { loadHeroModels, heroModelReady, buildHeroModel, ZONE_TOY, FOLK_TOY } from './actors/heroModels.js';
+import { BUILDING_GLB } from './regions/village/data.js';
+import { loadGlb } from './gfx/glbAssets.js';
+import { loadRegionGlbs, regionGlbUrls } from './regions/assets/glbPieces.js';
 import { loadEnemyModels } from './regions/monsters/enemyModels.js';
+import { loadBuildingGlbs } from './world/buildings/index.js';
+import { loadFurnitureGlbs } from './home/furnitureMesh.js';
+import { loadExtGlbs } from './home/extGlb.js';
+import { loadTreeGlbs } from './world/treeGlb.js';
 import { VILLAGERS, randomVillagerSpec } from './actors/roster.js';
 import { U } from './gfx/materials.js';
 import { glowTexture } from './gfx/textures.js';
@@ -123,7 +130,11 @@ export async function boot() {
   G.qaModule = (name) => (name === 'items' ? import('./rpg/items.js') : Promise.reject(new Error('no module ' + name))); // (QA on the production bundle: tools/qa/s50-coop-panes.mjs makes items with it)
 
   // Blender-refined skins for Chewy and Shadow must be in memory before their rigs (and portraits) are built
-  const [uiMod, audioMod] = await Promise.all([P.has('noui') ? null : tryImport('ui', () => import('./ui/ui.js')), P.has('noaudio') ? null : tryImport('audio', () => import('./audio/audio.js')), loadRefinedRigs(REFINED_CAST), loadHeroModels(['chewy', 'moka', 'poe', 'shihtzu', 'golden', 'stella', 'shadow', 'rosie', 'mochi', 'kuma', 'usagi', 'kitsune', 'pan', 'tanu', 'kero', 'tanukiBandit', 'tanukiBanditMaroon', 'tamamo']), loadWhelp(), loadEnemyModels()]); // (loadWhelp: Shadow's dragon whelp outfit and its wing prop, worn while the dragoon is played: actors/whelp.js)
+  const [uiMod, audioMod] = await Promise.all([P.has('noui') ? null : tryImport('ui', () => import('./ui/ui.js')), P.has('noaudio') ? null : tryImport('audio', () => import('./audio/audio.js')), loadRefinedRigs(REFINED_CAST), loadHeroModels(['chewy', 'moka', 'poe', 'shihtzu', 'golden', 'stella', 'shadow', 'rosie', 'mochi', 'kuma', 'usagi', 'kitsune', 'pan', 'tanu', 'kero', 'tanukiBandit', 'tanukiBanditMaroon', 'tamamo']), loadWhelp(), loadEnemyModels(), loadBuildingGlbs(), loadFurnitureGlbs(), loadExtGlbs(), loadTreeGlbs()]); // (loadWhelp: Shadow's dragon whelp outfit and its wing prop, worn while the dragoon is played: actors/whelp.js)
+  import('./dungeon/portalModel.js').then(m => m.loadPortalFrame()); import('./regions/spiritLantern.js').then(m => m.loadLanternModel()); import('./dungeon/propModels.js').then(m => m.loadDungeonProps()); // (the Blender moon gate and Spirit Lantern: ROADMAP Z-D6)
+  loadHeroModels(Object.values(ZONE_TOY).flat()); // (the zone villagers' Blender rigs, ROADMAP VL-2: in the background, the zones aren't on screen yet)
+  for (const u of Object.values(BUILDING_GLB).flatMap(z => Object.values(z))) loadGlb(u).catch(() => {}); // (and the zone villages' Blender buildings: Z-D6)
+  loadRegionGlbs(); // (and the regions' Blender landmark props)
   loadStellaProps(); // (Stella's sun wagasa: actors/stellaGear.js; a procedural stand-in until it lands)
   loadGoldenProps(); // (the dragoon's lance and javelin props: actors/goldenGear.js; procedural stand-ins until they land) // (poe: while her model is pending, heroModels.js fetches nothing)
   G.audio = audioMod?.Audio || null;
@@ -178,8 +189,10 @@ export async function boot() {
   // one per check, and only wait when the pool is empty and the village is on screen.
   const folkPool = [];
   const hitchHidden = () => G.titleActive || (G.mode !== 'village' && G.mode !== 'interior') || (G.ui?.hidesHitches ? G.ui.hidesHitches() : G.ui?.dlg?.active || G.ui?.anyModal?.()); // (an interior is on screen: no hitches there either; a menu only once it has finished opening: ui.js hidesHitches)
-  const stockFolk = () => { if (folk.length + folkPool.length < FOLK_MAX) folkPool.push(prebuildHumanoid(randomVillagerSpec())); };
-  for (let i = 0; i < 6; i++) stockFolk(); // behind the boot splash
+  // (the Blender townsfolk, heroModels FOLK_TOY, load first: a pool rig built before them would be the kit's)
+  let folkToysIn = false;
+  const stockFolk = () => { if (folkToysIn && folk.length + folkPool.length < FOLK_MAX) folkPool.push(prebuildHumanoid(randomVillagerSpec())); };
+  loadHeroModels(Object.values(FOLK_TOY).flat()).finally(() => { folkToysIn = true; for (let i = 0; i < 6; i++) stockFolk(); }); // behind the boot splash
   setInterval(() => { if (hitchHidden()) stockFolk(); }, 350);
   function syncTownsfolk() {
     const homes = sim.list.filter(r => r.data.type === 'home' && (r.data.residents || 0) > 0);
@@ -277,7 +290,7 @@ export async function boot() {
     settingsBooted = true;
     G.ui.onMenu?.({ save: () => { save(); }, /* (the menu shows its own "Game saved!" toast: ui/menu.js) */ quit: () => { save(); location.reload(); } });
   }
-  const BUFF_INFO = { howl: ['War Banner', 'music', '#ff9a6a'], frenzy: ['Flowing Water', 'bolt', '#ffd84a'], shrineZoom: ['Zoomies Shrine', 'bolt', '#8fe0c0'], shrineLuck: ['Lucky Cat', 'clover', '#ffd84a'], shrineXp: ['Sparkle Shrine', 'sparkle', '#b8a8ff'], cursed: ['Cursed', 'skull', '#b88aff'], shadowPower: ['Pack Call', 'shadowDog', '#8ab8ff'], moonlit: ['Moonlit Rally', 'moon', '#ffb080'] };
+  const BUFF_INFO = { howl: ['War Banner', 'music', '#ff9a6a'], frenzy: ['Flowing Water', 'bolt', '#ffd84a'], shrineZoom: ['Zoomies Shrine', 'bolt', '#8fe0c0'], shrineLuck: ['Lucky Cat', 'clover', '#ffd84a'], shrineXp: ['Sparkle Shrine', 'sparkle', '#b8a8ff'], cursed: ['Cursed', 'skull', '#b88aff'], shadowPower: ['Pack Call', 'shadowDog', '#8ab8ff'], moonlit: ['Moonlit Rally', 'moon', '#ffb080'], tempo: ['Tempo — your Combo strikes are quicker', 'bolt', '#ffb46a'] }; // (tempo: a Combo finisher's perk, docs/COMBO.md)
   function syncBuffs() {
     const B = G.combat?.buffs || {}; const list = [];
     for (const [k, b] of Object.entries(B)) { const inf = BUFF_INFO[k]; if (!inf || (k === 'frenzy' && !b.stacks)) continue; list.push({ id: k, name: k === 'frenzy' ? `${inf[0]} ×${b.stacks}` : inf[0], glyph: inf[1], color: inf[2], time: b.t > 0 ? b.t : 0 }); }
@@ -394,6 +407,16 @@ export async function boot() {
   };
   G.enterRegion = (id) => {
     const def = REGIONS[id]; if (!def) return;
+    // the zone's Blender villagers (ROADMAP VL-2): preloaded after boot; if they're still on their way, wait a moment for them
+    // (and its Blender buildings, which stand in for the kit's: an empty plot until they land)
+    const toys = (ZONE_TOY[id] || []).filter(v => !heroModelReady(v)), glbs = (G._zoneGlbReady ||= new Set()).has(id) ? [] : [...Object.values(BUILDING_GLB[id] || {}), ...regionGlbUrls(id)];
+    if ((toys.length || glbs.length) && !G._zoneToyWait) {
+      G._zoneToyWait = true;
+      const all = Promise.all([loadHeroModels(toys), ...glbs.map(u => loadGlb(u).catch(() => {})), loadRegionGlbs(id)]);
+      Promise.race([all, new Promise(r => setTimeout(r, glbs.length ? 6000 : 2500))]).finally(() => { G._zoneToyWait = false; G._zoneGlbReady.add(id); G.enterRegion(id); }); // (waited once: a model still loading pops in)
+      return;
+    }
+    if (G._zoneToyWait) return;
     enterCombatWorld(() => new RegionMode(G, id), undefined, { location: () => def.name, sub: `Lv ${def.levels[0]}`, region: id });
   };
   // The Travel Map (ui/travel.js) reads places from here: Blossom Hollow + the four regions (docs/REGIONS.md §1)
@@ -823,6 +846,7 @@ export async function boot() {
   // ---- title screen & intro
   let skip = null;
   try { skip = sessionStorage.getItem('chewy3d.skipTitle'); sessionStorage.removeItem('chewy3d.skipTitle'); } catch (e) { /* storage unavailable */ }
+  if (skip) G.audio?.tryStart?.(); // (the page reloaded from a click on the title: the sound needn't wait for another)
   G.titleActive = false;
   const showTitle = G.ui?.setMode && !skip && !P.has('fresh') && !P.has('floor') && !P.has('region') && !P.has('notitle');
   if (showTitle) {

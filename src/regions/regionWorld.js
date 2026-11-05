@@ -39,7 +39,7 @@ export class RegionWorld {
     sun.castShadow = true;
     const q = this.quality;
     sun.shadow.mapSize.set(q >= 2 ? 4096 : 2048, q >= 2 ? 4096 : 2048);
-    const sc = sun.shadow.camera; sc.left = -34; sc.right = 34; sc.top = 34; sc.bottom = -34; sc.near = 1; sc.far = 180;
+    const sc = sun.shadow.camera; sc.left = -34; sc.right = 34; sc.top = 34; sc.bottom = -34; sc.near = 1; sc.far = 180; sc.layers.enable(1); // (vegetation.js SHADOW_ONLY_LAYER: the Blender trees' shadow-only crown masses)
     sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03; sun.shadow.radius = 3;
     scene.add(sun, sun.target);
     this.sunDir = V(...(M.sun?.dir || [0.4, 0.8, 0.4])).normalize();
@@ -401,6 +401,15 @@ export class RegionWorld {
     if (this.pools.length) { const T = this.terrain; if (this.waterAt(x, z) > (T.water?.wade ?? 0.35)) return false; }
     return true;
   }
+  // swimming (actors/traverse.js, ROADMAP TR-1): a swimmer may go into the region's deep water (its lakes, the sea), still
+  // inside the map and below the band's top; no climbing here (the band's walls are the region's edge)
+  travelOk(x, z) {
+    if (this.walkable(x, z)) return true;
+    const T = this.terrain; if (x < 2.5 || z < 2.5 || x > SIZE - 2.5 || z > SIZE - 2.5) return false;
+    return this.waterAt(x, z) > (T.water?.wade ?? 0.35) && T.gridHeight(x, z) < T.band[1] + 0.25;
+  }
+  waterDepth(x, z) { return this.decks.length && this.deckAt(x, z) ? 0 : this.waterAt(x, z); }
+  waterSurface(x, z) { return this.terrain.gridHeight(x, z) + this.waterAt(x, z); }
   /** water depth in metres (0 on dry land and on ice): region water + local pools */
   waterAt(x, z) {
     let d = this.terrain.waterAt(x, z);
@@ -566,7 +575,7 @@ export function defaultPopulate(ctx) {
   const rockB = ctx.batch('rock', ctx.mats.rock(), { sort: false }), pl = [];
   for (let i = 0; i < 260; i++) { const x = rng.range(-20, 132), z = rng.range(-20, 132); if (ctx.canPlace(x, z, 0.9)) pl.push({ x, z, y: ctx.heightAt(x, z) - 0.1, rot: rng.range(0, 6.28), s: rng.range(0.6, 1.6), sy: rng.range(0.8, 1.2), v: rng.int(0, 3) }); }
   ctx.place(rocks, [rockB], pl, { kind: 'rock', collide: 0.45 });
-  const bark = ctx.batch('bark', ctx.mats.bark()), fol = ctx.batch('foliage', ctx.mats.foliage()), cards = ctx.batch('cards:round', ctx.mats.cards('round'), { castShadow: false });
+  const bark = ctx.batch('bark', ctx.mats.bark()), fol = buildTree('round', 1).massKey ? ctx.batch('foliage:shadow', ctx.mats.foliage({ shadowOnly: true })) : ctx.batch('foliage', ctx.mats.foliage()), cards = ctx.batch('cards:round', ctx.mats.cards('round'), { castShadow: false });
   const vars = [1, 2, 3].map(v => { const t = ctx.memo('round' + v, () => buildTree('round', v)); return [t.trunkGeo, t.foliage, t.cardGeo]; });
   const tp = [];
   for (let i = 0; i < 900 && tp.length < 90; i++) { const x = rng.range(-30, 142), z = rng.range(-30, 142); if (ctx.openDist(x, z) < 3) continue; if (ctx.canPlace(x, z, 1.2, { space: 2.4 })) tp.push({ x, z, rot: rng.range(0, 6.28), s: rng.range(0.85, 1.25), v: rng.int(0, 2) }); }

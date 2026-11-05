@@ -11,6 +11,8 @@ export const RAMBLE = [
   { id: 'lighthouse', pts: [[41, 105.5], [39, 104.8]] },
   // the travel post → north up the peninsula → Kite Hill → the north footbridge → the northern shelf → the lagoon
   { id: 'north', pts: [[42, 104], [43.5, 92], [47, 82], [55, 72], [66, 64], [78, 57.4], [88.5, 53.3]] },
+  // the town's Waterfall Trail (its cobbled end at 104, 57) up to the north footbridge
+  { id: 'fallsLink', pts: [[104, 57.4], [103.8, 53.4], [102.6, 50], [101.4, 46.9]] }, // (down the ramp cut in the riser: islandShape.js)
   { id: 'shelf', pts: [[101.4, 46.9], [110, 49.5], [122, 51.5], [134, 50.5], [144, 48.5], [154, 49.5], [162, 54.5], [166, 57.4]] },
   // the lagoon → down the east coast (round the shrine hill's seaward shoulder) → the Bee Meadow → the south shore
   { id: 'east', pts: [[166, 57.4], [176, 64], [186, 73], [192.5, 88], [193.6, 102], [196.4, 116], [195, 128], [190.5, 140], [182, 150], [170, 162], [156, 174], [138, 186], [118, 197], [104, 201.5]] },

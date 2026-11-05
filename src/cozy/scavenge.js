@@ -18,9 +18,10 @@ import { mulberry32 } from '../core/util.js';
 import { worldDay } from './clock.js';
 
 export const SCAV_AREAS = ['home', 'bamboo', 'maple', 'tidepool', 'onsen'];
-/** the dig: the ring fills over DIG_SECS while held; letting go inside the golden band is a Perfect dig (COZY §7.1) */
-export const DIG_SECS = 1.4;
-export const DIG_BAND = [0.7, 0.85];
+/** the dig: the ring fills over DIG_SECS while held; letting go inside the golden band is a Perfect dig (COZY §7.1).
+ *  (The owner, 2026-10-27, found 1.4 s with a 70–85% band too hard: a 0.63 s window now, three times the old 0.21 s.) */
+export const DIG_SECS = 1.8;
+export const DIG_BAND = [0.55, 0.9];
 /** Shadow's nose: how near a hidden spot has to be before he smells it (the Bandana: 18 m) */
 export const NOSE_RANGE = 12, NOSE_RANGE_BANDANA = 18;
 /** the pickup pose for a gather (life/tools.js run) */

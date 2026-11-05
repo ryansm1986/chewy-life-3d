@@ -28,9 +28,11 @@ import * as THREE from 'three';
 import { SH, M, col } from '../dungeonWorld.js';
 import { tube, puff, paint, merge } from '../../gfx/geom.js';
 import { mulberry32, clamp, TAU, rand } from '../../core/util.js';
-import * as TA from '../../regions/assets/tidepoolAssets.js';
+import * as TAKit from '../../regions/assets/tidepoolAssets.js';
 import { kitPiece, lump, ribbon, nz } from '../../regions/assets/tidepoolKit.js';
-import * as Pr from '../../regions/assets/bambooProps.js';
+import * as PrKit from '../../regions/assets/bambooProps.js';
+import { withGlb, glbFn } from '../../regions/assets/glbPieces.js';
+const TA = withGlb('tidepool', TAKit), Pr = withGlb('bamboo', PrKit); // (the region props' Blender models, as the regions draw them)
 import { G as BG, C as BC } from '../../world/buildings/kit.js';
 import { roof } from '../../world/buildings/roofs.js';
 import { shimenawa, net, bucket, fishRack } from '../../world/buildings/props2.js';
@@ -577,7 +579,7 @@ function floatLantern(seed = 0, h = 1.55) {
 }
 /** a little sea shrine to Ebisu: a driftwood hokora on a barnacled rock, a rope and shide, a red sea bream and sake on
  *  the offering shelf, a glass float hung from the eave, a round little stone Ebisu with his rod (local +z: the front) */
-function umiHokora(seed = 0) {
+function umiHokoraKit(seed = 0) {
   return cached('umiHokora:' + seed, () => kitPiece(seed * 17 + 9, B => {
     B.add(paintCave(lump(V(0, 0.1, 0), 0.75, { detail: 2, noise: 0.25, squash: 0.42, seed: seed + 3, sx: 1.25 }), { wetTo: 0.18, seed, barn: 0.8 }), null);
     B.at([0, 0.34, -0.05], 0, () => {
@@ -608,8 +610,9 @@ function umiHokora(seed = 0) {
     B.light([0.3, 0.86, 0.4], { color: '#9ff0e8', intensity: 1.2, radius: 3.5, flicker: 0.2, nightOnly: false });
   }, 0.02));
 }
+const umiHokora = glbFn('dg-tidepool', 'umiHokora', umiHokoraKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-tidepool'])
 /** an empty giant crab shell lying on the sand (a heikegani's moult: the scowling samurai face on its back), two claws */
-function crabHusk(seed = 0) {
+function crabHuskKit(seed = 0) {
   return cached('husk:' + seed, () => kitPiece(seed * 7 + 5, B => {
     const sh = BG.sph(0.62, 18, 10, 0, TAU, 0, PI / 2); sh.scale(1.25, 0.55, 1.0);
     B.add(sh, (p, n, o) => {
@@ -627,8 +630,9 @@ function crabHusk(seed = 0) {
     }
   }, 0.01));
 }
+const crabHusk = glbFn('dg-tidepool', 'crabHusk', crabHuskKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-tidepool'])
 /** a weathered brazier on three stones (the fishermen's warm fire) */
-function brazier(seed = 0) {
+function brazierKit(seed = 0) {
   return cached('brazier:' + seed, () => kitPiece(seed * 3 + 1, B => {
     for (let k = 0; k < 3; k++) { const a = k / 3 * TAU; B.add(paintCave(lump(V(Math.cos(a) * 0.3, 0.06, Math.sin(a) * 0.3), 0.15, { detail: 1, noise: 0.3, squash: 0.7, seed: k + seed }), { wetTo: 0.05 }), null); }
     const bowl = BG.lathe([[0.001, 0.0], [0.3, 0.02], [0.4, 0.2], [0.37, 0.22], [0.27, 0.06], [0.001, 0.06]], 12); bowl.translate(0, 0.16, 0); B.add(bowl, '#3a3434');
@@ -637,8 +641,9 @@ function brazier(seed = 0) {
     B.light([0, 0.7, 0], { color: '#ffa04a', intensity: 3, radius: 6, flicker: 0.9, nightOnly: false });
   }, 0.01));
 }
+const brazier = glbFn('dg-tidepool', 'brazier', brazierKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-tidepool'])
 /** wedded rocks: two barnacled basalt stacks tied together by a great rope with paper streamers (local x span) */
-function weddedPair(seed = 0) {
+function weddedPairKit(seed = 0) {
   return cached('wed:' + seed, () => kitPiece(seed * 11 + 2, B => {
     const stack = (x, H, R, sd) => { let y = 0; for (let k = 0; k < 3; k++) { const r = R * (1 - k * 0.2), sq = 0.9 + k * 0.15; B.add(paintCave(lump(V(x + (k % 2 ? 0.05 : -0.04), y + r * sq * 0.8, 0), r, { detail: 2, noise: 0.28, squash: sq, seed: sd + k }), { wetTo: 0.5, seed: sd, barn: 0.9 }), null); y += r * sq * (H / (R * 2.9)); } return y; };
     const ha = stack(-1.2, 2.6, 0.8, seed * 3 + 1), hb = stack(1.15, 2.0, 0.65, seed * 3 + 5);
@@ -651,6 +656,7 @@ function weddedPair(seed = 0) {
     }
   }, 0.01));
 }
+const weddedPair = glbFn('dg-tidepool', 'weddedPair', weddedPairKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-tidepool'])
 /** a sea stack worn by the tide: a tall leaning column of basalt with a waist cut by the waves, a shoulder rock at its
  *  foot, barnacles and weed up to the high-water mark */
 function cavePillar(seed = 0) {
@@ -670,12 +676,13 @@ function cavePillar(seed = 0) {
   });
 }
 /** a lattice of salvaged planks laid on the sand (the arrival's landing; local x along the boards) */
-function planks(seed = 0) {
+function planksKit(seed = 0) {
   return cached('planks:' + seed, () => kitPiece(seed + 21, B => {
     for (let i = 0; i < 6; i++) { const b = BG.box(1.7 + B.wob(0.2), 0.05, 0.24, 0.012); b.rotateY(B.wob(0.06)); b.translate(B.wob(0.1), 0.025, (i - 2.5) * 0.27); B.add(b, B.pick(['#a89a86', '#b8aa94', '#9a8c7a', '#c4b8a4'])); }
     for (const x of [-0.6, 0.6]) { const s = BG.box(0.08, 0.04, 1.7, 0.01); s.translate(x, 0.01, 0); B.add(s, '#6e6052'); }
   }, 0.01));
 }
+const planks = glbFn('dg-tidepool', 'planks', planksKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-tidepool'])
 
 // ------------------------------------------------------------------ the wall kit
 const floatCols = ['#8fd0ff', '#8fe0c0', '#ffc070', '#a8e8ff'];
@@ -1101,7 +1108,7 @@ function crab(W, x, z, a, r) {
   for (const s of [-1, 1]) CL.add(SH.blob(), M(x + Math.cos(a) * 0.035 * s - Math.sin(a) * 0.06, 0.12, z - Math.sin(a) * 0.035 * s - Math.cos(a) * 0.06, 0.016, 0.016, 0.016), col('#1a1416'));
 }
 /** a heap of net with floats, a crate, two buoys, a bucket and a coil of rope (local -z = the wall) */
-function netPile(seed = 0) {
+function netPileKit(seed = 0) {
   return cached('netpile:' + seed, () => kitPiece(seed * 9 + 4, B => {
     const heap = BG.sph(0.5, 12, 6, 0, TAU, 0, PI / 2); heap.scale(1.3, 0.5, 0.9); B.add(heap, (p, n, o) => o.set('#a89878').multiplyScalar(0.7 + 0.3 * (Math.abs(Math.sin(p.x * 40)) > 0.85 || Math.abs(Math.sin(p.z * 40)) > 0.85 ? 1.2 : 0.8)));
     for (let k = 0; k < 4; k++) { const f = BG.sph(0.09, 8, 6); f.translate((k - 1.5) * 0.3, 0.22 + (k % 2) * 0.06, 0.1 + (k % 2) * 0.12); B.glow(f, floatCols[(k + seed) % 4], { tint: 0.6 }); }
@@ -1111,6 +1118,7 @@ function netPile(seed = 0) {
     for (let k = 0; k < 4; k++) { const t = BG.torus(0.22 - k * 0.032, 0.028, 5, 14); t.rotateX(PI / 2); t.translate(-0.4, 0.03 + k * 0.04, 0.62); B.add(t, '#d4c08c'); }
   }, 0.01));
 }
+const netPile = glbFn('dg-tidepool', 'netPile', netPileKit); // (its Blender model once listed: regions/assets/glbPieces.js REGION_GLB['dg-tidepool'])
 function channelStones(W) { // stepping stones of dark basalt across each tide channel, weed on its banks
   const r = W.drng;
   for (const st of W.kitState.channels) {
@@ -1369,3 +1377,5 @@ export const TIDEPOOL_KIT = {
   rooms: ROOMS, extras, arrival, hoard, corridor,
   seal: { color: '#8ff4ff', rope: '#e4d098' }, // the arena seal's look (dungeon/zoneRun.js)
 };
+// the kit's own pieces, unwrapped (the Blender builders dump them for reference: tools/blender/work/codex/dg-tidepool)
+export const KIT_PIECES = { umiHokora: umiHokoraKit, crabHusk: crabHuskKit, brazier: brazierKit, weddedPair: weddedPairKit, planks: planksKit, netPile: netPileKit };

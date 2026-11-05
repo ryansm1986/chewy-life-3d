@@ -95,6 +95,19 @@ function threadTex() {
   g.fillStyle = gr; g.fillRect(0, 0, 32, 32);
   return (TEX.thread = canvasTex(c));
 }
+// Glum Bonk's splat: a small, lumpy gloom splash with an ink rim and a few teal droplets thrown off it (a floor decal,
+// normal blend: gloom-grey, never a dark hole in the floor)
+function bonkTex() {
+  if (TEX.bonk) return TEX.bonk;
+  const { c, g } = newCanvas(256); g.translate(128, 128);
+  const blob = (R, lumps, j) => { g.beginPath(); for (let i = 0; i <= 96; i++) { const a = (i / 96) * TAU, r = R + j * Math.sin(a * lumps + 0.7) + j * 0.45 * Math.sin(a * (lumps * 2 + 1)); const x = Math.cos(a) * r, y = Math.sin(a) * r; i ? g.lineTo(x, y) : g.moveTo(x, y); } g.closePath(); };
+  blob(78, 7, 12); g.fillStyle = 'rgba(42,31,48,0.85)'; g.fill(); // (the ink rim: the fill below sits just inside it)
+  blob(70, 7, 11); const gr = g.createRadialGradient(-14, -16, 6, 0, 0, 84); gr.addColorStop(0, 'rgba(184,176,200,0.95)'); gr.addColorStop(0.6, 'rgba(132,116,148,0.9)'); gr.addColorStop(1, 'rgba(104,86,120,0.88)'); g.fillStyle = gr; g.fill();
+  blob(40, 5, 6); g.fillStyle = 'rgba(92,224,192,0.35)'; g.fill(); // (a ghostlight sheen in the middle)
+  g.fillStyle = 'rgba(248,242,234,0.7)'; g.beginPath(); g.ellipse(-22, -24, 16, 8, -0.6, 0, TAU); g.fill();
+  for (let i = 0; i < 9; i++) { const a = i * 0.71 + 0.2, r = 96 + (i % 3) * 9, s = 9 - (i % 3) * 2.2; g.fillStyle = 'rgba(42,31,48,0.85)'; g.beginPath(); g.arc(Math.cos(a) * r, Math.sin(a) * r, s + 2.5, 0, TAU); g.fill(); g.fillStyle = i % 2 ? 'rgba(92,224,192,0.95)' : 'rgba(154,134,184,0.95)'; g.beginPath(); g.arc(Math.cos(a) * r, Math.sin(a) * r, s, 0, TAU); g.fill(); }
+  return (TEX.bonk = canvasTex(c));
+}
 const GEO = {};
 /** a flat ring sector (the wallop's sweep), +x centred, `arc` radians wide, inner 0.42 of the outer radius 1; vertex colours: cream
  *  toward the inside, ghostlight at the rim; alpha fading in toward the middle of the sweep and out at both ends */
@@ -165,6 +178,24 @@ const M = {
     m.geometry = sweepGeo(arc); m.position.set(pos.x, pos.y + 0.5, pos.z); m.rotation.y = facing - Math.PI / 2; m.scale.setScalar(r);
     const U = m.material.uniforms, a0 = 0.62 * clamp(2.6 / r, 0.6, 1);
     this.run((dt, t) => { U.uHead.value = 1.15 * ease.outCubic(clamp(t / 0.14)); U.uAlpha.value = a0 * (1 - ease.inQuad(clamp((t - 0.1) / 0.15))); return t < 0.25; }, () => this.give('sweep', m));
+  },
+  /** Glum Bonk lands at `pos` (r: the splat's reach, big: a charged one): a small gloom splat on the floor that pops out
+   *  and soaks away, a squash ring, a little cream impact star, gloom drops flung round and a puff or two (normal blend,
+   *  all small: the bonked foe stays in full view; 0.9 s) */
+  bonk(pos, r = 0.9, big = false) {
+    this._lastBonk = this.t; // (QA reads when the last one landed)
+    const m = this.take('bonk', () => decal(bonkTex(), { polygonOffsetFactor: -3 }));
+    m.position.set(pos.x, pos.y + 0.045, pos.z); m.rotation.y = rand(0, TAU);
+    const R = r * (big ? 1.05 : 0.95), life = big ? 1.2 : 0.9;
+    this.run((dt, t) => { const k = clamp(t / life); m.scale.setScalar(Math.max(0.05, R * (0.35 + 0.65 * ease.outBack(clamp(t / 0.12))))); m.material.opacity = 0.75 * (1 - ease.inQuad(k)); return k < 1; }, () => this.give('bonk', m));
+    this.ring(pos, r * (big ? 1.5 : 1.15), big ? 0.28 : 0.2, K.lilac, 0.5);
+    // the impact star: one cream star that pops and shrinks at the spot (a comic "bonk")
+    this.pn.spawn({ x: pos.x, y: pos.y + 0.55, z: pos.z, life: 0.2, size: big ? 0.62 : 0.46, size1: 0.12, color: K.cream, alpha: 0.95, alpha1: 0.2, frame: SF.STAR, rot: rand(-0.3, 0.3) });
+    const n = big ? 12 : 7;
+    for (let i = 0; i < n; i++) { const a = (i / n) * TAU + rand(-0.25, 0.25), s = rand(1.4, 2.6) * (big ? 1.25 : 1); this.pn.spawn({ x: pos.x, y: pos.y + 0.25, z: pos.z, vx: Math.cos(a) * s, vy: rand(1.6, 3), vz: Math.sin(a) * s, life: rand(0.4, 0.6), size: rand(0.07, 0.11), color: i % 3 ? K.plumLt : K.ghost, alpha: 1, alpha1: 0.5, grav: 10, frame: SF.DROP, rot: Math.PI }); }
+    this.gloomPuff(_a.copy(pos).setY(pos.y + 0.15), big ? 4 : 2, r * 0.4, K.gloomLt);
+    this.glint(_a.copy(pos).setY(pos.y + 0.3), big ? 3 : 1);
+    if (big) this.thud(pos, 0.8, false);
   },
   // ================================================================== the ghosts (one set per scene)
   pupBatch() { return this._pups || (this._pups = new GhostBatch(this.scene, 'pup', 8)); },
@@ -520,7 +551,7 @@ ShihtzuFX.prototype.prewarm = function (renderer, camera) {
     B.set(s1, { x: 0, y: -50, z: 0, alpha: 1 }); W.set(s2, { x: 0, y: -50, z: 0, alpha: 1 });
     const gp = this.grandpaw(); gp.model.set({ x: 0, y: -50, z: 0, alpha: 1 });
     const tome = this.tome(); tome.set(p, 0); const sw = this.swirl(); sw.set(p, 2, 0.016); const cl = this.cloud(p, 2); const te = this.tether(); te.set(p, p.clone().setX(1), 0.016);
-    const lan = this.lantern(p, 2); this.sweep(p, 0, 120, 2);
+    const lan = this.lantern(p, 2); this.sweep(p, 0, 120, 2); this.bonk(p, 0.9);
     renderer.compile(this.scene, camera);
     requestAnimationFrame(() => requestAnimationFrame(() => { B.remove(s1); W.remove(s2); this.giveGrandpaw(gp); tome.end(); sw.end(); cl.end(); te.end(); lan.end(); }));
   } catch (e) { /* cosmetic */ }

@@ -1,8 +1,8 @@
 // The Bamboo Depths' gate look (regions/dungeonGate.js; docs/ZONES.md §8.2): a mossy cave mouth in a rock outcrop with
 // bamboo on top, a weathered torii, a shimenawa across the mouth, two stone lanterns, ferns.
 // A gate look = { build(ctx) → { lanterns, colliders, mouth }, seal, glb }:
-//   ctx: { main (Placer: the gate's own mass, hidden when its Blender model arrives), dress (Placer: torii, lanterns,
-//          flora), lp(lx, lz) → [x, z] (gate-local → world; local +z faces out of the gate, toward the camera), gx, gz,
+//   ctx: { main (Placer: the gate's own mass, hidden when its Blender model arrives), frame (Placer: the torii or rope
+//          gate, hidden with main: the Blender gate models it too), dress (Placer: lanterns, flora), lp(lx, lz) → [x, z] (gate-local → world; local +z faces out of the gate, toward the camera), gx, gz,
 //          yaw, rim (ground height at the mouth), W (the RegionWorld), V }
 //   → lanterns: world points of the lantern fires (lit when the gate opens); colliders: [[lx, lz, r], …] in gate-local
 //     metres (also closed in the monsters' grid); mouth: { lz, w, h } the opening the seal curtain fills.
@@ -50,10 +50,10 @@ function caveMouth(seed = 0) {
 
 export const BAMBOO_GATE = {
   seal: '#d6ff9a',
-  glb: { url: null, scale: 1, yaw: 0, y: 0 },
-  build({ main, dress, lp, gx, gz, yaw, rim, W }) {
+  glb: { url: '/models/gate-bamboo.glb', scale: 1, yaw: 0, y: 0 },
+  build({ main, frame, dress, lp, gx, gz, yaw, rim, W }) {
     main.piece(caveMouth(0), gx, gz, yaw, { y: rim - 0.15 });
-    { const [x, z] = lp(0, 1.75); dress.piece(Pr.torii(4, { w: 3.0, h: 3.1 }), x, z, yaw, { y: rim }); for (const e of [-1, 1]) { const [px, pz] = lp(e * 1.5, 1.75); W.collision.addCircle(px, pz, 0.22); } }
+    { const [x, z] = lp(0, 1.75); frame.piece(Pr.torii(4, { w: 3.0, h: 3.1 }), x, z, yaw, { y: rim }); for (const e of [-1, 1]) { const [px, pz] = lp(e * 1.5, 1.75); W.collision.addCircle(px, pz, 0.22); } }
     const lanterns = [];
     for (const e of [-1, 1]) { const [x, z] = lp(e * 2.55, 1.55); dress.piece(Pr.lantern(26 + e, { s: 0.9 }), x, z, yaw, { y: rim, lights: false }); W.collision.addCircle(x, z, 0.32); lanterns.push(V(x, rim + 0.85, z)); }
     for (const [lx, lz, kind, s] of [[-1.3, -2.6, 'clump', 0.85], [1.6, -3.0, 'grove', 0.7], [-3.6, -1.6, 'young', 1], [3.7, -1.4, 'young', 0.9]]) { const [x, z] = lp(lx, lz); dress.multi(F.stand(kind, kind.length % 2), x, W.heightAt(x, z) + 0.4, z, { rot: lx, s }); }

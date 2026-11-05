@@ -173,6 +173,15 @@ class ScavRun {
     };
     const box = new THREE.Box3(), m4 = new THREE.Matrix4(), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
     const markBox = (bb, M, shrink = 0.8) => { box.copy(bb).applyMatrix4(M); const cx = (box.min.x + box.max.x) / 2, cz = (box.min.z + box.max.z) / 2, hx = (box.max.x - box.min.x) / 2 * shrink, hz = (box.max.z - box.min.z) / 2 * shrink; mark(cx - hx, cz - hz, cx + hx, cz + hz, box.min.y, box.max.y); };
+    // a tree / clump (a veg: batch): its round crown by its own box turned with it, not the box of the turned box (a wide
+    // crown turned 45 deg grew its square by up to 1.41: a Blender sakura's 7 m crown screened a 12 m square)
+    const sc = new THREE.Vector3(), q = new THREE.Quaternion(), pc = new THREE.Vector3();
+    const markRound = (bb, M, shrink = 0.8) => {
+      M.decompose(pc, q, sc); box.copy(bb).applyMatrix4(M);
+      const r = ((bb.max.x - bb.min.x) * Math.abs(sc.x) + (bb.max.z - bb.min.z) * Math.abs(sc.z)) / 4 * shrink;
+      c.set((bb.min.x + bb.max.x) / 2, 0, (bb.min.z + bb.max.z) / 2).applyMatrix4(M);
+      mark(c.x - r, c.z - r, c.x + r, c.z + r, box.min.y, box.max.y);
+    };
     const walk = ob => {
       if (skip.has(ob) || ob.visible === false || ob.isSkinnedMesh || ob.isBone || ob.isSprite || ob.isPoints || ob.isLine || LOW.test(ob.name || '') || /^terrain/.test(ob.name || '')) return;
       const mat = Array.isArray(ob.material) ? ob.material[0] : ob.material, g = ob.geometry;
@@ -180,7 +189,8 @@ class ScavRun {
         ob.updateWorldMatrix(true, false);
         if (ob.isBatchedMesh) {
           const n = ob._instanceInfo?.length ?? ob.instanceCount;
-          for (let i = 0; i < n; i++) { try { if (!ob.getVisibleAt(i)) continue; ob.getMatrixAt(i, m4); m4.premultiply(ob.matrixWorld); const bb = ob.getBoundingBoxAt(ob.getGeometryIdAt(i), box.clone()); if (bb) markBox(bb, m4); } catch (e) { /* a freed slot */ } }
+          const round = /^veg:/.test(ob.name || '');
+          for (let i = 0; i < n; i++) { try { if (!ob.getVisibleAt(i)) continue; ob.getMatrixAt(i, m4); m4.premultiply(ob.matrixWorld); const bb = ob.getBoundingBoxAt(ob.getGeometryIdAt(i), box.clone()); if (bb) (round ? markRound : markBox)(bb, m4); } catch (e) { /* a freed slot */ } }
         } else if (ob.isInstancedMesh) {
           if (!g.boundingBox) g.computeBoundingBox();
           for (let i = 0; i < ob.count; i++) { ob.getMatrixAt(i, m4); m4.premultiply(ob.matrixWorld); markBox(g.boundingBox, m4); }
@@ -433,7 +443,7 @@ class ScavRun {
     this.G.vfx?.dust?.(p, { n: 4, color: '#c8a880', size: 0.22 });
     Events.emit('sfx', 'bark_small', { pos: p });
     Events.emit('scavenge:found', { area: v.area, spot: s.id, quest: !!s.quest });
-    if (!this.st.flags?.hints?.scavDig) this.G.hint?.('scavDig', `*Sniff sniff!* Something's buried here! ${scavState(this.st) && this.digMode() ? 'Press {interact} to dig!' : 'Hold {interact} to dig, and let go in the gold!'}`);
+    if (!this.st.flags?.hints?.scavDig) this.G.hint?.('scavDig', `*Sniff sniff!* Something's buried here! ${scavState(this.st) && this.digMode() ? 'Press {interact} to dig!' : 'Hold {interact} to dig. When the ring glows gold, let go for a Perfect dig!'}`);
   }
   digMode() { return this.G.ui?.settings?.digMode === 1 ? 1 : 0; } // 0 hold · 1 tap (Settings › Dig)
 

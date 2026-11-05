@@ -9,8 +9,13 @@ export function goldenSim({ area, rk, pp, RP }) {
   const BURN = 0.6;
   const lineN = (len, w, sc) => (sc.n <= 1 ? 1 : Math.max(1, Math.min(sc.n, sc.n * (len * 2 * (w + 0.3)) / (Math.PI * RP * RP) * 1.8)));
   const perk = (k, s, c, id) => (rk(k, id) ? pp(c, s, id) / 100 : 0);
+  const cone = (r, arc, sc) => (sc.n <= 1 ? 1 : Math.max(1, Math.min(sc.n, area(r, sc) * Math.min(1, arc / 120))));
   const DMG = {
     // ---- Lance Arts
+    // (Eager Jabs: its jabs, the last ×lastPct, each into the narrow cone: in a pack the cone's share of the area round him
+    //  (arc/120, as the breath's), never under one foe; Tail Wind's puff a little further on, catching ~half again)
+    eagerJabs: (p, k, s, sc, c) => p.dmgPct * (p.jabs - 1 + p.lastPct / 100) * cone(p.radius, p.arc, sc)
+      + (rk(k, 'tailWind') ? p.dmgPct * pp(c, s, 'tailWind') / 100 * cone(p.radius + c.perks.tailWind.r, 70, sc) * 0.6 : 0),
     sunbeamThrust: (p, k, s, sc, c) => p.dmgPct * lineN(p.length, p.width, sc) * (1 + perk(k, s, c, 'secondSun')),
     sunfallJump: (p, k, s, sc, c) => p.dmgPct * area(p.radius, sc) + (rk(k, 'embers') ? pp(c, s, 'embers') * c.perks.embers.t * BURN * area(p.radius * 0.8, sc) * 0.5 : 0),
     pinwheelSweep: (p, k, s, sc, c) => p.dmgPct * area(p.radius, sc) * (1 + 0.8 * ((p.turns || 1) - 1) * (p.turnPct || 100) / 100) + (rk(k, 'gust') ? p.dmgPct * pp(c, s, 'gust') / 100 * area(Math.min(p.radius + c.perks.gust.r, RP + 1), sc) * 0.7 : 0),

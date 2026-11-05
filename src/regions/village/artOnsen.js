@@ -17,7 +17,7 @@ import { tube, puff } from '../../gfx/geom.js';
 import { mulberry32, clamp, TAU, Noise } from '../../core/util.js';
 import * as FL from '../assets/onsenFlora.js';
 import { boards, soot, debris, warBanner, waystone } from './art.js';
-import { slotAt, slotOf, screenAt, screenYaw } from './data.js';
+import { slotAt, slotOf, screenAt, screenYaw, PIECE_GLB } from './data.js';
 
 /** minimap roof colours per building kind (the roofs are all snow, so the map uses each building's own accent) */
 export const MAP = { elder: '#b4a07a', inn: '#a8485a', shop: '#e8903a', bathhouse: '#4a5a96', smith: '#5e5a66', waypoint: '#6a7ac8' };
@@ -941,7 +941,8 @@ export function decor(VL, ctx, PL, h0) {
   // the foot bath (ashiyu) at the square's edge: a steaming stone trough under a little snowy roof, benches both sides
   {
     const p = at(SPOTS.footbath[0], sq + SPOTS.footbath[1]), rot = face(p);
-    prop(B => footbath(B), p.x, p.z, rot, 61);
+    if (PIECE_GLB.ashiyu && VL.addPieceGlb) VL.addPieceGlb(PIECE_GLB.ashiyu, p.x, ctx.heightAt(p.x, p.z), p.z, rot); // (the Blender foot bath, ROADMAP Z-D6)
+    else prop(B => footbath(B), p.x, p.z, rot, 61);
     const c = Math.cos(rot), s = Math.sin(rot), loc = (x, z) => ({ x: p.x + x * c + z * s, z: p.z - x * s + z * c });
     for (const [x, z] of [[-0.9, 0], [0, 0], [0.9, 0]]) { const q = loc(x, z); solid(q.x, q.z, 0.38); }
     for (const [x, z, f] of [[-0.55, 0.62, PI], [0.55, 0.62, PI], [-0.55, -0.62, 0], [0.55, -0.62, 0]]) { const q = loc(x, z); out.spots.push({ x: q.x, z: q.z, face: rot + f, seat: true, seatY: h0 + 0.4, w: 1.4, dur: [16, 30], emote: ['heart', 'note', 'zzz'] }); }
@@ -968,7 +969,7 @@ export function decor(VL, ctx, PL, h0) {
   }
   for (const c of cross) {
     const L = Math.hypot(c.tx, c.tz) || 1, tx = c.tx / L, tz = c.tz / L, rot = Math.atan2(tx, tz);
-    ctx.prop(B => gate(B, { w: 3.6 }), { x: c.x, z: c.z, y: ctx.heightAt(c.x, c.z), rot, seed: 51, warp: 0.02 });
+    { const o = { x: c.x, z: c.z, y: ctx.heightAt(c.x, c.z), rot, seed: 51, warp: 0.02 }, k = B => gate(B, { w: 3.6 }); VL.decorGlb('gate', o, k) || ctx.prop(k, o); } // (Z-D6: its Blender model, if built)
     for (const s of [-1, 1]) solid(c.x + tz * s * 1.8, c.z - tx * s * 1.8, 0.26);
     for (const s of [-1, 1]) { const x = c.x + tz * s * 1.48, z = c.z - tx * s * 1.48; out.lamps.push({ x, y: ctx.heightAt(x, z) + 2.45 - 0.69, z, color: '#fff0d8', light: '#ffc890' }); }
   }
@@ -983,7 +984,7 @@ export function decor(VL, ctx, PL, h0) {
     const x = x1 + nx * (ctx.plan.trailW + 0.9), z = z1 + nzz * (ctx.plan.trailW + 0.9);
     if (inBuilding(x, z, 0.5) || nearDoor(x, z, 2.2)) continue;
     const rot = Math.atan2(-nx, -nzz) + PI / 2;
-    let hook = null; ctx.prop(B => { hook = lanternPost(B); }, { x, z, y: ctx.heightAt(x, z), rot, seed: 61 + i, warp: 0.02 });
+    let hook = null; { const o = { x, z, y: ctx.heightAt(x, z), rot, seed: 61 + i, warp: 0.02 }, k = B => { hook = lanternPost(B); }; VL.decorGlb('lanternPost', o, k) || ctx.prop(k, o); }
     solid(x, z, 0.16);
     const c = Math.cos(rot), s = Math.sin(rot);
     out.lamps.push({ x: x + hook[0] * c + hook[2] * s, y: ctx.heightAt(x, z) + hook[1], z: z - hook[0] * s + hook[2] * c, color: '#ffd890' });

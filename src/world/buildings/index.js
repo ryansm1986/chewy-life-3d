@@ -16,6 +16,21 @@ import { bridgeDeckHeight } from './decor.js';
 import { cleanStyle, styleKey } from './styles.js';
 import { clamp, lerp } from '../../core/util.js';
 import { memLite } from '../../core/deck.js';
+import { loadGlb, glbInstance } from '../../gfx/glbAssets.js';
+
+// Blender centrepieces (ROADMAP Z-D6; catalog `glb: [url per level]`): an unstyled building whose model is loaded stands
+// as the Blender model, the kit template still giving its door, lights, footprint and height. `window_glow` materials
+// take the kit's shared night glow (setNight). loadBuildingGlbs() at boot; before it lands the kit model stands.
+const GLB = new Map(); // 'guild:2' → template
+export function loadBuildingGlbs() {
+  const jobs = [];
+  for (const [id, def] of Object.entries(BUILDINGS)) (def.glb || []).forEach((url, i) => { if (url) jobs.push(loadGlb(url).then(t => GLB.set(`${id}:${i + 1}`, t)).catch(e => console.warn('[buildings] model', url, e))); });
+  // catalog glbVariants: [n per level]: a model per seeded variant (homes, shops: /models/<id>-<level>-v<k>.glb, k = variant % n)
+  for (const [id, def] of Object.entries(BUILDINGS)) (def.glbVariants || []).forEach((n, i) => { for (let k = 0; k < n; k++) { const url = `/models/${id}-${i + 1}-v${k}.glb`; jobs.push(loadGlb(url).then(t => GLB.set(`${id}:${i + 1}:v${k}`, t)).catch(e => console.warn('[buildings] model', url, e))); } });
+  return Promise.all(jobs);
+}
+/** placeable copies of every loaded building model (gfx/thumbs.js warmPrograms compiles their programs ahead) */
+export const buildingGlbInstances = () => [...GLB.values()].map(t => glbInstance(t, { outline: true }));
 
 export { BUILDINGS, CATEGORIES, sizeOf, bridgeDeckHeight };
 export const VARIANTS = 8;
@@ -89,6 +104,25 @@ export function buildModel(id, { level = 1, seed = 0, style = null } = {}) {
   const tpl = getTemplate(id, level, seed, style);
   tpl.users++;
   const inst = instantiate(tpl);
+  const L = clamp(level | 0, 1, BUILDINGS[id].levels || 1), nv = BUILDINGS[id].glbVariants?.[L - 1];
+  const gt = !cleanStyle(style) && (nv ? GLB.get(`${id}:${L}:v${variantOf(seed) % nv}`) : GLB.get(`${id}:${L}`)); // (a remodelled building keeps the kit: its style swaps kit parts)
+  if (gt) { // (the Blender model stands in for the kit's meshes; catalog glbKeep: kit layers that stay, e.g. the Burrow's
+    // portal ('hot' + its spinning 'anim' parts) or the fountain's jets ('jet' + 'anim'))
+    const M = MATS(), keep = BUILDINGS[id].glbKeep || [], keepMats = keep.map(k => M[k]).filter(Boolean);
+    for (const c of [...inst.group.children]) {
+      const part = inst.parts.find(p => p.node === c);
+      if (part ? keep.includes('anim') : (c.isMesh && keepMats.includes(c.material))) continue;
+      inst.group.remove(c);
+    }
+    if (!keep.includes('anim')) inst.parts.length = 0;
+    const o = glbInstance(gt, { outline: true });
+    o.traverse(m => {
+      if (!m.isMesh) return;
+      if (/window_glow/i.test(m.material?.name || '')) { m.material = M.glow; if (!inst.glow.includes(M.glow)) inst.glow.push(M.glow); }
+      else if (/water/i.test(m.material?.name || '') && M.water) m.material = M.water; // (the kit's animated water)
+    });
+    inst.group.add(o);
+  }
   inst.group.name = `building:${id}`;
   const parts = inst.parts;
   const model = {

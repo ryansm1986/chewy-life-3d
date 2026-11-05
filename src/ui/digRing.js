@@ -1,6 +1,6 @@
 // The dig ring (docs/COZY.md §7.1, §10; ROADMAP CZ-5): a little paper disc over the hero while Shadow and the hero dig.
-// The ring fills over the dig (1.4 s held), a golden band sits at 70–85%, and letting go inside it is a "Perfect dig!"
-// (the fill turns gold while it's in the band). Holding on to the end, or letting go anywhere else, is a good dig:
+// The ring fills over the dig (1.8 s held), a golden band sits at 55–90%, and letting go inside it is a "Perfect dig!"
+// A live call over the disc says what to do: "Hold…" while it fills, then a big "Let go!" as the whole disc glows gold. Holding on to the end, or letting go anywhere else, is a good dig:
 // nothing is ever lost. The keys under it follow the device (F or the mouse, A, the attack button). Drawn by
 // cozy/scavengeWorld.js; transforms are written only when they change.
 import './scavenge.css';
@@ -25,20 +25,21 @@ export class DigRing {
         <circle class="dr-tick" cx="36" cy="36" r="${R}" stroke-dasharray="1.6 ${C.toFixed(2)}" stroke-dashoffset="${(-(DIG_BAND[1] * C) + 0.8).toFixed(2)}"/>
       </svg>
       <div class="dr-paw">${glyph('paw')}</div>
+      <div class="dr-call"></div>
       <div class="dr-word"></div>
     </div>
-    <div class="dr-hint"><span class="kbm-only"><span class="kc sm">F</span></span><span class="pad-only">${keyCap('attack', { sm: true })}</span><span class="touch-only"><i class="dr-tap">${glyph('paw')}</i></span><b>hold, let go in the gold</b></div>`;
+    <div class="dr-hint"><span class="kbm-only"><span class="kc sm">F</span></span><span class="pad-only">${keyCap('attack', { sm: true })}</span><span class="touch-only"><i class="dr-tap">${glyph('paw')}</i></span><b>Hold · let go on the gold</b></div>`;
     layer.appendChild(r);
     const q = s => r.querySelector(s);
-    this.$ = { card: q('.dr-card'), fill: q('.dr-fill'), word: q('.dr-word'), hint: q('.dr-hint'), hintTx: q('.dr-hint b') };
+    this.$ = { card: q('.dr-card'), fill: q('.dr-fill'), word: q('.dr-word'), call: q('.dr-call'), hint: q('.dr-hint'), hintTx: q('.dr-hint b') };
     this.on = false; this.last = {};
   }
   /** a dig starts. o: { hold: the ring follows the button (else it fills by itself), tap: a tap-mode dig } */
   start(o = {}) {
     clearTimeout(this._hideT);
     const $ = this.$;
-    $.card.className = 'dr-card start'; $.word.textContent = '';
-    $.hintTx.textContent = o.hold ? 'hold, let go in the gold' : 'digging…';
+    $.card.className = 'dr-card start'; $.word.textContent = ''; $.call.textContent = o.hold ? 'Hold…' : '';
+    $.hintTx.textContent = o.hold ? 'Hold · let go on the gold' : 'digging…';
     this.root.classList.toggle('auto', !o.hold);
     this.root.classList.add('show'); this.on = true; this.last = {};
   }
@@ -51,7 +52,10 @@ export class DigRing {
     const f = Math.round(Math.max(0, Math.min(1, k)) * 1000) / 1000;
     if (f !== L.f) { $.fill.setAttribute('stroke-dasharray', `${(f * C).toFixed(2)} ${C.toFixed(2)}`); L.f = f; }
     const inBand = f >= DIG_BAND[0] && f <= DIG_BAND[1], st = inBand ? 'gold' : f > DIG_BAND[1] ? 'past' : '';
-    if (st !== L.st) { $.card.classList.toggle('gold', inBand); $.card.classList.toggle('past', f > DIG_BAND[1]); L.st = st; }
+    if (st !== L.st) {
+      $.card.classList.toggle('gold', inBand); $.card.classList.toggle('past', f > DIG_BAND[1]); L.st = st;
+      $.call.textContent = inBand ? 'Let go!' : st === 'past' ? 'Still a good dig!' : 'Hold…';
+    }
   }
   /** the dig is done: 'perfect' | 'normal' | 'cancel' */
   finish(result, streak = 0) {

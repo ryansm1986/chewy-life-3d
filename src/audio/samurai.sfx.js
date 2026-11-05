@@ -2,6 +2,7 @@
 // into the sfx table by src/audio/sfx.js. All synthesized (WebAudio, no files), soft and round like the rest:
 //   katana_draw   the "shing" of a draw: a bright metallic ring sliding up, a quick swish of air under it
 //   katana_sheath the sheath's "click": a wooden tap and a tiny bright tick as the habaki seats in the saya mouth
+//   katana_slice  Swallow Return's quick cuts: a thin bright tear of air and the edge's zing
 //   katana_clang  a blade meeting something hard (a parry, Helmet Splitter, a moon blade landing): a short bell clang
 const R = (a, b) => a + Math.random() * (b - a);
 // inharmonic metal partials (a blade, not a glass bell)
@@ -19,6 +20,12 @@ export const SFX = {
     s.noise({ at: 0.15, ft: 'bandpass', f: 1400, q: 3, a: 0.001, d: 0.035, v: 0.5 }); // the click
     s.tone({ at: 0.15, f: 820, f2: 620, a: 0.001, d: 0.05, v: 0.12, type: 'triangle' });
     s.bell({ at: 0.152, f: 3150, d: 0.12, v: 0.03, partials: BLADE });
+  } },
+  // Swallow Return's cuts: a fast, thin "shhk" of torn air (quicker and brighter than a swing) with the edge's zing on top
+  katana_slice: { vary: 0.06, max: 3, gap: 0.04, trim: 1.2, fn(s) {
+    s.noise({ pts: [[0, 1400], [0.04, 5200], [0.11, 1900]], q: 2.6, a: 0.008, d: 0.09, v: 0.75 });
+    s.noise({ at: 0.005, pts: [[0, 700], [0.05, 1700], [0.12, 600]], q: 1.2, a: 0.015, d: 0.08, v: 0.35, color: 'pink' }); // (its body)
+    s.bell({ at: 0.03, f: 2350, d: 0.2, v: 0.035, partials: BLADE, rev: 0.25 });
   } },
   katana_clang: { vary: 0.06, max: 3, gap: 0.05, trim: 1.1, fn(s) {
     s.bell({ f: R(820, 900), d: 0.42, v: 0.1, partials: BLADE, rev: 0.3 });

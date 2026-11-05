@@ -53,6 +53,20 @@ const stackCap = d => (d && d.hexStacks) || 3;
 
 const DEFS = {
   // =================================================================== FLAIL ARTS (Strength)
+  // Glum Bonk is the quick, precise one (one foe, one spot, a daze); Woeful Wallop the slow, wide sweep
+  glumBonk: {
+    tree: 'flail', name: 'Glum Bonk', row: 0, col: 0, pre: [], wep: 'flail', kind: 'active', element: 'phys',
+    cost: l => r1(2.6 + 0.1 * (l - 1)), cd: () => 0,
+    desc: 'Up goes the flail, straight down comes the ball: bonk, right on the head of the foe in front of you. Quick, precise and deeply unimpressed. They see stars for a moment. He sees no reason to smile.',
+    syn: [{ id: 'weightOfWorld', p: 3 }, { id: 'tugOfWoe', p: 4 }],
+    params(l, d) {
+      return { dmgPct: lin(88, 11)(l) * F('glumBonk', d), radius: 1.45, splash: 0.9, splashPct: 35, daze: r2(0.3 + 0.01 * l), knockback: 0.2 };
+    },
+    info(l, d) {
+      const p = DEFS.glumBonk.params(l, d);
+      return [`Damage: ${pct(p.dmgPct)} weapon damage${dmgRange(p.dmgPct, d)} to one foe`, `The splat: ${p.splashPct}% to others within ${p.splash} m`, `Dazed for ${p.daze}s (bosses only flinch)`, costLine(DEFS.glumBonk, l, d), ...synLine('glumBonk', d), ...mastLine('flail', d)];
+    },
+  },
   woefulWallop: {
     tree: 'flail', name: 'Woeful Wallop', row: 0, col: 1, pre: [], wep: 'flail', kind: 'active', element: 'phys',
     cost: l => r1(3.5 + 0.17 * (l - 1)), cd: () => 0,
@@ -307,7 +321,7 @@ const DEFS = {
 
 /** Skills whose real cast isn't built yet: greyed in the K panel ("In training"), can't be learned (skills.js canLearn)
  *  or cast (usable). Each one leaves this list as its move, effects and sound land (docs/SHIHTZU.md §3). */
-export const SHIHTZU_TRAINING = new Set(); // (all 21 are built: H-4 checkpoint 2)
+export const SHIHTZU_TRAINING = new Set(); // (all 22 are built: H-4 checkpoint 2, Glum Bonk 2026-11-03)
 
 for (const id in DEFS) {
   const d = DEFS[id];

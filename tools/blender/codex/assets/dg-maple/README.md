@@ -1,0 +1,3 @@
+# The Maple Halls' set pieces (dg-maple): Blender source (Z-D6, 2026-11-04)
+
+The maple zone dungeon kit's own pieces (src/dungeon/zoneKits/maple.js, wrapped with glbFn('dg-maple')): hokora (two red eave lanterns, glow), rootTangle (2 variants, an earth bank sunk into the wall), fallenBranch (2), stump (glowing shelf fungus), hoshigakiRack, sakeTable. Built in each kit piece's local frame; the game swaps the geometry and keeps the kit lights (REGION_GLB['dg-maple'], variants by seed % 2). Build: build_dg-maple.py --piece <name|all> (run.sh), from dg-bamboo's kit. game/find_pieces.mjs hooks the placement in the page and shoots each listed GLB where it landed (zone-shots frames rooms, not pieces).

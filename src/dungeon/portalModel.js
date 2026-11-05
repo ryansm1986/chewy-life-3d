@@ -8,6 +8,14 @@ import * as THREE from 'three';
 import { makeToon, makeOutline } from '../gfx/materials.js';
 import { paint, merge, tube } from '../gfx/geom.js';
 import { glowTexture } from '../gfx/textures.js';
+import { loadGlb, glbInstance } from '../gfx/glbAssets.js';
+
+// The Blender moon gate (public/models/moon-gate.glb; tools/blender/codex/assets/magic-props): the kit's stone, rope and
+// shide in the same units (its opening r 0.89 round the swirl disc). loadPortalFrame() at boot; until it lands (or if it
+// fails) the kit frame stands in.
+export const PORTAL_GLB = '/models/moon-gate.glb';
+let FRAME_TPL = null;
+export function loadPortalFrame() { return loadGlb(PORTAL_GLB).then(t => { FRAME_TPL = t; return true; }).catch(e => { console.warn('[portal] model', e); return false; }); }
 
 const TAU = Math.PI * 2;
 let FRAME = null; // (the stone ring, plinth, rope and shide: built once, shared, never disposed per portal)
@@ -68,7 +76,8 @@ export function portalModel({ colors = ['#ff9ec0', '#8fd0ff', '#fff4e8'], frame 
   const root = new THREE.Group(); root.scale.setScalar(size); group.add(root); // (the group's own scale stays free for the cast's grow)
   const F = frameGeometry();
   const parts = [];
-  if (frame) {
+  if (frame && FRAME_TPL) { const o = glbInstance(FRAME_TPL, { outline: true }); root.add(o); } // (the Blender gate)
+  else if (frame) {
     const sm = makeToon({ vertexColors: true, rim: 0.22, brush: 0.25 }), cm = makeToon({ vertexColors: true, rim: 0.2 });
     const stone = new THREE.Mesh(F.stone, sm), cloth = new THREE.Mesh(F.cloth, cm);
     stone.castShadow = true; cloth.castShadow = true; stone.receiveShadow = true;

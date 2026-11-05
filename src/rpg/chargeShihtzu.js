@@ -11,6 +11,15 @@ export function shihtzuCharge({ STAGES, QUICK, FOCUS, SPLIT, WIDE, ECHO, UNIQUE,
   const dm = (c, s) => (c.tune?.dmg ? by(c.tune.dmg, s) : 1); // (the balance layer for his own damage keys)
 
   // =================================================================== FLAIL ARTS
+  C.glumBonk = {
+    ready: true, tune: { dmg: [0.75, 0.69, 0.55], shape: [1, 1, 1] }, base: 0.7, color: '#9a7ab8', pose: 'stzBonk', title: 'The Glummest Bonk',
+    blurb: 'Hold the flail up high and brood about it. The longer he broods, the harder it comes down: a much bigger bonk on the one foe, a wider splat of gloom, and stars for longer.',
+    splash: [1.15, 1.3, 1.45], daze: [0.3, 0.5, 0.8],
+    apply(p, s) { p.dmgPct *= by(STAGE_MULT, s); p.splash = r2(p.splash * by(this.splash, s)); p.daze = r2(p.daze + by(this.daze, s)); return p; },
+    lines(p) { return [`Bonk: ${pct(p.dmgPct)} on one foe · dazed ${p.daze}s`, `The splat: ${p.splashPct}% to others within ${p.splash} m`]; },
+    perks: set(STAGES(), QUICK(), ECHO({ name: 'Bonk Bonk', pct: 50, delay: 0.35 }),
+      UNIQUE('noggin', 'Right on the Noggin', 6, 'A charged bonk is always a critical hit on the foe it lands on.')),
+  };
   C.woefulWallop = {
     ready: true, tune: { dmg: [0.87, 0.77, 0.68], shape: [1, 1, 1] }, base: 0.85, color: '#c8a0d8', pose: 'stzWallop', title: 'Grand Wallop',
     blurb: 'Wind the flail round and round behind you, sighing ever more deeply: the wallop sweeps wider and further, hits much harder, and knocks the wind out of everything it catches.',

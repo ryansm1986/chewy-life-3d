@@ -2,7 +2,7 @@
  "name": "rosie_toy",
  "contract": "hero",
  "scale": 1.0,
- "height": 1.29,
+ "height": 1.422,
  "bones": [
   {
    "name": "root",
@@ -63,71 +63,71 @@
    "parent": "head",
    "pos": [
     0.0,
-    0.80112,
-    0.18594
+    0.81672,
+    0.09679
    ]
   },
   {
    "name": "eye_L",
    "parent": "head",
    "pos": [
-    0.13223,
-    0.89381,
-    0.24227
+    0.17122,
+    0.92625,
+    0.15184
    ]
   },
   {
    "name": "lidU_L",
    "parent": "head",
    "pos": [
-    0.1404,
-    0.8902,
-    0.04528
+    0.10644,
+    0.9217,
+    0.01436
    ]
   },
   {
    "name": "lidD_L",
    "parent": "head",
    "pos": [
-    0.1404,
-    1.18716,
-    -0.10204
+    0.03896,
+    0.95393,
+    -0.09693
    ]
   },
   {
    "name": "brow_L",
    "parent": "head",
    "pos": [
-    0.1378,
-    1.01744,
-    0.21548
+    0.1736,
+    1.07464,
+    0.12492
    ]
   },
   {
    "name": "lip_L",
    "parent": "head",
    "pos": [
-    0.0442,
-    0.80112,
-    0.29448
+    0.0527,
+    0.81672,
+    0.22755
    ]
   },
   {
    "name": "ear_L",
    "parent": "head",
    "pos": [
-    0.26163,
-    0.8492,
-    -0.06756
+    0.30482,
+    0.87419,
+    -0.00922
    ]
   },
   {
    "name": "earTip_L",
    "parent": "ear_L",
    "pos": [
-    0.30263,
-    0.8506,
-    -0.05136
+    0.34581,
+    0.8756,
+    0.00698
    ]
   },
   {
@@ -188,63 +188,63 @@
    "name": "eye_R",
    "parent": "head",
    "pos": [
-    -0.13223,
-    0.89381,
-    0.24227
+    -0.17122,
+    0.92625,
+    0.15184
    ]
   },
   {
    "name": "lidU_R",
    "parent": "head",
    "pos": [
-    -0.1404,
-    0.8902,
-    0.04528
+    -0.10644,
+    0.9217,
+    0.01436
    ]
   },
   {
    "name": "lidD_R",
    "parent": "head",
    "pos": [
-    -0.1404,
-    1.18716,
-    -0.10204
+    -0.03896,
+    0.95393,
+    -0.09693
    ]
   },
   {
    "name": "brow_R",
    "parent": "head",
    "pos": [
-    -0.1378,
-    1.01744,
-    0.21548
+    -0.1736,
+    1.07464,
+    0.12492
    ]
   },
   {
    "name": "lip_R",
    "parent": "head",
    "pos": [
-    -0.0442,
-    0.80112,
-    0.29448
+    -0.0527,
+    0.81672,
+    0.22755
    ]
   },
   {
    "name": "ear_R",
    "parent": "head",
    "pos": [
-    -0.26163,
-    0.8492,
-    -0.06756
+    -0.30482,
+    0.87419,
+    -0.00922
    ]
   },
   {
    "name": "earTip_R",
    "parent": "ear_R",
    "pos": [
-    -0.30263,
-    0.8506,
-    -0.05136
+    -0.34581,
+    0.8756,
+    0.00698
    ]
   },
   {
@@ -345,51 +345,51 @@
    "itemSize": 3,
    "normalized": false,
    "offset": 0,
-   "count": 56835
+   "count": 63507
   },
   {
    "name": "normal",
    "type": "i2",
    "itemSize": 3,
    "normalized": true,
-   "offset": 227340,
-   "count": 56835
+   "offset": 254028,
+   "count": 63507
   },
   {
    "name": "uv",
    "type": "f4",
    "itemSize": 2,
    "normalized": false,
-   "offset": 341012,
-   "count": 37890
+   "offset": 381044,
+   "count": 42338
   },
   {
    "name": "skinIndex",
    "type": "u1",
    "itemSize": 4,
    "normalized": false,
-   "offset": 492572,
-   "count": 75780
+   "offset": 550396,
+   "count": 84676
   },
   {
    "name": "skinWeight",
    "type": "u1",
    "itemSize": 4,
    "normalized": true,
-   "offset": 568352,
-   "count": 75780
+   "offset": 635072,
+   "count": 84676
   },
   {
    "name": "index",
    "type": "u4",
    "itemSize": 1,
    "normalized": false,
-   "offset": 644132,
-   "count": 101724
+   "offset": 719748,
+   "count": 113964
   }
  ],
- "vertexCount": 18945,
- "outlineIndexCount": 90510,
+ "vertexCount": 21169,
+ "outlineIndexCount": 102156,
  "bin": "rosie_toy.bin",
  "tex": "rosie_toy.png",
  "normalTex": "rosie_toy_n.png"

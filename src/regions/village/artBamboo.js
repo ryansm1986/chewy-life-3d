@@ -13,7 +13,7 @@ import { M as KM } from '../assets/bambooKit.js';
 import * as F from '../assets/bambooFlora.js';
 import * as Pr from '../assets/bambooProps.js';
 import { Events } from '../../core/events.js';
-import { slotAt, slotOf, screenAt, screenYaw } from './data.js';
+import { slotAt, slotOf, screenAt, screenYaw, PIECE_GLB } from './data.js';
 import { roof } from '../../world/buildings/roofs.js';
 import { foundation, walls, onFace, shoji, roundWindow, latticeWindow, door, engawa, posts, steps, fence as kitFence, STONES } from '../../world/buildings/parts.js';
 import { chochin, pot, barrel, crate, bush, flowerPatch, signboard, torii, toro, woodStack, rock, produce } from '../../world/buildings/props.js';
@@ -521,16 +521,21 @@ export function decor(VL, ctx, PL, h0) {
   const inBuilding = (x, z, pad = 0.4) => VL.buildings.some(b => { const c = Math.cos(b.rot), s = Math.sin(b.rot), dx = x - b.x, dz = z - b.z, lx = dx * c - dz * s, lz = dx * s + dz * c, f = b.info.fp; return lx > f[0] - pad && lx < f[2] + pad && lz > f[1] - pad && lz < f[3] + pad; });
   // the shishi-odoshi basin at the top of the square, in front of Grandma Sasa's house (it clacks)
   {
-    const p = at(0, sq + 1.15), rot = face(p) + PI * 0.5, so = Pr.shishiOdoshi(3);
-    PL.piece(so.pc, p.x, p.z, rot, { y: h0, lights: false });
-    const m = PL.mesh(new THREE.Mesh(so.rocker.geo, KM('d:body'))); m.castShadow = true; m.receiveShadow = true;
-    const q = new THREE.Vector3(so.rocker.pivot.x, so.rocker.pivot.y, so.rocker.pivot.z).applyAxisAngle(new THREE.Vector3(0, 1, 0), rot);
-    m.position.set(p.x + q.x, h0 + q.y, p.z + q.z); m.rotation.y = rot;
+    const p = at(0, sq + 1.15), rot = face(p) + PI * 0.5;
+    let m; // the rocker that tips: the Blender model's `rocker` node (its origin the pivot, ROADMAP Z-D6), else the kit's
+    if (PIECE_GLB.shishiOdoshi && VL.addPieceGlb) { m = { rotation: { z: 0 } }; VL.addPieceGlb(PIECE_GLB.shishiOdoshi, p.x, h0, p.z, rot, { onLoad: o => { const r = o.getObjectByName('rocker'); if (r) { r.rotation.z = m.rotation.z; m = r; } } }); }
+    else {
+      const so = Pr.shishiOdoshi(3);
+      PL.piece(so.pc, p.x, p.z, rot, { y: h0, lights: false });
+      m = PL.mesh(new THREE.Mesh(so.rocker.geo, KM('d:body'))); m.castShadow = true; m.receiveShadow = true;
+      const q = new THREE.Vector3(so.rocker.pivot.x, so.rocker.pivot.y, so.rocker.pivot.z).applyAxisAngle(new THREE.Vector3(0, 1, 0), rot);
+      m.position.set(p.x + q.x, h0 + q.y, p.z + q.z); m.rotation.y = rot;
+    }
     solid(p.x, p.z, 0.55);
     const f = face(p);
     out.spots.push({ x: p.x + Math.sin(f) * 1.0, z: p.z + Math.cos(f) * 1.0, face: f + PI, pose: 'admire', w: 1, dur: [8, 14], emote: ['sparkle', 'note'] });
-    let clacked = false;
-    out.update = (dt, t) => { const c = Pr.shishiCycle(t + 2.3); m.rotation.z = c.a; if (c.clackWindow && !clacked) { clacked = true; Events.emit('sfx', 'env_shishi_odoshi', { pos: m.position }); } else if (!c.clackWindow) clacked = false; };
+    let clacked = false; const clackAt = new THREE.Vector3(p.x, h0 + 0.5, p.z); // (world space: the GLB rocker's position is local)
+    out.update = (dt, t) => { const c = Pr.shishiCycle(t + 2.3); m.rotation.z = c.a; if (c.clackWindow && !clacked) { clacked = true; Events.emit('sfx', 'env_shishi_odoshi', { pos: clackAt }); } else if (!c.clackWindow) clacked = false; };
   }
   // benches facing the square (villagers sit on them), stone lanterns at its corners, the notice board
   for (const a of [-64, 64]) { const p = at(a, sq + 1.25), r = face(p); PL.piece(Pr.bambooBench(a > 0 ? 2 : 1), p.x, p.z, r, { y: h0 }); solid(p.x, p.z, 0.55); out.spots.push({ x: p.x, z: p.z, face: r, seat: true, seatY: h0 + 0.47, w: 1.2, dur: [16, 30], emote: ['note', 'heart', 'zzz'] }); }
@@ -549,7 +554,7 @@ export function decor(VL, ctx, PL, h0) {
   }
   for (const c of cross) {
     const L = Math.hypot(c.tx, c.tz) || 1, tx = c.tx / L, tz = c.tz / L, rot = Math.atan2(tx, tz);
-    ctx.prop(B => gate(B, { w: 3.6 }), { x: c.x, z: c.z, y: ctx.heightAt(c.x, c.z), rot, seed: 51 });
+    { const o = { x: c.x, z: c.z, y: ctx.heightAt(c.x, c.z), rot, seed: 51 }, k = B => gate(B, { w: 3.6 }); VL.decorGlb('gate', o, k) || ctx.prop(k, o); } // (Z-D6: its Blender model, if built)
     for (const s of [-1, 1]) solid(c.x + tz * s * 1.8, c.z - tx * s * 1.8, 0.24);
   }
   out.gates = cross;
@@ -564,7 +569,7 @@ export function decor(VL, ctx, PL, h0) {
     const x = x1 + nx * (ctx.plan.trailW + 1.0), z = z1 + nz * (ctx.plan.trailW + 1.0);
     if (inBuilding(x, z, 0.6)) continue;
     const rot = Math.atan2(-nx, -nz) + PI / 2;
-    let hook = null; ctx.prop(B => { hook = lanternPost(B); }, { x, z, y: ctx.heightAt(x, z), rot, seed: 61 + i });
+    let hook = null; { const o = { x, z, y: ctx.heightAt(x, z), rot, seed: 61 + i }, k = B => { hook = lanternPost(B); }; VL.decorGlb('lanternPost', o, k) || ctx.prop(k, o); }
     solid(x, z, 0.16);
     const c = Math.cos(rot), s = Math.sin(rot);
     out.lamps.push({ x: x + hook[0] * c + hook[2] * s, y: ctx.heightAt(x, z) + hook[1], z: z - hook[0] * s + hook[2] * c, color: '#f0c860' });

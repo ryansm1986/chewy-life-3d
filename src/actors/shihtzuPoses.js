@@ -81,6 +81,22 @@ export const SHIHTZU_ACTIONS = {
     A.earKick += -1.5 * sigh + 3 * s * k; A.eyesClosed = sigh > 0.6 ? 1 : 0; A.mouth = Math.max(A.mouth, 0.5 * bump(0.55, 0.72, t));
     along(A, [[0, 0.2, -0.7, -0.4], [0.3, -0.5, 0.15, -0.85], [0.5, -0.85, 0.25, -0.4], [0.6, 0.9, 0.12, 0.3], [0.72, 0.1, 0.0, 0.99]], t, Math.max(0.6 * w, s * (1 - S(0.72, 0.92, t))));
   } },
+  // Glum Bonk: quick and precise. A small hop up onto his toes with the paw shot straight up (the ball flicked up behind
+  // his topknot), a beat at the top, then the paw chopped straight down the middle with all his weight dropping into it,
+  // so the ball comes over the top and lands right in front of him, on his facing. A squash on the bonk, ears flung,
+  // a grumpy "hmph", and a short settle (the fast, narrow answer to the wallop's wide sweep)
+  glumBonk: { dur: 0.46, flail: true, ev: { hit: 0.54 }, pose: (t, P, A) => {
+    const up = ease.outCubic(S(0, 0.3, t)), dn = ease.inQuad(S(0.36, 0.5, t)), land = bump(0.48, 0.72, t), r = ease.inOutQuad(S(0.66, 1, t)), k = 1 - r;
+    A.armR.x += lerp(lerp(0, -3.05, up), -0.7, dn) * k; A.armR.z += lerp(0.2 * up, 0.75, dn) * k;
+    A.foreR.x += lerp(-0.3 * up, 0.1, dn) * k;
+    A.armL.x += lerp(-0.5 * up, 0.15, dn) * k; A.armL.z += lerp(0.35 * up, 0.1, dn) * k;
+    A.y += 0.05 * bump(0.05, 0.45, t) - 0.05 * land * k; A.sq += -0.06 * up * (1 - dn) + 0.15 * land * k;
+    A.body.x += lerp(-0.16 * up, 0.28, dn) * k; A.body.y += lerp(-0.12 * up, 0.08, dn) * k; A.head.x += lerp(-0.1 * up, 0.04, dn) * k;
+    A.legL.x += lerp(0.1 * up, -0.25, dn) * k; A.legR.x += lerp(-0.1 * up, 0.2, dn) * k;
+    A.earKick += -0.8 * up * (1 - dn) + 3.5 * dn * k; A.mouth = Math.max(A.mouth, 0.45 * bump(0.46, 0.66, t));
+    // the ball: up behind his head on the wind-up, over the top, then straight down onto the spot in front of him
+    along(A, [[0, 0.3, -0.6, -0.3], [0.28, -0.4, 0.92, 0.02], [0.4, -0.15, 0.99, 0.02], [0.45, 0.55, 0.8, 0.03], [0.5, 0.85, -0.5, 0.04], [0.7, 0.7, -0.7, 0.04]], t, Math.max(0.85 * up * (1 - dn), dn * (1 - S(0.66, 0.88, t))));
+  } },
   // a hex: the free (left) paw raised by his face, then thrust at the foe, ghostlight swirling off it (the sheet's CAST)
   hexFlick: { dur: 0.42, ev: { release: 0.52 }, pose: (t, P, A) => {
     const u = ease.outBack(S(0, 0.48, t)), f = ease.outQuad(S(0.48, 0.62, t)), r = ease.inOutQuad(S(0.68, 1, t)), k = 1 - r;
@@ -212,7 +228,7 @@ export const SHIHTZU_ACTIONS = {
   } },
 };
 /** the actions that root him (WASD won't walk out of them): player.js BUSY */
-export const SHIHTZU_ROOTED = ['flailSwing1', 'flailSwing2', 'flailSlam', 'wallop', 'hexFlick', 'tugThrow', 'tugHaul', 'stzWhirl', 'sulk', 'sulkSpin', 'sigh', 'hexRaise', 'awoo', 'tomeRead', 'lanternSet']; // (stzWhirl: he walks slowly while it whirls: canMoveWhileActing)
+export const SHIHTZU_ROOTED = ['flailSwing1', 'flailSwing2', 'flailSlam', 'wallop', 'glumBonk', 'hexFlick', 'tugThrow', 'tugHaul', 'stzWhirl', 'sulk', 'sulkSpin', 'sigh', 'hexRaise', 'awoo', 'tomeRead', 'lanternSet']; // (stzWhirl: he walks slowly while it whirls: canMoveWhileActing)
 
 // ------------------------------------------------------------------ charge wind-ups (combat/charge.js plays 'charge')
 // (t: seconds held, k: 0..1 of the whole charge, A: the pose accumulator, e: the blend in/out). Each holds the wound-back
@@ -224,6 +240,17 @@ export const SHIHTZU_CHARGE_POSES = {
     A.body.y += (-0.8 - 0.15 * k) * e; A.body.x += -0.1 * e; A.head.y += (-0.35 - 0.05 * k) * e; A.y += -0.04 * e;
     A.legL.x += 0.2 * e; A.legR.x += -0.2 * e; A.legL.z += 0.12 * e; A.legR.z += -0.12 * e; A.sq += (0.04 + 0.06 * k) * e;
     const a = Math.PI - t * (6 + 8 * k); guide(A, Math.cos(a) * 0.9 - 0.3, -0.1 + 0.15 * k, Math.sin(a) * 0.6 - 0.4, 0.7 * e);
+  },
+  // Glum Bonk held at the top (glumBonk at u ≈ 0.36): up on his toes, the paw straight up, the ball raised high behind his
+  // topknot and bobbing in a tight little circle; he leans back further and trembles as it fills, ears drawn back, eyes
+  // screwed shut at full (a very grumpy, very precise bonk on the way)
+  stzBonk(t, k, A, e) {
+    const sh = Math.sin(t * (22 + 30 * k)) * 0.03 * k;
+    A.armR.x += (-3.05 - 0.08 * k + sh) * e; A.armR.z += 0.2 * e; A.foreR.x += -0.3 * e;
+    A.armL.x += (-0.5 - 0.15 * k) * e; A.armL.z += (0.35 + 0.1 * k) * e;
+    A.y += (0.03 + 0.03 * k) * e; A.sq += (-0.05 - 0.04 * k) * e; A.body.x += (-0.14 - 0.08 * k) * e; A.body.y += -0.12 * e; A.head.x += (-0.08 - 0.05 * k + sh) * e;
+    A.legL.x += 0.1 * e; A.legR.x += -0.1 * e; A.earKick += (-0.8 - 0.6 * k) * e; A.eyesClosed = k > 0.97 ? 1 : 0;
+    const a = t * (8 + 10 * k); guide(A, -0.3 + Math.cos(a) * 0.14, 0.95, Math.sin(a) * 0.14, 0.85 * e);
   },
   // the ball whirled overhead, quicker as it fills (Tug of Woe, Melancholy Maelstrom)
   stzWhirlUp(t, k, A, e) {

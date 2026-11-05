@@ -460,8 +460,9 @@ state.cozy = {
   mushrooms, shoots, shells, cocoons, sea glass.
 - **Dig** (hold) at **Shadow's dig spots**: when you're within 12 m of a hidden spot, Shadow lifts his nose, trots over,
   paws the ground and sits; a sparkle and a paw mark show (and a paw dot on the minimap). **Hold** F / A / the touch
-  context button: a dig ring fills over 1.4 s (the hero digs, Shadow helps); a golden band sits at 70–85%. **Release
-  in the band: "Perfect dig!"** (one bonus roll, a sparkle, a pad rumble). Release anywhere else, or keep holding to
+  context button: a dig ring fills over 1.8 s (the hero digs, Shadow helps); a golden band sits at 55–90% (0.63 s; the owner
+  found 70–85% of 1.4 s too hard, 2026-10-27). A call over the ring says "Hold…", then "Let go!" as the whole disc glows
+  gold. **Release in the band: "Perfect dig!"** (one bonus roll, a sparkle, a pad rumble). Release anywhere else, or keep holding to
   100%, and it still digs up the normal find. Nothing is lost. Settings › Gameplay › Dig: Hold / Tap (tap = an
   automatic normal dig, for accessibility).
 - **Tools**: none needed (nothing like an axe or pickaxe exists, and none is required). Two optional upgrades sold at

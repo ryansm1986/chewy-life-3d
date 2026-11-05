@@ -172,6 +172,8 @@ export class PadNav {
       const S = this.scope(); if (!S) return;
       const cands = this.candidates(S.roots);
       let n = e.isConnected && cands.includes(e) ? e : cands.find(c => c.matches(selectorOf(e)));
+      const want = this.focusNext; this.focusNext = null; // (a panel may hand the focus on: the Cook panel's picked recipe → its Cook button, ui/cook.js)
+      if (want?.isConnected && cands.includes(want)) n = want;
       if (!n) return;
       if (n === this.cur) { this.cur = null; this.ui.tip.hide(); }
       this.focus(n, cands);

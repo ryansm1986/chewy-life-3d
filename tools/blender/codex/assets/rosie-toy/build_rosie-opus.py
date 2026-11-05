@@ -24,7 +24,7 @@ os.makedirs(os.path.join(ROOT, 'preview'), exist_ok=True)
 np.random.seed(7)
 bpy.ops.wm.read_factory_settings(use_empty=True)
 PI = math.pi
-W = .52; CHIN = .72; HY = -.02          # face width, chin height, head centre y (round 7: 0.44 -> 0.52, a chibi head)
+W = .62; CHIN = .72; HY = -.02          # face width, chin height, head centre y (round 7: 0.44 -> 0.52; F7: 0.62, the cast's 0.48 x height)
 SW = W / .44                            # metric detail sizes from the 0.44 m head scale with it
 LOG = {}
 
@@ -65,20 +65,45 @@ def smin(a, b, k):
     h = np.clip(.5 + .5 * (b - a) / k, 0, 1)
     return b * (1 - h) + a * h - k * h * (1 - h)
 
-# round 7: a wide, chubby squircle, wider than tall -- a lower, broader cranium (chin to crown 0.86 W, was 1.0) over a
-# taller, fuller low cheek mass (widest at z 0.30, 0.78 W wide at z 0.08)
-BLOB = {'C': [[0, .005, .445], [.485, .510, .410]],    # cranium (round 2: 0.02 W forward: the brow is part of the ball)
-        'K': [[0, -.005, .260], [.500, .505, .300]],   # low chubby cheek mass (widest 0.30 W above the chin)
-        'J': [[0, -.284, .140], [.310, .255, .170]]}   # full round jaw / chin front (round 2: 0.014 W fuller)
-K_CK, K_J = .15, .075
+# F7 (feedback-7, 2026-10-27, the owner: "her head shape is different from everyone else's"): the skull is ONE ball
+# whose front IS the face, built like the cast's (Mochi's superquadric): horizontal ellipse sections whose half-width
+# and half-depth follow their own vertical superellipse profiles -- a broad soft chin below the cheeks (widest at z
+# 0.28), a round dome above (chin to crown 0.85 W) -- the front narrowing into an egg so the face wraps the ball (the
+# eyes face ~33 deg out), and a low swelling of the front depth so the cheeks and mouth sit forward of the eye
+# sockets. The profile is one convex arc, crown -> forehead -> cheek -> chin; only the nose button stands out of it.
+SK = dict(A=.500, BF=.445, BB=.440, ZC=.280, HT=.570, HB=.280, nA_t=2.0, nA_b=2.7, nB_t=2.0, nB_b=3.3,
+          nBb_t=2.2, nBb_b=2.4, n=2.0, egg=.22)
+LOWFACE = dict(m=.11, z=.14, w=.10)
+# F7c (2026-10-28, the owner: "her face still protrudes too far out"): the front half is shallower (BF 0.445 -> 0.32: nose
+# to ear 0.40 W, the face under the bangs), the lower-face push is gone (the brow-to-chin profile is a near-vertical, gently
+# convex arc), and the eyes sit a touch further round the sides (x 0.29 W) to keep facing ~28 deg out. The width, the crown and the back half are unchanged.
+F7C = True
+SK_F7B_BF = SK['BF']
+if F7C:
+    SK.update(BF=.320)   # egg 0.22 and the elliptic sections kept: a lower front exponent (tried 1.4) rippled the toon band on the lower face; LOWFACE['m'] = 0.
+def sk_prof(z, m_t, m_b):
+    zc = SK['ZC']; v = np.where(z >= zc, (z - zc) / SK['HT'], (zc - z) / SK['HB'])
+    m = np.where(z >= zc, m_t, m_b); vv = np.clip(v, 0, 1)
+    return np.maximum(np.clip(1 - vv ** m, 0, 1) ** (1 / m), 1e-4), v
 def base_local(q):
-    d = ell(q, *BLOB['C']); d = smin(d, ell(q, *BLOB['K']), K_CK); return smin(d, ell(q, *BLOB['J']), K_J)
-# Put the front-view lowest point of the skull exactly on the chin line (z = 0).
-_yy, _zz = np.meshgrid(np.linspace(-.7, .7, 561), np.linspace(-.25, .25, 501))
-_q = np.stack([np.zeros_like(_yy), _yy, _zz], -1).reshape(-1, 3)
-ZMIN = float(_q[base_local(_q) < 0][:, 2].min())
-for k in BLOB: BLOB[k][0][2] -= ZMIN + .035          # the under-jaw dips 0.035 W behind the chin, onto the collar
-LOG['skull_zmin_shift_W'] = ZMIN
+    """the skull ball (approximately a distance, W units)"""
+    x, y, z = q[..., 0], q[..., 1], q[..., 2]
+    gA, v = sk_prof(z, SK['nA_t'], SK['nA_b']); gB, _ = sk_prof(z, SK['nB_t'], SK['nB_b']); gBb, _ = sk_prof(z, SK['nBb_t'], SK['nBb_b'])
+    a = SK['A'] * gA
+    b = np.where(y < 0, SK['BF'] * gB * (1 + LOWFACE['m'] * np.exp(-((z - LOWFACE['z']) / LOWFACE['w']) ** 2)), SK['BB'] * gBb)
+    vv = np.clip(y / b, -1, 0); a = a * (1 - SK['egg'] * vv * vv)
+    # F7c: the front half's own section exponent, 2 at the midline (a round, ridge-free face centre) easing to nf by the eyes
+    nf = SK['n'] - (SK['n'] - SK.get('nf', SK['n'])) * smooth(.04, .36, np.abs(x) / SK['A'])
+    nn = np.where(y < 0, nf, SK['n'])
+    s = (np.abs(x / a) ** nn + np.abs(y / b) ** nn) ** (1 / nn)
+    d = (s - 1) * np.minimum(a, b)
+    d = np.where(v > 1, np.maximum(d, (v - 1) * np.where(z >= SK['ZC'], SK['HT'], SK['HB'])), d)
+    return smin(d, ell(q, *UJ), K_UJ)
+# the under-jaw: a soft mass under the ball's flat bottom, so the chin rounds under and the jaw slopes down behind it
+# onto the neck (lowest 0.035 W, 0.4 W behind the nose tip, as round 6), with no corner at the chin's bottom edge
+UJ = [[0, -.09, .08], [.32, .27, .115]]; K_UJ = .06
+if F7C: UJ = [[0, -.075, .075], [.30, .19, .11]]     # F7c: a short under-chin, tucked round into the neck
+LOG['skull'] = dict(SK, lowface=LOWFACE, underjaw=UJ)
 
 def front_local(x, z, f):
     """first surface hit marching from the front (-y) at (x, z), W units, vectorised"""
@@ -97,7 +122,7 @@ _yf = float(front_local(0, .26, base_local)[0])
 _OLD_NOSE = [[0, _yf - .006, .262], [.046, .031, .038]]
 # the round-1 nose tip: the fixed reference for the hair layout and hairline
 NOSE_TIP_REF = float(front_local(0, .262, lambda q: smin(base_local(q), ell(q, *_OLD_NOSE), .013))[0])
-NOSE_FWD = .020                                                    # the button sits 0.05 W proud of the cheek
+NOSE_FWD = .030 if not F7C else .012                                                    # the button sits 0.05 W proud of the cheek
 NOSE = [[0, _yf - .006 - NOSE_FWD, .262], [.046, .031, .038]]; K_N = .013    # tiny button, 0.09 W wide
 # Round 2 face volume, all inside the smooth blend (no mesh pushing):
 #  a soft brow band, fuller lower cheeks, and a gentle set-in recess around each eye opening
@@ -127,11 +152,10 @@ def eye_recess(q):
 # lowers the rear of the jaw (zero at the chin, no junction), and the neck itself is blended in; the base skull
 # (and so the chin height and the front outline) is untouched
 UNDERJAW = dict(A=.014, b=.34, z=-.035, rx=.16, ry=.17, rz=.09)
-NECK = [[0, NOSE_TIP_REF - NOSE_FWD + .53, -.20], [.19, .15, .20]]; K_NECK = .08
-if GEO:   # phase-2 fix 1: the neck tucks further under the chin's shade (no sliver between the collar flaps)
-    NECK = [[0, NOSE_TIP_REF - NOSE_FWD + .57, -.20], [.175, .14, .20]]
-# round 7: the neck stays the same metric size and place on the unchanged body (its W numbers were for the 0.44 m head)
-NECK = [[0, NECK[0][1] / SW, NECK[0][2] / SW], [r / SW for r in NECK[1]]]; K_NECK = K_NECK / SW
+UNDERJAW['A'] = 0.     # F7: the under-jaw is part of the ball (UJ); the old local dip would bulge the new chin's edge
+# the neck stays the same metric size and place on the unchanged body (round 6's values, in metres: phase-2 fix 1 kept)
+NECK_M = dict(c=(0, -.02854, .632), r=(.077, .0616, .088), k=.050)   # F7: k 0.035 -> 0.05, a softer fillet under the new chin
+NECK = [[0, (NECK_M['c'][1] - HY) / W, (NECK_M['c'][2] - CHIN) / W], [r / W for r in NECK_M['r']]]; K_NECK = NECK_M['k'] / W
 def head_local(q, neck=True):
     # the set-in socket is a smooth domain warp: over each opening the ball is translated straight back (+y) by delta,
     # so the eye keeps its front-view position, size and 33 deg facing; outside, a C2 falloff blends it away
@@ -147,7 +171,7 @@ def L2M(q): return np.stack([q[..., 0] * W, HY + q[..., 1] * W, CHIN + q[..., 2]
 def M2L(p): return np.stack([p[..., 0] / W, (p[..., 1] - HY) / W, (p[..., 2] - CHIN) / W], -1)
 def head_sdf(p): return head_local(M2L(p)) * W
 def soft_local(q):
-    return smin(ell(q, *BLOB['C']), ell(q, *BLOB['K']), .30)
+    return base_local(q)          # F7: the superquadric is already one smooth ball (the temple bangs' seat)
 def soft_sdf(p): return soft_local(M2L(p)) * W
 def front_hit(x, z, f=head_sdf):
     """metres in, metres out"""
@@ -190,7 +214,7 @@ def head_uv_dir(U, V):
     return np.stack([np.sin(a) * np.cos(psi), -np.cos(a), np.sin(a) * np.sin(psi)], -1)
 
 # ============================================================== face layout (front projection, metres)
-EX = .27 * W; EZ = CHIN + .335 * W; EHW = .15 * W; EHH = .13 * W; EN = 2.15
+EX = (.27 if not F7C else .29) * W; EZ = CHIN + .335 * W; EHW = .15 * W; EHH = .13 * W; EN = 2.15
 def eye_unit(psi):
     c = np.cos(psi); s = np.sin(psi)
     return spow(c, 2 / EN), spow(s, 2 / EN)
@@ -200,27 +224,53 @@ def eye_s(side, x, z):
     X = side * (np.asarray(x) - side * EX) / EHW; Z = (np.asarray(z) - EZ) / EHH
     return (np.abs(X) ** EN + np.abs(Z) ** EN) ** (1 / EN), np.arctan2(Z, X), X, Z
 NZ = CHIN + .262 * W; MZ = CHIN + .14 * W; MHW = .085 * W
-BROW_Z = CHIN + .572 * W; BROW_X = .265 * W
-BLUSH = (.31 * W, CHIN + .18 * W, .085 * W, .05 * W)
+BROW_Z = CHIN + .572 * W; BROW_X = (.265 if not F7C else .280) * W
+BLUSH = ((.31 if not F7C else .318) * W, CHIN + .18 * W, .085 * W, .05 * W)
+F7_EAR = True
+F7_SEAT = True
+EAR_B = .555          # F7: the ear sits just behind the ball's equator (0.51 W behind the nose tip), was 0.74 on the long egg
+EAR_Y = .0322         # F7c: the ear's place in the head (W behind the head centre), fixed while the face moves back
+if F7C: EAR_B = EAR_Y - NOSE_TIP_L
 EAR_C = {}
 for s in (-1, 1):
-    EAR_C[s] = np.array([s * .505 * W, behind_tip(.74), CHIN + .25 * W])
+    EAR_C[s] = np.array([s * .505 * W, behind_tip(EAR_B), CHIN + .25 * W])
 
 # ============================================================== hair fields
 CAP = .025 * W
+# F7c: the hairline was laid out on round 7b's deeper front; map the new front half back onto it (y * BF_7b / BF), and keep
+# 7b's nose reference, so the hairline, the bangs' seat and the paint keep their place on the face
+HAIR_TIP_REF = -0.4935747671714162 if F7C else NOSE_TIP_REF
+def f7c_y(q):
+    y = q[..., 1]
+    return np.where(y < 0, y * (SK_F7B_BF / SK['BF']), y) if F7C else y
 def hairline_mask(q):
     """1 on the bare face (in front of the ears, below the bang line), 0 where the hair grows"""
-    b = q[..., 1] - NOSE_TIP_REF; z = q[..., 2]
-    bh = np.interp(z, [-.4, .10, .18, .44, .52, .60, .66, .72, .80, 2], [.95, .95, .80, .78, .45, .26, .15, .02, -.10, -.10])
+    b = f7c_y(q) - HAIR_TIP_REF; z = q[..., 2]
+    # F7: on the round ball the side equator is 0.51 W behind the nose tip (was ~0.6): the skin wraps the cheek to just
+    # behind the ear, the temples and forehead carry the bangs
+    bh = np.interp(z, [-.4, .10, .18, .44, .52, .60, .66, .72, .80, 2], [.70, .70, .66, .64, .44, .30, .22, .12, -.10, -.10])
     return smooth(-.035, .035, bh - b)
+def hairline_mask_seat(q):
+    # F7b: the hair seat's own, wider hairline step (+-0.10 W; the paint and the skin density keep +-0.035): the dark envelope
+    # and the pillows seated on it dive smoothly under the skin instead of stepping 0.09 W over 0.07 W, which the meshes
+    # could not follow (a sawtooth skin / envelope edge at her right temple, creased facets on the side crown pillow)
+    b = f7c_y(q) - HAIR_TIP_REF; z = q[..., 2]
+    bh = np.interp(z, [-.4, .10, .18, .44, .52, .60, .66, .72, .80, 2], [.70, .70, .66, .64, .44, .30, .22, .12, -.10, -.10])
+    return smooth(-.10, .10, bh - b)
 def cap_local(q):
-    m = hairline_mask(q); return head_local(q, neck=False) - (CAP / W) * (1 - m) + (.065) * m    # no hair sheath on the neck
+    m = hairline_mask(q) if not F7_SEAT else hairline_mask_seat(q)
+    return head_local(q, neck=False) - (CAP / W) * (1 - m) + (.065) * m    # no hair sheath on the neck
 BOB = [[0, .25, .48], [.55, .55, .55]]
 BOB = [[0, .26, .40], [.58, .55, .49]]      # round 7: lower (no tall crown), a touch wider
+BOB = [[0, .12, .45], [.43, .36, .535]] if not F7C else [[0, .16, .45], [.43, .32, .535]]     # F7: the hair hugs the skull -- the bob seat lifts the crown behind the part 0.1 W, the back 0.03 W; it stays inside the receding forehead
 def env_local(q): return smin(cap_local(q), ell(q, *BOB), .09)
 def env_sdf(p): return env_local(M2L(p)) * W
 def env_soft_sdf(p):          # a rounder seat for the thick crown pillows: no concave junction to fold them
-    q = M2L(p); return smin(cap_local(q), ell(q, *BOB), .24) * W
+    q = M2L(p); k = K_SEAT[0] - (K_SEAT[0] - K_SEAT[1]) * smooth(.20, .42, np.abs(q[..., 0]))
+    return smin(cap_local(q), ell(q, *BOB), k) * W
+# F7: round 6's round 0.24 blend over the front and top (the top-front pillow covers the centre bang's roll cleanly),
+# a tighter 0.14 at the sides (the wide blend bulged the temple seat ~0.06 W past the hugging outline)
+K_SEAT = (.24, .14)
 
 # ============================================================== geometry helpers
 parts = {k: [] for k in ['head', 'hair', 'eye.L', 'eye.R', 'dress', 'skirt', 'arm.L', 'arm.R', 'leg.L', 'leg.R']}
@@ -482,7 +532,10 @@ if GEO:
         return {'visible_tris': int(vis.sum()), 'err_mean_deg': round(float(err[vis].mean()), 3), 'err_p90_deg': round(float(np.percentile(err[vis], 90)), 3),
                 'band_disp_p90_mm': round(float(np.percentile(disp[vis], 90)), 3), 'band_disp_p99_mm': round(float(np.percentile(disp[vis], 99)), 3),
                 'band_disp_max_mm': round(float(disp[vis].max()), 3)}
-    REFINE_ADD = int(globals().get('REFINE_ADD', 1300)); D_LOW, D_T = .12, .45
+    def worst_(err, disp, vis, Pv, F, k=8):
+        o = np.argsort(-np.where(vis, disp, -1))[:k]
+        return [[round(float(disp[t]), 1), round(float(err[t]), 2)] + [round(float(c), 3) for c in M2L(Pv[F[t]].mean(0)[None])[0]] for t in o]
+    REFINE_ADD = int(globals().get('REFINE_ADD', 1800)); D_LOW, D_T = .12, .45   # F7: 1300 -> 1800, the bigger face has ~1.4x the area
     dom_out, F, out_of = skin_cdt(pts); err, disp, vis, Pv = tri_errors(dom_out, F)
     LOG['head_refine_before'] = stats_(err, disp, vis)
     # coarsen: drop fill points whose every incident triangle is visible and places the band within D_LOW (independent set)
@@ -519,6 +572,7 @@ if GEO:
         pts.extend([tuple(c_) for c_ in taken]); n_add += len(taken)
     dom_out, F, out_of = skin_cdt(pts); err, disp, vis, Pv = tri_errors(dom_out, F)
     LOG['head_refine'] = {'dropped': len(drop), 'added': n_add, **stats_(err, disp, vis)}
+    print('HEAD_REFINE_WORST', json.dumps(worst_(err, disp, vis, Pv, F, 12)), flush=True)
     print('HEAD_REFINE', json.dumps(LOG['head_refine_before']), json.dumps(LOG['head_refine']), flush=True)
 else:
     dom_out, F, out_of = skin_cdt(pts)
@@ -613,10 +667,10 @@ for s, tag in ((-1, 'R'), (1, 'L')):
 # ============================================================== EARS: small round cupped skin ears
 ear_info = {}
 for s in (-1, 1):
-    yc = behind_tip(.74); zc = CHIN + .25 * W
+    yc = behind_tip(EAR_B); zc = CHIN + .25 * W
     S = radial_hit(unit(np.array([[s * 1.0, 0, 0]])), o=np.array([0, yc, zc]))[0]
     ne = unit(np.array([s * .88, -.46, .04])); up = np.array([0, 0, 1.]); up = unit(up - ne * (up @ ne)); tt = np.cross(up, ne)
-    C0 = S + np.array([s * .050 * W, 0, 0])
+    C0 = S + np.array([s * (.050 if not F7_EAR else .022) * W, 0, 0])      # F7: a nub tucked closer (the outline stays the cheek)
     at, au_, an, dish = .056 * W, .070 * W, .034 * W, .020 * W
     seg, rows = 18, 10
     V = []; UVs = []; EN_ = []
@@ -748,7 +802,7 @@ def loc(x, b, z):   # W units: lateral, behind the nose tip, above the chin -> m
     return np.array([x * W, behind(b), CHIN + z * W])
 
 # --- the envelope: closed dark base under every lobe (buried beneath the face skin)
-seg, rows = 34, 22
+seg, rows = (34, 22) if not F7_EAR else (40, 26)     # round 8 trim (48 x 30 -> 40 x 26)     # F7b: finer, so the base reads smooth wherever a gap shows it
 V = []
 for j in range(rows + 1):
     ph = PI * j / rows
@@ -777,14 +831,17 @@ def skin_dir(xw, zw):
     raise ValueError('no skin at %s' % zw)
 def angle(a, b): return math.acos(float(np.clip(a @ b, -1, 1)))
 dC = skin_dir(-.03, .800)
-ob, g = pillow('bang_centre_lobe', dC, [0, .25, 1], .95, angle(dC, skin_dir(-.03, .600)), angle(dC, skin_dir(.28, .800)),
-               .036 * W, f=head_sdf, base=-.0015, taper=-.85, rot=math.radians(-8), rings=9, seg=44)
+ob, g = pillow('bang_centre_lobe', dC, [0, .25, 1], .95, angle(dC, skin_dir(-.03, .600)), angle(dC, skin_dir(.28 if not F7_EAR else .36, .800)),
+               (.036 if not F7_EAR else .050) * W, f=head_sdf, base=-.0015, taper=-.85, rot=math.radians(-8 if not F7_EAR else 0), rings=9, seg=44 if not F7_EAR else 52)
+# F7: one fuller roll carries the front; F7b: wider (to x 0.36) and level, so its right end overlaps the right
+# temple lobe (the -8 deg tilt lifted it and opened a slit of bare skin at her right temple)
 bang_grids.append(g)
 for s in (-1, 1):
-    dS = skin_dir(s * .370, .720); dT = skin_dir(s * .50, .515)
+    dS = skin_dir(s * .370, .720); dT = skin_dir(s * .50, .515) if not F7_EAR else skin_dir(s * .445, .505)   # F7: inside the rounder ball's edge
     up = dS - dT
-    ob, g = pillow('bang_temple_lobe.' + ('L' if s > 0 else 'R'), dS, up, .72, angle(dS, dT),
-                   .165 / .50, .075 * W, f=soft_sdf, base=-.030, taper=.20, rot=0., rings=10, seg=50, narrow=.50)
+    ob, g = pillow('bang_temple_lobe.' + ('L' if s > 0 else 'R'), dS, up, .72 if not F7_SEAT else .50, angle(dS, dT),   # F7b: its top tucks under the side crown
+                   .165 / .50, (.075 if not F7_EAR else .090) * W, f=soft_sdf, base=-.030, taper=.20 if not F7_SEAT else .28, rot=0., rings=10 if not F7_EAR else 11,
+                   seg=50 if not F7_EAR else 54, narrow=.50)   # round 8 trim (62 x 12 -> 54 x 11)     # F7b: finer rims (the left temple's polygon steps)
     bang_grids.append(g)
 
 # --- crown: big smooth pillow sections radiating from a soft part (slightly to her left) to the back
@@ -795,30 +852,104 @@ def crown_dir(az, down):
 CROWN = [('crown_back_centre', 90, 64, .62, .70, .40, .120), ('crown_back.L', 40, 66, .60, .66, .37, .110),
          ('crown_back.R', 140, 66, .60, .66, .37, .110), ('crown_side.L', 10, 56, .58, .44, .44, .127),
          ('crown_side.R', 170, 56, .58, .44, .44, .127), ('crown_top_front', -90, 24, .32, .34, .58, .125)]
+CROWN_H = 1.30
+if True:   # F7: the hair hugs the skull -- thinner pillows (the outline 1.1 W wide, as tall as wide), thinnest at the sides
+    CROWN = [('crown_back_centre', 90, 64, .62, .70, .40, .100), ('crown_back.L', 40, 66, .60, .66, .37, .110),
+             ('crown_back.R', 140, 66, .60, .66, .37, .110), ('crown_side.L', 22, 56, .58, .44, .37, .092),
+             ('crown_side.R', 158, 56, .58, .44, .37, .092)]   # F7b: narrower (B .37): the temple bang is the top surface at the temple   # F7: turned 12 deg back, behind the temple bangs   # F7: no top-front pillow -- on the receding forehead it stacked a second roll over the bang
+    CROWN_H = 1.0
 for name, az, down, Aup, Adn, B, H in CROWN:
     d0 = crown_dir(az, down)
-    pillow(name, d0, PART, Aup, Adn, B, H * W * 1.30, f=env_soft_sdf, base=-.014, taper=.25 if 'back' not in name else .05, rings=(11 if 'side' in name else 9) if 'back' not in name else 7,
-           seg=(42 if 'top' in name else 38) if 'back' not in name else (30 if GEO else 28))   # phase-2 fix 2: finer rear crown
-
+    pillow(name, d0, PART, Aup, Adn, B, H * W * CROWN_H, f=env_soft_sdf, base=-.014, taper=.25 if 'back' not in name else .05,
+           rings=((12 if F7_EAR else 11) if 'side' in name else 9) if 'back' not in name else 7,
+           seg=(42 if 'top' in name else (44 if F7_EAR else 38)) if 'back' not in name else (30 if GEO else 28))   # phase-2 fix 2: finer rear crown; F7b: finer side rims
 # --- side and back curls: closed clay volumes (W units: lateral, behind nose tip, above chin; radii)
+# F7: the curls hug the ball -- each is seated on the hair cap at an azimuth round from the front (+ toward her left) and
+# a height, its outer face `proud` W off the cap, its long axes along the skull: beside and behind the cheeks (a thin rim
+# past the cheek outline at ear height), and pulled in against the back of the skull
+def curl_seat(az, zw, r, proud):
+    a = math.radians(az); d = np.array([[math.sin(a), -math.cos(a), 0.]])
+    S = radial_hit(d, env_sdf, o=np.array([0, HY, CHIN + zw * W]), t0=.0)
+    n = grad_n(S, env_sdf)[0]; n = unit(np.array([n[0], n[1], .35 * n[2]]))
+    return S[0] + n * (proud - r[0]) * W, n
 CURLS = []
-for s in (-1, 1):                                       # 10 big lobes, each overlapping its neighbours by ~25%
-    CURLS += [(s * .540, .84, .620, (.205, .210, .205)),    # upper side: fills the temple pinch (round 7: lower, a touch out)
-              (s * .595, .96, .330, (.210, .215, .210)),    # eye level, widest, behind the ear
-              (s * .550, 1.00, .040, (.205, .210, .200)),   # jaw level, behind the ear
-              (s * .460, 1.26, .240, (.225, .225, .220))]   # back-side
-CURLS += [(-.190, 1.31, .080, (.240, .235, .230)), (.190, 1.31, .080, (.240, .235, .230))]   # two big nape curls
-HC = loc(0, .95, .40)
-for k, (x, b, z, r) in enumerate(CURLS):
-    c = loc(x, b, z)
-    curl_qs('curl_%02d' % k, c, r, c - HC + np.array([0, 0, -.05]), n=6)
+for s in (-1, 1):
+    CURLS += [(s * 116, .300, (.140, .175, .185), .080),    # behind the ear, eye-to-cheek level: the thin rim past the cheek
+              (s * 120, .060, (.135, .165, .160), .075),    # jaw level, behind the cheek
+              (s * 104, .560, (.130, .170, .165), .075),    # upper side: fills the temple pinch under the side crown
+              (s * 146, .360, (.150, .200, .200), .105),    # back-side
+              (s * 150, .090, (.140, .185, .170), .100)]    # back-side, low
+CURLS += [(-158, .110, (.150, .200, .175), .110), (158, .110, (.150, .200, .175), .110)]   # two nape curls
+CURL_LOG = []
+for k, (az, zw, r, proud) in enumerate(CURLS):
+    c, n = curl_seat(az, zw, r, proud)
+    curl_qs('curl_%02d' % k, c, r, n, n=6 if abs(zw - .56) < .01 else 5); CURL_LOG.append([round(float(v), 4) for v in c])   # round 8 trim: n 8 / 6 -> 6 / 5 (F7b had n 8 on the temple curls)
 LOG['curls'] = len(CURLS)
+
+# --- F7b (2026-10-27, the owner: "I'd like some more hair curls hanging"): hanging ringlets, a doll's sausage curls.
+# Each is a thick tube on a gently swaying centreline, its radius carved by one smooth helical groove (3-4 turns), so it
+# reads as a twist; a round tip; the top buried under the side / back curls it hangs from. Normals from the parametric
+# derivatives (smooth for the toon band). Own objects 'ringlet_NN' inside the hair group, so the rig's part labels can
+# tell them apart (round 8 may weight their tips toward the neck / chest).
+def ringlet(name, top, L, R0, turns, hand, phase, out_dir, sway_out, sway_lat, NR=30, NS=10, groove=.34):   # round 8 trim: 34 x 12 -> 30 x 10
+    top = np.asarray(top, float); od = unit(np.array([out_dir[0], out_dir[1], 0.])); lat = np.array([-od[1], od[0], 0.])
+    def C(t):
+        t = np.asarray(t, float)[..., None]
+        return (top + np.array([0, 0, -L]) * t + od * (sway_out * W) * np.sin(PI * .5 * np.clip(t, 0, 1))
+                + lat * (sway_lat * W) * np.sin(PI * 1.3 * t))
+    def R(t):
+        t = np.asarray(t, float)
+        cap_b = np.where(t > .86, np.sqrt(np.clip(1 - ((t - .86) / .14) ** 2, 0, 1)), 1.)
+        cap_t = np.where(t < .07, np.sqrt(np.clip(1 - ((.07 - t) / .07) ** 2, 0, 1)), 1.)
+        return R0 * W * (1 - .22 * t) * cap_b * cap_t
+    def frame(t):
+        e = 1e-4; T = unit(C(t + e) - C(t - e)); e1 = unit(od - T * (T @ od)[..., None]); return T, e1, np.cross(T, e1)
+    def S(t, th):
+        t = np.asarray(t, float); th = np.asarray(th, float); T, e1, e2 = frame(t)
+        ph = hand * th - 2 * PI * turns * t + phase; g = groove * ((1 + np.cos(ph)) / 2) ** 2.5
+        r = R(t) * (1 - g)
+        return C(t) + r[..., None] * (np.cos(th)[..., None] * e1 + np.sin(th)[..., None] * e2), g
+    V = []; NV = []; vals = []
+    tt = np.linspace(0, 1, NR + 1); th = np.linspace(0, 2 * PI, NS, endpoint=False)
+    V.append(tuple(C(np.array([0.]))[0])); NV.append(np.array([0, 0, 1.])); vals.append(.46)
+    for t in tt[1:-1]:
+        T_ = np.full(NS, t); P, g = S(T_, th); e = 1e-4
+        dt = S(T_ + e, th)[0] - S(T_ - e, th)[0]; dth = S(T_, th + e)[0] - S(T_, th - e)[0]
+        n = unit(np.cross(dth, dt)); out = P - C(T_); n = np.where(((n * out).sum(1) < 0)[:, None], -n, n)
+        V += [tuple(p) for p in P]; NV += list(n); vals += list(hair_val(n, np.clip(g / groove, 0, 1), extra=.04))
+    tip = C(np.array([1.]))[0]; V.append(tuple(tip)); NV.append(-frame(np.array([1.]))[0][0]); vals.append(.40)
+    fs = []; ix = lambda j, i: 1 + j * NS + i % NS; M = NR - 1
+    for i in range(NS): fs.append((0, ix(0, i), ix(0, i + 1)))
+    for j in range(M - 1):
+        for i in range(NS): fs.append((ix(j, i), ix(j + 1, i), ix(j + 1, i + 1), ix(j, i + 1)))
+    last = len(V) - 1
+    for i in range(NS): fs.append((ix(M - 1, i), last, ix(M - 1, i + 1)))
+    ob = finish_hair(name, V, fs, vals, normals=np.array(NV))
+    pts = C(np.linspace(0, 1, 200)); length = float(np.linalg.norm(np.diff(pts, axis=0), axis=1).sum())
+    return ob, {'length_m': round(length, 3), 'length_W': round(length / W, 3), 'top_z_W': round(float((top[2] - CHIN) / W), 3),
+                'lowest_z_W': round(float((min(v[2] for v in V) - CHIN) / W), 3), 'thick_top_W': round(2 * R0, 3)}
+def ringlet_top(az, zw, R0, bury=.35):
+    a = math.radians(az); d = np.array([[math.sin(a), -math.cos(a), 0.]])
+    S_ = radial_hit(d, env_sdf, o=np.array([0, HY, CHIN + zw * W]), t0=.0)[0]; n = grad_n(S_[None], env_sdf)[0]
+    return S_ - n * bury * R0 * W, np.array([math.sin(a), -math.cos(a)])
+# (azimuth from the front, + toward her left; top height W; radius W; length m; turns; sway out / sideways, W)
+RINGLETS = [(123, .300, .063, .300, 3.3, .080, .020), (-121, .305, .063, .310, 3.3, .075, -.025),     # sides, front pair
+            (139, .265, .060, .275, 3.0, .060, .030), (-137, .270, .060, .290, 3.0, .065, -.020),     # sides, back pair
+            (157, .360, .065, .375, 3.6, .035, .025), (-159, .350, .065, .400, 3.8, .040, -.020),     # back
+            (178, .380, .064, .355, 3.5, .045, .015)]
+RINGLET_LOG = {}
+for k, (az, zw, R0, L, turns, so, sl) in enumerate(RINGLETS):
+    top, od = ringlet_top(az, zw, R0)
+    ob, info = ringlet('ringlet_%02d' % k, top, L, R0, turns, 1 if az > 0 else -1, .7 * k, od, so, sl)   # mirrored twist
+    RINGLET_LOG[ob.name] = dict(info, az=az)
+LOG['ringlets'] = len(RINGLETS)
 
 # ============================================================== BOW (approved round-12 shape), seated on the new crown
 def all_verts(obs): return np.array([list(o.matrix_world @ v.co) for o in obs for v in o.data.vertices])
 HV = all_verts(parts['hair'])
 near = HV[(np.abs(HV[:, 0]) < .07) & (np.abs(HV[:, 1] + .01) < .06)]
 HAIR_TOP_AT_BOW = float(near[:, 2].max())
+HAIR_TOP_AT_BOW = 1.3118      # round 8: the approved 7c seat (the trimmed crown samples its top 3 mm higher; the bow stays exactly where it was approved)
 BOW_Y = HY + (-.018 - HY) * SW
 for s in (-1, 1):
     def bowshape(u, v, s=s):
@@ -943,7 +1074,7 @@ for s, tag in [(-1, 'R'), (1, 'L')]:
 
 # ============================================================== PAINTED ATLAS (2048, deterministic PNG)
 # the visible lower edge of the bangs in front projection, for the soft contact shadow on the forehead
-BX = np.linspace(-.25, .25, 126); BZ = np.full(len(BX), 9.)
+BXR = .36; BX = np.linspace(-BXR, BXR, int(round(2 * BXR / .004)) + 1); BZ = np.full(len(BX), 9.)
 for g in bang_grids:
     for (top, S, n, r, an) in g[1:]:
         off = ((top - S) * n).sum(1)
@@ -952,7 +1083,7 @@ for g in bang_grids:
         dense = (top[:, None, :] * (1 - k[None, :, None]) + top[nxt][:, None, :] * k[None, :, None]).reshape(-1, 3)
         doff = (off[:, None] * (1 - k[None, :]) + off[nxt][:, None] * k[None, :]).ravel()
         dense = dense[(doff > .0012) & (dense[:, 1] < HY)]
-        idx = np.round((dense[:, 0] + .25) / .004).astype(int); okb = (idx >= 0) & (idx < len(BX))
+        idx = np.round((dense[:, 0] + BXR) / .004).astype(int); okb = (idx >= 0) & (idx < len(BX))
         np.minimum.at(BZ, idx[okb], dense[okb, 2])
 good = BZ < 5
 BZ = np.interp(BX, BX[good], BZ[good]); BZ = np.convolve(np.pad(BZ, 5, mode='edge'), np.ones(11) / 11, 'valid')
@@ -1177,8 +1308,72 @@ MEAS = {'units': 'W = %.2f m face width; profile x = behind the nose tip, z = ab
         'eye_centre_W': [EX / W, (EZ - CHIN) / W], 'nose_z_W': .262, 'mouth_z_W': .14, 'brow_z_W': .572,
         'blush_W': [BLUSH[0] / W, (BLUSH[1] - CHIN) / W, 2 * BLUSH[2] / W, 2 * BLUSH[3] / W],
         'nose_tip_proud_W': round(float(front_local(0, .262, base_local)[0] - NOSE_TIP_L), 3)}
+# F7: the numbers feedback-7 asks for (W units unless _m)
+def skull_width_at(zw):
+    xs = np.linspace(0, .70, 701); ys = np.linspace(-.85, .85, 341); X, Y = np.meshgrid(xs, ys)
+    ins = (head_local(np.stack([X, Y, np.full_like(X, zw)], -1).reshape(-1, 3), neck=False) < 0).reshape(X.shape).any(0)
+    return round(2 * float(xs[ins].max()), 3) if ins.any() else 0.
+# the head-plus-hair box as the views see it: the neck under the chin (inside the collar) is not part of the outline
+_nk = lambda v: v[v[:, 2] > CHIN - .05 * W]        # the head skin only (its neck); hair below the chin counts
+_hh = np.concatenate([_nk(all_verts(parts['head'])), all_verts([o for o in parts['hair'] + parts['eye.L'] + parts['eye.R'] if 'bow' not in o.name])])
+_hb = np.concatenate([_nk(all_verts(parts['head'])), all_verts(parts['hair'] + parts['eye.L'] + parts['eye.R'])])
+MEAS['f7_part_extents_W'] = {o.name: [round(float(np.abs(v[:, 0]).max() / W), 3), round(float((v[:, 1].max() - nose_tip_y) / W), 3), round(float((v[:, 2].min() - CHIN) / W), 3), round(float((v[:, 2].max() - CHIN) / W), 3)]
+                             for o in parts['head'] + parts['hair'] for v in [all_verts([o])]}
+print('F7_PARTS', json.dumps(MEAS['f7_part_extents_W']), flush=True)
+_all = all_verts([o for g in parts.values() for o in g])
+_box = lambda v: {'width_m': round(float(np.ptp(v[:, 0])), 4), 'height_m': round(float(np.ptp(v[:, 2])), 4), 'depth_m': round(float(np.ptp(v[:, 1])), 4),
+                  'width_W': round(float(np.ptp(v[:, 0]) / W), 3), 'height_W': round(float(np.ptp(v[:, 2]) / W), 3), 'depth_W': round(float(np.ptp(v[:, 1]) / W), 3),
+                  'low_z_W': round(float((v[:, 2].min() - CHIN) / W), 3), 'top_z_W': round(float((v[:, 2].max() - CHIN) / W), 3)}
+MEAS['f7'] = {'W_m': W, 'skull_crown_above_chin_W': MEAS['skull_top_above_chin_W'],
+              'face_width_z0.08_0.25_0.50_W': [skull_width_at(z) for z in (.08, .25, .50)],
+              'head_plus_hair_box_no_bow': _box(_hh), 'head_plus_hair_box_with_bow': _box(_hb),
+              'hair_top_above_chin_W': round(float((hair_hi[2] - CHIN) / W), 3),
+              'W_over_outline_width': round(float(W / np.ptp(_hh[:, 0])), 3),
+              'total_height_m': round(float(_all[:, 2].max() - _all[:, 2].min()), 4), 'W_over_total_height': round(float(W / np.ptp(_all[:, 2])), 3),
+              'curl_centres_m': CURL_LOG}
+from mathutils.bvhtree import BVHTree
+_body = [o for g in ('dress', 'skirt', 'arm.L', 'arm.R') for o in parts[g]]
+_bv = []; _bp = []; _owner = []
+for o in _body:
+    off = len(_bv); _bv += [tuple(v) for v in all_verts([o])]
+    for p in o.data.polygons: _bp.append(tuple(i + off for i in p.vertices)); _owner.append(o.name)
+_bvh = BVHTree.FromPolygons(_bv, _bp)
+for o in parts['hair']:
+    if not o.name.startswith('ringlet'): continue
+    best = (9., None, None)
+    for v in all_verts([o]):
+        hit = _bvh.find_nearest(Vector(v))
+        if hit[0] is not None and hit[3] < best[0]: best = (hit[3], _owner[hit[2]], [round(float(c), 3) for c in v])
+    RINGLET_LOG[o.name].update(clear_body_m=round(best[0], 4), nearest_part=best[1], at_m=best[2])
+MEAS['f7']['head_hair_width_at_or_above_chin_W'] = round(float(np.ptp(_hh[_hh[:, 2] >= CHIN][:, 0]) / W), 3)
+MEAS['f7']['head_hair_width_below_chin_W'] = round(float(np.ptp(_hh[_hh[:, 2] < CHIN][:, 0]) / W), 3)
+MEAS['f7']['ringlets'] = RINGLET_LOG
+# F7c: the side-view depth numbers (W): nose tip to ear centre; the cheek's front (z 0.25, beside the nose button) ahead of
+# the centre bang's lowest front edge; the nose ahead of that cheek; the under-chin from the chin's front back to the neck
+def f7c_side():
+    ear_y = float(ear_info[1][0][1]); cheek_y = HY + W * float(front_local(0, .25, lambda q: head_local(q, neck=False) if False else base_local(q))[0])   # the silhouette's cheek front (no nose button)
+    g = bang_grids[0]; P = np.concatenate([t[0] for t in g[1:]]); off = np.concatenate([((t[0] - t[1]) * t[2]).sum(1) for t in g[1:]])
+    P = P[off > .0012]; zmin = P[:, 2].min(); bang_y = float(P[P[:, 2] < zmin + .05 * W][:, 1].min())
+    ys = np.linspace(-.75, .30, 1051); zs = np.linspace(-.40, .20, 601); Y, Z = np.meshgrid(ys, zs)
+    ins = (head_local(np.stack([np.zeros_like(Y), Y, Z], -1).reshape(-1, 3)) < 0).reshape(Y.shape)
+    chin = ins[(zs > -.02) & (zs < .04)].any(0); y_chin = float(ys[chin].min())
+    neck = ins[zs < -.09].any(0); y_neck = float(ys[neck].min())
+    return {'nose_to_ear_W': round((ear_y - nose_tip_y) / W, 3), 'cheek_ahead_of_bang_edge_W': round((bang_y - cheek_y) / W, 3),
+            'nose_ahead_of_cheek_W': round((cheek_y - nose_tip_y) / W, 3), 'under_chin_W': round(y_neck - y_chin, 3),
+            'chin_front_behind_mouth_W': round(float(front_local(0, .03, head_local)[0] - front_local(0, .12, head_local)[0]), 3)}
+MEAS['f7c'] = f7c_side()
+_col = [o for o in parts['dress'] if o.name.startswith(('flat_peter_pan_flap', 'thin_flat_collar_back_band'))]
+_cv = []; _cp = []
+for o in _col:
+    off = len(_cv); _cv += [tuple(v) for v in all_verts([o])]; _cp += [tuple(i + off for i in p.vertices) for p in o.data.polygons]
+_cb = BVHTree.FromPolygons(_cv, _cp); _sk = all_verts(parts['head'][:1]); _sk = _sk[(_sk[:, 2] > CHIN - .06 * W) & (_sk[:, 1] < NECK_M['c'][1] - NECK_M['r'][1] - .005)]   # the jaw in front of the neck
+MEAS['f7c']['jaw_clear_collar_m'] = round(min(_cb.find_nearest(Vector(v))[3] for v in _sk), 4); MEAS['f7c']['eye_axis_L'] = LOG.get('eye_axis_L'); MEAS['f7c']['eye_margin_W'] = MEAS['profile']['eye_and_lash_margin_inside_silhouette']
+print('F7C', json.dumps(MEAS['f7c']), flush=True)
+print('F7', json.dumps(MEAS['f7']), flush=True)
 MEAS.update(LOG)
 
+if os.environ.get('ROSIE_NOJOIN'):     # diagnostics only: the separate parts, for ray-casting flaws to their object
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT, 'scratch', 'nojoin.blend')); raise SystemExit(0)
 # ============================================================== JOIN, CLEAN, NORMALS
 objects = []; part_tri = {}
 for group, obs in parts.items():

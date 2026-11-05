@@ -1,7 +1,7 @@
 // The Golden Retriever dragoon's skills (docs/GOLDEN.md): SkillRunner cast implementations (`cast_<id>(R, aim, target)`)
 // plus the per-frame state they need: the reach combo (two long thrusts, then a sweeping swat) and its lunge, Sunbeam
-// Thrust, the javelins (thrown on readable arcs from the quiver: Bonk Dart; their flight, bonks and the ones left stuck
-// in the ground, all in one instanced batch: gfx/goldenFx.js). installGoldenSkills(proto) mixes these into SkillRunner;
+// Thrust, Eager Jabs (a quick flurry of short jabs in a narrow cone), the javelins (thrown on readable arcs from the
+// quiver: Bonk Dart; their flight, bonks and the ones left stuck in the ground, all in one instanced batch: gfx/goldenFx.js). installGoldenSkills(proto) mixes these into SkillRunner;
 // skillRunner.js routes the lance basic attack here (cast_lancePoke) and calls updateGolden(dt) / clearGolden().
 // Reach is his identity: the thrusts hit a long, narrow line (lineHit), not an arc.
 // Looks: gfx/goldenFx.js; poses: actors/goldenPoses.js; the lance: actors/goldenGear.js; sounds: audio/golden.sfx.js.
@@ -14,12 +14,13 @@ import { lancePoint } from '../actors/goldenGear.js';
 import { installGoldenArts } from './goldenArts.js';
 import { installGoldenWhelp } from './goldenWhelp.js';
 import { installChargedGolden } from './chargedGolden.js';
+import { jabAction, jabDur } from '../actors/goldenPoses.js';
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _d = new THREE.Vector3(), _t = new THREE.Vector3(), _h = new THREE.Vector3();
 const sfx = (n, o) => Events.emit('sfx', n, o);
 const POKES = ['lanceThrust1', 'lanceThrust2', 'lanceSwat'];
 const POKE_DUR = [0.42, 0.42, 0.5]; // (the actions' own durations: each move takes one attack at his attack speed; the swat a little longer)
-const MELEE_SET = new Set([...POKES, 'sunbeamThrust']);
+const MELEE_SET = new Set([...POKES, 'sunbeamThrust', ...[3, 4, 5].map(jabAction)]);
 const LUNGE_SPEED = 9;
 const JAV_G = 16; // m/s²: a javelin's arc (a ~1 m apex over 10 m: it reads as a lob, not a laser)
 
@@ -137,6 +138,60 @@ const M = {
         this.lineHit(at, f0, len, p.width, e => this.gldHit(e, { dmgPct: p.dmgPct * ss.pct / 100, knock: p.knockback * 0.5, from: at }, true));
       }); }
     } });
+  },
+
+  // ================================================================== LANCE ARTS · Eager Jabs
+  /** three quick short jabs in a narrow cone (more, charged), the last a bigger poke that knocks back. One flurry takes 1.1
+   *  attacks' time at his attack speed (a charged one keeps the rhythm and lasts longer). o: a charged release's extras
+   *  (wind: Tail Wind, chargedGolden.js) */
+  cast_eagerJabs(R, aim, target, o = {}) {
+    const P = this.G.player, p = R.params, n = clamp(Math.round(p.jabs || 3), 3, 5);
+    const m = this.melee; this.melee = null;
+    this.gldMelee = m ? { target: m.target, reach: m.reach, budget: m.budget } : null;
+    this.gldCombo = 0;
+    sfx('lance_whoosh', { pitch: 1.3, vol: 0.35 });
+    P.anim.play(jabAction(n), { speed: this.animSpeed(jabDur(3) / 1.1), onEvent: ev => {
+      if (ev.startsWith('jab')) { const k = +ev.slice(3); this.gldJab(p, target, k, k === n - 1, o); }
+    } });
+  },
+  /** one jab at its full reach: k (0..), last: the big one */
+  gldJab(p, target, k, last, o) {
+    const G = this.G, P = G.player, fx = this.gldFx();
+    if (k === 0) this.gldSnapIn(target, p.radius);
+    const f = P.facing, r = p.radius, arc = p.arc * (last ? 1.2 : 1);
+    this.gldJabFx(r, k, last);
+    sfx('lance_whoosh', { pitch: last ? 0.95 : 1.3 + 0.1 * (k % 2), vol: last ? 0.75 : 0.45 });
+    let hit = 0;
+    const dm = p.dmgPct * (last ? p.lastPct / 100 : 1);
+    this.arcHit(P.pos, f, r, arc, e => {
+      this.gldHit(e, { dmgPct: dm, knock: last ? p.knockback : 0.12, stun: last ? p.stun || 0 : 0, from: P.pos }, true);
+      if (last && p.stun && e.alive && !e.def?.boss) this.fx?.()?.dizzy?.(e, p.stun);
+      if (hit++ < 2) fx.bonk(_h.set(e.pos.x, e.pos.y + (e.height || 1) * 0.55, e.pos.z), last);
+    }, target);
+    if (hit) { sfx('lance_poke', { pitch: last ? 0.82 : 1.18 + 0.08 * k, vol: last ? 1 : 0.7 }); G.engine.rig.shake(last ? 0.12 : 0.035); if (last) G.engine.hitStop = Math.max(G.engine.hitStop || 0, 0.03); }
+    if (!last) return;
+    sfx('golden_boof', { vol: 0.45 }); // (a happy little "boof" with the big one)
+    this.gldMelee = null;
+    const w = o.wind; // (Tail Wind: the last jab blows a puff of leaves on out past the lance)
+    if (w) {
+      _d.set(Math.sin(f), 0, Math.cos(f));
+      for (let i = 0; i < 7; i++) { const s = r * 0.6 + (i / 6) * w.r * 1.2, a = f + (Math.random() - 0.5) * 0.9; fx.leaves(_v.set(P.pos.x + Math.sin(a) * s, P.pos.y + 0.3, P.pos.z + Math.cos(a) * s), 2, { speed: 2.4, up: 1.1 }); }
+      fx.dust(_w.set(P.pos.x + _d.x * (r + 0.4), P.pos.y, P.pos.z + _d.z * (r + 0.4)), 3);
+      sfx('lance_whoosh', { pitch: 0.7, vol: 0.5 });
+      this.arcHit(P.pos, f, r + w.r, 70, e => this.gldHit(e, { dmgPct: p.dmgPct * w.pct / 100, knock: 1.6, from: P.pos }, true));
+    }
+  },
+  /** a jab's look: a short, narrow sunbeam flick from the lance out to its reach (alternating a touch either side, as the
+   *  pokes do), a puff at his feet; the last one a fuller streak with its core and a few leaves at the tip */
+  gldJabFx(len, k, last) {
+    const G = this.G, P = G.player, f = P.facing + (last ? 0 : (k % 2 ? -0.07 : 0.07)), fx = this.gldFx();
+    const L = P.lance, y = P.pos.y + (last ? 0.62 : k % 2 ? 0.7 : 0.58);
+    _d.set(Math.sin(f), 0, Math.cos(f));
+    if (L) { lancePoint(L, 0.1, _v); _v.y = y; } else _v.set(P.pos.x + _d.x * 0.3, y, P.pos.z + _d.z * 0.3);
+    const reach = len - Math.hypot(_v.x - P.pos.x, _v.z - P.pos.z) + 0.2;
+    fx.streak(_v, _d, Math.max(0.5, reach), last ? { width: 0.44, life: 0.22, core: true } : { width: 0.24, life: 0.12, core: false, alpha: 0.6 });
+    if (last) { fx.dust(_w.set(P.pos.x - _d.x * 0.25, P.pos.y, P.pos.z - _d.z * 0.25), 4); fx.leaves(_w.set(P.pos.x + _d.x * len, P.pos.y + 0.5, P.pos.z + _d.z * len), 4, { speed: 1.6, up: 1.2 }); }
+    else if (k === 0) fx.dust(_w.set(P.pos.x, P.pos.y, P.pos.z), 1);
   },
 
   // ================================================================== JAVELINS · Bonk Dart (and the javelins' flight)
@@ -283,13 +338,14 @@ const M = {
 };
 
 /** Mix the dragoon's cast implementations into SkillRunner.prototype (skillRunner.js does this at import). Sunbeam Thrust
- *  is a melee move too: the reach assist walks him up to a far target and lunges at a near one; its reach is its line. */
+ *  and Eager Jabs are melee moves too: the reach assist walks him up to a far target and lunges at a near one; Sunbeam
+ *  Thrust's reach is its line, Eager Jabs' its cone (the default: its radius). */
 export function installGoldenSkills(proto) {
   for (const k in M) if (!(k in proto)) proto[k] = M[k];
   installGoldenArts(proto); installGoldenWhelp(proto); installChargedGolden(proto);
   const blocked = proto.castBlocked; // (Poe's fuma wait is there already: the dragoon's own checks first)
   proto.castBlocked = function (id, aim, target, charge) { return this.gldCastBlocked(id) || (blocked ? blocked.call(this, id, aim, target, charge) : false); };
   const isMelee = proto.isMelee, reach = proto.reach;
-  proto.isMelee = function (id, R) { return id === 'sunbeamThrust' || isMelee.call(this, id, R); };
+  proto.isMelee = function (id, R) { return id === 'sunbeamThrust' || id === 'eagerJabs' || isMelee.call(this, id, R); };
   proto.reach = function (R, target) { return R?.id === 'sunbeamThrust' ? R.params.length * 0.8 + (target?.radius || 0.3) - 0.15 : reach.call(this, R, target); };
 }

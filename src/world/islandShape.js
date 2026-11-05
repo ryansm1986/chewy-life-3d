@@ -2,7 +2,7 @@
 // the northern cliff terraces, the shrine hill, the bamboo rise, the river channel, the waterfall's plunge pool and the
 // koi pond. Terrain samples it at boot; tools (the plan preview, QA) can call it from Node too.
 import { smoothstep, lerp } from '../core/util.js';
-import { ISLAND, PLATEAU, NORTH, HILL, BAMBOO, POND, BASIN, FALLS, RIVER, RIVER_W, TERRACES } from './layout.js';
+import { WORLD, ISLAND, PLATEAU, NORTH, HILL, BAMBOO, POND, BASIN, FALLS, RIVER, RIVER_W, TERRACES } from './layout.js';
 
 function segDist(px, pz, ax, az, bx, bz) {
   const vx = bx - ax, vz = bz - az, wx = px - ax, wz = pz - az;
@@ -72,8 +72,19 @@ export function islandHeight(n, x, z) {
     let top = -1; for (let i = S0.length - 1; i >= 0; i--) if (z < S0[i].z + 0.1) top = S0[i].y - 0.45;
     h = lerp(h, Math.min(h, top), smoothstep(3.4, 2.5, fx));
   }
+  // a ramp down the cliff riser from the town's Waterfall Trail (its end at 104, 57) to the northern shelf and the Ramble's
+  // north footbridge (outskirtsPlan.js 'fallsLink'): an even slope cut through the 2 m step
+  const rx = Math.abs(x - 103.8);
+  if (rx < 3 && z > 52.5 && z < 59.5) {
+    const target = 1.15 + 2.1 * Math.min(1, Math.max(0, (z - 53.2) / 5.6));
+    h = lerp(h, target, smoothstep(3, 1.7, rx) * smoothstep(52.5, 53.5, z) * smoothstep(59.5, 58.6, z));
+  }
   // koi pond
   const pd = Math.hypot(x - POND.x, z - POND.z) + n.n2(x * 0.15, z * 0.15) * 0.9;
   if (pd < POND.r + 3.2) h = lerp(h, -0.75, smoothstep(POND.r + 3.0, POND.r - 1.6, pd));
+  // the world's edge: the northern mountains run off the island's disc, so near the map's edge the land falls away to the
+  // sea in a wavy rocky cliff and a strip of shore (no cut-off wall at the edge of the world)
+  const de = Math.min(x, z, WORLD - x, WORLD - z) + n.fbm(x * 0.045 + 11, z * 0.045 - 7, 3) * 6;
+  if (de < 24) h = Math.min(h, -2.6 + Math.max(0, de - 5) * 0.85);
   return h;
 }

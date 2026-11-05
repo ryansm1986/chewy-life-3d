@@ -74,10 +74,10 @@ export const ONSEN_GATE = {
   seal: '#bfe8ff',
   lanternI: 1.6, // (dungeonGate's lantern lights when it opens: soft, the snow would blow out under the full 4.5)
   spirit: [-5.0, 3.9], spiritI: 1.6, // (the Spirit Lantern stands left of the torii, the hot spring is on the right; a soft light on the snow)
-  glb: { url: null, scale: 1, yaw: 0, y: 0 },
-  build({ main, dress, lp, gx, gz, yaw, rim, W }) {
+  glb: { url: '/models/gate-onsen.glb', scale: 1, yaw: 0, y: 0 },
+  build({ main, frame, dress, lp, gx, gz, yaw, rim, W }) {
     main.piece(iceMouth(0), gx, gz, yaw, { y: rim - 0.15 });
-    { const [x, z] = lp(0, 1.75); dress.piece(Pr.snowTorii(4, { w: 3.0, h: 3.1 }), x, z, yaw, { y: rim }); for (const e of [-1, 1]) { const [px, pz] = lp(e * 1.5, 1.75); W.collision.addCircle(px, pz, 0.22); } }
+    { const [x, z] = lp(0, 1.75); frame.piece(Pr.snowTorii(4, { w: 3.0, h: 3.1 }), x, z, yaw, { y: rim }); for (const e of [-1, 1]) { const [px, pz] = lp(e * 1.5, 1.75); W.collision.addCircle(px, pz, 0.22); } }
     const lanterns = [];
     for (const e of [-1, 1]) { const [x, z] = lp(e * 2.6, 1.6); dress.piece(Pr.yukimiLantern(26 + e, { s: 0.92 }), x, z, yaw, { y: rim, lights: false }); W.collision.addCircle(x, z, 0.5); lanterns.push(V(x, rim + 1.2, z)); }
     // the hot spring steaming at the gate's foot, off to the right, a bench and oke by it

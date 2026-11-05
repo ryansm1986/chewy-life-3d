@@ -60,6 +60,7 @@ class AudioSystem {
     if (this.inited || typeof window === 'undefined') return this;
     this.inited = true; this.addGestures();
     this.unbind = this.bindEvents(CoreEvents);
+    if (window.pawhaven) this.tryStart(); // (the desktop app: no click needed, and a pad's buttons aren't a gesture)
     return this;
   }
   get ready() { return !!this.ctx && this.ctx.state === 'running'; }
@@ -68,6 +69,10 @@ class AudioSystem {
   addGestures() { for (const e of ['pointerdown', 'pointerup', 'keydown', 'touchend']) window.addEventListener(e, this.onGesture, { capture: true, passive: true }); }
   removeGestures() { for (const e of ['pointerdown', 'pointerup', 'keydown', 'touchend']) window.removeEventListener(e, this.onGesture, { capture: true }); }
   onGesture() { this.unlock(); }
+  // The AudioContext now, without waiting for a gesture: it runs where the page may already play sound (a page reloaded
+  // just after a click, e.g. the title's New Game: Chrome carries the click over a same-origin reload; the desktop app's
+  // autoplay switch); elsewhere it waits, suspended, and the first gesture resumes it as before
+  tryStart() { if (this.inited) this.unlock(); return this.ready; }
   // Creates/resumes the AudioContext. Must run inside a user gesture (init() wires that up).
   unlock() {
     if (!this.ctx) {

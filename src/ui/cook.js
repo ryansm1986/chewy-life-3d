@@ -49,7 +49,12 @@ export class CookPanel extends Panel {
     const q = s => this.body.querySelector(s);
     this.$ = { list: q('.ck-list'), main: q('.ck-main'), det: q('.ck-det'), mix: q('.ck-mix'), slots: q('.mx-slots'), grid: q('.mx-grid'), pot: q('.ck-pot'), drops: q('.kp-drops'), out: q('.kp-out'), ring: q('.kp-ring .fill'), tabN: this.extra.querySelector('.tab-n') };
     this.extra.querySelector('.ck-tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (t && t.dataset.t !== this.tab) { this.setTab(t.dataset.t); this.ui.sfx?.('tab'); } });
-    this.$.list.addEventListener('click', e => { const r = e.target.closest('.ck-row'); if (!r) return; if (this.tab !== 'book') this.setTab('book'); this.select(r.dataset.id); this.ui.sfx?.('select'); });
+    this.$.list.addEventListener('click', e => {
+      const r = e.target.closest('.ck-row'); if (!r) return;
+      const pad = this.ui.padNav?.cur === r; // (the pad's A on a row: the focus goes on to Cook, so A again cooks; a long list scrolls, the D-pad can't reach it from the bottom rows)
+      if (this.tab !== 'book') this.setTab('book'); this.select(r.dataset.id); this.ui.sfx?.('select');
+      const go = pad && this.$.det.querySelector('.ck-go:not(.dis)'); if (go) this.ui.padNav.focusNext = go;
+    });
     this.$.det.addEventListener('click', e => {
       const b = e.target.closest('[data-q]'); if (b) { const m = maxCook(this.st, this.sel); this.qty = b.dataset.q === 'max' ? Math.max(1, m) : Math.max(1, Math.min(Math.max(1, m), this.qty + +b.dataset.q)); this.renderDet(); this.ui.sfx?.('tick'); return; }
       if (e.target.closest('.ck-go')) this.cook();

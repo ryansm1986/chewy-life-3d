@@ -14,6 +14,7 @@
 //  mossBoulder(seed)  a round stone wearing a thick moss cap, pebbles at its foot.                   → { rock }
 //  litter(seed, kind) flat fallen-leaf decals ('bamboo' | 'maple' | 'mixed').                        → { litter }
 import * as THREE from 'three';
+import { treeGlb } from '../../world/treeGlb.js';
 import { tube, puff, merge, paint } from '../../gfx/geom.js';
 import { mossyStone } from '../../world/buildings/props.js';
 import { mulberry32, TAU, clamp } from '../../core/util.js';
@@ -122,6 +123,7 @@ const STAND = {
 export const STAND_KINDS = Object.keys(STAND);
 export function stand(kind = 'grove', seed = 0) {
   return cached(`stand:${kind}:${seed}`, () => {
+    { const g = treeGlb('stand-' + kind, seed); if (g?.culm) return g; } // (its Blender model once built and loaded: world/treeGlb.js)
     const S = STAND[kind], r = mulberry32(seed * 7919 + kind.length * 131 + 1), C = new CardSet(), parts = [];
     const n = S.n[0] + Math.floor(r() * (S.n[1] - S.n[0] + 1)), la0 = r() * TAU;
     for (let i = 0; i < n; i++) {

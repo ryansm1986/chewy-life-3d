@@ -547,12 +547,13 @@ try {
     // by day (11 am): he comes at once, and says he's early
     await ev(() => { window.G.day.hour = 11; window.__said = []; window.__ev = []; });
     const msg = await debugRun('Play an arrival', 'shihtzu');
-    await until(() => window.G.heroes.stzJoin.state === 'kneel', null, 30000).catch(() => {});
+    // (he has come once he kneels; standing within 4.5 m of his spot, he rises to proclaim in the same tick, so either counts)
+    await until(() => ['kneel', 'proclaim', 'talk'].includes(window.G.heroes.stzJoin.state), null, 30000).catch(() => {});
     const l2 = await A('shihtzu');
     await walkUp('shihtzu'); await until(() => window.G.ui.dlg?.active, null, 20000).catch(() => {});
     const pk = await drainTo('shihtzu', [1, 1]);
     const day = await said();
-    R.check('l) at golden hour no "I am early"; by day (debug › Play an arrival) he comes at once: "…It is not sunset. I am early. A knight is never late."; "Only if the ghost pups come too." gets "They were always coming."', !/I am early/.test(dusk) && /on the way/.test(msg) && l2.state === 'kneel' && /It is not sunset\. I am early\. A knight is never late\./.test(day) && /They were always coming/.test(day) && pk.includes('Only if the ghost pups come too.'), { msg, l2, dusk: dusk.slice(0, 80), day: day.slice(0, 200), pk });
+    R.check('l) at golden hour no "I am early"; by day (debug › Play an arrival) he comes at once: "…It is not sunset. I am early. A knight is never late."; "Only if the ghost pups come too." gets "They were always coming."', !/I am early/.test(dusk) && /on the way/.test(msg) && ['kneel', 'proclaim', 'talk'].includes(l2.state) && /It is not sunset\. I am early\. A knight is never late\./.test(day) && /They were always coming/.test(day) && pk.includes('Only if the ghost pups come too.'), { msg, l2, dusk: dusk.slice(0, 80), day: day.slice(0, 200), pk });
     await close();
   }
   // ================================================================ m) Stella: Kaizo's boat, the float, the greeting, the zoomies, her plea; her quest

@@ -1,0 +1,260 @@
+{
+  "units": "metres (final, crown 1.05 m under the hat, ear tips 1.35 m)",
+  "coordinate_system": "Blender Z-up, front -Y; character left is +X",
+  "hips": [
+    0.0,
+    -0.004,
+    0.25
+  ],
+  "spine": [
+    0.0,
+    -0.004,
+    0.345
+  ],
+  "chest": [
+    0.0,
+    -0.002,
+    0.445
+  ],
+  "neck": [
+    0.0,
+    0.0,
+    0.555
+  ],
+  "head": [
+    0.0,
+    0.0025,
+    0.76
+  ],
+  "head_nod_pivot_suggested": [
+    0.0,
+    0.0525,
+    0.57875
+  ],
+  "jaw_pivot": [
+    0.0,
+    -0.1475,
+    0.64438
+  ],
+  "eyes": {
+    "R": [
+      -0.1316,
+      -0.20507,
+      0.78876
+    ],
+    "L": [
+      0.1316,
+      -0.20507,
+      0.78876
+    ]
+  },
+  "eye_axes": {
+    "R": {
+      "out_deg": 22.7,
+      "down_deg": -13.6
+    },
+    "L": {
+      "out_deg": 22.7,
+      "down_deg": -13.6
+    }
+  },
+  "lash": {
+    "R": {
+      "tip": [
+        -0.2195,
+        -0.1476,
+        0.8258
+      ],
+      "root": [
+        -0.0785,
+        -0.232,
+        0.8078
+      ],
+      "max_proud_W": 0.0075
+    },
+    "L": {
+      "tip": [
+        0.2195,
+        -0.1476,
+        0.8258
+      ],
+      "root": [
+        0.0785,
+        -0.232,
+        0.8078
+      ],
+      "max_proud_W": 0.0075
+    }
+  },
+  "ears": {
+    "R": {
+      "base": [
+        -0.08937,
+        0.04937,
+        0.885
+      ],
+      "mid": [
+        -0.12457,
+        0.06932,
+        1.11966
+      ],
+      "tip": [
+        -0.15977,
+        0.08927,
+        1.35433
+      ]
+    },
+    "L": {
+      "base": [
+        0.08937,
+        0.04937,
+        0.885
+      ],
+      "mid": [
+        0.12457,
+        0.06932,
+        1.11966
+      ],
+      "tip": [
+        0.15977,
+        0.08927,
+        1.35433
+      ]
+    }
+  },
+  "hat": {
+    "anchor": [
+      0.0,
+      0.11581,
+      0.91685
+    ],
+    "top": [
+      0.0,
+      0.18379,
+      1.10361
+    ],
+    "tilt_back_deg": 20.0
+  },
+  "buttons": {
+    "R": [
+      -0.12967,
+      -0.17678,
+      0.45955
+    ],
+    "L": [
+      0.12967,
+      -0.17678,
+      0.45955
+    ]
+  },
+  "arms": {
+    "L": {
+      "shoulder": [
+        0.178,
+        -0.004,
+        0.513
+      ],
+      "elbow": [
+        0.25486,
+        -0.01024,
+        0.41462
+      ],
+      "wrist": [
+        0.30405,
+        -0.01424,
+        0.35166
+      ]
+    },
+    "R": {
+      "shoulder": [
+        -0.178,
+        -0.004,
+        0.513
+      ],
+      "elbow": [
+        -0.25486,
+        -0.01024,
+        0.41462
+      ],
+      "wrist": [
+        -0.30405,
+        -0.01424,
+        0.35166
+      ]
+    }
+  },
+  "legs": {
+    "L": {
+      "hip": [
+        0.128,
+        0.004,
+        0.255
+      ],
+      "knee": [
+        0.132,
+        -0.004,
+        0.165
+      ],
+      "ankle": [
+        0.138,
+        0.0,
+        0.08
+      ],
+      "toe": [
+        0.17047,
+        -0.20075,
+        0.036
+      ]
+    },
+    "R": {
+      "hip": [
+        -0.128,
+        0.004,
+        0.255
+      ],
+      "knee": [
+        -0.132,
+        -0.004,
+        0.165
+      ],
+      "ankle": [
+        -0.138,
+        0.0,
+        0.08
+      ],
+      "toe": [
+        -0.17047,
+        -0.20075,
+        0.036
+      ]
+    }
+  },
+  "tail": [
+    [
+      0.0,
+      0.21969,
+      0.262
+    ]
+  ],
+  "palm_R": [
+    -0.33737,
+    -0.01758,
+    0.29277
+  ],
+  "palm_L": [
+    0.33737,
+    -0.01758,
+    0.29277
+  ],
+  "notes": [
+    "Phase 1: no rig, weights or animations. Same keys as the Usagi / Tanuki joints.json (final metres).",
+    "head = the head centre (the radial origin); head_nod_pivot_suggested = base of the skull, for the rig.",
+    "Head skin = zero surface of one convex implicit ball (bun skull + full jaw + soft muzzle + nose), analytic normals, toon-band refinement; no eye sockets.",
+    "Upper lash lines: separate ribbons (Inaho_lash_L / _R), origin at the eye centre, for the upper lids; lash tip / root in lash.",
+    "Eyelid holes ringed by 6 loops each with the rim rolled in behind separate lens eyeballs; 3 loops round the mouth, 4 round the nose.",
+    "Ears: separate pieces (Inaho_ear_L / _R), ring stacks along the axis (bend loops), pivot = ears.base (buried in the skull, under the hat); they pass through the hat crown.",
+    "Hat: Inaho_hat (the straw lathe + the band) rides the head bone, pivot = hat.anchor (the crown base centre).",
+    "Tail: Inaho_tail, a small closed ball, pivot = tail[0].",
+    "The shorts are one closed piece with a split between the legs and a rolled cuff ring per leg; the sleeves are open tubes; arms carry rings along the forearm and wrist."
+  ]
+}

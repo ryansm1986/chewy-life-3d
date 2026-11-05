@@ -9,6 +9,7 @@ import { ringTexture } from '../gfx/textures.js';
 import { installMokaSpells, setSpellGame } from './mokaSpells.js';
 import { chargeRuntime, perkAt } from '../rpg/charge.js';
 import { ChargeController } from './charge.js';
+import { ComboController } from './combo.js';
 import { installChargedSkills } from './chargedSkills.js';
 import { installPoeSkills } from './poeSkills.js';
 import { installShihtzuSkills } from './shihtzuSkills.js';
@@ -33,12 +34,14 @@ const CUTS = [
   { act: 'cut3', arc: 2.8, tilt: 0, rev: true, y: 0.6, w: 0.56, pitch: 0.9 },
 ];
 const _slide = new THREE.Vector3();
+const SLASH_WHITE = new THREE.Color('#ffffff'); // (Swallow Return's white-hot core)
 
 export class SkillRunner {
   constructor(G) {
     this.G = G; this.cds = {}; this.channel = null; this.combo = 0; this.orbits = [];
     this.queued = null;
     this.charge = new ChargeController(this); // hold-to-charge (docs/CHARGE.md)
+    this.chain = new ComboController(this); // tap again to chain (docs/COMBO.md)
     setSpellGame(G);
   }
   get combat() { return this.G.combat; }
@@ -50,7 +53,8 @@ export class SkillRunner {
   tryCast(id, aim, target = null, charge = null) {
     const G = this.G, P = G.player;
     if (!id || !P || G.playerDead) return false;
-    if (P.anim.busy() && id !== 'whirl') { this.queued = { id, aim: aim.clone(), target, t: 0.25, charge }; return false; }
+    if (P.trav?.busy) return false; // (no attacks or skills swimming or climbing: actors/traverse.js)
+    if (P.anim.busy() && id !== 'whirl') { this.queued = { id, aim: aim.clone(), target, t: Math.max(0.25, this.chain.bufferFor(id)), charge }; return false; } // (a combo strike pressed in its own recovery waits for it: docs/COMBO.md)
     const def = getSkill(id); if (!def) return false;
     // auto-swap to the right weapon for weapon skills
     if (def.wep && G.derived.weaponType !== def.wep) {
@@ -61,12 +65,13 @@ export class SkillRunner {
         return false;
       }
     }
-    const u = usable(id, G.state, G.derived);
+    const u = usable(id, G.state, G.derived, this.chain.zoomFor(id, charge)); // (a cheaper chain step: judged at its own cost)
     if (!u.ok) { if (!this._warnT || G.engine.time - this._warnT > 1) { this._warnT = G.engine.time; G.ui?.float?.(P.pos.clone().setY(1.6), u.why, { kind: 'status', color: '#9fd0ff' }); Events.emit('sfx', 'ui_error'); } return false; }
     if ((this.cds[id] || 0) > 0) return false;
     if (this.castBlocked?.(id, aim, target, charge)) return false; // (Poe: Fūma Throw waits for the fūma to come home — poeSkills.js)
     if (this.channel && this.channel.id === id) return true; // already channelling (Whirlwind Stance, Moonbeam)
     const R = charge ? chargeRuntime(id, G.state, G.derived, charge.stage, charge) : this.rt(id); if (!R) return false;
+    const plan = this.chain.plan(id, charge); this.chain.apply(R, plan); // (a combo chain's step: its cost, speed and the finisher's bonus)
     // melee: never swing at thin air when a monster was clicked — walk up (too far) or lunge (just out of reach)
     let melee = null;
     if (this.isMelee(id, R)) {
@@ -84,13 +89,14 @@ export class SkillRunner {
     P.faceTarget = Math.atan2(aim.x - P.pos.x, aim.z - P.pos.z); P.facing = P.faceTarget;
     this.melee = melee;
     this.flourish = null; // (any cast cuts a pending sheathing flourish short)
-    const fn = (R.charge && this[`charged_${id}`]) || this[`cast_${id}`] || this.castGeneric;
+    const fn = (R.charge && this[`charged_${id}`]) || this[`cast_${id}`] || this.castGeneric, before = P.anim.action;
     fn.call(this, R, aim.clone(), target);
+    this.chain.commit(id, R, plan, before); // (the step starts at its speed; another skill drops the chain)
     G.state.player.lastCast = id;
     return true;
   }
   // ---------------------------------------------------------------- melee reach assist
-  isMelee(id, R) { return id === 'chomp' || (id === 'attack' && !R.params?.projectile); }
+  isMelee(id, R) { return id === 'chomp' || id === 'swallow' || id === 'fumaFlurry' || (id === 'attack' && !R.params?.projectile); }
   // centre-to-centre distance at which the swing's arc (radius + body) still lands with a little margin
   reach(R, target) { return (R.params?.radius || 1.8) + (target?.radius || 0.3) - 0.15; }
   // no monster under the cursor: a monster within lunge reach roughly where Chewy is aiming
@@ -315,6 +321,40 @@ export class SkillRunner {
     fx.arc(at, f, { arc, r: p.radius * 1.08, rev: false, y: 0.55, width: 0.5 + 0.12 * (k - 1), life: 0.4, sweep: 0.08, mode: 1, grow: 0.14 });
     fx.arc(at, f, { arc: arc * 0.92, r: p.radius * 0.8, rev: false, y: 0.68, width: 0.24, life: 0.26, sweep: 0.07, tilt: 0.25 });
     this.G.vfx.decal(_d.copy(at).addScaledVector(this.forward(), p.radius * 0.45), { r: p.radius * 0.7, color: '#3a2418', opacity: 0.22, life: 1.6, grow: 0.2 });
+  }
+  // Swallow Return (tsubame gaeshi): out of the hip on a rising cut up to the right shoulder, the wrist turns, and both
+  // paws snap it straight back down the same line (samuraiPoses.js 'tsubame'). Quicker than the iai (animSpeed 0.6 to
+  // its 0.5), narrow, two hits; each cut its own trail, slash marks on what it struck, a hit-stop and a shake.
+  cast_swallow(R, aim, target) {
+    const P = this.G.player;
+    P.anim.play('tsubame', { speed: this.animSpeed(0.6), onEvent: ev => {
+      if (ev === 'draw') { this.drawFromHip(); return; }
+      if (ev === 'end') { this.queueFlourish(); return; }
+      if (ev === 'hit' || ev === 'hit2') this.swallowCut(R, ev === 'hit2', target);
+    } });
+  }
+  /** one of Swallow Return's two cuts (back: the return, down the same line) → the foes it struck; k: the trails' size
+   *  (a charged one's are bigger) */
+  swallowCut(R, back, target, k = R.charge ? 1 + 0.1 * R.charge.stage : 1) {
+    const G = this.G, P = G.player, p = R.params, f = P.facing, fx = bladeFx(G), arc = p.arc * Math.PI / 180;
+    this.snapIn(target, p.radius);
+    // the trail: a steep diagonal ribbon, rising left → right, then back down right → left (the return bolder, with a
+    // white-hot core inside it)
+    fx.arc(P.pos, f, { arc: arc * 1.05, r: 1.7 * Math.min(1.3, k), tilt: 1.25, rev: back, y: 0.7, width: back ? 0.6 : 0.46, life: back ? 0.32 : 0.25, sweep: back ? 0.04 : 0.05, grow: 0.06 });
+    if (back) fx.arc(P.pos, f, { arc: arc * 0.95, r: 1.5 * Math.min(1.3, k), tilt: 1.1, rev: true, y: 0.7, width: 0.2, life: 0.22, sweep: 0.04, grow: 0.04, core: SLASH_WHITE, edge: SLASH_WHITE });
+    Events.emit('sfx', 'katana_slice', { pitch: back ? 0.88 : 1.15 }); Events.emit('sfx', back ? 'swing_heavy' : 'swing', { pitch: back ? 1.2 : 1.35, vol: back ? 0.55 : 0.4 });
+    const hit = [];
+    this.arcHit(P.pos, f, p.radius, p.arc, e => { this.combat.hitMonster(e, { dmgPct: p.dmgPct, knock: back ? p.knockback : 0, from: P.pos }); hit.push(e); }, target);
+    // a slash mark across each foe struck, along the cut's line (right and up from Chewy's view; the return wipes back)
+    const s = back ? -1 : 1, rx = -Math.cos(f), rz = Math.sin(f);
+    for (let i = 0; i < Math.min(3, hit.length); i++) {
+      const e = hit[i];
+      fx.slash(_d.set(e.pos.x, e.pos.y + (e.height || 1) * 0.5, e.pos.z), _o1.set(rx * 0.78 * s, 0.62 * s, rz * 0.78 * s), { len: (back ? 1.8 : 1.5) * Math.min(1.3, k), width: back ? 0.5 : 0.4 });
+    }
+    if (hit.length) { G.engine.rig.shake(back ? 0.22 : 0.12); G.engine.hitStop = Math.max(G.engine.hitStop, back ? 0.055 : 0.035); }
+    else if (back) G.engine.rig.shake(0.08);
+    if (back) { G.vfx.dust(P.pos, { n: 3 }); this.melee = null; }
+    return hit;
   }
   /** the iai's draw: if the katana is in the saya it comes out now, with a glint at the hip */
   drawFromHip() {
@@ -568,6 +608,7 @@ export class SkillRunner {
     for (const k in this.cds) if (this.cds[k] > 0) this.cds[k] = Math.max(0, this.cds[k] - dt);
     if (this.queued) { this.queued.t -= dt; if (this.queued.t <= 0) this.queued = null; else if (!P.anim.busy()) { const q = this.queued; this.queued = null; this.tryCast(q.id, q.target?.alive ? q.target.pos.clone() : q.aim, q.target, q.charge); } }
     this.charge.update(dt);
+    this.chain.update(dt);
     this.updateApproach(dt);
     this.updateMelee(dt);
     // channels (Whirlwind Stance; Moka's Moonbeam) — each needs its weapon
@@ -665,6 +706,7 @@ export class SkillRunner {
   clearAll() {
     this.melee = null; this.approach = null; this.flourish = null; this.banner?.end(); this.banner = null;
     this.charge?.cancel('clear', true);
+    this.chain?.clear();
     if (this.channel) this.endChannel();
     const P = this.G.player; if (P) { P.leap = null; P.dash = null; P.invuln = false; P.canMoveWhileActing = false; if (P.anim.action?.name === 'spin') P.anim.stop('spin'); }
     for (const o of this.orbits) for (const b of o.bones) b.m.parent?.remove(b.m);

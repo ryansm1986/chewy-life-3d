@@ -1,0 +1,289 @@
+{
+  "units": "metres (final, crown 1.05 m, ear tips 1.30 m)",
+  "coordinate_system": "Blender Z-up, front -Y; character left is +X",
+  "hips": [
+    0.0,
+    0.004,
+    0.255
+  ],
+  "spine": [
+    0.0,
+    0.002,
+    0.36
+  ],
+  "chest": [
+    0.0,
+    0.0,
+    0.47
+  ],
+  "neck": [
+    0.0,
+    0.0,
+    0.58
+  ],
+  "head": [
+    0.0,
+    0.0004,
+    0.7834
+  ],
+  "head_nod_pivot_suggested": [
+    0.0,
+    0.05,
+    0.6036
+  ],
+  "jaw_pivot": [
+    0.0,
+    -0.1484,
+    0.6687
+  ],
+  "eyes": {
+    "R": [
+      -0.14178,
+      -0.2052,
+      0.79168
+    ],
+    "L": [
+      0.14178,
+      -0.2052,
+      0.79168
+    ]
+  },
+  "eye_axes": {
+    "R": {
+      "out_deg": 23.8,
+      "down_deg": -12.7
+    },
+    "L": {
+      "out_deg": 23.8,
+      "down_deg": -12.7
+    }
+  },
+  "lash": {
+    "R": {
+      "tip": [
+        -0.2251,
+        -0.1524,
+        0.826
+      ],
+      "root": [
+        -0.0883,
+        -0.233,
+        0.8126
+      ],
+      "max_proud_W": 0.0075
+    },
+    "L": {
+      "tip": [
+        0.2251,
+        -0.1524,
+        0.826
+      ],
+      "root": [
+        0.0883,
+        -0.233,
+        0.8126
+      ],
+      "max_proud_W": 0.0075
+    }
+  },
+  "ears": {
+    "R": {
+      "base": [
+        -0.124,
+        0.0252,
+        0.895
+      ],
+      "mid": [
+        -0.15663,
+        0.04596,
+        1.09275
+      ],
+      "tip": [
+        -0.18926,
+        0.06673,
+        1.29051
+      ]
+    },
+    "L": {
+      "base": [
+        0.124,
+        0.0252,
+        0.895
+      ],
+      "mid": [
+        0.15663,
+        0.04596,
+        1.09275
+      ],
+      "tip": [
+        0.18926,
+        0.06673,
+        1.29051
+      ]
+    }
+  },
+  "bandana_knot": [
+    0.0,
+    0.2324,
+    0.8361
+  ],
+  "bandana_tails": {
+    "R": {
+      "root": [
+        0.0,
+        0.23303,
+        0.83624
+      ],
+      "mid": [
+        -0.04932,
+        0.2725,
+        0.76436
+      ],
+      "tip": [
+        -0.09864,
+        0.27724,
+        0.69262
+      ]
+    },
+    "L": {
+      "root": [
+        0.0,
+        0.23303,
+        0.83624
+      ],
+      "mid": [
+        0.04932,
+        0.2725,
+        0.76436
+      ],
+      "tip": [
+        0.09864,
+        0.27724,
+        0.69262
+      ]
+    }
+  },
+  "bag": {
+    "pivot": [
+      -0.23458,
+      -0.1806,
+      0.39
+    ],
+    "centre": [
+      -0.238,
+      -0.19,
+      0.29
+    ]
+  },
+  "arms": {
+    "L": {
+      "shoulder": [
+        0.178,
+        -0.004,
+        0.538
+      ],
+      "elbow": [
+        0.25486,
+        -0.01024,
+        0.43962
+      ],
+      "wrist": [
+        0.30405,
+        -0.01424,
+        0.37666
+      ]
+    },
+    "R": {
+      "shoulder": [
+        -0.178,
+        -0.004,
+        0.538
+      ],
+      "elbow": [
+        -0.25486,
+        -0.01024,
+        0.43962
+      ],
+      "wrist": [
+        -0.30405,
+        -0.01424,
+        0.37666
+      ]
+    }
+  },
+  "legs": {
+    "L": {
+      "hip": [
+        0.128,
+        0.004,
+        0.255
+      ],
+      "knee": [
+        0.132,
+        -0.004,
+        0.165
+      ],
+      "ankle": [
+        0.138,
+        0.0,
+        0.08
+      ],
+      "toe": [
+        0.17047,
+        -0.20075,
+        0.036
+      ]
+    },
+    "R": {
+      "hip": [
+        -0.128,
+        0.004,
+        0.255
+      ],
+      "knee": [
+        -0.132,
+        -0.004,
+        0.165
+      ],
+      "ankle": [
+        -0.138,
+        0.0,
+        0.08
+      ],
+      "toe": [
+        -0.17047,
+        -0.20075,
+        0.036
+      ]
+    }
+  },
+  "tail": [
+    [
+      0.0,
+      0.22027,
+      0.3
+    ]
+  ],
+  "palm_R": [
+    -0.33737,
+    -0.01758,
+    0.31777
+  ],
+  "palm_L": [
+    0.33737,
+    -0.01758,
+    0.31777
+  ],
+  "notes": [
+    "Phase 1: no rig, weights or animations. Same keys as the Usagi / Tanuki joints.json (final metres).",
+    "head = the head centre (the radial origin); head_nod_pivot_suggested = base of the skull, for the rig.",
+    "Head skin = zero surface of one convex implicit ball (bun skull + full jaw + soft muzzle + nose), analytic normals, toon-band refinement; no eye sockets.",
+    "Upper lash lines: separate ribbons (Chiku_lash_L / _R), origin at the eye centre, for the upper lids; lash tip / root in lash.",
+    "Eyelid holes ringed by 6 loops each with the rim rolled in behind separate lens eyeballs; 3 loops round the mouth, 4 round the nose.",
+    "Ears: separate pieces (Chiku_ear_L / _R), 27 rings along the axis (bend loops), pivot = ears.base (buried in the skull, under the bandana).",
+    "Bandana: Chiku_band (band + knot) rides the head bone, pivot = bandana_knot; the two ends are separate (Chiku_band_tail_L / _R), 15 rings each, pivot = their root.",
+    "Bag: Chiku_bag (bag, flap, button), pivot = bag.pivot (between the strap ends); the strap is part of Chiku_body (it follows the torso).",
+    "Tail: Chiku_tail, a small closed ball, pivot = tail[0].",
+    "The trousers are one closed piece with a split between the legs; the sleeves are open tubes; arms carry rings along the forearm and wrist."
+  ]
+}

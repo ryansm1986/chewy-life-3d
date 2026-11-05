@@ -1,6 +1,6 @@
 // Cached 3D thumbnails of buildings for the build palette (rendered once with the game's renderer).
 import * as THREE from 'three';
-import { buildModel, sizeOf } from '../world/buildings/index.js';
+import { buildModel, sizeOf, buildingGlbInstances } from '../world/buildings/index.js';
 import { MATS } from '../world/buildings/kit.js';
 import { U } from './materials.js';
 
@@ -31,6 +31,9 @@ export class BuildingThumbs {
       // otherwise link its program on the spot (~1 s on ANGLE)
       const geo = g.getObjectsByProperty('isMesh', true)[0]?.geometry;
       if (geo) for (const m of Object.values(MATS())) g.add(new THREE.Mesh(geo, m));
+      // and the Blender building models' own (vertex-coloured toon, glow, ink): the Town Hall's first thumbnail linked
+      // them on the spot, ~500 ms in one prewarm step
+      for (const o of buildingGlbInstances()) g.add(o);
       this.scene.add(g); g.updateMatrixWorld(true);
     } catch (e) { return (this._warm = Promise.resolve()); }
     return (this._warm = R.compileAsync(this.scene, this.cam).catch(() => {}).finally(() => this.scene.remove(g)));

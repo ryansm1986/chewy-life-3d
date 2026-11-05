@@ -6,7 +6,9 @@
 // The river falls from a waterfall at the north-east edge. Assets: src/regions/assets/mapleFlora.js / mapleProps.js.
 import * as THREE from 'three';
 import * as F from '../assets/mapleFlora.js';
-import * as Pr from '../assets/mapleProps.js';
+import * as PrKit from '../assets/mapleProps.js';
+import { withGlb } from '../assets/glbPieces.js';
+const Pr = withGlb('maple', PrKit); // (its landmark props drawn from their Blender models once loaded: ROADMAP Z-D6)
 import * as BF from '../assets/bambooFlora.js';
 import { Placer, M } from '../assets/bambooKit.js';
 import { viewGuard, handOver, polyDist, sstep, trailCrossing, bridgeDeck, alongTrail, arenaGate } from '../biomeKit.js';
@@ -182,7 +184,7 @@ function populate(ctx) {
     for (const sd of [-1, 1]) { const a = far + sd * 0.95, [x, z] = at(a, A.r + 2.2); PL.piece(Pr.hasa(sd > 0 ? 1 : 2, { L: 3.4 }), x, z, a + Math.PI / 2); ctx.addCollider(x, z, 1.4);
       const [lx, lz] = at(a + sd * 0.55, A.r + 1.6); PL.piece(Pr.lanternLine(6 + sd, { L: 3.6, h: 2.4 }), lx, lz, a + Math.PI / 2 + sd * 0.4);
       ctx.arenaLanterns.push(new THREE.Vector3(lx, H(lx, lz) + 2, lz)); }
-    for (const s of [-1, 1]) { const x = g.x + Math.sin(g.a) * 1.9 * s, z = g.z - Math.cos(g.a) * 1.9 * s; PL.piece(Pr.tanuki(s > 0 ? 1 : 2, { s: 1.2 }), x, z, g.yaw + Math.PI); ctx.addCollider(x, z, 0.5); }
+    for (const s of [-1, 1]) { const x = g.x + Math.sin(g.a) * 1.9 * s, z = g.z - Math.cos(g.a) * 1.9 * s; PL.piece(Pr.tanuki(s > 0 ? 1 : 2, { s: 1.2 }), x, z, g.yaw); /* (facing the way in: the player walks up to their faces) */ ctx.addCollider(x, z, 0.5); }
     for (let k = 0; k < 7; k++) { const a = far + (k - 3) * 0.42, [x, z] = at(a, A.r + 6 + (k % 2) * 1.5); if (!G.lens(x, z) && !G.camSide(x, z)) tree(F.persimmon(k % 3), x, z, 2, 1.05); }
     // a few sheaves and a straw hut standing in the far half of the field
     for (const [da, rr, kind] of [[-0.5, 0.55, 's'], [0.35, 0.62, 'w'], [0.9, 0.5, 's'], [-1.1, 0.66, 's']]) {

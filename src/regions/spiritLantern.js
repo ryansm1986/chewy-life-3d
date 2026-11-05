@@ -12,6 +12,13 @@ import { runLevel } from '../rpg/tiers.js';
 import { paint, merge, tube } from '../gfx/geom.js';
 import { makeToon, makeOutline } from '../gfx/materials.js';
 import { glowTexture } from '../gfx/textures.js';
+import { loadGlb, glbInstance } from '../gfx/glbAssets.js';
+
+// The Blender Spirit Lantern (public/models/spirit-lantern.glb; tools/blender/codex/assets/magic-props): the kit's
+// silhouette and light point (0, 1.58, 0); its `flame` light box shows only while the lantern is lit. loadLanternModel()
+// at boot; until it lands (or if it fails) the kit lantern stands in.
+let LANTERN_TPL = null;
+export function loadLanternModel() { return loadGlb('/models/spirit-lantern.glb').then(t => { LANTERN_TPL = t; return true; }).catch(e => { console.warn('[lantern] model', e); return false; }); }
 import { Events } from '../core/events.js';
 import { rand, TAU, clamp } from '../core/util.js';
 
@@ -107,6 +114,8 @@ export function lanternModel() {
   flame.position.set(0, 1.56, 0); flame.scale.set(0.4, 0.58, 1);
   const charmMat = makeToon({ vertexColors: true, rim: 0.3, side: THREE.DoubleSide, emissive: '#ffe8f8', emissiveIntensity: 0.15 });
   const charms = [0, 1, 2].map(i => { const m = new THREE.Mesh(charmGeo, charmMat); m.userData.ph = i / 3 * TAU; m.visible = false; return m; });
+  let lit = null; // (the Blender lantern's `flame`: shown as the lantern lights)
+  if (LANTERN_TPL) { const o = glbInstance(LANTERN_TPL, { outline: true }); lit = o.getObjectByName('flame'); if (lit) lit.visible = false; stone.visible = paper.visible = false; root.add(o); }
   root.add(stone, paper, glow, flame, ...charms);
   const S = { lit: false, k: 0 };
   return {
@@ -116,6 +125,7 @@ export function lanternModel() {
       S.k += ((S.lit ? 1 : 0) - S.k) * Math.min(1, dt * 2.5);
       const fl = 0.85 + Math.sin(t * 5.3) * 0.06 + Math.sin(t * 11.7) * 0.04;
       paperMat.emissive.copy(C('#2a2640')).lerp(C('#c8b4ff'), S.k * fl);
+      if (lit) lit.visible = S.k > 0.25;
       glow.material.opacity = S.k * 0.55 * fl; glow.scale.setScalar(1.3 + Math.sin(t * 2) * 0.08);
       flame.material.opacity = S.k * 0.95 * fl; flame.scale.set(0.4 + Math.sin(t * 9) * 0.04, 0.58 + Math.sin(t * 7) * 0.06, 1);
       for (const c of charms) { const a = t * 0.55 + c.userData.ph; c.position.set(Math.cos(a) * 0.95, 1.5 + Math.sin(t * 1.3 + c.userData.ph * 2) * 0.16, Math.sin(a) * 0.95); c.rotation.set(Math.sin(t * 2 + c.userData.ph) * 0.25, -a + Math.PI / 2, Math.sin(t * 1.7 + c.userData.ph) * 0.2); }

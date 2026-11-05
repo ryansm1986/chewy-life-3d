@@ -1,5 +1,6 @@
 // Chewy the samurai's moves (docs/HEROES.md "Chewy the samurai"), merged into animator.js' ACTIONS: the basic-attack
-// combo (cut1 diagonal kesa, cut2 rising backhand, cut3 big two-handed sweep), the iai draw-cut (Crescent Chomp), the
+// combo (cut1 diagonal kesa, cut2 rising backhand, cut3 big two-handed sweep), the iai draw-cut (Crescent Chomp), Swallow
+// Return's two cuts on one line (tsubame), the
 // sheathing flourish (noto: a model with a saya) or a blade flick (chiburi: no saya), the Flash Draw dash and the Kiai!
 // battle cry. Each one is a few key poses blended in time; the cuts keep the timing of the swings they replace (dur 0.46,
 // hit at 0.42: the attack speed and the hit frame are game numbers), and the battle cry the bark's (0.5, shout at 0.28).
@@ -67,6 +68,19 @@ const IAI = K({ armR: [-0.35, 0, 1.25], foreR: [-0.9, 0, 0.6], dir: [-0.75, -0.2
 const IAI_MID = K({ armR: [-0.9, 0, 0.8], foreR: [-0.5, 0, 0.3], dir: [0.9, 0.1, 0.35], edge: [0, 0, -1], armL: [-0.2, 0, -0.2], body: [0.25, 0, 0], legL: [-0.55, 0, 0.1], legR: [0.5, 0, -0.1], sq: 0.04, y: -0.06, armLock: 1 });
 const DRAWN = K({ armR: [-1.45, 0, 0.15], foreR: [-0.25, 0, 0.05], dir: [0.55, 0.1, -0.83], edge: [-0.3, 0, -1], two: 1, body: [0.14, -0.45, 0], head: [0, 0.35, 0], legL: [-0.6, 0, 0.1], legR: [0.5, 0, -0.1], sq: -0.07, y: -0.05, lean: 0.06, armLock: 1 });
 
+// Swallow Return (tsubame gaeshi): one diagonal line cut twice. Low at the left hip (the iai's place, sunk deeper and
+// coiled toward the saya), the blade snaps up across the front to high over the right shoulder (one paw; he rises onto
+// his toes), the free paw slaps onto the hilt as the wrist turns the edge over at the top, and both paws drive it
+// straight back down the same line to the left hip, the whole body crashing down into the lunge. The cut's line in his
+// frame: forward and the diagonal d = (up − left)/√2; the blade's dir sweeps from −d (back at the hip) through forward
+// to +d and back, its edge leading each way (flipped over at the top through the plane's normal, up-left).
+const TS_LOW = K({ armR: [-0.3, 0, 1.3], foreR: [-0.85, 0, 0.6], dir: [-0.45, -0.55, 0.7], edge: [0.7, 0.5, 0.2], armL: [-0.3, 0, -0.3], foreL: [-0.6, 0, -0.3], body: [0.26, 0.45, 0], head: [-0.2, -0.42, 0], legL: [-0.62, 0, 0.14], legR: [0.52, 0, -0.14], sq: 0.16, y: -0.09, earKick: -0.5, armLock: 1 });
+const TS_RISE = K({ armR: [-1.15, 0, 0.3], foreR: [-0.5, 0, 0.2], dir: [0.97, 0.16, -0.16], edge: [-0.17, 0.7, -0.7], armL: [-0.75, 0, 0.05], foreL: [-0.8, 0, 0], body: [0.1, -0.05, 0], head: [-0.04, 0.05, 0], legL: [-0.45], legR: [0.4], sq: -0.03, y: -0.02, armLock: 1 });
+const TS_HIGH = K({ armR: [-2.0, 0, 0.3], foreR: [-0.8, 0, 0.2], dir: [0.05, 0.92, -0.38], edge: [-1, 0.05, 0], two: 1, body: [-0.15, -0.42, 0], head: [-0.1, 0.35, 0], legL: [-0.2], legR: [0.25], sq: -0.11, y: 0.05, earKick: 1.2, armLock: 1 });
+const TS_TURN = K({ armR: [-2.05, 0, 0.32], foreR: [-0.8, 0, 0.2], dir: [0.04, 0.93, -0.36], edge: [0, 0.38, 0.92], two: 1, body: [-0.13, -0.44, 0], head: [-0.08, 0.36, 0], legL: [-0.22], legR: [0.27], sq: -0.1, y: 0.05, earKick: 1.4, armLock: 1 });
+const TS_DOWN = K({ armR: [-1.0, 0, 0.7], foreR: [-0.8, 0, 0.3], dir: [0.95, 0.05, 0.3], edge: [0.1, -0.7, 0.7], two: 1, body: [0.18, 0.1, 0], head: [0.04, -0.05, 0], legL: [-0.5], legR: [0.45], sq: 0.02, y: -0.03, armLock: 1 });
+const TS_END = K({ armR: [-0.5, 0, 1.05], foreR: [-0.4, 0, 0.25], dir: [0.45, -0.6, 0.66], edge: [0.2, -0.7, 0.7], two: 1, body: [0.2, 0.5, 0], head: [-0.1, -0.42, 0], legL: [-0.72], legR: [0.58], sq: 0.13, y: -0.09, lean: 0.05, armLock: 1 });
+
 // the sheathing flourish: the blade turned back to the saya at the left hip, the free paw at the mouth
 const NOTO_IN = K({ armR: [-0.45, 0, 1.25], foreR: [-0.9, 0, 0.6], dir: [-0.88, -0.32, 0.3], edge: [-0.2, 0.97, 0.1], armL: [-0.2, 0, -0.35], foreL: [-0.6, 0, -0.3], body: [0.1, 0.25, 0], head: [0.15, -0.2, 0], armLock: 1 });
 // (NOTO_HOME's dir / edge: the samurai model's saya axis and edge-up, export/saya_mount.json in his frame: the hand-off to the sheathed hilt is seamless)
@@ -130,6 +144,12 @@ export const SAMURAI_ACTIONS = {
   cut3: act(0.46, { hit: 0.42 }, [[0, REST], [0.32, LAID_BACK, out], [0.42, SWEEP_MID, inq], [0.5, SWEPT, snap], [0.7, SWEPT], [1, REST, io]]),
   // ---- Crescent Chomp: the iai draw-cut (its charge holds the IAI key: chargePoses.js 'iai')
   iaiCut: act(0.46, { draw: 0.36, hit: 0.42 }, [[0, REST], [0.28, IAI, out], [0.34, IAI], [0.42, IAI_MID, inq], [0.5, DRAWN, snap], [0.7, DRAWN], [1, REST, io]]),
+  // ---- Swallow Return: the rising cut ('hit') and the return down the same line ('hit2'), a held beat at the top
+  //      between them (the swallow turning); played quicker than the iai (skillRunner.cast_swallow). Its charge holds
+  //      TS_LOW (chargePoses.js 'gedan', the release from 0.17)
+  tsubame: act(0.46, { draw: 0.08, hit: 0.24, hit2: 0.45 }, [[0, REST], [0.12, TS_LOW, out], [0.17, TS_LOW], [0.23, TS_RISE, inq], [0.29, TS_HIGH, snap], [0.35, TS_TURN, io], [0.43, TS_DOWN, ease.inCubic], [0.5, TS_END, snap], [0.74, TS_END], [1, REST, io]], (t, A) => {
+    if (t > 0.26 && t < 0.4) A.earKick += 1.5 * Math.sin((t - 0.26) * 44); // (the ears flick up at the top)
+  }),
   // ---- the end of a combo: sheathe it (a model with a saya: 'click' puts the katana away) or flick it clean
   noto: act(0.8, { click: 0.7 }, [[0, REST], [0.3, NOTO_IN, io], [0.7, NOTO_HOME, inq], [0.82, NOTO_HOME], [1, REST, io]]),
   chiburi: act(0.55, { flick: 0.42 }, [[0, REST], [0.3, FLICK_UP, io], [0.42, FLICK_DOWN, snap], [0.72, FLICK_DOWN], [1, REST, io]]),
@@ -147,10 +167,10 @@ export const SAMURAI_ACTIONS = {
   parry: act(0.32, null, [[0, REST], [0.25, PARRY, snap], [0.6, PARRY], [1, REST, io]]),
 };
 /** actions that root him (no walking out of a cut) */
-export const SAMURAI_ROOTED = ['cut1', 'cut2', 'cut3', 'iaiCut', 'kiai', 'stormCall', 'command', 'warCry', 'moonCall'];
+export const SAMURAI_ROOTED = ['cut1', 'cut2', 'cut3', 'iaiCut', 'tsubame', 'kiai', 'stormCall', 'command', 'warCry', 'moonCall'];
 /** the sword cuts the melee assist tracks (skillRunner.updateMelee) */
-export const SAMURAI_CUTS = new Set(['cut1', 'cut2', 'cut3', 'iaiCut']);
+export const SAMURAI_CUTS = new Set(['cut1', 'cut2', 'cut3', 'iaiCut', 'tsubame']);
 /** the flourishes: anything cuts them short, and they don't make the next cast wait */
 export const SAMURAI_FLOURISH = new Set(['noto', 'chiburi', 'parry']);
 /** the keys, for the charge wind-ups (chargePoses.js) */
-export const SAMURAI_KEYS = { IAI, HASSO, KIAI_IN, CHUDAN, WHIRL, WHIRL_DIR, SPLIT_CROUCH, STORM_IN, WAR_IN, add };
+export const SAMURAI_KEYS = { IAI, TS_LOW, HASSO, KIAI_IN, CHUDAN, WHIRL, WHIRL_DIR, SPLIT_CROUCH, STORM_IN, WAR_IN, add };

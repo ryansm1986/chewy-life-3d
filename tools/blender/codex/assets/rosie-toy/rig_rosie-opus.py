@@ -20,7 +20,7 @@ from mathutils.bvhtree import BVHTree
 ROOT = Path(__file__).resolve().parent
 src = (ROOT / 'build_rosie-opus.py').read_text(encoding='utf-8')
 ns = {'__file__': str(ROOT / 'build_rosie-opus.py'), '__name__': 'rosie_model', 'RIG_MODE': True}
-ns['REFINE_ADD'] = int(os.environ.get('REFINE_ADD', '1200'))     # round 8: the face refinement budget (was 1300; the convex face needs less, the new lid more)
+ns['REFINE_ADD'] = int(os.environ.get('REFINE_ADD', '1800'))     # round 10: the approved 7c face's refinement (the build's own 1800; was 1200 on the old head)
 exec(compile(src, str(ROOT / 'build_rosie-opus.py'), 'exec'), ns)
 W, CHIN, HY = ns['W'], ns['CHIN'], ns['HY']
 EX, EZ, EHW, EHH, EN = ns['EX'], ns['EZ'], ns['EHW'], ns['EHH'], ns['EN']
@@ -114,7 +114,7 @@ for o in base_objects:      # tag every vertex with its index so the part labels
     lnor = np.empty(len(o.data.loops) * 3, np.float32); o.data.corner_normals.foreach_get('vector', lnor)
     c_ = o.data.attributes.new('cust_lnor', 'FLOAT_VECTOR', 'CORNER'); c_.data.foreach_set('vector', lnor)
 head_rigid = [OBJ[n] for n in ('Rosie_head', 'Rosie_hair', 'Rosie_eye_L', 'Rosie_eye_R')]
-CULL = cull_hidden([OBJ['Rosie_hair'], OBJ['Rosie_eye_L'], OBJ['Rosie_eye_R']], head_rigid)
+CULL = cull_hidden([OBJ['Rosie_hair'], OBJ['Rosie_eye_L'], OBJ['Rosie_eye_R']], head_rigid) if not os.environ.get('LID_SCAN') else {}
 for n in ('Rosie_hair', 'Rosie_eye_L', 'Rosie_eye_R'):
     me = OBJ[n].data; oi = np.empty(len(me.vertices), np.int32); me.attributes['orig_idx'].data.foreach_get('value', oi)
     labels[n] = [labels[n][i] for i in oi]
@@ -346,8 +346,8 @@ def rest_exposure(V, pivot, angs):
 # lid) dives to r_edge, just outside the eye, to tuck under the lower rim when shut; dark on the dark band, that dive can't
 # show. The hinge sits on the eye's height, far enough back (0.21 m) that the lid stands ~2-5 mm off the eye.
 LID8 = os.environ.get('LID8', '1') == '1'
-L8 = dict(YB=float(os.environ.get('L8_YB', '.21')), ZO=float(os.environ.get('L8_ZO', '-.004')),
-          SQ=float(os.environ.get('L8_SQ', '.70')), COV=float(os.environ.get('L8_COV', '.20')),
+L8 = dict(YB=float(os.environ.get('L8_YB', '.17')), ZO=float(os.environ.get('L8_ZO', '-.006')),      # round 10: the tilted-frame hinge for the 7c face (scan: logs/scan1, scan2)
+          SQ=float(os.environ.get('L8_SQ', '.30')), COV=float(os.environ.get('L8_COV', '.20')),     # (SQ, round 10b: the recommended happy upper value, squint [0.30, -0.24])
           DELTA=.0003, G_BODY=.0008, G_EDGE=.0006, TUCK=.0005, NCOL=21)
 ROWS8 = [0, .025, .05, .075, .10, .125, .15] + [float(v) for v in np.linspace(.15, 1, 13)[1:]]
 def eye_hits(x, pivot, phs, tag):
@@ -384,6 +384,8 @@ def upper_lid8(tag):
         px = float(phs[np.argmax(above)]) if above.any() else pb
         r_edge = min(r_body, max(maxeye + L8['G_EDGE'], float(np.interp(pl, phs, dsk)) - L8['TUCK'])) if np.isfinite(de).any() else r_body
         pe = pl - .004                       # shut, every column's edge sits just under the lower rim: one clean lash curve
+        if abs(X) < 1 and np.isfinite(de).any():   # round 10: ... in height too (the edge rides at r_edge, inside the rim's radius)
+            pe = min(pe, math.asin(float(np.clip((zl - .0012 - zp) / r_edge, -1, 1))))
         if os.environ.get('L8_LEVEL') == '1' and zl < zlev < zt: pe = min(pe, angp(fy(zlev), zlev) - (target - L8['SQ']))
         dk = .0020 + .0058 * max(0., 1 - min(abs(X), 1.) ** 2) ** .6
         if X < 0: dk = max(.0007, dk * float(smooth(-.98, -.55, X)))      # fades toward the inner corner (no hook)
@@ -454,6 +456,8 @@ def lid_shell(tag, upper):
     best = None
     if upper and LID8:
         g = upper_lid8(tag); e = rest_exposure(g[0], g[3], angs); best = (e, 0., g); cands = []
+    if not upper and LID10:
+        best = (0., 0., lower_lid10(tag)); cands = []
     for dz in cands:
         g = lid_geometry(tag, upper, float(dz)); e = rest_exposure(g[0], g[3], angs)
         if upper:      # hidden at rest and closing fully are required; then the squint nearest 28 % and the snuggest shell
@@ -473,30 +477,345 @@ def lid_shell(tag, upper):
         print('LID_DIAG', tag, upper, 'pivot', pivot.round(4), 'dz', dz, 'closure', closure, 'radii', [round(c[1], 4) for c in cols], flush=True)
         if upper: print('LID_DIAG dark_mm', [round(d_ * 1000, 1) for d_ in paint['dark']], flush=True)
     chart = 'lidU' if upper else 'lidD'
-    if tag == 'L': LID_PAINT[chart] = paint
+    paint['tag'] = tag; paint['pivot_l'] = np.array(pivot, float); paint['target'] = target
+    if tag == 'L': LID_PAINT[chart] = paint                  # (G in the left eye's frame; paint_lids turns it back)
     name = ('Rosie_lidU_' if upper else 'Rosie_lidD_') + tag
+    Rw_ = EYE_FRAME[tag]['Rw']; pivot_l = np.array(pivot)    # round 10: built in the eye's frame, turned back to the head
+    V = to_world(np.array(V), tag).tolist(); NRM = (np.array(NRM) @ Rw_.T).tolist(); pivot = to_world(pivot_l, tag)
     me = bpy.data.meshes.new(name); me.from_pydata(V, [], fs); me.update()
     layer = me.uv_layers.new(name='Atlas')
     for p in me.polygons:
         p.use_smooth = True
         for l in p.loop_indices: layer.data[l].uv = au(chart, *UVs[me.loops[l].vertex_index])
-    bm = bmesh.new(); bm.from_mesh(me); yp, zp = pivot[1], pivot[2]
-    for f in bm.faces:        # outward = away from the pivot axis
-        c = f.calc_center_median()
-        if f.normal.dot(Vector((0, c.y - yp, c.z - zp))) < 0: f.normal_flip()
+    bm = bmesh.new(); bm.from_mesh(me); hk = hinge(tag)
+    for f in bm.faces:        # outward = away from the (tilted) hinge axis
+        c = np.array(f.calc_center_median()) - pivot; rv = c - hk * (c @ hk)
+        if np.dot(np.array(f.normal), rv) < 0: f.normal_flip()
     bm.to_mesh(me); bm.free()
     me.normals_split_custom_set([tuple(NRM[me.loops[l].vertex_index]) for l in range(len(me.loops))])
     ob = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(ob); me.materials.append(MAT)
     lid_objects.append((ob, ('lidU_' if upper else 'lidD_') + tag))
-    lid_info[name] = {'pivot': [float(v) for v in pivot], 'pivot_offset_m': dz, 'score': round(e, 4),
+    lid_info[name] = {'pivot': [float(v) for v in pivot], 'pivot_eye_frame': [float(v) for v in pivot_l],
+                      'hinge_blender': [round(float(v), 5) for v in hinge(tag)], 'pivot_offset_m': dz, 'score': round(e, 4),
                       'closed_edge_above_rim_mm': None if closure is None else round(closure[0] * 1000, 2),
                       'squint_coverage': None if closure is None else round(closure[1], 3),
                       'closed_standoff_centre_mm': None if closure is None else round(closure[2] * 1000, 2),
                       'radius_centre_m': float(cols[len(cols) // 2][1]), 'target': target}
     return tuple(float(v) for v in pivot)
+# ---------------------------------------------------------------- round 10 (feedback-8): tilted lid hinges (HERO_MODELS lidTilt)
+# The 7c face is shallower (its front recedes faster above the eyes) and the eyes face 28 deg outward. About world X the LID8 shell,
+# tuned for the old face, stood up to 18 mm proud of the forehead at rest. The game can turn lidU / lidD about each eye's own
+# sideways axis instead: Blender (cos t, +sin t, 0) for her left (+X) eye and (cos t, -sin t, 0) for the right (animator.js
+# lidTurn), t = LID_TILT. Each lid is designed in its eye's own frame (the head and the eye turned about the vertical through the
+# eye's surface centre, so the eye faces -Y and the hinge is X; the Mochi / Shih Tzu technique) with the constructions above
+# unchanged, then turned back.
+LID_TILT = float(os.environ.get('LID_TILT', '.4887'))           # 28.0 deg: the eyes' measured outward facing (build LOG eye_axis)
+HEAD_SDF_W = head_sdf; FRONT_HIT_W = front_hit; GRAD_N_W = ns['grad_n']; EYE_XZ_W = ns['eye_xz']
+def Rz(phi):
+    c, s_ = math.cos(phi), math.sin(phi); return np.array([[c, -s_, 0], [s_, c, 0], [0, 0, 1.]])
+EYE_FRAME = {}
+for tag_, s_ in (('L', 1), ('R', -1)):
+    Sc_ = np.array([s_ * EX, float(FRONT_HIT_W(s_ * EX, EZ)[0]), EZ]); ax_ = GRAD_N_W(Sc_[None])[0]
+    EYE_FRAME[tag_] = {'Sc': Sc_, 's': s_, 'a_measured': math.atan2(s_ * ax_[0], -ax_[1]), 'Rw': Rz(s_ * LID_TILT), 'Rl': Rz(-s_ * LID_TILT)}
+def hinge(tag): return EYE_FRAME[tag]['Rw'] @ np.array([1., 0, 0])
+def to_world(q, tag):
+    f_ = EYE_FRAME[tag]; q = np.asarray(q, float); return f_['Sc'] + (q - f_['Sc']) @ f_['Rw'].T
+def to_local(p, tag):
+    f_ = EYE_FRAME[tag]; p = np.asarray(p, float); return f_['Sc'] + (p - f_['Sc']) @ f_['Rl'].T
+def rot_axis(V, Pv, axis, ang):
+    k = np.asarray(axis, float) / np.linalg.norm(axis); d = np.asarray(V, float) - Pv
+    c, s_ = math.cos(ang), math.sin(ang)
+    return Pv + d * c + np.cross(k, d) * s_ + np.outer(d @ k, k) * (1 - c)
+print('LID_TILT', LID_TILT, 'eye facing measured', {t: round(EYE_FRAME[t]['a_measured'], 4) for t in 'LR'}, 'hinge L', hinge('L').round(4).tolist(), flush=True)
+HV_ = np.array([v.co[:] for v in head.data.vertices]); HT_ = [tuple(t.vertices) for t in head.data.loop_triangles]
+SWAP = {}; FRAME_FIT = {}
+EYE_S_W, OUTLINE_W, EYE_TREE_W = ns['eye_s'], outline_z, eye_tree
+EXW, EZW, EHWW, EHHW = EX, EZ, EHW, EHH
+# round 10: the lower lid, rebuilt for the 7c face (LID10, default on). The old one (a circle per column about a hinge ~0.5 m
+# off, tuned for the old face) couldn't follow the 28 deg-out eye: raised, its surface waved, a sliver of eye showed under it
+# and at the outer corner it floated ~1.5 cm off the eyeball, past the far cheek's silhouette in the 3/4 view. The game only
+# ever shows lidD at -0.10 (hidden) or the happy value (animator.js sets it, no tween), so the lid is built AT the happy angle
+# as the eyeball's own surface + 1.2 mm (the build's analytic eye: the ball + eye_h(sr) along its normal), from well under the
+# lower rim up to an arched edge (35 % of the opening at the centre, 20 % at the corners), and only the tilted hinge is
+# searched: behind the eye so it lowers, high enough that lowering also sinks it (hidden at -0.10), no higher than needed
+# (at -0.26, Rosie's entry today, it lifts off the eye a little).
+LID10 = os.environ.get('LID10', '1') == '1'
+ROWS_D10 = [0, .30, .55, .72, .84, .92, .965, .99, 1.0]
+LD10 = dict(T=-.24, OFF=.0012, NCOL=19, XMAX=1.08)
+def lower_lid10(tag):
+    s_ = 1 if tag == 'L' else -1; k = hinge(tag); Rl_ = EYE_FRAME[tag]['Rl']
+    Xs = np.linspace(-LD10['XMAX'], LD10['XMAX'], LD10['NCOL']); nr = len(ROWS_D10)
+    def surf(x, z):          # the eyeball surface + OFF (under the skin outside the opening), and its normal
+        x = np.asarray(x, float); z = np.asarray(z, float); y = FRONT_HIT_W(x, z); S = np.stack([x, y, z], -1); n = GRAD_N_W(S)
+        sr = EYE_S_W(s_, x, z)[0]; off = np.asarray(ns['eye_h'](sr), float) + LD10['OFF']
+        off = np.where(sr > 1, np.maximum(off, -.005), off)
+        # round 10b: across the rim (sr 0.97-1.05) it stands 0.5 mm over the skin, covering the skin's lip there (in the game the
+        # lip drew a thin seam round the eye where the lid met it), then dives back under the cheek
+        rim_b = smooth(.90, .97, sr) * (1 - smooth(1.05, 1.13, sr)); off = np.maximum(off, .0005 * rim_b - .006 * (1 - rim_b))
+        return S + n * off[:, None], n
+    G = np.zeros((len(Xs), nr, 3)); N = np.zeros_like(G); ARC = np.zeros((len(Xs), nr))
+    for i, X in enumerate(Xs):
+        x = s_ * EXW + s_ * EHWW * X; Xc = float(np.clip(X, -.999, .999))
+        zl, zt = float(OUTLINE_W(Xc, False)), float(OUTLINE_W(Xc, True))
+        frac = .35 - .15 * min(abs(X) / .90, 1.) ** 2                      # the arch: 35 % at the centre, 20 % at the corners
+        ztop = zl + (zt - zl) * frac if abs(X) < .97 else zl - .006 * (abs(X) - .97) / .11
+        zbot = zl - float(os.environ.get('LD10_BOT', '.22')) * EHHW          # (tucked ~1.8 cm under the rim at the happy angle)
+        zz = zbot + (ztop - zbot) * np.array(ROWS_D10)
+        Pp, nn = surf(np.full(nr, x), zz); G[i] = Pp; N[i] = nn
+        seg = np.r_[0, np.linalg.norm(np.diff(Pp, axis=0), axis=1)]; ARC[i] = seg[::-1].cumsum()[::-1]       # distance down from the edge
+    Gf = G.reshape(-1, 3); Nf = N.reshape(-1, 3); Sc_ = EYE_FRAME[tag]['Sc']
+    def hidden_margin(V):    # >0: hidden (mm-scale signed margin; behind the eye over the opening, under the skin outside)
+        sd = HEAD_SDF_W(V); sr = EYE_S_W(s_, V[:, 0], V[:, 2])[0]
+        def esd_w(p_):
+            loc, nrm, idx, dist = EYE_TREE_W[tag].find_nearest(Vector(p_), .3)
+            return .3 if loc is None else (dist if (Vector(p_) - loc).dot(nrm) >= 0 else -dist)
+        es = np.array([esd_w(p_) if r_ < 1.05 else -1. for p_, r_ in zip(V, sr)])
+        return np.minimum(-sd, np.where(sr < 1.05, -es, 9.))
+    best = None; table = []
+    # the hinge: 0.30 m behind the eye's surface centre, 0.05 m above the arched edge (in the eye's frame), from the search
+    # below (LD10_SEARCH=1; its hidden margin over-counts the rim band where the eye dips under the skin, so the rig's own
+    # checks decide: hidden at 0 and -0.10 by the skin field and by the camera rays, clean at -0.24 / -0.26)
+    grid = ((.12, .16, .20, .25, .30, .40), (.05, .08, .12, .16, .22, .30)) if os.environ.get('LD10_SEARCH') else ((.30,), (.05,))
+    for D in grid[0]:
+        for H in grid[1]:
+            pl = np.array([0., D, H]); piv = Sc_ + np.array([0, 0, float(np.mean(G[:, -1, 2])) - Sc_[2]]) + pl @ EYE_FRAME[tag]['Rw'].T
+            V10 = rot_axis(Gf, piv, k, -.10 - LD10['T']); V0 = rot_axis(Gf, piv, k, -LD10['T'])
+            m = min(float(hidden_margin(V10).min()), float(hidden_margin(V0).min()))
+            V26 = rot_axis(Gf, piv, k, -.26 - LD10['T']); sd26 = HEAD_SDF_W(V26); sr26 = EYE_S_W(s_, V26[:, 0], V26[:, 2])[0]
+            out26 = float(np.where(sr26 > 1.02, sd26, -1).max())
+            score = (0 if m > .0008 else 10 + (.0008 - m) * 1000) + max(out26, 0) * 1000 + H
+            table.append((D, H, round(m * 1000, 1), round(out26 * 1000, 1)))
+            if best is None or score < best[0]: best = (score, D, H, piv, m, out26)
+    print('LID10_TABLE', tag, table, flush=True)
+    score, D, H, piv, m, out26 = best
+    Vrest = rot_axis(Gf, piv, k, -LD10['T']); Nrest = rot_axis(Nf, np.zeros(3), k, -LD10['T'])
+    print('LID10', tag, json.dumps({'D': D, 'H': H, 'pivot': [round(float(v), 4) for v in piv], 'hidden_margin_mm_at_-0.10_and_0': round(m * 1000, 2),
+                                    'max_out_of_skin_mm_at_-0.26': round(out26 * 1000, 2)}), flush=True)
+    UVs = [(i / (len(Xs) - 1), t) for i in range(len(Xs)) for t in ROWS_D10]
+    fs = [(i * nr + j, (i + 1) * nr + j, (i + 1) * nr + j + 1, i * nr + j + 1) for i in range(len(Xs) - 1) for j in range(nr - 1)]
+    # handed back in the eye's frame (lid_shell turns it to the head)
+    paint = {'G': to_local(Gf, tag).reshape(G.shape), 'arc': ARC, 'X': Xs, 'rows': np.array(ROWS_D10), 'dark': np.zeros(len(Xs))}
+    cols = [(float(G[i, -1, 0]), float(np.linalg.norm(G[i, -1] - piv)), 0, 0) for i in range(len(Xs))]
+    return (to_local(Vrest, tag).tolist(), UVs, fs, to_local(piv, tag), cols, LD10['T'], (Nrest @ Rl_.T).tolist(), None, paint)
+def enter(tag):
+    f_ = EYE_FRAME[tag]; s_ = f_['s']; g = globals()
+    def hsdf_l(q):
+        q = np.asarray(q, float); return np.asarray(HEAD_SDF_W(to_world(q.reshape(-1, 3), tag))).reshape(q.shape[:-1])
+    def front_hit_l(x, z, f=None): return FRONT_HIT_W(x, z, f if f is not None else hsdf_l)
+    def grad_n_l(p, f=None, e=1.5e-4): return GRAD_N_W(p, f if f is not None else hsdf_l, e)
+    sk_t = BVHTree.FromPolygons([Vector(p) for p in to_local(HV_, tag)], HT_)
+    eo = OBJ['Rosie_eye_' + tag]; EVl = to_local(np.array([list(v.co) for v in eo.data.vertices]), tag)
+    ey_t = BVHTree.FromPolygons([Vector(p) for p in EVl], [tuple(p.vertices) for p in eo.data.polygons])
+    ps = np.linspace(0, 2 * math.pi, 120, endpoint=False); rx, rz = EYE_XZ_W(s_, ps)       # the opening's rim, in the eye's frame
+    rim = to_local(np.stack([rx, FRONT_HIT_W(rx, rz), rz], -1), tag)
+    EXl = abs(float(rim[:, 0].max() + rim[:, 0].min()) / 2); EZl = float(rim[:, 2].max() + rim[:, 2].min()) / 2
+    EHWl = float(rim[:, 0].max() - rim[:, 0].min()) / 2; EHHl = float(rim[:, 2].max() - rim[:, 2].min()) / 2
+    def eye_xz_l(side, psi, k=1.0):
+        ux, uz = ns['eye_unit'](psi); return side * EXl + side * EHWl * k * ux, EZl + EHHl * k * uz
+    def eye_s_l(side, x, z):
+        X = side * (np.asarray(x) - side * EXl) / EHWl; Z = (np.asarray(z) - EZl) / EHHl
+        return (np.abs(X) ** EN + np.abs(Z) ** EN) ** (1 / EN), np.arctan2(Z, X), X, Z
+    srr = eye_s_l(s_, rim[:, 0], rim[:, 2])[0]
+    # the turned rim isn't quite a superellipse (+-4.5 %): the lids' key heights (top / lower rim per column) follow the true rim
+    Xr = s_ * (rim[:, 0] - s_ * EXl) / EHWl; up_ = rim[:, 2] >= EZl
+    oT = np.argsort(Xr[up_]); oB = np.argsort(Xr[~up_])
+    XT, ZT = Xr[up_][oT], rim[up_, 2][oT]; XB, ZB = Xr[~up_][oB], rim[~up_, 2][oB]
+    def outline_z_l(X, top):
+        X = np.asarray(X, float); return np.interp(X, XT, ZT) if top else np.interp(X, XB, ZB)
+    SWAP['outline_z'] = g['outline_z']; g['outline_z'] = outline_z_l
+    FRAME_FIT[tag] = {'EX_EZ_EHW_EHH_local': [round(v, 4) for v in (EXl, EZl, EHWl, EHHl)], 'world': [round(v, 4) for v in (EX, EZ, EHW, EHH)],
+                      'rim_sr_min_max': [round(float(srr.min()), 4), round(float(srr.max()), 4)]}
+    for k_, v_ in (('front_hit', front_hit_l), ('head_sdf', hsdf_l), ('skin_tree', sk_t), ('eye_tree', {tag: ey_t}),
+                   ('EX', EXl), ('EZ', EZl), ('EHW', EHWl), ('EHH', EHHl)):
+        SWAP[k_] = g[k_]; g[k_] = v_
+    for k_, v_ in (('eye_s', eye_s_l), ('eye_xz', eye_xz_l), ('grad_n', grad_n_l)):
+        SWAP['ns:' + k_] = ns[k_]; ns[k_] = v_
+    rx_, rz_ = eye_xz_l(s_, np.linspace(0, 2 * math.pi, 72, endpoint=False), 1.02)
+    SWAP['RIM_N'] = dict(RIM_N); RIM_N[tag] = (np.stack([rx_, rz_], -1), grad_n_l(np.stack([rx_, front_hit_l(rx_, rz_), rz_], -1)))
+    print('EYE_FRAME', tag, json.dumps(FRAME_FIT[tag]), flush=True)
+def leave():
+    g = globals()
+    for k_, v_ in SWAP.items():
+        if k_.startswith('ns:'): ns[k_[3:]] = v_
+        elif k_ == 'RIM_N': RIM_N.clear(); RIM_N.update(v_)
+        else: g[k_] = v_
+    SWAP.clear()
+def sweep_world(V, piv, tag, angs, upper=True):
+    """the LID_SWEEP measure in world space (the painted band and the opening are world front-projection shapes): per angle
+    [flaps off the band, flaps on the band, holes, worst flap mm, floating > 4 mm over the eye, worst float mm]"""
+    s_ = 1 if tag == 'L' else -1; out = {}; k = hinge(tag); V = np.asarray(V, float)
+    for a in angs:
+        Vr = rot_axis(V, piv, k, a)
+        sd = head_sdf(Vr); sr, psi_, X_, Z_ = ns['eye_s'](s_, Vr[:, 0], Vr[:, 2])
+        th = ns['lash_th'](psi_); band = (Z_ > -.05) & (sr <= 1.05 + th)
+        esd = np.array([eye_sd(p, tag) for p in Vr])
+        near = sd > -.006
+        flap = (sr > 1.02) & (sd > .0003) & ~band
+        flap_b = (sr > 1.02) & (sd > .0003) & band
+        hole = (sr < .97) & (esd < -.0002) & near
+        flt = (sr < 1.0) & (esd > .004)            # round 10: over the eye, floating more than 4 mm off it
+        out[float(round(a, 3))] = [int(flap.sum()), int(flap_b.sum()), int(hole.sum()), round(float(sd[flap].max()) * 1000, 1) if flap.any() else 0,
+                                   int(flt.sum()), round(float(esd[sr < 1.0].max()) * 1000, 1) if (sr < 1.0).any() else 0]
+    return out
+if os.environ.get('LID_SCAN'):        # dev: scan the upper hinge (L8_YB x L8_ZO) in the tilted frame, print the sweep, stop
+    yb_s, zo_s = os.environ['LID_SCAN'].split(';')
+    for yb in [float(v) for v in yb_s.split(',')]:
+        for zo in [float(v) for v in zo_s.split(',')]:
+            L8['YB'], L8['ZO'] = yb, zo
+            enter('L')
+            try:
+                V_, UV_, fs_, piv_, cols_, tgt_, N_, clo_, pt_ = upper_lid8('L')
+            finally:
+                leave()
+            Vw = to_world(np.array(V_), 'L'); pw = to_world(np.array(piv_), 'L')
+            sw = sweep_world(Vw, pw, 'L', np.round(np.linspace(0, 1.22, 13), 3))
+            nr_ = len(ROWS8); fl = {}
+            for a in (1.22, 1.017, .61):
+                Vr = rot_axis(Vw, pw, hinge('L'), a); sd = head_sdf(Vr); sr, psi_, X_, Z_ = ns['eye_s'](1, Vr[:, 0], Vr[:, 2])
+                band = (Z_ > -.05) & (sr <= 1.05 + ns['lash_th'](psi_)); f = np.where((sr > 1.02) & (sd > .0003) & ~band)[0]
+                fl[a] = [(int(k // nr_), int(k % nr_), round(float(sd[k]) * 1000, 1), round(float(X_[k]), 2), round(float(Z_[k]), 2)) for k in f[np.argsort(-sd[f])][:8]]
+            print('SCANFLAPS', yb, zo, json.dumps(fl), 'cols', [round(float(x), 2) for x in [c[0] for c in cols_]], flush=True)
+            rest = rot_axis(Vw, pw, hinge('L'), 0.); sd0 = head_sdf(rest)
+            # round 10b: how far a rigid normal must be from the skin's in one held pose to match it in the other (shut vs squint),
+            # over the vertices that show in both
+            def nb_at(a_):
+                Vs_ = rot_axis(Vw, pw, hinge('L'), a_); Q_ = Vs_.copy()
+                for _ in range(3): Q_ = Q_ - head_sdf(Q_)[:, None] * ns['grad_n'](Q_)
+                vis_ = (head_sdf(Vs_) > -.0012) | (ns['eye_s'](1, Vs_[:, 0], Vs_[:, 2])[0] < 1.0)
+                return rot_axis(ns['grad_n'](Q_), np.zeros(3), hinge('L'), -a_), vis_
+            n1, v1 = nb_at(1.22); n2, v2 = nb_at(.488); both = v1 & v2
+            mis = np.degrees(np.arccos(np.clip((n1 * n2).sum(1), -1, 1)))[both]
+            print('SCAN', json.dumps({'YB': yb, 'ZO': zo, 'mismatch_deg_mean_p90': [round(float(mis.mean()), 1), round(float(np.percentile(mis, 90)), 1)] if both.any() else None, 'n_both': int(both.sum()), 'closure_mm': round(clo_[0] * 1000, 2), 'squint_cov_SQ': round(clo_[1], 3),
+                                      'standoff_mm': round(clo_[2] * 1000, 1), 'rest_max_sd_mm': round(float(sd0.max()) * 1000, 2),
+                                      'flaps': sum(v[0] for v in sw.values()), 'flap_max_mm': max(v[3] for v in sw.values()),
+                                      'holes': sum(v[2] for v in sw.values()), 'sweep': sw}), flush=True)
+    sys.exit(0)
 for tag in 'LR':
-    P['lidU_' + tag] = lid_shell(tag, True)
-    P['lidD_' + tag] = lid_shell(tag, False)
+    enter(tag)
+    try:
+        P['lidU_' + tag] = lid_shell(tag, True)
+        P['lidD_' + tag] = lid_shell(tag, False)
+    finally:
+        leave()
+
+# round 10: the tilted lids' corners. Shut (and near it) the end columns' edges stood 4-8 mm proud of the skin just outside the
+# opening's inner and outer corners. Each such vertex is pulled toward its hinge axis (only radii shrink; the shell stays rigid,
+# the shrink smoothed over the lid grid) until it is under the skin at every swept angle, but never below the visible eyeball
+# at any angle where it passes over the opening (no holes).
+def cap_shell(o, bname, angs, nr, tol_cols=None):
+    tag = bname[-1]; s_ = 1 if tag == 'L' else -1; piv = np.array(P[bname]); k = hinge(tag)
+    V = np.array([list(v.co) for v in o.data.vertices]); c = V - piv; ax = np.outer(c @ k, k); rad = c - ax
+    tol = np.repeat(np.asarray(tol_cols, float), nr) if tol_cols is not None else np.full(len(V), -.0004)
+    r = np.linalg.norm(rad, axis=1); u = rad / r[:, None]; nc_ = len(V) // nr
+    floor = np.full(len(V), -9.)
+    for a in np.linspace(min(angs), max(angs), 25):
+        ua = rot_axis(u, np.zeros(3), k, a)
+        for i in range(len(V)):
+            o_ = piv + ax[i] + ua[i] * (r[i] + .06); h = eye_tree[tag].ray_cast(Vector(o_), Vector(-ua[i]), r[i] + .06)
+            if h[0] is not None and float(ns['eye_s'](s_, h[0].x, h[0].z)[0]) < 1.0: floor[i] = max(floor[i], r[i] + .06 - h[3] + .0008)
+    raw = np.zeros(len(V))
+    for it in range(8):
+        moved = 0
+        for a in angs:
+            Vr = piv + ax + rot_axis(u, np.zeros(3), k, a) * (r - raw)[:, None]
+            sd = head_sdf(Vr); sr, psi_, X_, Z_ = ns['eye_s'](s_, Vr[:, 0], Vr[:, 2])
+            band = (Z_ > -.05) & (sr <= 1.05 + ns['lash_th'](psi_))
+            bad = (sd > tol) & (sr > 1.02) & ~band
+            raw[bad] += sd[bad] - tol[bad] + .0004; moved += int(bad.sum())
+        if not moved: break
+    sh = raw.reshape(nc_, nr).copy()
+    for _ in range(10):
+        p_ = np.pad(sh, 1, mode='edge'); sh = .2 * (p_[1:-1, 1:-1] + p_[:-2, 1:-1] + p_[2:, 1:-1] + p_[1:-1, :-2] + p_[1:-1, 2:])
+        sh = np.maximum(sh, raw.reshape(nc_, nr))
+    r_new = np.maximum(r - sh.ravel(), np.minimum(floor, r))
+    for v, p_ in zip(o.data.vertices, piv + ax + u * r_new[:, None]): v.co = Vector(p_)
+    o.data.update()
+    return {'pulled': int((sh.ravel() > 1e-6).sum()), 'max_shrink_mm': round(float((r - r_new).max()) * 1000, 2),
+            'floor_limited': int(((r - sh.ravel()) < floor - 1e-6).sum())}
+# ... and over the eye: a rigid shell can't follow the eyeball where it wraps round the side of the ball, so at the outer corner the
+# raised lower lid floated ~1.5 cm off the eye and stood past the far cheek's silhouette in the 3/4 view. At its working angles
+# every vertex over the visible eye comes in to at most HUG_OFF off the eyeball (radii only; smoothed; never behind the visible
+# eye at any angle of its sweep).
+HUG_OFF = float(os.environ.get('HUG_OFF', '.004'))
+def d_eye_along(V, piv, k, a, tag):
+    s_ = 1 if tag == 'L' else -1; c = V - piv; ax = np.outer(c @ k, k); rad = c - ax; r = np.linalg.norm(rad, axis=1); u = rad / r[:, None]
+    ua = rot_axis(u, np.zeros(3), k, a); d = np.full(len(V), -1.)
+    for i in range(len(V)):
+        o_ = piv + ax[i] + ua[i] * (r[i] + .06); h = eye_tree[tag].ray_cast(Vector(o_), Vector(-ua[i]), r[i] + .06)
+        if h[0] is not None and float(ns['eye_s'](s_, h[0].x, h[0].z)[0]) < 1.0: d[i] = r[i] + .06 - h[3]
+    return d, ax, r, u
+def hug_shell(o, bname, hug_angs, keep_angs, nr):
+    tag = bname[-1]; piv = np.array(P[bname]); k = hinge(tag); V = np.array([list(v.co) for v in o.data.vertices]); nc_ = len(V) // nr
+    need = np.zeros(len(V)); floor = np.full(len(V), -9.)
+    for a in sorted(set(list(hug_angs) + list(keep_angs))):
+        d, ax, r, u = d_eye_along(V, piv, k, a, tag)
+        floor = np.where(d > 0, np.maximum(floor, d + .0008), floor)
+        if a in hug_angs: need = np.where(d > 0, np.maximum(need, r - (d + HUG_OFF)), need)
+    # per column: the least shrink any of its rows over the eye asks for (so no row comes nearer the eye than HUG_OFF), each
+    # column staying one clean arc; smoothed across the columns (a per-vertex hug cut the coarse rows into the eye's bulge)
+    need = need.reshape(nc_, nr); over = (floor > 0).reshape(nc_, nr) & (need > 0)
+    col = np.array([need[i][over[i]].min() if over[i].any() else 0. for i in range(nc_)])
+    for _ in range(4): col = np.minimum(col, .25 * np.r_[col[0], col[:-1]] + .5 * col + .25 * np.r_[col[1:], col[-1]])
+    sh = np.repeat(col[:, None], nr, 1)
+    r_new = np.minimum(r, np.maximum(r - sh.ravel(), floor))
+    for v, p_ in zip(o.data.vertices, piv + ax + u * r_new[:, None]): v.co = Vector(p_)
+    o.data.update()
+    return {'hugged': int((r - r_new > 1e-5).sum()), 'max_shrink_mm': round(float((r - r_new).max()) * 1000, 2), 'want_max_mm': round(float(need.max()) * 1000, 1)}
+def lid_visible(Q, tag):
+    """a lid point that can show: at or outside the skin, or over the eye's opening (in front of the eye)"""
+    s_ = 1 if tag == 'L' else -1
+    return (head_sdf(Q) > -.0012) | (ns['eye_s'](s_, Q[:, 0], Q[:, 2])[0] < 1.0)
+LID_CAPS = {}
+for o, b in lid_objects:
+    up_ = b.startswith('lidU'); nr_ = len(ROWS8) if up_ else len(ROWS_D)
+    sweep_a = list(np.round(np.linspace(0, 1.22, 13), 3)) if up_ else [-.10, -.18, -.24, -.26]
+    # the lower lid is only ever shown at -0.10 (hidden) and the happy value (animator.js sets it, no tween: -0.24, Rosie's entry
+    # -0.26), so it hugs and is floored at those two; the upper lid sweeps the whole blink, so its floor covers squint..shut
+    # (the upper lid isn't hugged: it sweeps the blink, and hugging it at the squint tore its edge along the lash band)
+    if not up_ and LID10: nr_ = len(ROWS_D10)
+    hug = None if (up_ or LID10) else hug_shell(o, b, [-.24, -.26], [-.24, -.26], nr_)
+    # the columns past the inner corner (X <= -0.97) cover the skin's inner lip and the lash band's inner end by design (shut,
+    # under the skin it showed as a dark toon sliver hooking up from the lash line): they may stand 0.6 mm over the skin
+    tc = [(.0006 if X_ <= -.965 else -.0004) for X_ in LID_PAINT['lidU']['X']] if up_ else None
+    LID_CAPS[o.name] = {'hug': hug, 'cap': cap_shell(o, b, sweep_a, nr_, tc)}
+print('LID_CAPS', json.dumps(LID_CAPS), flush=True)
+# round 10: shut, the upper lid's inner corner showed a dark toon sliver: there its blink-averaged shading normals leaned up to
+# tens of degrees off the skin's (those vertices sit by the skin through much of the blink). Where a vertex's normal is more than
+# ~8 deg off the skin ball's normal under it at the shut pose, it blends to that normal (carried back to rest).
+def fix_lid_normals(o, bname, nr, poses=((1.22, 1.),)):
+    """round 10b: each lid vertex's shading normal is the skin ball's normal under it, carried back to rest, averaged over the
+    poses the game holds still where that vertex shows (the upper lid: shut and the squint), then smoothed over the lid grid.
+    (The blink-averaged normals, and a shut-only fix at the skin, left steps the game's toon band showed where its light
+    grazes: a pale raised disc on her right eye shut, pale squint patches.)"""
+    tag = bname[-1]; piv = np.array(P[bname]); k = hinge(tag); me = o.data
+    V = np.array([list(v.co) for v in me.vertices]); acc = np.zeros_like(V); wsum = np.zeros(len(V)); n_sh = None; per = []
+    for a, wt in poses:
+        Vs = rot_axis(V, piv, k, a); Q = Vs.copy()
+        for _ in range(3): Q = Q - head_sdf(Q)[:, None] * ns['grad_n'](Q)
+        nb = rot_axis(ns['grad_n'](Q), np.zeros(3), k, -a)
+        if n_sh is None: n_sh = nb
+        vis = lid_visible(Vs, tag); wv = wt * vis.astype(float); acc += wv[:, None] * nb; wsum += wv; per.append((a, nb, vis))
+    nn = np.where(wsum[:, None] > 0, acc, n_sh); nn /= np.linalg.norm(nn, axis=1, keepdims=True)
+    G = nn.reshape(-1, nr, 3)
+    for _ in range(2):
+        p_ = np.pad(G, ((1, 1), (1, 1), (0, 0)), mode='edge')
+        G = .5 * G + .125 * (p_[:-2, 1:-1] + p_[2:, 1:-1] + p_[1:-1, :-2] + p_[1:-1, 2:])
+        G /= np.linalg.norm(G, axis=2, keepdims=True)
+    nn = G.reshape(-1, 3)
+    out = {'shown_in_both': int(sum(1 for i in range(len(V)) if all(p_[2][i] for p_ in per)))}
+    for a, nb, vis in per:            # how far the final normal is from the skin's, where the lid shows, per held pose
+        dv = np.degrees(np.arccos(np.clip((nn * nb).sum(1), -1, 1)))[vis]
+        out['dev_at_%.3f' % a] = {'n': int(vis.sum()), 'mean': round(float(dv.mean()), 1), 'p90': round(float(np.percentile(dv, 90)), 1), 'max': round(float(dv.max()), 1)}
+    lv = np.empty(len(me.loops), np.int64); me.loops.foreach_get('vertex_index', lv)
+    me.normals_split_custom_set([tuple(nn[i]) for i in lv])
+    return out
+# round 10b (judged in the game): a rigid lid can't carry one normal that matches the skin both shut and at the squint (Rosie's face is
+# nearly flat across the eye's travel, so the two poses ask for normals ~37 deg apart whatever the hinge; scan3). The shut lid gets the
+# skin's exact normals (blink and sleep read as flush skin), and the happy squint comes mostly from the lower lid (exact at -0.24),
+# with the upper lid at 0.30, on the lash band. LID_SQ_W > 0 blends the squint pose in (1: half the error in each pose).
+LID_SQ_W = float(os.environ.get('LID_SQ_W', '0'))
+LID_NFIX = {o.name: fix_lid_normals(o, b, len(ROWS8), ((1.22, 1.), (L8['SQ'], LID_SQ_W))) for o, b in lid_objects if b.startswith('lidU')}
+print('LID_NFIX', json.dumps(LID_NFIX), flush=True)
 
 # the lid charts: her own face paint (without the upper lash band) under each lid point at its target pose, so a
 # closed or squinting lid is the skin it covers; the upper lid carries the thick lash line on its edge, the lower a
@@ -515,11 +834,22 @@ def paint_lids():
             F = np.asarray(F); e = (Ellipsis,) + (None,) * (F.ndim - 2)
             return (F[i0, j0] * ((1 - a) * (1 - b))[e] + F[i0 + 1, j0] * (a * (1 - b))[e]
                     + F[i0, j0 + 1] * ((1 - a) * b)[e] + F[i0 + 1, j0 + 1] * (a * b)[e])
-        Pp = bil(G).reshape(-1, 3); arc = bil(A); Xc = info['X'][i0] * (1 - a) + info['X'][i0 + 1] * a
-        d = Pp - ns['O']; d /= np.linalg.norm(d, axis=1, keepdims=True)
-        uv = ns['head_uv'](d)
-        ns['PAINT_OPTS']['band'] = False; ns['PAINT_OPTS']['blush'] = False
-        C = np.asarray(ns['paint_head'](uv[:, 0], uv[:, 1])).reshape(h, w, 3)
+        Pp = to_world(bil(G).reshape(-1, 3), info['tag']); arc = bil(A); Xc = info['X'][i0] * (1 - a) + info['X'][i0 + 1] * a
+        # round 10b (the game's renderer): a rigid lid texel lies over different skin in each pose the game holds still (the
+        # upper lid: shut 1.22 and the squint; the lower: its happy angle only), so it takes the skin's own paint (blush on: the
+        # blush reaches into the bottom of the opening) averaged over the poses where it shows. Painted at the shut pose alone
+        # with the blush off, the squinting lid read as a pale patch with a hard top edge in the game
+        tg_ = info['tag']; k_ = hinge(tg_); pw_ = to_world(info['pivot_l'], tg_)
+        poses = [(info['target'], 1.)] + ([(L8['SQ'], 1.)] if chart == 'lidU' else [])
+        ns['PAINT_OPTS']['band'] = False; ns['PAINT_OPTS']['blush'] = True
+        acc = np.zeros((len(Pp), 3)); wsum = np.zeros(len(Pp))
+        for ang, wt in poses:
+            Q = rot_axis(Pp, pw_, k_, ang - info['target'])
+            d = Q - ns['O']; d /= np.linalg.norm(d, axis=1, keepdims=True); uv = ns['head_uv'](d)
+            Ck = np.asarray(ns['paint_head'](uv[:, 0], uv[:, 1])).reshape(-1, 3)
+            wk = wt * lid_visible(Q, tg_).astype(float) + (1e-3 if ang == info['target'] else 0.)
+            acc += wk[:, None] * Ck; wsum += wk
+        C = (acc / wsum[:, None]).reshape(h, w, 3)
         ns['PAINT_OPTS']['band'] = True; ns['PAINT_OPTS']['blush'] = True
         # her skin as it renders around the socket: the lids carry the eye's (more lit) orientation, so their albedo is
         # set a touch deeper to read as the same skin under the same light
@@ -615,6 +945,16 @@ def face_weights(p, lab, kind):
     neck = sm(-.02, -.11, zl) * sm(.30, .42, b)
     return {'lip_' + side: lip, 'jaw': (1 - lip) * jw, 'neck': (1 - lip) * (1 - jw) * neck, 'head': (1 - lip) * (1 - jw) * (1 - neck)}
 
+# the hanging ringlets (feedback-8). Round 10, the director's call (2026-10-28): they stay round, whole coils that swing with the
+# head, so every ringlet is rigid to the head (RINGLET_BLEND 0; the blend machinery is kept for RINGLET_BLEND=1 experiments).
+# Any head -> neck / chest hand-over has to absorb ~15 cm of shear at a 0.6 turn and drew the coils into thin diagonal strands
+# across her back (tried: z 0.77 -> 0.63 at 100 %, 60 %, a 0.80 -> 0.60 ramp; the ones that cleared the sleeves all smeared the
+# spiral). The cost: at the full +-0.6 turn the front side pair touches the sleeve tops (ringclear in rig_tests.py measures it).
+RINGLET_Z = dict(body_lo=.630, body_hi=.770, chest_lo=.600, chest_hi=.690)
+RINGLET_BLEND = {k_: float(os.environ.get('RINGLET_BLEND', '0')) for k_ in ('ringlet_00', 'ringlet_01', 'ringlet_02', 'ringlet_03', 'ringlet_04', 'ringlet_05', 'ringlet_06')}
+def ringlet_w(p, lab='ringlet_00'):
+    z = p[2]; body = RINGLET_BLEND.get(lab, 0.) * (1 - sm(RINGLET_Z['body_lo'], RINGLET_Z['body_hi'], z)); chest = 1 - sm(RINGLET_Z['chest_lo'], RINGLET_Z['chest_hi'], z)
+    return {'head': 1 - body, 'neck': body * (1 - chest), 'chest': body * chest}
 def body_weights(p, lab):
     x, y, z = p; side = 'L' if x >= 0 else 'R'
     if lab.endswith('.L') or lab.endswith('.1'): side = 'L'
@@ -707,11 +1047,19 @@ for f in bm.faces:
     if f.normal.dot(f.calc_center_median() - cc) > 0: f.normal_flip()        # faces look into the pocket
 bm.to_mesh(mouth.data); bm.free()
 ty = rim[len(rim) // 2][1] + .030              # far enough back that it never shows through the closed lip
-tongue_c = (0, ty, MZ - .018 * W)
+tongue_c = (0, ty, MZ - .014 * W)       # round 9: a touch higher and shorter, clear of the shallower under-chin
 ns['parts']['head'] = []
-tongue = ns['sphere']('Rosie_tongue', tongue_c, (.060 * W, .045 * W, .012 * W), 'tongue', 'head', 12, 6)
+tongue = ns['sphere']('Rosie_tongue', tongue_c, (.060 * W, .040 * W, .011 * W), 'tongue', 'head', 12, 6)
 for l in tongue.data.uv_layers.active.data: l.uv = au('tongue', .5, .5)
 tongue.data.materials.clear(); tongue.data.materials.append(MAT)
+# round 10: on the 7c face the under-chin is short; the tongue shrinks toward its own centre until it sits >= 1.2 mm inside the skin
+TONGUE_FIT = 1.0
+for _ in range(12):
+    TV = np.array([list(v.co) for v in tongue.data.vertices])
+    if float(head_sdf(TV).max()) < -.0012: break
+    for v in tongue.data.vertices: v.co = Vector(tongue_c) + (v.co - Vector(tongue_c)) * .96
+    TONGUE_FIT *= .96
+print('TONGUE_FIT', round(TONGUE_FIT, 4), 'max_sdf_mm', round(float(head_sdf(np.array([list(v.co) for v in tongue.data.vertices])).max()) * 1000, 2), flush=True)
 
 # ---------------------------------------------------------------- bind
 def bind(o, weights):
@@ -732,7 +1080,7 @@ for o in base_objects:
     pp = [tuple(v.co) for v in o.data.vertices]; lab = labels[o.name]
     if o.name == 'Rosie_head':
         kinds = vkind; weights = [face_weights(p, l, k) for p, l, k in zip(pp, lab, kinds)]
-    elif o.name == 'Rosie_hair': weights = [{'head': 1} for p in pp]
+    elif o.name == 'Rosie_hair': weights = [ringlet_w(p, l) if l.startswith('ringlet') else {'head': 1} for p, l in zip(pp, lab)]
     elif o.name.startswith('Rosie_eye_'): weights = [{'eye_' + o.name[-1]: 1} for p in pp]
     else: weights = [body_weights(p, l) for p, l in zip(pp, lab)]
     bind(o, weights); objects.append(o)
@@ -745,38 +1093,68 @@ for o in objects:
     o.data.calc_loop_triangles(); total += len(o.data.loop_triangles)
     assert len(o.modifiers) == 1 and o.modifiers[0].type == 'ARMATURE', o.name
     for v in o.data.vertices: assert 1 <= len(v.groups) <= 4 and abs(sum(g.weight for g in v.groups) - 1) < 1e-6, (o.name, v.index)
-print('TRI_TOTAL', total, flush=True); assert total <= 34000, total
+print('TRI_TOTAL', total, flush=True); assert total <= 38000, total     # round 9: 38k (the owner asked for the ringlets; Moka is 37.9k)
+RING_V = [i for i, l in enumerate(labels['Rosie_hair']) if l.startswith('ringlet')]
+(ROOT / 'rig_ringlets.json').write_text(json.dumps({'object': 'Rosie_hair', 'vertices': RING_V, 'weights_z_m': RINGLET_Z, 'blend': RINGLET_BLEND}))
 # hidden at rest: every lid vertex inside the head field (behind the skin or the eye), lower lids also at -0.10
 hidden = {}
 for o, bname in lid_objects:
     piv = np.array(P[bname]); V = np.array([list(v.co) for v in o.data.vertices])
     for ang in ([0.0] if bname.startswith('lidU') else [0.0, -.10]):
-        c, s_ = math.cos(ang), math.sin(ang); d = V - piv
-        Vr = np.stack([d[:, 0], d[:, 1] * c - d[:, 2] * s_, d[:, 1] * s_ + d[:, 2] * c], -1) + piv
+        Vr = rot_axis(V, piv, hinge(bname[-1]), ang)                 # round 10: about the tilted hinge
         sd = head_sdf(Vr); hidden[f'{o.name}@{ang}'] = {'max_sdf_mm': round(float(sd.max()) * 1000, 2), 'outside_count': int((sd > -.0005).sum())}
 # round 8: the whole sweep, not only rest / squint / shut (the Stella lesson): at each blink angle, lid vertices in front of
 # the skin outside the opening (flaps; on the painted lash band they're allowed to cover it) and vertices over the opening
 # behind the eye surface while their neighbours are in front (holes: the eye pokes through the lid)
 def lid_sweep(o, bname):
-    tag = bname[-1]; s_ = 1 if tag == 'L' else -1; piv = np.array(P[bname]); V = np.array([list(v.co) for v in o.data.vertices])
-    out = {}
-    angs = np.round(np.linspace(0, 1.22, 13), 3) if bname.startswith('lidU') else np.round([-.10, -.18, -.26], 3)
-    for a in angs:
-        c, s__ = math.cos(a), math.sin(a); d = V - piv
-        Vr = np.stack([d[:, 0], d[:, 1] * c - d[:, 2] * s__, d[:, 1] * s__ + d[:, 2] * c], -1) + piv
-        sd = head_sdf(Vr); sr, psi_, X_, Z_ = ns['eye_s'](s_, Vr[:, 0], Vr[:, 2])
-        th = ns['lash_th'](psi_); band = (Z_ > -.05) & (sr <= 1.05 + th)
-        esd = np.array([eye_sd(p, tag) for p in Vr])
-        near = sd > -.006
-        flap = (sr > 1.02) & (sd > .0003) & ~band
-        flap_b = (sr > 1.02) & (sd > .0003) & band
-        hole = (sr < .97) & (esd < -.0002) & near
-        out[float(a)] = [int(flap.sum()), int(flap_b.sum()), int(hole.sum()), round(float(sd[flap].max()) * 1000, 1) if flap.any() else 0]
-    return out
+    tag = bname[-1]; piv = np.array(P[bname]); V = np.array([list(v.co) for v in o.data.vertices])
+    angs = np.round(np.linspace(0, 1.22, 13), 3) if bname.startswith('lidU') else np.round([-.10, -.18, -.24, -.26], 3)
+    return sweep_world(V, piv, tag, angs)          # round 10: about the tilted hinge, in world space
 SWEEP = {o.name: lid_sweep(o, b) for o, b in lid_objects}
 print('LID_SWEEP', json.dumps(SWEEP), flush=True)
+# round 10: what the cameras see. Rays from the front and from the game camera (45 deg down, yaw 0 / +-45) at points over
+# each opening (shut: must all hit a lid, never the eye) and over the whole eye region (rest, lidD at -0.10: must never hit a lid)
+def lid_views():
+    LO = {b: o for o, b in lid_objects}; out = {}
+    skin_t = BVHTree.FromPolygons([v.co[:] for v in head.data.vertices], [tuple(p.vertices) for p in head.data.polygons])
+    def posed(b, a):
+        o = LO[b]; V = rot_axis(np.array([list(v.co) for v in o.data.vertices]), np.array(P[b]), hinge(b[-1]), a)
+        return BVHTree.FromPolygons([Vector(p) for p in V], [tuple(p.vertices) for p in o.data.polygons])
+    cams = {'front': Vector((0, 1, 0))}
+    for yaw in (0, 45, -45):
+        e, y_ = math.radians(45), math.radians(yaw)
+        cams['game%+d' % yaw] = -Vector((math.sin(y_) * math.cos(e), -math.cos(y_) * math.cos(e), math.sin(e)))
+    for tag, s_ in (('L', 1), ('R', -1)):
+        gx, gz = np.meshgrid(np.linspace(-1.3, 1.3, 53), np.linspace(-1.5, 1.6, 63))
+        X_, Z_ = s_ * EX + s_ * EHW * gx.ravel(), EZ + EHH * gz.ravel(); sr = ns['eye_s'](s_, X_, Z_)[0]
+        for state, (aU, aD) in (('shut', (1.22, -.10)), ('rest', (0., -.10)), ('bones_at_0', (0., 0.)), ('squint', (L8['SQ'], -.24)), ('happy_entry', (.40, -.26))):
+            T = {'eye': eye_tree[tag], 'skin': skin_t, 'lidU': posed('lidU_' + tag, aU), 'lidD': posed('lidD_' + tag, aD)}
+            res = {}
+            for cn, d in cams.items():
+                n_eye = n_lid = n_pts = 0
+                for x, z, r_ in zip(X_, Z_, sr):
+                    if state == 'shut' and r_ > .95: continue
+                    if state != 'shut' and r_ > 1.6: continue
+                    hp = eye_tree[tag].ray_cast(Vector((x, -1.5, z)), Vector((0, 1, 0)), 3)[0] if r_ <= 1 else skin_t.ray_cast(Vector((x, -1.5, z)), Vector((0, 1, 0)), 3)[0]
+                    if hp is None: continue
+                    o_ = hp - d * .5; best = (9., None)
+                    for nm, t_ in T.items():
+                        h = t_.ray_cast(o_, d, .6)
+                        if h[0] is not None and h[3] < best[0]: best = (h[3], nm)
+                    if best[1] is None: continue
+                    n_pts += 1
+                    if best[1] == 'eye' and (hp - o_).length - best[0] < .002: n_eye += 1     # (the eye point itself)
+                    if best[1] in ('lidU', 'lidD'): n_lid += 1
+                res[cn] = {'pts': n_pts, 'eye_seen': n_eye, 'lid_seen': n_lid}
+            out[f'{tag}_{state}'] = res
+    return out
+VIEWS = lid_views(); print('LID_VIEWS', json.dumps(VIEWS), flush=True)
 sd = head_sdf(np.array([list(v.co) for v in tongue.data.vertices]))
 hidden['Rosie_tongue@rest'] = {'max_sdf_mm': round(float(sd.max()) * 1000, 2), 'outside_count': int((sd > -.0005).sum())}
+CV = np.array([list(v.co) for v in mouth.data.vertices]); inner = np.array([j > 0 for lev in range(2) for j in range(D + 1) for _ in range(n)])
+sdc = head_sdf(CV[inner])          # round 10: the pocket behind the seam row stays inside the shallower lower face
+hidden['Rosie_mouth_cavity@rest'] = {'max_sdf_mm': round(float(sdc.max()) * 1000, 2), 'outside_count': int((sdc > -.0005).sum())}
+print('CAVITY', hidden['Rosie_mouth_cavity@rest'], flush=True)
 assert hidden['Rosie_tongue@rest']['outside_count'] == 0, hidden['Rosie_tongue@rest']
 # the normals the exporter reads (corner normals) vs the analytic skin normal, and what the toon light sees across each
 # triangle (the interpolated normal vs the analytic one under it), over the visible face
@@ -804,7 +1182,8 @@ arm.data.pose_position = 'POSE'
 bpy.context.scene.cursor.location = (0, 0, 0)
 bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'rosie-opus_rig.blend'))
 rig = {'bones': [{'name': b, 'parent': PARENT[b], 'head_blender_m': [round(float(c), 5) for c in P[b]]} for b in HERO],
-       'triangles': total, 'lids': lid_info, 'lids_hidden_check': hidden, 'normals': NORMALS, **LOG,
+       'triangles': total, 'lidTilt': LID_TILT, 'lid_hinge_blender': {t: [round(float(v), 5) for v in hinge(t)] for t in 'LR'},
+       'eye_frame_fit': FRAME_FIT, 'lid_sweep': SWEEP, 'tongue_fit': TONGUE_FIT, 'lid_caps': LID_CAPS, 'lid_normal_fix': LID_NFIX, 'lid_views': VIEWS, 'lids': lid_info, 'lids_hidden_check': hidden, 'normals': NORMALS, **LOG,
        'objects': {o.name: len(o.data.loop_triangles) for o in objects},
        'notes': ['Game axes: X = Blender +X, Y = Blender +Z, Z = Blender -Y; pose bones use YZX Euler = three.js XYZ.',
                  'Head pivot at the skull base (back of the neck, chin height), not the head centre.',

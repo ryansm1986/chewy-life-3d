@@ -45,6 +45,26 @@ export const POE_ACTIONS = {
     A.legL.x += lerp(-0.25 * w, 0.2, rl) * k; A.legR.x += lerp(0.15 * w, -0.25, rl) * k;
     A.sq += (0.07 * w * (1 - rl) - 0.08 * rl) * k; A.earKick += 3 * rl * k; A.tailWag = 2;
   } },
+  // Fūma Flurry: the fūma kept in her paw, whirling like a buzz-saw, through three quick cuts — a crouch with it cocked
+  // out to the right, a forehand whip across, a backhand back out on a skip, then a front flip with it overhead that
+  // lands in a chop straight down in front (cut3 on the landing), and a proud little "ta-da". Light and springy where
+  // Chewy's cuts are planted; the flip's roll is a full turn of the body (the fūma traces a vertical circle with it).
+  fumaFlurry: { dur: 0.62, ev: { cut1: 0.2, cut2: 0.43, cut3: 0.74 }, pose: (t, P, A) => {
+    const w = ease.outCubic(S(0, 0.15, t)), c1 = ease.outQuad(S(0.14, 0.22, t)), c2 = ease.outQuad(S(0.34, 0.45, t));
+    const lf = ease.inOutQuad(S(0.46, 0.56, t)), fl = S(0.5, 0.74, t), air = Math.sin(fl * Math.PI), ch = ease.inQuad(S(0.62, 0.75, t));
+    const land = bump(0.72, 0.88, t), r = ease.inOutQuad(S(0.8, 1, t)), k = 1 - r;
+    // the paw: cocked out right → whipped across → back out → up overhead (through the flip) → chopped down in front
+    A.armR.x += lerp(lerp(lerp(lerp(lerp(0, -1.45, w), -1.4, c1), -1.35, c2), -2.8, lf), -0.7, ch) * k;
+    A.armR.z += lerp(lerp(lerp(lerp(0, -1.15, w), 1.6, c1), -1.35, c2), -0.12, lf) * k;
+    A.armL.x += lerp(lerp(-0.55 * w, -0.25, c2), -1.6, lf) * k; A.armL.z += lerp(lerp(0.2 * w, -0.3, c1), 0.45, c2) * (1 - lf) * k + 0.5 * lf * k; // (the free paw: a guard, then flung out for balance)
+    A.body.y += lerp(lerp(lerp(0, 0.5, w), -0.7, c1), 0.6, c2) * (1 - lf) * k; A.body.x += (0.12 * c1 * (1 - c2) + 0.1 * c2 * (1 - lf) + 0.25 * land) * k;
+    A.head.y += lerp(lerp(-0.25 * w, 0.2, c1), -0.22, c2) * (1 - lf) * k; A.head.x += (-0.18 * lf * (1 - ch) + 0.12 * land) * k;
+    A.roll = ease.inOutQuad(fl) * Math.PI * 2; // (the front flip)
+    A.y += (-0.04 * w * (1 - c1) + 0.07 * bump(0.28, 0.48, t) - 0.05 * bump(0.44, 0.54, t) + 0.48 * air) * k;
+    A.legL.x += (-0.35 * bump(0.3, 0.5, t) - 1.0 * air) * k; A.legR.x += (0.25 * bump(0.3, 0.5, t) - 0.9 * air) * k;
+    A.sq += (0.08 * w * (1 - c1) - 0.05 * c1 * (1 - c2) - 0.05 * c2 * (1 - lf) + 0.12 * bump(0.44, 0.54, t) - 0.07 * air + 0.15 * land) * k;
+    A.earKick += (2 * c1 + 2.2 * c2 * (1 - lf) + 4.5 * air + 3 * land) * k; A.tailWag = 3; A.eyesHappy = t > 0.84 ? 1 : 0;
+  } },
   // the fūma comes home: a paw up, a snap and a proud little bounce
   fumaCatch: { dur: 0.36, ev: { catch: 0.18 }, pose: (t, P, A) => {
     const u = bump(0, 1, t), c = bump(0.15, 0.5, t);
@@ -216,7 +236,7 @@ export const POE_ACTIONS = {
   } },
 };
 /** the actions that root her (WASD won't walk out of them): player.js BUSY */
-export const POE_ROOTED = ['fumaSlash', 'fumaSlash2', 'fumaTwirl', 'fumaThrow', 'handSeal', 'shadowStepOut', 'shadowStrike',
+export const POE_ROOTED = ['fumaSlash', 'fumaSlash2', 'fumaTwirl', 'fumaThrow', 'fumaFlurry', 'handSeal', 'shadowStepOut', 'shadowStrike',
   'kunaiFan', 'stitchThrow', 'sawThrow', 'rainLeap', 'starSpin', 'puffSpit', 'thunderSlap', 'dragonSeal', 'crossSeal', 'swapSeal', 'dashRun', 'vanishSeal', 'backflip', 'brushFlick'];
 
 // ------------------------------------------------------------------ charge wind-ups (combat/charge.js plays 'charge'; chargePoses.js)
@@ -228,6 +248,15 @@ export const POE_CHARGE_POSES = {
     A.armR.x += (-1.05 - 0.2 * k) * e; A.armR.z += (1.55 + 0.1 * k) * e; A.armL.x += (-1.35 + 0.2 * k) * e; A.armL.z += (-0.25 - 0.5 * k) * e;
     A.body.y += (-0.75 - 0.25 * k) * e; A.body.x += -0.12 * e; A.head.y += (0.5 + 0.1 * k) * e;
     A.legL.x += -0.25 * e; A.legR.x += 0.15 * e; A.sq += (0.07 + 0.06 * k) * e; A.y += -0.03 * k * e; A.tailWag = 1.5;
+  },
+  // the fūma cocked out to her right in a low crouch, revving in her paw: a buzz that grows with the charge, the free
+  // paw out as a guard (fumaFlurry at u ≈ 0.14)
+  poeSaw(t, k, A, e) {
+    const buzz = Math.sin(t * (40 + 50 * k)) * 0.025 * k;
+    A.armR.x += (-1.3 + 0.1 * k + buzz) * e; A.armR.z += (-1.15 - 0.15 * k) * e; A.armL.x += (-0.55 - 0.2 * k) * e; A.armL.z += 0.2 * e;
+    A.body.y += (0.5 + 0.2 * k) * e; A.body.x += 0.1 * k * e; A.head.y += (-0.25 - 0.05 * k) * e;
+    A.sq += (0.08 + 0.07 * k) * e; A.y += (-0.04 - 0.05 * k) * e; A.legL.x += -0.2 * e; A.legR.x += 0.15 * e;
+    A.earKick += (0.6 + 1.6 * k) * e; A.tailWag = 1 + 2 * k;
   },
   // the kunai fanned between crossed paws at her chest (kunaiFan / stitchThrow at u ≈ 0.42)
   poeKunai(t, k, A, e) {

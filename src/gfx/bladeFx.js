@@ -1,5 +1,6 @@
 // Chewy the samurai's effects (docs/HEROES.md "Chewy the samurai"): the katana's swing trails (bone-white crescents
-// with a warm gold edge: samuraiPalette.js), Crescent Chomp's moon-shaped crescent and its charged wave, Flash Draw's cut line, the Kiai!
+// with a warm gold edge: samuraiPalette.js), Crescent Chomp's moon-shaped crescent and its charged wave, Swallow Return's
+// slash marks and its charged flying swallow, Flash Draw's cut line, the Kiai!
 // shout ring and burst, the sheathing glint and the chiburi flick. One BladeFX per VFX instance (the village's and each
 // Burrow floor's) through vfx.js' extension hook, like SpellFX / ChargeFX.
 // Readability (docs/CHARGE.md §4): everything is normal-blended (bone-white, the outfit's gold and a thin ink line read on any floor
@@ -212,6 +213,53 @@ export class BladeFX {
     }, () => { m.matrixAutoUpdate = true; this.give('line', m); });
   }
 
+  // ------------------------------------------------------------------ Swallow Return: the cut mark and the flying swallow
+  /** a white-hot slash mark across a struck foe: a short stroke along dir (world, unit: its wipe runs that way) centred
+   *  on at, turned to the camera round its own axis, drawn over the foe's body; a few sparks fly off along it */
+  slash(at, dir, { len = 1.2, width = 0.3, life = 0.24, wipe = 0.045, sparks = 5 } = {}) {
+    const m = this.take('slash', () => { const o = new THREE.Mesh(lineGeo(), this.mLine()); o.material.depthTest = false; o.renderOrder = 16; o.matrixAutoUpdate = false; return o; });
+    const U = m.material.uniforms; U.uK.value = 0; U.uWipe.value = 0; U.uA.value = 1;
+    len = Math.min(len, 3);
+    const dx = dir.x, dy = dir.y, dz = dir.z;
+    _a.set(dx, dy, dz).normalize(); _b.crossVectors(_a, CAM_F).normalize(); _c.crossVectors(_a, _b);
+    const x0 = at.x - _a.x * len * 0.5, y0 = at.y - _a.y * len * 0.5, z0 = at.z - _a.z * len * 0.5;
+    _m.makeBasis(_a.multiplyScalar(len), _b.multiplyScalar(width), _c);
+    m.matrix.copy(_m).setPosition(x0, y0, z0); m.matrixWorldNeedsUpdate = true;
+    const sp = this.spell;
+    for (let i = 0; i < sparks; i++) { const s = Math.random(), v = rand(1.5, 3.5); sp.pn.spawn({ frame: i % 2 ? F.SPARK : F.GLOWSTAR, x: x0 + dx * len * s, y: y0 + dy * len * s, z: z0 + dz * len * s, vx: dx * v + rand(-0.8, 0.8), vy: dy * v + rand(0.3, 1.4), vz: dz * v + rand(-0.8, 0.8), life: rand(0.2, 0.32), size: rand(0.14, 0.22), size1: 0.03, color: i % 3 ? CORE : EDGE, alpha: 1, alpha1: 0, drag: 2 }); }
+    this.run((dt, t) => { U.uWipe.value = Math.min(1, t / wipe); const k = Math.min(1, t / life); U.uK.value = k; return k < 1; }, () => this.give('slash', m));
+  }
+  /**
+   * A charged Swallow Return's swallow: a small bone-white crescent with swept-back wingtips (the trail shader's crescent
+   * moon, mode 1, lying flat at y), its wings beating, darting from origin along dir at speed for len m, with a streamer
+   * of sparks off each wingtip. onStep(a, b) sweeps the hits along each frame's stretch (a, b: the head's last and new
+   * place, scratch vectors); next() at the end of a flight may send it on: → { dir, len } (it turns there) or null.
+   */
+  swallowFly(origin, dir, { len = 6, speed = 17, r = 0.6, width = 0.3, y = 0.75, onStep = null, next = null, edge = null, core = null } = {}) {
+    const m = this.arcMesh(), U = m.material.uniforms, sp = this.spell, EC = edge || EDGE;
+    U.uMode.value = 1; U.uHead.value = 1; U.uK.value = 0; U.uTilt.value = 0; U.uRev.value = 0; U.uA.value = 1;
+    U.uW.value = clamp(width / r, 0.05, 0.6); U.uCore.value.copy(core || CORE); U.uEdge.value.copy(EC);
+    const head = new THREE.Vector3(origin.x, (origin.y || 0) + y, origin.z), prev = new THREE.Vector3(), d = new THREE.Vector3(dir.x, 0, dir.z).normalize();
+    let left = Math.min(len, CAP.line), fade = 0;
+    const place = () => { const f = Math.atan2(d.x, d.z); m.rotation.set(0, f + Math.PI, 0); m.position.set(head.x - d.x * r * 0.75, head.y, head.z - d.z * r * 0.75); return f; };
+    place(); m.scale.setScalar(r);
+    this.run((dt, t) => {
+      if (left > 0) {
+        prev.copy(head); const st = Math.min(left, speed * dt); head.addScaledVector(d, st); left -= st;
+        if (onStep) onStep(prev, head);
+        if (left <= 0 && next) { const n = next(head); if (n) { d.set(n.dir.x, 0, n.dir.z).normalize(); left = Math.min(n.len, CAP.line); } }
+      } else fade += dt / 0.16;
+      const f = place(), beat = Math.sin(t * 34);
+      U.uArc.value = 2.45 + 0.35 * beat; m.scale.setScalar(r * (1 + 0.05 * beat)); // (the wings beat)
+      U.uK.value = fade > 0 ? 0.25 + 0.75 * Math.min(1, fade) : 0; // (fades out once the last leg is flown)
+      for (let i = this.emit('swallow', 70, dt); i > 0 && fade <= 0; i--) for (const s of [-1, 1]) { // a streamer off each wingtip
+        const a = f + Math.PI + s * U.uArc.value * 0.5 * 0.96, wx = m.position.x - Math.sin(a) * r, wz = m.position.z - Math.cos(a) * r;
+        sp.pn.spawn({ frame: F.SPARK, x: wx, y: head.y + rand(-0.04, 0.04), z: wz, vx: rand(-0.3, 0.3), vy: rand(0.1, 0.5), vz: rand(-0.3, 0.3), life: rand(0.18, 0.3), size: rand(0.13, 0.19), size1: 0.03, color: Math.random() < 0.35 ? EC : CORE, alpha: 1, alpha1: 0, drag: 3 });
+      }
+      return fade < 1;
+    }, () => this.give('arc', m));
+  }
+
   // ------------------------------------------------------------------ Kiai!: the shout
   /** a zigzag shout ring rolling out to r on the ground, and a comic burst popping at the head (headY above pos) */
   shout(pos, { r = 3.5, life = 0.42, color = WHITE, headY = 1.3, burst = true } = {}) {
@@ -329,7 +377,7 @@ export class BladeFX {
   prewarm() {
     if (this.warmed) return; this.warmed = true;
     const p = _a.set(0, -54, 0);
-    this.arc(p, 0, { life: 0.05 }); this.shout(p, { life: 0.05 }); this.cutLine(p, _b.set(1, -54, 0), { life: 0.05 });
+    this.arc(p, 0, { life: 0.05 }); this.shout(p, { life: 0.05 }); this.cutLine(p, _b.set(1, -54, 0), { life: 0.05 }); this.slash(p, _b.set(0.7, 0.7, 0), { life: 0.05, sparks: 0 });
     this.crack(_a.set(0, -54, 0), 0, { life: 0.05 }); this.moonBlade(_a.set(0, -60, 0), { life: 0.05 }); this.banner(_a.set(0, -54, 0), { life: 0.05 });
   }
 }

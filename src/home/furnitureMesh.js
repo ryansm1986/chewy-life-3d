@@ -16,6 +16,43 @@ import { BUILDERS2 } from './furnitureModels2.js';
 import { TROPHY_BUILDERS } from './trophyModels.js'; // (the keepsakes a crew brings home: docs/COZY.md §4.6)
 const BUILDERS = { ...B1, ...BUILDERS2, ...TROPHY_BUILDERS };
 import { clamp } from '../core/util.js';
+import { loadGlb } from '../gfx/glbAssets.js';
+
+// Blender furniture (ROADMAP Z-D6 "Blender everything"; tools/blender/work/codex/furn-*): an item listed here is drawn
+// from /models/furn-<id>.glb once loaded (loadFurnitureGlbs, awaited at boot) instead of its kit builder: its meshes go
+// into the same material buckets by material name (body, window_glow / glow, cloth, leaf, water, hot), in the template's
+// local frame (Blender -Y = the item's front +z), so the instanced batches draw it like any template. Not loaded: the kit.
+export const FURN_GLB_IDS = [
+  'chabudai', 'zabutonPink', 'zabutonBlue', 'woodTable', 'sideTable', 'woodChair', 'armchair', 'workbench', 'melonStool', 'napPillow', 'bambooBench', 'acornStool',
+  'futonBed', 'pupBasket', 'treasureChest', 'kitchenStove', 'kitchenCounter', 'bookshelf', 'tansu', 'wardrobe', 'breadShelf', 'curioCabinet',
+  'wallShelf', 'plateRack', 'cuckooClock', 'packPhoto', 'hangingScroll', 'kamidana', 'mapleWreath', 'glassFloats', 'onsenNoren', 'teaSet',
+  'flowerVase', 'bookStack', 'fruitBowl', 'succulent', 'paintPots', 'incenseBurner', 'pandaPlush', 'frogFountain', 'daruma', 'goldfishBowl', 'luckyCat',
+  'andonLamp', 'paperPendant', 'mushroomLamp', 'bambooLantern', 'pumpkinLamp', 'festivalLantern', 'yokaiLantern', 'shellLamp', 'ragRug', 'tileMat', 'tatamiMat', 'mapleRug', 'waveRug',
+  'pottedFern', 'artEasel', 'catTower', 'flourSacks', 'plantStand', 'byobu', 'ikebana', 'bonsaiStand', 'irori', 'foxStatue', 'bambooPlanter', 'hangingPlanter', 'fishTank', 'lilyTub', 'cypressBucket', 'taikoDrum', 'tanukiStatue',
+  'trophyFrostMirror', 'bannerGaleclaw', 'bannerStrawgrin', 'bannerBrineclaw', 'bannerFrostbelly',
+  'trophyMochiCrown', 'trophyKasaStand', 'trophyOniCleaver', 'trophyMoonLantern', 'trophyTenguFan', 'trophyLeafJar', 'trophySeaLantern',
+];
+const GLB_TPL = new Map();
+export function loadFurnitureGlbs() {
+  return Promise.all(FURN_GLB_IDS.map(id => loadGlb(`/models/furn-${id}.glb`).then(t => { GLB_TPL.set(id, t); cache.delete(id); }).catch(e => console.warn('[furniture] model', id, e))));
+}
+const bucketOf = name => (/glow/i.test(name) ? 'glow' : /cloth/i.test(name) ? 'cloth' : /leaf/i.test(name) ? 'leaf' : /water/i.test(name) ? 'water' : /hot/i.test(name) ? 'hot' : 'body');
+/** a loaded furniture GLB → its bucket geometry lists (non-indexed, rgb vertex colours like the kit's) */
+function glbBuckets(tpl) {
+  const out = Object.fromEntries(BUCKETS.map(k => [k, []]));
+  tpl.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(tpl.matrixWorld).invert(), mtx = new THREE.Matrix4();
+  tpl.traverse(o => {
+    if (!o.isMesh || o.userData.isInk) return;
+    let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+    g.applyMatrix4(mtx.multiplyMatrices(inv, o.matrixWorld));
+    const c = g.attributes.color, n = g.attributes.position.count, rgb = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { rgb[i * 3] = c ? c.getX(i) : 1; rgb[i * 3 + 1] = c ? c.getY(i) : 1; rgb[i * 3 + 2] = c ? c.getZ(i) : 1; }
+    g.setAttribute('color', new THREE.Float32BufferAttribute(rgb, 3));
+    out[bucketOf(o.material?.name || '')].push(g);
+  });
+  return out;
+}
 
 const cache = new Map();
 const BUCKETS = ['body', 'glow', 'hot', 'cloth', 'leaf', 'water', 'jet'];
@@ -49,20 +86,22 @@ export function furnitureTemplate(id) {
   if (!d) throw new Error(`[furniture] unknown id ${id}`);
   const B = new Builder(hashStr(id));
   B.id = id; B.detail = 1; B.jitter = 0.025; B.warpAmt = 0.01;
-  try { (BUILDERS[id] || placeholder)(B, d); } catch (e) { console.error('[furniture] builder failed', id, e); B.buckets = Object.fromEntries(BUCKETS.map(k => [k, []])); placeholder(B, d); }
+  const glb = GLB_TPL.get(id);
+  if (glb) B.buckets = glbBuckets(glb); // (the Blender model: painted already, so no kit warp or base shade)
+  else try { (BUILDERS[id] || placeholder)(B, d); } catch (e) { console.error('[furniture] builder failed', id, e); B.buckets = Object.fromEntries(BUCKETS.map(k => [k, []])); placeholder(B, d); }
   const geos = {};
   for (const k of BUCKETS) {
     const list = B.buckets[k]; if (!list?.length) continue;
     const g = merge(list);
-    if (k !== 'jet' && k !== 'water') warp(g, B.seed, B.warpAmt);
-    if (k === 'body') baseShade(g, d);
+    if (!glb && k !== 'jet' && k !== 'water') warp(g, B.seed, B.warpAmt);
+    if (!glb && k === 'body') baseShade(g, d);
     g.computeBoundingSphere(); g.computeBoundingBox();
     geos[k] = g;
   }
   const box = new THREE.Box3();
   for (const g of Object.values(geos)) box.union(g.boundingBox);
   if (box.isEmpty()) box.set(new THREE.Vector3(-0.2, 0, -0.2), new THREE.Vector3(0.2, 0.4, 0.2));
-  t = { id, geos, box, tris: Object.values(geos).reduce((a, g) => a + g.attributes.position.count / 3, 0), real: !!BUILDERS[id] };
+  t = { id, geos, box, tris: Object.values(geos).reduce((a, g) => a + g.attributes.position.count / 3, 0), real: !!BUILDERS[id] || !!glb, glb: !!glb };
   cache.set(id, t);
   return t;
 }

@@ -9,6 +9,7 @@
 //  frostGrass(seed)         a tuft of pale frosted grass blades poking out of the snow
 //  icicles(seed, { L, n })  a row of hanging icicles along local x (for eaves, cave lips, the frozen fall)
 import * as THREE from 'three';
+import { treeGlb } from '../../world/treeGlb.js';
 import { VEG_BUILD } from '../../world/vegetation.js';
 import { tube, puff, merge, paint, branch, cards } from '../../gfx/geom.js';
 import { mulberry32, TAU, clamp } from '../../core/util.js';
@@ -30,10 +31,14 @@ function barkPaint(g, c0, c1) {
   return paint(g, (p, n, o) => o.copy(a).lerp(b, clamp(n.y * 0.3 + 0.5 + nz(p.x * 3.1 + p.y * 1.3, p.z * 3.1 - p.y * 2.2) * 0.22)));
 }
 
+// a Blender tree's snow caps sway with its boughs (bambooKit M 'snowTree'), not still like the detail body
+const swaySnow = g => { if (g['d:body']) { g.snowTree = g['d:body']; delete g['d:body']; } return g; };
+
 // ------------------------------------------------------------------ snow fir (sugi / momi)
 const FIR_GREEN = cols('#123a3a', '#1c4c46', '#2a5e52', '#3a7060');
 export function snowFir(seed = 0, { H = 5.2, snow = 1 } = {}) {
   return cached(`fir:${seed}:${H}:${snow}`, () => {
+    { const g = treeGlb('snowFir', seed, { scale: H / 5.2 }); if (g?.bark) return bound(swaySnow(g)); } // (its Blender model, built at H 5.2: world/treeGlb.js)
     const r = mulberry32(seed * 811 + 5), trunk = [], skirts = [], needles = [];
     trunk.push(branch(V(0, -0.2, 0), V((r() - 0.5) * 0.1, H * 0.92, (r() - 0.5) * 0.1), 0.2, 0.05, V(0, 0, 0), 5, 7));
     const tiers = 5 + (r() < 0.4 ? 1 : 0), base = 0.75, crown = V(0, H * 0.55, 0);
@@ -69,13 +74,14 @@ export function snowPine(seed = 1) {
     recolor(f, (o, p, i) => { o.offsetHSL(0.03, -0.12, -0.04); snowOn(o, V(0, nf.getY(i) + nz(p.x * 3, p.z * 3) * 0.2, 0), 1, 0.22, 0.55); });
     const nc = c.attributes.normal;
     recolor(c, (o, p, i) => { o.offsetHSL(0.03, -0.1, -0.02); o.lerp(SNOW, clamp(nc.getY(i) - 0.35) * 0.55); });
-    return bound({ bark: flat(v.trunkGeo), foliage: f, 'cards:pine': c });
+    return bound({ bark: flat(v.trunkGeo), [v.massKey || 'foliage']: f, 'cards:pine': c });
   });
 }
 
 // ------------------------------------------------------------------ birch
 export function birch(seed = 0, { H = 4.6 } = {}) {
   return cached(`birch:${seed}:${H}`, () => {
+    { const g = treeGlb('birch', seed, { scale: H / 4.6 }); if (g?.bark) return bound(swaySnow(g)); }
     const r = mulberry32(seed * 419 + 77), wood = [], snowy = [];
     const lean = V((r() - 0.5) * 0.5, H, (r() - 0.5) * 0.5);
     wood.push(branch(V(0, -0.15, 0), lean, 0.13, 0.04, V((r() - 0.5) * 0.2, 0, (r() - 0.5) * 0.2), 7, 7));

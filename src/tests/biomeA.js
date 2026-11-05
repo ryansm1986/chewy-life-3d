@@ -12,9 +12,11 @@ const SETS = { ...BAMBOO };
 
 export default async function () {
   const P = new URLSearchParams(location.search);
+  if (!P.has('kit')) await (await import('../regions/assets/glbPieces.js')).loadRegionGlbs(); // (&kit: the kit props)
+  if (!P.has('kit')) await (await import('../world/treeGlb.js')).loadTreeGlbs(); // (the Blender trees: set=trees)
   const sets = (P.get('set') || 'bamboo').split(',');
   // later sets are loaded on demand so a half-finished module never breaks the others
-  for (const s of sets) if (!SETS[s]) { try { const m = await import(`../regions/assets/${s.startsWith('maple') ? 'maple' : 'bamboo'}Showcase.js`); Object.assign(SETS, m.SHOWCASE); } catch (e) { console.warn('[biomeA] no set', s, e.message); } }
+  for (const s of sets) if (!SETS[s]) { try { const m = await import(`../regions/assets/${s.startsWith('maple') ? 'maple' : s === 'trees' ? 'tree' : 'bamboo'}Showcase.js`); Object.assign(SETS, m.SHOWCASE); } catch (e) { console.warn('[biomeA] no set', s, e.message); } }
   const only = P.get('only')?.split(',');
   const names = [];
   for (const s of sets) for (const [n, it] of Object.entries(SETS[s] || {})) if (!only || only.includes(n)) names.push([n, it]);

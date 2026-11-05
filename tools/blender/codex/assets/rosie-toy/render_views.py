@@ -50,10 +50,10 @@ def shot(name, rx, ry):
     sc.render.filepath = os.path.join(OUT, name + '.png'); bpy.ops.render.render(write_still=True)
 scales = {}
 def view_dir(name):
-    return {'front': (0, -1, 0), '34': (.64, -.77, 0), 'q25': (.4226, -.9063, 0), 'side': (1, 0, 0), 'back': (0, 1, 0), 'top': (0, -.0001, 1)}[name]
+    return {'front': (0, -1, 0), '34': (.64, -.77, 0), 'q25': (.4226, -.9063, 0), 'side': (1, 0, 0), 'back': (0, 1, 0), 'top': (0, -.0001, 1), 'b34': (.64, .77, 0), 'b34m': (-.64, .77, 0)}[name]
 # head close-ups: 1000 px = 0.95 m (round 7: the 0.52 m head)
 HC = Vector((0, -.02, 1.03))
-for n in ('front', 'q25', '34', 'side', 'back', 'top'):
+for n in ('front', 'q25', '34', 'side', 'back', 'top', 'b34', 'b34m'):
     c = HC + Vector((0, .07, 0)) if n == 'side' else HC      # the side view also frames the back of the hair
     d = Vector(view_dir(n)).normalized(); aim(c + d * 4, c, ortho=.95); shot('head_' + n, 1000, 1000)
     scales['head_' + n] = {'px_per_m': 1000 / .95, 'centre_m': list(c), 'res': [1000, 1000]}

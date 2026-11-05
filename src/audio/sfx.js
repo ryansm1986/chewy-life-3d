@@ -8,6 +8,7 @@ import { babble, gibberish } from './babble.js';
 import { REGION_SFX } from '../regions/sfx/index.js'; // region monsters / bosses / environments (docs/REGIONS.md)
 import { SFX as LIFE_SFX } from '../life/life.sfx.js'; // the homestead: farming, fishing, cooking (docs/HOMESTEAD.md)
 import { SFX as CHARGE_SFX } from './charge.sfx.js'; // charged abilities: the hum, stage chimes, release (docs/CHARGE.md)
+import { SFX as COMBO_SFX } from './combo.sfx.js'; // combo chains: the step tick, the finisher chime (docs/COMBO.md)
 import { SFX as POE_SFX } from './poe.sfx.js'; // Poe: fūma swishes and whirrs, smoke, shadow steps, her sneeze (docs/POE.md)
 import { SFX as SAMURAI_SFX } from './samurai.sfx.js'; // Chewy the samurai: the katana's draw, its sheath's click, a clang (docs/HEROES.md)
 import { SFX as SHIHTZU_SFX } from './shihtzu.sfx.js'; // the Shih Tzu: the flail's whoosh and thud, squeaky bonks, hexes, his awoo (docs/SHIHTZU.md)
@@ -678,6 +679,7 @@ for (const [k, v] of Object.entries(TRIM)) SFX[k].trim = v;
 for (const k in REGION_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = REGION_SFX[k]; } // (each carries its own trim)
 for (const k in LIFE_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = LIFE_SFX[k]; }
 for (const k in CHARGE_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = CHARGE_SFX[k]; }
+for (const k in COMBO_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = COMBO_SFX[k]; }
 for (const k in POE_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = POE_SFX[k]; }
 for (const k in SAMURAI_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = SAMURAI_SFX[k]; }
 for (const k in SHIHTZU_SFX) { if (SFX[k]) throw new Error(`sfx clash: ${k}`); SFX[k] = SHIHTZU_SFX[k]; }

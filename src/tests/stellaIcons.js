@@ -17,7 +17,7 @@ const WAGASA = [
   ['daystar', 'Daystar', ['#fff0c0', '#ffd36a', '#ffffff']], ['corona', 'Corona', ['#ffb070', '#fff1b8', '#d9573e']],
   ['solstice', 'Solstice', ['#7a3a8a', '#ffd36a', '#ffb070']], ['dawn', 'Dawn', ['#f7b8a8', '#ffd36a', '#fffaf0']],
 ];
-const GOLDEN = ['attack_lance', 'sunbeamThrust', 'knightsVow', 'sunfallJump', 'tailwagVolley', 'emberBreath', 'bestFriends', 'dragonHeart'];
+const GOLDEN = ['attack_lance', 'eagerJabs', 'sunbeamThrust', 'knightsVow', 'sunfallJump', 'tailwagVolley', 'emberBreath', 'bestFriends', 'dragonHeart'];
 
 export default function () {
   const Q = new URLSearchParams(location.search);

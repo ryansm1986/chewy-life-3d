@@ -1,0 +1,5 @@
+# Townsfolk frogs (folk-frog-toy): Blender source (Z-D6, 2026-11-04)
+
+Three random townsfolk frogs, the owner's picks A (Momo, peach shirt, moss overalls, a leaf cap), B (Dango, teal, butter top, cream apron, coral neckerchief) and C (Pip, lime, blue smock, lilac satchel; 0.90 m) from the Codex sheet `sheet.png` (folk-frog-concept). Game ids `folk_frog_a|b|c` (HERO_MODELS lidTilt 0.384 / 0.384 / 0.386, lidClose 1.294 / 1.664 / 0.944, squint [0.14, -0.26]); a random townsfolk frog is one of them by its seed (heroModels FOLK_TOY).
+
+Build: `build_folk-frog-toy.py -- --design a|b|c|all` with `frog_head.py` (eye domes with a midline valley so they read from 45 deg above), rig: `rig_folk-frog-toy.py` with `rig_lids.py` (B: `HUG=0 XR0=-1.55 XR1=1.26 LID_NC=29 EDGE_BAND=.003 EYE_SHARE=.30`). **Lid lesson**: a frog's eye straddles the dome and the snout, so no single rigid lid covers it; the fix is the eyeball riding the lid, 30% on `lidU` and 70% on `eye_*`, so it rolls back under the skin as the lid shuts (A and C on a per-column hugging lid, B on the plain lid). Known: a small corner hook on A's shut eye at 45 deg and a slight b85 puff.

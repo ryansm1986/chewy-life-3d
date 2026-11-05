@@ -140,18 +140,21 @@ try {
     const r = await ev(id => {
       const G = window.G, P = G.player;
       G.skills.clearPoe(); G.skills.cds = {}; P.anim.stop(); G.actions.restoreAll();
+      // every skill from the same spot: the dashes, blinks and Fūma Flurry's lunge wander, and a wall close by would eat a dash or a throw
+      if (!window.__home) window.__home = P.pos.clone(); else { P.setPos(window.__home.x, window.__home.z); P.pos.y = G.world.heightAt(P.pos.x, P.pos.z); }
       if (G.dungeon.monsters.filter(m => m.alive && !m.def.boss).length < 6) G.dungeon.summonAround({ pos: P.pos }, 'mochi', 6);
       const { r: rr } = G.engine.rig.groundAxes();
       G.dungeon.monsters.filter(m => m.alive && !m.def.boss).slice(0, 6).forEach((m, i) => { m.pos.set(P.pos.x + rr.x * (2.5 + i * 0.8) + (i % 2) * 0.7, 0, P.pos.z + rr.z * (2.5 + i * 0.8) - (i % 2) * 0.7); m.lifeMax = m.life = 1e7; m.status.stun = 99; m.speed = 0; });
       window.__hits = 0;
-      const aim = P.pos.clone().addScaledVector(rr, 3.5), tgt = G.combat.nearest(aim, 'ally', 3);
+      const near = id === 'fumaFlurry' ? G.combat.nearest(P.pos, 'ally', 4) : null; // (the melee flurry goes for the closest foe: a far one is walked up to first)
+      const aim = near ? near.pos.clone() : P.pos.clone().addScaledVector(rr, 3.5), tgt = near || G.combat.nearest(aim, 'ally', 3);
       try { return { ok: G.skills.tryCast(id, aim, tgt) }; } catch (e) { return { threw: String(e.stack || e).slice(0, 300) }; }
     }, id);
     await sleep(page, ['shadowClone', 'vanish', 'whirlingFuma', 'caltropFlip', 'thousandStars', 'bullseyeMark'].includes(id) ? 2600 : 1600);
     res.push({ id, ...r, hits: await ev(() => window.__hits) });
   }
   const noHit = res.filter(r => !['shadowClone', 'vanish', 'bullseyeMark'].includes(r.id) && !(r.hits > 0)).map(r => r.id), threw = res.filter(r => r.threw);
-  R.check(`playing Poe: every active skill (${ids.length}) casts in a Burrow fight, the damage skills land hits, no errors`, ids.length === 18 && !threw.length && res.every(r => r.ok) && !noHit.length, JSON.stringify({ noHit, threw: threw.map(t => t.id + ': ' + t.threw), casts: res.map(r => `${r.id}:${r.hits}`).join(' ') }));
+  R.check(`playing Poe: every active skill (${ids.length}) casts in a Burrow fight, the damage skills land hits, no errors`, ids.length === 19 && !threw.length && res.every(r => r.ok) && !noHit.length, JSON.stringify({ noHit, threw: threw.map(t => t.id + ': ' + t.threw), casts: res.map(r => `${r.id}:${r.hits}`).join(' ') }));
   const look = await ev(async () => {
     const G = window.G, P = G.player, r = P.rig, kind = h => h?.children[0]?.userData.kind || null;
     for (let i = 0; i < 30 && kind(r.parts.fumaBack) !== 'glb'; i++) await new Promise(q => setTimeout(q, 100));
@@ -161,6 +164,7 @@ try {
   // a real hold on right-click (Fūma Throw)
   const xy = await ev(() => {
     const G = window.G, P = G.player, st = G.state.player; G.skills.clearPoe(); G.skills.cds = {}; P.anim.stop(); G.actions.restoreAll();
+    if (window.__home) { P.setPos(window.__home.x, window.__home.z); P.pos.y = G.world.heightAt(P.pos.x, P.pos.z); G.engine.rig.focus.copy(P.pos); G.engine.rig.snap(); } // (back on the open spot the skills were cast from)
     st.hotbar[1] = 'fumaThrow'; st.chargePerks = { fumaThrow: { stages: 2 } };
     window.__rel = []; G.events.on('charge:release', p => window.__rel.push(p));
     const { r } = G.engine.rig.groundAxes(), p = P.pos.clone().addScaledVector(r, 4), v = p.project(G.engine.camera);

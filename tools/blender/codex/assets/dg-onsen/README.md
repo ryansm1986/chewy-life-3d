@@ -1,0 +1,3 @@
+# The Ice Cavern's set pieces (dg-onsen): Blender source (Z-D6, 2026-11-04)
+
+The onsen zone dungeon kit's own pieces (src/dungeon/zoneKits/onsen.js, wrapped with glbFn('dg-onsen')): snowHokora (candle glow), frozenBarrels, bathDeck (water in the oke), towelRack (cloth with the kit's cloth UVs), snowMonkey, iceSpire (2 variants), coldBrazier, storePile, lanternPost (red chochin, glow). Built in each kit piece's local frame; the game swaps the geometry and keeps the kit lights (REGION_GLB['dg-onsen']). Build: build_dg-onsen.py --piece <name|all> with snow_kit.py and pieces.py. Its exporter compensates the glTF V flip on every UV the game reads (glow tint and flicker): dg-bamboo / dg-maple got the same fix.

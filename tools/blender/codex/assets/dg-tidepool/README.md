@@ -1,0 +1,3 @@
+# The Sea Cave's set pieces (dg-tidepool): Blender source (Z-D6, 2026-11-04)
+
+The tidepool zone dungeon kit's own pieces (src/dungeon/zoneKits/tidepool.js, wrapped with glbFn('dg-tidepool')): umiHokora (the glass float glows), crabHusk (the scowling face sculpted), brazier (only embers and flame tongues are hot: a hot coal mound washed out), weddedPair, planks, netPile (glass floats glow, water in the bucket). cavePillar stays kit (a bare rock geometry into W.solid). Built in each kit piece's local frame with dg-onsen's V-flip-compensating exporter; the game swaps the geometry and keeps the kit lights (REGION_GLB['dg-tidepool']). Only body / glow / hot / cloth / water: the dungeon's addPiece bakes no rock or reed. Build: build_dg-tidepool.py --piece <name|all> (run.sh).

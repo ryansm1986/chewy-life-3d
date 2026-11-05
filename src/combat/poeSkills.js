@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { Events } from '../core/events.js';
 import { rand, TAU, clamp, dist, angleDiff } from '../core/util.js';
-import { poeFx, POE_COL } from '../gfx/poeFx.js';
+import { poeFx, POE_COL, PF, streakFn } from '../gfx/poeFx.js';
 import { ghost, tickGhost } from '../actors/poeGear.js';
 import { M as ARTS } from './poeArts.js';
 import { M as JUTSU } from './poeJutsu.js';
@@ -19,7 +19,7 @@ const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _h = new THREE.Vector3
 const sfx = (n, o) => Events.emit('sfx', n, o);
 const isFoe = e => e.alive && e.team === 'enemy' && !e.breakable;
 const SLASHES = ['fumaSlash', 'fumaSlash2', 'fumaTwirl'];
-const SLASH_SET = new Set(SLASHES);
+const SLASH_SET = new Set([...SLASHES, 'fumaFlurry']); // (the actions her melee lunge tracks: the combo and Fūma Flurry)
 const LUNGE = 1.2, LUNGE_SPEED = 10;
 
 const M = {
@@ -37,9 +37,9 @@ const M = {
     return this.combat.hitMonster(e, o);
   },
   // ------------------------------------------------------------------ hooks (skillRunner.js / combat.js)
-  /** tryCast asks first: true = not now (queued). Fūma Throw waits for the fūma to come home. */
+  /** tryCast asks first: true = not now (queued). Fūma Throw and Fūma Flurry wait for the fūma to come home. */
   castBlocked(id, aim, target, charge) {
-    if (id === 'fumaThrow' && this.poeFuma) { this.queued = { id, aim: aim.clone(), target, t: Math.min(2, this.poeFuma.eta + 0.3), charge }; return true; }
+    if ((id === 'fumaThrow' || id === 'fumaFlurry') && this.poeFuma) { this.queued = { id, aim: aim.clone(), target, t: Math.min(2, this.poeFuma.eta + 0.3), charge }; return true; }
     return false;
   },
   /** combat.hitPlayer asks this before a monster's hit lands: true = dodged (Swift as Wind, her class dodge) */
@@ -386,7 +386,10 @@ const M = {
     // Thunder Paw's raised paw crackles; a charging wind-up gathers its element on her
     if (this.poeCrackleT > 0) { this.poeCrackleT -= dt; this.pfx().crackle(this.poeHand(_h), dt, 40); }
     const ch = this.charge?.active;
-    if (ch && P.hero === 'poe' && !ch.chan) this.pfx().gather(this.charge.focusPoint(_h), ch.c.pose, dt, ch.tMax ? ch.t / ch.tMax : 0);
+    if (ch && P.hero === 'poe' && !ch.chan) this.pfx().gather(this.charge.focusPoint(_h), ch.c.pose === 'poeSaw' ? 'poeFuma' : ch.c.pose, dt, ch.tMax ? ch.t / ch.tMax : 0);
+    // Fūma Flurry's wind-up: the fūma revs in her paw (actors/poeGear.js carryFuma), spitting a spark now and then
+    P._sawRev = ch && ch.id === 'fumaFlurry' ? clamp(ch.tMax ? ch.t / ch.tMax : 0) : -1;
+    if (P._sawRev > 0.25 && Math.random() < dt * (6 + 18 * P._sawRev)) { const h = this.poeHand(_h), a = rand(0, TAU); this.pfx().pn.spawn({ frame: PF.STREAK, x: h.x, y: h.y, z: h.z, vx: Math.cos(a) * 3, vy: rand(0.5, 1.5), vz: Math.sin(a) * 3, life: 0.16, size: 0.22, size1: 0.05, color: POE_COL.cream, alpha: 0.8, alpha1: 0, drag: 4, fn: streakFn }); }
     // Shadow Step safety: never stuck invulnerable (an interrupted strike)
     const st = this.poeStep;
     if (st) { st.t += dt; const a = P.anim.action?.name; if (st.t > 1.2 || (a !== 'shadowStepOut' && a !== 'shadowStrike' && st.t > 0.1)) { P.invuln = !!G.heroSwitching; this.poeStep = null; } }
@@ -411,7 +414,7 @@ const M = {
     for (const m of this.poeMarks?.values() || []) m.h.end(); this.poeMarks?.clear();
     for (const c of this.poeImgAll || []) c.dispose(); this.poeImgAll = []; this.poeImgFree = []; this.poeImgRig = null;
     if (this.poeDash || this.poeFlip || this.poeBarrage || this._subT > 0) { this.poeDash = this.poeFlip = this.poeBarrage = null; this._subT = 0; if (P) P.invuln = false; }
-    this.poeCrackleT = 0; if (P) P.poeSpeed = 1;
+    this.poeCrackleT = 0; if (P) { P.poeSpeed = 1; P._sawRev = -1; }
   },
 };
 

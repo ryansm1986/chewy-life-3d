@@ -177,6 +177,7 @@ dog signature and stays exactly as it was.
 | id | Was | Now | The move |
 |---|---|---|---|
 | chomp | Chomp Slash | **Crescent Chomp** | an iai draw-cut out of the hip, the free paw joining on the hilt; a bone-white crescent |
+| swallow | (new, 2026-11-03) | **Swallow Return** | tsubame gaeshi: a quick rising cut out of the hip and a hard snap straight back down the same line |
 | boneMastery | Bone Mastery | **Way of the Bone** | passive sword training |
 | whirl | Tail Spin | **Whirlwind Stance** | spinning two-handed cuts with cherry petals |
 | dig | Dig Slam | **Helmet Splitter** | a leap into an overhead two-handed cut that cracks the ground |
@@ -196,6 +197,32 @@ the perks that named the old flavour were re-flavoured too (Grand Crescent, Seco
 Return Stroke…; docs/CHARGE.md §7 is generated from `src/rpg/charge.js`). Item names: the Bone Sword base is the **Bone
 Katana**, the Rib Sabre the Rib Wakizashi, the Shark Tooth Saber the Shark Tooth Tachi (ids unchanged; older saves'
 items are renamed on load by `renameLegacyItem`, items.js / actions.js `normalizeHeroes`).
+
+**Swallow Return** (`swallow`, row 0 col 0, added 2026-11-03: the owner's "Chewy has the one boring sword attack"): a
+second level-1 Bone Katana attack beside Crescent Chomp, and its opposite: quick and narrow where Chomp is slow and wide.
+- **The move** (`samuraiPoses.js` `tsubame`, `skillRunner.js` `cast_swallow` / `swallowCut`): he sinks into a low guard at
+  the left hip (the katana comes out of the saya there, `drawFromHip`, as Chomp's does), snaps the blade up across the
+  front to high over his right shoulder on one paw, rising onto his toes; the free paw slaps onto the hilt as the wrist
+  turns the edge over at the top, and both paws drive it straight back down the same line to the left hip, the whole
+  body crashing into the lunge. The end queues the usual flourish (`queueFlourish`: the noto into the saya). Played at
+  `animSpeed(0.6)` (Chomp's iai 0.5): at 1.4 attacks a second the rising cut lands ~0.13 s after the press and the return ~0.12 s after it, with a short hang at the top as the edge turns over.
+- **The look and feel**: each cut its own steep diagonal trail (`bladeFx.arc`, rising left → right, the return right →
+  left and bolder, with a white-hot core), a white-hot slash mark across every foe it struck (`bladeFx.slash`, drawn over
+  the body, along the cut's line), a hit-stop and a shake per cut (the return's harder), and its own sound
+  (`katana_slice` in `audio/samurai.sfx.js`: a thin bright tear of air and the edge's zing; pitched up for the rise,
+  down for the return).
+- **Numbers**: two cuts of 62 / 130 / 205% weapon damage each at skill level 1 / 10 / 20 (before synergies), a 90° arc,
+  2.1 m reach; the first cut doesn't knock back (the foe stays put for the return), the return knocks back 0.5. Zoom 2.5
+  / 3.6 / 4.9. Synergies: Way of the Bone 6% and Flowing Water 5% a point (Chomp's are Way of the Bone and Helmet
+  Splitter). Balance: on a lone foe its tap damage a second is Chomp's (×0.99–1.01 at every level, the zoom a second too);
+  on a pack of five it does ×0.5–0.75 of Chomp's (each narrow cut catches fewer).
+- **Charged: Swallow's Flight** (`charge.js` `C.swallow`, `chargedChewy.js` `charged_swallow`; the wind-up holds the low
+  guard, `chargePoses.js` `gedan`): both cuts bite harder and reach a little wider, and the return sends a bone-white
+  swallow (`bladeFx.swallowFly`: the trail shader's crescent, wings beating, a spark streamer off each wingtip) darting on
+  5 / 6.5 / 8 m down the line through every foe in its way for 60 / 70 / 80% of a cut. Perks: Deeper Charge, Quick
+  Wind-up, **Swallow Flock** (the common Split family: +1 / +2 swallows fanned 14°, 50% each) and the unique **Darting
+  Swallow** (level 8: at the end of its flight the swallow darts on to 2 more foes within 5 m, 60% each). A full charge
+  is +23% sustained over tapping (`tools/charge-sim.mjs`).
 
 **The Bone Katana** (`src/actors/charKit.js` `katanaGeo`): since R-15 (the owner's pick 2026-10-09: "Could the katana
 have a bone shape to it?") the blade is **one long, gently curved bone**: a soft lens section with the white edge kept,

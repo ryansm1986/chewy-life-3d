@@ -39,6 +39,11 @@ const pp = (c, s, id) => c.perks[id].pct * PERK_STAGE[Math.max(0, Math.min(2, (s
 // expected damage % per cast (Σ dmgPct × foes), by skill. p: params, k: perks (charged only), s: stage (0 = tap)
 const DMG = {
   chomp: (p, k, s, sc) => p.dmgPct * area(p.radius, sc) * Math.min(1, p.arc / 200) + (p.wave ? p.dmgPct * p.wavePct / 100 * area(Math.min(p.wave, RP + 1), sc) * 0.8 : 0),
+  // Swallow Return: two cuts (a lone foe takes both; in a pack each cut's narrow arc catches its share), and charged, the
+  // swallow down the line (a line of foes; Swallow Flock's extras at their share in a pack) and Darting Swallow's darts
+  swallow: (p, k, s, sc, c) => p.dmgPct * 2 * (sc.n <= 1 ? 1 : area(p.radius, sc) * Math.min(1, p.arc / 200))
+    + (s && p.fly ? p.dmgPct * p.flyPct / 100 * line(4, sc) * (1 + rk(k, 'split') * pp(c, s, 'split') / 100 * (sc.n > 1 ? 0.8 : 0)) : 0)
+    + (s && rk(k, 'dart') && sc.n > 1 ? c.perks.dart.n * p.dmgPct * pp(c, s, 'dart') / 100 : 0),
   dig: (p, k, s, sc, c) => p.dmgPct * area(p.radius, sc) * (1 + (rk(k, 'aftershock') ? pp(c, s, 'aftershock') / 100 : 0)),
   bonestorm: (p, k, s, sc, c) => p.dmgPct * Math.min(p.count * p.orbitSpeed / 6.283, 1 / p.hitInterval * 1.6) * p.duration * area(p.radius, sc) * 0.5 + (rk(k, 'volley') ? p.count * p.dmgPct * pp(c, s, 'volley') / 100 * 0.8 : 0),
   throw: (p, k, s, sc, c) => { const L = line(p.pierce, sc), n = 1 + (s ? rk(k, 'split') * 0.7 * (sc.n > 1 ? 0.8 : 0) : 0); return p.dmgPct * L * n * (1 + (rk(k, 'boomerang') ? pp(c, s, 'boomerang') / 100 : 0)); },
@@ -83,11 +88,13 @@ const VALUE = {
 { const poe = poeSim({ area, line, fan, rk, pp, RP }); Object.assign(DMG, poe.DMG); Object.assign(VALUE, poe.VALUE); }
 // the Shih Tzu's (tools/charge-sim-shihtzu.mjs: 9 damage skills, the Maelstrom channel, 2 summons and 3 buffs)
 { const stz = shihtzuSim({ area, line, fan, rk, pp, RP }); Object.assign(DMG, stz.DMG); Object.assign(CHAN, stz.CHAN); Object.assign(VALUE, stz.VALUE); }
-// Foosy's (tools/charge-sim-golden.mjs: 12 damage skills, Dragon Heart and 2 buffs)
+// Foosy's (tools/charge-sim-golden.mjs: 13 damage skills, Dragon Heart and 2 buffs)
 { const gld = goldenSim({ area, line, fan, rk, pp, RP }); Object.assign(DMG, gld.DMG); Object.assign(VALUE, gld.VALUE); }
 // Stella's (tools/charge-sim-stella.mjs: 9 damage skills, the Solar Ray channel, Hinata and the Dawn's 5 heals and buffs)
 { const stl = stellaSim({ area, line, fan, rk, pp, RP }); Object.assign(DMG, stl.DMG); Object.assign(CHAN, stl.CHAN); Object.assign(VALUE, stl.VALUE); }
 export const KIND = id => (DMG[id] ? 'damage' : CHAN[id] ? 'channel' : 'utility');
+/** a tap's expected damage % (Σ dmgPct × foes) for params p in scene sc ({ n: foes }): the Combo sim's model (tools/combo-sim.mjs); null without one */
+export const tapDamage = (id, p, sc) => (DMG[id] ? DMG[id](p, {}, 0, sc, CHARGE[id]) : null);
 
 /** a skill-build hero at level 30 with skill level `lvl` in every charged skill of its class */
 export function simHero(hero, lvl = 12) {

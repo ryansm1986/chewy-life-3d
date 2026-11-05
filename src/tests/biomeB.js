@@ -4,7 +4,9 @@
 import * as THREE from 'three';
 import { makeStage } from './_stage.js';
 import { makeMats, Placer } from '../regions/assets/tidepoolKit.js';
-import * as TP from '../regions/assets/tidepoolAssets.js';
+import * as TPKit from '../regions/assets/tidepoolAssets.js';
+import { withGlb, loadRegionGlbs } from '../regions/assets/glbPieces.js';
+const TP = withGlb('tidepool', TPKit); // (the Blender models, as the region draws them, unless &kit)
 
 const SETS = {
   tidepool: {
@@ -30,6 +32,7 @@ function shells() {
 
 export default async function () {
   const P = new URLSearchParams(location.search);
+  if (!P.has('kit')) await loadRegionGlbs();
   let setName = P.get('set') || 'tidepool';
   if (setName === 'onsen' && !SETS.onsen) {
     const ON = await import('../regions/assets/onsenAssets.js');

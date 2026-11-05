@@ -1888,3 +1888,17 @@ back to the same spot. In an outdoor zone the same controls still go home at onc
   down there; a long press shows the tooltip. Sort is the button; the filter chips are icons on a phone (44 px).
 - **The mouse**: the footprint shows under the pointer while you carry an item (a drag or a click-held one); a click
   or the release puts it there. Ctrl+Click and right-click go to the first spot that fits.
+
+## 15. Swimming and climbing; no jump (TR-1, 2026-10-27)
+- **No jump.** The owner looked at how other games pair jump and dodge (Elden Ring's tap-to-roll / hold-to-sprint
+  button with jump on its own, Genshin's dodge on the sprint, Zelda's lock-on hops, the top-down ARPGs with no jump)
+  and chose: "Let's just not add jump". Space / B stay the dodge roll.
+- **Swimming** needs no button: walk into water deeper than half a metre and the hero swims (a doggy paddle, the head
+  out, at two thirds of the walking speed), with no stamina and no drowning. No attacks, skills, charges, roll or
+  sprint while swimming. Shadow paddles after. Walk out onto a shore to stand again.
+- **Climbing** needs no button either: walk into a natural rocky cliff in the village (the terraces' risers, the
+  northern mountains, the shrine hill's edges) and the hero climbs it, facing the rock, at a steady 1.5 m/s along the
+  face, up or down. Buildings, fences, the waterfall's rock garden, the regions' edges and dungeon walls stay solid.
+- The pad, the touch stick and the keys all work the same: it's the move input. Click-to-move still routes round water
+  and cliffs (the nav grid is unchanged): to swim or climb, steer with the keys or the stick.
+- Code: `actors/traverse.js` (see docs/ARCHITECTURE.md § Swimming and climbing).

@@ -125,6 +125,10 @@ export class Engine {
     r.setSize(innerWidth, innerHeight);
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFShadowMap;
+    // three draws a shadow caster only if the MAIN camera's layers include it, so the trees' shadow-only crown masses
+    // (layer 1, vegetation.js SHADOW_ONLY_LAYER) join the shadow pass alone: the main camera sees layer 1 only while the
+    // shadow map renders (the main pass's render list is built before it, so they never draw on screen)
+    { const sm = r.shadowMap, render = sm.render.bind(sm); sm.render = (lights, scene, camera) => { const had = camera.layers.isEnabled(1); if (!had) camera.layers.enable(1); try { render(lights, scene, camera); } finally { if (!had) camera.layers.disable(1); } }; }
     r.toneMapping = THREE.NoToneMapping;
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.domElement.id = 'game';

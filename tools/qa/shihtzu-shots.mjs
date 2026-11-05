@@ -1,6 +1,7 @@
 // The Shih Tzu look-review shots (docs/SHIHTZU.md §9): the baked model and his flail at the game camera, a real Burrow
 // fight with each move frozen at a few moments, the hero wheel and the HUD.
-//   node tools/qa/shihtzu-shots.mjs [look] [idle] [walk] [attack] [woefulWallop] [drippingPaw] [wheel] [--out dir] [--qs k=v]
+//   node tools/qa/shihtzu-shots.mjs [look] [idle] [walk] [attack] [glumBonk] [woefulWallop] [drippingPaw] [wheel] [--out dir] [--qs k=v]
+//   node tools/qa/shihtzu-shots.mjs strip --only bonk [--view front] [--stage 3]   (a swing as a contact sheet; --stage: the charged release)
 // Writes PNGs to tools/qa/tmp/shihtzu-shots (gitignored) (or --out) and prints any runtime errors. Time is frozen per shot
 // (engine.timeScale 0) once a move has had `at` seconds to develop.
 //  look: the village, the camera round him (front, both 45° yaws, behind) at the game's distance and a close one;
@@ -16,9 +17,9 @@ const val = n => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : null
 const OUT = val('--out') || 'tools/qa/tmp/shihtzu-shots';
 fs.mkdirSync(OUT, { recursive: true });
 const QS = val('--qs') ? '&' + val('--qs') : '';
-const ids = args.filter((a, i) => !a.startsWith('--') && !['--out', '--qs', '--view', '--only', '--stage'].includes(args[i - 1]));
+const ids = args.filter((a, i) => !a.startsWith('--') && !['--out', '--qs', '--view', '--only', '--stage', '--t0', '--step'].includes(args[i - 1]));
 const PLAN = {
-  attack: { at: [0.18, 0.38, 0.5, 0.75], rep: 3 }, woefulWallop: { at: [0.3, 0.5, 0.62, 0.8] }, drippingPaw: { at: [0.3, 0.55, 0.8, 1.6] },
+  attack: { at: [0.18, 0.38, 0.5, 0.75], rep: 3 }, glumBonk: { at: [0.2, 0.3, 0.36, 0.5] }, woefulWallop: { at: [0.3, 0.5, 0.62, 0.8] }, drippingPaw: { at: [0.3, 0.55, 0.8, 1.6] },
 };
 const want = ids.length ? ids : ['look', 'idle', 'walk', 'attack', 'woefulWallop', 'drippingPaw', 'wheel'];
 const shot = async (page, name) => { const f = path.join(OUT, `${name}.png`); await page.screenshot({ path: f }); console.log('saved', f); };
@@ -120,7 +121,7 @@ try {
     if (STAGE) await page.evaluate(async (s) => { const G = window.G, { CHARGE } = await import('/src/rpg/charge.js'); window.__stage = s; const P = G.state.player; P.chargePerks = {}; for (const id in CHARGE) if (CHARGE[id] && P.skills[id]) P.chargePerks[id] = Object.fromEntries(Object.entries(CHARGE[id].perks).map(([k, q]) => [k, q.ranks])); }, STAGE);
     // [shot name, skill, when to freeze: seconds after the cast, or 'action:u']
     const PLAN2 = [
-      ['woefulWallop', 'woefulWallop', 'sweep:0.09'], ['tugOfWoe', 'tugOfWoe', 0.55], ['maelstrom', 'maelstrom', 1.0], ['steadfastSulk', 'steadfastSulk', 0.7], ['heaviestSigh', 'heaviestSigh', 1.05],
+      ['glumBonk', 'glumBonk', 'bonk:0.06'], ['woefulWallop', 'woefulWallop', 'sweep:0.09'], ['tugOfWoe', 'tugOfWoe', 0.55], ['maelstrom', 'maelstrom', 1.0], ['steadfastSulk', 'steadfastSulk', 0.7], ['heaviestSigh', 'heaviestSigh', 1.05],
       ['drippingPaw', 'drippingPaw', 0.9], ['grumbleCloud', 'grumbleCloud', 1.6], ['caseOfMopes', 'caseOfMopes', 0.9], ['mournfulAwoo', 'mournfulAwoo', 0.62], ['everlastingGloom', 'everlastingGloom', 1.0],
       ['ghostPups', 'ghostPups', 2.2], ['borrowedWarmth', 'borrowedWarmth', 1.2], ['boneWard', 'boneWard', 1.0], ['wayhomeLantern', 'wayhomeLantern', 1.4], ['grandpawsGhost', 'grandpawsGhost', 3.2],
     ].filter(x => !val('--only') || val('--only').split(',').includes(x[0]));
@@ -136,10 +137,11 @@ try {
         if (id === 'mournfulAwoo') G.skills.stzHex(near, 60, 6, 3, 3); // (a hexed foe for the howl to spread from)
         window.__ok = G.skills.tryCast(id, aim, ['grumbleCloud', 'caseOfMopes', 'everlastingGloom', 'wayhomeLantern'].includes(id) ? null : near, window.__stage ? { stage: window.__stage } : undefined);
         if (id === 'maelstrom' && G.skills.channel) G.skills.channel.toggleHeld = true;
-        window.__t0 = G.engine.time;
+        window.__t0 = G.engine.time; window.__fx0 = G.vfx.stz?._lastBonk ?? -1;
       }, { id });
       // (`at`: seconds after the cast, or 'action:u' — that action's own progress, so a swing freezes at its hit at any attack speed)
-      if (typeof at === 'string' && at.startsWith('sweep:')) await page.waitForFunction(dt => { const f = window.G.vfx.stz?._lastSweep; return f && window.G.vfx.stz.t - f >= +dt; }, at.split(':')[1], { timeout: 15000, polling: 'raf' }).catch(() => {}); // (the wallop's sweep, its edge mid-run)
+      if (typeof at === 'string' && at.startsWith('bonk:')) await page.waitForFunction(dt => { const f = window.G.vfx.stz?._lastBonk; return f != null && f > window.__fx0 && window.G.vfx.stz.t - f >= +dt; }, at.split(':')[1], { timeout: 15000, polling: 'raf' }).catch(() => {}); // (Glum Bonk's splat, just landed)
+      else if (typeof at === 'string' && at.startsWith('sweep:')) await page.waitForFunction(dt => { const f = window.G.vfx.stz?._lastSweep; return f && window.G.vfx.stz.t - f >= +dt; }, at.split(':')[1], { timeout: 15000, polling: 'raf' }).catch(() => {}); // (the wallop's sweep, its edge mid-run)
       else if (typeof at === 'string') await page.waitForFunction(([a, u]) => { const x = window.G.player.anim.action; return x?.name === a && x.t / x.dur >= +u; }, at.split(':'), { timeout: 15000, polling: 'raf' }).catch(() => {});
       else await page.waitForFunction(at => (window.G.engine.time - window.__t0) >= at, at, { timeout: 15000 }).catch(() => {});
       await page.evaluate(() => { window.G.engine.timeScale = 0; });
@@ -199,10 +201,10 @@ try {
     }, close);
     for (const id of fight) {
       if (id === 'strip') { // each swing frozen at 10 moments, cropped round him, as a contact sheet per swing
-        for (const [name, cast, combo] of [['swing1', 'attack', 0], ['swing2', 'attack', 1], ['slam', 'attack', 2], ['wallop', 'woefulWallop', 0]].filter(x => !val('--only') || val('--only').split(',').includes(x[0]))) {
+        for (const [name, cast, combo] of [['swing1', 'attack', 0], ['swing2', 'attack', 1], ['slam', 'attack', 2], ['wallop', 'woefulWallop', 0], ['bonk', 'glumBonk', 0]].filter(x => !val('--only') || val('--only').split(',').includes(x[0]))) {
           await park(true); await sleep(page, 600);
           const rows = [];
-          await page.evaluate(({ cast, combo, view }) => {
+          await page.evaluate(async ({ cast, combo, view, stage }) => {
             const G = window.G, P = G.player, D = G.dungeon, R = G.engine.rig;
             const foes = D.monsters.filter(m => m.alive && !m.def.boss).sort((a, b) => a.pos.distanceTo(P.pos) - b.pos.distanceTo(P.pos));
             // the camera: 'front' faces him (yaw = his facing toward the foe); 'game' is the game's own camera (its yaw kept)
@@ -210,14 +212,15 @@ try {
             if (view === 'front') R.yawTarget = f;
             if (view) { R.distTarget = 9; R.snap(); }
             G.skills.cds = {}; G.state.player.zoom = null; G.skills.stzCombo = combo; G.skills.stzComboT = G.engine.time;
-            G.skills.tryCast(cast, foes[0].pos.clone(), foes[0]); window.__t0 = G.engine.time;
-          }, { cast, combo, view: val('--view') });
+            if (stage) { const { CHARGE } = await import('/src/rpg/charge.js'); if (CHARGE[cast]) G.state.player.chargePerks = { [cast]: Object.fromEntries(Object.entries(CHARGE[cast].perks).map(([k, q]) => [k, q.ranks])) }; }
+            G.skills.tryCast(cast, foes[0].pos.clone(), foes[0], stage && cast !== 'attack' ? { stage } : undefined); window.__t0 = G.engine.time;
+          }, { cast, combo, view: val('--view'), stage: +(val('--stage') || 0) });
           for (let k = 0; k < 10; k++) {
-            const at = 0.08 + k * 0.1;
+            const at = +(val('--t0') || 0.08) + k * +(val('--step') || 0.1); // (--t0 / --step: a denser strip for a fast swing)
             await page.waitForFunction(at => (window.G.engine.time - window.__t0) >= at, at, { timeout: 8000 }).catch(() => {});
             const c = await page.evaluate(() => { const G = window.G; G.engine.timeScale = 0; const v = G.player.pos.clone().setY(G.player.pos.y + 0.6).project(G.engine.camera); return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight }; });
             await sleep(page, 90);
-            const f = path.join(OUT, `strip-${name}${val('--view') ? '-' + val('--view') : ''}-${k}.png`);
+            const f = path.join(OUT, `strip-${name}${val('--view') ? '-' + val('--view') : ''}${val('--stage') ? '-c' + val('--stage') : ''}-${k}.png`);
             await page.screenshot({ path: f, clip: { x: Math.max(0, c.x - 300), y: Math.max(0, c.y - 300), width: 600, height: 600 } });
             rows.push(`${f}\t${name} ${at.toFixed(2)}s`);
             await page.evaluate(() => { window.G.engine.timeScale = 1; });

@@ -76,8 +76,8 @@ const lampPost = seed => { const k = 'post:' + seed; if (!cache.has(k)) cache.se
 
 export const MAPLE_GATE = {
   seal: '#ffc884',
-  glb: { url: null, scale: 1, yaw: 0, y: 0 },
-  build({ main, dress, lp: lp0, gx, gz, yaw, rim, W }) {
+  glb: { url: '/models/gate-maple.glb', scale: 1, yaw: 0, y: 0 },
+  build({ main, frame, dress, lp: lp0, gx, gz, yaw, rim, W }) {
     // (the hollow stands 1.2 m in from the gate's usual spot: the harvest clearing's far rim — its barrel pyramid and
     // lantern line (regions/biomes/maple.js) and the trees beyond — then sits inside and behind the bank, not in the
     // mouth, and the mouth reads clear under the trees)
@@ -85,7 +85,7 @@ export const MAPLE_GATE = {
     const [hx, hz] = lp(0, 0), y0 = Math.max(rim, W.heightAt(hx, hz));
     main.piece(rootHollow(0), hx, hz, yaw, { y: y0 - 0.15 });
     { const [x, z] = lp(-3.7, -2.2); dress.multi(F.maple('weep', 1, 'scarlet'), x, W.heightAt(x, z) + 0.5, z, { rot: 1.3, s: 0.85 }); }
-    { const [x, z] = lp(0, 1.85); dress.piece(BP.torii(6, { w: 3.0, h: 3.1 }), x, z, yaw, { y: W.heightAt(x, z) }); for (const e of [-1, 1]) { const [px, pz] = lp(e * 1.5, 1.85); W.collision.addCircle(px, pz, 0.22); } }
+    { const [x, z] = lp(0, 1.85); frame.piece(BP.torii(6, { w: 3.0, h: 3.1 }), x, z, yaw, { y: W.heightAt(x, z) }); for (const e of [-1, 1]) { const [px, pz] = lp(e * 1.5, 1.85); W.collision.addCircle(px, pz, 0.22); } }
     const lanterns = [];
     for (const e of [-1, 1]) { // red paper lanterns on posts, their arms reaching in toward the path
       const [x, z] = lp(e * 2.6, 1.5), y = W.heightAt(x, z); dress.piece(lampPost(e + 2), x, z, yaw - e * Math.PI / 2, { y, lights: false }); W.collision.addCircle(x, z, 0.22);

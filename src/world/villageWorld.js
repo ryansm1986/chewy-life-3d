@@ -11,6 +11,7 @@ import { applyLayout, reservedAt, distToPaths, LANDMARKS } from './layout.js';
 import { validatePlots } from './plots.js';
 import { sizeOf } from './buildings/catalog.js';
 import { Collision } from './collision.js';
+import { CLIMB_SLOPE } from '../actors/traverse.js';
 
 export class VillageWorld {
   // rank: the village's ring rank (state.village.ringRank): the expansion rings' stub streets up to it are paved
@@ -70,6 +71,16 @@ export class VillageWorld {
     if (this.deckAt(x, z)) return true;
     const h = this.terrain.heightAt(x, z);
     return h > -0.22 && this.terrain.slopeAt(x, z) < 0.5;
+  }
+  // swimming and climbing (actors/traverse.js, ROADMAP TR-1): a swimmer or climber may go anywhere on the island and in
+  // its waters (the colliders still stop them), out to the map's edge; the climb faces are the natural steep rock, not the
+  // waterfall's rock garden (its boulders stand there)
+  travelOk(x, z) { return x > 2 && z > 2 && x < WORLD - 2 && z < WORLD - 2; }
+  waterDepth(x, z) { if (this.deckAt(x, z)) return 0; const h = this.terrain.heightAt(x, z); return h < 0 ? -h : 0; }
+  waterSurface() { return 0; }
+  climbable(x, z) {
+    if (this.deckAt(x, z) || this.terrain.heightAt(x, z) < -0.22 || this.terrain.slopeAt(x, z) < CLIMB_SLOPE) return false;
+    return !(x > 88 && x < 112 && z > 17 && z < 46); // (the falls and their garden)
   }
   onVegRemoved(rec) {
     if (rec.col?.ref) this.collision.remove(rec.col.ref);

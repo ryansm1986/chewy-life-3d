@@ -48,7 +48,7 @@ export class ChargeController {
   // ------------------------------------------------------------------ input
   /** A hotbar key is down this frame (called every frame while held). → true if it was handled. */
   feed(slot, id, aim, target = null) {
-    if (!id) return false;
+    if (!id || this.G?.player?.trav?.busy) return false; // (swimming / climbing: no wind-ups either)
     const R = this.runner, edge = !this.prev[slot], mode = this.mode;
     this.fed[slot] = true;
     if (mode === CHARGE_MODE.OFF || !chargeable(id)) {
@@ -75,7 +75,7 @@ export class ChargeController {
     this.press = { slot, id, t: 0, toggle: mode === CHARGE_MODE.TOGGLE, warned: false };
     return true;
   }
-  tap() { const pr = this.press; this.press = null; if (pr) this.runner.tryCast(pr.id, this.aim, this.target); }
+  tap() { const pr = this.press; this.press = null; if (!pr) return; const R = this.runner; R.tapping = true; try { R.tryCast(pr.id, this.aim, this.target); } finally { R.tapping = false; } } // (tapping: a real tap, which a combo chain may buffer through the swing: combat/combo.js bufferFor)
   cast(id, charge) { return this.runner.tryCast(id, this.aim, this.target, charge); }
 
   // ------------------------------------------------------------------ per frame (SkillRunner.update)

@@ -5,7 +5,9 @@
 // Assets: src/regions/assets/bambooFlora.js / bambooProps.js (drawn through the bambooKit Placer).
 import * as THREE from 'three';
 import * as F from '../assets/bambooFlora.js';
-import * as Pr from '../assets/bambooProps.js';
+import * as PrKit from '../assets/bambooProps.js';
+import { withGlb } from '../assets/glbPieces.js';
+const Pr = withGlb('bamboo', PrKit); // (its landmark props drawn from their Blender models once loaded: ROADMAP Z-D6)
 import { Placer, M } from '../assets/bambooKit.js';
 import { Events } from '../../core/events.js';
 import { farAt, spots, tallOk, gladeGround } from '../../cozy/wildKit.js';

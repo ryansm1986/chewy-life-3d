@@ -104,6 +104,8 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
       r.puffed = await until(() => (G.skills.gldW?.puffs || 0) > 0, 3000); await until(() => !G.skills.gldW, 3000);
       await until(() => !P.anim.action, 2000);
       G.skills.cds = {}; st.zoom = null; r.charged = G.skills.tryCast('sunbeamThrust', at(), null, { stage: 1 }) && G.player.anim.action?.name === 'sunbeamThrust';
+      await until(() => !P.anim.action, 2000); st.skills.eagerJabs = 3; G.actions.recompute(); // (Eager Jabs: the flurry of three jabs, the second level-1 lance attack)
+      G.skills.cds = {}; st.zoom = null; r.jabs = G.skills.tryCast('eagerJabs', at(), null) && G.player.anim.action?.name === 'eagerJabs';
       await until(() => !P.anim.action, 2000);
       G.heroes.cd = 0; r.switch = G.heroes.switchTo('chewy', { quiet: true });
       await until(() => G.state.activeHero === 'chewy' && !G.heroSwitching, 6000);
@@ -555,7 +557,7 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
     const at = sel => E(sel => { const e = document.querySelector(sel), r = e?.getBoundingClientRect(); return r?.width ? [r.x + r.width / 2, r.y + r.height / 2] : null; }, sel);
     await E(() => { const G = window.G, pl = G.state.player; pl.lvl = 14; pl.skillPts = 3; Object.assign(pl.skills, { chomp: 6, whirl: 3 }); pl.chargePerks = {}; G.state.flags.hints = { all: true }; G.actions.recompute(); });
     await page.mouse.move(1500, 450); await page.keyboard.press('k');
-    const open = await W(() => window.G.ui.isOpen('skills') && !document.querySelector('.pw.opening') && document.querySelectorAll('.chg-pick .chg-sk').length === 4);
+    const open = await W(() => window.G.ui.isOpen('skills') && !document.querySelector('.pw.opening') && document.querySelectorAll('.chg-pick .chg-sk').length === 5); // (Bone Blade: Swallow Return, Crescent Chomp, Whirlwind Stance, Helmet Splitter, Sakura Storm)
     const b = await at('.chg-sk[data-k="whirl"]'); if (b) await page.mouse.click(b[0], b[1]);
     const shown = await W(() => window.G.ui.panels.skills.chg.id === 'whirl' && !document.querySelector('.chg-drawer.swap'));
     const p = await E(() => document.querySelector('.chg-pk.can')?.dataset.p || null), pb = p && await at(`.chg-pk[data-p="${p}"]`);
@@ -569,7 +571,7 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
   const pz = s.poe, poeOk = !pz || (pz.hero === 'poe' && (!TOY_POE || (s.model === 'poe_toy' && pz.baked)) && (!POE_FUMA || (pz.fuma === 'glb' && pz.villagerFuma === 'glb')) && pz.back && pz.wt === 'fuma' && pz.cast && pz.flying && pz.caught && pz.icons && pz.switch && pz.after === 'chewy' && pz.poeVillager);
   const sz = s.shihtzu, stzOk = !sz || (sz.hero === 'shihtzu' && (!TOY_STZ || (s.model === 'shihtzu_toy' && sz.baked)) && (!STZ_FLAIL || (sz.flail === 'glb' && sz.links && sz.villager === 'glb')) && sz.chain && sz.wt === 'flail' && sz.dr >= 5 && sz.icons && sz.kit?.pups >= 2 && sz.kit.gp && sz.kit.lantern && sz.switch && sz.after === 'chewy');
   const gd = s.golden, gldOk = !gd || (gd.hero === 'golden' && (!TOY_GOLDEN || (gd.model === 'golden_toy' && gd.baked)) && (!GLD_PROPS || (gd.lance && gd.villager)) && gd.wt === 'lance' && gd.shadowLife >= 20
-    && gd.whelp && (!WHELP || (gd.whelpModel === 'shadow_whelp' && gd.wings)) && gd.flying && gd.icons && gd.thrust && gd.dart && gd.javelin && gd.landed && gd.jump && gd.air && gd.crash && gd.breath && gd.puffed && gd.charged && gd.switch && gd.after === 'chewy' && gd.whelpOff);
+    && gd.whelp && (!WHELP || (gd.whelpModel === 'shadow_whelp' && gd.wings)) && gd.flying && gd.icons && gd.thrust && gd.dart && gd.javelin && gd.landed && gd.jump && gd.air && gd.crash && gd.breath && gd.puffed && gd.charged && gd.jabs && gd.switch && gd.after === 'chewy' && gd.whelpOff);
   const sl = s.stella, stlOk = !sl || (sl.hero === 'stella' && (!TOY_STELLA || (sl.model === 'stella_toy' && sl.baked)) && (!STL_WAGASA || (sl.wagasa && sl.tassels >= 4)) && sl.wt === 'parasol' && sl.revive === 6
     && sl.icons && sl.sweep && sl.ray && sl.light && sl.healed && sl.shell && sl.charged && sl.flare && sl.flareHit && sl.sun && sl.switch && sl.after === 'chewy' && sl.cleared);
   const dg = s.dig, digOk = !dg || (dg.nodes === 10 && dg.draws === 3 && dg.gathered && dg.nose && dg.dug && dg.perfect === 1);
@@ -577,7 +579,7 @@ for (const [label, q] of [['title', '/?smoke=1'], ['village', '/?fresh&nointro']
   const pc = s.peaceful, peaceOk = !pc || (pc.board && pc.cards >= 1 && pc.css === '760px' && pc.peace && pc.wild === 2 && pc.allWild && pc.edge && pc.glades >= 2 && pc.zoneBoard && (!pc.sight || pc.bounty));
   const gl = s.guild, guildOk = !gl || (gl.built && gl.model && gl.hachi && gl.css === '960px' && gl.cands === 3 && gl.hired && gl.out === 1 && gl.away && gl.back && gl.xp > 0 && gl.inTown);
   const cc = s.crewclear, crewOk = !cc || (cc.offered && cc.out === 1 && cc.result === 'success' && cc.crew === 1 && cc.cleared === 0 && cc.t1 === 1 && cc.maple && cc.fan0 === 0 && cc.claim && cc.fan === 1 && cc.ribbon && cc.stamp === 'Saved' && cc.lit);
-  const cz = s.cozy, cozyOk = !cz || (cz.board && cz.css === '1010px' && cz.cards >= 6 && cz.out === 1 && cz.away && cz.back && /success|partial|setback/.test(cz.report) && cz.xp > 0 && cz.chip && cz.inTown && cz.card && cz.log >= 1 && cz.guides === 13); // (13 since H-6: Meet Stella)
+  const cz = s.cozy, cozyOk = !cz || (cz.board && cz.css === '1010px' && cz.cards >= 6 && cz.out === 1 && cz.away && cz.back && /success|partial|setback/.test(cz.report) && cz.xp > 0 && cz.chip && cz.inTown && cz.card && cz.log >= 1 && cz.guides === 14); // (13 since H-6: Meet Stella; 14 with Tap, tap, finish!: docs/COMBO.md)
   const db = s.debug, debugOk = (label !== 'village' || s.noDebug) && (!db || (db.refused && db.on && db.chunk && db.tabs >= 10 && db.css === '760px' && db.coins === 1000 && db.used && db.closed));
   const pd = s.pad, padOk = !pd || (pd.dev === 'pad' && pd.moved > 1.5 && pd.glyphs >= 6 && pd.cursor && pd.cast >= 1 && pd.focus);
   const tc = s.touch, touchOk = !tc || (tc.dev === 'touch' && tc.on && tc.slots === 6 && tc.preset === 4 && tc.pr === 1 && tc.phone && tc.moved > 1 && tc.manifest && tc.burrow?.gone > 0 && tc.burrow.calls > 0 && tc.burrow2?.gone > 0 && tc.burrow2.calls > 0);

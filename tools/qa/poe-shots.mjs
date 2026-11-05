@@ -1,9 +1,10 @@
 // Poe look-review shots (docs/POE.md): a real Burrow fight as Poe, each skill cast at a pack, frozen at its peak.
-//   node tools/qa/poe-shots.mjs [attack fumaThrow kunaiFan ...] [--charge 1|2|3] [--close] [--follow] [--village] [--out dir]
+//   node tools/qa/poe-shots.mjs [attack fumaThrow kunaiFan ...] [--charge 1|2|3] [--close] [--game] [--follow] [--village] [--out dir]
 // Writes PNGs to tools/qa/tmp/poe-shots (gitignored) (or --out) and prints any runtime errors. Time is frozen per shot
 // (engine.timeScale 0) once the effect has had `at` seconds to develop, so the frame shows the move itself.
 // --charge s casts the charged release at stage s with every perk (docs/CHARGE.md; the wind-up poses: charge-shots.mjs);
-// --follow frames the thrown fūma half-way between her and it (as the camera would show a long throw).
+// --follow frames the thrown fūma half-way between her and it (as the camera would show a long throw); --game shoots at the
+// game's own dungeon camera distance (22). A plan with `near` parks the pack in melee reach (Fūma Flurry).
 import { launch, boot, waitMode, sleep } from './lib.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,7 +19,7 @@ const STAGE = +(val('--charge') || 0);
 const ids = args.filter((a, i) => !a.startsWith('--') && !['--out', '--qs', '--charge'].includes(args[i - 1]));
 // skill → the seconds after the cast to freeze at
 const PLAN = {
-  attack: { at: [0.22, 0.5, 0.95], rep: 3 }, fumaThrow: { at: [0.3, 0.45, 0.6, 0.75, 0.9, 1.05] }, kunaiFan: { at: [0.32, 0.45, 0.62] },
+  attack: { at: [0.22, 0.5, 0.95], rep: 3 }, fumaThrow: { at: [0.3, 0.45, 0.6, 0.75, 0.9, 1.05] }, fumaFlurry: { at: [0.1, 0.16, 0.27, 0.35, 0.44, 0.5, 0.58, 0.66, 0.8], near: true }, kunaiFan: { at: [0.32, 0.45, 0.62] },
   shadowStitch: { at: [0.3, 0.55, 1.1] }, whirlingFuma: { at: [0.42, 0.9, 1.8] }, shurikenRain: { at: [0.35, 0.8, 1.3, 1.8] },
   thousandStars: { at: [0.4, 1.0, 1.8] }, smokeBomb: { at: [0.3, 0.45, 0.8, 1.6] }, puffBall: { at: [0.42, 0.65, 0.95] },
   shadowClone: { at: [0.42, 0.7, 1.5] }, substitution: { at: [0.15, 0.4, 1.2, 2.8] }, thunderPaw: { at: [0.42, 0.55, 0.75] },
@@ -31,6 +32,7 @@ try {
   await boot(page, (flag('--village') ? 'fresh&nointro&notut&hero=poe' : 'fresh&nointro&notut&hero=poe&floor=1') + QS);
   if (!flag('--village')) await waitMode(page, 'dungeon');
   if (flag('--close')) await page.evaluate(() => { window.__close = true; });
+  if (flag('--game')) await page.evaluate(() => { window.__game = true; });
   await sleep(page, 1200);
   // a level-30 Poe with every skill at 12 (and every perk when charging), full zoom
   await page.evaluate(async (stage) => {
@@ -45,7 +47,7 @@ try {
   for (const id of list) {
     const plan = PLAN[id] || { at: [0.3, 0.6, 1.0] };
     // a fresh pack each time: up to 5 monsters parked 3-5 m off (to the screen's right, toward the camera), tough and still
-    const ok = await page.evaluate(async () => {
+    const ok = await page.evaluate(async (near) => {
       const G = window.G, P = G.player, D = G.dungeon;
       if (!D) return false;
       G.engine.timeScale = 1;
@@ -54,11 +56,11 @@ try {
       const live = D.monsters.filter(m => m.alive && !m.def.boss);
       const { f: cf, r: cr } = G.engine.rig.groundAxes(), L = Math.hypot(cr.x - 0.15 * cf.x, cr.z - 0.15 * cf.z), f = { x: (cr.x - 0.15 * cf.x) / L, z: (cr.z - 0.15 * cf.z) / L }; // (the pack to the screen's right, clear of the HUD)
       P.facing = P.faceTarget = Math.atan2(f.x, f.z);
-      live.slice(0, 5).forEach((m, i) => { const a = (i - 2) * (window.__close ? 0.28 : 0.42), d = (3.4 + (i % 2) * 1.3) * (window.__close ? 0.8 : 1); m.pos.set(P.pos.x + (f.x * Math.cos(a) - f.z * Math.sin(a)) * d, m.pos.y, P.pos.z + (f.z * Math.cos(a) + f.x * Math.sin(a)) * d); m.aggro = false; m.lifeMax = m.life = 1e6; m.status = { stun: 999 }; m.cancelAttack?.(); });
+      live.slice(0, 5).forEach((m, i) => { const a = (i - 2) * (window.__close ? 0.28 : 0.42), d = near ? 1.9 + (i % 2) * 0.9 + (i === 2 ? -0.3 : 0) : (3.4 + (i % 2) * 1.3) * (window.__close ? 0.8 : 1); m.pos.set(P.pos.x + (f.x * Math.cos(a) - f.z * Math.sin(a)) * d, m.pos.y, P.pos.z + (f.z * Math.cos(a) + f.x * Math.sin(a)) * d); m.aggro = false; m.lifeMax = m.life = 1e6; m.status = { stun: 999 }; m.cancelAttack?.(); });
       for (const m of live.slice(5)) if (Math.hypot(m.pos.x - P.pos.x, m.pos.z - P.pos.z) < 14) m.pos.x += 30;
       G.skills.cds = {}; G.actions.restoreAll?.();
-      G.engine.rig.distTarget = window.__close ? 7.5 : 13; return true;
-    });
+      G.engine.rig.distTarget = window.__close ? 7.5 : window.__game ? 22 : 13; return true;
+    }, !!plan.near);
     if (!ok) { console.log('no dungeon'); break; }
     await sleep(page, 500);
     for (let k = 0; k < plan.at.length; k++) {

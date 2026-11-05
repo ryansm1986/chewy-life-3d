@@ -1,0 +1,822 @@
+{
+  "bones": [
+    {
+      "name": "root",
+      "parent": null,
+      "head_blender_m": [
+        0.0,
+        -0.008,
+        0.0
+      ],
+      "head_game_m": [
+        0.0,
+        0.0,
+        0.008
+      ]
+    },
+    {
+      "name": "hips",
+      "parent": "root",
+      "head_blender_m": [
+        0.0,
+        -0.008,
+        0.3
+      ],
+      "head_game_m": [
+        0.0,
+        0.3,
+        0.008
+      ]
+    },
+    {
+      "name": "spine",
+      "parent": "hips",
+      "head_blender_m": [
+        0.0,
+        -0.008,
+        0.39
+      ],
+      "head_game_m": [
+        0.0,
+        0.39,
+        0.008
+      ]
+    },
+    {
+      "name": "chest",
+      "parent": "spine",
+      "head_blender_m": [
+        0.0,
+        -0.012,
+        0.48
+      ],
+      "head_game_m": [
+        0.0,
+        0.48,
+        0.012
+      ]
+    },
+    {
+      "name": "neck",
+      "parent": "chest",
+      "head_blender_m": [
+        0.0,
+        -0.012,
+        0.58
+      ],
+      "head_game_m": [
+        0.0,
+        0.58,
+        0.012
+      ]
+    },
+    {
+      "name": "head",
+      "parent": "neck",
+      "head_blender_m": [
+        0.0,
+        0.04396,
+        0.5999
+      ],
+      "head_game_m": [
+        0.0,
+        0.5999,
+        -0.04396
+      ]
+    },
+    {
+      "name": "jaw",
+      "parent": "head",
+      "head_blender_m": [
+        0.0,
+        -0.15218,
+        0.72209
+      ],
+      "head_game_m": [
+        0.0,
+        0.72209,
+        0.15218
+      ]
+    },
+    {
+      "name": "eye_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.1563,
+        -0.21381,
+        0.8102
+      ],
+      "head_game_m": [
+        0.1563,
+        0.8102,
+        0.21381
+      ]
+    },
+    {
+      "name": "lidU_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.10956,
+        -0.13285,
+        0.80038
+      ],
+      "head_game_m": [
+        0.10956,
+        0.80038,
+        0.13285
+      ]
+    },
+    {
+      "name": "lidD_L",
+      "parent": "head",
+      "head_blender_m": [
+        -0.00601,
+        0.06733,
+        1.40337
+      ],
+      "head_game_m": [
+        -0.00601,
+        1.40337,
+        -0.06733
+      ]
+    },
+    {
+      "name": "brow_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.15312,
+        -0.18194,
+        0.9462
+      ],
+      "head_game_m": [
+        0.15312,
+        0.9462,
+        0.18194
+      ]
+    },
+    {
+      "name": "lip_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.05916,
+        -0.29462,
+        0.72209
+      ],
+      "head_game_m": [
+        0.05916,
+        0.72209,
+        0.29462
+      ]
+    },
+    {
+      "name": "ear_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.19911,
+        -0.00152,
+        1.0492
+      ],
+      "head_game_m": [
+        0.19911,
+        1.0492,
+        0.00152
+      ]
+    },
+    {
+      "name": "earTip_L",
+      "parent": "ear_L",
+      "head_blender_m": [
+        0.22947,
+        -0.01384,
+        1.13225
+      ],
+      "head_game_m": [
+        0.22947,
+        1.13225,
+        0.01384
+      ]
+    },
+    {
+      "name": "upperarm_L",
+      "parent": "chest",
+      "head_blender_m": [
+        0.165,
+        0.012,
+        0.5
+      ],
+      "head_game_m": [
+        0.165,
+        0.5,
+        -0.012
+      ]
+    },
+    {
+      "name": "forearm_L",
+      "parent": "upperarm_L",
+      "head_blender_m": [
+        0.27485,
+        0.0218,
+        0.43257
+      ],
+      "head_game_m": [
+        0.27485,
+        0.43257,
+        -0.0218
+      ]
+    },
+    {
+      "name": "hand_L",
+      "parent": "forearm_L",
+      "head_blender_m": [
+        0.32119,
+        0.0236,
+        0.35544
+      ],
+      "head_game_m": [
+        0.32119,
+        0.35544,
+        -0.0236
+      ]
+    },
+    {
+      "name": "thigh_L",
+      "parent": "hips",
+      "head_blender_m": [
+        0.1,
+        -0.008,
+        0.29
+      ],
+      "head_game_m": [
+        0.1,
+        0.29,
+        0.008
+      ]
+    },
+    {
+      "name": "shin_L",
+      "parent": "thigh_L",
+      "head_blender_m": [
+        0.13575,
+        -0.0146,
+        0.18
+      ],
+      "head_game_m": [
+        0.13575,
+        0.18,
+        0.0146
+      ]
+    },
+    {
+      "name": "foot_L",
+      "parent": "shin_L",
+      "head_blender_m": [
+        0.165,
+        -0.02,
+        0.09
+      ],
+      "head_game_m": [
+        0.165,
+        0.09,
+        0.02
+      ]
+    },
+    {
+      "name": "eye_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.1563,
+        -0.21381,
+        0.8102
+      ],
+      "head_game_m": [
+        -0.1563,
+        0.8102,
+        0.21381
+      ]
+    },
+    {
+      "name": "lidU_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.10956,
+        -0.13285,
+        0.80038
+      ],
+      "head_game_m": [
+        -0.10956,
+        0.80038,
+        0.13285
+      ]
+    },
+    {
+      "name": "lidD_R",
+      "parent": "head",
+      "head_blender_m": [
+        0.00601,
+        0.06733,
+        1.40337
+      ],
+      "head_game_m": [
+        0.00601,
+        1.40337,
+        -0.06733
+      ]
+    },
+    {
+      "name": "brow_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.15312,
+        -0.18194,
+        0.9462
+      ],
+      "head_game_m": [
+        -0.15312,
+        0.9462,
+        0.18194
+      ]
+    },
+    {
+      "name": "lip_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.05916,
+        -0.29462,
+        0.72209
+      ],
+      "head_game_m": [
+        -0.05916,
+        0.72209,
+        0.29462
+      ]
+    },
+    {
+      "name": "ear_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.19911,
+        -0.00152,
+        1.0492
+      ],
+      "head_game_m": [
+        -0.19911,
+        1.0492,
+        0.00152
+      ]
+    },
+    {
+      "name": "earTip_R",
+      "parent": "ear_R",
+      "head_blender_m": [
+        -0.22947,
+        -0.01384,
+        1.13225
+      ],
+      "head_game_m": [
+        -0.22947,
+        1.13225,
+        0.01384
+      ]
+    },
+    {
+      "name": "upperarm_R",
+      "parent": "chest",
+      "head_blender_m": [
+        -0.165,
+        0.012,
+        0.5
+      ],
+      "head_game_m": [
+        -0.165,
+        0.5,
+        -0.012
+      ]
+    },
+    {
+      "name": "forearm_R",
+      "parent": "upperarm_R",
+      "head_blender_m": [
+        -0.27485,
+        0.0218,
+        0.43257
+      ],
+      "head_game_m": [
+        -0.27485,
+        0.43257,
+        -0.0218
+      ]
+    },
+    {
+      "name": "hand_R",
+      "parent": "forearm_R",
+      "head_blender_m": [
+        -0.32119,
+        0.0236,
+        0.35544
+      ],
+      "head_game_m": [
+        -0.32119,
+        0.35544,
+        -0.0236
+      ]
+    },
+    {
+      "name": "thigh_R",
+      "parent": "hips",
+      "head_blender_m": [
+        -0.1,
+        -0.008,
+        0.29
+      ],
+      "head_game_m": [
+        -0.1,
+        0.29,
+        0.008
+      ]
+    },
+    {
+      "name": "shin_R",
+      "parent": "thigh_R",
+      "head_blender_m": [
+        -0.13575,
+        -0.0146,
+        0.18
+      ],
+      "head_game_m": [
+        -0.13575,
+        0.18,
+        0.0146
+      ]
+    },
+    {
+      "name": "foot_R",
+      "parent": "shin_R",
+      "head_blender_m": [
+        -0.165,
+        -0.02,
+        0.09
+      ],
+      "head_game_m": [
+        -0.165,
+        0.09,
+        0.02
+      ]
+    },
+    {
+      "name": "tail1",
+      "parent": "hips",
+      "head_blender_m": [
+        -0.03,
+        0.15,
+        0.33
+      ],
+      "head_game_m": [
+        -0.03,
+        0.33,
+        -0.15
+      ]
+    },
+    {
+      "name": "tail2",
+      "parent": "tail1",
+      "head_blender_m": [
+        -0.13404,
+        0.27917,
+        0.2961
+      ],
+      "head_game_m": [
+        -0.13404,
+        0.2961,
+        -0.27917
+      ]
+    },
+    {
+      "name": "tail3",
+      "parent": "tail2",
+      "head_blender_m": [
+        -0.24544,
+        0.35695,
+        0.32836
+      ],
+      "head_game_m": [
+        -0.24544,
+        0.32836,
+        -0.35695
+      ]
+    },
+    {
+      "name": "tail4",
+      "parent": "tail3",
+      "head_blender_m": [
+        -0.31701,
+        0.3856,
+        0.44246
+      ],
+      "head_game_m": [
+        -0.31701,
+        0.44246,
+        -0.3856
+      ]
+    }
+  ],
+  "triangles": 33932,
+  "lids": {
+    "lidU_L": {
+      "pivot": [
+        0.10955717975382459,
+        -0.13284612917778305,
+        0.8003778690405495
+      ],
+      "R": 0.11,
+      "closed_eye_specks_of_1600": {
+        "front": 16,
+        "game+45": 10,
+        "game-45": 10
+      },
+      "span_c": 1.16,
+      "squint_coverage_centre": 0.239,
+      "rest_margin_rad": -0.157,
+      "conflicts_rest_hidden_vs_closed": 21,
+      "closed_standoff_over_eye_mm": 10.75,
+      "hinge_blender": [
+        0.86602,
+        0.5,
+        0.0
+      ]
+    },
+    "lidD_L": {
+      "pivot": [
+        -0.006014893647386638,
+        0.0673300078638217,
+        1.4033658398538802
+      ],
+      "lever_m": 0.725,
+      "beta_deg": 62.0,
+      "happy_cover_centre": 0.28,
+      "happy_cover_corners": 0.2,
+      "hinge_blender": [
+        0.86602,
+        0.5,
+        0.0
+      ]
+    },
+    "lidU_R": {
+      "pivot": [
+        -0.10955717975382459,
+        -0.13284612917778305,
+        0.8003778690405495
+      ],
+      "R": 0.11,
+      "closed_eye_specks_of_1600": {
+        "front": 20,
+        "game+45": 10,
+        "game-45": 11
+      },
+      "span_c": 1.16,
+      "squint_coverage_centre": 0.239,
+      "rest_margin_rad": -0.157,
+      "conflicts_rest_hidden_vs_closed": 21,
+      "closed_standoff_over_eye_mm": 10.75,
+      "hinge_blender": [
+        0.86602,
+        -0.5,
+        0.0
+      ]
+    },
+    "lidD_R": {
+      "pivot": [
+        0.006014893647386638,
+        0.0673300078638217,
+        1.4033658398538802
+      ],
+      "lever_m": 0.725,
+      "beta_deg": 62.0,
+      "happy_cover_centre": 0.28,
+      "happy_cover_corners": 0.2,
+      "hinge_blender": [
+        0.86602,
+        -0.5,
+        0.0
+      ]
+    }
+  },
+  "lids_hidden_check": {
+    "Kazemaru_lidU_L@0.0": {
+      "max_sdf_mm": 4.1,
+      "outside_count": 12,
+      "seen_by_rays": {
+        "front": 16,
+        "game+45": 16,
+        "game-45": 15,
+        "below": 16
+      }
+    },
+    "Kazemaru_lidD_L@0.0": {
+      "max_sdf_mm": -87.88,
+      "outside_count": 0,
+      "seen_by_rays": {
+        "front": 0,
+        "game+45": 0,
+        "game-45": 0,
+        "below": 0
+      }
+    },
+    "Kazemaru_lidD_L@-0.1": {
+      "max_sdf_mm": -61.33,
+      "outside_count": 0,
+      "seen_by_rays": {
+        "front": 0,
+        "game+45": 0,
+        "game-45": 0,
+        "below": 0
+      }
+    },
+    "Kazemaru_lidU_R@0.0": {
+      "max_sdf_mm": 4.1,
+      "outside_count": 12,
+      "seen_by_rays": {
+        "front": 16,
+        "game+45": 15,
+        "game-45": 16,
+        "below": 16
+      }
+    },
+    "Kazemaru_lidD_R@0.0": {
+      "max_sdf_mm": -87.88,
+      "outside_count": 0,
+      "seen_by_rays": {
+        "front": 0,
+        "game+45": 0,
+        "game-45": 0,
+        "below": 0
+      }
+    },
+    "Kazemaru_lidD_R@-0.1": {
+      "max_sdf_mm": -61.33,
+      "outside_count": 0,
+      "seen_by_rays": {
+        "front": 0,
+        "game+45": 0,
+        "game-45": 0,
+        "below": 0
+      }
+    },
+    "Kazemaru_lidU_L@blink 0.3": {
+      "max_sdf_outside_opening_mm": 12.0,
+      "outside_count": 1
+    },
+    "Kazemaru_lidU_L@blink 0.45": {
+      "max_sdf_outside_opening_mm": -1.28,
+      "outside_count": 0
+    },
+    "Kazemaru_lidU_L@blink 0.6": {
+      "max_sdf_outside_opening_mm": -1.23,
+      "outside_count": 0
+    },
+    "Kazemaru_lidU_L@blink 0.75": {
+      "max_sdf_outside_opening_mm": 2.41,
+      "outside_count": 3
+    },
+    "Kazemaru_lidU_L@blink 0.9": {
+      "max_sdf_outside_opening_mm": 4.47,
+      "outside_count": 18
+    },
+    "Kazemaru_lidU_L@blink 1.05": {
+      "max_sdf_outside_opening_mm": 1.38,
+      "outside_count": 15
+    },
+    "Kazemaru_lidU_R@blink 0.3": {
+      "max_sdf_outside_opening_mm": 12.0,
+      "outside_count": 1
+    },
+    "Kazemaru_lidU_R@blink 0.45": {
+      "max_sdf_outside_opening_mm": -1.28,
+      "outside_count": 0
+    },
+    "Kazemaru_lidU_R@blink 0.6": {
+      "max_sdf_outside_opening_mm": -1.23,
+      "outside_count": 0
+    },
+    "Kazemaru_lidU_R@blink 0.75": {
+      "max_sdf_outside_opening_mm": 2.41,
+      "outside_count": 3
+    },
+    "Kazemaru_lidU_R@blink 0.9": {
+      "max_sdf_outside_opening_mm": 4.47,
+      "outside_count": 18
+    },
+    "Kazemaru_lidU_R@blink 1.05": {
+      "max_sdf_outside_opening_mm": 1.38,
+      "outside_count": 15
+    },
+    "Kazemaru_mouth_cavity@rest": {
+      "max_sdf_mm": 0.0,
+      "outside_count": 82
+    },
+    "Kazemaru_tongue@rest": {
+      "max_sdf_mm": -28.94,
+      "outside_count": 0
+    }
+  },
+  "squint_designed_for": [
+    0.12,
+    -0.24
+  ],
+  "lidTilt": 0.5236,
+  "lid_hinge_blender": {
+    "L": [
+      0.86602,
+      0.5,
+      0.0
+    ],
+    "R": [
+      0.86602,
+      -0.5,
+      0.0
+    ]
+  },
+  "mouth": {
+    "parting_vertices": 41,
+    "split_vertices": 39,
+    "cavity_rim_points": 41,
+    "corner_z_m": 0.7221
+  },
+  "ears": {
+    "v_root": 0.06,
+    "v_fold": 0.5,
+    "root_inward_fraction": 0.0
+  },
+  "tailRoot": [
+    -0.03,
+    0.15,
+    0.33
+  ],
+  "tail_t": [
+    0.0,
+    0.3,
+    0.55,
+    0.8
+  ],
+  "rest_vs_approved": {
+    "Kazemaru_head": 0.0,
+    "Kazemaru_eye_R": 0.0,
+    "Kazemaru_eye_L": 0.0,
+    "Kazemaru_ear_L": 0.0,
+    "Kazemaru_ear_R": 0.0,
+    "Kazemaru_band": 0.0,
+    "Kazemaru_body": 0.0,
+    "Kazemaru_gi_skirt": 0.0,
+    "Kazemaru_hakama": 0.0,
+    "Kazemaru_sleeve_L": 0.0,
+    "Kazemaru_arm_L": 0.0,
+    "Kazemaru_sleeve_R": 0.0,
+    "Kazemaru_arm_R": 0.0,
+    "Kazemaru_tail": 0.0
+  },
+  "objects": {
+    "Kazemaru_head": 8042,
+    "Kazemaru_eye_R": 704,
+    "Kazemaru_eye_L": 704,
+    "Kazemaru_ear_L": 2816,
+    "Kazemaru_ear_R": 2816,
+    "Kazemaru_band": 2568,
+    "Kazemaru_body": 4436,
+    "Kazemaru_gi_skirt": 1344,
+    "Kazemaru_hakama": 1904,
+    "Kazemaru_sleeve_L": 1056,
+    "Kazemaru_arm_L": 716,
+    "Kazemaru_sleeve_R": 1056,
+    "Kazemaru_arm_R": 716,
+    "Kazemaru_tail": 1120,
+    "Kazemaru_mouth_cavity": 570,
+    "Kazemaru_tongue": 108,
+    "Kazemaru_lidU_L": 972,
+    "Kazemaru_lidD_L": 288,
+    "Kazemaru_lidU_R": 972,
+    "Kazemaru_lidD_R": 288,
+    "Kaze_lash_L": 368,
+    "Kaze_lash_R": 368
+  },
+  "rewound_faces": {
+    "Kazemaru_body": 14,
+    "Kazemaru_gi_skirt": 48,
+    "Kazemaru_hakama": 51,
+    "Kazemaru_sleeve_L": 8,
+    "Kazemaru_sleeve_R": 9,
+    "Kazemaru_tail": 2,
+    "Kazemaru_mouth_cavity": 2,
+    "Kazemaru_lidU_L": 3,
+    "Kazemaru_lidU_R": 3
+  },
+  "notes": [
+    "Game axes: X = Blender +X, Y = Blender +Z, Z = Blender -Y; pose bones use YZX Euler = three.js XYZ.",
+    "Head pivot at the skull base (back of the neck, chin height), not the head centre; neck at the collar.",
+    "Lids are rigid shells about their bone world X axis (a radius per vertex): blink +1.22 closes, +0.488 is the happy squint, lidD -0.1 neutral, -0.24 happy. Their pivots sit behind the eyes (a 13 cm opening needs an 11+ cm hinge for 1.22 rad), not at the eyeball centres.",
+    "The mouth parting was cut in the model (round 2); the lower copies are jaw-side, the corners shared (sealed). A closed cavity pocket on the parting, a tongue on its floor (jaw).",
+    "Weights quantized to an exact 255 sum; <= 4 influences. Ears: head (root) -> ear -> earTip (the hanging lobe below the fold).",
+    "The gi skirt follows the hips with its front / side / back partly on the thighs (34 / 22 / 30% at the hem); the hakama legs follow their own thighs (the top on the hips, the hem 45% shin).",
+    "The sleeves follow the upper arms (the root on the chest, the opening 40% forearm); the belt and its knot are rigid-ish on spine / hips, the hanging ends a touch on the thighs.",
+    "The headband (ring, knot, loops, tails) is rigid on head; the ears: head (the root under the band) -> ear_ -> earTip_ over the top half.",
+    "The tail: tail1 at its root inside the gi skirt (the root rings share the hips), tail2-4 along the centreline, tail4 near the white tip."
+  ]
+}

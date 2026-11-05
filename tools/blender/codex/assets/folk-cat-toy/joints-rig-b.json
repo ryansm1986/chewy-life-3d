@@ -1,0 +1,1397 @@
+{
+  "bones": [
+    {
+      "name": "root",
+      "parent": null,
+      "head_blender_m": [
+        0.0,
+        -0.004,
+        0.0
+      ]
+    },
+    {
+      "name": "hips",
+      "parent": "root",
+      "head_blender_m": [
+        0.0,
+        0.002,
+        0.23
+      ]
+    },
+    {
+      "name": "spine",
+      "parent": "hips",
+      "head_blender_m": [
+        0.0,
+        0.004,
+        0.31
+      ]
+    },
+    {
+      "name": "chest",
+      "parent": "spine",
+      "head_blender_m": [
+        0.0,
+        0.008,
+        0.41
+      ]
+    },
+    {
+      "name": "neck",
+      "parent": "chest",
+      "head_blender_m": [
+        0.0,
+        0.012,
+        0.495
+      ]
+    },
+    {
+      "name": "head",
+      "parent": "neck",
+      "head_blender_m": [
+        0.0,
+        0.028,
+        0.535
+      ]
+    },
+    {
+      "name": "jaw",
+      "parent": "head",
+      "head_blender_m": [
+        0.0,
+        -0.12803,
+        0.64503
+      ]
+    },
+    {
+      "name": "eye_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.12141,
+        -0.20756,
+        0.71298
+      ]
+    },
+    {
+      "name": "lidU_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.09023,
+        -0.15036,
+        0.70565
+      ]
+    },
+    {
+      "name": "lidD_L",
+      "parent": "head",
+      "head_blender_m": [
+        -0.00607,
+        0.02832,
+        0.75974
+      ]
+    },
+    {
+      "name": "brow_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.13194,
+        -0.17971,
+        0.83066
+      ]
+    },
+    {
+      "name": "lip_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.05238,
+        -0.26553,
+        0.64503
+      ]
+    },
+    {
+      "name": "ear_L",
+      "parent": "head",
+      "head_blender_m": [
+        0.19214,
+        0.03581,
+        0.93451
+      ]
+    },
+    {
+      "name": "earTip_L",
+      "parent": "ear_L",
+      "head_blender_m": [
+        0.19162,
+        0.05925,
+        1.01745
+      ]
+    },
+    {
+      "name": "upperarm_L",
+      "parent": "chest",
+      "head_blender_m": [
+        0.19,
+        0.005,
+        0.455
+      ]
+    },
+    {
+      "name": "forearm_L",
+      "parent": "upperarm_L",
+      "head_blender_m": [
+        0.25327,
+        -0.00733,
+        0.37402
+      ]
+    },
+    {
+      "name": "hand_L",
+      "parent": "forearm_L",
+      "head_blender_m": [
+        0.30614,
+        -0.01764,
+        0.30634
+      ]
+    },
+    {
+      "name": "thigh_L",
+      "parent": "hips",
+      "head_blender_m": [
+        0.128,
+        0.0,
+        0.23
+      ]
+    },
+    {
+      "name": "shin_L",
+      "parent": "thigh_L",
+      "head_blender_m": [
+        0.132,
+        -0.002,
+        0.14
+      ]
+    },
+    {
+      "name": "foot_L",
+      "parent": "shin_L",
+      "head_blender_m": [
+        0.138,
+        -0.006,
+        0.065
+      ]
+    },
+    {
+      "name": "eye_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.12141,
+        -0.20756,
+        0.71298
+      ]
+    },
+    {
+      "name": "lidU_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.09023,
+        -0.15036,
+        0.70565
+      ]
+    },
+    {
+      "name": "lidD_R",
+      "parent": "head",
+      "head_blender_m": [
+        0.00607,
+        0.02832,
+        0.75974
+      ]
+    },
+    {
+      "name": "brow_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.13194,
+        -0.17971,
+        0.83066
+      ]
+    },
+    {
+      "name": "lip_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.05238,
+        -0.26553,
+        0.64503
+      ]
+    },
+    {
+      "name": "ear_R",
+      "parent": "head",
+      "head_blender_m": [
+        -0.19214,
+        0.03581,
+        0.93451
+      ]
+    },
+    {
+      "name": "earTip_R",
+      "parent": "ear_R",
+      "head_blender_m": [
+        -0.19162,
+        0.05925,
+        1.01745
+      ]
+    },
+    {
+      "name": "upperarm_R",
+      "parent": "chest",
+      "head_blender_m": [
+        -0.19,
+        0.005,
+        0.455
+      ]
+    },
+    {
+      "name": "forearm_R",
+      "parent": "upperarm_R",
+      "head_blender_m": [
+        -0.25327,
+        -0.00733,
+        0.37402
+      ]
+    },
+    {
+      "name": "hand_R",
+      "parent": "forearm_R",
+      "head_blender_m": [
+        -0.30614,
+        -0.01764,
+        0.30634
+      ]
+    },
+    {
+      "name": "thigh_R",
+      "parent": "hips",
+      "head_blender_m": [
+        -0.128,
+        0.0,
+        0.23
+      ]
+    },
+    {
+      "name": "shin_R",
+      "parent": "thigh_R",
+      "head_blender_m": [
+        -0.132,
+        -0.002,
+        0.14
+      ]
+    },
+    {
+      "name": "foot_R",
+      "parent": "shin_R",
+      "head_blender_m": [
+        -0.138,
+        -0.006,
+        0.065
+      ]
+    },
+    {
+      "name": "tail1",
+      "parent": "hips",
+      "head_blender_m": [
+        0.0,
+        0.12,
+        0.175
+      ]
+    },
+    {
+      "name": "tail2",
+      "parent": "tail1",
+      "head_blender_m": [
+        0.04087,
+        0.23813,
+        0.10188
+      ]
+    },
+    {
+      "name": "tail3",
+      "parent": "tail2",
+      "head_blender_m": [
+        0.066,
+        0.345,
+        0.175
+      ]
+    },
+    {
+      "name": "tail4",
+      "parent": "tail3",
+      "head_blender_m": [
+        0.02819,
+        0.36631,
+        0.30006
+      ]
+    }
+  ],
+  "triangles": 25314,
+  "lidTilt": 0.499,
+  "squint_designed_for": [
+    0.2,
+    -0.3
+  ],
+  "lid_hinge_blender": {
+    "L": [
+      0.87806,
+      0.47855,
+      0.0
+    ],
+    "R": [
+      0.87806,
+      -0.47855,
+      0.0
+    ]
+  },
+  "lids": {
+    "FolkCatB_lidU_L": {
+      "pivot": [
+        0.09023,
+        -0.15036,
+        0.70565
+      ],
+      "cap": {
+        "capped": 413,
+        "max_shrink_mm": 2.1
+      },
+      "columns(X, r_b_mm, eye_clear_mm, hid_above_mm, hid_below_mm)": [
+        [
+          -1.22,
+          75.7,
+          99.0,
+          9.0,
+          9.0
+        ],
+        [
+          -1.12,
+          77.0,
+          99.0,
+          9.0,
+          9.0
+        ],
+        [
+          -1.02,
+          78.5,
+          1.2,
+          6.4,
+          3.3
+        ],
+        [
+          -0.93,
+          81.8,
+          -0.6,
+          4.3,
+          5.2
+        ],
+        [
+          -0.83,
+          85.6,
+          -1.4,
+          1.2,
+          6.1
+        ],
+        [
+          -0.73,
+          89.2,
+          -1.4,
+          0.6,
+          6.0
+        ],
+        [
+          -0.64,
+          92.1,
+          -1.1,
+          0.6,
+          5.7
+        ],
+        [
+          -0.54,
+          94.2,
+          -1.2,
+          0.6,
+          6.0
+        ],
+        [
+          -0.44,
+          95.9,
+          -0.6,
+          0.6,
+          5.2
+        ],
+        [
+          -0.34,
+          97.2,
+          -0.5,
+          0.6,
+          5.0
+        ],
+        [
+          -0.25,
+          98.1,
+          0.3,
+          0.6,
+          4.2
+        ],
+        [
+          -0.15,
+          98.7,
+          0.6,
+          0.6,
+          3.8
+        ],
+        [
+          -0.05,
+          99.0,
+          0.9,
+          0.6,
+          3.8
+        ],
+        [
+          0.05,
+          99.1,
+          1.6,
+          0.6,
+          2.9
+        ],
+        [
+          0.14,
+          98.8,
+          2.1,
+          0.6,
+          2.4
+        ],
+        [
+          0.24,
+          98.3,
+          2.5,
+          0.6,
+          2.3
+        ],
+        [
+          0.34,
+          97.5,
+          3.1,
+          0.6,
+          1.4
+        ],
+        [
+          0.44,
+          95.8,
+          3.5,
+          0.6,
+          1.0
+        ],
+        [
+          0.53,
+          94.3,
+          3.8,
+          0.6,
+          0.7
+        ],
+        [
+          0.63,
+          92.1,
+          3.8,
+          0.6,
+          0.2
+        ],
+        [
+          0.73,
+          89.5,
+          3.8,
+          0.6,
+          -0.2
+        ],
+        [
+          0.83,
+          86.5,
+          3.9,
+          1.2,
+          -0.6
+        ],
+        [
+          0.92,
+          82.7,
+          3.8,
+          4.4,
+          -0.6
+        ],
+        [
+          1.02,
+          79.0,
+          99.0,
+          9.0,
+          9.0
+        ],
+        [
+          1.12,
+          77.9,
+          99.0,
+          9.0,
+          9.0
+        ]
+      ],
+      "eye_clear_min_mm": -0.9,
+      "out_of_skin_mm_by_angle": {
+        "0.0": 1.1,
+        "0.102": 0.3,
+        "0.203": 0.8,
+        "0.305": -0.4,
+        "0.407": -0.8,
+        "0.508": -0.6,
+        "0.61": -0.1,
+        "0.712": -0.9,
+        "0.813": -0.8,
+        "0.915": -0.8,
+        "1.017": -0.8,
+        "1.118": -0.8,
+        "1.22": -0.8
+      },
+      "shut_edge_rel_lowrim_EHH": [
+        -0.85,
+        -0.18,
+        -0.02
+      ],
+      "rest_edge_minus_holetop_EHH_min": -0.768,
+      "r_b_mm_range": [
+        75.7,
+        99.1
+      ]
+    },
+    "FolkCatB_lidD_L": {
+      "pivot": [
+        -0.00607,
+        0.02832,
+        0.75974
+      ],
+      "cap": {
+        "capped": 251,
+        "max_shrink_mm": 55.3
+      }
+    },
+    "FolkCatB_lidU_R": {
+      "pivot": [
+        -0.09023,
+        -0.15036,
+        0.70565
+      ],
+      "cap": {
+        "capped": 413,
+        "max_shrink_mm": 2.1
+      },
+      "columns(X, r_b_mm, eye_clear_mm, hid_above_mm, hid_below_mm)": [
+        [
+          -1.22,
+          75.7,
+          99.0,
+          9.0,
+          9.0
+        ],
+        [
+          -1.12,
+          77.0,
+          99.0,
+          9.0,
+          9.0
+        ],
+        [
+          -1.02,
+          78.5,
+          1.2,
+          6.4,
+          3.3
+        ],
+        [
+          -0.93,
+          81.8,
+          -0.6,
+          4.3,
+          5.2
+        ],
+        [
+          -0.83,
+          85.6,
+          -1.4,
+          1.2,
+          6.1
+        ],
+        [
+          -0.73,
+          89.2,
+          -1.4,
+          0.6,
+          6.0
+        ],
+        [
+          -0.64,
+          92.1,
+          -1.1,
+          0.6,
+          5.7
+        ],
+        [
+          -0.54,
+          94.2,
+          -1.2,
+          0.6,
+          6.0
+        ],
+        [
+          -0.44,
+          95.9,
+          -0.6,
+          0.6,
+          5.2
+        ],
+        [
+          -0.34,
+          97.2,
+          -0.5,
+          0.6,
+          5.0
+        ],
+        [
+          -0.25,
+          98.1,
+          0.3,
+          0.6,
+          4.2
+        ],
+        [
+          -0.15,
+          98.7,
+          0.6,
+          0.6,
+          3.8
+        ],
+        [
+          -0.05,
+          99.0,
+          0.9,
+          0.6,
+          3.8
+        ],
+        [
+          0.05,
+          99.1,
+          1.6,
+          0.6,
+          2.9
+        ],
+        [
+          0.14,
+          98.8,
+          2.1,
+          0.6,
+          2.4
+        ],
+        [
+          0.24,
+          98.3,
+          2.5,
+          0.6,
+          2.3
+        ],
+        [
+          0.34,
+          97.5,
+          3.1,
+          0.6,
+          1.4
+        ],
+        [
+          0.44,
+          95.8,
+          3.5,
+          0.6,
+          1.0
+        ],
+        [
+          0.53,
+          94.3,
+          3.8,
+          0.6,
+          0.7
+        ],
+        [
+          0.63,
+          92.1,
+          3.8,
+          0.6,
+          0.2
+        ],
+        [
+          0.73,
+          89.5,
+          3.8,
+          0.6,
+          -0.2
+        ],
+        [
+          0.83,
+          86.5,
+          3.9,
+          1.2,
+          -0.6
+        ],
+        [
+          0.92,
+          82.7,
+          3.8,
+          4.4,
+          -0.6
+        ],
+        [
+          1.02,
+          79.0,
+          99.0,
+          9.0,
+          9.0
+        ],
+        [
+          1.12,
+          77.9,
+          99.0,
+          9.0,
+          9.0
+        ]
+      ],
+      "eye_clear_min_mm": -0.9,
+      "out_of_skin_mm_by_angle": {
+        "0.0": 1.1,
+        "0.102": 0.3,
+        "0.203": 0.8,
+        "0.305": -0.4,
+        "0.407": -0.8,
+        "0.508": -0.6,
+        "0.61": -0.1,
+        "0.712": -0.9,
+        "0.813": -0.8,
+        "0.915": -0.8,
+        "1.017": -0.8,
+        "1.118": -0.8,
+        "1.22": -0.8
+      },
+      "shut_edge_rel_lowrim_EHH": [
+        -0.85,
+        -0.18,
+        -0.02
+      ],
+      "rest_edge_minus_holetop_EHH_min": -0.768,
+      "r_b_mm_range": [
+        75.7,
+        99.1
+      ]
+    },
+    "FolkCatB_lidD_R": {
+      "pivot": [
+        0.00607,
+        0.02832,
+        0.75974
+      ],
+      "cap": {
+        "capped": 251,
+        "max_shrink_mm": 55.3
+      }
+    }
+  },
+  "lids_hidden_check": {
+    "FolkCatB_lidU_L@0.0": {
+      "max_sdf_mm": 1.11,
+      "outside_count": 3,
+      "over_opening_count": 0
+    },
+    "FolkCatB_lidD_L@0.0": {
+      "max_sdf_mm": -10.79,
+      "outside_count": 0,
+      "over_opening_count": 0
+    },
+    "FolkCatB_lidD_L@-0.1": {
+      "max_sdf_mm": -13.56,
+      "outside_count": 0,
+      "over_opening_count": 0
+    },
+    "FolkCatB_lidU_R@0.0": {
+      "max_sdf_mm": 1.11,
+      "outside_count": 3,
+      "over_opening_count": 0
+    },
+    "FolkCatB_lidD_R@0.0": {
+      "max_sdf_mm": -10.79,
+      "outside_count": 0,
+      "over_opening_count": 0
+    },
+    "FolkCatB_lidD_R@-0.1": {
+      "max_sdf_mm": -13.56,
+      "outside_count": 0,
+      "over_opening_count": 0
+    },
+    "FolkCatB_tongue@rest": {
+      "max_sdf_mm": -3.59,
+      "outside_count": 0
+    }
+  },
+  "lash_sweep": {
+    "L": {
+      "0.0": {
+        "proud_max_mm": 5.8,
+        "buried_frac": 0.38,
+        "Z_range_EHH": [
+          -0.77,
+          1.25
+        ]
+      },
+      "0.18": {
+        "proud_max_mm": 14.8,
+        "buried_frac": 0.193,
+        "Z_range_EHH": [
+          -1.05,
+          0.99
+        ]
+      },
+      "0.488": {
+        "proud_max_mm": 20.5,
+        "buried_frac": 0.255,
+        "Z_range_EHH": [
+          -1.46,
+          0.48
+        ]
+      },
+      "0.8": {
+        "proud_max_mm": 20.6,
+        "buried_frac": 0.416,
+        "Z_range_EHH": [
+          -1.75,
+          -0.11
+        ]
+      },
+      "1.0": {
+        "proud_max_mm": 16.9,
+        "buried_frac": 0.602,
+        "Z_range_EHH": [
+          -1.87,
+          -0.5
+        ]
+      },
+      "1.22": {
+        "proud_max_mm": 8.3,
+        "buried_frac": 0.872,
+        "Z_range_EHH": [
+          -1.91,
+          -0.91
+        ]
+      }
+    },
+    "R": {
+      "0.0": {
+        "proud_max_mm": 5.8,
+        "buried_frac": 0.376,
+        "Z_range_EHH": [
+          -0.77,
+          1.24
+        ]
+      },
+      "0.18": {
+        "proud_max_mm": 15.2,
+        "buried_frac": 0.193,
+        "Z_range_EHH": [
+          -1.05,
+          0.98
+        ]
+      },
+      "0.488": {
+        "proud_max_mm": 22.2,
+        "buried_frac": 0.263,
+        "Z_range_EHH": [
+          -1.46,
+          0.47
+        ]
+      },
+      "0.8": {
+        "proud_max_mm": 21.6,
+        "buried_frac": 0.416,
+        "Z_range_EHH": [
+          -1.76,
+          -0.12
+        ]
+      },
+      "1.0": {
+        "proud_max_mm": 17.6,
+        "buried_frac": 0.606,
+        "Z_range_EHH": [
+          -1.87,
+          -0.5
+        ]
+      },
+      "1.22": {
+        "proud_max_mm": 8.8,
+        "buried_frac": 0.865,
+        "Z_range_EHH": [
+          -1.92,
+          -0.9
+        ]
+      }
+    }
+  },
+  "shut_U_band": {
+    "lidU.L": {
+      "cols": 20,
+      "emerge_mm": [
+        null,
+        null,
+        45.9,
+        45.2,
+        34.6,
+        22.7,
+        15.4,
+        10.5,
+        6.6,
+        4.1,
+        2.6,
+        1.4,
+        1.1,
+        1.5,
+        2.6,
+        4.6,
+        7.4,
+        10.7,
+        15.5,
+        20.2,
+        27.3,
+        37.4,
+        51.8,
+        null,
+        null
+      ]
+    },
+    "lidU.R": {
+      "cols": 20,
+      "emerge_mm": [
+        null,
+        null,
+        45.9,
+        45.2,
+        34.6,
+        22.7,
+        15.4,
+        10.5,
+        6.6,
+        4.1,
+        2.6,
+        1.4,
+        1.1,
+        1.5,
+        2.6,
+        4.6,
+        7.4,
+        10.7,
+        15.5,
+        20.2,
+        27.3,
+        37.4,
+        51.8,
+        null,
+        null
+      ]
+    }
+  },
+  "happy_edge_screen": {
+    "0.12": {
+      "L": {
+        "front": {
+          "outer_minus_inner_W": 0.015,
+          "mid_minus_inner_W": 0.045
+        },
+        "game0": {
+          "outer_minus_inner_W": 0.0708,
+          "mid_minus_inner_W": 0.063
+        },
+        "game+45": {
+          "outer_minus_inner_W": -0.0195,
+          "mid_minus_inner_W": 0.0174
+        },
+        "game-45": {
+          "outer_minus_inner_W": 0.1267,
+          "mid_minus_inner_W": 0.0931
+        },
+        "covers_mid_frac": 0.07
+      },
+      "R": {
+        "front": {
+          "outer_minus_inner_W": 0.015,
+          "mid_minus_inner_W": 0.045
+        },
+        "game0": {
+          "outer_minus_inner_W": 0.0708,
+          "mid_minus_inner_W": 0.063
+        },
+        "game+45": {
+          "outer_minus_inner_W": 0.1267,
+          "mid_minus_inner_W": 0.0931
+        },
+        "game-45": {
+          "outer_minus_inner_W": -0.0195,
+          "mid_minus_inner_W": 0.0174
+        },
+        "covers_mid_frac": 0.07
+      }
+    },
+    "0.2": {
+      "L": {
+        "front": {
+          "outer_minus_inner_W": 0.0035,
+          "mid_minus_inner_W": 0.0446
+        },
+        "game0": {
+          "outer_minus_inner_W": 0.0644,
+          "mid_minus_inner_W": 0.064
+        },
+        "game+45": {
+          "outer_minus_inner_W": -0.0307,
+          "mid_minus_inner_W": 0.0132
+        },
+        "game-45": {
+          "outer_minus_inner_W": 0.1235,
+          "mid_minus_inner_W": 0.0985
+        },
+        "covers_mid_frac": 0.13
+      },
+      "R": {
+        "front": {
+          "outer_minus_inner_W": 0.0035,
+          "mid_minus_inner_W": 0.0446
+        },
+        "game0": {
+          "outer_minus_inner_W": 0.0644,
+          "mid_minus_inner_W": 0.064
+        },
+        "game+45": {
+          "outer_minus_inner_W": 0.1235,
+          "mid_minus_inner_W": 0.0985
+        },
+        "game-45": {
+          "outer_minus_inner_W": -0.0307,
+          "mid_minus_inner_W": 0.0132
+        },
+        "covers_mid_frac": 0.13
+      }
+    },
+    "0.26": {
+      "L": {
+        "front": {
+          "outer_minus_inner_W": 0.0037,
+          "mid_minus_inner_W": 0.044
+        },
+        "game0": {
+          "outer_minus_inner_W": 0.0645,
+          "mid_minus_inner_W": 0.0622
+        },
+        "game+45": {
+          "outer_minus_inner_W": -0.0306,
+          "mid_minus_inner_W": 0.0113
+        },
+        "game-45": {
+          "outer_minus_inner_W": 0.1236,
+          "mid_minus_inner_W": 0.0976
+        },
+        "covers_mid_frac": 0.177
+      },
+      "R": {
+        "front": {
+          "outer_minus_inner_W": 0.0037,
+          "mid_minus_inner_W": 0.044
+        },
+        "game0": {
+          "outer_minus_inner_W": 0.0645,
+          "mid_minus_inner_W": 0.0622
+        },
+        "game+45": {
+          "outer_minus_inner_W": 0.1236,
+          "mid_minus_inner_W": 0.0976
+        },
+        "game-45": {
+          "outer_minus_inner_W": -0.0306,
+          "mid_minus_inner_W": 0.0113
+        },
+        "covers_mid_frac": 0.177
+      }
+    },
+    "0.488": {
+      "L": {
+        "front": {
+          "outer_minus_inner_W": 0.0152,
+          "mid_minus_inner_W": 0.0405
+        },
+        "game0": {
+          "outer_minus_inner_W": 0.0681,
+          "mid_minus_inner_W": 0.0512
+        },
+        "game+45": {
+          "outer_minus_inner_W": -0.0225,
+          "mid_minus_inner_W": 0.0049
+        },
+        "game-45": {
+          "outer_minus_inner_W": 0.126,
+          "mid_minus_inner_W": 0.0868
+        },
+        "covers_mid_frac": 0.369
+      },
+      "R": {
+        "front": {
+          "outer_minus_inner_W": 0.0152,
+          "mid_minus_inner_W": 0.0405
+        },
+        "game0": {
+          "outer_minus_inner_W": 0.0681,
+          "mid_minus_inner_W": 0.0512
+        },
+        "game+45": {
+          "outer_minus_inner_W": 0.126,
+          "mid_minus_inner_W": 0.0868
+        },
+        "game-45": {
+          "outer_minus_inner_W": -0.0225,
+          "mid_minus_inner_W": 0.0049
+        },
+        "covers_mid_frac": 0.369
+      }
+    }
+  },
+  "proud_outside_opening(count, max_mm)": {
+    "FolkCatB_lidU_L": {
+      "0.0": [
+        2,
+        1.1
+      ],
+      "0.102": [
+        0,
+        0.3
+      ],
+      "0.203": [
+        1,
+        0.8
+      ],
+      "0.305": [
+        0,
+        -0.4
+      ],
+      "0.407": [
+        0,
+        -0.8
+      ],
+      "0.508": [
+        0,
+        -0.6
+      ],
+      "0.61": [
+        0,
+        -0.1
+      ],
+      "0.712": [
+        0,
+        -0.9
+      ],
+      "0.813": [
+        0,
+        -0.8
+      ],
+      "0.915": [
+        0,
+        -0.8
+      ],
+      "1.017": [
+        0,
+        -0.8
+      ],
+      "1.118": [
+        0,
+        -0.8
+      ],
+      "1.22": [
+        0,
+        -0.8
+      ]
+    },
+    "FolkCatB_lidD_L": {
+      "0.0": [
+        0,
+        -10.8
+      ],
+      "-0.1": [
+        0,
+        -13.6
+      ],
+      "-0.18": [
+        0,
+        -5.4
+      ],
+      "-0.24": [
+        0,
+        -4.0
+      ],
+      "-0.3": [
+        0,
+        0.2
+      ],
+      "-0.34": [
+        0,
+        -1.4
+      ]
+    },
+    "FolkCatB_lidU_R": {
+      "0.0": [
+        2,
+        1.1
+      ],
+      "0.102": [
+        0,
+        0.3
+      ],
+      "0.203": [
+        1,
+        0.8
+      ],
+      "0.305": [
+        0,
+        -0.4
+      ],
+      "0.407": [
+        0,
+        -0.8
+      ],
+      "0.508": [
+        0,
+        -0.6
+      ],
+      "0.61": [
+        0,
+        -0.1
+      ],
+      "0.712": [
+        0,
+        -0.9
+      ],
+      "0.813": [
+        0,
+        -0.8
+      ],
+      "0.915": [
+        0,
+        -0.8
+      ],
+      "1.017": [
+        0,
+        -0.8
+      ],
+      "1.118": [
+        0,
+        -0.8
+      ],
+      "1.22": [
+        0,
+        -0.8
+      ]
+    },
+    "FolkCatB_lidD_R": {
+      "0.0": [
+        0,
+        -10.8
+      ],
+      "-0.1": [
+        0,
+        -13.6
+      ],
+      "-0.18": [
+        0,
+        -5.4
+      ],
+      "-0.24": [
+        0,
+        -4.0
+      ],
+      "-0.3": [
+        0,
+        0.2
+      ],
+      "-0.34": [
+        0,
+        -1.4
+      ]
+    }
+  },
+  "lid_pivot_L": {
+    "pivot": [
+      0.0902,
+      -0.1504,
+      0.7056
+    ],
+    "fit_err_mm": 10.1,
+    "radius_mm": 102.5
+  },
+  "lid_pivot_search_L": {
+    "cost_mm": 27.3,
+    "land_EHH": -1.011,
+    "shift_mm": [
+      -0.0,
+      -0.0
+    ]
+  },
+  "lid_pivot_R": {
+    "pivot": [
+      -0.0902,
+      -0.1504,
+      0.7056
+    ],
+    "fit_err_mm": 10.1,
+    "radius_mm": 102.5
+  },
+  "lid_pivot_search_R": {
+    "cost_mm": 28.5,
+    "land_EHH": -1.022,
+    "shift_mm": [
+      -0.0,
+      -0.0
+    ]
+  },
+  "mouth_seam_points": 13,
+  "objects": {
+    "FolkCatB_head": 6126,
+    "FolkCatB_eye_R": 672,
+    "FolkCatB_eye_L": 672,
+    "FolkCatB_lash_R": 540,
+    "FolkCatB_lash_L": 540,
+    "FolkCatB_ear_R": 1656,
+    "FolkCatB_ear_L": 1656,
+    "FolkCatB_bandana": 2232,
+    "FolkCatB_bandana_tabs": 960,
+    "FolkCatB_body": 2804,
+    "FolkCatB_arm_R": 1008,
+    "FolkCatB_arm_L": 1008,
+    "FolkCatB_leg_R": 596,
+    "FolkCatB_leg_L": 596,
+    "FolkCatB_tail": 896,
+    "FolkCatB_mouth_cavity": 180,
+    "FolkCatB_tongue": 196,
+    "FolkCatB_lidU_L": 960,
+    "FolkCatB_lidD_L": 528,
+    "FolkCatB_lidU_R": 960,
+    "FolkCatB_lidD_R": 528
+  },
+  "notes": [
+    "Game axes: X = Blender +X, Y = Blender +Z, Z = Blender -Y; pose bones use YZX Euler = three.js XYZ.",
+    "Head pivot at the skull base (back of the neck, chin height), not the head centre.",
+    "Lids turn about the tilted hinge (cos t, +-sin t, 0) through their bone head (HERO_MODELS lidTilt = t).",
+    "The lash ribbons (<NM>_lash_L/R) are weighted 100% to lidU_L/R and ride the upper lid, whose rest edge runs just under the ribbon.",
+    "Upper-lid colour = the head paint (patch, blush) at the near-shut pose; shading normals = the skin normals over lidU 0.8-1.22.",
+    "Costume per the shared rig brief (see body_weights). Ears: root on the head, ear_*, earTip_* over the top half. Bandana ring, knot and tabs rigid on the head."
+  ]
+}

@@ -52,7 +52,7 @@ export function materialIconURL(k) {
 }
 export function potionInfo(k) { const P = rpg.items.POTIONS?.[k]; return P ? { name: P.name, desc: P.desc, price: P.price, color: P.color } : null; }
 
-const SKILL_FALLBACK_G = { attack: 'swords', attack_ball: 'ball', attack_staff: 'staff', attack_fuma: 'fuma', attack_flail: 'flail', attack_lance: 'lance', attack_parasol: 'parasol', chomp: 'bone', fetch: 'ball' };
+const SKILL_FALLBACK_G = { attack: 'swords', attack_ball: 'ball', attack_staff: 'staff', attack_fuma: 'fuma', attack_flail: 'flail', attack_lance: 'lance', attack_parasol: 'parasol', chomp: 'bone', swallow: 'bone', fetch: 'ball' };
 // hotbar / popover icon: the basic 'attack' follows the equipped weapon (bone katana vs tennis ball)
 export function hotbarIconURL(id, derived) { return skillIconURL(id === 'attack' && derived?.weaponType === 'ball' ? 'attack_ball' : id === 'attack' && derived?.weaponType === 'staff' ? 'attack_staff' : id === 'attack' && derived?.weaponType === 'fuma' ? 'attack_fuma' : id === 'attack' && derived?.weaponType === 'flail' ? 'attack_flail' : id === 'attack' && derived?.weaponType === 'lance' ? 'attack_lance' : id === 'attack' && derived?.weaponType === 'parasol' ? 'attack_parasol' : id); }
 export const plural = (n, word, pl = word + 's') => `${n} ${n === 1 ? word : pl}`;

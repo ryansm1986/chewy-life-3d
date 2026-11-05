@@ -2,7 +2,9 @@
 // small group) through the Placer at (x, z); w = cell width multiplier, fy = camera focus height with &focus.
 import * as THREE from 'three';
 import * as F from './bambooFlora.js';
-import * as Pr from './bambooProps.js';
+import * as PrKit from './bambooProps.js';
+import { withGlb } from './glbPieces.js';
+const Pr = withGlb('bamboo', PrKit); // (the Blender models, as the region draws them: biomeA loads them unless &kit)
 import { M } from './bambooKit.js';
 
 const one = (parts, extra = {}) => ({ place: (P, x, z) => P.multi(parts(), x, 0, z), ...extra });

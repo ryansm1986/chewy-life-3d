@@ -21,17 +21,19 @@ export class Actor {
     this.turnRate = 14;
     world.scene.add(rig.root); world.scene.add(this.shadow);
   }
-  setPos(x, z) { this.pos.set(x, this.world.heightAt(x, z), z); this.sync(); return this; }
+  setPos(x, z) { this.pos.set(x, this.world.heightAt(x, z), z); this.trav?.settle(); this.sync(); return this; }
   // walk toward a direction (unit xz) with collision; returns actual displacement
   step(dir, dt, speedMul = 1) {
     _prev.copy(this.pos);
+    const T = this.trav; if (T) speedMul *= T.mul; // (swimming / climbing: actors/traverse.js)
     if (dir.lengthSq() > 1e-6) {
       this.pos.x += dir.x * this.speed * speedMul * dt;
       this.pos.z += dir.z * this.speed * speedMul * dt;
       this.faceTarget = Math.atan2(dir.x, dir.z);
     }
-    this.world.collision?.resolve(this.pos, this.radius, _prev);
+    this.world.collision?.resolve(this.pos, this.radius, _prev, T ? T.block : undefined);
     this.pos.y = this.world.heightAt(this.pos.x, this.pos.z);
+    if (T) T.settle();
     return this.pos.distanceTo(_prev);
   }
   // move toward a world point; returns true when arrived
@@ -46,17 +48,19 @@ export class Actor {
   faceTo(x, z) { this.faceTarget = Math.atan2(x - this.pos.x, z - this.pos.z); }
   sync() {
     const r = this.rig.root;
-    r.position.set(this.pos.x, this.pos.y + (this.rig.offsetY || 0), this.pos.z);
+    const o = this.trav?.off; // (a hand's breadth off a cliff face while climbing: actors/traverse.js)
+    r.position.set(this.pos.x + (o ? o.x : 0), this.pos.y + (this.rig.offsetY || 0), this.pos.z + (o ? o.z : 0));
     r.rotation.y = this.facing;
     this.shadow.position.set(this.pos.x, this.pos.y + 0.03, this.pos.z);
     const lift = clamp(1 - (this.rig.offsetY || 0) * 1.2, 0.3, 1);
     this.shadow.scale.setScalar(lift);
   }
   update(dt) {
+    this.trav?.update(dt);
     this.facing = dampAngle(this.facing, this.faceTarget, this.turnRate, dt);
     this.anim.update(dt, this.pos);
     this.sync();
-    this.rig.root.visible = this.visible; this.shadow.visible = this.visible;
+    this.rig.root.visible = this.visible; this.shadow.visible = this.visible && !this.trav?.swimming;
   }
   changeWorld(world) {
     this.world.scene.remove(this.rig.root); this.world.scene.remove(this.shadow);

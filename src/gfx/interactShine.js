@@ -13,7 +13,8 @@
 // gives the star only; `noShine: true` nothing. Docs: ARCHITECTURE "The interact shine".
 import * as THREE from 'three';
 
-const COL = new THREE.Color('#fff0c4'), LINE = new THREE.Color('#ffdf7e');
+// (soft cream, not gold: the owner found the gold line and wash on the villagers too bright and jarring, 2026-10-27)
+const COL = new THREE.Color('#fff7e8'), LINE = new THREE.Color('#fff4dc'), LINE_A = 0.6;
 const SWEEP = new THREE.Vector3(0.55, 1, 0.35).normalize(); // (the band runs up and across, diagonally)
 const MAX_XZ = 3.4, MAX_Y = 4.2; // a prop, not a building or the ground
 const LIT = m => m && (m.isMeshToonMaterial || m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial);
@@ -27,7 +28,7 @@ const SHINE_OUT = /* glsl */`
     float shS = dot((uShCam * vec4(-vViewPosition, 1.0)).xyz, uShDir), shW = max(0.12, (uShSpan.y - uShSpan.x) * 0.16);
     float shC = mix(uShSpan.x - shW * 2.0, uShSpan.y + shW * 2.0, uShPhase);
     float shBand = smoothstep(shW, 0.0, abs(shS - shC));
-    gl_FragColor = vec4(uShCol * (0.07 + shRim * 0.85 + shBand * 0.8) * uShAmt, 1.0);
+    gl_FragColor = vec4(uShCol * (0.025 + shRim * 0.42 + shBand * 0.3) * uShAmt, 1.0); // (a rim and a passing band: the body keeps its own colours)
   }
 `;
 const HULL_VPARS = /* glsl */'uniform float uShPx; uniform vec2 uShRes;\n';
@@ -39,7 +40,7 @@ const HULL_VOUT = /* glsl */`
     if (dot(shN.xy, shN.xy) > 1e-8) gl_Position.xy += normalize(shN.xy) * uShPx * 2.0 / uShRes * gl_Position.w; }
 `;
 const HULL_FPARS = /* glsl */'uniform vec3 uShLine; uniform float uShAmt;\n';
-const HULL_FOUT = /* glsl */'  gl_FragColor = vec4(uShLine, uShAmt);\n';
+const HULL_FOUT = /* glsl */`  gl_FragColor = vec4(uShLine, uShAmt * ${LINE_A.toFixed(2)});\n`;
 const atEnd = (src, code) => src.replace(/\}\s*$/, code + '}\n');
 
 function copyOf(src, uni, hull) {
@@ -66,7 +67,7 @@ function copyOf(src, uni, hull) {
 // an unlit material (no normal to rim): a plain additive tint over it
 function tintOf(src, uni) {
   const m = new THREE.MeshBasicMaterial({ color: COL, map: src.map || null, alphaMap: src.alphaMap || null, alphaTest: src.alphaTest || 0, side: src.side, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, depthFunc: THREE.LessEqualDepth, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1, fog: false });
-  m.onBeforeCompile = sh => { Object.assign(sh.uniforms, uni); sh.fragmentShader = 'uniform float uShAmt;\n' + atEnd(sh.fragmentShader, '  gl_FragColor.rgb *= 0.35 * uShAmt;\n'); };
+  m.onBeforeCompile = sh => { Object.assign(sh.uniforms, uni); sh.fragmentShader = 'uniform float uShAmt;\n' + atEnd(sh.fragmentShader, '  gl_FragColor.rgb *= 0.2 * uShAmt;\n'); };
   m.customProgramCacheKey = () => 'shineTint';
   return m;
 }
@@ -200,7 +201,7 @@ export class InteractShine {
     const uni = {
       uShCol: { value: COL }, uShLine: { value: LINE }, uShAmt: { value: 0 }, uShPhase: { value: 0 },
       uShSpan: { value: new THREE.Vector2(0, 1) }, uShDir: { value: SWEEP }, uShCam: { value: new THREE.Matrix4() },
-      uShPx: { value: 3.2 }, uShRes: { value: new THREE.Vector2(1280, 720) },
+      uShPx: { value: 2.2 }, uShRes: { value: new THREE.Vector2(1280, 720) },
     };
     return { it: null, objs: [], overlays: [], uni, gain, copies: new WeakMap(), star: null, amt: 0 };
   }

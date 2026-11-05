@@ -172,16 +172,16 @@ try {
   for (const id of ids) {
     const r = await ev(id => {
       const G = window.G, P = G.player;
-      G.skills.clearShihtzu(); G.skills.cds = {}; P.anim.stop(); G.actions.restoreAll();
+      G.skills.clearShihtzu(); G.skills.cds = {}; P.anim.stop(); G.actions.restoreAll(); G.skills.approach = null; P.moveTarget = null; // (no walk-up left over from the swing before)
       if (G.dungeon.monsters.filter(m => m.alive && !m.def.boss).length < 6) G.dungeon.summonAround({ pos: P.pos }, 'mochi', 6);
       const { r: rr } = G.engine.rig.groundAxes();
       G.dungeon.monsters.filter(m => m.alive && !m.def.boss).slice(0, 6).forEach((m, i) => { m.pos.set(P.pos.x + rr.x * (2.2 + i * 0.5) + (i % 2) * 0.6, 0, P.pos.z + rr.z * (2.2 + i * 0.5) - (i % 2) * 0.6); m.lifeMax = m.life = 1e7; m.status.stun = 99; m.speed = 0; });
       window.__hits = 0;
       const aim = P.pos.clone().addScaledVector(rr, 3), tgt = G.combat.nearest(aim, 'ally', 3);
-      try { return { ok: G.skills.tryCast(id, aim, tgt) }; } catch (e) { return { threw: String(e.stack || e).slice(0, 300) }; }
+      try { return { ok: G.skills.tryCast(id, aim, tgt) || !!G.skills.approach }; } catch (e) { return { threw: String(e.stack || e).slice(0, 300) }; } // (ok: cast, or a melee swing walking up to a foe out of reach first: Glum Bonk's 1.45 m)
     }, id);
     if (id === 'maelstrom') await ev(() => { if (window.G.skills.channel) window.G.skills.channel.toggleHeld = true; });
-    await sleep(page, ['ghostPups', 'grandpawsGhost', 'grumbleCloud', 'steadfastSulk', 'maelstrom', 'everlastingGloom', 'borrowedWarmth', 'wayhomeLantern'].includes(id) ? 2600 : 1600);
+    await sleep(page, ['glumBonk', 'ghostPups', 'grandpawsGhost', 'grumbleCloud', 'steadfastSulk', 'maelstrom', 'everlastingGloom', 'borrowedWarmth', 'wayhomeLantern'].includes(id) ? 2600 : 1600);
     const extra = await ev(id => { const S = window.G.skills; const a = (S.stzAllies || []).filter(x => x.alive); return { pups: a.filter(x => x.slot).length, gp: a.some(x => x.gp), ward: !!S.stzWard, lantern: !!S.stzLantern, cloud: (S.stzClouds || []).length, tethers: (S.stzTethers || []).length, mopes: S.stzMopes?.size || 0, hexes: S.stzHexes?.size || 0 }; }, id);
     if (id === 'maelstrom') await ev(() => { if (window.G.skills.channel) window.G.skills.endChannel(); });
     res.push({ id, ...r, hits: await ev(() => window.__hits), ...extra });
@@ -189,7 +189,7 @@ try {
   const noHit = res.filter(r => !['caseOfMopes', 'boneWard', 'ghostPups', 'grandpawsGhost', 'wayhomeLantern'].includes(r.id) && !(r.hits > 0)).map(r => r.id), threw = res.filter(r => r.threw);
   const by = id => res.find(r => r.id === id) || {};
   const shows = by('ghostPups').pups >= 2 && by('grandpawsGhost').gp && by('boneWard').ward && by('wayhomeLantern').lantern && by('grumbleCloud').cloud >= 1 && by('borrowedWarmth').tethers >= 1 && by('caseOfMopes').mopes >= 1 && by('drippingPaw').hexes >= 1;
-  R.check(`playing him: every active skill (${ids.length}) casts in a Burrow fight, the damage skills land hits, the summons, ward, lantern, cloud, threads, mopes and hexes appear, no errors`, ids.length === 15 && !threw.length && res.every(r => r.ok) && !noHit.length && shows, JSON.stringify({ noHit, threw: threw.map(t => t.id + ': ' + t.threw), casts: res.map(r => `${r.id}:${r.ok ? 'ok' : 'no'}/${r.hits}`).join(' ') }));
+  R.check(`playing him: every active skill (${ids.length}) casts in a Burrow fight, the damage skills land hits, the summons, ward, lantern, cloud, threads, mopes and hexes appear, no errors`, ids.length === 16 && !threw.length && res.every(r => r.ok) && !noHit.length && shows, JSON.stringify({ noHit, threw: threw.map(t => t.id + ': ' + t.threw), casts: res.map(r => `${r.id}:${r.ok ? 'ok' : 'no'}/${r.hits}`).join(' ') }));
   const look = await ev(async () => {
     const G = window.G, P = G.player, r = P.rig;
     for (let i = 0; i < 30 && P.flail?.kind !== 'glb'; i++) await new Promise(q => setTimeout(q, 100));
@@ -212,6 +212,26 @@ try {
   await page.waitForFunction(() => window.G.player.anim.action?.name === 'wallop', null, { timeout: 3000 }).catch(() => {});
   const d1 = await ev(() => ({ rel: window.__rel.slice(-1)[0] || null, act: window.G.player.anim.action?.name }));
   R.check('a real hold on Woeful Wallop: the flail wound round behind him (stzWallop pose) to Stage Ⅱ, and the release swings the Grand Wallop', d0.stage >= 2 && d0.pose === 'stzWallop' && d1.rel?.stage >= 2 && d1.rel.ok && d1.act === 'wallop', JSON.stringify({ d0, d1 }));
+  // a real hold on Glum Bonk (the quick, precise one): the flail held up high (stzBonk), the release bonks one foe with the splat
+  const xy2 = await ev(() => {
+    const G = window.G, P = G.player, st = G.state.player; G.skills.clearShihtzu(); G.skills.cds = {}; P.anim.stop(); G.actions.restoreAll();
+    st.skills.glumBonk = Math.max(10, st.skills.glumBonk || 0); st.hotbar[1] = 'glumBonk'; st.chargePerks = { glumBonk: { stages: 2, echo: 1, noggin: 1 } }; G.actions.recompute();
+    const { r } = G.engine.rig.groundAxes(), foes = G.dungeon.monsters.filter(m => m.alive && !m.def.boss);
+    if (foes[0]) { foes[0].pos.set(P.pos.x + r.x * 1.5, 0, P.pos.z + r.z * 1.5); foes[0].lifeMax = foes[0].life = 1e7; foes[0].status.stun = 99; }
+    window.__bonkHits = 0; const raw = G.combat.hitMonster; G.combat.hitMonster = function (m, o) { if (o?.forceCrit) window.__bonkHits++; return raw.call(this, m, o); };
+    window.__bonk0 = G.vfx.stz?._lastBonk ?? -1;
+    const p = (foes[0]?.pos || P.pos.clone().addScaledVector(r, 1.5)).clone(), v = p.project(G.engine.camera);
+    return [(v.x * 0.5 + 0.5) * innerWidth, (-v.y * 0.5 + 0.5) * innerHeight];
+  });
+  await page.mouse.move(xy2[0], xy2[1]); await sleep(page, 150);
+  await page.mouse.down({ button: 'right' });
+  await page.waitForFunction(() => (window.G.skills.charge.active?.stage || 0) >= 2, null, { timeout: 6000 }).catch(() => {});
+  const b0 = await ev(() => ({ stage: window.G.skills.charge.active?.stage || 0, pose: window.G.player.anim.action?.style || window.G.player.anim.action?.name }));
+  await page.mouse.up({ button: 'right' });
+  await page.waitForFunction(() => window.G.player.anim.action?.name === 'glumBonk', null, { timeout: 3000 }).catch(() => {});
+  await page.waitForFunction(() => (window.G.vfx.stz?._lastBonk ?? -1) !== window.__bonk0, null, { timeout: 3000 }).catch(() => {});
+  const b1 = await ev(() => ({ rel: window.__rel.slice(-1)[0] || null, act: window.G.player.anim.action?.name, splat: (window.G.vfx.stz?._lastBonk ?? -1) !== window.__bonk0, crit: window.__bonkHits }));
+  R.check('a real hold on Glum Bonk: the flail held up high (stzBonk pose) to Stage Ⅱ, the release bonks (glumBonk), its splat lands and Right on the Noggin crits', b0.stage >= 2 && b0.pose === 'stzBonk' && b1.rel?.stage >= 2 && b1.rel.ok && b1.splat && b1.crit >= 1, JSON.stringify({ b0, b1 }));
 
   }
   if (PART.includes('e')) { // ================================================================ e) perf

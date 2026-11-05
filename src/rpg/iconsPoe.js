@@ -2,7 +2,7 @@
 // her skill art. icons.js calls these with its drawing kit K (ICON_KIT: paint, vol, volR, shine, sparkle, glow, …), so
 // this module imports nothing from it (no import cycle). Art is drawn around 0,0 in a 64 box.
 export const POE_SKILL_TREE = {
-  fumaThrow: 'shuriken', shurikenMastery: 'shuriken', kunaiFan: 'shuriken', shadowStitch: 'shuriken', whirlingFuma: 'shuriken', shurikenRain: 'shuriken', thousandStars: 'shuriken',
+  fumaThrow: 'shuriken', fumaFlurry: 'shuriken', shurikenMastery: 'shuriken', kunaiFan: 'shuriken', shadowStitch: 'shuriken', whirlingFuma: 'shuriken', shurikenRain: 'shuriken', thousandStars: 'shuriken',
   smokeBomb: 'jutsu', ninjutsuMastery: 'jutsu', puffBall: 'jutsu', shadowClone: 'jutsu', substitution: 'jutsu', thunderPaw: 'jutsu', smokeDragon: 'jutsu',
   shadowStep: 'shadow', swiftWind: 'shadow', afterimageDash: 'shadow', vanish: 'shadow', caltropFlip: 'shadow', bullseyeMark: 'shadow', phantomBarrage: 'shadow',
 };
@@ -89,6 +89,21 @@ export function drawPoeSkill(g, id, K) {
       g.beginPath(); g.moveTo(-18, 14); g.lineTo(-13, 11); g.moveTo(-18, 14); g.lineTo(-13.4, 17.6); K.stroke(g, INKC, 2.2);
       for (let i = 0; i < 3; i++) ribbon(g, K, () => { g.beginPath(); g.arc(4, -5, 15 + i * 3.4, 2.4 + i * 0.25, 3.3 + i * 0.25); }, 1.8);
       g.save(); g.translate(5, -6); drawFuma(g, 'bone', null, true, K, 0.62); g.restore();
+      return true;
+    }
+    case 'fumaFlurry': { // her paw on the hub of the fūma, whirling as a buzz-saw: a swept blur disc, three quick cut arcs round it
+      for (let i = 0; i < 3; i++) ribbon(g, K, () => { g.beginPath(); g.arc(3, -3, 27 - i * 0.5, -3.0 + i * 0.85, -2.45 + i * 0.85); }, 2.4 - i * 0.25); // (three cuts, upper left round to the top right)
+      K.circ(g, 3, -3, 19); g.fillStyle = 'rgba(255,250,240,0.38)'; g.fill(); K.stroke(g, 'rgba(74,44,42,0.55)', 1.5);
+      for (let i = 0; i < 4; i++) { g.beginPath(); g.arc(3, -3, 16.5, i * Math.PI / 2 + 0.15, i * Math.PI / 2 + 0.95); K.stroke(g, 'rgba(255,250,240,0.9)', 2.2); } // (the spin's swept streaks)
+      g.save(); g.translate(3, -3); g.rotate(0.3); drawFuma(g, 'bone', null, true, K, 0.66); g.restore();
+      // the arm in from the lower left: a green sleeve, a black forearm and a round black paw on the hub
+      const arm = () => { g.beginPath(); g.moveTo(-17, 19); g.quadraticCurveTo(-12, 8, -3, 3); };
+      g.beginPath(); g.moveTo(-28, 28); g.lineTo(-17, 19); K.stroke(g, INKC, 14); g.beginPath(); g.moveTo(-28, 28); g.lineTo(-17.5, 19.5); K.stroke(g, '#4f7a44', 11);
+      arm(); K.stroke(g, INKC, 11.5); arm(); K.stroke(g, '#3a3530', 8.6);
+      K.ell(g, 0, 0, 7, 6.2, -0.6); K.paint(g, K.volR(g, '#3a3530', -1.5, -1.5, 7, 0.45, 0.3), 1.8);
+      for (const [x, y] of [[-4.6, -2.6], [-1.6, -5.4], [2.4, -5], [4.4, -1.6]]) { K.circ(g, x, y, 1.25); g.fillStyle = '#d8b0a8'; g.fill(); }
+      K.ell(g, 0.4, 0.6, 2.6, 2, -0.6); g.fillStyle = '#d8b0a8'; g.fill();
+      K.sparkle(g, 24, -24, 3.2, '#fff6c0'); K.sparkle(g, -21, -16, 2.4, '#fff6c0');
       return true;
     }
     case 'smokeBomb': { // POOF: a big puff with curls, a pepper bomb's spark

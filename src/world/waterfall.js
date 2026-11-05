@@ -97,7 +97,7 @@ export class Waterfall {
       // the shelf's still water behind the lip (the top one is the stream between the shoulder boulders)
       const back = i === 0 ? 2.4 : 1.25;
       const sm = mat(SHELF_FS); this.mats.push(sm);
-      const shelf = new THREE.Mesh(shelfGeo(X, s.z - back, s.z + 0.02, s.y + 0.015, s.w + 0.3), sm); shelf.renderOrder = 2; this.group.add(shelf);
+      const shelf = new THREE.Mesh(shelfGeo(X, s.z - back, s.z - 0.04, s.y + 0.015, s.w + 0.3), sm); shelf.renderOrder = 2; this.group.add(shelf);
     });
     // ---- ripples round the foot
     const rm = mat(RIPPLE_FS); this.mats.push(rm);
@@ -131,11 +131,13 @@ const PI2 = Math.PI / 2;
 function curtainGeo(x, z0, yTop, yBot, w, throw_) {
   const NY = 16, NX = 20, pos = [], uv = [], idx = [];
   for (let i = 0; i <= NY; i++) {
-    const t = i / NY, y = yTop - (yTop - yBot) * t, dz = throw_ * Math.sqrt(t) + 0.04;
+    // the top rows lie on the shelf water just behind the lip and roll over it (no seam between the shelf and the fall)
+    const t = i / NY, k = Math.min(1, t / 0.13), roll = k * k * (3 - 2 * k);
+    const y = yTop + 0.015 * (1 - roll) - (yTop - yBot) * t, dz = (throw_ * Math.sqrt(t) + 0.04) * roll - 0.12 * (1 - roll);
     for (let j = 0; j <= NX; j++) {
       const u = j / NX, lobe = Math.cos((u - 0.5) * TAU * LOBES), ww = w * (1 + t * 0.1);
       const hem = t > 0.95 ? lobe * 0.07 : 0;
-      pos.push(x + (u - 0.5) * ww, y - hem, z0 + dz + lobe * 0.035 + Math.sin(u * Math.PI) * 0.1 * (0.4 + t));
+      pos.push(x + (u - 0.5) * ww, y - hem, z0 + dz + (lobe * 0.035 + Math.sin(u * Math.PI) * 0.1 * (0.4 + t)) * roll);
       uv.push(u, t);
     }
   }

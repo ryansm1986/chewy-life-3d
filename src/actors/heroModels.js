@@ -66,7 +66,7 @@ export const HERO_MODELS = {
   // purple; [desat, r, g, b] pulls the hue out of the dark texels and biases them (0..255 sRGB units) against the lift
   shadow: { file: 'shadow_toy', name: 'Shadow', outline: '#1c181e', earGain: 0, sitDrop: 0.08, darkGrade: [1, -4, 14, -9] },
   // the Toybox Rosie (tools/blender/codex/assets/rosie-toy, built by an Opus agent with the toybox-character skill): a
-  // villager, not a playable hero (game.js hands her Villager this rig); hat: the nightcap anchor on her curls [x, y, z, scale]; wave: 'out' waves and cheers outward, squint: her happy lids [upper, lower] (animator.js);
+  // villager, not a playable hero (game.js hands her Villager this rig); wave: 'out' waves and cheers outward, squint: her happy lids [upper, lower] (animator.js);
   // darkGrade: the warm grade turned her chocolate hair maroon (a tint would grey her skin), so only the dark texels shift
   // the Toybox villagers of Blossom Hollow (ROADMAP VL-1; tools/blender/codex/assets/<id>-toy, Opus builders, from the
   // sheets the owner approved for the Toybox kit): game.js hands each roster Villager its rig when it's loaded, else the
@@ -85,7 +85,56 @@ export const HERO_MODELS = {
   // kero: no ears or tail (their bones are unweighted); lidClose 1.10: his tall frog eye can't be swept cleanly by a rigid
   // lid to the usual 1.22, so his lids are built to close at 1.10 (a soft, puffy closed lid on the eye dome)
   kero: { file: 'kero_toy', name: 'Kero', outline: '#2a3a20', earGain: 0, lidTilt: 0.485, lidClose: 1.10, squint: [0.30, -0.34], wave: 'out', hat: [0, 0.52, 0.04, 1.3], palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
-  rosie: { file: 'rosie_toy', name: 'Rosie', outline: '#4e2a18', earGain: 0, darkGrade: [0.4, -10, 6, 4], wave: 'out', squint: [0.40, -0.26], palm: [0, -0.05, 0.012], back: [0, 0.1, -0.15], hat: [0, 0.44, -0.03, 1.15] },
+  // rosie (round 8, the rounder head): lidTilt, her eyes face 28° out; noNightcap, her big bow is part of the hair and
+  // pokes through any cap, so she sleeps in her bow
+  rosie: { file: 'rosie_toy', name: 'Rosie', outline: '#4e2a18', earGain: 0, darkGrade: [0.4, -10, 6, 4], lidTilt: 0.4887, wave: 'out', squint: [0.30, -0.24], noNightcap: true, palm: [0, -0.05, 0.012], back: [0, 0.1, -0.15] },
+  // the zone villagers in Blender (ROADMAP VL-2; tools/blender/codex/assets/<id>-toy, Opus builders, sheets drawn for
+  // VL-2): ZoneVillager (actors/zoneVillagers.js) takes the rig when it's loaded (ZONE_TOY, preloaded after boot and
+  // awaited briefly on entering a zone), else the kit builds them as before. Same options as the Blossom Hollow villagers
+  tk_sasa: { file: 'tk_sasa_toy', name: 'Grandma Sasa', outline: '#2a2026', earGain: 0, lidTilt: 0.55, squint: [0.12, -0.30], wave: 'out', darkGrade: [1, -4, 14, -9], noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  tk_kazemaru: { file: 'tk_kazemaru_toy', name: 'Master Kazemaru', outline: '#2a2838', earGain: 0.4, darkGrade: [0.3, -6, 8, -4], lidTilt: 0.5236, shutLash: [0.135, 0.048, -0.054, 0.07, 0.008], squint: [0.12, -0.24], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  tk_takumi: { file: 'tk_takumi_toy', name: 'Takumi', outline: '#2a1c14', earGain: 0.3, lidTilt: 0.236, shutLash: [0.10, 0.035, -0.04, 0.052, 0.006], squint: [0.20, -0.30], wave: 'out', noNightcap: true, palm: [0, -0.05, 0.012], back: [0, 0.1, -0.2] },
+  tk_chiku: { file: 'tk_chiku_toy', name: 'Chiku', outline: '#3a2a26', earGain: 0.6, lidTilt: 0.4153, shutLash: [0.108, 0.038, -0.043, 0.056, 0.0066], squint: [0.20, -0.24], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  // tk_fuku: her lids are built to shut at 0.479 rad (lidClose), the hinge at the eyeball's centre of curvature
+  tk_fuku: { file: 'tk_fuku_toy', name: 'Okami Fuku', outline: '#3a2a24', earGain: 0.3, lidTilt: 0.255, lidClose: 0.479, squint: [0.11, -0.24], darkGrade: [0.3, 8, 4, -10], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  tk_kome: { file: 'tk_kome_toy', name: 'Kome', outline: '#4a2e24', earGain: 0.5, lidTilt: 0.517, shutLash: [0.108, 0.038, -0.043, 0.056, 0.0066], squint: [0.08, -0.30], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  sk_funaki: { file: 'sk_funaki_toy', name: 'Funaki', outline: '#2a1c14', earGain: 0.3, lidTilt: 0.292, shutLash: [0.10, 0.035, -0.04, 0.052, 0.006], squint: [0.20, -0.30], wave: 'out', noNightcap: true, palm: [0, -0.05, 0.012], back: [0, 0.1, -0.2] },
+  ak_tobi: { file: 'ak_tobi_toy', name: 'Tobi', outline: '#3a2a1c', earGain: 0.5, lidTilt: 0.5236, shutLash: [0.10, 0.035, -0.04, 0.052, 0.006], squint: [0.12, -0.24], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  ak_kaede: { file: 'ak_kaede_toy', name: 'Elder Kaede', outline: '#3a2420', earGain: 0.4, lidTilt: 0.5236, shutLash: [0.108, 0.038, -0.043, 0.056, 0.0066], squint: [0.12, -0.24], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  ak_inaho: { file: 'ak_inaho_toy', name: 'Inaho', outline: '#3a2a26', earGain: 0.5, lidTilt: 0.3968, shutLash: [0.108, 0.038, -0.043, 0.056, 0.0066], squint: [0.20, -0.24], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  ak_ochiyo: { file: 'ak_ochiyo_toy', name: 'Ochiyo', outline: '#3a2430', earGain: 0.5, lidTilt: 0.515, shutLash: [0.108, 0.038, -0.043, 0.056, 0.0066], squint: [0.08, -0.30], darkGrade: [0.3, -4, 6, 2], shutLashColor: ['#2a1a1a', '#d8ccd4'], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  ak_yae: { file: 'ak_yae_toy', name: 'Okami Yae', outline: '#2a1c14', earGain: 0.3, lidTilt: 0.266, shutLash: [0.10, 0.035, -0.04, 0.052, 0.006], squint: [0.15, -0.26], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  ak_benji: { file: 'ak_benji_toy', name: 'Benji', outline: '#2a1e1a', earGain: 0.3, lidTilt: 0.318, lidClose: 0.544, shutLash: [0.10, 0.035, -0.035, 0.05, 0.006], shutLashColor: ['#e8d8c8', '#e8d8c8'], squint: [0.14, -0.24], darkGrade: [0.3, 8, 4, -10], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  sk_saba: { file: 'sk_saba_toy', name: 'Saba', outline: '#2a2a34', earGain: 0.5, lidTilt: 0.449, shutLash: [0.108, 0.038, -0.043, 0.056, 0.0066], shutLashColor: ['#2a1a1a', '#d8d4e0'], squint: [0.12, -0.20], darkGrade: [0.3, -2, 4, 6], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  sk_nami: { file: 'sk_nami_toy', name: 'Nami', outline: '#3a2a30', earGain: 0.6, lidTilt: 0.3697, shutLash: [0.108, 0.038, -0.043, 0.056, 0.0066], squint: [0.20, -0.24], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  sk_kaizo: { file: 'sk_kaizo_toy', name: 'Old Captain Kaizo', outline: '#2a2626', earGain: 0.2, lidTilt: 0.15, lidClose: 0.80, shutLash: [0.10, 0.035, -0.04, 0.052, 0.006], squint: [0.10, -0.30], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  sk_shinju: { file: 'sk_shinju_toy', name: 'Okami Shinju', outline: '#3a3040', earGain: 0, lidTilt: 0.393, shutLash: [0.10, 0.035, -0.04, 0.052, 0.006], squint: [0.15, -0.28], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  sk_kaito: { file: 'sk_kaito_toy', name: 'Kaito', outline: '#3a2626', earGain: 0.5, lidTilt: 0.5236, shutLash: [0.11, 0.04, -0.068, 0.056, 0.0066], squint: [0.12, -0.24], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  yk_yuzu: { file: 'yk_yuzu_toy', name: 'Yuzu', outline: '#2a2026', earGain: 0.5, lidTilt: 0.253, lidClose: 0.65, shutLash: [0.11, 0.038, -0.035, 0.055, 0.006], shutLashColor: ['#e8d8c8', '#e8d8c8'], squint: [0.13, -0.30], darkGrade: [0.3, 8, 4, -10], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  yk_mikan: { file: 'yk_mikan_toy', name: 'Mikan', outline: '#3a2420', earGain: 0.4, lidTilt: 0.5236, shutLash: [0.12, 0.042, -0.07, 0.056, 0.0066], squint: [0.14, -0.24], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  yk_tsubaki: { file: 'yk_tsubaki_toy', name: 'Okami Tsubaki', outline: '#2a1e26', earGain: 0.5, lidTilt: 0.532, shutLash: [0.108, 0.038, -0.043, 0.056, 0.0066], shutLashColor: ['#d8ccd4', '#d8ccd4'], squint: [0.08, -0.30], darkGrade: [0.85, -2, 8, -4, 0.12], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  yk_hokuto: { file: 'yk_hokuto_toy', name: 'Hokuto', outline: '#29262d', earGain: 0.4, lidTilt: 0.251, lidClose: 0.42, shutLash: [0.10, 0.035, -0.035, 0.05, 0.006], shutLashColor: ['#e8e2e6', '#e8e2e6'], squint: [0.12, -0.28], darkGrade: [1, -4, 14, -9], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  yk_shirayuki: { file: 'yk_shirayuki_toy', name: 'Granny Shirayuki', outline: '#3a3040', earGain: 0.5, lidTilt: 0.3888, shutLash: [0.08, 0.03, -0.035, 0.045, 0.0055], squint: [0.12, -0.26], wave: 'out', noNightcap: true, palm: [0, -0.04, 0.01], back: [0, 0.07, -0.12] },
+  yk_tetsu: { file: 'yk_tetsu_toy', name: 'Tetsu', outline: '#1e1612', earGain: 0.3, lidTilt: 0.326, shutLash: [0.10, 0.035, -0.04, 0.052, 0.006], shutLashColor: ['#d8c8b8', '#d8c8b8'], squint: [0.12, -0.26], darkGrade: [0.55, 5, 8, -7], wave: 'out', noNightcap: true, palm: [0, -0.05, 0.012], back: [0, 0.1, -0.2] },
+  // the Blender townsfolk (Z-D6, tools/blender/work/codex/folk-<species>-toy): drawn at random by species + seed (folkToys.js);
+  // // provisional face values until each rig is tuned in the game (villager-face.mjs)
+  folk_cat_a: { file: 'folk_cat_a_toy', name: 'Townsfolk', outline: '#3a2a26', earGain: 0.5, lidTilt: 0.522, shutLash: [0.108, 0.038, -0.043, 0.056, 0.0066], squint: [0.20, -0.30], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  folk_cat_b: { file: 'folk_cat_b_toy', name: 'Townsfolk', outline: '#3a2a26', earGain: 0.5, lidTilt: 0.499, shutLash: [0.108, 0.038, -0.043, 0.056, 0.0066], squint: [0.20, -0.30], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  folk_bunny_a: { file: 'folk_bunny_a_toy', name: 'Townsfolk', outline: '#3a2a26', earGain: 0.6, lidTilt: 0.3607, lidClose: 0.52, shutLash: [0.108, 0.038, -0.068, 0.056, 0.0066], squint: [0.06, -0.26], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  folk_bunny_b: { file: 'folk_bunny_b_toy', name: 'Townsfolk', outline: '#3a2a26', earGain: 0.6, lidTilt: 0.3287, lidClose: 0.485, shutLash: [0.108, 0.038, -0.068, 0.056, 0.0066], squint: [0.056, -0.26], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  folk_bear_a: { file: 'folk_bear_a_toy', name: 'Townsfolk', outline: '#2a1c14', earGain: 0.3, lidTilt: 0.436, shutLash: [0.10, 0.035, -0.04, 0.052, 0.006], squint: [0.16, -0.28], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  folk_bear_b: { file: 'folk_bear_b_toy', name: 'Townsfolk', outline: '#2a1c14', earGain: 0.3, lidTilt: 0.436, shutLash: [0.10, 0.035, -0.04, 0.052, 0.006], squint: [0.16, -0.28], darkGrade: [0.3, 18, 10, -6], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  folk_fox_a: { file: 'folk_fox_a_toy', name: 'Townsfolk', outline: '#3a2420', earGain: 0.4, lidTilt: 0.5236, shutLash: [0.12, 0.042, -0.07, 0.056, 0.0066], squint: [0.14, -0.26], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  folk_fox_c: { file: 'folk_fox_c_toy', name: 'Townsfolk', outline: '#3a2420', earGain: 0.4, lidTilt: 0.5236, shutLash: [0.12, 0.042, -0.07, 0.056, 0.0066], squint: [0.14, -0.26], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  folk_panda_a: { file: 'folk_panda_a_toy', name: 'Townsfolk', outline: '#1c181e', earGain: 0.3, lidTilt: 0.263, lidClose: 0.42, shutLash: [0.10, 0.028, -0.046, 0.05, 0.0055], shutLashColor: ['#e8e2e6', '#e8e2e6'], darkGrade: [1, -4, 14, -9], squint: [0.09, -0.30], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  folk_panda_b: { file: 'folk_panda_b_toy', name: 'Townsfolk', outline: '#1c181e', earGain: 0.3, lidTilt: 0.224, lidClose: 0.5, shutLash: [0.10, 0.028, -0.046, 0.05, 0.0055], shutLashColor: ['#e8e2e6', '#e8e2e6'], darkGrade: [1, -4, 14, -9], squint: [0.11, -0.30], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  folk_tanuki_a: { file: 'folk_tanuki_a_toy', name: 'Townsfolk', outline: '#2a1e1a', earGain: 0.3, lidTilt: 0.169, lidClose: 1.1, shutLash: [0.108, 0.038, -0.043, 0.056, 0.0066], shutLashColor: ['#e8d8c8', '#e8d8c8'], darkGrade: [0.3, 8, 4, -10], squint: [0.12, -0.28], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  folk_tanuki_b: { file: 'folk_tanuki_b_toy', name: 'Townsfolk', outline: '#2a1e1a', earGain: 0.3, lidTilt: 0.217, lidClose: 0.62, shutLash: [0.108, 0.038, -0.043, 0.056, 0.0066], shutLashColor: ['#e8d8c8', '#e8d8c8'], darkGrade: [0.3, 8, 4, -10], squint: [0.12, -0.28], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  folk_frog_a: { file: 'folk_frog_a_toy', name: 'Townsfolk', outline: '#2a3a20', earGain: 0, lidTilt: 0.384, lidClose: 1.294, shutLash: [0.108, 0.038, -0.043, 0.056, 0.0066], squint: [0.14, -0.26], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  folk_frog_b: { file: 'folk_frog_b_toy', name: 'Townsfolk', outline: '#2a3a20', earGain: 0, lidTilt: 0.384, lidClose: 1.664, shutLash: [0.108, 0.038, -0.043, 0.056, 0.0066], squint: [0.14, -0.26], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  folk_frog_c: { file: 'folk_frog_c_toy', name: 'Townsfolk', outline: '#2a3a20', earGain: 0, lidTilt: 0.386, lidClose: 0.944, shutLash: [0.108, 0.038, -0.043, 0.056, 0.0066], squint: [0.14, -0.26], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  folk_duck_a: { file: 'folk_duck_a_toy', name: 'Townsfolk', outline: '#3a3040', earGain: 0, lidTilt: 0.5236, lidClose: 0.467, shutLash: [0.108, 0.038, -0.043, 0.056, 0.0066], squint: [0.057, -0.28], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
+  folk_duck_b: { file: 'folk_duck_b_toy', name: 'Townsfolk', outline: '#3a3040', earGain: 0, lidTilt: 0.4992, lidClose: 0.515, shutLash: [0.108, 0.038, -0.043, 0.056, 0.0066], squint: [0.063, -0.28], wave: 'out', noNightcap: true, palm: [0, -0.045, 0.01], back: [0, 0.08, -0.15] },
   // the Toybox Moka (tools/blender/codex/assets/moka-toy, the toybox-character skill, Opus builder): the Moka; the
   // Storybook one below is only for ?chewymodel=disney. Its attach points and grade are set when the rig lands.
   mokaToy: { file: 'moka_toy', name: 'Moka', outline: '#2a1510', earGain: 0.45, darkGrade: [0.2, 4, 16, 12], wave: 'front', palm: [0, -0.054, 0.009], back: [0, 0.02, -0.13] },
@@ -208,6 +257,12 @@ export const toyHeroes = (m = chewyModel()) => m === 'samurai' || m === 'toy';
 // Toybox cast: a hero whose Toybox rig is missing or still loading plays its kit build (Toybox style) instead. Only
 // ?chewymodel=disney reaches the Storybook models.
 const TOY = { chewy: 'chewyToy', moka: 'mokaToy', poe: 'poeToy', shihtzu: 'shihtzuToy', golden: 'goldenToy', stella: 'stellaToy' };
+/** the zone villagers with a Blender rig (VL-2), by zone: preloaded after boot, awaited briefly on entering the zone */
+export const ZONE_TOY = { bamboo: ['tk_sasa', 'tk_kazemaru', 'tk_takumi', 'tk_chiku', 'tk_fuku', 'tk_kome'], maple: ['ak_tobi', 'ak_kaede', 'ak_inaho', 'ak_ochiyo', 'ak_yae', 'ak_benji'], tidepool: ['sk_funaki', 'sk_saba', 'sk_nami', 'sk_kaizo', 'sk_shinju', 'sk_kaito'], onsen: ['yk_shirayuki', 'yk_tetsu', 'yk_yuzu', 'yk_mikan', 'yk_tsubaki', 'yk_hokuto'] };
+/** the Blender townsfolk by species (Z-D6, folk-<species>-toy): a random townsfolk (roster.js randomVillagerSpec) of a listed
+ *  species stands in as one of them, picked by its seed (charKit.js buildHumanoid); preloaded after boot. Dogs stay kit. */
+export const FOLK_TOY = { cat: ['folk_cat_a', 'folk_cat_b'], fox: ['folk_fox_a', 'folk_fox_c'], bear: ['folk_bear_a', 'folk_bear_b'], bunny: ['folk_bunny_a', 'folk_bunny_b'], panda: ['folk_panda_a', 'folk_panda_b'], tanuki: ['folk_tanuki_a', 'folk_tanuki_b'], duck: ['folk_duck_a', 'folk_duck_b'], frog: ['folk_frog_a', 'folk_frog_b', 'folk_frog_c'] };
+
 const cfgFor = id => (id === 'chewy' && chewyModel() === 'samurai' ? ['chewySamurai', 'chewyToy'] : TOY[id] && toyHeroes() ? [TOY[id]] : [id])
   .map(k => HERO_MODELS[k]).filter(c => c && !c.pending); // (a hero with no model, or one still pending, plays its kit)
 
@@ -382,6 +437,79 @@ const WARM_CAP = /* glsl */`
     outgoingLight = mix(outgoingLight, a * (L / La), w * 0.5);
     outgoingLight = mix(outgoingLight, min(outgoingLight, a * uWarmCap), w);
   }`;
+/** The closed eye's ∪ lash (ROADMAP VL-2): a rigid lid on its hinge can only carry its lash down as a flat line, so a
+ *  rig with cfg.shutLash = [w, sag, y, z, r] gets a dark ∪ per eye on the head bone, shown by the Animator (face) only
+ *  while the eye is shut. In metres, in the eye's own frame (x across, y up, z out of the eye, turned out by lidTilt),
+ *  from the eye bone's head: w the width, sag how far the corners rise above the middle, y / z the middle's offset, r the
+ *  stroke's half-thickness. Tapered to the ends, unlit, drawn over the lid. */
+const SHUT_LASH = new Map(); // cfg → [geo, mat] per side: shared by every copy of the rig (never disposed per rig, like its skin)
+function shutLashes(cfg, B, abs, geo, meta) {
+  const parts = SHUT_LASH.get(cfg) || SHUT_LASH.set(cfg, shutLashParts(cfg, abs, geo, meta)).get(cfg);
+  return ['L', 'R'].map((side, si) => {
+    const m = new THREE.Mesh(parts[si][0], parts[si][1]); m.name = 'shutLash_' + side; m.visible = false; m.renderOrder = 2;
+    m.position.copy(abs['eye_' + side]).sub(abs.head); B.head.add(m); return m;
+  });
+}
+/** Lay the ∪ on the shut eye: its points come from cfg.shutLash in the eye's plane, but the head curves away from that
+ *  plane, so at 45° the far eye's ∪ hung past the silhouette (and a copied z could stand it centimetres proud). Each
+ *  point is cast back along the eye's axis (toward the eye bone where that misses) against the head near the eye in the
+ *  shut pose (the skin, the eyeball, and the lid shells and lash rolls turned shut on their hinges as the Animator turns
+ *  them) and set half a stroke proud of the first surface it meets. */
+function hugSkin(pts, eye, side, cfg, r, geo, meta, abs) {
+  const P = geo.attributes.position, SI = geo.attributes.skinIndex, SW = geo.attributes.skinWeight, I = geo.index;
+  if (!P || !SI || !SW || !I) return;
+  const tilt = cfg.lidTilt || 0, sx = side === 'L' ? -1 : 1, axis = new THREE.Vector3(Math.cos(tilt), 0, sx * Math.sin(tilt)); // (Animator.face: lidTurn's axes)
+  const turn = {}; // bone index → [pivot, quaternion] for the lids (every other bone stays at bind)
+  meta.bones.forEach((b, i) => {
+    const m = /^lid([UD])_([LR])$/.exec(b.name); if (!m) return;
+    const ax = m[2] === side ? axis : new THREE.Vector3(Math.cos(tilt), 0, -sx * Math.sin(tilt));
+    turn[i] = [abs[b.name], new THREE.Quaternion().setFromAxisAngle(ax, m[1] === 'U' ? cfg.lidClose || 1.22 : -0.1)];
+  });
+  const near = 0.16, v = new THREE.Vector3(), q = new THREE.Vector3(), posed = new Map();
+  const pose = i => { // vertex i in the shut pose (linear blend, as the skinning does)
+    let o = posed.get(i); if (o) return o;
+    v.fromBufferAttribute(P, i); o = new THREE.Vector3();
+    for (let k = 0; k < 4; k++) {
+      const w = SW.getComponent(i, k); if (w <= 0) continue;
+      const t = turn[SI.getComponent(i, k)];
+      if (t) o.addScaledVector(q.copy(v).sub(t[0]).applyQuaternion(t[1]).add(t[0]), w); else o.addScaledVector(v, w);
+    }
+    posed.set(i, o); return o;
+  };
+  const tris = [];
+  for (let t = 0; t < I.count; t += 3) {
+    const i0 = I.getX(t), i1 = I.getX(t + 1), i2 = I.getX(t + 2);
+    if (v.fromBufferAttribute(P, i0).distanceTo(eye) > near || v.fromBufferAttribute(P, i1).distanceTo(eye) > near || v.fromBufferAttribute(P, i2).distanceTo(eye) > near) continue;
+    tris.push(pose(i0), pose(i1), pose(i2));
+  }
+  const ray = new THREE.Ray(), hit = new THREE.Vector3(), dir = new THREE.Vector3();
+  const cast = (o, d) => { ray.set(o, d); let best = Infinity; for (let k = 0; k < tris.length; k += 3) if (ray.intersectTriangle(tris[k], tris[k + 1], tris[k + 2], false, hit)) best = Math.min(best, hit.distanceTo(o)); return best; };
+  const fwd = new THREE.Vector3(-sx * Math.sin(tilt), 0, Math.cos(tilt)), back = fwd.clone().negate(); // (the eye's out-of-face axis)
+  for (const p of pts) {
+    // along the eye's axis first (the ∪ keeps its front-view shape); a point past the silhouette, whose ray meets
+    // nothing, goes back toward the eye bone instead
+    let t = cast(q.copy(eye).add(p).addScaledVector(fwd, 0.12), back);
+    if (t < Infinity) { p.addScaledVector(back, t - 0.12 - r * 0.5); continue; }
+    const d = p.length(); if (d < 1e-6) continue;
+    dir.copy(p).divideScalar(d);
+    t = cast(q.copy(eye).addScaledVector(dir, d + 0.12), v.copy(dir).negate());
+    if (t < Infinity) p.copy(dir).multiplyScalar(d + 0.12 - t + r * 0.5);
+  }
+}
+function shutLashParts(cfg, abs, skin, meta) {
+  const [w, sag, y, z, r] = cfg.shutLash, tilt = cfg.lidTilt || 0, N = 14;
+  const cols = Array.isArray(cfg.shutLashColor) ? cfg.shutLashColor : [cfg.shutLashColor, cfg.shutLashColor]; // ([L, R]: a light crease on a dark patch)
+  return ['L', 'R'].map((side, si) => {
+    const mat = new THREE.MeshBasicMaterial({ color: cols[si] || '#2a1a1a', polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const sx = side === 'L' ? 1 : -1, a = sx * tilt, ca = Math.cos(a), sa = Math.sin(a);
+    const pts = []; for (let i = 0; i <= N; i++) { const u = i / N * 2 - 1; const lx = u * w / 2, ly = y + sag * u * u, lz = z - Math.abs(u) ** 2 * w * 0.18; pts.push(new THREE.Vector3(lx * ca + lz * sa, ly, -lx * sa + lz * ca)); }
+    hugSkin(pts, abs['eye_' + side], side, cfg, r, skin, meta, abs);
+    const curve = new THREE.CatmullRomCurve3(pts), geo = new THREE.TubeGeometry(curve, 24, r, 6, false);
+    { const p = geo.attributes.position, c = new THREE.Vector3(); for (let i = 0; i < p.count; i++) { const t = Math.floor(i / 7) / 24, k = 0.35 + 0.65 * Math.sin(Math.PI * t); curve.getPointAt(t, c); p.setXYZ(i, c.x + (p.getX(i) - c.x) * k, c.y + (p.getY(i) - c.y) * k, c.z + (p.getZ(i) - c.z) * k); } }
+    geo.userData.shared = true; return [geo, mat];
+  });
+}
+
 export function buildHeroModel(id, spec = null) {
   const A = ASSETS.get(id); if (!A) throw new Error(`hero model ${id} not loaded`);
   const cfg = A.cfg || HERO_MODELS[id];
@@ -455,6 +583,7 @@ export function buildHeroModel(id, spec = null) {
   const outline = mk(olGeo, outMat, 'outline_skin'); outline.castShadow = false;
   outline.visible = false; // film look: no ink hull (it also pokes through the eye, nose and mouth hollows)
 
+  const shutLash = !quad && cfg.shutLash ? shutLashes(cfg, B, abs, geo, meta) : null; // (the closed eye's ∪ lash: see shutLashes)
   const parts = quad ? { // the kit Boston's parts (Animator.poseQuad): the legs hang off the root, the head and tail off the body
     body: B.body, head: B.head, legs: [B.legFL, B.legFR, B.legBL, B.legBR], earL: B.ear_L, earR: B.ear_R, tail: B.tail1,
     jaw: B.jaw, lids: [B.lidU_L, B.lidU_R], lidsLow: [B.lidD_L, B.lidD_R], lips: [B.lip_L, B.lip_R], eyes: [], brows: [],
@@ -462,7 +591,7 @@ export function buildHeroModel(id, spec = null) {
   } : {
     body: B.spine, head: B.head, armL: B.upperarm_L, armR: B.upperarm_R, handL: palm('handL'), handR: palm('handR'),
     foreL: B.forearm_L, foreR: B.forearm_R, wristL: B.hand_L, wristR: B.hand_R, saya, // (elbows / wrists: the samurai cuts bend them; animator.js)
-    legL: B.thigh_L, legR: B.thigh_R, earL: B.ear_L, earR: B.ear_R, tail: B.tail1, back, hatAnchor, wave: cfg.wave, anim: cfg.anim, fumaMount, flailMount, lanceMount, parasolMount,
+    legL: B.thigh_L, legR: B.thigh_R, earL: B.ear_L, earR: B.ear_R, tail: B.tail1, back, hatAnchor, shutLash, wave: cfg.wave, anim: cfg.anim, fumaMount, flailMount, lanceMount, parasolMount,
     jaw: B.jaw, lids: [B.lidU_L, B.lidU_R], lidsLow: [B.lidD_L, B.lidD_R], lips: [B.lip_L, B.lip_R], eyes: [], brows: [],
     eyeballs: [B.eye_L, B.eye_R],
   };

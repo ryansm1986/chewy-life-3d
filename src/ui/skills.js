@@ -7,6 +7,7 @@ import { padGlyph } from './padGlyphs.js';
 import { Panel } from './panel.js';
 import { TREES, treesFor, skillList, skillDef, skillIconURL, hotbarIconURL, skillInfoLines, canLearnSkill, effLevel, treeInfo, skillTraining } from './rpg.js';
 import { ChargeDrawer, chipState, chargeTipHTML } from './chargePanel.js';
+import { comboChipState, comboTipHTML, CHAIN_SVG } from './comboPanel.js';
 import { aimLine } from '../combat/autoTarget.js';
 
 const COLW = 118, ROWH = 80, NODE = 64, PADX = 64, PADY = 26;
@@ -27,7 +28,7 @@ export class SkillsPanel extends Panel {
     // (R-16: on the ⚡ chip the node's tooltip steps aside: it sat over the Charge drawer and hid the switch the chip makes)
     N.addEventListener('mouseover', e => {
       const n = e.target.closest('.node'); if (!n) return;
-      const chip = !!e.target.closest('.nd-chg.on');
+      const chip = !!e.target.closest('.nd-chg.on, .nd-cmb.on'); // (and the combo chain chip: docs/COMBO.md)
       if (n === this._hov && chip === this._hovChip) return;
       this._hov = n; this._hovChip = chip; this.hoverId = n.dataset.id;
       if (chip) this.ui.tip.hide(); else this.ui.tip.show(this.tipHTML(n.dataset.id), 'skill', n);
@@ -50,7 +51,8 @@ export class SkillsPanel extends Panel {
       const p = this._press; this._press = null;
       if (this._drag) { const id = this._drag; this._drag = null; this.ui.dragSkillEnd(id, e.clientX, e.clientY); return; }
       if (p && e.target.closest?.('.node') === p.n) {
-        if (e.target.closest?.('.nd-chg')) { this.chg.choose(p.id); return; }
+        if (e.target.closest?.('.nd-chg')) { if (this.chg.mode === 'combo') this.chg.setMode('charge'); this.chg.choose(p.id); return; }
+        if (e.target.closest?.('.nd-cmb.on')) { this.chg.chooseCombo(p.id); return; } // (the chain chip: its Combo pane)
         if (this.ui.mobile?.dblTap === e) return; // (the second tap of a double-tap is the assign popover, not a second learn)
         this.learn(p.id, p.n);
       }
@@ -100,7 +102,7 @@ export class SkillsPanel extends Panel {
     tr.dataset.tree = T.id;
     this.chg.pick(T.id);
     this.chg.render();
-    const sig = T.id + '|' + list.map(s => s.id + this.lvl(s.id) + this.state(s)).join() + '|' + (p.hotbar || []).join() + '|' + JSON.stringify(p.chargePerks || {}) + '|' + pts + '|' + this.chg.id;
+    const sig = T.id + '|' + list.map(s => s.id + this.lvl(s.id) + this.state(s)).join() + '|' + (p.hotbar || []).join() + '|' + JSON.stringify(p.chargePerks || {}) + '|' + JSON.stringify(p.comboPerks || {}) + '|' + pts + '|' + this.chg.id + '|' + this.chg.mode + '|' + this.chg.combo?.id;
     if (sig === this._treeSig) return;
     this._treeSig = sig;
     this.$.title.innerHTML = `<span class="tr-wm">${glyph(T.glyph)}</span>`;
@@ -129,7 +131,7 @@ export class SkillsPanel extends Panel {
       let n = keep.get(s.id);
       if (!n) {
         n = el('div', 'node'); n.dataset.id = s.id;
-        n.innerHTML = `<div class="nd-ring"></div><div class="nd-in"><img alt="" draggable="false"></div><span class="nd-lv"></span><span class="nd-lock">${glyph('lock')}</span><span class="nd-hk"></span><span class="nd-chg" title="Charge perks">${glyph('zap')}<b></b></span>`;
+        n.innerHTML = `<div class="nd-ring"></div><div class="nd-in"><img alt="" draggable="false"></div><span class="nd-lv"></span><span class="nd-lock">${glyph('lock')}</span><span class="nd-hk"></span><span class="nd-chg" title="Charge perks">${glyph('zap')}<b></b></span><span class="nd-cmb" title="Combo perks">${CHAIN_SVG}<b></b></span>`;
         n.querySelector('img').src = skillIconURL(s.id);
         this.$.nodes.appendChild(n);
       } else keep.delete(s.id);
@@ -145,7 +147,10 @@ export class SkillsPanel extends Panel {
       hkEl.classList.toggle('on', hk >= 0);
       // the ⚡ chip: this skill's charge perks (points spent; glows when one can be bought; ringed when shown in the drawer)
       const cs = s.passive ? null : chipState(s.id, this.st), ch = n.querySelector('.nd-chg');
-      ch.classList.toggle('on', !!cs); if (cs) { ch.querySelector('b').textContent = cs.spent ? String(cs.spent) : ''; ch.classList.toggle('spent', cs.spent > 0); ch.classList.toggle('can', cs.can); ch.classList.toggle('sel', this.chg.id === s.id); }
+      ch.classList.toggle('on', !!cs); if (cs) { ch.querySelector('b').textContent = cs.spent ? String(cs.spent) : ''; ch.classList.toggle('spent', cs.spent > 0); ch.classList.toggle('can', cs.can); ch.classList.toggle('sel', this.chg.id === s.id && this.chg.mode !== 'combo'); }
+      // the chain chip: a combo skill's perks (docs/COMBO.md §4), the same marks
+      const ks = s.passive ? null : comboChipState(s.id, this.st), cm = n.querySelector('.nd-cmb');
+      cm.classList.toggle('on', !!ks); if (ks) { cm.querySelector('b').textContent = ks.spent ? String(ks.spent) : ''; cm.classList.toggle('spent', ks.spent > 0); cm.classList.toggle('can', ks.can); cm.classList.toggle('sel', this.chg.mode === 'combo' && this.chg.combo?.id === s.id); }
     }
     for (const n of keep.values()) n.remove();
     this.$.links.setAttribute('viewBox', `0 0 ${PADX * 2 + COLW * 2 + NODE} ${PADY * 2 + ROWH * 5 + NODE}`);
@@ -209,9 +214,10 @@ export class SkillsPanel extends Panel {
       ${next.length ? `<div class="tt-sect next"><div class="tt-sh">${lvl ? 'Next level' : 'Level 1'}</div>${next.map(l => `<div class="tt-l">${esc(l)}</div>`).join('')}</div>` : lvl >= s.maxLvl ? '<div class="tt-max">✦ Mastered! ✦</div>' : ''}
       ${reqs.length ? `<div class="tt-reqs">Requires: ${reqs.join(', ')}</div>` : ''}
       ${skillTraining(id) ? `<div class="tt-train">In training: ${esc(CLASSES[skillDef(id)?.raw?.cls || skillDef(id)?.cls]?.name || 'the hero')} is still practising this one. Coming soon!</div>` : ''}
+      ${!s.passive && lvl ? comboTipHTML(id, this.st, this.d) : ''}
       ${!s.passive && lvl ? chargeTipHTML(id, this.st, this.d) : ''}
       ${syn ? `<div class="tt-sect syn"><div class="tt-sh">Synergies</div>${syn}</div>` : ''}
-      <div class="tt-hints"><span><b>Click</b> learn</span>${!s.passive && lvl ? '<span><b>Right-click</b> / <b>1–4</b> assign</span><span><b>⚡</b> charge perks</span>' : ''}</div>
+      <div class="tt-hints"><span><b>Click</b> learn</span>${!s.passive && lvl ? '<span><b>Right-click</b> / <b>1–4</b> assign</span><span><b>⚡</b> charge perks</span>' : ''}${!s.passive && lvl && comboChipState(id, this.st) ? '<span><b>⛓</b> combo perks</span>' : ''}</div>
     </div>`;
   }
   // skill → slot chooser

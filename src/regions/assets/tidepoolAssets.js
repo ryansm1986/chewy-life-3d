@@ -36,7 +36,7 @@ export function coastPine(seed, dir = V(0.95, 0, -0.3).normalize(), k = 0.085) {
     }
     p.needsUpdate = true; g.computeBoundingSphere();
   }
-  return { bark: t.trunkGeo, foliage: t.foliage, 'cards:pine': t.cardGeo };
+  return { bark: t.trunkGeo, [t.massKey || 'foliage']: t.foliage, 'cards:pine': t.cardGeo };
 }
 /** Dune grass (kōbōmugi): a fountain of long sun-bleached blades. Material 'reed' (sways with the wind). */
 export function duneGrass(seed) {

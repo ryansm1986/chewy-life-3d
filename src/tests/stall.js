@@ -8,11 +8,14 @@ import { makeStage } from './_stage.js';
 import { instantiate, MATS } from '../world/buildings/kit.js';
 import { setNightAll } from '../world/buildings/index.js';
 import { makeToon } from '../gfx/materials.js';
-import { trinketStallTemplate } from '../home/stallModel.js';
+import { trinketStallTemplate as kitStall } from '../home/stallModel.js';
+import { withExtGlb, loadExtGlbs } from '../home/extGlb.js';
+const trinketStallTemplate = () => (new URLSearchParams(location.search).has('kit') ? kitStall() : withExtGlb('trinketStall', kitStall())); // (&kit: the kit model)
 import { furnitureGroup } from '../home/furnitureMesh.js';
 import { FURNITURE } from '../home/furniture.js';
 
-export default function () {
+export default async function () {
+  await loadExtGlbs();
   const P = new URLSearchParams(location.search), furn = P.get('furn');
   const S = makeStage({ ground: 60, hour: 10, center: [0, 0], dist: furn ? 2.4 : 8, groundColor: '#e2d2b6' });
   const rig = S.engine.rig;
@@ -36,6 +39,7 @@ export default function () {
   } else {
     const tpl = trinketStallTemplate(), inst = instantiate(tpl);
     S.scene.add(inst.group);
+    if (P.has('mailbox')) { const EM = await import('../home/exteriorModels.js'); const mt = withExtGlb('mailbox', EM.mailboxTemplate()), mi = instantiate(mt); mi.group.position.set(1.9, 0, 0.9); S.scene.add(mi.group); } // (&mailbox: the home mailbox beside it)
     for (const l of tpl.lights) lightSrc.push({ pos: l.pos.clone(), color: l.color, intensity: l.intensity, radius: l.radius, flicker: l.flicker, nightOnly: l.nightOnly });
     let tris = 0; for (const geo of Object.values(tpl.geos)) tris += geo.attributes.position.count / 3;
     window.__info = { tris: Math.round(tris), buckets: Object.keys(tpl.geos), lights: tpl.lights.length };

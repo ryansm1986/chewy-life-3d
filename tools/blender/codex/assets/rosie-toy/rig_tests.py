@@ -35,15 +35,21 @@ for args in (('key', (-2.2, 1.9, 1.0), 175, (1, .92, .86)), ('fill', (2.4, -.4, 
     light(*args)
 PB = arm.pose.bones
 def reset():
-    for b in PB: b.rotation_mode = 'YZX'; b.rotation_euler = (0, 0, 0); b.location = (0, 0, 0)
+    for b in PB: b.rotation_mode = 'YZX'; b.rotation_euler = (0, 0, 0); b.location = (0, 0, 0); b.rotation_axis_angle = (0, 0, 1, 0)
 def game_rot(bone, gx=0., gy=0., gz=0.):
     e = PB[bone].rotation_euler; PB[bone].rotation_euler = (e.x + gx, e.y - gz, e.z + gy)
+import json as _json
+LID_TILT = _json.load(open(os.path.join(ROOT, 'joints-rig.json'))).get('lidTilt', 0.)   # round 10: the game's lidTilt (animator.js lidTurn)
+def lid_rot(name, a):
+    """a lid turned as the game turns it: about its eye's sideways axis, Blender (cos t, +-sin t, 0) (left eye +)"""
+    t = LID_TILT; sd = 1 if name.endswith('L') else -1; b = PB[name]
+    b.rotation_mode = 'AXIS_ANGLE'; b.rotation_axis_angle = (a, math.cos(t), sd * math.sin(t), 0)
 def neutral(smile=.4, lidD=-.10):
     for t in 'LR':
-        game_rot('lidD_' + t, gx=lidD); PB['lip_' + t].location = (0, .004 * smile, .007 * smile)
+        lid_rot('lidD_' + t, lidD); PB['lip_' + t].location = (0, .004 * smile, .007 * smile)
 def face_state(lidU=0., lidD=-.10, jaw=0., smile=.4):
     for t in 'LR':
-        game_rot('lidU_' + t, gx=lidU); game_rot('lidD_' + t, gx=lidD); PB['lip_' + t].location = (0, .004 * smile, .007 * smile)
+        lid_rot('lidU_' + t, lidU); lid_rot('lidD_' + t, lidD); PB['lip_' + t].location = (0, .004 * smile, .007 * smile)
     game_rot('jaw', gx=jaw)
 def aim(loc, target, ortho=None, lens=None):
     cam.location = loc; cam.rotation_euler = (Vector(target) - Vector(loc)).to_track_quat('-Z', 'Y').to_euler()
@@ -73,10 +79,18 @@ POSES = [
     ('arms in (spin)', lambda: (neutral(), game_rot('upperarm_R', gz=1.4 - .12, gx=-.2), game_rot('upperarm_L', gz=-1.4 + .12))),
     ('wave', lambda: (neutral(1.0), game_rot('upperarm_R', gz=2.5 - .12, gx=-.3), game_rot('upperarm_L', gz=.12), game_rot('head', gz=.12))),
     ('head turn + nod', lambda: (neutral(), game_rot('head', gx=.3, gy=.45))),
+    ('turn +0.6', lambda: (neutral(), game_rot('head', gy=.6))),
+    ('turn -0.6', lambda: (neutral(), game_rot('head', gy=-.6))),
+    ('nod +0.3', lambda: (neutral(), game_rot('head', gx=.3))),
+    ('nod -0.3', lambda: (neutral(), game_rot('head', gx=-.3))),
+    ('tilt 0.15', lambda: (neutral(), game_rot('head', gz=.15))),
+    ('turn 0.6 + nod 0.3', lambda: (neutral(), game_rot('head', gx=.3, gy=.6))),
+    ('turn -0.6 + nod -0.3', lambda: (neutral(), game_rot('head', gx=-.3, gy=-.6))),
     ('happy hop', lambda: (face_state(.488, -.24, 0, 1.0), game_rot('upperarm_R', gz=2.4 - .12, gx=-.2), game_rot('upperarm_L', gz=-2.4 + .12, gx=-.2))),
 ]
-FACES = [('rest', dict()), ('blink', dict(lidU=1.22)), ('happy', dict(lidU=.488, lidD=-.24, smile=1.0)), ('talk 0.15', dict(jaw=.15)),
-         ('jaw 0.42', dict(jaw=.42)), ('jaw 0.42 + happy + lips', dict(lidU=.488, lidD=-.24, jaw=.42, smile=1.0))]
+SQ = [float(v) for v in os.environ.get('ROSIE_SQUINT', '.30,-.24').split(',')]      # round 10: the happy pair (game squint entry)
+FACES = [('rest', dict()), ('blink', dict(lidU=1.22)), ('squint', dict(lidU=SQ[0])), ('happy', dict(lidU=SQ[0], lidD=SQ[1], smile=1.0)),
+         ('talk 0.15', dict(jaw=.15)), ('jaw 0.42', dict(jaw=.42)), ('jaw 0.42 + happy + lips', dict(lidU=SQ[0], lidD=SQ[1], jaw=.42, smile=1.0))]
 if only in (None, 'poses'):
     paths = []
     for name, fn in POSES:
@@ -84,16 +98,43 @@ if only in (None, 'poses'):
         t = Vector((0, 0, .66))
         aim(t + game_dir(45) * 5.6, t, lens=135); paths.append(shot(os.path.join(OUT, '_p_%s_g.png' % name.replace(' ', '_')), 380, 420))
         aim(t + Vector((0, -1, .06)).normalized() * 8, t, ortho=1.45); paths.append(shot(os.path.join(OUT, '_p_%s_f.png' % name.replace(' ', '_')), 380, 420))
-    montage(paths, 4, os.path.join(OUT, 'poses.png'))
+        tb = Vector((0, .02, .80)); aim(tb + Vector((.55, .80, .30)).normalized() * 6, tb, ortho=.95)       # round 9: the ringlets from behind
+        paths.append(shot(os.path.join(OUT, '_p_%s_b.png' % name.replace(' ', '_')), 380, 420))
+    montage(paths, 6, os.path.join(OUT, 'poses.png'))
+if only == 'ringclear':    # round 9: the ringlets' signed clearance to the posed dress, sleeves and skirt (negative = inside)
+    import json
+    from mathutils.bvhtree import BVHTree
+    RV = json.load(open(os.path.join(ROOT, 'rig_ringlets.json')))['vertices']
+    hair = bpy.data.objects['Rosie_hair']; body = [bpy.data.objects[n] for n in ('Rosie_dress', 'Rosie_arm_L', 'Rosie_arm_R', 'Rosie_skirt')]
+    res = {}
+    for name, fn in POSES:
+        reset(); fn(); bpy.context.view_layer.update(); dg = bpy.context.evaluated_depsgraph_get()
+        trees = []
+        for o in body:
+            e = o.evaluated_get(dg); me = e.to_mesh(); me.calc_loop_triangles()
+            trees.append((o.name, BVHTree.FromPolygons([e.matrix_world @ v.co for v in me.vertices], [tuple(t.vertices) for t in me.loop_triangles])))
+            e.to_mesh_clear()
+        e = hair.evaluated_get(dg); me = e.to_mesh(); best = (9., None, None); n_in = 0
+        for i in RV:
+            p = e.matrix_world @ me.vertices[i].co; inside = False
+            for nm, tr in trees:
+                loc, nrm, idx, dist = tr.find_nearest(p, .2)
+                if loc is None: continue
+                sd = dist if ((p - loc).dot(nrm) >= 0 or dist > .04) else -dist     # (the face-normal sign is only meaningful near the surface)
+                inside |= sd < 0
+                if sd < best[0]: best = (sd, nm, [round(c, 3) for c in p])
+            n_in += inside
+        e.to_mesh_clear(); res[name] = {'min_clear_m': round(best[0], 4), 'part': best[1], 'at': best[2], 'verts_inside': n_in}
+    print('RING_CLEAR', json.dumps(res), flush=True)
 if only in (None, 'face'):
     paths = []
-    HCt = Vector((0, -.06, .965))
+    HCt = Vector((0, -.06, .945))
     for name, kw in FACES:
         reset(); face_state(**kw)
-        aim(HCt + Vector((0, -1, 0)) * 4, HCt, ortho=.62); paths.append(shot(os.path.join(OUT, '_f_%s_0.png' % len(paths)), 360, 360))
-        for yaw in (45, -45):
-            g = Vector((0, -.14, .83)); aim(g + game_dir(yaw) * 4, g, ortho=.60); paths.append(shot(os.path.join(OUT, '_f_%s_1.png' % len(paths)), 360, 360))
-        aim(HCt + Vector((.64, -.77, 0)) * 4, HCt, ortho=.62); paths.append(shot(os.path.join(OUT, '_f_%s_3.png' % len(paths)), 360, 360))
+        aim(HCt + Vector((0, -1, 0)) * 4, HCt, ortho=.66); paths.append(shot(os.path.join(OUT, '_f_%s_0.png' % len(paths)), 360, 360))
+        for yaw in (45, -45):        # round 10: framed for the 0.62 m head (the game camera, 45 deg down)
+            g = Vector((0, -.06, .93)); aim(g + game_dir(yaw) * 4, g, ortho=.82); paths.append(shot(os.path.join(OUT, '_f_%s_1.png' % len(paths)), 360, 360))
+        aim(HCt + Vector((.64, -.77, 0)) * 4, HCt, ortho=.66); paths.append(shot(os.path.join(OUT, '_f_%s_3.png' % len(paths)), 360, 360))
     montage(paths, 4, os.path.join(OUT, 'face.png'))
 if only == 'rest':         # every bone at rest, round-3 framings (portrait, head front / 3/4) -> scratch/rest_*.png
     reset(); sc.eevee.taa_render_samples = 48; bpy.data.lights['rim'].size = 2.5
@@ -151,7 +192,7 @@ def toon_materials(L):
     return m
 if only == 'toon':         # preview/toon-check.png: hard-ramp toon light, sun 50 deg up from either side, yaw 0 / +-0.6
     sc.view_settings.view_transform = 'Standard'
-    rows = [('rest', dict(), 82), ('rest', dict(), -82), ('blink', dict(lidU=1.22), 82), ('happy', dict(lidU=.488, lidD=-.24, smile=1.0), -82)]
+    rows = [('rest', dict(), 82), ('rest', dict(), -82), ('blink', dict(lidU=1.22), 82), ('happy', dict(lidU=SQ[0], lidD=SQ[1], smile=1.0), -82)]
     paths = []
     for name, kw, az in rows:
         e = math.radians(50); a = math.radians(az)

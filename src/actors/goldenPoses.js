@@ -88,6 +88,20 @@ const SUN_DRAW = K({ armR: [0.3, 0, 0.3], foreR: [-1.0, 0, 0.3], armL: [-1.2, 0,
   dir: [0.97, 0.12, 0.22], up: [0, 1, 0], two: 1, slide: -0.25, sq: 0.12, y: -0.08, earKick: -1, armLock: 1 });
 const SUN_LUNGE = K({ armR: [-1.45, 0, 0.5], foreR: [0, 0, 0], armL: [-1.55, 0, -0.15], foreL: [0, 0, 0], body: [0.32, -0.25, 0], head: [-0.12, 0.25, 0], legL: [-1.0], legR: [0.75],
   dir: [1, -0.04, 0.08], up: [0, 1, 0], two: 0.85, slide: 0.3, sq: -0.1, y: -0.1, lean: 0.1, mouth: 1, earKick: 3, armLock: 1 });
+// ---- Eager Jabs: short, quick pokes, not lunges. The chamber: the lance pulled in close at his right hip, half turned, up on
+// his toes; each jab drives the shaft out through the left paw (the slide does most of it) with only a little lean, the
+// feet staying under him; the two small jabs alternate a touch low / a touch high so they read as separate pokes; the
+// last one draws back deeper and goes in with a real step and the whole body (the knockback)
+const JAB_SET = K({ armR: [-0.05, 0, 0.4], foreR: [-0.95, 0, 0.25], armL: [-1.1, 0, -0.42], foreL: [-0.4, 0, 0], body: [0.04, -0.42, 0], head: [0, 0.4, 0], legL: [-0.3], legR: [0.25],
+  dir: [0.96, 0.1, 0.26], up: [0, 1, 0], two: 1, slide: -0.14, sq: 0.05, y: -0.02, earKick: 0.6, armLock: 1 });
+const JAB_A = K({ armR: [-1.0, 0, 0.45], foreR: [-0.3, 0, 0.12], armL: [-1.4, 0, -0.3], foreL: [-0.08, 0, 0], body: [0.16, -0.26, 0], head: [-0.04, 0.26, 0], legL: [-0.5], legR: [0.38],
+  dir: [1, -0.02, 0.14], up: [0, 1, 0], two: 1, slide: 0.27, sq: -0.05, y: -0.03, lean: 0.04, mouth: 0.55, earKick: 1.6, armLock: 1 });
+const JAB_B = K({ armR: [-1.18, 0, 0.36], foreR: [-0.2, 0, 0.08], armL: [-1.52, 0, -0.22], foreL: [-0.05, 0, 0], body: [0.13, -0.14, 0], head: [-0.07, 0.16, 0], legL: [-0.42], legR: [0.4],
+  dir: [1, 0.1, 0.06], up: [0, 1, 0], two: 1, slide: 0.25, sq: -0.05, y: -0.03, lean: 0.04, mouth: 0.65, earKick: 2.2, armLock: 1 });
+const JAB_BIG_SET = K({ armR: [0.15, 0, 0.38], foreR: [-0.9, 0, 0.28], armL: [-1.1, 0, -0.5], foreL: [-0.4, 0, 0], body: [-0.04, -0.62, 0], head: [0, 0.55, 0], legL: [-0.4], legR: [0.35],
+  dir: [0.95, 0.12, 0.3], up: [0, 1, 0], two: 1, slide: -0.22, sq: 0.1, y: -0.05, earKick: -0.8, armLock: 1 });
+const JAB_BIG = K({ armR: [-1.4, 0, 0.45], foreR: [-0.05, 0, 0.08], armL: [-1.5, 0, -0.2], foreL: [0, 0, 0], body: [0.28, -0.18, 0], head: [-0.1, 0.18, 0], legL: [-0.85], legR: [0.6],
+  dir: [1, -0.03, 0.1], up: [0, 1, 0], two: 1, slide: 0.32, sq: -0.09, y: -0.07, lean: 0.08, mouth: 0.9, earKick: 2.8, armLock: 1 });
 // a javelin throw: the lance stays in the left paw (goldenGear 'left'), a javelin drawn from the quiver over his right
 // shoulder, wound back behind his head, then hurled overhand with a step, the left paw (and the lance) swinging back
 const JAV_DRAW = K({ armR: [-2.0, 0, -0.55], foreR: [-0.8, 0, 0], armL: [-0.55, 0, -0.25], foreL: [-0.4, 0, 0], body: [-0.1, -0.45, 0], head: [-0.05, 0.4, 0], legL: [-0.3], legR: [0.3],
@@ -183,6 +197,36 @@ const act = (dur, ev, keys, extra, flags = {}) => ({ dur, ev, ...flags, pose: (t
 const LANCE = { lance: true, guard: true };
 const jw = (a, b) => (t, A) => { A.javW = t > a && t < b ? 1 : 0; }; // (the javelin in his paw from the draw to the release)
 
+// ---- Eager Jabs (combat/goldenSkills.js cast_eagerJabs): n jabs (3 tapped, 4 or 5 charged), the last the big one. Built in
+// seconds at speed 1 and normalised: every flurry keeps the same rhythm (a jab every 0.15 s), a longer one just lasts longer.
+// Events jab0..jab(n−1) at each jab's full reach; the tail wags hard the whole way through (and harder still at the end).
+const JAB = { lead: 0.06, step: 0.075, wind: 0.1, strike: 0.065, hold: 0.12, back: 0.2 };
+/** the flurry's action name for n jabs */
+export const jabAction = n => (n <= 3 ? 'eagerJabs' : `eagerJabs${Math.min(5, n)}`);
+/** its length at speed 1 (s) */
+export const jabDur = n => JAB.lead + (2 * Math.max(1, n - 1) - 1) * JAB.step + JAB.wind + JAB.strike + JAB.hold + JAB.back;
+/** where its chamber is (u): the frame the charged wind-up holds (chargedGolden.js fromFrame) */
+export const jabFrom = n => JAB.lead / jabDur(n);
+function jabsAct(n) {
+  const keys = [[0, GUARD]], hits = [];
+  let t = JAB.lead; keys.push([t, JAB_SET, out]);
+  for (let i = 0; i < n - 1; i++) {
+    if (i > 0) { t += JAB.step; keys.push([t, JAB_SET, io]); } // (pulled back in between)
+    t += JAB.step; keys.push([t, i % 2 ? JAB_B : JAB_A, snap]); hits.push(t);
+  }
+  t += JAB.wind; keys.push([t, JAB_BIG_SET, out]);
+  t += JAB.strike; keys.push([t, JAB_BIG, snap]); hits.push(t);
+  t += JAB.hold; keys.push([t, JAB_BIG]);
+  t += JAB.back; keys.push([t, GUARD, io]);
+  const D = t, hu = hits.map(h => h / D), last = hu[hu.length - 1], ku = keys.map(([s, k, e]) => [s / D, k, e]);
+  return { dur: D, ev: Object.fromEntries(hu.map((u, i) => ['jab' + i, u])), ...LANCE, pose: (u, P, A) => {
+    track(A, ku, u);
+    let hop = 0; for (const h of hu) hop = Math.max(hop, bump(h - 0.05, h + 0.06, u)); // (a little bounce on his toes at each jab)
+    A.y += 0.02 * hop; A.tailWag += 3 * S(0, JAB.lead / D, u) + 1.5 * bump(last - 0.02, 1, u);
+    if (u > last + 0.04 && u < 0.92) { A.happy = 1; A.eyesHappy = 1; } // (pleased with himself)
+  } };
+}
+
 export const GOLDEN_ACTIONS = {
   // ---- the reach combo (combat/goldenSkills.js cast_lancePoke: one move per attack, at his attack speed)
   lanceThrust1: act(0.42, { hit: 0.46 }, [[0, GUARD], [0.3, DRAW, out], [0.46, LUNGE, snap], [0.66, LUNGE], [1, GUARD, io]], null, LANCE),
@@ -191,6 +235,8 @@ export const GOLDEN_ACTIONS = {
   // ---- Sunbeam Thrust
   sunbeamThrust: act(0.62, { hit: 0.5 }, [[0, GUARD], [0.36, SUN_DRAW, out], [0.5, SUN_LUNGE, snap], [0.74, SUN_LUNGE], [1, GUARD, io]],
     (t, A) => { A.eyesClosed = t > 0.2 && t < 0.42 ? 1 : 0; A.tailWag += 2 * bump(0.5, 1, t); }, LANCE),
+  // ---- Eager Jabs (3 tapped; 4 or 5 charged)
+  eagerJabs: jabsAct(3), eagerJabs4: jabsAct(4), eagerJabs5: jabsAct(5),
   // ---- a javelin from the quiver (Bonk Dart and the other throws: combat/goldenSkills.js; jav: the lance goes to the left paw)
   javToss: act(0.46, { release: 0.52 }, [[0, REST], [0.16, JAV_DRAW, out], [0.42, JAV_WIND, io], [0.54, JAV_THROW, snap], [0.74, JAV_THROW], [1, REST, io]],
     jw(0.1, 0.52), { jav: true }), // (the javelin in his paw from the draw to the release: then it's in the air)
@@ -245,7 +291,7 @@ export function LANCE_GUARD(A, t, k) {
   A.armR.x += Math.sin(t * 2.1) * 0.03 * k; A.armL.x += Math.sin(t * 2.1 + 0.4) * 0.03 * k;
 }
 /** the actions that root him (WASD won't walk out of them): player.js BUSY */
-export const GOLDEN_ROOTED = ['lanceThrust1', 'lanceThrust2', 'lanceSwat', 'sunbeamThrust', 'javToss', 'sunfallJump', 'pinwheel', 'gallantCharge', 'starfallThrow', 'lanceCatch',
+export const GOLDEN_ROOTED = ['lanceThrust1', 'lanceThrust2', 'lanceSwat', 'sunbeamThrust', 'eagerJabs', 'eagerJabs4', 'eagerJabs5', 'javToss', 'sunfallJump', 'pinwheel', 'gallantCharge', 'starfallThrow', 'lanceCatch',
   'javVolley', 'javTrue', 'sunshowerThrow', 'whelpCall'];
 
 // ------------------------------------------------------------------ charged wind-ups (docs/CHARGE.md; rpg/chargeGolden.js
@@ -256,6 +302,14 @@ export const GLD_JAV_STYLES = new Set(['gldJav', 'gldVolley', 'gldTrue', 'gldSho
 export const GOLDEN_CHARGE_POSES = {
   // Sunbeam Thrust (from 0.36): crouched over the lance drawn right back, sinking lower as the sunbeam gathers
   gldThrust(t, k, A, e) { addKey(A, SUN_DRAW, e); A.sq += 0.06 * k * e; A.y += -0.04 * k * e; A.body.y += -0.12 * k * e; A.armR.x += tremble(t, k) * e; A.eyesClosed = 1; },
+  // Eager Jabs (from jabFrom(n), the chamber): the lance in close at his hip, bouncing on his toes faster and faster, the
+  // point twitching at the foe, the tail wagging harder and harder as it fills (he can hardly wait)
+  gldJabs(t, k, A, e) {
+    addKey(A, JAB_SET, e); const f = 7 + 7 * k;
+    A.y += Math.abs(Math.sin(t * f)) * (0.012 + 0.018 * k) * e; A.sq += (0.02 + 0.03 * k) * e;
+    A.armR.x += Math.sin(t * f * 2) * 0.04 * k * e; A.body.y += -0.1 * k * e;
+    A.tailWag += (2 + 3 * k) * e; A.earKick += Math.sin(t * f) * 0.8 * e; A.mouth = Math.max(A.mouth, (0.25 + 0.3 * k) * (0.6 + 0.4 * Math.sin(t * 11)) * e);
+  },
   // Sunfall Jump (from 0.13): the crouch, coiling like a spring
   gldJump(t, k, A, e) { addKey(A, JUMP_CROUCH, e); A.sq += 0.08 * k * e; A.y += -0.05 * k * e; A.body.x += 0.06 * k * e; A.earKick += -0.6 * k * e; },
   // Pinwheel Sweep (from 0.26): the lance out to his right, wound back further round behind him
