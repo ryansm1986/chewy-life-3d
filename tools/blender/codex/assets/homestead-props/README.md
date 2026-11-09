@@ -1,0 +1,1 @@
+homestead-props: Blender crops (young and ripe), 15 fish, two rods, hoe, seed bag, the campfire camp and the Seed Stall (ROADMAP Z-D6). Build: python build_homestead-props.py --piece <name|crops|fish|tools|all> inside Blender. Hooks: world/treeGlb.js PROP_GLB, world/poiGlb.js POI_GLB.

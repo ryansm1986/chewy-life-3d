@@ -2849,6 +2849,7 @@ hr('BLENDER MODELS: EVERY LISTED GLB EXISTS (ROADMAP Z-D6: catalog glb, village 
   const furn = (fs.readFileSync(new URL('../src/home/furnitureMesh.js', import.meta.url), 'utf8').match(/FURN_GLB_IDS = \[([^\]]*)\]/)?.[1] || '').match(/'[^']+'/g)?.map(s => `/models/furn-${s.slice(1, -1)}.glb`) || [];
   const urls = [...Object.values(BUILDINGS).flatMap(d => (d.glb || []).filter(Boolean)), ...Object.entries(BUILDINGS).flatMap(([id, d]) => (d.glbVariants || []).flatMap((n, i) => Array.from({ length: n }, (_, k) => `/models/${id}-${i + 1}-v${k}.glb`))), ...Object.values(VD.BUILDING_GLB).flatMap(z => Object.values(z)), ...Object.values(VD.PIECE_GLB).filter(Boolean), ...(VD.WAYSTONE.glb ? [VD.WAYSTONE.glb] : []), ...furn, ...(fs.readFileSync(new URL('../src/regions/assets/glbPieces.js', import.meta.url), 'utf8').match(/\/models\/[rd]g-[\w-]+\.glb/g) || []), ...(fs.readFileSync(new URL('../src/home/extGlb.js', import.meta.url), 'utf8').match(/\/models\/ext-[\w-]+\.glb/g) || [])];
   urls.push(...(await import('../src/world/treeGlb.js')).treeGlbUrls());
+  urls.push(...(await import('../src/world/poiGlb.js')).poiGlbUrls());
   const missing = urls.filter(u => !fs.existsSync(root + u));
   ok(urls.length > 20 && !missing.length, `blender models: all ${urls.length} listed GLBs exist in public/ (${missing.join(', ') || 'none missing'})`);
 }

@@ -152,7 +152,7 @@ export function tidepoolPopulate(ctx) {
   //      framing the sea-side ends. The floor itself stays clear.
   {
     const [ax, az] = S.arena, [sx, sz] = S.arenaSea, R = 11.6;
-    const stoneG = V3('ringStone', () => A.boulder(77, 0.3, 0.7).rock);
+    const stoneG = V3('ringStone', () => AKit.boulder(77, 0.3, 0.7).rock); // (the kit's: a small ring stone, the Blender boulders are all R 0.7)
     for (let k = 0; k < 44; k++) {
       const a = k / 44 * TAU, x = ax + Math.cos(a) * R, z = az + Math.sin(a) * R;
       if (Math.cos(a) * sx + Math.sin(a) * sz > 0.35) continue; // leave the sea side open

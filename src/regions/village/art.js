@@ -14,6 +14,15 @@ import { shimenawa } from '../../world/buildings/props2.js';
 import { roof as roofPart } from '../../world/buildings/roofs.js';
 import { shapeGeo } from '../../world/buildings/symbols.js';
 import { lerp, clamp, mulberry32, TAU } from '../../core/util.js';
+import { propParts } from '../../world/treeGlb.js';
+
+// a siege piece's Blender model, if listed (world/treeGlb.js PROP_GLB: siege-<key>-v<k>), into the Builder at its current
+// frame, each part in its bucket; → false for the kit. n: the variants, picked by the seed
+function glbInto(B, key, seed, n) {
+  const p = propParts(`siege-${key}-v${((seed % n) + n) % n}`); if (!p) return false;
+  for (const k of Object.keys(p)) { const bucket = /leaf/.test(k) ? 'leaf' : /cloth/.test(k) ? 'cloth' : 'body'; B.add(p[k].clone(), null, bucket); }
+  return true;
+}
 
 // ------------------------------------------------------------------ materials (one set per village visit)
 const GLOW_FRAG = /* glsl */`
@@ -162,6 +171,7 @@ export function warBanner(B, { h = 2.6, w = 0.62, color = '#4a2a5a', mark = '#f0
 }
 /** a spiked barricade (cheval-de-frise): a log on trestles bristling with sharpened stakes, along local x */
 export function spikes(B, L = 2.4, { seed = 0 } = {}) {
+  if (glbInto(B, 'spikes', seed, 2)) return;
   const rr = mulberry32(seed * 19 + 3);
   const log = G.cyl(0.11, 0.12, L, 8); log.rotateZ(PI / 2); log.translate(0, 0.42, 0); B.add(log, '#7a5a40');
   for (const s of [-1, 1]) { const c = G.cyl(0.115, 0.115, 0.02, 8); c.rotateZ(PI / 2); c.translate(s * L / 2, 0.42, 0); B.add(c, '#c8a878'); }
@@ -178,6 +188,7 @@ export function spikes(B, L = 2.4, { seed = 0 } = {}) {
 }
 /** a yokai tent: patched cloth over a ridge pole on two crossed pairs of poles, along local x */
 export function tent(B, { L = 1.8, w = 1.5, h = 1.25, color = '#6a4a6a', patch = '#a8885a', seed = 0 } = {}) {
+  if (glbInto(B, 'tent', seed, 3)) return;
   const rr = mulberry32(seed * 29 + 11);
   for (const s of [-1, 1]) for (const k of [-1, 1]) { const p = G.cyl(0.03, 0.035, h * 1.25, 5); p.translate(0, h * 0.62, 0); B.at([s * L / 2, 0, k * w * 0.3], 0, () => B.add(p, '#5a4434'), 1, k * -0.45, 0); }
   const ridge = G.cyl(0.03, 0.03, L + 0.3, 5); ridge.rotateZ(PI / 2); ridge.translate(0, h, 0); B.add(ridge, '#5a4434');
@@ -196,9 +207,12 @@ export function tent(B, { L = 1.8, w = 1.5, h = 1.25, color = '#6a4a6a', patch =
 /** a campfire: a stone ring, crossed logs and glowing embers (light added by the caller) */
 export function campfire(B, { r = 0.42, seed = 0 } = {}) {
   const rr = mulberry32(seed * 37 + 2);
+  if (!glbInto(B, 'campfire', seed, 2)) { // (the Blender stones and logs; the embers and flames stay the kit's glow)
   for (let i = 0; i < 9; i++) { const a = i / 9 * TAU, s = puff(V(0, 0, 0), 0.11 + rr() * 0.04, { detail: 1, noise: 0.25, squash: 0.65, seed: seed * 9 + i }); s.translate(Math.cos(a) * r, 0.05, Math.sin(a) * r); B.add(s, STONES[i % STONES.length]); }
   for (let i = 0; i < 4; i++) { const lg = G.cyl(0.045, 0.05, r * 1.5, 6); lg.rotateZ(PI / 2 - 0.35); lg.rotateY(i / 4 * PI + rr() * 0.3); lg.translate(0, 0.12, 0); B.add(lg, '#5a3a28'); }
   const ash = G.cyl(r * 0.75, r * 0.8, 0.04, 10); ash.translate(0, 0.02, 0); B.add(ash, '#3a3030');
+  }
+  for (let i = 0; i < 4; i++) rr(); // (the flames keep their old places)
   const ember = G.ico(r * 0.42, 1); ember.scale(1, 0.4, 1); ember.translate(0, 0.08, 0); B.glow(ember, '#ff8a3a', { hot: true, flicker: 1, tint: 1 });
   for (let i = 0; i < 3; i++) { const f = G.cone(0.09 - i * 0.02, 0.32 - i * 0.06, 6); f.translate((rr() - 0.5) * 0.12, 0.28, (rr() - 0.5) * 0.12); B.glow(f, i ? '#ffd27a' : '#ff9a4a', { hot: true, flicker: 1, tint: 1 }); }
 }
@@ -309,6 +323,7 @@ export function cageTpl(seed = 0) {
     const sh = G.torus(0.035, 0.012, 4, 8, PI); sh.translate(w - 0.05, h * 0.55 + 0.06, 0.05); B.add(sh, C.iron);
   });
   const tpl = B.finish();
+  { const p = propParts(`siege-cage-v${((seed % 2) + 2) % 2}`); if (p) { for (const k of ['body', 'leaf', 'cloth']) delete tpl.geos[k]; Object.assign(tpl.geos, p); } } // (the Blender cage: its door stays the kit's swinging part)
   tpl.size = { w, d, h };
   return tpl;
 }

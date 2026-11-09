@@ -1,0 +1,3 @@
+# The siege camps' pieces (siege-camp): Blender source (Z-D6, 2026-11-06)
+
+Raiders' tents (3 colourways), stake barricades (2), campfires (2: the kit's embers and flames stay, in the open centre) and captive cages (2: the kit's door stays, its swinging part): public/models/prop-siege-<key>-v<k>.glb, PROP_GLB (world/treeGlb.js), regions/village/art.js glbInto and cageTpl. Variants by seed. War banners, debris and bones stay the kit (wind cloth; radial scatters). Build: build_siege-camp.py. Building this found the camps sitting at one flat height: each piece now takes the ground at its own spot (village.js).

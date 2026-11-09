@@ -17,6 +17,8 @@ import { cleanStyle, styleKey } from './styles.js';
 import { clamp, lerp } from '../../core/util.js';
 import { memLite } from '../../core/deck.js';
 import { loadGlb, glbInstance } from '../../gfx/glbAssets.js';
+import { makeToon, applyDepth } from '../../gfx/materials.js';
+import { VEG_MATS } from '../vegetation.js';
 
 // Blender centrepieces (ROADMAP Z-D6; catalog `glb: [url per level]`): an unstyled building whose model is loaded stands
 // as the Blender model, the kit template still giving its door, lights, footprint and height. `window_glow` materials
@@ -100,6 +102,37 @@ export const templateStats = () => ({ all: cache.size, styled: [...cache.values(
 /** a model is gone (its building despawned): its template may be evicted again */
 export function releaseModel(model) { const t = model?.tplKey && cache.get(model.tplKey); if (t && model._held) { t.users = Math.max(0, t.users - 1); model._held = false; } }
 
+/** a Blender model stands in for an instantiated kit template's meshes: `keep` names kit layers that stay ('anim': its moving
+ *  parts, or a material key such as 'hot'); the template's door, lights and footprint are untouched */
+let STAND_CARDS = null, STAND_LEAF = null; // (one material for every stand-in's leaves: one program, kept for the session)
+export function glbStandIn(inst, gt, keep = [], { wind = false } = {}) {
+  const M = MATS(), keepMats = keep.map(k => M[k]).filter(Boolean);
+  for (const c of [...inst.group.children]) {
+    const part = inst.parts.find(p => p.node === c);
+    if (part ? keep.includes('anim') : (c.isMesh && keepMats.includes(c.material))) continue;
+    inst.group.remove(c);
+  }
+  if (!keep.includes('anim')) inst.parts.length = 0;
+  const o = glbInstance(gt, { outline: true });
+  o.traverse(m => {
+    if (!m.isMesh) return;
+    if (/window_glow/i.test(m.material?.name || '')) { m.material = M.glow; if (!inst.glow.includes(M.glow)) inst.glow.push(M.glow); }
+    else if (/water/i.test(m.material?.name || '') && M.water) m.material = M.water; // (the kit's animated water)
+    else if (wind && /^cards_round/i.test(m.material?.name || '')) { // the trees' own textured leaf cards (the kit's atlas UVs: world/vegetation.js)
+      m.material = (STAND_CARDS ||= VEG_MATS.cards('round'));
+      for (const c of [...m.children]) if (c.userData.isInk) m.remove(c);
+      applyDepth(m);
+    }
+    else if (wind && /leaf|cloth/i.test(m.material?.name || '')) { // its parts sway as the kit's do (cloth by its uv), seen from both sides (a card from behind
+      // would otherwise show only its ink), with no ink shell, which has no wind and slips off them, and shadows that sway too
+      m.material = /leaf/i.test(m.material.name) ? (STAND_LEAF ||= makeToon({ vertexColors: true, wind: 'leaf', windAmt: 0.45, side: THREE.DoubleSide, noFlip: true, brush: 0.22, brushScale: 0.8, rim: 0.55, shadowSat: 0.5, term: [-0.15, 0.4] })) : M.cloth;
+      for (const c of [...m.children]) if (c.userData.isInk) m.remove(c);
+      applyDepth(m);
+    }
+  });
+  inst.group.add(o);
+  return inst;
+}
 export function buildModel(id, { level = 1, seed = 0, style = null } = {}) {
   const tpl = getTemplate(id, level, seed, style);
   tpl.users++;
@@ -108,20 +141,7 @@ export function buildModel(id, { level = 1, seed = 0, style = null } = {}) {
   const gt = !cleanStyle(style) && (nv ? GLB.get(`${id}:${L}:v${variantOf(seed) % nv}`) : GLB.get(`${id}:${L}`)); // (a remodelled building keeps the kit: its style swaps kit parts)
   if (gt) { // (the Blender model stands in for the kit's meshes; catalog glbKeep: kit layers that stay, e.g. the Burrow's
     // portal ('hot' + its spinning 'anim' parts) or the fountain's jets ('jet' + 'anim'))
-    const M = MATS(), keep = BUILDINGS[id].glbKeep || [], keepMats = keep.map(k => M[k]).filter(Boolean);
-    for (const c of [...inst.group.children]) {
-      const part = inst.parts.find(p => p.node === c);
-      if (part ? keep.includes('anim') : (c.isMesh && keepMats.includes(c.material))) continue;
-      inst.group.remove(c);
-    }
-    if (!keep.includes('anim')) inst.parts.length = 0;
-    const o = glbInstance(gt, { outline: true });
-    o.traverse(m => {
-      if (!m.isMesh) return;
-      if (/window_glow/i.test(m.material?.name || '')) { m.material = M.glow; if (!inst.glow.includes(M.glow)) inst.glow.push(M.glow); }
-      else if (/water/i.test(m.material?.name || '') && M.water) m.material = M.water; // (the kit's animated water)
-    });
-    inst.group.add(o);
+    glbStandIn(inst, gt, BUILDINGS[id].glbKeep || []);
   }
   inst.group.name = `building:${id}`;
   const parts = inst.parts;

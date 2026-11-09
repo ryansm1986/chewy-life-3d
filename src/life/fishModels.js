@@ -1,5 +1,6 @@
 // Fishing models (docs/HOMESTEAD.md §3): the two rods (grip at the origin, rod along +z, tip at ROD_TIP), the float,
 // and a chunky toy fish per species for the catch (head +z, ~0.5 m long at scale 1). Built once, cached.
+import { propGeo } from '../world/treeGlb.js';
 import * as THREE from 'three';
 import { Builder, G, C, PI, col, shade } from '../world/buildings/kit.js';
 import { tube, merge, paint } from '../gfx/geom.js';
@@ -21,6 +22,7 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
 /** rod 1: a bamboo rod with a cork grip and a red reel; rod 2: the Moonlit Rod, navy lacquer, gold fittings, a moon charm */
 export function rodGeo(tier = 1) {
+  { const g = propGeo(`rod-${tier > 1 ? 2 : 1}`); if (g) return g; } // (the Blender rod: grip at the origin, tip at ROD_TIP)
   return build('rod' + tier, B => {
     const moon = tier >= 2, L = 1.12;
     const sh = G.cyl(0.009, 0.019, L, 7); sh.rotateX(PI / 2); sh.translate(0, 0, L / 2 - 0.04);
@@ -159,6 +161,7 @@ function flounder(B) {
 }
 /** The catch model for a species (head toward +z). */
 export function fishGeo(id) {
+  { const g = propGeo(`fish-${id}`); if (g) return g; }
   return build('fish:' + id, B => {
     if (id === 'octopus') return octopus(B);
     if (id === 'pufferfish') return pufferfish(B);

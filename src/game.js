@@ -66,6 +66,7 @@ import { BuildingThumbs } from './gfx/thumbs.js';
 import { installServices } from './world/services.js';
 import { Waterfall } from './world/waterfall.js';
 import { installOutskirts } from './world/outskirts/index.js';
+import { loadPoiGlbs } from './world/poiGlb.js';
 import { VillageMinimap, DungeonMinimap, RegionMinimap } from './world/minimap.js';
 import { installMapPin } from './world/mapPin.js';
 import { installQuestMoments } from './world/questMoments.js';
@@ -130,7 +131,7 @@ export async function boot() {
   G.qaModule = (name) => (name === 'items' ? import('./rpg/items.js') : Promise.reject(new Error('no module ' + name))); // (QA on the production bundle: tools/qa/s50-coop-panes.mjs makes items with it)
 
   // Blender-refined skins for Chewy and Shadow must be in memory before their rigs (and portraits) are built
-  const [uiMod, audioMod] = await Promise.all([P.has('noui') ? null : tryImport('ui', () => import('./ui/ui.js')), P.has('noaudio') ? null : tryImport('audio', () => import('./audio/audio.js')), loadRefinedRigs(REFINED_CAST), loadHeroModels(['chewy', 'moka', 'poe', 'shihtzu', 'golden', 'stella', 'shadow', 'rosie', 'mochi', 'kuma', 'usagi', 'kitsune', 'pan', 'tanu', 'kero', 'tanukiBandit', 'tanukiBanditMaroon', 'tamamo']), loadWhelp(), loadEnemyModels(), loadBuildingGlbs(), loadFurnitureGlbs(), loadExtGlbs(), loadTreeGlbs()]); // (loadWhelp: Shadow's dragon whelp outfit and its wing prop, worn while the dragoon is played: actors/whelp.js)
+  const [uiMod, audioMod] = await Promise.all([P.has('noui') ? null : tryImport('ui', () => import('./ui/ui.js')), P.has('noaudio') ? null : tryImport('audio', () => import('./audio/audio.js')), loadRefinedRigs(REFINED_CAST), loadHeroModels(['chewy', 'moka', 'poe', 'shihtzu', 'golden', 'stella', 'shadow', 'rosie', 'mochi', 'kuma', 'usagi', 'kitsune', 'pan', 'tanu', 'kero', 'tanukiBandit', 'tanukiBanditMaroon', 'tamamo']), loadWhelp(), loadEnemyModels(), loadBuildingGlbs(), loadFurnitureGlbs(), loadExtGlbs(), loadTreeGlbs(), loadPoiGlbs()]); // (loadWhelp: Shadow's dragon whelp outfit and its wing prop, worn while the dragoon is played: actors/whelp.js)
   import('./dungeon/portalModel.js').then(m => m.loadPortalFrame()); import('./regions/spiritLantern.js').then(m => m.loadLanternModel()); import('./dungeon/propModels.js').then(m => m.loadDungeonProps()); // (the Blender moon gate and Spirit Lantern: ROADMAP Z-D6)
   loadHeroModels(Object.values(ZONE_TOY).flat()); // (the zone villagers' Blender rigs, ROADMAP VL-2: in the background, the zones aren't on screen yet)
   for (const u of Object.values(BUILDING_GLB).flatMap(z => Object.values(z))) loadGlb(u).catch(() => {}); // (and the zone villages' Blender buildings: Z-D6)

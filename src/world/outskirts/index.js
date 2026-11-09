@@ -11,6 +11,8 @@ import { Events } from '../../core/events.js';
 import { mulberry32, clamp } from '../../core/util.js';
 import { U } from '../../gfx/materials.js';
 import { Builder, instantiate } from '../buildings/kit.js';
+import { glbStandIn } from '../buildings/index.js';
+import { poiGlb } from '../poiGlb.js';
 import { registerDebug } from '../../debug/registry.js';
 import { POIS, POI, FOOTBRIDGES } from '../outskirtsPlan.js';
 import { footbridge, footbridgeDeckY } from './footbridge.js';
@@ -59,7 +61,7 @@ export function installOutskirts(G, world) {
   const st = outskirtsState(G);
   const places = [];
   const mkCtx = (poi) => {
-    const updates = [];
+    const updates = []; let kitN = 0;
     const ctx = {
       G, world, poi, group, THREE,
       rand: mulberry32(poi.id.split('').reduce((a, c) => a * 31 + c.charCodeAt(0), 7) >>> 0),
@@ -70,6 +72,7 @@ export function installOutskirts(G, world) {
       kit(seed, fn, { x = poi.x, z = poi.z, y = null, yaw = 0, warp = 0.02 } = {}) {
         const B = new Builder(seed); B.warpAmt = warp; B.jitter = 0.03; fn(B);
         const tpl = B.finish(), inst = instantiate(tpl);
+        { const gt = poiGlb(poi.id, kitN++); if (gt) glbStandIn(inst, gt, ['anim'], { wind: true }); } // (its Blender model: world/poiGlb.js; the moving parts stay)
         const yy = y ?? world.terrain.heightAt(x, z);
         inst.group.position.set(x, yy, z); inst.group.rotation.y = yaw; group.add(inst.group);
         inst.group.updateMatrixWorld(true);

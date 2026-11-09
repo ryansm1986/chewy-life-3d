@@ -11,7 +11,9 @@ import * as THREE from 'three';
 import { Builder, G, V, C, PI, shade } from '../../world/buildings/kit.js';
 import { MODELS } from '../../world/buildings/models.js';
 import * as F from '../assets/mapleFlora.js';
-import * as Pr from '../assets/mapleProps.js';
+import * as PrKit from '../assets/mapleProps.js';
+import { glbFn } from '../assets/glbPieces.js';
+const Pr = { ...PrKit, sheaf: glbFn('maple', 'sheaf', PrKit.sheaf), bench: glbFn('maple', 'bench', PrKit.bench) }; // (the Blender sheaf and bench, as the region draws them)
 import { slotAt, slotOf, screenAt, screenYaw, PIECE_GLB } from './data.js';
 import { roof } from '../../world/buildings/roofs.js';
 import { foundation, walls, onFace, shoji, roundWindow, latticeWindow, door, engawa, posts, noren as norenPart, STONES } from '../../world/buildings/parts.js';

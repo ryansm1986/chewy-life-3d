@@ -1,0 +1,3 @@
+# The scavenging nodes (scav-nodes): Blender source (Z-D6, 2026-11-05)
+
+21 gather nodes, each with a full and a taken look: public/models/prop-scav-<model>-<full|taken>.glb, PROP_GLB (world/treeGlb.js), cozy/scavengeModels.js nodeGeos. Each GLB is one mesh, material body, vertex colours, merged and batched by the kit's scavMaterial. Full and taken share their non-goods exactly, so a node stays the same object with the goods gone. Build: build_scav-nodes.py --piece all (scav_kit.py), reproducible byte for byte. Known: the pine fronds read a little like holly; the moss dabs on terrace and honey log look stuck on.

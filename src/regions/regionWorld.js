@@ -380,14 +380,24 @@ export class RegionWorld {
       const [ax, az] = pts[i], [bx, bz] = pts[i + 1], ya = ys[i], yb = ys[i + 1], vx = bx - ax, vz = bz - az, l2 = vx * vx + vz * vz || 1;
       const tAt = (x, z) => clamp(((x - ax) * vx + (z - az) * vz) / l2);
       const d = { x0: Math.min(ax, bx) - w / 2, z0: Math.min(az, bz) - w / 2, x1: Math.max(ax, bx) + w / 2, z1: Math.max(az, bz) + w / 2,
-        test: (x, z) => { const t = tAt(x, z); return Math.hypot(x - ax - vx * t, z - az - vz * t) <= w / 2; }, h: (x, z) => lerp(ya, yb, tAt(x, z)) };
+        dist: (x, z) => { const t = tAt(x, z); return Math.hypot(x - ax - vx * t, z - az - vz * t); }, r: w / 2, h: (x, z) => lerp(ya, yb, tAt(x, z)) };
       this.decks.push(d); made.push(d);
     }
     return made;
   }
 
   // ------------------------------------------------------------------ contract
-  deckAt(x, z) { for (const d of this.decks) if (x > d.x0 && x < d.x1 && z > d.z0 && z < d.z1 && (!d.test || d.test(x, z))) return d; return null; }
+  // (the nearest segment, not the first that holds the point: a curved deck's short segments overlap by far more than their
+  //  length, and the first one's height stood up to 26 cm off the curve under the player)
+  deckAt(x, z) {
+    let best = null, bd = Infinity;
+    for (const d of this.decks) {
+      if (!(x > d.x0 && x < d.x1 && z > d.z0 && z < d.z1)) continue;
+      if (!d.dist) { if (!d.test || d.test(x, z)) return d; continue; }
+      const q = d.dist(x, z); if (q <= d.r && q < bd) { bd = q; best = d; }
+    }
+    return best;
+  }
   heightAt(x, z) {
     if (this.decks.length) { const d = this.deckAt(x, z); if (d) return d.h(x, z); }
     const T = this.terrain, h = T.gridHeight(x, z), W = T.water;

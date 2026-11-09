@@ -817,7 +817,7 @@ function buildCenterpieces(W) {
       W.collision.addCircle(p.x, p.z, 1.6);
     } else { // a snowed-in hokora with a snow torii before it and a pair of yukimi lanterns
       addPiece(W, snowHokora(Math.floor(r() * 3)), p.x, p.z - 0.6, 0);
-      addPiece(W, Pr.snowTorii(5, { w: 1.8, h: 2.1 }), p.x, p.z + 1.4, 0);
+      addPiece(W, /* (the kit: these stretch to each room, and the region's Blender torii are fixed widths) */ PrKit.snowTorii(5, { w: 1.8, h: 2.1 }), p.x, p.z + 1.4, 0);
       for (const s2 of [-1, 1]) addPiece(W, Pr.yukimiLantern(9 + s2, { s: 0.66 }), p.x + s2 * 1.55, p.z + 0.4, 0, { mul: 0.8, lightK: 0.6 });
       W.collision.addCircle(p.x, p.z - 0.6, 0.85); for (const s2 of [-1, 1]) { W.collision.addCircle(p.x + s2 * 0.9, p.z + 1.4, 0.18); W.collision.addCircle(p.x + s2 * 1.55, p.z + 0.4, 0.42); }
     }
@@ -850,7 +850,7 @@ function buildArena(W) {
   }
   if (mouth) { // the snow torii over the way in (it faces the corridor), lanterns flanking it
     const tx = ar.x + Math.cos(ma) * (ar.r - 0.4), tz = ar.z + Math.sin(ma) * (ar.r - 0.4), yaw = Math.atan2(Math.cos(ma), Math.sin(ma));
-    addPiece(W, Pr.snowTorii(2, { w: 3.8, h: 3.6 }), tx, tz, yaw);
+    addPiece(W, PrKit.snowTorii(2, { w: 3.8, h: 3.6 }), tx, tz, yaw);
     const px = -Math.sin(ma), pz = Math.cos(ma);
     for (const s of [-1, 1]) { W.collision.addCircle(tx + px * s * 1.9, tz + pz * s * 1.9, 0.22); const lx = tx + px * s * 2.8 - Math.cos(ma) * 0.6, lz = tz + pz * s * 2.8 - Math.sin(ma) * 0.6; if (W.walkable(lx, lz)) { addPiece(W, Pr.yukimiLantern(31 + s, { s: 0.7 }), lx, lz, yaw, { mul: 0.8, lightK: 0.5 }); W.collision.addCircle(lx, lz, 0.42); } }
     W.arenaGate = { x: tx, z: tz, yaw, w: 3.8 };
@@ -885,7 +885,7 @@ function buildLandmarks(W) {
   const ok = (x, z, pad = 0.25) => W.walkable(x, z) && !W.collision.solidAt(x, z, pad);
   for (let i = 0; i < 12; i++) { const a = i / 12 * TAU + q() * 0.1, R = 1.4 + q() * 0.06, x = c.x + Math.cos(a) * R, z = c.z + Math.sin(a) * R; if (W.walkable(x, z)) W.clutter.addVC(Pr.stoneStep(i + 1, { R: 0.3 }).body, M(x, -0.02, z, 1, 1, 1, 0, -a, 0)); }
   const tx = c.x - CAMX * 0.6, tz = c.z - CAMZ * 0.6;
-  if (ok(tx, tz, 0.1)) { addPiece(W, Pr.snowTorii(7, { w: 2.3, h: 2.4 }), tx, tz, CAM); for (const e of [-1, 1]) W.collision.addCircle(tx + rx * e * 1.15, tz + rz * e * 1.15, 0.18); }
+  if (ok(tx, tz, 0.1)) { addPiece(W, PrKit.snowTorii(7, { w: 2.3, h: 2.4 }), tx, tz, CAM); for (const e of [-1, 1]) W.collision.addCircle(tx + rx * e * 1.15, tz + rz * e * 1.15, 0.18); }
   for (const e of [-1, 1]) { const x = c.x + rx * e * 2.1 - CAMX * 0.2, z = c.z + rz * e * 2.1 - CAMZ * 0.2; if (ok(x, z)) { addPiece(W, Pr.yukimiLantern(20 + e, { s: 0.72 }), x, z, CAM, { mul: 0.8, lightK: 0.6 }); W.collision.addCircle(x, z, 0.42); } }
   for (let i = 0; i < 3; i++) { const a = CAM + Math.PI + (i - 1) * 0.6, x = c.x + Math.cos(a) * 2.3, z = c.z + Math.sin(a) * 2.3; if (ok(x, z, 0.1)) W.clutter.addVC(F.drift(i, { R: 0.7, h: 0.28 })['d:body'], M(x, -0.04, z, 1, 1, 1, 0, a, 0)); }
 }
@@ -1135,7 +1135,7 @@ const ROOMS = {
       const m = addPiece(W, jizo(i + (e > 0 ? 2 : 0)), x, z, s.face + e * 0.12, { s: 0.85 }); D.coll(x, z, 0.26);
       if (m) W.solid.add(SH.sphLo(), M(x, 1.0 * 0.85 + 0.2, z, 0.13, 0.06, 0.13), null, snowP);
     }
-    const [tx, tz] = D.lp(s, 0, 2.1); if (D.ok(tx, tz, 0.15)) { addPiece(W, Pr.snowTorii(3, { w: 1.7, h: 2.0 }), tx, tz, s.face); D.coll(tx + Math.cos(s.face) * 0.85, tz - Math.sin(s.face) * 0.85, 0.16); D.coll(tx - Math.cos(s.face) * 0.85, tz + Math.sin(s.face) * 0.85, 0.16); }
+    const [tx, tz] = D.lp(s, 0, 2.1); if (D.ok(tx, tz, 0.15)) { addPiece(W, PrKit.snowTorii(3, { w: 1.7, h: 2.0 }), tx, tz, s.face); D.coll(tx + Math.cos(s.face) * 0.85, tz - Math.sin(s.face) * 0.85, 0.16); D.coll(tx - Math.cos(s.face) * 0.85, tz + Math.sin(s.face) * 0.85, 0.16); }
   },
   storeroom(D, A) { // a frozen storeroom: firewood and sacks under snow, frozen barrels, a cold brazier
     prep(D, A); const W = D.W;
@@ -1159,7 +1159,7 @@ function arrival(D, A) { // the way home: a snow torii framing the exit portal, 
   const W = D.W, L = D.L, px = (L.start.x + 0.5) * CELL - 1.6, pz = (L.start.y + 0.5) * CELL - 1.6;
   D.decal(1, px, pz, 1.25, 0.85, -Math.PI / 4, 3);
   const tx = px - CAMX * 0.5, tz = pz - CAMZ * 0.5;
-  if (W.walkable(tx, tz)) { addPiece(W, Pr.snowTorii(9, { w: 2.3, h: 2.6 }), tx, tz, CAM); for (const e of [-1, 1]) D.coll(tx + CAMX * e * 1.15, tz - CAMZ * e * 1.15, 0.16); }
+  if (W.walkable(tx, tz)) { addPiece(W, PrKit.snowTorii(9, { w: 2.3, h: 2.6 }), tx, tz, CAM); for (const e of [-1, 1]) D.coll(tx + CAMX * e * 1.15, tz - CAMZ * e * 1.15, 0.16); }
   for (const e of [-1, 1]) { const x = px + CAMX * e * 2.0, z = pz - CAMZ * e * 2.0; if (W.walkable(x, z) && !W.collision.solidAt(x, z, 0.2)) { addPiece(W, Pr.yukimiLantern(60 + e, { s: 0.66 }), x, z, CAM, { mul: 0.8, lightK: 0.6 }); D.coll(x, z, 0.4); } }
   D.claim(px, pz, 1.4, false);
 }
@@ -1170,7 +1170,7 @@ function hoard(D, A) { // the treasure dais: the gold chest on a goza mat, a lit
     const x0 = (c.x + 0.5) * CELL, z0 = (c.y + 0.5) * CELL;
     W.kitDecal(1, x0, z0, 1.35, 1.1, CAM, 3);
     const tx = x0 - CAMX * 1.3, tz = z0 - CAMZ * 1.3;
-    if (W.walkable(tx, tz) && !W.collision.solidAt(tx, tz, 0.1)) { addPiece(W, Pr.snowTorii(12, { w: 1.7, h: 2.0 }), tx, tz, CAM); for (const e of [-1, 1]) D.coll(tx + CAMX * e * 0.85, tz - CAMZ * e * 0.85, 0.14); }
+    if (W.walkable(tx, tz) && !W.collision.solidAt(tx, tz, 0.1)) { addPiece(W, PrKit.snowTorii(12, { w: 1.7, h: 2.0 }), tx, tz, CAM); for (const e of [-1, 1]) D.coll(tx + CAMX * e * 0.85, tz - CAMZ * e * 0.85, 0.14); }
     for (const e of [-1, 1]) { const x = x0 + CAMX * e * 1.8 - CAMX * 0.5, z = z0 - CAMZ * e * 1.8 - CAMZ * 0.5; if (W.walkable(x, z) && !W.collision.solidAt(x, z, 0.2)) { addPiece(W, Pr.yukimiLantern(70 + e, { s: 0.6 }), x, z, CAM, { mul: 0.8, lightK: 0.55 }); D.coll(x, z, 0.36); } }
     for (const e of [-1, 1]) { const x = x0 - CAMX * 2.2 + CAMX * e * 1.9, z = z0 - CAMZ * 2.2 - CAMZ * e * 1.9; if (W.walkable(x, z) && !W.collision.solidAt(x, z, 0.3)) { addPiece(W, iceCluster(40 + e, { n: 6, H: 1.4 }), x, z, CAM, { s: 0.85 }); D.coll(x, z, 0.5); } }
   }

@@ -210,12 +210,14 @@ export class ZoneVillage {
     for (const c of this.camps) {
       const P = c.pieces || {}, at = q => screenAt(this.site, q[0], q[1]), sd = c.a | 0;
       const f = at(P.fire || c.at);
-      B.at([f.x, h0, f.z], 0, () => { campfire(B, { seed: sd }); bones(B, 1.6, { seed: sd + 3, n: 4 }); debris(B, 2.4, { seed: sd + 5, n: 5 }); });
-      burns.push({ x: f.x, y: h0, z: f.z, r: c.r * 0.8, seed: sd + 1, a: 0.55 });
-      col(f.x, f.z, 0.45); c.fire = V3(f.x, h0 + 0.5, f.z);
-      if (P.tent) { const t = at(P.tent), yaw = screenYaw(P.tent[2] || 0); B.at([t.x, h0, t.z], yaw, () => tent(B, { L: 1.7, w: 1.4, h: 1.15, color: ['#5a3a5a', '#3a4a5a', '#5a3a3a'][this.camps.indexOf(c) % 3], seed: sd })); for (const k of [-0.5, 0.5]) col(t.x + Math.cos(yaw) * k, t.z - Math.sin(yaw) * k, 0.62); }
-      if (P.banner) { const b = at(P.banner); B.at([b.x, h0, b.z], 0, () => warBanner(B, { h: 2.7, w: 0.6, seed: sd + 7 })); col(b.x, b.z, 0.14); }
-      if (P.spikes) { const sp = at(P.spikes), yaw = screenYaw(P.spikes[2] || 0); B.at([sp.x, h0, sp.z], yaw, () => spikes(B, 2.4, { seed: sd })); for (const k of [-0.9, 0, 0.9]) col(sp.x + Math.cos(yaw) * k, sp.z - Math.sin(yaw) * k, 0.38); }
+      // (each piece on the ground at its own spot, not the square's flat height: up to 26 cm off on a slope)
+      const gy = (x, z) => W.heightAt(x, z), fy = gy(f.x, f.z);
+      B.at([f.x, fy, f.z], 0, () => { campfire(B, { seed: sd }); bones(B, 1.6, { seed: sd + 3, n: 4 }); debris(B, 2.4, { seed: sd + 5, n: 5 }); });
+      burns.push({ x: f.x, y: fy, z: f.z, r: c.r * 0.8, seed: sd + 1, a: 0.55 });
+      col(f.x, f.z, 0.45); c.fire = V3(f.x, fy + 0.5, f.z);
+      if (P.tent) { const t = at(P.tent), yaw = screenYaw(P.tent[2] || 0); B.at([t.x, gy(t.x, t.z), t.z], yaw, () => tent(B, { L: 1.7, w: 1.4, h: 1.15, color: ['#5a3a5a', '#3a4a5a', '#5a3a3a'][this.camps.indexOf(c) % 3], seed: sd })); for (const k of [-0.5, 0.5]) col(t.x + Math.cos(yaw) * k, t.z - Math.sin(yaw) * k, 0.62); }
+      if (P.banner) { const b = at(P.banner); B.at([b.x, gy(b.x, b.z), b.z], 0, () => warBanner(B, { h: 2.7, w: 0.6, seed: sd + 7 })); col(b.x, b.z, 0.14); }
+      if (P.spikes) { const sp = at(P.spikes), yaw = screenYaw(P.spikes[2] || 0); B.at([sp.x, gy(sp.x, sp.z), sp.z], yaw, () => spikes(B, 2.4, { seed: sd })); for (const k of [-0.9, 0, 0.9]) col(sp.x + Math.cos(yaw) * k, sp.z - Math.sin(yaw) * k, 0.38); }
     }
     // the captain's dais: war banners at the square's top corners and scorch on the paving
     for (const a0 of [-48, 48]) { // (off the road: nudged round the square's rim until clear of the trail)
@@ -286,7 +288,7 @@ export class ZoneVillage {
   makeCage(c) {
     const tpl = cageTpl((c.a | 0) + 3), g = tplGroup(tpl, this.mats, 'village:cage');
     const q = c.pieces?.cage || [c.at[0], c.at[1] - 2.5, 0], p = screenAt(this.site, q[0], q[1]), x = p.x, z = p.z, face = screenYaw(q[2] || 0); // (its door faces the camera)
-    g.position.set(x, this.h0, z); g.rotation.y = face;
+    g.position.set(x, this.world.heightAt(x, z), z); g.rotation.y = face;
     this.world.scene.add(g);
     const cg = { camp: c, npc: c.cage, x, z, face, group: g, door: g.userData.parts[0]?.node, open: 0, opening: false, cols: [] };
     // its colliders (the villager stands inside), and the interactable

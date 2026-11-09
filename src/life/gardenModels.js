@@ -9,6 +9,7 @@ import { produce, pot, signboard } from '../world/buildings/props.js';
 import { puff, tube, merge, paint } from '../gfx/geom.js';
 import { clamp, TAU } from '../core/util.js';
 import { CROPS, CROP_IDS } from './pantry.js';
+import { propGeo, propParts } from '../world/treeGlb.js';
 
 export const STAGES = ['seed', 'sprout', 'young', 'ripe'];
 /** The model stage for a crop at growth stage s (0 = just planted .. days = ripe). */
@@ -251,6 +252,7 @@ function build(key, fn, warp = 0.03) {
 }
 /** { body, leaf } geometries (either may be null) for a crop at a model stage ('seed'|'sprout'|'young'|'ripe'). */
 export function cropGeo(crop, stage) {
+  { const p = (stage === 'young' || stage === 'ripe') && propParts(`crop-${crop}-${stage}`); if (p) return { body: p.body || null, leaf: p.leaf || null }; } // (the Blender crop: world/treeGlb.js PROP_GLB; seed and sprout stay the shared kit ones)
   return build(`crop:${crop}:${stage}`, B => {
     if (stage === 'seed') seedStage(B, crop);
     else if (stage === 'sprout') sproutStage(B, crop);
@@ -380,6 +382,7 @@ export function sprinkler(B) {
 function solidMerge(parts) { return merge(parts.map(([g, c]) => paint(g.index ? g.toNonIndexed() : g, typeof c === 'function' ? c : ((p, n, o) => o.set(c))))); }
 /** The hoe: an ash handle along +z (tipped down), a broad iron blade hanging at its end. */
 export function hoeGeo() {
+  { const g = propGeo('tool-hoe'); if (g) return g; }
   let g = CACHE.get('hoe'); if (g) return g;
   const h = new THREE.CylinderGeometry(0.018, 0.022, 0.78, 7); h.rotateX(PI / 2); h.translate(0, 0, 0.3);
   const grip = new THREE.CylinderGeometry(0.026, 0.026, 0.12, 7); grip.rotateX(PI / 2); grip.translate(0, 0, -0.04);
@@ -392,6 +395,7 @@ export function hoeGeo() {
 }
 /** A little burlap seed pouch tied with a red string (grip at the top knot). */
 export function seedBagGeo() {
+  { const g = propGeo('tool-seedBag'); if (g) return g; }
   let g = CACHE.get('seedbag'); if (g) return g;
   const b = new THREE.SphereGeometry(0.08, 10, 8); b.scale(1, 1.1, 0.9); b.translate(0, -0.1, 0.03);
   const neck = new THREE.CylinderGeometry(0.03, 0.05, 0.05, 8); neck.translate(0, -0.02, 0.03);

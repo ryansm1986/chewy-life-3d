@@ -9,6 +9,7 @@
 //   scavMaterial()                         the session-long toon material (vegToon: BatchedMesh-aware)
 //
 // Local frame: ground at y = 0, about a metre across, so a node reads at the game camera (~22 m out) beside a hero.
+import { propGeo } from '../world/treeGlb.js';
 import * as THREE from 'three';
 import { Builder, G, V, PI } from '../world/buildings/kit.js';
 import { puff, tube, paint, mergeVertices } from '../gfx/geom.js';
@@ -567,7 +568,7 @@ const NODE_CACHE = new Map(), DIG_CACHE = new Map();
 export const MODEL_KEYS = Object.keys(MODELS);
 export function nodeGeos(model) {
   let c = NODE_CACHE.get(model);
-  if (!c) { const M = MODELS[model] || MODELS.riverStone; c = { full: M.full(), taken: M.taken() }; NODE_CACHE.set(model, c); }
+  if (!c) { const M = MODELS[model] || MODELS.riverStone, gf = propGeo(`scav-${model}-full`), gt = propGeo(`scav-${model}-taken`); c = { full: gf ? prep(gf.clone()) : M.full(), taken: gt ? prep(gt.clone()) : M.taken() }; NODE_CACHE.set(model, c); } // (the Blender models: world/treeGlb.js PROP_GLB)
   return c;
 }
 export function digGeos(ground = 'loam') {

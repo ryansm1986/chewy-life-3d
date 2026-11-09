@@ -2,6 +2,7 @@
 // a log seat and a crate of supplies) that sits by the Burrow and region arrival points, the little cooking pot on a
 // stand that appears in front of the player when cooking at home or at Rosie's, and the ladle. Toybox-chunky, vertex
 // colours, one merged geometry each (the flames and the pot's broth are separate meshes so they can glow and move).
+import { propGeo } from '../world/treeGlb.js';
 import * as THREE from 'three';
 import { Builder, G, PI, col } from '../world/buildings/kit.js';
 import { merge, paint } from '../gfx/geom.js';
@@ -37,6 +38,7 @@ export function brothGeo(r = 0.17, color = '#f2b45a') {
 
 /** The campfire camp. Origin: the fire's centre on the ground. Front (+z) is where the cook stands. */
 export function campfireGeo() {
+  { const g = propGeo('campfire'); if (g) return g; } // (the Blender camp: the flames stay flameGeos)
   return build('campfire', B => {
     // ash bed + a ring of chunky stones
     const ash = G.disc(0.5, 18); ash.rotateX(-PI / 2); ash.translate(0, 0.006, 0);

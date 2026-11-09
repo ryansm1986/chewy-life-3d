@@ -14,6 +14,8 @@ import { installFishingSocial } from './fishSocial.js';
 import { Kitchen } from './kitchen.js';
 import { installCookSocial } from './cookSocial.js';
 import { seedStallTemplate } from './gardenModels.js';
+import { poiGlb } from '../world/poiGlb.js';
+import { glbStandIn } from '../world/buildings/index.js';
 import { pantryIcon } from './pantryIcons.js';
 
 const STARTER = { turnipSeed: 5, carrotSeed: 3 };
@@ -47,6 +49,7 @@ export function installLife(G, village) {
 // ------------------------------------------------------------------ Usagi's Seed Stall (South Meadows)
 function addSeedStall(G, village) {
   const S = SEED_STALL, inst = instantiate(seedStallTemplate());
+  { const gt = poiGlb('seedStall'); if (gt) glbStandIn(inst, gt, [], { wind: true }); } // (its Blender model: world/poiGlb.js)
   const y = village.heightAt(S.x, S.z);
   inst.group.position.set(S.x, y, S.z); inst.group.rotation.y = S.rot; inst.group.name = 'seedStall';
   inst.group.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
@@ -54,6 +57,7 @@ function addSeedStall(G, village) {
   const c = Math.cos(S.rot), s = Math.sin(S.rot); // local +z (the front) → world
   const fx = s, fz = c;
   village.collision?.addCircle(S.x, S.z, 0.72, 'stall'); // (not a sim building: s5's collider audit counts those)
+  for (const sd of [-1, 1]) village.collision?.addCircle(S.x + c * sd * 0.8 + fx * 0.15, S.z - s * sd * 0.8 + fz * 0.15, 0.55, 'stall'); // (the sacks and the bucket at its sides)
   village.veg?.clearRect?.(S.x - 1.4, S.z - 1.4, S.x + 1.4, S.z + 1.4, 0.2);
   const pos = new THREE.Vector3(S.x + fx * 1.1, y, S.z + fz * 1.1);
   village.interactables.push({ pos, radius: 1.2, label: "Usagi's Seed Stall", onInteract: () => G.openSeedStall() });

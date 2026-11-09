@@ -17,6 +17,10 @@ export const TREE_GLB = { // key → n variants (tools/blender/work/codex/trees-
   'village-rock': 4,
 };
 const PARTS = new Map(); // `${key}:v${k}` → { partKey: BufferGeometry }
+// Small Blender props with the same parts-by-material contract (ROADMAP Z-D6): /models/prop-<key>.glb. Scavenge nodes
+// (scav-<model>-full|taken), crops (crop-<crop>-young|ripe), fish (fish-<id>), the rods, tools and the campfire.
+export const PROP_GLB = ['scav-driftwood-full', 'scav-driftwood-taken', 'scav-riverStone-full', 'scav-riverStone-taken', 'scav-petalDrift-full', 'scav-petalDrift-taken', 'scav-mulberry-full', 'scav-mulberry-taken', 'scav-culms-full', 'scav-culms-taken', 'scav-mossRubble-full', 'scav-mossRubble-taken', 'scav-cocoons-full', 'scav-cocoons-taken', 'scav-shoots-full', 'scav-shoots-taken', 'scav-branches-full', 'scav-branches-taken', 'scav-terrace-full', 'scav-terrace-taken', 'scav-mapleLeaves-full', 'scav-mapleLeaves-taken', 'scav-honeyLog-full', 'scav-honeyLog-taken', 'scav-seaDrift-full', 'scav-seaDrift-taken', 'scav-seaStones-full', 'scav-seaStones-taken', 'scav-netScraps-full', 'scav-netScraps-taken', 'scav-seaGlass-full', 'scav-seaGlass-taken', 'scav-seaweed-full', 'scav-seaweed-taken', 'scav-pine-full', 'scav-pine-taken', 'scav-sinter-full', 'scav-sinter-taken', 'scav-iceCrystal-full', 'scav-iceCrystal-taken', 'scav-snowForage-full', 'scav-snowForage-taken', 'crop-turnip-young', 'crop-turnip-ripe', 'crop-carrot-young', 'crop-carrot-ripe', 'crop-cabbage-young', 'crop-cabbage-ripe', 'crop-daikon-young', 'crop-daikon-ripe', 'crop-strawberry-young', 'crop-strawberry-ripe', 'crop-rice-young', 'crop-rice-ripe', 'crop-pumpkin-young', 'crop-pumpkin-ripe', 'crop-melon-young', 'crop-melon-ripe', 'fish-crucian', 'fish-koi', 'fish-goldKoi', 'fish-moonKoi', 'fish-ayu', 'fish-trout', 'fish-char', 'fish-loach', 'fish-rainbowTrout', 'fish-salmon', 'fish-seaBream', 'fish-mackerel', 'fish-flounder', 'fish-octopus', 'fish-pufferfish', 'rod-1', 'rod-2', 'tool-hoe', 'tool-seedBag', 'campfire', 'siege-tent-v0', 'siege-tent-v1', 'siege-tent-v2', 'siege-spikes-v0', 'siege-spikes-v1', 'siege-campfire-v0', 'siege-campfire-v1', 'siege-cage-v0', 'siege-cage-v1']; // the listed keys
+const PROPS = new Map(); // key → { partKey: BufferGeometry } (templates, shared: the kits cache and batch them)
 
 function toParts(tpl) {
   const lists = {};
@@ -26,6 +30,7 @@ function toParts(tpl) {
     if (!o.isMesh || o.userData.isInk) return;
     const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
     g.applyMatrix4(m.multiplyMatrices(inv, o.matrixWorld));
+    if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2)); // (a BatchedMesh takes one attribute set)
     const c = g.attributes.color, n = g.attributes.position.count, rgb = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) { rgb[i * 3] = c ? c.getX(i) : 1; rgb[i * 3 + 1] = c ? c.getY(i) : 1; rgb[i * 3 + 2] = c ? c.getZ(i) : 1; }
     g.setAttribute('color', new THREE.Float32BufferAttribute(rgb, 3));
@@ -35,13 +40,21 @@ function toParts(tpl) {
   for (const k in lists) { out[k] = merge(lists[k]); out[k].computeBoundingSphere(); out[k].computeBoundingBox(); out[k].userData.shared = true; }
   return out;
 }
-export const treeGlbUrls = () => Object.entries(TREE_GLB).flatMap(([key, n]) => Array.from({ length: n }, (_, k) => `/models/tree-${key}-v${k}.glb`));
+export const treeGlbUrls = () => [...Object.entries(TREE_GLB).flatMap(([key, n]) => Array.from({ length: n }, (_, k) => `/models/tree-${key}-v${k}.glb`)), ...PROP_GLB.map(k => `/models/prop-${k}.glb`)];
 /** load every listed tree model (awaited at boot, before the village and the regions build their trees) */
 export function loadTreeGlbs() {
-  return Promise.all(Object.entries(TREE_GLB).flatMap(([key, n]) => Array.from({ length: n }, (_, k) => {
+  return Promise.all([...Object.entries(TREE_GLB).flatMap(([key, n]) => Array.from({ length: n }, (_, k) => {
     const url = `/models/tree-${key}-v${k}.glb`;
     return loadGlb(url).then(t => { PARTS.set(`${key}:v${k}`, toParts(t)); }).catch(e => console.warn('[trees] model', url, e));
-  })));
+  })), ...PROP_GLB.map(key => { const url = `/models/prop-${key}.glb`; return loadGlb(url).then(t => { PROPS.set(key, toParts(t)); }).catch(e => console.warn('[props] model', url, e)); })]);
+}
+/** a prop's Blender parts by material ({ body, leaf, ... }, shared templates), or null for the kit */
+export const propParts = key => PROPS.get(key) || null;
+/** a prop's Blender model as one geometry (shared, cached), or null for the kit */
+export function propGeo(key) {
+  const p = PROPS.get(key); if (!p) return null;
+  if (!p._one) { const l = Object.values(p).filter(g => g?.isBufferGeometry); Object.defineProperty(p, '_one', { value: l.length === 1 ? l[0] : merge(l), enumerable: false }); p._one.userData.shared = true; }
+  return p._one;
 }
 /** a tree's Blender parts for this seed (fresh geometry, the caller's to keep), or null for the kit */
 export function treeGlb(key, seed = 0, { scale = 1 } = {}) {
