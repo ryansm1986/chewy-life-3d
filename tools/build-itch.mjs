@@ -33,8 +33,9 @@ const walk = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(d => (d
 // ---- 1. build with relative URLs
 console.log('== building (base ./) ->', path.relative(ROOT, OUT));
 // (VITE_ITCH: the game knows it's the itch build, so inside a frame it keeps clear of itch's buttons: ui/mobile.js, CT-6)
-await build({ root: ROOT, base: './', logLevel: 'warn', define: { 'import.meta.env.VITE_ITCH': JSON.stringify('1') }, build: { outDir: OUT, emptyOutDir: true, reportCompressedSize: false, chunkSizeWarningLimit: 8192 } });
+await build({ root: ROOT, base: './', logLevel: 'warn', define: { 'import.meta.env.VITE_ITCH': JSON.stringify('1') }, plugins: [{ name: 'itch-relative-urls', renderChunk: code => ({ code: code.replace(/(["'`])\/(models|rigs)\//g, '$1./$2/'), map: null }) }], build: { outDir: OUT, emptyOutDir: true, reportCompressedSize: false, chunkSizeWarningLimit: 8192, rolldownOptions: { output: { advancedChunks: { groups: [{ name: 'tests', test: /[\/]src[\/]tests[\/]/ }] } } } } });
 
+// (itch-relative-urls: the Blender model lists say '/models/...', fine at a site root; itch serves from a sub-folder. tests: the ?test= review pages as one chunk, for itch's 1000-file limit)
 // licences of what ships inside the bundle: the UI fonts (OFL) and the runtime npm dependencies (their LICENSE files;
 // the minified bundle drops the source headers). Models, textures and audio are made by this project.
 const LIC = path.join(OUT, 'licenses');
